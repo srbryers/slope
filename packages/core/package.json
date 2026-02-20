@@ -30,6 +30,14 @@
     "slope"
   ],
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/srbryers/slope.git",
+    "directory": "packages/core"
+  },
   "devDependencies": {
     "typescript": "^5.7.0",
     "vitest": "^3.0.0"

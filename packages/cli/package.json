@@ -16,6 +16,25 @@
     "@types/node": "^25.3.0",
     "typescript": "^5.7.0"
   },
+  "files": [
+    "dist"
+  ],
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/srbryers/slope.git",
+    "directory": "packages/cli"
+  },
+  "keywords": [
+    "slope",
+    "sprint",
+    "scoring",
+    "cli",
+    "retro"
+  ],
   "engines": {
     "node": ">=18"
   }
