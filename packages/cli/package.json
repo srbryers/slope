@@ -1,0 +1,22 @@
+{
+  "name": "@slope-dev/cli",
+  "version": "0.1.0",
+  "description": "SLOPE CLI — Sprint Lifecycle & Operational Performance Engine",
+  "type": "module",
+  "bin": {
+    "slope": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@slope-dev/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.0",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
