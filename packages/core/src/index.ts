@@ -82,3 +82,32 @@ export type {
   RecommendClubInput,
   TrainingPlanInput,
 } from './advisor.js';
+
+// Formatter
+export {
+  formatSprintReview,
+  formatAdvisorReport,
+} from './formatter.js';
+export type {
+  ProjectStats,
+  ProjectStatsDelta,
+  ReviewMode,
+  AdvisorReportInput,
+} from './formatter.js';
+
+// Briefing
+export {
+  filterCommonIssues,
+  extractHazardIndex,
+  computeNutritionTrend,
+  hazardBriefing,
+  formatBriefing,
+} from './briefing.js';
+export type {
+  RecurringPattern,
+  CommonIssuesFile,
+  SessionEntry,
+  BriefingFilter,
+  HazardEntry,
+  NutritionTrend,
+} from './briefing.js';
