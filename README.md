@@ -1,2 +1,129 @@
-# slope
-SLOPE — Sprint Lifecycle &amp; Operational Performance Engine. Golf-metaphor sprint scoring for engineering teams.
+# SLOPE
+
+**Sprint Lifecycle & Operational Performance Engine**
+
+A golf-inspired framework for measuring and improving sprint execution quality. Replace subjective retrospectives with objective, quantifiable metrics.
+
+## Quick Start
+
+```bash
+# Install
+npm install -g @slope-dev/cli
+
+# Initialize in your project
+slope init
+
+# View your handicap card
+slope card
+
+# Validate a scorecard
+slope validate docs/retros/sprint-1.json
+
+# Get a pre-round briefing
+slope briefing
+```
+
+## What is SLOPE?
+
+SLOPE maps sprint execution to golf scoring. Every sprint is a "hole" with a par (expected ticket count), every ticket is a "shot" with a club (approach complexity) and result (outcome quality).
+
+Over time, your **handicap** reveals patterns: Do you over-engineer? Under-scope? Pick the wrong approach? SLOPE's dispersion analysis and training recommendations help you improve systematically.
+
+See [docs/framework.md](docs/framework.md) for the full framework.
+
+## Packages
+
+| Package | Description |
+|---------|-------------|
+| [`@slope-dev/core`](packages/core) | Core scoring engine — types, handicap, builder, validation, advisor, formatter, briefing |
+| [`@slope-dev/cli`](packages/cli) | CLI tool — `slope init`, `card`, `validate`, `review`, `briefing`, `plan`, `classify` |
+
+## Core API
+
+```typescript
+import {
+  buildScorecard,
+  validateScorecard,
+  computeHandicapCard,
+  formatSprintReview,
+  recommendClub,
+  classifyShot,
+  generateTrainingPlan,
+} from '@slope-dev/core';
+
+// Build a scorecard from shots — stats, score, and label auto-computed
+const card = buildScorecard({
+  sprint_number: 1,
+  theme: 'My First Sprint',
+  par: 3,
+  slope: 0,
+  date: '2026-02-20',
+  shots: [
+    { ticket_key: 'S1-1', title: 'Setup', club: 'short_iron', result: 'green', hazards: [] },
+    { ticket_key: 'S1-2', title: 'Feature', club: 'short_iron', result: 'in_the_hole', hazards: [] },
+    { ticket_key: 'S1-3', title: 'Tests', club: 'wedge', result: 'green', hazards: [] },
+  ],
+});
+
+// Validate
+const result = validateScorecard(card);
+console.log(result.valid); // true
+
+// Handicap over time
+const handicap = computeHandicapCard([card]);
+console.log(handicap.all_time.handicap); // 0.0
+
+// Club recommendation for next ticket
+const rec = recommendClub({
+  ticketComplexity: 'medium',
+  scorecards: [card],
+});
+console.log(rec.club); // 'short_iron'
+```
+
+## CLI Commands
+
+| Command | Description |
+|---------|-------------|
+| `slope init` | Create `.slope/` directory with config and example scorecard |
+| `slope init --claude-code` | Also install Claude Code rules and hooks |
+| `slope card` | Display handicap card with rolling windows |
+| `slope validate [path]` | Validate scorecard(s) — runs all if no path given |
+| `slope review [path]` | Format sprint review as markdown |
+| `slope review --plain` | Non-technical sprint review |
+| `slope briefing` | Pre-round briefing (handicap + hazards + gotchas) |
+| `slope briefing --categories=testing` | Filter briefing by category |
+| `slope plan --complexity=medium` | Get club recommendation + training plan |
+| `slope classify --scope=... --modified=... --tests=pass --reverts=0` | Classify a shot |
+
+## Configuration
+
+After `slope init`, configure `.slope/config.json`:
+
+```json
+{
+  "scorecardDir": "docs/retros",
+  "scorecardPattern": "sprint-*.json",
+  "minSprint": 1,
+  "commonIssuesPath": ".slope/common-issues.json",
+  "sessionsPath": ".slope/sessions.json"
+}
+```
+
+## Claude Code Integration
+
+SLOPE includes templates for [Claude Code](https://docs.anthropic.com/en/docs/claude-code):
+
+```bash
+slope init --claude-code
+```
+
+This installs:
+- `.claude/rules/sprint-checklist.md` — Pre-Round, Post-Shot, Post-Hole routines
+- `.claude/rules/commit-discipline.md` — Commit/push triggers
+- `.claude/rules/review-loop.md` — Architect review tiers
+- `.claude/hooks/pre-merge-check.sh` — Validates scorecard before merge
+
+## License
+
+MIT
