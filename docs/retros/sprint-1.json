@@ -1,0 +1,95 @@
+{
+  "sprint_number": 1,
+  "theme": "Open-source SLOPE extraction",
+  "type": "feature",
+  "par": 5,
+  "slope": 2,
+  "score": 5,
+  "score_label": "par",
+  "date": "2026-02-20",
+  "shots": [
+    {
+      "ticket_key": "S1-1",
+      "title": "Repo scaffold + type extraction",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [
+        { "type": "rough", "description": "gh repo create --clone put repo inside caddystack dir" }
+      ],
+      "notes": "Clean scaffold, types + constants extracted and building"
+    },
+    {
+      "ticket_key": "S1-2",
+      "title": "Core scoring engine",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        { "type": "bunker", "description": "Dynamic import path in builder.test.ts missed by sed batch replacement" }
+      ],
+      "notes": "174 tests passing — handicap, builder, validation, dispersion, advisor"
+    },
+    {
+      "ticket_key": "S1-3",
+      "title": "Formatter + briefing",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Generalized ProjectStats replacing SpecStatusSummary. 247 tests total."
+    },
+    {
+      "ticket_key": "S1-4",
+      "title": "Standalone CLI",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [
+        { "type": "bunker", "description": "Missing @types/node in CLI package, strict TS needed return after process.exit" }
+      ],
+      "notes": "7 commands, all tested. Config-driven via .slope/config.json."
+    },
+    {
+      "ticket_key": "S1-5",
+      "title": "Claude Code starter kit + docs",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Templates, framework doc, scorecard template, README, LICENSE"
+    }
+  ],
+  "conditions": [
+    { "type": "wind", "description": "Context compaction mid-sprint required session resumption", "impact": "minor" }
+  ],
+  "special_plays": [],
+  "stats": {
+    "fairways_hit": 5,
+    "fairways_total": 5,
+    "greens_in_regulation": 5,
+    "greens_total": 5,
+    "putts": 1,
+    "penalties": 0,
+    "hazards_hit": 3,
+    "miss_directions": { "long": 0, "short": 0, "left": 0, "right": 0 }
+  },
+  "training": [
+    { "type": "lessons", "description": "First extraction of SLOPE into standalone package", "outcome": "Clean separation — no CaddyStack dependencies" }
+  ],
+  "nutrition": [
+    { "category": "hydration", "description": "Fresh dependencies (vitest 3.2, typescript 5.8)", "status": "healthy" },
+    { "category": "diet", "description": "Clean ESM, strict TS, no dead code", "status": "healthy" },
+    { "category": "stretching", "description": "Read all source files before porting", "status": "healthy" }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Smooth extraction — the SLOPE code was already well-decoupled from CaddyStack",
+    "advice_for_next_player": "The formatter test adaptations need careful attention — ProjectStats replaces SpecStatusSummary with different key names",
+    "excited_about_next": "Publishing to npm, wiring CaddyStack to depend on @slope-dev/core"
+  },
+  "bunker_locations": [
+    "Dynamic imports in test files can be missed by batch sed replacements",
+    "CLI packages need @types/node explicitly — not inherited from monorepo root",
+    "process.exit() doesn't narrow types in strict TS — add return after for type safety"
+  ],
+  "yardage_book_updates": [],
+  "course_management_notes": [
+    "Sprint 1 of independent slope repo — uses its own sprint tracker (dogfooding)",
+    "247 tests, 8 test files, ~2300 lines source, ~3600 lines tests"
+  ]
+}
