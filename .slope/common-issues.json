@@ -1,0 +1,40 @@
+{
+  "recurring_patterns": [
+    {
+      "id": 1,
+      "title": "Example pattern",
+      "category": "general",
+      "sprints_hit": [1],
+      "gotcha_refs": [],
+      "description": "This is an example recurring pattern. Replace with your own.",
+      "prevention": "Add your prevention strategy here."
+    },
+    {
+      "id": 2,
+      "title": "Run full Post-Hole routine after every sprint",
+      "category": "general",
+      "sprints_hit": [3],
+      "gotcha_refs": [],
+      "description": "After filing the scorecard, it's easy to skip validate + review + common-issues.",
+      "prevention": "Always run: slope validate on new scorecard; slope review (save to sprint-N-review.md); update common-issues if new patterns emerged."
+    },
+    {
+      "id": 3,
+      "title": "Workspace packages must use workspace:* protocol for local deps",
+      "category": "monorepo",
+      "sprints_hit": [4],
+      "gotcha_refs": ["S4-3"],
+      "description": "mcp-tools had @slope-dev/core pinned to ^0.3.3 (npm), so TypeScript resolved the published version instead of the local workspace version with new exports.",
+      "prevention": "Always use \"workspace:*\" for intra-monorepo dependencies. Check resolution with pnpm ls after adding new exports."
+    },
+    {
+      "id": 4,
+      "title": "Core package needs @types/node when importing node: modules",
+      "category": "monorepo",
+      "sprints_hit": [4],
+      "gotcha_refs": ["S4-1"],
+      "description": "Moving config.ts/loader.ts to core failed to compile because core didn't have @types/node — it had been a pure-logic package until now.",
+      "prevention": "When moving files that import node:fs, node:path, etc. into a package, verify @types/node is in devDependencies."
+    }
+  ]
+}

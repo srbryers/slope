@@ -1,0 +1,97 @@
+{
+  "sprint_number": 4,
+  "theme": "Code Mode MCP Refactor",
+  "par": 4,
+  "slope": 3,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-02-21",
+  "shots": [
+    {
+      "ticket_key": "S4-1",
+      "title": "Move config.ts and loader.ts from CLI to core",
+      "club": "long_iron",
+      "result": "in_the_hole",
+      "hazards": [
+        {
+          "type": "rough",
+          "description": "core missing @types/node — required adding devDep"
+        }
+      ],
+      "notes": "Clean copy; CLI re-exports preserve API. Added @types/node to core."
+    },
+    {
+      "ticket_key": "S4-2",
+      "title": "Build function registry and search() tool",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "33-entry SLOPE_REGISTRY + SLOPE_TYPES constant; search tool with query/module filtering"
+    },
+    {
+      "ticket_key": "S4-3",
+      "title": "Build execute() tool and node:vm sandbox",
+      "club": "driver",
+      "result": "in_the_hole",
+      "hazards": [
+        {
+          "type": "rough",
+          "description": "mcp-tools resolved published core v0.3.3 instead of workspace — switched to workspace:* protocol"
+        }
+      ],
+      "notes": "node:vm sandbox with full core API, path-scoped fs, 30s timeout, console capture"
+    },
+    {
+      "ticket_key": "S4-4",
+      "title": "Remove old tools, tests, docs, bump versions",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Server now exposes exactly 2 tools; 16 new tests all pass; README rewritten for code-mode pattern"
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 2,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "type": "infra",
+  "conditions": [
+    {
+      "type": "wind",
+      "description": "cross_package refactor (CLI → core)",
+      "impact": "minor"
+    },
+    {
+      "type": "altitude",
+      "description": "new_area: node:vm sandbox",
+      "impact": "minor"
+    },
+    {
+      "type": "wind",
+      "description": "external_dep: workspace protocol resolution",
+      "impact": "minor"
+    }
+  ],
+  "special_plays": [],
+  "bunker_locations": [],
+  "yardage_book_updates": [
+    "mcp-tools must use workspace:* for @slope-dev/core dep to resolve local changes",
+    "core needs @types/node when importing node:fs / node:path modules",
+    "node:vm createContext + runInContext pattern for sandboxed code execution"
+  ],
+  "course_management_notes": [
+    "Code-mode MCP pattern: 2 tools (search + execute) replace N individual tools",
+    "Path-scope all fs helpers with safePath() — resolve then check startsWith(cwd)"
+  ]
+}
