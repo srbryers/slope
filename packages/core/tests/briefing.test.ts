@@ -7,7 +7,7 @@ import {
   hazardBriefing,
 } from '../src/briefing.js';
 import type { CommonIssuesFile, RecurringPattern } from '../src/briefing.js';
-import type { GolfScorecard, ShotRecord, HoleStats } from '../src/types.js';
+import type { GolfScorecard, ShotRecord, HoleStats, SprintClaim } from '../src/types.js';
 
 // --- Helpers ---
 
@@ -482,5 +482,103 @@ describe('formatBriefing', () => {
     });
     expect(output).toContain('PRE-ROUND BRIEFING');
     expect(output).toContain('LAST SESSION');
+  });
+});
+
+// --- formatBriefing — COURSE STATUS ---
+
+function makeClaim(overrides: Partial<SprintClaim> = {}): SprintClaim {
+  return {
+    id: 'c-001',
+    sprint_number: 2,
+    player: 'alice',
+    target: 'S2-1',
+    scope: 'ticket',
+    claimed_at: '2026-02-20T00:00:00Z',
+    ...overrides,
+  };
+}
+
+describe('formatBriefing — COURSE STATUS', () => {
+  it('shows "No active claims." when claims is undefined', () => {
+    const output = formatBriefing({
+      scorecards: [],
+      commonIssues: makeIssues([]),
+    });
+    expect(output).toContain('COURSE STATUS');
+    expect(output).toContain('No active claims.');
+  });
+
+  it('shows "No active claims." when claims is empty array', () => {
+    const output = formatBriefing({
+      scorecards: [],
+      commonIssues: makeIssues([]),
+      claims: [],
+    });
+    expect(output).toContain('COURSE STATUS');
+    expect(output).toContain('No active claims.');
+  });
+
+  it('groups claims by player with scope tags and notes', () => {
+    const claims = [
+      makeClaim({ player: 'alice', target: 'S2-1', scope: 'ticket' }),
+      makeClaim({ id: 'c-002', player: 'alice', target: 'packages/cli', scope: 'area', notes: 'CLI work' }),
+      makeClaim({ id: 'c-003', player: 'bob', target: 'S2-3', scope: 'ticket' }),
+    ];
+    const output = formatBriefing({
+      scorecards: [],
+      commonIssues: makeIssues([]),
+      claims,
+    });
+    expect(output).toContain('alice:');
+    expect(output).toContain('[ticket] S2-1');
+    expect(output).toContain('[area] packages/cli');
+    expect(output).toContain('CLI work');
+    expect(output).toContain('bob:');
+    expect(output).toContain('[ticket] S2-3');
+  });
+
+  it('shows overlap conflicts with [!!] icon', () => {
+    const claims = [
+      makeClaim({ player: 'alice', target: 'S2-1' }),
+      makeClaim({ id: 'c-002', player: 'bob', target: 'S2-1' }),
+    ];
+    const output = formatBriefing({
+      scorecards: [],
+      commonIssues: makeIssues([]),
+      claims,
+    });
+    expect(output).toContain('Conflicts:');
+    expect(output).toContain('[!!]');
+    expect(output).toContain('Both alice and bob claimed "S2-1"');
+  });
+
+  it('does not show Conflicts subsection when no conflicts exist', () => {
+    const claims = [
+      makeClaim({ player: 'alice', target: 'S2-1' }),
+      makeClaim({ id: 'c-002', player: 'bob', target: 'S2-2' }),
+    ];
+    const output = formatBriefing({
+      scorecards: [],
+      commonIssues: makeIssues([]),
+      claims,
+    });
+    expect(output).toContain('COURSE STATUS');
+    expect(output).not.toContain('Conflicts:');
+  });
+
+  it('appears between HAZARDS and NUTRITION sections', () => {
+    const output = formatBriefing({
+      scorecards: [makeCard({
+        nutrition: [{ category: 'recovery', description: 'bad', status: 'neglected' }],
+      })],
+      commonIssues: makeIssues([]),
+      claims: [],
+    });
+    const hazardsPos = output.indexOf('HAZARDS');
+    const coursePos = output.indexOf('COURSE STATUS');
+    const nutritionPos = output.indexOf('NUTRITION ALERTS');
+    expect(hazardsPos).toBeLessThan(coursePos);
+    expect(coursePos).toBeLessThan(nutritionPos);
   });
 });

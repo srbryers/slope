@@ -206,3 +206,26 @@ export interface TrainingRecommendation {
   priority: 'high' | 'medium' | 'low';
   instruction_adjustment?: string;
 }
+
+// --- Sprint Claims & Registry Types ---
+
+/** Scope of a sprint claim: individual ticket or broader area */
+export type ClaimScope = 'ticket' | 'area';
+
+/** A claim reserving a ticket or area for a player during a sprint */
+export interface SprintClaim {
+  id: string;
+  sprint_number: number;
+  player: string;
+  target: string;
+  scope: ClaimScope;
+  claimed_at: string;
+  notes?: string;
+}
+
+/** A conflict detected between two sprint claims */
+export interface SprintConflict {
+  claims: [SprintClaim, SprintClaim];
+  reason: string;
+  severity: 'overlap' | 'adjacent';
+}

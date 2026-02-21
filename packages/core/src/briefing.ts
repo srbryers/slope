@@ -3,10 +3,12 @@ import type {
   MissDirection,
   NutritionCategory,
   NutritionEntry,
+  SprintClaim,
 } from './types.js';
 import { computeHandicapCard } from './handicap.js';
 import { computeDispersion } from './dispersion.js';
 import { generateTrainingPlan } from './advisor.js';
+import { checkConflicts } from './registry.js';
 
 // --- Input types ---
 
@@ -219,8 +221,9 @@ export function formatBriefing(opts: {
   lastSession?: SessionEntry;
   filter?: BriefingFilter;
   includeTraining?: boolean;
+  claims?: SprintClaim[];
 }): string {
-  const { scorecards, commonIssues, lastSession, filter, includeTraining = true } = opts;
+  const { scorecards, commonIssues, lastSession, filter, includeTraining = true, claims } = opts;
   const lines: string[] = [];
 
   // Section 1: Handicap snapshot
@@ -266,6 +269,42 @@ export function formatBriefing(opts: {
     }
   } else {
     lines.push('  No bunker locations recorded.');
+  }
+
+  // Section 2.5: Course status (active claims)
+  lines.push('');
+  lines.push('\u2500'.repeat(50));
+  lines.push('COURSE STATUS');
+
+  if (!claims || claims.length === 0) {
+    lines.push('  No active claims.');
+  } else {
+    // Group claims by player
+    const byPlayer = new Map<string, SprintClaim[]>();
+    for (const c of claims) {
+      const list = byPlayer.get(c.player) || [];
+      list.push(c);
+      byPlayer.set(c.player, list);
+    }
+    for (const [player, playerClaims] of byPlayer) {
+      lines.push(`  ${player}:`);
+      for (const c of playerClaims) {
+        const tag = c.scope === 'area' ? '[area]' : '[ticket]';
+        const notes = c.notes ? ` — ${c.notes}` : '';
+        lines.push(`    ${tag} ${c.target}${notes}`);
+      }
+    }
+
+    // Show conflicts
+    const conflicts = checkConflicts(claims);
+    if (conflicts.length > 0) {
+      lines.push('');
+      lines.push('  Conflicts:');
+      for (const c of conflicts) {
+        const icon = c.severity === 'overlap' ? '[!!]' : '[~]';
+        lines.push(`    ${icon} ${c.reason}`);
+      }
+    }
   }
 
   // Section 3: Nutrition trends

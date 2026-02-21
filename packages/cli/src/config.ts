@@ -7,6 +7,10 @@ export interface SlopeConfig {
   minSprint: number;
   commonIssuesPath: string;
   sessionsPath: string;
+  registry: 'file' | 'api';
+  claimsPath: string;
+  registryApiUrl?: string;
+  currentSprint?: number;
 }
 
 const DEFAULT_CONFIG: SlopeConfig = {
@@ -15,6 +19,8 @@ const DEFAULT_CONFIG: SlopeConfig = {
   minSprint: 1,
   commonIssuesPath: '.slope/common-issues.json',
   sessionsPath: '.slope/sessions.json',
+  registry: 'file',
+  claimsPath: '.slope/claims.json',
 };
 
 const CONFIG_DIR = '.slope';

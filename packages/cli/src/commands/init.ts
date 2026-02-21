@@ -105,6 +105,13 @@ export function initCommand(args: string[]): void {
     console.log(`  Created ${sessionsPath}`);
   }
 
+  // Write empty claims.json
+  const claimsPath = join(cwd, '.slope', 'claims.json');
+  if (!existsSync(claimsPath)) {
+    writeFileSync(claimsPath, JSON.stringify({ claims: [] }, null, 2) + '\n');
+    console.log(`  Created ${claimsPath}`);
+  }
+
   // Claude Code templates
   if (claudeCode) {
     const templatesRoot = join(__dirname, '..', '..', '..', '..', 'templates', 'claude-code');

@@ -30,6 +30,9 @@ export type {
   ShotClassification,
   ClubRecommendation,
   TrainingRecommendation,
+  ClaimScope,
+  SprintClaim,
+  SprintConflict,
 } from './types.js';
 
 // Constants
@@ -111,3 +114,7 @@ export type {
   HazardEntry,
   NutritionTrend,
 } from './briefing.js';
+
+// Registry
+export { checkConflicts } from './registry.js';
+export type { SprintRegistry } from './registry.js';
