@@ -237,7 +237,7 @@ describe('Common Issues', () => {
   it('round-trips common issues', async () => {
     const data = {
       recurring_patterns: [{
-        id: 'ci-1',
+        id: 1,
         title: 'Test flakiness',
         category: 'testing',
         sprints_hit: [1, 2],

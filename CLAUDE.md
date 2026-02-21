@@ -3,13 +3,14 @@
 Sprint Lifecycle & Operational Performance Engine — golf-metaphor sprint scoring.
 
 ## Monorepo Structure
-- `packages/core` — scoring engine, types, config, loader (v0.4.0)
-- `packages/cli` — CLI tool (init, card, validate, review, briefing, plan)
-- `packages/mcp-tools` — code-mode MCP server (search + execute)
+- `packages/core` — scoring engine, types, config, store interface, loader (v1.0.0)
+- `packages/store-sqlite` — SQLite storage adapter (v1.0.0)
+- `packages/cli` — CLI tool (init, card, validate, review, briefing, plan, session, hook)
+- `packages/mcp-tools` — code-mode MCP server (search + execute + session/claim tools)
 
 ## Commands
 - `pnpm -r build` — build all packages
-- `pnpm -r test` — run all tests (core: 275, cli: 22, mcp-tools: 16)
+- `pnpm -r test` — run all tests (core: 275, store-sqlite: 22, cli: 22, mcp-tools: 30)
 - `pnpm -r typecheck` — type check all packages
 
 ## MCP Tools
@@ -33,5 +34,7 @@ This repo uses SLOPE to score its own sprints:
 
 ## Key Files
 - `.slope/config.json` — SLOPE configuration
-- `.slope/common-issues.json` — recurring patterns and gotchas
+- `.slope/slope.db` — SQLite store (sessions, claims, scorecards, common issues)
+- `.slope/common-issues.json` — recurring patterns and gotchas (legacy, migrating to store)
+- `.slope/hooks.json` — installed hook registry
 - `docs/backlog/README.md` — sprint plan index
