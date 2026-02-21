@@ -30,6 +30,23 @@ Add to `.cursor/mcp.json`:
 }
 ```
 
+### Claude Code
+
+Add to `.mcp.json` in your project root:
+
+```json
+{
+  "mcpServers": {
+    "slope": {
+      "command": "npx",
+      "args": ["@slope-dev/mcp-tools"]
+    }
+  }
+}
+```
+
+Or run `slope init --claude-code` to install automatically.
+
 ### Claude Desktop
 
 Add to `claude_desktop_config.json`:

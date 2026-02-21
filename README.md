@@ -37,6 +37,7 @@ See [docs/framework.md](docs/framework.md) for the full framework.
 |---------|-------------|
 | [`@slope-dev/core`](packages/core) | Core scoring engine — types, handicap, builder, validation, advisor, formatter, briefing |
 | [`@slope-dev/cli`](packages/cli) | CLI tool — `slope init`, `card`, `validate`, `review`, `briefing`, `plan`, `classify` |
+| [`@slope-dev/mcp-tools`](packages/mcp-tools) | Code-mode MCP server — `search` + `execute` with full SLOPE API |
 
 ## Core API
 
@@ -87,7 +88,7 @@ console.log(rec.club); // 'short_iron'
 |---------|-------------|
 | `slope init` | Create `.slope/` directory with config and example scorecard |
 | `slope init --cursor` | Also install Cursor IDE rules (`.cursor/rules/`) |
-| `slope init --claude-code` | Also install Claude Code rules and hooks |
+| `slope init --claude-code` | Also install Claude Code rules, hooks, MCP config, and CLAUDE.md |
 | `slope init --generic` | Install a provider-agnostic SLOPE checklist |
 | `slope card` | Display handicap card with rolling windows |
 | `slope validate [path]` | Validate scorecard(s) — runs all if no path given |
@@ -128,6 +129,8 @@ This installs:
 - `.claude/rules/commit-discipline.md` — Commit/push triggers
 - `.claude/rules/review-loop.md` — Architect review tiers
 - `.claude/hooks/pre-merge-check.sh` — Validates scorecard before merge
+- `.mcp.json` — SLOPE MCP server config (search + execute)
+- `CLAUDE.md` — Project context for Claude Code
 
 ## License
 

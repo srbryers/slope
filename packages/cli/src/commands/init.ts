@@ -109,6 +109,13 @@ function installClaudeCodeTemplates(cwd: string): void {
     }
   }
 
+  const claudeMdSrc = join(getTemplatesRoot(), 'claude-code', 'CLAUDE.md');
+  const claudeMdDest = join(cwd, 'CLAUDE.md');
+  if (existsSync(claudeMdSrc) && !existsSync(claudeMdDest)) {
+    cpSync(claudeMdSrc, claudeMdDest);
+    console.log(`  Created ${claudeMdDest}`);
+  }
+
   console.log('\n  Claude Code templates installed to .claude/rules/ and .claude/hooks/');
 }
 
@@ -152,6 +159,26 @@ const SLOPE_MCP_ENTRY = {
   command: 'npx',
   args: ['@slope-dev/mcp-tools'],
 };
+
+function installClaudeCodeMcpConfig(cwd: string): void {
+  const mcpPath = join(cwd, '.mcp.json');
+  let config: { mcpServers?: Record<string, { command: string; args: string[] }> } = {};
+
+  if (existsSync(mcpPath)) {
+    try {
+      const raw = readFileSync(mcpPath, 'utf8');
+      config = JSON.parse(raw) as typeof config;
+    } catch {
+      config = {};
+    }
+  }
+
+  if (!config.mcpServers) config.mcpServers = {};
+  config.mcpServers.slope = SLOPE_MCP_ENTRY;
+
+  writeFileSync(mcpPath, JSON.stringify(config, null, 2) + '\n');
+  console.log(`  Created/updated ${mcpPath} (slope MCP server)`);
+}
 
 function installCursorMcpConfig(cwd: string): void {
   const mcpPath = join(cwd, '.cursor', 'mcp.json');
@@ -214,6 +241,7 @@ export function initCommand(args: string[]): void {
   switch (provider) {
     case 'claude-code':
       installClaudeCodeTemplates(cwd);
+      installClaudeCodeMcpConfig(cwd);
       break;
     case 'cursor':
       installCursorTemplates(cwd);

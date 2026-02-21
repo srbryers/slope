@@ -63,3 +63,68 @@ describe('init --cursor (includes MCP)', () => {
     expect(existsSync(mcpPath)).toBe(false);
   });
 });
+
+describe('init --claude-code (includes MCP)', () => {
+  it('creates .mcp.json with slope server when file does not exist', () => {
+    initCommand(['--claude-code']);
+
+    const mcpPath = join(tmpDir, '.mcp.json');
+    expect(existsSync(mcpPath)).toBe(true);
+
+    const content = JSON.parse(readFileSync(mcpPath, 'utf8'));
+    expect(content.mcpServers).toBeDefined();
+    expect(content.mcpServers.slope).toEqual({
+      command: 'npx',
+      args: ['@slope-dev/mcp-tools'],
+    });
+  });
+
+  it('merges slope into existing .mcp.json without removing other servers', () => {
+    const mcpPath = join(tmpDir, '.mcp.json');
+    writeFileSync(
+      mcpPath,
+      JSON.stringify({
+        mcpServers: {
+          other: { command: 'echo', args: [] },
+        },
+      }, null, 2)
+    );
+
+    initCommand(['--claude-code']);
+
+    const content = JSON.parse(readFileSync(mcpPath, 'utf8'));
+    expect(content.mcpServers.other).toEqual({ command: 'echo', args: [] });
+    expect(content.mcpServers.slope).toEqual({
+      command: 'npx',
+      args: ['@slope-dev/mcp-tools'],
+    });
+  });
+
+  it('does not create .mcp.json when --generic is used', () => {
+    initCommand(['--generic']);
+
+    const mcpPath = join(tmpDir, '.mcp.json');
+    expect(existsSync(mcpPath)).toBe(false);
+  });
+
+  it('creates CLAUDE.md when file does not exist', () => {
+    initCommand(['--claude-code']);
+
+    const claudeMd = join(tmpDir, 'CLAUDE.md');
+    expect(existsSync(claudeMd)).toBe(true);
+
+    const content = readFileSync(claudeMd, 'utf8');
+    expect(content).toContain('SLOPE Project');
+    expect(content).toContain('MCP Tools');
+  });
+
+  it('does not overwrite existing CLAUDE.md', () => {
+    const claudeMd = join(tmpDir, 'CLAUDE.md');
+    writeFileSync(claudeMd, '# My Custom CLAUDE.md\n');
+
+    initCommand(['--claude-code']);
+
+    const content = readFileSync(claudeMd, 'utf8');
+    expect(content).toBe('# My Custom CLAUDE.md\n');
+  });
+});
