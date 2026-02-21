@@ -1,0 +1,19 @@
+---
+description: After completing a SLOPE sprint, always run the full Post-Hole routine (validate, review, common-issues).
+globs: "**/retros/*.json"
+alwaysApply: false
+---
+
+# SLOPE Post-Hole Routine (Sprint Completion)
+
+When you have just completed a sprint and filed a scorecard (e.g. `docs/retros/sprint-N.json`), **always** run the full Post-Hole routine before considering the sprint done:
+
+1. **Validate** — Run `slope validate docs/retros/sprint-N.json` (or from repo root: `node packages/cli/dist/index.js validate docs/retros/sprint-N.json` if slope is not on PATH). Fix any validation errors.
+
+2. **Review** — Run `slope review docs/retros/sprint-N.json` and **save the output** to `docs/retros/sprint-N-review.md` so the sprint review markdown is committed with the scorecard.
+
+3. **Distill learnings** — If the sprint revealed a recurring pattern, gotcha, or prevention tactic, add it to `.slope/common-issues.json` (recurring_patterns array). If nothing to add, skip.
+
+4. **Commit** — Commit the review file and any common-issues updates together with the scorecard (or in a follow-up commit).
+
+Do not skip validate or review. The routine keeps the handicap and briefing data accurate and leaves a readable review for future sprints.
