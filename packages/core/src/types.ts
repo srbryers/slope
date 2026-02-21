@@ -229,3 +229,71 @@ export interface SprintConflict {
   reason: string;
   severity: 'overlap' | 'adjacent';
 }
+
+// --- Tournament Review Types ---
+
+/** A tournament is a multi-sprint initiative tracked as a cohesive unit */
+export interface TournamentReview {
+  /** Initiative identifier (e.g. "M-09") */
+  id: string;
+  /** Human-readable name */
+  name: string;
+  /** Start/end dates (from first/last scorecard) */
+  dateRange: { start: string; end: string };
+  /** Sprints included in this tournament */
+  sprints: TournamentSprintEntry[];
+  /** Aggregate scoring */
+  scoring: TournamentScoring;
+  /** Aggregate stats across all sprints */
+  stats: TournamentStats;
+  /** Hazard patterns discovered across the tournament */
+  hazardIndex: TournamentHazard[];
+  /** Per-club performance (which complexities went well/poorly) */
+  clubPerformance: Record<string, { attempts: number; inTheHole: number; avgScore: number }>;
+  /** Strategic takeaways */
+  takeaways: string[];
+  /** What would you do differently */
+  improvements: string[];
+  /** Free-form reflection */
+  reflection?: string;
+}
+
+export interface TournamentSprintEntry {
+  sprintNumber: number;
+  theme: string;
+  par: number;
+  slope: number;
+  score: number;
+  scoreLabel: ScoreLabel;
+  ticketCount: number;
+  ticketsLanded: number;
+}
+
+export interface TournamentScoring {
+  totalPar: number;
+  totalScore: number;
+  differential: number;
+  avgScoreLabel: string;
+  bestSprint: { sprintNumber: number; label: ScoreLabel };
+  worstSprint: { sprintNumber: number; label: ScoreLabel };
+  sprintCount: number;
+  ticketCount: number;
+  ticketsLanded: number;
+  landingRate: number;
+}
+
+export interface TournamentStats {
+  avgSlope: number;
+  totalHazards: number;
+  totalPenalties: number;
+  avgPutts: number;
+  fairwayRate: number;
+  girRate: number;
+}
+
+export interface TournamentHazard {
+  gotchaId: string;
+  sprint: number;
+  area: string;
+  description: string;
+}

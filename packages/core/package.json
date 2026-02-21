@@ -1,6 +1,6 @@
 {
   "name": "@slope-dev/core",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "SLOPE — Sprint Lifecycle & Operational Performance Engine. Golf-metaphor sprint scoring for engineering teams.",
   "type": "module",
   "main": "./dist/index.js",

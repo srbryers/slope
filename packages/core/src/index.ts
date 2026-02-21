@@ -118,3 +118,16 @@ export type {
 // Registry
 export { checkConflicts } from './registry.js';
 export type { SprintRegistry } from './registry.js';
+
+// Tournament Review
+export {
+  buildTournamentReview,
+  formatTournamentReview,
+} from './tournament.js';
+export type {
+  TournamentReview,
+  TournamentSprintEntry,
+  TournamentScoring,
+  TournamentStats,
+  TournamentHazard,
+} from './types.js';
