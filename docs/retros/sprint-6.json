@@ -1,0 +1,193 @@
+{
+  "sprint_number": 6,
+  "theme": "SLOPE v1.0 — SlopeStore + Sessions + Hooks + MCP Tools",
+  "par": 5,
+  "slope": 3,
+  "score": 11,
+  "score_label": "triple_plus",
+  "date": "2026-02-21",
+  "shots": [
+    {
+      "ticket_key": "S-1-1",
+      "title": "SlopeStore interface + extended SprintClaim in core",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Clean type-only change, no friction"
+    },
+    {
+      "ticket_key": "S-1-2",
+      "title": "Create store-sqlite package scaffold",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [
+        {
+          "type": "rough",
+          "description": "better-sqlite3 native build required pnpm approve-builds; worked around via package.json onlyBuiltDependencies"
+        }
+      ],
+      "notes": "New package creation with native dep"
+    },
+    {
+      "ticket_key": "S-1-3",
+      "title": "Implement SqliteSlopeStore",
+      "club": "long_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "WAL mode, FK constraints, CASCADE deletes, upsert semantics — all clean on first build"
+    },
+    {
+      "ticket_key": "S-1-4",
+      "title": "Store-SQLite tests — 22 tests",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "All 22 tests passed on first run"
+    },
+    {
+      "ticket_key": "S-2-1",
+      "title": "slope session command + resolveStore()",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Dynamic import pattern for store resolution"
+    },
+    {
+      "ticket_key": "S-2-2",
+      "title": "slope hook command — add/remove/list/show",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Embedded templates with managed section markers"
+    },
+    {
+      "ticket_key": "S-2-3",
+      "title": "Enhanced init + migrate claim commands to store",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "description": "initCommand became async — broke 5 existing tests that called it synchronously without await"
+        }
+      ],
+      "notes": "Fixed by adding async/await to test callbacks"
+    },
+    {
+      "ticket_key": "S-2-4",
+      "title": "Deprecate old registries",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "JSDoc @deprecated annotations only"
+    },
+    {
+      "ticket_key": "S-3-1",
+      "title": "MCP session/claim tools + integration tests",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "3 new MCP tools behind store guard, findProjectRoot(), 30 tests"
+    },
+    {
+      "ticket_key": "S-3-2",
+      "title": "Final tests + CLAUDE.md update",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "description": "RecurringPattern.id is number not string — test type mismatch caught by typecheck"
+        },
+        {
+          "type": "rough",
+          "description": "store-sqlite tsconfig.json needed to exclude *.test.ts from build"
+        }
+      ],
+      "notes": "Two minor fixes during final verification"
+    },
+    {
+      "ticket_key": "S-3-3",
+      "title": "Bump all to v1.0.0 + publish prep",
+      "club": "putter",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Version bumps + prepublishOnly scripts"
+    }
+  ],
+  "stats": {
+    "fairways_hit": 11,
+    "fairways_total": 11,
+    "greens_in_regulation": 11,
+    "greens_total": 11,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 4,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "type": "feature",
+  "conditions": [
+    {
+      "type": "altitude",
+      "description": "Large sprint (11 tickets across 3 sub-sprints) — highest ticket count yet",
+      "impact": "minor"
+    },
+    {
+      "type": "wind",
+      "description": "New external dependency (better-sqlite3) with native compilation",
+      "impact": "minor"
+    }
+  ],
+  "special_plays": [],
+  "training": [],
+  "nutrition": [
+    {
+      "category": "hydration",
+      "description": "Tests at every checkpoint",
+      "status": "healthy"
+    },
+    {
+      "category": "diet",
+      "description": "Full build+test+typecheck before final commit",
+      "status": "healthy"
+    },
+    {
+      "category": "recovery",
+      "description": "Clean deprecation path — old registries kept functional",
+      "status": "healthy"
+    },
+    {
+      "category": "supplements",
+      "description": "Integration tests for MCP + real SQLite",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Extremely smooth for an 11-ticket sprint. The plan's execution order was well-designed — each ticket built cleanly on the previous.",
+    "advice_for_next_player": "The store-sqlite package uses better-sqlite3 which needs native compilation. If you see build failures, check pnpm onlyBuiltDependencies in root package.json.",
+    "what_surprised_you": "Only 3 hazards across 11 tickets. The extended SprintClaim approach (D2) eliminated all type-mapping friction — no toSprintClaim() adapter needed.",
+    "excited_about_next": "v1.0 is shipped. Ready for session-start/end hooks to auto-register sessions, and the deferred hook subcommands (update/freeze/diff) in v1.1."
+  },
+  "bunker_locations": [
+    "better-sqlite3 native build requires pnpm onlyBuiltDependencies approval",
+    "Making sync functions async breaks callers that don't await the returned promise",
+    "tsconfig.json must exclude *.test.ts when tests live in src/ alongside implementation"
+  ],
+  "yardage_book_updates": [
+    "SlopeStore extends SprintRegistry — add sessions/scorecards/common-issues on top of existing claim interface",
+    "resolveStore() uses dynamic import() for store-sqlite — keeps CLI dependency optional at type level",
+    "better-sqlite3 CASCADE deletes make session cleanup automatic for associated claims",
+    "findProjectRoot() walks up from cwd looking for .slope/config.json — same pattern as loadConfig()"
+  ],
+  "course_management_notes": [
+    "11 tickets, 9 in_the_hole, 2 green — no misses across the entire sprint",
+    "3 hazards encountered but all resolved quickly (async test fix, type mismatch, tsconfig exclude)",
+    "Commit-per-ticket discipline maintained — 11 commits for 11 tickets",
+    "Push after S-1-4, S-2-3, S-3-1, S-3-3 — 4 pushes matching plan"
+  ]
+}

@@ -35,7 +35,10 @@ const subcommand = process.argv[2];
 
 switch (subcommand) {
   case 'init':
-    initCommand(process.argv.slice(3));
+    initCommand(process.argv.slice(3)).catch(err => {
+      console.error('Error:', err.message);
+      process.exit(1);
+    });
     break;
   case 'card':
     cardCommand();

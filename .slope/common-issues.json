@@ -35,6 +35,33 @@
       "gotcha_refs": ["S4-1"],
       "description": "Moving config.ts/loader.ts to core failed to compile because core didn't have @types/node — it had been a pure-logic package until now.",
       "prevention": "When moving files that import node:fs, node:path, etc. into a package, verify @types/node is in devDependencies."
+    },
+    {
+      "id": 5,
+      "title": "better-sqlite3 native build requires pnpm onlyBuiltDependencies approval",
+      "category": "monorepo",
+      "sprints_hit": [6],
+      "gotcha_refs": ["S-1-2"],
+      "description": "pnpm ignores native build scripts by default. better-sqlite3 silently fails to compile, causing runtime errors. pnpm approve-builds is interactive and unusable in CI/agent contexts.",
+      "prevention": "Add native packages to pnpm.onlyBuiltDependencies in root package.json before running pnpm install."
+    },
+    {
+      "id": 6,
+      "title": "Making sync functions async breaks callers that don't await",
+      "category": "general",
+      "sprints_hit": [6],
+      "gotcha_refs": ["S-2-3"],
+      "description": "Changing initCommand from sync to async caused 5 CLI tests to fail — they called initCommand() without await, so assertions ran before the async work completed.",
+      "prevention": "When converting a sync function to async, search all callers (tests, CLI entry points, other commands) and add await. In test callbacks, add async to the it() function."
+    },
+    {
+      "id": 7,
+      "title": "tsconfig.json must exclude *.test.ts when tests live alongside source",
+      "category": "monorepo",
+      "sprints_hit": [6],
+      "gotcha_refs": ["S-3-2"],
+      "description": "store-sqlite had tests in src/index.test.ts. The default include: ['src/**/*.ts'] pulled test files into the build, causing type errors from test-only types to surface during tsc.",
+      "prevention": "When placing test files in src/ alongside implementation, add 'src/**/*.test.ts' to the exclude array in tsconfig.json."
     }
   ]
 }
