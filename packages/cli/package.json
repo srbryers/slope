@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@slope-dev/core": "workspace:*"
+    "@slope-dev/core": "workspace:*",
+    "@slope-dev/store-sqlite": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^25.3.0",

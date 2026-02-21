@@ -13,6 +13,9 @@ importers:
       '@slope-dev/core':
         specifier: workspace:*
         version: link:../core
+      '@slope-dev/store-sqlite':
+        specifier: workspace:*
+        version: link:../store-sqlite
     devDependencies:
       '@types/node':
         specifier: ^25.3.0

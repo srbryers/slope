@@ -28,6 +28,7 @@ import { statusCommand } from './commands/status.js';
 import { tournamentCommand } from './commands/tournament.js';
 import { autoCardCommand } from './commands/auto-card.js';
 import { nextCommand } from './commands/next.js';
+import { sessionCommand } from './commands/session.js';
 
 const subcommand = process.argv[2];
 
@@ -84,6 +85,12 @@ switch (subcommand) {
   case 'auto-card':
     autoCardCommand(process.argv.slice(3));
     break;
+  case 'session':
+    sessionCommand(process.argv.slice(3)).catch(err => {
+      console.error('Error:', err.message);
+      process.exit(1);
+    });
+    break;
   case 'next':
     nextCommand();
     break;
@@ -105,6 +112,7 @@ Usage:
   slope status [--sprint=N]                 Show sprint course status + conflicts
   slope tournament --id=<id> --sprints=N..M Build tournament review from sprints
   slope auto-card --sprint=<N> [options]    Generate scorecard from git commits
+  slope session start|end|heartbeat|list    Manage live sessions
   slope next                                Show next sprint number (auto-detect)
 
 Examples:
