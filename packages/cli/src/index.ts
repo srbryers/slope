@@ -26,6 +26,8 @@ import { claimCommand } from './commands/claim.js';
 import { releaseCommand } from './commands/release.js';
 import { statusCommand } from './commands/status.js';
 import { tournamentCommand } from './commands/tournament.js';
+import { autoCardCommand } from './commands/auto-card.js';
+import { nextCommand } from './commands/next.js';
 
 const subcommand = process.argv[2];
 
@@ -76,12 +78,21 @@ switch (subcommand) {
       process.exit(1);
     });
     break;
+  case 'tournament':
+    tournamentCommand(process.argv.slice(3));
+    break;
+  case 'auto-card':
+    autoCardCommand(process.argv.slice(3));
+    break;
+  case 'next':
+    nextCommand();
+    break;
   default:
     console.log(`
 SLOPE CLI — Sprint Lifecycle & Operational Performance Engine
 
 Usage:
-  slope init [--claude-code]                Initialize .slope/ directory
+  slope init [--claude-code|--cursor|--generic]  Initialize .slope/ directory
   slope card                                Show handicap card
   slope validate [path]                     Validate scorecard(s)
   slope review [path] [--plain]             Format sprint review markdown
@@ -92,9 +103,13 @@ Usage:
   slope release --id=<id>                   Release a claim by ID
   slope release --target=<t> [--player=<p>] Release a claim by target
   slope status [--sprint=N]                 Show sprint course status + conflicts
+  slope tournament --id=<id> --sprints=N..M Build tournament review from sprints
+  slope auto-card --sprint=<N> [options]    Generate scorecard from git commits
+  slope next                                Show next sprint number (auto-detect)
 
 Examples:
   slope init                                Create .slope/ with config + example scorecard
+  slope init --cursor                       Also install Cursor IDE rules
   slope init --claude-code                  Also install Claude Code rules + hooks
   slope card                                Show handicap across all scorecards
   slope validate docs/retros/sprint-1.json  Validate a specific scorecard

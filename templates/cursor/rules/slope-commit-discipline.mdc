@@ -1,0 +1,37 @@
+---
+description: Commit and push discipline for SLOPE-managed sprints
+globs:
+alwaysApply: true
+---
+
+# Commit Discipline
+
+**Commit early, commit often.** The last push is the recovery point.
+
+## Commit triggers:
+
+Commit immediately after ANY of these:
+1. Each new file — route, migration, config, component, test
+2. Each endpoint or feature implemented
+3. Each migration — commit separately
+4. Each bug fix — no matter how small
+5. Before switching context to a different area
+6. Before risky operations — large refactor, dependency upgrade
+7. Time check — if ~15 minutes since last commit, commit what works
+8. Session end — never leave uncommitted changes (use `wip:` prefix if incomplete)
+
+## Push triggers:
+
+Push immediately after ANY of these:
+1. After each completed ticket (Post-Shot Routine)
+2. Every 30 minutes
+3. Before switching tickets
+4. Session end — never leave unpushed commits
+
+## Commit message format:
+
+```
+<type>(<ticket>): <short summary in imperative mood>
+```
+
+Types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `wip`

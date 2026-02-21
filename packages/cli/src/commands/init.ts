@@ -1,8 +1,7 @@
-import { writeFileSync, mkdirSync, existsSync, cpSync } from 'node:fs';
+import { writeFileSync, mkdirSync, existsSync, cpSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createConfig } from '../config.js';
-import type { SlopeConfig } from '../config.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -69,81 +68,135 @@ const EXAMPLE_COMMON_ISSUES = {
   ],
 };
 
+type Provider = 'claude-code' | 'cursor' | 'generic';
+
+function detectProvider(args: string[]): Provider | null {
+  if (args.includes('--claude-code')) return 'claude-code';
+  if (args.includes('--cursor')) return 'cursor';
+  if (args.includes('--generic')) return 'generic';
+  return null;
+}
+
+function getTemplatesRoot(): string {
+  return join(__dirname, '..', '..', '..', '..', 'templates');
+}
+
+function installClaudeCodeTemplates(cwd: string): void {
+  const templatesRoot = join(getTemplatesRoot(), 'claude-code');
+  const rulesDir = join(cwd, '.claude', 'rules');
+  const hooksDir = join(cwd, '.claude', 'hooks');
+
+  mkdirSync(rulesDir, { recursive: true });
+  mkdirSync(hooksDir, { recursive: true });
+
+  const ruleFiles = ['sprint-checklist.md', 'commit-discipline.md', 'review-loop.md'];
+  for (const file of ruleFiles) {
+    const src = join(templatesRoot, 'rules', file);
+    const dest = join(rulesDir, file);
+    if (existsSync(src) && !existsSync(dest)) {
+      cpSync(src, dest);
+      console.log(`  Created ${dest}`);
+    }
+  }
+
+  const hookFiles = ['pre-merge-check.sh'];
+  for (const file of hookFiles) {
+    const src = join(templatesRoot, 'hooks', file);
+    const dest = join(hooksDir, file);
+    if (existsSync(src) && !existsSync(dest)) {
+      cpSync(src, dest);
+      console.log(`  Created ${dest}`);
+    }
+  }
+
+  console.log('\n  Claude Code templates installed to .claude/rules/ and .claude/hooks/');
+}
+
+function installCursorTemplates(cwd: string): void {
+  const templatesRoot = join(getTemplatesRoot(), 'cursor', 'rules');
+  const rulesDir = join(cwd, '.cursor', 'rules');
+
+  mkdirSync(rulesDir, { recursive: true });
+
+  try {
+    const files = readdirSync(templatesRoot).filter((f: string) => f.endsWith('.mdc'));
+    for (const file of files) {
+      const src = join(templatesRoot, file);
+      const dest = join(rulesDir, file);
+      if (!existsSync(dest)) {
+        cpSync(src, dest);
+        console.log(`  Created ${dest}`);
+      }
+    }
+  } catch {
+    console.error('  Warning: Could not find Cursor rule templates');
+  }
+
+  console.log('\n  Cursor rules installed to .cursor/rules/');
+}
+
+function installGenericTemplates(cwd: string): void {
+  const templatesRoot = join(getTemplatesRoot(), 'generic');
+  const dest = join(cwd, 'SLOPE-CHECKLIST.md');
+
+  const src = join(templatesRoot, 'SLOPE-CHECKLIST.md');
+  if (existsSync(src) && !existsSync(dest)) {
+    cpSync(src, dest);
+    console.log(`  Created ${dest}`);
+  }
+
+  console.log('\n  Generic SLOPE checklist installed.');
+}
+
 export function initCommand(args: string[]): void {
   const cwd = process.cwd();
-  const claudeCode = args.includes('--claude-code');
+  const provider = detectProvider(args);
 
-  // Create .slope directory and config
   const configPath = createConfig(cwd);
   console.log(`  Created ${configPath}`);
 
-  // Create scorecard directory
   const scorecardDir = join(cwd, 'docs', 'retros');
   if (!existsSync(scorecardDir)) {
     mkdirSync(scorecardDir, { recursive: true });
     console.log(`  Created ${scorecardDir}/`);
   }
 
-  // Write example scorecard
   const examplePath = join(scorecardDir, 'sprint-1.json');
   if (!existsSync(examplePath)) {
     writeFileSync(examplePath, JSON.stringify(EXAMPLE_SCORECARD, null, 2) + '\n');
     console.log(`  Created ${examplePath}`);
   }
 
-  // Write example common-issues.json
   const commonIssuesPath = join(cwd, '.slope', 'common-issues.json');
   if (!existsSync(commonIssuesPath)) {
     writeFileSync(commonIssuesPath, JSON.stringify(EXAMPLE_COMMON_ISSUES, null, 2) + '\n');
     console.log(`  Created ${commonIssuesPath}`);
   }
 
-  // Write example sessions.json
   const sessionsPath = join(cwd, '.slope', 'sessions.json');
   if (!existsSync(sessionsPath)) {
     writeFileSync(sessionsPath, JSON.stringify({ sessions: [] }, null, 2) + '\n');
     console.log(`  Created ${sessionsPath}`);
   }
 
-  // Write empty claims.json
   const claimsPath = join(cwd, '.slope', 'claims.json');
   if (!existsSync(claimsPath)) {
     writeFileSync(claimsPath, JSON.stringify({ claims: [] }, null, 2) + '\n');
     console.log(`  Created ${claimsPath}`);
   }
 
-  // Claude Code templates
-  if (claudeCode) {
-    const templatesRoot = join(__dirname, '..', '..', '..', '..', 'templates', 'claude-code');
-    const rulesDir = join(cwd, '.claude', 'rules');
-    const hooksDir = join(cwd, '.claude', 'hooks');
-
-    mkdirSync(rulesDir, { recursive: true });
-    mkdirSync(hooksDir, { recursive: true });
-
-    // Copy rule templates
-    const ruleFiles = ['sprint-checklist.md', 'commit-discipline.md', 'review-loop.md'];
-    for (const file of ruleFiles) {
-      const src = join(templatesRoot, 'rules', file);
-      const dest = join(rulesDir, file);
-      if (existsSync(src) && !existsSync(dest)) {
-        cpSync(src, dest);
-        console.log(`  Created ${dest}`);
-      }
-    }
-
-    // Copy hook templates
-    const hookFiles = ['pre-merge-check.sh'];
-    for (const file of hookFiles) {
-      const src = join(templatesRoot, 'hooks', file);
-      const dest = join(hooksDir, file);
-      if (existsSync(src) && !existsSync(dest)) {
-        cpSync(src, dest);
-        console.log(`  Created ${dest}`);
-      }
-    }
-
-    console.log('\n  Claude Code templates installed to .claude/rules/ and .claude/hooks/');
+  switch (provider) {
+    case 'claude-code':
+      installClaudeCodeTemplates(cwd);
+      break;
+    case 'cursor':
+      installCursorTemplates(cwd);
+      break;
+    case 'generic':
+      installGenericTemplates(cwd);
+      break;
+    default:
+      break;
   }
 
   console.log('\nSLOPE initialized. Try:');

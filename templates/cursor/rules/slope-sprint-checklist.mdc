@@ -1,0 +1,39 @@
+---
+description: SLOPE sprint lifecycle checklist — routines for pre-round, per-ticket, and post-round
+globs:
+alwaysApply: true
+---
+
+# Sprint Checklists (SLOPE Routine Hierarchy)
+
+The SLOPE framework organizes sprint work into a hierarchy of routines, mirroring golf's structured approach to each shot, hole, and round.
+
+## Pre-Round Routine (Sprint Start)
+
+Before writing any code in a new sprint:
+
+1. **Run `slope briefing`** — Outputs handicap snapshot, hazard index, nutrition alerts, filtered gotchas, and session continuity
+   - Use `--categories=testing,api` or `--keywords=migration` to filter for the sprint's work area
+2. **Verify previous scorecard exists** — If the last sprint's scorecard wasn't created, create it now
+3. **Branch hygiene check** — `git branch -a` to confirm no stale branches remain
+4. **Set par and slope** — Par from ticket count (1-2=3, 3-4=4, 5+=5), slope from complexity factors
+
+## Pre-Shot Routine (Per-Ticket, Before Code)
+
+1. **Select your club** — driver (risky/new), long_iron (multi-package), short_iron (standard), wedge (small), putter (trivial)
+2. **Check the yardage book** — Review relevant codebase sections for files you'll modify
+3. **Scan for hazards** — Check `bunker_locations` from recent scorecards and common issues
+
+## Post-Shot Routine (Per-Ticket, After Completion)
+
+1. **Score the shot** — in_the_hole (perfect), green (landed), fairway (clean start), or miss direction
+2. **Record hazards** — Note any gotchas encountered
+3. **Check for penalties** — Tests break? Reverts needed?
+4. **Push** — The last push is the recovery point
+
+## Post-Hole Routine (Sprint Completion)
+
+1. **Build the SLOPE scorecard** — Create scorecard JSON. Run `slope validate`
+2. **Distill learnings** — Update common-issues with new recurring patterns
+3. **Review** — Run `slope review` to generate the sprint review markdown
+4. **Compute handicap** — Run `slope card` to see trending stats

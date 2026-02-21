@@ -86,7 +86,9 @@ console.log(rec.club); // 'short_iron'
 | Command | Description |
 |---------|-------------|
 | `slope init` | Create `.slope/` directory with config and example scorecard |
+| `slope init --cursor` | Also install Cursor IDE rules (`.cursor/rules/`) |
 | `slope init --claude-code` | Also install Claude Code rules and hooks |
+| `slope init --generic` | Install a provider-agnostic SLOPE checklist |
 | `slope card` | Display handicap card with rolling windows |
 | `slope validate [path]` | Validate scorecard(s) — runs all if no path given |
 | `slope review [path]` | Format sprint review as markdown |
@@ -95,6 +97,9 @@ console.log(rec.club); // 'short_iron'
 | `slope briefing --categories=testing` | Filter briefing by category |
 | `slope plan --complexity=medium` | Get club recommendation + training plan |
 | `slope classify --scope=... --modified=... --tests=pass --reverts=0` | Classify a shot |
+| `slope tournament --id=M-09 --sprints=197..202` | Build tournament review from sprint range |
+| `slope auto-card --sprint=N [--since=date]` | Generate scorecard from git commits |
+| `slope next` | Show next sprint number (auto-detected from scorecards) |
 
 ## Configuration
 
@@ -110,19 +115,38 @@ After `slope init`, configure `.slope/config.json`:
 }
 ```
 
-## Claude Code Integration
+## Agent / IDE Integration
 
-SLOPE includes templates for [Claude Code](https://docs.anthropic.com/en/docs/claude-code):
+SLOPE ships provider-specific templates so your AI coding assistant follows sprint discipline automatically.
+
+### Cursor
+
+```bash
+slope init --cursor
+```
+
+Installs `.cursor/rules/` with SLOPE-aware `.mdc` rule files:
+- `slope-sprint-checklist.mdc` — Pre-Round, Post-Shot, Post-Hole routines
+- `slope-commit-discipline.mdc` — Commit/push triggers
+- `slope-review-loop.mdc` — Architect review tiers
+
+### Claude Code
 
 ```bash
 slope init --claude-code
 ```
 
-This installs:
-- `.claude/rules/sprint-checklist.md` — Pre-Round, Post-Shot, Post-Hole routines
-- `.claude/rules/commit-discipline.md` — Commit/push triggers
-- `.claude/rules/review-loop.md` — Architect review tiers
-- `.claude/hooks/pre-merge-check.sh` — Validates scorecard before merge
+Installs `.claude/rules/` and `.claude/hooks/`:
+- `sprint-checklist.md`, `commit-discipline.md`, `review-loop.md`
+- `pre-merge-check.sh` — Validates scorecard before merge
+
+### Generic / MCP
+
+```bash
+slope init --generic
+```
+
+Installs a standalone `SLOPE-CHECKLIST.md` in your project root for any agent or manual use.
 
 ## License
 

@@ -46,6 +46,25 @@ export function loadScorecards(config: SlopeConfig, cwd: string = process.cwd())
   return scorecards;
 }
 
+/**
+ * Detect the latest sprint number from existing scorecards.
+ * Returns 0 if no scorecards are found.
+ */
+export function detectLatestSprint(config: SlopeConfig, cwd: string = process.cwd()): number {
+  const cards = loadScorecards(config, cwd);
+  if (cards.length === 0) return 0;
+  return Math.max(...cards.map((c) => c.sprint_number));
+}
+
+/**
+ * Resolve the current sprint number: explicit config > auto-detect + 1.
+ */
+export function resolveCurrentSprint(config: SlopeConfig, cwd: string = process.cwd()): number {
+  if (config.currentSprint) return config.currentSprint;
+  const latest = detectLatestSprint(config, cwd);
+  return latest + 1;
+}
+
 function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
