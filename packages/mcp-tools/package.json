@@ -11,6 +11,7 @@
   "scripts": {
     "build": "tsc",
     "test": "vitest run",
+    "test:integration": "vitest run --config vitest.config.integration.ts",
     "typecheck": "tsc --noEmit"
   },
   "keywords": [
@@ -31,6 +32,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.26.0",
     "@slope-dev/core": "workspace:*",
+    "@slope-dev/store-sqlite": "workspace:*",
     "zod": "^3.24.0"
   },
   "devDependencies": {

@@ -4,7 +4,7 @@
 
 export interface FunctionRegistryEntry {
   name: string;
-  module: 'core' | 'fs' | 'constants';
+  module: 'core' | 'fs' | 'constants' | 'store';
   description: string;
   signature: string;
   example: string;
@@ -277,6 +277,29 @@ export const SLOPE_REGISTRY: FunctionRegistryEntry[] = [
     signature: 'const NUTRITION_CHECKLIST: NutritionCategory[]',
     example: 'return NUTRITION_CHECKLIST;',
   },
+
+  // ─── Store (MCP tools) ───
+  {
+    name: 'session_status',
+    module: 'store',
+    description: 'MCP tool: Returns active sessions and claims from the SlopeStore.',
+    signature: 'session_status(): { sessions: SlopeSession[]; claims: SprintClaim[] }',
+    example: '// Called via MCP tool, not directly',
+  },
+  {
+    name: 'acquire_claim',
+    module: 'store',
+    description: 'MCP tool: Claims a ticket or area for the current sprint via SlopeStore.',
+    signature: 'acquire_claim(sessionId: string, target: string, scope: ClaimScope, sprintNumber: number, player: string): SprintClaim',
+    example: '// Called via MCP tool, not directly',
+  },
+  {
+    name: 'check_conflicts',
+    module: 'store',
+    description: 'MCP tool: Detects overlapping and adjacent conflicts among active claims.',
+    signature: 'check_conflicts(sprintNumber?: number): { claims: number; conflicts: SprintConflict[] }',
+    example: '// Called via MCP tool, not directly',
+  },
 ];
 
 /**
@@ -315,7 +338,11 @@ interface DispersionReport { total_shots: number; total_misses: number; miss_rat
 interface AreaReport { by_sprint_type: Record<string, { count: number; avg_score_vs_par: number; fairway_pct: number; gir_pct: number }>; by_club: Record<string, { count: number; in_the_hole_rate: number; miss_rate: number }>; par_performance: Record<number, { count: number; avg_score_vs_par: number; over_par_rate: number }>; }
 
 // ─── Config & Loader ───
-interface SlopeConfig { scorecardDir: string; scorecardPattern: string; minSprint: number; commonIssuesPath: string; sessionsPath: string; registry: 'file' | 'api'; claimsPath: string; registryApiUrl?: string; currentSprint?: number; }
+interface SlopeConfig { scorecardDir: string; scorecardPattern: string; minSprint: number; commonIssuesPath: string; sessionsPath: string; registry: 'file' | 'api'; claimsPath: string; registryApiUrl?: string; currentSprint?: number; store?: string; store_path?: string; }
+
+// ─── Store ───
+interface SlopeSession { session_id: string; role: 'primary' | 'secondary' | 'observer'; ide: string; worktree_path?: string; branch?: string; started_at: string; last_heartbeat_at: string; metadata?: Record<string, unknown>; }
+interface SprintClaim { id: string; sprint_number: number; player: string; target: string; scope: ClaimScope; claimed_at: string; notes?: string; session_id?: string; expires_at?: string; metadata?: Record<string, unknown>; }
 
 // ─── Builder Input ───
 interface ScorecardInput { sprint_number: number; theme: string; par: 3 | 4 | 5; slope: number; date: string; shots: ShotRecord[]; putts?: number; penalties?: number; type?: SprintType; conditions?: ConditionRecord[]; special_plays?: SpecialPlay[]; training?: TrainingSession[]; nutrition?: NutritionEntry[]; nineteenth_hole?: NineteenthHole; bunker_locations?: string[]; yardage_book_updates?: string[]; course_management_notes?: string[]; }

@@ -2,21 +2,75 @@ import { describe, it, expect } from 'vitest';
 import { createSlopeToolsServer, SLOPE_MCP_TOOL_NAMES } from './index.js';
 import { SLOPE_REGISTRY, SLOPE_TYPES } from './registry.js';
 import { runInSandbox } from './sandbox.js';
-import { mkdtempSync, writeFileSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import type { SlopeStore, SlopeSession, SprintClaim, GolfScorecard } from '@slope-dev/core';
+import type { CommonIssuesFile } from '@slope-dev/core';
+
+/** In-memory mock store for testing */
+function createMockStore(): SlopeStore & { sessions: SlopeSession[]; claims: SprintClaim[] } {
+  const sessions: SlopeSession[] = [];
+  const claims: SprintClaim[] = [];
+
+  return {
+    sessions,
+    claims,
+    async registerSession(s) {
+      const session: SlopeSession = { ...s, started_at: new Date().toISOString(), last_heartbeat_at: new Date().toISOString() };
+      sessions.push(session);
+      return session;
+    },
+    async removeSession(id) {
+      const idx = sessions.findIndex(s => s.session_id === id);
+      if (idx === -1) return false;
+      sessions.splice(idx, 1);
+      return true;
+    },
+    async getActiveSessions() { return [...sessions]; },
+    async updateHeartbeat() {},
+    async cleanStaleSessions() { return 0; },
+    async claim(input) {
+      const claim: SprintClaim = { ...input, id: `claim-${Date.now()}`, claimed_at: new Date().toISOString() };
+      claims.push(claim);
+      return claim;
+    },
+    async release(id) {
+      const idx = claims.findIndex(c => c.id === id);
+      if (idx === -1) return false;
+      claims.splice(idx, 1);
+      return true;
+    },
+    async list(n) { return claims.filter(c => c.sprint_number === n); },
+    async get(id) { return claims.find(c => c.id === id); },
+    async getActiveClaims(n) { return n !== undefined ? claims.filter(c => c.sprint_number === n) : [...claims]; },
+    async saveScorecard() {},
+    async listScorecards() { return []; },
+    async loadCommonIssues() { return { recurring_patterns: [] }; },
+    async saveCommonIssues() {},
+    close() {},
+  };
+}
 
 describe('createSlopeToolsServer', () => {
-  it('returns an MCP server instance', () => {
+  it('returns an MCP server instance without store', () => {
     const server = createSlopeToolsServer();
     expect(server).toBeDefined();
     expect(typeof server).toBe('object');
   });
 
-  it('exposes exactly 2 tools', () => {
-    expect(SLOPE_MCP_TOOL_NAMES).toHaveLength(2);
+  it('returns an MCP server instance with store', () => {
+    const server = createSlopeToolsServer(createMockStore());
+    expect(server).toBeDefined();
+  });
+
+  it('exposes exactly 5 tool names', () => {
+    expect(SLOPE_MCP_TOOL_NAMES).toHaveLength(5);
     expect(SLOPE_MCP_TOOL_NAMES).toContain('search');
     expect(SLOPE_MCP_TOOL_NAMES).toContain('execute');
+    expect(SLOPE_MCP_TOOL_NAMES).toContain('session_status');
+    expect(SLOPE_MCP_TOOL_NAMES).toContain('acquire_claim');
+    expect(SLOPE_MCP_TOOL_NAMES).toContain('check_conflicts');
   });
 });
 
@@ -41,11 +95,18 @@ describe('registry', () => {
     expect(fsEntries.every((e) => e.module === 'fs')).toBe(true);
   });
 
+  it('store module entries exist', () => {
+    const storeEntries = SLOPE_REGISTRY.filter((e) => e.module === 'store');
+    expect(storeEntries).toHaveLength(3);
+    expect(storeEntries.map(e => e.name)).toEqual(['session_status', 'acquire_claim', 'check_conflicts']);
+  });
+
   it('SLOPE_TYPES contains key type definitions', () => {
     expect(SLOPE_TYPES).toContain('GolfScorecard');
     expect(SLOPE_TYPES).toContain('HandicapCard');
     expect(SLOPE_TYPES).toContain('SlopeConfig');
     expect(SLOPE_TYPES).toContain('ScorecardInput');
+    expect(SLOPE_TYPES).toContain('SlopeSession');
   });
 });
 
@@ -129,5 +190,58 @@ describe('sandbox', () => {
       tmp,
     );
     expect(result).toBe(1);
+  });
+});
+
+describe('mock store tools', () => {
+  it('session_status returns sessions and claims from mock', async () => {
+    const store = createMockStore();
+    await store.registerSession({ session_id: 's1', role: 'primary', ide: 'claude-code' });
+    await store.claim({ sprint_number: 1, player: 'alice', target: 'T-1', scope: 'ticket', session_id: 's1' });
+
+    const sessions = await store.getActiveSessions();
+    const claims = await store.getActiveClaims();
+    expect(sessions).toHaveLength(1);
+    expect(claims).toHaveLength(1);
+  });
+
+  it('acquire_claim creates claim in mock', async () => {
+    const store = createMockStore();
+    const claim = await store.claim({ sprint_number: 1, player: 'bob', target: 'T-2', scope: 'ticket' });
+    expect(claim.id).toMatch(/^claim-/);
+    expect(claim.target).toBe('T-2');
+  });
+
+  it('check_conflicts detects overlaps', async () => {
+    const { checkConflicts } = await import('@slope-dev/core');
+    const store = createMockStore();
+    await store.claim({ sprint_number: 1, player: 'alice', target: 'T-1', scope: 'ticket' });
+    await store.claim({ sprint_number: 1, player: 'bob', target: 'T-1', scope: 'ticket' });
+
+    const claims = await store.getActiveClaims(1);
+    const conflicts = checkConflicts(claims);
+    expect(conflicts).toHaveLength(1);
+    expect(conflicts[0].severity).toBe('overlap');
+  });
+
+  it('check_conflicts filters by sprint', async () => {
+    const { checkConflicts } = await import('@slope-dev/core');
+    const store = createMockStore();
+    await store.claim({ sprint_number: 1, player: 'alice', target: 'T-1', scope: 'ticket' });
+    await store.claim({ sprint_number: 2, player: 'bob', target: 'T-1', scope: 'ticket' });
+
+    const claimsSprint1 = await store.getActiveClaims(1);
+    const conflicts = checkConflicts(claimsSprint1);
+    expect(conflicts).toHaveLength(0); // Different sprints, only sprint 1 claims returned
+  });
+
+  it('server without store creates successfully with only 2 base tools', () => {
+    const server = createSlopeToolsServer();
+    expect(server).toBeDefined();
+  });
+
+  it('server with store creates successfully', () => {
+    const server = createSlopeToolsServer(createMockStore());
+    expect(server).toBeDefined();
   });
 });
