@@ -11,6 +11,8 @@ export interface SlopeConfig {
   claimsPath: string;
   registryApiUrl?: string;
   currentSprint?: number;
+  store?: string;
+  store_path?: string;
 }
 
 const DEFAULT_CONFIG: SlopeConfig = {

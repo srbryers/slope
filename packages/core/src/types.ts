@@ -221,6 +221,10 @@ export interface SprintClaim {
   scope: ClaimScope;
   claimed_at: string;
   notes?: string;
+  // Store-backed claim fields
+  session_id?: string;
+  expires_at?: string;
+  metadata?: Record<string, unknown>;
 }
 
 /** A conflict detected between two sprint claims */

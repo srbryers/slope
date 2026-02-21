@@ -119,6 +119,10 @@ export type {
 export { checkConflicts } from './registry.js';
 export type { SprintRegistry } from './registry.js';
 
+// Store
+export { SlopeStoreError } from './store.js';
+export type { SlopeStore, SlopeSession, StoreErrorCode } from './store.js';
+
 // Tournament Review
 export {
   buildTournamentReview,
