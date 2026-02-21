@@ -217,7 +217,7 @@ export function initCommand(args: string[]): void {
       break;
     case 'cursor':
       installCursorTemplates(cwd);
-      if (args.includes('--mcp')) installCursorMcpConfig(cwd);
+      installCursorMcpConfig(cwd);
       break;
     case 'generic':
       installGenericTemplates(cwd);

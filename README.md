@@ -101,23 +101,6 @@ console.log(rec.club); // 'short_iron'
 | `slope auto-card --sprint=N [--since=date]` | Generate scorecard from git commits |
 | `slope next` | Show next sprint number (auto-detected from scorecards) |
 
-## Cursor MCP
-
-Add SLOPE as an MCP server in Cursor for handicap, briefing, and club recommendations. In `.cursor/mcp.json`:
-
-```json
-{
-  "mcpServers": {
-    "slope": {
-      "command": "npx",
-      "args": ["@slope-dev/mcp-tools"]
-    }
-  }
-}
-```
-
-Or run `slope init --cursor --mcp` to add this when initializing a project.
-
 ## Configuration
 
 After `slope init`, configure `.slope/config.json`:
