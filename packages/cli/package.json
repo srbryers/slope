@@ -1,6 +1,6 @@
 {
   "name": "@slope-dev/cli",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "SLOPE CLI — Sprint Lifecycle & Operational Performance Engine",
   "type": "module",
   "bin": {

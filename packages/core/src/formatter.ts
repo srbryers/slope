@@ -65,6 +65,12 @@ const PLAIN_SCORES: Record<ScoreLabel, string> = {
   triple_plus: 'Major overrun',
 };
 
+function safeBunkerLabel(b: unknown): string {
+  if (typeof b === 'string') return b;
+  if (b && typeof b === 'object') return (b as Record<string, unknown>).area as string ?? String(b);
+  return String(b);
+}
+
 // --- Formatter ---
 
 /**
@@ -83,13 +89,16 @@ export function formatSprintReview(
     return formatPlainReview(card, projectStats, deltas);
   }
   const sprintNum = card.sprint_number ?? (card as any).sprint;
+  const stats = normalizeStats(card.stats, card.shots?.length ?? 0);
+  const shots = card.shots ?? [];
+  const conditions = card.conditions ?? [];
+  const bunkerLocations = card.bunker_locations ?? [];
+  const courseNotes = card.course_management_notes ?? [];
   const lines: string[] = [];
 
-  // Header
   lines.push(`## Sprint ${sprintNum} Review: ${card.theme}`);
   lines.push('');
 
-  // SLOPE Scorecard Summary
   lines.push('### SLOPE Scorecard Summary');
   lines.push('');
   lines.push('| Metric | Value |');
@@ -98,13 +107,12 @@ export function formatSprintReview(
   lines.push(`| Slope | ${card.slope} |`);
   lines.push(`| Score | ${card.score} |`);
   lines.push(`| Label | ${card.score_label} |`);
-  lines.push(`| Fairway % | ${pct(card.stats.fairways_hit, card.stats.fairways_total)} (${card.stats.fairways_hit}/${card.stats.fairways_total}) |`);
-  lines.push(`| GIR % | ${pct(card.stats.greens_in_regulation, card.stats.greens_total)} (${card.stats.greens_in_regulation}/${card.stats.greens_total}) |`);
-  lines.push(`| Putts | ${card.stats.putts} |`);
-  lines.push(`| Penalties | ${card.stats.penalties} |`);
+  lines.push(`| Fairway % | ${pct(stats.fairways_hit, stats.fairways_total)} (${stats.fairways_hit}/${stats.fairways_total}) |`);
+  lines.push(`| GIR % | ${pct(stats.greens_in_regulation, stats.greens_total)} (${stats.greens_in_regulation}/${stats.greens_total}) |`);
+  lines.push(`| Putts | ${stats.putts} |`);
+  lines.push(`| Penalties | ${stats.penalties} |`);
   lines.push('');
 
-  // Project Stats (if provided)
   if (projectStats) {
     lines.push('### Project Stats');
     lines.push('');
@@ -115,7 +123,6 @@ export function formatSprintReview(
         const d = deltas?.[key];
         lines.push(`| ${key} | ${value} | ${delta(d)} |`);
       } else if (typeof value === 'object' && value !== null) {
-        // Nested record — render as sub-rows
         const total = Object.values(value).reduce((sum, v) => sum + v, 0);
         const d = deltas?.[key];
         lines.push(`| ${key} | ${total} | ${delta(d)} |`);
@@ -127,30 +134,28 @@ export function formatSprintReview(
     lines.push('');
   }
 
-  // Shot-by-Shot
-  lines.push(`### Shot-by-Shot (Tickets Delivered: ${card.shots.length})`);
+  lines.push(`### Shot-by-Shot (Tickets Delivered: ${shots.length})`);
   lines.push('');
   lines.push('| Ticket | Club | Result | Hazards | Notes |');
   lines.push('|---|---|---|---|---|');
-  for (const shot of card.shots) {
-    const hazards = shot.hazards.length > 0
-      ? shot.hazards.map(h => `${h.type}: ${h.description}`).join('; ')
+  for (const shot of shots) {
+    const hazards = (shot.hazards ?? []).length > 0
+      ? shot.hazards.map(h => `${h.type}: ${h.description ?? 'unknown'}`).join('; ')
       : '—';
     const notes = shot.notes ?? '—';
     lines.push(`| ${shot.ticket_key} | ${shot.club} | ${shot.result} | ${hazards} | ${notes} |`);
   }
   lines.push('');
 
-  // Miss Pattern
-  const missTotal = card.stats.miss_directions.long + card.stats.miss_directions.short +
-    card.stats.miss_directions.left + card.stats.miss_directions.right;
+  const missTotal = stats.miss_directions.long + stats.miss_directions.short +
+    stats.miss_directions.left + stats.miss_directions.right;
   if (missTotal > 0) {
     lines.push('### Miss Pattern');
     lines.push('');
     lines.push('| Direction | Count |');
     lines.push('|---|---|');
     for (const dir of ['long', 'short', 'left', 'right'] as MissDirection[]) {
-      const count = card.stats.miss_directions[dir];
+      const count = stats.miss_directions[dir];
       if (count > 0) {
         lines.push(`| ${MISS_LABELS[dir]} | ${count} |`);
       }
@@ -158,41 +163,38 @@ export function formatSprintReview(
     lines.push('');
   }
 
-  // Conditions
-  if (card.conditions.length > 0) {
+  if (conditions.length > 0) {
     lines.push('### Conditions');
     lines.push('');
     lines.push('| Condition | Impact | Description |');
     lines.push('|---|---|---|');
-    for (const c of card.conditions) {
+    for (const c of conditions) {
       lines.push(`| ${c.type} | ${c.impact} | ${c.description} |`);
     }
     lines.push('');
   }
 
-  // Hazards Discovered
-  const allHazards = card.shots.flatMap(s => s.hazards.map(h => ({ ...h, ticket: s.ticket_key })));
-  if (allHazards.length > 0 || card.bunker_locations.length > 0) {
+  const allHazards = shots.flatMap(s => (s.hazards ?? []).map(h => ({ ...h, ticket: s.ticket_key })));
+  if (allHazards.length > 0 || bunkerLocations.length > 0) {
     lines.push('### Hazards Discovered (Bunker Locations)');
     lines.push('');
     if (allHazards.length > 0) {
       lines.push('| Type | Ticket | Description |');
       lines.push('|---|---|---|');
       for (const h of allHazards) {
-        lines.push(`| ${h.type} | ${h.ticket} | ${h.description} |`);
+        lines.push(`| ${h.type} | ${h.ticket} | ${h.description ?? 'unknown'} |`);
       }
       lines.push('');
     }
-    if (card.bunker_locations.length > 0) {
+    if (bunkerLocations.length > 0) {
       lines.push('**Bunker locations for future sprints:**');
-      for (const b of card.bunker_locations) {
-        lines.push(`- ${b}`);
+      for (const b of bunkerLocations) {
+        lines.push(`- ${safeBunkerLabel(b)}`);
       }
       lines.push('');
     }
   }
 
-  // Training Log
   if (card.training && card.training.length > 0) {
     lines.push('### Training Log');
     lines.push('');
@@ -204,7 +206,6 @@ export function formatSprintReview(
     lines.push('');
   }
 
-  // Nutrition Check
   if (card.nutrition && card.nutrition.length > 0) {
     lines.push('### Nutrition Check (Development Health)');
     lines.push('');
@@ -216,17 +217,15 @@ export function formatSprintReview(
     lines.push('');
   }
 
-  // Course Management Notes
-  if (card.course_management_notes.length > 0) {
+  if (courseNotes.length > 0) {
     lines.push('### Course Management Notes');
     lines.push('');
-    for (const note of card.course_management_notes) {
+    for (const note of courseNotes) {
       lines.push(`- ${note}`);
     }
     lines.push('');
   }
 
-  // 19th Hole
   if (card.nineteenth_hole) {
     const nh = card.nineteenth_hole;
     lines.push('### 19th Hole');
@@ -249,15 +248,10 @@ export interface AdvisorReportInput {
   hazardWarnings?: string[];
 }
 
-/**
- * Format advisor outputs (club recommendation, training plan, hazard warnings)
- * into a readable markdown report. Sections are omitted if their input is undefined/empty.
- */
 export function formatAdvisorReport(input: AdvisorReportInput): string {
   const { clubRecommendation, trainingPlan, hazardWarnings } = input;
   const lines: string[] = [];
 
-  // Club Recommendation
   if (clubRecommendation) {
     lines.push('### CLUB RECOMMENDATION');
     lines.push('');
@@ -274,7 +268,6 @@ export function formatAdvisorReport(input: AdvisorReportInput): string {
     lines.push('');
   }
 
-  // Training Recommendations (high/medium only)
   const filtered = trainingPlan?.filter(t => t.priority === 'high' || t.priority === 'medium') ?? [];
   if (filtered.length > 0) {
     lines.push('### TRAINING RECOMMENDATIONS');
@@ -288,7 +281,6 @@ export function formatAdvisorReport(input: AdvisorReportInput): string {
     lines.push('');
   }
 
-  // Hazard Warnings
   if (hazardWarnings && hazardWarnings.length > 0) {
     lines.push('### HAZARD WARNINGS');
     lines.push('');
@@ -309,24 +301,22 @@ function formatPlainReview(
   deltas?: ProjectStatsDelta,
 ): string {
   const sprintNum = card.sprint_number ?? (card as any).sprint;
+  const shots = card.shots ?? [];
   const lines: string[] = [];
 
-  // Header
   lines.push(`## Sprint ${sprintNum}: ${card.theme}`);
   lines.push('');
 
-  // Summary
   const scoreDesc = PLAIN_SCORES[card.score_label] ?? card.score_label;
   lines.push(`**Status:** ${scoreDesc}`);
-  lines.push(`**Tickets:** ${card.shots.length} delivered`);
+  lines.push(`**Tickets:** ${shots.length} delivered`);
   lines.push('');
 
-  // Tickets
   lines.push('### Tickets');
   lines.push('');
   lines.push('| Ticket | Approach | Outcome | Notes |');
   lines.push('|---|---|---|---|');
-  for (const shot of card.shots) {
+  for (const shot of shots) {
     const approach = PLAIN_CLUBS[shot.club] ?? shot.club;
     const outcome = PLAIN_RESULTS[shot.result] ?? shot.result;
     const notes = shot.notes ?? '—';
@@ -334,7 +324,6 @@ function formatPlainReview(
   }
   lines.push('');
 
-  // Project Stats
   if (projectStats) {
     lines.push('### System Stats');
     lines.push('');
@@ -347,7 +336,6 @@ function formatPlainReview(
     lines.push('');
   }
 
-  // Reflection
   if (card.nineteenth_hole) {
     const nh = card.nineteenth_hole;
     lines.push('### Reflection');

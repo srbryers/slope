@@ -61,11 +61,9 @@ function computeRollingStats(scorecards: GolfScorecard[]): RollingStats {
 
   const n = scorecards.length;
 
-  // Handicap: average (score - par), floored at 0
   const totalDiff = scorecards.reduce((sum, sc) => sum + (sc.score - sc.par), 0);
   const handicap = Math.max(0, Math.round((totalDiff / n) * 10) / 10);
 
-  // Aggregate stats
   let totalFairways = 0;
   let totalFairwaysTotal = 0;
   let totalGir = 0;
@@ -77,7 +75,7 @@ function computeRollingStats(scorecards: GolfScorecard[]): RollingStats {
   let totalGimmes = 0;
 
   for (const sc of scorecards) {
-    const stats: HoleStats = sc.stats;
+    const stats = normalizeStats(sc.stats, sc.shots?.length ?? 0);
     totalFairways += stats.fairways_hit;
     totalFairwaysTotal += stats.fairways_total;
     totalGir += stats.greens_in_regulation;
@@ -89,7 +87,7 @@ function computeRollingStats(scorecards: GolfScorecard[]): RollingStats {
       missPattern[dir] += stats.miss_directions[dir] ?? 0;
     }
 
-    for (const play of sc.special_plays) {
+    for (const play of sc.special_plays ?? []) {
       if (play === 'mulligan') totalMulligans++;
       if (play === 'gimme') totalGimmes++;
     }
