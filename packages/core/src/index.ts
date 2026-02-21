@@ -55,7 +55,6 @@ export {
 // Builder
 export {
   computeStatsFromShots,
-  normalizeStats,
   buildScorecard,
 } from './builder.js';
 export type { ScorecardInput } from './builder.js';

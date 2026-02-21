@@ -77,7 +77,7 @@ function computeRollingStats(scorecards: GolfScorecard[]): RollingStats {
   let totalGimmes = 0;
 
   for (const sc of scorecards) {
-    const stats: HoleStats = normalizeStats(sc.stats, sc.shots?.length ?? 0);
+    const stats: HoleStats = sc.stats;
     totalFairways += stats.fairways_hit;
     totalFairwaysTotal += stats.fairways_total;
     totalGir += stats.greens_in_regulation;

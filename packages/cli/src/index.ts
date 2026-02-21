@@ -92,7 +92,6 @@ Usage:
   slope release --id=<id>                   Release a claim by ID
   slope release --target=<t> [--player=<p>] Release a claim by target
   slope status [--sprint=N]                 Show sprint course status + conflicts
-  slope tournament --id=<id> [options]      Generate tournament review from scorecards
 
 Examples:
   slope init                                Create .slope/ with config + example scorecard

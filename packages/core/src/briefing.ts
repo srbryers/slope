@@ -191,19 +191,18 @@ export function hazardBriefing(opts: {
     // Check shot hazards
     for (const shot of sc.shots) {
       for (const h of shot.hazards) {
-        const desc = (h.description ?? '').toLowerCase();
+        const desc = h.description.toLowerCase();
         if (loweredAreas.some(area => desc.includes(area))) {
-          warnings.push(`WARNING: ${h.type} — ${h.description ?? 'unknown'} (seen in S${sprintNum})`);
+          warnings.push(`WARNING: ${h.type} — ${h.description} (seen in S${sprintNum})`);
         }
       }
     }
 
     // Check bunker locations
     for (const loc of sc.bunker_locations) {
-      const locStr = typeof loc === 'string' ? loc : (loc as Record<string, unknown>)?.area as string ?? '';
-      const lowLoc = locStr.toLowerCase();
+      const lowLoc = loc.toLowerCase();
       if (loweredAreas.some(area => lowLoc.includes(area))) {
-        warnings.push(`WARNING: bunker — ${locStr} (seen in S${sprintNum})`);
+        warnings.push(`WARNING: bunker — ${loc} (seen in S${sprintNum})`);
       }
     }
   }
