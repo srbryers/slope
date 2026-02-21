@@ -1,0 +1,75 @@
+{
+  "sprint_number": 5,
+  "theme": "Universal Dev Tooling + Dogfood",
+  "par": 4,
+  "slope": 1,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-02-21",
+  "shots": [
+    {
+      "ticket_key": "S5-1",
+      "title": "Add installClaudeCodeMcpConfig() to CLI init",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Clean mirror of installCursorMcpConfig; 3 new tests"
+    },
+    {
+      "ticket_key": "S5-2",
+      "title": "Add CLAUDE.md template to slope init --claude-code",
+      "club": "putter",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Template + existsSync guard + 2 new tests"
+    },
+    {
+      "ticket_key": "S5-3",
+      "title": "Dogfood — wire SLOPE into its own repo",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Local .mcp.json + hand-authored CLAUDE.md; smoke-tested MCP server"
+    },
+    {
+      "ticket_key": "S5-4",
+      "title": "Update README + mcp-tools docs",
+      "club": "putter",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "CLI table, Claude Code section, packages table, mcp-tools README"
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "wind",
+      "description": "mirroring existing pattern (Cursor MCP → Claude Code MCP)",
+      "impact": "minor"
+    }
+  ],
+  "special_plays": [],
+  "bunker_locations": [],
+  "yardage_book_updates": [
+    "Claude Code MCP config goes in .mcp.json at project root (not nested like .cursor/mcp.json)",
+    "Dogfood MCP uses node + local dist path instead of npx — no network dependency"
+  ],
+  "course_management_notes": [
+    "All 4 shots landed in_the_hole — clean sprint with no hazards",
+    "Pattern mirroring (Cursor → Claude Code) keeps complexity low"
+  ]
+}
