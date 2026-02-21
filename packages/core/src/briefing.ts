@@ -113,8 +113,8 @@ export function extractHazardIndex(
   for (const sc of scorecards) {
     const sprintNum = sc.sprint_number ?? (sc as any).sprint;
 
-    for (const shot of sc.shots) {
-      for (const h of shot.hazards) {
+    for (const shot of sc.shots ?? []) {
+      for (const h of shot.hazards ?? []) {
         const desc = h.description ?? '';
         if (!kw || desc.toLowerCase().includes(kw)) {
           shotHazards.push({
@@ -127,7 +127,7 @@ export function extractHazardIndex(
       }
     }
 
-    for (const loc of sc.bunker_locations) {
+    for (const loc of sc.bunker_locations ?? []) {
       const locStr = typeof loc === 'string' ? loc : (loc as Record<string, unknown>)?.area as string ?? '';
       if (!kw || locStr.toLowerCase().includes(kw)) {
         bunkers.push({ sprint: sprintNum, location: locStr });
@@ -146,7 +146,7 @@ export function computeNutritionTrend(scorecards: GolfScorecard[]): NutritionTre
   const counts: Record<string, { healthy: number; needs_attention: number; neglected: number }> = {};
 
   for (const sc of scorecards) {
-    if (!sc.nutrition) continue;
+    if (!sc.nutrition || !Array.isArray(sc.nutrition)) continue;
     for (const entry of sc.nutrition) {
       if (!counts[entry.category]) {
         counts[entry.category] = { healthy: 0, needs_attention: 0, neglected: 0 };
@@ -188,21 +188,20 @@ export function hazardBriefing(opts: {
   for (const sc of scorecards) {
     const sprintNum = sc.sprint_number ?? (sc as any).sprint;
 
-    // Check shot hazards
-    for (const shot of sc.shots) {
-      for (const h of shot.hazards) {
-        const desc = h.description.toLowerCase();
+    for (const shot of sc.shots ?? []) {
+      for (const h of shot.hazards ?? []) {
+        const desc = (h.description ?? '').toLowerCase();
         if (loweredAreas.some(area => desc.includes(area))) {
-          warnings.push(`WARNING: ${h.type} — ${h.description} (seen in S${sprintNum})`);
+          warnings.push(`WARNING: ${h.type} — ${h.description ?? 'unknown'} (seen in S${sprintNum})`);
         }
       }
     }
 
-    // Check bunker locations
-    for (const loc of sc.bunker_locations) {
-      const lowLoc = loc.toLowerCase();
+    for (const loc of sc.bunker_locations ?? []) {
+      const locStr = typeof loc === 'string' ? loc : (loc as Record<string, unknown>)?.area as string ?? '';
+      const lowLoc = locStr.toLowerCase();
       if (loweredAreas.some(area => lowLoc.includes(area))) {
-        warnings.push(`WARNING: bunker — ${loc} (seen in S${sprintNum})`);
+        warnings.push(`WARNING: bunker — ${locStr} (seen in S${sprintNum})`);
       }
     }
   }
