@@ -1,6 +1,6 @@
 {
   "name": "@slope-dev/core",
-  "version": "0.4.0",
+  "version": "1.0.0",
   "description": "SLOPE — Sprint Lifecycle & Operational Performance Engine. Golf-metaphor sprint scoring for engineering teams.",
   "type": "module",
   "main": "./dist/index.js",
@@ -17,7 +17,8 @@
   "scripts": {
     "build": "tsc",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "pnpm run build"
   },
   "keywords": [
     "sprint",

@@ -1,6 +1,6 @@
 {
   "name": "@slope-dev/mcp-tools",
-  "version": "0.2.0",
+  "version": "1.0.0",
   "description": "MCP server exposing SLOPE advisory tools — handicap, dispersion, club recommendation, briefing, and more.",
   "type": "module",
   "main": "./dist/index.js",
@@ -12,7 +12,8 @@
     "build": "tsc",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.config.integration.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "pnpm run build"
   },
   "keywords": [
     "slope",
@@ -39,6 +40,9 @@
     "@types/node": "^25.3.0",
     "typescript": "^5.7.0",
     "vitest": "^3.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "files": [
     "dist",

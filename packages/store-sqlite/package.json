@@ -1,6 +1,6 @@
 {
   "name": "@slope-dev/store-sqlite",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "SQLite storage adapter for SLOPE — persistent sessions, claims, scorecards, and common issues.",
   "type": "module",
   "main": "./dist/index.js",
@@ -17,7 +17,8 @@
   "scripts": {
     "build": "tsc",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "pnpm run build"
   },
   "license": "MIT",
   "publishConfig": {

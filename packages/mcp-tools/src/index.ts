@@ -30,7 +30,7 @@ export const SLOPE_MCP_TOOL_NAMES = ['search', 'execute', 'session_status', 'acq
 export function createSlopeToolsServer(store?: SlopeStore): McpServer {
   const server = new McpServer({
     name: 'slope-tools',
-    version: '0.2.0',
+    version: '1.0.0',
   });
 
   server.tool(
