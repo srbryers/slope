@@ -1,7 +1,7 @@
 import { checkConflicts } from '@slope-dev/core';
 import { loadConfig } from '../config.js';
 import { loadScorecards } from '../loader.js';
-import { createRegistry } from '../registries/index.js';
+import { resolveStore } from '../store.js';
 import type { SprintClaim } from '@slope-dev/core';
 
 function parseArgs(args: string[]): Record<string, string> {
@@ -26,11 +26,10 @@ function resolveSprint(flags: Record<string, string>, cwd: string): number {
 export async function statusCommand(args: string[]): Promise<void> {
   const flags = parseArgs(args);
   const cwd = process.cwd();
-  const config = loadConfig(cwd);
-  const registry = createRegistry(config, cwd);
+  const store = await resolveStore(cwd);
   const sprintNumber = resolveSprint(flags, cwd);
 
-  const claims = await registry.list(sprintNumber);
+  const claims = await store.list(sprintNumber);
 
   console.log(`\nSprint ${sprintNumber} — Course Status`);
   console.log('═'.repeat(40));

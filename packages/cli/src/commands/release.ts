@@ -1,6 +1,6 @@
 import { loadConfig } from '../config.js';
 import { loadScorecards } from '../loader.js';
-import { createRegistry } from '../registries/index.js';
+import { resolveStore } from '../store.js';
 
 function parseArgs(args: string[]): Record<string, string> {
   const result: Record<string, string> = {};
@@ -25,12 +25,11 @@ function resolveSprintRange(flags: Record<string, string>, cwd: string): number[
 export async function releaseCommand(args: string[]): Promise<void> {
   const flags = parseArgs(args);
   const cwd = process.cwd();
-  const config = loadConfig(cwd);
-  const registry = createRegistry(config, cwd);
+  const store = await resolveStore(cwd);
 
   // Release by ID
   if (flags.id) {
-    const released = await registry.release(flags.id);
+    const released = await store.release(flags.id);
     if (released) {
       console.log(`\nClaim ${flags.id} released.\n`);
     } else {
@@ -46,10 +45,10 @@ export async function releaseCommand(args: string[]): Promise<void> {
     const sprints = resolveSprintRange(flags, cwd);
 
     for (const sprint of sprints) {
-      const claims = await registry.list(sprint);
+      const claims = await store.list(sprint);
       const match = claims.find(c => c.target === flags.target && c.player === player);
       if (match) {
-        const released = await registry.release(match.id);
+        const released = await store.release(match.id);
         if (released) {
           console.log(`\nClaim ${match.id} (${match.target} by ${match.player}, sprint ${match.sprint_number}) released.\n`);
           return;

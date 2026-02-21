@@ -19,8 +19,8 @@ afterEach(() => {
 });
 
 describe('init --cursor (includes MCP)', () => {
-  it('creates .cursor/mcp.json with slope server when file does not exist', () => {
-    initCommand(['--cursor']);
+  it('creates .cursor/mcp.json with slope server when file does not exist', async () => {
+    await initCommand(['--cursor']);
 
     const mcpPath = join(tmpDir, '.cursor', 'mcp.json');
     expect(existsSync(mcpPath)).toBe(true);
@@ -33,7 +33,7 @@ describe('init --cursor (includes MCP)', () => {
     });
   });
 
-  it('merges slope into existing .cursor/mcp.json without removing other servers', () => {
+  it('merges slope into existing .cursor/mcp.json without removing other servers', async () => {
     const cursorDir = join(tmpDir, '.cursor');
     const mcpPath = join(cursorDir, 'mcp.json');
     mkdirSync(cursorDir, { recursive: true });
@@ -46,7 +46,7 @@ describe('init --cursor (includes MCP)', () => {
       }, null, 2)
     );
 
-    initCommand(['--cursor']);
+    await initCommand(['--cursor']);
 
     const content = JSON.parse(readFileSync(mcpPath, 'utf8'));
     expect(content.mcpServers.other).toEqual({ command: 'echo', args: [] });
@@ -56,8 +56,8 @@ describe('init --cursor (includes MCP)', () => {
     });
   });
 
-  it('does not create .cursor/mcp.json when --cursor is not used', () => {
-    initCommand(['--generic']);
+  it('does not create .cursor/mcp.json when --cursor is not used', async () => {
+    await initCommand(['--generic']);
 
     const mcpPath = join(tmpDir, '.cursor', 'mcp.json');
     expect(existsSync(mcpPath)).toBe(false);
@@ -65,8 +65,8 @@ describe('init --cursor (includes MCP)', () => {
 });
 
 describe('init --claude-code (includes MCP)', () => {
-  it('creates .mcp.json with slope server when file does not exist', () => {
-    initCommand(['--claude-code']);
+  it('creates .mcp.json with slope server when file does not exist', async () => {
+    await initCommand(['--claude-code']);
 
     const mcpPath = join(tmpDir, '.mcp.json');
     expect(existsSync(mcpPath)).toBe(true);
@@ -79,7 +79,7 @@ describe('init --claude-code (includes MCP)', () => {
     });
   });
 
-  it('merges slope into existing .mcp.json without removing other servers', () => {
+  it('merges slope into existing .mcp.json without removing other servers', async () => {
     const mcpPath = join(tmpDir, '.mcp.json');
     writeFileSync(
       mcpPath,
@@ -90,7 +90,7 @@ describe('init --claude-code (includes MCP)', () => {
       }, null, 2)
     );
 
-    initCommand(['--claude-code']);
+    await initCommand(['--claude-code']);
 
     const content = JSON.parse(readFileSync(mcpPath, 'utf8'));
     expect(content.mcpServers.other).toEqual({ command: 'echo', args: [] });
@@ -100,15 +100,15 @@ describe('init --claude-code (includes MCP)', () => {
     });
   });
 
-  it('does not create .mcp.json when --generic is used', () => {
-    initCommand(['--generic']);
+  it('does not create .mcp.json when --generic is used', async () => {
+    await initCommand(['--generic']);
 
     const mcpPath = join(tmpDir, '.mcp.json');
     expect(existsSync(mcpPath)).toBe(false);
   });
 
-  it('creates CLAUDE.md when file does not exist', () => {
-    initCommand(['--claude-code']);
+  it('creates CLAUDE.md when file does not exist', async () => {
+    await initCommand(['--claude-code']);
 
     const claudeMd = join(tmpDir, 'CLAUDE.md');
     expect(existsSync(claudeMd)).toBe(true);
@@ -118,11 +118,11 @@ describe('init --claude-code (includes MCP)', () => {
     expect(content).toContain('MCP Tools');
   });
 
-  it('does not overwrite existing CLAUDE.md', () => {
+  it('does not overwrite existing CLAUDE.md', async () => {
     const claudeMd = join(tmpDir, 'CLAUDE.md');
     writeFileSync(claudeMd, '# My Custom CLAUDE.md\n');
 
-    initCommand(['--claude-code']);
+    await initCommand(['--claude-code']);
 
     const content = readFileSync(claudeMd, 'utf8');
     expect(content).toBe('# My Custom CLAUDE.md\n');

@@ -1,7 +1,7 @@
 import { checkConflicts } from '@slope-dev/core';
 import { loadConfig } from '../config.js';
 import { loadScorecards } from '../loader.js';
-import { createRegistry } from '../registries/index.js';
+import { resolveStore } from '../store.js';
 import type { ClaimScope, SprintClaim } from '@slope-dev/core';
 
 function parseArgs(args: string[]): Record<string, string> {
@@ -27,8 +27,7 @@ export async function claimCommand(args: string[]): Promise<void> {
   const flags = parseArgs(args);
   const force = args.includes('--force');
   const cwd = process.cwd();
-  const config = loadConfig(cwd);
-  const registry = createRegistry(config, cwd);
+  const store = await resolveStore(cwd);
 
   const target = flags.target;
   if (!target) {
@@ -41,7 +40,7 @@ export async function claimCommand(args: string[]): Promise<void> {
   const sprintNumber = resolveSprint(flags, cwd);
 
   // Preflight conflict check: build a temporary claim and test against existing claims
-  const existingClaims = await registry.list(sprintNumber);
+  const existingClaims = await store.list(sprintNumber);
   const tempClaim: SprintClaim = {
     id: '__pending__',
     sprint_number: sprintNumber,
@@ -67,7 +66,7 @@ export async function claimCommand(args: string[]): Promise<void> {
   }
 
   // Register the claim
-  const claim = await registry.claim({
+  const claim = await store.claim({
     sprint_number: sprintNumber,
     player,
     target,

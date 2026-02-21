@@ -2,6 +2,7 @@ import { writeFileSync, mkdirSync, existsSync, cpSync, readdirSync, readFileSync
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createConfig } from '../config.js';
+import { saveHooksConfig } from '../hooks-config.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -201,7 +202,48 @@ function installCursorMcpConfig(cwd: string): void {
   console.log(`  Created/updated ${mcpPath} (slope MCP server)`);
 }
 
-export function initCommand(args: string[]): void {
+function installDefaultHooks(cwd: string, provider: Provider): void {
+  // Import hook templates inline to avoid circular deps
+  const SESSION_HOOKS: Record<string, string[]> = {
+    'session-start': ['slope session start --ide="$SLOPE_IDE" --role=primary', 'slope briefing --compact'],
+    'session-end': ['slope session end --session-id="$SLOPE_SESSION_ID"'],
+  };
+
+  const hooksDir = provider === 'claude-code'
+    ? join(cwd, '.claude', 'hooks')
+    : join(cwd, '.cursor', 'hooks');
+  mkdirSync(hooksDir, { recursive: true });
+
+  const { loadHooksConfig } = { loadHooksConfig: (c: string) => {
+    try { return JSON.parse(readFileSync(join(c, '.slope/hooks.json'), 'utf8')); }
+    catch { return { installed: {} }; }
+  }};
+  const config = loadHooksConfig(cwd);
+
+  for (const [name, commands] of Object.entries(SESSION_HOOKS)) {
+    const filePath = join(hooksDir, `slope-${name}.sh`);
+    if (!existsSync(filePath)) {
+      const script = [
+        '#!/usr/bin/env bash',
+        `# SLOPE hook: ${name}`,
+        '',
+        '# === SLOPE MANAGED (do not edit above this line) ===',
+        ...commands,
+        '# === SLOPE END ===',
+        '',
+        '# Add your custom commands below:',
+        '',
+      ].join('\n');
+      writeFileSync(filePath, script, { mode: 0o755 });
+      config.installed[name] = { provider, installed_at: new Date().toISOString() };
+      console.log(`  Installed hook: ${name}`);
+    }
+  }
+
+  saveHooksConfig(cwd, config);
+}
+
+export async function initCommand(args: string[]): Promise<void> {
   const cwd = process.cwd();
   const provider = detectProvider(args);
 
@@ -226,26 +268,33 @@ export function initCommand(args: string[]): void {
     console.log(`  Created ${commonIssuesPath}`);
   }
 
-  const sessionsPath = join(cwd, '.slope', 'sessions.json');
-  if (!existsSync(sessionsPath)) {
-    writeFileSync(sessionsPath, JSON.stringify({ sessions: [] }, null, 2) + '\n');
-    console.log(`  Created ${sessionsPath}`);
+  // Create SQLite store (replaces sessions.json and claims.json)
+  const dbPath = join(cwd, '.slope', 'slope.db');
+  if (!existsSync(dbPath)) {
+    try {
+      const { createStore } = await import('@slope-dev/store-sqlite');
+      const store = createStore({ storePath: '.slope/slope.db', cwd });
+      store.close();
+      console.log(`  Created ${dbPath}`);
+    } catch (err) {
+      console.error(`  Warning: Could not create SQLite store: ${(err as Error).message}`);
+    }
   }
 
-  const claimsPath = join(cwd, '.slope', 'claims.json');
-  if (!existsSync(claimsPath)) {
-    writeFileSync(claimsPath, JSON.stringify({ claims: [] }, null, 2) + '\n');
-    console.log(`  Created ${claimsPath}`);
-  }
+  // Create initial hooks config
+  saveHooksConfig(cwd, { installed: {} });
+  console.log(`  Created .slope/hooks.json`);
 
   switch (provider) {
     case 'claude-code':
       installClaudeCodeTemplates(cwd);
       installClaudeCodeMcpConfig(cwd);
+      installDefaultHooks(cwd, 'claude-code');
       break;
     case 'cursor':
       installCursorTemplates(cwd);
       installCursorMcpConfig(cwd);
+      installDefaultHooks(cwd, 'cursor');
       break;
     case 'generic':
       installGenericTemplates(cwd);

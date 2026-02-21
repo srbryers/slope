@@ -4,7 +4,7 @@ import { formatBriefing } from '@slope-dev/core';
 import type { CommonIssuesFile, SessionEntry, SprintClaim } from '@slope-dev/core';
 import { loadConfig } from '../config.js';
 import { loadScorecards } from '../loader.js';
-import { createRegistry } from '../registries/index.js';
+import { resolveStore } from '../store.js';
 
 export async function briefingCommand(args: string[]): Promise<void> {
   const config = loadConfig();
@@ -59,11 +59,12 @@ export async function briefingCommand(args: string[]): Promise<void> {
     sprintNumber = 1;
   }
 
-  // Load claims
+  // Load claims from store
   let claims: SprintClaim[] = [];
   try {
-    const registry = createRegistry(config, cwd);
-    claims = await registry.list(sprintNumber);
+    const store = await resolveStore(cwd);
+    claims = await store.list(sprintNumber);
+    store.close();
   } catch { /* skip — claims are optional */ }
 
   const filter = (categories.length > 0 || keywords.length > 0)
