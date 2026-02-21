@@ -6,6 +6,7 @@ interface ClaimsFile {
   claims: SprintClaim[];
 }
 
+/** @deprecated Use `SlopeStore` via `resolveStore()` instead. Will be removed in v1.1. */
 export class FileRegistry implements SprintRegistry {
   private filePath: string;
 

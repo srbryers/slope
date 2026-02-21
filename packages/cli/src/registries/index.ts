@@ -4,6 +4,7 @@ import type { SlopeConfig } from '../config.js';
 import { FileRegistry } from './file-registry.js';
 import { ApiRegistry } from './api-registry.js';
 
+/** @deprecated Use `resolveStore()` from '../store.js' instead. Will be removed in v1.1. */
 export function createRegistry(config: SlopeConfig, cwd: string = process.cwd()): SprintRegistry {
   switch (config.registry) {
     case 'api': {
