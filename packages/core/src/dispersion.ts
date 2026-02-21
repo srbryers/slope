@@ -6,6 +6,7 @@ import type {
   AreaReport,
   ClubSelection,
 } from './types.js';
+import { normalizeStats } from './builder.js';
 
 // --- Helpers ---
 
@@ -129,12 +130,13 @@ export function computeAreaPerformance(scorecards: GolfScorecard[]): AreaReport 
       byType[sprintType] = { count: 0, totalDiff: 0, fairwayNum: 0, fairwayDen: 0, girNum: 0, girDen: 0 };
     }
     const t = byType[sprintType];
+    const safeStats = normalizeStats(sc.stats, sc.shots?.length ?? 0);
     t.count++;
     t.totalDiff += diff;
-    t.fairwayNum += sc.stats.fairways_hit;
-    t.fairwayDen += sc.stats.fairways_total;
-    t.girNum += sc.stats.greens_in_regulation;
-    t.girDen += sc.stats.greens_total;
+    t.fairwayNum += safeStats.fairways_hit;
+    t.fairwayDen += safeStats.fairways_total;
+    t.girNum += safeStats.greens_in_regulation;
+    t.girDen += safeStats.greens_total;
 
     // By par
     if (!byPar[sc.par]) {

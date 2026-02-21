@@ -7,6 +7,7 @@ import type {
   ScoreLabel,
 } from './types.js';
 import { PAR_THRESHOLDS, SCORE_LABELS } from './constants.js';
+import { normalizeStats } from './builder.js';
 
 /**
  * Compute par value from ticket count.
@@ -76,7 +77,7 @@ function computeRollingStats(scorecards: GolfScorecard[]): RollingStats {
   let totalGimmes = 0;
 
   for (const sc of scorecards) {
-    const stats: HoleStats = sc.stats;
+    const stats: HoleStats = normalizeStats(sc.stats, sc.shots?.length ?? 0);
     totalFairways += stats.fairways_hit;
     totalFairwaysTotal += stats.fairways_total;
     totalGir += stats.greens_in_regulation;

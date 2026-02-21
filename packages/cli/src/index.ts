@@ -25,6 +25,7 @@ import { classifyCommand } from './commands/classify.js';
 import { claimCommand } from './commands/claim.js';
 import { releaseCommand } from './commands/release.js';
 import { statusCommand } from './commands/status.js';
+import { tournamentCommand } from './commands/tournament.js';
 
 const subcommand = process.argv[2];
 
@@ -91,6 +92,7 @@ Usage:
   slope release --id=<id>                   Release a claim by ID
   slope release --target=<t> [--player=<p>] Release a claim by target
   slope status [--sprint=N]                 Show sprint course status + conflicts
+  slope tournament --id=<id> [options]      Generate tournament review from scorecards
 
 Examples:
   slope init                                Create .slope/ with config + example scorecard

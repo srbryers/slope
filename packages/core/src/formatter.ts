@@ -7,6 +7,7 @@ import type {
   ClubRecommendation,
   TrainingRecommendation,
 } from './types.js';
+import { normalizeStats } from './builder.js';
 
 // --- Input types ---
 
@@ -82,6 +83,7 @@ export function formatSprintReview(
     return formatPlainReview(card, projectStats, deltas);
   }
   const sprintNum = card.sprint_number ?? (card as any).sprint;
+  const stats = normalizeStats(card.stats, card.shots?.length ?? 0);
   const lines: string[] = [];
 
   // Header
@@ -97,10 +99,10 @@ export function formatSprintReview(
   lines.push(`| Slope | ${card.slope} |`);
   lines.push(`| Score | ${card.score} |`);
   lines.push(`| Label | ${card.score_label} |`);
-  lines.push(`| Fairway % | ${pct(card.stats.fairways_hit, card.stats.fairways_total)} (${card.stats.fairways_hit}/${card.stats.fairways_total}) |`);
-  lines.push(`| GIR % | ${pct(card.stats.greens_in_regulation, card.stats.greens_total)} (${card.stats.greens_in_regulation}/${card.stats.greens_total}) |`);
-  lines.push(`| Putts | ${card.stats.putts} |`);
-  lines.push(`| Penalties | ${card.stats.penalties} |`);
+  lines.push(`| Fairway % | ${pct(stats.fairways_hit, stats.fairways_total)} (${stats.fairways_hit}/${stats.fairways_total}) |`);
+  lines.push(`| GIR % | ${pct(stats.greens_in_regulation, stats.greens_total)} (${stats.greens_in_regulation}/${stats.greens_total}) |`);
+  lines.push(`| Putts | ${stats.putts} |`);
+  lines.push(`| Penalties | ${stats.penalties} |`);
   lines.push('');
 
   // Project Stats (if provided)
@@ -114,7 +116,6 @@ export function formatSprintReview(
         const d = deltas?.[key];
         lines.push(`| ${key} | ${value} | ${delta(d)} |`);
       } else if (typeof value === 'object' && value !== null) {
-        // Nested record — render as sub-rows
         const total = Object.values(value).reduce((sum, v) => sum + v, 0);
         const d = deltas?.[key];
         lines.push(`| ${key} | ${total} | ${delta(d)} |`);
@@ -133,7 +134,7 @@ export function formatSprintReview(
   lines.push('|---|---|---|---|---|');
   for (const shot of card.shots) {
     const hazards = shot.hazards.length > 0
-      ? shot.hazards.map(h => `${h.type}: ${h.description}`).join('; ')
+      ? shot.hazards.map(h => `${h.type}: ${h.description ?? 'unknown'}`).join('; ')
       : '—';
     const notes = shot.notes ?? '—';
     lines.push(`| ${shot.ticket_key} | ${shot.club} | ${shot.result} | ${hazards} | ${notes} |`);
@@ -141,15 +142,15 @@ export function formatSprintReview(
   lines.push('');
 
   // Miss Pattern
-  const missTotal = card.stats.miss_directions.long + card.stats.miss_directions.short +
-    card.stats.miss_directions.left + card.stats.miss_directions.right;
+  const missTotal = stats.miss_directions.long + stats.miss_directions.short +
+    stats.miss_directions.left + stats.miss_directions.right;
   if (missTotal > 0) {
     lines.push('### Miss Pattern');
     lines.push('');
     lines.push('| Direction | Count |');
     lines.push('|---|---|');
     for (const dir of ['long', 'short', 'left', 'right'] as MissDirection[]) {
-      const count = card.stats.miss_directions[dir];
+      const count = stats.miss_directions[dir];
       if (count > 0) {
         lines.push(`| ${MISS_LABELS[dir]} | ${count} |`);
       }
@@ -178,14 +179,15 @@ export function formatSprintReview(
       lines.push('| Type | Ticket | Description |');
       lines.push('|---|---|---|');
       for (const h of allHazards) {
-        lines.push(`| ${h.type} | ${h.ticket} | ${h.description} |`);
+        lines.push(`| ${h.type} | ${h.ticket} | ${h.description ?? 'unknown'} |`);
       }
       lines.push('');
     }
     if (card.bunker_locations.length > 0) {
       lines.push('**Bunker locations for future sprints:**');
       for (const b of card.bunker_locations) {
-        lines.push(`- ${b}`);
+        const label = typeof b === 'string' ? b : (b as Record<string, unknown>)?.area as string ?? String(b);
+        lines.push(`- ${label}`);
       }
       lines.push('');
     }
@@ -256,7 +258,6 @@ export function formatAdvisorReport(input: AdvisorReportInput): string {
   const { clubRecommendation, trainingPlan, hazardWarnings } = input;
   const lines: string[] = [];
 
-  // Club Recommendation
   if (clubRecommendation) {
     lines.push('### CLUB RECOMMENDATION');
     lines.push('');
@@ -273,7 +274,6 @@ export function formatAdvisorReport(input: AdvisorReportInput): string {
     lines.push('');
   }
 
-  // Training Recommendations (high/medium only)
   const filtered = trainingPlan?.filter(t => t.priority === 'high' || t.priority === 'medium') ?? [];
   if (filtered.length > 0) {
     lines.push('### TRAINING RECOMMENDATIONS');
@@ -287,7 +287,6 @@ export function formatAdvisorReport(input: AdvisorReportInput): string {
     lines.push('');
   }
 
-  // Hazard Warnings
   if (hazardWarnings && hazardWarnings.length > 0) {
     lines.push('### HAZARD WARNINGS');
     lines.push('');
@@ -310,17 +309,14 @@ function formatPlainReview(
   const sprintNum = card.sprint_number ?? (card as any).sprint;
   const lines: string[] = [];
 
-  // Header
   lines.push(`## Sprint ${sprintNum}: ${card.theme}`);
   lines.push('');
 
-  // Summary
   const scoreDesc = PLAIN_SCORES[card.score_label] ?? card.score_label;
   lines.push(`**Status:** ${scoreDesc}`);
   lines.push(`**Tickets:** ${card.shots.length} delivered`);
   lines.push('');
 
-  // Tickets
   lines.push('### Tickets');
   lines.push('');
   lines.push('| Ticket | Approach | Outcome | Notes |');
@@ -333,7 +329,6 @@ function formatPlainReview(
   }
   lines.push('');
 
-  // Project Stats
   if (projectStats) {
     lines.push('### System Stats');
     lines.push('');
@@ -346,7 +341,6 @@ function formatPlainReview(
     lines.push('');
   }
 
-  // Reflection
   if (card.nineteenth_hole) {
     const nh = card.nineteenth_hole;
     lines.push('### Reflection');

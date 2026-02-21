@@ -196,6 +196,7 @@ export function formatTournamentReview(review: TournamentReview): string {
   lines.push(`**ID:** ${review.id} | **Period:** ${review.dateRange.start} — ${review.dateRange.end}`);
   lines.push('');
 
+  // Scoring summary
   const s = review.scoring;
   const diffLabel = s.differential < 0 ? `${s.differential}` : s.differential === 0 ? 'E' : `+${s.differential}`;
   lines.push('## Scoring Summary');
@@ -211,6 +212,7 @@ export function formatTournamentReview(review: TournamentReview): string {
   lines.push(`| Worst Sprint | S${s.worstSprint.sprintNumber} (${s.worstSprint.label}) |`);
   lines.push('');
 
+  // Sprint-by-sprint table
   lines.push('## Sprint Breakdown');
   lines.push('');
   lines.push('| Sprint | Theme | Par | Slope | Score | Label | Tickets |');
@@ -220,6 +222,7 @@ export function formatTournamentReview(review: TournamentReview): string {
   }
   lines.push('');
 
+  // Aggregate stats
   const st = review.stats;
   lines.push('## Aggregate Stats');
   lines.push('');
@@ -233,6 +236,7 @@ export function formatTournamentReview(review: TournamentReview): string {
   lines.push(`| Total Hazards Hit | ${st.totalHazards} |`);
   lines.push('');
 
+  // Club performance
   const clubs = Object.entries(review.clubPerformance).sort((a, b) => b[1].attempts - a[1].attempts);
   if (clubs.length > 0) {
     lines.push('## Club Performance');
@@ -246,6 +250,7 @@ export function formatTournamentReview(review: TournamentReview): string {
     lines.push('');
   }
 
+  // Hazard index
   if (review.hazardIndex.length > 0) {
     lines.push('## Hazard Index');
     lines.push('');
@@ -258,6 +263,7 @@ export function formatTournamentReview(review: TournamentReview): string {
     lines.push('');
   }
 
+  // Takeaways
   if (review.takeaways.length > 0) {
     lines.push('## Strategic Takeaways');
     lines.push('');
@@ -267,6 +273,7 @@ export function formatTournamentReview(review: TournamentReview): string {
     lines.push('');
   }
 
+  // Improvements
   if (review.improvements.length > 0) {
     lines.push('## What We\'d Do Differently');
     lines.push('');
@@ -276,6 +283,7 @@ export function formatTournamentReview(review: TournamentReview): string {
     lines.push('');
   }
 
+  // Reflection
   if (review.reflection) {
     lines.push('## Reflection');
     lines.push('');

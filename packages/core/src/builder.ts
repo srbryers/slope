@@ -77,6 +77,65 @@ export function computeStatsFromShots(
   };
 }
 
+// --- Stats normalization ---
+
+/**
+ * Normalize any stats shape to a proper HoleStats object.
+ * Handles the simplified format ({ fairway: true, putts: 0 }) used by
+ * some scorecards, falling back to safe defaults for missing fields.
+ */
+export function normalizeStats(raw: unknown, shotCount = 0): HoleStats {
+  if (!raw || typeof raw !== 'object') {
+    return {
+      fairways_hit: 0, fairways_total: 0,
+      greens_in_regulation: 0, greens_total: 0,
+      putts: 0, penalties: 0, hazards_hit: 0,
+      miss_directions: { long: 0, short: 0, left: 0, right: 0 },
+    };
+  }
+
+  const s = raw as Record<string, unknown>;
+
+  if ('fairways_hit' in s && 'fairways_total' in s) {
+    return {
+      fairways_hit: Number(s.fairways_hit) || 0,
+      fairways_total: Number(s.fairways_total) || 0,
+      greens_in_regulation: Number(s.greens_in_regulation) || 0,
+      greens_total: Number(s.greens_total) || 0,
+      putts: Number(s.putts) || 0,
+      penalties: Number(s.penalties) || 0,
+      hazards_hit: Number(s.hazards_hit) || 0,
+      miss_directions: normalizeMissDirections(s.miss_directions),
+    };
+  }
+
+  const fairwayHit = s.fairway === true ? shotCount : 0;
+  const girHit = s.gir === true ? shotCount : 0;
+
+  return {
+    fairways_hit: fairwayHit,
+    fairways_total: shotCount,
+    greens_in_regulation: girHit,
+    greens_total: shotCount,
+    putts: Number(s.putts) || 0,
+    penalties: Number(s.penalties) || 0,
+    hazards_hit: Number(s.hazards_hit) || 0,
+    miss_directions: normalizeMissDirections(s.miss_directions),
+  };
+}
+
+function normalizeMissDirections(raw: unknown): Record<MissDirection, number> {
+  const defaults: Record<MissDirection, number> = { long: 0, short: 0, left: 0, right: 0 };
+  if (!raw || typeof raw !== 'object') return defaults;
+  const r = raw as Record<string, unknown>;
+  return {
+    long: Number(r.long) || 0,
+    short: Number(r.short) || 0,
+    left: Number(r.left) || 0,
+    right: Number(r.right) || 0,
+  };
+}
+
 // --- Scorecard builder ---
 
 /** Minimal input for building a scorecard — everything else is computed */
