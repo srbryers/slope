@@ -37,7 +37,6 @@ See [docs/framework.md](docs/framework.md) for the full framework.
 |---------|-------------|
 | [`@slope-dev/core`](packages/core) | Core scoring engine — types, handicap, builder, validation, advisor, formatter, briefing |
 | [`@slope-dev/cli`](packages/cli) | CLI tool — `slope init`, `card`, `validate`, `review`, `briefing`, `plan`, `classify` |
-| [`@slope-dev/mcp-tools`](packages/mcp-tools) | MCP server — 10 SLOPE tools for Cursor, Claude Desktop, or any MCP agent |
 
 ## Core API
 
@@ -115,6 +114,23 @@ After `slope init`, configure `.slope/config.json`:
   "sessionsPath": ".slope/sessions.json"
 }
 ```
+
+## Cursor MCP
+
+Add SLOPE as an MCP server in Cursor so the agent can use handicap, briefing, and club recommendations as tools. In `.cursor/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "slope": {
+      "command": "npx",
+      "args": ["@slope-dev/mcp-tools"]
+    }
+  }
+}
+```
+
+Or run `slope init --cursor --mcp` (when available) to add this automatically.
 
 ## Claude Code Integration
 
