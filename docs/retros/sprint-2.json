@@ -1,0 +1,81 @@
+{
+  "sprint_number": 2,
+  "theme": "Sprint Claims Registry & Multi-Agent Coordination",
+  "type": "feature",
+  "par": 4,
+  "slope": 2,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-02-20",
+  "shots": [
+    {
+      "ticket_key": "S2-1",
+      "title": "Core types + conflict detection engine",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "SprintClaim, SprintConflict types, checkConflicts() with overlap/adjacent rules. 12 tests."
+    },
+    {
+      "ticket_key": "S2-2",
+      "title": "Registry abstraction + file/API backends",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "SprintRegistry interface, FileRegistry (JSON persistence), ApiRegistry stub. 9 tests."
+    },
+    {
+      "ticket_key": "S2-3",
+      "title": "CLI commands: claim, release, status",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [
+        { "type": "rough", "description": "Sprint resolution needed fallback chain: --sprint flag → config → latest scorecard + 1" }
+      ],
+      "notes": "3 new async commands with sprint resolution, registry factory, init scaffolding."
+    },
+    {
+      "ticket_key": "S2-4",
+      "title": "Preflight conflict check + claim blocking",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Check-before-register pattern, --force override for overlaps, adjacent conflicts informational only. Briefing COURSE STATUS section with grouped claims and conflict display. 11 new tests."
+    }
+  ],
+  "conditions": [],
+  "special_plays": [],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 1,
+    "penalties": 0,
+    "hazards_hit": 1,
+    "miss_directions": { "long": 0, "short": 0, "left": 0, "right": 0 }
+  },
+  "training": [],
+  "nutrition": [
+    { "category": "hydration", "description": "Clean async patterns, consistent error handling across commands", "status": "healthy" },
+    { "category": "diet", "description": "Registry abstraction enables future backends without CLI changes", "status": "healthy" },
+    { "category": "stretching", "description": "Preflight conflict check prevents silent overlaps", "status": "healthy" }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Clean build — the registry abstraction fell into place naturally and conflict detection rules were straightforward",
+    "advice_for_next_player": "ApiRegistry is a stub with no tests — needs a real backend or at minimum test coverage before use",
+    "what_surprised_you": "The briefing integration was the most impactful change — agents seeing claims before planning is more useful than the claim command itself",
+    "excited_about_next": "Dogfooding SLOPE on itself from Sprint 3 onward — using briefing, claims, and scoring for real"
+  },
+  "bunker_locations": [
+    "Sprint resolution fallback chain (flag → config → scorecard inference) is duplicated in claim.ts and briefing.ts",
+    "ApiRegistry has no test coverage — don't switch registry mode to 'api' without adding tests first"
+  ],
+  "yardage_book_updates": [
+    "Registry factory pattern: createRegistry(config, cwd) returns FileRegistry or ApiRegistry based on config.registry"
+  ],
+  "course_management_notes": [
+    "Sprint 2 of independent slope repo — 22 files changed, +1172 lines",
+    "279 tests (265 core + 14 CLI), 11 test files, 10 new commands/modules"
+  ]
+}
