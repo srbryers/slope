@@ -110,6 +110,7 @@ Usage:
 Examples:
   slope init                                Create .slope/ with config + example scorecard
   slope init --cursor                       Also install Cursor IDE rules
+  slope init --cursor --mcp                 Also add SLOPE MCP server to .cursor/mcp.json
   slope init --claude-code                  Also install Claude Code rules + hooks
   slope card                                Show handicap across all scorecards
   slope validate docs/retros/sprint-1.json  Validate a specific scorecard

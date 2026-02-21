@@ -1,0 +1,60 @@
+{
+  "sprint_number": 3,
+  "theme": "Publish MCP + Cursor DX",
+  "par": 4,
+  "slope": 2,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-02-21",
+  "shots": [
+    {
+      "ticket_key": "S3-1",
+      "title": "Publish checklist for mcp-tools and CLI",
+      "club": "putter",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added Publishing section to docs/backlog/README.md with order and OTP note"
+    },
+    {
+      "ticket_key": "S3-2",
+      "title": "slope init --cursor --mcp adds .cursor/mcp.json",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "installCursorMcpConfig merges with existing mcp.json; --mcp flag gates behavior"
+    },
+    {
+      "ticket_key": "S3-3",
+      "title": "Unit tests for @slope-dev/mcp-tools",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Vitest; createSlopeToolsServer + SLOPE_MCP_TOOL_NAMES; computeHandicapCard and buildScorecard integration"
+    },
+    {
+      "ticket_key": "S3-4",
+      "title": "README and docs refresh",
+      "club": "putter",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Packages table + mcp-tools, Cursor MCP section, init --cursor --mcp in CLI table, Backlog pointer"
+    }
+  ],
+  "conditions": ["external_dep", "new_area"],
+  "special_plays": [],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "miss_directions": { "long": 0, "short": 0, "left": 0, "right": 0 }
+  },
+  "yardage_book_updates": [
+    "Cursor MCP config: .cursor/mcp.json; merge-on-write when adding slope server"
+  ],
+  "bunker_locations": [],
+  "course_management_notes": []
+}

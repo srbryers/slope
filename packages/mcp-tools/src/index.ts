@@ -27,6 +27,20 @@ import {
 
 const scorecardSchema = z.array(z.any()).describe('Array of GolfScorecard objects');
 
+/** Tool names exposed by this MCP server (for tests and tool discovery). */
+export const SLOPE_MCP_TOOL_NAMES = [
+  'recommend_club',
+  'classify_shot',
+  'generate_training_plan',
+  'compute_handicap',
+  'compute_dispersion',
+  'build_scorecard',
+  'format_briefing',
+  'format_sprint_review',
+  'build_tournament_review',
+  'format_tournament_review',
+] as const;
+
 export function createSlopeToolsServer(): McpServer {
   const server = new McpServer({
     name: 'slope-tools',

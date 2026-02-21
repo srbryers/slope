@@ -1,4 +1,4 @@
-import { writeFileSync, mkdirSync, existsSync, cpSync, readdirSync } from 'node:fs';
+import { writeFileSync, mkdirSync, existsSync, cpSync, readdirSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createConfig } from '../config.js';
@@ -148,6 +148,32 @@ function installGenericTemplates(cwd: string): void {
   console.log('\n  Generic SLOPE checklist installed.');
 }
 
+const SLOPE_MCP_ENTRY = {
+  command: 'npx',
+  args: ['@slope-dev/mcp-tools'],
+};
+
+function installCursorMcpConfig(cwd: string): void {
+  const mcpPath = join(cwd, '.cursor', 'mcp.json');
+  let config: { mcpServers?: Record<string, { command: string; args: string[] }> } = {};
+
+  if (existsSync(mcpPath)) {
+    try {
+      const raw = readFileSync(mcpPath, 'utf8');
+      config = JSON.parse(raw) as typeof config;
+    } catch {
+      config = {};
+    }
+  }
+
+  if (!config.mcpServers) config.mcpServers = {};
+  config.mcpServers.slope = SLOPE_MCP_ENTRY;
+
+  mkdirSync(join(cwd, '.cursor'), { recursive: true });
+  writeFileSync(mcpPath, JSON.stringify(config, null, 2) + '\n');
+  console.log(`  Created/updated ${mcpPath} (slope MCP server)`);
+}
+
 export function initCommand(args: string[]): void {
   const cwd = process.cwd();
   const provider = detectProvider(args);
@@ -191,6 +217,7 @@ export function initCommand(args: string[]): void {
       break;
     case 'cursor':
       installCursorTemplates(cwd);
+      if (args.includes('--mcp')) installCursorMcpConfig(cwd);
       break;
     case 'generic':
       installGenericTemplates(cwd);
