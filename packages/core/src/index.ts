@@ -131,3 +131,10 @@ export type {
   TournamentStats,
   TournamentHazard,
 } from './types.js';
+
+// Config
+export type { SlopeConfig } from './config.js';
+export { loadConfig, createConfig, resolveConfigPath } from './config.js';
+
+// Loader
+export { loadScorecards, detectLatestSprint, resolveCurrentSprint } from './loader.js';

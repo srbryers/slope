@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 /**
- * @slope-dev/mcp-tools — MCP server exposing SLOPE advisory tools.
+ * @slope-dev/mcp-tools — Code-mode MCP server for SLOPE.
  *
- * All tools are read-only: they compute analysis and recommendations from
- * scorecard data passed as input. No DB or filesystem access needed.
+ * Exposes two tools:
+ *   search()  — discover the SLOPE API (functions, types, constants)
+ *   execute() — run JS in a sandboxed node:vm with the full API pre-injected
  *
  * Usage:
  *   npx @slope-dev/mcp-tools              # stdio transport
@@ -12,170 +13,62 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import {
-  recommendClub,
-  classifyShot,
-  generateTrainingPlan,
-  computeHandicapCard,
-  computeDispersion,
-  buildScorecard,
-  formatBriefing,
-  formatSprintReview,
-  buildTournamentReview,
-  formatTournamentReview,
-} from '@slope-dev/core';
-
-const scorecardSchema = z.array(z.any()).describe('Array of GolfScorecard objects');
+import { SLOPE_REGISTRY, SLOPE_TYPES } from './registry.js';
+import { runInSandbox } from './sandbox.js';
 
 /** Tool names exposed by this MCP server (for tests and tool discovery). */
-export const SLOPE_MCP_TOOL_NAMES = [
-  'recommend_club',
-  'classify_shot',
-  'generate_training_plan',
-  'compute_handicap',
-  'compute_dispersion',
-  'build_scorecard',
-  'format_briefing',
-  'format_sprint_review',
-  'build_tournament_review',
-  'format_tournament_review',
-] as const;
+export const SLOPE_MCP_TOOL_NAMES = ['search', 'execute'] as const;
 
 export function createSlopeToolsServer(): McpServer {
   const server = new McpServer({
     name: 'slope-tools',
-    version: '0.1.0',
+    version: '0.2.0',
   });
 
   server.tool(
-    'recommend_club',
-    'Get a data-driven club (complexity) recommendation for an upcoming ticket.',
+    'search',
+    'Discover SLOPE API functions, filesystem helpers, constants, and type definitions. Call with no args to see everything, or filter by query/module.',
     {
-      ticketComplexity: z.enum(['trivial', 'small', 'medium', 'large']).describe('Ticket complexity'),
-      scorecards: scorecardSchema,
-      slopeFactors: z.array(z.string()).optional().describe('Slope factors present'),
+      query: z.string().optional().describe('Case-insensitive search term to filter by name or description'),
+      module: z.enum(['core', 'fs', 'constants', 'types']).optional().describe('Filter by module category'),
     },
-    async ({ ticketComplexity, scorecards, slopeFactors }) => {
-      const result = recommendClub({ ticketComplexity, scorecards, slopeFactors });
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+    async ({ query, module }) => {
+      if (module === 'types') {
+        return { content: [{ type: 'text' as const, text: SLOPE_TYPES }] };
+      }
+      let results = SLOPE_REGISTRY;
+      if (module) {
+        results = results.filter((e) => e.module === module);
+      }
+      if (query) {
+        const q = query.toLowerCase();
+        results = results.filter(
+          (e) => e.name.toLowerCase().includes(q) || e.description.toLowerCase().includes(q),
+        );
+      }
+      return { content: [{ type: 'text' as const, text: JSON.stringify(results, null, 2) }] };
     },
   );
 
   server.tool(
-    'classify_shot',
-    'Classify a shot result from execution trace data.',
+    'execute',
+    'Run JavaScript code in a sandboxed environment with the full SLOPE API and filesystem helpers pre-injected. Use `return` to produce output. Call search() first to discover available functions.',
     {
-      trace: z.any().describe('ExecutionTrace object with scope, modified files, test results, etc.'),
+      code: z.string().describe('JavaScript code to execute. Use `return` for output. All SLOPE core functions, constants, and fs helpers are available as top-level names.'),
     },
-    async ({ trace }) => {
-      const result = classifyShot(trace);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-    },
-  );
-
-  server.tool(
-    'generate_training_plan',
-    'Generate training recommendations from handicap trends and dispersion data.',
-    {
-      handicap: z.any().describe('HandicapCard object'),
-      dispersion: z.any().describe('DispersionReport object'),
-      recentScorecards: scorecardSchema,
-    },
-    async ({ handicap, dispersion, recentScorecards }) => {
-      const result = generateTrainingPlan({ handicap, dispersion, recentScorecards });
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-    },
-  );
-
-  server.tool(
-    'compute_handicap',
-    'Compute handicap card (rolling stats) from scorecard history.',
-    { scorecards: scorecardSchema },
-    async ({ scorecards }) => {
-      const result = computeHandicapCard(scorecards);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-    },
-  );
-
-  server.tool(
-    'compute_dispersion',
-    'Compute shot dispersion analysis (miss patterns, systemic issues).',
-    { scorecards: scorecardSchema },
-    async ({ scorecards }) => {
-      const result = computeDispersion(scorecards);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-    },
-  );
-
-  server.tool(
-    'build_scorecard',
-    'Build a complete SLOPE scorecard from minimal input (auto-computes stats, score, label).',
-    {
-      input: z.any().describe('ScorecardInput object with sprint_number, theme, par, slope, shots'),
-    },
-    async ({ input }) => {
-      const result = buildScorecard(input);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-    },
-  );
-
-  server.tool(
-    'format_briefing',
-    'Format a pre-round briefing with hazards, gotchas, handicap, and training.',
-    {
-      scorecards: scorecardSchema,
-      commonIssues: z.any().describe('CommonIssuesFile object'),
-      lastSession: z.any().optional().describe('Last session entry'),
-      filter: z.object({
-        categories: z.array(z.string()).optional(),
-        keywords: z.array(z.string()).optional(),
-      }).optional().describe('Filter criteria'),
-    },
-    async ({ scorecards, commonIssues, lastSession, filter }) => {
-      const result = formatBriefing({ scorecards, commonIssues, lastSession, filter });
-      return { content: [{ type: 'text' as const, text: result }] };
-    },
-  );
-
-  server.tool(
-    'format_sprint_review',
-    'Format a SLOPE scorecard into a markdown sprint review.',
-    {
-      scorecard: z.any().describe('GolfScorecard object'),
-      mode: z.enum(['technical', 'plain']).optional().describe('Review mode (default: technical)'),
-    },
-    async ({ scorecard, mode }) => {
-      const result = formatSprintReview(scorecard, undefined, undefined, mode);
-      return { content: [{ type: 'text' as const, text: result }] };
-    },
-  );
-
-  server.tool(
-    'build_tournament_review',
-    'Build a tournament review aggregating multiple sprint scorecards.',
-    {
-      id: z.string().describe('Tournament ID (e.g. "M-09")'),
-      name: z.string().describe('Tournament name'),
-      scorecards: scorecardSchema,
-      takeaways: z.array(z.string()).optional(),
-      improvements: z.array(z.string()).optional(),
-      reflection: z.string().optional(),
-    },
-    async ({ id, name, scorecards, takeaways, improvements, reflection }) => {
-      const review = buildTournamentReview(id, name, scorecards, { takeaways, improvements, reflection });
-      return { content: [{ type: 'text' as const, text: JSON.stringify(review, null, 2) }] };
-    },
-  );
-
-  server.tool(
-    'format_tournament_review',
-    'Format a TournamentReview object into markdown.',
-    {
-      review: z.any().describe('TournamentReview object'),
-    },
-    async ({ review }) => {
-      const result = formatTournamentReview(review);
-      return { content: [{ type: 'text' as const, text: result }] };
+    async ({ code }) => {
+      try {
+        const { result, logs } = await runInSandbox(code, process.cwd());
+        const parts: Array<{ type: 'text'; text: string }> = [];
+        if (logs.length > 0) {
+          parts.push({ type: 'text' as const, text: '--- logs ---\n' + logs.join('\n') });
+        }
+        parts.push({ type: 'text' as const, text: JSON.stringify(result, null, 2) ?? 'undefined' });
+        return { content: parts };
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        return { content: [{ type: 'text' as const, text: message }], isError: true };
+      }
     },
   );
 

@@ -26,6 +26,9 @@ importers:
 
   packages/core:
     devDependencies:
+      '@types/node':
+        specifier: ^25.3.0
+        version: 25.3.0
       typescript:
         specifier: ^5.7.0
         version: 5.9.3
@@ -39,8 +42,8 @@ importers:
         specifier: ^1.26.0
         version: 1.26.0(zod@3.25.76)
       '@slope-dev/core':
-        specifier: ^0.3.3
-        version: 0.3.3
+        specifier: workspace:*
+        version: link:../core
       zod:
         specifier: ^3.24.0
         version: 3.25.76
@@ -369,9 +372,6 @@ packages:
     resolution: {integrity: sha512-QFsBgQNTnh5K0t/sBsjJLq24YVqEIVkGpfN2VHsnN90soZyhaiA9UUHufcctVNL4ypJY0wrwad0wslx2KJQ1/w==}
     cpu: [x64]
     os: [win32]
-
-  '@slope-dev/core@0.3.3':
-    resolution: {integrity: sha512-eLuAtgeGJ8QIn+pF9qrM36R7cR4oAYlRqIkAAb+Pyip9TTOnirUU9HAiClZ15ouQIrRtxLh0jDsSLq6zl8UoVQ==}
 
   '@types/chai@5.2.3':
     resolution: {integrity: sha512-Mw558oeA9fFbv65/y4mHtXDs9bPnFMZAL/jxdPFUpOHHIXX91mcgEHbS5Lahr+pwZFR8A7GQleRWeI6cGFC2UA==}
@@ -1156,8 +1156,6 @@ snapshots:
 
   '@rollup/rollup-win32-x64-msvc@4.58.0':
     optional: true
-
-  '@slope-dev/core@0.3.3': {}
 
   '@types/chai@5.2.3':
     dependencies:

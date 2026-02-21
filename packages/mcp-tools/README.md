@@ -1,8 +1,13 @@
 # @slope-dev/mcp-tools
 
-MCP server exposing [SLOPE](https://github.com/srbryers/slope) advisory tools via the [Model Context Protocol](https://modelcontextprotocol.io/).
+Code-mode MCP server for [SLOPE](https://github.com/srbryers/slope) — the Sprint Lifecycle & Operational Performance Engine.
 
-Add this server to Cursor, Claude Desktop, or any MCP-compatible agent to get sprint scoring, handicap analysis, and club recommendations as tools.
+Instead of 10 individual tools, this server exposes **two tools** following the [code-mode MCP pattern](https://blog.cloudflare.com/code-mode-mcp/):
+
+| Tool | Description |
+|------|-------------|
+| `search` | Discover SLOPE API functions, types, constants, and filesystem helpers |
+| `execute` | Run JavaScript in a sandboxed `node:vm` with the full SLOPE API pre-injected |
 
 ## Quick Start
 
@@ -40,22 +45,72 @@ Add to `claude_desktop_config.json`:
 }
 ```
 
-## Tools (10)
+## Usage
 
-| Tool | Description |
-|------|-------------|
-| `recommend_club` | Data-driven complexity recommendation for a ticket |
-| `classify_shot` | Classify shot result from execution trace |
-| `generate_training_plan` | Training recommendations from handicap + dispersion |
-| `compute_handicap` | Handicap card with rolling windows from scorecards |
-| `compute_dispersion` | Shot dispersion analysis (miss patterns) |
-| `build_scorecard` | Build scorecard from minimal input (auto-computes stats) |
-| `format_briefing` | Pre-round briefing (hazards, gotchas, handicap) |
-| `format_sprint_review` | Format scorecard as markdown review |
-| `build_tournament_review` | Aggregate scorecards into tournament review |
-| `format_tournament_review` | Format tournament review as markdown |
+### 1. Discover the API
 
-All tools are **read-only** — they compute analysis from scorecard data passed as input. No filesystem or database access required.
+```
+search({})                          → full registry (all functions, helpers, constants)
+search({ query: "handicap" })       → handicap-related functions
+search({ module: "fs" })            → filesystem helpers (loadScorecards, readFile, etc.)
+search({ module: "types" })         → TypeScript type definitions
+search({ module: "constants" })     → PAR_THRESHOLDS, SLOPE_FACTORS, etc.
+```
+
+### 2. Execute code
+
+The `execute` tool runs JavaScript in a sandboxed environment with all SLOPE core functions, constants, and filesystem helpers available as top-level names:
+
+```js
+// Compute handicap from project scorecards
+execute({ code: `
+  const cards = loadScorecards();
+  return computeHandicapCard(cards);
+` })
+
+// Build a new scorecard
+execute({ code: `
+  return buildScorecard({
+    sprint_number: 4,
+    theme: "Code Mode MCP",
+    par: 4,
+    slope: 3,
+    date: "2026-02-21",
+    shots: [
+      { ticket_key: "S4-1", title: "Move config to core", club: "long_iron", result: "in_the_hole", hazards: [] },
+      { ticket_key: "S4-2", title: "Build search tool", club: "short_iron", result: "green", hazards: [] },
+    ],
+  });
+` })
+
+// Get a pre-round briefing
+execute({ code: `
+  return formatBriefing({
+    scorecards: loadScorecards(),
+    commonIssues: loadCommonIssues(),
+  });
+` })
+```
+
+### Available in the sandbox
+
+- **All `@slope-dev/core` exports** — `computeHandicapCard`, `buildScorecard`, `computeDispersion`, `recommendClub`, `formatBriefing`, etc.
+- **Constants** — `PAR_THRESHOLDS`, `SLOPE_FACTORS`, `SCORE_LABELS`, etc.
+- **Filesystem helpers** (scoped to project root):
+  - `loadConfig()` — load `.slope/config.json`
+  - `loadScorecards()` — load all sprint scorecards
+  - `loadCommonIssues()` — load common issues file
+  - `loadSessions()` — load sessions file
+  - `saveScorecard(card)` — write scorecard to `{scorecardDir}/sprint-{N}.json`
+  - `readFile(path)` — read any file (scoped to project root)
+  - `writeFile(path, content)` — write a file (scoped to project root)
+  - `listFiles(dir?, pattern?)` — list files with optional glob
+
+### Security
+
+- Code runs in `node:vm` — no access to `require`, `process`, `import`, `eval`, `fetch`
+- All filesystem operations are scoped to the project root (path escape is blocked)
+- 30-second execution timeout
 
 ## License
 
