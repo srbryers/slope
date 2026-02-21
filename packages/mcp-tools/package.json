@@ -1,0 +1,43 @@
+{
+  "name": "@slope-dev/mcp-tools",
+  "version": "0.1.0",
+  "description": "MCP server exposing SLOPE advisory tools — handicap, dispersion, club recommendation, briefing, and more.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "mcp-slope-tools": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "slope",
+    "mcp",
+    "model-context-protocol",
+    "sprint",
+    "scoring",
+    "golf",
+    "handicap"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/srbryers/slope.git",
+    "directory": "packages/mcp-tools"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.26.0",
+    "@slope-dev/core": "^0.3.3",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.0",
+    "typescript": "^5.7.0"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ]
+}

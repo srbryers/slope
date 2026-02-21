@@ -37,6 +37,7 @@ See [docs/framework.md](docs/framework.md) for the full framework.
 |---------|-------------|
 | [`@slope-dev/core`](packages/core) | Core scoring engine — types, handicap, builder, validation, advisor, formatter, briefing |
 | [`@slope-dev/cli`](packages/cli) | CLI tool — `slope init`, `card`, `validate`, `review`, `briefing`, `plan`, `classify` |
+| [`@slope-dev/mcp-tools`](packages/mcp-tools) | MCP server — 10 SLOPE tools for Cursor, Claude Desktop, or any MCP agent |
 
 ## Core API
 
@@ -115,38 +116,19 @@ After `slope init`, configure `.slope/config.json`:
 }
 ```
 
-## Agent / IDE Integration
+## Claude Code Integration
 
-SLOPE ships provider-specific templates so your AI coding assistant follows sprint discipline automatically.
-
-### Cursor
-
-```bash
-slope init --cursor
-```
-
-Installs `.cursor/rules/` with SLOPE-aware `.mdc` rule files:
-- `slope-sprint-checklist.mdc` — Pre-Round, Post-Shot, Post-Hole routines
-- `slope-commit-discipline.mdc` — Commit/push triggers
-- `slope-review-loop.mdc` — Architect review tiers
-
-### Claude Code
+SLOPE includes templates for [Claude Code](https://docs.anthropic.com/en/docs/claude-code):
 
 ```bash
 slope init --claude-code
 ```
 
-Installs `.claude/rules/` and `.claude/hooks/`:
-- `sprint-checklist.md`, `commit-discipline.md`, `review-loop.md`
-- `pre-merge-check.sh` — Validates scorecard before merge
-
-### Generic / MCP
-
-```bash
-slope init --generic
-```
-
-Installs a standalone `SLOPE-CHECKLIST.md` in your project root for any agent or manual use.
+This installs:
+- `.claude/rules/sprint-checklist.md` — Pre-Round, Post-Shot, Post-Hole routines
+- `.claude/rules/commit-discipline.md` — Commit/push triggers
+- `.claude/rules/review-loop.md` — Architect review tiers
+- `.claude/hooks/pre-merge-check.sh` — Validates scorecard before merge
 
 ## License
 
