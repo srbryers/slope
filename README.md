@@ -2,7 +2,7 @@
 
 **Sprint Lifecycle & Operational Performance Engine**
 
-A golf-inspired framework for measuring and improving sprint execution quality. Replace subjective retrospectives with objective, quantifiable metrics.
+A framework for measuring and improving sprint execution quality. Replace subjective retrospectives with objective, quantifiable metrics. Works with Claude Code, Cursor, and OpenCode.
 
 ## Quick Start
 
@@ -10,97 +10,174 @@ A golf-inspired framework for measuring and improving sprint execution quality. 
 # Install
 npm install -g @slope-dev/cli
 
-# Initialize in your project
+# Initialize in your project (auto-detects your AI tool)
 slope init
+
+# Or specify your platform
+slope init --claude-code
+slope init --cursor
+slope init --opencode
 
 # View your handicap card
 slope card
 
-# Validate a scorecard
-slope validate docs/retros/sprint-1.json
-
-# Get a pre-round briefing
+# Get a pre-sprint briefing
 slope briefing
+
+# Generate an HTML performance report
+slope report --html
 ```
 
 ## What is SLOPE?
 
-SLOPE maps sprint execution to golf scoring. Every sprint is a "hole" with a par (expected ticket count), every ticket is a "shot" with a club (approach complexity) and result (outcome quality).
+SLOPE maps sprint execution to a scoring metaphor. Every sprint has a **par** (expected ticket count), every ticket is a **shot** with an approach complexity and outcome. Over time, your **handicap** reveals patterns: Do you over-engineer? Under-scope? Pick the wrong approach?
 
-Over time, your **handicap** reveals patterns: Do you over-engineer? Under-scope? Pick the wrong approach? SLOPE's dispersion analysis and training recommendations help you improve systematically.
+SLOPE provides:
+- **Scorecards** — structured sprint retros with quantified outcomes
+- **Handicap tracking** — rolling performance windows (last 5, 10, all-time)
+- **Dispersion analysis** — miss pattern detection and systemic issue identification
+- **Training recommendations** — data-driven improvement suggestions
+- **Agent guidance hooks** — real-time hints for AI coding agents
+- **HTML reports** — self-contained visual performance dashboards
+- **Multi-platform support** — Claude Code, Cursor, OpenCode
 
-See [docs/framework.md](docs/framework.md) for the full framework.
+## Metaphors
+
+SLOPE ships with 6 built-in metaphors. The scoring math is identical — only the terminology changes.
+
+| Metaphor | Sprint | Ticket | Perfect | Par | Miss |
+|----------|--------|--------|---------|-----|------|
+| **Golf** (default) | Sprint | Shot | Hole-in-One | Par | Missed Long/Short/Left/Right |
+| **Tennis** | Set | Point | Ace | Deuce | Wide/Net/Long/Out |
+| **Baseball** | Inning | At-Bat | Home Run | Single | Foul/Strike/Pop/Ground |
+| **Gaming** | Level | Quest | S-Rank | B-Rank | Over-leveled/Under-leveled/Wrong Path/Side-tracked |
+| **D&D** | Quest | Encounter | Natural 20 | DC Met | Fumble/Misfire/Detour/Distraction |
+| **Matrix** | Simulation | Anomaly | The One | Stable | Overclocked/Underclocked/Drift/Noise |
+
+Configure in `.slope/config.json`:
+
+```json
+{ "metaphor": "gaming" }
+```
+
+Or per-command: `slope review --metaphor=tennis`
 
 ## Packages
 
 | Package | Description |
 |---------|-------------|
-| [`@slope-dev/core`](packages/core) | Core scoring engine — types, handicap, builder, validation, advisor, formatter, briefing |
-| [`@slope-dev/cli`](packages/cli) | CLI tool — `slope init`, `card`, `validate`, `review`, `briefing`, `plan`, `classify` |
-| [`@slope-dev/mcp-tools`](packages/mcp-tools) | Code-mode MCP server — `search` + `execute` with full SLOPE API |
-
-## Core API
-
-```typescript
-import {
-  buildScorecard,
-  validateScorecard,
-  computeHandicapCard,
-  formatSprintReview,
-  recommendClub,
-  classifyShot,
-  generateTrainingPlan,
-} from '@slope-dev/core';
-
-// Build a scorecard from shots — stats, score, and label auto-computed
-const card = buildScorecard({
-  sprint_number: 1,
-  theme: 'My First Sprint',
-  par: 3,
-  slope: 0,
-  date: '2026-02-20',
-  shots: [
-    { ticket_key: 'S1-1', title: 'Setup', club: 'short_iron', result: 'green', hazards: [] },
-    { ticket_key: 'S1-2', title: 'Feature', club: 'short_iron', result: 'in_the_hole', hazards: [] },
-    { ticket_key: 'S1-3', title: 'Tests', club: 'wedge', result: 'green', hazards: [] },
-  ],
-});
-
-// Validate
-const result = validateScorecard(card);
-console.log(result.valid); // true
-
-// Handicap over time
-const handicap = computeHandicapCard([card]);
-console.log(handicap.all_time.handicap); // 0.0
-
-// Club recommendation for next ticket
-const rec = recommendClub({
-  ticketComplexity: 'medium',
-  scorecards: [card],
-});
-console.log(rec.club); // 'short_iron'
-```
+| [`@slope-dev/core`](packages/core) | Core engine — scoring, handicap, metaphors, reports, guards, roadmap, events |
+| [`@slope-dev/store-sqlite`](packages/store-sqlite) | SQLite storage adapter — sessions, claims, events, scorecards |
+| [`@slope-dev/cli`](packages/cli) | CLI tool — 20+ commands for the full sprint lifecycle |
+| [`@slope-dev/mcp-tools`](packages/mcp-tools) | Code-mode MCP server — `search` + `execute` + session/claim tools |
 
 ## CLI Commands
 
+### Scoring & Analysis
+
 | Command | Description |
 |---------|-------------|
-| `slope init` | Create `.slope/` directory with config and example scorecard |
-| `slope init --cursor` | Also install Cursor IDE rules (`.cursor/rules/`) |
-| `slope init --claude-code` | Also install Claude Code rules, hooks, MCP config, and CLAUDE.md |
-| `slope init --generic` | Install a provider-agnostic SLOPE checklist |
 | `slope card` | Display handicap card with rolling windows |
-| `slope validate [path]` | Validate scorecard(s) — runs all if no path given |
-| `slope review [path]` | Format sprint review as markdown |
-| `slope review --plain` | Non-technical sprint review |
-| `slope briefing` | Pre-round briefing (handicap + hazards + gotchas) |
-| `slope briefing --categories=testing` | Filter briefing by category |
-| `slope plan --complexity=medium` | Get club recommendation + training plan |
-| `slope classify --scope=... --modified=... --tests=pass --reverts=0` | Classify a shot |
-| `slope tournament --id=M-09 --sprints=197..202` | Build tournament review from sprint range |
-| `slope auto-card --sprint=N [--since=date]` | Generate scorecard from git commits |
-| `slope next` | Show next sprint number (auto-detected from scorecards) |
+| `slope validate [path]` | Validate scorecard(s) |
+| `slope review [path] [--plain] [--metaphor=id]` | Format sprint review as markdown |
+| `slope report --html [--output=path] [--metaphor=id]` | Generate HTML performance report |
+| `slope tournament --id=<id> --sprints=N..M` | Build tournament review from sprint range |
+| `slope auto-card --sprint=N [--ci=path]` | Generate scorecard from git + CI signals |
+
+### Planning & Guidance
+
+| Command | Description |
+|---------|-------------|
+| `slope briefing [--sprint=N] [--categories=...] [--keywords=...]` | Pre-sprint briefing |
+| `slope plan --complexity=<level>` | Club recommendation + training plan |
+| `slope classify --scope=... --modified=... --tests=pass` | Classify a shot from execution trace |
+| `slope next` | Show next sprint number |
+| `slope roadmap validate\|review\|status\|show` | Strategic planning tools |
+
+### Sessions & Claims
+
+| Command | Description |
+|---------|-------------|
+| `slope session start\|end\|heartbeat\|list` | Manage live sessions |
+| `slope claim --target=<t> [--scope=area] [--force]` | Claim a ticket or area |
+| `slope release --id=<id>` | Release a claim |
+| `slope status [--sprint=N]` | Show sprint course status + conflicts |
+
+### Agent Hooks
+
+| Command | Description |
+|---------|-------------|
+| `slope hook add\|remove\|list\|show` | Manage lifecycle hooks |
+| `slope hook add --level=full` | Install all guidance hooks |
+| `slope guard list\|enable\|disable` | Manage guard activation |
+| `slope guard <name>` | Run a guard handler (stdin/stdout) |
+
+### Setup
+
+| Command | Description |
+|---------|-------------|
+| `slope init` | Create `.slope/` directory with config |
+| `slope init --claude-code` | Install Claude Code rules, hooks, MCP config |
+| `slope init --cursor` | Install Cursor rules + MCP config |
+| `slope init --opencode` | Install OpenCode AGENTS.md + plugin |
+| `slope init --all` | Install for all detected platforms |
+| `slope extract --file=<path>` | Extract events into SLOPE store |
+| `slope distill [--auto]` | Promote event patterns to common issues |
+
+## Platform Setup
+
+### Claude Code
+
+```bash
+slope init --claude-code
+```
+
+Installs:
+- `.claude/rules/` — Sprint checklist, commit discipline, review loop
+- `.claude/hooks/` — Guard dispatcher for real-time guidance
+- `.mcp.json` — SLOPE MCP server config
+- `CLAUDE.md` — Project context
+
+### Cursor
+
+```bash
+slope init --cursor
+```
+
+Installs:
+- `.cursor/rules/` — SLOPE methodology rules
+- `.cursor/mcp.json` — MCP server config
+
+### OpenCode
+
+```bash
+slope init --opencode
+```
+
+Installs:
+- `AGENTS.md` — SLOPE methodology (OpenCode reads this format)
+- `.opencode/plugins/slope-plugin.ts` — Event capture plugin
+
+## Agent Guidance Hooks
+
+SLOPE can guide AI agents in real-time via hook integration. Six guards provide contextual hints:
+
+| Guard | Trigger | What it does |
+|-------|---------|-------------|
+| `explore` | Before search/read | Suggests checking codebase index first |
+| `hazard` | Before file edit | Warns about known issues in the area |
+| `commit-nudge` | After file edit | Nudges commit/push after prolonged editing |
+| `scope-drift` | Before file edit | Warns when editing outside claimed scope |
+| `compaction` | Before context compact | Saves checkpoint to store |
+| `stop-check` | Before session end | Blocks if uncommitted/unpushed work exists |
+
+Install all guards:
+
+```bash
+slope hook add --level=full
+```
+
+Guards are non-blocking hints (except `stop-check`) — they inject context, never deny actions.
 
 ## Configuration
 
@@ -111,26 +188,55 @@ After `slope init`, configure `.slope/config.json`:
   "scorecardDir": "docs/retros",
   "scorecardPattern": "sprint-*.json",
   "minSprint": 1,
+  "metaphor": "golf",
   "commonIssuesPath": ".slope/common-issues.json",
-  "sessionsPath": ".slope/sessions.json"
+  "sessionsPath": ".slope/sessions.json",
+  "roadmapPath": "docs/backlog/roadmap.json",
+  "guidance": {
+    "disabled": [],
+    "commitInterval": 15,
+    "pushInterval": 30
+  }
 }
 ```
 
-## Claude Code Integration
+## Core API
 
-SLOPE includes templates for [Claude Code](https://docs.anthropic.com/en/docs/claude-code):
+```typescript
+import {
+  buildScorecard,
+  validateScorecard,
+  computeHandicapCard,
+  computeDispersion,
+  formatSprintReview,
+  recommendClub,
+  classifyShot,
+  generateTrainingPlan,
+  buildReportData,
+  generateHtmlReport,
+  getMetaphor,
+  loadScorecards,
+} from '@slope-dev/core';
 
-```bash
-slope init --claude-code
+// Build a scorecard
+const card = buildScorecard({
+  sprint_number: 1,
+  theme: 'My First Sprint',
+  par: 3,
+  slope: 0,
+  date: '2026-02-22',
+  shots: [
+    { ticket_key: 'S1-1', title: 'Setup', club: 'short_iron', result: 'green', hazards: [] },
+    { ticket_key: 'S1-2', title: 'Feature', club: 'short_iron', result: 'in_the_hole', hazards: [] },
+    { ticket_key: 'S1-3', title: 'Tests', club: 'wedge', result: 'green', hazards: [] },
+  ],
+});
+
+// Generate HTML report with gaming metaphor
+const data = buildReportData([card]);
+const gaming = getMetaphor('gaming');
+const html = generateHtmlReport(data, gaming);
 ```
-
-This installs:
-- `.claude/rules/sprint-checklist.md` — Pre-Round, Post-Shot, Post-Hole routines
-- `.claude/rules/commit-discipline.md` — Commit/push triggers
-- `.claude/rules/review-loop.md` — Architect review tiers
-- `.claude/hooks/pre-merge-check.sh` — Validates scorecard before merge
-- `.mcp.json` — SLOPE MCP server config (search + execute)
-- `CLAUDE.md` — Project context for Claude Code
 
 ## License
 
