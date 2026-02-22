@@ -1,0 +1,116 @@
+{
+  "sprint_number": 12,
+  "theme": "The Caddy — Agent Guidance Hooks",
+  "par": 4,
+  "slope": 2,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-02-22",
+  "type": "feature",
+  "shots": [
+    {
+      "ticket_key": "S12-1",
+      "title": "Guard framework + hook generation",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "New guard.ts in core with types, 6 guard definitions, formatters, and Claude Code settings.json generator. New slope guard CLI command. slope hook add --level=full installs all guards. Added guidance config to SlopeConfig. 18 new core tests."
+    },
+    {
+      "ticket_key": "S12-2",
+      "title": "PreToolUse guards — explore + hazard",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Explore guard checks for codebase index files and suggests checking them. Hazard guard looks up common issues by file area and injects warnings. Both non-blocking (additionalContext only). 10 new CLI tests."
+    },
+    {
+      "ticket_key": "S12-3",
+      "title": "Discipline hooks — commit nudge + scope drift",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Commit nudge checks git log for time since last commit/push with configurable thresholds. Scope drift checks if edited file is outside claimed areas. Both non-blocking. 7 new CLI tests."
+    },
+    {
+      "ticket_key": "S12-4",
+      "title": "Session hooks — compaction checkpoint + stop check",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Compaction guard records event to store on PreCompact. Stop check blocks session end when uncommitted/unpushed work exists. 6 new CLI tests."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "altitude",
+      "description": "Context continued from previous session — required reconstruction from summary",
+      "impact": "none"
+    },
+    {
+      "type": "wind",
+      "description": "Research spike on Claude Code hooks API informed architecture",
+      "impact": "positive"
+    }
+  ],
+  "special_plays": [],
+  "training": [],
+  "nutrition": [
+    {
+      "category": "hydration",
+      "description": "Full build+test+typecheck after every ticket (675 tests at completion)",
+      "status": "healthy"
+    },
+    {
+      "category": "diet",
+      "description": "Commit-per-ticket discipline — 4 commits for 4 tickets, pushed after each",
+      "status": "healthy"
+    },
+    {
+      "category": "supplements",
+      "description": "41 new tests: 18 core (guard framework) + 23 CLI (guards + init)",
+      "status": "healthy"
+    },
+    {
+      "category": "recovery",
+      "description": "Zero hazards — cleanest sprint yet. Research spike before implementation prevented common issue #8 (TS strict config cast).",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Third consecutive par sprint. The guard framework fell into place naturally — the research on Claude Code's hook API upfront was key. All 6 guards implemented with clean separation between core types and CLI handlers.",
+    "advice_for_next_player": "Guards use additionalContext for non-blocking guidance — never deny/block for guidance hooks. Only stop-check uses blockReason because it's the Stop event. The guard dispatcher script at .claude/hooks/slope-guard.sh routes all hooks to `slope guard <name>`.",
+    "what_surprised_you": "Claude Code's hook system is more capable than expected — PreToolUse can inject context, modify tool input, and control permissions. The matcher regex system is clean. The research spike paid for itself immediately.",
+    "excited_about_next": "The guidance layer is complete. S13 brings HTML reports and launch polish — the last sprint before multi-agent orchestration."
+  },
+  "bunker_locations": [],
+  "yardage_book_updates": [
+    "packages/core/src/guard.ts: HookInput, GuardResult, PreToolUseOutput, PostToolUseOutput, StopOutput, GUARD_DEFINITIONS",
+    "slope guard <name>: CLI command reads hook JSON from stdin, runs handler, outputs response JSON",
+    "slope hook add --level=full: installs all 6 guards into .claude/settings.json",
+    "Guards: explore (PreToolUse Read|Glob|Grep), hazard (PreToolUse Edit|Write), commit-nudge (PostToolUse Edit|Write), scope-drift (PreToolUse Edit|Write), compaction (PreCompact), stop-check (Stop)",
+    "SlopeConfig.guidance: disabled, indexPaths, hazardRecency, commitInterval, pushInterval, scopeDrift",
+    ".claude/hooks/slope-guard.sh: dispatcher script that routes to slope guard handlers"
+  ],
+  "course_management_notes": [
+    "4 tickets, 4 in_the_hole — zero misses, zero hazards (3rd consecutive clean sprint)",
+    "Tests grew from 634 to 675 (+41 across core and cli)",
+    "7 new files: guard.ts, guard CLI, 4 guard handlers, guard tests",
+    "Research spike on Claude Code hooks API before implementation — prevented architectural missteps"
+  ]
+}

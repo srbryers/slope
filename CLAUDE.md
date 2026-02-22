@@ -10,7 +10,7 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
 
 ## Commands
 - `pnpm -r build` — build all packages
-- `pnpm -r test` — run all tests (core: 470, store-sqlite: 32, cli: 96, mcp-tools: 36)
+- `pnpm -r test` — run all tests (core: 488, store-sqlite: 32, cli: 119, mcp-tools: 36)
 - `pnpm -r typecheck` — type check all packages
 
 ## MCP Tools
