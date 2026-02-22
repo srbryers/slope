@@ -1,8 +1,20 @@
-import { writeFileSync, mkdirSync, existsSync, cpSync, readdirSync, readFileSync } from 'node:fs';
+import { writeFileSync, mkdirSync, existsSync, cpSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createConfig } from '../config.js';
 import { saveHooksConfig } from '../hooks-config.js';
+import { resolveMetaphor } from '../metaphor.js';
+import type { MetaphorDefinition } from '@slope-dev/core';
+import {
+  generateProjectContext,
+  generateSprintChecklist,
+  generateCommitDiscipline,
+  generateReviewLoop,
+  generateCursorSprintChecklist,
+  generateCursorCommitDiscipline,
+  generateCursorReviewLoop,
+  generateGenericChecklist,
+} from '../template-generator.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -104,24 +116,29 @@ function getTemplatesRoot(): string {
   return join(__dirname, '..', '..', '..', '..', 'templates');
 }
 
-function installClaudeCodeTemplates(cwd: string): void {
-  const templatesRoot = join(getTemplatesRoot(), 'claude-code');
+function installClaudeCodeTemplates(cwd: string, metaphor: MetaphorDefinition): void {
   const rulesDir = join(cwd, '.claude', 'rules');
   const hooksDir = join(cwd, '.claude', 'hooks');
 
   mkdirSync(rulesDir, { recursive: true });
   mkdirSync(hooksDir, { recursive: true });
 
-  const ruleFiles = ['sprint-checklist.md', 'commit-discipline.md', 'review-loop.md'];
-  for (const file of ruleFiles) {
-    const src = join(templatesRoot, 'rules', file);
+  // Generate metaphor-aware rules
+  const ruleGenerators: Record<string, string> = {
+    'sprint-checklist.md': generateSprintChecklist(metaphor),
+    'commit-discipline.md': generateCommitDiscipline(metaphor),
+    'review-loop.md': generateReviewLoop(),
+  };
+  for (const [file, content] of Object.entries(ruleGenerators)) {
     const dest = join(rulesDir, file);
-    if (existsSync(src) && !existsSync(dest)) {
-      cpSync(src, dest);
+    if (!existsSync(dest)) {
+      writeFileSync(dest, content);
       console.log(`  Created ${dest}`);
     }
   }
 
+  // Copy static hook files (not metaphor-dependent)
+  const templatesRoot = join(getTemplatesRoot(), 'claude-code');
   const hookFiles = ['pre-merge-check.sh'];
   for (const file of hookFiles) {
     const src = join(templatesRoot, 'hooks', file);
@@ -132,46 +149,42 @@ function installClaudeCodeTemplates(cwd: string): void {
     }
   }
 
-  const claudeMdSrc = join(getTemplatesRoot(), 'claude-code', 'CLAUDE.md');
+  // Generate CLAUDE.md
   const claudeMdDest = join(cwd, 'CLAUDE.md');
-  if (existsSync(claudeMdSrc) && !existsSync(claudeMdDest)) {
-    cpSync(claudeMdSrc, claudeMdDest);
+  if (!existsSync(claudeMdDest)) {
+    writeFileSync(claudeMdDest, generateProjectContext(metaphor));
     console.log(`  Created ${claudeMdDest}`);
   }
 
   console.log('\n  Claude Code templates installed to .claude/rules/ and .claude/hooks/');
 }
 
-function installCursorTemplates(cwd: string): void {
-  const templatesRoot = join(getTemplatesRoot(), 'cursor', 'rules');
+function installCursorTemplates(cwd: string, metaphor: MetaphorDefinition): void {
   const rulesDir = join(cwd, '.cursor', 'rules');
-
   mkdirSync(rulesDir, { recursive: true });
 
-  try {
-    const files = readdirSync(templatesRoot).filter((f: string) => f.endsWith('.mdc'));
-    for (const file of files) {
-      const src = join(templatesRoot, file);
-      const dest = join(rulesDir, file);
-      if (!existsSync(dest)) {
-        cpSync(src, dest);
-        console.log(`  Created ${dest}`);
-      }
+  // Generate metaphor-aware Cursor rules
+  const ruleGenerators: Record<string, string> = {
+    'slope-sprint-checklist.mdc': generateCursorSprintChecklist(metaphor),
+    'slope-commit-discipline.mdc': generateCursorCommitDiscipline(metaphor),
+    'slope-review-loop.mdc': generateCursorReviewLoop(),
+  };
+  for (const [file, content] of Object.entries(ruleGenerators)) {
+    const dest = join(rulesDir, file);
+    if (!existsSync(dest)) {
+      writeFileSync(dest, content);
+      console.log(`  Created ${dest}`);
     }
-  } catch {
-    console.error('  Warning: Could not find Cursor rule templates');
   }
 
   console.log('\n  Cursor rules installed to .cursor/rules/');
 }
 
-function installGenericTemplates(cwd: string): void {
-  const templatesRoot = join(getTemplatesRoot(), 'generic');
+function installGenericTemplates(cwd: string, metaphor: MetaphorDefinition): void {
   const dest = join(cwd, 'SLOPE-CHECKLIST.md');
 
-  const src = join(templatesRoot, 'SLOPE-CHECKLIST.md');
-  if (existsSync(src) && !existsSync(dest)) {
-    cpSync(src, dest);
+  if (!existsSync(dest)) {
+    writeFileSync(dest, generateGenericChecklist(metaphor));
     console.log(`  Created ${dest}`);
   }
 
@@ -269,16 +282,17 @@ export async function initCommand(args: string[]): Promise<void> {
   const cwd = process.cwd();
   const provider = detectProvider(args);
 
+  // Resolve metaphor early — used for config and template generation
+  const metaphorArg = args.find(a => a.startsWith('--metaphor='));
+  const metaphorId = metaphorArg?.slice('--metaphor='.length);
+  const metaphor = resolveMetaphor(args, metaphorId || undefined);
+
   const configPath = createConfig(cwd);
 
-  // Apply --metaphor flag to config
-  const metaphorArg = args.find(a => a.startsWith('--metaphor='));
-  if (metaphorArg) {
-    const metaphorId = metaphorArg.slice('--metaphor='.length);
-    const configData = JSON.parse(readFileSync(configPath, 'utf8'));
-    configData.metaphor = metaphorId;
-    writeFileSync(configPath, JSON.stringify(configData, null, 2) + '\n');
-  }
+  // Apply metaphor to config (always write it, even for default golf)
+  const configData = JSON.parse(readFileSync(configPath, 'utf8'));
+  configData.metaphor = metaphor.id;
+  writeFileSync(configPath, JSON.stringify(configData, null, 2) + '\n');
 
   console.log(`  Created ${configPath}`);
 
@@ -328,17 +342,17 @@ export async function initCommand(args: string[]): Promise<void> {
 
   switch (provider) {
     case 'claude-code':
-      installClaudeCodeTemplates(cwd);
+      installClaudeCodeTemplates(cwd, metaphor);
       installClaudeCodeMcpConfig(cwd);
       installDefaultHooks(cwd, 'claude-code');
       break;
     case 'cursor':
-      installCursorTemplates(cwd);
+      installCursorTemplates(cwd, metaphor);
       installCursorMcpConfig(cwd);
       installDefaultHooks(cwd, 'cursor');
       break;
     case 'generic':
-      installGenericTemplates(cwd);
+      installGenericTemplates(cwd, metaphor);
       break;
     default:
       break;
