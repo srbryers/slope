@@ -261,6 +261,20 @@ export {
 } from './roles.js';
 export type { RoleDefinition } from './roles.js';
 
+// Escalation
+export {
+  resolveEscalationConfig,
+  detectEscalation,
+  buildEscalationEvent,
+} from './escalation.js';
+export type {
+  EscalationTrigger,
+  EscalationSeverity,
+  EscalationAction,
+  EscalationConfig,
+  EscalationResult,
+} from './escalation.js';
+
 // Standup (Communication Protocol)
 export {
   generateStandup,

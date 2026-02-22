@@ -36,6 +36,7 @@ import { distillCommand } from './commands/distill.js';
 import { guardCommand, guardManageCommand } from './commands/guard.js';
 import { reportCommand } from './commands/report.js';
 import { standupCommand } from './commands/standup.js';
+import { escalateCommand } from './commands/escalate.js';
 
 const subcommand = process.argv[2];
 
@@ -141,6 +142,12 @@ switch (subcommand) {
     break;
   case 'standup':
     standupCommand(process.argv.slice(3)).catch(err => {
+      console.error('Error:', err.message);
+      process.exit(1);
+    });
+    break;
+  case 'escalate':
+    escalateCommand(process.argv.slice(3)).catch(err => {
       console.error('Error:', err.message);
       process.exit(1);
     });

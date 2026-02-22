@@ -264,6 +264,29 @@ export const SLOPE_REGISTRY: FunctionRegistryEntry[] = [
     example: 'return listRoles().map(r => r.id);',
   },
 
+  // ─── Escalation ───
+  {
+    name: 'detectEscalation',
+    module: 'core',
+    description: 'Detects escalation conditions from swarm state: blocker timeouts, claim conflicts, test failure cascades.',
+    signature: 'detectEscalation(opts: { config?: EscalationConfig; standups?: StandupReport[]; conflicts?: SprintConflict[]; events?: SlopeEvent[]; now?: number }): EscalationResult[]',
+    example: 'return detectEscalation({ standups: [...], conflicts: [...], events: [...] });',
+  },
+  {
+    name: 'buildEscalationEvent',
+    module: 'core',
+    description: 'Creates a hazard event from an escalation result, suitable for store.insertEvent().',
+    signature: 'buildEscalationEvent(escalation: EscalationResult, sessionId: string, sprintNumber?: number): Omit<SlopeEvent, "id" | "timestamp">',
+    example: 'const event = buildEscalationEvent(escalation, "sess-1", 15);',
+  },
+  {
+    name: 'resolveEscalationConfig',
+    module: 'core',
+    description: 'Merges partial escalation config with defaults (blocker_timeout: 15, claim_conflict: true, test_failure_cascade: 10).',
+    signature: 'resolveEscalationConfig(config?: EscalationConfig): Required<EscalationConfig>',
+    example: 'return resolveEscalationConfig({ blocker_timeout: 30 });',
+  },
+
   // ─── Filesystem helpers (injected into sandbox) ───
   {
     name: 'loadConfig',
@@ -439,6 +462,13 @@ interface RoleDefinition { id: string; name: string; description: string; focusA
 interface AgentBreakdown { session_id: string; agent_role: string; shots: ShotRecord[]; score: number; stats: HoleStats; }
 interface AgentShotInput { session_id: string; agent_role: string; shots: ShotRecord[]; }
 interface ScorecardInput { sprint_number: number; theme: string; par: 3 | 4 | 5; slope: number; date: string; shots: ShotRecord[]; putts?: number; penalties?: number; type?: SprintType; conditions?: ConditionRecord[]; special_plays?: SpecialPlay[]; training?: TrainingSession[]; nutrition?: NutritionEntry[]; nineteenth_hole?: NineteenthHole; bunker_locations?: string[]; yardage_book_updates?: string[]; course_management_notes?: string[]; agents?: AgentBreakdown[]; }
+
+// ─── Escalation ───
+type EscalationTrigger = 'blocker_timeout' | 'claim_conflict' | 'test_failure_cascade' | 'manual';
+type EscalationSeverity = 'warning' | 'critical';
+type EscalationAction = 'log_event' | 'mark_blocked' | 'notify_standup';
+interface EscalationConfig { blocker_timeout?: number; claim_conflict?: boolean; test_failure_cascade?: number; actions?: EscalationAction[]; }
+interface EscalationResult { trigger: EscalationTrigger; severity: EscalationSeverity; description: string; session_id?: string; agent_role?: string; actions: EscalationAction[]; }
 
 // ─── Advisor ───
 interface ExecutionTrace { planned_scope_paths: string[]; modified_files: string[]; test_results: { suite: string; passed: boolean; first_run: boolean }[]; reverts: number; elapsed_minutes: number; hazards_encountered: HazardHit[]; }
