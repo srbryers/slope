@@ -78,11 +78,12 @@ export async function autoCardCommand(args: string[]): Promise<void> {
 
   const sprintNumber = parseInt(opts.sprint ?? '', 10);
   if (!sprintNumber) {
-    console.error('\nUsage: slope auto-card --sprint=<N> [--since=<date>] [--branch=<ref>] [--theme=<text>] [--test-output=<file>] [--pr=<number>] [--swarm=<id>] [--dry-run]\n');
+    console.error('\nUsage: slope auto-card --sprint=<N> [--since=<date>] [--branch=<ref>] [--theme=<text>] [--player=<name>] [--test-output=<file>] [--pr=<number>] [--swarm=<id>] [--dry-run]\n');
     console.error('  --sprint       Sprint number (required)');
     console.error('  --since        Git log start date, e.g. "2026-02-20" (optional)');
     console.error('  --branch       Git ref to scan (default: HEAD)');
     console.error('  --theme        Sprint theme (default: auto-generated)');
+    console.error('  --player       Player name for multi-developer repos');
     console.error('  --test-output  Path to test runner output file (Vitest/Jest) for CI-aware scoring');
     console.error('  --pr           PR number to fetch review/check metadata via `gh` CLI');
     console.error('  --swarm        Swarm ID — map commits to agents for per-agent breakdowns');
@@ -170,6 +171,7 @@ export async function autoCardCommand(args: string[]): Promise<void> {
     slope: computeSlope(slopeFactors),
     date: new Date().toISOString().split('T')[0],
     shots,
+    ...(opts.player ? { player: opts.player } : {}),
     ...(agents ? { agents } : {}),
   });
 

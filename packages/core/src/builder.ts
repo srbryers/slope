@@ -147,6 +147,7 @@ export interface ScorecardInput {
   slope: number;
   date: string;
   shots: ShotRecord[];
+  player?: string;
 
   // Optional overrides for fields that can't be derived from shots
   putts?: number;
@@ -188,6 +189,7 @@ export function buildScorecard(input: ScorecardInput): GolfScorecard {
 
   return {
     sprint_number: input.sprint_number,
+    ...(input.player ? { player: input.player } : {}),
     theme: input.theme,
     par: input.par,
     slope: input.slope,

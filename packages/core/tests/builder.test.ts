@@ -324,6 +324,31 @@ describe('buildScorecard', () => {
     });
     expect(card.agents).toBeUndefined();
   });
+
+  it('includes player field when provided', () => {
+    const card = buildScorecard({
+      sprint_number: 21,
+      theme: 'Player Test',
+      par: 3,
+      slope: 1,
+      date: '2026-02-22',
+      shots: [makeShot()],
+      player: 'srbryers',
+    });
+    expect(card.player).toBe('srbryers');
+  });
+
+  it('omits player field when not provided', () => {
+    const card = buildScorecard({
+      sprint_number: 21,
+      theme: 'No Player Test',
+      par: 3,
+      slope: 1,
+      date: '2026-02-22',
+      shots: [makeShot()],
+    });
+    expect(card.player).toBeUndefined();
+  });
 });
 
 // --- buildAgentBreakdowns ---
