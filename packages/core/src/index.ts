@@ -33,6 +33,8 @@ export type {
   ClaimScope,
   SprintClaim,
   SprintConflict,
+  EventType,
+  SlopeEvent,
 } from './types.js';
 
 // Constants

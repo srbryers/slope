@@ -6,7 +6,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import Database from 'better-sqlite3';
 import type { Database as DatabaseType } from 'better-sqlite3';
-import type { SprintClaim, GolfScorecard } from '@slope-dev/core';
+import type { SprintClaim, GolfScorecard, SlopeEvent, EventType } from '@slope-dev/core';
 import type { CommonIssuesFile } from '@slope-dev/core';
 import { SlopeStoreError } from '@slope-dev/core';
 import type { SlopeStore, SlopeSession } from '@slope-dev/core';
@@ -19,19 +19,11 @@ function nowISO(): string {
   return new Date().toISOString();
 }
 
-export class SqliteSlopeStore implements SlopeStore {
-  private db: DatabaseType;
-
-  constructor(dbPath: string) {
-    mkdirSync(dirname(dbPath), { recursive: true });
-    this.db = new Database(dbPath);
-    this.db.pragma('journal_mode = WAL');
-    this.db.pragma('foreign_keys = ON');
-    this.migrate();
-  }
-
-  private migrate(): void {
-    this.db.exec(`
+/** Sequential schema migrations — each runs exactly once */
+const MIGRATIONS: Array<{ version: number; sql: string }> = [
+  {
+    version: 1,
+    sql: `
       CREATE TABLE IF NOT EXISTS sessions (
         session_id TEXT PRIMARY KEY,
         role TEXT NOT NULL,
@@ -69,7 +61,65 @@ export class SqliteSlopeStore implements SlopeStore {
         data TEXT NOT NULL,
         updated_at TEXT NOT NULL
       );
+    `,
+  },
+  {
+    version: 2,
+    sql: `
+      CREATE TABLE IF NOT EXISTS events (
+        id TEXT PRIMARY KEY,
+        session_id TEXT REFERENCES sessions(session_id) ON DELETE SET NULL,
+        type TEXT NOT NULL,
+        timestamp TEXT NOT NULL,
+        data TEXT NOT NULL DEFAULT '{}',
+        sprint_number INTEGER,
+        ticket_key TEXT
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_events_session ON events(session_id);
+      CREATE INDEX IF NOT EXISTS idx_events_sprint ON events(sprint_number);
+      CREATE INDEX IF NOT EXISTS idx_events_ticket ON events(ticket_key);
+      CREATE INDEX IF NOT EXISTS idx_events_type ON events(type);
+    `,
+  },
+];
+
+export class SqliteSlopeStore implements SlopeStore {
+  private db: DatabaseType;
+
+  constructor(dbPath: string) {
+    mkdirSync(dirname(dbPath), { recursive: true });
+    this.db = new Database(dbPath);
+    this.db.pragma('journal_mode = WAL');
+    this.db.pragma('foreign_keys = ON');
+    this.migrate();
+  }
+
+  /** Versioned migration framework — runs each migration exactly once */
+  private migrate(): void {
+    // Bootstrap schema_version table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS schema_version (
+        version INTEGER PRIMARY KEY,
+        applied_at TEXT NOT NULL
+      );
     `);
+
+    const currentVersion = this.getSchemaVersion();
+
+    for (const migration of MIGRATIONS) {
+      if (migration.version > currentVersion) {
+        this.db.exec(migration.sql);
+        this.db.prepare('INSERT INTO schema_version (version, applied_at) VALUES (?, ?)')
+          .run(migration.version, nowISO());
+      }
+    }
+  }
+
+  /** Get current schema version (0 if no migrations applied) */
+  getSchemaVersion(): number {
+    const row = this.db.prepare('SELECT MAX(version) as v FROM schema_version').get() as { v: number | null } | undefined;
+    return row?.v ?? 0;
   }
 
   // --- Sessions ---
@@ -236,6 +286,49 @@ export class SqliteSlopeStore implements SlopeStore {
     `).run(JSON.stringify(issues), nowISO());
   }
 
+  // --- Events ---
+
+  async insertEvent(event: Omit<SlopeEvent, 'id' | 'timestamp'>): Promise<SlopeEvent> {
+    const full: SlopeEvent = {
+      id: generateId('evt'),
+      timestamp: nowISO(),
+      ...event,
+    };
+
+    this.db.prepare(`
+      INSERT INTO events (id, session_id, type, timestamp, data, sprint_number, ticket_key)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      full.id,
+      full.session_id ?? null,
+      full.type,
+      full.timestamp,
+      JSON.stringify(full.data),
+      full.sprint_number ?? null,
+      full.ticket_key ?? null,
+    );
+
+    return full;
+  }
+
+  async getEventsBySession(sessionId: string): Promise<SlopeEvent[]> {
+    const rows = this.db.prepare('SELECT * FROM events WHERE session_id = ? ORDER BY timestamp')
+      .all(sessionId) as Array<Record<string, unknown>>;
+    return rows.map(rowToEvent);
+  }
+
+  async getEventsBySprint(sprintNumber: number): Promise<SlopeEvent[]> {
+    const rows = this.db.prepare('SELECT * FROM events WHERE sprint_number = ? ORDER BY timestamp')
+      .all(sprintNumber) as Array<Record<string, unknown>>;
+    return rows.map(rowToEvent);
+  }
+
+  async getEventsByTicket(ticketKey: string): Promise<SlopeEvent[]> {
+    const rows = this.db.prepare('SELECT * FROM events WHERE ticket_key = ? ORDER BY timestamp')
+      .all(ticketKey) as Array<Record<string, unknown>>;
+    return rows.map(rowToEvent);
+  }
+
   // --- Lifecycle ---
 
   close(): void {
@@ -270,6 +363,18 @@ function rowToClaim(row: Record<string, unknown>): SprintClaim {
     session_id: (row.session_id as string | null) ?? undefined,
     expires_at: (row.expires_at as string | null) ?? undefined,
     metadata: row.metadata ? JSON.parse(row.metadata as string) : undefined,
+  };
+}
+
+function rowToEvent(row: Record<string, unknown>): SlopeEvent {
+  return {
+    id: row.id as string,
+    session_id: (row.session_id as string | null) ?? undefined,
+    type: row.type as EventType,
+    timestamp: row.timestamp as string,
+    data: row.data ? JSON.parse(row.data as string) : {},
+    sprint_number: (row.sprint_number as number | null) ?? undefined,
+    ticket_key: (row.ticket_key as string | null) ?? undefined,
   };
 }
 

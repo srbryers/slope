@@ -301,3 +301,19 @@ export interface TournamentHazard {
   area: string;
   description: string;
 }
+
+// --- Event Types (Session Telemetry) ---
+
+/** Types of events captured during a session */
+export type EventType = 'failure' | 'dead_end' | 'scope_change' | 'compaction' | 'hazard' | 'decision';
+
+/** A telemetry event captured during a session */
+export interface SlopeEvent {
+  id: string;
+  session_id?: string;
+  type: EventType;
+  timestamp: string;
+  data: Record<string, unknown>;
+  sprint_number?: number;
+  ticket_key?: string;
+}

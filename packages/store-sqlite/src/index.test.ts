@@ -253,6 +253,153 @@ describe('Common Issues', () => {
   });
 });
 
+describe('Events', () => {
+  it('inserts and retrieves events by session', async () => {
+    await store.registerSession({ session_id: 'sess-1', role: 'primary', ide: 'claude-code' });
+
+    const event = await store.insertEvent({
+      session_id: 'sess-1',
+      type: 'failure',
+      data: { error: 'build failed', file: 'index.ts' },
+      sprint_number: 5,
+      ticket_key: 'S5-2',
+    });
+
+    expect(event.id).toMatch(/^evt-/);
+    expect(event.timestamp).toBeTruthy();
+    expect(event.type).toBe('failure');
+    expect(event.data).toEqual({ error: 'build failed', file: 'index.ts' });
+
+    const bySession = await store.getEventsBySession('sess-1');
+    expect(bySession).toHaveLength(1);
+    expect(bySession[0].id).toBe(event.id);
+  });
+
+  it('retrieves events by sprint', async () => {
+    await store.insertEvent({ type: 'hazard', data: { desc: 'flaky test' }, sprint_number: 3 });
+    await store.insertEvent({ type: 'decision', data: { choice: 'refactor' }, sprint_number: 3 });
+    await store.insertEvent({ type: 'failure', data: {}, sprint_number: 4 });
+
+    const sprint3 = await store.getEventsBySprint(3);
+    expect(sprint3).toHaveLength(2);
+    expect(sprint3[0].type).toBe('hazard');
+    expect(sprint3[1].type).toBe('decision');
+  });
+
+  it('retrieves events by ticket', async () => {
+    await store.insertEvent({ type: 'scope_change', data: { reason: 'expanded' }, ticket_key: 'S5-1' });
+    await store.insertEvent({ type: 'dead_end', data: { approach: 'api v1' }, ticket_key: 'S5-1' });
+    await store.insertEvent({ type: 'failure', data: {}, ticket_key: 'S5-2' });
+
+    const ticket1 = await store.getEventsByTicket('S5-1');
+    expect(ticket1).toHaveLength(2);
+    expect(ticket1[0].type).toBe('scope_change');
+    expect(ticket1[1].type).toBe('dead_end');
+  });
+
+  it('handles events without session_id', async () => {
+    const event = await store.insertEvent({
+      type: 'compaction',
+      data: { tokens_before: 100000, tokens_after: 50000 },
+    });
+
+    expect(event.session_id).toBeUndefined();
+
+    const bySprint = await store.getEventsBySprint(1);
+    expect(bySprint).toHaveLength(0);
+  });
+
+  it('preserves complex nested data', async () => {
+    const complexData = {
+      files: ['a.ts', 'b.ts'],
+      metrics: { lines: 150, coverage: 0.85 },
+      tags: ['refactor', 'breaking'],
+    };
+
+    await store.insertEvent({
+      type: 'decision',
+      data: complexData,
+      sprint_number: 1,
+    });
+
+    const events = await store.getEventsBySprint(1);
+    expect(events[0].data).toEqual(complexData);
+  });
+
+  it('cascades event session_id to NULL on session delete', async () => {
+    await store.registerSession({ session_id: 'sess-del', role: 'primary', ide: 'vscode' });
+    await store.insertEvent({
+      session_id: 'sess-del',
+      type: 'failure',
+      data: { msg: 'test' },
+      sprint_number: 1,
+    });
+
+    await store.removeSession('sess-del');
+
+    // Event still exists but session_id is null
+    const events = await store.getEventsBySprint(1);
+    expect(events).toHaveLength(1);
+    expect(events[0].session_id).toBeUndefined();
+  });
+});
+
+describe('Schema Migration', () => {
+  it('reports current schema version', () => {
+    expect(store.getSchemaVersion()).toBe(2);
+  });
+
+  it('is idempotent — reopening same DB does not fail', () => {
+    const dbPath = join(tmpDir, 'reopen.db');
+    const s1 = new SqliteSlopeStore(dbPath);
+    expect(s1.getSchemaVersion()).toBe(2);
+    s1.close();
+
+    const s2 = new SqliteSlopeStore(dbPath);
+    expect(s2.getSchemaVersion()).toBe(2);
+    s2.close();
+  });
+
+  it('migrates v1 database to v2 on reopen', () => {
+    // Create a v1-only database by manually setting up tables
+    const dbPath = join(tmpDir, 'v1.db');
+    const Database = require('better-sqlite3');
+    const db = new Database(dbPath);
+    db.pragma('journal_mode = WAL');
+
+    // Create schema_version with only v1
+    db.exec(`
+      CREATE TABLE schema_version (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL);
+      INSERT INTO schema_version VALUES (1, '2025-01-01T00:00:00.000Z');
+    `);
+    // Create v1 tables
+    db.exec(`
+      CREATE TABLE sessions (
+        session_id TEXT PRIMARY KEY, role TEXT NOT NULL, ide TEXT NOT NULL,
+        worktree_path TEXT, branch TEXT, started_at TEXT NOT NULL,
+        last_heartbeat_at TEXT NOT NULL, metadata TEXT
+      );
+      CREATE TABLE claims (
+        id TEXT PRIMARY KEY, session_id TEXT, sprint_number INTEGER NOT NULL,
+        target TEXT NOT NULL, player TEXT NOT NULL, scope TEXT NOT NULL,
+        claimed_at TEXT NOT NULL, expires_at TEXT, notes TEXT, metadata TEXT,
+        UNIQUE(sprint_number, scope, target)
+      );
+      CREATE TABLE scorecards (sprint_number INTEGER PRIMARY KEY, data TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+      CREATE TABLE common_issues (id INTEGER PRIMARY KEY DEFAULT 1, data TEXT NOT NULL, updated_at TEXT NOT NULL);
+    `);
+    db.close();
+
+    // Reopen with SqliteSlopeStore — should auto-migrate to v2
+    const upgraded = new SqliteSlopeStore(dbPath);
+    expect(upgraded.getSchemaVersion()).toBe(2);
+
+    // Verify events table works
+    upgraded.insertEvent({ type: 'failure', data: { test: true } });
+    upgraded.close();
+  });
+});
+
 describe('createStore factory', () => {
   it('creates a store with cwd + storePath', () => {
     const s = createStore({ storePath: 'test2.db', cwd: tmpDir });

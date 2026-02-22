@@ -48,6 +48,10 @@ function createMockStore(): SlopeStore & { sessions: SlopeSession[]; claims: Spr
     async listScorecards() { return []; },
     async loadCommonIssues() { return { recurring_patterns: [] }; },
     async saveCommonIssues() {},
+    async insertEvent(e) { return { ...e, id: `evt-${Date.now()}`, timestamp: new Date().toISOString() } as any; },
+    async getEventsBySession() { return []; },
+    async getEventsBySprint() { return []; },
+    async getEventsByTicket() { return []; },
     close() {},
   };
 }

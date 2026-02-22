@@ -1,7 +1,7 @@
 // SLOPE — SlopeStore Interface
 // Pluggable persistent storage for sessions, claims, scorecards, and common issues.
 
-import type { SprintClaim, GolfScorecard } from './types.js';
+import type { SprintClaim, GolfScorecard, SlopeEvent } from './types.js';
 import type { CommonIssuesFile } from './briefing.js';
 import type { SprintRegistry } from './registry.js';
 
@@ -44,6 +44,12 @@ export interface SlopeStore extends SprintRegistry {
   // Common issues
   loadCommonIssues(): Promise<CommonIssuesFile>;
   saveCommonIssues(issues: CommonIssuesFile): Promise<void>;
+
+  // Events (session telemetry)
+  insertEvent(event: Omit<SlopeEvent, 'id' | 'timestamp'>): Promise<SlopeEvent>;
+  getEventsBySession(sessionId: string): Promise<SlopeEvent[]>;
+  getEventsBySprint(sprintNumber: number): Promise<SlopeEvent[]>;
+  getEventsByTicket(ticketKey: string): Promise<SlopeEvent[]>;
 
   // Lifecycle
   close(): void;
