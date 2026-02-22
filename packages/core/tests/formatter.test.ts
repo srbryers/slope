@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { formatSprintReview, formatAdvisorReport } from '../src/formatter.js';
 import type { GolfScorecard, ShotRecord, ClubRecommendation, TrainingRecommendation } from '../src/types.js';
 import type { ProjectStats, ProjectStatsDelta } from '../src/formatter.js';
+import { golf, gaming } from '../src/metaphors/index.js';
 
 // --- Helpers ---
 
@@ -361,5 +362,144 @@ describe('formatAdvisorReport', () => {
   it('returns empty string when all inputs empty/undefined', () => {
     const output = formatAdvisorReport({});
     expect(output).toBe('');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════
+// Metaphor-aware formatting
+// ═══════════════════════════════════════════════════════════
+
+describe('formatSprintReview — metaphor-aware', () => {
+  it('golf metaphor uses golf display terms', () => {
+    const card = makeCard({
+      shots: [makeShot({ club: 'short_iron', result: 'in_the_hole' })],
+      stats: {
+        fairways_hit: 1, fairways_total: 1,
+        greens_in_regulation: 1, greens_total: 1,
+        putts: 0, penalties: 0, hazards_hit: 0,
+        miss_directions: { long: 0, short: 0, left: 0, right: 0 },
+      },
+      nineteenth_hole: { how_did_it_feel: 'Great' },
+    });
+    const output = formatSprintReview(card, undefined, undefined, 'technical', golf);
+    expect(output).toContain('Short Iron');
+    expect(output).toContain('In the Hole');
+    expect(output).toContain('### 19th Hole');
+    expect(output).toContain('| Label | Par |');
+  });
+
+  it('gaming metaphor uses gaming display terms', () => {
+    const card = makeCard({
+      shots: [makeShot({ club: 'driver', result: 'in_the_hole' })],
+      stats: {
+        fairways_hit: 1, fairways_total: 1,
+        greens_in_regulation: 1, greens_total: 1,
+        putts: 0, penalties: 0, hazards_hit: 0,
+        miss_directions: { long: 0, short: 0, left: 0, right: 0 },
+      },
+      nineteenth_hole: { how_did_it_feel: 'Epic' },
+    });
+    const output = formatSprintReview(card, undefined, undefined, 'technical', gaming);
+    expect(output).toContain('Boss Fight');
+    expect(output).toContain('S-Rank');
+    expect(output).toContain('### Save Point');
+    expect(output).toContain('| Label | B-Rank |');
+  });
+
+  it('no metaphor uses raw enum values (backward compat)', () => {
+    const card = makeCard({
+      shots: [makeShot({ club: 'short_iron', result: 'green' })],
+      stats: {
+        fairways_hit: 1, fairways_total: 1,
+        greens_in_regulation: 1, greens_total: 1,
+        putts: 0, penalties: 0, hazards_hit: 0,
+        miss_directions: { long: 0, short: 0, left: 0, right: 0 },
+      },
+    });
+    const output = formatSprintReview(card);
+    expect(output).toContain('| short_iron |');
+    expect(output).toContain('| green |');
+  });
+
+  it('gaming metaphor translates hazard types', () => {
+    const card = makeCard({
+      shots: [makeShot({
+        club: 'short_iron',
+        result: 'green',
+        hazards: [{ type: 'rough', description: 'Bad timing' }],
+      })],
+      stats: {
+        fairways_hit: 1, fairways_total: 1,
+        greens_in_regulation: 1, greens_total: 1,
+        putts: 0, penalties: 0, hazards_hit: 1,
+        miss_directions: { long: 0, short: 0, left: 0, right: 0 },
+      },
+    });
+    const output = formatSprintReview(card, undefined, undefined, 'technical', gaming);
+    expect(output).toContain('Lag: Bad timing');
+    expect(output).toContain('| Lag |');
+  });
+
+  it('gaming metaphor translates condition types', () => {
+    const card = makeCard({
+      conditions: [{ type: 'wind', description: 'Changing reqs', impact: 'minor' as const }],
+    });
+    const output = formatSprintReview(card, undefined, undefined, 'technical', gaming);
+    expect(output).toContain('| RNG |');
+  });
+
+  it('gaming metaphor translates miss directions', () => {
+    const card = makeCard({
+      shots: [makeShot({ result: 'missed_long' })],
+      stats: {
+        fairways_hit: 0, fairways_total: 1,
+        greens_in_regulation: 0, greens_total: 1,
+        putts: 0, penalties: 0, hazards_hit: 0,
+        miss_directions: { long: 1, short: 0, left: 0, right: 0 },
+      },
+    });
+    const output = formatSprintReview(card, undefined, undefined, 'technical', gaming);
+    expect(output).toContain('Over-leveled (too much scope)');
+  });
+
+  it('gaming metaphor translates nutrition categories', () => {
+    const card = makeCard({
+      nutrition: [{ category: 'hydration', description: 'Good', status: 'healthy' }],
+    });
+    const output = formatSprintReview(card, undefined, undefined, 'technical', gaming);
+    expect(output).toContain('| Mana |');
+  });
+
+  it('gaming metaphor translates training types', () => {
+    const card = makeCard({
+      training: [{ type: 'driving_range', description: 'Research', outcome: 'Found pattern' }],
+    });
+    const output = formatSprintReview(card, undefined, undefined, 'technical', gaming);
+    expect(output).toContain('| Exploration |');
+  });
+});
+
+describe('formatAdvisorReport — metaphor-aware', () => {
+  it('gaming metaphor translates club name', () => {
+    const output = formatAdvisorReport(
+      { clubRecommendation: { club: 'driver', confidence: 0.8, reasoning: 'High complexity' } },
+      gaming,
+    );
+    expect(output).toContain('**Club:** Boss Fight');
+  });
+
+  it('gaming metaphor translates training types', () => {
+    const plan: TrainingRecommendation[] = [
+      { area: 'Scope', type: 'chipping_practice', description: 'Practice', priority: 'high' },
+    ];
+    const output = formatAdvisorReport({ trainingPlan: plan }, gaming);
+    expect(output).toContain('Combo Practice');
+  });
+
+  it('no metaphor uses raw values (backward compat)', () => {
+    const output = formatAdvisorReport(
+      { clubRecommendation: { club: 'driver', confidence: 0.8, reasoning: 'High complexity' } },
+    );
+    expect(output).toContain('**Club:** driver');
   });
 });

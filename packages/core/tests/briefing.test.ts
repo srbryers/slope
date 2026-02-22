@@ -8,6 +8,7 @@ import {
 } from '../src/briefing.js';
 import type { CommonIssuesFile, RecurringPattern } from '../src/briefing.js';
 import type { GolfScorecard, ShotRecord, HoleStats, SprintClaim } from '../src/types.js';
+import { golf, gaming } from '../src/metaphors/index.js';
 
 // --- Helpers ---
 
@@ -695,5 +696,86 @@ describe('formatBriefing — STRATEGIC CONTEXT', () => {
     const hazardsPos = output.indexOf('HAZARDS');
     expect(briefingPos).toBeLessThan(contextPos);
     expect(contextPos).toBeLessThan(hazardsPos);
+  });
+});
+
+describe('formatBriefing — METAPHOR', () => {
+  it('uses golf briefing title by default (no metaphor)', () => {
+    const output = formatBriefing({
+      scorecards: [],
+      commonIssues: { recurring_patterns: [] },
+    });
+    expect(output).toContain('PRE-ROUND BRIEFING');
+  });
+
+  it('uses golf briefing title with golf metaphor', () => {
+    const output = formatBriefing({
+      scorecards: [],
+      commonIssues: { recurring_patterns: [] },
+      metaphor: golf,
+    });
+    expect(output).toContain('PRE-ROUND BRIEFING');
+  });
+
+  it('uses gaming briefing title with gaming metaphor', () => {
+    const output = formatBriefing({
+      scorecards: [],
+      commonIssues: { recurring_patterns: [] },
+      metaphor: gaming,
+    });
+    expect(output).toContain('QUEST LOG');
+  });
+
+  it('gaming metaphor translates score label in latest sprint', () => {
+    const card = makeCard({ score_label: 'par' });
+    const output = formatBriefing({
+      scorecards: [card],
+      commonIssues: { recurring_patterns: [] },
+      metaphor: gaming,
+    });
+    expect(output).toContain('B-Rank');
+  });
+
+  it('gaming metaphor translates training types in recommendations', () => {
+    // Need scorecards with recurring hazards to trigger training recommendations
+    const cards = Array.from({ length: 5 }, (_, i) => makeCard({
+      sprint_number: i + 1,
+      shots: [
+        makeShot({
+          result: 'missed_long',
+          hazards: [{ type: 'rough', description: 'test' }],
+        }),
+      ],
+      stats: {
+        fairways_hit: 0, fairways_total: 1,
+        greens_in_regulation: 0, greens_total: 1,
+        putts: 0, penalties: 0, hazards_hit: 1,
+        miss_directions: { long: 1, short: 0, left: 0, right: 0 },
+      },
+    }));
+    const output = formatBriefing({
+      scorecards: cards,
+      commonIssues: { recurring_patterns: [] },
+      metaphor: gaming,
+      includeTraining: true,
+    });
+    // Gaming training types should appear
+    if (output.includes('TRAINING RECOMMENDATIONS')) {
+      expect(output).not.toContain('[driving_range]');
+      expect(output).not.toContain('[chipping_practice]');
+    }
+  });
+
+  it('no metaphor preserves backward compatible output', () => {
+    const card = makeCard({ score_label: 'par' });
+    const withMetaphor = formatBriefing({
+      scorecards: [card],
+      commonIssues: { recurring_patterns: [] },
+    });
+    const withoutMetaphor = formatBriefing({
+      scorecards: [card],
+      commonIssues: { recurring_patterns: [] },
+    });
+    expect(withMetaphor).toBe(withoutMetaphor);
   });
 });

@@ -5,6 +5,7 @@ import type {
   NutritionEntry,
   SprintClaim,
 } from './types.js';
+import type { MetaphorDefinition } from './metaphor.js';
 import { computeHandicapCard } from './handicap.js';
 import { computeDispersion } from './dispersion.js';
 import { generateTrainingPlan } from './advisor.js';
@@ -227,12 +228,14 @@ export function formatBriefing(opts: {
   claims?: SprintClaim[];
   roadmap?: RoadmapDefinition;
   currentSprint?: number;
+  metaphor?: MetaphorDefinition;
 }): string {
-  const { scorecards, commonIssues, lastSession, filter, includeTraining = true, claims, roadmap, currentSprint } = opts;
+  const { scorecards, commonIssues, lastSession, filter, includeTraining = true, claims, roadmap, currentSprint, metaphor: m } = opts;
   const lines: string[] = [];
 
   // Section 1: Handicap snapshot
-  lines.push('PRE-ROUND BRIEFING');
+  const briefingTitle = m ? m.vocabulary.briefing.toUpperCase() : 'PRE-ROUND BRIEFING';
+  lines.push(briefingTitle);
   lines.push('\u2550'.repeat(50));
 
   if (scorecards.length > 0) {
@@ -256,7 +259,8 @@ export function formatBriefing(opts: {
       lines.push('Miss pattern: Clean \u2014 no misses recorded.');
     }
 
-    lines.push(`Latest: S${latestNum} ${latest.score_label} (${latest.score} vs par ${latest.par})`);
+    const scoreDisplay = m?.scoreLabels[latest.score_label] ?? latest.score_label;
+    lines.push(`Latest: S${latestNum} ${scoreDisplay} (${latest.score} vs par ${latest.par})`);
   } else {
     lines.push('');
     lines.push('No SLOPE-era scorecards yet.');
@@ -372,7 +376,8 @@ export function formatBriefing(opts: {
       for (const item of relevant) {
         const icon = item.priority === 'high' ? '!!' : '! ';
         const adjustment = item.instruction_adjustment ?? item.description;
-        lines.push(`  ${icon} [${item.type}] ${item.area}`);
+        const typeDisplay = m?.trainingTypes[item.type] ?? item.type;
+      lines.push(`  ${icon} [${typeDisplay}] ${item.area}`);
         lines.push(`     ${adjustment.slice(0, 120)}${adjustment.length > 120 ? '...' : ''}`);
       }
     }
