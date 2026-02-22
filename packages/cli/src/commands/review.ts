@@ -24,7 +24,11 @@ export function reviewCommand(path?: string, mode?: string, metaphorFlag?: strin
           const m = f.match(regex);
           return m && parseInt(m[1], 10) >= config.minSprint;
         })
-        .sort();
+        .sort((a, b) => {
+          const na = parseInt(a.match(regex)?.[1] ?? '0', 10);
+          const nb = parseInt(b.match(regex)?.[1] ?? '0', 10);
+          return na - nb;
+        });
       if (files.length === 0) {
         console.log('\nNo scorecards found.\n');
         process.exit(1);

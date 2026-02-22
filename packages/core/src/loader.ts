@@ -21,7 +21,11 @@ export function loadScorecards(config: SlopeConfig, cwd: string = process.cwd())
 
   const files = readdirSync(dir)
     .filter((f: string) => regex.test(f))
-    .sort();
+    .sort((a, b) => {
+      const na = parseInt(a.match(regex)?.[1] ?? '0', 10);
+      const nb = parseInt(b.match(regex)?.[1] ?? '0', 10);
+      return na - nb;
+    });
 
   const scorecards: GolfScorecard[] = [];
 
