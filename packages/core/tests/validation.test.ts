@@ -258,8 +258,13 @@ describe('validateScorecard - warnings', () => {
     expect(result.warnings.some(w => w.code === 'NO_NUTRITION')).toBe(true);
   });
 
-  it('no warnings when all optional fields present', () => {
+  it('warns on missing player', () => {
     const result = validateScorecard(makeCard());
+    expect(result.warnings.some(w => w.code === 'NO_PLAYER')).toBe(true);
+  });
+
+  it('no warnings when all optional fields present', () => {
+    const result = validateScorecard(makeCard({ player: 'alice' }));
     expect(result.warnings).toHaveLength(0);
   });
 });
@@ -268,7 +273,7 @@ describe('validateScorecard - warnings', () => {
 
 describe('validateScorecard - integration', () => {
   it('validates a complete valid scorecard with no errors or warnings', () => {
-    const result = validateScorecard(makeCard());
+    const result = validateScorecard(makeCard({ player: 'alice' }));
     expect(result.valid).toBe(true);
     expect(result.errors).toHaveLength(0);
     expect(result.warnings).toHaveLength(0);

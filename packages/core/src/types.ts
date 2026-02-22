@@ -132,6 +132,8 @@ export interface AgentBreakdown {
 /** Complete SLOPE scorecard — the primary artifact for sprint retros */
 export interface GolfScorecard extends HoleScore {
   type?: SprintType;
+  /** Developer who played this sprint — omit for single-player repos */
+  player?: string;
   date: string;
   training?: TrainingSession[];
   nutrition?: NutritionEntry[];

@@ -140,6 +140,9 @@ export function validateScorecard(card: GolfScorecard & { sprint?: number }): Sc
   }
 
   // Rule 7: warnings for optional but recommended fields
+  if (!card.player) {
+    warnings.push({ code: 'NO_PLAYER', message: 'No player field — scorecard attributed to default player' });
+  }
   if (!card.bunker_locations || card.bunker_locations.length === 0) {
     warnings.push({ code: 'EMPTY_BUNKERS', message: 'No bunker_locations recorded — consider noting hazards for future sprints' });
   }

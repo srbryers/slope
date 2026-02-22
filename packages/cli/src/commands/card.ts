@@ -1,11 +1,21 @@
-import { computeHandicapCard, computeTeamHandicap } from '@slope-dev/core';
-import type { MissDirection } from '@slope-dev/core';
+import { computeHandicapCard, computeTeamHandicap, computePlayerHandicaps, filterScorecardsByPlayer } from '@slope-dev/core';
+import type { MissDirection, PlayerHandicap } from '@slope-dev/core';
 import { loadConfig } from '../config.js';
 import { loadScorecards } from '../loader.js';
 import { resolveMetaphor } from '../metaphor.js';
 
-function parseCardArgs(args: string[]): { swarm: boolean } {
-  return { swarm: args.includes('--swarm') };
+function parseCardArgs(args: string[]): { swarm: boolean; player?: string; team: boolean } {
+  let player: string | undefined;
+  for (const arg of args) {
+    if (arg.startsWith('--player=')) {
+      player = arg.slice('--player='.length).trim();
+    }
+  }
+  return {
+    swarm: args.includes('--swarm'),
+    player,
+    team: args.includes('--team'),
+  };
 }
 
 export function cardCommand(args: string[] = []): void {
@@ -24,14 +34,30 @@ export function cardCommand(args: string[] = []): void {
     return;
   }
 
-  const card = computeHandicapCard(scorecards);
+  if (flags.team) {
+    showPlayerComparison(scorecards, config.minSprint);
+    return;
+  }
+
+  // If --player, filter scorecards to that player
+  const effectiveScorecards = flags.player
+    ? filterScorecardsByPlayer(scorecards, flags.player)
+    : scorecards;
+
+  if (effectiveScorecards.length === 0) {
+    console.log(`\nNo scorecards found for player "${flags.player}".\n`);
+    process.exit(0);
+  }
+
+  const card = computeHandicapCard(effectiveScorecards);
 
   const pad = (s: string | number, w: number) => String(s).padStart(w);
   const pct = (n: number) => n.toFixed(1) + '%';
 
   const minSprint = config.minSprint;
+  const playerSuffix = flags.player ? ` — ${flags.player}` : '';
   const cardTitle = metaphor ? `SLOPE ${metaphor.vocabulary.handicapCard.charAt(0).toUpperCase() + metaphor.vocabulary.handicapCard.slice(1)}` : 'SLOPE Handicap Card';
-  console.log(`\n${cardTitle} (${scorecards.length} scorecard${scorecards.length === 1 ? '' : 's'}, Sprint ${minSprint}+)`);
+  console.log(`\n${cardTitle} (${effectiveScorecards.length} scorecard${effectiveScorecards.length === 1 ? '' : 's'}, Sprint ${minSprint}+)${playerSuffix}`);
   console.log('\u2501'.repeat(47));
   console.log('');
   console.log(`${'Stat'.padEnd(20)}${'Last 5'.padStart(9)}${'Last 10'.padStart(10)}${'All-time'.padStart(10)}`);
@@ -66,8 +92,35 @@ export function cardCommand(args: string[] = []): void {
     console.log(`Miss Pattern: ${dirs} (${totalMisses} total)`);
   }
 
-  if (scorecards.length < 5) {
-    console.log(`\nNote: Only ${scorecards.length} scorecard${scorecards.length === 1 ? '' : 's'} \u2014 windows fill at Sprint ${minSprint + 5 - scorecards.length}.`);
+  if (effectiveScorecards.length < 5) {
+    console.log(`\nNote: Only ${effectiveScorecards.length} scorecard${effectiveScorecards.length === 1 ? '' : 's'} \u2014 windows fill at Sprint ${minSprint + 5 - effectiveScorecards.length}.`);
+  }
+
+  console.log('');
+}
+
+function showPlayerComparison(scorecards: import('@slope-dev/core').GolfScorecard[], minSprint: number): void {
+  const playerHandicaps = computePlayerHandicaps(scorecards);
+
+  if (playerHandicaps.length === 0) {
+    console.log('\nNo scorecards found.\n');
+    return;
+  }
+
+  const pad = (s: string | number, w: number) => String(s).padStart(w);
+  const pct = (n: number) => n.toFixed(1) + '%';
+
+  console.log(`\nSLOPE Team Handicap Comparison (${scorecards.length} scorecard${scorecards.length === 1 ? '' : 's'}, Sprint ${minSprint}+)`);
+  console.log('\u2501'.repeat(62));
+  console.log('');
+  console.log(`${'Player'.padEnd(16)}${'Cards'.padStart(7)}${'Handicap'.padStart(10)}${'Fairway%'.padStart(10)}${'GIR%'.padStart(8)}${'Penalties'.padStart(11)}`);
+  console.log('\u2500'.repeat(62));
+
+  for (const ph of playerHandicaps) {
+    const at = ph.handicapCard.all_time;
+    console.log(
+      `${ph.player.padEnd(16)}${pad(ph.scorecardCount, 7)}${pad(`+${at.handicap.toFixed(1)}`, 10)}${pad(pct(at.fairway_pct), 10)}${pad(pct(at.gir_pct), 8)}${pad(at.penalties_per_round.toFixed(1), 11)}`,
+    );
   }
 
   console.log('');

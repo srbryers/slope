@@ -34,6 +34,10 @@ export interface SlopeConfig {
     autoOpen?: boolean;
     refreshInterval?: number;
   };
+  team?: {
+    players?: Record<string, string>;
+    defaultPlayer?: string;
+  };
 }
 
 const DEFAULT_CONFIG: SlopeConfig = {

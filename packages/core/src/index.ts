@@ -368,5 +368,15 @@ export type {
   PluginsConfig,
 } from './plugins.js';
 
+// Player (Multi-Developer)
+export {
+  DEFAULT_PLAYER,
+  extractPlayers,
+  filterScorecardsByPlayer,
+  computePlayerHandicaps,
+  computePlayerHandicap,
+} from './player.js';
+export type { PlayerHandicap } from './player.js';
+
 // Built-in metaphors (auto-registers on import)
 export { golf, tennis, baseball, gaming, dnd, matrix } from './metaphors/index.js';
