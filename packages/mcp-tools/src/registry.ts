@@ -227,6 +227,36 @@ export const SLOPE_REGISTRY: FunctionRegistryEntry[] = [
     example: 'return formatTournamentReview(buildTournamentReview("M-09", "Q1", loadScorecards()));',
   },
 
+  // ─── Roles ───
+  {
+    name: 'registerRole',
+    module: 'core',
+    description: 'Registers a custom role definition in the role registry.',
+    signature: 'registerRole(role: RoleDefinition): void',
+    example: 'registerRole({ id: "qa", name: "QA", description: "Quality assurance", focusAreas: ["tests"], clubPreferences: {}, briefingFilter: { emphasize: ["testing"], deemphasize: [] } });',
+  },
+  {
+    name: 'getRole',
+    module: 'core',
+    description: 'Returns a registered role by ID. Throws if not found.',
+    signature: 'getRole(id: string): RoleDefinition',
+    example: 'return getRole("backend");',
+  },
+  {
+    name: 'hasRole',
+    module: 'core',
+    description: 'Checks if a role ID is registered.',
+    signature: 'hasRole(id: string): boolean',
+    example: 'return hasRole("frontend"); // → true',
+  },
+  {
+    name: 'listRoles',
+    module: 'core',
+    description: 'Returns all registered role definitions.',
+    signature: 'listRoles(): RoleDefinition[]',
+    example: 'return listRoles().map(r => r.id);',
+  },
+
   // ─── Filesystem helpers (injected into sandbox) ───
   {
     name: 'loadConfig',
@@ -392,8 +422,11 @@ interface AreaReport { by_sprint_type: Record<string, { count: number; avg_score
 interface SlopeConfig { scorecardDir: string; scorecardPattern: string; minSprint: number; commonIssuesPath: string; sessionsPath: string; registry: 'file' | 'api'; claimsPath: string; registryApiUrl?: string; currentSprint?: number; store?: string; store_path?: string; }
 
 // ─── Store ───
-interface SlopeSession { session_id: string; role: 'primary' | 'secondary' | 'observer'; ide: string; worktree_path?: string; branch?: string; started_at: string; last_heartbeat_at: string; metadata?: Record<string, unknown>; }
+interface SlopeSession { session_id: string; role: 'primary' | 'secondary' | 'observer'; ide: string; worktree_path?: string; branch?: string; started_at: string; last_heartbeat_at: string; metadata?: Record<string, unknown>; agent_role?: string; swarm_id?: string; }
 interface SprintClaim { id: string; sprint_number: number; player: string; target: string; scope: ClaimScope; claimed_at: string; notes?: string; session_id?: string; expires_at?: string; metadata?: Record<string, unknown>; }
+
+// ─── Roles ───
+interface RoleDefinition { id: string; name: string; description: string; focusAreas: string[]; clubPreferences: Partial<Record<string, ClubSelection>>; briefingFilter: { emphasize: string[]; deemphasize: string[] }; }
 
 // ─── Builder Input ───
 interface ScorecardInput { sprint_number: number; theme: string; par: 3 | 4 | 5; slope: number; date: string; shots: ShotRecord[]; putts?: number; penalties?: number; type?: SprintType; conditions?: ConditionRecord[]; special_plays?: SpecialPlay[]; training?: TrainingSession[]; nutrition?: NutritionEntry[]; nineteenth_hole?: NineteenthHole; bunker_locations?: string[]; yardage_book_updates?: string[]; course_management_notes?: string[]; }

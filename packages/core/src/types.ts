@@ -305,7 +305,7 @@ export interface TournamentHazard {
 // --- Event Types (Session Telemetry) ---
 
 /** Types of events captured during a session */
-export type EventType = 'failure' | 'dead_end' | 'scope_change' | 'compaction' | 'hazard' | 'decision';
+export type EventType = 'failure' | 'dead_end' | 'scope_change' | 'compaction' | 'hazard' | 'decision' | 'standup';
 
 /** CI/test runner identifier */
 export type CIRunner = 'vitest' | 'jest' | 'unknown';

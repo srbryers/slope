@@ -358,17 +358,17 @@ describe('Events', () => {
 
 describe('Schema Migration', () => {
   it('reports current schema version', () => {
-    expect(store.getSchemaVersion()).toBe(2);
+    expect(store.getSchemaVersion()).toBe(3);
   });
 
   it('is idempotent — reopening same DB does not fail', () => {
     const dbPath = join(tmpDir, 'reopen.db');
     const s1 = new SqliteSlopeStore(dbPath);
-    expect(s1.getSchemaVersion()).toBe(2);
+    expect(s1.getSchemaVersion()).toBe(3);
     s1.close();
 
     const s2 = new SqliteSlopeStore(dbPath);
-    expect(s2.getSchemaVersion()).toBe(2);
+    expect(s2.getSchemaVersion()).toBe(3);
     s2.close();
   });
 
@@ -402,13 +402,133 @@ describe('Schema Migration', () => {
     `);
     db.close();
 
-    // Reopen with SqliteSlopeStore — should auto-migrate to v2
+    // Reopen with SqliteSlopeStore — should auto-migrate to v2 and v3
     const upgraded = new SqliteSlopeStore(dbPath);
-    expect(upgraded.getSchemaVersion()).toBe(2);
+    expect(upgraded.getSchemaVersion()).toBe(3);
 
     // Verify events table works
     upgraded.insertEvent({ type: 'failure', data: { test: true } });
     upgraded.close();
+  });
+
+  it('migrates v2 database to v3 on reopen', () => {
+    // Create a v2 database (has events but no agent_role/swarm_id)
+    const dbPath = join(tmpDir, 'v2.db');
+    const Database = require('better-sqlite3');
+    const db = new Database(dbPath);
+    db.pragma('journal_mode = WAL');
+
+    db.exec(`
+      CREATE TABLE schema_version (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL);
+      INSERT INTO schema_version VALUES (1, '2025-01-01T00:00:00.000Z');
+      INSERT INTO schema_version VALUES (2, '2025-01-02T00:00:00.000Z');
+
+      CREATE TABLE sessions (
+        session_id TEXT PRIMARY KEY, role TEXT NOT NULL, ide TEXT NOT NULL,
+        worktree_path TEXT, branch TEXT, started_at TEXT NOT NULL,
+        last_heartbeat_at TEXT NOT NULL, metadata TEXT
+      );
+      CREATE TABLE claims (
+        id TEXT PRIMARY KEY, session_id TEXT, sprint_number INTEGER NOT NULL,
+        target TEXT NOT NULL, player TEXT NOT NULL, scope TEXT NOT NULL,
+        claimed_at TEXT NOT NULL, expires_at TEXT, notes TEXT, metadata TEXT,
+        UNIQUE(sprint_number, scope, target)
+      );
+      CREATE TABLE scorecards (sprint_number INTEGER PRIMARY KEY, data TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+      CREATE TABLE common_issues (id INTEGER PRIMARY KEY DEFAULT 1, data TEXT NOT NULL, updated_at TEXT NOT NULL);
+      CREATE TABLE events (
+        id TEXT PRIMARY KEY, session_id TEXT, type TEXT NOT NULL,
+        timestamp TEXT NOT NULL, data TEXT NOT NULL DEFAULT '{}',
+        sprint_number INTEGER, ticket_key TEXT
+      );
+      CREATE INDEX idx_events_session ON events(session_id);
+      CREATE INDEX idx_events_sprint ON events(sprint_number);
+      CREATE INDEX idx_events_ticket ON events(ticket_key);
+      CREATE INDEX idx_events_type ON events(type);
+
+      INSERT INTO sessions VALUES ('pre-v3', 'primary', 'vscode', NULL, 'main', '2025-01-01T00:00:00Z', '2025-01-01T00:00:00Z', NULL);
+    `);
+    db.close();
+
+    // Reopen — should auto-migrate to v3
+    const upgraded = new SqliteSlopeStore(dbPath);
+    expect(upgraded.getSchemaVersion()).toBe(3);
+
+    // Existing session should have null agent_role and swarm_id
+    const sessions = upgraded.getActiveSessions();
+    sessions.then(s => {
+      expect(s).toHaveLength(1);
+      expect(s[0].agent_role).toBeUndefined();
+      expect(s[0].swarm_id).toBeUndefined();
+    });
+
+    // New session with agent_role and swarm_id should work
+    upgraded.registerSession({
+      session_id: 'post-v3',
+      role: 'secondary',
+      ide: 'claude-code',
+      agent_role: 'backend',
+      swarm_id: 'swarm-1',
+    });
+
+    upgraded.close();
+  });
+});
+
+describe('Swarm sessions', () => {
+  it('registers sessions with agent_role and swarm_id', async () => {
+    const session = await store.registerSession({
+      session_id: 'swarm-s1',
+      role: 'primary',
+      ide: 'claude-code',
+      agent_role: 'backend',
+      swarm_id: 'swarm-abc',
+    });
+
+    expect(session.agent_role).toBe('backend');
+    expect(session.swarm_id).toBe('swarm-abc');
+
+    const active = await store.getActiveSessions();
+    expect(active[0].agent_role).toBe('backend');
+    expect(active[0].swarm_id).toBe('swarm-abc');
+  });
+
+  it('getSessionsBySwarm filters by swarm_id', async () => {
+    await store.registerSession({
+      session_id: 'sw1', role: 'primary', ide: 'claude-code',
+      agent_role: 'backend', swarm_id: 'swarm-1',
+    });
+    await store.registerSession({
+      session_id: 'sw2', role: 'secondary', ide: 'cursor',
+      agent_role: 'frontend', swarm_id: 'swarm-1',
+    });
+    await store.registerSession({
+      session_id: 'sw3', role: 'primary', ide: 'claude-code',
+      agent_role: 'devops', swarm_id: 'swarm-2',
+    });
+    await store.registerSession({
+      session_id: 'solo', role: 'primary', ide: 'vscode',
+    });
+
+    const swarm1 = await store.getSessionsBySwarm('swarm-1');
+    expect(swarm1).toHaveLength(2);
+    expect(swarm1.map(s => s.session_id).sort()).toEqual(['sw1', 'sw2']);
+
+    const swarm2 = await store.getSessionsBySwarm('swarm-2');
+    expect(swarm2).toHaveLength(1);
+    expect(swarm2[0].agent_role).toBe('devops');
+
+    const empty = await store.getSessionsBySwarm('nonexistent');
+    expect(empty).toHaveLength(0);
+  });
+
+  it('sessions without swarm_id are not returned by getSessionsBySwarm', async () => {
+    await store.registerSession({
+      session_id: 'no-swarm', role: 'primary', ide: 'vscode',
+    });
+
+    const result = await store.getSessionsBySwarm('anything');
+    expect(result).toHaveLength(0);
   });
 });
 

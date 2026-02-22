@@ -82,6 +82,15 @@ const MIGRATIONS: Array<{ version: number; sql: string }> = [
       CREATE INDEX IF NOT EXISTS idx_events_type ON events(type);
     `,
   },
+  {
+    version: 3,
+    sql: `
+      ALTER TABLE sessions ADD COLUMN agent_role TEXT;
+      ALTER TABLE sessions ADD COLUMN swarm_id TEXT;
+
+      CREATE INDEX IF NOT EXISTS idx_sessions_swarm ON sessions(swarm_id);
+    `,
+  },
 ];
 
 export class SqliteSlopeStore implements SlopeStore {
@@ -134,8 +143,8 @@ export class SqliteSlopeStore implements SlopeStore {
 
     try {
       this.db.prepare(`
-        INSERT INTO sessions (session_id, role, ide, worktree_path, branch, started_at, last_heartbeat_at, metadata)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO sessions (session_id, role, ide, worktree_path, branch, started_at, last_heartbeat_at, metadata, agent_role, swarm_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         full.session_id,
         full.role,
@@ -145,6 +154,8 @@ export class SqliteSlopeStore implements SlopeStore {
         full.started_at,
         full.last_heartbeat_at,
         full.metadata ? JSON.stringify(full.metadata) : null,
+        full.agent_role ?? null,
+        full.swarm_id ?? null,
       );
     } catch (err: unknown) {
       if (err instanceof Error && err.message.includes('UNIQUE constraint')) {
@@ -163,6 +174,12 @@ export class SqliteSlopeStore implements SlopeStore {
 
   async getActiveSessions(): Promise<SlopeSession[]> {
     const rows = this.db.prepare('SELECT * FROM sessions ORDER BY started_at DESC').all() as Array<Record<string, unknown>>;
+    return rows.map(rowToSession);
+  }
+
+  async getSessionsBySwarm(swarmId: string): Promise<SlopeSession[]> {
+    const rows = this.db.prepare('SELECT * FROM sessions WHERE swarm_id = ? ORDER BY started_at')
+      .all(swarmId) as Array<Record<string, unknown>>;
     return rows.map(rowToSession);
   }
 
@@ -348,6 +365,8 @@ function rowToSession(row: Record<string, unknown>): SlopeSession {
     started_at: row.started_at as string,
     last_heartbeat_at: row.last_heartbeat_at as string,
     metadata: row.metadata ? JSON.parse(row.metadata as string) : undefined,
+    agent_role: (row.agent_role as string | null) ?? undefined,
+    swarm_id: (row.swarm_id as string | null) ?? undefined,
   };
 }
 

@@ -15,6 +15,8 @@ export interface SlopeSession {
   started_at: string;
   last_heartbeat_at: string;
   metadata?: Record<string, unknown>;
+  agent_role?: string;
+  swarm_id?: string;
 }
 
 export type StoreErrorCode = 'SESSION_CONFLICT' | 'CLAIM_EXISTS' | 'NOT_FOUND' | 'STORE_UNAVAILABLE';
@@ -31,6 +33,7 @@ export interface SlopeStore extends SprintRegistry {
   registerSession(session: Omit<SlopeSession, 'started_at' | 'last_heartbeat_at'>): Promise<SlopeSession>;
   removeSession(sessionId: string): Promise<boolean>;
   getActiveSessions(): Promise<SlopeSession[]>;
+  getSessionsBySwarm(swarmId: string): Promise<SlopeSession[]>;
   updateHeartbeat(sessionId: string): Promise<void>;
   cleanStaleSessions(maxAgeMs: number): Promise<number>;
 

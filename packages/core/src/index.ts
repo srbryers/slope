@@ -244,5 +244,20 @@ export type {
   NutritionTrendEntry,
 } from './report.js';
 
+// Roles
+export {
+  registerRole,
+  getRole,
+  hasRole,
+  listRoles,
+  loadCustomRoles,
+  generalist,
+  backend,
+  frontend,
+  architect,
+  devops,
+} from './roles.js';
+export type { RoleDefinition } from './roles.js';
+
 // Built-in metaphors (auto-registers on import)
 export { golf, tennis, baseball, gaming, dnd, matrix } from './metaphors/index.js';

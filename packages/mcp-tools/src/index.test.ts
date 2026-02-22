@@ -28,6 +28,7 @@ function createMockStore(): SlopeStore & { sessions: SlopeSession[]; claims: Spr
       return true;
     },
     async getActiveSessions() { return [...sessions]; },
+    async getSessionsBySwarm(swarmId: string) { return sessions.filter(s => s.swarm_id === swarmId); },
     async updateHeartbeat() {},
     async cleanStaleSessions() { return 0; },
     async claim(input) {
