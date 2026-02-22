@@ -1,0 +1,117 @@
+{
+  "sprint_number": 20,
+  "theme": "The Foursome",
+  "par": 4,
+  "slope": 2,
+  "score": 3,
+  "score_label": "birdie",
+  "date": "2026-02-22",
+  "shots": [
+    {
+      "ticket_key": "S20-1",
+      "title": "Player identification + per-player handicaps",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added optional player field to GolfScorecard, created player.ts (extractPlayers, filterScorecardsByPlayer, computePlayerHandicaps, computePlayerHandicap). Added team config to SlopeConfig, NO_PLAYER validation warning. CLI --player and --team flags on card command. 17 new tests."
+    },
+    {
+      "ticket_key": "S20-2",
+      "title": "Shared hazard indices with multi-reporter severity",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added reported_by to RecurringPattern, created computeReporterSeverity (1→low, 2→medium, 3+→high), mergeHazardIndices (union sprints, accumulate reporters), filterHazardsByVisibility. Briefing shows [N reporters] tag. CLI --player/--personal flags on briefing. 18 new tests."
+    },
+    {
+      "ticket_key": "S20-3",
+      "title": "Team leaderboard + dashboard integration",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Created leaderboard.ts (buildLeaderboard, formatLeaderboard, renderLeaderboardHtml). Dashboard conditionally renders leaderboard when >1 player. Added /api/leaderboard route and --player flag to dashboard CLI. 13 new tests."
+    },
+    {
+      "ticket_key": "S20-4",
+      "title": "Documentation + onboarding",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added --team flag to init command. Updated CLI help with new flags and examples. Created docs/guides/multi-developer.md. Updated backlog README. Registered 6 new functions in MCP registry (extractPlayers, filterScorecardsByPlayer, computePlayerHandicaps, buildLeaderboard, computeReporterSeverity, mergeHazardIndices)."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "type": "feature",
+  "conditions": [
+    {
+      "type": "wind",
+      "description": "Multi-package schema change — optional player field on GolfScorecard ripples through validation, briefing, dashboard, and CLI. Filter-before-compute architecture avoided threading player through existing functions.",
+      "impact": "minor"
+    }
+  ],
+  "special_plays": [],
+  "nutrition": [
+    {
+      "category": "hydration",
+      "description": "Clean build + typecheck + all 1002 tests pass (768 core + 36 store + 144 CLI + 54 MCP) after each commit",
+      "status": "healthy"
+    },
+    {
+      "category": "diet",
+      "description": "3 focused commits matching execution order (S20-1 first, S20-2+S20-3 parallel, S20-4 last). Build/test/typecheck before each commit.",
+      "status": "healthy"
+    },
+    {
+      "category": "supplements",
+      "description": "Filter-before-compute: existing computeHandicapCard, buildReportData, generateDashboardHtml all unchanged — player filtering happens before they're called. Zero modifications to computation functions.",
+      "status": "healthy"
+    },
+    {
+      "category": "recovery",
+      "description": "All existing 955 tests pass unchanged (2 validation tests updated for NO_PLAYER warning). 47 new tests added. Zero regressions — scorecards without player field work identically.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Clean. The filter-before-compute architecture made this surprisingly simple — most of the sprint was writing new leaf-node modules (player.ts, leaderboard.ts) that compose existing functions, not modifying existing ones. The existing test suite caught the NO_PLAYER warning impact immediately.",
+    "advice_for_next_player": "All optional fields use ?? DEFAULT_PLAYER fallback. Scorecards without player field continue to work identically. Leaderboard auto-hides on dashboard when only 1 player. The --team flag on card is for multi-developer comparison (across sprints), while --swarm is for multi-agent analysis (within sprints). MCP sandbox picks up new exports automatically via ...core spread.",
+    "what_surprised_you": "How little existing code needed changing. Only 2 existing tests needed updates (validation tests expected 0 warnings, now there's NO_PLAYER). The briefing.ts change was 2 lines — one for the reported_by type field, one for the [N reporters] tag. Dashboard integration was 7 lines (import + conditional render).",
+    "excited_about_next": "Team leaderboard + per-player handicaps unlock competitive/collaborative workflows. The reported_by field on RecurringPattern enables team-wide hazard intelligence — patterns reported by 3+ developers are clearly systemic. The /api/leaderboard endpoint could feed team dashboards or Slack integrations."
+  },
+  "bunker_locations": [],
+  "yardage_book_updates": [
+    "packages/core/src/types.ts: Added optional player field to GolfScorecard",
+    "packages/core/src/player.ts: New file — extractPlayers, filterScorecardsByPlayer, computePlayerHandicaps, computePlayerHandicap, computeReporterSeverity, mergeHazardIndices, filterHazardsByVisibility",
+    "packages/core/src/leaderboard.ts: New file — buildLeaderboard, formatLeaderboard, renderLeaderboardHtml",
+    "packages/core/src/config.ts: Added team config (players, defaultPlayer) to SlopeConfig",
+    "packages/core/src/validation.ts: NO_PLAYER warning for scorecards without player field",
+    "packages/core/src/briefing.ts: reported_by on RecurringPattern, [N reporters] tag in formatBriefing",
+    "packages/core/src/dashboard.ts: Conditional leaderboard section when >1 player",
+    "packages/cli/src/commands/card.ts: --player and --team flags, showPlayerComparison table",
+    "packages/cli/src/commands/briefing.ts: --player and --personal flags with hazard visibility filtering",
+    "packages/cli/src/commands/dashboard.ts: /api/leaderboard route, --player flag for filtered dashboard",
+    "packages/cli/src/commands/init.ts: --team flag writes team config",
+    "packages/mcp-tools/src/registry.ts: 6 new function entries + PlayerHandicap/Leaderboard types"
+  ],
+  "course_management_notes": [
+    "4 tickets, 4 in_the_hole — zero hazards, zero penalties, birdie",
+    "20 files changed, 1163 lines added, 21 removed",
+    "Filter-before-compute: zero modifications to existing computation functions (computeHandicapCard, buildReportData, generateDashboardHtml)",
+    "All fields optional with backward-compatible fallbacks (?? DEFAULT_PLAYER, reported_by ?? [])",
+    "47 new tests: 31 player, 4 briefing, 13 leaderboard. Total test count: 1002"
+  ]
+}
