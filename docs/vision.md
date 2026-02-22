@@ -230,6 +230,20 @@ Caddystack is the proof point for SLOPE at scale — 200+ sprints of continuous,
 ### Local Dashboard (Future)
 `slope dashboard` starts a local web server for interactive exploration of scorecard data. Reads from `.slope/` directory, no external hosting. Similar to Storybook's local dev server model.
 
+## CLI Reference
+
+All 22 commands grouped by category:
+
+| Category | Commands |
+|----------|----------|
+| **Scoring** | `card`, `validate`, `auto-card`, `classify` |
+| **Session** | `session`, `claim`, `release`, `status` |
+| **Reporting** | `review`, `briefing`, `report`, `tournament` |
+| **Planning** | `plan`, `roadmap`, `next` |
+| **Orchestration** | `standup`, `escalate`, `guard` |
+| **Setup** | `init`, `hook` |
+| **Analysis** | `extract`, `distill` |
+
 ## Roadmap
 
 ### Shipped (v1.0–v1.1)
