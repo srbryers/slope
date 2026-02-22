@@ -137,6 +137,45 @@ describe('registry', () => {
     expect(SLOPE_TYPES).toContain('CriticalPathResult');
     expect(SLOPE_TYPES).toContain('ParallelGroup');
   });
+
+  // S15 orchestration registry entries
+  it('registry includes standup functions', () => {
+    const names = ['generateStandup', 'formatStandup', 'parseStandup', 'extractRelevantHandoffs'];
+    for (const name of names) {
+      expect(SLOPE_REGISTRY.find(e => e.name === name)).toBeDefined();
+    }
+  });
+
+  it('registry includes escalation functions', () => {
+    const names = ['detectEscalation', 'buildEscalationEvent', 'resolveEscalationConfig'];
+    for (const name of names) {
+      expect(SLOPE_REGISTRY.find(e => e.name === name)).toBeDefined();
+    }
+  });
+
+  it('registry includes team handicap functions', () => {
+    const names = ['computeTeamHandicap', 'computeRoleHandicap', 'computeSwarmEfficiency', 'analyzeRoleCombinations'];
+    for (const name of names) {
+      expect(SLOPE_REGISTRY.find(e => e.name === name)).toBeDefined();
+    }
+  });
+
+  it('registry includes agent breakdown functions', () => {
+    const entry = SLOPE_REGISTRY.find(e => e.name === 'buildAgentBreakdowns');
+    expect(entry).toBeDefined();
+    expect(entry!.module).toBe('core');
+  });
+
+  it('SLOPE_TYPES contains orchestration type definitions', () => {
+    expect(SLOPE_TYPES).toContain('StandupReport');
+    expect(SLOPE_TYPES).toContain('HandoffEntry');
+    expect(SLOPE_TYPES).toContain('EscalationConfig');
+    expect(SLOPE_TYPES).toContain('EscalationResult');
+    expect(SLOPE_TYPES).toContain('AgentBreakdown');
+    expect(SLOPE_TYPES).toContain('TeamHandicapCard');
+    expect(SLOPE_TYPES).toContain('SwarmEfficiency');
+    expect(SLOPE_TYPES).toContain('RoleHandicap');
+  });
 });
 
 describe('sandbox', () => {
@@ -263,6 +302,65 @@ describe('sandbox', () => {
     const { result } = await runInSandbox('const r = loadRoadmap(); return r ? r.name : null;', tmp);
     expect(result).toBe('Test Roadmap');
     rmSync(tmp, { recursive: true, force: true });
+  });
+
+  // S15 orchestration sandbox tests
+  it('executes generateStandup in sandbox', async () => {
+    const code = `
+      const report = generateStandup({
+        sessionId: 'test-sess',
+        agent_role: 'backend',
+        events: [],
+        claims: [],
+      });
+      return report.sessionId;
+    `;
+    const { result } = await runInSandbox(code, process.cwd());
+    expect(result).toBe('test-sess');
+  });
+
+  it('executes detectEscalation in sandbox', async () => {
+    const code = `
+      const results = detectEscalation({
+        standups: [],
+        conflicts: [],
+        events: [],
+      });
+      return results.length;
+    `;
+    const { result } = await runInSandbox(code, process.cwd());
+    expect(result).toBe(0);
+  });
+
+  it('executes buildAgentBreakdowns in sandbox', async () => {
+    const code = `
+      const agents = buildAgentBreakdowns([{
+        session_id: 's1',
+        agent_role: 'backend',
+        shots: [{ ticket_key: 'T-1', title: 'Test', club: 'short_iron', result: 'green', hazards: [] }],
+      }]);
+      return agents[0].score;
+    `;
+    const { result } = await runInSandbox(code, process.cwd());
+    expect(result).toBe(1);
+  });
+
+  it('executes computeTeamHandicap in sandbox', async () => {
+    const code = `
+      const card = computeTeamHandicap([]);
+      return card.swarm_efficiency.total_sprints;
+    `;
+    const { result } = await runInSandbox(code, process.cwd());
+    expect(result).toBe(0);
+  });
+
+  it('executes resolveEscalationConfig in sandbox', async () => {
+    const code = `
+      const config = resolveEscalationConfig({ blocker_timeout: 30 });
+      return config.blocker_timeout;
+    `;
+    const { result } = await runInSandbox(code, process.cwd());
+    expect(result).toBe(30);
   });
 
   it('loads scorecards from a test project', async () => {

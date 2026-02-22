@@ -264,6 +264,36 @@ export const SLOPE_REGISTRY: FunctionRegistryEntry[] = [
     example: 'return listRoles().map(r => r.id);',
   },
 
+  // ─── Standup (Communication Protocol) ───
+  {
+    name: 'generateStandup',
+    module: 'core',
+    description: 'Generate a standup report from session events and claims. Extracts progress, blockers, decisions, and handoffs.',
+    signature: 'generateStandup(opts: { sessionId: string; agent_role?: string; events: SlopeEvent[]; claims: SprintClaim[] }): StandupReport',
+    example: 'return generateStandup({ sessionId: "sess-1", events: [...], claims: [...] });',
+  },
+  {
+    name: 'formatStandup',
+    module: 'core',
+    description: 'Formats a standup report as human-readable markdown with status icons [ACTIVE]/[BLOCKED]/[DONE].',
+    signature: 'formatStandup(report: StandupReport): string',
+    example: 'return formatStandup(generateStandup({ sessionId: "s1", events: [], claims: [] }));',
+  },
+  {
+    name: 'parseStandup',
+    module: 'core',
+    description: 'Parse a standup report from JSON event data. Used when ingesting another agent standup.',
+    signature: 'parseStandup(data: Record<string, unknown>): StandupReport | null',
+    example: 'return parseStandup({ sessionId: "s1", status: "working", progress: "Active" });',
+  },
+  {
+    name: 'extractRelevantHandoffs',
+    module: 'core',
+    description: 'Extract handoffs from a standup that are relevant to a given role. Returns all when no role specified.',
+    signature: 'extractRelevantHandoffs(standup: StandupReport, roleId?: string): HandoffEntry[]',
+    example: 'return extractRelevantHandoffs(standup, "frontend");',
+  },
+
   // ─── Escalation ───
   {
     name: 'detectEscalation',
@@ -484,6 +514,10 @@ interface SlopeConfig { scorecardDir: string; scorecardPattern: string; minSprin
 // ─── Store ───
 interface SlopeSession { session_id: string; role: 'primary' | 'secondary' | 'observer'; ide: string; worktree_path?: string; branch?: string; started_at: string; last_heartbeat_at: string; metadata?: Record<string, unknown>; agent_role?: string; swarm_id?: string; }
 interface SprintClaim { id: string; sprint_number: number; player: string; target: string; scope: ClaimScope; claimed_at: string; notes?: string; session_id?: string; expires_at?: string; metadata?: Record<string, unknown>; }
+
+// ─── Standup ───
+interface StandupReport { sessionId: string; agent_role?: string; ticketKey?: string; status: 'working' | 'blocked' | 'complete'; progress: string; blockers: string[]; decisions: string[]; handoffs: HandoffEntry[]; timestamp: string; }
+interface HandoffEntry { target: string; description: string; for_role?: string; }
 
 // ─── Roles ───
 interface RoleDefinition { id: string; name: string; description: string; focusAreas: string[]; clubPreferences: Partial<Record<string, ClubSelection>>; briefingFilter: { emphasize: string[]; deemphasize: string[] }; }
