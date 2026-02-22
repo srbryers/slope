@@ -259,5 +259,17 @@ export {
 } from './roles.js';
 export type { RoleDefinition } from './roles.js';
 
+// Standup (Communication Protocol)
+export {
+  generateStandup,
+  formatStandup,
+  parseStandup,
+  extractRelevantHandoffs,
+} from './standup.js';
+export type {
+  StandupReport,
+  HandoffEntry,
+} from './standup.js';
+
 // Built-in metaphors (auto-registers on import)
 export { golf, tennis, baseball, gaming, dnd, matrix } from './metaphors/index.js';
