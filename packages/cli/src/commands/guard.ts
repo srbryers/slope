@@ -1,5 +1,5 @@
-import { GUARD_DEFINITIONS, formatPreToolUseOutput, formatPostToolUseOutput, formatStopOutput } from '@slope-dev/core';
-import type { HookInput, GuardResult, GuardName } from '@slope-dev/core';
+import { GUARD_DEFINITIONS, formatPreToolUseOutput, formatPostToolUseOutput, formatStopOutput, getAllGuardDefinitions, getCustomGuard, loadPluginGuards } from '@slope-dev/core';
+import type { HookInput, GuardResult, GuardName, AnyGuardDefinition } from '@slope-dev/core';
 import { loadConfig } from '../config.js';
 import { exploreGuard } from '../guards/explore.js';
 import { hazardGuard } from '../guards/hazard.js';
@@ -7,6 +7,7 @@ import { commitNudgeGuard } from '../guards/commit-nudge.js';
 import { scopeDriftGuard } from '../guards/scope-drift.js';
 import { compactionGuard } from '../guards/compaction.js';
 import { stopCheckGuard } from '../guards/stop-check.js';
+import { execSync } from 'node:child_process';
 
 type GuardHandler = (input: HookInput, cwd: string) => Promise<GuardResult>;
 
@@ -46,10 +47,13 @@ export async function guardCommand(args: string[]): Promise<void> {
     return;
   }
 
-  // Find guard definition
-  const def = GUARD_DEFINITIONS.find(d => d.name === name);
+  // Load custom guard plugins
+  loadPluginGuards(cwd, config.plugins);
+
+  // Find guard definition (built-in or custom)
+  const def: AnyGuardDefinition | undefined = getAllGuardDefinitions().find(d => d.name === name);
   if (!def) {
-    console.error(`Unknown guard: "${name}". Available: ${GUARD_DEFINITIONS.map(d => d.name).join(', ')}`);
+    console.error(`Unknown guard: "${name}". Available: ${getAllGuardDefinitions().map(d => d.name).join(', ')}`);
     process.exit(1);
   }
 
@@ -67,9 +71,25 @@ export async function guardCommand(args: string[]): Promise<void> {
   }
 
   // Find and run the handler
-  const handler = handlers[name];
+  const handler = handlers[name as GuardName];
   if (!handler) {
-    // No handler registered yet — passthrough (guard framework only, implementations in S12-2/3/4)
+    // Check for custom guard plugin — shell out to its command
+    const customDef = getCustomGuard(name);
+    if (customDef) {
+      try {
+        const output = execSync(customDef.command, {
+          cwd,
+          input: JSON.stringify(input),
+          encoding: 'utf8',
+          timeout: 10000,
+        });
+        if (output.trim()) {
+          process.stdout.write(output);
+        }
+      } catch { /* custom guard failed — silent passthrough */ }
+      return;
+    }
+    // No handler registered — passthrough
     return;
   }
 
@@ -124,6 +144,7 @@ async function readStdin(): Promise<HookInput> {
 }
 
 function printUsage(): void {
+  const allDefs = getAllGuardDefinitions();
   console.log(`
 slope guard — Execute a SLOPE guidance hook
 
@@ -134,7 +155,7 @@ Usage:
   slope guard disable <name>  Disable a guard
 
 Guards:
-${GUARD_DEFINITIONS.map(d => `  ${d.name.padEnd(16)} [${d.hookEvent}] ${d.description}`).join('\n')}
+${allDefs.map(d => `  ${d.name.padEnd(16)} [${d.hookEvent}] ${d.description}`).join('\n')}
 `);
 }
 
@@ -144,16 +165,27 @@ ${GUARD_DEFINITIONS.map(d => `  ${d.name.padEnd(16)} [${d.hookEvent}] ${d.descri
 export async function guardManageCommand(args: string[]): Promise<void> {
   const sub = args[0];
   const name = args[1];
+  const cwd = process.cwd();
 
   switch (sub) {
     case 'list': {
       const config = loadConfig();
       const disabled = config.guidance?.disabled ?? [];
 
+      // Load custom guard plugins
+      loadPluginGuards(cwd, config.plugins);
+
       console.log('\nSLOPE Guards:\n');
       for (const d of GUARD_DEFINITIONS) {
         const status = disabled.includes(d.name) ? '[disabled]' : '[enabled] ';
         console.log(`  ${status} ${d.name.padEnd(16)} [${d.hookEvent}] ${d.description}`);
+      }
+      // Show custom guards
+      const allDefs = getAllGuardDefinitions();
+      const customDefs = allDefs.filter(d => !GUARD_DEFINITIONS.includes(d as typeof GUARD_DEFINITIONS[number]));
+      for (const d of customDefs) {
+        const status = disabled.includes(d.name) ? '[disabled]' : '[enabled] ';
+        console.log(`  ${status} ${d.name.padEnd(16)} [${d.hookEvent}] ${d.description} [custom]`);
       }
       console.log('');
       break;
@@ -164,7 +196,12 @@ export async function guardManageCommand(args: string[]): Promise<void> {
         console.error(`Error: guard name required. Usage: slope guard ${sub} <name>`);
         process.exit(1);
       }
-      if (!GUARD_DEFINITIONS.find(d => d.name === name)) {
+
+      // Load custom guard plugins to check against all guards
+      const config = loadConfig();
+      loadPluginGuards(cwd, config.plugins);
+
+      if (!getAllGuardDefinitions().find(d => d.name === name)) {
         console.error(`Unknown guard: "${name}"`);
         process.exit(1);
       }

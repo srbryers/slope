@@ -347,6 +347,50 @@ export const SLOPE_REGISTRY: FunctionRegistryEntry[] = [
     example: 'return analyzeRoleCombinations(loadScorecards());',
   },
 
+  // ─── Plugins ───
+  {
+    name: 'discoverPlugins',
+    module: 'core',
+    description: 'Scans .slope/plugins/metaphors/ and .slope/plugins/guards/ for plugin JSON files. Returns discovered plugins with manifest and file path.',
+    signature: 'discoverPlugins(cwd: string): DiscoveredPlugin[]',
+    example: 'return discoverPlugins(process.cwd());',
+  },
+  {
+    name: 'loadPlugins',
+    module: 'core',
+    description: 'Discovers, validates, and registers all custom plugins (metaphors + guards). Returns loaded plugins and any errors.',
+    signature: 'loadPlugins(cwd: string, config?: PluginsConfig): PluginLoadResult',
+    example: 'return loadPlugins(process.cwd());',
+  },
+  {
+    name: 'loadPluginMetaphors',
+    module: 'core',
+    description: 'Loads and registers custom metaphor plugins from .slope/plugins/metaphors/. Each JSON file is a full MetaphorDefinition.',
+    signature: 'loadPluginMetaphors(cwd: string, config?: PluginsConfig): PluginLoadResult',
+    example: 'return loadPluginMetaphors(process.cwd());',
+  },
+  {
+    name: 'loadPluginGuards',
+    module: 'core',
+    description: 'Loads and registers custom guard plugins from .slope/plugins/guards/. Each JSON has name, hookEvent, command, and level.',
+    signature: 'loadPluginGuards(cwd: string, config?: PluginsConfig): PluginLoadResult',
+    example: 'return loadPluginGuards(process.cwd());',
+  },
+  {
+    name: 'validatePluginManifest',
+    module: 'core',
+    description: 'Validates a plugin manifest object for required fields (type, id, name).',
+    signature: 'validatePluginManifest(raw: unknown): { valid: boolean; errors: string[] }',
+    example: 'return validatePluginManifest({ type: "metaphor", id: "custom", name: "Custom" });',
+  },
+  {
+    name: 'isPluginEnabled',
+    module: 'core',
+    description: 'Checks if a plugin is enabled based on the PluginsConfig disabled/enabled lists.',
+    signature: 'isPluginEnabled(id: string, config?: PluginsConfig): boolean',
+    example: 'return isPluginEnabled("my-plugin", { disabled: ["other"] });',
+  },
+
   // ─── Filesystem helpers (injected into sandbox) ───
   {
     name: 'loadConfig',

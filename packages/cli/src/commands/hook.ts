@@ -1,8 +1,8 @@
 import { writeFileSync, readFileSync, existsSync, unlinkSync, mkdirSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { loadHooksConfig, saveHooksConfig } from '../hooks-config.js';
-import { GUARD_DEFINITIONS, generateClaudeCodeHooksConfig } from '@slope-dev/core';
-import type { GuardDefinition } from '@slope-dev/core';
+import { GUARD_DEFINITIONS, getAllGuardDefinitions, generateClaudeCodeHooksConfig, loadPluginGuards, loadConfig } from '@slope-dev/core';
+import type { AnyGuardDefinition } from '@slope-dev/core';
 
 const HOOK_TEMPLATES: Record<string, { description: string; managed: string[] }> = {
   'session-start': {
@@ -240,8 +240,12 @@ function showHook(name: string, cwd: string): void {
 function installGuardHooks(cwd: string, level: 'scoring' | 'full'): void {
   const provider = detectProvider(cwd);
 
-  // Filter guards by level
-  const guards = GUARD_DEFINITIONS.filter(g =>
+  // Load custom guard plugins
+  const config = loadConfig(cwd);
+  loadPluginGuards(cwd, config.plugins);
+
+  // Filter guards by level (includes custom guards)
+  const guards = getAllGuardDefinitions().filter(g =>
     level === 'full' || g.level === 'scoring',
   );
 
@@ -258,7 +262,7 @@ function installGuardHooks(cwd: string, level: 'scoring' | 'full'): void {
   }
 }
 
-function installClaudeCodeGuards(cwd: string, guards: GuardDefinition[]): void {
+function installClaudeCodeGuards(cwd: string, guards: AnyGuardDefinition[]): void {
   const hooksDir = join(cwd, '.claude', 'hooks');
   mkdirSync(hooksDir, { recursive: true });
 

@@ -442,6 +442,18 @@ export async function initCommand(args: string[]): Promise<void> {
     }
   }
 
+  // Create plugin directories
+  const pluginDirs = [
+    join(cwd, '.slope', 'plugins', 'metaphors'),
+    join(cwd, '.slope', 'plugins', 'guards'),
+  ];
+  for (const dir of pluginDirs) {
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true });
+    }
+  }
+  console.log(`  Created .slope/plugins/ directories`);
+
   // Create initial hooks config
   saveHooksConfig(cwd, { installed: {} });
   console.log(`  Created .slope/hooks.json`);

@@ -37,6 +37,7 @@ import { guardCommand, guardManageCommand } from './commands/guard.js';
 import { reportCommand } from './commands/report.js';
 import { standupCommand } from './commands/standup.js';
 import { escalateCommand } from './commands/escalate.js';
+import { pluginCommand } from './commands/plugin.js';
 
 const subcommand = process.argv[2];
 
@@ -168,6 +169,12 @@ switch (subcommand) {
     }
     break;
   }
+  case 'plugin':
+    pluginCommand(process.argv.slice(3)).catch(err => {
+      console.error('Error:', err.message);
+      process.exit(1);
+    });
+    break;
   default:
     console.log(`
 SLOPE CLI — Sprint Lifecycle & Operational Performance Engine
@@ -198,6 +205,7 @@ Usage:
   slope standup --ingest=<path> [--role=<id>] Ingest another agent's standup
   slope report --html [--output=<path>]      Generate HTML performance report
   slope roadmap validate|review|status|show  Strategic planning tools
+  slope plugin list|validate                Manage custom plugins
 
 Examples:
   slope init                                Create .slope/ with config + example scorecard
