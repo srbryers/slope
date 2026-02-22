@@ -1,8 +1,8 @@
 {
   "mcpServers": {
     "slope": {
-      "command": "node",
-      "args": ["packages/mcp-tools/dist/index.js"]
+      "command": "npx",
+      "args": ["@slope-dev/mcp-tools"]
     }
   }
 }

@@ -5,7 +5,9 @@
   "scripts": {
     "build": "pnpm -r build",
     "test": "pnpm -r test",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "publish:all": "pnpm -r build && pnpm -r test && pnpm -r typecheck && pnpm -r publish --access public --no-git-checks",
+    "publish:dry": "pnpm -r build && pnpm -r test && pnpm -r typecheck && pnpm -r publish --access public --no-git-checks --dry-run"
   },
   "engines": {
     "node": ">=18"
