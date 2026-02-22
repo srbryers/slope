@@ -1,0 +1,112 @@
+{
+  "sprint_number": 10,
+  "theme": "Signal Intelligence — CI Parser + Combined Classification + Events",
+  "par": 4,
+  "slope": 2,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-02-22",
+  "type": "feature",
+  "shots": [
+    {
+      "ticket_key": "S10-1",
+      "title": "Events table + schema migration framework",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Versioned migration system replaces CREATE TABLE IF NOT EXISTS. Events table with 4 indexes. 9 new tests (7 events + 2 migration). Also added event methods to SlopeStore interface."
+    },
+    {
+      "ticket_key": "S10-2",
+      "title": "CI/test signal parser for Vitest and Jest",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "New ci-signals.ts module in core. Auto-detects runner, parses test/suite counts, duration, retries, coverage. Generic fallback parser. 17 new tests."
+    },
+    {
+      "ticket_key": "S10-3",
+      "title": "Combined signal shot classification",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "classifyShotFromSignals() merges git + CI + events. Git-only defaults to green (not in_the_hole). CI confirmation required for in_the_hole. Dead-end/scope-change events become miss signals. 15 new tests."
+    },
+    {
+      "ticket_key": "S10-4",
+      "title": "Auto-card CI integration + documentation",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Wired parseTestOutput + classifyShotFromSignals into auto-card. New --test-output flag. Updated CLAUDE.md with test counts and store events."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "altitude",
+      "description": "Context continued from previous session — required reconstruction from summary",
+      "impact": "none"
+    }
+  ],
+  "special_plays": [],
+  "training": [],
+  "nutrition": [
+    {
+      "category": "hydration",
+      "description": "Full build+test after every ticket (595 tests at completion)",
+      "status": "healthy"
+    },
+    {
+      "category": "diet",
+      "description": "Commit-per-ticket discipline — 4 commits for 4 tickets, pushed after each",
+      "status": "healthy"
+    },
+    {
+      "category": "supplements",
+      "description": "41 new tests across core (32: 17 CI + 15 combined) and store-sqlite (9: 7 events + 2 migration)",
+      "status": "healthy"
+    },
+    {
+      "category": "recovery",
+      "description": "Mock store in mcp-tools updated to include new event methods — no production breakage",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Two consecutive zero-hazard sprints. The versioned migration framework was a clean upgrade path from CREATE TABLE IF NOT EXISTS. The CI parser and combined classifier slotted in naturally.",
+    "advice_for_next_player": "classifyShotFromSignals() git-only defaults to green — this is intentional. Without CI confirmation, we can't know if tests actually pass. Always provide --test-output to auto-card for accurate scoring.",
+    "what_surprised_you": "The combined signals classifier was simpler than expected. Most of the complexity was already in classifyShot() — the new function just adds CI/event layers on top.",
+    "excited_about_next": "Events table is ready for session telemetry hooks. Auto-card can now produce more accurate scorecards. The foundation for transcript extraction is in place."
+  },
+  "bunker_locations": [],
+  "yardage_book_updates": [
+    "schema_version table: versioned migrations, each runs exactly once",
+    "events table: id, session_id (FK), type, timestamp, data (JSON), sprint_number, ticket_key + 4 indexes",
+    "EventType: 'failure' | 'dead_end' | 'scope_change' | 'compaction' | 'hazard' | 'decision'",
+    "CISignal: runner, test counts, suite counts, duration_ms, retries, coverage_pct",
+    "detectRunner() + parseTestOutput() + parseVitestOutput() + parseJestOutput() in ci-signals.ts",
+    "classifyShotFromSignals(): git-only → green, CI pass → in_the_hole, CI fail → missed_right",
+    "auto-card --test-output=<file>: pipe test runner output for CI-aware scoring"
+  ],
+  "course_management_notes": [
+    "4 tickets, 4 in_the_hole — zero misses, zero hazards (2nd consecutive clean sprint)",
+    "Tests grew from 554 to 595 (+41 across core and store-sqlite)",
+    "2 files created, 7 files modified",
+    "Push after each ticket — 4 pushes"
+  ]
+}
