@@ -8,6 +8,15 @@ alwaysApply: true
 
 The SLOPE framework organizes sprint work into a hierarchy of routines, mirroring golf's structured approach to each shot, hole, and round.
 
+## Pre-Tournament Routine (Course Strategy)
+
+Before starting a new phase or project:
+
+1. **Build the roadmap** — Create `docs/backlog/roadmap.json` with sprints, dependencies, and phases
+2. **Run `slope roadmap validate`** — Check for dependency cycles, numbering gaps
+3. **Run `slope roadmap review`** — Scope balance, critical path, bottlenecks
+4. **Run `slope roadmap show`** — Dependency graph and parallel tracks
+
 ## Pre-Round Routine (Sprint Start)
 
 Before writing any code in a new sprint:

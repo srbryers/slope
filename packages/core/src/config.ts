@@ -9,6 +9,7 @@ export interface SlopeConfig {
   sessionsPath: string;
   registry: 'file' | 'api';
   claimsPath: string;
+  roadmapPath: string;
   registryApiUrl?: string;
   currentSprint?: number;
   store?: string;
@@ -23,6 +24,7 @@ const DEFAULT_CONFIG: SlopeConfig = {
   sessionsPath: '.slope/sessions.json',
   registry: 'file',
   claimsPath: '.slope/claims.json',
+  roadmapPath: 'docs/backlog/roadmap.json',
 };
 
 const CONFIG_DIR = '.slope';

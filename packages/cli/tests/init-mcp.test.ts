@@ -128,3 +128,37 @@ describe('init --claude-code (includes MCP)', () => {
     expect(content).toBe('# My Custom CLAUDE.md\n');
   });
 });
+
+describe('init creates roadmap', () => {
+  it('creates starter roadmap.json', async () => {
+    await initCommand([]);
+
+    const roadmapPath = join(tmpDir, 'docs', 'backlog', 'roadmap.json');
+    expect(existsSync(roadmapPath)).toBe(true);
+
+    const content = JSON.parse(readFileSync(roadmapPath, 'utf8'));
+    expect(content.name).toBe('Project Roadmap');
+    expect(content.sprints).toHaveLength(1);
+    expect(content.sprints[0].tickets).toHaveLength(3);
+    expect(content.phases).toHaveLength(1);
+  });
+
+  it('does not overwrite existing roadmap.json', async () => {
+    const backlogDir = join(tmpDir, 'docs', 'backlog');
+    mkdirSync(backlogDir, { recursive: true });
+    writeFileSync(join(backlogDir, 'roadmap.json'), '{"name":"Custom"}');
+
+    await initCommand([]);
+
+    const content = readFileSync(join(backlogDir, 'roadmap.json'), 'utf8');
+    expect(content).toBe('{"name":"Custom"}');
+  });
+
+  it('config includes roadmapPath field', async () => {
+    await initCommand([]);
+
+    const configPath = join(tmpDir, '.slope', 'config.json');
+    const config = JSON.parse(readFileSync(configPath, 'utf8'));
+    expect(config.roadmapPath).toBe('docs/backlog/roadmap.json');
+  });
+});

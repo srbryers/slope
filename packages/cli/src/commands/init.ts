@@ -69,6 +69,28 @@ const EXAMPLE_COMMON_ISSUES = {
   ],
 };
 
+const STARTER_ROADMAP = {
+  name: 'Project Roadmap',
+  description: 'Replace this with your project roadmap. Run "slope roadmap validate" to check.',
+  phases: [
+    { name: 'Phase 1', sprints: [1] },
+  ],
+  sprints: [
+    {
+      id: 1,
+      theme: 'Getting Started',
+      par: 3,
+      slope: 0,
+      type: 'feature',
+      tickets: [
+        { key: 'S1-1', title: 'Set up project', club: 'short_iron', complexity: 'standard' },
+        { key: 'S1-2', title: 'Add core feature', club: 'short_iron', complexity: 'standard' },
+        { key: 'S1-3', title: 'Write tests', club: 'wedge', complexity: 'small' },
+      ],
+    },
+  ],
+};
+
 type Provider = 'claude-code' | 'cursor' | 'generic';
 
 function detectProvider(args: string[]): Provider | null {
@@ -266,6 +288,15 @@ export async function initCommand(args: string[]): Promise<void> {
   if (!existsSync(commonIssuesPath)) {
     writeFileSync(commonIssuesPath, JSON.stringify(EXAMPLE_COMMON_ISSUES, null, 2) + '\n');
     console.log(`  Created ${commonIssuesPath}`);
+  }
+
+  // Create starter roadmap
+  const backlogDir = join(cwd, 'docs', 'backlog');
+  const roadmapJsonPath = join(backlogDir, 'roadmap.json');
+  if (!existsSync(roadmapJsonPath)) {
+    mkdirSync(backlogDir, { recursive: true });
+    writeFileSync(roadmapJsonPath, JSON.stringify(STARTER_ROADMAP, null, 2) + '\n');
+    console.log(`  Created ${roadmapJsonPath}`);
   }
 
   // Create SQLite store (replaces sessions.json and claims.json)

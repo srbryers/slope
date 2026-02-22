@@ -69,10 +69,7 @@ export async function briefingCommand(args: string[]): Promise<void> {
 
   // Load roadmap (graceful degradation)
   let roadmap: RoadmapDefinition | undefined;
-  const configAny = config as unknown as Record<string, unknown>;
-  const roadmapPath = typeof configAny.roadmapPath === 'string'
-    ? configAny.roadmapPath
-    : 'docs/backlog/roadmap.json';
+  const roadmapPath = config.roadmapPath;
   const resolvedRoadmapPath = join(cwd, roadmapPath);
   try {
     if (existsSync(resolvedRoadmapPath)) {

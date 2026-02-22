@@ -1,5 +1,11 @@
 # SLOPE Sprint Checklist
 
+## Pre-Tournament (Course Strategy)
+1. Build roadmap in `docs/backlog/roadmap.json`
+2. Run `slope roadmap validate` — check dependencies and structure
+3. Run `slope roadmap review` — scope balance, critical path, bottlenecks
+4. Run `slope roadmap show` — view dependency graph
+
 ## Pre-Round (Sprint Start)
 1. Run `slope briefing` — handicap, hazards, gotchas, session continuity
 2. Verify previous scorecard exists

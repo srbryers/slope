@@ -67,10 +67,7 @@ function buildFsHelpers(cwd: string) {
 
   const loadRoadmap = (): unknown => {
     const config = loadConfig();
-    const configAny = config as unknown as Record<string, unknown>;
-    const roadmapPath = typeof configAny.roadmapPath === 'string'
-      ? configAny.roadmapPath
-      : 'docs/backlog/roadmap.json';
+    const roadmapPath = config.roadmapPath;
     const resolved = safePath(cwd, roadmapPath);
     if (!fs.existsSync(resolved)) return null;
     try {

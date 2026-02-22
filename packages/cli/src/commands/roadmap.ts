@@ -28,10 +28,7 @@ const DEFAULT_ROADMAP_PATH = 'docs/backlog/roadmap.json';
 function resolveRoadmapPath(flags: Record<string, string>, cwd: string): string {
   if (flags.path) return flags.path;
   const config = loadConfig(cwd);
-  if ('roadmapPath' in config && typeof (config as Record<string, unknown>).roadmapPath === 'string') {
-    return join(cwd, (config as Record<string, unknown>).roadmapPath as string);
-  }
-  return join(cwd, DEFAULT_ROADMAP_PATH);
+  return join(cwd, config.roadmapPath);
 }
 
 function loadRoadmapFile(flags: Record<string, string>, cwd: string): RoadmapDefinition | null {
