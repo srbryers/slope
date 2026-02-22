@@ -22,6 +22,7 @@ export type {
   NutritionEntry,
   NineteenthHole,
   GolfScorecard,
+  AgentBreakdown,
   RollingStats,
   HandicapCard,
   DispersionReport,
@@ -60,8 +61,9 @@ export {
 export {
   computeStatsFromShots,
   buildScorecard,
+  buildAgentBreakdowns,
 } from './builder.js';
-export type { ScorecardInput } from './builder.js';
+export type { ScorecardInput, AgentShotInput } from './builder.js';
 
 // Validation
 export {

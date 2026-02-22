@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { computeStatsFromShots, buildScorecard } from '../src/builder.js';
+import { computeStatsFromShots, buildScorecard, buildAgentBreakdowns } from '../src/builder.js';
 import type { ShotRecord } from '../src/types.js';
+import type { AgentShotInput } from '../src/builder.js';
 
 // --- Helpers ---
 
@@ -291,5 +292,114 @@ describe('buildScorecard', () => {
     expect(card.stats.greens_in_regulation).toBe(11);
     expect(card.stats.hazards_hit).toBe(2);
     expect(card.stats.miss_directions).toEqual({ long: 0, short: 0, left: 0, right: 0 });
+  });
+
+  it('includes agents field when provided', () => {
+    const agents = buildAgentBreakdowns([
+      { session_id: 'sess-1', agent_role: 'backend', shots: [makeShot({ result: 'in_the_hole' })] },
+      { session_id: 'sess-2', agent_role: 'frontend', shots: [makeShot({ result: 'green' })] },
+    ]);
+    const card = buildScorecard({
+      sprint_number: 15,
+      theme: 'Swarm Test',
+      par: 4,
+      slope: 2,
+      date: '2026-02-22',
+      shots: [makeShot({ result: 'in_the_hole' }), makeShot({ result: 'green' })],
+      agents,
+    });
+    expect(card.agents).toHaveLength(2);
+    expect(card.agents![0].agent_role).toBe('backend');
+    expect(card.agents![1].agent_role).toBe('frontend');
+  });
+
+  it('omits agents field when not provided', () => {
+    const card = buildScorecard({
+      sprint_number: 15,
+      theme: 'Solo Test',
+      par: 4,
+      slope: 1,
+      date: '2026-02-22',
+      shots: [makeShot()],
+    });
+    expect(card.agents).toBeUndefined();
+  });
+});
+
+// --- buildAgentBreakdowns ---
+
+describe('buildAgentBreakdowns', () => {
+  it('computes per-agent score and stats', () => {
+    const agents: AgentShotInput[] = [
+      {
+        session_id: 'sess-1',
+        agent_role: 'backend',
+        shots: [
+          makeShot({ result: 'in_the_hole' }),
+          makeShot({ result: 'green' }),
+        ],
+      },
+      {
+        session_id: 'sess-2',
+        agent_role: 'frontend',
+        shots: [
+          makeShot({ result: 'fairway' }),
+          makeShot({ result: 'missed_long' }),
+          makeShot({ result: 'green' }),
+        ],
+      },
+    ];
+
+    const breakdowns = buildAgentBreakdowns(agents);
+
+    expect(breakdowns).toHaveLength(2);
+
+    // Backend agent
+    expect(breakdowns[0].session_id).toBe('sess-1');
+    expect(breakdowns[0].agent_role).toBe('backend');
+    expect(breakdowns[0].score).toBe(2);
+    expect(breakdowns[0].stats.fairways_hit).toBe(2);
+    expect(breakdowns[0].stats.greens_in_regulation).toBe(2);
+
+    // Frontend agent
+    expect(breakdowns[1].session_id).toBe('sess-2');
+    expect(breakdowns[1].agent_role).toBe('frontend');
+    expect(breakdowns[1].score).toBe(3);
+    expect(breakdowns[1].stats.fairways_hit).toBe(2); // fairway + green
+    expect(breakdowns[1].stats.miss_directions.long).toBe(1);
+  });
+
+  it('returns empty array for empty input', () => {
+    expect(buildAgentBreakdowns([])).toEqual([]);
+  });
+
+  it('handles single agent with all shots', () => {
+    const breakdowns = buildAgentBreakdowns([{
+      session_id: 'solo',
+      agent_role: 'generalist',
+      shots: [makeShot(), makeShot(), makeShot()],
+    }]);
+
+    expect(breakdowns).toHaveLength(1);
+    expect(breakdowns[0].score).toBe(3);
+    expect(breakdowns[0].stats.fairways_total).toBe(3);
+  });
+
+  it('counts hazards per agent independently', () => {
+    const breakdowns = buildAgentBreakdowns([
+      {
+        session_id: 's1',
+        agent_role: 'backend',
+        shots: [makeShot({ hazards: [{ type: 'bunker', description: 'test' }] })],
+      },
+      {
+        session_id: 's2',
+        agent_role: 'frontend',
+        shots: [makeShot()],
+      },
+    ]);
+
+    expect(breakdowns[0].stats.hazards_hit).toBe(1);
+    expect(breakdowns[1].stats.hazards_hit).toBe(0);
   });
 });

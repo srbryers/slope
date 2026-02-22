@@ -116,6 +116,17 @@ export interface NineteenthHole {
   excited_about_next?: string;
 }
 
+// --- Agent Breakdown (Multi-Agent Sprints) ---
+
+/** Per-agent scoring breakdown within a swarm sprint */
+export interface AgentBreakdown {
+  session_id: string;
+  agent_role: string;
+  shots: ShotRecord[];
+  score: number;
+  stats: HoleStats;
+}
+
 // --- Full Scorecard ---
 
 /** Complete SLOPE scorecard — the primary artifact for sprint retros */
@@ -128,6 +139,8 @@ export interface GolfScorecard extends HoleScore {
   bunker_locations: string[];
   course_management_notes: string[];
   nineteenth_hole?: NineteenthHole;
+  /** Per-agent breakdowns for multi-agent (swarm) sprints */
+  agents?: AgentBreakdown[];
 }
 
 // --- Handicap Types ---

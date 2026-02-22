@@ -52,9 +52,16 @@ export const SLOPE_REGISTRY: FunctionRegistryEntry[] = [
   {
     name: 'buildScorecard',
     module: 'core',
-    description: 'Builds a complete GolfScorecard from minimal ScorecardInput, auto-computing stats and score.',
+    description: 'Builds a complete GolfScorecard from minimal ScorecardInput, auto-computing stats and score. Supports optional agents field for swarm sprints.',
     signature: 'buildScorecard(input: ScorecardInput): GolfScorecard',
     example: 'return buildScorecard({ sprint_number: 4, theme: "Code Mode", par: 4, slope: 3, date: "2026-02-21", shots: [...] });',
+  },
+  {
+    name: 'buildAgentBreakdowns',
+    module: 'core',
+    description: 'Builds per-agent scoring breakdowns from swarm session shot data. Each agent gets independent score and stats.',
+    signature: 'buildAgentBreakdowns(agents: AgentShotInput[]): AgentBreakdown[]',
+    example: 'return buildAgentBreakdowns([{ session_id: "s1", agent_role: "backend", shots: [...] }]);',
   },
 
   // ─── Validation ───
@@ -429,7 +436,9 @@ interface SprintClaim { id: string; sprint_number: number; player: string; targe
 interface RoleDefinition { id: string; name: string; description: string; focusAreas: string[]; clubPreferences: Partial<Record<string, ClubSelection>>; briefingFilter: { emphasize: string[]; deemphasize: string[] }; }
 
 // ─── Builder Input ───
-interface ScorecardInput { sprint_number: number; theme: string; par: 3 | 4 | 5; slope: number; date: string; shots: ShotRecord[]; putts?: number; penalties?: number; type?: SprintType; conditions?: ConditionRecord[]; special_plays?: SpecialPlay[]; training?: TrainingSession[]; nutrition?: NutritionEntry[]; nineteenth_hole?: NineteenthHole; bunker_locations?: string[]; yardage_book_updates?: string[]; course_management_notes?: string[]; }
+interface AgentBreakdown { session_id: string; agent_role: string; shots: ShotRecord[]; score: number; stats: HoleStats; }
+interface AgentShotInput { session_id: string; agent_role: string; shots: ShotRecord[]; }
+interface ScorecardInput { sprint_number: number; theme: string; par: 3 | 4 | 5; slope: number; date: string; shots: ShotRecord[]; putts?: number; penalties?: number; type?: SprintType; conditions?: ConditionRecord[]; special_plays?: SpecialPlay[]; training?: TrainingSession[]; nutrition?: NutritionEntry[]; nineteenth_hole?: NineteenthHole; bunker_locations?: string[]; yardage_book_updates?: string[]; course_management_notes?: string[]; agents?: AgentBreakdown[]; }
 
 // ─── Advisor ───
 interface ExecutionTrace { planned_scope_paths: string[]; modified_files: string[]; test_results: { suite: string; passed: boolean; first_run: boolean }[]; reverts: number; elapsed_minutes: number; hazards_encountered: HazardHit[]; }

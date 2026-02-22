@@ -1,9 +1,10 @@
 import { execSync } from 'node:child_process';
 import { writeFileSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { buildScorecard, computeSlope, parseTestOutput, classifyShotFromSignals } from '@slope-dev/core';
-import type { ShotRecord, CISignal, ShotResult } from '@slope-dev/core';
+import { buildScorecard, buildAgentBreakdowns, computeSlope, parseTestOutput, classifyShotFromSignals } from '@slope-dev/core';
+import type { ShotRecord, CISignal, ShotResult, AgentBreakdown } from '@slope-dev/core';
 import { loadConfig } from '../config.js';
+import { resolveStore } from '../store.js';
 
 function parseArgs(args: string[]): Record<string, string> {
   const result: Record<string, string> = {};
@@ -71,18 +72,19 @@ function inferSlopeFactors(commits: CommitInfo[]): string[] {
   return factors;
 }
 
-export function autoCardCommand(args: string[]): void {
+export async function autoCardCommand(args: string[]): Promise<void> {
   const opts = parseArgs(args);
   const config = loadConfig();
 
   const sprintNumber = parseInt(opts.sprint ?? '', 10);
   if (!sprintNumber) {
-    console.error('\nUsage: slope auto-card --sprint=<N> [--since=<date>] [--branch=<ref>] [--theme=<text>] [--test-output=<file>] [--dry-run]\n');
+    console.error('\nUsage: slope auto-card --sprint=<N> [--since=<date>] [--branch=<ref>] [--theme=<text>] [--test-output=<file>] [--swarm=<id>] [--dry-run]\n');
     console.error('  --sprint       Sprint number (required)');
     console.error('  --since        Git log start date, e.g. "2026-02-20" (optional)');
     console.error('  --branch       Git ref to scan (default: HEAD)');
     console.error('  --theme        Sprint theme (default: auto-generated)');
     console.error('  --test-output  Path to test runner output file (Vitest/Jest) for CI-aware scoring');
+    console.error('  --swarm        Swarm ID — map commits to agents for per-agent breakdowns');
     console.error('  --dry-run      Print scorecard JSON without writing to disk\n');
     process.exit(1);
   }
@@ -135,6 +137,12 @@ export function autoCardCommand(args: string[]): void {
   const slopeFactors = inferSlopeFactors(commits);
   const theme = opts.theme ?? `Sprint ${sprintNumber}`;
 
+  // Build per-agent breakdowns when --swarm is provided
+  let agents: AgentBreakdown[] | undefined;
+  if (opts.swarm) {
+    agents = await buildSwarmAgents(opts.swarm, commits, shots);
+  }
+
   const card = buildScorecard({
     sprint_number: sprintNumber,
     theme,
@@ -142,6 +150,7 @@ export function autoCardCommand(args: string[]): void {
     slope: computeSlope(slopeFactors),
     date: new Date().toISOString().split('T')[0],
     shots,
+    ...(agents ? { agents } : {}),
   });
 
   const output = {
@@ -179,5 +188,82 @@ export function autoCardCommand(args: string[]): void {
   } else {
     console.log(`  No CI output — shots default to green. Use --test-output for better scoring.`);
   }
+  if (card.agents && card.agents.length > 0) {
+    console.log(`  Agents: ${card.agents.length} (${card.agents.map(a => `${a.agent_role}: ${a.shots.length} shots`).join(', ')})`);
+  }
   console.log(`\n  Review shot results before filing.\n`);
+}
+
+/**
+ * Build per-agent breakdowns by mapping commits to swarm sessions via branch.
+ * Commits whose branch matches a session's branch are attributed to that agent.
+ * Unmatched commits are grouped under an "unknown" agent.
+ */
+async function buildSwarmAgents(
+  swarmId: string,
+  commits: CommitInfo[],
+  shots: ShotRecord[],
+): Promise<AgentBreakdown[]> {
+  const cwd = process.cwd();
+  const store = await resolveStore(cwd);
+  try {
+    const sessions = await store.getSessionsBySwarm(swarmId);
+    if (sessions.length === 0) {
+      console.error(`  Warning: No sessions found for swarm "${swarmId}". Skipping agent breakdowns.`);
+      return [];
+    }
+
+    // Map branches to sessions
+    const branchToSession = new Map<string, { session_id: string; agent_role: string }>();
+    for (const s of sessions) {
+      if (s.branch) {
+        branchToSession.set(s.branch, {
+          session_id: s.session_id,
+          agent_role: s.agent_role ?? 'generalist',
+        });
+      }
+    }
+
+    // Map each commit to an agent by checking which branches contain it
+    const agentShots = new Map<string, { session_id: string; agent_role: string; shots: ShotRecord[] }>();
+
+    for (let i = 0; i < commits.length; i++) {
+      const commit = commits[i];
+      const shot = shots[i];
+      let matched = false;
+
+      for (const [branch, agent] of branchToSession) {
+        // Check if this commit is reachable from this branch
+        const isAncestor = git(`merge-base --is-ancestor ${commit.hash} ${branch} 2>/dev/null && echo yes || echo no`);
+        if (isAncestor === 'yes') {
+          const key = agent.session_id;
+          if (!agentShots.has(key)) {
+            agentShots.set(key, { ...agent, shots: [] });
+          }
+          agentShots.get(key)!.shots.push(shot);
+          matched = true;
+          break;
+        }
+      }
+
+      if (!matched) {
+        // Fall back: attribute to first session or "unknown"
+        const fallbackKey = '_unmatched';
+        if (!agentShots.has(fallbackKey)) {
+          agentShots.set(fallbackKey, { session_id: 'unmatched', agent_role: 'unknown', shots: [] });
+        }
+        agentShots.get(fallbackKey)!.shots.push(shot);
+      }
+    }
+
+    return buildAgentBreakdowns(
+      Array.from(agentShots.values()).map(a => ({
+        session_id: a.session_id,
+        agent_role: a.agent_role,
+        shots: a.shots,
+      })),
+    );
+  } finally {
+    store.close();
+  }
 }

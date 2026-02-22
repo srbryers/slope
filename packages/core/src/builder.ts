@@ -11,6 +11,7 @@ import type {
   NineteenthHole,
   SprintType,
   ScoreLabel,
+  AgentBreakdown,
 } from './types.js';
 import { computeScoreLabel } from './handicap.js';
 
@@ -159,6 +160,9 @@ export interface ScorecardInput {
   bunker_locations?: string[];
   yardage_book_updates?: string[];
   course_management_notes?: string[];
+
+  // Multi-agent (swarm) sprints
+  agents?: AgentBreakdown[];
 }
 
 /**
@@ -201,5 +205,32 @@ export function buildScorecard(input: ScorecardInput): GolfScorecard {
     bunker_locations: input.bunker_locations ?? [],
     yardage_book_updates: input.yardage_book_updates ?? [],
     course_management_notes: input.course_management_notes ?? [],
+    ...(input.agents ? { agents: input.agents } : {}),
   };
+}
+
+// --- Agent Aggregation ---
+
+/** Input for building per-agent breakdowns from swarm session data */
+export interface AgentShotInput {
+  session_id: string;
+  agent_role: string;
+  shots: ShotRecord[];
+}
+
+/**
+ * Build AgentBreakdown entries from per-agent shot data.
+ * Each agent's score and stats are computed independently.
+ */
+export function buildAgentBreakdowns(agents: AgentShotInput[]): AgentBreakdown[] {
+  return agents.map((agent) => {
+    const stats = computeStatsFromShots(agent.shots);
+    return {
+      session_id: agent.session_id,
+      agent_role: agent.agent_role,
+      shots: agent.shots,
+      score: agent.shots.length,
+      stats,
+    };
+  });
 }

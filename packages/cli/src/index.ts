@@ -95,7 +95,10 @@ switch (subcommand) {
     tournamentCommand(process.argv.slice(3));
     break;
   case 'auto-card':
-    autoCardCommand(process.argv.slice(3));
+    autoCardCommand(process.argv.slice(3)).catch(err => {
+      console.error('Error:', err.message);
+      process.exit(1);
+    });
     break;
   case 'hook':
     hookCommand(process.argv.slice(3)).catch(err => {
