@@ -68,7 +68,7 @@ Or per-command: `slope review --metaphor=tennis`
 |---------|-------------|
 | [`@slope-dev/core`](packages/core) | Core engine — scoring, handicap, metaphors, reports, guards, roadmap, events |
 | [`@slope-dev/store-sqlite`](packages/store-sqlite) | SQLite storage adapter — sessions, claims, events, scorecards |
-| [`@slope-dev/cli`](packages/cli) | CLI tool — 20+ commands for the full sprint lifecycle |
+| [`@slope-dev/cli`](packages/cli) | CLI tool — 22 commands for the full sprint lifecycle |
 | [`@slope-dev/mcp-tools`](packages/mcp-tools) | Code-mode MCP server — `search` + `execute` + session/claim tools |
 
 ## CLI Commands
