@@ -20,6 +20,8 @@ Sprint plans and backlog items for the SLOPE framework (core, CLI, MCP tools).
 | 14 | — | The Foursome — Multi-Agent Primitives |
 | 15 | — | The Leaderboard — Team Scoring + Integration |
 | 16 | — | The 19th Hole — Vision Refresh + Phase 4 Roadmap |
+| 17 | — | The Pro Shop — Plugin System |
+| 18 | — | PR Signals — Review Metadata Integration |
 
 ## Roadmaps
 

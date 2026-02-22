@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SLOPE PR Signal Plugin Contract",
+  "description": "Schema for PR signal plugins. Implement this contract to add PR metadata from platforms beyond GitHub (e.g., GitLab, Bitbucket).",
+  "type": "object",
+  "required": ["platform", "pr_number", "review_cycles", "change_request_count", "ci_checks_passed", "ci_checks_failed", "file_count", "additions", "deletions", "comment_count", "review_decision"],
+  "properties": {
+    "platform": {
+      "type": "string",
+      "enum": ["github", "gitlab", "bitbucket", "unknown"],
+      "description": "Source platform identifier"
+    },
+    "pr_number": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "PR/MR number on the platform"
+    },
+    "review_cycles": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of review submissions (each reviewer submission counts as one cycle)"
+    },
+    "change_request_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of reviews with CHANGES_REQUESTED state"
+    },
+    "time_to_merge_minutes": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "description": "Minutes from PR creation to merge. Null if not yet merged."
+    },
+    "ci_checks_passed": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of CI/status checks that passed"
+    },
+    "ci_checks_failed": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of CI/status checks that failed"
+    },
+    "file_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of files changed in the PR"
+    },
+    "additions": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Lines added"
+    },
+    "deletions": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Lines removed"
+    },
+    "comment_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total number of comments on the PR"
+    },
+    "review_decision": {
+      "type": "string",
+      "enum": ["APPROVED", "CHANGES_REQUESTED", "REVIEW_REQUIRED", "COMMENTED", "NONE"],
+      "description": "Final review decision state"
+    }
+  },
+  "examples": [
+    {
+      "platform": "gitlab",
+      "pr_number": 123,
+      "review_cycles": 2,
+      "change_request_count": 1,
+      "time_to_merge_minutes": 180,
+      "ci_checks_passed": 5,
+      "ci_checks_failed": 0,
+      "file_count": 8,
+      "additions": 200,
+      "deletions": 50,
+      "comment_count": 3,
+      "review_decision": "APPROVED"
+    }
+  ]
+}

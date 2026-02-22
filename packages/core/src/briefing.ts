@@ -5,6 +5,7 @@ import type {
   NutritionEntry,
   SprintClaim,
   SlopeEvent,
+  PRSignal,
 } from './types.js';
 import type { MetaphorDefinition } from './metaphor.js';
 import type { RoleDefinition } from './roles.js';
@@ -234,8 +235,9 @@ export function formatBriefing(opts: {
   role?: RoleDefinition;
   recentEvents?: SlopeEvent[];
   eventRecencyWindow?: number;
+  prSignal?: PRSignal;
 }): string {
-  const { scorecards, commonIssues, lastSession, filter, includeTraining = true, claims, roadmap, currentSprint, metaphor: m, role, recentEvents, eventRecencyWindow = 5 } = opts;
+  const { scorecards, commonIssues, lastSession, filter, includeTraining = true, claims, roadmap, currentSprint, metaphor: m, role, recentEvents, eventRecencyWindow = 5, prSignal } = opts;
   const lines: string[] = [];
 
   // Merge role's briefingFilter with explicit filter (explicit filter takes precedence)
@@ -354,6 +356,23 @@ export function formatBriefing(opts: {
         const icon = c.severity === 'overlap' ? '[!!]' : '[~]';
         lines.push(`    ${icon} ${c.reason}`);
       }
+    }
+  }
+
+  // Section 2.6: PR context (when available)
+  if (prSignal) {
+    lines.push('');
+    lines.push('\u2500'.repeat(50));
+    lines.push('PR CONTEXT');
+    lines.push(`  PR: #${prSignal.pr_number} (${prSignal.platform})`);
+    lines.push(`  Review: ${prSignal.review_decision} — ${prSignal.review_cycles} cycle(s), ${prSignal.change_request_count} change request(s)`);
+    lines.push(`  Files: ${prSignal.file_count} (+${prSignal.additions} / -${prSignal.deletions})`);
+    lines.push(`  CI checks: ${prSignal.ci_checks_passed} passed, ${prSignal.ci_checks_failed} failed`);
+    lines.push(`  Comments: ${prSignal.comment_count}${prSignal.file_count > 0 ? ` (${(prSignal.comment_count / prSignal.file_count).toFixed(1)}/file)` : ''}`);
+    if (prSignal.time_to_merge_minutes !== null) {
+      const hours = Math.floor(prSignal.time_to_merge_minutes / 60);
+      const mins = prSignal.time_to_merge_minutes % 60;
+      lines.push(`  Time to merge: ${hours > 0 ? `${hours}h ` : ''}${mins}m`);
     }
   }
 

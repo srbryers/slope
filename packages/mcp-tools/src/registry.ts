@@ -347,6 +347,36 @@ export const SLOPE_REGISTRY: FunctionRegistryEntry[] = [
     example: 'return analyzeRoleCombinations(loadScorecards());',
   },
 
+  // ─── PR Signals ───
+  {
+    name: 'parsePRJson',
+    module: 'core',
+    description: 'Parses raw `gh pr view --json` output into a structured PRSignal object.',
+    signature: 'parsePRJson(json: Record<string, unknown>): PRSignal',
+    example: 'const raw = JSON.parse(readFile("pr-data.json")); return parsePRJson(raw);',
+  },
+  {
+    name: 'buildGhCommand',
+    module: 'core',
+    description: 'Builds the `gh pr view --json` CLI command string for a given PR number.',
+    signature: 'buildGhCommand(prNumber: number): string',
+    example: 'return buildGhCommand(42); // → "gh pr view 42 --json number,additions,..."',
+  },
+  {
+    name: 'mergePRChecksWithCI',
+    module: 'core',
+    description: 'Merges PR check data with an existing CISignal. Derives CISignal from PR when no CI exists; detects retry scenarios.',
+    signature: 'mergePRChecksWithCI(prSignal: PRSignal, existingCI?: CISignal): CISignal',
+    example: 'const prSignal = parsePRJson(json); return mergePRChecksWithCI(prSignal, ciSignal);',
+  },
+  {
+    name: 'emptyPRSignal',
+    module: 'core',
+    description: 'Returns a PRSignal with safe defaults for graceful degradation when PR data is unavailable.',
+    signature: 'emptyPRSignal(prNumber?: number): PRSignal',
+    example: 'return emptyPRSignal(42);',
+  },
+
   // ─── Plugins ───
   {
     name: 'discoverPlugins',
@@ -584,9 +614,15 @@ interface SwarmEfficiency { total_sprints: number; total_agents: number; avg_age
 interface RoleCombinationStats { roles: string[]; sprint_count: number; avg_score_vs_par: number; total_hazards: number; }
 interface TeamHandicapCard { overall: RollingStats; by_role: RoleHandicap[]; swarm_efficiency: SwarmEfficiency; role_combinations: RoleCombinationStats[]; }
 
+// ─── PR Signals ───
+type PRPlatform = 'github' | 'gitlab' | 'bitbucket' | 'unknown';
+type PRReviewDecision = 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | 'COMMENTED' | 'NONE';
+interface PRSignal { platform: PRPlatform; pr_number: number; review_cycles: number; change_request_count: number; time_to_merge_minutes: number | null; ci_checks_passed: number; ci_checks_failed: number; file_count: number; additions: number; deletions: number; comment_count: number; review_decision: PRReviewDecision; }
+
 // ─── Advisor ───
 interface ExecutionTrace { planned_scope_paths: string[]; modified_files: string[]; test_results: { suite: string; passed: boolean; first_run: boolean }[]; reverts: number; elapsed_minutes: number; hazards_encountered: HazardHit[]; }
 interface ShotClassification { result: ShotResult; miss_direction: MissDirection | null; confidence: number; reasoning: string; }
+interface CombinedSignals { trace: ExecutionTrace; ci?: CISignal; pr?: PRSignal; events?: SlopeEvent[]; }
 interface ClubRecommendation { club: ClubSelection; confidence: number; reasoning: string; provisional_suggestion?: string; }
 interface TrainingRecommendation { area: string; type: TrainingType; description: string; priority: 'high' | 'medium' | 'low'; instruction_adjustment?: string; }
 interface RecommendClubInput { ticketComplexity: 'trivial' | 'small' | 'medium' | 'large'; scorecards: GolfScorecard[]; slopeFactors?: string[]; }
