@@ -135,6 +135,15 @@ describe('generateDashboardHtml', () => {
     expect(html).toContain('id="sprint-detail"');
   });
 
+  it('sprint table rows have data-sprint attributes', () => {
+    const data = buildReportData(makeScorecards(3));
+    const html = generateDashboardHtml(data);
+
+    expect(html).toContain('data-sprint="1"');
+    expect(html).toContain('data-sprint="2"');
+    expect(html).toContain('data-sprint="3"');
+  });
+
   it('uses metaphor terms when provided', async () => {
     const { gaming } = await import('../src/metaphors/gaming.js');
     const data = buildReportData(makeScorecards(2));

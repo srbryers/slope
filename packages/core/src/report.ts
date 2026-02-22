@@ -386,7 +386,7 @@ export function renderSprintTable(trend: SprintTrendEntry[], metaphor?: Metaphor
   const rows = trend.map(t => {
     const diffStr = t.differential > 0 ? `+${t.differential}` : `${t.differential}`;
     const diffClass = t.differential > 0 ? 'over' : t.differential < 0 ? 'under' : 'even';
-    return `<tr>
+    return `<tr data-sprint="${t.sprintNumber}">
       <td>S${t.sprintNumber}</td>
       <td>${escapeHtml(t.theme)}</td>
       <td>${t.par}</td>
