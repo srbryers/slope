@@ -239,6 +239,8 @@ Examples:
   slope claim --target=S2-1 --force         Claim even if overlap conflict exists
   slope status --sprint=2                   Show all claims for sprint 2
   slope release --target=S2-1               Release your claim on S2-1
+  slope dashboard                           Start live dashboard on port 3000
+  slope dashboard --port=8080 --no-open     Custom port, no browser auto-open
 `);
     process.exit(subcommand ? 1 : 0);
 }
