@@ -5,12 +5,12 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
 ## Monorepo Structure
 - `packages/core` — scoring engine, types, config, metaphor engine, roles, standup protocol, CI signal parser, store interface, loader (v1.1.0)
 - `packages/store-sqlite` — SQLite storage adapter (v1.1.0)
-- `packages/cli` — CLI tool (init, card, validate, review, report, briefing, plan, session, standup, hook, guard, extract, distill)
+- `packages/cli` — CLI tool (init, card, validate, review, report, briefing, plan, session, standup, escalate, hook, guard, extract, distill)
 - `packages/mcp-tools` — code-mode MCP server (search + execute + session/claim tools)
 
 ## Commands
 - `pnpm -r build` — build all packages
-- `pnpm -r test` — run all tests (core: 559, store-sqlite: 36, cli: 124, mcp-tools: 36)
+- `pnpm -r test` — run all tests (core: 598, store-sqlite: 36, cli: 124, mcp-tools: 46)
 - `pnpm -r typecheck` — type check all packages
 
 ## MCP Tools

@@ -1,0 +1,114 @@
+{
+  "sprint_number": 15,
+  "theme": "The Leaderboard — Team-level Scoring, Escalation, and Integration Surface",
+  "par": 4,
+  "slope": 2,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-02-22",
+  "type": "feature",
+  "shots": [
+    {
+      "ticket_key": "S15-1",
+      "title": "Multi-agent scorecard aggregation",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "AgentBreakdown type + agents field on GolfScorecard. buildAgentBreakdowns() computes per-agent score/stats. auto-card gains --swarm flag. Backward compatible. 6 new tests."
+    },
+    {
+      "ticket_key": "S15-2",
+      "title": "Escalation rules",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "EscalationConfig with 3 triggers: blocker_timeout, claim_conflict, test_failure_cascade. detectEscalation() + buildEscalationEvent(). CLI slope escalate. Config under orchestration.escalation. 18 new tests."
+    },
+    {
+      "ticket_key": "S15-3",
+      "title": "Team handicap + swarm performance",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "computeTeamHandicap() with per-role handicap, swarm efficiency, role combination analysis. CLI slope card --swarm. 15 new tests. One test fix for card shots count mismatch."
+    },
+    {
+      "ticket_key": "S15-4",
+      "title": "Integration surface + MCP orchestration tests",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Complete MCP registry for all orchestration primitives: standup, escalation, team handicap, agent aggregation. Type definitions. 10 new MCP integration tests (registry + sandbox execution)."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "wind",
+      "description": "Flow state continued from S14 — session continuation with full context of swarm primitives",
+      "impact": "positive"
+    }
+  ],
+  "special_plays": [],
+  "training": [],
+  "nutrition": [
+    {
+      "category": "hydration",
+      "description": "Full build+test+typecheck after every ticket (804 tests at completion)",
+      "status": "healthy"
+    },
+    {
+      "category": "diet",
+      "description": "Commit-per-ticket discipline — 4 commits for 4 tickets, pushed after each",
+      "status": "healthy"
+    },
+    {
+      "category": "supplements",
+      "description": "49 new tests: 6 builder + 18 escalation + 15 team-handicap + 10 mcp-tools",
+      "status": "healthy"
+    },
+    {
+      "category": "recovery",
+      "description": "One test fix in S15-3 (card shots vs agent shots mismatch) — caught inline. 6th consecutive clean sprint.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Sixth consecutive par sprint. The leaderboard primitives landed cleanly — agent breakdown follows the same additive pattern (optional field, backward compatible). Escalation rules provide the missing safety net for swarm coordination.",
+    "advice_for_next_player": "AgentBreakdown is display-only — it enriches the scorecard but doesn't change scoring logic. auto-card --swarm maps commits to sessions via branch matching. SwarmEfficiency's efficiency_ratio uses card.shots.length (total), not sum of agent shots. Team handicap per-role 'handicap' field is average score, not differential like the main handicap.",
+    "what_surprised_you": "The test failure in S15-3 was subtle — the makeCard helper creates 4 default shots, but the agent only had 2 shots. The efficiency calculation uses card.shots.length, so 4/(4+2)=66.7%, not 2/(2+2)=50%. Fixed by aligning card shots with agent shots in the test.",
+    "excited_about_next": "SLOPE now has the complete orchestration stack: roles, communication (standup), coordination (claims + escalation), and performance tracking (team handicap). The MCP surface is fully documented — Caddystack has a clear integration path."
+  },
+  "bunker_locations": [],
+  "yardage_book_updates": [
+    "packages/core/src/types.ts: AgentBreakdown interface, agents field on GolfScorecard",
+    "packages/core/src/builder.ts: buildAgentBreakdowns(), AgentShotInput, agents passthrough in buildScorecard()",
+    "packages/core/src/escalation.ts: EscalationConfig, detectEscalation(), buildEscalationEvent(), 3 trigger types",
+    "packages/core/src/team-handicap.ts: computeTeamHandicap(), per-role handicap, swarm efficiency, role combinations",
+    "packages/core/src/config.ts: orchestration.escalation config field",
+    "packages/cli/src/commands/auto-card.ts: --swarm flag, buildSwarmAgents() maps commits to sessions",
+    "packages/cli/src/commands/card.ts: --swarm flag, showTeamHandicap()",
+    "packages/cli/src/commands/escalate.ts: slope escalate CLI (manual + auto-detect modes)",
+    "packages/mcp-tools/src/registry.ts: 12 new entries (standup, escalation, team-handicap, agent breakdown)"
+  ],
+  "course_management_notes": [
+    "4 tickets, 4 in_the_hole — zero misses, zero hazards (6th consecutive clean sprint)",
+    "Tests grew from 755 to 804 (+49 across core, mcp-tools)",
+    "3 new files: escalation.ts, team-handicap.ts, escalate.ts (CLI)",
+    "Cross-package changes: core types/builder/config/index, cli auto-card/card/index, mcp-tools registry/tests"
+  ]
+}
