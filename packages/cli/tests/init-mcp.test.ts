@@ -234,6 +234,32 @@ describe('init --opencode', () => {
     expect(content).toContain('Pre-Level');
     expect(content).toContain('Boss Fight');
   });
+
+  it('creates .opencode/plugins/slope-plugin.ts', async () => {
+    await initCommand(['--opencode']);
+
+    const pluginPath = join(tmpDir, '.opencode', 'plugins', 'slope-plugin.ts');
+    expect(existsSync(pluginPath)).toBe(true);
+
+    const content = readFileSync(pluginPath, 'utf8');
+    expect(content).toContain('SLOPE Plugin for OpenCode');
+    expect(content).toContain('session.created');
+    expect(content).toContain('session.idle');
+    expect(content).toContain('session.compacted');
+    expect(content).toContain('slope session start');
+    expect(content).toContain('slope briefing');
+  });
+
+  it('does not overwrite existing plugin', async () => {
+    const pluginsDir = join(tmpDir, '.opencode', 'plugins');
+    mkdirSync(pluginsDir, { recursive: true });
+    writeFileSync(join(pluginsDir, 'slope-plugin.ts'), '// custom plugin\n');
+
+    await initCommand(['--opencode']);
+
+    const content = readFileSync(join(pluginsDir, 'slope-plugin.ts'), 'utf8');
+    expect(content).toBe('// custom plugin\n');
+  });
 });
 
 describe('detectPlatforms', () => {

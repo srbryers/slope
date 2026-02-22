@@ -15,6 +15,7 @@ import {
   generateCursorReviewLoop,
   generateCursorrules,
   generateAgentsMd,
+  generateOpenCodePlugin,
   generateGenericChecklist,
 } from '../template-generator.js';
 
@@ -275,6 +276,17 @@ function installOpenCodeTemplates(cwd: string, metaphor: MetaphorDefinition): vo
   console.log('\n  OpenCode AGENTS.md installed.');
 }
 
+function installOpenCodePlugin(cwd: string): void {
+  const pluginsDir = join(cwd, '.opencode', 'plugins');
+  mkdirSync(pluginsDir, { recursive: true });
+
+  const pluginPath = join(pluginsDir, 'slope-plugin.ts');
+  if (!existsSync(pluginPath)) {
+    writeFileSync(pluginPath, generateOpenCodePlugin());
+    console.log(`  Created ${pluginPath}`);
+  }
+}
+
 function installOpenCodeMcpConfig(cwd: string): void {
   const mcpPath = join(cwd, 'opencode.json');
   let config: { $schema?: string; mcp?: Record<string, { type: string; command: string[]; enabled?: boolean }> } = {};
@@ -355,6 +367,7 @@ function installForProvider(cwd: string, provider: Provider, metaphor: MetaphorD
     case 'opencode':
       installOpenCodeTemplates(cwd, metaphor);
       installOpenCodeMcpConfig(cwd);
+      installOpenCodePlugin(cwd);
       break;
     case 'generic':
       installGenericTemplates(cwd, metaphor);
