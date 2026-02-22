@@ -7,7 +7,7 @@ import {
   hazardBriefing,
 } from '../src/briefing.js';
 import type { CommonIssuesFile, RecurringPattern } from '../src/briefing.js';
-import type { GolfScorecard, ShotRecord, HoleStats, SprintClaim } from '../src/types.js';
+import type { GolfScorecard, ShotRecord, HoleStats, SprintClaim, SlopeEvent } from '../src/types.js';
 import { golf, gaming } from '../src/metaphors/index.js';
 
 // --- Helpers ---
@@ -777,5 +777,174 @@ describe('formatBriefing — METAPHOR', () => {
       commonIssues: { recurring_patterns: [] },
     });
     expect(withMetaphor).toBe(withoutMetaphor);
+  });
+});
+
+// --- formatBriefing — RECENT EVENTS ---
+
+function makeEvent(type: SlopeEvent['type'], sprintNumber: number, data: Record<string, unknown> = {}): SlopeEvent {
+  return {
+    id: `evt-${Math.random().toString(36).slice(2)}`,
+    type,
+    timestamp: new Date().toISOString(),
+    data,
+    sprint_number: sprintNumber,
+  };
+}
+
+describe('formatBriefing — RECENT EVENTS', () => {
+  it('shows recent events section when events provided', () => {
+    const events = [
+      makeEvent('failure', 10, { error: 'build failed' }),
+      makeEvent('failure', 11, { error: 'test timeout' }),
+    ];
+    const output = formatBriefing({
+      scorecards: [],
+      commonIssues: makeIssues([]),
+      recentEvents: events,
+      currentSprint: 12,
+    });
+    expect(output).toContain('RECENT EVENTS');
+    expect(output).toContain('[failure] x2');
+    expect(output).toContain('build failed');
+  });
+
+  it('groups events by type', () => {
+    const events = [
+      makeEvent('failure', 10, { error: 'build failed' }),
+      makeEvent('dead_end', 10, { description: 'wrong approach' }),
+      makeEvent('failure', 11, { error: 'test timeout' }),
+    ];
+    const output = formatBriefing({
+      scorecards: [],
+      commonIssues: makeIssues([]),
+      recentEvents: events,
+      currentSprint: 12,
+    });
+    expect(output).toContain('[failure] x2');
+    expect(output).toContain('[dead_end] x1');
+  });
+
+  it('shows sprint numbers in event summary', () => {
+    const events = [
+      makeEvent('failure', 9, { error: 'err' }),
+      makeEvent('failure', 11, { error: 'err2' }),
+    ];
+    const output = formatBriefing({
+      scorecards: [],
+      commonIssues: makeIssues([]),
+      recentEvents: events,
+      currentSprint: 12,
+    });
+    expect(output).toContain('S9');
+    expect(output).toContain('S11');
+  });
+
+  it('filters out events outside recency window', () => {
+    const events = [
+      makeEvent('failure', 1, { error: 'ancient' }),
+      makeEvent('failure', 11, { error: 'recent' }),
+    ];
+    const output = formatBriefing({
+      scorecards: [],
+      commonIssues: makeIssues([]),
+      recentEvents: events,
+      currentSprint: 12,
+      eventRecencyWindow: 5,
+    });
+    expect(output).toContain('RECENT EVENTS');
+    expect(output).toContain('recent');
+    // Sprint 1 is outside window (12 - 5 = 7, so only > 7 included)
+    expect(output).not.toContain('ancient');
+  });
+
+  it('respects custom eventRecencyWindow', () => {
+    const events = [
+      makeEvent('failure', 8, { error: 'slightly old' }),
+      makeEvent('failure', 11, { error: 'recent' }),
+    ];
+    // Window of 2: only sprints > 10 included
+    const output = formatBriefing({
+      scorecards: [],
+      commonIssues: makeIssues([]),
+      recentEvents: events,
+      currentSprint: 12,
+      eventRecencyWindow: 2,
+    });
+    expect(output).toContain('recent');
+    expect(output).not.toContain('slightly old');
+  });
+
+  it('omits section when no events provided', () => {
+    const output = formatBriefing({
+      scorecards: [],
+      commonIssues: makeIssues([]),
+      currentSprint: 12,
+    });
+    expect(output).not.toContain('RECENT EVENTS');
+  });
+
+  it('omits section when events array is empty', () => {
+    const output = formatBriefing({
+      scorecards: [],
+      commonIssues: makeIssues([]),
+      recentEvents: [],
+      currentSprint: 12,
+    });
+    expect(output).not.toContain('RECENT EVENTS');
+  });
+
+  it('omits section when no currentSprint provided', () => {
+    const events = [makeEvent('failure', 10, { error: 'err' })];
+    const output = formatBriefing({
+      scorecards: [],
+      commonIssues: makeIssues([]),
+      recentEvents: events,
+    });
+    expect(output).not.toContain('RECENT EVENTS');
+  });
+
+  it('uses data.area as description fallback', () => {
+    const events = [makeEvent('hazard', 10, { area: 'packages/core' })];
+    const output = formatBriefing({
+      scorecards: [],
+      commonIssues: makeIssues([]),
+      recentEvents: events,
+      currentSprint: 12,
+    });
+    expect(output).toContain('packages/core');
+  });
+
+  it('places section between COURSE STATUS and NUTRITION ALERTS', () => {
+    const events = [makeEvent('failure', 10, { error: 'err' })];
+    const output = formatBriefing({
+      scorecards: [makeCard({
+        nutrition: [{ category: 'recovery', description: 'bad', status: 'neglected' }],
+      })],
+      commonIssues: makeIssues([]),
+      recentEvents: events,
+      currentSprint: 12,
+    });
+    const coursePos = output.indexOf('COURSE STATUS');
+    const eventsPos = output.indexOf('RECENT EVENTS');
+    const nutritionPos = output.indexOf('NUTRITION ALERTS');
+    expect(coursePos).toBeLessThan(eventsPos);
+    expect(eventsPos).toBeLessThan(nutritionPos);
+  });
+
+  it('backward compatible — no events does not change output', () => {
+    const baseOutput = formatBriefing({
+      scorecards: [makeCard()],
+      commonIssues: makeIssues([makePattern()]),
+    });
+    const withEmptyEvents = formatBriefing({
+      scorecards: [makeCard()],
+      commonIssues: makeIssues([makePattern()]),
+      recentEvents: [],
+      currentSprint: 12,
+    });
+    // Both should not contain RECENT EVENTS
+    expect(baseOutput).not.toContain('RECENT EVENTS');
+    expect(withEmptyEvents).not.toContain('RECENT EVENTS');
   });
 });

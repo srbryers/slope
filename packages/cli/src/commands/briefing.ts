@@ -1,7 +1,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { formatBriefing, parseRoadmap } from '@slope-dev/core';
-import type { CommonIssuesFile, SessionEntry, SprintClaim, RoadmapDefinition } from '@slope-dev/core';
+import type { CommonIssuesFile, SessionEntry, SprintClaim, RoadmapDefinition, SlopeEvent } from '@slope-dev/core';
 import { loadConfig } from '../config.js';
 import { loadScorecards } from '../loader.js';
 import { resolveStore } from '../store.js';
@@ -60,13 +60,20 @@ export async function briefingCommand(args: string[]): Promise<void> {
     sprintNumber = 1;
   }
 
-  // Load claims from store
+  // Load claims and events from store
   let claims: SprintClaim[] = [];
+  let recentEvents: SlopeEvent[] = [];
   try {
     const store = await resolveStore(cwd);
     claims = await store.list(sprintNumber);
+    // Load events from recent sprints (current + previous window)
+    const eventWindow = 5;
+    for (let s = Math.max(1, sprintNumber - eventWindow); s <= sprintNumber; s++) {
+      const sprintEvents = await store.getEventsBySprint(s);
+      recentEvents.push(...sprintEvents);
+    }
     store.close();
-  } catch { /* skip — claims are optional */ }
+  } catch { /* skip — claims/events are optional */ }
 
   // Load roadmap (graceful degradation)
   let roadmap: RoadmapDefinition | undefined;
@@ -85,7 +92,7 @@ export async function briefingCommand(args: string[]): Promise<void> {
     : undefined;
 
   const metaphor = resolveMetaphor(args, config.metaphor);
-  const output = formatBriefing({ scorecards, commonIssues, lastSession, filter, includeTraining, claims, roadmap, currentSprint: sprintNumber, metaphor });
+  const output = formatBriefing({ scorecards, commonIssues, lastSession, filter, includeTraining, claims, roadmap, currentSprint: sprintNumber, metaphor, recentEvents });
   console.log('');
   console.log(output);
 }

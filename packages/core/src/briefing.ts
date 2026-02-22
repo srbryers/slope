@@ -4,6 +4,7 @@ import type {
   NutritionCategory,
   NutritionEntry,
   SprintClaim,
+  SlopeEvent,
 } from './types.js';
 import type { MetaphorDefinition } from './metaphor.js';
 import { computeHandicapCard } from './handicap.js';
@@ -229,8 +230,10 @@ export function formatBriefing(opts: {
   roadmap?: RoadmapDefinition;
   currentSprint?: number;
   metaphor?: MetaphorDefinition;
+  recentEvents?: SlopeEvent[];
+  eventRecencyWindow?: number;
 }): string {
-  const { scorecards, commonIssues, lastSession, filter, includeTraining = true, claims, roadmap, currentSprint, metaphor: m } = opts;
+  const { scorecards, commonIssues, lastSession, filter, includeTraining = true, claims, roadmap, currentSprint, metaphor: m, recentEvents, eventRecencyWindow = 5 } = opts;
   const lines: string[] = [];
 
   // Section 1: Handicap snapshot
@@ -325,6 +328,36 @@ export function formatBriefing(opts: {
       for (const c of conflicts) {
         const icon = c.severity === 'overlap' ? '[!!]' : '[~]';
         lines.push(`    ${icon} ${c.reason}`);
+      }
+    }
+  }
+
+  // Section 2.75: Recent events from telemetry
+  if (recentEvents && recentEvents.length > 0 && currentSprint) {
+    const minSprint = currentSprint - eventRecencyWindow;
+    const relevant = recentEvents.filter(e =>
+      e.sprint_number != null && e.sprint_number > minSprint,
+    );
+
+    if (relevant.length > 0) {
+      // Group by type for compact display
+      const byType = new Map<string, SlopeEvent[]>();
+      for (const e of relevant) {
+        const list = byType.get(e.type) || [];
+        list.push(e);
+        byType.set(e.type, list);
+      }
+
+      lines.push('');
+      lines.push('\u2500'.repeat(50));
+      lines.push(`RECENT EVENTS (last ${eventRecencyWindow} sprints)`);
+      for (const [type, events] of byType) {
+        const sprints = [...new Set(events.map(e => e.sprint_number))].sort((a, b) => (a ?? 0) - (b ?? 0));
+        const sprintList = sprints.map(s => `S${s}`).join(', ');
+        const sample = events[0];
+        const desc = (sample.data.error as string) ?? (sample.data.description as string) ?? (sample.data.area as string) ?? '';
+        const descSuffix = desc ? ` — ${desc.slice(0, 80)}${desc.length > 80 ? '...' : ''}` : '';
+        lines.push(`  [${type}] x${events.length} (${sprintList})${descSuffix}`);
       }
     }
   }
