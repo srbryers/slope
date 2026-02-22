@@ -1,7 +1,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { formatBriefing, parseRoadmap } from '@slope-dev/core';
-import type { CommonIssuesFile, SessionEntry, SprintClaim, RoadmapDefinition, SlopeEvent } from '@slope-dev/core';
+import { formatBriefing, parseRoadmap, getRole, hasRole, loadCustomRoles } from '@slope-dev/core';
+import type { CommonIssuesFile, SessionEntry, SprintClaim, RoadmapDefinition, SlopeEvent, RoleDefinition } from '@slope-dev/core';
 import { loadConfig } from '../config.js';
 import { loadScorecards } from '../loader.js';
 import { resolveStore } from '../store.js';
@@ -35,6 +35,7 @@ export async function briefingCommand(args: string[]): Promise<void> {
   const keywords: string[] = [];
   let includeTraining = true;
   let sprintFlag: number | undefined;
+  let roleFlag: string | undefined;
   for (const arg of args) {
     if (arg.startsWith('--categories=')) {
       categories.push(...arg.slice('--categories='.length).split(',').map(s => s.trim()).filter(Boolean));
@@ -42,8 +43,22 @@ export async function briefingCommand(args: string[]): Promise<void> {
       keywords.push(...arg.slice('--keywords='.length).split(',').map(s => s.trim()).filter(Boolean));
     } else if (arg.startsWith('--sprint=')) {
       sprintFlag = parseInt(arg.slice('--sprint='.length), 10);
+    } else if (arg.startsWith('--role=')) {
+      roleFlag = arg.slice('--role='.length).trim();
     } else if (arg === '--no-training') {
       includeTraining = false;
+    }
+  }
+
+  // Resolve role
+  let role: RoleDefinition | undefined;
+  if (roleFlag) {
+    loadCustomRoles(cwd);
+    if (hasRole(roleFlag)) {
+      role = getRole(roleFlag);
+    } else {
+      console.error(`Unknown role: "${roleFlag}". Available roles: generalist, backend, frontend, architect, devops`);
+      process.exit(1);
     }
   }
 
@@ -92,7 +107,7 @@ export async function briefingCommand(args: string[]): Promise<void> {
     : undefined;
 
   const metaphor = resolveMetaphor(args, config.metaphor);
-  const output = formatBriefing({ scorecards, commonIssues, lastSession, filter, includeTraining, claims, roadmap, currentSprint: sprintNumber, metaphor, recentEvents });
+  const output = formatBriefing({ scorecards, commonIssues, lastSession, filter, includeTraining, claims, roadmap, currentSprint: sprintNumber, metaphor, role, recentEvents });
   console.log('');
   console.log(output);
 }

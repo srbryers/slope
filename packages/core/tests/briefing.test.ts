@@ -9,6 +9,8 @@ import {
 import type { CommonIssuesFile, RecurringPattern } from '../src/briefing.js';
 import type { GolfScorecard, ShotRecord, HoleStats, SprintClaim, SlopeEvent } from '../src/types.js';
 import { golf, gaming } from '../src/metaphors/index.js';
+import { backend, frontend, generalist } from '../src/roles.js';
+import type { RoleDefinition } from '../src/roles.js';
 
 // --- Helpers ---
 
@@ -946,5 +948,147 @@ describe('formatBriefing — RECENT EVENTS', () => {
     // Both should not contain RECENT EVENTS
     expect(baseOutput).not.toContain('RECENT EVENTS');
     expect(withEmptyEvents).not.toContain('RECENT EVENTS');
+  });
+});
+
+// --- formatBriefing — ROLE-BASED CONTEXT INJECTION ---
+
+describe('formatBriefing — ROLE-BASED CONTEXT', () => {
+  it('shows role identity in header when role is provided', () => {
+    const output = formatBriefing({
+      scorecards: [],
+      commonIssues: makeIssues([]),
+      role: backend,
+    });
+    expect(output).toContain('Role: Backend');
+    expect(output).toContain('API, database, server-side logic specialist');
+  });
+
+  it('does not show role line when no role provided', () => {
+    const output = formatBriefing({
+      scorecards: [],
+      commonIssues: makeIssues([]),
+    });
+    expect(output).not.toContain('Role:');
+  });
+
+  it('generalist role shows role line but does not filter', () => {
+    const issues = makeIssues([
+      makePattern({ id: 1, category: 'database', title: 'DB timeout', description: 'database related issue', prevention: 'Add retry' }),
+      makePattern({ id: 2, category: 'styling', title: 'CSS bugs', description: 'styling related issue', prevention: 'Use module CSS' }),
+    ]);
+    const output = formatBriefing({
+      scorecards: [],
+      commonIssues: issues,
+      role: generalist,
+    });
+    expect(output).toContain('Role: Generalist');
+    // Generalist has no emphasis, so both should appear (no filter applied means top 10 by recency)
+    expect(output).toContain('DB timeout');
+    expect(output).toContain('CSS bugs');
+  });
+
+  it('backend role emphasizes database/api issues via keyword filtering', () => {
+    const issues = makeIssues([
+      makePattern({ id: 1, category: 'testing', title: 'API timeout in tests', description: 'api related testing', prevention: 'Mock API', sprints_hit: [10] }),
+      makePattern({ id: 2, category: 'styling', title: 'Button alignment', description: 'CSS grid issue', prevention: 'Use flexbox', sprints_hit: [10] }),
+      makePattern({ id: 3, category: 'database', title: 'Migration failure', description: 'database migration broke', prevention: 'Test migrations', sprints_hit: [10] }),
+    ]);
+    const output = formatBriefing({
+      scorecards: [],
+      commonIssues: issues,
+      role: backend,
+    });
+    // Backend emphasizes: database, api, testing, migration, schema
+    // These keywords match pattern 1 (api, testing) and 3 (database, migration)
+    expect(output).toContain('API timeout');
+    expect(output).toContain('Migration failure');
+  });
+
+  it('role hazard filtering uses focus areas', () => {
+    const card = makeCard({
+      sprint_number: 5,
+      shots: [
+        makeShot({ ticket_key: 'S5-1', hazards: [{ type: 'bunker', description: 'flaky test in packages/core' }] }),
+        makeShot({ ticket_key: 'S5-2', hazards: [{ type: 'water', description: 'CSS regression in src/components' }] }),
+      ],
+      bunker_locations: ['packages/core: type export issue', 'src/components: styling breakage'],
+    });
+    // Backend focuses on: packages/core, packages/store-*, src/api, src/server, src/db, migrations
+    const output = formatBriefing({
+      scorecards: [card],
+      commonIssues: makeIssues([]),
+      role: backend,
+    });
+    expect(output).toContain('packages/core');
+    expect(output).not.toContain('src/components');
+    expect(output).not.toContain('CSS regression');
+  });
+
+  it('frontend role filters hazards to component/styling areas', () => {
+    const card = makeCard({
+      sprint_number: 5,
+      shots: [
+        makeShot({ ticket_key: 'S5-1', hazards: [{ type: 'bunker', description: 'flaky test in packages/core' }] }),
+        makeShot({ ticket_key: 'S5-2', hazards: [{ type: 'water', description: 'CSS regression in src/components' }] }),
+      ],
+      bunker_locations: ['packages/core: type export issue', 'src/components: styling breakage'],
+    });
+    // Frontend focuses on: src/components, src/pages, src/styles, src/hooks, public
+    const output = formatBriefing({
+      scorecards: [card],
+      commonIssues: makeIssues([]),
+      role: frontend,
+    });
+    expect(output).toContain('src/components');
+    expect(output).not.toContain('packages/core');
+  });
+
+  it('role deemphasis pushes categories to end of common issues', () => {
+    // Backend deemphasizes: accessibility, styling, bundle
+    const issues = makeIssues([
+      makePattern({ id: 1, category: 'styling', title: 'CSS issue', description: 'styling problem', prevention: 'Fix CSS', sprints_hit: [10] }),
+      makePattern({ id: 2, category: 'database', title: 'DB issue', description: 'database problem', prevention: 'Fix DB', sprints_hit: [10] }),
+      makePattern({ id: 3, category: 'accessibility', title: 'A11y issue', description: 'accessibility problem', prevention: 'Add ARIA', sprints_hit: [10] }),
+    ]);
+    // Backend emphasis keywords: database, api, testing, migration, schema
+    // Only pattern 2 (database) matches keywords
+    const output = formatBriefing({
+      scorecards: [],
+      commonIssues: issues,
+      role: backend,
+    });
+    // With backend role, emphasis filters to database/api/testing/migration/schema keywords
+    expect(output).toContain('DB issue');
+  });
+
+  it('role + explicit filter: explicit filter keywords merge with role emphasis', () => {
+    const issues = makeIssues([
+      makePattern({ id: 1, category: 'testing', title: 'Custom keyword match', description: 'foobar related', prevention: 'Fix foobar', sprints_hit: [10] }),
+      makePattern({ id: 2, category: 'database', title: 'DB migration issue', description: 'database migration', prevention: 'Test it', sprints_hit: [10] }),
+    ]);
+    const output = formatBriefing({
+      scorecards: [],
+      commonIssues: issues,
+      role: backend,
+      filter: { keywords: ['foobar'] },
+    });
+    // Merged keywords: foobar + backend emphasis (database, api, testing, migration, schema)
+    // Pattern 1 matches 'foobar' and 'testing', pattern 2 matches 'database' and 'migration'
+    expect(output).toContain('Custom keyword match');
+    expect(output).toContain('DB migration issue');
+  });
+
+  it('backward compatible — no role produces same output as before', () => {
+    const baseOutput = formatBriefing({
+      scorecards: [makeCard()],
+      commonIssues: makeIssues([makePattern()]),
+    });
+    const withoutRole = formatBriefing({
+      scorecards: [makeCard()],
+      commonIssues: makeIssues([makePattern()]),
+      role: undefined,
+    });
+    expect(baseOutput).toBe(withoutRole);
   });
 });

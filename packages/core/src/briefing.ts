@@ -7,6 +7,7 @@ import type {
   SlopeEvent,
 } from './types.js';
 import type { MetaphorDefinition } from './metaphor.js';
+import type { RoleDefinition } from './roles.js';
 import { computeHandicapCard } from './handicap.js';
 import { computeDispersion } from './dispersion.js';
 import { generateTrainingPlan } from './advisor.js';
@@ -230,15 +231,22 @@ export function formatBriefing(opts: {
   roadmap?: RoadmapDefinition;
   currentSprint?: number;
   metaphor?: MetaphorDefinition;
+  role?: RoleDefinition;
   recentEvents?: SlopeEvent[];
   eventRecencyWindow?: number;
 }): string {
-  const { scorecards, commonIssues, lastSession, filter, includeTraining = true, claims, roadmap, currentSprint, metaphor: m, recentEvents, eventRecencyWindow = 5 } = opts;
+  const { scorecards, commonIssues, lastSession, filter, includeTraining = true, claims, roadmap, currentSprint, metaphor: m, role, recentEvents, eventRecencyWindow = 5 } = opts;
   const lines: string[] = [];
+
+  // Merge role's briefingFilter with explicit filter (explicit filter takes precedence)
+  const effectiveFilter = mergeRoleFilter(filter, role);
 
   // Section 1: Handicap snapshot
   const briefingTitle = m ? m.vocabulary.briefing.toUpperCase() : 'PRE-ROUND BRIEFING';
   lines.push(briefingTitle);
+  if (role) {
+    lines.push(`Role: ${role.name} — ${role.description}`);
+  }
   lines.push('\u2550'.repeat(50));
 
   if (scorecards.length > 0) {
@@ -288,8 +296,25 @@ export function formatBriefing(opts: {
   lines.push('HAZARDS');
 
   const hazards = extractHazardIndex(scorecards, filter?.keywords?.[0]);
-  if (hazards.bunker_locations.length > 0) {
-    for (const b of hazards.bunker_locations) {
+  let filteredBunkers = hazards.bunker_locations;
+  let filteredShotHazards = hazards.shot_hazards;
+
+  // Role-based focus area filtering: show only hazards relevant to the role's focus
+  if (role && role.focusAreas.length > 0) {
+    const focusLow = role.focusAreas.map(a => a.replace(/\*/g, '').replace(/\/$/, '').toLowerCase());
+    filteredBunkers = filteredBunkers.filter(b =>
+      focusLow.some(f => b.location.toLowerCase().includes(f)),
+    );
+    filteredShotHazards = filteredShotHazards.filter(h =>
+      focusLow.some(f => h.description.toLowerCase().includes(f) || h.ticket.toLowerCase().includes(f)),
+    );
+  }
+
+  if (filteredBunkers.length > 0 || filteredShotHazards.length > 0) {
+    for (const h of filteredShotHazards) {
+      lines.push(`  [S${h.sprint}] ${h.type}: ${h.description}`);
+    }
+    for (const b of filteredBunkers) {
       lines.push(`  [S${b.sprint}] ${b.location}`);
     }
   } else {
@@ -377,10 +402,19 @@ export function formatBriefing(opts: {
     }
   }
 
-  // Section 4: Relevant common issues
-  const filtered = filter
-    ? filterCommonIssues(commonIssues, filter)
+  // Section 4: Relevant common issues (role emphasis applied)
+  let filtered = effectiveFilter
+    ? filterCommonIssues(commonIssues, effectiveFilter)
     : filterCommonIssues(commonIssues, {}); // Return top 10 by recency if no filter
+
+  // Role deemphasis: push deemphasized categories to the end
+  if (role && role.briefingFilter.deemphasize.length > 0) {
+    const deempSet = new Set(role.briefingFilter.deemphasize.map(d => d.toLowerCase()));
+    filtered = [
+      ...filtered.filter(p => !deempSet.has(p.category.toLowerCase())),
+      ...filtered.filter(p => deempSet.has(p.category.toLowerCase())),
+    ];
+  }
 
   if (filtered.length > 0) {
     lines.push('');
@@ -428,4 +462,34 @@ export function formatBriefing(opts: {
 
   lines.push('');
   return lines.join('\n');
+}
+
+/**
+ * Merge a role's briefingFilter with an explicit filter.
+ * Role emphasis keywords are added to the filter's keywords list,
+ * enabling role-aware filtering without losing explicit user filters.
+ * Explicit filter categories/keywords take precedence — role adds to them.
+ */
+function mergeRoleFilter(
+  filter: BriefingFilter | undefined,
+  role: RoleDefinition | undefined,
+): BriefingFilter | undefined {
+  if (!role || role.briefingFilter.emphasize.length === 0) {
+    return filter;
+  }
+
+  const roleKeywords = role.briefingFilter.emphasize;
+  if (!filter) {
+    return { keywords: roleKeywords };
+  }
+
+  // Merge: explicit keywords + role emphasis keywords
+  const merged: BriefingFilter = { ...filter };
+  if (merged.keywords && merged.keywords.length > 0) {
+    // User already specified keywords — keep them, add role keywords
+    merged.keywords = [...merged.keywords, ...roleKeywords];
+  } else {
+    merged.keywords = roleKeywords;
+  }
+  return merged;
 }
