@@ -3,14 +3,14 @@
 Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint scoring.
 
 ## Monorepo Structure
-- `packages/core` — scoring engine, types, config, metaphor engine, store interface, loader (v1.0.0)
+- `packages/core` — scoring engine, types, config, metaphor engine, CI signal parser, store interface, loader (v1.0.0)
 - `packages/store-sqlite` — SQLite storage adapter (v1.0.0)
 - `packages/cli` — CLI tool (init, card, validate, review, briefing, plan, session, hook)
 - `packages/mcp-tools` — code-mode MCP server (search + execute + session/claim tools)
 
 ## Commands
 - `pnpm -r build` — build all packages
-- `pnpm -r test` — run all tests (core: 411, store-sqlite: 22, cli: 47, mcp-tools: 36)
+- `pnpm -r test` — run all tests (core: 443, store-sqlite: 31, cli: 85, mcp-tools: 36)
 - `pnpm -r typecheck` — type check all packages
 
 ## MCP Tools
@@ -43,7 +43,7 @@ SLOPE uses a pluggable metaphor engine for display output. Internal types remain
 
 ## Key Files
 - `.slope/config.json` — SLOPE configuration (includes `metaphor` field)
-- `.slope/slope.db` — SQLite store (sessions, claims, scorecards, common issues)
+- `.slope/slope.db` — SQLite store (sessions, claims, scorecards, common issues, events)
 - `.slope/common-issues.json` — recurring patterns and gotchas (legacy, migrating to store)
 - `.slope/hooks.json` — installed hook registry
 - `docs/backlog/README.md` — sprint plan index

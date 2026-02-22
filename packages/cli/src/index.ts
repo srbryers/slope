@@ -130,7 +130,7 @@ Usage:
   slope release --target=<t> [--player=<p>] Release a claim by target
   slope status [--sprint=N]                 Show sprint course status + conflicts
   slope tournament --id=<id> --sprints=N..M Build tournament review from sprints
-  slope auto-card --sprint=<N> [options]    Generate scorecard from git commits
+  slope auto-card --sprint=<N> [options]    Generate scorecard from git + CI signals
   slope hook add|remove|list|show            Manage lifecycle hooks
   slope session start|end|heartbeat|list    Manage live sessions
   slope next                                Show next sprint number (auto-detect)
