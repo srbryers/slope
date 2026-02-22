@@ -1,4 +1,6 @@
-# SLOPE Roadmap — Full Framework
+# SLOPE Roadmap — Phases 1-3 (Complete)
+
+> **Status: Complete.** All 9 sprints (S7-S15) have been implemented. See [roadmap-phase4.md](roadmap-phase4.md) for the next phase (S17-S20).
 
 **Phase 1 (S7-S10):** Course strategy tooling + metaphor engine + platform reach + improved auto-scoring
 **Phase 2 (S11-S13):** Session telemetry + agent guidance + HTML reports + launch polish
