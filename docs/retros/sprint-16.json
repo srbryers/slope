@@ -1,0 +1,109 @@
+{
+  "sprint_number": 16,
+  "theme": "The 19th Hole — Vision Refresh + Phase 4 Roadmap",
+  "par": 4,
+  "slope": 1,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-02-22",
+  "shots": [
+    {
+      "ticket_key": "S16-1",
+      "title": "Vision doc content refresh",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Fixed all stale content in docs/vision.md: removed 'Planned' labels from shipped features (Metaphors, HTML Reports), updated signal source markers, fixed package descriptions, updated architecture diagram (22 commands, events table, orchestration tools, guard hooks), moved S7-S15 from Next to Shipped, added Phase 4 as Next, updated Later and Open Questions."
+    },
+    {
+      "ticket_key": "S16-2",
+      "title": "Architecture diagram + CLI reference",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added CLI reference section to vision.md grouping all 22 commands into 7 categories: Scoring, Session, Reporting, Planning, Orchestration, Setup, Analysis. Architecture diagram was expanded in S16-1 with orchestration tools layer, guard hooks, and updated scoring engine capabilities."
+    },
+    {
+      "ticket_key": "S16-3",
+      "title": "Phase 4 roadmap (S17-S20)",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Created docs/backlog/roadmap-phase4.md with 4 sprints (S17: Plugin System, S18: PR Signals, S19: Dashboard, S20: Multi-Developer). Each sprint has 4 tickets with club selection, design decisions, risk assessment, and execution order. Marked roadmap.md (S7-S15) as complete with link to Phase 4."
+    },
+    {
+      "ticket_key": "S16-4",
+      "title": "Backlog index + consistency pass",
+      "club": "putter",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Updated docs/backlog/README.md with sprint entries S6-S16 (was only S3-S5), added roadmap table linking Phase 1-3 and Phase 4. Fixed README.md '20+ commands' to '22 commands'. Consistency pass verified zero stale Planned labels, correct command counts, sprint number agreement across all docs."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "type": "docs",
+  "conditions": [
+    {
+      "type": "wind",
+      "description": "Docs-only sprint — no build/test needed, fast iteration",
+      "impact": "positive"
+    }
+  ],
+  "special_plays": [],
+  "nutrition": [
+    {
+      "category": "hydration",
+      "description": "No code changes — no build/test/typecheck needed for docs sprint",
+      "status": "healthy"
+    },
+    {
+      "category": "diet",
+      "description": "Commit-per-ticket discipline — 4 commits for 4 tickets, pushed after each",
+      "status": "healthy"
+    },
+    {
+      "category": "supplements",
+      "description": "Comprehensive consistency pass: grepped for stale labels, verified cross-doc agreement",
+      "status": "healthy"
+    },
+    {
+      "category": "recovery",
+      "description": "Zero code changes means zero regression risk. Vision doc brought up to date after 15 sprints of drift.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Clean and satisfying. The vision doc had accumulated significant drift over 15 sprints — 'Planned' labels on shipped features, '15 commands' when there are 22, S7-S15 described as future work. Everything is now aligned with reality.",
+    "advice_for_next_player": "The Phase 4 roadmap (S17-S20) covers all three 'Later' items from the vision doc: plugin system, local dashboard, shared hazard indices. S17 (plugins) is the critical foundation — start there. PR signals (S18) depend on plugin architecture for extensibility. The 'docs-only' sprint pattern works well for catching up documentation after intensive implementation phases.",
+    "what_surprised_you": "The scope of drift was larger than expected. The architecture diagram, package descriptions, signal source markers, roadmap section, open questions, and CLI counts were all stale. Systematic section-by-section editing was the right approach — trying to do it in one pass would have missed things.",
+    "excited_about_next": "Phase 4 is well-scoped: plugins (S17), PR signals (S18), dashboard (S19), multi-developer (S20). The plugin system will unlock community contributions. The dashboard will make SLOPE's data actionable for non-CLI users."
+  },
+  "bunker_locations": [],
+  "yardage_book_updates": [
+    "docs/vision.md: Full content refresh — headers, signal markers, package descriptions, architecture diagram, roadmap section, open questions, CLI reference",
+    "docs/backlog/roadmap-phase4.md: New file — Phase 4 roadmap (S17-S20) with 16 tickets",
+    "docs/backlog/roadmap.md: Marked as complete, linked to Phase 4",
+    "docs/backlog/README.md: Backfilled S6-S16, added roadmap table",
+    "README.md: Fixed CLI command count"
+  ],
+  "course_management_notes": [
+    "4 tickets, 4 in_the_hole — docs-only sprint, zero code risk",
+    "5 files modified: vision.md, roadmap-phase4.md (new), roadmap.md, backlog/README.md, README.md",
+    "Phase 4 roadmap covers all 3 'Later' items from vision doc",
+    "7th consecutive clean sprint"
+  ]
+}
