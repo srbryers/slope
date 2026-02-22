@@ -158,6 +158,50 @@ export const SLOPE_REGISTRY: FunctionRegistryEntry[] = [
     example: 'return formatBriefing({ scorecards: loadScorecards(), commonIssues: loadCommonIssues() });',
   },
 
+  // ─── Roadmap ───
+  {
+    name: 'validateRoadmap',
+    module: 'core',
+    description: 'Validates a roadmap definition for structural correctness (cycles, numbering, ticket counts).',
+    signature: 'validateRoadmap(roadmap: RoadmapDefinition): RoadmapValidationResult',
+    example: 'const roadmap = JSON.parse(readFile("docs/backlog/roadmap.json")); return validateRoadmap(roadmap);',
+  },
+  {
+    name: 'computeCriticalPath',
+    module: 'core',
+    description: 'Computes the critical path (longest dependency chain) through the roadmap.',
+    signature: 'computeCriticalPath(roadmap: RoadmapDefinition): CriticalPathResult',
+    example: 'const roadmap = loadRoadmap(); return computeCriticalPath(roadmap);',
+  },
+  {
+    name: 'findParallelOpportunities',
+    module: 'core',
+    description: 'Finds sprints that can run in parallel (no mutual dependencies).',
+    signature: 'findParallelOpportunities(roadmap: RoadmapDefinition): ParallelGroup[]',
+    example: 'const roadmap = loadRoadmap(); return findParallelOpportunities(roadmap);',
+  },
+  {
+    name: 'parseRoadmap',
+    module: 'core',
+    description: 'Parses and validates a roadmap from a JSON object.',
+    signature: 'parseRoadmap(json: unknown): { roadmap: RoadmapDefinition | null; validation: RoadmapValidationResult }',
+    example: 'return parseRoadmap(JSON.parse(readFile("docs/backlog/roadmap.json")));',
+  },
+  {
+    name: 'formatRoadmapSummary',
+    module: 'core',
+    description: 'Formats a roadmap summary as markdown (phases, critical path, parallel opportunities).',
+    signature: 'formatRoadmapSummary(roadmap: RoadmapDefinition): string',
+    example: 'const roadmap = loadRoadmap(); return formatRoadmapSummary(roadmap);',
+  },
+  {
+    name: 'formatStrategicContext',
+    module: 'core',
+    description: 'Formats concise strategic context for a sprint (3-5 lines for briefings).',
+    signature: 'formatStrategicContext(roadmap: RoadmapDefinition, currentSprint: number): string | null',
+    example: 'const roadmap = loadRoadmap(); return formatStrategicContext(roadmap, 8);',
+  },
+
   // ─── Registry ───
   {
     name: 'checkConflicts',
@@ -218,6 +262,13 @@ export const SLOPE_REGISTRY: FunctionRegistryEntry[] = [
     description: 'Writes a scorecard to {scorecardDir}/sprint-{N}.json.',
     signature: 'saveScorecard(card: GolfScorecard): string',
     example: 'const path = saveScorecard(buildScorecard({ ... }));',
+  },
+  {
+    name: 'loadRoadmap',
+    module: 'fs',
+    description: 'Loads and parses the roadmap JSON from the configured path (default: docs/backlog/roadmap.json). Returns null if no roadmap file exists.',
+    signature: 'loadRoadmap(): RoadmapDefinition | null',
+    example: 'const roadmap = loadRoadmap(); if (roadmap) return formatRoadmapSummary(roadmap);',
   },
   {
     name: 'readFile',
@@ -354,6 +405,18 @@ interface ClubRecommendation { club: ClubSelection; confidence: number; reasonin
 interface TrainingRecommendation { area: string; type: TrainingType; description: string; priority: 'high' | 'medium' | 'low'; instruction_adjustment?: string; }
 interface RecommendClubInput { ticketComplexity: 'trivial' | 'small' | 'medium' | 'large'; scorecards: GolfScorecard[]; slopeFactors?: string[]; }
 interface TrainingPlanInput { handicap: HandicapCard; dispersion: DispersionReport; recentScorecards: GolfScorecard[]; }
+
+// ─── Roadmap ───
+type RoadmapClub = 'driver' | 'long_iron' | 'short_iron' | 'wedge' | 'putter';
+interface RoadmapTicket { key: string; title: string; club: RoadmapClub; complexity: 'trivial' | 'small' | 'standard' | 'moderate'; depends_on?: string[]; }
+interface RoadmapSprint { id: number; theme: string; par: 3 | 4 | 5; slope: number; type: string; tickets: RoadmapTicket[]; depends_on?: number[]; }
+interface RoadmapPhase { name: string; sprints: number[]; }
+interface RoadmapDefinition { name: string; description?: string; phases: RoadmapPhase[]; sprints: RoadmapSprint[]; }
+interface RoadmapValidationResult { valid: boolean; errors: RoadmapValidationError[]; warnings: RoadmapValidationWarning[]; }
+interface RoadmapValidationError { type: 'error'; sprint?: number; ticket?: string; message: string; }
+interface RoadmapValidationWarning { type: 'warning'; sprint?: number; ticket?: string; message: string; }
+interface CriticalPathResult { path: number[]; length: number; totalPar: number; }
+interface ParallelGroup { sprints: number[]; reason: string; }
 
 // ─── Briefing ───
 interface RecurringPattern { id: number; title: string; category: string; sprints_hit: number[]; gotcha_refs: string[]; description: string; prevention: string; }

@@ -65,6 +65,23 @@ function buildFsHelpers(cwd: string) {
     return filePath;
   };
 
+  const loadRoadmap = (): unknown => {
+    const config = loadConfig();
+    const configAny = config as unknown as Record<string, unknown>;
+    const roadmapPath = typeof configAny.roadmapPath === 'string'
+      ? configAny.roadmapPath
+      : 'docs/backlog/roadmap.json';
+    const resolved = safePath(cwd, roadmapPath);
+    if (!fs.existsSync(resolved)) return null;
+    try {
+      const raw = JSON.parse(fs.readFileSync(resolved, 'utf8'));
+      const { roadmap } = core.parseRoadmap(raw);
+      return roadmap;
+    } catch {
+      return null;
+    }
+  };
+
   const readFile = (p: string): string => {
     const resolved = safePath(cwd, p);
     return fs.readFileSync(resolved, 'utf8');
@@ -92,7 +109,7 @@ function buildFsHelpers(cwd: string) {
     return entries.sort();
   };
 
-  return { loadConfig, loadScorecards, loadCommonIssues, loadSessions, saveScorecard, readFile, writeFile, listFiles };
+  return { loadConfig, loadScorecards, loadCommonIssues, loadSessions, loadRoadmap, saveScorecard, readFile, writeFile, listFiles };
 }
 
 /**

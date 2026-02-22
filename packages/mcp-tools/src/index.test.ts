@@ -108,6 +108,30 @@ describe('registry', () => {
     expect(SLOPE_TYPES).toContain('ScorecardInput');
     expect(SLOPE_TYPES).toContain('SlopeSession');
   });
+
+  it('registry includes roadmap functions', () => {
+    const roadmapNames = [
+      'validateRoadmap', 'computeCriticalPath', 'findParallelOpportunities',
+      'parseRoadmap', 'formatRoadmapSummary', 'formatStrategicContext',
+    ];
+    for (const name of roadmapNames) {
+      expect(SLOPE_REGISTRY.find(e => e.name === name)).toBeDefined();
+    }
+  });
+
+  it('registry includes loadRoadmap fs helper', () => {
+    const entry = SLOPE_REGISTRY.find(e => e.name === 'loadRoadmap');
+    expect(entry).toBeDefined();
+    expect(entry!.module).toBe('fs');
+  });
+
+  it('SLOPE_TYPES contains roadmap type definitions', () => {
+    expect(SLOPE_TYPES).toContain('RoadmapDefinition');
+    expect(SLOPE_TYPES).toContain('RoadmapSprint');
+    expect(SLOPE_TYPES).toContain('RoadmapTicket');
+    expect(SLOPE_TYPES).toContain('CriticalPathResult');
+    expect(SLOPE_TYPES).toContain('ParallelGroup');
+  });
 });
 
 describe('sandbox', () => {
@@ -161,6 +185,79 @@ describe('sandbox', () => {
     await expect(
       runInSandbox('return process.env;', process.cwd()),
     ).rejects.toThrow();
+  });
+
+  it('executes roadmap functions in sandbox', async () => {
+    const code = `
+      const roadmap = {
+        name: 'Test',
+        phases: [{ name: 'P1', sprints: [1, 2] }],
+        sprints: [
+          { id: 1, theme: 'A', par: 4, slope: 2, type: 'feature', tickets: [
+            { key: 'S1-1', title: 'T1', club: 'short_iron', complexity: 'standard' },
+            { key: 'S1-2', title: 'T2', club: 'wedge', complexity: 'small' },
+            { key: 'S1-3', title: 'T3', club: 'short_iron', complexity: 'standard' },
+          ]},
+          { id: 2, theme: 'B', par: 4, slope: 2, type: 'feature', depends_on: [1], tickets: [
+            { key: 'S2-1', title: 'T1', club: 'short_iron', complexity: 'standard' },
+            { key: 'S2-2', title: 'T2', club: 'short_iron', complexity: 'standard' },
+            { key: 'S2-3', title: 'T3', club: 'wedge', complexity: 'small' },
+          ]},
+        ],
+      };
+      const v = validateRoadmap(roadmap);
+      const cp = computeCriticalPath(roadmap);
+      return { valid: v.valid, criticalPath: cp.path, length: cp.length };
+    `;
+    const { result } = await runInSandbox(code, process.cwd());
+    const r = result as { valid: boolean; criticalPath: number[]; length: number };
+    expect(r.valid).toBe(true);
+    expect(r.criticalPath).toEqual([1, 2]);
+    expect(r.length).toBe(2);
+  });
+
+  it('loadRoadmap returns null when no roadmap file', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'slope-sandbox-roadmap-'));
+    const slopeDir = join(tmp, '.slope');
+    mkdirSync(slopeDir, { recursive: true });
+    writeFileSync(join(slopeDir, 'config.json'), JSON.stringify({
+      scorecardDir: 'docs/retros',
+      scorecardPattern: 'sprint-*.json',
+      minSprint: 1,
+    }));
+
+    const { result } = await runInSandbox('return loadRoadmap();', tmp);
+    expect(result).toBeNull();
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  it('loadRoadmap loads and parses roadmap from file', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'slope-sandbox-roadmap-'));
+    const slopeDir = join(tmp, '.slope');
+    const backlogDir = join(tmp, 'docs', 'backlog');
+    mkdirSync(slopeDir, { recursive: true });
+    mkdirSync(backlogDir, { recursive: true });
+    writeFileSync(join(slopeDir, 'config.json'), JSON.stringify({
+      scorecardDir: 'docs/retros',
+      scorecardPattern: 'sprint-*.json',
+      minSprint: 1,
+    }));
+    writeFileSync(join(backlogDir, 'roadmap.json'), JSON.stringify({
+      name: 'Test Roadmap',
+      phases: [{ name: 'P1', sprints: [1] }],
+      sprints: [{
+        id: 1, theme: 'Intro', par: 3, slope: 1, type: 'feature',
+        tickets: [
+          { key: 'S1-1', title: 'T1', club: 'wedge', complexity: 'small' },
+          { key: 'S1-2', title: 'T2', club: 'wedge', complexity: 'small' },
+          { key: 'S1-3', title: 'T3', club: 'wedge', complexity: 'small' },
+        ],
+      }],
+    }));
+
+    const { result } = await runInSandbox('const r = loadRoadmap(); return r ? r.name : null;', tmp);
+    expect(result).toBe('Test Roadmap');
+    rmSync(tmp, { recursive: true, force: true });
   });
 
   it('loads scorecards from a test project', async () => {

@@ -9,6 +9,8 @@ import { computeHandicapCard } from './handicap.js';
 import { computeDispersion } from './dispersion.js';
 import { generateTrainingPlan } from './advisor.js';
 import { checkConflicts } from './registry.js';
+import type { RoadmapDefinition } from './roadmap.js';
+import { formatStrategicContext } from './roadmap.js';
 
 // --- Input types ---
 
@@ -223,8 +225,10 @@ export function formatBriefing(opts: {
   filter?: BriefingFilter;
   includeTraining?: boolean;
   claims?: SprintClaim[];
+  roadmap?: RoadmapDefinition;
+  currentSprint?: number;
 }): string {
-  const { scorecards, commonIssues, lastSession, filter, includeTraining = true, claims } = opts;
+  const { scorecards, commonIssues, lastSession, filter, includeTraining = true, claims, roadmap, currentSprint } = opts;
   const lines: string[] = [];
 
   // Section 1: Handicap snapshot
@@ -256,6 +260,19 @@ export function formatBriefing(opts: {
   } else {
     lines.push('');
     lines.push('No SLOPE-era scorecards yet.');
+  }
+
+  // Section 1.5: Strategic context (from roadmap)
+  if (roadmap && currentSprint) {
+    const context = formatStrategicContext(roadmap, currentSprint);
+    if (context) {
+      lines.push('');
+      lines.push('\u2500'.repeat(50));
+      lines.push('STRATEGIC CONTEXT');
+      for (const line of context.split('\n')) {
+        lines.push(`  ${line}`);
+      }
+    }
   }
 
   // Section 2: Hazard index

@@ -582,3 +582,118 @@ describe('formatBriefing — COURSE STATUS', () => {
     expect(coursePos).toBeLessThan(nutritionPos);
   });
 });
+
+// --- formatBriefing — STRATEGIC CONTEXT ---
+
+import type { RoadmapDefinition } from '../src/roadmap.js';
+
+function makeRoadmap(): RoadmapDefinition {
+  return {
+    name: 'Test Roadmap',
+    phases: [{ name: 'Phase 1', sprints: [7, 8, 9] }],
+    sprints: [
+      {
+        id: 7, theme: 'Foundation', par: 4, slope: 2, type: 'feature',
+        tickets: [
+          { key: 'S7-1', title: 'T1', club: 'short_iron', complexity: 'standard' },
+          { key: 'S7-2', title: 'T2', club: 'wedge', complexity: 'small' },
+          { key: 'S7-3', title: 'T3', club: 'short_iron', complexity: 'standard' },
+        ],
+      },
+      {
+        id: 8, theme: 'Platform', par: 4, slope: 2, type: 'feature',
+        depends_on: [7],
+        tickets: [
+          { key: 'S8-1', title: 'T1', club: 'short_iron', complexity: 'standard' },
+          { key: 'S8-2', title: 'T2', club: 'short_iron', complexity: 'standard' },
+          { key: 'S8-3', title: 'T3', club: 'wedge', complexity: 'small' },
+        ],
+      },
+      {
+        id: 9, theme: 'Polish', par: 3, slope: 1, type: 'feature',
+        depends_on: [8],
+        tickets: [
+          { key: 'S9-1', title: 'T1', club: 'wedge', complexity: 'small' },
+          { key: 'S9-2', title: 'T2', club: 'putter', complexity: 'trivial' },
+          { key: 'S9-3', title: 'T3', club: 'wedge', complexity: 'small' },
+        ],
+      },
+    ],
+  };
+}
+
+describe('formatBriefing — STRATEGIC CONTEXT', () => {
+  it('includes strategic context when roadmap and currentSprint provided', () => {
+    const output = formatBriefing({
+      scorecards: [],
+      commonIssues: makeIssues([]),
+      roadmap: makeRoadmap(),
+      currentSprint: 8,
+    });
+    expect(output).toContain('STRATEGIC CONTEXT');
+    expect(output).toContain('S8');
+    expect(output).toContain('Phase 1');
+  });
+
+  it('shows critical path info for sprint on critical path', () => {
+    const output = formatBriefing({
+      scorecards: [],
+      commonIssues: makeIssues([]),
+      roadmap: makeRoadmap(),
+      currentSprint: 8,
+    });
+    expect(output).toContain('critical path');
+  });
+
+  it('shows dependents for sprint with downstream sprints', () => {
+    const output = formatBriefing({
+      scorecards: [],
+      commonIssues: makeIssues([]),
+      roadmap: makeRoadmap(),
+      currentSprint: 7,
+    });
+    expect(output).toContain('Feeds into');
+    expect(output).toContain('S8');
+  });
+
+  it('omits strategic context when no roadmap provided', () => {
+    const output = formatBriefing({
+      scorecards: [],
+      commonIssues: makeIssues([]),
+    });
+    expect(output).not.toContain('STRATEGIC CONTEXT');
+  });
+
+  it('omits strategic context when no currentSprint provided', () => {
+    const output = formatBriefing({
+      scorecards: [],
+      commonIssues: makeIssues([]),
+      roadmap: makeRoadmap(),
+    });
+    expect(output).not.toContain('STRATEGIC CONTEXT');
+  });
+
+  it('omits strategic context when currentSprint not in roadmap', () => {
+    const output = formatBriefing({
+      scorecards: [],
+      commonIssues: makeIssues([]),
+      roadmap: makeRoadmap(),
+      currentSprint: 99,
+    });
+    expect(output).not.toContain('STRATEGIC CONTEXT');
+  });
+
+  it('places strategic context between handicap and hazards', () => {
+    const output = formatBriefing({
+      scorecards: [],
+      commonIssues: makeIssues([]),
+      roadmap: makeRoadmap(),
+      currentSprint: 8,
+    });
+    const briefingPos = output.indexOf('PRE-ROUND BRIEFING');
+    const contextPos = output.indexOf('STRATEGIC CONTEXT');
+    const hazardsPos = output.indexOf('HAZARDS');
+    expect(briefingPos).toBeLessThan(contextPos);
+    expect(contextPos).toBeLessThan(hazardsPos);
+  });
+});

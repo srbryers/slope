@@ -1,7 +1,7 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { formatBriefing } from '@slope-dev/core';
-import type { CommonIssuesFile, SessionEntry, SprintClaim } from '@slope-dev/core';
+import { formatBriefing, parseRoadmap } from '@slope-dev/core';
+import type { CommonIssuesFile, SessionEntry, SprintClaim, RoadmapDefinition } from '@slope-dev/core';
 import { loadConfig } from '../config.js';
 import { loadScorecards } from '../loader.js';
 import { resolveStore } from '../store.js';
@@ -67,11 +67,26 @@ export async function briefingCommand(args: string[]): Promise<void> {
     store.close();
   } catch { /* skip — claims are optional */ }
 
+  // Load roadmap (graceful degradation)
+  let roadmap: RoadmapDefinition | undefined;
+  const configAny = config as unknown as Record<string, unknown>;
+  const roadmapPath = typeof configAny.roadmapPath === 'string'
+    ? configAny.roadmapPath
+    : 'docs/backlog/roadmap.json';
+  const resolvedRoadmapPath = join(cwd, roadmapPath);
+  try {
+    if (existsSync(resolvedRoadmapPath)) {
+      const raw = JSON.parse(readFileSync(resolvedRoadmapPath, 'utf8'));
+      const parsed = parseRoadmap(raw);
+      if (parsed.roadmap) roadmap = parsed.roadmap;
+    }
+  } catch { /* skip — roadmap is optional */ }
+
   const filter = (categories.length > 0 || keywords.length > 0)
     ? { categories: categories.length > 0 ? categories : undefined, keywords: keywords.length > 0 ? keywords : undefined }
     : undefined;
 
-  const output = formatBriefing({ scorecards, commonIssues, lastSession, filter, includeTraining, claims });
+  const output = formatBriefing({ scorecards, commonIssues, lastSession, filter, includeTraining, claims, roadmap, currentSprint: sprintNumber });
   console.log('');
   console.log(output);
 }
