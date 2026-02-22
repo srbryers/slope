@@ -1,0 +1,128 @@
+{
+  "sprint_number": 7,
+  "theme": "The Yardage Book — Strategic Planning Tools",
+  "par": 4,
+  "slope": 2,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-02-22",
+  "type": "feature",
+  "shots": [
+    {
+      "ticket_key": "S7-1",
+      "title": "Structured roadmap format + schema",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Types + 6 compute functions (validate, critical path, parallel, parse, format summary, strategic context). 30 core tests, all passed first run."
+    },
+    {
+      "ticket_key": "S7-2",
+      "title": "`slope roadmap` CLI command — validate/review/status/show",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "description": "TypeScript strict mode rejects SlopeConfig as Record<string, unknown> — interface has no index signature. Required double-cast via unknown."
+        },
+        {
+          "type": "rough",
+          "description": "roadmapCommand is async, so process.exit mock throws become unhandled rejections. Tests needed await/rejects pattern instead of sync toThrow."
+        }
+      ],
+      "notes": "4 subcommands (validate, review, status, show). 16 CLI tests. Architect review includes scope balance, critical path analysis, bottleneck detection, parallelism, fan-in/fan-out."
+    },
+    {
+      "ticket_key": "S7-3",
+      "title": "MCP + briefing integration for roadmap",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "6 roadmap functions + loadRoadmap helper in MCP registry. formatBriefing gains strategic context section. Graceful degradation when no roadmap. 13 new tests across core + MCP."
+    },
+    {
+      "ticket_key": "S7-4",
+      "title": "Documentation + slope init integration",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "roadmapPath in SlopeConfig (eliminated all prior casts). slope init creates starter roadmap.json. Pre-Tournament Routine in all 3 template variants. 3 new tests."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 2,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "wind",
+      "description": "New subsystem (roadmap) touching all 4 packages — core, CLI, MCP, templates",
+      "impact": "minor"
+    },
+    {
+      "type": "altitude",
+      "description": "Session continued from previous context that ran out — required context reconstruction from summary",
+      "impact": "none"
+    }
+  ],
+  "special_plays": [],
+  "training": [],
+  "nutrition": [
+    {
+      "category": "hydration",
+      "description": "Full build+test after every ticket (411 tests at completion)",
+      "status": "healthy"
+    },
+    {
+      "category": "diet",
+      "description": "Commit-per-ticket discipline maintained — 4 feat commits for 4 tickets",
+      "status": "healthy"
+    },
+    {
+      "category": "recovery",
+      "description": "S7-4 cleaned up type workarounds from S7-2/S7-3 by adding roadmapPath to config",
+      "status": "healthy"
+    },
+    {
+      "category": "supplements",
+      "description": "Tests across all 4 packages — 30 core + 16 CLI + 13 MCP = 59 new tests",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Smooth execution. The course-level methodology (vision → roadmap → review) is now a first-class part of SLOPE. 4 tickets, clean linear execution order, no scope surprises.",
+    "advice_for_next_player": "SlopeConfig interface is strict TypeScript — when adding new optional fields, add them to the interface first (like roadmapPath) to avoid the double-cast-via-unknown pattern. Also, async CLI commands need await/rejects in tests, not sync toThrow.",
+    "what_surprised_you": "The roadmap review subcommand turned out richer than expected — scope balance, club distribution, bottleneck detection, fan-in/fan-out analysis. All computable from the roadmap JSON without any external tools.",
+    "excited_about_next": "The roadmap subsystem is foundational for S8+ work. slope roadmap status can now show which sprints are completed/active/blocked, and the briefing automatically includes strategic context."
+  },
+  "bunker_locations": [
+    "TypeScript strict mode: interface-to-Record<string,unknown> cast requires double-cast via unknown",
+    "Async CLI commands: process.exit mock in tests needs await/rejects pattern, not sync toThrow"
+  ],
+  "yardage_book_updates": [
+    "roadmap.ts: cycle detection via DFS with stack tracking, critical path via topological sort + longest path DP",
+    "CLI subcommand pattern: switch on args[0], parseArgs helper for --key=value flags",
+    "formatBriefing accepts optional roadmap/currentSprint — backward compatible, graceful degradation",
+    "MCP sandbox spreads ...core into context — new core exports are automatically available to agents",
+    "loadRoadmap fs helper: loads from config.roadmapPath, falls back to default, returns null on missing/invalid"
+  ],
+  "course_management_notes": [
+    "4 tickets, 3 in_the_hole, 1 green — no misses",
+    "2 hazards (TypeScript cast pattern, async test pattern) — both resolved quickly",
+    "Tests grew from 395 to 411 (+16 across core, CLI, MCP)",
+    "25 files changed, ~2,984 lines added across all packages",
+    "Push after each ticket — 4 pushes matching execution order"
+  ]
+}

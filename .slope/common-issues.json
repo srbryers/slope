@@ -62,6 +62,24 @@
       "gotcha_refs": ["S-3-2"],
       "description": "store-sqlite had tests in src/index.test.ts. The default include: ['src/**/*.ts'] pulled test files into the build, causing type errors from test-only types to surface during tsc.",
       "prevention": "When placing test files in src/ alongside implementation, add 'src/**/*.test.ts' to the exclude array in tsconfig.json."
+    },
+    {
+      "id": 8,
+      "title": "TypeScript strict mode rejects interface-to-Record<string,unknown> cast",
+      "category": "typescript",
+      "sprints_hit": [7],
+      "gotcha_refs": ["S7-2"],
+      "description": "SlopeConfig interface has no index signature, so TypeScript strict mode rejects `config as Record<string, unknown>`. The workaround is double-cast via unknown, but the real fix is adding the field to the interface.",
+      "prevention": "When adding new config fields, add them to the SlopeConfig interface first (like roadmapPath). Avoid double-cast-via-unknown as a long-term pattern."
+    },
+    {
+      "id": 9,
+      "title": "Async CLI commands need await/rejects in tests, not sync toThrow",
+      "category": "testing",
+      "sprints_hit": [7],
+      "gotcha_refs": ["S7-2"],
+      "description": "When a CLI command is async and mocks process.exit, using `expect(() => fn()).toThrow()` silently passes because the promise rejection is unhandled. Tests appear to pass but assertions never execute.",
+      "prevention": "For async CLI commands that call process.exit, use `await expect(fn()).rejects.toThrow()` with async test callbacks. This is related to pattern #6 (making sync functions async breaks callers)."
     }
   ]
 }
