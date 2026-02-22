@@ -7,7 +7,8 @@
       "sprints_hit": [1],
       "gotcha_refs": [],
       "description": "This is an example recurring pattern. Replace with your own.",
-      "prevention": "Add your prevention strategy here."
+      "prevention": "Add your prevention strategy here.",
+      "reported_by": []
     },
     {
       "id": 2,
@@ -16,7 +17,8 @@
       "sprints_hit": [3],
       "gotcha_refs": [],
       "description": "After filing the scorecard, it's easy to skip validate + review + common-issues.",
-      "prevention": "Always run: slope validate on new scorecard; slope review (save to sprint-N-review.md); update common-issues if new patterns emerged."
+      "prevention": "Always run: slope validate on new scorecard; slope review (save to sprint-N-review.md); update common-issues if new patterns emerged.",
+      "reported_by": []
     },
     {
       "id": 3,
@@ -25,7 +27,8 @@
       "sprints_hit": [4],
       "gotcha_refs": ["S4-3"],
       "description": "mcp-tools had @slope-dev/core pinned to ^0.3.3 (npm), so TypeScript resolved the published version instead of the local workspace version with new exports.",
-      "prevention": "Always use \"workspace:*\" for intra-monorepo dependencies. Check resolution with pnpm ls after adding new exports."
+      "prevention": "Always use \"workspace:*\" for intra-monorepo dependencies. Check resolution with pnpm ls after adding new exports.",
+      "reported_by": []
     },
     {
       "id": 4,
@@ -34,7 +37,8 @@
       "sprints_hit": [4],
       "gotcha_refs": ["S4-1"],
       "description": "Moving config.ts/loader.ts to core failed to compile because core didn't have @types/node — it had been a pure-logic package until now.",
-      "prevention": "When moving files that import node:fs, node:path, etc. into a package, verify @types/node is in devDependencies."
+      "prevention": "When moving files that import node:fs, node:path, etc. into a package, verify @types/node is in devDependencies.",
+      "reported_by": []
     },
     {
       "id": 5,
@@ -43,7 +47,8 @@
       "sprints_hit": [6],
       "gotcha_refs": ["S-1-2"],
       "description": "pnpm ignores native build scripts by default. better-sqlite3 silently fails to compile, causing runtime errors. pnpm approve-builds is interactive and unusable in CI/agent contexts.",
-      "prevention": "Add native packages to pnpm.onlyBuiltDependencies in root package.json before running pnpm install."
+      "prevention": "Add native packages to pnpm.onlyBuiltDependencies in root package.json before running pnpm install.",
+      "reported_by": []
     },
     {
       "id": 6,
@@ -52,7 +57,8 @@
       "sprints_hit": [6],
       "gotcha_refs": ["S-2-3"],
       "description": "Changing initCommand from sync to async caused 5 CLI tests to fail — they called initCommand() without await, so assertions ran before the async work completed.",
-      "prevention": "When converting a sync function to async, search all callers (tests, CLI entry points, other commands) and add await. In test callbacks, add async to the it() function."
+      "prevention": "When converting a sync function to async, search all callers (tests, CLI entry points, other commands) and add await. In test callbacks, add async to the it() function.",
+      "reported_by": []
     },
     {
       "id": 7,
@@ -61,7 +67,8 @@
       "sprints_hit": [6],
       "gotcha_refs": ["S-3-2"],
       "description": "store-sqlite had tests in src/index.test.ts. The default include: ['src/**/*.ts'] pulled test files into the build, causing type errors from test-only types to surface during tsc.",
-      "prevention": "When placing test files in src/ alongside implementation, add 'src/**/*.test.ts' to the exclude array in tsconfig.json."
+      "prevention": "When placing test files in src/ alongside implementation, add 'src/**/*.test.ts' to the exclude array in tsconfig.json.",
+      "reported_by": []
     },
     {
       "id": 8,
@@ -70,7 +77,8 @@
       "sprints_hit": [7],
       "gotcha_refs": ["S7-2"],
       "description": "SlopeConfig interface has no index signature, so TypeScript strict mode rejects `config as Record<string, unknown>`. The workaround is double-cast via unknown, but the real fix is adding the field to the interface.",
-      "prevention": "When adding new config fields, add them to the SlopeConfig interface first (like roadmapPath). Avoid double-cast-via-unknown as a long-term pattern."
+      "prevention": "When adding new config fields, add them to the SlopeConfig interface first (like roadmapPath). Avoid double-cast-via-unknown as a long-term pattern.",
+      "reported_by": []
     },
     {
       "id": 9,
@@ -79,7 +87,8 @@
       "sprints_hit": [7],
       "gotcha_refs": ["S7-2"],
       "description": "When a CLI command is async and mocks process.exit, using `expect(() => fn()).toThrow()` silently passes because the promise rejection is unhandled. Tests appear to pass but assertions never execute.",
-      "prevention": "For async CLI commands that call process.exit, use `await expect(fn()).rejects.toThrow()` with async test callbacks. This is related to pattern #6 (making sync functions async breaks callers)."
+      "prevention": "For async CLI commands that call process.exit, use `await expect(fn()).rejects.toThrow()` with async test callbacks. This is related to pattern #6 (making sync functions async breaks callers).",
+      "reported_by": []
     },
     {
       "id": 10,
@@ -88,7 +97,18 @@
       "sprints_hit": [11],
       "gotcha_refs": ["S11-1"],
       "description": "Events table initially had REFERENCES sessions(session_id). This prevented inserting events with session IDs that don't exist in the sessions table (e.g., from external tools or after session cleanup).",
-      "prevention": "Telemetry/event tables should be independent. Use indexes for query performance but avoid FK constraints that create coupling between telemetry producers and session lifecycle."
+      "prevention": "Telemetry/event tables should be independent. Use indexes for query performance but avoid FK constraints that create coupling between telemetry producers and session lifecycle.",
+      "reported_by": []
+    },
+    {
+      "id": 11,
+      "title": "Lexicographic .sort() on sprint filenames breaks when sprint > 9",
+      "category": "general",
+      "sprints_hit": [20],
+      "gotcha_refs": [],
+      "description": "Array.sort() without a comparator sorts strings lexicographically. 'sprint-9.json' > 'sprint-20.json' because '9' > '2'. This caused slope review to show sprint 9 instead of 20.",
+      "prevention": "Always use numeric comparator when sorting files with embedded numbers: .sort((a,b) => extractNum(a) - extractNum(b))",
+      "reported_by": []
     }
   ]
 }

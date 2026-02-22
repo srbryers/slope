@@ -1,0 +1,101 @@
+{
+  "sprint_number": 21,
+  "theme": "Dogfooding Fixes",
+  "par": 4,
+  "slope": 1,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-02-22",
+  "shots": [
+    {
+      "ticket_key": "S21-1",
+      "title": "Numeric sort in loader.ts and review.ts",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Replaced lexicographic .sort() with numeric comparator in loader.ts and review.ts. Added loader.test.ts with 6 tests covering numeric ordering, minSprint filter, and detectLatestSprint."
+    },
+    {
+      "ticket_key": "S21-2",
+      "title": "Add --player flag to auto-card and ScorecardInput",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added player field to ScorecardInput interface, threaded through buildScorecard with conditional spread. Added --player to auto-card CLI usage and passthrough. 2 new builder tests for player field presence/absence."
+    },
+    {
+      "ticket_key": "S21-4",
+      "title": "Thread reported_by in distill pipeline",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Extract unique player/session_player from cluster events into reported_by on suggested patterns. Merge reported_by arrays (union, deduplicated) when updating existing patterns. 4 new pipeline tests."
+    },
+    {
+      "ticket_key": "S21-3,5,6",
+      "title": "Config fields, reported_by data, sort bug pattern",
+      "club": "putter",
+      "result": "green",
+      "hazards": [],
+      "notes": "Data-only fixes (gitignored .slope/ directory): added missing fields to config.json, added reported_by: [] to all 10 common-issues patterns, added pattern #11 for the sort bug."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "type": "bugfix",
+  "conditions": [],
+  "special_plays": [],
+  "nutrition": [
+    {
+      "category": "hydration",
+      "description": "Clean build + typecheck + all 1014 tests pass (780 core + 36 store + 144 CLI + 54 MCP) after each commit",
+      "status": "healthy"
+    },
+    {
+      "category": "diet",
+      "description": "3 focused commits in execution order. Commit-per-fix discipline. Build/test/typecheck before final push.",
+      "status": "healthy"
+    },
+    {
+      "category": "recovery",
+      "description": "All existing tests pass unchanged. 12 new tests added (6 loader, 2 builder, 4 pipeline). Zero regressions.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Quick and clean. Classic bugfix sprint — the sort bug was the critical one and had a one-line fix. The pattern of dogfooding revealing small gaps is exactly what SLOPE is designed to surface.",
+    "advice_for_next_player": "The .slope/ directory is gitignored, so config.json and common-issues.json changes are local-only. Each developer needs to update their own .slope/config.json with the new fields. The loader numeric sort fix means slope review (no args) now correctly finds the latest sprint.",
+    "what_surprised_you": "Nothing surprising — all fixes were straightforward. The lexicographic sort bug is a classic JavaScript gotcha (pattern #11 now documents it). Good example of why dogfooding matters.",
+    "excited_about_next": "SLOPE now works correctly on its own repo. Future sprints can rely on slope review, slope card, slope briefing without manual path overrides."
+  },
+  "bunker_locations": [],
+  "yardage_book_updates": [
+    "packages/core/src/loader.ts: Numeric sort comparator for scorecard filenames",
+    "packages/cli/src/commands/review.ts: Same numeric sort fix for default-latest-scorecard path",
+    "packages/core/src/builder.ts: Added player field to ScorecardInput, threaded through buildScorecard",
+    "packages/cli/src/commands/auto-card.ts: Added --player flag and passthrough",
+    "packages/core/src/pipeline.ts: reported_by extraction from cluster events + merge on update",
+    "packages/core/tests/loader.test.ts: New file — 6 tests for numeric sort ordering",
+    "packages/core/tests/builder.test.ts: 2 new tests for player field passthrough",
+    "packages/core/tests/pipeline.test.ts: 4 new tests for reported_by population and merge"
+  ],
+  "course_management_notes": [
+    "4 shots, 3 in_the_hole + 1 green — zero hazards, zero penalties, par",
+    "8 files changed, 230 lines added, 3 removed",
+    "Critical fix: sprint-9.json no longer sorts after sprint-20.json",
+    "12 new tests. Total test count: 1014 (up from 1002)"
+  ]
+}
