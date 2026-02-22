@@ -132,6 +132,46 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
   },
 ];
 
+// --- Custom Guard Support ---
+
+/** A custom guard defined by a plugin (not constrained to GuardName union) */
+export interface CustomGuardDefinition {
+  name: string;
+  description: string;
+  hookEvent: 'PreToolUse' | 'PostToolUse' | 'Stop' | 'PreCompact';
+  matcher?: string;
+  level: 'scoring' | 'full';
+  command: string;
+}
+
+/** Union type for functions that accept both built-in and custom guards */
+export type AnyGuardDefinition = GuardDefinition | CustomGuardDefinition;
+
+const customGuards: CustomGuardDefinition[] = [];
+
+/** Register a custom guard plugin. Idempotent — skips if name already registered. */
+export function registerCustomGuard(guard: CustomGuardDefinition): void {
+  if (customGuards.some(g => g.name === guard.name)) return;
+  customGuards.push(guard);
+}
+
+/** Returns all guard definitions: built-in + custom */
+export function getAllGuardDefinitions(): AnyGuardDefinition[] {
+  return [...GUARD_DEFINITIONS, ...customGuards];
+}
+
+/** Look up a custom guard by name */
+export function getCustomGuard(name: string): CustomGuardDefinition | undefined {
+  return customGuards.find(g => g.name === name);
+}
+
+/** Clear all custom guards (for testing) */
+export function clearCustomGuards(): void {
+  customGuards.length = 0;
+}
+
+// --- Formatters ---
+
 /** Format a GuardResult as PreToolUse JSON output */
 export function formatPreToolUseOutput(result: GuardResult): PreToolUseOutput {
   return {
@@ -180,13 +220,13 @@ export function formatStopOutput(result: GuardResult): StopOutput {
  * Returns the `hooks` object to merge into .claude/settings.json.
  */
 export function generateClaudeCodeHooksConfig(
-  guards: GuardDefinition[],
+  guards: AnyGuardDefinition[],
   guardScriptPath: string,
 ): Record<string, Array<{ matcher?: string; hooks: Array<{ type: string; command: string; timeout?: number; statusMessage?: string }> }>> {
   const config: Record<string, Array<{ matcher?: string; hooks: Array<{ type: string; command: string; timeout?: number; statusMessage?: string }> }>> = {};
 
   // Group guards by hookEvent + matcher
-  const groups = new Map<string, GuardDefinition[]>();
+  const groups = new Map<string, AnyGuardDefinition[]>();
   for (const g of guards) {
     const key = `${g.hookEvent}::${g.matcher ?? ''}`;
     const list = groups.get(key) || [];

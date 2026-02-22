@@ -223,6 +223,10 @@ export {
   formatPostToolUseOutput,
   formatStopOutput,
   generateClaudeCodeHooksConfig,
+  registerCustomGuard,
+  getAllGuardDefinitions,
+  getCustomGuard,
+  clearCustomGuards,
 } from './guard.js';
 export type {
   HookInput,
@@ -233,6 +237,8 @@ export type {
   GuardName,
   GuardDefinition,
   GuidanceConfig,
+  CustomGuardDefinition,
+  AnyGuardDefinition,
 } from './guard.js';
 
 // Report
@@ -301,6 +307,23 @@ export type {
   StandupReport,
   HandoffEntry,
 } from './standup.js';
+
+// Plugin System
+export {
+  validatePluginManifest,
+  discoverPlugins,
+  loadPlugins,
+  loadPluginMetaphors,
+  loadPluginGuards,
+  isPluginEnabled,
+} from './plugins.js';
+export type {
+  PluginType,
+  PluginManifest,
+  DiscoveredPlugin,
+  PluginLoadResult,
+  PluginsConfig,
+} from './plugins.js';
 
 // Built-in metaphors (auto-registers on import)
 export { golf, tennis, baseball, gaming, dnd, matrix } from './metaphors/index.js';

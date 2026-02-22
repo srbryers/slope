@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { EscalationConfig } from './escalation.js';
+import type { PluginsConfig } from './plugins.js';
 
 export interface SlopeConfig {
   scorecardDir: string;
@@ -27,6 +28,7 @@ export interface SlopeConfig {
   orchestration?: {
     escalation?: EscalationConfig;
   };
+  plugins?: PluginsConfig;
 }
 
 const DEFAULT_CONFIG: SlopeConfig = {
