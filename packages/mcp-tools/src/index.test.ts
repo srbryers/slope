@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { createSlopeToolsServer, SLOPE_MCP_TOOL_NAMES } from './index.js';
+import { createSlopeToolsServer, SLOPE_MCP_TOOL_NAMES, detectSetupHints, buildSetupHint } from './index.js';
+import type { SetupHints } from './index.js';
 import { SLOPE_REGISTRY, SLOPE_TYPES } from './registry.js';
 import { runInSandbox } from './sandbox.js';
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
@@ -442,6 +443,127 @@ describe('mock store tools', () => {
 
   it('server with store creates successfully', () => {
     const server = createSlopeToolsServer(createMockStore());
+    expect(server).toBeDefined();
+  });
+});
+
+describe('detectSetupHints', () => {
+  it('returns all false when no hooks.json or settings.json exist', () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'slope-hints-'));
+    const hints = detectSetupHints(tmp);
+    expect(hints.guardsInstalled).toBe(false);
+    expect(hints.lifecycleHooksInstalled).toBe(false);
+    expect(hints.settingsConfigured).toBe(false);
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  it('detects guard hooks in hooks.json', () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'slope-hints-'));
+    const slopeDir = join(tmp, '.slope');
+    mkdirSync(slopeDir, { recursive: true });
+    writeFileSync(join(slopeDir, 'hooks.json'), JSON.stringify({
+      installed: {
+        'guard-explore': { provider: 'claude-code', installed_at: '2026-01-01T00:00:00Z' },
+        'guard-hazard': { provider: 'claude-code', installed_at: '2026-01-01T00:00:00Z' },
+      },
+    }));
+    const hints = detectSetupHints(tmp);
+    expect(hints.guardsInstalled).toBe(true);
+    expect(hints.lifecycleHooksInstalled).toBe(false);
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  it('detects lifecycle hooks in hooks.json', () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'slope-hints-'));
+    const slopeDir = join(tmp, '.slope');
+    mkdirSync(slopeDir, { recursive: true });
+    writeFileSync(join(slopeDir, 'hooks.json'), JSON.stringify({
+      installed: {
+        'session-start': { provider: 'claude-code', installed_at: '2026-01-01T00:00:00Z' },
+        'session-end': { provider: 'claude-code', installed_at: '2026-01-01T00:00:00Z' },
+      },
+    }));
+    const hints = detectSetupHints(tmp);
+    expect(hints.guardsInstalled).toBe(false);
+    expect(hints.lifecycleHooksInstalled).toBe(true);
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  it('requires both session-start and session-end for lifecycle', () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'slope-hints-'));
+    const slopeDir = join(tmp, '.slope');
+    mkdirSync(slopeDir, { recursive: true });
+    writeFileSync(join(slopeDir, 'hooks.json'), JSON.stringify({
+      installed: {
+        'session-start': { provider: 'claude-code', installed_at: '2026-01-01T00:00:00Z' },
+      },
+    }));
+    const hints = detectSetupHints(tmp);
+    expect(hints.lifecycleHooksInstalled).toBe(false);
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  it('detects slope-guard.sh in settings.json', () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'slope-hints-'));
+    const claudeDir = join(tmp, '.claude');
+    mkdirSync(claudeDir, { recursive: true });
+    writeFileSync(join(claudeDir, 'settings.json'), JSON.stringify({
+      hooks: {
+        PreToolUse: [{ hooks: [{ command: '$CLAUDE_PROJECT_DIR/.claude/hooks/slope-guard.sh explore' }] }],
+      },
+    }));
+    const hints = detectSetupHints(tmp);
+    expect(hints.settingsConfigured).toBe(true);
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  it('handles malformed hooks.json gracefully', () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'slope-hints-'));
+    const slopeDir = join(tmp, '.slope');
+    mkdirSync(slopeDir, { recursive: true });
+    writeFileSync(join(slopeDir, 'hooks.json'), 'not valid json{{{');
+    const hints = detectSetupHints(tmp);
+    expect(hints.guardsInstalled).toBe(false);
+    expect(hints.lifecycleHooksInstalled).toBe(false);
+    rmSync(tmp, { recursive: true, force: true });
+  });
+});
+
+describe('buildSetupHint', () => {
+  it('returns null when everything is set up', () => {
+    const hints: SetupHints = { guardsInstalled: true, lifecycleHooksInstalled: true, settingsConfigured: true };
+    expect(buildSetupHint(hints)).toBeNull();
+  });
+
+  it('includes guard hint when guards not installed', () => {
+    const hints: SetupHints = { guardsInstalled: false, lifecycleHooksInstalled: true, settingsConfigured: true };
+    const result = buildSetupHint(hints);
+    expect(result).toContain('Guard hooks');
+    expect(result).toContain('slope hook add --level=full');
+    expect(result).not.toContain('Lifecycle hooks');
+  });
+
+  it('includes lifecycle hint when lifecycle hooks not installed', () => {
+    const hints: SetupHints = { guardsInstalled: true, lifecycleHooksInstalled: false, settingsConfigured: true };
+    const result = buildSetupHint(hints);
+    expect(result).toContain('Lifecycle hooks');
+    expect(result).toContain('slope hook add session-start');
+    expect(result).not.toContain('Guard hooks');
+  });
+
+  it('includes both hints when nothing is installed', () => {
+    const hints: SetupHints = { guardsInstalled: false, lifecycleHooksInstalled: false, settingsConfigured: false };
+    const result = buildSetupHint(hints);
+    expect(result).toContain('Guard hooks');
+    expect(result).toContain('Lifecycle hooks');
+    expect(result).toContain('SLOPE Setup Hint');
+  });
+});
+
+describe('search with setup hints', () => {
+  it('server accepts setupHints parameter', () => {
+    const hints: SetupHints = { guardsInstalled: false, lifecycleHooksInstalled: false, settingsConfigured: false };
+    const server = createSlopeToolsServer(undefined, hints);
     expect(server).toBeDefined();
   });
 });

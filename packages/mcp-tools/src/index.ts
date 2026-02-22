@@ -13,7 +13,7 @@
  *   npx @slope-dev/mcp-tools              # stdio transport
  *   import { createSlopeToolsServer }     # programmatic
  */
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -27,7 +27,85 @@ import type { ClaimScope } from '@slope-dev/core';
 /** Tool names exposed by this MCP server (for tests and tool discovery). */
 export const SLOPE_MCP_TOOL_NAMES = ['search', 'execute', 'session_status', 'acquire_claim', 'check_conflicts'] as const;
 
-export function createSlopeToolsServer(store?: SlopeStore): McpServer {
+/** Detection results for hook/settings activation status. */
+export interface SetupHints {
+  guardsInstalled: boolean;
+  lifecycleHooksInstalled: boolean;
+  settingsConfigured: boolean;
+}
+
+/** Detect which SLOPE hooks and settings are activated in the project. */
+export function detectSetupHints(projectRoot: string): SetupHints {
+  const hints: SetupHints = {
+    guardsInstalled: false,
+    lifecycleHooksInstalled: false,
+    settingsConfigured: false,
+  };
+
+  // Check .slope/hooks.json for guard-* and lifecycle hook entries
+  const hooksPath = join(projectRoot, '.slope', 'hooks.json');
+  if (existsSync(hooksPath)) {
+    try {
+      const hooksData = JSON.parse(readFileSync(hooksPath, 'utf-8'));
+      const installed = hooksData?.installed ?? {};
+      const keys = Object.keys(installed);
+      hints.guardsInstalled = keys.some((k) => k.startsWith('guard-'));
+      hints.lifecycleHooksInstalled =
+        keys.includes('session-start') && keys.includes('session-end');
+    } catch {
+      // Malformed JSON — treat as not installed
+    }
+  }
+
+  // Check .claude/settings.json for slope-guard.sh in hooks commands
+  const settingsPath = join(projectRoot, '.claude', 'settings.json');
+  if (existsSync(settingsPath)) {
+    try {
+      const raw = readFileSync(settingsPath, 'utf-8');
+      hints.settingsConfigured = raw.includes('slope-guard.sh');
+    } catch {
+      // Unreadable — treat as not configured
+    }
+  }
+
+  return hints;
+}
+
+/** Build a markdown hint string, or null if everything is already set up. */
+export function buildSetupHint(hints: SetupHints): string | null {
+  const missing: string[] = [];
+
+  if (!hints.guardsInstalled) {
+    missing.push(
+      '- **Guard hooks** (explore, hazard, commit-nudge, scope-drift, compaction, stop-check):\n' +
+      '  Proactive guidance during coding. Install with: `slope hook add --level=full`',
+    );
+  }
+
+  if (!hints.lifecycleHooksInstalled) {
+    missing.push(
+      '- **Lifecycle hooks** (session-start, session-end):\n' +
+      '  Automatic session tracking and briefings.\n' +
+      '  Install with: `slope hook add session-start && slope hook add session-end`',
+    );
+  }
+
+  if (!hints.settingsConfigured && !hints.guardsInstalled) {
+    // Settings only matter if guards aren't installed; if guards are installed
+    // but settings are missing, the hook add command handles both.
+  }
+
+  if (missing.length === 0) return null;
+
+  return (
+    '---\n' +
+    'SLOPE Setup Hint: The following hooks are not yet activated:\n\n' +
+    missing.join('\n\n') +
+    '\n\nRun the commands above, then restart your session to activate.'
+  );
+}
+
+export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHints): McpServer {
   const server = new McpServer({
     name: 'slope-tools',
     version: '1.0.0',
@@ -54,7 +132,17 @@ export function createSlopeToolsServer(store?: SlopeStore): McpServer {
           (e) => e.name.toLowerCase().includes(q) || e.description.toLowerCase().includes(q),
         );
       }
-      return { content: [{ type: 'text' as const, text: JSON.stringify(results, null, 2) }] };
+      const content: Array<{ type: 'text'; text: string }> = [
+        { type: 'text' as const, text: JSON.stringify(results, null, 2) },
+      ];
+      // Append setup hint only on unfiltered discovery calls (no query, no module)
+      if (!query && !module && setupHints) {
+        const hint = buildSetupHint(setupHints);
+        if (hint) {
+          content.push({ type: 'text' as const, text: hint });
+        }
+      }
+      return { content };
     },
   );
 
@@ -164,16 +252,18 @@ function findProjectRoot(startDir: string): string {
 
 async function main(): Promise<void> {
   let store: SlopeStore | undefined;
+  let hints: SetupHints | undefined;
   try {
     const { loadConfig } = await import('@slope-dev/core');
     const { createStore } = await import('@slope-dev/store-sqlite');
     const cwd = findProjectRoot(process.cwd());
     const config = loadConfig(cwd);
     store = createStore({ storePath: config.store_path ?? '.slope/slope.db', cwd });
+    hints = detectSetupHints(cwd);
   } catch {
     // No config or store — server runs without store tools
   }
-  const server = createSlopeToolsServer(store);
+  const server = createSlopeToolsServer(store, hints);
   const transport = new StdioServerTransport();
   await server.connect(transport);
 }
