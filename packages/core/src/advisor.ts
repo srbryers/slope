@@ -11,6 +11,7 @@ import type {
   HandicapCard,
   DispersionReport,
   CISignal,
+  PRSignal,
   SlopeEvent,
 } from './types.js';
 import { computeAreaPerformance, computeDispersion } from './dispersion.js';
@@ -220,6 +221,7 @@ export function classifyShot(trace: ExecutionTrace): ShotClassification {
 export interface CombinedSignals {
   trace: ExecutionTrace;
   ci?: CISignal;
+  pr?: PRSignal;
   events?: SlopeEvent[];
 }
 
@@ -234,14 +236,14 @@ export interface CombinedSignals {
  * - Events (failure, dead_end, scope_change) add miss signals
  */
 export function classifyShotFromSignals(input: CombinedSignals): ShotClassification {
-  const { trace, ci, events = [] } = input;
+  const { trace, ci, pr, events = [] } = input;
 
   // Start with base classification from execution trace
   const base = classifyShot(trace);
 
-  // If base already detected misses, enrich with CI/event signals
+  // If base already detected misses, enrich with CI/event/PR signals
   if (base.miss_direction !== null) {
-    return enrichMissClassification(base, ci, events);
+    return enrichMissClassification(base, ci, events, pr);
   }
 
   // Base classified as good (green or in_the_hole)
@@ -292,7 +294,29 @@ export function classifyShotFromSignals(input: CombinedSignals): ShotClassificat
     };
   }
 
-  // No miss signals from events — determine green vs in_the_hole
+  // No miss signals from events — check PR signals before green vs in_the_hole
+
+  // PR signal: high change requests → missed_right (execution needed rework)
+  if (pr && pr.change_request_count >= 2) {
+    return {
+      result: 'missed_right',
+      miss_direction: 'right',
+      confidence: 0.7,
+      reasoning: `${pr.change_request_count} change request(s) on PR #${pr.pr_number} — execution needed rework`,
+    };
+  }
+
+  // PR signal: high comment density + change request → stay green (complex but completed)
+  if (pr && pr.change_request_count > 0 && pr.file_count > 0 && (pr.comment_count / pr.file_count) > 3) {
+    return {
+      result: 'green',
+      miss_direction: null,
+      confidence: 0.8,
+      reasoning: `PR #${pr.pr_number}: high comment density (${pr.comment_count} comments / ${pr.file_count} files) with change request — complex but completed`,
+    };
+  }
+
+  // Determine green vs in_the_hole
 
   // If base was green (hazards with rework), keep it
   if (base.result === 'green') {
@@ -333,19 +357,23 @@ export function classifyShotFromSignals(input: CombinedSignals): ShotClassificat
   }
 
   // CI confirms: all tests pass, no retries → in_the_hole
+  const prBoost = pr && pr.change_request_count === 0 && pr.review_decision === 'APPROVED'
+    ? ` + PR #${pr.pr_number} APPROVED with 0 change requests`
+    : '';
   return {
     result: 'in_the_hole',
     miss_direction: null,
     confidence: 1.0,
-    reasoning: `CI confirms: ${ci!.test_passed}/${ci!.test_total} tests pass, 0 retries — clean execution`,
+    reasoning: `CI confirms: ${ci!.test_passed}/${ci!.test_total} tests pass, 0 retries — clean execution${prBoost}`,
   };
 }
 
-/** Enrich an existing miss classification with CI/event data */
+/** Enrich an existing miss classification with CI/event/PR data */
 function enrichMissClassification(
   base: ShotClassification,
   ci?: CISignal,
   events: SlopeEvent[] = [],
+  pr?: PRSignal,
 ): ShotClassification {
   const reasons: string[] = [base.reasoning];
 
@@ -358,10 +386,15 @@ function enrichMissClassification(
     reasons.push(`${failureCount} failure event(s) recorded`);
   }
 
+  if (pr && pr.change_request_count > 0) {
+    reasons.push(`PR #${pr.pr_number}: ${pr.change_request_count} change request(s)`);
+  }
+
   // If multiple sources agree, boost confidence
   const ciAgrees = ci !== undefined && ci.test_failed > 0;
   const eventsAgree = failureCount > 0;
-  const sources = 1 + (ciAgrees ? 1 : 0) + (eventsAgree ? 1 : 0);
+  const prAgrees = pr !== undefined && pr.change_request_count > 0;
+  const sources = 1 + (ciAgrees ? 1 : 0) + (eventsAgree ? 1 : 0) + (prAgrees ? 1 : 0);
   const confidence = Math.min(base.confidence + (sources - 1) * 0.1, 1.0);
 
   return {
