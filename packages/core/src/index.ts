@@ -83,11 +83,13 @@ export {
 export {
   recommendClub,
   classifyShot,
+  classifyShotFromSignals,
   generateTrainingPlan,
 } from './advisor.js';
 export type {
   RecommendClubInput,
   TrainingPlanInput,
+  CombinedSignals,
 } from './advisor.js';
 
 // Formatter

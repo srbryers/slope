@@ -10,6 +10,8 @@ import type {
   TrainingType,
   HandicapCard,
   DispersionReport,
+  CISignal,
+  SlopeEvent,
 } from './types.js';
 import { computeAreaPerformance, computeDispersion } from './dispersion.js';
 
@@ -207,6 +209,165 @@ export function classifyShot(trace: ExecutionTrace): ShotClassification {
     miss_direction: null,
     confidence: 1.0,
     reasoning: 'Clean execution — all files in scope, no failures, no reverts',
+  };
+}
+
+// ═══════════════════════════════════════════════════════════
+// classifyShotFromSignals()
+// ═══════════════════════════════════════════════════════════
+
+/** Combined signal sources for enhanced shot classification */
+export interface CombinedSignals {
+  trace: ExecutionTrace;
+  ci?: CISignal;
+  events?: SlopeEvent[];
+}
+
+/**
+ * Enhanced shot classification using multiple signal sources.
+ *
+ * Key difference from classifyShot():
+ * - Git-only (no CI, no events) defaults to `green` instead of `in_the_hole`
+ * - CI signals can upgrade to `in_the_hole` (all tests pass, no retries, no failures)
+ * - CI test failures add miss signals (missed_right)
+ * - CI retries reduce confidence
+ * - Events (failure, dead_end, scope_change) add miss signals
+ */
+export function classifyShotFromSignals(input: CombinedSignals): ShotClassification {
+  const { trace, ci, events = [] } = input;
+
+  // Start with base classification from execution trace
+  const base = classifyShot(trace);
+
+  // If base already detected misses, enrich with CI/event signals
+  if (base.miss_direction !== null) {
+    return enrichMissClassification(base, ci, events);
+  }
+
+  // Base classified as good (green or in_the_hole)
+  // Now apply multi-source rules
+
+  // Count event-based miss signals
+  const failureEvents = events.filter(e => e.type === 'failure');
+  const deadEndEvents = events.filter(e => e.type === 'dead_end');
+  const scopeChangeEvents = events.filter(e => e.type === 'scope_change');
+
+  const eventSignals: { result: ShotResult; weight: number; reason: string }[] = [];
+
+  if (deadEndEvents.length > 0) {
+    eventSignals.push({
+      result: 'missed_left',
+      weight: deadEndEvents.length * 2,
+      reason: `${deadEndEvents.length} dead end(s) encountered — approach changes required`,
+    });
+  }
+
+  if (failureEvents.length >= 3) {
+    eventSignals.push({
+      result: 'missed_right',
+      weight: failureEvents.length,
+      reason: `${failureEvents.length} failure events — execution difficulties`,
+    });
+  }
+
+  if (scopeChangeEvents.length > 0) {
+    eventSignals.push({
+      result: 'missed_long',
+      weight: scopeChangeEvents.length,
+      reason: `${scopeChangeEvents.length} scope change(s) — scope expanded during execution`,
+    });
+  }
+
+  // If event signals indicate a miss, return that
+  if (eventSignals.length > 0) {
+    eventSignals.sort((a, b) => b.weight - a.weight);
+    const dominant = eventSignals[0];
+    const dir = MISS_RESULT_TO_DIR[dominant.result] ?? null;
+    const confidence = eventSignals.length === 1 ? 0.8 : 0.6;
+    return {
+      result: dominant.result,
+      miss_direction: dir,
+      confidence,
+      reasoning: dominant.reason,
+    };
+  }
+
+  // No miss signals from events — determine green vs in_the_hole
+
+  // If base was green (hazards with rework), keep it
+  if (base.result === 'green') {
+    return base;
+  }
+
+  // Base was in_the_hole — check if we have CI confirmation
+  const hasCi = ci !== undefined && ci.test_total > 0;
+
+  if (!hasCi) {
+    // Git-only: downgrade to green (need CI to confirm in_the_hole)
+    return {
+      result: 'green',
+      miss_direction: null,
+      confidence: 0.7,
+      reasoning: 'Clean git signals but no CI confirmation — defaulting to green',
+    };
+  }
+
+  // We have CI data — evaluate
+  if (ci!.test_failed > 0) {
+    return {
+      result: 'missed_right',
+      miss_direction: 'right',
+      confidence: 0.9,
+      reasoning: `CI reports ${ci!.test_failed} test failure(s) out of ${ci!.test_total}`,
+    };
+  }
+
+  if (ci!.retries > 0) {
+    // Tests pass but had retries — green, not in_the_hole
+    return {
+      result: 'green',
+      miss_direction: null,
+      confidence: 0.8,
+      reasoning: `All ${ci!.test_passed} tests pass but ${ci!.retries} retry(s) needed — not clean enough for in_the_hole`,
+    };
+  }
+
+  // CI confirms: all tests pass, no retries → in_the_hole
+  return {
+    result: 'in_the_hole',
+    miss_direction: null,
+    confidence: 1.0,
+    reasoning: `CI confirms: ${ci!.test_passed}/${ci!.test_total} tests pass, 0 retries — clean execution`,
+  };
+}
+
+/** Enrich an existing miss classification with CI/event data */
+function enrichMissClassification(
+  base: ShotClassification,
+  ci?: CISignal,
+  events: SlopeEvent[] = [],
+): ShotClassification {
+  const reasons: string[] = [base.reasoning];
+
+  if (ci && ci.test_failed > 0) {
+    reasons.push(`CI confirms: ${ci.test_failed} test failure(s)`);
+  }
+
+  const failureCount = events.filter(e => e.type === 'failure').length;
+  if (failureCount > 0) {
+    reasons.push(`${failureCount} failure event(s) recorded`);
+  }
+
+  // If multiple sources agree, boost confidence
+  const ciAgrees = ci !== undefined && ci.test_failed > 0;
+  const eventsAgree = failureCount > 0;
+  const sources = 1 + (ciAgrees ? 1 : 0) + (eventsAgree ? 1 : 0);
+  const confidence = Math.min(base.confidence + (sources - 1) * 0.1, 1.0);
+
+  return {
+    ...base,
+    confidence: Math.round(confidence * 100) / 100,
+    reasoning: reasons.join('. '),
   };
 }
 
