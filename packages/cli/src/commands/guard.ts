@@ -3,6 +3,8 @@ import type { HookInput, GuardResult, GuardName } from '@slope-dev/core';
 import { loadConfig } from '../config.js';
 import { exploreGuard } from '../guards/explore.js';
 import { hazardGuard } from '../guards/hazard.js';
+import { commitNudgeGuard } from '../guards/commit-nudge.js';
+import { scopeDriftGuard } from '../guards/scope-drift.js';
 
 type GuardHandler = (input: HookInput, cwd: string) => Promise<GuardResult>;
 
@@ -10,6 +12,8 @@ type GuardHandler = (input: HookInput, cwd: string) => Promise<GuardResult>;
 const handlers: Partial<Record<GuardName, GuardHandler>> = {
   explore: exploreGuard,
   hazard: hazardGuard,
+  'commit-nudge': commitNudgeGuard,
+  'scope-drift': scopeDriftGuard,
 };
 
 /** Register a guard handler */

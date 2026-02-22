@@ -25,6 +25,8 @@ vi.mock('../src/config.js', () => ({
 
 import { exploreGuard } from '../src/guards/explore.js';
 import { hazardGuard } from '../src/guards/hazard.js';
+import { commitNudgeGuard } from '../src/guards/commit-nudge.js';
+import { scopeDriftGuard } from '../src/guards/scope-drift.js';
 
 let tmpDir: string;
 
@@ -169,6 +171,58 @@ describe('hazardGuard', () => {
       makeInput({ tool_input: { file_path: join(tmpDir, 'packages/core/src/foo.ts') } }),
       tmpDir,
     );
+    expect(result.decision).toBeUndefined();
+    expect(result.blockReason).toBeUndefined();
+  });
+});
+
+describe('commitNudgeGuard', () => {
+  it('returns empty in non-git directory', async () => {
+    const result = await commitNudgeGuard(makeInput(), tmpDir);
+    expect(result).toEqual({});
+  });
+
+  it('returns empty when no uncommitted changes', async () => {
+    // Initialize a git repo with a commit
+    const { execSync } = await import('node:child_process');
+    execSync('git init && git add -A && git commit -m "init" --allow-empty', { cwd: tmpDir, stdio: 'ignore' });
+
+    const result = await commitNudgeGuard(makeInput(), tmpDir);
+    expect(result).toEqual({});
+  });
+
+  it('is non-blocking (no decision/blockReason)', async () => {
+    const result = await commitNudgeGuard(makeInput(), tmpDir);
+    expect(result.decision).toBeUndefined();
+    expect(result.blockReason).toBeUndefined();
+  });
+});
+
+describe('scopeDriftGuard', () => {
+  it('returns empty when no file path in input', async () => {
+    const result = await scopeDriftGuard(makeInput({ tool_input: {} }), tmpDir);
+    expect(result).toEqual({});
+  });
+
+  it('returns empty when no currentSprint in config', async () => {
+    const result = await scopeDriftGuard(
+      makeInput({ tool_input: { file_path: join(tmpDir, 'src/foo.ts') } }),
+      tmpDir,
+    );
+    expect(result).toEqual({});
+  });
+
+  it('returns empty when scopeDrift is disabled', async () => {
+    mockConfig.guidance = { scopeDrift: false };
+    const result = await scopeDriftGuard(
+      makeInput({ tool_input: { file_path: join(tmpDir, 'src/foo.ts') } }),
+      tmpDir,
+    );
+    expect(result).toEqual({});
+  });
+
+  it('is non-blocking (no decision/blockReason)', async () => {
+    const result = await scopeDriftGuard(makeInput({ tool_input: {} }), tmpDir);
     expect(result.decision).toBeUndefined();
     expect(result.blockReason).toBeUndefined();
   });
