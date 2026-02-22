@@ -8,4 +8,8 @@ Sprint plans and backlog items for the SLOPE framework (core, CLI, MCP tools).
 | 4 | [sprint-4-plan.md](sprint-4-plan.md) | Code Mode MCP Refactor |
 | 5 | [sprint-5-plan.md](sprint-5-plan.md) | Universal Dev Tooling + Dogfood |
 
+## Roadmap
+
+See [roadmap.md](roadmap.md) for the full framework roadmap (S7-S15).
+
 After each sprint, file the scorecard in [../retros/](../retros/) as `sprint-N.json`.
