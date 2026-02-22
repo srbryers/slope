@@ -307,6 +307,24 @@ export interface TournamentHazard {
 /** Types of events captured during a session */
 export type EventType = 'failure' | 'dead_end' | 'scope_change' | 'compaction' | 'hazard' | 'decision';
 
+/** CI/test runner identifier */
+export type CIRunner = 'vitest' | 'jest' | 'unknown';
+
+/** Structured test signal parsed from CI/test runner output */
+export interface CISignal {
+  runner: CIRunner;
+  test_total: number;
+  test_passed: number;
+  test_failed: number;
+  test_skipped: number;
+  suites_total: number;
+  suites_passed: number;
+  suites_failed: number;
+  duration_ms?: number;
+  retries: number;
+  coverage_pct?: number;
+}
+
 /** A telemetry event captured during a session */
 export interface SlopeEvent {
   id: string;

@@ -35,6 +35,8 @@ export type {
   SprintConflict,
   EventType,
   SlopeEvent,
+  CIRunner,
+  CISignal,
 } from './types.js';
 
 // Constants
@@ -189,6 +191,14 @@ export type {
   TrainingTypeTerms,
   NutritionTerms,
 } from './metaphor.js';
+
+// CI Signal Parser
+export {
+  detectRunner,
+  parseTestOutput,
+  parseVitestOutput,
+  parseJestOutput,
+} from './ci-signals.js';
 
 // Built-in metaphors (auto-registers on import)
 export { golf, tennis, baseball, gaming, dnd, matrix } from './metaphors/index.js';
