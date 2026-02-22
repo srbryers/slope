@@ -5,6 +5,7 @@ import type { CommonIssuesFile, SessionEntry, SprintClaim, RoadmapDefinition } f
 import { loadConfig } from '../config.js';
 import { loadScorecards } from '../loader.js';
 import { resolveStore } from '../store.js';
+import { resolveMetaphor } from '../metaphor.js';
 
 export async function briefingCommand(args: string[]): Promise<void> {
   const config = loadConfig();
@@ -83,7 +84,8 @@ export async function briefingCommand(args: string[]): Promise<void> {
     ? { categories: categories.length > 0 ? categories : undefined, keywords: keywords.length > 0 ? keywords : undefined }
     : undefined;
 
-  const output = formatBriefing({ scorecards, commonIssues, lastSession, filter, includeTraining, claims, roadmap, currentSprint: sprintNumber });
+  const metaphor = resolveMetaphor(args, config.metaphor);
+  const output = formatBriefing({ scorecards, commonIssues, lastSession, filter, includeTraining, claims, roadmap, currentSprint: sprintNumber, metaphor });
   console.log('');
   console.log(output);
 }

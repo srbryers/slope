@@ -270,6 +270,16 @@ export async function initCommand(args: string[]): Promise<void> {
   const provider = detectProvider(args);
 
   const configPath = createConfig(cwd);
+
+  // Apply --metaphor flag to config
+  const metaphorArg = args.find(a => a.startsWith('--metaphor='));
+  if (metaphorArg) {
+    const metaphorId = metaphorArg.slice('--metaphor='.length);
+    const configData = JSON.parse(readFileSync(configPath, 'utf8'));
+    configData.metaphor = metaphorId;
+    writeFileSync(configPath, JSON.stringify(configData, null, 2) + '\n');
+  }
+
   console.log(`  Created ${configPath}`);
 
   const scorecardDir = join(cwd, 'docs', 'retros');

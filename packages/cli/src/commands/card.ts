@@ -2,9 +2,11 @@ import { computeHandicapCard } from '@slope-dev/core';
 import type { MissDirection } from '@slope-dev/core';
 import { loadConfig } from '../config.js';
 import { loadScorecards } from '../loader.js';
+import { resolveMetaphor } from '../metaphor.js';
 
-export function cardCommand(): void {
+export function cardCommand(args: string[] = []): void {
   const config = loadConfig();
+  const metaphor = resolveMetaphor(args, config.metaphor);
   const scorecards = loadScorecards(config);
 
   if (scorecards.length === 0) {
@@ -18,7 +20,8 @@ export function cardCommand(): void {
   const pct = (n: number) => n.toFixed(1) + '%';
 
   const minSprint = config.minSprint;
-  console.log(`\nSLOPE Handicap Card (${scorecards.length} scorecard${scorecards.length === 1 ? '' : 's'}, Sprint ${minSprint}+)`);
+  const cardTitle = metaphor ? `SLOPE ${metaphor.vocabulary.handicapCard.charAt(0).toUpperCase() + metaphor.vocabulary.handicapCard.slice(1)}` : 'SLOPE Handicap Card';
+  console.log(`\n${cardTitle} (${scorecards.length} scorecard${scorecards.length === 1 ? '' : 's'}, Sprint ${minSprint}+)`);
   console.log('\u2501'.repeat(47));
   console.log('');
   console.log(`${'Stat'.padEnd(20)}${'Last 5'.padStart(9)}${'Last 10'.padStart(10)}${'All-time'.padStart(10)}`);

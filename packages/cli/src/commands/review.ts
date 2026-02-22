@@ -3,10 +3,12 @@ import { join } from 'node:path';
 import { formatSprintReview } from '@slope-dev/core';
 import type { GolfScorecard, ProjectStats } from '@slope-dev/core';
 import { loadConfig } from '../config.js';
+import { resolveMetaphor } from '../metaphor.js';
 
-export function reviewCommand(path?: string, mode?: string): void {
+export function reviewCommand(path?: string, mode?: string, metaphorFlag?: string): void {
   const config = loadConfig();
   const cwd = process.cwd();
+  const metaphor = resolveMetaphor(metaphorFlag ? [`--metaphor=${metaphorFlag}`] : [], config.metaphor);
 
   if (!path) {
     // Default to latest scorecard
@@ -45,7 +47,7 @@ export function reviewCommand(path?: string, mode?: string): void {
   const card: GolfScorecard = { ...raw, sprint_number: raw.sprint_number ?? raw.sprint };
 
   const reviewMode = mode === 'plain' ? 'plain' : 'technical';
-  const review = formatSprintReview(card, undefined, undefined, reviewMode);
+  const review = formatSprintReview(card, undefined, undefined, reviewMode, metaphor);
   console.log('');
   console.log(review);
 }

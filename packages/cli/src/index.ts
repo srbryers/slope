@@ -42,7 +42,7 @@ switch (subcommand) {
     });
     break;
   case 'card':
-    cardCommand();
+    cardCommand(process.argv.slice(3));
     break;
   case 'validate':
     validateCommand(process.argv[3]);
@@ -50,8 +50,10 @@ switch (subcommand) {
   case 'review': {
     const reviewArgs = process.argv.slice(3);
     const plainFlag = reviewArgs.includes('--plain');
+    const metaphorArg = reviewArgs.find((a: string) => a.startsWith('--metaphor='));
+    const metaphorVal = metaphorArg?.slice('--metaphor='.length);
     const path = reviewArgs.find((a: string) => !a.startsWith('--'));
-    reviewCommand(path, plainFlag ? 'plain' : undefined);
+    reviewCommand(path, plainFlag ? 'plain' : undefined, metaphorVal);
     break;
   }
   case 'briefing':
