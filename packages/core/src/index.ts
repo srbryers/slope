@@ -164,3 +164,29 @@ export { loadConfig, createConfig, resolveConfigPath } from './config.js';
 
 // Loader
 export { loadScorecards, detectLatestSprint, resolveCurrentSprint } from './loader.js';
+
+// Metaphor
+export {
+  registerMetaphor,
+  getMetaphor,
+  listMetaphors,
+  hasMetaphor,
+  validateMetaphor,
+} from './metaphor.js';
+export type {
+  MetaphorDefinition,
+  MetaphorVocabulary,
+  ClubTerms,
+  ShotResultTerms,
+  HazardTerms,
+  ConditionTerms,
+  SpecialPlayTerms,
+  MissDirectionTerms,
+  ScoreLabelTerms,
+  SprintTypeTerms,
+  TrainingTypeTerms,
+  NutritionTerms,
+} from './metaphor.js';
+
+// Built-in metaphors (auto-registers on import)
+export { golf, tennis, baseball, gaming, dnd, matrix } from './metaphors/index.js';
