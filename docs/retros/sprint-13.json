@@ -1,0 +1,111 @@
+{
+  "sprint_number": 13,
+  "theme": "The Clubhouse — HTML Reports + Launch Polish",
+  "par": 4,
+  "slope": 2,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-02-22",
+  "type": "feature",
+  "shots": [
+    {
+      "ticket_key": "S13-1",
+      "title": "Static HTML report generation",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "New report.ts in core with buildReportData() + generateHtmlReport(). Embedded SVG charts: handicap trend, dispersion scatter, area performance bars, nutrition stacked bars, sprint history table. CLI slope report --html with --output and --metaphor flags. Self-contained HTML with inline CSS. 15 core tests + 5 CLI tests."
+    },
+    {
+      "ticket_key": "S13-2",
+      "title": "Report metaphor awareness",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "All report sections now use configured metaphor terms: title, summary cards, chart headings, table headers, dispersion labels, club names, nutrition categories, legend text. 9 new metaphor tests verify gaming vs golf label differences."
+    },
+    {
+      "ticket_key": "S13-3",
+      "title": "Documentation + README overhaul",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Complete README rewrite: metaphor comparison table, 3-platform setup guide (Claude Code, Cursor, OpenCode), agent guidance hooks section, CLI commands organized by category (scoring, planning, sessions, hooks, setup), core API examples with reports + metaphors."
+    },
+    {
+      "ticket_key": "S13-4",
+      "title": "Launch checklist + version bump",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "All 704 tests pass, build + typecheck clean, version bumped 1.0.0 → 1.1.0 across all 4 packages. CLAUDE.md test counts updated."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "wind",
+      "description": "Context continued from previous session — S12 just completed, flow state maintained",
+      "impact": "positive"
+    }
+  ],
+  "special_plays": [],
+  "training": [],
+  "nutrition": [
+    {
+      "category": "hydration",
+      "description": "Full build+test+typecheck after every ticket (704 tests at completion)",
+      "status": "healthy"
+    },
+    {
+      "category": "diet",
+      "description": "Commit-per-ticket discipline — 4 commits for 4 tickets, pushed after each",
+      "status": "healthy"
+    },
+    {
+      "category": "supplements",
+      "description": "29 new tests: 24 core (report + metaphor awareness) + 5 CLI (report integration)",
+      "status": "healthy"
+    },
+    {
+      "category": "recovery",
+      "description": "Zero hazards — 4th consecutive clean sprint. One test helper bug (missing ...overrides spread) caught and fixed immediately.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Fourth consecutive par sprint and cleanest execution yet. The HTML report generation came together quickly with embedded SVG — no external dependencies needed. The metaphor awareness was a clean wedge shot since the report already accepted MetaphorDefinition params.",
+    "advice_for_next_player": "The report module at packages/core/src/report.ts is fully self-contained — HTML + CSS + SVG charts with no dependencies. When adding new chart types, follow the pattern: data computation in buildReportData(), SVG renderer function, then wire into generateHtmlReport(). Metaphor terms are passed through to all renderers.",
+    "what_surprised_you": "The makeScorecard test helper bug (forgetting ...overrides spread) was the only hiccup across all 4 tickets. The embedded SVG approach for charts is surprisingly clean — viewBox scaling handles responsiveness naturally.",
+    "excited_about_next": "Phase 2 is complete. S14 brings multi-agent orchestration — roles, communication protocol, and swarm sessions. The foundation (scoring + metaphors + guidance + reports) is solid."
+  },
+  "bunker_locations": [],
+  "yardage_book_updates": [
+    "packages/core/src/report.ts: buildReportData(), generateHtmlReport(), SVG chart renderers",
+    "packages/cli/src/commands/report.ts: slope report --html [--output=path] [--metaphor=id]",
+    "Report charts: handicap trend (line), dispersion (scatter), area performance (horizontal bars), nutrition (stacked bars)",
+    "All report sections use MetaphorDefinition for display terms",
+    "README.md: complete rewrite with metaphor table, 3-platform setup, full CLI reference",
+    "Version bump: all packages 1.0.0 → 1.1.0"
+  ],
+  "course_management_notes": [
+    "4 tickets, 4 in_the_hole — zero misses, zero hazards (4th consecutive clean sprint)",
+    "Tests grew from 675 to 704 (+29 across core and cli)",
+    "3 new files: report.ts, commands/report.ts, report tests",
+    "Phase 2 complete: S11 (telemetry) + S12 (guidance) + S13 (reports + launch) all delivered"
+  ]
+}
