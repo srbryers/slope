@@ -13,6 +13,8 @@ import {
   renderNutritionChart,
   renderSprintTable,
 } from './report.js';
+import { extractPlayers } from './player.js';
+import { buildLeaderboard, renderLeaderboardHtml } from './leaderboard.js';
 
 // --- Dashboard Config ---
 
@@ -485,6 +487,13 @@ export function generateDashboardHtml(
 
   <h2>${escapeHtml(sprintLabel)} History</h2>
   ${renderSprintTable(data.sprintTrend, metaphor)}
+
+  ${(() => {
+    const players = extractPlayers(data.scorecards);
+    if (players.length <= 1) return '';
+    const leaderboard = buildLeaderboard(data.scorecards);
+    return `<h2>Team Leaderboard</h2>\n  ${renderLeaderboardHtml(leaderboard, metaphor)}`;
+  })()}
 
   <div id="sprint-detail"></div>
 

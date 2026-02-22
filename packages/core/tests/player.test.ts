@@ -5,8 +5,12 @@ import {
   filterScorecardsByPlayer,
   computePlayerHandicaps,
   computePlayerHandicap,
+  computeReporterSeverity,
+  mergeHazardIndices,
+  filterHazardsByVisibility,
 } from '../src/player.js';
 import type { GolfScorecard } from '../src/types.js';
+import type { CommonIssuesFile, RecurringPattern } from '../src/briefing.js';
 
 // --- Test helpers ---
 
@@ -188,5 +192,124 @@ describe('backward compatibility', () => {
     expect(handicaps).toHaveLength(1);
     expect(handicaps[0].player).toBe(DEFAULT_PLAYER);
     expect(handicaps[0].scorecardCount).toBe(2);
+  });
+});
+
+// --- Hazard helpers ---
+
+function makePattern(overrides: Partial<RecurringPattern> = {}): RecurringPattern {
+  return {
+    id: 1,
+    title: 'Test pattern',
+    category: 'testing',
+    sprints_hit: [1],
+    gotcha_refs: [],
+    description: 'Test',
+    prevention: 'Test',
+    ...overrides,
+  };
+}
+
+function makeIssues(patterns: RecurringPattern[]): CommonIssuesFile {
+  return { recurring_patterns: patterns };
+}
+
+// --- computeReporterSeverity ---
+
+describe('computeReporterSeverity', () => {
+  it('returns low for 1 reporter', () => {
+    expect(computeReporterSeverity(['alice'])).toBe('low');
+  });
+
+  it('returns medium for 2 reporters', () => {
+    expect(computeReporterSeverity(['alice', 'bob'])).toBe('medium');
+  });
+
+  it('returns high for 3+ reporters', () => {
+    expect(computeReporterSeverity(['alice', 'bob', 'charlie'])).toBe('high');
+  });
+
+  it('deduplicates reporters before counting', () => {
+    expect(computeReporterSeverity(['alice', 'alice', 'alice'])).toBe('low');
+  });
+
+  it('returns low for empty list', () => {
+    expect(computeReporterSeverity([])).toBe('low');
+  });
+});
+
+// --- mergeHazardIndices ---
+
+describe('mergeHazardIndices', () => {
+  it('adds new pattern with reporter', () => {
+    const existing = makeIssues([]);
+    const newPattern = makePattern({ id: 1, sprints_hit: [5] });
+    const result = mergeHazardIndices(existing, [newPattern], 'alice');
+    expect(result.recurring_patterns).toHaveLength(1);
+    expect(result.recurring_patterns[0].reported_by).toEqual(['alice']);
+  });
+
+  it('merges existing pattern: unions sprints and accumulates reporters', () => {
+    const existing = makeIssues([makePattern({ id: 1, sprints_hit: [1, 2], reported_by: ['alice'] })]);
+    const newPattern = makePattern({ id: 1, sprints_hit: [2, 3] });
+    const result = mergeHazardIndices(existing, [newPattern], 'bob');
+    const merged = result.recurring_patterns[0];
+    expect(merged.sprints_hit).toEqual([1, 2, 3]);
+    expect(merged.reported_by).toEqual(['alice', 'bob']);
+  });
+
+  it('does not duplicate reporters', () => {
+    const existing = makeIssues([makePattern({ id: 1, reported_by: ['alice'] })]);
+    const newPattern = makePattern({ id: 1 });
+    const result = mergeHazardIndices(existing, [newPattern], 'alice');
+    expect(result.recurring_patterns[0].reported_by).toEqual(['alice']);
+  });
+
+  it('handles empty inputs', () => {
+    const result = mergeHazardIndices(makeIssues([]), [], 'alice');
+    expect(result.recurring_patterns).toEqual([]);
+  });
+
+  it('preserves unmatched existing patterns', () => {
+    const existing = makeIssues([makePattern({ id: 1 }), makePattern({ id: 2, title: 'Other' })]);
+    const newPattern = makePattern({ id: 1, sprints_hit: [5] });
+    const result = mergeHazardIndices(existing, [newPattern], 'alice');
+    expect(result.recurring_patterns).toHaveLength(2);
+  });
+});
+
+// --- filterHazardsByVisibility ---
+
+describe('filterHazardsByVisibility', () => {
+  const issues = makeIssues([
+    makePattern({ id: 1, reported_by: ['alice'] }),
+    makePattern({ id: 2, reported_by: ['bob'] }),
+    makePattern({ id: 3, reported_by: ['alice', 'bob'] }),
+    makePattern({ id: 4 }),
+  ]);
+
+  it('returns all for team-wide', () => {
+    const result = filterHazardsByVisibility(issues, { teamWide: true });
+    expect(result.recurring_patterns).toHaveLength(4);
+  });
+
+  it('returns all when no flags set', () => {
+    const result = filterHazardsByVisibility(issues, {});
+    expect(result.recurring_patterns).toHaveLength(4);
+  });
+
+  it('filters by player with personal flag', () => {
+    const result = filterHazardsByVisibility(issues, { player: 'alice', teamWide: false });
+    const ids = result.recurring_patterns.map(p => p.id);
+    expect(ids).toContain(1);
+    expect(ids).toContain(3);
+    expect(ids).toContain(4); // no reported_by = visible to all
+    expect(ids).not.toContain(2);
+  });
+
+  it('playerless patterns visible to all players', () => {
+    const result = filterHazardsByVisibility(issues, { player: 'charlie', teamWide: false });
+    const ids = result.recurring_patterns.map(p => p.id);
+    expect(ids).toEqual([4]); // only the one without reported_by
   });
 });

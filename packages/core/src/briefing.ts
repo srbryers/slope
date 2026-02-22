@@ -27,6 +27,8 @@ export interface RecurringPattern {
   gotcha_refs: string[];
   description: string;
   prevention: string;
+  /** Players who have reported this pattern */
+  reported_by?: string[];
 }
 
 /** The top-level common-issues.json shape */
@@ -444,7 +446,8 @@ export function formatBriefing(opts: {
     lines.push(`${label} (${filtered.length}/${commonIssues.recurring_patterns.length} patterns)`);
     for (const p of filtered) {
       const lastHit = Math.max(...p.sprints_hit);
-      lines.push(`  [${p.category}] ${p.title} (last: S${lastHit})`);
+      const reporterTag = (p.reported_by && p.reported_by.length > 1) ? ` [${p.reported_by.length} reporters]` : '';
+      lines.push(`  [${p.category}] ${p.title} (last: S${lastHit})${reporterTag}`);
       lines.push(`    Prevention: ${p.prevention.slice(0, 120)}${p.prevention.length > 120 ? '...' : ''}`);
     }
   }

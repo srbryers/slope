@@ -368,6 +368,14 @@ export type {
   PluginsConfig,
 } from './plugins.js';
 
+// Leaderboard (Multi-Developer)
+export {
+  buildLeaderboard,
+  formatLeaderboard,
+  renderLeaderboardHtml,
+} from './leaderboard.js';
+export type { LeaderboardEntry, Leaderboard } from './leaderboard.js';
+
 // Player (Multi-Developer)
 export {
   DEFAULT_PLAYER,
@@ -375,8 +383,11 @@ export {
   filterScorecardsByPlayer,
   computePlayerHandicaps,
   computePlayerHandicap,
+  computeReporterSeverity,
+  mergeHazardIndices,
+  filterHazardsByVisibility,
 } from './player.js';
-export type { PlayerHandicap } from './player.js';
+export type { PlayerHandicap, ReporterSeverity } from './player.js';
 
 // Built-in metaphors (auto-registers on import)
 export { golf, tennis, baseball, gaming, dnd, matrix } from './metaphors/index.js';

@@ -8,6 +8,8 @@ import {
   renderSprintDetail,
   getMetaphor,
   DEFAULT_DASHBOARD_CONFIG,
+  buildLeaderboard,
+  filterScorecardsByPlayer,
 } from '@slope-dev/core';
 import type { SlopeConfig, DashboardConfig } from '@slope-dev/core';
 
@@ -60,22 +62,33 @@ export async function dashboardCommand(args: string[]): Promise<void> {
     metaphor = getMetaphor('golf');
   }
 
+  // Parse --player flag
+  const playerArg = args.find(a => a.startsWith('--player='));
+  const playerFilter = playerArg?.slice('--player='.length);
+
   const server = createServer((req, res) => {
     const url = new URL(req.url ?? '/', `http://localhost:${dashConfig.port}`);
     const pathname = url.pathname;
 
     try {
       if (pathname === '/' && req.method === 'GET') {
-        const scorecards = loadScorecards(config, cwd);
+        const allScorecards = loadScorecards(config, cwd);
+        const scorecards = playerFilter ? filterScorecardsByPlayer(allScorecards, playerFilter) : allScorecards;
         const data = buildReportData(scorecards);
         const html = generateDashboardHtml(data, metaphor, dashConfig);
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         res.end(html);
       } else if (pathname === '/api/data' && req.method === 'GET') {
-        const scorecards = loadScorecards(config, cwd);
+        const allScorecards = loadScorecards(config, cwd);
+        const scorecards = playerFilter ? filterScorecardsByPlayer(allScorecards, playerFilter) : allScorecards;
         const data = buildReportData(scorecards);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(data));
+      } else if (pathname === '/api/leaderboard' && req.method === 'GET') {
+        const scorecards = loadScorecards(config, cwd);
+        const leaderboard = buildLeaderboard(scorecards);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(leaderboard));
       } else if (pathname.startsWith('/api/sprint/') && req.method === 'GET') {
         const sprintStr = pathname.slice('/api/sprint/'.length);
         const sprintNum = parseInt(sprintStr, 10);
@@ -142,11 +155,13 @@ Usage:
   slope dashboard --no-open          Don't auto-open browser
   slope dashboard --refresh=60       Set auto-refresh interval (seconds, 0=disable)
   slope dashboard --metaphor=gaming  Use specific metaphor for labels
+  slope dashboard --player=alice     Filter dashboard to a single player
 
 Routes:
-  /                 Dashboard HTML page
-  /api/data         Report data as JSON
-  /api/sprint/:n    Single sprint scorecard (JSON or ?html=1)
+  /                  Dashboard HTML page
+  /api/data          Report data as JSON
+  /api/sprint/:n     Single sprint scorecard (JSON or ?html=1)
+  /api/leaderboard   Team leaderboard (JSON)
 
 Examples:
   slope dashboard

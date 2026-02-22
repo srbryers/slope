@@ -1092,3 +1092,52 @@ describe('formatBriefing — ROLE-BASED CONTEXT', () => {
     expect(baseOutput).toBe(withoutRole);
   });
 });
+
+// --- formatBriefing — MULTI-REPORTER TAGS ---
+
+describe('formatBriefing — reporter tags', () => {
+  it('shows reporter count for multi-reporter patterns', () => {
+    const issues = makeIssues([
+      makePattern({ id: 1, title: 'Shared gotcha', reported_by: ['alice', 'bob', 'charlie'], sprints_hit: [10] }),
+    ]);
+    const output = formatBriefing({
+      scorecards: [],
+      commonIssues: issues,
+    });
+    expect(output).toContain('[3 reporters]');
+  });
+
+  it('does not show reporter tag for single reporter', () => {
+    const issues = makeIssues([
+      makePattern({ id: 1, title: 'Solo gotcha', reported_by: ['alice'], sprints_hit: [10] }),
+    ]);
+    const output = formatBriefing({
+      scorecards: [],
+      commonIssues: issues,
+    });
+    expect(output).not.toContain('reporters]');
+  });
+
+  it('does not show reporter tag when reported_by is absent', () => {
+    const issues = makeIssues([
+      makePattern({ id: 1, title: 'Legacy gotcha', sprints_hit: [10] }),
+    ]);
+    const output = formatBriefing({
+      scorecards: [],
+      commonIssues: issues,
+    });
+    expect(output).not.toContain('reporters]');
+  });
+
+  it('backward compat — patterns without reported_by render normally', () => {
+    const issues = makeIssues([
+      makePattern({ id: 1, title: 'Old pattern', sprints_hit: [5] }),
+    ]);
+    const output = formatBriefing({
+      scorecards: [],
+      commonIssues: issues,
+    });
+    expect(output).toContain('Old pattern');
+    expect(output).toContain('S5');
+  });
+});
