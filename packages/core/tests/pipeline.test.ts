@@ -118,6 +118,52 @@ describe('findPromotionCandidates', () => {
     expect(findPromotionCandidates(clusters)).toHaveLength(0);
   });
 
+  it('populates reported_by from event data.player', () => {
+    const clusters = [
+      {
+        type: 'failure', area: 'core', sprints: [1, 2],
+        events: [
+          makeEvent('failure', 1, { area: 'core', player: 'alice' }),
+          makeEvent('failure', 2, { area: 'core', player: 'bob' }),
+          makeEvent('failure', 2, { area: 'core', player: 'alice' }),
+        ],
+        description: 'test',
+      },
+    ];
+
+    const candidates = findPromotionCandidates(clusters);
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0].suggestedPattern.reported_by).toEqual(['alice', 'bob']);
+  });
+
+  it('populates reported_by from event data.session_player as fallback', () => {
+    const clusters = [
+      {
+        type: 'failure', area: 'core', sprints: [1, 2],
+        events: [
+          makeEvent('failure', 1, { area: 'core', session_player: 'charlie' }),
+          makeEvent('failure', 2, { area: 'core' }),
+        ],
+        description: 'test',
+      },
+    ];
+
+    const candidates = findPromotionCandidates(clusters);
+    expect(candidates[0].suggestedPattern.reported_by).toEqual(['charlie']);
+  });
+
+  it('returns empty reported_by when no player data', () => {
+    const clusters = [
+      { type: 'failure', area: 'core', sprints: [1, 2], events: [
+        makeEvent('failure', 1, { area: 'core' }),
+        makeEvent('failure', 2, { area: 'core' }),
+      ], description: 'test' },
+    ];
+
+    const candidates = findPromotionCandidates(clusters);
+    expect(candidates[0].suggestedPattern.reported_by).toEqual([]);
+  });
+
   it('maps event types to correct categories', () => {
     const clusters = [
       { type: 'dead_end', area: 'api', sprints: [1, 2], events: [], description: 'wrong approach' },
@@ -224,6 +270,30 @@ describe('runPipeline', () => {
     expect(result.clusters).toHaveLength(0);
     expect(result.candidates).toHaveLength(0);
     expect(result.promoted).toBe(0);
+  });
+
+  it('merges reported_by when updating existing pattern', () => {
+    const existingPattern = {
+      id: 1,
+      title: '[telemetry] failure in testing',
+      category: 'build',
+      sprints_hit: [1, 2],
+      gotcha_refs: [],
+      description: 'old',
+      prevention: 'old prevention',
+      reported_by: ['alice'],
+    };
+
+    const events = [
+      makeEvent('failure', 1, { area: 'testing', player: 'alice' }),
+      makeEvent('failure', 2, { area: 'testing', player: 'bob' }),
+      makeEvent('failure', 3, { area: 'testing', player: 'bob' }),
+    ];
+
+    const issues: CommonIssuesFile = { recurring_patterns: [existingPattern] };
+    runPipeline(events, issues);
+
+    expect(issues.recurring_patterns[0].reported_by).toEqual(['alice', 'bob']);
   });
 
   it('assigns sequential IDs to new patterns', () => {

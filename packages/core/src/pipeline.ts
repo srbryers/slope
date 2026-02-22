@@ -145,6 +145,9 @@ export function findPromotionCandidates(
           gotcha_refs: [],
           description: cluster.description,
           prevention: `Check ${cluster.area} area before starting — recurring ${cluster.type} pattern detected from telemetry.`,
+          reported_by: [...new Set(cluster.events
+            .map(e => (e.data.player as string) ?? (e.data.session_player as string))
+            .filter(Boolean))],
         },
       });
     }
@@ -189,6 +192,10 @@ export function runPipeline(
         existing.sprints_hit.push(...newSprints);
         existing.sprints_hit.sort((a, b) => a - b);
         existing.description = candidate.suggestedPattern.description;
+        // Merge reported_by arrays (union, deduplicated)
+        const candidateReporters = candidate.suggestedPattern.reported_by ?? [];
+        const existingReporters = existing.reported_by ?? [];
+        existing.reported_by = [...new Set([...existingReporters, ...candidateReporters])];
         promoted++;
       } else {
         skipped++;
