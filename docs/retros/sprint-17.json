@@ -1,0 +1,133 @@
+{
+  "sprint_number": 17,
+  "theme": "The Plugin System",
+  "par": 4,
+  "slope": 2,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-02-22",
+  "shots": [
+    {
+      "ticket_key": "S17-1",
+      "title": "Plugin discovery + loader framework",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Created packages/core/src/plugins.ts (~150 lines). Types: PluginType, PluginManifest, DiscoveredPlugin, PluginLoadResult, PluginsConfig. Functions: validatePluginManifest, discoverPlugins, isPluginEnabled. Added PluginsConfig to SlopeConfig. Pattern follows loadCustomRoles() — sync fs, try/catch per file, collect errors. 20 tests in plugins.test.ts."
+    },
+    {
+      "ticket_key": "S17-2",
+      "title": "Pluggable metaphor loaders",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [
+        {
+          "type": "rough",
+          "description": "MetaphorDefinition has no type field — discoverPlugins needed to infer type from directory context"
+        }
+      ],
+      "notes": "Added loadPluginMetaphors(cwd) to plugins.ts. Scans .slope/plugins/metaphors/*.json, validates via validateMetaphor(), registers via registerMetaphor(). Test fixture exposed that MetaphorDefinition lacks a type field — fixed by inferring type from directory in discoverPlugins. 12 tests."
+    },
+    {
+      "ticket_key": "S17-3",
+      "title": "Custom guard plugins",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [
+        {
+          "type": "bunker",
+          "description": "GuardName union type constraint — CustomGuardDefinition needed standalone interface with string name instead of extending GuardDefinition"
+        }
+      ],
+      "notes": "Core: CustomGuardDefinition, AnyGuardDefinition, registerCustomGuard (idempotent), getAllGuardDefinitions, getCustomGuard, clearCustomGuards. Widened generateClaudeCodeHooksConfig to AnyGuardDefinition[]. loadPluginGuards in plugins.ts. CLI guard.ts: loads plugins, dispatches custom guards via execSync, guard list shows [custom]. CLI hook.ts: uses getAllGuardDefinitions. 9 tests."
+    },
+    {
+      "ticket_key": "S17-4",
+      "title": "Plugin CLI + init + MCP integration",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [
+        {
+          "type": "rough",
+          "description": "TypeScript type narrowing — builtinGuardNames.includes(g.name) failed because GuardName[] vs string from AnyGuardDefinition. Fixed with explicit string[] annotation."
+        }
+      ],
+      "notes": "Created slope plugin list/validate command. init creates .slope/plugins/{metaphors,guards}/. metaphor.ts loads plugin metaphors before resolution. MCP registry adds 6 plugin function entries. 8 CLI tests."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 3,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "type": "feature",
+  "conditions": [
+    {
+      "type": "altitude",
+      "description": "Architecture sprint — new subsystem touching core, CLI, and MCP packages",
+      "impact": "minor"
+    }
+  ],
+  "special_plays": [],
+  "nutrition": [
+    {
+      "category": "hydration",
+      "description": "Clean build + all 853 tests pass (639 core + 36 store + 132 CLI + 46 MCP) after each commit",
+      "status": "healthy"
+    },
+    {
+      "category": "diet",
+      "description": "2 focused commits: core (S17-1/2/3) then CLI+MCP (S17-3/4). Commit after each build verification.",
+      "status": "healthy"
+    },
+    {
+      "category": "supplements",
+      "description": "Followed loadCustomRoles() pattern from roles.ts — sync fs, try/catch per file, collect errors. Consistent with codebase conventions.",
+      "status": "healthy"
+    },
+    {
+      "category": "recovery",
+      "description": "All existing 804 tests continue to pass. 49 new tests added. Zero regressions.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Smooth and well-scoped. The plan was detailed enough that implementation was mostly mechanical — the biggest decisions had already been made. Three minor hazards were encountered and resolved inline without backtracking.",
+    "advice_for_next_player": "The plugin system is now live. To add a custom metaphor: drop a MetaphorDefinition JSON in .slope/plugins/metaphors/. For guards: drop a JSON with {name, hookEvent, matcher?, level, command} in .slope/plugins/guards/. The command receives hook JSON on stdin. Use slope plugin validate <path> to check before deploying. PluginsConfig in .slope/config.json supports enabled/disabled lists for filtering.",
+    "what_surprised_you": "The MetaphorDefinition type has no type field — it was designed as a pure display config, not a manifest. The discoverPlugins function needed to infer type from directory context rather than requiring it in the file. Also, the GuardName string union made it impossible to extend GuardDefinition directly — the separate CustomGuardDefinition interface was the right call from the plan.",
+    "excited_about_next": "S18 (PR Signals) can now leverage the plugin system for extensible signal parsers. The pattern of scan-dir → validate → register is proven and reusable. The guard plugin dispatch (execSync with stdin piping) opens the door for any external tool integration."
+  },
+  "bunker_locations": [
+    "MetaphorDefinition has no type field — plugin discovery must infer type from directory",
+    "GuardName is a string union — custom guards need standalone CustomGuardDefinition interface",
+    "AnyGuardDefinition union causes TypeScript narrowing issues with Array.includes()"
+  ],
+  "yardage_book_updates": [
+    "packages/core/src/plugins.ts: New file — plugin discovery, validation, metaphor/guard loaders",
+    "packages/core/src/guard.ts: CustomGuardDefinition, AnyGuardDefinition, custom guard registry",
+    "packages/core/src/config.ts: PluginsConfig added to SlopeConfig",
+    "packages/cli/src/commands/plugin.ts: New file — slope plugin list/validate",
+    "packages/cli/src/commands/guard.ts: Custom guard dispatch via execSync",
+    "packages/cli/src/commands/hook.ts: getAllGuardDefinitions for hook installation",
+    "packages/cli/src/commands/init.ts: Creates .slope/plugins/ directories",
+    "packages/cli/src/metaphor.ts: Loads plugin metaphors before resolution",
+    "packages/mcp-tools/src/registry.ts: 6 plugin function entries"
+  ],
+  "course_management_notes": [
+    "4 tickets, 4 in_the_hole — clean execution with minor hazards addressed inline",
+    "13 files modified, 1239 lines added, 19 removed",
+    "Plugin system follows established patterns: loadCustomRoles (roles.ts), registerMetaphor (metaphor.ts)",
+    "Custom guards are idempotent — safe to call loadPluginGuards multiple times",
+    "No scope creep: delivered exactly the plan specification"
+  ]
+}
