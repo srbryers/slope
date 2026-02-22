@@ -38,6 +38,9 @@ export type {
   SlopeEvent,
   CIRunner,
   CISignal,
+  PRPlatform,
+  PRReviewDecision,
+  PRSignal,
 } from './types.js';
 
 // Constants
@@ -215,6 +218,14 @@ export {
   parseVitestOutput,
   parseJestOutput,
 } from './ci-signals.js';
+
+// PR Signal Parser
+export {
+  GH_PR_JSON_FIELDS,
+  buildGhCommand,
+  parsePRJson,
+  emptyPRSignal,
+} from './pr-signals.js';
 
 // Guard Framework
 export {

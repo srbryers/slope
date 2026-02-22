@@ -338,6 +338,30 @@ export interface CISignal {
   coverage_pct?: number;
 }
 
+// --- PR Signal Types ---
+
+/** Supported PR/code review platforms */
+export type PRPlatform = 'github' | 'gitlab' | 'bitbucket' | 'unknown';
+
+/** PR review decision states */
+export type PRReviewDecision = 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | 'COMMENTED' | 'NONE';
+
+/** Structured signal parsed from PR metadata (e.g. gh pr view --json) */
+export interface PRSignal {
+  platform: PRPlatform;
+  pr_number: number;
+  review_cycles: number;
+  change_request_count: number;
+  time_to_merge_minutes: number | null;
+  ci_checks_passed: number;
+  ci_checks_failed: number;
+  file_count: number;
+  additions: number;
+  deletions: number;
+  comment_count: number;
+  review_decision: PRReviewDecision;
+}
+
 /** A telemetry event captured during a session */
 export interface SlopeEvent {
   id: string;
