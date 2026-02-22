@@ -1,0 +1,117 @@
+{
+  "sprint_number": 8,
+  "theme": "The Rosetta Stone — Metaphor Engine",
+  "par": 4,
+  "slope": 2,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-02-22",
+  "type": "feature",
+  "shots": [
+    {
+      "ticket_key": "S8-1",
+      "title": "MetaphorDefinition interface + metaphor registry",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Created metaphor.ts with MetaphorDefinition, 10 term map types, registry (register/get/list/has/validate). 6 metaphor definitions (golf, tennis, baseball, gaming, dnd, matrix). 82 core tests, all passed."
+    },
+    {
+      "ticket_key": "S8-2",
+      "title": "Metaphor-aware formatters",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "description": "capitalize() only uppercases first char — needed titleCase() with regex /\\b\\w/g for multi-word vocabulary terms like '19th Hole' and 'Save Point'"
+        }
+      ],
+      "notes": "Updated formatSprintReview, formatBriefing, formatAdvisorReport with optional MetaphorDefinition parameter. All backward compatible — omitting metaphor gives identical output. 17 new tests."
+    },
+    {
+      "ticket_key": "S8-3",
+      "title": "CLI metaphor resolution + config support",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Created resolveMetaphor() with fallback chain (flag → config → golf). Updated card, review, briefing commands. slope init --metaphor flag. 6 CLI tests."
+    },
+    {
+      "ticket_key": "S8-4",
+      "title": "Metaphor documentation + validation",
+      "club": "putter",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Updated CLAUDE.md with Metaphor System section, test counts, package description."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 1,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "wind",
+      "description": "New subsystem (metaphor engine) touching core + CLI — 10 new source files, 7 modified",
+      "impact": "minor"
+    },
+    {
+      "type": "altitude",
+      "description": "Context continued from previous session — required reconstruction from summary",
+      "impact": "none"
+    }
+  ],
+  "special_plays": [],
+  "training": [],
+  "nutrition": [
+    {
+      "category": "hydration",
+      "description": "Full build+test after every ticket (516 tests at completion)",
+      "status": "healthy"
+    },
+    {
+      "category": "diet",
+      "description": "Commit-per-ticket discipline — 4 commits for 4 tickets, pushed after each",
+      "status": "healthy"
+    },
+    {
+      "category": "supplements",
+      "description": "105 new tests across core (82 metaphor + 17 formatter/briefing) and CLI (6 metaphor)",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Clean execution. The metaphor engine is display-only by design — internal types stay golf-derived, which prevented a massive rename cascade. 6 complete metaphor definitions ship with zero breaking changes.",
+    "advice_for_next_player": "When adding titleCase/capitalize helpers for vocabulary display, use regex /\\b\\w/g to capitalize each word. Also, metaphor barrel import (metaphors/index.ts) auto-registers via side effects — importing @slope-dev/core ensures all metaphors are registered.",
+    "what_surprised_you": "The scope was well-estimated. S8-2 (long_iron) was the most complex as expected — touching formatters across core. The titleCase bug was the only hazard across 4 tickets.",
+    "excited_about_next": "Metaphors are the foundation for S9 (cross-platform) — templates can now be generated dynamically per-metaphor. The engine is extensible — community metaphors just need a MetaphorDefinition object."
+  },
+  "bunker_locations": [
+    "titleCase vs capitalize: vocabulary terms like '19th hole' need each word capitalized, not just the first char"
+  ],
+  "yardage_book_updates": [
+    "metaphor.ts: Map-based registry with getMetaphor fallback to golf, validateMetaphor checks all 10 term maps + vocabulary",
+    "metaphors/index.ts: barrel import registers all 6 metaphors via side effects on import",
+    "Formatter pattern: optional metaphor?: MetaphorDefinition parameter, use m?.clubs[shot.club] ?? shot.club for backward compat",
+    "CLI fallback chain: --metaphor flag → config.metaphor → 'golf' default, resolveMetaphor() in packages/cli/src/metaphor.ts"
+  ],
+  "course_management_notes": [
+    "4 tickets, 3 in_the_hole, 1 green — no misses",
+    "1 hazard (titleCase) — resolved quickly",
+    "Tests grew from 411 to 516 (+105 across core and CLI)",
+    "10 new files created, 7 files modified",
+    "Push after each ticket — 4 pushes"
+  ]
+}
