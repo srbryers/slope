@@ -1,16 +1,16 @@
 # SLOPE Monorepo
 
-Sprint Lifecycle & Operational Performance Engine — golf-metaphor sprint scoring.
+Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint scoring.
 
 ## Monorepo Structure
-- `packages/core` — scoring engine, types, config, store interface, loader (v1.0.0)
+- `packages/core` — scoring engine, types, config, metaphor engine, store interface, loader (v1.0.0)
 - `packages/store-sqlite` — SQLite storage adapter (v1.0.0)
 - `packages/cli` — CLI tool (init, card, validate, review, briefing, plan, session, hook)
 - `packages/mcp-tools` — code-mode MCP server (search + execute + session/claim tools)
 
 ## Commands
 - `pnpm -r build` — build all packages
-- `pnpm -r test` — run all tests (core: 275, store-sqlite: 22, cli: 22, mcp-tools: 30)
+- `pnpm -r test` — run all tests (core: 411, store-sqlite: 22, cli: 47, mcp-tools: 36)
 - `pnpm -r typecheck` — type check all packages
 
 ## MCP Tools
@@ -32,8 +32,17 @@ This repo uses SLOPE to score its own sprints:
 - Always run full build + test + typecheck before committing
 - Core package needs `@types/node` for `node:` module imports
 
+## Metaphor System
+SLOPE uses a pluggable metaphor engine for display output. Internal types remain golf-derived; metaphors are display-only.
+- Config: `"metaphor": "golf"` in `.slope/config.json` (default: golf)
+- Available: golf, tennis, baseball, gaming, dnd, matrix
+- CLI: `--metaphor=<id>` flag on card, review, briefing commands
+- Init: `slope init --metaphor=gaming` sets metaphor in config
+- Core: `packages/core/src/metaphor.ts` (registry + types), `packages/core/src/metaphors/` (definitions)
+- Fallback chain: CLI flag → config.metaphor → golf default
+
 ## Key Files
-- `.slope/config.json` — SLOPE configuration
+- `.slope/config.json` — SLOPE configuration (includes `metaphor` field)
 - `.slope/slope.db` — SQLite store (sessions, claims, scorecards, common issues)
 - `.slope/common-issues.json` — recurring patterns and gotchas (legacy, migrating to store)
 - `.slope/hooks.json` — installed hook registry
