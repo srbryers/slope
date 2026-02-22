@@ -23,6 +23,7 @@ Sprint plans and backlog items for the SLOPE framework (core, CLI, MCP tools).
 | 17 | — | The Pro Shop — Plugin System |
 | 18 | — | PR Signals — Review Metadata Integration |
 | 19 | — | The Dashboard — Live Local Performance Dashboard |
+| 20 | — | The Foursome — Multi-Developer Support |
 
 ## Roadmaps
 

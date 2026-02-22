@@ -395,9 +395,13 @@ export async function initCommand(args: string[]): Promise<void> {
 
   const configPath = createConfig(cwd);
 
-  // Apply metaphor to config (always write it, even for default golf)
+  // Apply metaphor and team config
   const configData = JSON.parse(readFileSync(configPath, 'utf8'));
   configData.metaphor = metaphor.id;
+  if (args.includes('--team')) {
+    configData.team = { players: {} };
+    console.log('  Team mode enabled — add players to .slope/config.json team.players');
+  }
   writeFileSync(configPath, JSON.stringify(configData, null, 2) + '\n');
 
   console.log(`  Created ${configPath}`);

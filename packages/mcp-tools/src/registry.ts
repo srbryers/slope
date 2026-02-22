@@ -421,6 +421,50 @@ export const SLOPE_REGISTRY: FunctionRegistryEntry[] = [
     example: 'return isPluginEnabled("my-plugin", { disabled: ["other"] });',
   },
 
+  // ─── Player (Multi-Developer) ───
+  {
+    name: 'extractPlayers',
+    module: 'core',
+    description: 'Extracts unique sorted player names from scorecards. Undefined player maps to DEFAULT_PLAYER.',
+    signature: 'extractPlayers(scorecards: GolfScorecard[]): string[]',
+    example: 'return extractPlayers(loadScorecards());',
+  },
+  {
+    name: 'filterScorecardsByPlayer',
+    module: 'core',
+    description: 'Filters scorecards to those belonging to a specific player.',
+    signature: 'filterScorecardsByPlayer(scorecards: GolfScorecard[], player: string): GolfScorecard[]',
+    example: 'return filterScorecardsByPlayer(loadScorecards(), "alice");',
+  },
+  {
+    name: 'computePlayerHandicaps',
+    module: 'core',
+    description: 'Computes independent handicap cards for all players found in scorecards.',
+    signature: 'computePlayerHandicaps(scorecards: GolfScorecard[]): PlayerHandicap[]',
+    example: 'return computePlayerHandicaps(loadScorecards());',
+  },
+  {
+    name: 'buildLeaderboard',
+    module: 'core',
+    description: 'Builds a ranked team leaderboard by handicap. Ties get same rank, secondary sort by improvement trend.',
+    signature: 'buildLeaderboard(scorecards: GolfScorecard[]): Leaderboard',
+    example: 'return buildLeaderboard(loadScorecards());',
+  },
+  {
+    name: 'computeReporterSeverity',
+    module: 'core',
+    description: 'Computes hazard severity from reporter count: 1→low, 2→medium, 3+→high.',
+    signature: "computeReporterSeverity(reporters: string[]): 'low' | 'medium' | 'high'",
+    example: 'return computeReporterSeverity(["alice", "bob"]); // → "medium"',
+  },
+  {
+    name: 'mergeHazardIndices',
+    module: 'core',
+    description: 'Merges new patterns into existing common issues, accumulating reporters and unioning sprints_hit.',
+    signature: 'mergeHazardIndices(issues: CommonIssuesFile, newPatterns: RecurringPattern[], reporter: string): CommonIssuesFile',
+    example: 'return mergeHazardIndices(loadCommonIssues(), newPatterns, "alice");',
+  },
+
   // ─── Filesystem helpers (injected into sandbox) ───
   {
     name: 'loadConfig',
@@ -572,7 +616,7 @@ interface HoleStats { fairways_hit: number; fairways_total: number; greens_in_re
 interface HoleScore { sprint_number: number; theme: string; par: 3 | 4 | 5; slope: number; score: number; score_label: ScoreLabel; shots: ShotRecord[]; conditions: ConditionRecord[]; special_plays: SpecialPlay[]; stats: HoleStats; }
 
 // ─── Full Scorecard ───
-interface GolfScorecard extends HoleScore { type?: SprintType; date: string; training?: TrainingSession[]; nutrition?: NutritionEntry[]; yardage_book_updates: string[]; bunker_locations: string[]; course_management_notes: string[]; nineteenth_hole?: NineteenthHole; }
+interface GolfScorecard extends HoleScore { type?: SprintType; player?: string; date: string; training?: TrainingSession[]; nutrition?: NutritionEntry[]; yardage_book_updates: string[]; bunker_locations: string[]; course_management_notes: string[]; nineteenth_hole?: NineteenthHole; }
 
 // ─── Handicap ───
 interface RollingStats { handicap: number; fairway_pct: number; gir_pct: number; avg_putts: number; penalties_per_round: number; miss_pattern: Record<MissDirection, number>; mulligans: number; gimmes: number; }
@@ -640,8 +684,13 @@ interface RoadmapValidationWarning { type: 'warning'; sprint?: number; ticket?: 
 interface CriticalPathResult { path: number[]; length: number; totalPar: number; }
 interface ParallelGroup { sprints: number[]; reason: string; }
 
+// ─── Player (Multi-Developer) ───
+interface PlayerHandicap { player: string; scorecardCount: number; handicapCard: HandicapCard; }
+interface LeaderboardEntry { rank: number; player: string; handicap: number; scorecardCount: number; improvementTrend: number; fairwayPct: number; girPct: number; }
+interface Leaderboard { entries: LeaderboardEntry[]; generatedAt: string; }
+
 // ─── Briefing ───
-interface RecurringPattern { id: number; title: string; category: string; sprints_hit: number[]; gotcha_refs: string[]; description: string; prevention: string; }
+interface RecurringPattern { id: number; title: string; category: string; sprints_hit: number[]; gotcha_refs: string[]; description: string; prevention: string; reported_by?: string[]; }
 interface CommonIssuesFile { recurring_patterns: RecurringPattern[]; }
 interface SessionEntry { id: number; date: string; sprint: string; summary: string; where_left_off: string; }
 interface BriefingFilter { categories?: string[]; keywords?: string[]; }

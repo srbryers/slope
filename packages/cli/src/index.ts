@@ -189,7 +189,10 @@ SLOPE CLI — Sprint Lifecycle & Operational Performance Engine
 
 Usage:
   slope init [--claude-code|--cursor|--opencode|--generic|--all]  Initialize .slope/ directory
+  slope init --team                         Enable multi-developer team mode
   slope card                                Show handicap card
+  slope card --player=<name>                Show handicap for a specific player
+  slope card --team                         Show per-player comparison table
   slope validate [path]                     Validate scorecard(s)
   slope review [path] [--plain]             Format sprint review markdown
   slope briefing [--sprint=N] [options]      Pre-round briefing
@@ -213,6 +216,7 @@ Usage:
   slope standup --ingest=<path> [--role=<id>] Ingest another agent's standup
   slope report --html [--output=<path>]      Generate HTML performance report
   slope dashboard [--port=N] [--no-open]    Live local performance dashboard
+  slope dashboard --player=<name>          Filter dashboard to a single player
   slope roadmap validate|review|status|show  Strategic planning tools
   slope plugin list|validate                Manage custom plugins
 
@@ -222,7 +226,10 @@ Examples:
   slope init --cursor                       Also add SLOPE MCP server to .cursor/mcp.json
   slope init --claude-code                  Also install Claude Code rules + hooks
   slope init --opencode                     Also install OpenCode AGENTS.md + MCP config
+  slope init --team                          Enable multi-developer mode
   slope card                                Show handicap across all scorecards
+  slope card --player=alice                 Show handicap for alice only
+  slope card --team                         Compare all players side-by-side
   slope validate docs/retros/sprint-1.json  Validate a specific scorecard
   slope validate                            Validate all scorecards
   slope review                              Review the latest scorecard
