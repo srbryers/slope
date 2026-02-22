@@ -32,6 +32,7 @@ import { sessionCommand } from './commands/session.js';
 import { hookCommand } from './commands/hook.js';
 import { roadmapCommand } from './commands/roadmap.js';
 import { extractCommand } from './commands/extract.js';
+import { distillCommand } from './commands/distill.js';
 
 const subcommand = process.argv[2];
 
@@ -120,6 +121,12 @@ switch (subcommand) {
       process.exit(1);
     });
     break;
+  case 'distill':
+    distillCommand(process.argv.slice(3)).catch(err => {
+      console.error('Error:', err.message);
+      process.exit(1);
+    });
+    break;
   default:
     console.log(`
 SLOPE CLI — Sprint Lifecycle & Operational Performance Engine
@@ -142,6 +149,7 @@ Usage:
   slope session start|end|heartbeat|list    Manage live sessions
   slope next                                Show next sprint number (auto-detect)
   slope extract --file=<path> [options]       Extract events into SLOPE store
+  slope distill [--auto] [--dry-run]         Promote event patterns to common issues
   slope roadmap validate|review|status|show  Strategic planning tools
 
 Examples:

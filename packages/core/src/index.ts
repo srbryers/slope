@@ -194,6 +194,18 @@ export type {
   NutritionTerms,
 } from './metaphor.js';
 
+// Event Pipeline
+export {
+  clusterEvents,
+  findPromotionCandidates,
+  runPipeline,
+} from './pipeline.js';
+export type {
+  EventCluster,
+  PromotionCandidate,
+  PipelineResult,
+} from './pipeline.js';
+
 // CI Signal Parser
 export {
   detectRunner,
