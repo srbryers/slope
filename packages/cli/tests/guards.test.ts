@@ -27,6 +27,8 @@ import { exploreGuard } from '../src/guards/explore.js';
 import { hazardGuard } from '../src/guards/hazard.js';
 import { commitNudgeGuard } from '../src/guards/commit-nudge.js';
 import { scopeDriftGuard } from '../src/guards/scope-drift.js';
+import { compactionGuard } from '../src/guards/compaction.js';
+import { stopCheckGuard } from '../src/guards/stop-check.js';
 
 let tmpDir: string;
 
@@ -225,5 +227,57 @@ describe('scopeDriftGuard', () => {
     const result = await scopeDriftGuard(makeInput({ tool_input: {} }), tmpDir);
     expect(result.decision).toBeUndefined();
     expect(result.blockReason).toBeUndefined();
+  });
+});
+
+describe('compactionGuard', () => {
+  it('returns empty when no session_id', async () => {
+    const result = await compactionGuard(makeInput({ session_id: '' }), tmpDir);
+    expect(result).toEqual({});
+  });
+
+  it('handles missing store gracefully or records event', async () => {
+    const result = await compactionGuard(makeInput({ session_id: 'test-123' }), tmpDir);
+    // Either returns empty (no store) or returns context (store available)
+    if (result.context) {
+      expect(result.context).toContain('compaction checkpoint');
+      expect(result.context).toContain('test-123');
+    } else {
+      expect(result).toEqual({});
+    }
+  });
+});
+
+describe('stopCheckGuard', () => {
+  it('returns empty in non-git directory', async () => {
+    const result = await stopCheckGuard(makeInput(), tmpDir);
+    expect(result).toEqual({});
+  });
+
+  it('returns empty when everything is committed and pushed', async () => {
+    const { execSync } = await import('node:child_process');
+    execSync('git init && git commit -m "init" --allow-empty', { cwd: tmpDir, stdio: 'ignore' });
+
+    const result = await stopCheckGuard(makeInput(), tmpDir);
+    expect(result).toEqual({});
+  });
+
+  it('blocks when uncommitted changes exist', async () => {
+    const { execSync } = await import('node:child_process');
+    execSync('git init && git commit -m "init" --allow-empty', { cwd: tmpDir, stdio: 'ignore' });
+    writeFileSync(join(tmpDir, 'dirty.txt'), 'uncommitted');
+
+    const result = await stopCheckGuard(makeInput(), tmpDir);
+    expect(result.blockReason).toContain('uncommitted');
+    expect(result.blockReason).toContain('SLOPE');
+  });
+
+  it('mentions commit and push in block reason', async () => {
+    const { execSync } = await import('node:child_process');
+    execSync('git init && git commit -m "init" --allow-empty', { cwd: tmpDir, stdio: 'ignore' });
+    writeFileSync(join(tmpDir, 'dirty.txt'), 'uncommitted');
+
+    const result = await stopCheckGuard(makeInput(), tmpDir);
+    expect(result.blockReason).toContain('Commit and push');
   });
 });

@@ -5,6 +5,8 @@ import { exploreGuard } from '../guards/explore.js';
 import { hazardGuard } from '../guards/hazard.js';
 import { commitNudgeGuard } from '../guards/commit-nudge.js';
 import { scopeDriftGuard } from '../guards/scope-drift.js';
+import { compactionGuard } from '../guards/compaction.js';
+import { stopCheckGuard } from '../guards/stop-check.js';
 
 type GuardHandler = (input: HookInput, cwd: string) => Promise<GuardResult>;
 
@@ -14,6 +16,8 @@ const handlers: Partial<Record<GuardName, GuardHandler>> = {
   hazard: hazardGuard,
   'commit-nudge': commitNudgeGuard,
   'scope-drift': scopeDriftGuard,
+  compaction: compactionGuard,
+  'stop-check': stopCheckGuard,
 };
 
 /** Register a guard handler */
