@@ -1,8 +1,8 @@
 import { execSync } from 'node:child_process';
 import { writeFileSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { buildScorecard, buildAgentBreakdowns, computeSlope, parseTestOutput, classifyShotFromSignals } from '@slope-dev/core';
-import type { ShotRecord, CISignal, ShotResult, AgentBreakdown } from '@slope-dev/core';
+import { buildScorecard, buildAgentBreakdowns, computeSlope, parseTestOutput, classifyShotFromSignals, buildGhCommand, parsePRJson, mergePRChecksWithCI } from '@slope-dev/core';
+import type { ShotRecord, CISignal, PRSignal, ShotResult, AgentBreakdown } from '@slope-dev/core';
 import { loadConfig } from '../config.js';
 import { resolveStore } from '../store.js';
 
@@ -78,12 +78,13 @@ export async function autoCardCommand(args: string[]): Promise<void> {
 
   const sprintNumber = parseInt(opts.sprint ?? '', 10);
   if (!sprintNumber) {
-    console.error('\nUsage: slope auto-card --sprint=<N> [--since=<date>] [--branch=<ref>] [--theme=<text>] [--test-output=<file>] [--swarm=<id>] [--dry-run]\n');
+    console.error('\nUsage: slope auto-card --sprint=<N> [--since=<date>] [--branch=<ref>] [--theme=<text>] [--test-output=<file>] [--pr=<number>] [--swarm=<id>] [--dry-run]\n');
     console.error('  --sprint       Sprint number (required)');
     console.error('  --since        Git log start date, e.g. "2026-02-20" (optional)');
     console.error('  --branch       Git ref to scan (default: HEAD)');
     console.error('  --theme        Sprint theme (default: auto-generated)');
     console.error('  --test-output  Path to test runner output file (Vitest/Jest) for CI-aware scoring');
+    console.error('  --pr           PR number to fetch review/check metadata via `gh` CLI');
     console.error('  --swarm        Swarm ID — map commits to agents for per-agent breakdowns');
     console.error('  --dry-run      Print scorecard JSON without writing to disk\n');
     process.exit(1);
@@ -107,6 +108,24 @@ export async function autoCardCommand(args: string[]): Promise<void> {
     }
   }
 
+  // Fetch PR metadata if --pr provided
+  let prSignal: PRSignal | undefined;
+  if (opts.pr) {
+    const prNumber = parseInt(opts.pr, 10);
+    if (prNumber > 0) {
+      try {
+        const cmd = buildGhCommand(prNumber);
+        const raw = execSync(cmd, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
+        const json = JSON.parse(raw) as Record<string, unknown>;
+        prSignal = parsePRJson(json);
+        // Merge PR check data with CI signal
+        ciSignal = mergePRChecksWithCI(prSignal, ciSignal);
+      } catch {
+        console.error(`  Warning: Could not fetch PR #${prNumber} via gh CLI. Is gh installed and authenticated?`);
+      }
+    }
+  }
+
   const shots: ShotRecord[] = commits.map((commit, i) => {
     const files = git(`diff-tree --no-commit-id --name-only -r ${commit.hash}`)
       .split('\n').filter(Boolean);
@@ -122,6 +141,7 @@ export async function autoCardCommand(args: string[]): Promise<void> {
         hazards_encountered: [],
       },
       ci: ciSignal,
+      pr: prSignal,
     });
 
     return {
@@ -159,9 +179,12 @@ export async function autoCardCommand(args: string[]): Promise<void> {
     _auto_generated: true,
     _commits: commits.length,
     _ci_signal: ciSignal ? { runner: ciSignal.runner, passed: ciSignal.test_passed, failed: ciSignal.test_failed } : null,
-    _note: ciSignal
-      ? 'Auto-generated with CI signals. Review shot results before filing.'
-      : 'Auto-generated from git only (no CI). Shots default to green. Provide --test-output for better scoring.',
+    _pr_signal: prSignal ? { pr_number: prSignal.pr_number, review_cycles: prSignal.review_cycles, change_requests: prSignal.change_request_count, review_decision: prSignal.review_decision } : null,
+    _note: prSignal
+      ? 'Auto-generated with CI + PR signals. Review shot results before filing.'
+      : ciSignal
+        ? 'Auto-generated with CI signals. Review shot results before filing.'
+        : 'Auto-generated from git only (no CI). Shots default to green. Provide --test-output for better scoring.',
   };
 
   const json = JSON.stringify(output, null, 2);
@@ -187,6 +210,9 @@ export async function autoCardCommand(args: string[]): Promise<void> {
     console.log(`  CI: ${ciSignal.runner} — ${ciSignal.test_passed}/${ciSignal.test_total} tests pass`);
   } else {
     console.log(`  No CI output — shots default to green. Use --test-output for better scoring.`);
+  }
+  if (prSignal) {
+    console.log(`  PR: #${prSignal.pr_number} — ${prSignal.review_decision}, ${prSignal.review_cycles} review cycle(s), ${prSignal.change_request_count} change request(s)`);
   }
   if (card.agents && card.agents.length > 0) {
     console.log(`  Agents: ${card.agents.length} (${card.agents.map(a => `${a.agent_role}: ${a.shots.length} shots`).join(', ')})`);

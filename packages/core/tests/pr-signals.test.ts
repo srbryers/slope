@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { buildGhCommand, parsePRJson, emptyPRSignal, GH_PR_JSON_FIELDS } from '../src/pr-signals.js';
+import { buildGhCommand, parsePRJson, emptyPRSignal, GH_PR_JSON_FIELDS, mergePRChecksWithCI, detectCheckRetries } from '../src/pr-signals.js';
+import type { CISignal, PRSignal } from '../src/types.js';
 
 // --- Real `gh pr view --json` sample fixtures ---
 
@@ -211,5 +212,113 @@ describe('emptyPRSignal', () => {
   it('accepts optional pr_number', () => {
     const signal = emptyPRSignal(123);
     expect(signal.pr_number).toBe(123);
+  });
+});
+
+// --- Helper for merge tests ---
+
+function makePR(overrides: Partial<PRSignal> = {}): PRSignal {
+  return {
+    platform: 'github',
+    pr_number: 42,
+    review_cycles: 1,
+    change_request_count: 0,
+    time_to_merge_minutes: 90,
+    ci_checks_passed: 3,
+    ci_checks_failed: 0,
+    file_count: 5,
+    additions: 100,
+    deletions: 20,
+    comment_count: 1,
+    review_decision: 'APPROVED',
+    ...overrides,
+  };
+}
+
+function makeCI(overrides: Partial<CISignal> = {}): CISignal {
+  return {
+    runner: 'vitest',
+    test_total: 100,
+    test_passed: 100,
+    test_failed: 0,
+    test_skipped: 0,
+    suites_total: 5,
+    suites_passed: 5,
+    suites_failed: 0,
+    retries: 0,
+    ...overrides,
+  };
+}
+
+describe('mergePRChecksWithCI', () => {
+  it('derives CISignal from PR when no existing CI', () => {
+    const result = mergePRChecksWithCI(makePR({ ci_checks_passed: 5, ci_checks_failed: 1 }));
+    expect(result.runner).toBe('unknown');
+    expect(result.test_total).toBe(6);
+    expect(result.test_passed).toBe(5);
+    expect(result.test_failed).toBe(1);
+    expect(result.suites_total).toBe(6);
+    expect(result.retries).toBe(0);
+  });
+
+  it('keeps existing CI data when both present', () => {
+    const ci = makeCI({ test_total: 200, test_passed: 200 });
+    const result = mergePRChecksWithCI(makePR(), ci);
+    expect(result.runner).toBe('vitest');
+    expect(result.test_total).toBe(200);
+    expect(result.test_passed).toBe(200);
+  });
+
+  it('detects retry scenario (PR had failures, CI now passing)', () => {
+    const pr = makePR({ ci_checks_failed: 2, ci_checks_passed: 3 });
+    const ci = makeCI({ test_failed: 0, retries: 0 });
+    const result = mergePRChecksWithCI(pr, ci);
+    expect(result.retries).toBe(2); // 2 checks that failed on PR but CI now passes
+  });
+
+  it('no retry boost when CI also has failures', () => {
+    const pr = makePR({ ci_checks_failed: 1 });
+    const ci = makeCI({ test_failed: 3 });
+    const result = mergePRChecksWithCI(pr, ci);
+    expect(result.retries).toBe(0); // CI still failing, not a retry scenario
+  });
+});
+
+describe('detectCheckRetries', () => {
+  it('detects retries from mixed results for same check name', () => {
+    const rollup = [
+      { name: 'test', conclusion: 'FAILURE' },
+      { name: 'test', conclusion: 'SUCCESS' },
+      { name: 'build', conclusion: 'SUCCESS' },
+    ];
+    expect(detectCheckRetries(rollup)).toBe(1);
+  });
+
+  it('returns 0 for empty input', () => {
+    expect(detectCheckRetries([])).toBe(0);
+  });
+
+  it('returns 0 for non-array input', () => {
+    expect(detectCheckRetries(null)).toBe(0);
+    expect(detectCheckRetries(undefined)).toBe(0);
+    expect(detectCheckRetries('not an array')).toBe(0);
+  });
+
+  it('returns 0 when all checks pass on first try', () => {
+    const rollup = [
+      { name: 'test', conclusion: 'SUCCESS' },
+      { name: 'build', conclusion: 'SUCCESS' },
+    ];
+    expect(detectCheckRetries(rollup)).toBe(0);
+  });
+
+  it('counts multiple retried checks', () => {
+    const rollup = [
+      { name: 'test', conclusion: 'FAILURE' },
+      { name: 'test', conclusion: 'SUCCESS' },
+      { name: 'lint', conclusion: 'TIMED_OUT' },
+      { name: 'lint', conclusion: 'SUCCESS' },
+    ];
+    expect(detectCheckRetries(rollup)).toBe(2);
   });
 });

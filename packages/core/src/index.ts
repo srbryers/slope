@@ -225,6 +225,8 @@ export {
   buildGhCommand,
   parsePRJson,
   emptyPRSignal,
+  mergePRChecksWithCI,
+  detectCheckRetries,
 } from './pr-signals.js';
 
 // Guard Framework
