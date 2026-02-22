@@ -128,10 +128,10 @@ describe('generateHtmlReport', () => {
     const html = generateHtmlReport(data);
 
     expect(html).toContain('Performance Trend');
-    expect(html).toContain('Shot Dispersion');
-    expect(html).toContain('Area Performance');
+    expect(html).toContain('Dispersion');
+    expect(html).toContain('Approach Performance');
     expect(html).toContain('Nutrition');
-    expect(html).toContain('History');
+    expect(html).toContain('Sprint History');
   });
 
   it('embeds SVG charts', () => {
@@ -202,5 +202,106 @@ describe('generateHtmlReport', () => {
     expect(html).toContain('Miss Rate');
     expect(html).toContain('Total Shots');
     expect(html).toContain('Dominant Miss');
+  });
+});
+
+describe('generateHtmlReport — metaphor awareness', () => {
+  // Import gaming metaphor for tests
+  let gamingMetaphor: import('../src/metaphor.js').MetaphorDefinition;
+
+  it('loads gaming metaphor', async () => {
+    const { gaming } = await import('../src/metaphors/gaming.js');
+    gamingMetaphor = gaming;
+    expect(gamingMetaphor.id).toBe('gaming');
+  });
+
+  it('uses metaphor vocabulary in title', async () => {
+    const { gaming } = await import('../src/metaphors/gaming.js');
+    const data = buildReportData(makeScorecards(2));
+    const html = generateHtmlReport(data, gaming);
+
+    // Gaming review is "save point"
+    expect(html).toContain('save point');
+    // Should contain "level" (gaming term for sprint)
+    expect(html).toContain('levels analyzed');
+  });
+
+  it('uses metaphor terms in summary cards', async () => {
+    const { gaming } = await import('../src/metaphors/gaming.js');
+    const data = buildReportData(makeScorecards(2));
+    const html = generateHtmlReport(data, gaming);
+
+    // Gaming handicapCard = "player stats"
+    expect(html).toContain('player stats');
+    // Gaming fairway = "Progress", green = "Clear"
+    expect(html).toContain('Progress %');
+    expect(html).toContain('Clear %');
+    // Gaming scorecard = "score screen"
+    expect(html).toContain('score screens');
+  });
+
+  it('uses metaphor terms in table headers', async () => {
+    const { gaming } = await import('../src/metaphors/gaming.js');
+    const data = buildReportData(makeScorecards(2));
+    const html = generateHtmlReport(data, gaming);
+
+    // Gaming sprint = "level"
+    expect(html).toContain('<th>level</th>');
+    // Gaming onTarget = "clear"
+    expect(html).toContain('<th>clear</th>');
+  });
+
+  it('uses metaphor terms in dispersion labels', async () => {
+    const { gaming } = await import('../src/metaphors/gaming.js');
+    const cards = [makeScorecard({
+      shots: [
+        { ticket_key: 'T-1', title: 'Task', club: 'short_iron', result: 'missed_long', hazards: [] },
+        { ticket_key: 'T-2', title: 'Task', club: 'short_iron', result: 'in_the_hole', hazards: [] },
+      ],
+    })];
+    const data = buildReportData(cards);
+    const html = generateHtmlReport(data, gaming);
+
+    // Gaming missDirections.long = "Over-leveled (too much scope)"
+    expect(html).toContain('Over-leveled');
+  });
+
+  it('uses metaphor terms for club names in area chart', async () => {
+    const { gaming } = await import('../src/metaphors/gaming.js');
+    const data = buildReportData(makeScorecards(2));
+    const html = generateHtmlReport(data, gaming);
+
+    // Gaming clubs: short_iron = "Side Quest", wedge = "Fetch Quest", putter = "Tutorial"
+    expect(html).toContain('Side Quest');
+  });
+
+  it('uses metaphor terms for nutrition categories', async () => {
+    const { gaming } = await import('../src/metaphors/gaming.js');
+    const data = buildReportData(makeScorecards(2));
+    const html = generateHtmlReport(data, gaming);
+
+    // Gaming nutrition: hydration = "Mana", diet = "HP"
+    expect(html).toContain('Mana');
+    expect(html).toContain('HP');
+  });
+
+  it('uses metaphor term in area performance legend', async () => {
+    const { gaming } = await import('../src/metaphors/gaming.js');
+    const data = buildReportData(makeScorecards(2));
+    const html = generateHtmlReport(data, gaming);
+
+    // Gaming shotResults.in_the_hole = "S-Rank"
+    expect(html).toContain('S-Rank');
+  });
+
+  it('golf metaphor produces standard labels', async () => {
+    const { golf } = await import('../src/metaphors/golf.js');
+    const data = buildReportData(makeScorecards(2));
+    const html = generateHtmlReport(data, golf);
+
+    // Golf vocabulary: handicap card, Fairway, sprint
+    expect(html).toContain('handicap card');
+    expect(html).toContain('Fairway %');
+    expect(html).toContain('Sprint');
   });
 });

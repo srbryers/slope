@@ -174,7 +174,7 @@ function renderHandicapTrendChart(trend: SprintTrendEntry[], metaphor?: Metaphor
     <svg viewBox="0 0 ${W} ${H}" width="100%">
       ${gridLines}
       <line x1="${PAD.left}" y1="${parY}" x2="${W - PAD.right}" y2="${parY}" stroke="#22c55e" stroke-width="1.5" stroke-dasharray="6,4"/>
-      ${svgText(W - PAD.right + 5, parY + 4, 'Par', { anchor: 'start', size: 10, fill: '#22c55e' })}
+      ${svgText(W - PAD.right + 5, parY + 4, metaphor?.vocabulary.onTarget ?? 'Par', { anchor: 'start', size: 10, fill: '#22c55e' })}
       ${svgLine(points, W, H, '#3b82f6', 2.5)}
       ${dots}
       ${xLabels}
@@ -249,7 +249,7 @@ function renderDispersionChart(dispersion: DispersionReport, metaphor?: Metaphor
       <div class="dispersion-stats">
         <div class="stat"><span class="stat-label">Total Shots</span><span class="stat-value">${dispersion.total_shots}</span></div>
         <div class="stat"><span class="stat-label">Miss Rate</span><span class="stat-value ${missRate > 20 ? 'warn' : ''}">${missRate}%</span></div>
-        <div class="stat"><span class="stat-label">Dominant Miss</span><span class="stat-value">${dominant ?? 'None'}</span></div>
+        <div class="stat"><span class="stat-label">Dominant Miss</span><span class="stat-value">${dominant ? escapeHtml(metaphor?.missDirections[dominant] ?? dominant) : 'None'}</span></div>
       </div>
     </div>
   </div>`;
@@ -288,16 +288,14 @@ function renderAreaPerformanceChart(area: AreaReport, metaphor?: MetaphorDefinit
     bars += svgText(PAD.left + holeW + missW + 8, y + barH / 2 + 4, `${data.in_the_hole_rate}% ${perfectLabel}`, { anchor: 'start', size: 10, fill: '#22c55e' });
   }
 
-  const clubsLabel = metaphor?.vocabulary.sprint ?? 'Club';
-
   return `
   <div class="chart-container">
-    <h3>${clubsLabel === 'Sprint' ? 'Club' : clubsLabel} Performance</h3>
+    <h3>Approach Performance</h3>
     <svg viewBox="0 0 ${W} ${H}" width="100%">
       ${bars}
     </svg>
     <div class="legend">
-      <span class="legend-item"><span class="dot green"></span> Perfect</span>
+      <span class="legend-item"><span class="dot green"></span> ${escapeHtml(metaphor?.shotResults.in_the_hole ?? 'Perfect')}</span>
       <span class="legend-item"><span class="dot red"></span> Miss</span>
     </div>
   </div>`;
@@ -362,12 +360,12 @@ function renderSummaryCards(data: ReportData, metaphor?: MetaphorDefinition): st
       <div class="card-sub" style="color:${trendColor}">Last 5: ${last5.handicap > 0 ? '+' : ''}${last5.handicap} ${trendArrow}</div>
     </div>
     <div class="card">
-      <div class="card-label">Fairway %</div>
+      <div class="card-label">${escapeHtml(metaphor?.shotResults.fairway ?? 'Fairway')} %</div>
       <div class="card-value">${all.fairway_pct}%</div>
       <div class="card-sub">Last 5: ${last5.fairway_pct}%</div>
     </div>
     <div class="card">
-      <div class="card-label">GIR %</div>
+      <div class="card-label">${escapeHtml(metaphor?.shotResults.green ?? 'GIR')} %</div>
       <div class="card-value">${all.gir_pct}%</div>
       <div class="card-sub">Last 5: ${last5.gir_pct}%</div>
     </div>
@@ -404,7 +402,7 @@ function renderSprintTable(trend: SprintTrendEntry[], metaphor?: MetaphorDefinit
     <h3>${escapeHtml(sprintLabel)} History</h3>
     <table>
       <thead>
-        <tr><th>${escapeHtml(sprintLabel)}</th><th>Theme</th><th>Par</th><th>Score</th><th>+/-</th><th>FW%</th><th>GIR%</th></tr>
+        <tr><th>${escapeHtml(sprintLabel)}</th><th>Theme</th><th>${escapeHtml(metaphor?.vocabulary.onTarget ?? 'Par')}</th><th>Score</th><th>+/-</th><th>${escapeHtml(metaphor?.shotResults.fairway ?? 'FW')}%</th><th>${escapeHtml(metaphor?.shotResults.green ?? 'GIR')}%</th></tr>
       </thead>
       <tbody>${rows}</tbody>
     </table>
@@ -451,6 +449,8 @@ const CSS = `
 
 export function generateHtmlReport(data: ReportData, metaphor?: MetaphorDefinition): string {
   const title = metaphor?.vocabulary.review ?? 'SLOPE Report';
+  const sprintLabel = metaphor?.vocabulary.sprint ?? 'Sprint';
+  const nutritionHeading = metaphor ? 'Development Health' : 'Nutrition';
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -469,16 +469,16 @@ export function generateHtmlReport(data: ReportData, metaphor?: MetaphorDefiniti
   <h2>Performance Trend</h2>
   ${renderHandicapTrendChart(data.sprintTrend, metaphor)}
 
-  <h2>Shot Dispersion</h2>
+  <h2>Dispersion</h2>
   ${renderDispersionChart(data.dispersion, metaphor)}
 
-  <h2>Area Performance</h2>
+  <h2>Approach Performance</h2>
   ${renderAreaPerformanceChart(data.areaPerformance, metaphor)}
 
-  <h2>Nutrition</h2>
+  <h2>${escapeHtml(nutritionHeading)}</h2>
   ${renderNutritionChart(data.nutritionTrends, metaphor)}
 
-  <h2>History</h2>
+  <h2>${escapeHtml(sprintLabel)} History</h2>
   ${renderSprintTable(data.sprintTrend, metaphor)}
 
   <div class="footer">SLOPE &mdash; Sprint Lifecycle &amp; Operational Performance Engine</div>
