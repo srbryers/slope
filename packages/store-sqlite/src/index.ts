@@ -68,7 +68,7 @@ const MIGRATIONS: Array<{ version: number; sql: string }> = [
     sql: `
       CREATE TABLE IF NOT EXISTS events (
         id TEXT PRIMARY KEY,
-        session_id TEXT REFERENCES sessions(session_id) ON DELETE SET NULL,
+        session_id TEXT,
         type TEXT NOT NULL,
         timestamp TEXT NOT NULL,
         data TEXT NOT NULL DEFAULT '{}',

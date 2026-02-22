@@ -326,7 +326,7 @@ describe('Events', () => {
     expect(events[0].data).toEqual(complexData);
   });
 
-  it('cascades event session_id to NULL on session delete', async () => {
+  it('preserves events after session delete (no FK cascade)', async () => {
     await store.registerSession({ session_id: 'sess-del', role: 'primary', ide: 'vscode' });
     await store.insertEvent({
       session_id: 'sess-del',
@@ -337,10 +337,22 @@ describe('Events', () => {
 
     await store.removeSession('sess-del');
 
-    // Event still exists but session_id is null
+    // Event still exists with original session_id (events are independent)
     const events = await store.getEventsBySprint(1);
     expect(events).toHaveLength(1);
-    expect(events[0].session_id).toBeUndefined();
+    expect(events[0].session_id).toBe('sess-del');
+  });
+
+  it('inserts events with non-existent session_id', async () => {
+    const event = await store.insertEvent({
+      session_id: 'no-such-session',
+      type: 'decision',
+      data: { choice: 'refactor' },
+    });
+    expect(event.session_id).toBe('no-such-session');
+
+    const events = await store.getEventsBySession('no-such-session');
+    expect(events).toHaveLength(1);
   });
 });
 

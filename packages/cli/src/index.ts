@@ -31,6 +31,7 @@ import { nextCommand } from './commands/next.js';
 import { sessionCommand } from './commands/session.js';
 import { hookCommand } from './commands/hook.js';
 import { roadmapCommand } from './commands/roadmap.js';
+import { extractCommand } from './commands/extract.js';
 
 const subcommand = process.argv[2];
 
@@ -113,6 +114,12 @@ switch (subcommand) {
       process.exit(1);
     });
     break;
+  case 'extract':
+    extractCommand(process.argv.slice(3)).catch(err => {
+      console.error('Error:', err.message);
+      process.exit(1);
+    });
+    break;
   default:
     console.log(`
 SLOPE CLI — Sprint Lifecycle & Operational Performance Engine
@@ -134,6 +141,7 @@ Usage:
   slope hook add|remove|list|show            Manage lifecycle hooks
   slope session start|end|heartbeat|list    Manage live sessions
   slope next                                Show next sprint number (auto-detect)
+  slope extract --file=<path> [options]       Extract events into SLOPE store
   slope roadmap validate|review|status|show  Strategic planning tools
 
 Examples:

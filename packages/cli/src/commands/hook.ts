@@ -11,6 +11,15 @@ const HOOK_TEMPLATES: Record<string, { description: string; managed: string[] }>
     description: 'End the current SLOPE session',
     managed: ['slope session end --session-id="$SLOPE_SESSION_ID"'],
   },
+  'session-end-events': {
+    description: 'Extract session events on session end',
+    managed: [
+      '# Extract structured events from this session',
+      'if [ -n "$SLOPE_SESSION_EVENTS" ] && [ -f "$SLOPE_SESSION_EVENTS" ]; then',
+      '  slope extract --file="$SLOPE_SESSION_EVENTS" --session-id="$SLOPE_SESSION_ID"',
+      'fi',
+    ],
+  },
   'pre-commit': {
     description: 'Run checks before committing',
     managed: ['# Branch naming check (if configured)'],
