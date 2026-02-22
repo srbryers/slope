@@ -82,9 +82,9 @@ git/CI signals → auto-card generates scorecard → validated → committed wit
 
 Signal sources for automated scoring:
 - **Git** — diff size, file count, revert detection, commit cadence, scope drift *(implemented — `slope auto-card` uses git signals today)*
-- **CI/test results** — pass/fail, first-run vs retry, coverage changes *(planned)*
+- **CI/test results** — pass/fail, first-run vs retry, coverage changes *(shipped — S10)*
 - **PR metadata** — review cycles, change requests, merge time *(planned)*
-- **Agent telemetry** — tool calls, context compactions, session duration, escalations *(planned — see Session Telemetry below)*
+- **Agent telemetry** — tool calls, context compactions, session duration, escalations *(partial — session telemetry shipped S10-S11; full transcript extraction planned)*
 
 Manual scoring remains available for nuance the automation can't capture — architectural decisions, hazard severity, lessons learned.
 
@@ -128,13 +128,13 @@ These events feed into:
 - **Auto-scoring** — Dead ends, reverts, and scope changes directly inform shot classification
 - **Briefings** — Next session's pre-round briefing includes "last time in this area, the agent hit X"
 
-## Metaphors (Planned)
+## Metaphors
 
 SLOPE's core scoring engine is pure math — par computation, handicap calculation, dispersion analysis. The language layer is **swappable**. Developers choose the metaphor that resonates with them.
 
-> **Note:** Today, golf terminology is hardcoded throughout the codebase. The metaphor engine described below is planned work — the scoring engine will remain unchanged, but formatters, CLI output, and documentation templates will become metaphor-aware.
+> **Shipped in S8.** The metaphor engine provides a pluggable language layer — the scoring engine is metaphor-unaware, while formatters, CLI output, and documentation templates are metaphor-aware. Six metaphors ship built-in.
 
-### Planned Metaphors
+### Built-in Metaphors
 
 | Metaphor | Sprint | Ticket | Perfect | Good | Over-eng | Under-scope | Performance | Difficulty |
 |----------|--------|--------|---------|------|----------|-------------|-------------|------------|
@@ -145,7 +145,7 @@ SLOPE's core scoring engine is pure math — par computation, handicap calculati
 | **D&D** | Quest | Encounter | Critical hit | Hit | Overcast | Fumble | Level / XP | Challenge Rating |
 | **Matrix** | Simulation | Action | The One | Freed mind | Deja vu | Glitch | Anomaly index | Threat level |
 
-Configuration will be via a `"metaphor": "golf"` field in `.slope/config.json` (this field does not exist yet). The default is golf. The scoring engine is metaphor-unaware — metaphors only affect formatters, CLI output, and documentation templates.
+Configuration is via the `"metaphor": "golf"` field in `.slope/config.json`. The default is golf. The scoring engine is metaphor-unaware — metaphors only affect formatters, CLI output, and documentation templates.
 
 > **Why "metaphor" not "theme"?** The scorecard type already has a `theme` field that stores the sprint's title/description (e.g., "Code Mode MCP Refactor"). To avoid overloading the term, the pluggable language system uses "metaphor."
 
@@ -155,10 +155,10 @@ Configuration will be via a `"metaphor": "golf"` field in `.slope/config.json` (
 
 | Package | Purpose | npm |
 |---------|---------|-----|
-| `@slope-dev/core` | Scoring engine, types, validation, formatters, advisor | Published |
-| `@slope-dev/store-sqlite` | SQLite storage adapter for sessions, claims, scorecards | Published |
-| `@slope-dev/cli` | CLI tool — 15 commands including init, card, validate, review, briefing, plan, session, hook, claim, auto-card, tournament | Published |
-| `@slope-dev/mcp-tools` | Code-mode MCP server (search + execute + session/claim) | Published |
+| `@slope-dev/core` | Scoring engine, types, validation, formatters, advisor, metaphors, roles, standup protocol, escalation, team-handicap, agent breakdown | Published |
+| `@slope-dev/store-sqlite` | SQLite storage adapter for sessions, claims, scorecards, events, common issues | Published |
+| `@slope-dev/cli` | CLI tool — 22 commands covering scoring, sessions, reporting, planning, orchestration, and setup | Published |
+| `@slope-dev/mcp-tools` | Code-mode MCP server (search + execute + session/claim + orchestration registry) | Published |
 
 ### Integration Layers
 
@@ -171,26 +171,33 @@ Configuration will be via a `"metaphor": "golf"` field in `.slope/config.json` (
 │  ┌─────────┐  ┌─────────┐  ┌──────────────────┐    │
 │  │ search  │  │ execute │  │ session / claims │    │
 │  └─────────┘  └─────────┘  └──────────────────┘    │
+│  ┌────────────────────────────────────────────┐     │
+│  │ orchestration (standup, escalation, team)  │     │
+│  └────────────────────────────────────────────┘     │
 ├─────────────────────────────────────────────────────┤
 │  Scoring Engine (@slope-dev/core)                   │
 │  handicap · dispersion · advisor · tournament ·     │
-│  training · briefing · nutrition · classification   │
+│  training · briefing · nutrition · classification · │
+│  roles · standup · escalation · team-handicap       │
 ├─────────────────────────────────────────────────────┤
 │  Storage                                            │
 │  ┌──────────────┐  ┌──────────────────────────────┐ │
 │  │ JSON files   │  │ SQLite (.slope/slope.db)     │ │
-│  │ (scorecards) │  │ (sessions, claims, events*)  │ │
+│  │ (scorecards) │  │ (sessions, claims, events)   │ │
 │  └──────────────┘  └──────────────────────────────┘ │
-│  * events table planned for session telemetry       │
 ├─────────────────────────────────────────────────────┤
-│  CLI (@slope-dev/cli) — 15 commands                 │
+│  CLI (@slope-dev/cli) — 22 commands                 │
 │  init · card · validate · review · briefing ·       │
 │  plan · classify · auto-card · tournament ·         │
-│  session · hook · claim · release · status · next   │
+│  session · hook · claim · release · status · next · │
+│  roadmap · report · extract · distill · standup ·   │
+│  escalate · guard                                   │
 ├─────────────────────────────────────────────────────┤
 │  Hooks (@slope-dev/cli)                             │
 │  session-start · session-end · pre-merge ·          │
 │  post-sprint · pre-commit                           │
+│  Guards: explore · hazard · commit-nudge ·          │
+│  scope-drift · compaction · stop-check              │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -217,17 +224,19 @@ Caddystack is the proof point for SLOPE at scale — 200+ sprints of continuous,
 - `slope plan` — Club recommendation + training plan for upcoming work
 - `slope classify` — Classify a shot from execution trace data
 
-### Static HTML Reports (Planned)
-`slope report --html` generates a self-contained HTML file with embedded data and charts — handicap trends, dispersion visualizations, area performance breakdowns. No server required, shareable as a PR artifact or standalone file.
+### Static HTML Reports
+`slope report --html` generates a self-contained HTML file with embedded data and charts — handicap trends, dispersion visualizations, area performance breakdowns. No server required, shareable as a PR artifact or standalone file. Shipped in S13.
 
 ### Local Dashboard (Future)
 `slope dashboard` starts a local web server for interactive exploration of scorecard data. Reads from `.slope/` directory, no external hosting. Similar to Storybook's local dev server model.
 
 ## Roadmap
 
-### Now (v1.x) — Shipped
-- Core scoring engine, CLI (15 commands), MCP server — **shipped and published**
-- Golf metaphor as default — **shipped** (hardcoded)
+### Shipped (v1.0–v1.1)
+
+**Core (S1-S6):**
+- Core scoring engine, CLI, MCP server — **shipped and published**
+- Golf metaphor as default — **shipped**
 - `auto-card` for git-based scorecard generation — **shipped** (git signals only)
 - Session and claim management via SQLite — **shipped**
 - Hook system with templates for session lifecycle, pre-merge, post-sprint — **shipped**
@@ -235,36 +244,41 @@ Caddystack is the proof point for SLOPE at scale — 200+ sprints of continuous,
 - Nutrition/development health tracking — **shipped**
 - Training plan generation from handicap trends — **shipped**
 
-### Next (S7-S15) — Full Framework
+**Phase 1 — Foundation (S7-S10):**
+- **S7 — Course strategy** — Strategic planning tools: structured roadmap format, `slope roadmap` CLI (validate, review, status, show), MCP integration, strategic briefing context. **Shipped.**
+- **S8 — Metaphor engine** — Pluggable metaphor system with 6 metaphors (Golf, Tennis, Baseball, Gaming, D&D, Matrix). Formatters and CLI are metaphor-aware. **Shipped.**
+- **S9 — Cross-platform** — Cursor (.cursorrules + MCP) and OpenCode (AGENTS.md + MCP) support. Metaphor-aware template generation. Platform auto-detection in `slope init`. **Shipped.**
+- **S10 — Signal intelligence** — CI/test signal parsing, events table in SQLite, versioned migration framework, improved shot classification from combined signals. **Shipped.**
 
-See [docs/backlog/roadmap.md](docs/backlog/roadmap.md) for the detailed sprint-by-sprint plan.
+**Phase 2 — Telemetry, Guidance & Launch (S11-S13):**
+- **S11 — Session telemetry** — Claude Code session hooks for event capture, `slope extract` + `slope distill` commands, event-to-common-issues pipeline, briefing integration. **Shipped.**
+- **S12 — Agent guidance** — `PreToolUse`/`PostToolUse` guard hooks using SLOPE data. Two tiers: scoring (default) and full. Six guards: explore, hazard, commit-nudge, scope-drift, compaction, stop-check. **Shipped.**
+- **S13 — Launch polish** — Static HTML reports (`slope report --html`), documentation overhaul, version bump to v1.1.0. **Shipped.**
 
-**Phase 1 (S7-S10) — Foundation:**
-- **S7 — Course strategy** — Strategic planning tools: structured roadmap format, `slope roadmap` CLI (validate, review, status), MCP integration, strategic briefing context. Codifies the vision → roadmap → architect review → iteration process as methodology tooling.
-- **S8 — Metaphor engine** — Pluggable metaphor system with 6 metaphors (Golf, Tennis, Baseball, Gaming, D&D, Matrix). Scoring math untouched; formatters and CLI become metaphor-aware.
-- **S9 — Cross-platform** — Cursor (.cursorrules + MCP) and OpenCode (AGENTS.md + MCP) support. Template generation replaces static files. Platform auto-detection in `slope init`.
-- **S10 — Signal intelligence** — CI/test signal parsing, events table in SQLite, versioned migration framework, improved shot classification from combined signals. Runs parallel to S8-S9.
+**Phase 3 — Multi-Agent Orchestration (S14-S15):**
+- **S14 — Multi-agent primitives** — Role definitions, standardized standup/communication protocol, swarm session management. **Shipped.**
+- **S15 — Team scoring + integration** — Multi-agent scorecard aggregation, escalation rules, per-role handicaps, swarm performance metrics, Caddystack integration surface. **Shipped.**
 
-**Phase 2 (S11-S13) — Telemetry, Guidance & Launch:**
-- **S11 — Session telemetry** — Claude Code session hooks for event capture, event-to-common-issues pipeline, briefing integration. OpenCode plugin research.
-- **S12 — Agent guidance** — `PreToolUse`/`PostToolUse` hooks that use SLOPE data to guide agents in real-time. Two tiers: scoring (default) and full. Full includes explore guard, hazard warnings, commit discipline nudge, scope drift detection, context compaction checkpoint, and next-work suggestions. Non-blocking hints, not enforcement.
-- **S13 — Launch polish** — Static HTML reports (`slope report --html`), documentation overhaul, version bump, launch checklist.
+See [docs/backlog/roadmap.md](docs/backlog/roadmap.md) for the detailed Phase 1-3 roadmap (complete).
 
-**Phase 3 (S14-S15) — Multi-Agent Orchestration:**
-- **S14 — Multi-agent primitives** — Role definitions (backend, frontend, architect, etc.), standardized standup/communication protocol, swarm session management. One sprint, multiple agents, each with role-appropriate context.
-- **S15 — Team scoring + integration** — Multi-agent scorecard aggregation, escalation rules, per-role handicaps, swarm performance metrics. Caddystack integration surface — after S15, Caddystack becomes a pure mobile UI layer consuming SLOPE's orchestration API.
+### Next (S17-S20) — Phase 4
 
-**Critical path:** S10 → S11 → S12 → S13 → S14 → S15 (6 sprints). S7 (standalone) + S8 → S9 run in parallel. **Minimum viable launch:** S8 + S9. **Full framework:** S15.
+See [docs/backlog/roadmap-phase4.md](docs/backlog/roadmap-phase4.md) for the detailed sprint-by-sprint plan.
+
+- **S17 — The Plugin System** — Pluggable metaphor loaders, custom guard plugins, hook extensibility
+- **S18 — PR Signals** — PR-as-scorecard: scoring signals from PR metadata, review comments, CI status
+- **S19 — The Dashboard** — Local HTML dashboard: handicap trends, miss pattern heatmap, sprint timeline
+- **S20 — The Foursome** — Multi-developer support: per-player handicaps, team leaderboard, shared hazard indices
 
 ### Later
-- **Shared hazard indices** — Multiple developers (not agents) contributing to the same project's common issues. S11's event pipeline handles automated pattern detection; this is the multi-human sharing layer on top.
-- **Local dashboard** — Interactive web UI served locally (`slope dashboard`). S13 delivers static HTML reports; the dashboard adds interactivity and a local server.
-- **Plugin system** — Formalized plugin architecture beyond the OpenCode prototype in S11-4. Claude Code hooks for automatic lifecycle events beyond what S12 provides.
+- **Shared hazard indices** — Multiple developers (not agents) contributing to the same project's common issues. The event pipeline handles automated pattern detection; this is the multi-human sharing layer on top.
+- **Local dashboard** — Interactive web UI served locally (`slope dashboard`). Static HTML reports exist; the dashboard adds interactivity and a local server.
+- **Plugin system** — Formalized plugin architecture for custom metaphor loaders, guard plugins, and hook extensibility.
 
 ### Open Questions
-- **Multi-human workflow** — S15 covers per-role and per-agent handicaps for multi-agent swarms. The multi-human team layer (different developers, not agents, contributing scorecards) still needs design work. Separate handicaps with shared hazards is the likely starting point.
-- **Dashboard distribution** — Static HTML generation ships in S13. Local server is a later extension. Hosted service only if team/cloud features warrant it.
-- **Metaphor priorities** — Which metaphors ship first after golf? Likely driven by community interest.
+- **Multi-human workflow** — Per-role and per-agent handicaps for multi-agent swarms are shipped (S14-S15). The multi-human team layer (different developers, not agents, contributing scorecards) still needs design work. Separate handicaps with shared hazards is the likely starting point.
+- **Dashboard distribution** — Static HTML reports are shipped. Local server is a later extension. Hosted service only if team/cloud features warrant it.
+- **Community metaphors** — Six metaphors ship built-in. Community-contributed metaphors need a plugin loading mechanism (planned for S17).
 
 ## Competitive Position
 
