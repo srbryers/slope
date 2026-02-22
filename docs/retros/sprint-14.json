@@ -1,0 +1,111 @@
+{
+  "sprint_number": 14,
+  "theme": "The Foursome — Multi-Agent Orchestration Primitives",
+  "par": 4,
+  "slope": 2,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-02-22",
+  "type": "feature",
+  "shots": [
+    {
+      "ticket_key": "S14-1",
+      "title": "Role definition types + registry",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "RoleDefinition interface with focusAreas, clubPreferences, briefingFilter. 5 built-in roles (generalist, backend, frontend, architect, devops). Custom roles from .slope/roles/*.json. SlopeSession extended with agent_role + swarm_id. getSessionsBySwarm() on SlopeStore. SQLite migration v3 (ALTER TABLE). MCP registry updated. 19 new tests."
+    },
+    {
+      "ticket_key": "S14-2",
+      "title": "Role-based context injection",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "formatBriefing gains role parameter. Role identity shown in header. Hazards filtered by focusAreas. Common issues filtered by emphasis keywords. Deemphasized categories pushed to end. CLI --role=<id> flag. 9 new tests."
+    },
+    {
+      "ticket_key": "S14-3",
+      "title": "Communication protocol — standup format",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "StandupReport + HandoffEntry types. generateStandup() extracts progress/blockers/decisions/handoffs from events. formatStandup() renders markdown. parseStandup() for ingestion. extractRelevantHandoffs() filters by role. CLI slope standup with --ingest and --json modes. Standups stored as 'standup' events. 23 new tests."
+    },
+    {
+      "ticket_key": "S14-4",
+      "title": "Swarm session management",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "slope session start --swarm=<id> --agent-role=<role>. slope session list --swarm=<id> with stale agent detection. slope status --swarm=<id> for swarm overview: agent counts, per-agent claims, conflicts, blockers from latest standups. Auto-escalation of claim conflicts within swarms."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "wind",
+      "description": "Context continued from S13 — flow state maintained through session continuation",
+      "impact": "positive"
+    }
+  ],
+  "special_plays": [],
+  "training": [],
+  "nutrition": [
+    {
+      "category": "hydration",
+      "description": "Full build+test+typecheck after every ticket (755 tests at completion)",
+      "status": "healthy"
+    },
+    {
+      "category": "diet",
+      "description": "Commit-per-ticket discipline — 4 commits for 4 tickets, pushed after each",
+      "status": "healthy"
+    },
+    {
+      "category": "supplements",
+      "description": "51 new tests: 15 roles + 9 briefing-role + 23 standup + 4 store-sqlite swarm/migration",
+      "status": "healthy"
+    },
+    {
+      "category": "recovery",
+      "description": "Zero hazards — 5th consecutive clean sprint. Minor test expectation issues caught and fixed inline.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Fifth consecutive par sprint. Multi-agent primitives landed cleanly — the role registry follows the same pattern as metaphors (register/get/has/list, built-in auto-registration, JSON custom loading). The standup protocol provides a solid cross-platform communication format.",
+    "advice_for_next_player": "Roles are display-only filters — they don't change scoring or core behavior. The briefing's mergeRoleFilter() merges role emphasis with explicit keywords, but hazard extraction uses the original filter (not merged) to avoid false positives. Swarm session management is read-heavy — getSessionsBySwarm() is the key query.",
+    "what_surprised_you": "The hazard focus-area filtering needed careful separation from keyword emphasis filtering — using role emphasis keywords for extractHazardIndex() filtered out all hazards. The fix was straightforward: use original filter for extraction, role focusAreas for post-filtering.",
+    "excited_about_next": "S15 brings the leaderboard — multi-agent scorecard aggregation, escalation rules, and the integration API surface. SLOPE now has the full primitives: scoring, metaphors, guidance, reports, roles, communication, and swarm coordination."
+  },
+  "bunker_locations": [],
+  "yardage_book_updates": [
+    "packages/core/src/roles.ts: RoleDefinition, registry, 5 built-in roles, loadCustomRoles()",
+    "packages/core/src/standup.ts: StandupReport, generateStandup(), formatStandup(), parseStandup(), extractRelevantHandoffs()",
+    "packages/core/src/store.ts: SlopeSession gains agent_role + swarm_id, getSessionsBySwarm() added",
+    "packages/core/src/briefing.ts: formatBriefing gains role parameter with mergeRoleFilter()",
+    "packages/store-sqlite: Migration v3 (ALTER TABLE sessions ADD COLUMN agent_role, swarm_id)",
+    "packages/cli: slope standup, slope session --swarm, slope status --swarm, slope briefing --role"
+  ],
+  "course_management_notes": [
+    "4 tickets, 4 in_the_hole — zero misses, zero hazards (5th consecutive clean sprint)",
+    "Tests grew from 704 to 755 (+51 across core, store-sqlite, cli, mcp-tools)",
+    "4 new files: roles.ts, standup.ts, standup.test.ts, commands/standup.ts",
+    "Cross-package changes: core types, store interface, store-sqlite migration, mcp-tools registry + mock"
+  ]
+}
