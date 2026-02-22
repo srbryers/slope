@@ -80,6 +80,15 @@
       "gotcha_refs": ["S7-2"],
       "description": "When a CLI command is async and mocks process.exit, using `expect(() => fn()).toThrow()` silently passes because the promise rejection is unhandled. Tests appear to pass but assertions never execute.",
       "prevention": "For async CLI commands that call process.exit, use `await expect(fn()).rejects.toThrow()` with async test callbacks. This is related to pattern #6 (making sync functions async breaks callers)."
+    },
+    {
+      "id": 10,
+      "title": "Telemetry tables should not have FK constraints to session tables",
+      "category": "database",
+      "sprints_hit": [11],
+      "gotcha_refs": ["S11-1"],
+      "description": "Events table initially had REFERENCES sessions(session_id). This prevented inserting events with session IDs that don't exist in the sessions table (e.g., from external tools or after session cleanup).",
+      "prevention": "Telemetry/event tables should be independent. Use indexes for query performance but avoid FK constraints that create coupling between telemetry producers and session lifecycle."
     }
   ]
 }

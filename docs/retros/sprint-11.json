@@ -1,0 +1,124 @@
+{
+  "sprint_number": 11,
+  "theme": "The Transcript — Event Pipeline + Briefing Events + OpenCode Plugin",
+  "par": 4,
+  "slope": 2,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-02-22",
+  "type": "feature",
+  "shots": [
+    {
+      "ticket_key": "S11-1",
+      "title": "slope extract command + session-end-events hook",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [
+        {
+          "type": "rough",
+          "description": "FK constraint on events table prevented inserting events with non-existent session_id. Removed FK — events are independent telemetry."
+        }
+      ],
+      "notes": "New extract command reads structured event JSON from file/stdin. Added session-end-events hook template. 9 new CLI tests. Required migration fix to remove FK constraint."
+    },
+    {
+      "ticket_key": "S11-2",
+      "title": "Event-to-common-issues pipeline",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [
+        {
+          "type": "rough",
+          "description": "TypeScript type inference failed on conditional assignment in distill.ts. Fixed with explicit Awaited<ReturnType<>> annotation."
+        }
+      ],
+      "notes": "New pipeline.ts in core: clusterEvents() groups by type+area, findPromotionCandidates() finds 2+ sprint patterns, runPipeline() promotes to common issues. New distill CLI command. 15 pipeline tests + 1 distill test."
+    },
+    {
+      "ticket_key": "S11-3",
+      "title": "Briefing integration with events",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added recentEvents + eventRecencyWindow params to formatBriefing(). New RECENT EVENTS section groups by type with sprint attribution. CLI loads events from store automatically. 11 new briefing tests."
+    },
+    {
+      "ticket_key": "S11-4",
+      "title": "OpenCode plugin for session lifecycle hooks",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Generated .opencode/plugins/slope-plugin.ts on init --opencode. Handles session.created/idle/deleted/compacted events. 2 new init tests."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 2,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "altitude",
+      "description": "Context continued from previous session — required reconstruction from summary",
+      "impact": "none"
+    }
+  ],
+  "special_plays": [],
+  "training": [],
+  "nutrition": [
+    {
+      "category": "hydration",
+      "description": "Full build+test+typecheck after every ticket (634 tests at completion)",
+      "status": "healthy"
+    },
+    {
+      "category": "diet",
+      "description": "Commit-per-ticket discipline — 4 commits for 4 tickets, pushed after each",
+      "status": "healthy"
+    },
+    {
+      "category": "supplements",
+      "description": "39 new tests: 27 core (16 pipeline + 11 briefing) + 2 CLI init + 9 CLI extract + 1 distill",
+      "status": "healthy"
+    },
+    {
+      "category": "recovery",
+      "description": "FK constraint removal in S11-1 was caught immediately by tests — fast recovery",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Session telemetry pipeline is now end-to-end: extract events → cluster → promote to common issues → surface in briefing. OpenCode plugin closes the platform gap.",
+    "advice_for_next_player": "Events table has NO FK to sessions — this is intentional. Events are independent telemetry that should survive session cleanup. The pipeline's [telemetry] prefix distinguishes auto-promoted patterns from manual entries.",
+    "what_surprised_you": "The OpenCode plugin system is surprisingly clean — TypeScript functions with event dispatch, much more composable than shell script hooks. The briefing events section was a natural addition.",
+    "excited_about_next": "All three platforms now have session lifecycle hooks. The event pipeline can auto-maintain common-issues. Ready for HTML reports and launch prep."
+  },
+  "bunker_locations": [
+    "events table FK constraint — events must NOT have FK to sessions (independent telemetry)",
+    "TypeScript conditional assignment type inference — use explicit Awaited<ReturnType<>> for store method return types"
+  ],
+  "yardage_book_updates": [
+    "slope extract --file=<path> [--session-id=<id>] [--sprint=<N>]: reads JSON events into store",
+    "slope distill [--auto] [--dry-run] [--sprint=<N>] [--threshold=<N>]: event-to-common-issues pipeline",
+    "pipeline.ts: clusterEvents() + findPromotionCandidates() + runPipeline()",
+    "formatBriefing() now accepts recentEvents + eventRecencyWindow for telemetry display",
+    ".opencode/plugins/slope-plugin.ts: auto-generated on init --opencode",
+    "session-end-events hook template in hook.ts"
+  ],
+  "course_management_notes": [
+    "4 tickets, 4 in_the_hole — zero misses, 2 hazards (FK constraint, TS type inference)",
+    "Tests grew from 595 to 634 (+39 across core, cli)",
+    "3 new files created (pipeline.ts, extract.ts, distill.ts), 1 generated template (slope-plugin.ts)",
+    "Push after each ticket — 4 pushes"
+  ]
+}
