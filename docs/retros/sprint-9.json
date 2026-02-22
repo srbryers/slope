@@ -1,0 +1,109 @@
+{
+  "sprint_number": 9,
+  "theme": "Cross-Platform — Template Generators + OpenCode Support",
+  "par": 4,
+  "slope": 2,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-02-22",
+  "type": "feature",
+  "shots": [
+    {
+      "ticket_key": "S9-1",
+      "title": "Template generators replace static templates",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Created template-generator.ts with 10 generator functions for all platform/format combos. Refactored init.ts to use generators instead of cpSync from static templates. 15 new tests."
+    },
+    {
+      "ticket_key": "S9-2",
+      "title": "Cursor .cursorrules + complete integration",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added generateCursorrules() for project-root .cursorrules file with metaphor-aware vocabulary. slope init --cursor now installs .cursorrules + .mdc rules + MCP config. 6 new tests."
+    },
+    {
+      "ticket_key": "S9-3",
+      "title": "OpenCode AGENTS.md + opencode.json MCP config",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added --opencode provider. Generates AGENTS.md (OpenCode's project context) and opencode.json with MCP config using OpenCode's format (type: local, command array). 7 new tests."
+    },
+    {
+      "ticket_key": "S9-4",
+      "title": "Platform detection + unified init",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Auto-detection from project markers (.claude/, .cursor/, opencode.json, AGENTS.md, CLAUDE.md, .cursorrules). --all flag installs for all 3 platforms. 10 new tests."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "altitude",
+      "description": "Context continued from previous session — required reconstruction from summary",
+      "impact": "none"
+    }
+  ],
+  "special_plays": [],
+  "training": [],
+  "nutrition": [
+    {
+      "category": "hydration",
+      "description": "Full build+test after every ticket (554 tests at completion)",
+      "status": "healthy"
+    },
+    {
+      "category": "diet",
+      "description": "Commit-per-ticket discipline — 4 commits for 4 tickets, pushed after each",
+      "status": "healthy"
+    },
+    {
+      "category": "supplements",
+      "description": "38 new tests across CLI (15 generator + 6 cursor + 7 opencode + 10 detection)",
+      "status": "healthy"
+    },
+    {
+      "category": "recovery",
+      "description": "S9-1 refactored init.ts cleanly — existing 11 init tests all pass unchanged",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Cleanest sprint yet — zero hazards across all 4 tickets. The template generator pattern from S9-1 made S9-2 and S9-3 trivial to implement since the generator functions were already structured for new platforms.",
+    "advice_for_next_player": "OpenCode uses a different MCP config format than Claude Code and Cursor: command is an array (not string+args), top-level key is 'mcp' (not 'mcpServers'), and type field is required. Always research platform config formats before implementing.",
+    "what_surprised_you": "No hazards at all. The S8 metaphor engine was so well-designed that plugging it into template generation was completely smooth. The MetaphorDefinition interface provided exactly the vocabulary needed.",
+    "excited_about_next": "Three platforms now fully supported. The generator pattern means adding a fourth platform in the future is just adding one more generator function + install handler."
+  },
+  "bunker_locations": [],
+  "yardage_book_updates": [
+    "template-generator.ts: 10 generator functions covering CLAUDE.md, AGENTS.md, .cursorrules, sprint-checklist, commit-discipline, review-loop (3 formats each)",
+    "OpenCode MCP format: {mcp: {slope: {type: 'local', command: ['npx', '@slope-dev/mcp-tools']}}} in opencode.json",
+    "detectPlatforms(): checks .claude/, CLAUDE.md, .cursor/, .cursorrules, opencode.json, AGENTS.md",
+    "init --all installs for all 3 platforms; no-flag auto-detects from project markers"
+  ],
+  "course_management_notes": [
+    "4 tickets, 4 in_the_hole — zero misses, zero hazards",
+    "Tests grew from 516 to 554 (+38 across CLI)",
+    "4 files created, 3 files modified",
+    "Push after each ticket — 4 pushes"
+  ]
+}
