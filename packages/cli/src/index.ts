@@ -118,7 +118,7 @@ switch (subcommand) {
 SLOPE CLI — Sprint Lifecycle & Operational Performance Engine
 
 Usage:
-  slope init [--claude-code|--cursor|--opencode|--generic]  Initialize .slope/ directory
+  slope init [--claude-code|--cursor|--opencode|--generic|--all]  Initialize .slope/ directory
   slope card                                Show handicap card
   slope validate [path]                     Validate scorecard(s)
   slope review [path] [--plain]             Format sprint review markdown

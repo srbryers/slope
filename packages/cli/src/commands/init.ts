@@ -107,12 +107,29 @@ const STARTER_ROADMAP = {
 
 type Provider = 'claude-code' | 'cursor' | 'opencode' | 'generic';
 
-function detectProvider(args: string[]): Provider | null {
-  if (args.includes('--claude-code')) return 'claude-code';
-  if (args.includes('--cursor')) return 'cursor';
-  if (args.includes('--opencode')) return 'opencode';
-  if (args.includes('--generic')) return 'generic';
-  return null;
+function detectProvidersFromArgs(args: string[]): Provider[] {
+  const providers: Provider[] = [];
+  if (args.includes('--claude-code')) providers.push('claude-code');
+  if (args.includes('--cursor')) providers.push('cursor');
+  if (args.includes('--opencode')) providers.push('opencode');
+  if (args.includes('--generic')) providers.push('generic');
+  if (args.includes('--all')) return ['claude-code', 'cursor', 'opencode'];
+  return providers;
+}
+
+/** Detect platforms present in the project directory */
+export function detectPlatforms(cwd: string): Provider[] {
+  const detected: Provider[] = [];
+  if (existsSync(join(cwd, '.claude')) || existsSync(join(cwd, 'CLAUDE.md'))) {
+    detected.push('claude-code');
+  }
+  if (existsSync(join(cwd, '.cursor')) || existsSync(join(cwd, '.cursorrules'))) {
+    detected.push('cursor');
+  }
+  if (existsSync(join(cwd, 'opencode.json')) || existsSync(join(cwd, 'AGENTS.md'))) {
+    detected.push('opencode');
+  }
+  return detected;
 }
 
 function getTemplatesRoot(): string {
@@ -323,9 +340,40 @@ function installDefaultHooks(cwd: string, provider: Provider): void {
   saveHooksConfig(cwd, config);
 }
 
+function installForProvider(cwd: string, provider: Provider, metaphor: MetaphorDefinition): void {
+  switch (provider) {
+    case 'claude-code':
+      installClaudeCodeTemplates(cwd, metaphor);
+      installClaudeCodeMcpConfig(cwd);
+      installDefaultHooks(cwd, 'claude-code');
+      break;
+    case 'cursor':
+      installCursorTemplates(cwd, metaphor);
+      installCursorMcpConfig(cwd);
+      installDefaultHooks(cwd, 'cursor');
+      break;
+    case 'opencode':
+      installOpenCodeTemplates(cwd, metaphor);
+      installOpenCodeMcpConfig(cwd);
+      break;
+    case 'generic':
+      installGenericTemplates(cwd, metaphor);
+      break;
+  }
+}
+
 export async function initCommand(args: string[]): Promise<void> {
   const cwd = process.cwd();
-  const provider = detectProvider(args);
+
+  // Determine which providers to install
+  let providers = detectProvidersFromArgs(args);
+  if (providers.length === 0) {
+    // Auto-detect platforms present in the project
+    providers = detectPlatforms(cwd);
+    if (providers.length > 0) {
+      console.log(`  Detected platform${providers.length > 1 ? 's' : ''}: ${providers.join(', ')}`);
+    }
+  }
 
   // Resolve metaphor early — used for config and template generation
   const metaphorArg = args.find(a => a.startsWith('--metaphor='));
@@ -385,26 +433,8 @@ export async function initCommand(args: string[]): Promise<void> {
   saveHooksConfig(cwd, { installed: {} });
   console.log(`  Created .slope/hooks.json`);
 
-  switch (provider) {
-    case 'claude-code':
-      installClaudeCodeTemplates(cwd, metaphor);
-      installClaudeCodeMcpConfig(cwd);
-      installDefaultHooks(cwd, 'claude-code');
-      break;
-    case 'cursor':
-      installCursorTemplates(cwd, metaphor);
-      installCursorMcpConfig(cwd);
-      installDefaultHooks(cwd, 'cursor');
-      break;
-    case 'opencode':
-      installOpenCodeTemplates(cwd, metaphor);
-      installOpenCodeMcpConfig(cwd);
-      break;
-    case 'generic':
-      installGenericTemplates(cwd, metaphor);
-      break;
-    default:
-      break;
+  for (const p of providers) {
+    installForProvider(cwd, p, metaphor);
   }
 
   console.log('\nSLOPE initialized. Try:');

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, readFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { initCommand } from '../src/commands/init.js';
+import { initCommand, detectPlatforms } from '../src/commands/init.js';
 
 let tmpDir: string;
 let originalCwd: string;
@@ -233,6 +233,85 @@ describe('init --opencode', () => {
     expect(content).toContain('player stats');
     expect(content).toContain('Pre-Level');
     expect(content).toContain('Boss Fight');
+  });
+});
+
+describe('detectPlatforms', () => {
+  it('detects Claude Code from .claude directory', () => {
+    mkdirSync(join(tmpDir, '.claude'), { recursive: true });
+    expect(detectPlatforms(tmpDir)).toContain('claude-code');
+  });
+
+  it('detects Claude Code from CLAUDE.md', () => {
+    writeFileSync(join(tmpDir, 'CLAUDE.md'), '# Test');
+    expect(detectPlatforms(tmpDir)).toContain('claude-code');
+  });
+
+  it('detects Cursor from .cursor directory', () => {
+    mkdirSync(join(tmpDir, '.cursor'), { recursive: true });
+    expect(detectPlatforms(tmpDir)).toContain('cursor');
+  });
+
+  it('detects Cursor from .cursorrules', () => {
+    writeFileSync(join(tmpDir, '.cursorrules'), '# Test');
+    expect(detectPlatforms(tmpDir)).toContain('cursor');
+  });
+
+  it('detects OpenCode from opencode.json', () => {
+    writeFileSync(join(tmpDir, 'opencode.json'), '{}');
+    expect(detectPlatforms(tmpDir)).toContain('opencode');
+  });
+
+  it('detects OpenCode from AGENTS.md', () => {
+    writeFileSync(join(tmpDir, 'AGENTS.md'), '# Test');
+    expect(detectPlatforms(tmpDir)).toContain('opencode');
+  });
+
+  it('detects multiple platforms', () => {
+    mkdirSync(join(tmpDir, '.claude'), { recursive: true });
+    mkdirSync(join(tmpDir, '.cursor'), { recursive: true });
+    writeFileSync(join(tmpDir, 'opencode.json'), '{}');
+    const detected = detectPlatforms(tmpDir);
+    expect(detected).toContain('claude-code');
+    expect(detected).toContain('cursor');
+    expect(detected).toContain('opencode');
+  });
+
+  it('returns empty array when no platforms detected', () => {
+    expect(detectPlatforms(tmpDir)).toEqual([]);
+  });
+});
+
+describe('init --all', () => {
+  it('installs for all three platforms', async () => {
+    await initCommand(['--all']);
+
+    // Claude Code
+    expect(existsSync(join(tmpDir, 'CLAUDE.md'))).toBe(true);
+    expect(existsSync(join(tmpDir, '.mcp.json'))).toBe(true);
+    expect(existsSync(join(tmpDir, '.claude', 'rules', 'sprint-checklist.md'))).toBe(true);
+
+    // Cursor
+    expect(existsSync(join(tmpDir, '.cursorrules'))).toBe(true);
+    expect(existsSync(join(tmpDir, '.cursor', 'mcp.json'))).toBe(true);
+    expect(existsSync(join(tmpDir, '.cursor', 'rules', 'slope-sprint-checklist.mdc'))).toBe(true);
+
+    // OpenCode
+    expect(existsSync(join(tmpDir, 'AGENTS.md'))).toBe(true);
+    expect(existsSync(join(tmpDir, 'opencode.json'))).toBe(true);
+  });
+});
+
+describe('init auto-detection', () => {
+  it('auto-detects and installs for detected platforms', async () => {
+    // Pre-create a .cursor directory so detection picks it up
+    mkdirSync(join(tmpDir, '.cursor'), { recursive: true });
+
+    await initCommand([]);
+
+    // Cursor should be auto-installed
+    expect(existsSync(join(tmpDir, '.cursorrules'))).toBe(true);
+    expect(existsSync(join(tmpDir, '.cursor', 'mcp.json'))).toBe(true);
   });
 });
 
