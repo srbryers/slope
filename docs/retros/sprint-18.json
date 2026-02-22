@@ -1,0 +1,112 @@
+{
+  "sprint_number": 18,
+  "theme": "PR Signals",
+  "par": 4,
+  "slope": 2,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-02-22",
+  "shots": [
+    {
+      "ticket_key": "S18-1",
+      "title": "PR metadata signal parser",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Created packages/core/src/pr-signals.ts (~130 lines). Types: PRPlatform, PRReviewDecision, PRSignal. Functions: buildGhCommand, parsePRJson, emptyPRSignal. Internal helpers: countReviewCycles, countChangeRequests, computeTimeToMerge, extractStatusChecks, normalizeReviewDecision. Pure parser pattern following ci-signals.ts. 14 tests."
+    },
+    {
+      "ticket_key": "S18-2",
+      "title": "Review-based shot classification",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added pr?: PRSignal to CombinedSignals. PR rules in classifyShotFromSignals: change_request_count >= 2 → missed_right (0.7 confidence), high comment density (>3/file) + change request → green (0.8), clean PR boosts in_the_hole reasoning. Updated enrichMissClassification with PR source counting. All 83 existing advisor tests still pass. 13 new tests."
+    },
+    {
+      "ticket_key": "S18-3",
+      "title": "CI status integration from PR",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added mergePRChecksWithCI (derives CI from PR checks, detects retry scenario) and detectCheckRetries. CLI: --pr=<number> flag on auto-card with execSync + try/catch for graceful degradation. PR signal metadata in output JSON. 9 new tests."
+    },
+    {
+      "ticket_key": "S18-4",
+      "title": "MCP + briefing + docs",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "MCP registry: 4 PR signal entries (parsePRJson, buildGhCommand, mergePRChecksWithCI, emptyPRSignal). SLOPE_TYPES: PRPlatform, PRReviewDecision, PRSignal, CombinedSignals update. Briefing: PR Context section with review decision, cycles, checks, comment density, time-to-merge. Plugin template: docs/templates/pr-signal-plugin.json. 12 tests."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "type": "feature",
+  "conditions": [
+    {
+      "type": "altitude",
+      "description": "Multi-package feature — new signal source threading through core types, advisor logic, CLI integration, MCP registry, and briefing",
+      "impact": "minor"
+    }
+  ],
+  "special_plays": [],
+  "nutrition": [
+    {
+      "category": "hydration",
+      "description": "Clean build + all 901 tests pass (679 core + 36 store + 132 CLI + 54 MCP) after each commit",
+      "status": "healthy"
+    },
+    {
+      "category": "diet",
+      "description": "4 focused commits, one per ticket in sequence. Build + targeted test run after each before committing.",
+      "status": "healthy"
+    },
+    {
+      "category": "supplements",
+      "description": "Followed ci-signals.ts pure-parser pattern for pr-signals.ts. CombinedSignals optional pr field mirrors optional ci field. Plan line references anchored on code context.",
+      "status": "healthy"
+    },
+    {
+      "category": "recovery",
+      "description": "All existing 853 tests continue to pass. 48 new tests added across 4 test files. Zero regressions.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Very smooth. The plan was precise enough that implementation was mechanical — each ticket mapped cleanly to files and test suites. The ci-signals.ts pattern made pr-signals.ts straightforward. No hazards encountered.",
+    "advice_for_next_player": "PR signals flow: CLI runs `gh pr view --json` → parsePRJson() → feeds into classifyShotFromSignals via pr field + mergePRChecksWithCI for CI enrichment. The PRSignal type is the contract — see docs/templates/pr-signal-plugin.json for the schema. emptyPRSignal() is exported (unlike emptyCISignal) because MCP needs it for safe defaults.",
+    "what_surprised_you": "Nothing surprising — the plan was well-reviewed and the codebase patterns are mature. The comment density calculation (comments/files > 3) as a complexity signal is a simple but effective heuristic. The retry detection (PR checks failed but CI now passes) is a clever way to infer retries without parsing individual check re-runs.",
+    "excited_about_next": "The signal source matrix is now complete: git traces + CI output + PR metadata. Next opportunities: auto-card could auto-detect the latest merged PR for the branch, or the plugin system could support custom signal parsers for GitLab/Bitbucket using the pr-signal-plugin.json contract."
+  },
+  "bunker_locations": [],
+  "yardage_book_updates": [
+    "packages/core/src/types.ts: PRPlatform, PRReviewDecision, PRSignal types",
+    "packages/core/src/pr-signals.ts: New file — PR signal parser (buildGhCommand, parsePRJson, emptyPRSignal, mergePRChecksWithCI, detectCheckRetries)",
+    "packages/core/src/advisor.ts: CombinedSignals.pr, PR rules in classifyShotFromSignals, enrichMissClassification with PR source",
+    "packages/cli/src/commands/auto-card.ts: --pr flag with gh subprocess + graceful degradation",
+    "packages/core/src/briefing.ts: PR Context section in formatBriefing",
+    "packages/mcp-tools/src/registry.ts: 4 PR signal entries + SLOPE_TYPES update",
+    "docs/templates/pr-signal-plugin.json: JSON schema for cross-platform PR signal plugins"
+  ],
+  "course_management_notes": [
+    "4 tickets, 4 in_the_hole — zero hazards, zero regressions",
+    "13 files modified, 1126 lines added, 14 removed",
+    "Pure-parser pattern (pr-signals.ts) keeps I/O at CLI boundary — clean separation",
+    "Backward-compatible: pr is optional everywhere, existing behavior unchanged when absent",
+    "Signal source matrix now complete: git traces + CI output + PR metadata"
+  ]
+}
