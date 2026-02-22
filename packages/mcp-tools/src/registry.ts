@@ -287,6 +287,36 @@ export const SLOPE_REGISTRY: FunctionRegistryEntry[] = [
     example: 'return resolveEscalationConfig({ blocker_timeout: 30 });',
   },
 
+  // ─── Team Handicap ───
+  {
+    name: 'computeTeamHandicap',
+    module: 'core',
+    description: 'Builds a complete team handicap card: overall stats, per-role handicap, swarm efficiency, and role combination analysis.',
+    signature: 'computeTeamHandicap(scorecards: GolfScorecard[], coordinationEvents?: number): TeamHandicapCard',
+    example: 'return computeTeamHandicap(loadScorecards());',
+  },
+  {
+    name: 'computeRoleHandicap',
+    module: 'core',
+    description: 'Computes per-role handicap stats from agent breakdowns across sprints.',
+    signature: 'computeRoleHandicap(role: string, breakdowns: AgentBreakdown[]): RoleHandicap',
+    example: 'return computeRoleHandicap("backend", breakdowns);',
+  },
+  {
+    name: 'computeSwarmEfficiency',
+    module: 'core',
+    description: 'Computes swarm efficiency: agent counts, score vs par, and efficiency ratio (productive shots / total + coordination overhead).',
+    signature: 'computeSwarmEfficiency(scorecards: GolfScorecard[], coordinationEvents?: number): SwarmEfficiency',
+    example: 'return computeSwarmEfficiency(loadScorecards(), 5);',
+  },
+  {
+    name: 'analyzeRoleCombinations',
+    module: 'core',
+    description: 'Analyzes which role combinations produce the best sprint results.',
+    signature: 'analyzeRoleCombinations(scorecards: GolfScorecard[]): RoleCombinationStats[]',
+    example: 'return analyzeRoleCombinations(loadScorecards());',
+  },
+
   // ─── Filesystem helpers (injected into sandbox) ───
   {
     name: 'loadConfig',
@@ -469,6 +499,12 @@ type EscalationSeverity = 'warning' | 'critical';
 type EscalationAction = 'log_event' | 'mark_blocked' | 'notify_standup';
 interface EscalationConfig { blocker_timeout?: number; claim_conflict?: boolean; test_failure_cascade?: number; actions?: EscalationAction[]; }
 interface EscalationResult { trigger: EscalationTrigger; severity: EscalationSeverity; description: string; session_id?: string; agent_role?: string; actions: EscalationAction[]; }
+
+// ─── Team Handicap ───
+interface RoleHandicap { role: string; sprints_participated: number; total_shots: number; stats: RollingStats; }
+interface SwarmEfficiency { total_sprints: number; total_agents: number; avg_agents_per_sprint: number; total_shots: number; total_score: number; avg_score_vs_par: number; coordination_events: number; efficiency_ratio: number; }
+interface RoleCombinationStats { roles: string[]; sprint_count: number; avg_score_vs_par: number; total_hazards: number; }
+interface TeamHandicapCard { overall: RollingStats; by_role: RoleHandicap[]; swarm_efficiency: SwarmEfficiency; role_combinations: RoleCombinationStats[]; }
 
 // ─── Advisor ───
 interface ExecutionTrace { planned_scope_paths: string[]; modified_files: string[]; test_results: { suite: string; passed: boolean; first_run: boolean }[]; reverts: number; elapsed_minutes: number; hazards_encountered: HazardHit[]; }

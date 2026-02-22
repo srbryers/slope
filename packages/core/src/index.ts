@@ -246,6 +246,21 @@ export type {
   NutritionTrendEntry,
 } from './report.js';
 
+// Team Handicap
+export {
+  extractRoleData,
+  computeRoleHandicap,
+  computeSwarmEfficiency,
+  analyzeRoleCombinations,
+  computeTeamHandicap,
+} from './team-handicap.js';
+export type {
+  RoleHandicap,
+  SwarmEfficiency,
+  RoleCombinationStats,
+  TeamHandicapCard,
+} from './team-handicap.js';
+
 // Roles
 export {
   registerRole,
