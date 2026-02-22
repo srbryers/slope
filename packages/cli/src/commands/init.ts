@@ -14,6 +14,7 @@ import {
   generateCursorCommitDiscipline,
   generateCursorReviewLoop,
   generateCursorrules,
+  generateAgentsMd,
   generateGenericChecklist,
 } from '../template-generator.js';
 
@@ -104,11 +105,12 @@ const STARTER_ROADMAP = {
   ],
 };
 
-type Provider = 'claude-code' | 'cursor' | 'generic';
+type Provider = 'claude-code' | 'cursor' | 'opencode' | 'generic';
 
 function detectProvider(args: string[]): Provider | null {
   if (args.includes('--claude-code')) return 'claude-code';
   if (args.includes('--cursor')) return 'cursor';
+  if (args.includes('--opencode')) return 'opencode';
   if (args.includes('--generic')) return 'generic';
   return null;
 }
@@ -245,6 +247,41 @@ function installCursorMcpConfig(cwd: string): void {
   console.log(`  Created/updated ${mcpPath} (slope MCP server)`);
 }
 
+function installOpenCodeTemplates(cwd: string, metaphor: MetaphorDefinition): void {
+  // Generate AGENTS.md (OpenCode's project context file)
+  const agentsMdDest = join(cwd, 'AGENTS.md');
+  if (!existsSync(agentsMdDest)) {
+    writeFileSync(agentsMdDest, generateAgentsMd(metaphor));
+    console.log(`  Created ${agentsMdDest}`);
+  }
+
+  console.log('\n  OpenCode AGENTS.md installed.');
+}
+
+function installOpenCodeMcpConfig(cwd: string): void {
+  const mcpPath = join(cwd, 'opencode.json');
+  let config: { $schema?: string; mcp?: Record<string, { type: string; command: string[]; enabled?: boolean }> } = {};
+
+  if (existsSync(mcpPath)) {
+    try {
+      const raw = readFileSync(mcpPath, 'utf8');
+      config = JSON.parse(raw) as typeof config;
+    } catch {
+      config = {};
+    }
+  }
+
+  if (!config.$schema) config.$schema = 'https://opencode.ai/config.json';
+  if (!config.mcp) config.mcp = {};
+  config.mcp.slope = {
+    type: 'local',
+    command: ['npx', '@slope-dev/mcp-tools'],
+  };
+
+  writeFileSync(mcpPath, JSON.stringify(config, null, 2) + '\n');
+  console.log(`  Created/updated ${mcpPath} (slope MCP server)`);
+}
+
 function installDefaultHooks(cwd: string, provider: Provider): void {
   // Import hook templates inline to avoid circular deps
   const SESSION_HOOKS: Record<string, string[]> = {
@@ -358,6 +395,10 @@ export async function initCommand(args: string[]): Promise<void> {
       installCursorTemplates(cwd, metaphor);
       installCursorMcpConfig(cwd);
       installDefaultHooks(cwd, 'cursor');
+      break;
+    case 'opencode':
+      installOpenCodeTemplates(cwd, metaphor);
+      installOpenCodeMcpConfig(cwd);
       break;
     case 'generic':
       installGenericTemplates(cwd, metaphor);

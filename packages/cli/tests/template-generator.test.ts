@@ -5,6 +5,7 @@ import {
   generateSprintChecklist,
   generateCommitDiscipline,
   generateReviewLoop,
+  generateAgentsMd,
   generateCursorSprintChecklist,
   generateCursorCommitDiscipline,
   generateCursorReviewLoop,
@@ -131,6 +132,25 @@ describe('Cursor templates', () => {
 
     const commit = generateCursorCommitDiscipline(gaming);
     expect(commit).toContain('Post-Quest Routine');
+  });
+});
+
+describe('generateAgentsMd', () => {
+  it('golf output references opencode.json', () => {
+    const content = generateAgentsMd(golf);
+    expect(content).toContain('SLOPE Project');
+    expect(content).toContain('opencode.json');
+    expect(content).toContain('handicap card');
+    expect(content).toContain('Commit Discipline');
+    expect(content).toContain('Driver: risky');
+  });
+
+  it('gaming output uses gaming vocabulary', () => {
+    const content = generateAgentsMd(gaming);
+    expect(content).toContain('player stats');
+    expect(content).toContain('Pre-Level');
+    expect(content).toContain('Boss Fight');
+    expect(content).toContain('S-Rank: perfect');
   });
 });
 

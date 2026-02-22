@@ -171,6 +171,71 @@ describe('init --cursor creates .cursorrules', () => {
   });
 });
 
+describe('init --opencode', () => {
+  it('creates AGENTS.md when file does not exist', async () => {
+    await initCommand(['--opencode']);
+
+    const agentsMd = join(tmpDir, 'AGENTS.md');
+    expect(existsSync(agentsMd)).toBe(true);
+
+    const content = readFileSync(agentsMd, 'utf8');
+    expect(content).toContain('SLOPE Project');
+    expect(content).toContain('opencode.json');
+    expect(content).toContain('Commit Discipline');
+  });
+
+  it('does not overwrite existing AGENTS.md', async () => {
+    const agentsMd = join(tmpDir, 'AGENTS.md');
+    writeFileSync(agentsMd, '# My Custom AGENTS.md\n');
+
+    await initCommand(['--opencode']);
+
+    const content = readFileSync(agentsMd, 'utf8');
+    expect(content).toBe('# My Custom AGENTS.md\n');
+  });
+
+  it('creates opencode.json with slope MCP server', async () => {
+    await initCommand(['--opencode']);
+
+    const mcpPath = join(tmpDir, 'opencode.json');
+    expect(existsSync(mcpPath)).toBe(true);
+
+    const content = JSON.parse(readFileSync(mcpPath, 'utf8'));
+    expect(content.$schema).toBe('https://opencode.ai/config.json');
+    expect(content.mcp).toBeDefined();
+    expect(content.mcp.slope).toEqual({
+      type: 'local',
+      command: ['npx', '@slope-dev/mcp-tools'],
+    });
+  });
+
+  it('merges slope into existing opencode.json', async () => {
+    const mcpPath = join(tmpDir, 'opencode.json');
+    writeFileSync(mcpPath, JSON.stringify({
+      mcp: { other: { type: 'local', command: ['echo'] } },
+    }, null, 2));
+
+    await initCommand(['--opencode']);
+
+    const content = JSON.parse(readFileSync(mcpPath, 'utf8'));
+    expect(content.mcp.other).toEqual({ type: 'local', command: ['echo'] });
+    expect(content.mcp.slope).toEqual({
+      type: 'local',
+      command: ['npx', '@slope-dev/mcp-tools'],
+    });
+  });
+
+  it('uses metaphor vocabulary in AGENTS.md', async () => {
+    await initCommand(['--opencode', '--metaphor=gaming']);
+
+    const agentsMd = join(tmpDir, 'AGENTS.md');
+    const content = readFileSync(agentsMd, 'utf8');
+    expect(content).toContain('player stats');
+    expect(content).toContain('Pre-Level');
+    expect(content).toContain('Boss Fight');
+  });
+});
+
 describe('init creates roadmap', () => {
   it('creates starter roadmap.json', async () => {
     await initCommand([]);

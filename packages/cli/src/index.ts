@@ -118,7 +118,7 @@ switch (subcommand) {
 SLOPE CLI — Sprint Lifecycle & Operational Performance Engine
 
 Usage:
-  slope init [--claude-code|--cursor|--generic]  Initialize .slope/ directory
+  slope init [--claude-code|--cursor|--opencode|--generic]  Initialize .slope/ directory
   slope card                                Show handicap card
   slope validate [path]                     Validate scorecard(s)
   slope review [path] [--plain]             Format sprint review markdown
@@ -141,6 +141,7 @@ Examples:
   slope init --cursor                       Also install Cursor IDE rules
   slope init --cursor                       Also add SLOPE MCP server to .cursor/mcp.json
   slope init --claude-code                  Also install Claude Code rules + hooks
+  slope init --opencode                     Also install OpenCode AGENTS.md + MCP config
   slope card                                Show handicap across all scorecards
   slope validate docs/retros/sprint-1.json  Validate a specific scorecard
   slope validate                            Validate all scorecards

@@ -211,6 +211,56 @@ Delta review of Round 2 changes. Expected outcome: approval with minor notes.
 `;
 }
 
+// --- OpenCode AGENTS.md ---
+
+export function generateAgentsMd(m: MetaphorDefinition): string {
+  const r = routineNames(m);
+  const clubs = m.clubs;
+  const results = m.shotResults;
+
+  return `# SLOPE Project
+
+This project uses the SLOPE framework for sprint tracking.
+
+## Commands
+- \`slope card\` — view ${r.handicapCard.toLowerCase()}
+- \`slope validate\` — validate ${r.scorecard.toLowerCase()}s
+- \`slope review\` — generate sprint review
+- \`slope briefing\` — ${r.briefing.toLowerCase()}
+
+## MCP Tools
+A SLOPE MCP server is configured in \`opencode.json\`. Two tools:
+- \`search\` — discover API functions, types, constants
+- \`execute\` — run JS with full SLOPE API in sandbox
+
+## Sprint Workflow
+- **Pre-${r.sprint}:** \`slope briefing\` for handicap, hazards, gotchas
+- **Per-${r.ticket}:** classify each ticket with approach + result + hazards
+- **Post-${r.sprint}:** \`slope validate\` ${r.scorecard.toLowerCase()}, \`slope review\`, update common-issues
+
+## Approach Complexity
+- ${clubs.driver}: risky/new territory
+- ${clubs.long_iron}: multi-package changes
+- ${clubs.short_iron}: standard work
+- ${clubs.wedge}: small tasks
+- ${clubs.putter}: trivial changes
+
+## ${r.ticket} Results
+- ${results.in_the_hole}: perfect execution
+- ${results.green}: landed correctly
+- ${results.fairway}: clean start, needs finishing
+- Miss directions: over-scoped, under-scoped, wrong approach, drift
+
+## Commit Discipline
+- Commit after each file, feature, migration, or bug fix
+- Push after each ticket and every 30 minutes
+- Format: \`<type>(<ticket>): <summary>\` (feat/fix/refactor/docs/test/chore)
+
+## ${r.scorecard}s
+Stored in docs/retros/sprint-N.json. See .slope/config.json for configuration.
+`;
+}
+
 // --- Cursor .mdc wrappers ---
 
 export function generateCursorSprintChecklist(m: MetaphorDefinition): string {
