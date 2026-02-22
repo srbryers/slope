@@ -136,6 +136,28 @@ export type {
   TournamentHazard,
 } from './types.js';
 
+// Roadmap
+export {
+  validateRoadmap,
+  computeCriticalPath,
+  findParallelOpportunities,
+  parseRoadmap,
+  formatRoadmapSummary,
+  formatStrategicContext,
+} from './roadmap.js';
+export type {
+  RoadmapDefinition,
+  RoadmapSprint,
+  RoadmapTicket,
+  RoadmapPhase,
+  RoadmapClub,
+  RoadmapValidationResult,
+  RoadmapValidationError,
+  RoadmapValidationWarning,
+  CriticalPathResult,
+  ParallelGroup,
+} from './roadmap.js';
+
 // Config
 export type { SlopeConfig } from './config.js';
 export { loadConfig, createConfig, resolveConfigPath } from './config.js';
