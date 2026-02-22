@@ -233,5 +233,16 @@ export type {
   GuidanceConfig,
 } from './guard.js';
 
+// Report
+export {
+  buildReportData,
+  generateHtmlReport,
+} from './report.js';
+export type {
+  ReportData,
+  SprintTrendEntry,
+  NutritionTrendEntry,
+} from './report.js';
+
 // Built-in metaphors (auto-registers on import)
 export { golf, tennis, baseball, gaming, dnd, matrix } from './metaphors/index.js';
