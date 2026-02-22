@@ -1,11 +1,16 @@
 import { GUARD_DEFINITIONS, formatPreToolUseOutput, formatPostToolUseOutput, formatStopOutput } from '@slope-dev/core';
 import type { HookInput, GuardResult, GuardName } from '@slope-dev/core';
 import { loadConfig } from '../config.js';
+import { exploreGuard } from '../guards/explore.js';
+import { hazardGuard } from '../guards/hazard.js';
 
 type GuardHandler = (input: HookInput, cwd: string) => Promise<GuardResult>;
 
 /** Registry of guard handler implementations */
-const handlers: Partial<Record<GuardName, GuardHandler>> = {};
+const handlers: Partial<Record<GuardName, GuardHandler>> = {
+  explore: exploreGuard,
+  hazard: hazardGuard,
+};
 
 /** Register a guard handler */
 export function registerGuard(name: GuardName, handler: GuardHandler): void {
