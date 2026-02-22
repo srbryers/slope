@@ -15,6 +15,14 @@ export interface SlopeConfig {
   currentSprint?: number;
   store?: string;
   store_path?: string;
+  guidance?: {
+    disabled?: string[];
+    indexPaths?: string[];
+    hazardRecency?: number;
+    commitInterval?: number;
+    pushInterval?: number;
+    scopeDrift?: boolean;
+  };
 }
 
 const DEFAULT_CONFIG: SlopeConfig = {

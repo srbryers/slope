@@ -214,5 +214,24 @@ export {
   parseJestOutput,
 } from './ci-signals.js';
 
+// Guard Framework
+export {
+  GUARD_DEFINITIONS,
+  formatPreToolUseOutput,
+  formatPostToolUseOutput,
+  formatStopOutput,
+  generateClaudeCodeHooksConfig,
+} from './guard.js';
+export type {
+  HookInput,
+  PreToolUseOutput,
+  PostToolUseOutput,
+  StopOutput,
+  GuardResult,
+  GuardName,
+  GuardDefinition,
+  GuidanceConfig,
+} from './guard.js';
+
 // Built-in metaphors (auto-registers on import)
 export { golf, tennis, baseball, gaming, dnd, matrix } from './metaphors/index.js';

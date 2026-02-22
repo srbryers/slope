@@ -33,6 +33,7 @@ import { hookCommand } from './commands/hook.js';
 import { roadmapCommand } from './commands/roadmap.js';
 import { extractCommand } from './commands/extract.js';
 import { distillCommand } from './commands/distill.js';
+import { guardCommand, guardManageCommand } from './commands/guard.js';
 
 const subcommand = process.argv[2];
 
@@ -127,6 +128,22 @@ switch (subcommand) {
       process.exit(1);
     });
     break;
+  case 'guard': {
+    const guardArgs = process.argv.slice(3);
+    const guardSub = guardArgs[0];
+    if (guardSub === 'list' || guardSub === 'enable' || guardSub === 'disable') {
+      guardManageCommand(guardArgs).catch(err => {
+        console.error('Error:', err.message);
+        process.exit(1);
+      });
+    } else {
+      guardCommand(guardArgs).catch(err => {
+        console.error('Error:', err.message);
+        process.exit(1);
+      });
+    }
+    break;
+  }
   default:
     console.log(`
 SLOPE CLI — Sprint Lifecycle & Operational Performance Engine
@@ -146,6 +163,9 @@ Usage:
   slope tournament --id=<id> --sprints=N..M Build tournament review from sprints
   slope auto-card --sprint=<N> [options]    Generate scorecard from git + CI signals
   slope hook add|remove|list|show            Manage lifecycle hooks
+  slope hook add --level=full               Install all guidance hooks
+  slope guard <name>                        Run a guard handler (reads stdin)
+  slope guard list|enable|disable           Manage guard activation
   slope session start|end|heartbeat|list    Manage live sessions
   slope next                                Show next sprint number (auto-detect)
   slope extract --file=<path> [options]       Extract events into SLOPE store
