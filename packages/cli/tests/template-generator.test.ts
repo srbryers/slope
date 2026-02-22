@@ -8,6 +8,7 @@ import {
   generateCursorSprintChecklist,
   generateCursorCommitDiscipline,
   generateCursorReviewLoop,
+  generateCursorrules,
   generateGenericChecklist,
 } from '../src/template-generator.js';
 
@@ -130,6 +131,30 @@ describe('Cursor templates', () => {
 
     const commit = generateCursorCommitDiscipline(gaming);
     expect(commit).toContain('Post-Quest Routine');
+  });
+});
+
+describe('generateCursorrules', () => {
+  it('golf output contains SLOPE project context', () => {
+    const content = generateCursorrules(golf);
+    expect(content).toContain('SLOPE Project');
+    expect(content).toContain('.cursor/mcp.json');
+    expect(content).toContain('handicap card');
+    expect(content).toContain('Pre-Hole');
+    expect(content).toContain('Post-Hole');
+    expect(content).toContain('Driver: risky');
+    expect(content).toContain('Putter: trivial');
+    expect(content).toContain('In the Hole: perfect');
+    expect(content).toContain('.cursor/rules/');
+  });
+
+  it('gaming output uses gaming vocabulary', () => {
+    const content = generateCursorrules(gaming);
+    expect(content).toContain('player stats');
+    expect(content).toContain('Pre-Level');
+    expect(content).toContain('Post-Level');
+    expect(content).toContain('Boss Fight: risky');
+    expect(content).toContain('S-Rank: perfect');
   });
 });
 

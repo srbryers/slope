@@ -13,6 +13,7 @@ import {
   generateCursorSprintChecklist,
   generateCursorCommitDiscipline,
   generateCursorReviewLoop,
+  generateCursorrules,
   generateGenericChecklist,
 } from '../template-generator.js';
 
@@ -177,7 +178,14 @@ function installCursorTemplates(cwd: string, metaphor: MetaphorDefinition): void
     }
   }
 
-  console.log('\n  Cursor rules installed to .cursor/rules/');
+  // Generate .cursorrules (project root context file)
+  const cursorrulesDest = join(cwd, '.cursorrules');
+  if (!existsSync(cursorrulesDest)) {
+    writeFileSync(cursorrulesDest, generateCursorrules(metaphor));
+    console.log(`  Created ${cursorrulesDest}`);
+  }
+
+  console.log('\n  Cursor rules installed to .cursor/rules/ and .cursorrules');
 }
 
 function installGenericTemplates(cwd: string, metaphor: MetaphorDefinition): void {

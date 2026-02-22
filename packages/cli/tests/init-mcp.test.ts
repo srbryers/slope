@@ -129,6 +129,48 @@ describe('init --claude-code (includes MCP)', () => {
   });
 });
 
+describe('init --cursor creates .cursorrules', () => {
+  it('creates .cursorrules when file does not exist', async () => {
+    await initCommand(['--cursor']);
+
+    const cursorrules = join(tmpDir, '.cursorrules');
+    expect(existsSync(cursorrules)).toBe(true);
+
+    const content = readFileSync(cursorrules, 'utf8');
+    expect(content).toContain('SLOPE Project');
+    expect(content).toContain('.cursor/mcp.json');
+    expect(content).toContain('.cursor/rules/');
+  });
+
+  it('does not overwrite existing .cursorrules', async () => {
+    const cursorrules = join(tmpDir, '.cursorrules');
+    writeFileSync(cursorrules, '# My Custom Rules\n');
+
+    await initCommand(['--cursor']);
+
+    const content = readFileSync(cursorrules, 'utf8');
+    expect(content).toBe('# My Custom Rules\n');
+  });
+
+  it('uses metaphor vocabulary in .cursorrules', async () => {
+    await initCommand(['--cursor', '--metaphor=gaming']);
+
+    const cursorrules = join(tmpDir, '.cursorrules');
+    const content = readFileSync(cursorrules, 'utf8');
+    expect(content).toContain('player stats');
+    expect(content).toContain('Pre-Level');
+    expect(content).toContain('Boss Fight');
+  });
+
+  it('generates metaphor-aware .mdc rules', async () => {
+    await initCommand(['--cursor', '--metaphor=gaming']);
+
+    const checklist = readFileSync(join(tmpDir, '.cursor', 'rules', 'slope-sprint-checklist.mdc'), 'utf8');
+    expect(checklist).toContain('Pre-Level Routine');
+    expect(checklist).toContain('Post-Quest Routine');
+  });
+});
+
 describe('init creates roadmap', () => {
   it('creates starter roadmap.json', async () => {
     await initCommand([]);
