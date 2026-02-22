@@ -1,0 +1,111 @@
+{
+  "sprint_number": 19,
+  "theme": "The Dashboard",
+  "par": 4,
+  "slope": 2,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-02-22",
+  "shots": [
+    {
+      "ticket_key": "S19-1",
+      "title": "Dashboard server + data API",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Exported 6 chart renderers, 3 SVG helpers, REPORT_CSS, and escapeHtml from report.ts. Created packages/core/src/dashboard.ts (~500 lines) with generateDashboardHtml, renderSprintDetail, renderSprintTimeline, generateDashboardScript, computeMissHeatmap, renderMissHeatmap, computeAreaHazards, renderAreaHazardOverlay. CLI dashboard command with http.createServer (4 routes), browser auto-open, SIGINT handler. 53 new tests (41 core + 12 CLI)."
+    },
+    {
+      "ticket_key": "S19-2",
+      "title": "Sprint timeline + interactive drill-down",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "renderSprintTimeline SVG bar chart (gray par, colored actual). generateDashboardScript with click handlers, fetch /api/sprint/:n?html=1, toggle logic, scrollIntoView. data-sprint attributes on table rows and timeline bars. Bulk of implementation batched with S19-1; follow-up commit added data-sprint to renderSprintTable <tr> rows."
+    },
+    {
+      "ticket_key": "S19-3",
+      "title": "Miss pattern heatmap + area hazard overlay",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "computeMissHeatmap extracts per-sprint miss counts from stats.miss_directions, normalizes intensity 0-1. renderMissHeatmap: SVG grid with color interpolation #f8fafc to #ef4444, title tooltips. computeAreaHazards: per-club hazard frequency from shot records. renderAreaHazardOverlay: compact table below area performance. All integrated into generateDashboardHtml."
+    },
+    {
+      "ticket_key": "S19-4",
+      "title": "Configuration + docs",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added dashboard config to SlopeConfig (port, autoOpen, refreshInterval). resolveDashboardConfig merge chain: CLI flags > config file > defaults. Created docs/guides/dashboard.md usage guide. Updated backlog README with S19 entry. Added dashboard examples to CLI help text."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "type": "feature",
+  "conditions": [
+    {
+      "type": "altitude",
+      "description": "New infrastructure pattern — HTTP server in CLI, first live-serving feature. Composed existing renderers rather than duplicating.",
+      "impact": "minor"
+    }
+  ],
+  "special_plays": [],
+  "nutrition": [
+    {
+      "category": "hydration",
+      "description": "Clean build + all 955 tests pass (721 core + 36 store + 144 CLI + 54 MCP) after each commit",
+      "status": "healthy"
+    },
+    {
+      "category": "diet",
+      "description": "3 focused commits following execution order. Build + typecheck + targeted test run before each commit.",
+      "status": "healthy"
+    },
+    {
+      "category": "supplements",
+      "description": "Composed existing chart renderers from report.ts — zero duplication. Dashboard wraps same functions in new layout with nav, drill-down, heatmap. Config merge chain mirrors existing resolveEscalationConfig pattern.",
+      "status": "healthy"
+    },
+    {
+      "category": "recovery",
+      "description": "All existing 901 tests continue to pass. 54 new tests added (42 core, 12 CLI). Zero regressions — generateHtmlReport unchanged.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Efficient. S19-2 and S19-3 features were naturally batched into S19-1 since dashboard.ts was created from scratch — splitting them into separate files would have been artificial. The export-only refactor of report.ts was clean: add 'export' keyword, rename CSS to REPORT_CSS, zero behavior changes.",
+    "advice_for_next_player": "Dashboard composes, doesn't duplicate. All chart logic lives in report.ts (renderers) and dashboard.ts (new charts + layout). CLI server is thin: routes -> load data -> call renderers -> respond. The /api/sprint/:n?html=1 pattern lets the inline script fetch pre-rendered HTML for drill-down without client-side rendering. Port 0 in tests for random port allocation.",
+    "what_surprised_you": "How well the existing renderer separation worked — each chart function is pure (data in, HTML string out), so composing them into a different layout was trivial. The miss heatmap was simpler than expected since stats.miss_directions already has the data shaped correctly.",
+    "excited_about_next": "The dashboard is a natural home for future visualizations. Could add WebSocket for real-time updates during sprint execution, or server-sent events for session activity. The /api/data endpoint enables future external integrations."
+  },
+  "bunker_locations": [],
+  "yardage_book_updates": [
+    "packages/core/src/report.ts: Exported 6 renderers, 3 SVG helpers, REPORT_CSS, escapeHtml. Added data-sprint to table <tr> rows.",
+    "packages/core/src/dashboard.ts: New file — dashboard HTML generator, sprint detail, sprint timeline, miss heatmap, area hazard overlay, interactive drill-down script",
+    "packages/cli/src/commands/dashboard.ts: New file — HTTP server (/, /api/data, /api/sprint/:n), browser auto-open, resolveDashboardConfig",
+    "packages/core/src/config.ts: dashboard config (port, autoOpen, refreshInterval) added to SlopeConfig",
+    "packages/core/src/index.ts: Exports for dashboard functions/types + report renderers/helpers",
+    "docs/guides/dashboard.md: New file — usage guide with CLI flags, config, API routes, architecture"
+  ],
+  "course_management_notes": [
+    "4 tickets, 4 in_the_hole — zero hazards, zero regressions",
+    "10 files changed, 1506 lines added, 13 removed",
+    "Compose-not-duplicate: dashboard.ts calls report.ts renderers, never copies their implementation",
+    "Node built-in http module only — zero new dependencies in package.json",
+    "54 new tests with full HTTP integration testing (port 0, fetch, content-type assertions)"
+  ]
+}
