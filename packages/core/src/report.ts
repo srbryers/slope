@@ -103,7 +103,7 @@ export function buildReportData(scorecards: GolfScorecard[]): ReportData {
 
 // --- SVG Chart Helpers ---
 
-function svgLine(
+export function svgLine(
   data: { x: number; y: number }[],
   width: number,
   height: number,
@@ -115,18 +115,18 @@ function svgLine(
   return `<polyline points="${points}" fill="none" stroke="${color}" stroke-width="${strokeWidth}" stroke-linejoin="round" stroke-linecap="round"/>`;
 }
 
-function svgRect(x: number, y: number, w: number, h: number, fill: string, rx = 3): string {
+export function svgRect(x: number, y: number, w: number, h: number, fill: string, rx = 3): string {
   return `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}" rx="${rx}"/>`;
 }
 
-function svgText(x: number, y: number, text: string, opts: { anchor?: string; size?: number; fill?: string; weight?: string } = {}): string {
+export function svgText(x: number, y: number, text: string, opts: { anchor?: string; size?: number; fill?: string; weight?: string } = {}): string {
   const { anchor = 'middle', size = 11, fill = '#64748b', weight = 'normal' } = opts;
   return `<text x="${x}" y="${y}" text-anchor="${anchor}" font-size="${size}" fill="${fill}" font-weight="${weight}" font-family="system-ui, -apple-system, sans-serif">${escapeHtml(text)}</text>`;
 }
 
 // --- Chart Renderers ---
 
-function renderHandicapTrendChart(trend: SprintTrendEntry[], metaphor?: MetaphorDefinition): string {
+export function renderHandicapTrendChart(trend: SprintTrendEntry[], metaphor?: MetaphorDefinition): string {
   if (trend.length === 0) return '<p>No sprint data available.</p>';
 
   const W = 600, H = 250, PAD = { top: 30, right: 30, bottom: 40, left: 50 };
@@ -183,7 +183,7 @@ function renderHandicapTrendChart(trend: SprintTrendEntry[], metaphor?: Metaphor
   </div>`;
 }
 
-function renderDispersionChart(dispersion: DispersionReport, metaphor?: MetaphorDefinition): string {
+export function renderDispersionChart(dispersion: DispersionReport, metaphor?: MetaphorDefinition): string {
   const W = 300, H = 300, CX = W / 2, CY = H / 2, R = 100;
 
   const dirs: MissDirection[] = ['long', 'short', 'left', 'right'];
@@ -255,7 +255,7 @@ function renderDispersionChart(dispersion: DispersionReport, metaphor?: Metaphor
   </div>`;
 }
 
-function renderAreaPerformanceChart(area: AreaReport, metaphor?: MetaphorDefinition): string {
+export function renderAreaPerformanceChart(area: AreaReport, metaphor?: MetaphorDefinition): string {
   const clubEntries = Object.entries(area.by_club);
   if (clubEntries.length === 0) return '<p>No club performance data.</p>';
 
@@ -301,7 +301,7 @@ function renderAreaPerformanceChart(area: AreaReport, metaphor?: MetaphorDefinit
   </div>`;
 }
 
-function renderNutritionChart(trends: NutritionTrendEntry[], metaphor?: MetaphorDefinition): string {
+export function renderNutritionChart(trends: NutritionTrendEntry[], metaphor?: MetaphorDefinition): string {
   if (trends.length === 0) return '<p>No nutrition data.</p>';
 
   const W = 500, H = 180, PAD = { top: 20, right: 20, bottom: 30, left: 100 };
@@ -343,7 +343,7 @@ function renderNutritionChart(trends: NutritionTrendEntry[], metaphor?: Metaphor
 
 // --- Summary Cards ---
 
-function renderSummaryCards(data: ReportData, metaphor?: MetaphorDefinition): string {
+export function renderSummaryCards(data: ReportData, metaphor?: MetaphorDefinition): string {
   const { handicapCard, sprintTrend } = data;
   const all = handicapCard.all_time;
   const last5 = handicapCard.last_5;
@@ -379,7 +379,7 @@ function renderSummaryCards(data: ReportData, metaphor?: MetaphorDefinition): st
 
 // --- Sprint Table ---
 
-function renderSprintTable(trend: SprintTrendEntry[], metaphor?: MetaphorDefinition): string {
+export function renderSprintTable(trend: SprintTrendEntry[], metaphor?: MetaphorDefinition): string {
   if (trend.length === 0) return '';
 
   const sprintLabel = metaphor?.vocabulary.sprint ?? 'Sprint';
@@ -411,7 +411,7 @@ function renderSprintTable(trend: SprintTrendEntry[], metaphor?: MetaphorDefinit
 
 // --- HTML Generation ---
 
-const CSS = `
+export const REPORT_CSS = `
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: system-ui, -apple-system, sans-serif; background: #f8fafc; color: #1e293b; padding: 24px; max-width: 960px; margin: 0 auto; }
   h1 { font-size: 24px; margin-bottom: 4px; }
@@ -458,7 +458,7 @@ export function generateHtmlReport(data: ReportData, metaphor?: MetaphorDefiniti
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${escapeHtml(title)}</title>
-  <style>${CSS}</style>
+  <style>${REPORT_CSS}</style>
 </head>
 <body>
   <h1>${escapeHtml(title)}</h1>
@@ -486,6 +486,6 @@ export function generateHtmlReport(data: ReportData, metaphor?: MetaphorDefiniti
 </html>`;
 }
 
-function escapeHtml(s: string): string {
+export function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }

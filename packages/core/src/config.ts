@@ -29,6 +29,11 @@ export interface SlopeConfig {
     escalation?: EscalationConfig;
   };
   plugins?: PluginsConfig;
+  dashboard?: {
+    port?: number;
+    autoOpen?: boolean;
+    refreshInterval?: number;
+  };
 }
 
 const DEFAULT_CONFIG: SlopeConfig = {

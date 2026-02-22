@@ -258,12 +258,42 @@ export type {
 export {
   buildReportData,
   generateHtmlReport,
+  REPORT_CSS,
+  escapeHtml,
+  svgLine,
+  svgRect,
+  svgText,
+  renderSummaryCards,
+  renderHandicapTrendChart,
+  renderDispersionChart,
+  renderAreaPerformanceChart,
+  renderNutritionChart,
+  renderSprintTable,
 } from './report.js';
 export type {
   ReportData,
   SprintTrendEntry,
   NutritionTrendEntry,
 } from './report.js';
+
+// Dashboard
+export {
+  DEFAULT_DASHBOARD_CONFIG,
+  generateDashboardHtml,
+  renderSprintDetail,
+  renderSprintTimeline,
+  generateDashboardScript,
+  computeMissHeatmap,
+  renderMissHeatmap,
+  computeAreaHazards,
+  renderAreaHazardOverlay,
+} from './dashboard.js';
+export type {
+  DashboardConfig,
+  HeatmapCell,
+  MissHeatmapData,
+  AreaHazardEntry,
+} from './dashboard.js';
 
 // Team Handicap
 export {

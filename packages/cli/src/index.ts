@@ -13,6 +13,7 @@
  *   slope claim --target=<t> [--force]       Claim a ticket or area
  *   slope release --id=<id>                 Release a claim
  *   slope status [--sprint=N]               Show sprint course status
+ *   slope dashboard [--port=N] [--no-open]  Live local performance dashboard
  */
 
 import { initCommand } from './commands/init.js';
@@ -38,6 +39,7 @@ import { reportCommand } from './commands/report.js';
 import { standupCommand } from './commands/standup.js';
 import { escalateCommand } from './commands/escalate.js';
 import { pluginCommand } from './commands/plugin.js';
+import { dashboardCommand } from './commands/dashboard.js';
 
 const subcommand = process.argv[2];
 
@@ -175,6 +177,12 @@ switch (subcommand) {
       process.exit(1);
     });
     break;
+  case 'dashboard':
+    dashboardCommand(process.argv.slice(3)).catch(err => {
+      console.error('Error:', err.message);
+      process.exit(1);
+    });
+    break;
   default:
     console.log(`
 SLOPE CLI — Sprint Lifecycle & Operational Performance Engine
@@ -204,6 +212,7 @@ Usage:
   slope standup [--session=<id>] [--json]     Generate standup report from session
   slope standup --ingest=<path> [--role=<id>] Ingest another agent's standup
   slope report --html [--output=<path>]      Generate HTML performance report
+  slope dashboard [--port=N] [--no-open]    Live local performance dashboard
   slope roadmap validate|review|status|show  Strategic planning tools
   slope plugin list|validate                Manage custom plugins
 
