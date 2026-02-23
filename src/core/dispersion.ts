@@ -57,7 +57,7 @@ export function computeDispersion(scorecards: GolfScorecard[]): DispersionReport
   const dirCounts: Record<MissDirection, number> = { long: 0, short: 0, left: 0, right: 0 };
 
   for (const sc of scorecards) {
-    for (const shot of sc.shots) {
+    for (const shot of sc.shots ?? []) {
       totalShots++;
       const dir = MISS_RESULT_TO_DIR[shot.result];
       if (dir) {
@@ -147,7 +147,7 @@ export function computeAreaPerformance(scorecards: GolfScorecard[]): AreaReport 
     if (diff > 0) p.overPar++;
 
     // By club (per shot)
-    for (const shot of sc.shots) {
+    for (const shot of sc.shots ?? []) {
       if (!byClub[shot.club]) {
         byClub[shot.club] = { count: 0, holeInOne: 0, misses: 0 };
       }

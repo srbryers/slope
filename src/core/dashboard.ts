@@ -65,12 +65,12 @@ export function renderSprintDetail(scorecard: GolfScorecard, metaphor?: Metaphor
 
   // Shot table
   let shotsHtml = '';
-  if (scorecard.shots.length > 0) {
+  if ((scorecard.shots ?? []).length > 0) {
     const clubHeader = metaphor?.vocabulary.sprint ? 'Approach' : 'Club';
-    const rows = scorecard.shots.map(shot => {
+    const rows = (scorecard.shots ?? []).map(shot => {
       const clubLabel = metaphor?.clubs[shot.club as keyof typeof metaphor.clubs] ?? shot.club;
       const resultLabel = metaphor?.shotResults[shot.result as keyof typeof metaphor.shotResults] ?? shot.result;
-      const hazardList = shot.hazards.map(h => {
+      const hazardList = (shot.hazards ?? []).map(h => {
         const hLabel = metaphor?.hazards[h.type as keyof typeof metaphor.hazards] ?? h.type;
         return escapeHtml(`${hLabel}: ${h.description}`);
       }).join('<br>') || '—';
@@ -318,13 +318,13 @@ export function computeAreaHazards(scorecards: GolfScorecard[]): AreaHazardEntry
   const clubMap: Record<string, { totalShots: number; hazardCount: number; hazardTypes: Record<string, number> }> = {};
 
   for (const sc of scorecards) {
-    for (const shot of sc.shots) {
+    for (const shot of sc.shots ?? []) {
       if (!clubMap[shot.club]) {
         clubMap[shot.club] = { totalShots: 0, hazardCount: 0, hazardTypes: {} };
       }
       const entry = clubMap[shot.club];
       entry.totalShots++;
-      for (const h of shot.hazards) {
+      for (const h of shot.hazards ?? []) {
         entry.hazardCount++;
         entry.hazardTypes[h.type] = (entry.hazardTypes[h.type] ?? 0) + 1;
       }

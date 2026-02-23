@@ -30,7 +30,7 @@ export function buildTournamentReview(
   const sorted = [...scorecards].sort((a, b) => a.sprint_number - b.sprint_number);
 
   const sprints: TournamentSprintEntry[] = sorted.map((card) => {
-    const landed = card.shots.filter((s) => s.result === 'in_the_hole').length;
+    const landed = (card.shots ?? []).filter((s) => s.result === 'in_the_hole').length;
     return {
       sprintNumber: card.sprint_number,
       theme: card.theme,
@@ -38,7 +38,7 @@ export function buildTournamentReview(
       slope: card.slope,
       score: card.score,
       scoreLabel: card.score_label,
-      ticketCount: card.shots.length,
+      ticketCount: (card.shots ?? []).length,
       ticketsLanded: landed,
     };
   });
@@ -165,7 +165,7 @@ function computeClubPerformance(
   const clubMap = new Map<string, { attempts: number; inTheHole: number; scores: number[] }>();
 
   for (const card of cards) {
-    for (const shot of card.shots) {
+    for (const shot of card.shots ?? []) {
       const club = shot.club;
       if (!clubMap.has(club)) {
         clubMap.set(club, { attempts: 0, inTheHole: 0, scores: [] });

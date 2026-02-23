@@ -473,8 +473,8 @@ export function generateTrainingPlan(input: TrainingPlanInput): TrainingRecommen
     const hazardTypesBySprint: Map<string, number[]> = new Map();
     for (const sc of recentScorecards) {
       const sprintNum = sc.sprint_number;
-      for (const shot of sc.shots) {
-        for (const h of shot.hazards) {
+      for (const shot of sc.shots ?? []) {
+        for (const h of shot.hazards ?? []) {
           if (!hazardTypesBySprint.has(h.type)) {
             hazardTypesBySprint.set(h.type, []);
           }

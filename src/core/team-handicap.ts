@@ -94,7 +94,7 @@ export function computeRoleHandicap(role: string, breakdowns: AgentBreakdown[]):
     totalGir += stats.greens_in_regulation;
     totalGirTotal += stats.greens_total;
     totalHazards += stats.hazards_hit;
-    totalShots += bd.shots.length;
+    totalShots += (bd.shots ?? []).length;
 
     for (const dir of ['long', 'short', 'left', 'right'] as MissDirection[]) {
       missPattern[dir] += stats.miss_directions[dir] ?? 0;
@@ -158,7 +158,7 @@ export function computeSwarmEfficiency(
 
   for (const card of swarmCards) {
     totalAgents += card.agents!.length;
-    totalShots += card.shots.length;
+    totalShots += (card.shots ?? []).length;
   }
 
   const totalScore = swarmCards.reduce((sum, c) => sum + c.score, 0);
