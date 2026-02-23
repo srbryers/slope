@@ -1,0 +1,135 @@
+{
+  "sprint_number": 27,
+  "theme": "The Clubhouse — Marketing Site & Design Tokens",
+  "par": 4,
+  "slope": 3,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-02-23",
+  "type": "feature",
+  "shots": [
+    {
+      "ticket_key": "S27-1",
+      "title": "Create @srbryers/tokens design tokens package",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Created packages/tokens with colors, typography, spacing, and generateCssVariables(). 20 tests. Built and passed first try."
+    },
+    {
+      "ticket_key": "S27-2",
+      "title": "Refactor core HTML reports to use tokens",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "dependency_hell",
+          "description": "Token import `text` shadowed by `text` parameter in svgText() function — required aliasing to `textColor`"
+        }
+      ],
+      "notes": "Replaced all hardcoded hex values in REPORT_CSS, DASHBOARD_CSS, and chart functions. Naming collision caught during build, fixed with import alias. One non-interpolated reference missed by replace_all."
+    },
+    {
+      "ticket_key": "S27-3",
+      "title": "Create slope-web repo with migrated site",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "api_changes",
+          "description": "GitHub GraphQL API rate limit exhausted — switched to REST API for repo creation"
+        }
+      ],
+      "notes": "Created srbryers/slope-web repo, copied Astro site from caddystack, rebranded all CaddyStack references to SLOPE. 3 pages build clean. Live-stats API kept pointing at caddystack.fly.dev."
+    },
+    {
+      "ticket_key": "S27-4",
+      "title": "Cloudflare Pages deployment",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Created Cloudflare Pages project via wrangler CLI. First deployment live at slope-web.pages.dev. Ready for slope.dev custom domain when DNS is configured."
+    },
+    {
+      "ticket_key": "S27-5",
+      "title": "Docs + sprint artifacts",
+      "club": "putter",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Updated CLAUDE.md, publish.yml, backlog README. Saved sprint plan. Full build+typecheck+test green across all packages."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 5,
+    "fairways_total": 5,
+    "greens_in_regulation": 4,
+    "greens_total": 5,
+    "putts": 1,
+    "penalties": 0,
+    "hazards_hit": 2,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "wind",
+      "description": "New package + new repo + external service (Cloudflare) — high slope factor",
+      "impact": "none"
+    },
+    {
+      "type": "altitude",
+      "description": "GitHub GraphQL rate limit hit mid-sprint — required API fallback",
+      "impact": "minor"
+    }
+  ],
+  "special_plays": [],
+  "training": [],
+  "nutrition": [
+    {
+      "category": "hydration",
+      "description": "Full build+typecheck+test after S27-1 and S27-2, final verification before S27-5 commit",
+      "status": "healthy"
+    },
+    {
+      "category": "diet",
+      "description": "Commit-per-ticket discipline — 4 commits in slope repo, 1 in slope-web, pushed after each",
+      "status": "healthy"
+    },
+    {
+      "category": "supplements",
+      "description": "20 new tests in tokens package. All existing 1071 tests unchanged and passing.",
+      "status": "healthy"
+    },
+    {
+      "category": "recovery",
+      "description": "Naming collision in S27-2 caught at build time, fixed with import alias before commit — no broken commits",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Solid sprint with good breadth — touched the monorepo (new package + refactor), created a new repo, and deployed to Cloudflare. The tokens package extraction was clean and the report refactor preserved all visual output exactly.",
+    "advice_for_next_player": "When importing token names that match common parameter names (like `text`), use import aliases immediately (e.g., `text as textColor`). The replace_all tool only catches template interpolations `${text.xxx}` — bare references like `text.muted` in function arguments need manual attention.",
+    "what_surprised_you": "The GitHub GraphQL rate limit was unexpected — it was exhausted before we even started. The REST API fallback (POST /user/repos) worked perfectly though. Always have a fallback for external APIs.",
+    "excited_about_next": "slope-web is live and ready for content updates. Sprint 28 can focus on the fun stuff — metaphor switcher, install command toggle, and a full content audit against current SLOPE capabilities."
+  },
+  "bunker_locations": [
+    "Token import naming collisions — `text` is a common parameter name in rendering functions",
+    "GitHub GraphQL rate limits can exhaust mid-session if other tools (e.g., Copilot, gh CLI) consume budget"
+  ],
+  "yardage_book_updates": [
+    "packages/tokens: colors.ts, typography.ts, spacing.ts, css.ts — all report color values single-sourced",
+    "report.ts + dashboard.ts: import from @srbryers/tokens via workspace:*, use `text as textColor` alias",
+    "slope-web repo: Astro + Tailwind + GSAP, builds to dist/, deployed via Cloudflare Pages",
+    "live-stats.ts: still points at caddystack.fly.dev/public/slope-stats (reference implementation)"
+  ],
+  "course_management_notes": [
+    "5 tickets, par 4, score 4 — clean par with 2 minor hazards absorbed",
+    "New package created (tokens), new repo created (slope-web), external deployment (Cloudflare)",
+    "Tests grew from 1071 to 1091 (+20 in tokens package)",
+    "4 commits in slope repo, 1 commit in slope-web repo"
+  ]
+}
