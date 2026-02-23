@@ -211,6 +211,78 @@ Delta review of Round 2 changes. Expected outcome: approval with minor notes.
 `;
 }
 
+// --- Codebase context rule ---
+
+export function generateCodebaseContextRule(): string {
+  return `# Codebase Context — Map vs Explore
+
+SLOPE maintains a codebase map at \`CODEBASE.md\` (~5k tokens) with auto-generated sections covering packages, API surface, CLI commands, guards, MCP tools, tests, sprint history, and known gotchas.
+
+## When to use the map (default)
+
+- Starting a new sprint — read the map first
+- Understanding feature areas and file locations
+- Finding which package owns a feature
+- Looking up CLI commands, guards, or MCP tools
+- Checking recent sprint history and known gotchas
+
+**Access methods:**
+- \`Read CODEBASE.md\` — full map in one read
+- \`search({ module: 'map' })\` — full map via MCP
+- \`search({ module: 'map', query: 'guards' })\` — specific section via MCP
+
+## When to explore beyond the map
+
+- The map doesn't cover a new package or feature you need detail on
+- You need implementation-level detail (function signatures, complex logic)
+- The map metadata shows it's stale (explore guard will warn you)
+- You're debugging a specific issue that requires reading source code
+
+## Keeping the map current
+
+- Run \`slope map\` after adding new files, commands, or guards
+- Run \`slope map --check\` to verify staleness before a sprint
+- The map auto-updates only auto-generated sections; manual content is preserved
+`;
+}
+
+export function generateCursorCodebaseContextRule(): string {
+  return `---
+description: When to use the SLOPE codebase map vs exploring the codebase directly
+globs:
+alwaysApply: true
+---
+
+# Codebase Context — Map vs Explore
+
+SLOPE maintains a codebase map at \`CODEBASE.md\` (~5k tokens) with auto-generated sections covering packages, API surface, CLI commands, guards, MCP tools, tests, sprint history, and known gotchas.
+
+## When to use the map (default)
+
+- Starting a new sprint — read the map first
+- Understanding feature areas and file locations
+- Finding which package owns a feature
+- Looking up CLI commands, guards, or MCP tools
+
+**Access methods:**
+- Read \`CODEBASE.md\` — full map in one read
+- \`search({ module: 'map' })\` — full map via MCP
+- \`search({ module: 'map', query: 'guards' })\` — specific section via MCP
+
+## When to explore beyond the map
+
+- The map doesn't cover a new package or feature
+- You need implementation-level detail (function signatures, complex logic)
+- The map metadata shows it's stale
+- You're debugging a specific issue
+
+## Keeping the map current
+
+- Run \`slope map\` after adding new files, commands, or guards
+- Run \`slope map --check\` to verify staleness before a sprint
+`;
+}
+
 // --- OpenCode AGENTS.md ---
 
 export function generateAgentsMd(m: MetaphorDefinition): string {
@@ -255,6 +327,13 @@ A SLOPE MCP server is configured in \`opencode.json\`. Two tools:
 - Commit after each file, feature, migration, or bug fix
 - Push after each ticket and every 30 minutes
 - Format: \`<type>(<ticket>): <summary>\` (feat/fix/refactor/docs/test/chore)
+
+## Codebase Map
+
+SLOPE maintains a codebase map at \`CODEBASE.md\` (~5k tokens). Read it before exploring.
+- Run \`slope map\` to generate/update
+- Run \`slope map --check\` to verify staleness
+- Use \`search({ module: 'map' })\` via MCP for targeted queries
 
 ## ${r.scorecard}s
 Stored in docs/retros/sprint-N.json. See .slope/config.json for configuration.

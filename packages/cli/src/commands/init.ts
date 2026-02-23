@@ -10,9 +10,11 @@ import {
   generateSprintChecklist,
   generateCommitDiscipline,
   generateReviewLoop,
+  generateCodebaseContextRule,
   generateCursorSprintChecklist,
   generateCursorCommitDiscipline,
   generateCursorReviewLoop,
+  generateCursorCodebaseContextRule,
   generateCursorrules,
   generateAgentsMd,
   generateOpenCodePlugin,
@@ -149,6 +151,7 @@ function installClaudeCodeTemplates(cwd: string, metaphor: MetaphorDefinition): 
     'sprint-checklist.md': generateSprintChecklist(metaphor),
     'commit-discipline.md': generateCommitDiscipline(metaphor),
     'review-loop.md': generateReviewLoop(),
+    'codebase-context.md': generateCodebaseContextRule(),
   };
   for (const [file, content] of Object.entries(ruleGenerators)) {
     const dest = join(rulesDir, file);
@@ -189,6 +192,7 @@ function installCursorTemplates(cwd: string, metaphor: MetaphorDefinition): void
     'slope-sprint-checklist.mdc': generateCursorSprintChecklist(metaphor),
     'slope-commit-discipline.mdc': generateCursorCommitDiscipline(metaphor),
     'slope-review-loop.mdc': generateCursorReviewLoop(),
+    'slope-codebase-context.mdc': generateCursorCodebaseContextRule(),
   };
   for (const [file, content] of Object.entries(ruleGenerators)) {
     const dest = join(rulesDir, file);
