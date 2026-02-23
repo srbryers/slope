@@ -1,0 +1,207 @@
+import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdirSync, readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
+
+export interface ReviewState {
+  rounds_required: number;
+  rounds_completed: number;
+  plan_file?: string;
+  tier: string;
+  started_at: string;
+}
+
+const REVIEW_STATE_FILE = '.slope/review-state.json';
+
+const TIER_ROUNDS: Record<string, number> = {
+  skip: 0,
+  light: 1,
+  standard: 2,
+  deep: 3,
+};
+
+export function loadReviewState(cwd: string): ReviewState | null {
+  const statePath = join(cwd, REVIEW_STATE_FILE);
+  if (!existsSync(statePath)) return null;
+  try {
+    return JSON.parse(readFileSync(statePath, 'utf8')) as ReviewState;
+  } catch {
+    return null;
+  }
+}
+
+export function saveReviewState(cwd: string, state: ReviewState): void {
+  const dir = join(cwd, '.slope');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(cwd, REVIEW_STATE_FILE), JSON.stringify(state, null, 2) + '\n');
+}
+
+function findPlanFile(cwd: string): { path: string; content: string } | null {
+  const plansDir = join(cwd, '.claude', 'plans');
+  if (!existsSync(plansDir)) return null;
+
+  try {
+    const files = readdirSync(plansDir)
+      .filter(f => f.endsWith('.md'))
+      .map(f => ({
+        name: f,
+        path: join('.claude', 'plans', f),
+        fullPath: join(plansDir, f),
+        mtime: (() => { try { return statSync(join(plansDir, f)).mtimeMs; } catch { return 0; } })(),
+      }))
+      .sort((a, b) => b.mtime - a.mtime);
+
+    if (files.length > 0) {
+      return { path: files[0].path, content: readFileSync(files[0].fullPath, 'utf8') };
+    }
+  } catch { /* can't read plans dir */ }
+
+  return null;
+}
+
+function countTickets(content: string): number {
+  const ticketHeaders = content.match(/^###\s+S\d+-\d+/gm) ?? [];
+  if (ticketHeaders.length > 0) return ticketHeaders.length;
+  const h3Headers = content.match(/^###\s+/gm) ?? [];
+  return h3Headers.length;
+}
+
+function countPackageRefs(content: string): number {
+  const refs = new Set<string>();
+  const matches = content.matchAll(/packages\/(\w[\w-]*)/g);
+  for (const m of matches) refs.add(m[1]);
+  return refs.size;
+}
+
+function detectTier(content: string): { tier: string; rounds: number } {
+  const ticketCount = countTickets(content);
+  const packageRefs = countPackageRefs(content);
+  const hasInfra = /\b(infrastructure|new package|new service|architect)\b/i.test(content);
+  const isResearchOrDocs = /^#+\s*(research|docs|documentation|infra|spike)\b/im.test(content)
+    && ticketCount === 0;
+
+  if (isResearchOrDocs || ticketCount === 0) return { tier: 'skip', rounds: 0 };
+  if (ticketCount <= 2 && packageRefs <= 1) return { tier: 'light', rounds: 1 };
+  if (ticketCount >= 5 || hasInfra) return { tier: 'deep', rounds: 3 };
+  return { tier: 'standard', rounds: 2 };
+}
+
+function tierLabel(tier: string): string {
+  return tier.charAt(0).toUpperCase() + tier.slice(1);
+}
+
+function startCommand(args: string[], cwd: string): void {
+  const roundsArg = args.find(a => a.startsWith('--rounds='));
+  const tierArg = args.find(a => a.startsWith('--tier='));
+
+  let rounds: number;
+  let tier: string;
+  let planFile: string | undefined;
+
+  if (roundsArg) {
+    rounds = parseInt(roundsArg.slice('--rounds='.length), 10);
+    if (isNaN(rounds) || rounds < 0) {
+      console.error('Error: --rounds must be a non-negative integer.');
+      process.exit(1);
+    }
+    // Reverse-map rounds to tier name
+    const entry = Object.entries(TIER_ROUNDS).find(([, r]) => r === rounds);
+    tier = entry ? entry[0] : 'custom';
+  } else if (tierArg) {
+    tier = tierArg.slice('--tier='.length).toLowerCase();
+    if (!(tier in TIER_ROUNDS)) {
+      console.error(`Error: Unknown tier "${tier}". Use skip, light, standard, or deep.`);
+      process.exit(1);
+    }
+    rounds = TIER_ROUNDS[tier];
+  } else {
+    // Auto-detect from plan file
+    const plan = findPlanFile(cwd);
+    if (plan) {
+      const detected = detectTier(plan.content);
+      tier = detected.tier;
+      rounds = detected.rounds;
+      planFile = plan.path;
+    } else {
+      console.error('Error: No plan file found in .claude/plans/. Use --rounds=N or --tier=<tier>.');
+      process.exit(1);
+    }
+  }
+
+  // Find plan file if not already set
+  if (!planFile) {
+    const plan = findPlanFile(cwd);
+    if (plan) planFile = plan.path;
+  }
+
+  const state: ReviewState = {
+    rounds_required: rounds,
+    rounds_completed: 0,
+    plan_file: planFile,
+    tier,
+    started_at: new Date().toISOString(),
+  };
+
+  saveReviewState(cwd, state);
+  console.log(`Review started: ${tierLabel(tier)} (${rounds} round${rounds !== 1 ? 's' : ''}). Run 'slope review round' after each review round.`);
+}
+
+function roundCommand(cwd: string): void {
+  const state = loadReviewState(cwd);
+  if (!state) {
+    console.error("No active review. Run 'slope review start' to begin.");
+    process.exit(1);
+  }
+
+  state.rounds_completed += 1;
+  saveReviewState(cwd, state);
+
+  if (state.rounds_completed >= state.rounds_required) {
+    console.log(`Round ${state.rounds_completed}/${state.rounds_required} complete. Review done — ExitPlanMode is unblocked.`);
+  } else {
+    const remaining = state.rounds_required - state.rounds_completed;
+    console.log(`Round ${state.rounds_completed}/${state.rounds_required} complete. ${remaining} round${remaining !== 1 ? 's' : ''} remaining.`);
+  }
+}
+
+function statusCommand(cwd: string): void {
+  const state = loadReviewState(cwd);
+  if (!state) {
+    console.log("No active review. Run 'slope review start' to begin.");
+    return;
+  }
+
+  const done = state.rounds_completed >= state.rounds_required;
+  console.log(`Review: ${tierLabel(state.tier)} (${state.rounds_completed}/${state.rounds_required} rounds${done ? ' — complete' : ''})`);
+  if (state.plan_file) console.log(`Plan: ${state.plan_file}`);
+  console.log(`Started: ${state.started_at}`);
+}
+
+function resetCommand(cwd: string): void {
+  const statePath = join(cwd, REVIEW_STATE_FILE);
+  if (existsSync(statePath)) {
+    unlinkSync(statePath);
+  }
+  console.log('Review state cleared.');
+}
+
+export async function reviewStateCommand(args: string[]): Promise<void> {
+  const cwd = process.cwd();
+  const sub = args[0];
+
+  switch (sub) {
+    case 'start':
+      startCommand(args.slice(1), cwd);
+      break;
+    case 'round':
+      roundCommand(cwd);
+      break;
+    case 'status':
+      statusCommand(cwd);
+      break;
+    case 'reset':
+      resetCommand(cwd);
+      break;
+    default:
+      console.error(`Unknown review subcommand: ${sub}. Use start, round, status, or reset.`);
+      process.exit(1);
+  }
+}

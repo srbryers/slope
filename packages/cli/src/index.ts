@@ -41,6 +41,7 @@ import { escalateCommand } from './commands/escalate.js';
 import { pluginCommand } from './commands/plugin.js';
 import { dashboardCommand } from './commands/dashboard.js';
 import { mapCommand } from './commands/map.js';
+import { reviewStateCommand } from './commands/review-state.js';
 
 const subcommand = process.argv[2];
 
@@ -59,11 +60,19 @@ switch (subcommand) {
     break;
   case 'review': {
     const reviewArgs = process.argv.slice(3);
-    const plainFlag = reviewArgs.includes('--plain');
-    const metaphorArg = reviewArgs.find((a: string) => a.startsWith('--metaphor='));
-    const metaphorVal = metaphorArg?.slice('--metaphor='.length);
-    const path = reviewArgs.find((a: string) => !a.startsWith('--'));
-    reviewCommand(path, plainFlag ? 'plain' : undefined, metaphorVal);
+    const reviewSub = reviewArgs[0];
+    if (['start', 'round', 'status', 'reset'].includes(reviewSub)) {
+      reviewStateCommand(reviewArgs).catch(err => {
+        console.error('Error:', err.message);
+        process.exit(1);
+      });
+    } else {
+      const plainFlag = reviewArgs.includes('--plain');
+      const metaphorArg = reviewArgs.find((a: string) => a.startsWith('--metaphor='));
+      const metaphorVal = metaphorArg?.slice('--metaphor='.length);
+      const path = reviewArgs.find((a: string) => !a.startsWith('--'));
+      reviewCommand(path, plainFlag ? 'plain' : undefined, metaphorVal);
+    }
     break;
   }
   case 'briefing':
@@ -202,6 +211,10 @@ Usage:
   slope card --team                         Show per-player comparison table
   slope validate [path]                     Validate scorecard(s)
   slope review [path] [--plain]             Format sprint review markdown
+  slope review start [--rounds=N|--tier=T]  Start plan review lifecycle
+  slope review round                        Record a completed review round
+  slope review status                       Show current review state
+  slope review reset                        Clear review state
   slope briefing [--sprint=N] [options]      Pre-round briefing
   slope plan --complexity=<level>           Pre-shot advisor (club + training + hazards)
   slope classify --scope=... ...            Classify a shot from execution trace
