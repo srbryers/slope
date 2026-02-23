@@ -46,7 +46,7 @@ function makeStats(overrides: Partial<HoleStats> = {}): HoleStats {
   return {
     fairways_hit: 3, fairways_total: 4,
     greens_in_regulation: 3, greens_total: 4,
-    putts: 1, penalties: 0, hazards_hit: 0,
+    putts: 1, penalties: 0, hazards_hit: 0, hazard_penalties: 0,
     miss_directions: { long: 0, short: 0, left: 0, right: 0 },
     ...overrides,
   };
@@ -751,7 +751,7 @@ describe('formatBriefing — METAPHOR', () => {
       stats: {
         fairways_hit: 0, fairways_total: 1,
         greens_in_regulation: 0, greens_total: 1,
-        putts: 0, penalties: 0, hazards_hit: 1,
+        putts: 0, penalties: 0, hazards_hit: 1, hazard_penalties: 0,
         miss_directions: { long: 1, short: 0, left: 0, right: 0 },
       },
     }));

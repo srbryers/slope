@@ -28,7 +28,7 @@ function makeStats(overrides: Partial<HoleStats> = {}): HoleStats {
   return {
     fairways_hit: 3, fairways_total: 4,
     greens_in_regulation: 3, greens_total: 4,
-    putts: 0, penalties: 0, hazards_hit: 0,
+    putts: 0, penalties: 0, hazards_hit: 0, hazard_penalties: 0,
     miss_directions: { long: 0, short: 0, left: 0, right: 0 },
     ...overrides,
   };

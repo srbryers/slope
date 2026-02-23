@@ -24,6 +24,7 @@ function makeScorecard(overrides: Partial<GolfScorecard> = {}): GolfScorecard {
       putts: 1,
       penalties: 0,
       hazards_hit: 0,
+      hazard_penalties: 0,
       miss_directions: { long: 0, short: 0, left: 0, right: 0 },
     },
     yardage_book_updates: [],
@@ -194,14 +195,14 @@ describe('computeHandicapCard', () => {
     const sc1 = makeScorecard({
       stats: {
         fairways_hit: 2, fairways_total: 3, greens_in_regulation: 2, greens_total: 3,
-        putts: 1, penalties: 0, hazards_hit: 0,
+        putts: 1, penalties: 0, hazards_hit: 0, hazard_penalties: 0,
         miss_directions: { long: 2, short: 0, left: 1, right: 0 },
       },
     });
     const sc2 = makeScorecard({
       stats: {
         fairways_hit: 3, fairways_total: 4, greens_in_regulation: 3, greens_total: 4,
-        putts: 2, penalties: 1, hazards_hit: 1,
+        putts: 2, penalties: 1, hazards_hit: 1, hazard_penalties: 0,
         miss_directions: { long: 0, short: 1, left: 0, right: 3 },
       },
     });

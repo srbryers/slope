@@ -252,6 +252,7 @@ function makeScorecard(sprintNum: number, shots: RetroShot[]): GolfScorecard {
     putts: 0,
     penalties: 0,
     hazards_hit: sprintShots.reduce((sum, s) => sum + s.hazards.length, 0),
+    hazard_penalties: 0,
     miss_directions: { long: 0, short: 0, left: 0, right: 0 },
   };
 
@@ -1250,6 +1251,7 @@ describe('recommendClub() — synthetic miss history (S189-2)', () => {
       putts: 0,
       penalties: missCount,
       hazards_hit: hazardCount,
+      hazard_penalties: 0,
       miss_directions: {
         long: shots.filter(s => s.result === 'missed_long').length,
         short: shots.filter(s => s.result === 'missed_short').length,
@@ -1562,6 +1564,7 @@ describe('generateTrainingPlan() — cross-validation with synthetic miss histor
       putts: 0,
       penalties: missCount,
       hazards_hit: shots.reduce((sum, s) => sum + (s.hazards?.length ?? 0), 0),
+      hazard_penalties: 0,
       miss_directions: {
         long: shots.filter(s => s.result === 'missed_long').length,
         short: shots.filter(s => s.result === 'missed_short').length,

@@ -380,7 +380,7 @@ describe('sandbox', () => {
       score_label: 'par', date: '2026-01-01',
       shots: [], conditions: [], special_plays: [], stats: {
         fairways_hit: 0, fairways_total: 0, greens_in_regulation: 0,
-        greens_total: 0, putts: 0, penalties: 0, hazards_hit: 0,
+        greens_total: 0, putts: 0, penalties: 0, hazards_hit: 0, hazard_penalties: 0,
         miss_directions: { long: 0, short: 0, left: 0, right: 0 },
       },
       yardage_book_updates: [], bunker_locations: [], course_management_notes: [],

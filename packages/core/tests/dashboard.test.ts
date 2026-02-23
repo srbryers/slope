@@ -38,6 +38,7 @@ function makeScorecard(overrides: Partial<GolfScorecard> = {}): GolfScorecard {
       putts: 1,
       penalties: 0,
       hazards_hit: 1,
+      hazard_penalties: 0,
       miss_directions: { long: 1, short: 0, left: 0, right: 0 },
     },
     conditions: [{ type: 'wind', description: 'team changes', impact: 'minor' }],
@@ -67,7 +68,7 @@ function makeScorecards(count: number): GolfScorecard[] {
     stats: {
       fairways_hit: 3, fairways_total: 4,
       greens_in_regulation: 3, greens_total: 4,
-      putts: 1, penalties: 0, hazards_hit: i % 2,
+      putts: 1, penalties: 0, hazards_hit: i % 2, hazard_penalties: 0,
       miss_directions: { long: i % 2, short: 0, left: i % 3, right: 0 },
     },
   }));
@@ -348,7 +349,7 @@ describe('computeMissHeatmap', () => {
 
   it('max-count cell has intensity 1.0', () => {
     const cards = [
-      makeScorecard({ sprint_number: 1, stats: { fairways_hit: 3, fairways_total: 4, greens_in_regulation: 3, greens_total: 4, putts: 1, penalties: 0, hazards_hit: 0, miss_directions: { long: 5, short: 0, left: 0, right: 0 } } }),
+      makeScorecard({ sprint_number: 1, stats: { fairways_hit: 3, fairways_total: 4, greens_in_regulation: 3, greens_total: 4, putts: 1, penalties: 0, hazards_hit: 0, hazard_penalties: 0, miss_directions: { long: 5, short: 0, left: 0, right: 0 } } }),
     ];
     const heatmap = computeMissHeatmap(cards);
 
@@ -367,7 +368,7 @@ describe('computeMissHeatmap', () => {
 
   it('no misses means all intensity 0', () => {
     const cards = [makeScorecard({
-      stats: { fairways_hit: 4, fairways_total: 4, greens_in_regulation: 4, greens_total: 4, putts: 0, penalties: 0, hazards_hit: 0, miss_directions: { long: 0, short: 0, left: 0, right: 0 } },
+      stats: { fairways_hit: 4, fairways_total: 4, greens_in_regulation: 4, greens_total: 4, putts: 0, penalties: 0, hazards_hit: 0, hazard_penalties: 0, miss_directions: { long: 0, short: 0, left: 0, right: 0 } },
     })];
     const heatmap = computeMissHeatmap(cards);
 

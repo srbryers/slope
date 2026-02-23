@@ -612,7 +612,7 @@ interface ShotRecord { ticket_key: string; title: string; club: ClubSelection; r
 interface ConditionRecord { type: ConditionType; description: string; impact: 'none' | 'minor' | 'major'; }
 
 // ─── Scoring Types ───
-interface HoleStats { fairways_hit: number; fairways_total: number; greens_in_regulation: number; greens_total: number; putts: number; penalties: number; hazards_hit: number; miss_directions: Record<MissDirection, number>; }
+interface HoleStats { fairways_hit: number; fairways_total: number; greens_in_regulation: number; greens_total: number; putts: number; penalties: number; hazards_hit: number; hazard_penalties: number; miss_directions: Record<MissDirection, number>; }
 interface HoleScore { sprint_number: number; theme: string; par: 3 | 4 | 5; slope: number; score: number; score_label: ScoreLabel; shots: ShotRecord[]; conditions: ConditionRecord[]; special_plays: SpecialPlay[]; stats: HoleStats; }
 
 // ─── Full Scorecard ───

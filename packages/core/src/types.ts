@@ -69,6 +69,7 @@ export interface HoleStats {
   putts: number;
   penalties: number;
   hazards_hit: number;
+  hazard_penalties: number;
   miss_directions: Record<MissDirection, number>;
 }
 

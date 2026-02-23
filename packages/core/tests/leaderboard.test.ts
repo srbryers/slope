@@ -33,6 +33,7 @@ function makeCard(overrides: Partial<GolfScorecard> = {}): GolfScorecard {
       putts: 0,
       penalties: 0,
       hazards_hit: 0,
+      hazard_penalties: 0,
       miss_directions: { long: 0, short: 0, left: 0, right: 0 },
     },
     yardage_book_updates: [],

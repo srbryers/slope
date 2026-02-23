@@ -19,7 +19,7 @@ function makeCard(overrides: Partial<GolfScorecard> & { sprint_number: number })
     stats: {
       fairways_hit: 1, fairways_total: 1,
       greens_in_regulation: 1, greens_total: 1,
-      putts: 0, penalties: 0, hazards_hit: 0,
+      putts: 0, penalties: 0, hazards_hit: 0, hazard_penalties: 0,
       miss_directions: {} as any,
     },
     yardage_book_updates: [],

@@ -14,6 +14,7 @@ import type {
   AgentBreakdown,
 } from './types.js';
 import { computeScoreLabel } from './handicap.js';
+import { HAZARD_SEVERITY_PENALTIES } from './constants.js';
 
 // --- Helpers ---
 
@@ -46,6 +47,7 @@ export function computeStatsFromShots(
   let fairwaysHit = 0;
   let greensInReg = 0;
   let hazardsHit = 0;
+  let hazardPenalties = 0;
   const missDirs: Record<MissDirection, number> = { long: 0, short: 0, left: 0, right: 0 };
 
   for (const shot of shots) {
@@ -59,6 +61,9 @@ export function computeStatsFromShots(
     }
     // Hazards
     hazardsHit += shot.hazards.length;
+    for (const hazard of shot.hazards) {
+      hazardPenalties += HAZARD_SEVERITY_PENALTIES[hazard.severity ?? 'minor'];
+    }
     // Miss directions
     const dir = MISS_RESULT_TO_DIR[shot.result];
     if (dir) {
@@ -74,6 +79,7 @@ export function computeStatsFromShots(
     putts: overrides?.putts ?? 0,
     penalties: overrides?.penalties ?? 0,
     hazards_hit: hazardsHit,
+    hazard_penalties: hazardPenalties,
     miss_directions: missDirs,
   };
 }
@@ -90,7 +96,7 @@ export function normalizeStats(raw: unknown, shotCount = 0): HoleStats {
     return {
       fairways_hit: 0, fairways_total: 0,
       greens_in_regulation: 0, greens_total: 0,
-      putts: 0, penalties: 0, hazards_hit: 0,
+      putts: 0, penalties: 0, hazards_hit: 0, hazard_penalties: 0,
       miss_directions: { long: 0, short: 0, left: 0, right: 0 },
     };
   }
@@ -106,6 +112,7 @@ export function normalizeStats(raw: unknown, shotCount = 0): HoleStats {
       putts: Number(s.putts) || 0,
       penalties: Number(s.penalties) || 0,
       hazards_hit: Number(s.hazards_hit) || 0,
+      hazard_penalties: Number(s.hazard_penalties) || 0,
       miss_directions: normalizeMissDirections(s.miss_directions),
     };
   }
@@ -121,6 +128,7 @@ export function normalizeStats(raw: unknown, shotCount = 0): HoleStats {
     putts: Number(s.putts) || 0,
     penalties: Number(s.penalties) || 0,
     hazards_hit: Number(s.hazards_hit) || 0,
+    hazard_penalties: Number(s.hazard_penalties) || 0,
     miss_directions: normalizeMissDirections(s.miss_directions),
   };
 }
@@ -184,7 +192,7 @@ export function buildScorecard(input: ScorecardInput): GolfScorecard {
     penalties,
   });
 
-  const score = input.shots.length + penalties;
+  const score = Math.round(input.shots.length + penalties + stats.hazard_penalties);
   const score_label: ScoreLabel = computeScoreLabel(score, input.par);
 
   return {
@@ -231,7 +239,7 @@ export function buildAgentBreakdowns(agents: AgentShotInput[]): AgentBreakdown[]
       session_id: agent.session_id,
       agent_role: agent.agent_role,
       shots: agent.shots,
-      score: agent.shots.length,
+      score: Math.round(agent.shots.length + stats.hazard_penalties),
       stats,
     };
   });
