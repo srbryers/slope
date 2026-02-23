@@ -1,0 +1,109 @@
+{
+  "sprint_number": 25,
+  "theme": "Hazard Severity Scoring",
+  "par": 4,
+  "slope": 1,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-02-22",
+  "type": "feature",
+  "shots": [
+    {
+      "ticket_key": "S25-1",
+      "title": "Add HazardSeverity type and penalty mapping",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added HazardSeverity type ('minor'|'moderate'|'major'|'critical') to types.ts, optional severity field on HazardHit, and HAZARD_SEVERITY_PENALTIES constant to constants.ts. 2 files, 13 lines. Clean and minimal."
+    },
+    {
+      "ticket_key": "S25-2",
+      "title": "Update scoring to include hazard penalties",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        { "type": "rough", "description": "Adding required hazard_penalties field to HoleStats caused test churn across 22 files in all 4 packages — every inline HoleStats construction needed updating", "severity": "moderate" }
+      ],
+      "notes": "Updated builder.ts computeStatsFromShots to sum hazard penalties, normalizeStats (all 3 return paths), buildScorecard and buildAgentBreakdowns score formulas. Updated init.ts template, MCP registry type, and 18 test files with inline HoleStats fixtures across all packages."
+    },
+    {
+      "ticket_key": "S25-3",
+      "title": "Update formatter and validation",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added conditional Hazard Penalties row in formatter review table, INVALID_HAZARD_SEVERITY validation rule checking severity enum, and re-exported HazardSeverity type and HAZARD_SEVERITY_PENALTIES constant from index.ts. 3 files, 20 lines. All in one pass."
+    },
+    {
+      "ticket_key": "S25-4",
+      "title": "Tests for hazard severity scoring",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [],
+      "notes": "Added 11 new tests: 6 in builder.test.ts (severity computation, rounding, defaults, multiple hazards, score inclusion), 3 in validation.test.ts (valid/invalid/omitted severity), 2 in formatter.test.ts (row shown/hidden). All passed first run."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 1,
+    "hazard_penalties": 0.5,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    { "type": "wind", "description": "Resumed from a crashed/context-lost session — previous agent had done S25-1 but plan was rejected", "impact": "minor" }
+  ],
+  "special_plays": [],
+  "nutrition": [
+    {
+      "category": "hydration",
+      "description": "Clean build + typecheck + all 1071 tests pass (780→791 core + 36 store + 190 CLI + 65 MCP) after final commit",
+      "status": "healthy"
+    },
+    {
+      "category": "diet",
+      "description": "4 separate commits for 4 tickets — proper commit discipline. Each commit pushed immediately.",
+      "status": "healthy"
+    },
+    {
+      "category": "recovery",
+      "description": "Zero existing test regressions. 11 new tests added. Test fixture churn across 22 files handled cleanly with parallel edits.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Smooth execution despite the cross-package type change blast radius. The biggest effort was S25-2's test fixture updates — adding hazard_penalties to every inline HoleStats across all 4 packages (22 files). The actual feature logic was small and clean.",
+    "advice_for_next_player": "When adding a required field to HoleStats, expect ~20 inline test fixtures to need updating across all packages (core, cli, store-sqlite, mcp-tools). The MCP registry.ts has its own inline type definitions that also need syncing. Use grep for 'hazards_hit' to find all locations.",
+    "what_surprised_you": "The MCP registry.ts has a duplicate HoleStats interface definition — it's a standalone inline type, not imported from core. This needs syncing manually when core types change.",
+    "excited_about_next": "Hazard severity is the first feature that uses the new field — scorecards can now express that a 'critical' hazard (e.g., production incident) costs 2 penalty strokes while a 'minor' one (e.g., flaky test) costs 0. This will make scoring more nuanced."
+  },
+  "bunker_locations": [
+    "Adding a required field to HoleStats causes test churn across all 4 packages — ~20 inline fixtures need updating",
+    "MCP registry.ts has standalone inline type definitions that must be manually synced with core types"
+  ],
+  "yardage_book_updates": [
+    "packages/core/src/types.ts: Added HazardSeverity type, optional severity on HazardHit, hazard_penalties on HoleStats",
+    "packages/core/src/constants.ts: Added HAZARD_SEVERITY_PENALTIES mapping",
+    "packages/core/src/builder.ts: Updated scoring to compute and include hazard_penalties",
+    "packages/core/src/formatter.ts: Conditional Hazard Penalties row in review table",
+    "packages/core/src/validation.ts: INVALID_HAZARD_SEVERITY validation rule",
+    "packages/core/src/index.ts: Re-exported HazardSeverity and HAZARD_SEVERITY_PENALTIES",
+    "packages/mcp-tools/src/registry.ts: Synced HoleStats inline type definition"
+  ],
+  "course_management_notes": [
+    "4 shots: 2 in_the_hole + 2 green — 1 moderate hazard (test fixture churn), zero penalties, par",
+    "30 files changed across 5 commits, 443 lines added, 27 removed",
+    "Core test count: 780 → 791 (+11 new hazard severity tests)",
+    "Total test count: 1071 (unchanged outside core)",
+    "First scorecard to use the new hazard_penalties and severity fields"
+  ]
+}
