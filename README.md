@@ -7,8 +7,12 @@ A framework for measuring and improving sprint execution quality. Replace subjec
 ## Quick Start
 
 ```bash
-# Install
-npm install -g @srbryers/cli
+# Install globally (makes `slope` available everywhere)
+npm install -g @slope-dev/slope
+
+# Or install locally in your project and use npx
+npm install @slope-dev/slope
+npx slope init
 
 # Initialize in your project (auto-detects your AI tool)
 slope init
@@ -27,6 +31,8 @@ slope briefing
 # Generate an HTML performance report
 slope report --html
 ```
+
+> **Note:** If installed locally (without `-g`), prefix commands with `npx` — e.g., `npx slope card`.
 
 ## What is SLOPE?
 
@@ -62,14 +68,11 @@ Configure in `.slope/config.json`:
 
 Or per-command: `slope review --metaphor=tennis`
 
-## Packages
+## Package
 
-| Package | Description |
-|---------|-------------|
-| [`@srbryers/core`](packages/core) | Core engine — scoring, handicap, metaphors, reports, guards, roadmap, events |
-| [`@srbryers/store-sqlite`](packages/store-sqlite) | SQLite storage adapter — sessions, claims, events, scorecards |
-| [`@srbryers/cli`](packages/cli) | CLI tool — 22 commands for the full sprint lifecycle |
-| [`@srbryers/mcp-tools`](packages/mcp-tools) | Code-mode MCP server — `search` + `execute` + session/claim tools |
+Published as a single package: [`@slope-dev/slope`](https://www.npmjs.com/package/@slope-dev/slope)
+
+Includes the core scoring engine, SQLite store, CLI (22 commands), and MCP server.
 
 ## CLI Commands
 
@@ -216,7 +219,7 @@ import {
   generateHtmlReport,
   getMetaphor,
   loadScorecards,
-} from '@srbryers/core';
+} from '@slope-dev/slope';
 
 // Build a scorecard
 const card = buildScorecard({

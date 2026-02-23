@@ -77,7 +77,7 @@ slope briefing --personal           # Only hazards reported by you
 Use `mergeHazardIndices()` to combine patterns from multiple developers:
 
 ```typescript
-import { mergeHazardIndices } from '@srbryers/core';
+import { mergeHazardIndices } from '@slope-dev/slope';
 
 const merged = mergeHazardIndices(existingIssues, newPatterns, 'alice');
 ```

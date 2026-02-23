@@ -143,7 +143,7 @@ Track five categories of development health:
 ## Getting Started
 
 ```bash
-npm install -g @srbryers/cli
+npm install -g @slope-dev/slope
 slope init
 slope card
 ```
