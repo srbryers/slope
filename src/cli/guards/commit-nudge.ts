@@ -19,9 +19,17 @@ export async function commitNudgeGuard(input: HookInput, cwd: string): Promise<G
     if (lastCommitTime) {
       const minutesSinceCommit = (Date.now() / 1000 - parseInt(lastCommitTime, 10)) / 60;
 
-      // Check for uncommitted changes
+      // Check for uncommitted changes (excluding gitignored files)
       const status = execSync('git status --porcelain 2>/dev/null', { cwd, encoding: 'utf8' }).trim();
-      const hasChanges = status.length > 0;
+      let hasChanges = status.length > 0;
+      if (hasChanges) {
+        const paths = status.split('\n').filter(Boolean).map(l => l.slice(3));
+        try {
+          const ignored = execSync(`git check-ignore ${paths.map(p => `'${p}'`).join(' ')} 2>/dev/null`, { cwd, encoding: 'utf8' }).trim();
+          const ignoredSet = new Set(ignored.split('\n').filter(Boolean));
+          hasChanges = paths.some(p => !ignoredSet.has(p));
+        } catch { /* check-ignore exits 1 when no files are ignored — all files are real changes */ }
+      }
 
       if (hasChanges && minutesSinceCommit >= commitInterval) {
         nudges.push(`~${Math.round(minutesSinceCommit)} minutes since last commit — consider committing current progress.`);
