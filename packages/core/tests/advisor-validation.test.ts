@@ -1159,8 +1159,8 @@ describe('recommendClub() — sequential replay against real data', () => {
       scorecards: [],
     });
 
-    // With no history, confidence should be 0.5
-    expect(rec.confidence).toBe(0.5);
+    // With no history, confidence should be 0.3
+    expect(rec.confidence).toBe(0.3);
     expect(rec.club).toBe(shot.club); // default mapping matches
   });
 
@@ -1192,17 +1192,16 @@ describe('recommendClub() — sequential replay against real data', () => {
     }
 
     // First sprint should have lowest confidence
-    expect(confidenceOverTime[0].avgConfidence).toBe(0.5);
+    expect(confidenceOverTime[0].avgConfidence).toBeCloseTo(0.3, 5);
 
     // Later sprints should have higher confidence (more history)
     const lastFew = confidenceOverTime.slice(-3);
     const avgLast = lastFew.reduce((s, c) => s + c.avgConfidence, 0) / lastFew.length;
-    expect(avgLast).toBeGreaterThan(0.5);
+    expect(avgLast).toBeGreaterThan(0.3);
   });
 
-  it('driver recommendation requires 3+ slope factors', () => {
-    // The single driver shot (S176-2) maps to large complexity
-    // Without slope factors, algorithm recommends long_iron instead
+  it('large complexity always maps to long_iron (never driver)', () => {
+    // Driver upgrade was removed — large always maps to long_iron regardless of slope factors
     const priorCards = sprintNumbers
       .filter(n => n < 176)
       .map(n => scorecardsBySprint.get(n)!)
@@ -1219,7 +1218,7 @@ describe('recommendClub() — sequential replay against real data', () => {
       scorecards: priorCards,
       slopeFactors: ['cross_package', 'new_area', 'external_dep'],
     });
-    expect(withSlope.club).toBe('driver');
+    expect(withSlope.club).toBe('long_iron');
   });
 });
 
@@ -1402,8 +1401,8 @@ describe('recommendClub() — synthetic miss history (S189-2)', () => {
 // S189-2: Driver slope threshold boundary testing
 // ═══════════════════════════════════════════════════════════
 
-describe('recommendClub() — driver slope threshold (S189-2)', () => {
-  it('2 slope factors → long_iron (below threshold)', () => {
+describe('recommendClub() — large always maps to long_iron (S222-1)', () => {
+  it('2 slope factors → long_iron', () => {
     const rec = recommendClub({
       ticketComplexity: 'large',
       scorecards: [],
@@ -1412,31 +1411,30 @@ describe('recommendClub() — driver slope threshold (S189-2)', () => {
     expect(rec.club).toBe('long_iron');
   });
 
-  it('3 slope factors → driver (at threshold)', () => {
+  it('3 slope factors → long_iron (driver upgrade removed)', () => {
     const rec = recommendClub({
       ticketComplexity: 'large',
       scorecards: [],
       slopeFactors: ['cross_package', 'schema_migration', 'new_area'],
     });
-    expect(rec.club).toBe('driver');
+    expect(rec.club).toBe('long_iron');
   });
 
-  it('4 slope factors → driver (above threshold)', () => {
+  it('4 slope factors → long_iron (driver upgrade removed)', () => {
     const rec = recommendClub({
       ticketComplexity: 'large',
       scorecards: [],
       slopeFactors: ['cross_package', 'schema_migration', 'new_area', 'external_dep'],
     });
-    expect(rec.club).toBe('driver');
+    expect(rec.club).toBe('long_iron');
   });
 
-  it('slope factors only upgrade large complexity — not medium', () => {
+  it('slope factors do not affect any complexity level', () => {
     const rec = recommendClub({
       ticketComplexity: 'medium',
       scorecards: [],
       slopeFactors: ['cross_package', 'schema_migration', 'new_area'],
     });
-    // medium maps to short_iron, slope factors only affect large→driver
     expect(rec.club).toBe('short_iron');
   });
 });
@@ -1461,7 +1459,7 @@ describe('recommendClub() — confidence calibration (S189-2)', () => {
     driver: 'large',
   };
 
-  it('confidence starts at 0.5, reaches 0.7 quickly, plateaus at 1.0', () => {
+  it('confidence starts at 0.3, reaches 0.5 quickly, plateaus at 1.0', () => {
     const confidenceByDepth: { depth: number; avgConfidence: number }[] = [];
 
     for (let i = 0; i < sprintNumbers.length; i++) {
@@ -1489,26 +1487,26 @@ describe('recommendClub() — confidence calibration (S189-2)', () => {
       });
     }
 
-    // Phase 1: starts at 0.5 (no history)
-    expect(confidenceByDepth[0].avgConfidence).toBe(0.5);
+    // Phase 1: starts at 0.3 (no history)
+    expect(confidenceByDepth[0].avgConfidence).toBeCloseTo(0.3, 5);
 
-    // Phase 2: jumps to 0.7 after first sprint
-    expect(confidenceByDepth[1].avgConfidence).toBeGreaterThanOrEqual(0.7);
+    // Phase 2: jumps to 0.5 after first sprint
+    expect(confidenceByDepth[1].avgConfidence).toBeGreaterThanOrEqual(0.5);
 
     // Phase 3: reaches 1.0 within first 5 sprints for commonly-used clubs
     const firstFive = confidenceByDepth.slice(0, 5);
     const reachedMax = firstFive.some(c => c.avgConfidence === 1.0);
     expect(reachedMax).toBe(true);
 
-    // Phase 4: plateaus — last 5 sprints all at 1.0 for common clubs
+    // Phase 4: plateaus — last 5 sprints all at 0.5+ for common clubs
     const lastFive = confidenceByDepth.slice(-5);
     for (const entry of lastFive) {
-      expect(entry.avgConfidence).toBeGreaterThanOrEqual(0.7);
+      expect(entry.avgConfidence).toBeGreaterThanOrEqual(0.5);
     }
   });
 
-  it('confidence thresholds are 0.5 / 0.7 / 1.0 (not continuous)', () => {
-    // The algorithm uses discrete steps: 0 history → 0.5, 1-4 → 0.7, 5+ → 1.0
+  it('confidence thresholds are 0.3 / 0.5 / 1.0 (not continuous)', () => {
+    // The algorithm uses discrete steps: 0 history → 0.3, 1-4 → 0.5, 5+ → 1.0
     const uniqueConfidences = new Set<number>();
 
     for (const sprintNum of sprintNumbers) {
@@ -1529,10 +1527,10 @@ describe('recommendClub() — confidence calibration (S189-2)', () => {
       }
     }
 
-    // Only 3 discrete confidence levels: 0.5, 0.7, 1.0
+    // Only 3 discrete confidence levels: 0.3, 0.5, 1.0
     expect(uniqueConfidences.size).toBeLessThanOrEqual(3);
+    expect(uniqueConfidences.has(0.3)).toBe(true);
     expect(uniqueConfidences.has(0.5)).toBe(true);
-    expect(uniqueConfidences.has(0.7)).toBe(true);
     expect(uniqueConfidences.has(1.0)).toBe(true);
   });
 });

@@ -127,20 +127,11 @@ describe('recommendClub', () => {
     expect(result.club).toBe('long_iron');
   });
 
-  it('upgrades large to driver with slope >= 3', () => {
+  it('never recommends driver even with high slope factors', () => {
     const result = recommendClub({
       ticketComplexity: 'large',
       scorecards: [],
-      slopeFactors: ['cross_package', 'schema_migration', 'new_area'],
-    });
-    expect(result.club).toBe('driver');
-  });
-
-  it('does not upgrade large to driver with slope < 3', () => {
-    const result = recommendClub({
-      ticketComplexity: 'large',
-      scorecards: [],
-      slopeFactors: ['cross_package', 'schema_migration'],
+      slopeFactors: ['cross_package', 'schema_migration', 'new_area', 'external_dep'],
     });
     expect(result.club).toBe('long_iron');
   });
@@ -160,8 +151,8 @@ describe('recommendClub', () => {
     expect(result.reasoning).toContain('Downgraded');
   });
 
-  it('adds provisional suggestion on dominant miss', () => {
-    // Create scorecards with dominant miss pattern (>40% in one direction)
+  it('adds provisional suggestion on dominant miss with ≥3 total misses', () => {
+    // Create scorecards with dominant miss pattern (>40% in one direction) and ≥3 total misses
     const cards = Array.from({ length: 5 }, (_, i) => makeCard({
       sprint_number: 170 + i,
       shots: [
@@ -176,9 +167,32 @@ describe('recommendClub', () => {
     expect(result.provisional_suggestion).toContain('miss rate');
   });
 
+  it('does not add provisional suggestion with <3 total misses', () => {
+    // Create scorecards with dominant miss but only 2 total misses
+    const cards = [
+      makeCard({
+        sprint_number: 170,
+        shots: [
+          makeShot({ result: 'missed_long' }),
+          makeShot({ result: 'missed_long' }),
+          makeShot({ result: 'green' }),
+          makeShot({ result: 'green' }),
+          makeShot({ result: 'green' }),
+          makeShot({ result: 'green' }),
+          makeShot({ result: 'green' }),
+          makeShot({ result: 'green' }),
+          makeShot({ result: 'green' }),
+          makeShot({ result: 'green' }),
+        ],
+      }),
+    ];
+    const result = recommendClub({ ticketComplexity: 'medium', scorecards: cards });
+    expect(result.provisional_suggestion).toBeUndefined();
+  });
+
   it('has low confidence with no scorecards', () => {
     const result = recommendClub({ ticketComplexity: 'medium', scorecards: [] });
-    expect(result.confidence).toBe(0.5);
+    expect(result.confidence).toBe(0.3);
   });
 
   it('has high confidence with sufficient history', () => {
@@ -194,14 +208,14 @@ describe('recommendClub', () => {
     expect(result.confidence).toBe(1.0);
   });
 
-  it('has medium confidence with limited history', () => {
+  it('has medium confidence with limited history (1-4 samples)', () => {
     const cards = [makeCard({
       shots: [
         makeShot({ club: 'short_iron', result: 'green' }),
       ],
     })];
     const result = recommendClub({ ticketComplexity: 'medium', scorecards: cards });
-    expect(result.confidence).toBe(0.7);
+    expect(result.confidence).toBe(0.5);
   });
 });
 

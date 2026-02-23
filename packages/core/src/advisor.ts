@@ -52,26 +52,20 @@ export interface RecommendClubInput {
  * Recommend a club (approach complexity) for an upcoming ticket.
  *
  * Logic:
- * 1. Map ticket complexity to default club
- * 2. If large + slope >= 3, upgrade to driver
- * 3. Check historical performance — if default club miss_rate > 30%, downgrade one level
- * 4. Check dispersion for dominant miss — add provisional suggestion if present
- * 5. Confidence: 1.0 with ≥5 scorecards for that club, 0.7 with 1-4, 0.5 with 0
+ * 1. Map ticket complexity to default club (large → long_iron, never driver)
+ * 2. Check historical performance — if default club miss_rate > 30%, downgrade one level
+ * 3. Check dispersion for dominant miss — add provisional suggestion if ≥3 total misses
+ * 4. Confidence: 1.0 with ≥5 scorecards for that club, 0.5 with 1-4, 0.3 with 0
  */
 export function recommendClub(input: RecommendClubInput): ClubRecommendation {
   const { ticketComplexity, scorecards, slopeFactors = [] } = input;
 
-  // Step 1: Default club from complexity
+  // Step 1: Default club from complexity (large → long_iron, never driver)
   let club: ClubSelection = COMPLEXITY_TO_CLUB[ticketComplexity] ?? 'short_iron';
-
-  // Step 2: Slope-adjusted upgrade for large tickets
-  if (ticketComplexity === 'large' && slopeFactors.length >= 3) {
-    club = 'driver';
-  }
 
   const reasons: string[] = [`${ticketComplexity} complexity → ${club}`];
 
-  // Step 3: Historical performance check
+  // Step 2: Historical performance check
   if (scorecards.length > 0) {
     const areaReport = computeAreaPerformance(scorecards);
     const clubStats = areaReport.by_club[club];
@@ -86,25 +80,25 @@ export function recommendClub(input: RecommendClubInput): ClubRecommendation {
     }
   }
 
-  // Step 4: Provisional suggestion from dispersion
+  // Step 3: Provisional suggestion from dispersion (requires ≥3 total misses)
   let provisional_suggestion: string | undefined;
   if (scorecards.length > 0) {
     const dispersion = computeDispersion(scorecards);
-    if (dispersion.dominant_miss) {
+    if (dispersion.dominant_miss && dispersion.total_misses >= 3) {
       const missRate = dispersion.miss_rate_pct;
       provisional_suggestion = `Consider declaring provisional — this area has ${missRate}% miss rate (dominant: ${dispersion.dominant_miss})`;
     }
   }
 
-  // Step 5: Confidence from history depth for this club
+  // Step 4: Confidence from history depth for this club
   let confidence: number;
   if (scorecards.length > 0) {
     const areaReport = computeAreaPerformance(scorecards);
     const clubStats = areaReport.by_club[club];
     const clubCount = clubStats?.count ?? 0;
-    confidence = clubCount >= 5 ? 1.0 : clubCount >= 1 ? 0.7 : 0.5;
+    confidence = clubCount >= 5 ? 1.0 : clubCount >= 1 ? 0.5 : 0.3;
   } else {
-    confidence = 0.5;
+    confidence = 0.3;
   }
 
   return {
