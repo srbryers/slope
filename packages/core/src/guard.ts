@@ -62,7 +62,8 @@ export type GuardName =
   | 'subagent-gate'
   | 'push-nudge'
   | 'workflow-gate'
-  | 'review-tier';
+  | 'review-tier'
+  | 'version-check';
 
 /** Guard registration entry */
 export interface GuardDefinition {
@@ -170,6 +171,13 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     description: 'Recommend review tier based on plan scope',
     hookEvent: 'PreToolUse',
     matcher: 'ExitPlanMode',
+    level: 'full',
+  },
+  {
+    name: 'version-check',
+    description: 'Block push to main when package versions have not been bumped',
+    hookEvent: 'PreToolUse',
+    matcher: 'Bash',
     level: 'full',
   },
 ];

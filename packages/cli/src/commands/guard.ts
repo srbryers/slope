@@ -11,6 +11,7 @@ import { subagentGateGuard } from '../guards/subagent-gate.js';
 import { pushNudgeGuard } from '../guards/push-nudge.js';
 import { workflowGateGuard } from '../guards/workflow-gate.js';
 import { reviewTierGuard } from '../guards/review-tier.js';
+import { versionCheckGuard } from '../guards/version-check.js';
 import { execSync } from 'node:child_process';
 
 type GuardHandler = (input: HookInput, cwd: string) => Promise<GuardResult>;
@@ -27,6 +28,7 @@ const handlers: Partial<Record<GuardName, GuardHandler>> = {
   'push-nudge': pushNudgeGuard,
   'workflow-gate': workflowGateGuard,
   'review-tier': reviewTierGuard,
+  'version-check': versionCheckGuard,
 };
 
 /** Register a guard handler */
