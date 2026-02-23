@@ -1,4 +1,4 @@
-import type { GolfScorecard, ShotResult } from './types.js';
+import type { GolfScorecard, HazardSeverity, ShotResult } from './types.js';
 import { computeScoreLabel } from './handicap.js';
 
 // --- Validation-specific types ---
@@ -114,6 +114,20 @@ export function validateScorecard(card: GolfScorecard & { sprint?: number }): Sc
         message: `stats.hazards_hit (${stats.hazards_hit}) doesn't match total hazards from shots (${totalHazards})`,
         field: 'stats.hazards_hit',
       });
+    }
+
+    // Rule 4b: hazard severity values must be valid
+    const VALID_SEVERITIES: Set<string> = new Set<string>(['minor', 'moderate', 'major', 'critical']);
+    for (const shot of card.shots) {
+      for (const hazard of shot.hazards) {
+        if (hazard.severity != null && !VALID_SEVERITIES.has(hazard.severity)) {
+          errors.push({
+            code: 'INVALID_HAZARD_SEVERITY',
+            message: `hazard severity "${hazard.severity}" is not valid (expected minor|moderate|major|critical)`,
+            field: 'shots[].hazards[].severity',
+          });
+        }
+      }
     }
   }
 

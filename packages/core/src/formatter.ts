@@ -118,6 +118,9 @@ export function formatSprintReview(
   lines.push(`| GIR % | ${pct(stats.greens_in_regulation, stats.greens_total)} (${stats.greens_in_regulation}/${stats.greens_total}) |`);
   lines.push(`| Putts | ${stats.putts} |`);
   lines.push(`| Penalties | ${stats.penalties} |`);
+  if (stats.hazard_penalties > 0) {
+    lines.push(`| Hazard Penalties | ${stats.hazard_penalties} |`);
+  }
   lines.push('');
 
   if (projectStats) {

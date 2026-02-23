@@ -41,6 +41,7 @@ export type {
   PRPlatform,
   PRReviewDecision,
   PRSignal,
+  HazardSeverity,
 } from './types.js';
 
 // Constants
@@ -50,6 +51,7 @@ export {
   SCORE_LABELS,
   TRAINING_TYPE_MAP,
   NUTRITION_CHECKLIST,
+  HAZARD_SEVERITY_PENALTIES,
 } from './constants.js';
 
 // Handicap
