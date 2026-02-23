@@ -22,8 +22,8 @@ import { z } from 'zod';
 import { SLOPE_REGISTRY, SLOPE_TYPES } from './registry.js';
 import { runInSandbox } from './sandbox.js';
 import type { SlopeStore } from '@slope-dev/core';
-import { checkConflicts } from '@slope-dev/core';
-import type { ClaimScope } from '@slope-dev/core';
+import { checkConflicts, loadFlows, checkFlowStaleness } from '@slope-dev/core';
+import type { ClaimScope, FlowsFile, FlowDefinition } from '@slope-dev/core';
 
 /** Tool names exposed by this MCP server (for tests and tool discovery). */
 export const SLOPE_MCP_TOOL_NAMES = ['search', 'execute', 'session_status', 'acquire_claim', 'check_conflicts'] as const;
@@ -117,12 +117,16 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
     'Discover SLOPE API functions, filesystem helpers, constants, and type definitions. Call with no args to see everything, or filter by query/module.',
     {
       query: z.string().optional().describe('Case-insensitive search term to filter by name or description'),
-      module: z.enum(['core', 'fs', 'constants', 'types', 'store', 'map']).optional().describe('Filter by module category'),
+      module: z.enum(['core', 'fs', 'constants', 'types', 'store', 'map', 'flows']).optional().describe('Filter by module category'),
     },
     async ({ query, module }) => {
       // Map module — return codebase map content
       if (module === 'map') {
         return { content: [{ type: 'text' as const, text: handleMapQuery(query) }] };
+      }
+      // Flows module — return flow definitions
+      if (module === 'flows') {
+        return { content: [{ type: 'text' as const, text: handleFlowsQuery(query) }] };
       }
       if (module === 'types') {
         return { content: [{ type: 'text' as const, text: SLOPE_TYPES }] };
@@ -290,6 +294,105 @@ function handleMapQuery(query?: string): string {
   }
 
   return result;
+}
+
+/** Handle search({ module: 'flows' }) — return flow definitions with optional filtering */
+function handleFlowsQuery(query?: string): string {
+  const cwd = process.cwd();
+
+  // Resolve flows path from config (config.json is already in .slope/)
+  let flowsPath: string;
+  try {
+    const configPath = join(cwd, '.slope', 'config.json');
+    if (existsSync(configPath)) {
+      const config = JSON.parse(readFileSync(configPath, 'utf8'));
+      flowsPath = join(cwd, config.flowsPath || '.slope/flows.json');
+    } else {
+      flowsPath = join(cwd, '.slope', 'flows.json');
+    }
+  } catch {
+    flowsPath = join(cwd, '.slope', 'flows.json');
+  }
+
+  const flows = loadFlows(flowsPath);
+  if (!flows) {
+    return 'No flows defined. Run `slope flows init` to create .slope/flows.json.';
+  }
+
+  if (flows.flows.length === 0) {
+    return 'Flows file exists but contains no flow definitions.';
+  }
+
+  // Get current git SHA for staleness check
+  let currentSha = '';
+  try {
+    currentSha = execSync('git rev-parse HEAD 2>/dev/null', { cwd, encoding: 'utf8', timeout: 5000 }).trim();
+  } catch { /* not in git repo */ }
+
+  // Filter flows by query
+  let matched = flows.flows;
+  if (query) {
+    const q = query.toLowerCase();
+    matched = flows.flows.filter(f =>
+      f.id.toLowerCase().includes(q) ||
+      f.title.toLowerCase().includes(q) ||
+      f.tags.some(t => t.toLowerCase().includes(q)),
+    );
+  }
+
+  if (matched.length === 0) {
+    const allIds = flows.flows.map(f => f.id).join(', ');
+    return `No flows matching "${query}". Available flows: ${allIds}`;
+  }
+
+  // Format output
+  const sections: string[] = [];
+  for (const flow of matched) {
+    const lines: string[] = [];
+    lines.push(`## ${flow.title} (\`${flow.id}\`)`);
+    lines.push('');
+    lines.push(flow.description);
+    lines.push('');
+    lines.push(`**Entry point:** ${flow.entry_point}`);
+    lines.push(`**Tags:** ${flow.tags.join(', ') || '—'}`);
+
+    // Staleness
+    if (currentSha && flow.last_verified_sha) {
+      const { stale, changedFiles } = checkFlowStaleness(flow, currentSha, cwd);
+      if (stale) {
+        lines.push(`**Status:** STALE (${changedFiles.length} file(s) changed: ${changedFiles.join(', ')})`);
+      } else {
+        lines.push('**Status:** Current');
+      }
+    } else if (!flow.last_verified_sha) {
+      lines.push('**Status:** Unverified');
+    }
+
+    lines.push('');
+    lines.push('**Files:**');
+    for (const f of flow.files) {
+      lines.push(`- \`${f}\``);
+    }
+
+    if (flow.steps.length > 0) {
+      lines.push('');
+      lines.push('**Steps:**');
+      for (let i = 0; i < flow.steps.length; i++) {
+        const step = flow.steps[i];
+        lines.push(`${i + 1}. **${step.name}** — ${step.description}`);
+        for (const fp of step.file_paths) {
+          lines.push(`   - \`${fp}\``);
+        }
+        if (step.notes) {
+          lines.push(`   _${step.notes}_`);
+        }
+      }
+    }
+
+    sections.push(lines.join('\n'));
+  }
+
+  return sections.join('\n\n---\n\n');
 }
 
 /** Walk up directories looking for .slope/config.json */

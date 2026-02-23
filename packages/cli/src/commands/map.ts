@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { execSync } from 'node:child_process';
-import { loadConfig, loadScorecards, detectLatestSprint, GUARD_DEFINITIONS } from '@slope-dev/core';
+import { loadConfig, loadScorecards, detectLatestSprint, GUARD_DEFINITIONS, loadFlows, checkFlowStaleness } from '@slope-dev/core';
 import type { SlopeConfig } from '@slope-dev/core';
 
 // ── Helpers ─────────────────────────────────────────────────────
@@ -50,6 +50,7 @@ interface MapMetadata {
   packages: number;
   cli_commands: number;
   guards: number;
+  flows: number;
 }
 
 function gatherMetadata(cwd: string, config: SlopeConfig): MapMetadata {
@@ -71,6 +72,11 @@ function gatherMetadata(cwd: string, config: SlopeConfig): MapMetadata {
     ? readdirSync(commandsDir).filter(f => f.endsWith('.ts')).length
     : 0;
 
+  // Count flows
+  const flowsPath = join(cwd, config.flowsPath ?? '.slope/flows.json');
+  const flowsData = loadFlows(flowsPath);
+  const flowCount = flowsData?.flows.length ?? 0;
+
   return {
     generated_at: new Date().toISOString(),
     git_sha: gitSha,
@@ -80,6 +86,7 @@ function gatherMetadata(cwd: string, config: SlopeConfig): MapMetadata {
     packages: pkgDirs,
     cli_commands: cliCommands,
     guards: GUARD_DEFINITIONS.length,
+    flows: flowCount,
   };
 }
 
@@ -328,6 +335,43 @@ function generateKnownGotchas(cwd: string, config: SlopeConfig): string {
   }
 }
 
+function generateFlowsSummary(cwd: string, config: SlopeConfig): string {
+  const flowsPath = join(cwd, config.flowsPath ?? '.slope/flows.json');
+  const flows = loadFlows(flowsPath);
+
+  if (!flows || flows.flows.length === 0) {
+    return '\nNo flows defined. Run `slope flows init` to create flow definitions.\n';
+  }
+
+  let currentSha = '';
+  try {
+    currentSha = exec('git rev-parse HEAD', cwd);
+  } catch { /* not in git repo */ }
+
+  const lines: string[] = [''];
+  lines.push('| ID | Title | Tags | Files | Stale? |');
+  lines.push('|----|-------|------|-------|--------|');
+
+  for (const flow of flows.flows) {
+    const tags = flow.tags.join(', ') || '—';
+    let staleLabel = '—';
+
+    if (currentSha && flow.last_verified_sha) {
+      const { stale, changedFiles } = checkFlowStaleness(flow, currentSha, cwd);
+      staleLabel = stale ? `Yes (${changedFiles.length})` : 'No';
+    } else if (!flow.last_verified_sha) {
+      staleLabel = 'Unverified';
+    }
+
+    lines.push(`| \`${flow.id}\` | ${flow.title} | ${tags} | ${flow.files.length} | ${staleLabel} |`);
+  }
+
+  lines.push('');
+  lines.push(`Query via MCP: \`search({ module: 'flows' })\` or \`search({ module: 'flows', query: '<id>' })\``);
+
+  return lines.join('\n');
+}
+
 // ── Auto-section replacement ────────────────────────────────────
 
 function replaceAutoSection(content: string, sectionName: string, newContent: string): string {
@@ -360,6 +404,7 @@ function updateMetadataBlock(content: string, meta: MapMetadata): string {
       `packages: ${meta.packages}`,
       `cli_commands: ${meta.cli_commands}`,
       `guards: ${meta.guards}`,
+      `flows: ${meta.flows}`,
       '---',
     ].join('\n'),
   );
@@ -378,6 +423,7 @@ test_files: ${meta.test_files}
 packages: ${meta.packages}
 cli_commands: ${meta.cli_commands}
 guards: ${meta.guards}
+flows: ${meta.flows}
 ---
 
 # SLOPE Codebase Map
@@ -415,6 +461,12 @@ ${generateGuardsList()}
 <!-- AUTO-GENERATED: START mcp -->
 ${generateMcpTools(cwd)}
 <!-- AUTO-GENERATED: END mcp -->
+
+## User Flows
+
+<!-- AUTO-GENERATED: START flows -->
+${generateFlowsSummary(cwd, config)}
+<!-- AUTO-GENERATED: END flows -->
 
 ## Test Inventory
 
@@ -594,6 +646,7 @@ export async function mapCommand(args: string[]): Promise<void> {
     content = replaceAutoSection(content, 'cli', generateCliCommands(cwd));
     content = replaceAutoSection(content, 'guards', generateGuardsList());
     content = replaceAutoSection(content, 'mcp', generateMcpTools(cwd));
+    content = replaceAutoSection(content, 'flows', generateFlowsSummary(cwd, config));
     content = replaceAutoSection(content, 'tests', generateTestInventory(cwd));
     content = replaceAutoSection(content, 'history', generateSprintHistory(cwd, config));
     content = replaceAutoSection(content, 'gotchas', generateKnownGotchas(cwd, config));

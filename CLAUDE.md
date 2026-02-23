@@ -5,7 +5,7 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
 ## Monorepo Structure
 - `packages/core` — scoring engine, types, config, metaphor engine, roles, standup protocol, CI signal parser, store interface, loader (v1.4.0)
 - `packages/store-sqlite` — SQLite storage adapter (v1.4.0)
-- `packages/cli` — CLI tool (init, card, validate, review, report, briefing, plan, session, standup, escalate, hook, guard, extract, distill, map, dashboard, plugin) (v1.4.0)
+- `packages/cli` — CLI tool (init, card, validate, review, report, briefing, plan, session, standup, escalate, hook, guard, extract, distill, map, dashboard, plugin, flows) (v1.4.0)
 - `packages/mcp-tools` — code-mode MCP server (search + execute + session/claim tools) (v1.4.0)
 
 ## Commands
@@ -41,9 +41,18 @@ SLOPE uses a pluggable metaphor engine for display output. Internal types remain
 - Core: `packages/core/src/metaphor.ts` (registry + types), `packages/core/src/metaphors/` (definitions)
 - Fallback chain: CLI flag → config.metaphor → golf default
 
+## Flow Tracking
+SLOPE maps user-facing workflows (OAuth, checkout, onboarding) to code paths for agent navigation.
+- Config: `"flowsPath": ".slope/flows.json"` in `.slope/config.json` (default)
+- CLI: `slope flows init` (create template), `slope flows list` (show all), `slope flows check` (validate + staleness)
+- MCP: `search({ module: 'flows' })` returns all flows, `search({ module: 'flows', query: 'oauth' })` filters by id/title/tags
+- Core: `packages/core/src/flows.ts` (types + validation), exported from `packages/core/src/index.ts`
+- Guard: `stale-flows` warns when editing files belonging to a stale flow definition
+
 ## Key Files
 - `.slope/config.json` — SLOPE configuration (includes `metaphor` field)
 - `.slope/slope.db` — SQLite store (sessions, claims, scorecards, common issues, events)
 - `.slope/common-issues.json` — recurring patterns and gotchas (legacy, migrating to store)
+- `.slope/flows.json` — user flow definitions (workflow → code path mappings)
 - `.slope/hooks.json` — installed hook registry
 - `docs/backlog/README.md` — sprint plan index

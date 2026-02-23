@@ -391,5 +391,20 @@ export {
 } from './player.js';
 export type { PlayerHandicap, ReporterSeverity } from './player.js';
 
+// Flows
+export {
+  parseFlows,
+  validateFlows,
+  checkFlowStaleness,
+  loadFlows,
+} from './flows.js';
+export type {
+  FlowStep,
+  FlowDefinition,
+  FlowsFile,
+  FlowValidationResult,
+  FlowStalenessResult,
+} from './flows.js';
+
 // Built-in metaphors (auto-registers on import)
 export { golf, tennis, baseball, gaming, dnd, matrix } from './metaphors/index.js';

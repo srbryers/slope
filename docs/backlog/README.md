@@ -24,6 +24,7 @@ Sprint plans and backlog items for the SLOPE framework (core, CLI, MCP tools).
 | 18 | — | PR Signals — Review Metadata Integration |
 | 19 | — | The Dashboard — Live Local Performance Dashboard |
 | 20 | — | The Foursome — Multi-Developer Support |
+| 26 | [sprint-26-plan.md](sprint-26-plan.md) | The Fairway Map — User Flow Tracking |
 
 ## Roadmaps
 

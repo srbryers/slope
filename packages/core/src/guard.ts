@@ -63,7 +63,8 @@ export type GuardName =
   | 'push-nudge'
   | 'workflow-gate'
   | 'review-tier'
-  | 'version-check';
+  | 'version-check'
+  | 'stale-flows';
 
 /** Guard registration entry */
 export interface GuardDefinition {
@@ -178,6 +179,13 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     description: 'Block push to main when package versions have not been bumped',
     hookEvent: 'PreToolUse',
     matcher: 'Bash',
+    level: 'full',
+  },
+  {
+    name: 'stale-flows',
+    description: 'Warn when editing files belonging to a stale flow definition',
+    hookEvent: 'PreToolUse',
+    matcher: 'Edit|Write',
     level: 'full',
   },
 ];
