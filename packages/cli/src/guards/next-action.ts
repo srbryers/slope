@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync, renameSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import type { HookInput, GuardResult, SlopeConfig } from '@slope-dev/core';
-import { loadConfig, loadScorecards, detectLatestSprint, parseRoadmap, formatStrategicContext } from '@slope-dev/core';
+import type { HookInput, GuardResult, SlopeConfig } from '@srbryers/core';
+import { loadConfig, loadScorecards, detectLatestSprint, parseRoadmap, formatStrategicContext } from '@srbryers/core';
 import { resolveStore } from '../store.js';
 
 /** Sprint state types for next-action detection */

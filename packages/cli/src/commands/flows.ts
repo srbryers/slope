@@ -3,8 +3,8 @@
 import { existsSync, writeFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { execSync } from 'node:child_process';
-import { loadConfig, loadFlows, validateFlows, checkFlowStaleness } from '@slope-dev/core';
-import type { FlowsFile } from '@slope-dev/core';
+import { loadConfig, loadFlows, validateFlows, checkFlowStaleness } from '@srbryers/core';
+import type { FlowsFile } from '@srbryers/core';
 
 const EXAMPLE_FLOWS: FlowsFile = {
   version: '1',

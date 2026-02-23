@@ -1,7 +1,7 @@
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { buildTournamentReview, formatTournamentReview } from '@slope-dev/core';
-import type { GolfScorecard } from '@slope-dev/core';
+import { buildTournamentReview, formatTournamentReview } from '@srbryers/core';
+import type { GolfScorecard } from '@srbryers/core';
 import { loadConfig } from '../config.js';
 import { loadScorecards } from '../loader.js';
 

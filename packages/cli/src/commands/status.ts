@@ -1,5 +1,5 @@
-import { checkConflicts } from '@slope-dev/core';
-import type { SprintClaim, SlopeSession } from '@slope-dev/core';
+import { checkConflicts } from '@srbryers/core';
+import type { SprintClaim, SlopeSession } from '@srbryers/core';
 import { loadConfig } from '../config.js';
 import { loadScorecards } from '../loader.js';
 import { resolveStore } from '../store.js';

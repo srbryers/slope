@@ -1,5 +1,5 @@
-import { computeHandicapCard, computeTeamHandicap, computePlayerHandicaps, filterScorecardsByPlayer } from '@slope-dev/core';
-import type { MissDirection, PlayerHandicap } from '@slope-dev/core';
+import { computeHandicapCard, computeTeamHandicap, computePlayerHandicaps, filterScorecardsByPlayer } from '@srbryers/core';
+import type { MissDirection, PlayerHandicap } from '@srbryers/core';
 import { loadConfig } from '../config.js';
 import { loadScorecards } from '../loader.js';
 import { resolveMetaphor } from '../metaphor.js';
@@ -99,7 +99,7 @@ export function cardCommand(args: string[] = []): void {
   console.log('');
 }
 
-function showPlayerComparison(scorecards: import('@slope-dev/core').GolfScorecard[], minSprint: number): void {
+function showPlayerComparison(scorecards: import('@srbryers/core').GolfScorecard[], minSprint: number): void {
   const playerHandicaps = computePlayerHandicaps(scorecards);
 
   if (playerHandicaps.length === 0) {
@@ -126,7 +126,7 @@ function showPlayerComparison(scorecards: import('@slope-dev/core').GolfScorecar
   console.log('');
 }
 
-function showTeamHandicap(scorecards: import('@slope-dev/core').GolfScorecard[]): void {
+function showTeamHandicap(scorecards: import('@srbryers/core').GolfScorecard[]): void {
   const team = computeTeamHandicap(scorecards);
   const pad = (s: string | number, w: number) => String(s).padStart(w);
   const pct = (n: number) => n.toFixed(1) + '%';

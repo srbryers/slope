@@ -80,7 +80,7 @@
   "nineteenth_hole": {
     "how_did_it_feel": "Smooth extraction — the SLOPE code was already well-decoupled from CaddyStack",
     "advice_for_next_player": "The formatter test adaptations need careful attention — ProjectStats replaces SpecStatusSummary with different key names",
-    "excited_about_next": "Publishing to npm, wiring CaddyStack to depend on @slope-dev/core"
+    "excited_about_next": "Publishing to npm, wiring CaddyStack to depend on @srbryers/core"
   },
   "bunker_locations": [
     "Dynamic imports in test files can be missed by batch sed replacements",

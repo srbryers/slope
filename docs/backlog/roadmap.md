@@ -167,7 +167,7 @@ S8-1 (interface + registry) must land first — everything depends on `MetaphorD
 - **Existing infrastructure:** Cursor `.mdc` rule templates and MCP config already exist in `templates/cursor/`. This ticket completes the integration — adds `.cursorrules` file, updates MCP config to use published package, and wires templates through the metaphor-aware generator from S9-1.
 - Create `.cursorrules` template with SLOPE methodology (sprint checklist, commit discipline, review loop) adapted for Cursor's format
 - `slope init --cursor` installs `.cursorrules` (with metaphor terms) + Cursor MCP config
-- MCP config points to `@slope-dev/mcp-tools` (published package, not local build)
+- MCP config points to `@srbryers/mcp-tools` (published package, not local build)
 - Acceptance criteria: MCP server connects in Cursor, `search()` and `execute()` work (manual verification)
 - Tests: template generation, file installation, no-clobber guard
 

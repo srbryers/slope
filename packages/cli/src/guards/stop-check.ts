@@ -1,5 +1,5 @@
 import { execSync } from 'node:child_process';
-import type { HookInput, GuardResult } from '@slope-dev/core';
+import type { HookInput, GuardResult } from '@srbryers/core';
 
 /**
  * Stop check guard: fires on Stop.

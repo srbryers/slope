@@ -1,8 +1,8 @@
 import { writeFileSync, readFileSync, existsSync, unlinkSync, mkdirSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { loadHooksConfig, saveHooksConfig } from '../hooks-config.js';
-import { GUARD_DEFINITIONS, getAllGuardDefinitions, generateClaudeCodeHooksConfig, loadPluginGuards, loadConfig } from '@slope-dev/core';
-import type { AnyGuardDefinition } from '@slope-dev/core';
+import { GUARD_DEFINITIONS, getAllGuardDefinitions, generateClaudeCodeHooksConfig, loadPluginGuards, loadConfig } from '@srbryers/core';
+import type { AnyGuardDefinition } from '@srbryers/core';
 
 const HOOK_TEMPLATES: Record<string, { description: string; managed: string[] }> = {
   'session-start': {

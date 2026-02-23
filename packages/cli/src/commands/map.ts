@@ -1,8 +1,8 @@
 import { readFileSync, writeFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { execSync } from 'node:child_process';
-import { loadConfig, loadScorecards, detectLatestSprint, GUARD_DEFINITIONS, loadFlows, checkFlowStaleness } from '@slope-dev/core';
-import type { SlopeConfig } from '@slope-dev/core';
+import { loadConfig, loadScorecards, detectLatestSprint, GUARD_DEFINITIONS, loadFlows, checkFlowStaleness } from '@srbryers/core';
+import type { SlopeConfig } from '@srbryers/core';
 
 // ── Helpers ─────────────────────────────────────────────────────
 
@@ -275,7 +275,7 @@ function generateTestInventory(cwd: string): string {
     const { test } = countSourceFiles(join(packagesDir, pkg));
     totalTests += test;
     if (test > 0) {
-      lines.push(`| ${pkg} | ${test} | \`pnpm --filter @slope-dev/${pkg} test\` |`);
+      lines.push(`| ${pkg} | ${test} | \`pnpm --filter @srbryers/${pkg} test\` |`);
     }
   }
 

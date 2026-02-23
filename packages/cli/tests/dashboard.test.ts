@@ -4,7 +4,7 @@ import { mkdirSync, writeFileSync, rmSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import type { GolfScorecard, SlopeConfig, DashboardConfig } from '@slope-dev/core';
+import type { GolfScorecard, SlopeConfig, DashboardConfig } from '@srbryers/core';
 import {
   loadScorecards,
   buildReportData,
@@ -12,7 +12,7 @@ import {
   renderSprintDetail,
   getMetaphor,
   DEFAULT_DASHBOARD_CONFIG,
-} from '@slope-dev/core';
+} from '@srbryers/core';
 import { resolveDashboardConfig } from '../src/commands/dashboard.js';
 
 let tmpDir: string;

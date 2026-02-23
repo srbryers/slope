@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * @slope-dev/mcp-tools — Code-mode MCP server for SLOPE.
+ * @srbryers/mcp-tools — Code-mode MCP server for SLOPE.
  *
  * Exposes up to 5 tools:
  *   search()           — discover the SLOPE API (functions, types, constants)
@@ -10,7 +10,7 @@
  *   check_conflicts()  — detect overlapping claims (requires store)
  *
  * Usage:
- *   npx @slope-dev/mcp-tools              # stdio transport
+ *   npx @srbryers/mcp-tools              # stdio transport
  *   import { createSlopeToolsServer }     # programmatic
  */
 import { existsSync, readFileSync } from 'node:fs';
@@ -21,9 +21,9 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 import { SLOPE_REGISTRY, SLOPE_TYPES } from './registry.js';
 import { runInSandbox } from './sandbox.js';
-import type { SlopeStore } from '@slope-dev/core';
-import { checkConflicts, loadFlows, checkFlowStaleness } from '@slope-dev/core';
-import type { ClaimScope, FlowsFile, FlowDefinition } from '@slope-dev/core';
+import type { SlopeStore } from '@srbryers/core';
+import { checkConflicts, loadFlows, checkFlowStaleness } from '@srbryers/core';
+import type { ClaimScope, FlowsFile, FlowDefinition } from '@srbryers/core';
 
 /** Tool names exposed by this MCP server (for tests and tool discovery). */
 export const SLOPE_MCP_TOOL_NAMES = ['search', 'execute', 'session_status', 'acquire_claim', 'check_conflicts'] as const;
@@ -414,8 +414,8 @@ async function main(): Promise<void> {
   let store: SlopeStore | undefined;
   let hints: SetupHints | undefined;
   try {
-    const { loadConfig } = await import('@slope-dev/core');
-    const { createStore } = await import('@slope-dev/store-sqlite');
+    const { loadConfig } = await import('@srbryers/core');
+    const { createStore } = await import('@srbryers/store-sqlite');
     const cwd = findProjectRoot(process.cwd());
     const config = loadConfig(cwd);
     store = createStore({ storePath: config.store_path ?? '.slope/slope.db', cwd });

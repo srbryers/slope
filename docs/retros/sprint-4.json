@@ -86,7 +86,7 @@
   "special_plays": [],
   "bunker_locations": [],
   "yardage_book_updates": [
-    "mcp-tools must use workspace:* for @slope-dev/core dep to resolve local changes",
+    "mcp-tools must use workspace:* for @srbryers/core dep to resolve local changes",
     "core needs @types/node when importing node:fs / node:path modules",
     "node:vm createContext + runInContext pattern for sandboxed code execution"
   ],

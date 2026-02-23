@@ -1,11 +1,11 @@
 /**
  * SLOPE sandbox — runs agent-written JS in a node:vm context
- * with the full @slope-dev/core API + filesystem helpers pre-injected.
+ * with the full @srbryers/core API + filesystem helpers pre-injected.
  */
 import vm from 'node:vm';
 import fs from 'node:fs';
 import path from 'node:path';
-import * as core from '@slope-dev/core';
+import * as core from '@srbryers/core';
 
 export interface SandboxResult {
   result: unknown;
@@ -112,7 +112,7 @@ function buildFsHelpers(cwd: string) {
 /**
  * Run agent-written JS code in a sandboxed vm context.
  *
- * The context includes all @slope-dev/core exports as top-level names,
+ * The context includes all @srbryers/core exports as top-level names,
  * all constants, and filesystem helpers pre-bound to `cwd`.
  *
  * Code is wrapped in an async IIFE so `return` works naturally.

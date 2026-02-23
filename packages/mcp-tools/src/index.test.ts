@@ -6,8 +6,8 @@ import { runInSandbox } from './sandbox.js';
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import type { SlopeStore, SlopeSession, SprintClaim, GolfScorecard } from '@slope-dev/core';
-import type { CommonIssuesFile } from '@slope-dev/core';
+import type { SlopeStore, SlopeSession, SprintClaim, GolfScorecard } from '@srbryers/core';
+import type { CommonIssuesFile } from '@srbryers/core';
 
 /** In-memory mock store for testing */
 function createMockStore(): SlopeStore & { sessions: SlopeSession[]; claims: SprintClaim[] } {
@@ -414,7 +414,7 @@ describe('mock store tools', () => {
   });
 
   it('check_conflicts detects overlaps', async () => {
-    const { checkConflicts } = await import('@slope-dev/core');
+    const { checkConflicts } = await import('@srbryers/core');
     const store = createMockStore();
     await store.claim({ sprint_number: 1, player: 'alice', target: 'T-1', scope: 'ticket' });
     await store.claim({ sprint_number: 1, player: 'bob', target: 'T-1', scope: 'ticket' });
@@ -426,7 +426,7 @@ describe('mock store tools', () => {
   });
 
   it('check_conflicts filters by sprint', async () => {
-    const { checkConflicts } = await import('@slope-dev/core');
+    const { checkConflicts } = await import('@srbryers/core');
     const store = createMockStore();
     await store.claim({ sprint_number: 1, player: 'alice', target: 'T-1', scope: 'ticket' });
     await store.claim({ sprint_number: 2, player: 'bob', target: 'T-1', scope: 'ticket' });

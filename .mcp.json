@@ -2,7 +2,7 @@
   "mcpServers": {
     "slope": {
       "command": "npx",
-      "args": ["@slope-dev/mcp-tools"]
+      "args": ["@srbryers/mcp-tools"]
     }
   }
 }

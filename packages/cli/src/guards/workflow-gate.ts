@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { HookInput, GuardResult } from '@slope-dev/core';
+import type { HookInput, GuardResult } from '@srbryers/core';
 
 interface ReviewState {
   rounds_required: number;

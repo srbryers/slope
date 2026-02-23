@@ -1,8 +1,8 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import type { HookInput, GuardResult } from '@slope-dev/core';
+import type { HookInput, GuardResult } from '@srbryers/core';
 import { loadConfig } from '../config.js';
-import type { CommonIssuesFile } from '@slope-dev/core';
+import type { CommonIssuesFile } from '@srbryers/core';
 
 /**
  * Hazard guard: fires on Edit|Write (PreToolUse).

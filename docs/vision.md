@@ -155,10 +155,10 @@ Configuration is via the `"metaphor": "golf"` field in `.slope/config.json`. The
 
 | Package | Purpose | npm |
 |---------|---------|-----|
-| `@slope-dev/core` | Scoring engine, types, validation, formatters, advisor, metaphors, roles, standup protocol, escalation, team-handicap, agent breakdown | Published |
-| `@slope-dev/store-sqlite` | SQLite storage adapter for sessions, claims, scorecards, events, common issues | Published |
-| `@slope-dev/cli` | CLI tool — 22 commands covering scoring, sessions, reporting, planning, orchestration, and setup | Published |
-| `@slope-dev/mcp-tools` | Code-mode MCP server (search + execute + session/claim + orchestration registry) | Published |
+| `@srbryers/core` | Scoring engine, types, validation, formatters, advisor, metaphors, roles, standup protocol, escalation, team-handicap, agent breakdown | Published |
+| `@srbryers/store-sqlite` | SQLite storage adapter for sessions, claims, scorecards, events, common issues | Published |
+| `@srbryers/cli` | CLI tool — 22 commands covering scoring, sessions, reporting, planning, orchestration, and setup | Published |
+| `@srbryers/mcp-tools` | Code-mode MCP server (search + execute + session/claim + orchestration registry) | Published |
 
 ### Integration Layers
 
@@ -167,7 +167,7 @@ Configuration is via the `"metaphor": "golf"` field in `.slope/config.json`. The
 │                    AI Coding Agent                   │
 │           (Claude Code / Cursor / OpenCode)          │
 ├─────────────────────────────────────────────────────┤
-│  MCP Server (@slope-dev/mcp-tools)                  │
+│  MCP Server (@srbryers/mcp-tools)                  │
 │  ┌─────────┐  ┌─────────┐  ┌──────────────────┐    │
 │  │ search  │  │ execute │  │ session / claims │    │
 │  └─────────┘  └─────────┘  └──────────────────┘    │
@@ -175,7 +175,7 @@ Configuration is via the `"metaphor": "golf"` field in `.slope/config.json`. The
 │  │ orchestration (standup, escalation, team)  │     │
 │  └────────────────────────────────────────────┘     │
 ├─────────────────────────────────────────────────────┤
-│  Scoring Engine (@slope-dev/core)                   │
+│  Scoring Engine (@srbryers/core)                   │
 │  handicap · dispersion · advisor · tournament ·     │
 │  training · briefing · nutrition · classification · │
 │  roles · standup · escalation · team-handicap       │
@@ -186,14 +186,14 @@ Configuration is via the `"metaphor": "golf"` field in `.slope/config.json`. The
 │  │ (scorecards) │  │ (sessions, claims, events)   │ │
 │  └──────────────┘  └──────────────────────────────┘ │
 ├─────────────────────────────────────────────────────┤
-│  CLI (@slope-dev/cli) — 22 commands                 │
+│  CLI (@srbryers/cli) — 22 commands                 │
 │  init · card · validate · review · briefing ·       │
 │  plan · classify · auto-card · tournament ·         │
 │  session · hook · claim · release · status · next · │
 │  roadmap · report · extract · distill · standup ·   │
 │  escalate · guard                                   │
 ├─────────────────────────────────────────────────────┤
-│  Hooks (@slope-dev/cli)                             │
+│  Hooks (@srbryers/cli)                             │
 │  session-start · session-end · pre-merge ·          │
 │  post-sprint · pre-commit                           │
 │  Guards: explore · hazard · commit-nudge ·          │

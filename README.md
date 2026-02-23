@@ -8,7 +8,7 @@ A framework for measuring and improving sprint execution quality. Replace subjec
 
 ```bash
 # Install
-npm install -g @slope-dev/cli
+npm install -g @srbryers/cli
 
 # Initialize in your project (auto-detects your AI tool)
 slope init
@@ -66,10 +66,10 @@ Or per-command: `slope review --metaphor=tennis`
 
 | Package | Description |
 |---------|-------------|
-| [`@slope-dev/core`](packages/core) | Core engine — scoring, handicap, metaphors, reports, guards, roadmap, events |
-| [`@slope-dev/store-sqlite`](packages/store-sqlite) | SQLite storage adapter — sessions, claims, events, scorecards |
-| [`@slope-dev/cli`](packages/cli) | CLI tool — 22 commands for the full sprint lifecycle |
-| [`@slope-dev/mcp-tools`](packages/mcp-tools) | Code-mode MCP server — `search` + `execute` + session/claim tools |
+| [`@srbryers/core`](packages/core) | Core engine — scoring, handicap, metaphors, reports, guards, roadmap, events |
+| [`@srbryers/store-sqlite`](packages/store-sqlite) | SQLite storage adapter — sessions, claims, events, scorecards |
+| [`@srbryers/cli`](packages/cli) | CLI tool — 22 commands for the full sprint lifecycle |
+| [`@srbryers/mcp-tools`](packages/mcp-tools) | Code-mode MCP server — `search` + `execute` + session/claim tools |
 
 ## CLI Commands
 
@@ -216,7 +216,7 @@ import {
   generateHtmlReport,
   getMetaphor,
   loadScorecards,
-} from '@slope-dev/core';
+} from '@srbryers/core';
 
 // Build a scorecard
 const card = buildScorecard({

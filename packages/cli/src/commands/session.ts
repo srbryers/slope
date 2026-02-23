@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { checkConflicts } from '@slope-dev/core';
+import { checkConflicts } from '@srbryers/core';
 import { resolveStore } from '../store.js';
 
 function parseArgs(args: string[]): Record<string, string> {

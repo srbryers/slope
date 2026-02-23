@@ -1,7 +1,7 @@
 import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { HookInput, GuardResult } from '@slope-dev/core';
+import type { HookInput, GuardResult } from '@srbryers/core';
 
 /**
  * Version-check guard: fires PreToolUse on Bash.
@@ -29,7 +29,7 @@ export async function versionCheckGuard(input: HookInput, cwd: string): Promise<
   // Get published version from npm
   let publishedVersion: string;
   try {
-    publishedVersion = execSync('npm view @slope-dev/core version 2>/dev/null', {
+    publishedVersion = execSync('npm view @srbryers/core version 2>/dev/null', {
       cwd,
       encoding: 'utf8',
       timeout: 10000,
@@ -43,7 +43,7 @@ export async function versionCheckGuard(input: HookInput, cwd: string): Promise<
   if (localVersion === publishedVersion) {
     return {
       decision: 'deny',
-      blockReason: `Version not bumped — local @slope-dev/core is ${localVersion}, same as npm. Run \`pnpm version:bump <version>\` before pushing to main.`,
+      blockReason: `Version not bumped — local @srbryers/core is ${localVersion}, same as npm. Run \`pnpm version:bump <version>\` before pushing to main.`,
     };
   }
 

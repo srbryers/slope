@@ -1,7 +1,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { formatBriefing, parseRoadmap, getRole, hasRole, loadCustomRoles, filterScorecardsByPlayer, filterHazardsByVisibility } from '@slope-dev/core';
-import type { CommonIssuesFile, SessionEntry, SprintClaim, RoadmapDefinition, SlopeEvent, RoleDefinition } from '@slope-dev/core';
+import { formatBriefing, parseRoadmap, getRole, hasRole, loadCustomRoles, filterScorecardsByPlayer, filterHazardsByVisibility } from '@srbryers/core';
+import type { CommonIssuesFile, SessionEntry, SprintClaim, RoadmapDefinition, SlopeEvent, RoleDefinition } from '@srbryers/core';
 import { loadConfig } from '../config.js';
 import { loadScorecards } from '../loader.js';
 import { resolveStore } from '../store.js';

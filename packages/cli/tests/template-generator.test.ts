@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { golf, gaming } from '@slope-dev/core';
+import { golf, gaming } from '@srbryers/core';
 import {
   generateProjectContext,
   generateSprintChecklist,

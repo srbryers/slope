@@ -1,5 +1,5 @@
-import { classifyShot } from '@slope-dev/core';
-import type { ExecutionTrace } from '@slope-dev/core';
+import { classifyShot } from '@srbryers/core';
+import type { ExecutionTrace } from '@srbryers/core';
 
 export function classifyCommand(args: string[]): void {
   let scope: string | undefined;

@@ -220,10 +220,10 @@ Re-exports from `packages/core/src/index.ts`:
 
 | Package | Test Files | Command |
 |---------|-----------|---------|
-| cli | 12 | `pnpm --filter @slope-dev/cli test` |
-| core | 29 | `pnpm --filter @slope-dev/core test` |
-| mcp-tools | 3 | `pnpm --filter @slope-dev/mcp-tools test` |
-| store-sqlite | 1 | `pnpm --filter @slope-dev/store-sqlite test` |
+| cli | 12 | `pnpm --filter @srbryers/cli test` |
+| core | 29 | `pnpm --filter @srbryers/core test` |
+| mcp-tools | 3 | `pnpm --filter @srbryers/mcp-tools test` |
+| store-sqlite | 1 | `pnpm --filter @srbryers/store-sqlite test` |
 
 **Total test files:** 45
 **Run all:** `pnpm -r test`
@@ -251,7 +251,7 @@ Top recurring patterns from common-issues:
 
 - **Example pattern** (general, 1 sprint): This is an example recurring pattern. Replace with your own.
 - **Run full Post-Hole routine after every sprint** (general, 1 sprint): After filing the scorecard, it's easy to skip validate + review + common-issues.
-- **Workspace packages must use workspace:* protocol for local deps** (monorepo, 1 sprint): mcp-tools had @slope-dev/core pinned to ^0.3.3 (npm), so TypeScript resolved the published version instead of the local workspace version with new exports.
+- **Workspace packages must use workspace:* protocol for local deps** (monorepo, 1 sprint): mcp-tools had @srbryers/core pinned to ^0.3.3 (npm), so TypeScript resolved the published version instead of the local workspace version with new exports.
 - **Core package needs @types/node when importing node: modules** (monorepo, 1 sprint): Moving config.ts/loader.ts to core failed to compile because core didn't have @types/node — it had been a pure-logic package until now.
 - **better-sqlite3 native build requires pnpm onlyBuiltDependencies approval** (monorepo, 1 sprint): pnpm ignores native build scripts by default. better-sqlite3 silently fails to compile, causing runtime errors. pnpm approve-builds is interactive and unusable in CI/agent contexts.
 - **Making sync functions async breaks callers that don't await** (general, 1 sprint): Changing initCommand from sync to async caused 5 CLI tests to fail — they called initCommand() without await, so assertions ran before the async work completed.

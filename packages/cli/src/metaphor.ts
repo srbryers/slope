@@ -2,8 +2,8 @@
 // Fallback chain: --metaphor flag → config.metaphor → 'golf' default
 
 // Import named metaphors to ensure registration happens
-import { getMetaphor, hasMetaphor, listMetaphors, loadPluginMetaphors, golf } from '@slope-dev/core';
-import type { MetaphorDefinition, PluginsConfig } from '@slope-dev/core';
+import { getMetaphor, hasMetaphor, listMetaphors, loadPluginMetaphors, golf } from '@srbryers/core';
+import type { MetaphorDefinition, PluginsConfig } from '@srbryers/core';
 
 // Force registration side effect (golf import ensures all metaphors are registered
 // since the barrel import triggers packages/core/src/metaphors/index.ts)

@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { createConfig } from '../config.js';
 import { saveHooksConfig } from '../hooks-config.js';
 import { resolveMetaphor } from '../metaphor.js';
-import type { MetaphorDefinition } from '@slope-dev/core';
+import type { MetaphorDefinition } from '@srbryers/core';
 import {
   generateProjectContext,
   generateSprintChecklist,
@@ -226,7 +226,7 @@ function installGenericTemplates(cwd: string, metaphor: MetaphorDefinition): voi
 
 const SLOPE_MCP_ENTRY = {
   command: 'npx',
-  args: ['@slope-dev/mcp-tools'],
+  args: ['@srbryers/mcp-tools'],
 };
 
 function installClaudeCodeMcpConfig(cwd: string): void {
@@ -309,7 +309,7 @@ function installOpenCodeMcpConfig(cwd: string): void {
   if (!config.mcp) config.mcp = {};
   config.mcp.slope = {
     type: 'local',
-    command: ['npx', '@slope-dev/mcp-tools'],
+    command: ['npx', '@srbryers/mcp-tools'],
   };
 
   writeFileSync(mcpPath, JSON.stringify(config, null, 2) + '\n');
@@ -442,7 +442,7 @@ export async function initCommand(args: string[]): Promise<void> {
   const dbPath = join(cwd, '.slope', 'slope.db');
   if (!existsSync(dbPath)) {
     try {
-      const { createStore } = await import('@slope-dev/store-sqlite');
+      const { createStore } = await import('@srbryers/store-sqlite');
       const store = createStore({ storePath: '.slope/slope.db', cwd });
       store.close();
       console.log(`  Created ${dbPath}`);

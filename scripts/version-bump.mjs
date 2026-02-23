@@ -21,7 +21,7 @@ for (const pkg of packages) {
   const old = json.version;
   json.version = version;
   writeFileSync(pkgPath, JSON.stringify(json, null, 2) + '\n');
-  console.log(`  @slope-dev/${pkg}: ${old} → ${version}`);
+  console.log(`  @srbryers/${pkg}: ${old} → ${version}`);
 }
 
 console.log(`\nAll packages bumped to ${version}.`);

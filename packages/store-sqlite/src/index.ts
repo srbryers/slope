@@ -6,10 +6,10 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import Database from 'better-sqlite3';
 import type { Database as DatabaseType } from 'better-sqlite3';
-import type { SprintClaim, GolfScorecard, SlopeEvent, EventType } from '@slope-dev/core';
-import type { CommonIssuesFile } from '@slope-dev/core';
-import { SlopeStoreError } from '@slope-dev/core';
-import type { SlopeStore, SlopeSession } from '@slope-dev/core';
+import type { SprintClaim, GolfScorecard, SlopeEvent, EventType } from '@srbryers/core';
+import type { CommonIssuesFile } from '@srbryers/core';
+import { SlopeStoreError } from '@srbryers/core';
+import type { SlopeStore, SlopeSession } from '@srbryers/core';
 
 function generateId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;

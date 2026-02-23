@@ -1,5 +1,5 @@
 import { resolveStore } from '../store.js';
-import { runPipeline } from '@slope-dev/core';
+import { runPipeline } from '@srbryers/core';
 
 function parseArgs(args: string[]): Record<string, string> {
   const result: Record<string, string> = {};

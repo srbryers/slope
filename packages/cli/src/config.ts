@@ -1,1 +1,1 @@
-export { type SlopeConfig, loadConfig, createConfig, resolveConfigPath } from '@slope-dev/core';
+export { type SlopeConfig, loadConfig, createConfig, resolveConfigPath } from '@srbryers/core';

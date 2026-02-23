@@ -3,8 +3,8 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { SqliteSlopeStore, createStore } from './index.js';
-import { SlopeStoreError, checkConflicts } from '@slope-dev/core';
-import type { GolfScorecard } from '@slope-dev/core';
+import { SlopeStoreError, checkConflicts } from '@srbryers/core';
+import type { GolfScorecard } from '@srbryers/core';
 
 let store: SqliteSlopeStore;
 let tmpDir: string;

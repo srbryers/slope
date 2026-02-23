@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolveStore } from '../store.js';
-import type { EventType } from '@slope-dev/core';
+import type { EventType } from '@srbryers/core';
 
 const VALID_EVENT_TYPES: EventType[] = ['failure', 'dead_end', 'scope_change', 'compaction', 'hazard', 'decision'];
 

@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { dirname } from 'node:path';
-import type { SprintClaim, SprintRegistry } from '@slope-dev/core';
+import type { SprintClaim, SprintRegistry } from '@srbryers/core';
 
 interface ClaimsFile {
   claims: SprintClaim[];

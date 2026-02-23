@@ -3,8 +3,8 @@ import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createSlopeToolsServer } from '../src/index.js';
-import { createStore } from '@slope-dev/store-sqlite';
-import type { SlopeStore } from '@slope-dev/core';
+import { createStore } from '@srbryers/store-sqlite';
+import type { SlopeStore } from '@srbryers/core';
 
 let tmpDir: string;
 let store: SlopeStore;
@@ -55,7 +55,7 @@ describe('MCP integration with real SQLite store', () => {
   });
 
   it('check_conflicts detects real conflicts', async () => {
-    const { checkConflicts } = await import('@slope-dev/core');
+    const { checkConflicts } = await import('@srbryers/core');
 
     await store.claim({ sprint_number: 1, player: 'alice', target: 'shared-area', scope: 'area' });
     await store.claim({ sprint_number: 1, player: 'bob', target: 'shared-area/sub', scope: 'area' });

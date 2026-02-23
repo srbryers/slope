@@ -94,7 +94,7 @@
   ],
   "nineteenth_hole": {
     "how_did_it_feel": "Clean execution. The metaphor engine is display-only by design — internal types stay golf-derived, which prevented a massive rename cascade. 6 complete metaphor definitions ship with zero breaking changes.",
-    "advice_for_next_player": "When adding titleCase/capitalize helpers for vocabulary display, use regex /\\b\\w/g to capitalize each word. Also, metaphor barrel import (metaphors/index.ts) auto-registers via side effects — importing @slope-dev/core ensures all metaphors are registered.",
+    "advice_for_next_player": "When adding titleCase/capitalize helpers for vocabulary display, use regex /\\b\\w/g to capitalize each word. Also, metaphor barrel import (metaphors/index.ts) auto-registers via side effects — importing @srbryers/core ensures all metaphors are registered.",
     "what_surprised_you": "The scope was well-estimated. S8-2 (long_iron) was the most complex as expected — touching formatters across core. The titleCase bug was the only hazard across 4 tickets.",
     "excited_about_next": "Metaphors are the foundation for S9 (cross-platform) — templates can now be generated dynamically per-metaphor. The engine is extensible — community metaphors just need a MetaphorDefinition object."
   },

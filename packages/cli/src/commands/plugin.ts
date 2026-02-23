@@ -8,8 +8,8 @@ import {
   loadPluginMetaphors,
   loadPluginGuards,
   discoverPlugins,
-} from '@slope-dev/core';
-import type { MetaphorDefinition } from '@slope-dev/core';
+} from '@srbryers/core';
+import type { MetaphorDefinition } from '@srbryers/core';
 import { loadConfig } from '../config.js';
 
 export async function pluginCommand(args: string[]): Promise<void> {

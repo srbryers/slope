@@ -1,5 +1,5 @@
-import { GUARD_DEFINITIONS, formatPreToolUseOutput, formatPostToolUseOutput, formatStopOutput, getAllGuardDefinitions, getCustomGuard, loadPluginGuards } from '@slope-dev/core';
-import type { HookInput, GuardResult, GuardName, AnyGuardDefinition } from '@slope-dev/core';
+import { GUARD_DEFINITIONS, formatPreToolUseOutput, formatPostToolUseOutput, formatStopOutput, getAllGuardDefinitions, getCustomGuard, loadPluginGuards } from '@srbryers/core';
+import type { HookInput, GuardResult, GuardName, AnyGuardDefinition } from '@srbryers/core';
 import { loadConfig } from '../config.js';
 import { exploreGuard } from '../guards/explore.js';
 import { hazardGuard } from '../guards/hazard.js';

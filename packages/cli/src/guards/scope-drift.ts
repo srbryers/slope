@@ -1,4 +1,4 @@
-import type { HookInput, GuardResult } from '@slope-dev/core';
+import type { HookInput, GuardResult } from '@srbryers/core';
 import { loadConfig } from '../config.js';
 import { resolveStore } from '../store.js';
 

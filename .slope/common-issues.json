@@ -26,7 +26,7 @@
       "category": "monorepo",
       "sprints_hit": [4],
       "gotcha_refs": ["S4-3"],
-      "description": "mcp-tools had @slope-dev/core pinned to ^0.3.3 (npm), so TypeScript resolved the published version instead of the local workspace version with new exports.",
+      "description": "mcp-tools had @srbryers/core pinned to ^0.3.3 (npm), so TypeScript resolved the published version instead of the local workspace version with new exports.",
       "prevention": "Always use \"workspace:*\" for intra-monorepo dependencies. Check resolution with pnpm ls after adding new exports.",
       "reported_by": []
     },

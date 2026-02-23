@@ -1,8 +1,8 @@
-import { checkConflicts } from '@slope-dev/core';
+import { checkConflicts } from '@srbryers/core';
 import { loadConfig } from '../config.js';
 import { loadScorecards } from '../loader.js';
 import { resolveStore } from '../store.js';
-import type { ClaimScope, SprintClaim } from '@slope-dev/core';
+import type { ClaimScope, SprintClaim } from '@srbryers/core';
 
 function parseArgs(args: string[]): Record<string, string> {
   const result: Record<string, string> = {};

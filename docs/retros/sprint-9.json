@@ -96,7 +96,7 @@
   "bunker_locations": [],
   "yardage_book_updates": [
     "template-generator.ts: 10 generator functions covering CLAUDE.md, AGENTS.md, .cursorrules, sprint-checklist, commit-discipline, review-loop (3 formats each)",
-    "OpenCode MCP format: {mcp: {slope: {type: 'local', command: ['npx', '@slope-dev/mcp-tools']}}} in opencode.json",
+    "OpenCode MCP format: {mcp: {slope: {type: 'local', command: ['npx', '@srbryers/mcp-tools']}}} in opencode.json",
     "detectPlatforms(): checks .claude/, CLAUDE.md, .cursor/, .cursorrules, opencode.json, AGENTS.md",
     "init --all installs for all 3 platforms; no-flag auto-detects from project markers"
   ],

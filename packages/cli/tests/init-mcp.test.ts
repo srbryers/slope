@@ -29,7 +29,7 @@ describe('init --cursor (includes MCP)', () => {
     expect(content.mcpServers).toBeDefined();
     expect(content.mcpServers.slope).toEqual({
       command: 'npx',
-      args: ['@slope-dev/mcp-tools'],
+      args: ['@srbryers/mcp-tools'],
     });
   });
 
@@ -52,7 +52,7 @@ describe('init --cursor (includes MCP)', () => {
     expect(content.mcpServers.other).toEqual({ command: 'echo', args: [] });
     expect(content.mcpServers.slope).toEqual({
       command: 'npx',
-      args: ['@slope-dev/mcp-tools'],
+      args: ['@srbryers/mcp-tools'],
     });
   });
 
@@ -75,7 +75,7 @@ describe('init --claude-code (includes MCP)', () => {
     expect(content.mcpServers).toBeDefined();
     expect(content.mcpServers.slope).toEqual({
       command: 'npx',
-      args: ['@slope-dev/mcp-tools'],
+      args: ['@srbryers/mcp-tools'],
     });
   });
 
@@ -96,7 +96,7 @@ describe('init --claude-code (includes MCP)', () => {
     expect(content.mcpServers.other).toEqual({ command: 'echo', args: [] });
     expect(content.mcpServers.slope).toEqual({
       command: 'npx',
-      args: ['@slope-dev/mcp-tools'],
+      args: ['@srbryers/mcp-tools'],
     });
   });
 
@@ -205,7 +205,7 @@ describe('init --opencode', () => {
     expect(content.mcp).toBeDefined();
     expect(content.mcp.slope).toEqual({
       type: 'local',
-      command: ['npx', '@slope-dev/mcp-tools'],
+      command: ['npx', '@srbryers/mcp-tools'],
     });
   });
 
@@ -221,7 +221,7 @@ describe('init --opencode', () => {
     expect(content.mcp.other).toEqual({ type: 'local', command: ['echo'] });
     expect(content.mcp.slope).toEqual({
       type: 'local',
-      command: ['npx', '@slope-dev/mcp-tools'],
+      command: ['npx', '@srbryers/mcp-tools'],
     });
   });
 

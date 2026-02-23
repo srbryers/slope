@@ -3,8 +3,8 @@ import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { FileRegistry } from '../src/registries/file-registry.js';
-import { checkConflicts } from '@slope-dev/core';
-import type { SprintClaim } from '@slope-dev/core';
+import { checkConflicts } from '@srbryers/core';
+import type { SprintClaim } from '@srbryers/core';
 
 let tmpDir: string;
 let claimsPath: string;

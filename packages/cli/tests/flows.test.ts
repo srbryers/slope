@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, readFileSync
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execSync } from 'node:child_process';
-import type { FlowsFile } from '@slope-dev/core';
+import type { FlowsFile } from '@srbryers/core';
 
 // Mock process.cwd and process.exit
 let tmpDir: string;

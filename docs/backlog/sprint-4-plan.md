@@ -9,7 +9,7 @@
 - **Club:** long_iron | **Complexity:** medium
 - Copied `config.ts` and `loader.ts` from CLI to core (imports only `node:fs`, `node:path`)
 - Added re-exports to `packages/core/src/index.ts`
-- Replaced CLI files with re-exports from `@slope-dev/core`
+- Replaced CLI files with re-exports from `@srbryers/core`
 - Bumped core to v0.4.0
 
 ### S4-2: Build the function registry and search() tool

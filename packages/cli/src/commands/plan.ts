@@ -5,7 +5,7 @@ import {
   generateTrainingPlan,
   hazardBriefing,
   formatAdvisorReport,
-} from '@slope-dev/core';
+} from '@srbryers/core';
 import { loadConfig } from '../config.js';
 import { loadScorecards } from '../loader.js';
 

@@ -2,8 +2,8 @@ import {
   detectEscalation,
   buildEscalationEvent,
   checkConflicts,
-} from '@slope-dev/core';
-import type { EscalationResult } from '@slope-dev/core';
+} from '@srbryers/core';
+import type { EscalationResult } from '@srbryers/core';
 import { loadConfig } from '../config.js';
 import { resolveStore } from '../store.js';
 

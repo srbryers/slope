@@ -3,7 +3,7 @@ import { mkdirSync, writeFileSync, rmSync, existsSync, readFileSync } from 'node
 import { join } from 'node:path';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import type { HookInput } from '@slope-dev/core';
+import type { HookInput } from '@srbryers/core';
 
 // Mock loadConfig before importing guards
 const mockConfig = {

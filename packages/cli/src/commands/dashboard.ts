@@ -10,8 +10,8 @@ import {
   DEFAULT_DASHBOARD_CONFIG,
   buildLeaderboard,
   filterScorecardsByPlayer,
-} from '@slope-dev/core';
-import type { SlopeConfig, DashboardConfig } from '@slope-dev/core';
+} from '@srbryers/core';
+import type { SlopeConfig, DashboardConfig } from '@srbryers/core';
 
 export function resolveDashboardConfig(args: string[], config: SlopeConfig): DashboardConfig {
   const defaults = { ...DEFAULT_DASHBOARD_CONFIG };

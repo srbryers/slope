@@ -4,8 +4,8 @@ import {
   formatStandup,
   parseStandup,
   extractRelevantHandoffs,
-} from '@slope-dev/core';
-import type { SlopeEvent, SprintClaim, StandupReport } from '@slope-dev/core';
+} from '@srbryers/core';
+import type { SlopeEvent, SprintClaim, StandupReport } from '@srbryers/core';
 import { loadConfig } from '../config.js';
 import { resolveStore } from '../store.js';
 

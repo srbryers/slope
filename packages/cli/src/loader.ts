@@ -1,1 +1,1 @@
-export { loadScorecards, detectLatestSprint, resolveCurrentSprint } from '@slope-dev/core';
+export { loadScorecards, detectLatestSprint, resolveCurrentSprint } from '@srbryers/core';

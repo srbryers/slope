@@ -1,4 +1,4 @@
-# @slope-dev/mcp-tools
+# @srbryers/mcp-tools
 
 Code-mode MCP server for [SLOPE](https://github.com/srbryers/slope) — the Sprint Lifecycle & Operational Performance Engine.
 
@@ -12,7 +12,7 @@ Instead of 10 individual tools, this server exposes **two tools** following the 
 ## Quick Start
 
 ```bash
-npm install -g @slope-dev/mcp-tools
+npm install -g @srbryers/mcp-tools
 ```
 
 ### Cursor
@@ -24,7 +24,7 @@ Add to `.cursor/mcp.json`:
   "mcpServers": {
     "slope": {
       "command": "npx",
-      "args": ["@slope-dev/mcp-tools"]
+      "args": ["@srbryers/mcp-tools"]
     }
   }
 }
@@ -39,7 +39,7 @@ Add to `.mcp.json` in your project root:
   "mcpServers": {
     "slope": {
       "command": "npx",
-      "args": ["@slope-dev/mcp-tools"]
+      "args": ["@srbryers/mcp-tools"]
     }
   }
 }
@@ -56,7 +56,7 @@ Add to `claude_desktop_config.json`:
   "mcpServers": {
     "slope": {
       "command": "npx",
-      "args": ["@slope-dev/mcp-tools"]
+      "args": ["@srbryers/mcp-tools"]
     }
   }
 }
@@ -111,7 +111,7 @@ execute({ code: `
 
 ### Available in the sandbox
 
-- **All `@slope-dev/core` exports** — `computeHandicapCard`, `buildScorecard`, `computeDispersion`, `recommendClub`, `formatBriefing`, etc.
+- **All `@srbryers/core` exports** — `computeHandicapCard`, `buildScorecard`, `computeDispersion`, `recommendClub`, `formatBriefing`, etc.
 - **Constants** — `PAR_THRESHOLDS`, `SLOPE_FACTORS`, `SCORE_LABELS`, etc.
 - **Filesystem helpers** (scoped to project root):
   - `loadConfig()` — load `.slope/config.json`

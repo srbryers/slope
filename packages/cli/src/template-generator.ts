@@ -2,7 +2,7 @@
 // Generates platform-specific templates with metaphor-aware vocabulary.
 // When metaphor=golf, output matches the existing static templates in templates/.
 
-import type { MetaphorDefinition } from '@slope-dev/core';
+import type { MetaphorDefinition } from '@srbryers/core';
 
 const titleCase = (s: string) => s.replace(/\b\w/g, c => c.toUpperCase());
 

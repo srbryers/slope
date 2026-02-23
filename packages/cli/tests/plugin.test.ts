@@ -4,8 +4,8 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { initCommand } from '../src/commands/init.js';
 import { pluginCommand } from '../src/commands/plugin.js';
-import { clearCustomGuards } from '@slope-dev/core';
-import type { MetaphorDefinition } from '@slope-dev/core';
+import { clearCustomGuards } from '@srbryers/core';
+import type { MetaphorDefinition } from '@srbryers/core';
 
 let tmpDir: string;
 let originalCwd: string;

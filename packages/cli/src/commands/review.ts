@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { formatSprintReview } from '@slope-dev/core';
-import type { GolfScorecard, ProjectStats } from '@slope-dev/core';
+import { formatSprintReview } from '@srbryers/core';
+import type { GolfScorecard, ProjectStats } from '@srbryers/core';
 import { loadConfig } from '../config.js';
 import { resolveMetaphor } from '../metaphor.js';
 

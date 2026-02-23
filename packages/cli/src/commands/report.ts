@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { loadConfig } from '../config.js';
-import { loadScorecards, buildReportData, generateHtmlReport, getMetaphor } from '@slope-dev/core';
+import { loadScorecards, buildReportData, generateHtmlReport, getMetaphor } from '@srbryers/core';
 
 export async function reportCommand(args: string[]): Promise<void> {
   if (args.includes('--help') || args.includes('-h')) {

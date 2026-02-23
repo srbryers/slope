@@ -1,8 +1,8 @@
 import { execSync } from 'node:child_process';
 import { writeFileSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { buildScorecard, buildAgentBreakdowns, computeSlope, parseTestOutput, classifyShotFromSignals, buildGhCommand, parsePRJson, mergePRChecksWithCI } from '@slope-dev/core';
-import type { ShotRecord, CISignal, PRSignal, ShotResult, AgentBreakdown } from '@slope-dev/core';
+import { buildScorecard, buildAgentBreakdowns, computeSlope, parseTestOutput, classifyShotFromSignals, buildGhCommand, parsePRJson, mergePRChecksWithCI } from '@srbryers/core';
+import type { ShotRecord, CISignal, PRSignal, ShotResult, AgentBreakdown } from '@srbryers/core';
 import { loadConfig } from '../config.js';
 import { resolveStore } from '../store.js';
 

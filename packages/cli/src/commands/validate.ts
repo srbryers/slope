@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { validateScorecard } from '@slope-dev/core';
+import { validateScorecard } from '@srbryers/core';
 import { loadConfig } from '../config.js';
 
 export function validateCommand(path?: string): void {

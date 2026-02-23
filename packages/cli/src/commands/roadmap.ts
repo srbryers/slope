@@ -8,8 +8,8 @@ import {
   formatRoadmapSummary,
   formatStrategicContext,
   loadScorecards,
-} from '@slope-dev/core';
-import type { RoadmapDefinition, GolfScorecard } from '@slope-dev/core';
+} from '@srbryers/core';
+import type { RoadmapDefinition, GolfScorecard } from '@srbryers/core';
 import { loadConfig } from '../config.js';
 
 // --- Helpers ---

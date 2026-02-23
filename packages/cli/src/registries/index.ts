@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import type { SprintRegistry } from '@slope-dev/core';
+import type { SprintRegistry } from '@srbryers/core';
 import type { SlopeConfig } from '../config.js';
 import { FileRegistry } from './file-registry.js';
 import { ApiRegistry } from './api-registry.js';

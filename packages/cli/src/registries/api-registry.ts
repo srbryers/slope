@@ -1,4 +1,4 @@
-import type { SprintClaim, SprintRegistry } from '@slope-dev/core';
+import type { SprintClaim, SprintRegistry } from '@srbryers/core';
 
 /** @deprecated Use `SlopeStore` via `resolveStore()` instead. Will be removed in v1.1. */
 export class ApiRegistry implements SprintRegistry {

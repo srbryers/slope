@@ -25,7 +25,7 @@
     },
     {
       "ticket_key": "S3-3",
-      "title": "Unit tests for @slope-dev/mcp-tools",
+      "title": "Unit tests for @srbryers/mcp-tools",
       "club": "wedge",
       "result": "in_the_hole",
       "hazards": [],

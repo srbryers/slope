@@ -1,5 +1,5 @@
 {
-  "name": "@slope-dev/mcp-tools",
+  "name": "@srbryers/mcp-tools",
   "version": "1.5.0",
   "description": "MCP server exposing SLOPE advisory tools — handicap, dispersion, club recommendation, briefing, and more.",
   "type": "module",
@@ -32,8 +32,8 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.26.0",
-    "@slope-dev/core": "workspace:*",
-    "@slope-dev/store-sqlite": "workspace:*",
+    "@srbryers/core": "workspace:*",
+    "@srbryers/store-sqlite": "workspace:*",
     "zod": "^3.24.0"
   },
   "devDependencies": {
@@ -42,7 +42,7 @@
     "vitest": "^3.0.0"
   },
   "publishConfig": {
-    "access": "public"
+    "registry": "https://npm.pkg.github.com"
   },
   "files": [
     "dist",

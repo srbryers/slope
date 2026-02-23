@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import type { RoadmapDefinition } from '@slope-dev/core';
+import type { RoadmapDefinition } from '@srbryers/core';
 
 let tmpDir: string;
 let originalCwd: string;

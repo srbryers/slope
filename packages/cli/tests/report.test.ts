@@ -22,8 +22,8 @@ vi.mock('../src/config.js', () => ({
 }));
 
 // We test the core functions directly since the CLI command uses process.exit
-import { buildReportData, generateHtmlReport, loadScorecards } from '@slope-dev/core';
-import type { GolfScorecard } from '@slope-dev/core';
+import { buildReportData, generateHtmlReport, loadScorecards } from '@srbryers/core';
+import type { GolfScorecard } from '@srbryers/core';
 
 let tmpDir: string;
 
