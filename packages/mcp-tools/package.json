@@ -1,6 +1,6 @@
 {
   "name": "@slope-dev/mcp-tools",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "MCP server exposing SLOPE advisory tools — handicap, dispersion, club recommendation, briefing, and more.",
   "type": "module",
   "main": "./dist/index.js",
