@@ -28,6 +28,10 @@ importers:
         version: 3.2.4(@types/node@25.3.0)
 
   packages/core:
+    dependencies:
+      '@srbryers/tokens':
+        specifier: workspace:*
+        version: link:../tokens
     devDependencies:
       '@types/node':
         specifier: ^25.3.0
@@ -79,6 +83,15 @@ importers:
       '@types/node':
         specifier: ^25.3.0
         version: 25.3.0
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.4(@types/node@25.3.0)
+
+  packages/tokens:
+    devDependencies:
       typescript:
         specifier: ^5.7.0
         version: 5.9.3
