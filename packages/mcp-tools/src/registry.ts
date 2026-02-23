@@ -4,7 +4,7 @@
 
 export interface FunctionRegistryEntry {
   name: string;
-  module: 'core' | 'fs' | 'constants' | 'store';
+  module: 'core' | 'fs' | 'constants' | 'store' | 'flows';
   description: string;
   signature: string;
   example: string;
@@ -530,6 +530,36 @@ export const SLOPE_REGISTRY: FunctionRegistryEntry[] = [
     example: 'return listFiles("docs/retros", "sprint-*.json");',
   },
 
+  // ─── Flows ───
+  {
+    name: 'parseFlows',
+    module: 'flows',
+    description: 'Parse and validate a flows JSON string into a FlowsFile object.',
+    signature: 'parseFlows(json: string): FlowsFile',
+    example: 'return parseFlows(readFile(".slope/flows.json"));',
+  },
+  {
+    name: 'validateFlows',
+    module: 'flows',
+    description: 'Validate flows against the filesystem — check file paths resolve, detect orphaned paths and duplicates.',
+    signature: 'validateFlows(flows: FlowsFile, cwd: string): { errors: string[], warnings: string[] }',
+    example: 'const flows = parseFlows(readFile(".slope/flows.json")); return validateFlows(flows, process.cwd());',
+  },
+  {
+    name: 'checkFlowStaleness',
+    module: 'flows',
+    description: 'Check if files in a flow have changed since last_verified_sha. Returns stale boolean and list of changed files.',
+    signature: 'checkFlowStaleness(flow: FlowDefinition, currentSha: string, cwd: string): { stale: boolean, changedFiles: string[] }',
+    example: 'return checkFlowStaleness(flow, "abc123", process.cwd());',
+  },
+  {
+    name: 'loadFlows',
+    module: 'flows',
+    description: 'Load and parse flows from a file path. Returns null if file does not exist.',
+    signature: 'loadFlows(flowsPath: string): FlowsFile | null',
+    example: 'return loadFlows(".slope/flows.json");',
+  },
+
   // ─── Constants ───
   {
     name: 'PAR_THRESHOLDS',
@@ -688,6 +718,11 @@ interface ParallelGroup { sprints: number[]; reason: string; }
 interface PlayerHandicap { player: string; scorecardCount: number; handicapCard: HandicapCard; }
 interface LeaderboardEntry { rank: number; player: string; handicap: number; scorecardCount: number; improvementTrend: number; fairwayPct: number; girPct: number; }
 interface Leaderboard { entries: LeaderboardEntry[]; generatedAt: string; }
+
+// ─── Flows ───
+interface FlowStep { name: string; description: string; file_paths: string[]; notes?: string; }
+interface FlowDefinition { id: string; title: string; description: string; entry_point: string; steps: FlowStep[]; files: string[]; tags: string[]; last_verified_sha: string; last_verified_at: string; }
+interface FlowsFile { version: '1'; last_generated: string; flows: FlowDefinition[]; }
 
 // ─── Briefing ───
 interface RecurringPattern { id: number; title: string; category: string; sprints_hit: number[]; gotcha_refs: string[]; description: string; prevention: string; reported_by?: string[]; }
