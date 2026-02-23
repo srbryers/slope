@@ -60,12 +60,12 @@ describe('exploreGuard', () => {
     expect(result).toEqual({});
   });
 
-  it('suggests checking index when CODEBASE.md exists', async () => {
+  it('suggests checking map when CODEBASE.md exists', async () => {
     writeFileSync(join(tmpDir, 'CODEBASE.md'), '# Codebase\n');
 
     const result = await exploreGuard(makeInput(), tmpDir);
     expect(result.context).toContain('CODEBASE.md');
-    expect(result.context).toContain('check before deep exploration');
+    expect(result.context).toContain("search({ module: 'map' })");
   });
 
   it('suggests checking index when .slope/index.json exists', async () => {
@@ -76,13 +76,24 @@ describe('exploreGuard', () => {
     expect(result.context).toContain('.slope/index.json');
   });
 
-  it('lists multiple index files when several exist', async () => {
+  it('prefers CODEBASE.md map path when it exists alongside other indexes', async () => {
     writeFileSync(join(tmpDir, 'CODEBASE.md'), '# Index');
     mkdirSync(join(tmpDir, 'docs'), { recursive: true });
     writeFileSync(join(tmpDir, 'docs/architecture.md'), '# Arch');
 
     const result = await exploreGuard(makeInput(), tmpDir);
     expect(result.context).toContain('CODEBASE.md');
+    expect(result.context).toContain("search({ module: 'map' })");
+  });
+
+  it('falls back to listing index files when no CODEBASE.md', async () => {
+    mkdirSync(join(tmpDir, '.slope'), { recursive: true });
+    writeFileSync(join(tmpDir, '.slope/index.json'), '{}');
+    mkdirSync(join(tmpDir, 'docs'), { recursive: true });
+    writeFileSync(join(tmpDir, 'docs/architecture.md'), '# Arch');
+
+    const result = await exploreGuard(makeInput(), tmpDir);
+    expect(result.context).toContain('.slope/index.json');
     expect(result.context).toContain('docs/architecture.md');
   });
 
