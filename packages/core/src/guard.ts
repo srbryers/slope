@@ -64,7 +64,8 @@ export type GuardName =
   | 'workflow-gate'
   | 'review-tier'
   | 'version-check'
-  | 'stale-flows';
+  | 'stale-flows'
+  | 'next-action';
 
 /** Guard registration entry */
 export interface GuardDefinition {
@@ -186,6 +187,12 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     description: 'Warn when editing files belonging to a stale flow definition',
     hookEvent: 'PreToolUse',
     matcher: 'Edit|Write',
+    level: 'full',
+  },
+  {
+    name: 'next-action',
+    description: 'Suggest next actions before session end',
+    hookEvent: 'Stop',
     level: 'full',
   },
 ];

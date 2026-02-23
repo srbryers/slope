@@ -12,6 +12,7 @@ import { pushNudgeGuard } from '../guards/push-nudge.js';
 import { workflowGateGuard } from '../guards/workflow-gate.js';
 import { reviewTierGuard } from '../guards/review-tier.js';
 import { versionCheckGuard } from '../guards/version-check.js';
+import { nextActionGuard } from '../guards/next-action.js';
 import { execSync } from 'node:child_process';
 
 type GuardHandler = (input: HookInput, cwd: string) => Promise<GuardResult>;
@@ -29,6 +30,7 @@ const handlers: Partial<Record<GuardName, GuardHandler>> = {
   'workflow-gate': workflowGateGuard,
   'review-tier': reviewTierGuard,
   'version-check': versionCheckGuard,
+  'next-action': nextActionGuard,
 };
 
 /** Register a guard handler */
