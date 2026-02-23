@@ -12,20 +12,20 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 22
 
       - uses: pnpm/action-setup@v4
         with:
-          version: 9
+          version: 10
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Build
-        run: pnpm -r build
+        run: pnpm build
 
       - name: Test
-        run: pnpm -r test
+        run: pnpm test
 
       - name: Typecheck
-        run: pnpm -r typecheck
+        run: pnpm typecheck

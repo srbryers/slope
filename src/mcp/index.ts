@@ -1,0 +1,437 @@
+#!/usr/bin/env node
+/**
+ * @slope-dev/slope — Code-mode MCP server for SLOPE.
+ *
+ * Exposes up to 5 tools:
+ *   search()           — discover the SLOPE API (functions, types, constants)
+ *   execute()          — run JS in a sandboxed node:vm with the full API pre-injected
+ *   session_status()   — show active sessions and claims (requires store)
+ *   acquire_claim()    — claim a ticket/area (requires store)
+ *   check_conflicts()  — detect overlapping claims (requires store)
+ *
+ * Usage:
+ *   npx @slope-dev/slope              # stdio transport
+ *   import { createSlopeToolsServer }     # programmatic
+ */
+import { existsSync, readFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { execSync } from 'node:child_process';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { z } from 'zod';
+import { SLOPE_REGISTRY, SLOPE_TYPES } from './registry.js';
+import { runInSandbox } from './sandbox.js';
+import type { SlopeStore } from '../core/index.js';
+import { checkConflicts, loadFlows, checkFlowStaleness } from '../core/index.js';
+import type { ClaimScope, FlowsFile, FlowDefinition } from '../core/index.js';
+
+/** Tool names exposed by this MCP server (for tests and tool discovery). */
+export const SLOPE_MCP_TOOL_NAMES = ['search', 'execute', 'session_status', 'acquire_claim', 'check_conflicts'] as const;
+
+/** Detection results for hook/settings activation status. */
+export interface SetupHints {
+  guardsInstalled: boolean;
+  lifecycleHooksInstalled: boolean;
+  settingsConfigured: boolean;
+}
+
+/** Detect which SLOPE hooks and settings are activated in the project. */
+export function detectSetupHints(projectRoot: string): SetupHints {
+  const hints: SetupHints = {
+    guardsInstalled: false,
+    lifecycleHooksInstalled: false,
+    settingsConfigured: false,
+  };
+
+  // Check .slope/hooks.json for guard-* and lifecycle hook entries
+  const hooksPath = join(projectRoot, '.slope', 'hooks.json');
+  if (existsSync(hooksPath)) {
+    try {
+      const hooksData = JSON.parse(readFileSync(hooksPath, 'utf-8'));
+      const installed = hooksData?.installed ?? {};
+      const keys = Object.keys(installed);
+      hints.guardsInstalled = keys.some((k) => k.startsWith('guard-'));
+      hints.lifecycleHooksInstalled =
+        keys.includes('session-start') && keys.includes('session-end');
+    } catch {
+      // Malformed JSON — treat as not installed
+    }
+  }
+
+  // Check .claude/settings.json for slope-guard.sh in hooks commands
+  const settingsPath = join(projectRoot, '.claude', 'settings.json');
+  if (existsSync(settingsPath)) {
+    try {
+      const raw = readFileSync(settingsPath, 'utf-8');
+      hints.settingsConfigured = raw.includes('slope-guard.sh');
+    } catch {
+      // Unreadable — treat as not configured
+    }
+  }
+
+  return hints;
+}
+
+/** Build a markdown hint string, or null if everything is already set up. */
+export function buildSetupHint(hints: SetupHints): string | null {
+  const missing: string[] = [];
+
+  if (!hints.guardsInstalled) {
+    missing.push(
+      '- **Guard hooks** (explore, hazard, commit-nudge, scope-drift, compaction, stop-check):\n' +
+      '  Proactive guidance during coding. Install with: `slope hook add --level=full`',
+    );
+  }
+
+  if (!hints.lifecycleHooksInstalled) {
+    missing.push(
+      '- **Lifecycle hooks** (session-start, session-end):\n' +
+      '  Automatic session tracking and briefings.\n' +
+      '  Install with: `slope hook add session-start && slope hook add session-end`',
+    );
+  }
+
+  if (!hints.settingsConfigured && !hints.guardsInstalled) {
+    // Settings only matter if guards aren't installed; if guards are installed
+    // but settings are missing, the hook add command handles both.
+  }
+
+  if (missing.length === 0) return null;
+
+  return (
+    '---\n' +
+    'SLOPE Setup Hint: The following hooks are not yet activated:\n\n' +
+    missing.join('\n\n') +
+    '\n\nRun the commands above, then restart your session to activate.'
+  );
+}
+
+export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHints): McpServer {
+  const server = new McpServer({
+    name: 'slope-tools',
+    version: '1.0.0',
+  });
+
+  server.tool(
+    'search',
+    'Discover SLOPE API functions, filesystem helpers, constants, and type definitions. Call with no args to see everything, or filter by query/module.',
+    {
+      query: z.string().optional().describe('Case-insensitive search term to filter by name or description'),
+      module: z.enum(['core', 'fs', 'constants', 'types', 'store', 'map', 'flows']).optional().describe('Filter by module category'),
+    },
+    async ({ query, module }) => {
+      // Map module — return codebase map content
+      if (module === 'map') {
+        return { content: [{ type: 'text' as const, text: handleMapQuery(query) }] };
+      }
+      // Flows module — return flow definitions
+      if (module === 'flows') {
+        return { content: [{ type: 'text' as const, text: handleFlowsQuery(query) }] };
+      }
+      if (module === 'types') {
+        return { content: [{ type: 'text' as const, text: SLOPE_TYPES }] };
+      }
+      let results = SLOPE_REGISTRY;
+      if (module) {
+        results = results.filter((e) => e.module === module);
+      }
+      if (query) {
+        const q = query.toLowerCase();
+        results = results.filter(
+          (e) => e.name.toLowerCase().includes(q) || e.description.toLowerCase().includes(q),
+        );
+      }
+      const content: Array<{ type: 'text'; text: string }> = [
+        { type: 'text' as const, text: JSON.stringify(results, null, 2) },
+      ];
+      // Append setup hint only on unfiltered discovery calls (no query, no module)
+      if (!query && !module && setupHints) {
+        const hint = buildSetupHint(setupHints);
+        if (hint) {
+          content.push({ type: 'text' as const, text: hint });
+        }
+      }
+      return { content };
+    },
+  );
+
+  server.tool(
+    'execute',
+    'Run JavaScript code in a sandboxed environment with the full SLOPE API and filesystem helpers pre-injected. Use `return` to produce output. Call search() first to discover available functions.',
+    {
+      code: z.string().describe('JavaScript code to execute. Use `return` for output. All SLOPE core functions, constants, and fs helpers are available as top-level names.'),
+    },
+    async ({ code }) => {
+      try {
+        const { result, logs } = await runInSandbox(code, process.cwd());
+        const parts: Array<{ type: 'text'; text: string }> = [];
+        if (logs.length > 0) {
+          parts.push({ type: 'text' as const, text: '--- logs ---\n' + logs.join('\n') });
+        }
+        parts.push({ type: 'text' as const, text: JSON.stringify(result, null, 2) ?? 'undefined' });
+        return { content: parts };
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        return { content: [{ type: 'text' as const, text: message }], isError: true };
+      }
+    },
+  );
+
+  // Store-backed tools (only available when a store is provided)
+  if (store) {
+    server.tool(
+      'session_status',
+      'Show active SLOPE sessions and their claims.',
+      {},
+      async () => {
+        const sessions = await store.getActiveSessions();
+        const claims = await store.getActiveClaims();
+        return {
+          content: [{
+            type: 'text' as const,
+            text: JSON.stringify({ sessions, claims }, null, 2),
+          }],
+        };
+      },
+    );
+
+    server.tool(
+      'acquire_claim',
+      'Claim a ticket or area for the current sprint.',
+      {
+        sessionId: z.string().describe('Session ID to associate with the claim'),
+        target: z.string().describe('Ticket key or area path to claim'),
+        scope: z.enum(['ticket', 'area']).describe('Claim scope: ticket or area'),
+        sprintNumber: z.number().describe('Sprint number'),
+        player: z.string().describe('Player name'),
+      },
+      async ({ sessionId, target, scope, sprintNumber, player }) => {
+        const claim = await store.claim({
+          sprint_number: sprintNumber,
+          player,
+          target,
+          scope: scope as ClaimScope,
+          session_id: sessionId,
+        });
+        return {
+          content: [{
+            type: 'text' as const,
+            text: JSON.stringify(claim, null, 2),
+          }],
+        };
+      },
+    );
+
+    server.tool(
+      'check_conflicts',
+      'Detect overlapping and adjacent conflicts among sprint claims.',
+      {
+        sprintNumber: z.number().optional().describe('Optional sprint number to filter claims'),
+      },
+      async ({ sprintNumber }) => {
+        const claims = await store.getActiveClaims(sprintNumber);
+        const conflicts = checkConflicts(claims);
+        return {
+          content: [{
+            type: 'text' as const,
+            text: JSON.stringify({ claims: claims.length, conflicts }, null, 2),
+          }],
+        };
+      },
+    );
+  }
+
+  return server;
+}
+
+/** Handle search({ module: 'map' }) — return codebase map content with optional section filtering */
+function handleMapQuery(query?: string): string {
+  const cwd = process.cwd();
+  const mapPath = join(cwd, 'CODEBASE.md');
+
+  if (!existsSync(mapPath)) {
+    return 'No codebase map found at CODEBASE.md. Run `slope map` to generate one.';
+  }
+
+  const content = readFileSync(mapPath, 'utf8');
+  let result = '';
+
+  // Check staleness from metadata
+  const metaMatch = content.match(/^---\n([\s\S]*?)\n---/m);
+  if (metaMatch) {
+    const gitShaMatch = metaMatch[1].match(/git_sha:\s*"?([^"\n]+)"?/);
+    if (gitShaMatch) {
+      try {
+        const distance = parseInt(
+          execSync(`git rev-list --count ${gitShaMatch[1]}..HEAD 2>/dev/null`, { cwd, encoding: 'utf8' }).trim() || '0',
+          10,
+        );
+        if (distance > 50) {
+          result += `⚠️ WARNING: Codebase map is stale (${distance} commits behind). Run \`slope map\` to refresh.\n\n`;
+        }
+      } catch { /* git command failed — skip staleness check */ }
+    }
+  }
+
+  if (query) {
+    // Filter to sections matching the query
+    const q = query.toLowerCase();
+    const sections = content.split(/^(?=## )/m);
+    const matched = sections.filter(s => {
+      const heading = s.match(/^## (.+)/)?.[1] ?? '';
+      return heading.toLowerCase().includes(q);
+    });
+
+    if (matched.length === 0) {
+      result += `No sections matching "${query}" found in codebase map. Available sections:\n`;
+      const headings = content.match(/^## .+/gm) ?? [];
+      result += headings.map(h => `- ${h.replace('## ', '')}`).join('\n');
+    } else {
+      result += matched.join('\n');
+    }
+  } else {
+    result += content;
+  }
+
+  return result;
+}
+
+/** Handle search({ module: 'flows' }) — return flow definitions with optional filtering */
+function handleFlowsQuery(query?: string): string {
+  const cwd = process.cwd();
+
+  // Resolve flows path from config (config.json is already in .slope/)
+  let flowsPath: string;
+  try {
+    const configPath = join(cwd, '.slope', 'config.json');
+    if (existsSync(configPath)) {
+      const config = JSON.parse(readFileSync(configPath, 'utf8'));
+      flowsPath = join(cwd, config.flowsPath || '.slope/flows.json');
+    } else {
+      flowsPath = join(cwd, '.slope', 'flows.json');
+    }
+  } catch {
+    flowsPath = join(cwd, '.slope', 'flows.json');
+  }
+
+  const flows = loadFlows(flowsPath);
+  if (!flows) {
+    return 'No flows defined. Run `slope flows init` to create .slope/flows.json.';
+  }
+
+  if (flows.flows.length === 0) {
+    return 'Flows file exists but contains no flow definitions.';
+  }
+
+  // Get current git SHA for staleness check
+  let currentSha = '';
+  try {
+    currentSha = execSync('git rev-parse HEAD 2>/dev/null', { cwd, encoding: 'utf8', timeout: 5000 }).trim();
+  } catch { /* not in git repo */ }
+
+  // Filter flows by query
+  let matched = flows.flows;
+  if (query) {
+    const q = query.toLowerCase();
+    matched = flows.flows.filter(f =>
+      f.id.toLowerCase().includes(q) ||
+      f.title.toLowerCase().includes(q) ||
+      f.tags.some(t => t.toLowerCase().includes(q)),
+    );
+  }
+
+  if (matched.length === 0) {
+    const allIds = flows.flows.map(f => f.id).join(', ');
+    return `No flows matching "${query}". Available flows: ${allIds}`;
+  }
+
+  // Format output
+  const sections: string[] = [];
+  for (const flow of matched) {
+    const lines: string[] = [];
+    lines.push(`## ${flow.title} (\`${flow.id}\`)`);
+    lines.push('');
+    lines.push(flow.description);
+    lines.push('');
+    lines.push(`**Entry point:** ${flow.entry_point}`);
+    lines.push(`**Tags:** ${flow.tags.join(', ') || '—'}`);
+
+    // Staleness
+    if (currentSha && flow.last_verified_sha) {
+      const { stale, changedFiles } = checkFlowStaleness(flow, currentSha, cwd);
+      if (stale) {
+        lines.push(`**Status:** STALE (${changedFiles.length} file(s) changed: ${changedFiles.join(', ')})`);
+      } else {
+        lines.push('**Status:** Current');
+      }
+    } else if (!flow.last_verified_sha) {
+      lines.push('**Status:** Unverified');
+    }
+
+    lines.push('');
+    lines.push('**Files:**');
+    for (const f of flow.files) {
+      lines.push(`- \`${f}\``);
+    }
+
+    if (flow.steps.length > 0) {
+      lines.push('');
+      lines.push('**Steps:**');
+      for (let i = 0; i < flow.steps.length; i++) {
+        const step = flow.steps[i];
+        lines.push(`${i + 1}. **${step.name}** — ${step.description}`);
+        for (const fp of step.file_paths) {
+          lines.push(`   - \`${fp}\``);
+        }
+        if (step.notes) {
+          lines.push(`   _${step.notes}_`);
+        }
+      }
+    }
+
+    sections.push(lines.join('\n'));
+  }
+
+  return sections.join('\n\n---\n\n');
+}
+
+/** Walk up directories looking for .slope/config.json */
+function findProjectRoot(startDir: string): string {
+  let dir = startDir;
+  while (true) {
+    if (existsSync(join(dir, '.slope', 'config.json'))) {
+      return dir;
+    }
+    const parent = dirname(dir);
+    if (parent === dir) {
+      throw new Error('No .slope/config.json found in any parent directory');
+    }
+    dir = parent;
+  }
+}
+
+async function main(): Promise<void> {
+  let store: SlopeStore | undefined;
+  let hints: SetupHints | undefined;
+  try {
+    const { loadConfig } = await import('../core/index.js');
+    const { createStore } = await import('../store/index.js');
+    const cwd = findProjectRoot(process.cwd());
+    const config = loadConfig(cwd);
+    store = createStore({ storePath: config.store_path ?? '.slope/slope.db', cwd });
+    hints = detectSetupHints(cwd);
+  } catch {
+    // No config or store — server runs without store tools
+  }
+  const server = createSlopeToolsServer(store, hints);
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+}
+
+const isDirectRun = process.argv[1]?.endsWith('index.js') || process.argv[1]?.endsWith('mcp-slope-tools');
+if (isDirectRun) {
+  main().catch((err) => {
+    process.stderr.write(`MCP server error: ${err}\n`);
+    process.exit(1);
+  });
+}

@@ -1,17 +1,64 @@
 {
-  "name": "slope-monorepo",
-  "private": true,
+  "name": "@slope-dev/slope",
+  "version": "1.5.0",
+  "description": "SLOPE — Sprint Lifecycle & Operational Performance Engine. Golf-metaphor sprint scoring for engineering teams.",
   "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "slope": "./dist/cli/index.js",
+    "mcp-slope-tools": "./dist/mcp/index.js"
+  },
+  "files": [
+    "dist"
+  ],
   "scripts": {
-    "build": "pnpm -r build",
-    "test": "pnpm -r test",
-    "typecheck": "pnpm -r typecheck",
-    "publish:all": "pnpm -r build && pnpm -r test && pnpm -r typecheck && pnpm -r publish --access public --no-git-checks",
-    "publish:dry": "pnpm -r build && pnpm -r test && pnpm -r typecheck && pnpm -r publish --access public --no-git-checks --dry-run",
+    "build": "tsc",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "pnpm run build",
     "version:bump": "node scripts/version-bump.mjs"
+  },
+  "keywords": [
+    "sprint",
+    "scoring",
+    "golf",
+    "engineering",
+    "retro",
+    "retrospective",
+    "handicap",
+    "slope",
+    "cli",
+    "mcp"
+  ],
+  "license": "MIT",
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "provenance": true
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/srbryers/slope.git"
   },
   "engines": {
     "node": ">=18"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.26.0",
+    "better-sqlite3": "^11.0.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.0",
+    "@types/node": "^25.3.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

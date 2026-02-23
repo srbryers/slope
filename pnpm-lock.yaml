@@ -6,76 +6,17 @@ settings:
 
 importers:
 
-  .: {}
-
-  packages/cli:
-    dependencies:
-      '@srbryers/core':
-        specifier: workspace:*
-        version: link:../core
-      '@srbryers/store-sqlite':
-        specifier: workspace:*
-        version: link:../store-sqlite
-    devDependencies:
-      '@types/node':
-        specifier: ^25.3.0
-        version: 25.3.0
-      typescript:
-        specifier: ^5.7.0
-        version: 5.9.3
-      vitest:
-        specifier: ^3.0.0
-        version: 3.2.4(@types/node@25.3.0)
-
-  packages/core:
-    dependencies:
-      '@srbryers/tokens':
-        specifier: workspace:*
-        version: link:../tokens
-    devDependencies:
-      '@types/node':
-        specifier: ^25.3.0
-        version: 25.3.0
-      typescript:
-        specifier: ^5.7.0
-        version: 5.9.3
-      vitest:
-        specifier: ^3.0.0
-        version: 3.2.4(@types/node@25.3.0)
-
-  packages/mcp-tools:
+  .:
     dependencies:
       '@modelcontextprotocol/sdk':
         specifier: ^1.26.0
         version: 1.26.0(zod@3.25.76)
-      '@srbryers/core':
-        specifier: workspace:*
-        version: link:../core
-      '@srbryers/store-sqlite':
-        specifier: workspace:*
-        version: link:../store-sqlite
-      zod:
-        specifier: ^3.24.0
-        version: 3.25.76
-    devDependencies:
-      '@types/node':
-        specifier: ^25.3.0
-        version: 25.3.0
-      typescript:
-        specifier: ^5.7.0
-        version: 5.9.3
-      vitest:
-        specifier: ^3.0.0
-        version: 3.2.4(@types/node@25.3.0)
-
-  packages/store-sqlite:
-    dependencies:
-      '@srbryers/core':
-        specifier: workspace:*
-        version: link:../core
       better-sqlite3:
         specifier: ^11.0.0
         version: 11.10.0
+      zod:
+        specifier: ^3.24.0
+        version: 3.25.76
     devDependencies:
       '@types/better-sqlite3':
         specifier: ^7.6.0
@@ -83,15 +24,6 @@ importers:
       '@types/node':
         specifier: ^25.3.0
         version: 25.3.0
-      typescript:
-        specifier: ^5.7.0
-        version: 5.9.3
-      vitest:
-        specifier: ^3.0.0
-        version: 3.2.4(@types/node@25.3.0)
-
-  packages/tokens:
-    devDependencies:
       typescript:
         specifier: ^5.7.0
         version: 5.9.3
