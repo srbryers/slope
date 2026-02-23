@@ -159,28 +159,34 @@ function generateApiSurface(cwd: string): string {
 
   const content = readFileSync(indexPath, 'utf8');
   const lines: string[] = [''];
-  let currentSection = '';
 
-  for (const line of content.split('\n')) {
-    // Section comments
-    const commentMatch = line.match(/^\/\/\s*(.+)/);
-    if (commentMatch && !line.includes('barrel export')) {
-      currentSection = commentMatch[1].trim();
-      lines.push(`**${currentSection}:**`);
+  // Match all export blocks (single and multi-line) and section comments
+  const exportRegex = /^(\/\/\s*.+)|^(export\s+(?:type\s+)?\{[\s\S]*?\})/gm;
+  let match: RegExpExecArray | null;
+
+  while ((match = exportRegex.exec(content)) !== null) {
+    // Section comment
+    if (match[1]) {
+      const text = match[1].replace(/^\/\/\s*/, '').trim();
+      if (!text.includes('barrel export')) {
+        lines.push(`**${text}:**`);
+      }
       continue;
     }
 
-    // Export lines — extract names
-    const exportMatch = line.match(/^export\s+(?:type\s+)?\{([^}]+)\}/);
-    if (exportMatch) {
-      const names = exportMatch[1]
+    // Export block
+    if (match[2]) {
+      const block = match[2];
+      const isType = block.startsWith('export type');
+      // Extract names from the braces
+      const braceContent = block.match(/\{([\s\S]*?)\}/)?.[1] ?? '';
+      const names = braceContent
         .split(',')
         .map(n => n.trim())
         .filter(n => n && !n.includes(' as '));
       if (names.length > 0) {
-        const isType = line.includes('export type');
-        const prefix = isType ? '(types)' : '';
-        lines.push(`- ${names.map(n => `\`${n}\``).join(', ')} ${prefix}`.trimEnd());
+        const suffix = isType ? ' (types)' : '';
+        lines.push(`- ${names.map(n => `\`${n}\``).join(', ')}${suffix}`);
       }
     }
   }
