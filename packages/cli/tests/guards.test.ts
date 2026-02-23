@@ -201,7 +201,7 @@ describe('commitNudgeGuard', () => {
   it('returns empty when no uncommitted changes', async () => {
     // Initialize a git repo with a commit
     const { execSync } = await import('node:child_process');
-    execSync('git init && git add -A && git commit -m "init" --allow-empty', { cwd: tmpDir, stdio: 'ignore' });
+    execSync('git init && git config user.email "test@test.com" && git config user.name "Test" && git add -A && git commit -m "init" --allow-empty', { cwd: tmpDir, stdio: 'ignore' });
 
     const result = await commitNudgeGuard(makeInput(), tmpDir);
     expect(result).toEqual({});
@@ -285,7 +285,7 @@ describe('stopCheckGuard', () => {
 
   it('returns empty when everything is committed and pushed', async () => {
     const { execSync } = await import('node:child_process');
-    execSync('git init && git commit -m "init" --allow-empty', { cwd: tmpDir, stdio: 'ignore' });
+    execSync('git init && git config user.email "test@test.com" && git config user.name "Test" && git commit -m "init" --allow-empty', { cwd: tmpDir, stdio: 'ignore' });
 
     const result = await stopCheckGuard(makeInput(), tmpDir);
     expect(result).toEqual({});
@@ -293,7 +293,7 @@ describe('stopCheckGuard', () => {
 
   it('blocks when uncommitted changes exist', async () => {
     const { execSync } = await import('node:child_process');
-    execSync('git init && git commit -m "init" --allow-empty', { cwd: tmpDir, stdio: 'ignore' });
+    execSync('git init && git config user.email "test@test.com" && git config user.name "Test" && git commit -m "init" --allow-empty', { cwd: tmpDir, stdio: 'ignore' });
     writeFileSync(join(tmpDir, 'dirty.txt'), 'uncommitted');
 
     const result = await stopCheckGuard(makeInput(), tmpDir);
@@ -303,7 +303,7 @@ describe('stopCheckGuard', () => {
 
   it('mentions commit and push in block reason', async () => {
     const { execSync } = await import('node:child_process');
-    execSync('git init && git commit -m "init" --allow-empty', { cwd: tmpDir, stdio: 'ignore' });
+    execSync('git init && git config user.email "test@test.com" && git config user.name "Test" && git commit -m "init" --allow-empty', { cwd: tmpDir, stdio: 'ignore' });
     writeFileSync(join(tmpDir, 'dirty.txt'), 'uncommitted');
 
     const result = await stopCheckGuard(makeInput(), tmpDir);
@@ -424,7 +424,7 @@ describe('pushNudgeGuard', () => {
 
   it('is non-blocking (context only, no decision/blockReason)', async () => {
     const { execSync } = await import('node:child_process');
-    execSync('git init && git commit -m "init" --allow-empty', { cwd: tmpDir, stdio: 'ignore' });
+    execSync('git init && git config user.email "test@test.com" && git config user.name "Test" && git commit -m "init" --allow-empty', { cwd: tmpDir, stdio: 'ignore' });
 
     const result = await pushNudgeGuard(
       makeInput({ tool_input: { command: 'git commit -m "test"' } }),
