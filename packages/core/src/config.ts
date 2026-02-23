@@ -12,6 +12,7 @@ export interface SlopeConfig {
   registry: 'file' | 'api';
   claimsPath: string;
   roadmapPath: string;
+  flowsPath: string;
   metaphor: string;
   registryApiUrl?: string;
   currentSprint?: number;
@@ -54,6 +55,7 @@ const DEFAULT_CONFIG: SlopeConfig = {
   registry: 'file',
   claimsPath: '.slope/claims.json',
   roadmapPath: 'docs/backlog/roadmap.json',
+  flowsPath: '.slope/flows.json',
   metaphor: 'golf',
 };
 
