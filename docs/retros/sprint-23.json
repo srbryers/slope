@@ -1,0 +1,106 @@
+{
+  "sprint_number": 23,
+  "theme": "The Yardage Book: Codebase Map",
+  "par": 4,
+  "slope": 1,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-02-22",
+  "shots": [
+    {
+      "ticket_key": "S23-1",
+      "title": "Map generator + staleness checker (slope map)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        { "type": "rough", "description": "API surface parser initially only matched single-line exports, missing multi-line export blocks from core barrel file" }
+      ],
+      "notes": "Created packages/cli/src/commands/map.ts (632 lines). Scans packages, API surface, CLI commands, guards, MCP tools, tests, sprint history, and gotchas. Outputs CODEBASE.md with YAML frontmatter + auto-generated sections. Staleness checker validates source file drift, git distance, sprint currency, and dead refs. Needed one follow-up fix for multi-line export regex."
+    },
+    {
+      "ticket_key": "S23-2",
+      "title": "MCP map module + search integration",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added 'map' to search() module enum. search({ module: 'map' }) returns full CODEBASE.md, search({ module: 'map', query: 'guards' }) returns filtered sections. Includes git SHA staleness warning. Single clean commit."
+    },
+    {
+      "ticket_key": "S23-3",
+      "title": "Explore guard upgrade + codebase context rules",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        { "type": "rough", "description": "Changing explore guard behavior required updating 2 existing tests that asserted the old message format" }
+      ],
+      "notes": "Enhanced explore guard with staleness awareness (git SHA distance check) and richer context messages with token estimates. Added codebase-context rule generators for Claude Code (.md), Cursor (.mdc), and OpenCode (AGENTS.md section). Updated init command to install new rules. 2 test updates for changed assertions."
+    },
+    {
+      "ticket_key": "S23-4",
+      "title": "Review-tier guard (architect review hook)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added review-tier to GuardName union and GUARD_DEFINITIONS. Fires on ExitPlanMode, reads plan files from .claude/plans/, counts tickets and package refs, recommends review tier (Skip/Light/Standard/Deep). Context-only — never denies. Composes cleanly with workflow-gate."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 2,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "type": "feature",
+  "conditions": [],
+  "special_plays": [],
+  "nutrition": [
+    {
+      "category": "hydration",
+      "description": "Clean build + typecheck + all 1047 tests pass (780 core + 36 store + 166 CLI + 65 MCP) after final commit",
+      "status": "healthy"
+    },
+    {
+      "category": "diet",
+      "description": "7 commits, pushed at 6-commit mark. Commit-per-ticket discipline with test fixes in separate commit.",
+      "status": "healthy"
+    },
+    {
+      "category": "recovery",
+      "description": "Only 2 existing test assertions updated (guard count 9→10, explore guard message format). 1 new test added. Zero regressions.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Smooth port from the CaddyStack pattern. The map generator was the bulk of the work (632 lines) but followed a well-understood pattern. MCP integration, guard upgrade, and review-tier guard were all straightforward extensions of existing infrastructure.",
+    "advice_for_next_player": "The CODEBASE.md is 261 lines / 13.5KB — larger than the 500-line / 5k-token target. Consider trimming verbose sections (API surface types list, full gotcha descriptions) in a future sprint. The MCP 'map' module won't work until the MCP server is restarted (picks up the new code on next session). The review-tier guard reads from .claude/plans/ — it will silently return empty if no plan files exist.",
+    "what_surprised_you": "The API surface parser was trickier than expected — core's index.ts uses multi-line export blocks extensively, so the initial single-line regex missed most exports. Also, the generated map's readFirstComment() heuristic picks up section dividers (--- Helpers ---) as descriptions for some commands, which could be improved.",
+    "excited_about_next": "With the codebase map + MCP query + explore guard integration, agents should be able to navigate the SLOPE codebase without spawning Explore subagents for routine navigation. The 80% reduction target for explore tokens is plausible — the map covers packages, API, commands, guards, and gotchas which were the top explore targets."
+  },
+  "bunker_locations": [],
+  "yardage_book_updates": [
+    "packages/cli/src/commands/map.ts: New — map generator + staleness checker (632 lines)",
+    "packages/cli/src/guards/explore.ts: Enhanced — staleness awareness, map-aware context messages, token estimates",
+    "packages/cli/src/guards/review-tier.ts: New — PreToolUse context guard for ExitPlanMode",
+    "packages/core/src/guard.ts: GuardName union extended to 10, review-tier GUARD_DEFINITION added",
+    "packages/mcp-tools/src/index.ts: search() module enum gains 'map', handleMapQuery() for section filtering",
+    "packages/cli/src/template-generator.ts: generateCodebaseContextRule() and generateCursorCodebaseContextRule() added",
+    "packages/cli/src/commands/init.ts: codebase-context rule installed for Claude Code and Cursor",
+    ".claude/rules/codebase-context.md: New — when to use map vs explore",
+    "CODEBASE.md: New — auto-generated codebase map (261 lines)"
+  ],
+  "course_management_notes": [
+    "4 shots, 2 in_the_hole + 2 green — 2 rough hazards, zero penalties, par",
+    "13 files changed, 1275 lines added, 9 removed",
+    "Guard framework: 9 → 10 guards (review-tier)",
+    "Total test count: 1047 (up from 1046 — 1 new explore guard test)"
+  ]
+}
