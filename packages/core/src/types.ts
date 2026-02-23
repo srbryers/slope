@@ -12,6 +12,9 @@ export type ShotResult = 'fairway' | 'green' | 'in_the_hole' | 'missed_long' | '
 /** Types of hazards encountered during a ticket */
 export type HazardType = 'bunker' | 'water' | 'ob' | 'rough' | 'trees';
 
+/** Severity of a hazard — maps to penalty strokes */
+export type HazardSeverity = 'minor' | 'moderate' | 'major' | 'critical';
+
 /** External conditions that affected the sprint */
 export type ConditionType = 'wind' | 'rain' | 'frost_delay' | 'altitude' | 'pin_position';
 
@@ -32,6 +35,7 @@ export type SprintType = 'feature' | 'feedback' | 'infra' | 'bugfix' | 'research
 /** A hazard hit during a ticket */
 export interface HazardHit {
   type: HazardType;
+  severity?: HazardSeverity;
   description: string;
   gotcha_id?: string;
 }

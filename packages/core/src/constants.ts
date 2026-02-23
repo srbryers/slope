@@ -1,4 +1,4 @@
-import type { ScoreLabel, TrainingType, NutritionCategory, SprintType } from './types.js';
+import type { ScoreLabel, TrainingType, NutritionCategory, SprintType, HazardSeverity } from './types.js';
 
 /** Maps ticket count ranges to par values */
 export const PAR_THRESHOLDS: Record<number, [number, number]> = {
@@ -23,6 +23,14 @@ export const SCORE_LABELS: Record<number, ScoreLabel> = {
   [0]: 'par',
   [1]: 'bogey',
   [2]: 'double_bogey',
+};
+
+/** Maps hazard severity to penalty strokes */
+export const HAZARD_SEVERITY_PENALTIES: Record<HazardSeverity, number> = {
+  minor: 0,
+  moderate: 0.5,
+  major: 1,
+  critical: 2,
 };
 
 /** Maps sprint types to training types for training log categorization */
