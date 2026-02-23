@@ -109,6 +109,16 @@
       "description": "Array.sort() without a comparator sorts strings lexicographically. 'sprint-9.json' > 'sprint-20.json' because '9' > '2'. This caused slope review to show sprint 9 instead of 20.",
       "prevention": "Always use numeric comparator when sorting files with embedded numbers: .sort((a,b) => extractNum(a) - extractNum(b))",
       "reported_by": []
+    },
+    {
+      "id": 12,
+      "title": "Vitest spy.mockRestore() clears mock.calls — read calls before restoring",
+      "category": "testing",
+      "sprints_hit": [24],
+      "gotcha_refs": ["S24-1", "S24-3"],
+      "description": "vi.spyOn(console, 'log') captures calls, but mockRestore() wipes mock.calls. If you restore the spy before reading the captured calls, assertions see an empty array and tests silently pass or fail with unhelpful messages.",
+      "prevention": "Always capture spy.mock.calls into a variable before calling spy.mockRestore(). Pattern: `const logged = spy.mock.calls.map(c => c[0]).join('\\n'); spy.mockRestore(); expect(logged).toContain(...);`",
+      "reported_by": []
     }
   ]
 }
