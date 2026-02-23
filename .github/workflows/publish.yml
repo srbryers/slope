@@ -1,0 +1,49 @@
+name: Publish to npm
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          registry-url: https://registry.npmjs.org
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm -r build
+
+      - name: Test
+        run: pnpm -r test
+
+      - name: Typecheck
+        run: pnpm -r typecheck
+
+      - name: Publish changed packages
+        run: |
+          for pkg in core store-sqlite cli mcp-tools; do
+            LOCAL=$(node -p "require('./packages/$pkg/package.json').version")
+            PUBLISHED=$(npm view "@slope-dev/$pkg" version 2>/dev/null || echo "0.0.0")
+            if [ "$LOCAL" != "$PUBLISHED" ]; then
+              echo "Publishing @slope-dev/$pkg: $PUBLISHED → $LOCAL"
+              pnpm --filter "@slope-dev/$pkg" publish --access public --no-git-checks
+            else
+              echo "Skipping @slope-dev/$pkg: already at $LOCAL"
+            fi
+          done
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
