@@ -24,6 +24,11 @@ export interface SlopeConfig {
     commitInterval?: number;
     pushInterval?: number;
     scopeDrift?: boolean;
+    subagentExploreTurns?: number;
+    subagentPlanTurns?: number;
+    subagentAllowModels?: string[];
+    pushCommitThreshold?: number;
+    handoffsDir?: string;
   };
   orchestration?: {
     escalation?: EscalationConfig;

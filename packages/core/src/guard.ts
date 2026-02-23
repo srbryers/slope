@@ -58,7 +58,10 @@ export type GuardName =
   | 'commit-nudge'
   | 'scope-drift'
   | 'compaction'
-  | 'stop-check';
+  | 'stop-check'
+  | 'subagent-gate'
+  | 'push-nudge'
+  | 'workflow-gate';
 
 /** Guard registration entry */
 export interface GuardDefinition {
@@ -86,6 +89,16 @@ export interface GuidanceConfig {
   pushInterval?: number;
   /** Enable scope drift detection (default true) */
   scopeDrift?: boolean;
+  /** Max turns for Explore subagents (default 10) */
+  subagentExploreTurns?: number;
+  /** Max turns for Plan subagents (default 15) */
+  subagentPlanTurns?: number;
+  /** Models allowed for Explore/Plan subagents (default ['haiku']) */
+  subagentAllowModels?: string[];
+  /** Unpushed commit count before push nudge fires (default 5) */
+  pushCommitThreshold?: number;
+  /** Directory for compaction handoff files (default '.slope/handoffs') */
+  handoffsDir?: string;
 }
 
 /** All guard definitions */
@@ -128,6 +141,27 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     name: 'stop-check',
     description: 'Check for uncommitted/unpushed work before session end',
     hookEvent: 'Stop',
+    level: 'full',
+  },
+  {
+    name: 'subagent-gate',
+    description: 'Force haiku model and cap max_turns on Explore/Plan subagents',
+    hookEvent: 'PreToolUse',
+    matcher: 'Task',
+    level: 'full',
+  },
+  {
+    name: 'push-nudge',
+    description: 'Nudge to push after git commits when unpushed count or time is high',
+    hookEvent: 'PostToolUse',
+    matcher: 'Bash',
+    level: 'full',
+  },
+  {
+    name: 'workflow-gate',
+    description: 'Block ExitPlanMode until review rounds are complete',
+    hookEvent: 'PreToolUse',
+    matcher: 'ExitPlanMode',
     level: 'full',
   },
 ];
