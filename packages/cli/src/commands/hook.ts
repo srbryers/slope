@@ -302,10 +302,12 @@ function installClaudeCodeGuards(cwd: string, guards: AnyGuardDefinition[]): voi
     if (!existingHooks[event]) {
       existingHooks[event] = [];
     }
-    // Add SLOPE guard entries (avoid duplicates by checking command)
+    // Add SLOPE guard entries (avoid duplicates by checking command + matcher)
     for (const entry of entries) {
-      const existing = (existingHooks[event] as Array<{ hooks?: Array<{ command?: string }> }>);
+      const entryWithMatcher = entry as { matcher?: string; hooks: Array<{ command?: string }> };
+      const existing = (existingHooks[event] as Array<{ matcher?: string; hooks?: Array<{ command?: string }> }>);
       const isDuplicate = existing.some(e =>
+        e.matcher === entryWithMatcher.matcher &&
         e.hooks?.some(h => h.command?.includes('slope-guard.sh')),
       );
       if (!isDuplicate) {

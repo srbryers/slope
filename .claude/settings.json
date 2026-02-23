@@ -1,0 +1,104 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/slope-guard.sh explore",
+            "timeout": 10,
+            "statusMessage": "SLOPE: Suggest checking codebase index before deep exploration"
+          }
+        ],
+        "matcher": "Read|Glob|Grep"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/slope-guard.sh hazard",
+            "timeout": 10,
+            "statusMessage": "SLOPE: Warn about known issues in file areas being edited"
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/slope-guard.sh scope-drift",
+            "timeout": 10,
+            "statusMessage": "SLOPE: Warn when editing files outside claimed ticket scope"
+          }
+        ],
+        "matcher": "Edit|Write"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/slope-guard.sh subagent-gate",
+            "timeout": 10,
+            "statusMessage": "SLOPE: Force haiku model and cap max_turns on Explore/Plan subagents"
+          }
+        ],
+        "matcher": "Task"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/slope-guard.sh workflow-gate",
+            "timeout": 10,
+            "statusMessage": "SLOPE: Block ExitPlanMode until review rounds are complete"
+          }
+        ],
+        "matcher": "ExitPlanMode"
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/slope-guard.sh commit-nudge",
+            "timeout": 10,
+            "statusMessage": "SLOPE: Nudge to commit/push after prolonged editing"
+          }
+        ],
+        "matcher": "Edit|Write"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/slope-guard.sh push-nudge",
+            "timeout": 10,
+            "statusMessage": "SLOPE: Nudge to push after git commits when unpushed count or time is high"
+          }
+        ],
+        "matcher": "Bash"
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/slope-guard.sh compaction",
+            "timeout": 10,
+            "statusMessage": "SLOPE: Extract events before context compaction"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/slope-guard.sh stop-check",
+            "timeout": 10,
+            "statusMessage": "SLOPE: Check for uncommitted/unpushed work before session end"
+          }
+        ]
+      }
+    ]
+  }
+}
