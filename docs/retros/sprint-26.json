@@ -1,0 +1,124 @@
+{
+  "sprint_number": 26,
+  "theme": "The Fairway Map — User Flow Tracking",
+  "par": 4,
+  "slope": 2,
+  "score": 5,
+  "score_label": "bogey",
+  "date": "2026-02-23",
+  "shots": [
+    {
+      "ticket_key": "S26-1",
+      "title": "Flow types + validation functions",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Created packages/core/src/flows.ts with FlowStep, FlowDefinition, FlowsFile types and parseFlows, validateFlows, checkFlowStaleness, loadFlows functions. Added flowsPath to SlopeConfig. 24 tests, all passed first run."
+    },
+    {
+      "ticket_key": "S26-2",
+      "title": "slope flows CLI command",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Created flows.ts CLI with init/list/check subcommands. Registered in dispatch. 8 tests, all passed first run."
+    },
+    {
+      "ticket_key": "S26-3",
+      "title": "MCP search integration",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "description": "Used require() in ESM module for dynamic config loading — had to refactor to direct JSON parse from filesystem",
+          "severity": "minor"
+        }
+      ],
+      "notes": "Added flows module to MCP search Zod enum, handleFlowsQuery with filtering, registry entries + SLOPE_TYPES definitions. 9 tests passed."
+    },
+    {
+      "ticket_key": "S26-4",
+      "title": "CODEBASE.md flows section + stale-flows guard",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "description": "Guard count test expected 11, needed updating to 12 after adding stale-flows guard",
+          "severity": "minor"
+        }
+      ],
+      "notes": "Added generateFlowsSummary to map.ts with auto-section markers, flows metadata count. Added stale-flows to GuardName union and GUARD_DEFINITIONS. Fixed guard count test."
+    },
+    {
+      "ticket_key": "S26-5",
+      "title": "Docs + sprint plan artifact",
+      "club": "putter",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Sprint plan, backlog README row, CLAUDE.md flows section. Trivial."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 5,
+    "fairways_total": 5,
+    "greens_in_regulation": 5,
+    "greens_total": 5,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 2,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "type": "feature",
+  "conditions": [],
+  "special_plays": [],
+  "nutrition": [
+    {
+      "category": "hydration",
+      "description": "Clean build + typecheck + all 1124 tests pass (815 core + 36 store + 199 CLI + 74 MCP) after final commit",
+      "status": "healthy"
+    },
+    {
+      "category": "diet",
+      "description": "5 separate commits for 5 tickets — proper commit discipline. Pushed after completion.",
+      "status": "healthy"
+    },
+    {
+      "category": "recovery",
+      "description": "Zero existing test regressions. 41 new tests added (24 core + 8 CLI + 9 MCP). Only the expected guard count test needed updating.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Very smooth sprint. The plan was well-structured with clear ticket boundaries and the execution order worked perfectly. Each ticket built cleanly on the previous one. The established patterns (nested CLI subcommands, MCP module dispatch, auto-section map generation) made the implementation predictable.",
+    "advice_for_next_player": "The flows system is foundation-only — no auto-discovery or `flows update` command yet. When building S27 auto-discovery, the FlowDefinition type already has last_verified_sha/last_verified_at fields ready for a bump command. The handleFlowsQuery function in mcp-tools reads config via direct JSON parse (not loadConfig) to avoid ESM import issues.",
+    "what_surprised_you": "Nothing major — this was a textbook feature sprint. The only two hiccups were both predictable: ESM require() in MCP tools (known gotcha) and the guard count test update (always happens when adding a guard).",
+    "excited_about_next": "Auto-discovery from static code analysis (S27) would make flows self-maintaining. Also, the stale-flows guard is registered but not yet implemented as a handler — wiring it up would give real-time staleness warnings during coding."
+  },
+  "bunker_locations": [
+    "ESM modules cannot use require() — use direct fs reads or top-level imports for config resolution in MCP tools",
+    "Adding a guard to GUARD_DEFINITIONS requires updating the guard count test in packages/core/tests/guard.test.ts"
+  ],
+  "yardage_book_updates": [
+    "packages/core/src/flows.ts: FlowStep, FlowDefinition, FlowsFile types + parseFlows, validateFlows, checkFlowStaleness, loadFlows",
+    "packages/core/src/config.ts: Added flowsPath field to SlopeConfig with default .slope/flows.json",
+    "packages/core/src/guard.ts: Added stale-flows guard to GuardName union and GUARD_DEFINITIONS",
+    "packages/cli/src/commands/flows.ts: init/list/check subcommands for flow management",
+    "packages/cli/src/commands/map.ts: generateFlowsSummary + flows auto-section in CODEBASE.md template",
+    "packages/mcp-tools/src/index.ts: flows module in search Zod enum + handleFlowsQuery handler",
+    "packages/mcp-tools/src/registry.ts: Flow function entries + FlowStep/FlowDefinition/FlowsFile type definitions"
+  ],
+  "course_management_notes": [
+    "5 shots: 3 in_the_hole + 2 green — 2 minor hazards (ESM require, guard count test), zero penalties, bogey (+1)",
+    "16 files changed across 5 commits, 1215 lines added, 9 removed",
+    "New subsystem across 3 packages (core, cli, mcp-tools) following established patterns",
+    "Total test count: 1071 → 1124 (+41 new flow tracking tests + 12 from S25 hazard severity)"
+  ]
+}
