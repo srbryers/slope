@@ -1,0 +1,94 @@
+{
+  "sprint_number": 24,
+  "theme": "Review State Writer",
+  "par": 3,
+  "slope": 0,
+  "score": 3,
+  "score_label": "par",
+  "date": "2026-02-22",
+  "shots": [
+    {
+      "ticket_key": "S24-1",
+      "title": "Review state management commands",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        { "type": "rough", "description": "console.log spy in tests captured empty calls — mockRestore() clears mock.calls, needed to read calls before restoring" }
+      ],
+      "notes": "Created packages/cli/src/commands/review-state.ts (207 lines). Four subcommands: start (with --rounds, --tier, and auto-detect from plan files), round (increment + progress), status (display state), reset (delete state). Follows hooks-config.ts defensive JSON read/write pattern. Reuses review-tier guard's plan detection and tier classification logic."
+    },
+    {
+      "ticket_key": "S24-2",
+      "title": "CLI routing for review subcommands",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Updated packages/cli/src/index.ts review case to check for start|round|status|reset subcommands before falling through to existing reviewCommand. Same pattern as guard command routing. Added help text for new subcommands. Clean, minimal change."
+    },
+    {
+      "ticket_key": "S24-3",
+      "title": "Tests for review state commands",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [
+        { "type": "rough", "description": "Vitest spy.mockRestore() clears mock.calls — must capture calls before restoring. Fixed 6 tests in one pass." }
+      ],
+      "notes": "Created packages/cli/tests/review-state.test.ts (330 lines, 24 tests). Covers loadReviewState, saveReviewState, and all four subcommands with flag variants, auto-detection, error cases, and output verification. Uses process.exit mock pattern from existing tests."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 3,
+    "fairways_total": 3,
+    "greens_in_regulation": 3,
+    "greens_total": 3,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 2,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "type": "feature",
+  "conditions": [],
+  "special_plays": [],
+  "nutrition": [
+    {
+      "category": "hydration",
+      "description": "Clean build + typecheck + all 1071 tests pass (780 core + 36 store + 190 CLI + 65 MCP) after final commit",
+      "status": "healthy"
+    },
+    {
+      "category": "diet",
+      "description": "1 commit for 3 tickets — should have been 3 per commit discipline. Batched because tickets were tightly coupled and small.",
+      "status": "at_risk"
+    },
+    {
+      "category": "recovery",
+      "description": "Zero existing test regressions. 24 new tests added. 1 spy pattern issue caught and fixed in same session.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Fast and clean. Small scope, familiar patterns — the hooks-config.ts and review-tier guard code provided clear templates. The only friction was the Vitest spy restore ordering in tests.",
+    "advice_for_next_player": "The review-state.json is consumed by workflow-gate guard (read-only). When agents run 'slope review start' without flags, it auto-detects from .claude/plans/ — if no plan files exist, it errors with a helpful message. The spy.mockRestore() gotcha in Vitest: always read mock.calls before calling mockRestore().",
+    "what_surprised_you": "The spy pattern issue — Vitest's mockRestore() clears the mock.calls array, which is different from Jest's behavior. Had to restructure 6 tests to capture calls before restoring.",
+    "excited_about_next": "The review lifecycle is now complete: review-tier recommends → slope review start writes state → slope review round tracks progress → workflow-gate blocks/unblocks ExitPlanMode. Agents no longer need to manually create JSON files."
+  },
+  "bunker_locations": [
+    "Vitest spy.mockRestore() clears mock.calls — always read calls before restoring"
+  ],
+  "yardage_book_updates": [
+    "packages/cli/src/commands/review-state.ts: New — review state management (start/round/status/reset), 207 lines",
+    "packages/cli/src/index.ts: Updated — review subcommand routing + help text",
+    "packages/cli/tests/review-state.test.ts: New — 24 tests for review state commands"
+  ],
+  "course_management_notes": [
+    "3 shots, 1 in_the_hole + 2 green — 1 rough hazard (spy pattern), zero penalties, par",
+    "3 files changed, 548 lines added, 5 removed",
+    "CLI test count: 166 → 190 (+24 new review-state tests)",
+    "Total test count: 1047 → 1071"
+  ]
+}
