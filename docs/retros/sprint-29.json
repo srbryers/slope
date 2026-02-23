@@ -1,0 +1,144 @@
+{
+  "sprint_number": 29,
+  "theme": "Fix NPM Publishing Pipeline",
+  "par": 5,
+  "slope": 1,
+  "score": 5,
+  "score_label": "par",
+  "date": "2026-02-23",
+  "type": "fix",
+  "shots": [
+    {
+      "ticket_key": "S29-1",
+      "title": "Fix broken test mocks",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Two vi.mock() paths in next-action.test.ts and guards.test.ts didn't match import paths after package consolidation. Changed '../src/store.js' → '../../src/cli/store.js' and '../src/config.js' → '../../src/cli/config.js'. 20 tests fixed, CI green."
+    },
+    {
+      "ticket_key": "S29-2",
+      "title": "Update version-bump script",
+      "club": "putter",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Rewrote scripts/version-bump.mjs to bump single root package.json for @slope-dev/slope instead of looping over 5 old @srbryers/* packages."
+    },
+    {
+      "ticket_key": "S29-3",
+      "title": "Create NPM granular access token",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "wrong_token_type",
+          "description": "User first created a classic publish token (requires OTP) instead of a granular access token. Required a second attempt with the correct token type."
+        }
+      ],
+      "notes": "Manual step — replaced classic NPM publish token (EOTP error) with granular access token scoped to @slope-dev/slope. Updated NPM_TOKEN GitHub Actions secret. Took two attempts due to initial token type confusion."
+    },
+    {
+      "ticket_key": "S29-4",
+      "title": "Clean up stale publish artifacts",
+      "club": "putter",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Deleted failed v1.5.0-npm release and stale v1.5.0 release (GitHub Packages era) with their tags via gh CLI."
+    },
+    {
+      "ticket_key": "S29-5",
+      "title": "Add CI check on PRs",
+      "club": "putter",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added pull_request trigger to .github/workflows/ci.yml. CI previously only ran on push to main."
+    },
+    {
+      "ticket_key": "S29-6",
+      "title": "Test full release→publish flow",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "publish_retry",
+          "description": "First publish attempt failed due to wrong token type from S29-3. Re-ran workflow after token was corrected — succeeded on second attempt."
+        }
+      ],
+      "notes": "Bumped version to 1.5.1, created GitHub Release v1.5.1, watched publish workflow succeed. Verified @slope-dev/slope@1.5.1 live on npm with provenance attestation."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 6,
+    "fairways_total": 6,
+    "greens_in_regulation": 4,
+    "greens_total": 6,
+    "putts": 2,
+    "penalties": 0,
+    "hazards_hit": 2,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "wind",
+      "description": "Sprint was reactive — fixing breakage from recent consolidation refactor, not greenfield work",
+      "impact": "none"
+    },
+    {
+      "type": "altitude",
+      "description": "NPM token types and OIDC/provenance are under-documented — required trial and error for correct token configuration",
+      "impact": "minor"
+    }
+  ],
+  "special_plays": [],
+  "training": [],
+  "nutrition": [
+    {
+      "category": "hydration",
+      "description": "Full build + test + typecheck verified locally before every commit and confirmed green on CI",
+      "status": "healthy"
+    },
+    {
+      "category": "diet",
+      "description": "Commit-per-ticket discipline maintained — 5 code commits plus version bump, all pushed promptly",
+      "status": "healthy"
+    },
+    {
+      "category": "supplements",
+      "description": "No new tests written — sprint fixed 20 existing broken tests. 1161 total tests passing.",
+      "status": "healthy"
+    },
+    {
+      "category": "recovery",
+      "description": "Added .env to .gitignore immediately after user placed NPM token in local .env — prevented credential leak",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Fast, low-resistance sprint. All code fixes were surgical — 2-line mock path corrections, 13-line script rewrite, 2-line YAML addition. The only friction was external: NPM token types are confusing and the first token was the wrong type.",
+    "advice_for_next_player": "When publishing scoped packages to npm from GitHub Actions: use a Granular Access Token (not Classic Publish, not Classic Automation). Classic tokens require OTP even in CI. Granular tokens bypass OTP and can be scoped to specific packages. The --provenance flag requires id-token: write permission in the workflow.",
+    "what_surprised_you": "The consolidation from 5 packages to 1 only broke 2 test files (mock paths), not the source code itself. The publish workflow was already correctly updated but the release was created from a stale commit that ran the old workflow.",
+    "excited_about_next": "The release pipeline is now fully automated: bump version → push → create GitHub Release → auto-publish to npm with provenance. Future releases are a 3-step process."
+  },
+  "bunker_locations": [
+    "NPM classic publish tokens require OTP in CI — always use Granular Access Tokens for GitHub Actions",
+    "vi.mock() paths must exactly match the import paths used in the module under test — Vitest resolves them independently",
+    "Creating a GitHub Release from a stale commit runs the workflow version at that commit, not HEAD"
+  ],
+  "yardage_book_updates": [
+    "scripts/version-bump.mjs: now bumps single root package.json (was: loop over packages/*/package.json)",
+    ".github/workflows/ci.yml: triggers on push to main AND pull_request to main",
+    ".github/workflows/publish.yml: triggers on release published, uses npm publish --access public --provenance with granular access token",
+    "Release flow: node scripts/version-bump.mjs <ver> → commit + push → gh release create v<ver> → auto-publish"
+  ],
+  "course_management_notes": [
+    "6 tickets, par 5, score 5 — clean par with 2 minor hazards (token type, publish retry) absorbed without penalties",
+    "Slope 1 confirmed appropriate — all small fixes and config changes, no new infrastructure",
+    "Sprint type: fix — reactive cleanup after consolidation refactor broke CI and publish pipeline",
+    "@slope-dev/slope@1.5.1 published to npm with provenance attestation — pipeline verified end-to-end"
+  ]
+}
