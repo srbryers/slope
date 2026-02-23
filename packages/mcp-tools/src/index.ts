@@ -15,6 +15,7 @@
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
+import { execSync } from 'node:child_process';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
@@ -116,9 +117,13 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
     'Discover SLOPE API functions, filesystem helpers, constants, and type definitions. Call with no args to see everything, or filter by query/module.',
     {
       query: z.string().optional().describe('Case-insensitive search term to filter by name or description'),
-      module: z.enum(['core', 'fs', 'constants', 'types', 'store']).optional().describe('Filter by module category'),
+      module: z.enum(['core', 'fs', 'constants', 'types', 'store', 'map']).optional().describe('Filter by module category'),
     },
     async ({ query, module }) => {
+      // Map module — return codebase map content
+      if (module === 'map') {
+        return { content: [{ type: 'text' as const, text: handleMapQuery(query) }] };
+      }
       if (module === 'types') {
         return { content: [{ type: 'text' as const, text: SLOPE_TYPES }] };
       }
@@ -233,6 +238,58 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
   }
 
   return server;
+}
+
+/** Handle search({ module: 'map' }) — return codebase map content with optional section filtering */
+function handleMapQuery(query?: string): string {
+  const cwd = process.cwd();
+  const mapPath = join(cwd, 'CODEBASE.md');
+
+  if (!existsSync(mapPath)) {
+    return 'No codebase map found at CODEBASE.md. Run `slope map` to generate one.';
+  }
+
+  const content = readFileSync(mapPath, 'utf8');
+  let result = '';
+
+  // Check staleness from metadata
+  const metaMatch = content.match(/^---\n([\s\S]*?)\n---/m);
+  if (metaMatch) {
+    const gitShaMatch = metaMatch[1].match(/git_sha:\s*"?([^"\n]+)"?/);
+    if (gitShaMatch) {
+      try {
+        const distance = parseInt(
+          execSync(`git rev-list --count ${gitShaMatch[1]}..HEAD 2>/dev/null`, { cwd, encoding: 'utf8' }).trim() || '0',
+          10,
+        );
+        if (distance > 50) {
+          result += `⚠️ WARNING: Codebase map is stale (${distance} commits behind). Run \`slope map\` to refresh.\n\n`;
+        }
+      } catch { /* git command failed — skip staleness check */ }
+    }
+  }
+
+  if (query) {
+    // Filter to sections matching the query
+    const q = query.toLowerCase();
+    const sections = content.split(/^(?=## )/m);
+    const matched = sections.filter(s => {
+      const heading = s.match(/^## (.+)/)?.[1] ?? '';
+      return heading.toLowerCase().includes(q);
+    });
+
+    if (matched.length === 0) {
+      result += `No sections matching "${query}" found in codebase map. Available sections:\n`;
+      const headings = content.match(/^## .+/gm) ?? [];
+      result += headings.map(h => `- ${h.replace('## ', '')}`).join('\n');
+    } else {
+      result += matched.join('\n');
+    }
+  } else {
+    result += content;
+  }
+
+  return result;
 }
 
 /** Walk up directories looking for .slope/config.json */
