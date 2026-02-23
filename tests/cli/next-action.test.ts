@@ -14,7 +14,7 @@ const mockStore = {
   getActiveClaims: vi.fn().mockResolvedValue([]),
   close: vi.fn(),
 };
-vi.mock('../src/store.js', () => ({
+vi.mock('../../src/cli/store.js', () => ({
   resolveStore: vi.fn().mockRejectedValue(new Error('no store')),
 }));
 

@@ -19,7 +19,7 @@ const mockConfig = {
   guidance: {} as Record<string, unknown>,
 };
 
-vi.mock('../src/config.js', () => ({
+vi.mock('../../src/cli/config.js', () => ({
   loadConfig: () => mockConfig,
 }));
 
