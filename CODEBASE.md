@@ -1,11 +1,11 @@
 ---
-generated_at: "2026-02-23T01:58:02.409Z"
-git_sha: "12ce46874ae845438c415b00d673032693695b39"
-sprint: 22
-source_files: 89
-test_files: 44
+generated_at: "2026-02-23T02:30:01.372Z"
+git_sha: "6791f2bc3a0e1f1c4d5d03efa4351b0dc968df64"
+sprint: 24
+source_files: 90
+test_files: 45
 packages: 4
-cli_commands: 25
+cli_commands: 26
 guards: 10
 ---
 
@@ -19,7 +19,7 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
 
 ### `packages/cli`
 SLOPE CLI — Sprint Lifecycle & Operational Performance Engine
-- Source files: 46 | Test files: 11
+- Source files: 47 | Test files: 12
 - Key modules:
   - `config`
   - `hooks-config`
@@ -175,6 +175,7 @@ Re-exports from `packages/core/src/index.ts`:
 - `slope plugin`
 - `slope release`
 - `slope report`
+- `slope review-state`
 - `slope review`
 - `slope roadmap` — --- Helpers ---
 - `slope session`
@@ -219,12 +220,12 @@ Re-exports from `packages/core/src/index.ts`:
 
 | Package | Test Files | Command |
 |---------|-----------|---------|
-| cli | 11 | `pnpm --filter @slope-dev/cli test` |
+| cli | 12 | `pnpm --filter @slope-dev/cli test` |
 | core | 29 | `pnpm --filter @slope-dev/core test` |
 | mcp-tools | 3 | `pnpm --filter @slope-dev/mcp-tools test` |
 | store-sqlite | 1 | `pnpm --filter @slope-dev/store-sqlite test` |
 
-**Total test files:** 44
+**Total test files:** 45
 **Run all:** `pnpm -r test`
 **Typecheck:** `pnpm -r typecheck`
 <!-- AUTO-GENERATED: END tests -->
@@ -235,11 +236,11 @@ Re-exports from `packages/core/src/index.ts`:
 
 | Sprint | Theme | Tickets | Score |
 |--------|-------|---------|-------|
-| **18** | PR Signals | 4 | par |
-| **19** | The Dashboard | 4 | par |
 | **20** | The Foursome | 4 | birdie |
 | **21** | Dogfooding Fixes | 4 | par |
 | **22** | Port CaddyStack Guards | 4 | par |
+| **23** | The Yardage Book: Codebase Map | 4 | par |
+| **24** | Review State Writer | 3 | par |
 <!-- AUTO-GENERATED: END history -->
 
 ## Known Gotchas
