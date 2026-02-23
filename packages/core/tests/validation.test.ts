@@ -153,6 +153,44 @@ describe('validateScorecard - hazards count', () => {
   });
 });
 
+// --- Rule 4b: hazard severity validation ---
+
+describe('validateScorecard - hazard severity', () => {
+  it('passes with valid severity values', () => {
+    const shots = [
+      makeShot({ hazards: [{ type: 'bunker', description: 'test', severity: 'minor' }] }),
+      makeShot({ hazards: [{ type: 'water', description: 'test', severity: 'critical' }] }),
+    ];
+    const result = validateScorecard(makeCard({
+      shots,
+      stats: makeStats({ fairways_total: 2, hazards_hit: 2 }),
+    }));
+    expect(result.errors.filter(e => e.code === 'INVALID_HAZARD_SEVERITY')).toHaveLength(0);
+  });
+
+  it('fails with invalid severity value', () => {
+    const shots = [
+      makeShot({ hazards: [{ type: 'bunker', description: 'test', severity: 'extreme' as any }] }),
+    ];
+    const result = validateScorecard(makeCard({
+      shots,
+      stats: makeStats({ fairways_total: 1, hazards_hit: 1 }),
+    }));
+    expect(result.errors.some(e => e.code === 'INVALID_HAZARD_SEVERITY')).toBe(true);
+  });
+
+  it('passes when severity is omitted (defaults to minor)', () => {
+    const shots = [
+      makeShot({ hazards: [{ type: 'bunker', description: 'test' }] }),
+    ];
+    const result = validateScorecard(makeCard({
+      shots,
+      stats: makeStats({ fairways_total: 1, hazards_hit: 1 }),
+    }));
+    expect(result.errors.filter(e => e.code === 'INVALID_HAZARD_SEVERITY')).toHaveLength(0);
+  });
+});
+
 // --- Rule 5: miss_directions consistency ---
 
 describe('validateScorecard - miss directions', () => {

@@ -111,6 +111,24 @@ describe('formatSprintReview', () => {
     expect(output).toContain('bunker: migration conflict');
   });
 
+  it('shows hazard penalties row when > 0', () => {
+    const card = makeCard({
+      stats: {
+        fairways_hit: 4, fairways_total: 4, greens_in_regulation: 4, greens_total: 4,
+        putts: 0, penalties: 0, hazards_hit: 1, hazard_penalties: 2,
+        miss_directions: { long: 0, short: 0, left: 0, right: 0 },
+      },
+    });
+    const output = formatSprintReview(card, makeProjectStats());
+    expect(output).toContain('Hazard Penalties');
+    expect(output).toContain('2');
+  });
+
+  it('hides hazard penalties row when 0', () => {
+    const output = formatSprintReview(makeCard(), makeProjectStats());
+    expect(output).not.toContain('Hazard Penalties');
+  });
+
   it('includes miss pattern section when misses exist', () => {
     const card = makeCard({
       stats: {

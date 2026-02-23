@@ -77,6 +77,41 @@ describe('computeStatsFromShots', () => {
     expect(stats.miss_directions).toEqual({ long: 2, short: 1, left: 1, right: 1 });
   });
 
+  it('computes hazard_penalties from severity', () => {
+    const shots = [
+      makeShot({ hazards: [{ type: 'bunker', description: 'test', severity: 'minor' }] }),
+      makeShot({ hazards: [{ type: 'water', description: 'test', severity: 'moderate' }] }),
+      makeShot({ hazards: [{ type: 'rough', description: 'test', severity: 'major' }] }),
+      makeShot({ hazards: [{ type: 'bunker', description: 'test', severity: 'critical' }] }),
+    ];
+    const stats = computeStatsFromShots(shots);
+    expect(stats.hazard_penalties).toBe(3.5); // 0 + 0.5 + 1 + 2
+  });
+
+  it('defaults missing severity to minor (0 penalty)', () => {
+    const shots = [
+      makeShot({ hazards: [{ type: 'bunker', description: 'test' }] }),
+    ];
+    const stats = computeStatsFromShots(shots);
+    expect(stats.hazard_penalties).toBe(0);
+  });
+
+  it('sums multiple hazards on same shot', () => {
+    const shots = [
+      makeShot({ hazards: [
+        { type: 'bunker', description: 'a', severity: 'major' },
+        { type: 'water', description: 'b', severity: 'moderate' },
+      ] }),
+    ];
+    const stats = computeStatsFromShots(shots);
+    expect(stats.hazard_penalties).toBe(1.5); // 1 + 0.5
+  });
+
+  it('returns 0 hazard_penalties when no hazards', () => {
+    const stats = computeStatsFromShots([makeShot()]);
+    expect(stats.hazard_penalties).toBe(0);
+  });
+
   it('applies putts and penalties overrides', () => {
     const stats = computeStatsFromShots([makeShot()], { putts: 3, penalties: 1 });
     expect(stats.putts).toBe(3);
@@ -163,6 +198,42 @@ describe('buildScorecard', () => {
     expect(card.stats.greens_in_regulation).toBe(1);
     expect(card.stats.hazards_hit).toBe(1);
     expect(card.stats.miss_directions.long).toBe(1);
+  });
+
+  it('includes hazard penalties in score', () => {
+    const card = buildScorecard({
+      sprint_number: 168,
+      theme: 'Test',
+      par: 4,
+      slope: 0,
+      date: '2026-02-19',
+      shots: [
+        makeShot({ hazards: [{ type: 'water', description: 'test', severity: 'critical' }] }),
+        makeShot(),
+        makeShot(),
+      ],
+    });
+    // 3 shots + 0 penalties + 2 hazard_penalties = 5
+    expect(card.score).toBe(5);
+    expect(card.stats.hazard_penalties).toBe(2);
+  });
+
+  it('rounds score with fractional hazard penalties', () => {
+    const card = buildScorecard({
+      sprint_number: 168,
+      theme: 'Test',
+      par: 3,
+      slope: 0,
+      date: '2026-02-19',
+      shots: [
+        makeShot({ hazards: [{ type: 'rough', description: 'test', severity: 'moderate' }] }),
+        makeShot(),
+        makeShot(),
+      ],
+    });
+    // 3 shots + 0 penalties + 0.5 hazard_penalties = 3.5 → rounds to 4
+    expect(card.score).toBe(4);
+    expect(card.stats.hazard_penalties).toBe(0.5);
   });
 
   it('returns bogey score_label for 1-over', () => {
