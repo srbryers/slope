@@ -7,7 +7,8 @@
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
     "publish:all": "pnpm -r build && pnpm -r test && pnpm -r typecheck && pnpm -r publish --access public --no-git-checks",
-    "publish:dry": "pnpm -r build && pnpm -r test && pnpm -r typecheck && pnpm -r publish --access public --no-git-checks --dry-run"
+    "publish:dry": "pnpm -r build && pnpm -r test && pnpm -r typecheck && pnpm -r publish --access public --no-git-checks --dry-run",
+    "version:bump": "node scripts/version-bump.mjs"
   },
   "engines": {
     "node": ">=18"
