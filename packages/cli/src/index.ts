@@ -40,6 +40,7 @@ import { standupCommand } from './commands/standup.js';
 import { escalateCommand } from './commands/escalate.js';
 import { pluginCommand } from './commands/plugin.js';
 import { dashboardCommand } from './commands/dashboard.js';
+import { mapCommand } from './commands/map.js';
 
 const subcommand = process.argv[2];
 
@@ -183,6 +184,12 @@ switch (subcommand) {
       process.exit(1);
     });
     break;
+  case 'map':
+    mapCommand(process.argv.slice(3)).catch(err => {
+      console.error('Error:', err.message);
+      process.exit(1);
+    });
+    break;
   default:
     console.log(`
 SLOPE CLI — Sprint Lifecycle & Operational Performance Engine
@@ -218,6 +225,7 @@ Usage:
   slope dashboard [--port=N] [--no-open]    Live local performance dashboard
   slope dashboard --player=<name>          Filter dashboard to a single player
   slope roadmap validate|review|status|show  Strategic planning tools
+  slope map [--check] [--output=<path>]     Generate/update codebase map
   slope plugin list|validate                Manage custom plugins
 
 Examples:
