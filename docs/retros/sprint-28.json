@@ -1,0 +1,123 @@
+{
+  "sprint_number": 28,
+  "theme": "The Pro Tour — Content & Interactive Features",
+  "par": 4,
+  "slope": 2,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-02-23",
+  "type": "feature",
+  "shots": [
+    {
+      "ticket_key": "S28-1",
+      "title": "Content audit & rewrite",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "whitespace_mismatch",
+          "description": "NineteenthHole.astro edit failed due to indentation mismatch in old_string — required re-reading exact line content"
+        }
+      ],
+      "notes": "Updated 10 files: live-stats.ts (replaced CaddyStack fields with SLOPE data), Problem, Framework, WhyGolf, HazardMap, NineteenthHole, Results, CTA, Scorecard sections, and slope-framework.astro (added 6 new sections: CLI Commands, Guard Framework, Metaphor Engine, Plugin System, Flow Tracking, Roadmap Tools). All CaddyStack content references replaced except live-stats API URL (out of scope)."
+    },
+    {
+      "ticket_key": "S28-2",
+      "title": "Install command toggle",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added npm/pnpm/bun tabbed install toggle to Hero.astro with clipboard copy and localStorage persistence. initInstallToggle() in interactions.ts follows existing section-level import pattern."
+    },
+    {
+      "ticket_key": "S28-3",
+      "title": "Metaphor switcher",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Created src/data/metaphors.json (~6KB, 2.3KB gzipped) with all 6 metaphor vocabularies. Fixed-position dropdown in Base.astro, FOUC prevention via inline head script reading localStorage. Dynamic import keeps metaphor data in separate chunk. Added data-term attributes across 7 section files."
+    },
+    {
+      "ticket_key": "S28-4",
+      "title": "New sections & polish",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Created GettingStarted.astro (4-step quick start) and Packages.astro (4-package grid with SVG icons). Inserted into index.astro page order."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 3,
+    "greens_total": 4,
+    "putts": 1,
+    "penalties": 0,
+    "hazards_hit": 1,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "wind",
+      "description": "Low slope factor — all work in established Astro site with known patterns",
+      "impact": "none"
+    },
+    {
+      "type": "altitude",
+      "description": "slope-framework.astro is 60KB — required careful section-by-section editing rather than full rewrite",
+      "impact": "minor"
+    }
+  ],
+  "special_plays": [],
+  "training": [],
+  "nutrition": [
+    {
+      "category": "hydration",
+      "description": "Clean build after each ticket — npm run build verified between every commit",
+      "status": "healthy"
+    },
+    {
+      "category": "diet",
+      "description": "Commit-per-ticket discipline — 4 commits pushed sequentially after each ticket completed",
+      "status": "healthy"
+    },
+    {
+      "category": "supplements",
+      "description": "No new tests added — sprint was content and UI only. Existing 1091 tests unaffected.",
+      "status": "healthy"
+    },
+    {
+      "category": "recovery",
+      "description": "Whitespace mismatch in NineteenthHole edit caught immediately — re-read file and fixed before commit",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Smooth sprint with low resistance. Slope 2 was accurate — all work was content updates and UI additions in an established Astro site with clear patterns to follow. The metaphor switcher was the most complex ticket but the data-attribute pattern made it clean.",
+    "advice_for_next_player": "When editing Astro files with the Edit tool, always re-read the exact lines you plan to replace — indentation and whitespace in .astro files can differ from what you expect, especially in deeply nested HTML. The slope-framework.astro file is 60KB; edit targeted sections rather than attempting full rewrites.",
+    "what_surprised_you": "The metaphor JSON data was only ~6KB for all 6 metaphors with full vocabulary mappings. Dynamic import keeps it out of the main bundle. The FOUC prevention pattern (inline script in head reading localStorage) is simple but critical for theme-switching UIs.",
+    "excited_about_next": "The marketing site now fully reflects SLOPE S1-S27 capabilities with interactive features. Next could be the SLOPE-native stats API to replace the CaddyStack endpoint, or the slope.dev domain setup."
+  },
+  "bunker_locations": [
+    "Astro file whitespace — Edit tool old_string must exactly match file indentation, which varies across .astro sections",
+    "slope-framework.astro is 60KB — never attempt full-file rewrites, always edit targeted sections"
+  ],
+  "yardage_book_updates": [
+    "slope-web/src/data/metaphors.json: static vocabulary for 6 metaphors, dynamically imported by interactions.ts",
+    "slope-web/src/scripts/interactions.ts: initInstallToggle() + initMetaphorSwitcher() — both use localStorage persistence",
+    "slope-web/src/layouts/Base.astro: FOUC prevention inline script + metaphor switcher dropdown UI",
+    "slope-web/src/pages/slope-framework.astro: 6 new sections (CLI, Guards, Metaphors, Plugins, Flows, Roadmap) — now ~90KB",
+    "live-stats.ts: interface fields changed — cli_commands, guards, packages, metaphors replace endpoints, mobile_screens, migrations"
+  ],
+  "course_management_notes": [
+    "4 tickets, par 4, score 4 — clean par with 1 minor hazard absorbed",
+    "Slope 2 confirmed appropriate — content + UI in established site, no new infrastructure",
+    "13+ files modified across slope-web, 2 new files created (metaphors.json, GettingStarted.astro, Packages.astro)",
+    "All CaddyStack content references removed except live-stats API URL (intentionally out of scope)"
+  ]
+}
