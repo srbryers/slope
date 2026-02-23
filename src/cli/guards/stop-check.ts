@@ -8,12 +8,23 @@ import type { HookInput, GuardResult } from '../../core/index.js';
 export async function stopCheckGuard(input: HookInput, cwd: string): Promise<GuardResult> {
   const issues: string[] = [];
 
-  // Check for uncommitted changes
+  // Check for uncommitted changes (excluding gitignored files)
   try {
     const status = execSync('git status --porcelain 2>/dev/null', { cwd, encoding: 'utf8' }).trim();
     if (status.length > 0) {
-      const lines = status.split('\n').filter(Boolean);
-      issues.push(`${lines.length} uncommitted change${lines.length === 1 ? '' : 's'}`);
+      const paths = status.split('\n').filter(Boolean).map(l => l.slice(3));
+      // Filter out files matched by .gitignore (catches tracked-but-ignored files)
+      let filtered = paths;
+      if (paths.length > 0) {
+        try {
+          const ignored = execSync(`git check-ignore ${paths.map(p => `'${p}'`).join(' ')} 2>/dev/null`, { cwd, encoding: 'utf8' }).trim();
+          const ignoredSet = new Set(ignored.split('\n').filter(Boolean));
+          filtered = paths.filter(p => !ignoredSet.has(p));
+        } catch { /* check-ignore exits 1 when no files are ignored — all files are real changes */ }
+      }
+      if (filtered.length > 0) {
+        issues.push(`${filtered.length} uncommitted change${filtered.length === 1 ? '' : 's'}`);
+      }
     }
   } catch { /* not a git repo */ }
 
