@@ -1,8 +1,8 @@
 {
   "mcpServers": {
     "slope": {
-      "command": "npx",
-      "args": ["@srbryers/mcp-tools"]
+      "command": "node",
+      "args": ["dist/mcp/index.js"]
     }
   }
 }

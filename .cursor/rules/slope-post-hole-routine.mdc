@@ -8,7 +8,7 @@ alwaysApply: false
 
 When you have just completed a sprint and filed a scorecard (e.g. `docs/retros/sprint-N.json`), **always** run the full Post-Hole routine before considering the sprint done:
 
-1. **Validate** — Run `slope validate docs/retros/sprint-N.json` (or from repo root: `node packages/cli/dist/index.js validate docs/retros/sprint-N.json` if slope is not on PATH). Fix any validation errors.
+1. **Validate** — Run `slope validate docs/retros/sprint-N.json` (or from repo root: `node dist/cli/index.js validate docs/retros/sprint-N.json` if slope is not on PATH). Fix any validation errors.
 
 2. **Review** — Run `slope review docs/retros/sprint-N.json` and **save the output** to `docs/retros/sprint-N-review.md` so the sprint review markdown is committed with the scorecard.
 
