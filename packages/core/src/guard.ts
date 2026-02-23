@@ -61,7 +61,8 @@ export type GuardName =
   | 'stop-check'
   | 'subagent-gate'
   | 'push-nudge'
-  | 'workflow-gate';
+  | 'workflow-gate'
+  | 'review-tier';
 
 /** Guard registration entry */
 export interface GuardDefinition {
@@ -160,6 +161,13 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
   {
     name: 'workflow-gate',
     description: 'Block ExitPlanMode until review rounds are complete',
+    hookEvent: 'PreToolUse',
+    matcher: 'ExitPlanMode',
+    level: 'full',
+  },
+  {
+    name: 'review-tier',
+    description: 'Recommend review tier based on plan scope',
     hookEvent: 'PreToolUse',
     matcher: 'ExitPlanMode',
     level: 'full',
