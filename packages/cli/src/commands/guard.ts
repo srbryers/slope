@@ -7,6 +7,9 @@ import { commitNudgeGuard } from '../guards/commit-nudge.js';
 import { scopeDriftGuard } from '../guards/scope-drift.js';
 import { compactionGuard } from '../guards/compaction.js';
 import { stopCheckGuard } from '../guards/stop-check.js';
+import { subagentGateGuard } from '../guards/subagent-gate.js';
+import { pushNudgeGuard } from '../guards/push-nudge.js';
+import { workflowGateGuard } from '../guards/workflow-gate.js';
 import { execSync } from 'node:child_process';
 
 type GuardHandler = (input: HookInput, cwd: string) => Promise<GuardResult>;
@@ -19,6 +22,9 @@ const handlers: Partial<Record<GuardName, GuardHandler>> = {
   'scope-drift': scopeDriftGuard,
   compaction: compactionGuard,
   'stop-check': stopCheckGuard,
+  'subagent-gate': subagentGateGuard,
+  'push-nudge': pushNudgeGuard,
+  'workflow-gate': workflowGateGuard,
 };
 
 /** Register a guard handler */

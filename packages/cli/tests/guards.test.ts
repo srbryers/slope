@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdirSync, writeFileSync, rmSync, existsSync } from 'node:fs';
+import { mkdirSync, writeFileSync, rmSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -29,6 +29,9 @@ import { commitNudgeGuard } from '../src/guards/commit-nudge.js';
 import { scopeDriftGuard } from '../src/guards/scope-drift.js';
 import { compactionGuard } from '../src/guards/compaction.js';
 import { stopCheckGuard } from '../src/guards/stop-check.js';
+import { subagentGateGuard } from '../src/guards/subagent-gate.js';
+import { pushNudgeGuard } from '../src/guards/push-nudge.js';
+import { workflowGateGuard } from '../src/guards/workflow-gate.js';
 
 let tmpDir: string;
 
@@ -236,15 +239,30 @@ describe('compactionGuard', () => {
     expect(result).toEqual({});
   });
 
-  it('handles missing store gracefully or records event', async () => {
+  it('handles missing git repo gracefully', async () => {
     const result = await compactionGuard(makeInput({ session_id: 'test-123' }), tmpDir);
-    // Either returns empty (no store) or returns context (store available)
-    if (result.context) {
-      expect(result.context).toContain('compaction checkpoint');
-      expect(result.context).toContain('test-123');
-    } else {
-      expect(result).toEqual({});
-    }
+    // Always returns {} (side-effects only guard)
+    expect(result).toEqual({});
+  });
+
+  it('creates handoffs directory when session_id present', async () => {
+    await compactionGuard(makeInput({ session_id: 'test-abcd1234' }), tmpDir);
+    expect(existsSync(join(tmpDir, '.slope/handoffs'))).toBe(true);
+  });
+
+  it('writes handoff file with session prefix', async () => {
+    await compactionGuard(makeInput({ session_id: 'test-abcd1234-rest' }), tmpDir);
+    const handoffPath = join(tmpDir, '.slope/handoffs', 'test-abc.json');
+    expect(existsSync(handoffPath)).toBe(true);
+    const data = JSON.parse(readFileSync(handoffPath, 'utf8'));
+    expect(data.session_id).toBe('test-abcd1234-rest');
+    expect(data.timestamp).toBeDefined();
+  });
+
+  it('uses custom handoffsDir from config', async () => {
+    mockConfig.guidance = { handoffsDir: '.custom-handoffs' };
+    await compactionGuard(makeInput({ session_id: 'test-abcd1234' }), tmpDir);
+    expect(existsSync(join(tmpDir, '.custom-handoffs'))).toBe(true);
   });
 });
 
@@ -279,5 +297,192 @@ describe('stopCheckGuard', () => {
 
     const result = await stopCheckGuard(makeInput(), tmpDir);
     expect(result.blockReason).toContain('Commit and push');
+  });
+});
+
+describe('subagentGateGuard', () => {
+  it('passes through non-Task tool types', async () => {
+    const result = await subagentGateGuard(
+      makeInput({ tool_input: { subagent_type: 'Bash', command: 'ls' } }),
+      tmpDir,
+    );
+    expect(result).toEqual({});
+  });
+
+  it('passes through resumed agents', async () => {
+    const result = await subagentGateGuard(
+      makeInput({ tool_input: { subagent_type: 'Explore', model: 'sonnet', resume: 'agent-123' } }),
+      tmpDir,
+    );
+    expect(result).toEqual({});
+  });
+
+  it('denies non-haiku Explore agent', async () => {
+    const result = await subagentGateGuard(
+      makeInput({ tool_input: { subagent_type: 'Explore', model: 'sonnet', max_turns: 5 } }),
+      tmpDir,
+    );
+    expect(result.decision).toBe('deny');
+    expect(result.blockReason).toContain('subagent-gate');
+    expect(result.blockReason).toContain('sonnet');
+  });
+
+  it('denies missing max_turns', async () => {
+    const result = await subagentGateGuard(
+      makeInput({ tool_input: { subagent_type: 'Explore', model: 'haiku' } }),
+      tmpDir,
+    );
+    expect(result.decision).toBe('deny');
+    expect(result.blockReason).toContain('max_turns');
+  });
+
+  it('denies exceeded max_turns', async () => {
+    const result = await subagentGateGuard(
+      makeInput({ tool_input: { subagent_type: 'Explore', model: 'haiku', max_turns: 50 } }),
+      tmpDir,
+    );
+    expect(result.decision).toBe('deny');
+    expect(result.blockReason).toContain('max_turns');
+  });
+
+  it('allows correct Explore agent', async () => {
+    const result = await subagentGateGuard(
+      makeInput({ tool_input: { subagent_type: 'Explore', model: 'haiku', max_turns: 8 } }),
+      tmpDir,
+    );
+    expect(result).toEqual({});
+  });
+
+  it('allows correct Plan agent', async () => {
+    const result = await subagentGateGuard(
+      makeInput({ tool_input: { subagent_type: 'Plan', model: 'haiku', max_turns: 12 } }),
+      tmpDir,
+    );
+    expect(result).toEqual({});
+  });
+
+  it('respects custom config thresholds', async () => {
+    mockConfig.guidance = {
+      subagentExploreTurns: 5,
+      subagentPlanTurns: 8,
+      subagentAllowModels: ['haiku', 'sonnet'],
+    };
+
+    // sonnet allowed with custom config
+    const result1 = await subagentGateGuard(
+      makeInput({ tool_input: { subagent_type: 'Explore', model: 'sonnet', max_turns: 4 } }),
+      tmpDir,
+    );
+    expect(result1).toEqual({});
+
+    // exceeds custom Explore limit
+    const result2 = await subagentGateGuard(
+      makeInput({ tool_input: { subagent_type: 'Explore', model: 'haiku', max_turns: 6 } }),
+      tmpDir,
+    );
+    expect(result2.decision).toBe('deny');
+  });
+});
+
+describe('pushNudgeGuard', () => {
+  it('passes through non-git-commit commands', async () => {
+    const result = await pushNudgeGuard(
+      makeInput({ tool_input: { command: 'npm test' } }),
+      tmpDir,
+    );
+    expect(result).toEqual({});
+  });
+
+  it('passes through empty command', async () => {
+    const result = await pushNudgeGuard(
+      makeInput({ tool_input: {} }),
+      tmpDir,
+    );
+    expect(result).toEqual({});
+  });
+
+  it('handles non-git dir gracefully', async () => {
+    const result = await pushNudgeGuard(
+      makeInput({ tool_input: { command: 'git commit -m "test"' } }),
+      tmpDir,
+    );
+    // Should not throw, may return empty or context
+    expect(result.decision).toBeUndefined();
+    expect(result.blockReason).toBeUndefined();
+  });
+
+  it('is non-blocking (context only, no decision/blockReason)', async () => {
+    const { execSync } = await import('node:child_process');
+    execSync('git init && git commit -m "init" --allow-empty', { cwd: tmpDir, stdio: 'ignore' });
+
+    const result = await pushNudgeGuard(
+      makeInput({ tool_input: { command: 'git commit -m "test"' } }),
+      tmpDir,
+    );
+    expect(result.decision).toBeUndefined();
+    expect(result.blockReason).toBeUndefined();
+  });
+});
+
+describe('workflowGateGuard', () => {
+  it('passes through when no review-state.json', async () => {
+    const result = await workflowGateGuard(makeInput(), tmpDir);
+    expect(result).toEqual({});
+  });
+
+  it('passes through when rounds complete', async () => {
+    mkdirSync(join(tmpDir, '.slope'), { recursive: true });
+    writeFileSync(join(tmpDir, '.slope/review-state.json'), JSON.stringify({
+      rounds_required: 2,
+      rounds_completed: 2,
+    }));
+
+    const result = await workflowGateGuard(makeInput(), tmpDir);
+    expect(result).toEqual({});
+  });
+
+  it('denies when rounds incomplete', async () => {
+    mkdirSync(join(tmpDir, '.slope'), { recursive: true });
+    writeFileSync(join(tmpDir, '.slope/review-state.json'), JSON.stringify({
+      rounds_required: 3,
+      rounds_completed: 1,
+    }));
+
+    const result = await workflowGateGuard(makeInput(), tmpDir);
+    expect(result.decision).toBe('deny');
+    expect(result.blockReason).toContain('workflow-gate');
+    expect(result.blockReason).toContain('1/3');
+  });
+
+  it('handles malformed JSON', async () => {
+    mkdirSync(join(tmpDir, '.slope'), { recursive: true });
+    writeFileSync(join(tmpDir, '.slope/review-state.json'), 'not json');
+
+    const result = await workflowGateGuard(makeInput(), tmpDir);
+    expect(result).toEqual({});
+  });
+
+  it('includes plan_file in deny message', async () => {
+    mkdirSync(join(tmpDir, '.slope'), { recursive: true });
+    writeFileSync(join(tmpDir, '.slope/review-state.json'), JSON.stringify({
+      rounds_required: 2,
+      rounds_completed: 0,
+      plan_file: 'docs/backlog/sprint-22-plan.md',
+    }));
+
+    const result = await workflowGateGuard(makeInput(), tmpDir);
+    expect(result.decision).toBe('deny');
+    expect(result.blockReason).toContain('sprint-22-plan.md');
+  });
+
+  it('passes through when state has invalid types', async () => {
+    mkdirSync(join(tmpDir, '.slope'), { recursive: true });
+    writeFileSync(join(tmpDir, '.slope/review-state.json'), JSON.stringify({
+      rounds_required: 'two',
+      rounds_completed: 'one',
+    }));
+
+    const result = await workflowGateGuard(makeInput(), tmpDir);
+    expect(result).toEqual({});
   });
 });
