@@ -1,0 +1,103 @@
+{
+  "sprint_number": 22,
+  "theme": "Port CaddyStack Guards",
+  "par": 4,
+  "slope": 2,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-02-22",
+  "shots": [
+    {
+      "ticket_key": "S22-1",
+      "title": "MCP setup hints for hook activation",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added setup hints to MCP search/execute tools showing how to activate guards via slope init. 11 new MCP tests covering hint content and formatting."
+    },
+    {
+      "ticket_key": "S22-2",
+      "title": "Subagent-gate guard",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "PreToolUse guard on Task that forces haiku model and caps max_turns on Explore/Plan subagents. Exempts resumed agents. 8 tests covering model validation, turns limits, custom config, and passthrough cases."
+    },
+    {
+      "ticket_key": "S22-3",
+      "title": "Push-nudge guard",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "PostToolUse guard on Bash that fires after git commit commands. Nudges based on unpushed count, time since push, and main branch detection. 4 tests."
+    },
+    {
+      "ticket_key": "S22-4",
+      "title": "Workflow-gate guard + compaction upgrade",
+      "club": "long_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Workflow-gate: PreToolUse on ExitPlanMode, blocks until review rounds complete per review-state.json. Compaction upgrade: replaced single-event marker with full handoff (git state, sprint context, claims) to .slope/handoffs/. 10 tests across both guards."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "type": "feature",
+  "conditions": [],
+  "special_plays": [],
+  "nutrition": [
+    {
+      "category": "hydration",
+      "description": "Clean build + typecheck + all 1046 tests pass (780 core + 36 store + 165 CLI + 65 MCP) after each commit",
+      "status": "healthy"
+    },
+    {
+      "category": "diet",
+      "description": "7 commits in strict dependency order: core types first, then each guard file individually, then registration + tests. Commit-per-file discipline.",
+      "status": "healthy"
+    },
+    {
+      "category": "recovery",
+      "description": "All existing tests pass unchanged. 32 new tests added. Zero regressions. Only core guard count test updated (6→9).",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Efficient port from CaddyStack patterns into SLOPE's guard framework. The existing guard infrastructure (dispatcher, formatters, test patterns) made each new guard a straightforward plug-in. No architectural surprises.",
+    "advice_for_next_player": "Guards need `slope init --claude-code` to activate (generates settings.json hooks). The subagent-gate defaults to haiku-only — configure guidance.subagentAllowModels in .slope/config.json to allow other models. The workflow-gate reads .slope/review-state.json which must be written by the review process (not yet implemented). Compaction handoffs go to .slope/handoffs/ (gitignored).",
+    "what_surprised_you": "The compaction guard's dual-output design (file primary, store secondary) was the most interesting architectural choice. The 10-second guard timeout from Claude Code means store writes can fail — file writes are the reliable fallback.",
+    "excited_about_next": "The guard framework now has 9 guards covering the full agent lifecycle: exploration, editing, committing, pushing, subagent spawning, plan review, and session end. Next logical step is wiring the review-state.json writer into the review command."
+  },
+  "bunker_locations": [],
+  "yardage_book_updates": [
+    "packages/core/src/guard.ts: GuardName union extended to 9, GuidanceConfig gains 5 new fields, 3 new GUARD_DEFINITIONS",
+    "packages/core/src/config.ts: SlopeConfig.guidance type extended with subagent/push/handoff fields",
+    "packages/cli/src/guards/subagent-gate.ts: New — PreToolUse deny guard for Task tool",
+    "packages/cli/src/guards/push-nudge.ts: New — PostToolUse context guard for Bash",
+    "packages/cli/src/guards/workflow-gate.ts: New — PreToolUse deny guard for ExitPlanMode",
+    "packages/cli/src/guards/compaction.ts: Upgraded — full handoff with git state, sprint context, claims",
+    "packages/cli/src/commands/guard.ts: 3 new handler registrations",
+    "packages/cli/tests/guards.test.ts: 21 new tests across 4 describe blocks",
+    "packages/mcp-tools/src/index.ts: Setup hints for guard activation in search/execute tools",
+    "packages/mcp-tools/src/index.test.ts: 11 new tests for MCP setup hints"
+  ],
+  "course_management_notes": [
+    "4 shots, all in_the_hole — zero hazards, zero penalties, par",
+    "11 files changed, 697 lines added, 31 removed",
+    "Guard framework: 6 → 9 guards (subagent-gate, push-nudge, workflow-gate)",
+    "32 new tests. Total test count: 1046 (up from 1014)"
+  ]
+}
