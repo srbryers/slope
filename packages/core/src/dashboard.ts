@@ -2,6 +2,10 @@ import type { GolfScorecard, MissDirection } from './types.js';
 import type { MetaphorDefinition } from './metaphor.js';
 import type { ReportData, SprintTrendEntry } from './report.js';
 import {
+  background, text as textColor, border, status, chart, semantic,
+  fontSize, fontWeight, spacing, radius,
+} from '@srbryers/tokens';
+import {
   REPORT_CSS,
   escapeHtml,
   svgRect,
@@ -188,10 +192,10 @@ export function renderSprintTimeline(trend: SprintTrendEntry[], metaphor?: Metap
     // Par bar (gray)
     const parH = (t.par / maxVal) * plotH;
     const parY = PAD.top + plotH - parH;
-    bars += svgRect(groupX, parY, barW, parH, '#cbd5e1');
+    bars += svgRect(groupX, parY, barW, parH, chart.parBar);
 
     // Actual bar (colored)
-    const color = t.score < t.par ? '#22c55e' : t.score === t.par ? '#3b82f6' : '#ef4444';
+    const color = t.score < t.par ? chart.underPar : t.score === t.par ? chart.atPar : chart.overPar;
     const actH = (t.score / maxVal) * plotH;
     const actY = PAD.top + plotH - actH;
     bars += svgRect(groupX + barW + gap, actY, barW, actH, color);
@@ -207,7 +211,7 @@ export function renderSprintTimeline(trend: SprintTrendEntry[], metaphor?: Metap
   let yLabels = '';
   for (let v = 0; v <= maxVal; v++) {
     const y = PAD.top + plotH - (v / maxVal) * plotH;
-    yLabels += `<line x1="${PAD.left}" y1="${y}" x2="${W - PAD.right}" y2="${y}" stroke="#e2e8f0" stroke-width="0.5"/>`;
+    yLabels += `<line x1="${PAD.left}" y1="${y}" x2="${W - PAD.right}" y2="${y}" stroke="${border.default}" stroke-width="0.5"/>`;
     yLabels += svgText(PAD.left - 8, y + 4, `${v}`, { anchor: 'end', size: 10 });
   }
 
@@ -221,9 +225,9 @@ export function renderSprintTimeline(trend: SprintTrendEntry[], metaphor?: Metap
       ${bars}
     </svg>
     <div class="legend">
-      <span class="legend-item"><span class="dot" style="background:#cbd5e1"></span> Par</span>
+      <span class="legend-item"><span class="dot" style="background:${chart.parBar}"></span> Par</span>
       <span class="legend-item"><span class="dot green"></span> Under Par</span>
-      <span class="legend-item"><span class="dot" style="background:#3b82f6"></span> At Par</span>
+      <span class="legend-item"><span class="dot" style="background:${chart.atPar}"></span> At Par</span>
       <span class="legend-item"><span class="dot red"></span> Over Par</span>
     </div>
   </div>`;
@@ -284,7 +288,7 @@ export function renderMissHeatmap(heatmap: MissHeatmapData, metaphor?: MetaphorD
       const count = cell?.count ?? 0;
       const x = PAD.left + s * CELL_W;
 
-      // Interpolate color: #f8fafc (0) -> #ef4444 (1.0)
+      // Interpolate color: heatmapBase (0) -> heatmapHot (1.0)
       const r = Math.round(248 + (239 - 248) * intensity);
       const g = Math.round(250 + (68 - 250) * intensity);
       const b = Math.round(252 + (68 - 252) * intensity);
@@ -292,7 +296,7 @@ export function renderMissHeatmap(heatmap: MissHeatmapData, metaphor?: MetaphorD
 
       cells += svgRect(x + 2, y + 2, CELL_W - 4, CELL_H - 4, fill, 4);
       if (count > 0) {
-        cells += svgText(x + CELL_W / 2, y + CELL_H / 2 + 4, `${count}`, { size: 11, fill: intensity > 0.5 ? '#fff' : '#64748b' });
+        cells += svgText(x + CELL_W / 2, y + CELL_H / 2 + 4, `${count}`, { size: 11, fill: intensity > 0.5 ? '#fff' : textColor.muted });
       }
       const tooltip = `S${heatmap.sprints[s]} ${dirLabel}: ${count} misses`;
       cells += `<title>${escapeHtml(tooltip)}</title>`;
@@ -410,21 +414,21 @@ export function generateDashboardScript(config?: Partial<DashboardConfig>): stri
 // --- Dashboard HTML Generator ---
 
 const DASHBOARD_CSS = `
-  .dashboard-nav { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; margin-bottom: 24px; border-bottom: 2px solid #e2e8f0; }
+  .dashboard-nav { display: flex; justify-content: space-between; align-items: center; padding: ${spacing[4]} 0; margin-bottom: ${spacing[7]}; border-bottom: 2px solid ${border.default}; }
   .dashboard-nav h1 { margin: 0; }
-  .dashboard-nav .meta { font-size: 12px; color: #94a3b8; }
-  .sprint-detail { background: #fff; border: 2px solid #3b82f6; border-radius: 8px; padding: 20px; margin: 20px 0; }
-  .sprint-detail h3 { color: #1e293b; margin-bottom: 8px; }
-  .detail-meta { font-size: 13px; color: #64748b; margin-bottom: 16px; display: flex; gap: 16px; flex-wrap: wrap; }
-  .sprint-detail h4 { font-size: 13px; color: #475569; margin: 16px 0 8px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }
-  .tags { display: flex; gap: 8px; flex-wrap: wrap; }
-  .tag { background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 4px; padding: 2px 8px; font-size: 12px; color: #475569; }
-  .nineteenth-hole dt { font-weight: 600; color: #475569; font-size: 13px; margin-top: 8px; }
-  .nineteenth-hole dd { color: #64748b; font-size: 13px; margin: 2px 0 0 0; }
-  .hazard-overlay { border-color: #fde68a; }
-  .hazard-overlay h4 { color: #92400e; }
+  .dashboard-nav .meta { font-size: ${fontSize.sm}; color: ${textColor.faint}; }
+  .sprint-detail { background: ${background.surface}; border: 2px solid ${border.accent}; border-radius: ${radius.md}; padding: ${spacing[6]}; margin: ${spacing[6]} 0; }
+  .sprint-detail h3 { color: ${textColor.primary}; margin-bottom: ${spacing[3]}; }
+  .detail-meta { font-size: ${fontSize.base}; color: ${textColor.muted}; margin-bottom: ${spacing[5]}; display: flex; gap: ${spacing[5]}; flex-wrap: wrap; }
+  .sprint-detail h4 { font-size: ${fontSize.base}; color: ${textColor.secondary}; margin: ${spacing[5]} 0 ${spacing[3]}; border-bottom: 1px solid ${border.default}; padding-bottom: ${spacing[2]}; }
+  .tags { display: flex; gap: ${spacing[3]}; flex-wrap: wrap; }
+  .tag { background: ${background.muted}; border: 1px solid ${border.default}; border-radius: ${radius.sm}; padding: ${spacing[1]} ${spacing[3]}; font-size: ${fontSize.sm}; color: ${textColor.secondary}; }
+  .nineteenth-hole dt { font-weight: ${fontWeight.semibold}; color: ${textColor.secondary}; font-size: ${fontSize.base}; margin-top: ${spacing[3]}; }
+  .nineteenth-hole dd { color: ${textColor.muted}; font-size: ${fontSize.base}; margin: ${spacing[1]} 0 0 0; }
+  .hazard-overlay { border-color: ${border.warning}; }
+  .hazard-overlay h4 { color: ${semantic.hazardHeading}; }
   svg .clickable { cursor: pointer; }
-  svg .clickable:hover { opacity: 0.2; fill: #3b82f6; }
+  svg .clickable:hover { opacity: 0.2; fill: ${border.accent}; }
   #sprint-detail:empty { display: none; }
 `;
 

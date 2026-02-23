@@ -10,6 +10,10 @@ import type {
 import type { MetaphorDefinition } from './metaphor.js';
 import { computeHandicapCard } from './handicap.js';
 import { computeDispersion, computeAreaPerformance } from './dispersion.js';
+import {
+  background, text as textColor, border, status, chart, semantic,
+  fontFamily, fontSize, fontWeight, spacing, radius, layout,
+} from '@srbryers/tokens';
 
 // --- Report Data ---
 
@@ -120,7 +124,7 @@ export function svgRect(x: number, y: number, w: number, h: number, fill: string
 }
 
 export function svgText(x: number, y: number, text: string, opts: { anchor?: string; size?: number; fill?: string; weight?: string } = {}): string {
-  const { anchor = 'middle', size = 11, fill = '#64748b', weight = 'normal' } = opts;
+  const { anchor = 'middle', size = 11, fill = textColor.muted, weight = 'normal' } = opts;
   return `<text x="${x}" y="${y}" text-anchor="${anchor}" font-size="${size}" fill="${fill}" font-weight="${weight}" font-family="system-ui, -apple-system, sans-serif">${escapeHtml(text)}</text>`;
 }
 
@@ -149,7 +153,7 @@ export function renderHandicapTrendChart(trend: SprintTrendEntry[], metaphor?: M
   let gridLines = '';
   for (let v = Math.ceil(minY); v <= Math.floor(maxY); v++) {
     const y = scaleY(v);
-    gridLines += `<line x1="${PAD.left}" y1="${y}" x2="${W - PAD.right}" y2="${y}" stroke="#e2e8f0" stroke-width="1"/>`;
+    gridLines += `<line x1="${PAD.left}" y1="${y}" x2="${W - PAD.right}" y2="${y}" stroke="${border.default}" stroke-width="1"/>`;
     gridLines += svgText(PAD.left - 8, y + 4, v > 0 ? `+${v}` : `${v}`, { anchor: 'end', size: 10 });
   }
 
@@ -163,7 +167,7 @@ export function renderHandicapTrendChart(trend: SprintTrendEntry[], metaphor?: M
   // Data points
   let dots = '';
   for (const p of points) {
-    dots += `<circle cx="${p.x}" cy="${p.y}" r="4" fill="#3b82f6" stroke="#fff" stroke-width="2"/>`;
+    dots += `<circle cx="${p.x}" cy="${p.y}" r="4" fill="${chart.atPar}" stroke="#fff" stroke-width="2"/>`;
   }
 
   const title = metaphor?.vocabulary.handicapCard ?? 'Handicap';
@@ -173,9 +177,9 @@ export function renderHandicapTrendChart(trend: SprintTrendEntry[], metaphor?: M
     <h3>${escapeHtml(title)} Trend</h3>
     <svg viewBox="0 0 ${W} ${H}" width="100%">
       ${gridLines}
-      <line x1="${PAD.left}" y1="${parY}" x2="${W - PAD.right}" y2="${parY}" stroke="#22c55e" stroke-width="1.5" stroke-dasharray="6,4"/>
-      ${svgText(W - PAD.right + 5, parY + 4, metaphor?.vocabulary.onTarget ?? 'Par', { anchor: 'start', size: 10, fill: '#22c55e' })}
-      ${svgLine(points, W, H, '#3b82f6', 2.5)}
+      <line x1="${PAD.left}" y1="${parY}" x2="${W - PAD.right}" y2="${parY}" stroke="${chart.underPar}" stroke-width="1.5" stroke-dasharray="6,4"/>
+      ${svgText(W - PAD.right + 5, parY + 4, metaphor?.vocabulary.onTarget ?? 'Par', { anchor: 'start', size: 10, fill: chart.underPar })}
+      ${svgLine(points, W, H, chart.atPar, 2.5)}
       ${dots}
       ${xLabels}
       ${svgText(W / 2, H - 2, `${sprintLabel} Number`, { size: 10 })}
@@ -195,20 +199,20 @@ export function renderDispersionChart(dispersion: DispersionReport, metaphor?: M
   };
 
   // Background circle
-  let svg = `<circle cx="${CX}" cy="${CY}" r="${R}" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1"/>`;
-  svg += `<circle cx="${CX}" cy="${CY}" r="${R * 0.5}" fill="none" stroke="#e2e8f0" stroke-width="0.5"/>`;
+  let svg = `<circle cx="${CX}" cy="${CY}" r="${R}" fill="${background.page}" stroke="${border.default}" stroke-width="1"/>`;
+  svg += `<circle cx="${CX}" cy="${CY}" r="${R * 0.5}" fill="none" stroke="${border.default}" stroke-width="0.5"/>`;
 
   // Crosshairs
-  svg += `<line x1="${CX}" y1="${CY - R}" x2="${CX}" y2="${CY + R}" stroke="#e2e8f0" stroke-width="0.5"/>`;
-  svg += `<line x1="${CX - R}" y1="${CY}" x2="${CX + R}" y2="${CY}" stroke="#e2e8f0" stroke-width="0.5"/>`;
+  svg += `<line x1="${CX}" y1="${CY - R}" x2="${CX}" y2="${CY + R}" stroke="${border.default}" stroke-width="0.5"/>`;
+  svg += `<line x1="${CX - R}" y1="${CY}" x2="${CX + R}" y2="${CY}" stroke="${border.default}" stroke-width="0.5"/>`;
 
   // Center dot (target)
-  svg += `<circle cx="${CX}" cy="${CY}" r="4" fill="#22c55e"/>`;
+  svg += `<circle cx="${CX}" cy="${CY}" r="4" fill="${status.green}"/>`;
 
   // Miss dots (scatter based on count)
   const totalMisses = dispersion.total_misses || 1;
   const colors: Record<MissDirection, string> = {
-    long: '#ef4444', short: '#f97316', left: '#a855f7', right: '#3b82f6',
+    long: status.red, short: status.orange, left: status.purple, right: status.blue,
   };
 
   for (const dir of dirs) {
@@ -272,12 +276,12 @@ export function renderAreaPerformanceChart(area: AreaReport, metaphor?: Metaphor
 
     // In-the-hole rate bar (green)
     const holeW = (data.in_the_hole_rate / 100) * plotW;
-    bars += svgRect(PAD.left, y, holeW, barH, '#22c55e');
+    bars += svgRect(PAD.left, y, holeW, barH, status.green);
 
     // Miss rate bar overlay (red, stacked)
     const missW = (data.miss_rate / 100) * plotW;
     if (missW > 0) {
-      bars += svgRect(PAD.left + holeW, y, missW, barH, '#ef4444');
+      bars += svgRect(PAD.left + holeW, y, missW, barH, status.red);
     }
 
     // Label
@@ -285,7 +289,7 @@ export function renderAreaPerformanceChart(area: AreaReport, metaphor?: Metaphor
 
     // Value text
     const perfectLabel = metaphor?.shotResults.in_the_hole ?? 'perfect';
-    bars += svgText(PAD.left + holeW + missW + 8, y + barH / 2 + 4, `${data.in_the_hole_rate}% ${perfectLabel}`, { anchor: 'start', size: 10, fill: '#22c55e' });
+    bars += svgText(PAD.left + holeW + missW + 8, y + barH / 2 + 4, `${data.in_the_hole_rate}% ${perfectLabel}`, { anchor: 'start', size: 10, fill: status.green });
   }
 
   return `
@@ -320,9 +324,9 @@ export function renderNutritionChart(trends: NutritionTrendEntry[], metaphor?: M
     const attentionW = (t.needsAttention / total) * plotW;
     const neglectedW = (t.neglected / total) * plotW;
 
-    bars += svgRect(PAD.left, y, healthyW, barH, '#22c55e');
-    bars += svgRect(PAD.left + healthyW, y, attentionW, barH, '#f59e0b');
-    bars += svgRect(PAD.left + healthyW + attentionW, y, neglectedW, barH, '#ef4444');
+    bars += svgRect(PAD.left, y, healthyW, barH, status.green);
+    bars += svgRect(PAD.left + healthyW, y, attentionW, barH, status.amber);
+    bars += svgRect(PAD.left + healthyW + attentionW, y, neglectedW, barH, status.red);
 
     bars += svgText(PAD.left - 8, y + barH / 2 + 4, catLabel, { anchor: 'end', size: 11 });
   }
@@ -350,7 +354,7 @@ export function renderSummaryCards(data: ReportData, metaphor?: MetaphorDefiniti
   const scorecardLabel = metaphor?.vocabulary.scorecard ?? 'Scorecard';
 
   const trendArrow = last5.handicap < all.handicap ? '&#x25BC;' : last5.handicap > all.handicap ? '&#x25B2;' : '&#x25CF;';
-  const trendColor = last5.handicap <= all.handicap ? '#22c55e' : '#ef4444';
+  const trendColor = last5.handicap <= all.handicap ? status.green : status.red;
 
   return `
   <div class="summary-cards">
@@ -413,38 +417,38 @@ export function renderSprintTable(trend: SprintTrendEntry[], metaphor?: Metaphor
 
 export const REPORT_CSS = `
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: system-ui, -apple-system, sans-serif; background: #f8fafc; color: #1e293b; padding: 24px; max-width: 960px; margin: 0 auto; }
-  h1 { font-size: 24px; margin-bottom: 4px; }
-  h2 { font-size: 18px; color: #475569; margin: 32px 0 16px; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; }
-  h3 { font-size: 15px; color: #334155; margin-bottom: 12px; }
-  .subtitle { color: #64748b; font-size: 13px; margin-bottom: 24px; }
-  .summary-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 32px; }
-  .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; }
-  .card-label { font-size: 12px; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
-  .card-value { font-size: 28px; font-weight: 700; margin: 4px 0; }
-  .card-sub { font-size: 12px; color: #94a3b8; }
-  .chart-container { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+  body { font-family: ${fontFamily.system}; background: ${background.page}; color: ${textColor.primary}; padding: ${spacing[7]}; max-width: ${layout.maxWidth}; margin: 0 auto; }
+  h1 { font-size: ${fontSize.xl}; margin-bottom: ${spacing[2]}; }
+  h2 { font-size: ${fontSize.lg}; color: ${textColor.secondary}; margin: ${spacing[8]} 0 ${spacing[5]}; border-bottom: 2px solid ${border.default}; padding-bottom: ${spacing[3]}; }
+  h3 { font-size: ${fontSize.md}; color: ${textColor.tertiary}; margin-bottom: ${spacing[4]}; }
+  .subtitle { color: ${textColor.muted}; font-size: ${fontSize.base}; margin-bottom: ${spacing[7]}; }
+  .summary-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(${layout.cardMinWidth}, 1fr)); gap: ${layout.cardGap}; margin-bottom: ${spacing[8]}; }
+  .card { background: ${background.surface}; border: 1px solid ${border.default}; border-radius: ${radius.md}; padding: ${spacing[5]}; }
+  .card-label { font-size: ${fontSize.sm}; color: ${textColor.muted}; text-transform: uppercase; letter-spacing: 0.05em; }
+  .card-value { font-size: ${fontSize['2xl']}; font-weight: ${fontWeight.bold}; margin: ${spacing[2]} 0; }
+  .card-sub { font-size: ${fontSize.sm}; color: ${textColor.faint}; }
+  .chart-container { background: ${background.surface}; border: 1px solid ${border.default}; border-radius: ${radius.md}; padding: ${spacing[6]}; margin-bottom: ${spacing[6]}; }
   .chart-container svg { display: block; margin: 0 auto; }
-  .dispersion-layout { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; justify-content: center; }
-  .dispersion-stats { display: flex; flex-direction: column; gap: 12px; }
+  .dispersion-layout { display: flex; align-items: center; gap: ${spacing[7]}; flex-wrap: wrap; justify-content: center; }
+  .dispersion-stats { display: flex; flex-direction: column; gap: ${spacing[4]}; }
   .stat { display: flex; flex-direction: column; }
-  .stat-label { font-size: 11px; color: #64748b; text-transform: uppercase; }
-  .stat-value { font-size: 20px; font-weight: 600; }
-  .stat-value.warn { color: #ef4444; }
-  .legend { display: flex; gap: 16px; margin-top: 8px; font-size: 12px; color: #64748b; }
-  .legend-item { display: flex; align-items: center; gap: 4px; }
+  .stat-label { font-size: ${fontSize.xs}; color: ${textColor.muted}; text-transform: uppercase; }
+  .stat-value { font-size: 20px; font-weight: ${fontWeight.semibold}; }
+  .stat-value.warn { color: ${semantic.warn}; }
+  .legend { display: flex; gap: ${spacing[5]}; margin-top: ${spacing[3]}; font-size: ${fontSize.sm}; color: ${textColor.muted}; }
+  .legend-item { display: flex; align-items: center; gap: ${spacing[2]}; }
   .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
-  .dot.green { background: #22c55e; }
-  .dot.red { background: #ef4444; }
-  .dot.amber { background: #f59e0b; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th { text-align: left; padding: 8px; border-bottom: 2px solid #e2e8f0; font-weight: 600; color: #475569; }
-  td { padding: 8px; border-bottom: 1px solid #f1f5f9; }
-  tr:hover td { background: #f8fafc; }
-  .over { color: #ef4444; font-weight: 600; }
-  .under { color: #22c55e; font-weight: 600; }
-  .even { color: #64748b; font-weight: 600; }
-  .footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8; text-align: center; }
+  .dot.green { background: ${status.green}; }
+  .dot.red { background: ${status.red}; }
+  .dot.amber { background: ${status.amber}; }
+  table { width: 100%; border-collapse: collapse; font-size: ${fontSize.base}; }
+  th { text-align: left; padding: ${spacing[3]}; border-bottom: 2px solid ${border.default}; font-weight: ${fontWeight.semibold}; color: ${textColor.secondary}; }
+  td { padding: ${spacing[3]}; border-bottom: 1px solid ${border.subtle}; }
+  tr:hover td { background: ${background.page}; }
+  .over { color: ${semantic.over}; font-weight: ${fontWeight.semibold}; }
+  .under { color: ${semantic.under}; font-weight: ${fontWeight.semibold}; }
+  .even { color: ${semantic.even}; font-weight: ${fontWeight.semibold}; }
+  .footer { margin-top: ${spacing[9]}; padding-top: ${spacing[5]}; border-top: 1px solid ${border.default}; font-size: ${fontSize.xs}; color: ${textColor.faint}; text-align: center; }
 `;
 
 export function generateHtmlReport(data: ReportData, metaphor?: MetaphorDefinition): string {

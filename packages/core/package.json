@@ -39,6 +39,9 @@
     "url": "https://github.com/srbryers/slope.git",
     "directory": "packages/core"
   },
+  "dependencies": {
+    "@srbryers/tokens": "workspace:*"
+  },
   "devDependencies": {
     "@types/node": "^25.3.0",
     "typescript": "^5.7.0",
