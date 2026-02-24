@@ -356,17 +356,58 @@ describe('subagentGateGuard', () => {
     expect(result.blockReason).toContain('max_turns');
   });
 
-  it('allows correct Explore agent', async () => {
+  it('allows correct Explore agent with orientation context', async () => {
     const result = await subagentGateGuard(
       makeInput({ tool_input: { subagent_type: 'Explore', model: 'haiku', max_turns: 8 } }),
       tmpDir,
     );
-    expect(result).toEqual({});
+    expect(result.decision).toBeUndefined();
+    expect(result.context).toContain('SLOPE subagent tip');
   });
 
-  it('allows correct Plan agent', async () => {
+  it('allows correct Plan agent with orientation context', async () => {
     const result = await subagentGateGuard(
       makeInput({ tool_input: { subagent_type: 'Plan', model: 'haiku', max_turns: 12 } }),
+      tmpDir,
+    );
+    expect(result.decision).toBeUndefined();
+    expect(result.context).toContain('SLOPE subagent tip');
+  });
+
+  it('includes stats when CODEBASE.md has frontmatter', async () => {
+    const frontmatter = [
+      '---',
+      'cli_commands: 27',
+      'guards: 13',
+      'test_files: 45',
+      'source_files: 90',
+      '---',
+      '# Codebase',
+    ].join('\n');
+    writeFileSync(join(tmpDir, 'CODEBASE.md'), frontmatter);
+
+    const result = await subagentGateGuard(
+      makeInput({ tool_input: { subagent_type: 'Explore', model: 'haiku', max_turns: 8 } }),
+      tmpDir,
+    );
+    expect(result.context).toContain('27 CLI commands');
+    expect(result.context).toContain('13 guards');
+    expect(result.context).toContain('45 test files');
+    expect(result.context).toContain('Glob/Grep');
+  });
+
+  it('returns fallback context when CODEBASE.md is missing', async () => {
+    const result = await subagentGateGuard(
+      makeInput({ tool_input: { subagent_type: 'Explore', model: 'haiku', max_turns: 8 } }),
+      tmpDir,
+    );
+    expect(result.context).toContain('Glob/Grep');
+    expect(result.context).toContain('CODEBASE.md');
+  });
+
+  it('returns no context for non-Explore/Plan agents', async () => {
+    const result = await subagentGateGuard(
+      makeInput({ tool_input: { subagent_type: 'Bash', model: 'haiku', max_turns: 5 } }),
       tmpDir,
     );
     expect(result).toEqual({});
@@ -384,7 +425,8 @@ describe('subagentGateGuard', () => {
       makeInput({ tool_input: { subagent_type: 'Explore', model: 'sonnet', max_turns: 4 } }),
       tmpDir,
     );
-    expect(result1).toEqual({});
+    expect(result1.decision).toBeUndefined();
+    expect(result1.context).toContain('SLOPE subagent tip');
 
     // exceeds custom Explore limit
     const result2 = await subagentGateGuard(
