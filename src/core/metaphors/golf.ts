@@ -82,6 +82,7 @@ export const golf: MetaphorDefinition = {
     research: 'Research',
     flow: 'Flow',
     'test-coverage': 'Test Coverage',
+    audit: 'Course Review',
   },
 
   trainingTypes: {

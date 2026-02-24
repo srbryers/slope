@@ -82,6 +82,7 @@ export const tennis: MetaphorDefinition = {
     research: 'Film Study',
     flow: 'Rally',
     'test-coverage': 'Practice Match',
+    audit: 'Film Review',
   },
 
   trainingTypes: {

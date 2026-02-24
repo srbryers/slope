@@ -135,7 +135,7 @@ const REQUIRED_CONDITIONS: ConditionType[] = ['wind', 'rain', 'frost_delay', 'al
 const REQUIRED_SPECIALS: SpecialPlay[] = ['gimme', 'mulligan', 'provisional', 'lay_up', 'scramble'];
 const REQUIRED_MISS: MissDirection[] = ['long', 'short', 'left', 'right'];
 const REQUIRED_SCORES: ScoreLabel[] = ['eagle', 'birdie', 'par', 'bogey', 'double_bogey', 'triple_plus'];
-const REQUIRED_SPRINT_TYPES: SprintType[] = ['feature', 'feedback', 'infra', 'bugfix', 'research', 'flow', 'test-coverage'];
+const REQUIRED_SPRINT_TYPES: SprintType[] = ['feature', 'feedback', 'infra', 'bugfix', 'research', 'flow', 'test-coverage', 'audit'];
 const REQUIRED_TRAINING: TrainingType[] = ['driving_range', 'chipping_practice', 'putting_practice', 'lessons'];
 const REQUIRED_NUTRITION: NutritionCategory[] = ['hydration', 'diet', 'recovery', 'supplements', 'stretching'];
 

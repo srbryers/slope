@@ -10,17 +10,18 @@ import {
   gaming,
   dnd,
   matrix,
+  agile,
 } from '../../src/core/index.js';
 import type { MetaphorDefinition } from '../../src/core/index.js';
 
 // All built-in metaphors
-const ALL_METAPHORS = [golf, tennis, baseball, gaming, dnd, matrix];
-const ALL_IDS = ['golf', 'tennis', 'baseball', 'gaming', 'dnd', 'matrix'];
+const ALL_METAPHORS = [golf, tennis, baseball, gaming, dnd, matrix, agile];
+const ALL_IDS = ['golf', 'tennis', 'baseball', 'gaming', 'dnd', 'matrix', 'agile'];
 
 describe('metaphor registry', () => {
   it('all 6 built-in metaphors are registered', () => {
     const registered = listMetaphors();
-    expect(registered).toHaveLength(6);
+    expect(registered).toHaveLength(7);
     for (const id of ALL_IDS) {
       expect(hasMetaphor(id)).toBe(true);
     }
@@ -66,7 +67,7 @@ describe('metaphor term coverage', () => {
   const SPECIAL_KEYS = ['gimme', 'mulligan', 'provisional', 'lay_up', 'scramble'] as const;
   const MISS_KEYS = ['long', 'short', 'left', 'right'] as const;
   const SCORE_KEYS = ['eagle', 'birdie', 'par', 'bogey', 'double_bogey', 'triple_plus'] as const;
-  const SPRINT_KEYS = ['feature', 'feedback', 'infra', 'bugfix', 'research', 'flow', 'test-coverage'] as const;
+  const SPRINT_KEYS = ['feature', 'feedback', 'infra', 'bugfix', 'research', 'flow', 'test-coverage', 'audit'] as const;
   const TRAINING_KEYS = ['driving_range', 'chipping_practice', 'putting_practice', 'lessons'] as const;
   const NUTRITION_KEYS = ['hydration', 'diet', 'recovery', 'supplements', 'stretching'] as const;
 

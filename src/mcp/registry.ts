@@ -634,7 +634,7 @@ type ConditionType = 'wind' | 'rain' | 'frost_delay' | 'altitude' | 'pin_positio
 type SpecialPlay = 'gimme' | 'mulligan' | 'provisional' | 'lay_up' | 'scramble';
 type MissDirection = 'long' | 'short' | 'left' | 'right';
 type ScoreLabel = 'eagle' | 'birdie' | 'par' | 'bogey' | 'double_bogey' | 'triple_plus';
-type SprintType = 'feature' | 'feedback' | 'infra' | 'bugfix' | 'research' | 'flow' | 'test-coverage';
+type SprintType = 'feature' | 'feedback' | 'infra' | 'bugfix' | 'research' | 'flow' | 'test-coverage' | 'audit';
 
 // ─── Record Types ───
 interface HazardHit { type: HazardType; description: string; gotcha_id?: string; }

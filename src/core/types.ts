@@ -28,7 +28,7 @@ export type MissDirection = 'long' | 'short' | 'left' | 'right';
 export type ScoreLabel = 'eagle' | 'birdie' | 'par' | 'bogey' | 'double_bogey' | 'triple_plus';
 
 /** Sprint type — teams can extend this with their own types */
-export type SprintType = 'feature' | 'feedback' | 'infra' | 'bugfix' | 'research' | 'flow' | 'test-coverage';
+export type SprintType = 'feature' | 'feedback' | 'infra' | 'bugfix' | 'research' | 'flow' | 'test-coverage' | 'audit';
 
 // --- Record Types ---
 

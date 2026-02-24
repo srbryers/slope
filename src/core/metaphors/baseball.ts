@@ -82,6 +82,7 @@ export const baseball: MetaphorDefinition = {
     research: 'Scouting',
     flow: 'Rally',
     'test-coverage': 'Batting Practice',
+    audit: 'Tape Review',
   },
 
   trainingTypes: {

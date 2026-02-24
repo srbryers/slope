@@ -30,7 +30,7 @@ function makeTestMetaphor(id: string, name: string): MetaphorDefinition {
     specialPlays: { gimme: 'G', mulligan: 'M', provisional: 'P', lay_up: 'LU', scramble: 'S' },
     missDirections: { long: 'L', short: 'S', left: 'Le', right: 'Ri' },
     scoreLabels: { eagle: 'E', birdie: 'B', par: 'P', bogey: 'Bo', double_bogey: 'DB', triple_plus: 'T+' },
-    sprintTypes: { feature: 'F', feedback: 'FB', infra: 'I', bugfix: 'BF', research: 'R', flow: 'Fl', 'test-coverage': 'TC' },
+    sprintTypes: { feature: 'F', feedback: 'FB', infra: 'I', bugfix: 'BF', research: 'R', flow: 'Fl', 'test-coverage': 'TC', audit: 'A' },
     trainingTypes: { driving_range: 'DR', chipping_practice: 'CP', putting_practice: 'PP', lessons: 'L' },
     nutrition: { hydration: 'H', diet: 'D', recovery: 'R', supplements: 'S', stretching: 'St' },
   };

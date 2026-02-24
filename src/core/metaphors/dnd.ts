@@ -82,6 +82,7 @@ export const dnd: MetaphorDefinition = {
     research: 'Investigation',
     flow: 'Combat',
     'test-coverage': 'Training Montage',
+    audit: 'Inspection',
   },
 
   trainingTypes: {

@@ -82,6 +82,7 @@ export const gaming: MetaphorDefinition = {
     research: 'Exploration',
     flow: 'Speedrun',
     'test-coverage': 'Training Arena',
+    audit: 'Code Review',
   },
 
   trainingTypes: {

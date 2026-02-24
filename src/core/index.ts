@@ -407,4 +407,4 @@ export type {
 } from './flows.js';
 
 // Built-in metaphors (auto-registers on import)
-export { golf, tennis, baseball, gaming, dnd, matrix } from './metaphors/index.js';
+export { golf, tennis, baseball, gaming, dnd, matrix, agile } from './metaphors/index.js';

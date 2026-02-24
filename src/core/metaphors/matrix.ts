@@ -82,6 +82,7 @@ export const matrix: MetaphorDefinition = {
     research: 'Recon',
     flow: 'Overclock',
     'test-coverage': 'Diagnostic',
+    audit: 'System Audit',
   },
 
   trainingTypes: {
