@@ -1,12 +1,13 @@
 ---
-generated_at: "2026-02-23T02:30:01.372Z"
-git_sha: "6791f2bc3a0e1f1c4d5d03efa4351b0dc968df64"
-sprint: 24
-source_files: 90
-test_files: 45
-packages: 4
-cli_commands: 26
-guards: 10
+generated_at: "2026-02-24T21:21:58.570Z"
+git_sha: "79bd854cf7dd0848b8bc132a5abb864ff4598e02"
+sprint: 29
+source_files: 0
+test_files: 0
+packages: 0
+cli_commands: 0
+guards: 13
+flows: 0
 ---
 
 # SLOPE Codebase Map
@@ -17,49 +18,6 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
 
 <!-- AUTO-GENERATED: START packages -->
 
-### `packages/cli`
-SLOPE CLI — Sprint Lifecycle & Operational Performance Engine
-- Source files: 47 | Test files: 12
-- Key modules:
-  - `config`
-  - `hooks-config`
-  - `loader`
-  - `metaphor` — CLI metaphor resolution
-  - `store`
-  - `template-generator` — SLOPE Template Generator
-
-### `packages/core`
-SLOPE — Sprint Lifecycle & Operational Performance Engine. Golf-metaphor sprint scoring for engineering teams.
-- Source files: 38 | Test files: 29
-- Key modules:
-  - `advisor` — --- Module-private constants ---
-  - `briefing` — --- Input types ---
-  - `builder` — --- Helpers ---
-  - `ci-signals` — SLOPE — CI/Test Signal Parser
-  - `config`
-  - `constants` — Maps ticket count ranges to par values
-  - `dashboard` — --- Dashboard Config ---
-  - `dispersion` — --- Helpers ---
-  - `escalation` — SLOPE — Escalation Rules
-  - `formatter` — --- Input types ---
-  - `guard` — SLOPE Guard Framework
-  - `handicap` — Compute par value from ticket count.
-  - `leaderboard` — A single entry in the team leaderboard
-  - `loader` — Load SLOPE scorecards from the configured directory.
-  - `metaphor` — SLOPE — Metaphor Engine
-  - ... and 14 more
-
-### `packages/mcp-tools`
-MCP server exposing SLOPE advisory tools — handicap, dispersion, club recommendation, briefing, and more.
-- Source files: 4 | Test files: 3
-- Key modules:
-  - `registry` — ─── Core Scoring Enums ───
-  - `sandbox` — SLOPE sandbox — runs agent-written JS in a node:vm context
-
-### `packages/store-sqlite`
-SQLite storage adapter for SLOPE — persistent sessions, claims, scorecards, and common issues.
-- Source files: 1 | Test files: 1
-
 <!-- AUTO-GENERATED: END packages -->
 
 ## API Surface (core)
@@ -68,121 +26,12 @@ Re-exports from `packages/core/src/index.ts`:
 
 <!-- AUTO-GENERATED: START api -->
 
-**SLOPE — Sprint Lifecycle & Operational Performance Engine:**
-**Types:**
-- `ClubSelection`, `ShotResult`, `HazardType`, `ConditionType`, `SpecialPlay`, `MissDirection`, `ScoreLabel`, `SprintType`, `HazardHit`, `ShotRecord`, `ConditionRecord`, `HoleStats`, `HoleScore`, `TrainingType`, `TrainingSession`, `NutritionCategory`, `NutritionEntry`, `NineteenthHole`, `GolfScorecard`, `AgentBreakdown`, `RollingStats`, `HandicapCard`, `DispersionReport`, `AreaReport`, `ExecutionTrace`, `ShotClassification`, `ClubRecommendation`, `TrainingRecommendation`, `ClaimScope`, `SprintClaim`, `SprintConflict`, `EventType`, `SlopeEvent`, `CIRunner`, `CISignal`, `PRPlatform`, `PRReviewDecision`, `PRSignal` (types)
-**Constants:**
-- `PAR_THRESHOLDS`, `SLOPE_FACTORS`, `SCORE_LABELS`, `TRAINING_TYPE_MAP`, `NUTRITION_CHECKLIST`
-**Handicap:**
-- `computePar`, `computeSlope`, `computeScoreLabel`, `computeHandicapCard`
-**Builder:**
-- `computeStatsFromShots`, `buildScorecard`, `buildAgentBreakdowns`
-- `ScorecardInput`, `AgentShotInput` (types)
-**Validation:**
-- `validateScorecard`
-- `ScorecardValidationError`, `ScorecardValidationWarning`, `ScorecardValidationResult` (types)
-**Dispersion:**
-- `computeDispersion`, `computeAreaPerformance`
-**Advisor:**
-- `recommendClub`, `classifyShot`, `classifyShotFromSignals`, `generateTrainingPlan`
-- `RecommendClubInput`, `TrainingPlanInput`, `CombinedSignals` (types)
-**Formatter:**
-- `formatSprintReview`, `formatAdvisorReport`
-- `ProjectStats`, `ProjectStatsDelta`, `ReviewMode`, `AdvisorReportInput` (types)
-**Briefing:**
-- `filterCommonIssues`, `extractHazardIndex`, `computeNutritionTrend`, `hazardBriefing`, `formatBriefing`
-- `RecurringPattern`, `CommonIssuesFile`, `SessionEntry`, `BriefingFilter`, `HazardEntry`, `NutritionTrend` (types)
-**Registry:**
-- `checkConflicts`
-- `SprintRegistry` (types)
-**Store:**
-- `SlopeStoreError`
-- `SlopeStore`, `SlopeSession`, `StoreErrorCode` (types)
-**Tournament Review:**
-- `buildTournamentReview`, `formatTournamentReview`
-- `TournamentReview`, `TournamentSprintEntry`, `TournamentScoring`, `TournamentStats`, `TournamentHazard` (types)
-**Roadmap:**
-- `validateRoadmap`, `computeCriticalPath`, `findParallelOpportunities`, `parseRoadmap`, `formatRoadmapSummary`, `formatStrategicContext`
-- `RoadmapDefinition`, `RoadmapSprint`, `RoadmapTicket`, `RoadmapPhase`, `RoadmapClub`, `RoadmapValidationResult`, `RoadmapValidationError`, `RoadmapValidationWarning`, `CriticalPathResult`, `ParallelGroup` (types)
-**Config:**
-- `SlopeConfig` (types)
-- `loadConfig`, `createConfig`, `resolveConfigPath`
-**Loader:**
-- `loadScorecards`, `detectLatestSprint`, `resolveCurrentSprint`
-**Metaphor:**
-- `registerMetaphor`, `getMetaphor`, `listMetaphors`, `hasMetaphor`, `validateMetaphor`
-- `MetaphorDefinition`, `MetaphorVocabulary`, `ClubTerms`, `ShotResultTerms`, `HazardTerms`, `ConditionTerms`, `SpecialPlayTerms`, `MissDirectionTerms`, `ScoreLabelTerms`, `SprintTypeTerms`, `TrainingTypeTerms`, `NutritionTerms` (types)
-**Event Pipeline:**
-- `clusterEvents`, `findPromotionCandidates`, `runPipeline`
-- `EventCluster`, `PromotionCandidate`, `PipelineResult` (types)
-**CI Signal Parser:**
-- `detectRunner`, `parseTestOutput`, `parseVitestOutput`, `parseJestOutput`
-**PR Signal Parser:**
-- `GH_PR_JSON_FIELDS`, `buildGhCommand`, `parsePRJson`, `emptyPRSignal`, `mergePRChecksWithCI`, `detectCheckRetries`
-**Guard Framework:**
-- `GUARD_DEFINITIONS`, `formatPreToolUseOutput`, `formatPostToolUseOutput`, `formatStopOutput`, `generateClaudeCodeHooksConfig`, `registerCustomGuard`, `getAllGuardDefinitions`, `getCustomGuard`, `clearCustomGuards`
-- `HookInput`, `PreToolUseOutput`, `PostToolUseOutput`, `StopOutput`, `GuardResult`, `GuardName`, `GuardDefinition`, `GuidanceConfig`, `CustomGuardDefinition`, `AnyGuardDefinition` (types)
-**Report:**
-- `buildReportData`, `generateHtmlReport`, `REPORT_CSS`, `escapeHtml`, `svgLine`, `svgRect`, `svgText`, `renderSummaryCards`, `renderHandicapTrendChart`, `renderDispersionChart`, `renderAreaPerformanceChart`, `renderNutritionChart`, `renderSprintTable`
-- `ReportData`, `SprintTrendEntry`, `NutritionTrendEntry` (types)
-**Dashboard:**
-- `DEFAULT_DASHBOARD_CONFIG`, `generateDashboardHtml`, `renderSprintDetail`, `renderSprintTimeline`, `generateDashboardScript`, `computeMissHeatmap`, `renderMissHeatmap`, `computeAreaHazards`, `renderAreaHazardOverlay`
-- `DashboardConfig`, `HeatmapCell`, `MissHeatmapData`, `AreaHazardEntry` (types)
-**Team Handicap:**
-- `extractRoleData`, `computeRoleHandicap`, `computeSwarmEfficiency`, `analyzeRoleCombinations`, `computeTeamHandicap`
-- `RoleHandicap`, `SwarmEfficiency`, `RoleCombinationStats`, `TeamHandicapCard` (types)
-**Roles:**
-- `registerRole`, `getRole`, `hasRole`, `listRoles`, `loadCustomRoles`, `generalist`, `backend`, `frontend`, `architect`, `devops`
-- `RoleDefinition` (types)
-**Escalation:**
-- `resolveEscalationConfig`, `detectEscalation`, `buildEscalationEvent`
-- `EscalationTrigger`, `EscalationSeverity`, `EscalationAction`, `EscalationConfig`, `EscalationResult` (types)
-**Standup (Communication Protocol):**
-- `generateStandup`, `formatStandup`, `parseStandup`, `extractRelevantHandoffs`
-- `StandupReport`, `HandoffEntry` (types)
-**Plugin System:**
-- `validatePluginManifest`, `discoverPlugins`, `loadPlugins`, `loadPluginMetaphors`, `loadPluginGuards`, `isPluginEnabled`
-- `PluginType`, `PluginManifest`, `DiscoveredPlugin`, `PluginLoadResult`, `PluginsConfig` (types)
-**Leaderboard (Multi-Developer):**
-- `buildLeaderboard`, `formatLeaderboard`, `renderLeaderboardHtml`
-- `LeaderboardEntry`, `Leaderboard` (types)
-**Player (Multi-Developer):**
-- `DEFAULT_PLAYER`, `extractPlayers`, `filterScorecardsByPlayer`, `computePlayerHandicaps`, `computePlayerHandicap`, `computeReporterSeverity`, `mergeHazardIndices`, `filterHazardsByVisibility`
-- `PlayerHandicap`, `ReporterSeverity` (types)
-**Built-in metaphors (auto-registers on import):**
-- `golf`, `tennis`, `baseball`, `gaming`, `dnd`, `matrix`
 <!-- AUTO-GENERATED: END api -->
 
 ## CLI Commands
 
 <!-- AUTO-GENERATED: START cli -->
 
-- `slope auto-card` — Build per-agent breakdowns by mapping commits to swarm sessions via branch.
-- `slope briefing`
-- `slope card`
-- `slope claim`
-- `slope classify`
-- `slope dashboard`
-- `slope distill`
-- `slope escalate`
-- `slope extract`
-- `slope guard` — Registry of guard handler implementations
-- `slope hook`
-- `slope init` — Detect platforms present in the project directory
-- `slope map` — ── Helpers ─────────────────────────────────────────────────────
-- `slope next`
-- `slope plan`
-- `slope plugin`
-- `slope release`
-- `slope report`
-- `slope review-state`
-- `slope review`
-- `slope roadmap` — --- Helpers ---
-- `slope session`
-- `slope standup`
-- `slope status`
-- `slope tournament`
-- `slope validate`
 <!-- AUTO-GENERATED: END cli -->
 
 ## Guard Definitions
@@ -201,33 +50,21 @@ Re-exports from `packages/core/src/index.ts`:
 | `push-nudge` | PostToolUse | Bash | Nudge to push after git commits when unpushed count or time is high |
 | `workflow-gate` | PreToolUse | ExitPlanMode | Block ExitPlanMode until review rounds are complete |
 | `review-tier` | PreToolUse | ExitPlanMode | Recommend review tier based on plan scope |
+| `version-check` | PreToolUse | Bash | Block push to main when package versions have not been bumped |
+| `stale-flows` | PreToolUse | Edit|Write | Warn when editing files belonging to a stale flow definition |
+| `next-action` | Stop | — | Suggest next actions before session end |
 <!-- AUTO-GENERATED: END guards -->
 
 ## MCP Tools
 
 <!-- AUTO-GENERATED: START mcp -->
 
-- `search`
-- `execute`
-- `session_status`
-- `acquire_claim`
-- `check_conflicts`
 <!-- AUTO-GENERATED: END mcp -->
 
 ## Test Inventory
 
 <!-- AUTO-GENERATED: START tests -->
 
-| Package | Test Files | Command |
-|---------|-----------|---------|
-| cli | 12 | `pnpm --filter @srbryers/cli test` |
-| core | 29 | `pnpm --filter @srbryers/core test` |
-| mcp-tools | 3 | `pnpm --filter @srbryers/mcp-tools test` |
-| store-sqlite | 1 | `pnpm --filter @srbryers/store-sqlite test` |
-
-**Total test files:** 45
-**Run all:** `pnpm -r test`
-**Typecheck:** `pnpm -r typecheck`
 <!-- AUTO-GENERATED: END tests -->
 
 ## Recent Sprint History
@@ -236,11 +73,11 @@ Re-exports from `packages/core/src/index.ts`:
 
 | Sprint | Theme | Tickets | Score |
 |--------|-------|---------|-------|
-| **20** | The Foursome | 4 | birdie |
-| **21** | Dogfooding Fixes | 4 | par |
-| **22** | Port CaddyStack Guards | 4 | par |
-| **23** | The Yardage Book: Codebase Map | 4 | par |
-| **24** | Review State Writer | 3 | par |
+| **25** | Hazard Severity Scoring | 4 | par |
+| **26** | The Fairway Map — User Flow Tracking | 5 | bogey |
+| **27** | The Clubhouse — Marketing Site & Design Tokens | 5 | par |
+| **28** | The Pro Tour — Content & Interactive Features | 4 | par |
+| **29** | Fix NPM Publishing Pipeline | 6 | par |
 <!-- AUTO-GENERATED: END history -->
 
 ## Known Gotchas
