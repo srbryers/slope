@@ -1,6 +1,6 @@
 ---
-generated_at: "2026-02-24T21:27:33.160Z"
-git_sha: "27acf2d7d09d8b9657a248b546285df845917e94"
+generated_at: "2026-02-24T21:37:22.095Z"
+git_sha: "38fd775bb8a8072e86f1b060a9e28d167c67cbf2"
 sprint: 29
 source_files: 98
 test_files: 50
@@ -68,7 +68,7 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
 
 ## API Surface (core)
 
-Re-exports from `packages/core/src/index.ts`:
+Re-exports from `src/core/index.ts`:
 
 <!-- AUTO-GENERATED: START api -->
 
