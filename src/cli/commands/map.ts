@@ -47,7 +47,6 @@ interface MapMetadata {
   sprint: number;
   source_files: number;
   test_files: number;
-  packages: number;
   cli_commands: number;
   guards: number;
   flows: number;
@@ -57,17 +56,14 @@ function gatherMetadata(cwd: string, config: SlopeConfig): MapMetadata {
   const gitSha = exec('git rev-parse HEAD', cwd);
   const latestSprint = detectLatestSprint(config, cwd);
 
-  // Count source and test files across all packages
-  const packagesDir = join(cwd, 'packages');
-  const { source, test } = countSourceFiles(packagesDir);
+  // Count source files in src/
+  const { source } = countSourceFiles(join(cwd, 'src'));
 
-  // Count packages
-  const pkgDirs = existsSync(packagesDir)
-    ? readdirSync(packagesDir, { withFileTypes: true }).filter(d => d.isDirectory()).length
-    : 0;
+  // Count test files in tests/
+  const { test: testFiles } = countSourceFiles(join(cwd, 'tests'));
 
   // Count CLI commands
-  const commandsDir = join(cwd, 'packages', 'cli', 'src', 'commands');
+  const commandsDir = join(cwd, 'src', 'cli', 'commands');
   const cliCommands = existsSync(commandsDir)
     ? readdirSync(commandsDir).filter(f => f.endsWith('.ts')).length
     : 0;
@@ -82,8 +78,7 @@ function gatherMetadata(cwd: string, config: SlopeConfig): MapMetadata {
     git_sha: gitSha,
     sprint: latestSprint,
     source_files: source,
-    test_files: test,
-    packages: pkgDirs,
+    test_files: testFiles,
     cli_commands: cliCommands,
     guards: GUARD_DEFINITIONS.length,
     flows: flowCount,
@@ -93,52 +88,40 @@ function gatherMetadata(cwd: string, config: SlopeConfig): MapMetadata {
 // ── Section Generators ──────────────────────────────────────────
 
 function generatePackageInventory(cwd: string): string {
-  const packagesDir = join(cwd, 'packages');
-  if (!existsSync(packagesDir)) return '';
+  const srcDir = join(cwd, 'src');
+  if (!existsSync(srcDir)) return '';
 
   const lines: string[] = [''];
 
-  const pkgs = readdirSync(packagesDir, { withFileTypes: true })
+  const subdirs = readdirSync(srcDir, { withFileTypes: true })
     .filter(d => d.isDirectory())
     .map(d => d.name)
     .sort();
 
-  for (const pkg of pkgs) {
-    const pkgDir = join(packagesDir, pkg);
-    const { source, test } = countSourceFiles(pkgDir);
+  for (const subdir of subdirs) {
+    const subSrcDir = join(srcDir, subdir);
+    const subTestDir = join(cwd, 'tests', subdir);
+    const { source } = countSourceFiles(subSrcDir);
+    const { test: testCount } = existsSync(subTestDir) ? countSourceFiles(subTestDir) : { test: 0 };
 
-    // Read package.json for description
-    const pkgJsonPath = join(pkgDir, 'package.json');
-    let description = '';
-    if (existsSync(pkgJsonPath)) {
-      try {
-        const pkgJson = JSON.parse(readFileSync(pkgJsonPath, 'utf8'));
-        description = pkgJson.description || '';
-      } catch { /* skip */ }
-    }
+    lines.push(`### \`src/${subdir}\``);
+    lines.push(`- Source files: ${source} | Test files: ${testCount}`);
 
-    lines.push(`### \`packages/${pkg}\``);
-    if (description) lines.push(`${description}`);
-    lines.push(`- Source files: ${source} | Test files: ${test}`);
+    // List key modules (top-level .ts files in src/<subdir>/)
+    const modules = readdirSync(subSrcDir)
+      .filter(f => f.endsWith('.ts') && !f.endsWith('.test.ts') && !f.endsWith('.spec.ts') && f !== 'index.ts')
+      .sort();
 
-    // List key modules (src/*.ts top-level files)
-    const srcDir = join(pkgDir, 'src');
-    if (existsSync(srcDir)) {
-      const modules = readdirSync(srcDir)
-        .filter(f => f.endsWith('.ts') && !f.endsWith('.test.ts') && !f.endsWith('.spec.ts') && f !== 'index.ts')
-        .sort();
-
-      if (modules.length > 0) {
-        lines.push('- Key modules:');
-        for (const mod of modules.slice(0, 15)) {
-          const modPath = join(srcDir, mod);
-          const firstLine = readFirstComment(modPath);
-          const label = mod.replace('.ts', '');
-          lines.push(`  - \`${label}\`${firstLine ? ` — ${firstLine}` : ''}`);
-        }
-        if (modules.length > 15) {
-          lines.push(`  - ... and ${modules.length - 15} more`);
-        }
+    if (modules.length > 0) {
+      lines.push('- Key modules:');
+      for (const mod of modules.slice(0, 15)) {
+        const modPath = join(subSrcDir, mod);
+        const firstLine = readFirstComment(modPath);
+        const label = mod.replace('.ts', '');
+        lines.push(`  - \`${label}\`${firstLine ? ` — ${firstLine}` : ''}`);
+      }
+      if (modules.length > 15) {
+        lines.push(`  - ... and ${modules.length - 15} more`);
       }
     }
 
@@ -161,7 +144,7 @@ function readFirstComment(filePath: string): string {
 }
 
 function generateApiSurface(cwd: string): string {
-  const indexPath = join(cwd, 'packages', 'core', 'src', 'index.ts');
+  const indexPath = join(cwd, 'src', 'core', 'index.ts');
   if (!existsSync(indexPath)) return '';
 
   const content = readFileSync(indexPath, 'utf8');
@@ -202,7 +185,7 @@ function generateApiSurface(cwd: string): string {
 }
 
 function generateCliCommands(cwd: string): string {
-  const commandsDir = join(cwd, 'packages', 'cli', 'src', 'commands');
+  const commandsDir = join(cwd, 'src', 'cli', 'commands');
   if (!existsSync(commandsDir)) return '';
 
   const lines: string[] = [''];
@@ -236,7 +219,7 @@ function generateGuardsList(): string {
 
 function generateMcpTools(cwd: string): string {
   // Read SLOPE_MCP_TOOL_NAMES from the mcp-tools package source
-  const mcpIndexPath = join(cwd, 'packages', 'mcp-tools', 'src', 'index.ts');
+  const mcpIndexPath = join(cwd, 'src', 'mcp', 'index.ts');
   if (!existsSync(mcpIndexPath)) return '';
 
   const content = readFileSync(mcpIndexPath, 'utf8');
@@ -257,25 +240,25 @@ function generateMcpTools(cwd: string): string {
 }
 
 function generateTestInventory(cwd: string): string {
-  const packagesDir = join(cwd, 'packages');
-  if (!existsSync(packagesDir)) return '';
+  const testsDir = join(cwd, 'tests');
+  if (!existsSync(testsDir)) return '';
 
   const lines: string[] = [''];
 
-  lines.push('| Package | Test Files | Command |');
-  lines.push('|---------|-----------|---------|');
+  lines.push('| Directory | Test Files | Command |');
+  lines.push('|-----------|-----------|---------|');
 
-  const pkgs = readdirSync(packagesDir, { withFileTypes: true })
+  const subdirs = readdirSync(testsDir, { withFileTypes: true })
     .filter(d => d.isDirectory())
     .map(d => d.name)
     .sort();
 
   let totalTests = 0;
-  for (const pkg of pkgs) {
-    const { test } = countSourceFiles(join(packagesDir, pkg));
-    totalTests += test;
-    if (test > 0) {
-      lines.push(`| ${pkg} | ${test} | \`pnpm --filter @slope-dev/slope test\` |`);
+  for (const subdir of subdirs) {
+    const { test: testCount } = countSourceFiles(join(testsDir, subdir));
+    totalTests += testCount;
+    if (testCount > 0) {
+      lines.push(`| tests/${subdir} | ${testCount} | \`pnpm test\` |`);
     }
   }
 
@@ -401,7 +384,6 @@ function updateMetadataBlock(content: string, meta: MapMetadata): string {
       `sprint: ${meta.sprint}`,
       `source_files: ${meta.source_files}`,
       `test_files: ${meta.test_files}`,
-      `packages: ${meta.packages}`,
       `cli_commands: ${meta.cli_commands}`,
       `guards: ${meta.guards}`,
       `flows: ${meta.flows}`,
@@ -420,7 +402,6 @@ git_sha: "${meta.git_sha}"
 sprint: ${meta.sprint}
 source_files: ${meta.source_files}
 test_files: ${meta.test_files}
-packages: ${meta.packages}
 cli_commands: ${meta.cli_commands}
 guards: ${meta.guards}
 flows: ${meta.flows}
@@ -438,7 +419,7 @@ ${generatePackageInventory(cwd)}
 
 ## API Surface (core)
 
-Re-exports from \`packages/core/src/index.ts\`:
+Re-exports from \`src/core/index.ts\`:
 
 <!-- AUTO-GENERATED: START api -->
 ${generateApiSurface(cwd)}
@@ -515,8 +496,7 @@ export function parseMapMetadata(content: string): Record<string, string> {
 export function runStalenessCheck(cwd: string, config: SlopeConfig, mapContent: string): CheckResult[] {
   const results: CheckResult[] = [];
   const meta = parseMapMetadata(mapContent);
-  const packagesDir = join(cwd, 'packages');
-  const { source: currentSource } = countSourceFiles(packagesDir);
+  const { source: currentSource } = countSourceFiles(join(cwd, 'src'));
 
   // 1. Source file count drift
   const mapFiles = parseInt(meta.source_files || '0', 10);
@@ -558,7 +538,7 @@ export function runStalenessCheck(cwd: string, config: SlopeConfig, mapContent: 
   }
 
   // 4. Dead file references
-  const fileRefs = mapContent.matchAll(/`(packages\/[^`\s]+\.(?:ts|tsx|json|md))`/g);
+  const fileRefs = mapContent.matchAll(/`((?:src|tests)\/[^`\s]+\.(?:ts|tsx|json|md))`/g);
   const deadRefs: string[] = [];
   for (const m of fileRefs) {
     const refPath = m[1];
@@ -664,7 +644,7 @@ export async function mapCommand(args: string[]): Promise<void> {
   const lineCount = finalContent.split('\n').length;
   const sizeKb = (Buffer.byteLength(finalContent, 'utf8') / 1024).toFixed(1);
   console.log(`  ${lineCount} lines, ${sizeKb}KB`);
-  console.log(`  ${meta.source_files} source files, ${meta.test_files} test files, ${meta.packages} packages`);
+  console.log(`  ${meta.source_files} source files, ${meta.test_files} test files`);
   console.log(`  ${meta.cli_commands} CLI commands, ${meta.guards} guards`);
   console.log(`\nMap written to ${relative(cwd, outputPath)}\n`);
 }
