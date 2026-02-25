@@ -380,8 +380,88 @@ function installForProvider(cwd: string, provider: Provider, metaphor: MetaphorD
   }
 }
 
+async function runInteractiveInit(cwd: string, args: string[]): Promise<void> {
+  const { createInterface } = await import('node:readline');
+  const { initFromInterview } = await import('../../core/interview.js');
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+
+  const ask = (question: string): Promise<string> =>
+    new Promise(resolve => rl.question(question, answer => resolve(answer.trim())));
+
+  try {
+    const projectName = await ask('Project name: ');
+    if (!projectName) {
+      console.error('Project name is required');
+      process.exit(1);
+    }
+
+    const repoUrl = await ask('GitHub repo URL (optional): ') || undefined;
+    const metaphor = await ask('Metaphor [golf]: ') || undefined;
+    const sprintStr = await ask('Current sprint number [1]: ');
+    const currentSprint = sprintStr ? parseInt(sprintStr, 10) : undefined;
+
+    const teamStr = await ask('Team members (slug:name, comma-separated, optional): ');
+    let teamMembers: Record<string, string> | undefined;
+    if (teamStr) {
+      teamMembers = {};
+      for (const pair of teamStr.split(',')) {
+        const [slug, ...nameParts] = pair.trim().split(':');
+        if (slug && nameParts.length > 0) {
+          teamMembers[slug.trim()] = nameParts.join(':').trim();
+        }
+      }
+    }
+
+    const vision = await ask('Project vision (optional): ') || undefined;
+
+    console.log('\nInitializing SLOPE project...\n');
+
+    const result = await initFromInterview(cwd, {
+      projectName,
+      repoUrl,
+      metaphor,
+      currentSprint,
+      teamMembers,
+      vision,
+    });
+
+    console.log(`  Config: ${result.configPath}`);
+    for (const f of result.filesCreated.slice(1)) {
+      console.log(`  Created: ${f}`);
+    }
+
+    // Handle store setup (infrastructure concern — CLI only)
+    const storeArg = args.find(a => a.startsWith('--store='));
+    const storeType = storeArg?.slice('--store='.length) ?? 'sqlite';
+
+    if (storeType === 'sqlite') {
+      const dbPath = join(cwd, '.slope', 'slope.db');
+      if (!existsSync(dbPath)) {
+        try {
+          const { createStore } = await import('../../store/index.js');
+          const store = createStore({ storePath: '.slope/slope.db', cwd });
+          store.close();
+          console.log(`  Created ${dbPath}`);
+        } catch (err) {
+          console.error(`  Warning: Could not create SQLite store: ${(err as Error).message}`);
+        }
+      }
+    }
+
+    // Continue with provider installation
+    return;
+  } finally {
+    rl.close();
+  }
+}
+
 export async function initCommand(args: string[]): Promise<void> {
   const cwd = process.cwd();
+
+  // Interactive mode: prompt for project details
+  if (args.includes('--interactive') || args.includes('-i')) {
+    await runInteractiveInit(cwd, args);
+  }
 
   // Determine which providers to install
   let providers = detectProvidersFromArgs(args);
