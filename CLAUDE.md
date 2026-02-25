@@ -10,9 +10,21 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
 - `packages/mcp-tools` — code-mode MCP server (search + execute + session/claim tools) (v1.5.0)
 
 ## Commands
-- `pnpm -r build` — build all packages
-- `pnpm -r test` — run all tests (core: 780, store-sqlite: 36, cli: 190, mcp-tools: 65)
-- `pnpm -r typecheck` — type check all packages
+- `pnpm build` — build
+- `pnpm test` — run all tests (55 files, 1278 tests; PG store skipped without env var)
+- `pnpm typecheck` — type check
+- `pnpm test:pg` — run PostgreSQL store tests (requires local PG, see below)
+
+## PostgreSQL Store Tests
+The `store-pg` tests require a running PostgreSQL instance. They skip automatically when `SLOPE_TEST_PG_URL` is unset.
+
+**Local (Docker):**
+```sh
+docker run -d --name slope-pg -e POSTGRES_PASSWORD=slope -e POSTGRES_DB=slope_test -p 5432:5432 postgres:16
+pnpm test:pg
+```
+
+**CI:** GitHub Actions runs a `postgres:16` service container and sets `SLOPE_TEST_PG_URL` automatically — PG store tests always run in CI.
 
 ## MCP Tools
 The SLOPE MCP server is configured in `.mcp.json` (local build).

@@ -9,6 +9,21 @@ on:
 jobs:
   ci:
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: slope
+          POSTGRES_DB: slope_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - uses: actions/checkout@v4
 
@@ -28,6 +43,8 @@ jobs:
 
       - name: Test
         run: pnpm test
+        env:
+          SLOPE_TEST_PG_URL: postgresql://postgres:slope@localhost:5432/slope_test
 
       - name: Typecheck
         run: pnpm typecheck

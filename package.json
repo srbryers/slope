@@ -26,6 +26,7 @@
     "prepare": "tsc",
     "build": "tsc",
     "test": "vitest run",
+    "test:pg": "SLOPE_TEST_PG_URL=postgresql://postgres:slope@localhost:5432/slope_test vitest run tests/store-pg/",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "pnpm run build",
     "version:bump": "node scripts/version-bump.mjs"
