@@ -347,10 +347,13 @@ export {
   formatStandup,
   parseStandup,
   extractRelevantHandoffs,
+  aggregateStandups,
+  formatTeamStandup,
 } from './standup.js';
 export type {
   StandupReport,
   HandoffEntry,
+  TeamStandup,
 } from './standup.js';
 
 // Plugin System
@@ -405,6 +408,49 @@ export type {
   FlowValidationResult,
   FlowStalenessResult,
 } from './flows.js';
+
+// Interview (Init)
+export {
+  validateInitInput,
+  initFromInterview,
+} from './interview.js';
+export type {
+  InitInput,
+  InitResult,
+} from './interview.js';
+
+// Project Registry (Multi-Project)
+export { FileProjectRegistry } from './project-registry.js';
+export type { ProjectRegistry } from './project-registry.js';
+
+// GitHub (Remote Git Analysis)
+export {
+  createGitHubClient,
+  parseRepoUrl,
+  GitHubApiError,
+} from './github.js';
+export type {
+  GitHubClient,
+  GitHubCommit,
+  GitHubTreeEntry,
+  GitHubErrorCode,
+} from './github.js';
+
+// Webhooks (CI Integration)
+export {
+  validateGitHubWebhookSignature,
+  handleCheckRunWebhook,
+  handleWorkflowRunWebhook,
+} from './webhooks.js';
+export type { WebhookResult } from './webhooks.js';
+
+// Event Ingestion
+export {
+  validateEventPayload,
+  ingestEvents,
+  createEventHandler,
+} from './event-ingestion.js';
+export type { EventIngestionResult } from './event-ingestion.js';
 
 // Built-in metaphors (auto-registers on import)
 export { golf, tennis, baseball, gaming, dnd, matrix, agile } from './metaphors/index.js';
