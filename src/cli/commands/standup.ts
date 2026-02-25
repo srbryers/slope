@@ -4,6 +4,8 @@ import {
   formatStandup,
   parseStandup,
   extractRelevantHandoffs,
+  aggregateStandups,
+  formatTeamStandup,
 } from '../../core/index.js';
 import type { SlopeEvent, SprintClaim, StandupReport } from '../../core/index.js';
 import { loadConfig } from '../config.js';
@@ -19,6 +21,8 @@ export async function standupCommand(args: string[]): Promise<void> {
   let roleId: string | undefined;
   let sprintNumber: number | undefined;
 
+  let aggregate = false;
+
   for (const arg of args) {
     if (arg.startsWith('--session=')) {
       sessionId = arg.slice('--session='.length).trim();
@@ -30,13 +34,44 @@ export async function standupCommand(args: string[]): Promise<void> {
       roleId = arg.slice('--role='.length).trim();
     } else if (arg.startsWith('--sprint=')) {
       sprintNumber = parseInt(arg.slice('--sprint='.length), 10);
+    } else if (arg === '--aggregate') {
+      aggregate = true;
     }
   }
 
   const store = await resolveStore(cwd);
 
   try {
-    if (ingestPath) {
+    if (aggregate) {
+      // Aggregate mode: load all standup events for current sprint
+      const sprint = sprintNumber ?? config.currentSprint ?? 1;
+      const events = await store.getEventsBySprint(sprint);
+
+      // Filter to standup events and parse them
+      const standupEvents = events.filter(e => e.type === 'standup');
+      const standupReports: StandupReport[] = [];
+
+      for (const e of standupEvents) {
+        const report = parseStandup(e.data);
+        if (report) {
+          standupReports.push(report);
+        }
+      }
+
+      if (standupReports.length === 0) {
+        console.log(`No standup reports found for sprint ${sprint}`);
+        return;
+      }
+
+      const teamStandup = aggregateStandups(standupReports);
+      console.log('');
+      console.log(formatTeamStandup(teamStandup));
+
+      if (args.includes('--json')) {
+        console.log('---');
+        console.log(JSON.stringify(teamStandup, null, 2));
+      }
+    } else if (ingestPath) {
       // Ingest mode: read another agent's standup and surface handoffs
       let raw: string;
       if (ingestPath === '-') {

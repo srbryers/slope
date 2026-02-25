@@ -4,8 +4,10 @@ import {
   formatStandup,
   parseStandup,
   extractRelevantHandoffs,
+  aggregateStandups,
+  formatTeamStandup,
 } from '../../src/core/standup.js';
-import type { StandupReport, HandoffEntry } from '../../src/core/standup.js';
+import type { StandupReport, HandoffEntry, TeamStandup } from '../../src/core/standup.js';
 import type { SlopeEvent, SprintClaim } from '../../src/core/types.js';
 
 // --- Helpers ---
@@ -332,5 +334,205 @@ describe('extractRelevantHandoffs', () => {
   it('returns empty for standup with no handoffs', () => {
     const empty: StandupReport = { ...standup, handoffs: [] };
     expect(extractRelevantHandoffs(empty, 'frontend')).toEqual([]);
+  });
+});
+
+// --- aggregateStandups ---
+
+function makeStandup(overrides: Partial<StandupReport>): StandupReport {
+  return {
+    sessionId: 'sess-1',
+    status: 'working',
+    progress: 'In progress',
+    blockers: [],
+    decisions: [],
+    handoffs: [],
+    timestamp: '2026-02-22T00:00:00Z',
+    ...overrides,
+  };
+}
+
+describe('aggregateStandups', () => {
+  it('aggregates empty list', () => {
+    const result = aggregateStandups([]);
+    expect(result.agents).toEqual([]);
+    expect(result.summary).toEqual({ working: 0, blocked: 0, complete: 0 });
+    expect(result.status).toBe('complete');
+  });
+
+  it('counts statuses correctly', () => {
+    const result = aggregateStandups([
+      makeStandup({ sessionId: 's1', status: 'working' }),
+      makeStandup({ sessionId: 's2', status: 'blocked' }),
+      makeStandup({ sessionId: 's3', status: 'complete' }),
+      makeStandup({ sessionId: 's4', status: 'working' }),
+    ]);
+
+    expect(result.summary).toEqual({ working: 2, blocked: 1, complete: 1 });
+  });
+
+  it('overall status: blocked wins over working', () => {
+    const result = aggregateStandups([
+      makeStandup({ status: 'working' }),
+      makeStandup({ sessionId: 's2', status: 'blocked' }),
+    ]);
+    expect(result.status).toBe('blocked');
+  });
+
+  it('overall status: working wins over complete', () => {
+    const result = aggregateStandups([
+      makeStandup({ status: 'complete' }),
+      makeStandup({ sessionId: 's2', status: 'working' }),
+    ]);
+    expect(result.status).toBe('working');
+  });
+
+  it('overall status: complete when all complete', () => {
+    const result = aggregateStandups([
+      makeStandup({ status: 'complete' }),
+      makeStandup({ sessionId: 's2', status: 'complete' }),
+    ]);
+    expect(result.status).toBe('complete');
+  });
+
+  it('collects blockers with agent attribution', () => {
+    const result = aggregateStandups([
+      makeStandup({ agent_role: 'backend', blockers: ['DB down', 'API timeout'] }),
+      makeStandup({ sessionId: 's2', agent_role: 'frontend', blockers: ['CSS broken'] }),
+    ]);
+
+    expect(result.blockers).toHaveLength(3);
+    expect(result.blockers[0]).toEqual({ agent: 'backend', blocker: 'DB down' });
+    expect(result.blockers[2]).toEqual({ agent: 'frontend', blocker: 'CSS broken' });
+  });
+
+  it('uses sessionId as agent label when no role', () => {
+    const result = aggregateStandups([
+      makeStandup({ sessionId: 'my-session', blockers: ['test'] }),
+    ]);
+
+    expect(result.blockers[0].agent).toBe('my-session');
+  });
+
+  it('collects decisions with agent attribution', () => {
+    const result = aggregateStandups([
+      makeStandup({ agent_role: 'backend', decisions: ['Use pg'] }),
+      makeStandup({ sessionId: 's2', agent_role: 'frontend', decisions: ['Use React', 'Add Tailwind'] }),
+    ]);
+
+    expect(result.decisions).toHaveLength(3);
+  });
+
+  it('deduplicates handoffs by target+description', () => {
+    const result = aggregateStandups([
+      makeStandup({
+        handoffs: [
+          { target: 'src/core', description: 'Types updated' },
+          { target: 'src/cli', description: 'New command' },
+        ],
+      }),
+      makeStandup({
+        sessionId: 's2',
+        handoffs: [
+          { target: 'src/core', description: 'Types updated' }, // duplicate
+          { target: 'src/store', description: 'Schema changed' },
+        ],
+      }),
+    ]);
+
+    expect(result.handoffs).toHaveLength(3);
+    expect(result.handoffs.map(h => h.target)).toEqual(['src/core', 'src/cli', 'src/store']);
+  });
+
+  it('detects conflicts when agents report different statuses on same ticket', () => {
+    const result = aggregateStandups([
+      makeStandup({ sessionId: 's1', agent_role: 'backend', ticketKey: 'T-1', status: 'complete' }),
+      makeStandup({ sessionId: 's2', agent_role: 'frontend', ticketKey: 'T-1', status: 'blocked' }),
+    ]);
+
+    expect(result.conflicts).toHaveLength(1);
+    expect(result.conflicts[0].agents).toEqual(['backend', 'frontend']);
+    expect(result.conflicts[0].description).toContain('T-1');
+    expect(result.conflicts[0].description).toContain('conflicting statuses');
+  });
+
+  it('no conflicts when agents report same status on same ticket', () => {
+    const result = aggregateStandups([
+      makeStandup({ sessionId: 's1', ticketKey: 'T-1', status: 'working' }),
+      makeStandup({ sessionId: 's2', ticketKey: 'T-1', status: 'working' }),
+    ]);
+
+    expect(result.conflicts).toEqual([]);
+  });
+
+  it('no conflicts when agents work on different tickets', () => {
+    const result = aggregateStandups([
+      makeStandup({ sessionId: 's1', ticketKey: 'T-1', status: 'complete' }),
+      makeStandup({ sessionId: 's2', ticketKey: 'T-2', status: 'blocked' }),
+    ]);
+
+    expect(result.conflicts).toEqual([]);
+  });
+
+  it('sorts agents by timestamp', () => {
+    const result = aggregateStandups([
+      makeStandup({ sessionId: 's2', timestamp: '2026-02-22T02:00:00Z' }),
+      makeStandup({ sessionId: 's1', timestamp: '2026-02-22T01:00:00Z' }),
+      makeStandup({ sessionId: 's3', timestamp: '2026-02-22T03:00:00Z' }),
+    ]);
+
+    expect(result.agents.map(a => a.sessionId)).toEqual(['s1', 's2', 's3']);
+  });
+});
+
+// --- formatTeamStandup ---
+
+describe('formatTeamStandup', () => {
+  it('formats a team standup with all sections', () => {
+    const teamStandup: TeamStandup = {
+      timestamp: '2026-02-22T00:00:00Z',
+      agents: [
+        makeStandup({ sessionId: 's1', agent_role: 'backend', status: 'blocked' }),
+        makeStandup({ sessionId: 's2', agent_role: 'frontend', status: 'working' }),
+      ],
+      status: 'blocked',
+      summary: { working: 1, blocked: 1, complete: 0 },
+      blockers: [{ agent: 'backend', blocker: 'DB down' }],
+      decisions: [{ agent: 'frontend', decision: 'Use React' }],
+      handoffs: [{ target: 'src/core', description: 'Types updated' }],
+      conflicts: [{ agents: ['backend', 'frontend'], description: 'Ticket T-1 conflict' }],
+    };
+
+    const output = formatTeamStandup(teamStandup);
+    expect(output).toContain('# Team Standup [BLOCKED]');
+    expect(output).toContain('Agents:** 2');
+    expect(output).toContain('## Conflicts');
+    expect(output).toContain('Ticket T-1 conflict');
+    expect(output).toContain('## Blockers');
+    expect(output).toContain('**backend**: DB down');
+    expect(output).toContain('## Decisions');
+    expect(output).toContain('## Handoffs');
+    expect(output).toContain('## Agent Reports');
+  });
+
+  it('omits empty sections', () => {
+    const teamStandup: TeamStandup = {
+      timestamp: '2026-02-22T00:00:00Z',
+      agents: [makeStandup({ status: 'complete' })],
+      status: 'complete',
+      summary: { working: 0, blocked: 0, complete: 1 },
+      blockers: [],
+      decisions: [],
+      handoffs: [],
+      conflicts: [],
+    };
+
+    const output = formatTeamStandup(teamStandup);
+    expect(output).toContain('[DONE]');
+    expect(output).not.toContain('## Conflicts');
+    expect(output).not.toContain('## Blockers');
+    expect(output).not.toContain('## Decisions');
+    expect(output).not.toContain('## Handoffs');
+    expect(output).toContain('## Agent Reports');
   });
 });
