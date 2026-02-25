@@ -44,6 +44,12 @@ export interface SlopeConfig {
     players?: Record<string, string>;
     defaultPlayer?: string;
   };
+  projectId?: string;
+  projectName?: string;
+  postgres?: {
+    connectionString: string;
+    projectId?: string;
+  };
 }
 
 const DEFAULT_CONFIG: SlopeConfig = {
