@@ -1,9 +1,9 @@
 ---
-generated_at: "2026-02-24T21:37:22.095Z"
-git_sha: "38fd775bb8a8072e86f1b060a9e28d167c67cbf2"
+generated_at: "2026-02-25T12:41:40.041Z"
+git_sha: "0d7fa0cda68257e57cece099124a0076fd09dfcd"
 sprint: 29
-source_files: 98
-test_files: 50
+source_files: 104
+test_files: 56
 cli_commands: 27
 guards: 13
 flows: 0
@@ -28,7 +28,7 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
   - `template-generator` — SLOPE Template Generator
 
 ### `src/core`
-- Source files: 39 | Test files: 30
+- Source files: 44 | Test files: 35
 - Key modules:
   - `advisor` — --- Module-private constants ---
   - `briefing` — --- Input types ---
@@ -39,13 +39,13 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
   - `dashboard` — --- Dashboard Config ---
   - `dispersion` — --- Helpers ---
   - `escalation` — SLOPE — Escalation Rules
+  - `event-ingestion` — SLOPE — Real-Time Event Ingestion
   - `flows` — Flow tracking — map user-facing workflows to code paths.
   - `formatter` — --- Input types ---
+  - `github` — SLOPE — Remote Git Analysis
   - `guard` — SLOPE Guard Framework
   - `handicap` — Compute par value from ticket count.
-  - `leaderboard` — A single entry in the team leaderboard
-  - `loader` — Load SLOPE scorecards from the configured directory.
-  - ... and 15 more
+  - ... and 20 more
 
 ### `src/mcp`
 - Source files: 3 | Test files: 4
@@ -54,6 +54,9 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
   - `sandbox` — SLOPE sandbox — runs agent-written JS in a node:vm context
 
 ### `src/store`
+- Source files: 1 | Test files: 1
+
+### `src/store-pg`
 - Source files: 1 | Test files: 1
 
 ### `src/tokens`
@@ -142,8 +145,8 @@ Re-exports from `src/core/index.ts`:
 - `resolveEscalationConfig`, `detectEscalation`, `buildEscalationEvent`
 - `EscalationTrigger`, `EscalationSeverity`, `EscalationAction`, `EscalationConfig`, `EscalationResult` (types)
 **Standup (Communication Protocol):**
-- `generateStandup`, `formatStandup`, `parseStandup`, `extractRelevantHandoffs`
-- `StandupReport`, `HandoffEntry` (types)
+- `generateStandup`, `formatStandup`, `parseStandup`, `extractRelevantHandoffs`, `aggregateStandups`, `formatTeamStandup`
+- `StandupReport`, `HandoffEntry`, `TeamStandup` (types)
 **Plugin System:**
 - `validatePluginManifest`, `discoverPlugins`, `loadPlugins`, `loadPluginMetaphors`, `loadPluginGuards`, `isPluginEnabled`
 - `PluginType`, `PluginManifest`, `DiscoveredPlugin`, `PluginLoadResult`, `PluginsConfig` (types)
@@ -156,6 +159,21 @@ Re-exports from `src/core/index.ts`:
 **Flows:**
 - `parseFlows`, `validateFlows`, `checkFlowStaleness`, `loadFlows`
 - `FlowStep`, `FlowDefinition`, `FlowsFile`, `FlowValidationResult`, `FlowStalenessResult` (types)
+**Interview (Init):**
+- `validateInitInput`, `initFromInterview`
+- `InitInput`, `InitResult` (types)
+**Project Registry (Multi-Project):**
+- `FileProjectRegistry`
+- `ProjectRegistry` (types)
+**GitHub (Remote Git Analysis):**
+- `createGitHubClient`, `parseRepoUrl`, `GitHubApiError`
+- `GitHubClient`, `GitHubCommit`, `GitHubTreeEntry`, `GitHubErrorCode` (types)
+**Webhooks (CI Integration):**
+- `validateGitHubWebhookSignature`, `handleCheckRunWebhook`, `handleWorkflowRunWebhook`
+- `WebhookResult` (types)
+**Event Ingestion:**
+- `validateEventPayload`, `ingestEvents`, `createEventHandler`
+- `EventIngestionResult` (types)
 **Built-in metaphors (auto-registers on import):**
 - `golf`, `tennis`, `baseball`, `gaming`, `dnd`, `matrix`, `agile`
 <!-- AUTO-GENERATED: END api -->
@@ -232,12 +250,13 @@ Re-exports from `src/core/index.ts`:
 | Directory | Test Files | Command |
 |-----------|-----------|---------|
 | tests/cli | 14 | `pnpm test` |
-| tests/core | 30 | `pnpm test` |
+| tests/core | 35 | `pnpm test` |
 | tests/mcp | 4 | `pnpm test` |
 | tests/store | 1 | `pnpm test` |
+| tests/store-pg | 1 | `pnpm test` |
 | tests/tokens | 1 | `pnpm test` |
 
-**Total test files:** 50
+**Total test files:** 56
 **Run all:** `pnpm -r test`
 **Typecheck:** `pnpm -r typecheck`
 <!-- AUTO-GENERATED: END tests -->
