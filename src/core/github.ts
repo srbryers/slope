@@ -71,9 +71,9 @@ async function githubFetch(
     throw new GitHubApiError('NETWORK', `Network error: ${(err as Error).message}`);
   }
 
-  // Check rate limiting
-  const remaining = response.headers.get('X-RateLimit-Remaining');
-  if (remaining !== null && parseInt(remaining, 10) === 0) {
+  // Check rate limiting — only reject on actual 429, not on remaining=0 header
+  // (remaining=0 means "this was your last allowed request", the response is still valid)
+  if (response.status === 429) {
     const resetHeader = response.headers.get('X-RateLimit-Reset');
     const retryAfter = resetHeader ? parseInt(resetHeader, 10) - Math.floor(Date.now() / 1000) : undefined;
     throw new GitHubApiError('RATE_LIMITED', 'GitHub API rate limit exceeded', retryAfter);

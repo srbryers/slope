@@ -458,9 +458,11 @@ async function runInteractiveInit(cwd: string, args: string[]): Promise<void> {
 export async function initCommand(args: string[]): Promise<void> {
   const cwd = process.cwd();
 
-  // Interactive mode: prompt for project details
+  // Interactive mode: prompt for project details, then exit
+  // (do not fall through to non-interactive path which would overwrite the config)
   if (args.includes('--interactive') || args.includes('-i')) {
     await runInteractiveInit(cwd, args);
+    return;
   }
 
   // Determine which providers to install

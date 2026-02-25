@@ -235,10 +235,11 @@ describe('createGitHubClient', () => {
         .rejects.toThrow(GitHubApiError);
     });
 
-    it('throws RATE_LIMITED when remaining is 0', async () => {
+    it('throws RATE_LIMITED on HTTP 429', async () => {
       vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
-        ok: true,
-        status: 200,
+        ok: false,
+        status: 429,
+        statusText: 'Too Many Requests',
         headers: new Headers({
           'X-RateLimit-Remaining': '0',
           'X-RateLimit-Reset': String(Math.floor(Date.now() / 1000) + 60),
@@ -248,6 +249,22 @@ describe('createGitHubClient', () => {
       const client = createGitHubClient('test-token');
       await expect(client.listCommits('acme', 'repo'))
         .rejects.toThrow(GitHubApiError);
+    });
+
+    it('does not throw when remaining is 0 but response is 200', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers({
+          'X-RateLimit-Remaining': '0',
+          Link: '',
+        }),
+        json: async () => [],
+      } as unknown as Response);
+
+      const client = createGitHubClient('test-token');
+      const result = await client.listCommits('acme', 'repo');
+      expect(result).toEqual([]);
     });
 
     it('throws NETWORK on fetch failure', async () => {

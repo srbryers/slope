@@ -134,13 +134,16 @@ export class PostgresSlopeStore implements SlopeStore {
     this.projectId = opts.projectId ?? 'default';
   }
 
-  /** Run schema migrations with advisory lock for concurrency safety */
+  /** Run schema migrations with transaction-scoped advisory lock for concurrency safety */
   async migrate(): Promise<void> {
     if (this.migrated) return;
 
     const client = await this.pool.connect();
     try {
-      await client.query(`SELECT pg_advisory_lock(${MIGRATION_LOCK_ID})`);
+      // Use transaction-scoped advisory lock — auto-releases on COMMIT or ROLLBACK,
+      // so a migration failure never leaves a dangling lock in the pool.
+      await client.query('BEGIN');
+      await client.query(`SELECT pg_advisory_xact_lock(${MIGRATION_LOCK_ID})`);
 
       // Bootstrap schema_version table
       await client.query(`
@@ -163,8 +166,11 @@ export class PostgresSlopeStore implements SlopeStore {
         }
       }
 
-      await client.query(`SELECT pg_advisory_unlock(${MIGRATION_LOCK_ID})`);
+      await client.query('COMMIT');
       this.migrated = true;
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw err;
     } finally {
       client.release();
     }
