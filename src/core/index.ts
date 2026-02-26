@@ -42,6 +42,9 @@ export type {
   PRReviewDecision,
   PRSignal,
   HazardSeverity,
+  ReviewType,
+  ReviewFinding,
+  ReviewRecommendation,
 } from './types.js';
 
 // Constants
@@ -52,6 +55,7 @@ export {
   TRAINING_TYPE_MAP,
   NUTRITION_CHECKLIST,
   HAZARD_SEVERITY_PENALTIES,
+  REVIEW_TYPE_HAZARD_MAP,
 } from './constants.js';
 
 // Handicap
@@ -393,6 +397,13 @@ export {
   filterHazardsByVisibility,
 } from './player.js';
 export type { PlayerHandicap, ReporterSeverity } from './player.js';
+
+// Review (Implementation Review Integration)
+export {
+  recommendReviews,
+  findingToHazard,
+} from './review.js';
+export type { RecommendReviewsInput } from './review.js';
 
 // Flows
 export {

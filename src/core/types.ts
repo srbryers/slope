@@ -380,6 +380,27 @@ export interface SlopeEvent {
   ticket_key?: string;
 }
 
+// --- Review Types (Implementation Review Integration) ---
+
+/** Types of implementation reviews that can be run on a sprint */
+export type ReviewType = 'architect' | 'code' | 'ml-engineer' | 'security' | 'ux';
+
+/** A finding from an implementation review */
+export interface ReviewFinding {
+  review_type: ReviewType;
+  ticket_key: string;
+  severity: HazardSeverity;
+  description: string;
+  resolved: boolean;
+}
+
+/** A recommendation to run a specific review type */
+export interface ReviewRecommendation {
+  review_type: ReviewType;
+  reason: string;
+  priority: 'required' | 'recommended' | 'optional';
+}
+
 // --- Transcript Types (Session Tool-Call Tracking) ---
 
 /** Summary of a single tool call within a turn */
