@@ -660,6 +660,20 @@ export const SLOPE_REGISTRY: FunctionRegistryEntry[] = [
     signature: 'analyzeBacklog(cwd: string): Promise<BacklogAnalysis>',
     example: 'return await analyzeBacklog(".");',
   },
+  {
+    name: 'analyzeGitHubBacklog',
+    module: 'core',
+    description: 'Fetches open GitHub issues and milestones, groups by label/milestone, detects high-priority items.',
+    signature: 'analyzeGitHubBacklog(owner: string, repo: string, client: GitHubClient): Promise<GitHubBacklogAnalysis>',
+    example: 'const c = createGitHubClient(); return await analyzeGitHubBacklog("owner", "repo", c);',
+  },
+  {
+    name: 'mergeBacklogs',
+    module: 'core',
+    description: 'Combines local TODO/FIXME backlog with optional remote GitHub issue data into a unified MergedBacklog.',
+    signature: 'mergeBacklogs(local: BacklogAnalysis, remote?: GitHubBacklogAnalysis): MergedBacklog',
+    example: 'const local = await analyzeBacklog("."); return mergeBacklogs(local);',
+  },
 
   // ─── Generators ───
   {
@@ -682,6 +696,13 @@ export const SLOPE_REGISTRY: FunctionRegistryEntry[] = [
     description: 'Seeds common-issues.json from HACK/FIXME clusters and structural warnings.',
     signature: 'generateCommonIssues(profile: RepoProfile, backlog: BacklogAnalysis): CommonIssuesFile',
     example: 'const p = loadRepoProfile(); const b = await analyzeBacklog("."); return generateCommonIssues(p, b);',
+  },
+  {
+    name: 'generateRoadmap',
+    module: 'core',
+    description: 'Generates a RoadmapDefinition from repo profile, complexity, and merged backlog. Falls back: milestones → labels → local TODOs.',
+    signature: 'generateRoadmap(profile: RepoProfile, complexity: ComplexityProfile, backlog: MergedBacklog): RoadmapDefinition',
+    example: 'const p = loadRepoProfile(); const c = estimateComplexity(p); const b = mergeBacklogs(await analyzeBacklog(".")); return generateRoadmap(p, c, b);',
   },
 
   // ─── Vision ───
@@ -823,12 +844,14 @@ interface TournamentSprintEntry { sprintNumber: number; theme: string; par: numb
 interface TournamentScoring { totalPar: number; totalScore: number; differential: number; avgScoreLabel: string; bestSprint: { sprintNumber: number; label: ScoreLabel }; worstSprint: { sprintNumber: number; label: ScoreLabel }; sprintCount: number; ticketCount: number; ticketsLanded: number; landingRate: number; }
 
 // ─── Analyzers ───
-type AnalyzerName = 'stack' | 'structure' | 'git' | 'testing';
+type AnalyzerName = 'stack' | 'structure' | 'git' | 'testing' | 'ci' | 'docs';
 interface StackProfile { primaryLanguage: string; languages: Record<string, number>; frameworks: string[]; packageManager?: string; runtime?: string; buildTool?: string; }
 interface StructureProfile { totalFiles: number; sourceFiles: number; testFiles: number; maxDepth: number; isMonorepo: boolean; modules: Array<{ name: string; path: string; fileCount: number }>; largeFiles: Array<{ path: string; lines: number }>; }
 interface GitProfile { totalCommits: number; commitsLast90d: number; commitsPerWeek: number; contributors: Array<{ name: string; email: string; commits: number }>; activeBranches: string[]; lastRelease?: { tag: string; date: string }; inferredCadence: 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'sporadic'; }
 interface TestProfile { framework?: string; testFileCount: number; hasTestScript: boolean; hasCoverage: boolean; testDirs: string[]; }
-interface RepoProfile { analyzedAt: string; analyzersRun: AnalyzerName[]; stack: StackProfile; structure: StructureProfile; git: GitProfile; testing: TestProfile; }
+interface CIProfile { system?: 'github-actions' | 'circleci' | 'gitlab-ci' | 'jenkins' | 'travis'; configFiles: string[]; hasTestStage: boolean; hasBuildStage: boolean; hasDeployStage: boolean; }
+interface DocsProfile { hasReadme: boolean; readmeSummary?: string; hasContributing: boolean; hasChangelog: boolean; hasAdr: boolean; hasApiDocs: boolean; }
+interface RepoProfile { analyzedAt: string; analyzersRun: AnalyzerName[]; stack: StackProfile; structure: StructureProfile; git: GitProfile; testing: TestProfile; ci: CIProfile; docs: DocsProfile; }
 
 // ─── Complexity ───
 interface ComplexityProfile { estimatedPar: 3 | 4 | 5; estimatedSlope: number; slopeFactors: string[]; riskAreas: Array<{ module: string; reason: string }>; busFactor: Array<{ module: string; topContributor: string; pct: number }>; }
@@ -836,6 +859,12 @@ interface ComplexityProfile { estimatedPar: 3 | 4 | 5; estimatedSlope: number; s
 // ─── Backlog ───
 interface TodoEntry { type: 'TODO' | 'FIXME' | 'HACK' | 'XXX'; text: string; file: string; line: number; }
 interface BacklogAnalysis { todos: TodoEntry[]; todosByModule: Record<string, TodoEntry[]>; changelogUnreleased?: string[]; }
+
+// ─── GitHub Backlog ───
+interface GitHubIssue { number: number; title: string; state: 'open' | 'closed'; labels: string[]; milestone?: { number: number; title: string }; body?: string; createdAt: string; }
+interface GitHubMilestone { number: number; title: string; description?: string; state: 'open' | 'closed'; openIssues: number; closedIssues: number; dueOn?: string; }
+interface GitHubBacklogAnalysis { issues: GitHubIssue[]; issuesByLabel: Record<string, GitHubIssue[]>; issuesByMilestone: Record<string, GitHubIssue[]>; highPriority: GitHubIssue[]; milestones: GitHubMilestone[]; }
+interface MergedBacklog { local: BacklogAnalysis; remote?: GitHubBacklogAnalysis; totalItems: number; }
 
 // ─── Generators ───
 interface GeneratedConfig { projectName: string; metaphor: string; techStack: string[]; sprintCadence: 'weekly' | 'biweekly' | 'monthly'; team: Record<string, string>; }

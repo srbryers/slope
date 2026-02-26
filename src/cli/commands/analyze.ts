@@ -40,6 +40,31 @@ function formatSummary(profile: RepoProfile): string {
   if (profile.testing.testFileCount > 0) testParts.push(`${profile.testing.testFileCount} test files`);
   lines.push(`  Testing:     ${testParts.length > 0 ? testParts.join(', ') : 'none detected'}`);
 
+  // CI
+  if (profile.ci) {
+    if (profile.ci.system) {
+      const stages: string[] = [];
+      if (profile.ci.hasTestStage) stages.push('test');
+      if (profile.ci.hasBuildStage) stages.push('build');
+      if (profile.ci.hasDeployStage) stages.push('deploy');
+      const stageStr = stages.length > 0 ? ` (${stages.join(', ')})` : '';
+      lines.push(`  CI:          ${profile.ci.system}${stageStr}`);
+    } else {
+      lines.push(`  CI:          none detected`);
+    }
+  }
+
+  // Docs
+  if (profile.docs) {
+    const docParts: string[] = [];
+    if (profile.docs.hasReadme) docParts.push('README');
+    if (profile.docs.hasContributing) docParts.push('CONTRIBUTING');
+    if (profile.docs.hasChangelog) docParts.push('CHANGELOG');
+    if (profile.docs.hasAdr) docParts.push('ADR');
+    if (profile.docs.hasApiDocs) docParts.push('API docs');
+    lines.push(`  Docs:        ${docParts.length > 0 ? docParts.join(', ') : 'none detected'}`);
+  }
+
   return lines.join('\n');
 }
 
@@ -63,7 +88,7 @@ Usage:
   let analyzers: AnalyzerName[] | undefined;
   if (flags.analyzers) {
     analyzers = flags.analyzers.split(',').filter(
-      (a): a is AnalyzerName => ['stack', 'structure', 'git', 'testing'].includes(a)
+      (a): a is AnalyzerName => ['stack', 'structure', 'git', 'testing', 'ci', 'docs'].includes(a)
     );
   }
 
