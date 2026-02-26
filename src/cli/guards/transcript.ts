@@ -44,6 +44,10 @@ function detectSuccess(toolResponse: Record<string, unknown> | undefined): boole
  * Transcript guard: fires PostToolUse on all tools (no matcher).
  * Appends tool call metadata to the session transcript JSONL file.
  * Silent — returns empty GuardResult, no context injection.
+ *
+ * Note: appendFileSync is safe for single-agent sessions (typical usage).
+ * Multi-agent scenarios sharing a session_id could interleave partial writes;
+ * if multi-agent transcript support is needed, add file locking or per-agent files.
  */
 export async function transcriptGuard(input: HookInput, cwd: string): Promise<GuardResult> {
   // Skip if no session_id

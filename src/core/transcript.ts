@@ -37,10 +37,16 @@ export function readTranscript(transcriptsDir: string, sessionId: string): Trans
   const content = readFileSync(filePath, 'utf8').trim();
   if (!content) return [];
 
-  return content.split('\n').map((line, index) => {
-    const parsed: TranscriptLine = JSON.parse(line);
-    return { turn_number: index + 1, ...parsed };
-  });
+  const turns: TranscriptTurn[] = [];
+  for (const [index, line] of content.split('\n').entries()) {
+    try {
+      const parsed: TranscriptLine = JSON.parse(line);
+      turns.push({ turn_number: index + 1, ...parsed });
+    } catch {
+      // Skip malformed lines (e.g. truncated append from crash)
+    }
+  }
+  return turns;
 }
 
 /**
@@ -57,6 +63,6 @@ export function listTranscripts(transcriptsDir: string): string[] {
       name: f.replace('.jsonl', ''),
       mtime: statSync(join(transcriptsDir, f)).mtimeMs,
     }))
-    .sort((a, b) => b.mtime - a.mtime)
+    .sort((a, b) => b.mtime - a.mtime || a.name.localeCompare(b.name))
     .map(f => f.name);
 }

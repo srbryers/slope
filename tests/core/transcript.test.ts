@@ -91,6 +91,17 @@ describe('readTranscript', () => {
     expect(turns).toEqual([]);
   });
 
+  it('skips malformed lines without crashing', () => {
+    mkdirSync(TEST_DIR, { recursive: true });
+    const fs = require('node:fs');
+    const validLine = JSON.stringify({ role: 'tool_result', timestamp: '2026-02-26T14:30:00Z' });
+    fs.writeFileSync(join(TEST_DIR, 'corrupt.jsonl'), `${validLine}\n{truncated\n${validLine}\n`);
+    const turns = readTranscript(TEST_DIR, 'corrupt');
+    expect(turns).toHaveLength(2);
+    expect(turns[0].turn_number).toBe(1);
+    expect(turns[1].turn_number).toBe(3); // line 2 was skipped
+  });
+
   it('assigns 1-indexed turn_number from line position', () => {
     const line1: TranscriptLine = {
       role: 'tool_result',
