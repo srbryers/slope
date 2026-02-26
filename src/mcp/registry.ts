@@ -643,6 +643,47 @@ export const SLOPE_REGISTRY: FunctionRegistryEntry[] = [
     example: 'const p = await runAnalyzers(); saveRepoProfile(p); return "saved";',
   },
 
+  // ─── Complexity ───
+  {
+    name: 'estimateComplexity',
+    module: 'core',
+    description: 'Estimates par, slope, risk areas, and bus factor from a RepoProfile.',
+    signature: 'estimateComplexity(profile: RepoProfile): ComplexityProfile',
+    example: 'const p = loadRepoProfile(); return p ? estimateComplexity(p) : "no profile";',
+  },
+
+  // ─── Backlog ───
+  {
+    name: 'analyzeBacklog',
+    module: 'core',
+    description: 'Scans source files for TODO/FIXME/HACK/XXX comments and parses CHANGELOG unreleased section.',
+    signature: 'analyzeBacklog(cwd: string): Promise<BacklogAnalysis>',
+    example: 'return await analyzeBacklog(".");',
+  },
+
+  // ─── Generators ───
+  {
+    name: 'generateConfig',
+    module: 'core',
+    description: 'Generates a SLOPE config (project name, cadence, team, stack) from a RepoProfile.',
+    signature: 'generateConfig(profile: RepoProfile): GeneratedConfig',
+    example: 'const p = loadRepoProfile(); return p ? generateConfig(p) : "no profile";',
+  },
+  {
+    name: 'generateFirstSprint',
+    module: 'core',
+    description: 'Generates a starter roadmap and first sprint from repo analysis, complexity, and backlog data.',
+    signature: 'generateFirstSprint(profile: RepoProfile, complexity: ComplexityProfile, backlog?: BacklogAnalysis): GeneratedSprint',
+    example: 'const p = loadRepoProfile(); const c = estimateComplexity(p); return generateFirstSprint(p, c);',
+  },
+  {
+    name: 'generateCommonIssues',
+    module: 'core',
+    description: 'Seeds common-issues.json from HACK/FIXME clusters and structural warnings.',
+    signature: 'generateCommonIssues(profile: RepoProfile, backlog: BacklogAnalysis): CommonIssuesFile',
+    example: 'const p = loadRepoProfile(); const b = await analyzeBacklog("."); return generateCommonIssues(p, b);',
+  },
+
   // ─── Vision ───
   {
     name: 'loadVision',
@@ -788,6 +829,17 @@ interface StructureProfile { totalFiles: number; sourceFiles: number; testFiles:
 interface GitProfile { totalCommits: number; commitsLast90d: number; commitsPerWeek: number; contributors: Array<{ name: string; email: string; commits: number }>; activeBranches: string[]; lastRelease?: { tag: string; date: string }; inferredCadence: 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'sporadic'; }
 interface TestProfile { framework?: string; testFileCount: number; hasTestScript: boolean; hasCoverage: boolean; testDirs: string[]; }
 interface RepoProfile { analyzedAt: string; analyzersRun: AnalyzerName[]; stack: StackProfile; structure: StructureProfile; git: GitProfile; testing: TestProfile; }
+
+// ─── Complexity ───
+interface ComplexityProfile { estimatedPar: 3 | 4 | 5; estimatedSlope: number; slopeFactors: string[]; riskAreas: Array<{ module: string; reason: string }>; busFactor: Array<{ module: string; topContributor: string; pct: number }>; }
+
+// ─── Backlog ───
+interface TodoEntry { type: 'TODO' | 'FIXME' | 'HACK' | 'XXX'; text: string; file: string; line: number; }
+interface BacklogAnalysis { todos: TodoEntry[]; todosByModule: Record<string, TodoEntry[]>; changelogUnreleased?: string[]; }
+
+// ─── Generators ───
+interface GeneratedConfig { projectName: string; metaphor: string; techStack: string[]; sprintCadence: 'weekly' | 'biweekly' | 'monthly'; team: Record<string, string>; }
+interface GeneratedSprint { roadmap: RoadmapDefinition; sprint: RoadmapSprint; }
 
 // ─── Vision ───
 interface VisionDocument { purpose: string; audience?: string; priorities: string[]; techDirection?: string; nonGoals?: string[]; createdAt: string; updatedAt: string; }

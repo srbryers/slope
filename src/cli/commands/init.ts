@@ -426,36 +426,89 @@ async function runInteractiveInit(cwd: string, args: string[]): Promise<void> {
     const vision = visionPurpose || undefined;
 
     // Run smart analysis if --smart flag is present
+    let smartConfig: {
+      projectName?: string; techStack?: string[];
+      sprintCadence?: 'weekly' | 'biweekly' | 'monthly';
+      team?: Record<string, string>;
+      roadmap?: import('../../core/roadmap.js').RoadmapDefinition;
+      commonIssues?: import('../../core/briefing.js').CommonIssuesFile;
+    } = {};
     if (args.includes('--smart')) {
       console.log('\nRunning repo analysis...\n');
       const { runAnalyzers, saveRepoProfile } = await import('../../core/analyzers/index.js');
+      const { estimateComplexity } = await import('../../core/analyzers/complexity.js');
+      const { analyzeBacklog } = await import('../../core/analyzers/backlog.js');
+      const { generateConfig } = await import('../../core/generators/config.js');
+      const { generateFirstSprint } = await import('../../core/generators/first-sprint.js');
+      const { generateCommonIssues } = await import('../../core/generators/common-issues.js');
+
       const profile = await runAnalyzers({ cwd });
       saveRepoProfile(profile, cwd);
+
+      const complexity = estimateComplexity(profile);
+      const backlog = await analyzeBacklog(cwd);
+      const genConfig = generateConfig(profile);
+      const genSprint = generateFirstSprint(profile, complexity, backlog);
+      const genIssues = generateCommonIssues(profile, backlog);
+
+      // Use generated values as defaults (user input overrides)
+      smartConfig = {
+        projectName: genConfig.projectName,
+        techStack: genConfig.techStack,
+        sprintCadence: genConfig.sprintCadence,
+        team: genConfig.team,
+      };
+
+      // Store generated artifacts for writing after init
+      smartConfig.roadmap = genSprint.roadmap;
+      smartConfig.commonIssues = genIssues;
 
       const stackParts = [profile.stack.primaryLanguage || 'unknown'];
       if (profile.stack.packageManager) stackParts.push(profile.stack.packageManager);
       if (profile.stack.runtime) stackParts.push(profile.stack.runtime);
       if (profile.stack.frameworks.length > 0) stackParts.push(profile.stack.frameworks.slice(0, 3).join(', '));
+
+      const moduleInfo = profile.structure.modules.length > 0
+        ? `, ${profile.structure.modules.length} modules`
+        : '';
+
+      console.log('Smart Analysis Complete:');
       console.log(`  Stack:       ${stackParts.join(', ')}`);
-      console.log(`  Structure:   ${profile.structure.sourceFiles} source files, ${profile.structure.testFiles} test files`);
-      console.log(`  Velocity:    ${profile.git.commitsPerWeek} commits/week → ${profile.git.inferredCadence} cadence`);
-      console.log(`  Testing:     ${profile.testing.framework ?? 'none detected'}\n`);
+      console.log(`  Structure:   ${profile.structure.sourceFiles} source files, ${profile.structure.testFiles} test files${moduleInfo}`);
+      console.log(`  Complexity:  par ${complexity.estimatedPar}, slope ${complexity.estimatedSlope}${complexity.slopeFactors.length > 0 ? ` (${complexity.slopeFactors.join(', ')})` : ''}`);
+      console.log(`  Backlog:     ${backlog.todos.length} TODOs across ${Object.keys(backlog.todosByModule).length} modules`);
+      console.log(`  Suggested:   ${genSprint.sprint.tickets.length} tickets for Sprint 1\n`);
     }
 
     console.log('\nInitializing SLOPE project...\n');
 
     const result = await initFromInterview(cwd, {
-      projectName,
+      projectName: projectName || smartConfig.projectName || 'my-project',
       repoUrl,
       metaphor,
       currentSprint,
-      teamMembers,
+      teamMembers: teamMembers ?? smartConfig.team,
+      techStack: smartConfig.techStack,
+      sprintCadence: smartConfig.sprintCadence,
       vision,
     });
 
     console.log(`  Config: ${result.configPath}`);
     for (const f of result.filesCreated.slice(1)) {
       console.log(`  Created: ${f}`);
+    }
+
+    // Overwrite with smart-generated artifacts if available
+    if (smartConfig.roadmap) {
+      const roadmapPath = join(cwd, 'docs', 'backlog', 'roadmap.json');
+      mkdirSync(join(cwd, 'docs', 'backlog'), { recursive: true });
+      writeFileSync(roadmapPath, JSON.stringify(smartConfig.roadmap, null, 2) + '\n');
+      console.log(`  Updated: ${roadmapPath} (from smart analysis)`);
+    }
+    if (smartConfig.commonIssues) {
+      const issuesPath = join(cwd, '.slope', 'common-issues.json');
+      writeFileSync(issuesPath, JSON.stringify(smartConfig.commonIssues, null, 2) + '\n');
+      console.log(`  Updated: ${issuesPath} (from smart analysis)`);
     }
 
     // Save vision document if purpose was provided
