@@ -3,6 +3,8 @@ import type {
   ReviewFinding,
   ReviewRecommendation,
   HazardHit,
+  HazardType,
+  HazardSeverity,
   ClubSelection,
   SprintType,
   GolfScorecard,
@@ -116,8 +118,8 @@ export interface AmendResult {
   amendments: Array<{
     ticket_key: string;
     description: string;
-    hazard_type: string;
-    severity: string;
+    hazard_type: HazardType;
+    severity: HazardSeverity;
   }>;
   score_before: number;
   score_after: number;

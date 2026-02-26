@@ -123,25 +123,36 @@ describe('review amend', () => {
       .rejects.toThrow('process.exit(1)');
   });
 
-  it('is idempotent — running amend twice produces same result', async () => {
+  it('clears findings file after successful amend', async () => {
     setupScorecardAndFindings(33, [
       { review_type: 'architect', ticket_key: 'S33-1', severity: 'moderate', description: 'Test issue', resolved: true },
     ]);
 
     await runCommand(['amend', '--sprint=33']);
 
-    // Run amend again
+    // Findings file should be cleared
+    expect(existsSync(join(tmpDir, '.slope/review-findings.json'))).toBe(false);
+
+    // Score should be 5 (not double-counted on re-amend)
+    const scorecardPath = join(tmpDir, 'docs/retros/sprint-33.json');
+    const amended = JSON.parse(readFileSync(scorecardPath, 'utf8')) as GolfScorecard;
+    expect(amended.score).toBe(5);
+  });
+
+  it('second amend after clear shows no findings message', async () => {
+    setupScorecardAndFindings(33, [
+      { review_type: 'architect', ticket_key: 'S33-1', severity: 'moderate', description: 'Test issue', resolved: true },
+    ]);
+
+    await runCommand(['amend', '--sprint=33']);
+
+    // Run amend again — findings were cleared
     const spy = vi.spyOn(console, 'log');
     await runCommand(['amend', '--sprint=33']);
     const logged = spy.mock.calls.map(c => c[0]).join('\n');
     spy.mockRestore();
 
-    expect(logged).toContain('No new amendments');
-
-    // Score should still be 5 (not double-counted)
-    const scorecardPath = join(tmpDir, 'docs/retros/sprint-33.json');
-    const amended = JSON.parse(readFileSync(scorecardPath, 'utf8')) as GolfScorecard;
-    expect(amended.score).toBe(5);
+    expect(logged).toContain('No review findings to amend');
   });
 
   it('models Sprint 33 scenario: par → bogey with 5 findings', async () => {

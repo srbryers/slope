@@ -187,6 +187,34 @@ describe('review findings add', () => {
     expect(data!.findings[0].resolved).toBe(true);
   });
 
+  it('errors when adding findings for different sprint than existing', async () => {
+    mkdirSync(join(tmpDir, '.slope'), { recursive: true });
+    const existing: FindingsFile = {
+      sprint_number: 33,
+      findings: [{
+        review_type: 'architect',
+        ticket_key: 'S33-1',
+        severity: 'moderate',
+        description: 'Existing finding',
+        resolved: true,
+      }],
+    };
+    writeFileSync(join(tmpDir, '.slope/review-findings.json'), JSON.stringify(existing));
+
+    await expect(runCommand([
+      'findings', 'add',
+      '--type=code',
+      '--ticket=S34-1',
+      '--description=New finding',
+      '--sprint=34',
+    ])).rejects.toThrow('process.exit(1)');
+
+    // Verify original data is preserved
+    const data = loadFindings(tmpDir);
+    expect(data!.sprint_number).toBe(33);
+    expect(data!.findings).toHaveLength(1);
+  });
+
   it('errors with missing required args', async () => {
     await expect(runCommand(['findings', 'add', '--type=architect']))
       .rejects.toThrow('process.exit(1)');

@@ -251,11 +251,6 @@ function recommendCommand(cwd: string): void {
     hasNewInfra,
   });
 
-  if (recs.length === 0) {
-    console.log('No reviews recommended for this sprint.');
-    return;
-  }
-
   const sprintLabel = sprintNumber > 0 ? ` for Sprint ${sprintNumber}` : '';
   console.log(`Recommended reviews${sprintLabel} (${ticketCount} ticket${ticketCount !== 1 ? 's' : ''}, slope ${slope}):\n`);
   console.log('  Type           Priority      Reason');
@@ -325,6 +320,10 @@ function findingsAddCommand(args: string[], cwd: string): void {
   if (existing && existing.sprint_number === sprintNumber) {
     existing.findings.push(finding);
     saveFindings(cwd, existing);
+  } else if (existing && existing.sprint_number !== sprintNumber) {
+    console.error(`Error: Findings file contains Sprint ${existing.sprint_number} data, but --sprint=${sprintNumber} was specified.`);
+    console.error('Run `slope review findings clear` first, or use the correct --sprint value.');
+    process.exit(1);
   } else {
     saveFindings(cwd, { sprint_number: sprintNumber, findings: [finding] });
   }
@@ -450,7 +449,7 @@ function amendCommand(args: string[], cwd: string): void {
     const ticket = a.ticket_key.padEnd(7);
     const desc = a.description.length > 32 ? a.description.slice(0, 29) + '...' : a.description.padEnd(32);
     const hazard = a.hazard_type.padEnd(9);
-    const penalty = HAZARD_SEVERITY_PENALTIES[a.severity as keyof typeof HAZARD_SEVERITY_PENALTIES];
+    const penalty = HAZARD_SEVERITY_PENALTIES[a.severity];
     const penaltyStr = penalty > 0 ? `+${penalty}` : '+0';
     console.log(`  ${ticket} ${desc} ${hazard} ${penaltyStr}`);
   }
@@ -460,6 +459,13 @@ function amendCommand(args: string[], cwd: string): void {
   // Write amended scorecard
   writeFileSync(scorecardPath, JSON.stringify(result.scorecard, null, 2) + '\n');
   console.log(`Scorecard updated: ${config.scorecardDir}/sprint-${sprintNumber}.json`);
+
+  // Clear findings file after successful amend to prevent guard false-negatives
+  const findingsFilePath = join(cwd, FINDINGS_FILE);
+  if (existsSync(findingsFilePath)) {
+    unlinkSync(findingsFilePath);
+    console.log('Findings file cleared.');
+  }
 }
 
 // --- Main Command Router ---

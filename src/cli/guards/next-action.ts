@@ -3,6 +3,7 @@ import { join, dirname } from 'node:path';
 import type { HookInput, GuardResult, SlopeConfig } from '../../core/index.js';
 import { loadConfig, loadScorecards, detectLatestSprint, parseRoadmap, formatStrategicContext } from '../../core/index.js';
 import { resolveStore } from '../store.js';
+import { loadFindings } from '../commands/review-state.js';
 
 /** Sprint state types for next-action detection */
 type SprintState =
@@ -117,28 +118,25 @@ export async function detectSprintState(cwd: string): Promise<SprintState> {
     }
 
     // Check if findings exist but scorecard hasn't been amended
-    const findingsPath = join(cwd, '.slope', 'review-findings.json');
-    if (existsSync(findingsPath)) {
+    const findingsData = loadFindings(cwd);
+    if (findingsData && findingsData.findings.length > 0) {
       try {
-        const findingsData = JSON.parse(readFileSync(findingsPath, 'utf8'));
-        if (findingsData.findings?.length > 0) {
-          // Check if scorecard already has review hazards
-          const scorecardPath = join(retrosDir, `sprint-${latestScoredSprint}.json`);
-          if (existsSync(scorecardPath)) {
-            const scorecard = JSON.parse(readFileSync(scorecardPath, 'utf8'));
-            const hasReviewHazards = scorecard.shots?.some((s: { hazards?: Array<{ gotcha_id?: string }> }) =>
-              s.hazards?.some((h: { gotcha_id?: string }) => h.gotcha_id?.startsWith('review:')),
-            );
-            if (!hasReviewHazards) {
-              return {
-                type: 'needs-amend',
-                sprintNumber: latestScoredSprint,
-                findingCount: findingsData.findings.length,
-              };
-            }
+        // Check if scorecard already has review hazards
+        const scorecardPath = join(retrosDir, `sprint-${latestScoredSprint}.json`);
+        if (existsSync(scorecardPath)) {
+          const scorecard = JSON.parse(readFileSync(scorecardPath, 'utf8'));
+          const hasReviewHazards = scorecard.shots?.some((s: { hazards?: Array<{ gotcha_id?: string }> }) =>
+            s.hazards?.some((h: { gotcha_id?: string }) => h.gotcha_id?.startsWith('review:')),
+          );
+          if (!hasReviewHazards) {
+            return {
+              type: 'needs-amend',
+              sprintNumber: latestScoredSprint,
+              findingCount: findingsData.findings.length,
+            };
           }
         }
-      } catch { /* malformed findings file — skip */ }
+      } catch { /* scorecard parse error — skip */ }
     }
   }
 
