@@ -72,7 +72,7 @@ Or per-command: `slope review --metaphor=tennis`
 
 Published as a single package: [`@slope-dev/slope`](https://www.npmjs.com/package/@slope-dev/slope)
 
-Includes the core scoring engine, SQLite store, CLI (22 commands), and MCP server.
+Includes the core scoring engine, SQLite store, CLI (30 commands), and MCP server.
 
 ## CLI Commands
 
@@ -83,6 +83,9 @@ Includes the core scoring engine, SQLite store, CLI (22 commands), and MCP serve
 | `slope card` | Display handicap card with rolling windows |
 | `slope validate [path]` | Validate scorecard(s) |
 | `slope review [path] [--plain] [--metaphor=id]` | Format sprint review as markdown |
+| `slope review recommend` | Recommend review types for current sprint |
+| `slope review findings add\|list\|clear` | Track implementation review findings |
+| `slope review amend [--sprint=N]` | Apply review findings as hazards and recalculate score |
 | `slope report --html [--output=path] [--metaphor=id]` | Generate HTML performance report |
 | `slope tournament --id=<id> --sprints=N..M` | Build tournament review from sprint range |
 | `slope auto-card --sprint=N [--ci=path]` | Generate scorecard from git + CI signals |
@@ -163,7 +166,7 @@ Installs:
 
 ## Agent Guidance Hooks
 
-SLOPE can guide AI agents in real-time via hook integration. Six guards provide contextual hints:
+SLOPE can guide AI agents in real-time via hook integration. 15 guards provide contextual hints:
 
 | Guard | Trigger | What it does |
 |-------|---------|-------------|
@@ -173,6 +176,15 @@ SLOPE can guide AI agents in real-time via hook integration. Six guards provide 
 | `scope-drift` | Before file edit | Warns when editing outside claimed scope |
 | `compaction` | Before context compact | Saves checkpoint to store |
 | `stop-check` | Before session end | Blocks if uncommitted/unpushed work exists |
+| `next-action` | Before session end | Suggests next actions based on sprint state |
+| `subagent-gate` | Before task spawn | Enforces model and turn limits on subagents |
+| `push-nudge` | After tool use | Nudges push after prolonged period without pushing |
+| `workflow-gate` | Before tool use | Enforces sprint workflow compliance |
+| `review-tier` | Before tool use | Suggests review tier based on sprint complexity |
+| `version-check` | Before tool use | Warns when SLOPE version is outdated |
+| `stale-flows` | Before file edit | Warns when editing files in stale flow definitions |
+| `pr-review` | After tool use | Suggests PR review actions |
+| `transcript` | After tool use | Captures session transcript data |
 
 Install all guards:
 
@@ -219,6 +231,9 @@ import {
   generateHtmlReport,
   getMetaphor,
   loadScorecards,
+  recommendReviews,
+  findingToHazard,
+  amendScorecardWithFindings,
 } from '@slope-dev/slope';
 
 // Build a scorecard
