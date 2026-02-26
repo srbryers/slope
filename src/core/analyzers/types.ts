@@ -47,7 +47,24 @@ export interface VisionDocument {
   updatedAt: string;
 }
 
-export type AnalyzerName = 'stack' | 'structure' | 'git' | 'testing';
+export interface CIProfile {
+  system?: 'github-actions' | 'circleci' | 'gitlab-ci' | 'jenkins' | 'travis';
+  configFiles: string[];
+  hasTestStage: boolean;
+  hasBuildStage: boolean;
+  hasDeployStage: boolean;
+}
+
+export interface DocsProfile {
+  hasReadme: boolean;
+  readmeSummary?: string;
+  hasContributing: boolean;
+  hasChangelog: boolean;
+  hasAdr: boolean;
+  hasApiDocs: boolean;
+}
+
+export type AnalyzerName = 'stack' | 'structure' | 'git' | 'testing' | 'ci' | 'docs';
 
 export interface RepoProfile {
   analyzedAt: string;
@@ -56,4 +73,6 @@ export interface RepoProfile {
   structure: StructureProfile;
   git: GitProfile;
   testing: TestProfile;
+  ci: CIProfile;
+  docs: DocsProfile;
 }
