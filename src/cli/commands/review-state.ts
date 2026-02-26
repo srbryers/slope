@@ -1,8 +1,10 @@
 import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdirSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ReviewFinding, ReviewType, HazardSeverity } from '../../core/types.js';
-import { recommendReviews } from '../../core/review.js';
+import { recommendReviews, amendScorecardWithFindings } from '../../core/review.js';
 import { loadConfig, detectLatestSprint } from '../../core/index.js';
+import { HAZARD_SEVERITY_PENALTIES } from '../../core/constants.js';
+import type { GolfScorecard } from '../../core/types.js';
 
 export interface ReviewState {
   rounds_required: number;
@@ -385,6 +387,81 @@ function findingsCommand(args: string[], cwd: string): void {
   }
 }
 
+// --- Amend Subcommand ---
+
+function amendCommand(args: string[], cwd: string): void {
+  const sprintArg = args.find(a => a.startsWith('--sprint='));
+
+  let config;
+  try {
+    config = loadConfig(cwd);
+  } catch {
+    console.error('Error: No SLOPE config found. Run `slope init` first.');
+    process.exit(1);
+  }
+
+  // Determine sprint number
+  let sprintNumber: number;
+  if (sprintArg) {
+    sprintNumber = parseInt(sprintArg.slice('--sprint='.length), 10);
+  } else {
+    sprintNumber = detectLatestSprint(config, cwd);
+    if (sprintNumber === 0) {
+      console.error('Error: No scorecards found. Use --sprint=N to specify.');
+      process.exit(1);
+    }
+  }
+
+  // Load scorecard
+  const scorecardPath = join(cwd, config.scorecardDir, `sprint-${sprintNumber}.json`);
+  if (!existsSync(scorecardPath)) {
+    console.error(`Error: Scorecard not found at ${scorecardPath}`);
+    process.exit(1);
+  }
+
+  let scorecard: GolfScorecard;
+  try {
+    scorecard = JSON.parse(readFileSync(scorecardPath, 'utf8')) as GolfScorecard;
+  } catch {
+    console.error(`Error: Could not parse scorecard at ${scorecardPath}`);
+    process.exit(1);
+  }
+
+  // Load findings
+  const findingsData = loadFindings(cwd);
+  if (!findingsData || findingsData.findings.length === 0) {
+    console.log('No review findings to amend. Use `slope review findings add` first.');
+    return;
+  }
+
+  console.log(`Amending Sprint ${sprintNumber} scorecard with ${findingsData.findings.length} review finding${findingsData.findings.length !== 1 ? 's' : ''}...\n`);
+
+  // Amend
+  const result = amendScorecardWithFindings(scorecard, findingsData.findings);
+
+  if (result.amendments.length === 0) {
+    console.log('No new amendments applied (findings already present or no matching tickets).');
+    return;
+  }
+
+  // Display amendments
+  console.log('  Ticket  Finding                          Hazard    Penalty');
+  for (const a of result.amendments) {
+    const ticket = a.ticket_key.padEnd(7);
+    const desc = a.description.length > 32 ? a.description.slice(0, 29) + '...' : a.description.padEnd(32);
+    const hazard = a.hazard_type.padEnd(9);
+    const penalty = HAZARD_SEVERITY_PENALTIES[a.severity as keyof typeof HAZARD_SEVERITY_PENALTIES];
+    const penaltyStr = penalty > 0 ? `+${penalty}` : '+0';
+    console.log(`  ${ticket} ${desc} ${hazard} ${penaltyStr}`);
+  }
+
+  console.log(`\nScore: ${result.score_before} → ${result.score_after} (${result.label_before} → ${result.label_after})`);
+
+  // Write amended scorecard
+  writeFileSync(scorecardPath, JSON.stringify(result.scorecard, null, 2) + '\n');
+  console.log(`Scorecard updated: ${config.scorecardDir}/sprint-${sprintNumber}.json`);
+}
+
 // --- Main Command Router ---
 
 export async function reviewStateCommand(args: string[]): Promise<void> {
@@ -410,8 +487,11 @@ export async function reviewStateCommand(args: string[]): Promise<void> {
     case 'findings':
       findingsCommand(args.slice(1), cwd);
       break;
+    case 'amend':
+      amendCommand(args.slice(1), cwd);
+      break;
     default:
-      console.error(`Unknown review subcommand: ${sub}. Use start, round, status, reset, recommend, findings.`);
+      console.error(`Unknown review subcommand: ${sub}. Use start, round, status, reset, recommend, findings, amend.`);
       process.exit(1);
   }
 }

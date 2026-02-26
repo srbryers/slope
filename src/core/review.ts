@@ -5,8 +5,11 @@ import type {
   HazardHit,
   ClubSelection,
   SprintType,
+  GolfScorecard,
 } from './types.js';
 import { REVIEW_TYPE_HAZARD_MAP } from './constants.js';
+import { buildScorecard } from './builder.js';
+import type { ScorecardInput } from './builder.js';
 
 // --- Review Recommendation ---
 
@@ -102,5 +105,97 @@ export function findingToHazard(finding: ReviewFinding): HazardHit {
     severity: finding.severity,
     description: `[${finding.review_type} review] ${finding.description}`,
     gotcha_id: `review:${finding.review_type}`,
+  };
+}
+
+// --- Scorecard Amendment ---
+
+/** Result of amending a scorecard with review findings */
+export interface AmendResult {
+  scorecard: GolfScorecard;
+  amendments: Array<{
+    ticket_key: string;
+    description: string;
+    hazard_type: string;
+    severity: string;
+  }>;
+  score_before: number;
+  score_after: number;
+  label_before: string;
+  label_after: string;
+}
+
+/**
+ * Amend a scorecard with review findings by injecting hazards into shots.
+ * Idempotent: findings with `gotcha_id: "review:*"` are deduplicated.
+ * Recomputes stats, score, and score_label via buildScorecard().
+ */
+export function amendScorecardWithFindings(
+  scorecard: GolfScorecard,
+  findings: ReviewFinding[],
+): AmendResult {
+  const scoreBefore = scorecard.score;
+  const labelBefore = scorecard.score_label;
+  const amendments: AmendResult['amendments'] = [];
+
+  // Deep clone shots to avoid mutating original
+  const amendedShots = scorecard.shots.map(shot => ({
+    ...shot,
+    hazards: [...shot.hazards],
+  }));
+
+  for (const finding of findings) {
+    const shot = amendedShots.find(s => s.ticket_key === finding.ticket_key);
+    if (!shot) continue;
+
+    const hazard = findingToHazard(finding);
+
+    // Deduplicate: skip if a hazard with the same gotcha_id and description already exists
+    const duplicate = shot.hazards.some(
+      h => h.gotcha_id === hazard.gotcha_id && h.description === hazard.description,
+    );
+    if (duplicate) continue;
+
+    shot.hazards.push(hazard);
+    amendments.push({
+      ticket_key: finding.ticket_key,
+      description: finding.description,
+      hazard_type: hazard.type,
+      severity: finding.severity,
+    });
+  }
+
+  // Rebuild scorecard with amended shots to recompute stats + score
+  const input: ScorecardInput = {
+    sprint_number: scorecard.sprint_number,
+    theme: scorecard.theme,
+    par: scorecard.par,
+    slope: scorecard.slope,
+    date: scorecard.date,
+    shots: amendedShots,
+    putts: scorecard.stats.putts,
+    penalties: scorecard.stats.penalties,
+    type: scorecard.type,
+    conditions: scorecard.conditions,
+    special_plays: scorecard.special_plays,
+    training: scorecard.training,
+    nutrition: scorecard.nutrition,
+    nineteenth_hole: scorecard.nineteenth_hole,
+    bunker_locations: scorecard.bunker_locations,
+    yardage_book_updates: scorecard.yardage_book_updates,
+    course_management_notes: scorecard.course_management_notes,
+    ...(scorecard.player ? { player: scorecard.player } : {}),
+    ...(scorecard.agents ? { agents: scorecard.agents } : {}),
+  };
+
+  const amended = buildScorecard(input);
+
+  return {
+    scorecard: amended,
+    amendments,
+    score_before: scoreBefore,
+    score_after: amended.score,
+    label_before: labelBefore,
+    label_after: amended.score_label,
   };
 }

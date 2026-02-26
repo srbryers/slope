@@ -402,8 +402,9 @@ export type { PlayerHandicap, ReporterSeverity } from './player.js';
 export {
   recommendReviews,
   findingToHazard,
+  amendScorecardWithFindings,
 } from './review.js';
-export type { RecommendReviewsInput } from './review.js';
+export type { RecommendReviewsInput, AmendResult } from './review.js';
 
 // Flows
 export {

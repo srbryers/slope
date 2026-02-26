@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { recommendReviews, findingToHazard } from '../../src/core/review.js';
-import type { ReviewFinding } from '../../src/core/types.js';
+import { recommendReviews, findingToHazard, amendScorecardWithFindings } from '../../src/core/review.js';
+import type { ReviewFinding, GolfScorecard, ShotRecord } from '../../src/core/types.js';
 import { REVIEW_TYPE_HAZARD_MAP } from '../../src/core/constants.js';
+import { buildScorecard } from '../../src/core/builder.js';
 
 // --- recommendReviews ---
 
@@ -229,5 +230,156 @@ describe('findingToHazard', () => {
       });
       expect(hazard.type).toBe(REVIEW_TYPE_HAZARD_MAP[rt]);
     }
+  });
+});
+
+// --- amendScorecardWithFindings ---
+
+function makeShot(overrides: Partial<ShotRecord> = {}): ShotRecord {
+  return {
+    ticket_key: 'S33-1',
+    title: 'Test ticket',
+    club: 'short_iron',
+    result: 'in_the_hole',
+    hazards: [],
+    ...overrides,
+  };
+}
+
+function makeScorecard(overrides: Partial<GolfScorecard> = {}): GolfScorecard {
+  const shots = overrides.shots ?? [
+    makeShot({ ticket_key: 'S33-1', title: 'Ticket 1' }),
+    makeShot({ ticket_key: 'S33-2', title: 'Ticket 2' }),
+    makeShot({ ticket_key: 'S33-3', title: 'Ticket 3' }),
+    makeShot({ ticket_key: 'S33-4', title: 'Ticket 4' }),
+  ];
+  const base = buildScorecard({
+    sprint_number: 33,
+    theme: 'Test Sprint',
+    par: 4,
+    slope: 2,
+    date: '2026-02-26',
+    shots,
+    ...(overrides.type ? { type: overrides.type } : {}),
+  });
+  return { ...base, ...overrides, shots: overrides.shots ?? base.shots };
+}
+
+describe('amendScorecardWithFindings', () => {
+  it('injects hazards into matching shots and recalculates score', () => {
+    const scorecard = makeScorecard();
+    expect(scorecard.score).toBe(4); // par
+    expect(scorecard.score_label).toBe('par');
+
+    const findings: ReviewFinding[] = [
+      { review_type: 'architect', ticket_key: 'S33-1', severity: 'moderate', description: 'Malformed JSONL crash', resolved: true },
+      { review_type: 'architect', ticket_key: 'S33-1', severity: 'minor', description: 'Sort instability', resolved: true },
+    ];
+
+    const result = amendScorecardWithFindings(scorecard, findings);
+
+    expect(result.score_before).toBe(4);
+    // 4 shots + 0.5 hazard penalty (moderate) + 0 (minor) = 4.5 → rounds to 5
+    expect(result.score_after).toBe(5);
+    expect(result.label_before).toBe('par');
+    expect(result.label_after).toBe('bogey');
+    expect(result.amendments).toHaveLength(2);
+    // Original scorecard should not be mutated
+    expect(scorecard.shots[0].hazards).toHaveLength(0);
+  });
+
+  it('is idempotent — deduplicates existing review hazards', () => {
+    const scorecard = makeScorecard();
+    const findings: ReviewFinding[] = [
+      { review_type: 'architect', ticket_key: 'S33-1', severity: 'moderate', description: 'Test issue', resolved: true },
+    ];
+
+    // First amend
+    const result1 = amendScorecardWithFindings(scorecard, findings);
+    expect(result1.amendments).toHaveLength(1);
+
+    // Second amend on already-amended scorecard
+    const result2 = amendScorecardWithFindings(result1.scorecard, findings);
+    expect(result2.amendments).toHaveLength(0);
+    expect(result2.score_after).toBe(result1.score_after);
+  });
+
+  it('skips findings with no matching ticket_key', () => {
+    const scorecard = makeScorecard();
+    const findings: ReviewFinding[] = [
+      { review_type: 'architect', ticket_key: 'S99-1', severity: 'moderate', description: 'No match', resolved: true },
+    ];
+
+    const result = amendScorecardWithFindings(scorecard, findings);
+    expect(result.amendments).toHaveLength(0);
+    expect(result.score_after).toBe(result.score_before);
+  });
+
+  it('handles empty findings array', () => {
+    const scorecard = makeScorecard();
+    const result = amendScorecardWithFindings(scorecard, []);
+    expect(result.amendments).toHaveLength(0);
+    expect(result.score_after).toBe(result.score_before);
+  });
+
+  it('distributes findings across multiple shots', () => {
+    const scorecard = makeScorecard();
+    const findings: ReviewFinding[] = [
+      { review_type: 'architect', ticket_key: 'S33-1', severity: 'moderate', description: 'Issue in T1', resolved: true },
+      { review_type: 'ml-engineer', ticket_key: 'S33-3', severity: 'moderate', description: 'Issue in T3', resolved: true },
+    ];
+
+    const result = amendScorecardWithFindings(scorecard, findings);
+    expect(result.amendments).toHaveLength(2);
+
+    // Check hazards are on correct shots
+    const shot1 = result.scorecard.shots.find(s => s.ticket_key === 'S33-1');
+    const shot3 = result.scorecard.shots.find(s => s.ticket_key === 'S33-3');
+    expect(shot1!.hazards).toHaveLength(1);
+    expect(shot1!.hazards[0].type).toBe('bunker');
+    expect(shot3!.hazards).toHaveLength(1);
+    expect(shot3!.hazards[0].type).toBe('rough');
+  });
+
+  it('preserves non-computed fields', () => {
+    const scorecard = makeScorecard({
+      nineteenth_hole: { how_did_it_feel: 'Great' },
+      bunker_locations: ['test bunker'],
+      nutrition: [{ category: 'hydration', description: 'test', status: 'healthy' }],
+      course_management_notes: ['note 1'],
+    });
+
+    const findings: ReviewFinding[] = [
+      { review_type: 'code', ticket_key: 'S33-1', severity: 'minor', description: 'test', resolved: true },
+    ];
+
+    const result = amendScorecardWithFindings(scorecard, findings);
+    expect(result.scorecard.nineteenth_hole?.how_did_it_feel).toBe('Great');
+    expect(result.scorecard.bunker_locations).toEqual(['test bunker']);
+    expect(result.scorecard.nutrition).toHaveLength(1);
+    expect(result.scorecard.course_management_notes).toEqual(['note 1']);
+  });
+
+  it('models Sprint 33 amendment correctly (par → bogey)', () => {
+    // Sprint 33: 4 shots all in_the_hole, 0 hazards, score=4, par=4
+    const scorecard = makeScorecard();
+    expect(scorecard.score).toBe(4);
+    expect(scorecard.score_label).toBe('par');
+
+    // 5 findings from architect + ML reviews
+    const findings: ReviewFinding[] = [
+      { review_type: 'architect', ticket_key: 'S33-1', severity: 'moderate', description: 'Malformed JSONL crash', resolved: true },
+      { review_type: 'architect', ticket_key: 'S33-1', severity: 'minor', description: 'Sort instability', resolved: true },
+      { review_type: 'ml-engineer', ticket_key: 'S33-3', severity: 'moderate', description: 'Stats underutilizes schema', resolved: true },
+      { review_type: 'ml-engineer', ticket_key: 'S33-3', severity: 'minor', description: 'Missing per-tool breakdown', resolved: true },
+      { review_type: 'ml-engineer', ticket_key: 'S33-2', severity: 'minor', description: 'Token data notice missing', resolved: true },
+    ];
+
+    const result = amendScorecardWithFindings(scorecard, findings);
+
+    // 4 shots + 0.5 (moderate) + 0 (minor) + 0.5 (moderate) + 0 (minor) + 0 (minor) = 5
+    expect(result.score_after).toBe(5);
+    expect(result.label_after).toBe('bogey');
+    expect(result.amendments).toHaveLength(5);
   });
 });
