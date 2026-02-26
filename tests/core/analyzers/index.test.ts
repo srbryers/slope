@@ -13,6 +13,8 @@ function makeProfile(overrides: Partial<RepoProfile> = {}): RepoProfile {
     structure: { totalFiles: 15, sourceFiles: 10, testFiles: 5, maxDepth: 3, isMonorepo: false, modules: [], largeFiles: [] },
     git: { totalCommits: 50, commitsLast90d: 20, commitsPerWeek: 3, contributors: [], activeBranches: [], inferredCadence: 'weekly' },
     testing: { testFileCount: 5, hasTestScript: true, hasCoverage: false, testDirs: ['tests'] },
+    ci: { configFiles: [], hasTestStage: false, hasBuildStage: false, hasDeployStage: false },
+    docs: { hasReadme: false, hasContributing: false, hasChangelog: false, hasAdr: false, hasApiDocs: false },
     ...overrides,
   };
 }

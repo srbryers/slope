@@ -5,6 +5,12 @@ import type { GolfScorecard, SlopeStore } from '../../src/core/index.js';
 // Skip entire suite if no PG connection available
 const PG_URL = process.env.SLOPE_TEST_PG_URL;
 
+// Use a simple counter for unique sprint numbers — Date.now() overflows PG INTEGER
+let nextSprint = 100_000;
+function uniqueSprint(): number {
+  return nextSprint++;
+}
+
 describe.skipIf(!PG_URL)('PostgresSlopeStore', () => {
   let store: SlopeStore;
   let pool: unknown;
@@ -129,7 +135,7 @@ describe.skipIf(!PG_URL)('PostgresSlopeStore', () => {
 
   describe('Claims', () => {
     it('creates a claim and retrieves by list and get', async () => {
-      const sprint = Date.now(); // unique sprint to avoid collisions
+      const sprint = uniqueSprint();
       const claim = await store.claim({
         sprint_number: sprint,
         player: 'alice',
@@ -150,7 +156,7 @@ describe.skipIf(!PG_URL)('PostgresSlopeStore', () => {
     });
 
     it('releases a claim', async () => {
-      const sprint = Date.now();
+      const sprint = uniqueSprint();
       const claim = await store.claim({ sprint_number: sprint, player: 'bob', target: 'X', scope: 'ticket' });
       const released = await store.release(claim.id);
       expect(released).toBe(true);
@@ -160,15 +166,15 @@ describe.skipIf(!PG_URL)('PostgresSlopeStore', () => {
     });
 
     it('throws CLAIM_EXISTS on duplicate target in same sprint', async () => {
-      const sprint = Date.now();
+      const sprint = uniqueSprint();
       await store.claim({ sprint_number: sprint, player: 'alice', target: 'T-DUP', scope: 'ticket' });
       await expect(store.claim({ sprint_number: sprint, player: 'bob', target: 'T-DUP', scope: 'ticket' }))
         .rejects.toThrow(SlopeStoreError);
     });
 
     it('allows same target in different sprints', async () => {
-      const sprint1 = Date.now();
-      const sprint2 = sprint1 + 1;
+      const sprint1 = uniqueSprint();
+      const sprint2 = uniqueSprint();
       await store.claim({ sprint_number: sprint1, player: 'alice', target: 'T-CROSS', scope: 'ticket' });
       const c2 = await store.claim({ sprint_number: sprint2, player: 'alice', target: 'T-CROSS', scope: 'ticket' });
       expect(c2.sprint_number).toBe(sprint2);
@@ -198,16 +204,17 @@ describe.skipIf(!PG_URL)('PostgresSlopeStore', () => {
     });
 
     it('saves and lists scorecards', async () => {
-      const base = Date.now();
+      const base = uniqueSprint();
+      const base2 = uniqueSprint();
       await store.saveScorecard(makeCard(base));
-      await store.saveScorecard(makeCard(base + 1));
+      await store.saveScorecard(makeCard(base2));
 
-      const all = await store.listScorecards({ minSprint: base });
-      expect(all.length).toBeGreaterThanOrEqual(2);
+      const all = await store.listScorecards({ minSprint: base, maxSprint: base2 });
+      expect(all).toHaveLength(2);
     });
 
     it('upserts scorecards', async () => {
-      const sprint = Date.now();
+      const sprint = uniqueSprint();
       await store.saveScorecard(makeCard(sprint));
       await store.saveScorecard({ ...makeCard(sprint), theme: 'Updated' });
 
@@ -265,7 +272,7 @@ describe.skipIf(!PG_URL)('PostgresSlopeStore', () => {
     });
 
     it('retrieves events by sprint', async () => {
-      const sprint = Date.now();
+      const sprint = uniqueSprint();
       await store.insertEvent({ type: 'hazard', data: { desc: 'flaky' }, sprint_number: sprint });
       await store.insertEvent({ type: 'decision', data: { choice: 'refactor' }, sprint_number: sprint });
 

@@ -8,6 +8,8 @@ import type {
   StructureProfile,
   GitProfile,
   TestProfile,
+  CIProfile,
+  DocsProfile,
 } from './types.js';
 
 export interface AnalyzerOptions {
@@ -15,7 +17,7 @@ export interface AnalyzerOptions {
   analyzers?: AnalyzerName[];
 }
 
-const ALL_ANALYZERS: AnalyzerName[] = ['stack', 'structure', 'git', 'testing'];
+const ALL_ANALYZERS: AnalyzerName[] = ['stack', 'structure', 'git', 'testing', 'ci', 'docs'];
 
 const PROFILE_FILE = 'repo-profile.json';
 const SLOPE_DIR = '.slope';
@@ -36,6 +38,14 @@ function emptyTesting(): TestProfile {
   return { testFileCount: 0, hasTestScript: false, hasCoverage: false, testDirs: [] };
 }
 
+function emptyCi(): CIProfile {
+  return { configFiles: [], hasTestStage: false, hasBuildStage: false, hasDeployStage: false };
+}
+
+function emptyDocs(): DocsProfile {
+  return { hasReadme: false, hasContributing: false, hasChangelog: false, hasAdr: false, hasApiDocs: false };
+}
+
 export async function runAnalyzers(opts?: AnalyzerOptions): Promise<RepoProfile> {
   const cwd = opts?.cwd ?? process.cwd();
   const requested = opts?.analyzers ?? ALL_ANALYZERS;
@@ -47,6 +57,8 @@ export async function runAnalyzers(opts?: AnalyzerOptions): Promise<RepoProfile>
     structure: emptyStructure(),
     git: emptyGit(),
     testing: emptyTesting(),
+    ci: emptyCi(),
+    docs: emptyDocs(),
   };
 
   for (const name of requested) {
@@ -69,6 +81,16 @@ export async function runAnalyzers(opts?: AnalyzerOptions): Promise<RepoProfile>
       case 'testing': {
         const { analyzeTesting } = await import('./testing.js');
         profile.testing = await analyzeTesting(cwd);
+        break;
+      }
+      case 'ci': {
+        const { analyzeCI } = await import('./ci.js');
+        profile.ci = analyzeCI(cwd);
+        break;
+      }
+      case 'docs': {
+        const { analyzeDocs } = await import('./docs.js');
+        profile.docs = analyzeDocs(cwd);
         break;
       }
     }

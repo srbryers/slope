@@ -434,6 +434,8 @@ export type {
   GitHubCommit,
   GitHubTreeEntry,
   GitHubErrorCode,
+  GitHubIssue,
+  GitHubMilestone,
 } from './github.js';
 
 // Webhooks (CI Integration)
@@ -454,7 +456,7 @@ export type { EventIngestionResult } from './event-ingestion.js';
 
 // Analyzers
 export { runAnalyzers, loadRepoProfile, saveRepoProfile } from './analyzers/index.js';
-export type { RepoProfile, StackProfile, StructureProfile, GitProfile, TestProfile, AnalyzerName } from './analyzers/types.js';
+export type { RepoProfile, StackProfile, StructureProfile, GitProfile, TestProfile, CIProfile, DocsProfile, AnalyzerName } from './analyzers/types.js';
 
 // Complexity
 export { estimateComplexity } from './analyzers/complexity.js';
@@ -464,10 +466,19 @@ export type { ComplexityProfile } from './analyzers/complexity.js';
 export { analyzeBacklog } from './analyzers/backlog.js';
 export type { BacklogAnalysis, TodoEntry } from './analyzers/backlog.js';
 
+// GitHub Backlog
+export { analyzeGitHubBacklog } from './analyzers/github-backlog.js';
+export type { GitHubBacklogAnalysis } from './analyzers/github-backlog.js';
+
+// Merged Backlog
+export { mergeBacklogs } from './analyzers/backlog-merged.js';
+export type { MergedBacklog } from './analyzers/backlog-merged.js';
+
 // Generators
 export { generateConfig } from './generators/config.js';
 export { generateFirstSprint } from './generators/first-sprint.js';
 export { generateCommonIssues } from './generators/common-issues.js';
+export { generateRoadmap } from './generators/roadmap.js';
 export type { GeneratedConfig } from './generators/config.js';
 export type { GeneratedSprint } from './generators/first-sprint.js';
 

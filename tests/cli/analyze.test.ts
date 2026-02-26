@@ -57,7 +57,7 @@ describe('runAnalyzers (integration)', () => {
     const profile = await runAnalyzers({ cwd: tmpDir });
 
     expect(profile.analyzedAt).toBeTruthy();
-    expect(profile.analyzersRun).toEqual(['stack', 'structure', 'git', 'testing']);
+    expect(profile.analyzersRun).toEqual(['stack', 'structure', 'git', 'testing', 'ci', 'docs']);
 
     // Stack
     expect(profile.stack.primaryLanguage).toBe('TypeScript');
@@ -97,7 +97,7 @@ describe('runAnalyzers (integration)', () => {
     const loaded = loadRepoProfile(tmpDir);
     expect(loaded).toBeDefined();
     expect(loaded!.stack.primaryLanguage).toBe('TypeScript');
-    expect(loaded!.analyzersRun).toEqual(['stack', 'structure', 'git', 'testing']);
+    expect(loaded!.analyzersRun).toEqual(['stack', 'structure', 'git', 'testing', 'ci', 'docs']);
   });
 
   it('profile JSON is valid', async () => {
