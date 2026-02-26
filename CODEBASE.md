@@ -1,10 +1,10 @@
 ---
-generated_at: "2026-02-25T12:41:40.041Z"
-git_sha: "0d7fa0cda68257e57cece099124a0076fd09dfcd"
-sprint: 29
-source_files: 104
-test_files: 56
-cli_commands: 27
+generated_at: "2026-02-26T03:15:49.734Z"
+git_sha: "52966274cae52f329231baec6ee11aa4691b5653"
+sprint: 31
+source_files: 119
+test_files: 70
+cli_commands: 29
 guards: 13
 flows: 0
 ---
@@ -18,7 +18,7 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
 <!-- AUTO-GENERATED: START packages -->
 
 ### `src/cli`
-- Source files: 49 | Test files: 14
+- Source files: 51 | Test files: 16
 - Key modules:
   - `config`
   - `hooks-config`
@@ -28,7 +28,7 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
   - `template-generator` — SLOPE Template Generator
 
 ### `src/core`
-- Source files: 44 | Test files: 35
+- Source files: 57 | Test files: 46
 - Key modules:
   - `advisor` — --- Module-private constants ---
   - `briefing` — --- Input types ---
@@ -45,7 +45,7 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
   - `github` — SLOPE — Remote Git Analysis
   - `guard` — SLOPE Guard Framework
   - `handicap` — Compute par value from ticket count.
-  - ... and 20 more
+  - ... and 21 more
 
 ### `src/mcp`
 - Source files: 3 | Test files: 4
@@ -57,7 +57,7 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
 - Source files: 1 | Test files: 1
 
 ### `src/store-pg`
-- Source files: 1 | Test files: 1
+- Source files: 1 | Test files: 2
 
 ### `src/tokens`
 - Source files: 5 | Test files: 1
@@ -174,6 +174,24 @@ Re-exports from `src/core/index.ts`:
 **Event Ingestion:**
 - `validateEventPayload`, `ingestEvents`, `createEventHandler`
 - `EventIngestionResult` (types)
+**Analyzers:**
+- `runAnalyzers`, `loadRepoProfile`, `saveRepoProfile`
+- `RepoProfile`, `StackProfile`, `StructureProfile`, `GitProfile`, `TestProfile`, `AnalyzerName` (types)
+**Complexity:**
+- `estimateComplexity`
+- `ComplexityProfile` (types)
+**Backlog:**
+- `analyzeBacklog`
+- `BacklogAnalysis`, `TodoEntry` (types)
+**Generators:**
+- `generateConfig`
+- `generateFirstSprint`
+- `generateCommonIssues`
+- `GeneratedConfig` (types)
+- `GeneratedSprint` (types)
+**Vision:**
+- `loadVision`, `saveVision`, `validateVision`
+- `VisionDocument` (types)
 **Built-in metaphors (auto-registers on import):**
 - `golf`, `tennis`, `baseball`, `gaming`, `dnd`, `matrix`, `agile`
 <!-- AUTO-GENERATED: END api -->
@@ -182,6 +200,7 @@ Re-exports from `src/core/index.ts`:
 
 <!-- AUTO-GENERATED: START cli -->
 
+- `slope analyze` — SLOPE — slope analyze: run repo profile analyzers
 - `slope auto-card` — Build per-agent breakdowns by mapping commits to swarm sessions via branch.
 - `slope briefing`
 - `slope card`
@@ -209,6 +228,7 @@ Re-exports from `src/core/index.ts`:
 - `slope status`
 - `slope tournament`
 - `slope validate`
+- `slope vision` — SLOPE — slope vision: display project vision document
 <!-- AUTO-GENERATED: END cli -->
 
 ## Guard Definitions
@@ -249,14 +269,14 @@ Re-exports from `src/core/index.ts`:
 
 | Directory | Test Files | Command |
 |-----------|-----------|---------|
-| tests/cli | 14 | `pnpm test` |
-| tests/core | 35 | `pnpm test` |
+| tests/cli | 16 | `pnpm test` |
+| tests/core | 46 | `pnpm test` |
 | tests/mcp | 4 | `pnpm test` |
 | tests/store | 1 | `pnpm test` |
-| tests/store-pg | 1 | `pnpm test` |
+| tests/store-pg | 2 | `pnpm test` |
 | tests/tokens | 1 | `pnpm test` |
 
-**Total test files:** 56
+**Total test files:** 70
 **Run all:** `pnpm -r test`
 **Typecheck:** `pnpm -r typecheck`
 <!-- AUTO-GENERATED: END tests -->
@@ -267,11 +287,11 @@ Re-exports from `src/core/index.ts`:
 
 | Sprint | Theme | Tickets | Score |
 |--------|-------|---------|-------|
-| **25** | Hazard Severity Scoring | 4 | par |
 | **26** | The Fairway Map — User Flow Tracking | 5 | bogey |
 | **27** | The Clubhouse — Marketing Site & Design Tokens | 5 | par |
 | **28** | The Pro Tour — Content & Interactive Features | 4 | par |
 | **29** | Fix NPM Publishing Pipeline | 6 | par |
+| **31** | The Course Designer | 4 | par |
 <!-- AUTO-GENERATED: END history -->
 
 ## Known Gotchas
