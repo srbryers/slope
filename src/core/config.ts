@@ -13,6 +13,8 @@ export interface SlopeConfig {
   claimsPath: string;
   roadmapPath: string;
   flowsPath: string;
+  visionPath: string;
+  repoProfilePath: string;
   metaphor: string;
   registryApiUrl?: string;
   currentSprint?: number;
@@ -62,6 +64,8 @@ const DEFAULT_CONFIG: SlopeConfig = {
   claimsPath: '.slope/claims.json',
   roadmapPath: 'docs/backlog/roadmap.json',
   flowsPath: '.slope/flows.json',
+  visionPath: '.slope/vision.json',
+  repoProfilePath: '.slope/repo-profile.json',
   metaphor: 'golf',
 };
 
