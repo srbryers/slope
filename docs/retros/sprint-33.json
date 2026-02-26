@@ -1,0 +1,108 @@
+{
+  "sprint_number": 33,
+  "theme": "The Transcript",
+  "par": 4,
+  "slope": 2,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-02-26",
+  "type": "feature",
+  "shots": [
+    {
+      "ticket_key": "S33-1",
+      "title": "TranscriptTurn types + JSONL utilities",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "TranscriptTurn/ToolCallSummary/TranscriptLine types. JSONL utilities: appendTurn, readTranscript, listTranscripts, getTranscriptPath. All sync fs, turn_number derived on read. 12 tests, all passed first run."
+    },
+    {
+      "ticket_key": "S33-2",
+      "title": "PostToolUse transcript guard",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "PostToolUse guard with no matcher (fires on all tools). Per-tool param summarization, error detection from tool_response. Silent return, sync fs only. 13 tests passed first run."
+    },
+    {
+      "ticket_key": "S33-3",
+      "title": "slope transcript CLI commands",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "list, show, stats subcommands. Per-tool failure breakdown and token data observability notice added after AI/ML review. 10 tests passed first run."
+    },
+    {
+      "ticket_key": "S33-4",
+      "title": "Config, guard installation, exports, version bump",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "transcriptsPath config field, MCP registry entries for readTranscript/listTranscripts, version bump to 1.11.0. Full build + test + typecheck clean."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 2,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [],
+  "special_plays": [],
+  "training": [],
+  "nutrition": [
+    {
+      "category": "hydration",
+      "description": "Full build + test verified after each ticket and after review fixes. 1473 tests passing at completion, 0 failing.",
+      "status": "healthy"
+    },
+    {
+      "category": "diet",
+      "description": "7 commits: 4 feature, 1 codebase map, 1 architect review fix, 1 AI/ML review enhancement. All pushed before merge.",
+      "status": "healthy"
+    },
+    {
+      "category": "supplements",
+      "description": "36 new tests across 3 test files (transcript core: 13, transcript guard: 13, transcript CLI: 10). Includes malformed JSONL resilience test.",
+      "status": "healthy"
+    },
+    {
+      "category": "recovery",
+      "description": "Two review rounds (architect + AI/ML) caught 5 improvements: malformed line resilience, sort stability, concurrency docs, per-tool failure breakdown, token data notice. All addressed in same session.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Cleanest sprint in recent history. All 4 tickets landed in_the_hole on first attempt. The JSONL design made everything straightforward — append-only semantics eliminated concurrency complexity. Two review rounds added real value without finding structural issues.",
+    "advice_for_next_player": "Transcript guard fires on ALL tools (no matcher). If you add a new guard that also fires on all PostToolUse events, they'll share a hook entry in settings.json. The guard uses sync fs (appendFileSync) — don't add async operations without rethinking the guard path.",
+    "what_surprised_you": "The AI/ML review surfaced genuinely useful insights — per-tool failure breakdown and token data observability notice were quick wins that meaningfully improved the stats command. Two-perspective reviews (architect + ML) caught complementary issues.",
+    "excited_about_next": "Token counts when HookInput exposes them. Retry chain linking for failure recovery analysis. The JSONL foundation makes all of these additive — no schema migrations needed."
+  },
+  "bunker_locations": [
+    "PostToolUse guard with no matcher fires on EVERY tool call — be aware of this when adding similar guards",
+    "appendFileSync is single-agent safe but multi-agent sessions could interleave writes — documented in guard"
+  ],
+  "yardage_book_updates": [
+    "src/core/transcript.ts: JSONL utilities — appendTurn, readTranscript, listTranscripts, getTranscriptPath",
+    "src/core/types.ts: TranscriptTurn, ToolCallSummary, TranscriptLine types",
+    "src/cli/guards/transcript.ts: PostToolUse transcript guard (no matcher, fires on all tools)",
+    "src/cli/commands/transcript.ts: slope transcript list|show|stats CLI commands",
+    "src/core/config.ts: transcriptsPath field (default .slope/transcripts)"
+  ],
+  "course_management_notes": [
+    "4 tickets, par 4, score 4 — par. All shots in_the_hole, 0 hazards, 0 penalties.",
+    "Slope 2 confirmed appropriate — new infrastructure (JSONL files, new guard pattern) but familiar patterns.",
+    "6 new source files, 3 new test files, 7 modified files. Version bumped to 1.11.0.",
+    "Two review rounds (architect + AI/ML engineer) addressed 5 findings, all landed cleanly."
+  ]
+}
