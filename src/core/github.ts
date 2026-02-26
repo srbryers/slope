@@ -24,6 +24,26 @@ export interface GitHubTreeEntry {
   size?: number;
 }
 
+export interface GitHubIssue {
+  number: number;
+  title: string;
+  state: 'open' | 'closed';
+  labels: string[];
+  milestone?: { number: number; title: string };
+  body?: string;
+  createdAt: string;
+}
+
+export interface GitHubMilestone {
+  number: number;
+  title: string;
+  description?: string;
+  state: 'open' | 'closed';
+  openIssues: number;
+  closedIssues: number;
+  dueOn?: string;
+}
+
 export interface GitHubClient {
   listCommits(owner: string, repo: string, opts?: {
     branch?: string;
@@ -39,6 +59,17 @@ export interface GitHubClient {
   getFileContent(owner: string, repo: string, path: string, opts?: {
     branch?: string;
   }): Promise<string>;
+
+  listIssues(owner: string, repo: string, opts?: {
+    state?: 'open' | 'closed' | 'all';
+    labels?: string;
+    milestone?: number;
+    limit?: number;
+  }): Promise<GitHubIssue[]>;
+
+  listMilestones(owner: string, repo: string, opts?: {
+    state?: 'open' | 'closed' | 'all';
+  }): Promise<GitHubMilestone[]>;
 }
 
 const API_BASE = 'https://api.github.com';
@@ -180,6 +211,90 @@ export function createGitHubClient(token?: string): GitHubClient {
       }
 
       return data.content;
+    },
+
+    async listIssues(owner, repo, opts = {}) {
+      const { state = 'open', labels, milestone, limit = 200 } = opts;
+      const params = new URLSearchParams();
+      params.set('state', state);
+      params.set('per_page', String(Math.min(limit, 100)));
+      if (labels) params.set('labels', labels);
+      if (milestone !== undefined) params.set('milestone', String(milestone));
+
+      const issues: GitHubIssue[] = [];
+      let url: string | null = `${API_BASE}/repos/${owner}/${repo}/issues?${params}`;
+
+      while (url && issues.length < limit) {
+        const response = await githubFetch(url, resolvedToken);
+        const data = await response.json() as Array<{
+          number: number;
+          title: string;
+          state: string;
+          labels: Array<{ name: string }>;
+          milestone?: { number: number; title: string };
+          body?: string;
+          created_at: string;
+          pull_request?: unknown;
+        }>;
+
+        for (const item of data) {
+          if (issues.length >= limit) break;
+          // Skip pull requests (GitHub API returns PRs in issues endpoint)
+          if (item.pull_request) continue;
+          issues.push({
+            number: item.number,
+            title: item.title,
+            state: item.state as 'open' | 'closed',
+            labels: item.labels.map(l => l.name),
+            milestone: item.milestone ? { number: item.milestone.number, title: item.milestone.title } : undefined,
+            body: item.body ?? undefined,
+            createdAt: item.created_at,
+          });
+        }
+
+        url = getNextPageUrl(response.headers.get('Link'));
+      }
+
+      return issues;
+    },
+
+    async listMilestones(owner, repo, opts = {}) {
+      const { state = 'all' } = opts;
+      const params = new URLSearchParams();
+      params.set('state', state);
+      params.set('per_page', '100');
+
+      const milestones: GitHubMilestone[] = [];
+      let url: string | null = `${API_BASE}/repos/${owner}/${repo}/milestones?${params}`;
+
+      while (url) {
+        const response = await githubFetch(url, resolvedToken);
+        const data = await response.json() as Array<{
+          number: number;
+          title: string;
+          description?: string;
+          state: string;
+          open_issues: number;
+          closed_issues: number;
+          due_on?: string;
+        }>;
+
+        for (const item of data) {
+          milestones.push({
+            number: item.number,
+            title: item.title,
+            description: item.description ?? undefined,
+            state: item.state as 'open' | 'closed',
+            openIssues: item.open_issues,
+            closedIssues: item.closed_issues,
+            dueOn: item.due_on ?? undefined,
+          });
+        }
+
+        url = getNextPageUrl(response.headers.get('Link'));
+      }
+
+      return milestones;
     },
   };
 }
