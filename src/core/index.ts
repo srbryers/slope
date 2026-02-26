@@ -452,5 +452,13 @@ export {
 } from './event-ingestion.js';
 export type { EventIngestionResult } from './event-ingestion.js';
 
+// Analyzers
+export { runAnalyzers, loadRepoProfile, saveRepoProfile } from './analyzers/index.js';
+export type { RepoProfile, StackProfile, StructureProfile, GitProfile, TestProfile, AnalyzerName } from './analyzers/types.js';
+
+// Vision
+export { loadVision, saveVision, validateVision } from './vision.js';
+export type { VisionDocument } from './analyzers/types.js';
+
 // Built-in metaphors (auto-registers on import)
 export { golf, tennis, baseball, gaming, dnd, matrix, agile } from './metaphors/index.js';

@@ -5,6 +5,8 @@ import { createConfig } from '../config.js';
 import { saveHooksConfig } from '../hooks-config.js';
 import { resolveMetaphor } from '../metaphor.js';
 import type { MetaphorDefinition } from '../../core/index.js';
+import { saveVision } from '../../core/vision.js';
+import type { VisionDocument } from '../../core/analyzers/types.js';
 import {
   generateProjectContext,
   generateSprintChecklist,
@@ -412,7 +414,33 @@ async function runInteractiveInit(cwd: string, args: string[]): Promise<void> {
       }
     }
 
-    const vision = await ask('Project vision (optional): ') || undefined;
+    const visionPurpose = await ask('Project vision / purpose (optional): ') || undefined;
+    let visionPriorities: string[] = [];
+    if (visionPurpose) {
+      const priStr = await ask('Priorities (comma-separated, optional): ');
+      if (priStr) {
+        visionPriorities = priStr.split(',').map(s => s.trim()).filter(Boolean);
+      }
+    }
+
+    const vision = visionPurpose || undefined;
+
+    // Run smart analysis if --smart flag is present
+    if (args.includes('--smart')) {
+      console.log('\nRunning repo analysis...\n');
+      const { runAnalyzers, saveRepoProfile } = await import('../../core/analyzers/index.js');
+      const profile = await runAnalyzers({ cwd });
+      saveRepoProfile(profile, cwd);
+
+      const stackParts = [profile.stack.primaryLanguage || 'unknown'];
+      if (profile.stack.packageManager) stackParts.push(profile.stack.packageManager);
+      if (profile.stack.runtime) stackParts.push(profile.stack.runtime);
+      if (profile.stack.frameworks.length > 0) stackParts.push(profile.stack.frameworks.slice(0, 3).join(', '));
+      console.log(`  Stack:       ${stackParts.join(', ')}`);
+      console.log(`  Structure:   ${profile.structure.sourceFiles} source files, ${profile.structure.testFiles} test files`);
+      console.log(`  Velocity:    ${profile.git.commitsPerWeek} commits/week → ${profile.git.inferredCadence} cadence`);
+      console.log(`  Testing:     ${profile.testing.framework ?? 'none detected'}\n`);
+    }
 
     console.log('\nInitializing SLOPE project...\n');
 
@@ -428,6 +456,19 @@ async function runInteractiveInit(cwd: string, args: string[]): Promise<void> {
     console.log(`  Config: ${result.configPath}`);
     for (const f of result.filesCreated.slice(1)) {
       console.log(`  Created: ${f}`);
+    }
+
+    // Save vision document if purpose was provided
+    if (visionPurpose) {
+      const now = new Date().toISOString();
+      const visionDoc: VisionDocument = {
+        purpose: visionPurpose,
+        priorities: visionPriorities,
+        createdAt: now,
+        updatedAt: now,
+      };
+      saveVision(visionDoc, cwd);
+      console.log(`  Created .slope/vision.json`);
     }
 
     // Handle store setup (infrastructure concern — CLI only)
