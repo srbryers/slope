@@ -10,6 +10,7 @@ import type {
 import type { MetaphorDefinition } from './metaphor.js';
 import { computeHandicapCard } from './handicap.js';
 import { computeDispersion, computeAreaPerformance } from './dispersion.js';
+import { normalizeStats } from './builder.js';
 import {
   background, text as textColor, border, status, chart, semantic,
   fontFamily, fontSize, fontWeight, spacing, radius, layout,
@@ -56,16 +57,17 @@ export function buildReportData(scorecards: GolfScorecard[]): ReportData {
   const areaPerformance = computeAreaPerformance(sorted);
 
   const sprintTrend: SprintTrendEntry[] = sorted.map(sc => {
-    const fwTotal = sc.stats.fairways_total || 1;
-    const girTotal = sc.stats.greens_total || 1;
+    const stats = normalizeStats(sc.stats, (sc.shots ?? []).length);
+    const fwTotal = stats.fairways_total || 1;
+    const girTotal = stats.greens_total || 1;
     return {
       sprintNumber: sc.sprint_number,
       theme: sc.theme,
       par: sc.par,
       score: sc.score,
       differential: sc.score - sc.par,
-      fairwayPct: Math.round((sc.stats.fairways_hit / fwTotal) * 100),
-      girPct: Math.round((sc.stats.greens_in_regulation / girTotal) * 100),
+      fairwayPct: Math.round((stats.fairways_hit / fwTotal) * 100),
+      girPct: Math.round((stats.greens_in_regulation / girTotal) * 100),
     };
   });
 

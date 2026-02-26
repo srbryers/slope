@@ -1,6 +1,7 @@
 import type { GolfScorecard, MissDirection } from './types.js';
 import type { MetaphorDefinition } from './metaphor.js';
 import type { ReportData, SprintTrendEntry } from './report.js';
+import { normalizeStats } from './builder.js';
 import {
   background, text as textColor, border, status, chart, semantic,
   fontSize, fontWeight, spacing, radius,
@@ -244,8 +245,9 @@ export function computeMissHeatmap(scorecards: GolfScorecard[]): MissHeatmapData
   const cells: HeatmapCell[] = [];
 
   for (const sc of sorted) {
+    const stats = normalizeStats(sc.stats, (sc.shots ?? []).length);
     for (const dir of directions) {
-      const count = sc.stats.miss_directions[dir] ?? 0;
+      const count = stats.miss_directions[dir] ?? 0;
       if (count > maxCount) maxCount = count;
       cells.push({ sprintNumber: sc.sprint_number, direction: dir, count, intensity: 0 });
     }

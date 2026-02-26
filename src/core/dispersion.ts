@@ -132,10 +132,11 @@ export function computeAreaPerformance(scorecards: GolfScorecard[]): AreaReport 
     const t = byType[sprintType];
     t.count++;
     t.totalDiff += diff;
-    t.fairwayNum += sc.stats.fairways_hit;
-    t.fairwayDen += sc.stats.fairways_total;
-    t.girNum += sc.stats.greens_in_regulation;
-    t.girDen += sc.stats.greens_total;
+    const stats = normalizeStats(sc.stats, (sc.shots ?? []).length);
+    t.fairwayNum += stats.fairways_hit;
+    t.fairwayDen += stats.fairways_total;
+    t.girNum += stats.greens_in_regulation;
+    t.girDen += stats.greens_total;
 
     // By par
     if (!byPar[sc.par]) {
