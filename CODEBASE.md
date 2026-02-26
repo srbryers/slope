@@ -1,9 +1,9 @@
 ---
-generated_at: "2026-02-26T19:58:28.028Z"
-git_sha: "600f11c02edd4f9f6e9e7d01390ade3e200d1385"
-sprint: 32
-source_files: 128
-test_files: 80
+generated_at: "2026-02-26T23:08:25.856Z"
+git_sha: "5887790d0512a38a345cd987ee29af922d1fe94d"
+sprint: 33
+source_files: 129
+test_files: 83
 cli_commands: 30
 guards: 15
 flows: 0
@@ -18,7 +18,7 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
 <!-- AUTO-GENERATED: START packages -->
 
 ### `src/cli`
-- Source files: 54 | Test files: 20
+- Source files: 54 | Test files: 22
 - Key modules:
   - `config`
   - `hooks-config`
@@ -28,7 +28,7 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
   - `template-generator` — SLOPE Template Generator
 
 ### `src/core`
-- Source files: 63 | Test files: 52
+- Source files: 64 | Test files: 53
 - Key modules:
   - `advisor` — --- Module-private constants ---
   - `briefing` — --- Input types ---
@@ -45,7 +45,7 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
   - `github` — SLOPE — Remote Git Analysis
   - `guard` — SLOPE Guard Framework
   - `handicap` — Compute par value from ticket count.
-  - ... and 22 more
+  - ... and 23 more
 
 ### `src/mcp`
 - Source files: 3 | Test files: 4
@@ -77,9 +77,9 @@ Re-exports from `src/core/index.ts`:
 
 **SLOPE — Sprint Lifecycle & Operational Performance Engine:**
 **Types:**
-- `ClubSelection`, `ShotResult`, `HazardType`, `ConditionType`, `SpecialPlay`, `MissDirection`, `ScoreLabel`, `SprintType`, `HazardHit`, `ShotRecord`, `ConditionRecord`, `HoleStats`, `HoleScore`, `TrainingType`, `TrainingSession`, `NutritionCategory`, `NutritionEntry`, `NineteenthHole`, `GolfScorecard`, `AgentBreakdown`, `RollingStats`, `HandicapCard`, `DispersionReport`, `AreaReport`, `ExecutionTrace`, `ShotClassification`, `ClubRecommendation`, `TrainingRecommendation`, `ClaimScope`, `SprintClaim`, `SprintConflict`, `EventType`, `SlopeEvent`, `CIRunner`, `CISignal`, `PRPlatform`, `PRReviewDecision`, `PRSignal`, `HazardSeverity` (types)
+- `ClubSelection`, `ShotResult`, `HazardType`, `ConditionType`, `SpecialPlay`, `MissDirection`, `ScoreLabel`, `SprintType`, `HazardHit`, `ShotRecord`, `ConditionRecord`, `HoleStats`, `HoleScore`, `TrainingType`, `TrainingSession`, `NutritionCategory`, `NutritionEntry`, `NineteenthHole`, `GolfScorecard`, `AgentBreakdown`, `RollingStats`, `HandicapCard`, `DispersionReport`, `AreaReport`, `ExecutionTrace`, `ShotClassification`, `ClubRecommendation`, `TrainingRecommendation`, `ClaimScope`, `SprintClaim`, `SprintConflict`, `EventType`, `SlopeEvent`, `CIRunner`, `CISignal`, `PRPlatform`, `PRReviewDecision`, `PRSignal`, `HazardSeverity`, `ReviewType`, `ReviewFinding`, `ReviewRecommendation` (types)
 **Constants:**
-- `PAR_THRESHOLDS`, `SLOPE_FACTORS`, `SCORE_LABELS`, `TRAINING_TYPE_MAP`, `NUTRITION_CHECKLIST`, `HAZARD_SEVERITY_PENALTIES`
+- `PAR_THRESHOLDS`, `SLOPE_FACTORS`, `SCORE_LABELS`, `TRAINING_TYPE_MAP`, `NUTRITION_CHECKLIST`, `HAZARD_SEVERITY_PENALTIES`, `REVIEW_TYPE_HAZARD_MAP`
 **Handicap:**
 - `computePar`, `computeSlope`, `computeScoreLabel`, `computeHandicapCard`
 **Builder:**
@@ -156,6 +156,9 @@ Re-exports from `src/core/index.ts`:
 **Player (Multi-Developer):**
 - `DEFAULT_PLAYER`, `extractPlayers`, `filterScorecardsByPlayer`, `computePlayerHandicaps`, `computePlayerHandicap`, `computeReporterSeverity`, `mergeHazardIndices`, `filterHazardsByVisibility`
 - `PlayerHandicap`, `ReporterSeverity` (types)
+**Review (Implementation Review Integration):**
+- `recommendReviews`, `findingToHazard`, `amendScorecardWithFindings`
+- `RecommendReviewsInput`, `AmendResult` (types)
 **Flows:**
 - `parseFlows`, `validateFlows`, `checkFlowStaleness`, `loadFlows`
 - `FlowStep`, `FlowDefinition`, `FlowsFile`, `FlowValidationResult`, `FlowStalenessResult` (types)
@@ -230,7 +233,7 @@ Re-exports from `src/core/index.ts`:
 - `slope plugin`
 - `slope release`
 - `slope report`
-- `slope review-state`
+- `slope review-state` — --- Findings File Management ---
 - `slope review`
 - `slope roadmap` — --- Helpers ---
 - `slope session`
@@ -282,14 +285,14 @@ Re-exports from `src/core/index.ts`:
 
 | Directory | Test Files | Command |
 |-----------|-----------|---------|
-| tests/cli | 20 | `pnpm test` |
-| tests/core | 52 | `pnpm test` |
+| tests/cli | 22 | `pnpm test` |
+| tests/core | 53 | `pnpm test` |
 | tests/mcp | 4 | `pnpm test` |
 | tests/store | 1 | `pnpm test` |
 | tests/store-pg | 2 | `pnpm test` |
 | tests/tokens | 1 | `pnpm test` |
 
-**Total test files:** 80
+**Total test files:** 83
 **Run all:** `pnpm -r test`
 **Typecheck:** `pnpm -r typecheck`
 <!-- AUTO-GENERATED: END tests -->
@@ -300,11 +303,11 @@ Re-exports from `src/core/index.ts`:
 
 | Sprint | Theme | Tickets | Score |
 |--------|-------|---------|-------|
-| **27** | The Clubhouse — Marketing Site & Design Tokens | 5 | par |
 | **28** | The Pro Tour — Content & Interactive Features | 4 | par |
 | **29** | Fix NPM Publishing Pipeline | 6 | par |
 | **31** | The Course Designer | 4 | par |
 | **32** | The Scout | 4 | bogey |
+| **33** | The Transcript | 4 | par |
 <!-- AUTO-GENERATED: END history -->
 
 ## Known Gotchas
