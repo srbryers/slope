@@ -54,6 +54,20 @@ For SLOPE to become a **recommendation engine** — not just a workflow methodol
 
 Both paths use the same underlying analyzer pipeline.
 
+### Vision Document
+
+A new SLOPE artifact: `.slope/vision.md` (or `.slope/vision.json`). Created during the initial interview, it captures:
+
+- **Project purpose** — what the user says they're building
+- **Target audience** — who it's for
+- **Key priorities** — what matters most (speed, reliability, UX, etc.)
+- **Tech direction** — intended stack, architecture, deployment
+- **Non-goals** — what's explicitly out of scope
+
+SLOPE references this document during sprint planning and review. If the `RepoProfile` diverges from the vision (e.g., new languages appearing, scope expanding into unplanned areas, test coverage declining when reliability was a priority), SLOPE surfaces it as a strategic observation — not a blocker, but a prompt to either update the vision or course-correct.
+
+The user can revise their vision at any time via `slope init --interactive` or conversationally through the MCP tools.
+
 ### Analyzer Pipeline
 
 A series of independent analyzers that each extract one dimension of context from the repo. Each returns a structured result. The pipeline runs them all and merges results into a `RepoProfile`.
@@ -456,19 +470,41 @@ Add MCP `analyze` tool and flows generator:
 - Auto-flow detection from route/handler/page patterns
 - `search({ module: 'onboard' })` discovery
 
-## Open Questions
+## Design Decisions (Resolved)
 
-1. **Should `analyze` be cached?** Running all analyzers on a large repo could take a few seconds. Should we cache the `RepoProfile` in `.slope/repo-profile.json` and re-analyze on demand?
+### 1. Caching and Re-analysis
 
-2. **How much should we infer vs ask?** The stack/structure/git analyzers can be fully automated. But vision, priorities, and metaphor choice are subjective. Where's the line between smart defaults and user choice?
+**Decision:** Yes, cache the `RepoProfile` in `.slope/repo-profile.json`. Update it automatically at the end of each ad hoc task or sprint — not just on demand. A standalone `slope analyze` command updates the profile without re-running init.
 
-3. **GitHub token requirement** — Phase 3 needs a token for issue/milestone analysis. Should we make this optional (degrade gracefully) or prompt for it during init?
+This means the profile is a living document that evolves with the repo. The post-hole routine (sprint completion) and any task completion hook should trigger a re-analysis to keep the profile current.
 
-4. **Monorepo handling** — Should `analyze` run per-package or at the root? SLOPE already has `project_id` for multi-project — should each package get its own profile?
+### 2. Infer vs Ask — Interview-First with Vision Tracking
 
-5. **Re-analysis** — Should there be a `slope analyze` standalone command that updates the profile without re-running init? Useful for periodic health checks.
+**Decision:** Interview the user on first setup. Infer everything we can from the repo (stack, structure, git history), then ask about subjective things (vision, priorities, metaphor, team roles). The interview produces a **vision document** that SLOPE maintains and references.
 
-6. **LLM summary** — Should the `RepoProfile` include a natural-language summary field that an LLM generates? Or should the MCP tool return raw data and let the calling LLM interpret it?
+Critical addition: **SLOPE should flag drift from the original vision.** If the user declared "we're building a REST API" and the codebase starts growing React components, SLOPE should surface that as a strategic observation — not a blocker, but a "hey, your codebase is evolving beyond your stated vision, want to update it?"
+
+The user can re-initiate the interview or revise their vision at any time via `slope init --interactive` or through an LLM conversation.
+
+### 3. GitHub Token
+
+**Decision:** Optional. Ask for it during `slope init` (both CLI and interactive), degrade gracefully without it. Phase 1-2 analyzers work entirely locally. Phase 3 GitHub analyzers (backlog, docs, CI) simply skip if no token is available, and the profile notes which analyzers ran.
+
+### 4. Monorepo Handling
+
+**Decision:** Per-package analysis, leveraging multi-project (`project_id`). But this should be a question asked during init — "This looks like a monorepo. Would you like SLOPE to track each package separately?" The user decides whether to treat it as one project or many.
+
+### 5. Re-analysis Standalone Command
+
+**Decision:** Yes. `slope analyze` runs the analyzer pipeline and updates `.slope/repo-profile.json` without touching config, roadmap, or other artifacts. Intended to run:
+- At the end of each sprint (post-hole routine)
+- After significant codebase changes (new modules, major refactors)
+- On demand for health checks
+- Automatically via hooks if configured
+
+### 6. LLM Summary
+
+**Decision:** MCP `analyze` tool returns raw structured data. The calling LLM interprets it and generates natural-language summaries in context. No pre-baked summary field in the `RepoProfile` — this keeps the profile machine-readable and lets different LLMs frame the data for different audiences (developer vs manager vs new contributor).
 
 ## Non-Goals
 
