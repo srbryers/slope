@@ -122,7 +122,7 @@ describe('recommendReviews', () => {
       ticketCount: 4,
       slope: 3,
       sprintType: 'feature',
-      filePatterns: ['src/auth/oauth.ts', 'src/components/LoginForm.tsx'],
+      filePatterns: ['src/auth/oauth.ts', 'src/ui/Button.tsx'],
       hasNewInfra: true,
     });
     const types = recs.map(r => r.review_type);
