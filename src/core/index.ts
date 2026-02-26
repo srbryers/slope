@@ -456,6 +456,21 @@ export type { EventIngestionResult } from './event-ingestion.js';
 export { runAnalyzers, loadRepoProfile, saveRepoProfile } from './analyzers/index.js';
 export type { RepoProfile, StackProfile, StructureProfile, GitProfile, TestProfile, AnalyzerName } from './analyzers/types.js';
 
+// Complexity
+export { estimateComplexity } from './analyzers/complexity.js';
+export type { ComplexityProfile } from './analyzers/complexity.js';
+
+// Backlog
+export { analyzeBacklog } from './analyzers/backlog.js';
+export type { BacklogAnalysis, TodoEntry } from './analyzers/backlog.js';
+
+// Generators
+export { generateConfig } from './generators/config.js';
+export { generateFirstSprint } from './generators/first-sprint.js';
+export { generateCommonIssues } from './generators/common-issues.js';
+export type { GeneratedConfig } from './generators/config.js';
+export type { GeneratedSprint } from './generators/first-sprint.js';
+
 // Vision
 export { loadVision, saveVision, validateVision } from './vision.js';
 export type { VisionDocument } from './analyzers/types.js';
