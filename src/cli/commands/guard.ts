@@ -13,6 +13,7 @@ import { workflowGateGuard } from '../guards/workflow-gate.js';
 import { reviewTierGuard } from '../guards/review-tier.js';
 import { versionCheckGuard } from '../guards/version-check.js';
 import { nextActionGuard } from '../guards/next-action.js';
+import { prReviewGuard } from '../guards/pr-review.js';
 import { execSync } from 'node:child_process';
 
 type GuardHandler = (input: HookInput, cwd: string) => Promise<GuardResult>;
@@ -31,6 +32,7 @@ const handlers: Partial<Record<GuardName, GuardHandler>> = {
   'review-tier': reviewTierGuard,
   'version-check': versionCheckGuard,
   'next-action': nextActionGuard,
+  'pr-review': prReviewGuard,
 };
 
 /** Register a guard handler */

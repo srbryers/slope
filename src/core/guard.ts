@@ -65,7 +65,8 @@ export type GuardName =
   | 'review-tier'
   | 'version-check'
   | 'stale-flows'
-  | 'next-action';
+  | 'next-action'
+  | 'pr-review';
 
 /** Guard registration entry */
 export interface GuardDefinition {
@@ -193,6 +194,13 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     name: 'next-action',
     description: 'Suggest next actions before session end',
     hookEvent: 'Stop',
+    level: 'full',
+  },
+  {
+    name: 'pr-review',
+    description: 'Prompt for review workflow after PR creation',
+    hookEvent: 'PostToolUse',
+    matcher: 'Bash',
     level: 'full',
   },
 ];
