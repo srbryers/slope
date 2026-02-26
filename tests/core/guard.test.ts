@@ -9,8 +9,8 @@ import {
 import type { GuardResult } from '../../src/core/guard.js';
 
 describe('GUARD_DEFINITIONS', () => {
-  it('has 14 guards defined', () => {
-    expect(GUARD_DEFINITIONS).toHaveLength(14);
+  it('has 15 guards defined', () => {
+    expect(GUARD_DEFINITIONS).toHaveLength(15);
   });
 
   it('all guards have required fields', () => {

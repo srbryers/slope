@@ -1,11 +1,11 @@
 ---
-generated_at: "2026-02-26T03:15:49.734Z"
-git_sha: "52966274cae52f329231baec6ee11aa4691b5653"
-sprint: 31
-source_files: 119
-test_files: 70
-cli_commands: 29
-guards: 13
+generated_at: "2026-02-26T19:58:28.028Z"
+git_sha: "600f11c02edd4f9f6e9e7d01390ade3e200d1385"
+sprint: 32
+source_files: 128
+test_files: 80
+cli_commands: 30
+guards: 15
 flows: 0
 ---
 
@@ -18,7 +18,7 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
 <!-- AUTO-GENERATED: START packages -->
 
 ### `src/cli`
-- Source files: 51 | Test files: 16
+- Source files: 54 | Test files: 20
 - Key modules:
   - `config`
   - `hooks-config`
@@ -28,7 +28,7 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
   - `template-generator` — SLOPE Template Generator
 
 ### `src/core`
-- Source files: 57 | Test files: 46
+- Source files: 63 | Test files: 52
 - Key modules:
   - `advisor` — --- Module-private constants ---
   - `briefing` — --- Input types ---
@@ -45,7 +45,7 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
   - `github` — SLOPE — Remote Git Analysis
   - `guard` — SLOPE Guard Framework
   - `handicap` — Compute par value from ticket count.
-  - ... and 21 more
+  - ... and 22 more
 
 ### `src/mcp`
 - Source files: 3 | Test files: 4
@@ -167,7 +167,7 @@ Re-exports from `src/core/index.ts`:
 - `ProjectRegistry` (types)
 **GitHub (Remote Git Analysis):**
 - `createGitHubClient`, `parseRepoUrl`, `GitHubApiError`
-- `GitHubClient`, `GitHubCommit`, `GitHubTreeEntry`, `GitHubErrorCode` (types)
+- `GitHubClient`, `GitHubCommit`, `GitHubTreeEntry`, `GitHubErrorCode`, `GitHubIssue`, `GitHubMilestone` (types)
 **Webhooks (CI Integration):**
 - `validateGitHubWebhookSignature`, `handleCheckRunWebhook`, `handleWorkflowRunWebhook`
 - `WebhookResult` (types)
@@ -176,22 +176,32 @@ Re-exports from `src/core/index.ts`:
 - `EventIngestionResult` (types)
 **Analyzers:**
 - `runAnalyzers`, `loadRepoProfile`, `saveRepoProfile`
-- `RepoProfile`, `StackProfile`, `StructureProfile`, `GitProfile`, `TestProfile`, `AnalyzerName` (types)
+- `RepoProfile`, `StackProfile`, `StructureProfile`, `GitProfile`, `TestProfile`, `CIProfile`, `DocsProfile`, `AnalyzerName` (types)
 **Complexity:**
 - `estimateComplexity`
 - `ComplexityProfile` (types)
 **Backlog:**
 - `analyzeBacklog`
 - `BacklogAnalysis`, `TodoEntry` (types)
+**GitHub Backlog:**
+- `analyzeGitHubBacklog`
+- `GitHubBacklogAnalysis` (types)
+**Merged Backlog:**
+- `mergeBacklogs`
+- `MergedBacklog` (types)
 **Generators:**
 - `generateConfig`
 - `generateFirstSprint`
 - `generateCommonIssues`
+- `generateRoadmap`
 - `GeneratedConfig` (types)
 - `GeneratedSprint` (types)
 **Vision:**
 - `loadVision`, `saveVision`, `validateVision`
 - `VisionDocument` (types)
+**Transcript:**
+- `getTranscriptPath`, `appendTurn`, `readTranscript`, `listTranscripts`
+- `ToolCallSummary`, `TranscriptTurn`, `TranscriptLine` (types)
 **Built-in metaphors (auto-registers on import):**
 - `golf`, `tennis`, `baseball`, `gaming`, `dnd`, `matrix`, `agile`
 <!-- AUTO-GENERATED: END api -->
@@ -227,6 +237,7 @@ Re-exports from `src/core/index.ts`:
 - `slope standup`
 - `slope status`
 - `slope tournament`
+- `slope transcript` — slope transcript — View session transcript data
 - `slope validate`
 - `slope vision` — SLOPE — slope vision: display project vision document
 <!-- AUTO-GENERATED: END cli -->
@@ -250,6 +261,8 @@ Re-exports from `src/core/index.ts`:
 | `version-check` | PreToolUse | Bash | Block push to main when package versions have not been bumped |
 | `stale-flows` | PreToolUse | Edit|Write | Warn when editing files belonging to a stale flow definition |
 | `next-action` | Stop | — | Suggest next actions before session end |
+| `pr-review` | PostToolUse | Bash | Prompt for review workflow after PR creation |
+| `transcript` | PostToolUse | — | Append tool call metadata to session transcript |
 <!-- AUTO-GENERATED: END guards -->
 
 ## MCP Tools
@@ -269,14 +282,14 @@ Re-exports from `src/core/index.ts`:
 
 | Directory | Test Files | Command |
 |-----------|-----------|---------|
-| tests/cli | 16 | `pnpm test` |
-| tests/core | 46 | `pnpm test` |
+| tests/cli | 20 | `pnpm test` |
+| tests/core | 52 | `pnpm test` |
 | tests/mcp | 4 | `pnpm test` |
 | tests/store | 1 | `pnpm test` |
 | tests/store-pg | 2 | `pnpm test` |
 | tests/tokens | 1 | `pnpm test` |
 
-**Total test files:** 70
+**Total test files:** 80
 **Run all:** `pnpm -r test`
 **Typecheck:** `pnpm -r typecheck`
 <!-- AUTO-GENERATED: END tests -->
@@ -287,11 +300,11 @@ Re-exports from `src/core/index.ts`:
 
 | Sprint | Theme | Tickets | Score |
 |--------|-------|---------|-------|
-| **26** | The Fairway Map — User Flow Tracking | 5 | bogey |
 | **27** | The Clubhouse — Marketing Site & Design Tokens | 5 | par |
 | **28** | The Pro Tour — Content & Interactive Features | 4 | par |
 | **29** | Fix NPM Publishing Pipeline | 6 | par |
 | **31** | The Course Designer | 4 | par |
+| **32** | The Scout | 4 | bogey |
 <!-- AUTO-GENERATED: END history -->
 
 ## Known Gotchas

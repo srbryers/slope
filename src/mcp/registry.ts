@@ -620,6 +620,22 @@ export const SLOPE_REGISTRY: FunctionRegistryEntry[] = [
     example: '// Called via MCP tool, not directly',
   },
 
+  // ─── Transcript ───
+  {
+    name: 'readTranscript',
+    module: 'core',
+    description: 'Read all turns from a session transcript JSONL file. Assigns turn_number from line index (1-indexed).',
+    signature: 'readTranscript(transcriptsDir: string, sessionId: string): TranscriptTurn[]',
+    example: 'return readTranscript(".slope/transcripts", "sess-abc-123");',
+  },
+  {
+    name: 'listTranscripts',
+    module: 'core',
+    description: 'List session IDs that have transcripts, sorted by modification time (newest first).',
+    signature: 'listTranscripts(transcriptsDir: string): string[]',
+    example: 'return listTranscripts(".slope/transcripts");',
+  },
+
   // ─── Analyzers ───
   {
     name: 'runAnalyzers',

@@ -379,3 +379,32 @@ export interface SlopeEvent {
   sprint_number?: number;
   ticket_key?: string;
 }
+
+// --- Transcript Types (Session Tool-Call Tracking) ---
+
+/** Summary of a single tool call within a turn */
+export interface ToolCallSummary {
+  tool: string;
+  params_summary: string;
+  success: boolean;
+  duration_ms?: number;
+}
+
+/** A single turn in a session transcript */
+export interface TranscriptTurn {
+  /** Assigned on read from line index (1-indexed), NOT written to JSONL */
+  turn_number: number;
+  role: 'user' | 'assistant' | 'tool_result';
+  timestamp: string;
+  input_tokens?: number;
+  output_tokens?: number;
+  cache_read_tokens?: number;
+  tool_calls?: ToolCallSummary[];
+  outcome?: 'success' | 'failure' | 'retry' | 'abandoned';
+  outcome_note?: string;
+  context_used_pct?: number;
+  compacted?: boolean;
+}
+
+/** What's actually written per JSONL line (turn_number derived on read) */
+export type TranscriptLine = Omit<TranscriptTurn, 'turn_number'>;

@@ -486,5 +486,18 @@ export type { GeneratedSprint } from './generators/first-sprint.js';
 export { loadVision, saveVision, validateVision } from './vision.js';
 export type { VisionDocument } from './analyzers/types.js';
 
+// Transcript
+export {
+  getTranscriptPath,
+  appendTurn,
+  readTranscript,
+  listTranscripts,
+} from './transcript.js';
+export type {
+  ToolCallSummary,
+  TranscriptTurn,
+  TranscriptLine,
+} from './types.js';
+
 // Built-in metaphors (auto-registers on import)
 export { golf, tennis, baseball, gaming, dnd, matrix, agile } from './metaphors/index.js';
