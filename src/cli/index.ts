@@ -65,7 +65,7 @@ switch (subcommand) {
   case 'review': {
     const reviewArgs = process.argv.slice(3);
     const reviewSub = reviewArgs[0];
-    if (['start', 'round', 'status', 'reset'].includes(reviewSub)) {
+    if (['start', 'round', 'status', 'reset', 'recommend', 'findings', 'amend'].includes(reviewSub)) {
       reviewStateCommand(reviewArgs).catch(err => {
         console.error('Error:', err.message);
         process.exit(1);
@@ -243,6 +243,9 @@ Usage:
   slope review round                        Record a completed review round
   slope review status                       Show current review state
   slope review reset                        Clear review state
+  slope review recommend                    Recommend review types for current sprint
+  slope review findings add|list|clear      Manage implementation review findings
+  slope review amend [--sprint=N]           Amend scorecard with review findings
   slope briefing [--sprint=N] [options]      Pre-round briefing
   slope plan --complexity=<level>           Pre-shot advisor (club + training + hazards)
   slope classify --scope=... ...            Classify a shot from execution trace

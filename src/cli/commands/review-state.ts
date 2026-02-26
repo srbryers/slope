@@ -1,5 +1,10 @@
 import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdirSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import type { ReviewFinding, ReviewType, HazardSeverity } from '../../core/types.js';
+import { recommendReviews, amendScorecardWithFindings } from '../../core/review.js';
+import { loadConfig, detectLatestSprint } from '../../core/index.js';
+import { HAZARD_SEVERITY_PENALTIES } from '../../core/constants.js';
+import type { GolfScorecard } from '../../core/types.js';
 
 export interface ReviewState {
   rounds_required: number;
@@ -183,6 +188,288 @@ function resetCommand(cwd: string): void {
   console.log('Review state cleared.');
 }
 
+// --- Findings File Management ---
+
+const FINDINGS_FILE = '.slope/review-findings.json';
+
+export interface FindingsFile {
+  sprint_number: number;
+  findings: ReviewFinding[];
+}
+
+export function loadFindings(cwd: string): FindingsFile | null {
+  const filePath = join(cwd, FINDINGS_FILE);
+  if (!existsSync(filePath)) return null;
+  try {
+    return JSON.parse(readFileSync(filePath, 'utf8')) as FindingsFile;
+  } catch {
+    return null;
+  }
+}
+
+function saveFindings(cwd: string, data: FindingsFile): void {
+  const dir = join(cwd, '.slope');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(cwd, FINDINGS_FILE), JSON.stringify(data, null, 2) + '\n');
+}
+
+// --- Review Recommend ---
+
+function recommendCommand(cwd: string): void {
+  const plan = findPlanFile(cwd);
+  let ticketCount = 0;
+  let slope = 0;
+  let filePatterns: string[] = [];
+  let sprintNumber = 0;
+  let hasNewInfra = false;
+
+  if (plan) {
+    ticketCount = countTickets(plan.content);
+    // Extract slope from plan content
+    const slopeMatch = plan.content.match(/\*\*Slope:\*\*\s*(\d+)/);
+    if (slopeMatch) slope = parseInt(slopeMatch[1], 10);
+    // Extract sprint number
+    const sprintMatch = plan.content.match(/Sprint\s+(\d+)/);
+    if (sprintMatch) sprintNumber = parseInt(sprintMatch[1], 10);
+    // Extract file patterns from "Files to modify" sections
+    const fileMatches = plan.content.matchAll(/`([^`]+\.[a-z]+)`/g);
+    for (const m of fileMatches) filePatterns.push(m[1]);
+    // Check for new infrastructure keywords
+    hasNewInfra = /\b(new module|new package|new service|new infrastructure)\b/i.test(plan.content);
+  } else {
+    // Fallback: try to detect from config
+    try {
+      const config = loadConfig(cwd);
+      sprintNumber = detectLatestSprint(config, cwd) + 1;
+    } catch { /* no config */ }
+  }
+
+  const recs = recommendReviews({
+    ticketCount,
+    slope,
+    filePatterns,
+    hasNewInfra,
+  });
+
+  const sprintLabel = sprintNumber > 0 ? ` for Sprint ${sprintNumber}` : '';
+  console.log(`Recommended reviews${sprintLabel} (${ticketCount} ticket${ticketCount !== 1 ? 's' : ''}, slope ${slope}):\n`);
+  console.log('  Type           Priority      Reason');
+  for (const rec of recs) {
+    const type = rec.review_type.padEnd(14);
+    const priority = rec.priority.padEnd(13);
+    console.log(`  ${type} ${priority} ${rec.reason}`);
+  }
+}
+
+// --- Findings Subcommands ---
+
+const VALID_REVIEW_TYPES: ReviewType[] = ['architect', 'code', 'ml-engineer', 'security', 'ux'];
+const VALID_SEVERITIES: HazardSeverity[] = ['minor', 'moderate', 'major', 'critical'];
+
+function findingsAddCommand(args: string[], cwd: string): void {
+  const typeArg = args.find(a => a.startsWith('--type='));
+  const ticketArg = args.find(a => a.startsWith('--ticket='));
+  const severityArg = args.find(a => a.startsWith('--severity='));
+  const descArg = args.find(a => a.startsWith('--description='));
+  const sprintArg = args.find(a => a.startsWith('--sprint='));
+  const resolvedArg = args.includes('--resolved');
+
+  if (!typeArg || !ticketArg || !descArg) {
+    console.error('Error: --type, --ticket, and --description are required.');
+    console.error('Usage: slope review findings add --type=architect --ticket=S34-1 --severity=moderate --description="..."');
+    process.exit(1);
+  }
+
+  const reviewType = typeArg.slice('--type='.length) as ReviewType;
+  if (!VALID_REVIEW_TYPES.includes(reviewType)) {
+    console.error(`Error: Invalid review type "${reviewType}". Use: ${VALID_REVIEW_TYPES.join(', ')}`);
+    process.exit(1);
+  }
+
+  const severity = severityArg
+    ? severityArg.slice('--severity='.length) as HazardSeverity
+    : 'moderate';
+  if (!VALID_SEVERITIES.includes(severity)) {
+    console.error(`Error: Invalid severity "${severity}". Use: ${VALID_SEVERITIES.join(', ')}`);
+    process.exit(1);
+  }
+
+  const ticketKey = ticketArg.slice('--ticket='.length);
+  const description = descArg.slice('--description='.length);
+
+  // Determine sprint number
+  let sprintNumber = 0;
+  if (sprintArg) {
+    sprintNumber = parseInt(sprintArg.slice('--sprint='.length), 10);
+  } else {
+    try {
+      const config = loadConfig(cwd);
+      sprintNumber = detectLatestSprint(config, cwd);
+    } catch { /* fallback to 0 */ }
+  }
+
+  const finding: ReviewFinding = {
+    review_type: reviewType,
+    ticket_key: ticketKey,
+    severity,
+    description,
+    resolved: resolvedArg,
+  };
+
+  const existing = loadFindings(cwd);
+  if (existing && existing.sprint_number === sprintNumber) {
+    existing.findings.push(finding);
+    saveFindings(cwd, existing);
+  } else if (existing && existing.sprint_number !== sprintNumber) {
+    console.error(`Error: Findings file contains Sprint ${existing.sprint_number} data, but --sprint=${sprintNumber} was specified.`);
+    console.error('Run `slope review findings clear` first, or use the correct --sprint value.');
+    process.exit(1);
+  } else {
+    saveFindings(cwd, { sprint_number: sprintNumber, findings: [finding] });
+  }
+
+  console.log(`Finding added: [${reviewType}] ${ticketKey} — ${description} (${severity})`);
+}
+
+function findingsListCommand(args: string[], cwd: string): void {
+  const sprintArg = args.find(a => a.startsWith('--sprint='));
+  const data = loadFindings(cwd);
+
+  if (!data || data.findings.length === 0) {
+    console.log('No review findings recorded.');
+    return;
+  }
+
+  if (sprintArg) {
+    const requestedSprint = parseInt(sprintArg.slice('--sprint='.length), 10);
+    if (data.sprint_number !== requestedSprint) {
+      console.log(`No findings for Sprint ${requestedSprint}.`);
+      return;
+    }
+  }
+
+  console.log(`Sprint ${data.sprint_number} findings (${data.findings.length} total):\n`);
+  console.log('  Ticket  Type           Severity   Description');
+  for (const f of data.findings) {
+    const ticket = f.ticket_key.padEnd(7);
+    const type = f.review_type.padEnd(14);
+    const severity = f.severity.padEnd(10);
+    console.log(`  ${ticket} ${type} ${severity} ${f.description}`);
+  }
+}
+
+function findingsClearCommand(args: string[], cwd: string): void {
+  const filePath = join(cwd, FINDINGS_FILE);
+  if (existsSync(filePath)) {
+    unlinkSync(filePath);
+    console.log('Review findings cleared.');
+  } else {
+    console.log('No findings to clear.');
+  }
+}
+
+function findingsCommand(args: string[], cwd: string): void {
+  const sub = args[0];
+  switch (sub) {
+    case 'add':
+      findingsAddCommand(args.slice(1), cwd);
+      break;
+    case 'list':
+      findingsListCommand(args.slice(1), cwd);
+      break;
+    case 'clear':
+      findingsClearCommand(args.slice(1), cwd);
+      break;
+    default:
+      console.error(`Unknown findings subcommand: ${sub}. Use add, list, or clear.`);
+      process.exit(1);
+  }
+}
+
+// --- Amend Subcommand ---
+
+function amendCommand(args: string[], cwd: string): void {
+  const sprintArg = args.find(a => a.startsWith('--sprint='));
+
+  let config;
+  try {
+    config = loadConfig(cwd);
+  } catch {
+    console.error('Error: No SLOPE config found. Run `slope init` first.');
+    process.exit(1);
+  }
+
+  // Determine sprint number
+  let sprintNumber: number;
+  if (sprintArg) {
+    sprintNumber = parseInt(sprintArg.slice('--sprint='.length), 10);
+  } else {
+    sprintNumber = detectLatestSprint(config, cwd);
+    if (sprintNumber === 0) {
+      console.error('Error: No scorecards found. Use --sprint=N to specify.');
+      process.exit(1);
+    }
+  }
+
+  // Load scorecard
+  const scorecardPath = join(cwd, config.scorecardDir, `sprint-${sprintNumber}.json`);
+  if (!existsSync(scorecardPath)) {
+    console.error(`Error: Scorecard not found at ${scorecardPath}`);
+    process.exit(1);
+  }
+
+  let scorecard: GolfScorecard;
+  try {
+    scorecard = JSON.parse(readFileSync(scorecardPath, 'utf8')) as GolfScorecard;
+  } catch {
+    console.error(`Error: Could not parse scorecard at ${scorecardPath}`);
+    process.exit(1);
+  }
+
+  // Load findings
+  const findingsData = loadFindings(cwd);
+  if (!findingsData || findingsData.findings.length === 0) {
+    console.log('No review findings to amend. Use `slope review findings add` first.');
+    return;
+  }
+
+  console.log(`Amending Sprint ${sprintNumber} scorecard with ${findingsData.findings.length} review finding${findingsData.findings.length !== 1 ? 's' : ''}...\n`);
+
+  // Amend
+  const result = amendScorecardWithFindings(scorecard, findingsData.findings);
+
+  if (result.amendments.length === 0) {
+    console.log('No new amendments applied (findings already present or no matching tickets).');
+    return;
+  }
+
+  // Display amendments
+  console.log('  Ticket  Finding                          Hazard    Penalty');
+  for (const a of result.amendments) {
+    const ticket = a.ticket_key.padEnd(7);
+    const desc = a.description.length > 32 ? a.description.slice(0, 29) + '...' : a.description.padEnd(32);
+    const hazard = a.hazard_type.padEnd(9);
+    const penalty = HAZARD_SEVERITY_PENALTIES[a.severity];
+    const penaltyStr = penalty > 0 ? `+${penalty}` : '+0';
+    console.log(`  ${ticket} ${desc} ${hazard} ${penaltyStr}`);
+  }
+
+  console.log(`\nScore: ${result.score_before} → ${result.score_after} (${result.label_before} → ${result.label_after})`);
+
+  // Write amended scorecard
+  writeFileSync(scorecardPath, JSON.stringify(result.scorecard, null, 2) + '\n');
+  console.log(`Scorecard updated: ${config.scorecardDir}/sprint-${sprintNumber}.json`);
+
+  // Clear findings file after successful amend to prevent guard false-negatives
+  const findingsFilePath = join(cwd, FINDINGS_FILE);
+  if (existsSync(findingsFilePath)) {
+    unlinkSync(findingsFilePath);
+    console.log('Findings file cleared.');
+  }
+}
+
+// --- Main Command Router ---
+
 export async function reviewStateCommand(args: string[]): Promise<void> {
   const cwd = process.cwd();
   const sub = args[0];
@@ -200,8 +487,17 @@ export async function reviewStateCommand(args: string[]): Promise<void> {
     case 'reset':
       resetCommand(cwd);
       break;
+    case 'recommend':
+      recommendCommand(cwd);
+      break;
+    case 'findings':
+      findingsCommand(args.slice(1), cwd);
+      break;
+    case 'amend':
+      amendCommand(args.slice(1), cwd);
+      break;
     default:
-      console.error(`Unknown review subcommand: ${sub}. Use start, round, status, or reset.`);
+      console.error(`Unknown review subcommand: ${sub}. Use start, round, status, reset, recommend, findings, amend.`);
       process.exit(1);
   }
 }

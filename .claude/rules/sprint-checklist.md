@@ -48,10 +48,12 @@ After completing each ticket:
 After all tickets are complete:
 
 1. **Score the hole** — Audit commits, compute final score vs par
-2. **Build the SLOPE scorecard** — Create scorecard JSON in your retros directory. Run `slope validate` to confirm no errors
-3. **Distill learnings** — Update common-issues with new recurring patterns
-4. **Create PR and merge** — All artifacts travel with the PR
-5. **Review** — Run `slope review` to generate the sprint review markdown
+2. **Check for reviews** — Run `slope review recommend` to see if implementation reviews are needed
+3. **Build the SLOPE scorecard** — Create scorecard JSON in your retros directory. Run `slope validate` to confirm no errors
+4. **Record review findings** — If reviews were done, run `slope review findings add` for each finding, then `slope review amend` to apply them as hazards
+5. **Distill learnings** — Update common-issues with new recurring patterns
+6. **Create PR and merge** — All artifacts travel with the PR
+7. **Review** — Run `slope review` to generate the sprint review markdown
 
 ## Post-Round Routine (Per-Phase)
 

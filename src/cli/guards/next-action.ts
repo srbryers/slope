@@ -3,12 +3,14 @@ import { join, dirname } from 'node:path';
 import type { HookInput, GuardResult, SlopeConfig } from '../../core/index.js';
 import { loadConfig, loadScorecards, detectLatestSprint, parseRoadmap, formatStrategicContext } from '../../core/index.js';
 import { resolveStore } from '../store.js';
+import { loadFindings } from '../commands/review-state.js';
 
 /** Sprint state types for next-action detection */
 type SprintState =
   | { type: 'mid-sprint'; sprintNumber: number; claimCount: number; targets: string[] }
   | { type: 'sprint-complete'; sprintNumber: number }
   | { type: 'needs-review'; sprintNumber: number }
+  | { type: 'needs-amend'; sprintNumber: number; findingCount: number }
   | { type: 'between-sprints'; roadmapContext?: string };
 
 /**
@@ -114,6 +116,28 @@ export async function detectSprintState(cwd: string): Promise<SprintState> {
     if (!existsSync(reviewPath)) {
       return { type: 'needs-review', sprintNumber: latestScoredSprint };
     }
+
+    // Check if findings exist but scorecard hasn't been amended
+    const findingsData = loadFindings(cwd);
+    if (findingsData && findingsData.findings.length > 0) {
+      try {
+        // Check if scorecard already has review hazards
+        const scorecardPath = join(retrosDir, `sprint-${latestScoredSprint}.json`);
+        if (existsSync(scorecardPath)) {
+          const scorecard = JSON.parse(readFileSync(scorecardPath, 'utf8'));
+          const hasReviewHazards = scorecard.shots?.some((s: { hazards?: Array<{ gotcha_id?: string }> }) =>
+            s.hazards?.some((h: { gotcha_id?: string }) => h.gotcha_id?.startsWith('review:')),
+          );
+          if (!hasReviewHazards) {
+            return {
+              type: 'needs-amend',
+              sprintNumber: latestScoredSprint,
+              findingCount: findingsData.findings.length,
+            };
+          }
+        }
+      } catch { /* scorecard parse error — skip */ }
+    }
   }
 
   // Default: between sprints
@@ -188,6 +212,21 @@ export function buildSuggestions(state: SprintState): string {
         '2. Distill learnings and update common issues',
         '3. Run `slope review` for the full sprint review',
         '4. End session — nothing more to do right now',
+        '',
+        'Present these using AskUserQuestion. If the user chooses to end the session, stop without further action.',
+      ].join('\n');
+    }
+
+    case 'needs-amend': {
+      return [
+        header,
+        '',
+        `Current state: Sprint ${state.sprintNumber} has ${state.findingCount} review finding(s) not yet applied to scorecard`,
+        '',
+        'Suggested options:',
+        '1. Run `slope review amend` to apply findings as hazards and recalculate score',
+        '2. Run `slope review findings list` to see the findings first',
+        '3. End session — nothing more to do right now',
         '',
         'Present these using AskUserQuestion. If the user chooses to end the session, stop without further action.',
       ].join('\n');

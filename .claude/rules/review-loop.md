@@ -32,6 +32,17 @@ Review **only what changed** since Round 1:
 
 Delta review of Round 2 changes. Expected outcome: approval with minor notes.
 
+## Implementation Review Findings
+
+After implementation, reviews may discover issues in shipped code. These findings should be tracked as structured data and applied to the scorecard:
+
+1. **Run `slope review recommend`** — Check which review types apply to the sprint
+2. **Conduct reviews** — Run architect, code, ML, security, or UX reviews as recommended
+3. **Record findings** — For each issue found: `slope review findings add --type=<type> --ticket=<key> --severity=<sev> --description="..."`
+4. **Amend scorecard** — Run `slope review amend` to inject findings as hazards and recalculate score
+
+Review types map to hazard types: architect→bunker, code→rough, ml-engineer→rough, security→water, ux→trees.
+
 ## Tool Priority
 
 1. **Search** to check function signatures, type definitions, patterns

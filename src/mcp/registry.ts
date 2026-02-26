@@ -636,6 +636,29 @@ export const SLOPE_REGISTRY: FunctionRegistryEntry[] = [
     example: 'return listTranscripts(".slope/transcripts");',
   },
 
+  // ─── Review (Implementation Review Integration) ───
+  {
+    name: 'recommendReviews',
+    module: 'core',
+    description: 'Recommend which review types to run based on sprint characteristics (ticket count, slope, file patterns).',
+    signature: 'recommendReviews(input: RecommendReviewsInput): ReviewRecommendation[]',
+    example: 'return recommendReviews({ ticketCount: 4, slope: 2, filePatterns: ["src/core/review.ts"] });',
+  },
+  {
+    name: 'findingToHazard',
+    module: 'core',
+    description: 'Convert a ReviewFinding into a HazardHit using the review type → hazard type mapping.',
+    signature: 'findingToHazard(finding: ReviewFinding): HazardHit',
+    example: 'return findingToHazard({ review_type: "architect", ticket_key: "S33-1", severity: "moderate", description: "issue", resolved: true });',
+  },
+  {
+    name: 'amendScorecardWithFindings',
+    module: 'core',
+    description: 'Amend a scorecard by injecting review findings as hazards and recomputing score. Idempotent.',
+    signature: 'amendScorecardWithFindings(scorecard: GolfScorecard, findings: ReviewFinding[]): AmendResult',
+    example: 'const scorecard = loadScorecards()[0]; return amendScorecardWithFindings(scorecard, findings);',
+  },
+
   // ─── Analyzers ───
   {
     name: 'runAnalyzers',

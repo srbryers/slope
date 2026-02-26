@@ -1,4 +1,4 @@
-import type { ScoreLabel, TrainingType, NutritionCategory, SprintType, HazardSeverity } from './types.js';
+import type { ScoreLabel, TrainingType, NutritionCategory, SprintType, HazardSeverity, ReviewType, HazardType } from './types.js';
 
 /** Maps ticket count ranges to par values */
 export const PAR_THRESHOLDS: Record<number, [number, number]> = {
@@ -38,6 +38,15 @@ export const TRAINING_TYPE_MAP: Partial<Record<SprintType, TrainingType>> = {
   research: 'driving_range',
   feedback: 'chipping_practice',
   'test-coverage': 'putting_practice',
+};
+
+/** Maps review types to hazard types for finding → hazard conversion */
+export const REVIEW_TYPE_HAZARD_MAP: Record<ReviewType, HazardType> = {
+  architect: 'bunker',
+  code: 'rough',
+  'ml-engineer': 'rough',
+  security: 'water',
+  ux: 'trees',
 };
 
 /** Default nutrition items to assess per sprint */
