@@ -1,6 +1,6 @@
 // SLOPE — Structure Analyzer: file counts, depth, monorepo detection, modules, large files
 import { readFileSync, existsSync } from 'node:fs';
-import { join, dirname, extname } from 'node:path';
+import { join, extname } from 'node:path';
 import { walkDir } from './walk.js';
 import type { StructureProfile } from './types.js';
 
