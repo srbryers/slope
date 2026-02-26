@@ -149,6 +149,29 @@ describe('generateRoadmap', () => {
     expect(depTicket.depends_on).toContain(result.sprints[0].tickets[0].key);
   });
 
+  it('populates cross-sprint dependencies at sprint level', () => {
+    const milestones: GitHubMilestone[] = [
+      { number: 1, title: 'Sprint 1', state: 'open', openIssues: 1, closedIssues: 0 },
+      { number: 2, title: 'Sprint 2', state: 'open', openIssues: 1, closedIssues: 0 },
+    ];
+    const issues = [
+      makeIssue({ number: 10, title: 'Base', labels: ['feature'], milestone: { number: 1, title: 'Sprint 1' } }),
+      makeIssue({ number: 11, title: 'Needs base', labels: ['feature'], milestone: { number: 2, title: 'Sprint 2' }, body: 'blocked by #10' }),
+    ];
+    const remote = makeRemote(issues, milestones);
+    const backlog = makeBacklog(remote);
+
+    const result = generateRoadmap(makeProfile(), makeComplexity(), backlog);
+
+    // Sprint 2 should depend on Sprint 1 at the sprint level
+    const sprint2 = result.sprints.find(s => s.theme === 'Sprint 2');
+    expect(sprint2).toBeDefined();
+    expect(sprint2!.depends_on).toContain(result.sprints[0].id);
+
+    // The ticket should NOT have intra-sprint depends_on (it's cross-sprint)
+    expect(sprint2!.tickets[0].depends_on).toBeUndefined();
+  });
+
   it('produces valid RoadmapDefinition structure', () => {
     const milestones: GitHubMilestone[] = [
       { number: 1, title: 'v1.0', state: 'open', openIssues: 1, closedIssues: 0 },

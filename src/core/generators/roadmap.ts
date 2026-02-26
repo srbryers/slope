@@ -7,7 +7,7 @@ import type { MergedBacklog } from '../analyzers/backlog-merged.js';
 import type { RoadmapDefinition, RoadmapSprint, RoadmapTicket, RoadmapClub, RoadmapPhase } from '../roadmap.js';
 import type { GitHubIssue } from '../github.js';
 
-const ISSUE_REF_PATTERN = /(?:#(\d+)|depends\s+on\s+#(\d+)|blocked\s+by\s+#(\d+))/gi;
+const ISSUE_REF_PATTERN = /(?:depends\s+on\s+#(\d+)|blocked\s+by\s+#(\d+)|requires\s+#(\d+)|after\s+#(\d+))/gi;
 
 /**
  * Generate a roadmap from repo analysis data.
@@ -260,13 +260,19 @@ function resolveDependencies(
     let match: RegExpExecArray | null;
     const pattern = new RegExp(ISSUE_REF_PATTERN.source, 'gi');
     while ((match = pattern.exec(issue.body)) !== null) {
-      const refNum = parseInt(match[1] ?? match[2] ?? match[3], 10);
+      const refNum = parseInt(match[1] ?? match[2] ?? match[3] ?? match[4], 10);
       const depKey = issueToKey.get(refNum);
       if (depKey && depKey !== ticketKey) {
         const depSprint = keyToSprint.get(depKey);
-        // Only add intra-sprint dependencies
         if (depSprint === thisSprint) {
+          // Intra-sprint ticket dependency
           deps.push(depKey);
+        } else if (depSprint !== undefined) {
+          // Cross-sprint dependency — add at sprint level
+          const sprint = sprints.find(s => s.id === thisSprint);
+          if (sprint && !(sprint.depends_on ?? []).includes(depSprint)) {
+            sprint.depends_on = [...(sprint.depends_on ?? []), depSprint];
+          }
         }
       }
     }

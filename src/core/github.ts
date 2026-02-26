@@ -69,6 +69,7 @@ export interface GitHubClient {
 
   listMilestones(owner: string, repo: string, opts?: {
     state?: 'open' | 'closed' | 'all';
+    limit?: number;
   }): Promise<GitHubMilestone[]>;
 }
 
@@ -259,7 +260,7 @@ export function createGitHubClient(token?: string): GitHubClient {
     },
 
     async listMilestones(owner, repo, opts = {}) {
-      const { state = 'all' } = opts;
+      const { state = 'all', limit = 500 } = opts;
       const params = new URLSearchParams();
       params.set('state', state);
       params.set('per_page', '100');
@@ -267,7 +268,7 @@ export function createGitHubClient(token?: string): GitHubClient {
       const milestones: GitHubMilestone[] = [];
       let url: string | null = `${API_BASE}/repos/${owner}/${repo}/milestones?${params}`;
 
-      while (url) {
+      while (url && milestones.length < limit) {
         const response = await githubFetch(url, resolvedToken);
         const data = await response.json() as Array<{
           number: number;

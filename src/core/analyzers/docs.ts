@@ -2,7 +2,6 @@
 // Checks for README, CONTRIBUTING, CHANGELOG, ADR, and API docs.
 
 import { readFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
 import { walkDir } from './walk.js';
 import type { DocsProfile } from './types.js';
 
@@ -16,7 +15,8 @@ const API_DOC_FILES = ['openapi.json', 'swagger.json', 'openapi.yaml', 'openapi.
 export function analyzeDocs(cwd: string): DocsProfile {
   const entries = walkDir(cwd, { maxDepth: 3 });
 
-  const hasReadme = entries.some(e => !e.isDirectory && /^readme\.md$/i.test(e.path));
+  const readmeEntry = entries.find(e => !e.isDirectory && /^readme\.md$/i.test(e.path));
+  const hasReadme = !!readmeEntry;
   const hasContributing = entries.some(e => !e.isDirectory && /^contributing\.md$/i.test(e.path));
   const hasChangelog = entries.some(e => !e.isDirectory && /^changelog\.md$/i.test(e.path));
 
@@ -31,15 +31,14 @@ export function analyzeDocs(cwd: string): DocsProfile {
   );
 
   let readmeSummary: string | undefined;
-  if (hasReadme) {
-    readmeSummary = extractReadmeSummary(cwd);
+  if (hasReadme && readmeEntry) {
+    readmeSummary = extractReadmeSummary(readmeEntry.fullPath);
   }
 
   return { hasReadme, readmeSummary, hasContributing, hasChangelog, hasAdr, hasApiDocs };
 }
 
-function extractReadmeSummary(cwd: string): string | undefined {
-  const readmePath = join(cwd, 'README.md');
+function extractReadmeSummary(readmePath: string): string | undefined {
   if (!existsSync(readmePath)) return undefined;
 
   let content: string;
