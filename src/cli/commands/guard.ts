@@ -14,6 +14,7 @@ import { reviewTierGuard } from '../guards/review-tier.js';
 import { versionCheckGuard } from '../guards/version-check.js';
 import { nextActionGuard } from '../guards/next-action.js';
 import { prReviewGuard } from '../guards/pr-review.js';
+import { transcriptGuard } from '../guards/transcript.js';
 import { execSync } from 'node:child_process';
 
 type GuardHandler = (input: HookInput, cwd: string) => Promise<GuardResult>;
@@ -33,6 +34,7 @@ const handlers: Partial<Record<GuardName, GuardHandler>> = {
   'version-check': versionCheckGuard,
   'next-action': nextActionGuard,
   'pr-review': prReviewGuard,
+  transcript: transcriptGuard,
 };
 
 /** Register a guard handler */

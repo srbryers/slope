@@ -66,7 +66,8 @@ export type GuardName =
   | 'version-check'
   | 'stale-flows'
   | 'next-action'
-  | 'pr-review';
+  | 'pr-review'
+  | 'transcript';
 
 /** Guard registration entry */
 export interface GuardDefinition {
@@ -201,6 +202,13 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     description: 'Prompt for review workflow after PR creation',
     hookEvent: 'PostToolUse',
     matcher: 'Bash',
+    level: 'full',
+  },
+  {
+    name: 'transcript',
+    description: 'Append tool call metadata to session transcript',
+    hookEvent: 'PostToolUse',
+    // no matcher → fires on all tools
     level: 'full',
   },
 ];
