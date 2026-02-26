@@ -1,0 +1,126 @@
+{
+  "sprint_number": 32,
+  "theme": "The Scout",
+  "par": 4,
+  "slope": 2,
+  "score": 5,
+  "score_label": "bogey",
+  "date": "2026-02-26",
+  "type": "feature",
+  "shots": [
+    {
+      "ticket_key": "S32-1",
+      "title": "CI Pipeline + Documentation Analyzers",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Clean implementation. CI analyzer detects GitHub Actions, CircleCI, GitLab CI, Jenkins, Travis with stage detection. Docs analyzer checks README (with summary), CONTRIBUTING, CHANGELOG, ADR, API docs. Both integrated into runAnalyzers pipeline."
+    },
+    {
+      "ticket_key": "S32-2",
+      "title": "GitHub Backlog Analyzer + Merged Backlog",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "GitHubClient with listIssues/listMilestones, issue grouping by label/milestone, high-priority detection. mergeBacklogs() unifies local TODOs with remote issues."
+    },
+    {
+      "ticket_key": "S32-3",
+      "title": "Roadmap Generator from GitHub Milestones",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "description": "3-tier fallback complexity (milestones → labels → local TODOs) required careful dependency inference from issue body references."
+        }
+      ],
+      "notes": "Roadmap generator with milestone, label, and local-only fallback paths. Infers dependencies from issue body references, classifies tickets by label. Clean but required more design thinking than a standard short_iron."
+    },
+    {
+      "ticket_key": "S32-4",
+      "title": "MCP Registry, Exports, CLI, PR-Review Guard",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "water",
+          "description": "PG store tests failed in CI — Date.now() as sprint_number overflows PostgreSQL INTEGER (max ~2.1B, Date.now() is ~1.77T). Required post-PR fix commit."
+        }
+      ],
+      "notes": "Wired MCP registry entries, core exports, CLI analyze output for CI/docs. Added pr-review guard. Version bump to 1.10.0. PG test overflow was caught in CI after PR creation — fixed with uniqueSprint() counter pattern."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 2,
+    "greens_total": 4,
+    "putts": 2,
+    "penalties": 1,
+    "hazards_hit": 2,
+    "hazard_penalties": 1,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "wind",
+      "description": "First sprint touching external API (GitHub) — new surface area for mocking and error handling patterns",
+      "impact": "minor"
+    }
+  ],
+  "special_plays": [],
+  "training": [],
+  "nutrition": [
+    {
+      "category": "hydration",
+      "description": "Full build + test verified after each ticket. 1437 tests passing at completion (with PG fix), 0 failing.",
+      "status": "healthy"
+    },
+    {
+      "category": "diet",
+      "description": "7 commits: 4 feature, 1 pr-review guard, 1 code review fix, 1 PG test fix. All pushed before merge.",
+      "status": "healthy"
+    },
+    {
+      "category": "supplements",
+      "description": "37 new tests across 6 test files (CI: 114 lines, docs: 112 lines, github-backlog: 110 lines, backlog-merged: 65 lines, roadmap: 219 lines, pr-review: 75 lines).",
+      "status": "healthy"
+    },
+    {
+      "category": "recovery",
+      "description": "PG INTEGER overflow was caught in CI, not locally — local tests skip PG suite. Highlights the value of CI-only test coverage for integration stores.",
+      "status": "warning"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Productive sprint with good momentum through S32-1 and S32-2. The roadmap generator (S32-3) was the most complex piece — 3-tier fallback with dependency inference required careful design. The PG overflow bug was a surprise penalty that added a bogey.",
+    "advice_for_next_player": "Date.now() overflows PostgreSQL INTEGER columns. Use small counters for test uniqueness when the column type is INTEGER. The projectId (TEXT) already provides cross-run isolation.",
+    "what_surprised_you": "The PG overflow bug had been latent since the store-pg tests were written — it only manifested now because CI was actually running them. Good reminder that CI coverage is real coverage.",
+    "excited_about_next": "Session transcript tracking with JSONL — metadata-only approach to capture what worked, token usage, and failure patterns without the bulk of full tool results."
+  },
+  "bunker_locations": [
+    "Date.now() overflows PostgreSQL INTEGER (max ~2.1B) — use counters for test sprint_number values",
+    "3-tier fallback generators (milestones → labels → local) need careful test coverage for each path independently"
+  ],
+  "yardage_book_updates": [
+    "src/core/analyzers/ci.ts: CIProfile — detects CI system, config files, test/build/deploy stages",
+    "src/core/analyzers/docs.ts: DocsProfile — README summary, CONTRIBUTING, CHANGELOG, ADR, API docs",
+    "src/core/analyzers/github-backlog.ts: GitHubBacklogAnalysis — issues by label/milestone, high-priority",
+    "src/core/analyzers/backlog-merged.ts: mergeBacklogs() — unifies local TODOs with remote GitHub issues",
+    "src/core/generators/roadmap.ts: generateRoadmap() — 3-tier fallback from milestones/labels/TODOs",
+    "src/core/github.ts: GitHubClient — listIssues, listMilestones for GitHub API integration",
+    "src/cli/guards/pr-review.ts: pr-review guard — prompts for review workflow after PR creation"
+  ],
+  "course_management_notes": [
+    "4 tickets, par 4, score 5 — bogey due to PG overflow penalty",
+    "Slope 2 confirmed appropriate — GitHub API integration was new but patterns were established",
+    "5 new source files, 6 new test files, 5 modified files. Version bumped to 1.10.0.",
+    "Sprint 30 scorecard still missing — should be filed retroactively"
+  ]
+}
