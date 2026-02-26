@@ -75,27 +75,45 @@ function showCommand(sessionId: string): void {
 /**
  * Compute stats from a set of turns.
  */
+interface ToolStats {
+  count: number;
+  success: number;
+  failure: number;
+}
+
 interface TranscriptStats {
   turnCount: number;
   durationMin: number;
   toolCounts: Record<string, number>;
+  toolStats: Record<string, ToolStats>;
   successCount: number;
   failureCount: number;
   retryCount: number;
+  hasTokenData: boolean;
 }
 
 function computeStats(turns: TranscriptTurn[]): TranscriptStats {
   const toolCounts: Record<string, number> = {};
+  const toolStats: Record<string, ToolStats> = {};
   let successCount = 0;
   let failureCount = 0;
   let retryCount = 0;
+  let hasTokenData = false;
 
   for (const turn of turns) {
+    if (turn.input_tokens || turn.output_tokens) hasTokenData = true;
     if (turn.tool_calls) {
       for (const tc of turn.tool_calls) {
         toolCounts[tc.tool] = (toolCounts[tc.tool] ?? 0) + 1;
-        if (tc.success) successCount++;
-        else failureCount++;
+        if (!toolStats[tc.tool]) toolStats[tc.tool] = { count: 0, success: 0, failure: 0 };
+        toolStats[tc.tool].count++;
+        if (tc.success) {
+          successCount++;
+          toolStats[tc.tool].success++;
+        } else {
+          failureCount++;
+          toolStats[tc.tool].failure++;
+        }
       }
     }
     if (turn.outcome === 'retry') retryCount++;
@@ -108,7 +126,7 @@ function computeStats(turns: TranscriptTurn[]): TranscriptStats {
     durationMin = Math.round((last - first) / 60000);
   }
 
-  return { turnCount: turns.length, durationMin, toolCounts, successCount, failureCount, retryCount };
+  return { turnCount: turns.length, durationMin, toolCounts, toolStats, successCount, failureCount, retryCount, hasTokenData };
 }
 
 function formatStats(label: string, stats: TranscriptStats): void {
@@ -126,6 +144,22 @@ function formatStats(label: string, stats: TranscriptStats): void {
 
   console.log(`Success rate: ${successRate}% (${stats.successCount}/${total})`);
   console.log(`Retries: ${stats.retryCount} (${retryPct}%)`);
+
+  // Per-tool success rates (only show tools with failures)
+  const failingTools = Object.entries(stats.toolStats)
+    .filter(([, s]) => s.failure > 0)
+    .sort((a, b) => b[1].failure - a[1].failure);
+  if (failingTools.length > 0) {
+    console.log('Failures by tool:');
+    for (const [name, s] of failingTools) {
+      const rate = Math.round((s.success / s.count) * 100);
+      console.log(`  ${name}: ${rate}% success (${s.failure} failed of ${s.count})`);
+    }
+  }
+
+  if (!stats.hasTokenData) {
+    console.log('Note: Token counts unavailable (not yet exposed by HookInput)');
+  }
 }
 
 /**

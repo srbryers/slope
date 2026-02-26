@@ -153,6 +153,12 @@ describe('transcriptCommand', () => {
       expect(output).toContain('Read=2');
       expect(output).toContain('Success rate: 75%');
       expect(output).toContain('3/4');
+      // Per-tool failure breakdown
+      expect(output).toContain('Failures by tool:');
+      expect(output).toContain('Edit:');
+      expect(output).toContain('1 failed of 1');
+      // Token data notice
+      expect(output).toContain('Token counts unavailable');
     });
 
     it('aggregates stats across all sessions', async () => {
