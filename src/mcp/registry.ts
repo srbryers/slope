@@ -619,6 +619,52 @@ export const SLOPE_REGISTRY: FunctionRegistryEntry[] = [
     signature: 'check_conflicts(sprintNumber?: number): { claims: number; conflicts: SprintConflict[] }',
     example: '// Called via MCP tool, not directly',
   },
+
+  // ─── Analyzers ───
+  {
+    name: 'runAnalyzers',
+    module: 'core',
+    description: 'Runs repo profile analyzers (stack, structure, git, testing) and returns a RepoProfile.',
+    signature: 'runAnalyzers(opts?: { cwd?: string; analyzers?: AnalyzerName[] }): Promise<RepoProfile>',
+    example: 'return await runAnalyzers({ analyzers: ["stack", "git"] });',
+  },
+  {
+    name: 'loadRepoProfile',
+    module: 'core',
+    description: 'Loads cached RepoProfile from .slope/repo-profile.json.',
+    signature: 'loadRepoProfile(cwd?: string): RepoProfile | null',
+    example: 'return loadRepoProfile();',
+  },
+  {
+    name: 'saveRepoProfile',
+    module: 'core',
+    description: 'Saves a RepoProfile to .slope/repo-profile.json.',
+    signature: 'saveRepoProfile(profile: RepoProfile, cwd?: string): void',
+    example: 'const p = await runAnalyzers(); saveRepoProfile(p); return "saved";',
+  },
+
+  // ─── Vision ───
+  {
+    name: 'loadVision',
+    module: 'core',
+    description: 'Loads the VisionDocument from .slope/vision.json.',
+    signature: 'loadVision(cwd?: string): VisionDocument | null',
+    example: 'return loadVision();',
+  },
+  {
+    name: 'saveVision',
+    module: 'core',
+    description: 'Saves a VisionDocument to .slope/vision.json.',
+    signature: 'saveVision(vision: VisionDocument, cwd?: string): void',
+    example: 'saveVision({ purpose: "Build X", priorities: ["speed"], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }); return "saved";',
+  },
+  {
+    name: 'validateVision',
+    module: 'core',
+    description: 'Validates a VisionDocument, returning an array of error strings.',
+    signature: 'validateVision(vision: unknown): string[]',
+    example: 'return validateVision({ purpose: "", priorities: [] });',
+  },
 ];
 
 /**
@@ -734,4 +780,15 @@ interface BriefingFilter { categories?: string[]; keywords?: string[]; }
 interface TournamentReview { id: string; name: string; dateRange: { start: string; end: string }; sprints: TournamentSprintEntry[]; scoring: TournamentScoring; stats: TournamentStats; hazardIndex: TournamentHazard[]; clubPerformance: Record<string, { attempts: number; inTheHole: number; avgScore: number }>; takeaways: string[]; improvements: string[]; reflection?: string; }
 interface TournamentSprintEntry { sprintNumber: number; theme: string; par: number; slope: number; score: number; scoreLabel: ScoreLabel; ticketCount: number; ticketsLanded: number; }
 interface TournamentScoring { totalPar: number; totalScore: number; differential: number; avgScoreLabel: string; bestSprint: { sprintNumber: number; label: ScoreLabel }; worstSprint: { sprintNumber: number; label: ScoreLabel }; sprintCount: number; ticketCount: number; ticketsLanded: number; landingRate: number; }
+
+// ─── Analyzers ───
+type AnalyzerName = 'stack' | 'structure' | 'git' | 'testing';
+interface StackProfile { primaryLanguage: string; languages: Record<string, number>; frameworks: string[]; packageManager?: string; runtime?: string; buildTool?: string; }
+interface StructureProfile { totalFiles: number; sourceFiles: number; testFiles: number; maxDepth: number; isMonorepo: boolean; modules: Array<{ name: string; path: string; fileCount: number }>; largeFiles: Array<{ path: string; lines: number }>; }
+interface GitProfile { totalCommits: number; commitsLast90d: number; commitsPerWeek: number; contributors: Array<{ name: string; email: string; commits: number }>; activeBranches: string[]; lastRelease?: { tag: string; date: string }; inferredCadence: 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'sporadic'; }
+interface TestProfile { framework?: string; testFileCount: number; hasTestScript: boolean; hasCoverage: boolean; testDirs: string[]; }
+interface RepoProfile { analyzedAt: string; analyzersRun: AnalyzerName[]; stack: StackProfile; structure: StructureProfile; git: GitProfile; testing: TestProfile; }
+
+// ─── Vision ───
+interface VisionDocument { purpose: string; audience?: string; priorities: string[]; techDirection?: string; nonGoals?: string[]; createdAt: string; updatedAt: string; }
 `;
