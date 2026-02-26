@@ -15,6 +15,7 @@ export interface SlopeConfig {
   flowsPath: string;
   visionPath: string;
   repoProfilePath: string;
+  transcriptsPath: string;
   metaphor: string;
   registryApiUrl?: string;
   currentSprint?: number;
@@ -66,6 +67,7 @@ const DEFAULT_CONFIG: SlopeConfig = {
   flowsPath: '.slope/flows.json',
   visionPath: '.slope/vision.json',
   repoProfilePath: '.slope/repo-profile.json',
+  transcriptsPath: '.slope/transcripts',
   metaphor: 'golf',
 };
 

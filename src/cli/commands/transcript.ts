@@ -15,8 +15,7 @@ import { loadConfig } from '../config.js';
 function resolveTranscriptsDir(): string {
   const cwd = process.cwd();
   const config = loadConfig();
-  const transcriptsPath = (config as Record<string, unknown>).transcriptsPath as string | undefined;
-  return transcriptsPath ? join(cwd, transcriptsPath) : join(cwd, '.slope', 'transcripts');
+  return join(cwd, config.transcriptsPath ?? '.slope/transcripts');
 }
 
 /**

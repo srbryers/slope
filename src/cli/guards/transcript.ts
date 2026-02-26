@@ -50,10 +50,7 @@ export async function transcriptGuard(input: HookInput, cwd: string): Promise<Gu
   if (!input.session_id) return {};
 
   const config = loadConfig();
-  const transcriptsPath = (config as Record<string, unknown>).transcriptsPath as string | undefined;
-  const transcriptsDir = transcriptsPath
-    ? join(cwd, transcriptsPath)
-    : join(cwd, '.slope', 'transcripts');
+  const transcriptsDir = join(cwd, config.transcriptsPath ?? '.slope/transcripts');
 
   const toolName = input.tool_name ?? 'unknown';
   const toolInput = input.tool_input ?? {};
