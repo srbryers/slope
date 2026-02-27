@@ -67,6 +67,11 @@ export const CLAUDE_CODE_TOOLS: ToolNameMap = {
   exit_plan: 'ExitPlanMode',
 };
 
+// --- Adapter Priority ---
+
+/** Detection order for adapters. First match wins. Generic is always last (fallback). */
+export const ADAPTER_PRIORITY: HarnessId[] = ['claude-code', 'cursor', 'windsurf', 'generic'];
+
 // --- Adapter Registry ---
 
 const adapters = new Map<HarnessId, HarnessAdapter>();
@@ -88,16 +93,22 @@ export function listAdapters(): HarnessId[] {
 
 /**
  * Detect which harness is active in the given directory.
- * Tries each registered adapter's detect() in registration order.
- * Returns 'generic' if no adapter matches and a generic adapter is registered,
- * or undefined if nothing matches.
+ * Iterates ADAPTER_PRIORITY in order; first match wins.
+ * Falls back to generic if registered and no other adapter matches.
+ * Adapters not in ADAPTER_PRIORITY are checked after priority list (before generic).
  */
 export function detectAdapter(cwd: string): HarnessAdapter | undefined {
-  // Try non-generic adapters first
+  // Check priority-ordered adapters first (skip generic — it's the fallback)
+  for (const id of ADAPTER_PRIORITY) {
+    if (id === 'generic') continue;
+    const adapter = adapters.get(id);
+    if (adapter?.detect(cwd)) return adapter;
+  }
+  // Check any registered adapters not in the priority list (third-party)
   for (const adapter of adapters.values()) {
-    if (adapter.id !== 'generic' && adapter.detect(cwd)) {
-      return adapter;
-    }
+    if (adapter.id === 'generic') continue;
+    if (ADAPTER_PRIORITY.includes(adapter.id)) continue;
+    if (adapter.detect(cwd)) return adapter;
   }
   // Fall back to generic if registered
   return adapters.get('generic');

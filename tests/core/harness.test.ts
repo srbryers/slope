@@ -8,6 +8,7 @@ import {
   resolveToolMatcher,
   CLAUDE_CODE_TOOLS,
   TOOL_CATEGORIES,
+  ADAPTER_PRIORITY,
 } from '../../src/core/harness.js';
 import type { HarnessAdapter, ToolNameMap, ToolCategory } from '../../src/core/harness.js';
 import type { GuardResult } from '../../src/core/guard.js';
@@ -102,6 +103,41 @@ describe('detectAdapter', () => {
 
   it('returns undefined when no adapters registered', () => {
     expect(detectAdapter('/tmp')).toBeUndefined();
+  });
+
+  it('respects ADAPTER_PRIORITY order — claude-code wins over cursor', () => {
+    // Register in reverse priority order
+    registerAdapter(makeAdapter('cursor', true));
+    registerAdapter(makeAdapter('claude-code', true));
+    const result = detectAdapter('/tmp');
+    expect(result?.id).toBe('claude-code');
+  });
+
+  it('respects ADAPTER_PRIORITY order — cursor wins over windsurf', () => {
+    registerAdapter(makeAdapter('windsurf', true));
+    registerAdapter(makeAdapter('cursor', true));
+    const result = detectAdapter('/tmp');
+    expect(result?.id).toBe('cursor');
+  });
+
+  it('detects third-party adapters not in ADAPTER_PRIORITY', () => {
+    registerAdapter(makeAdapter('claude-code', false));
+    registerAdapter(makeAdapter('my-custom-harness', true));
+    registerAdapter(makeAdapter('generic', true));
+    const result = detectAdapter('/tmp');
+    expect(result?.id).toBe('my-custom-harness');
+  });
+});
+
+describe('ADAPTER_PRIORITY', () => {
+  it('starts with claude-code and ends with generic', () => {
+    expect(ADAPTER_PRIORITY[0]).toBe('claude-code');
+    expect(ADAPTER_PRIORITY[ADAPTER_PRIORITY.length - 1]).toBe('generic');
+  });
+
+  it('includes cursor and windsurf', () => {
+    expect(ADAPTER_PRIORITY).toContain('cursor');
+    expect(ADAPTER_PRIORITY).toContain('windsurf');
   });
 });
 
