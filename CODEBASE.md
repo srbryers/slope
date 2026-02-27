@@ -1,11 +1,11 @@
 ---
-generated_at: "2026-02-27T00:12:06.784Z"
-git_sha: "8247b74f06a2727acf871f90ef0e290a31687ea6"
-sprint: 33
-source_files: 130
-test_files: 84
+generated_at: "2026-02-27T10:39:46.836Z"
+git_sha: "4192408ec7cebd7b5cffd1a6b6fb3befac377a53"
+sprint: 34
+source_files: 134
+test_files: 88
 cli_commands: 29
-guards: 15
+guards: 16
 flows: 0
 ---
 
@@ -18,7 +18,7 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
 <!-- AUTO-GENERATED: START packages -->
 
 ### `src/cli`
-- Source files: 55 | Test files: 23
+- Source files: 56 | Test files: 24
 - Key modules:
   - `config`
   - `hooks-config`
@@ -29,7 +29,7 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
   - `template-generator` — SLOPE Template Generator
 
 ### `src/core`
-- Source files: 64 | Test files: 53
+- Source files: 67 | Test files: 56
 - Key modules:
   - `advisor` — --- Module-private constants ---
   - `briefing` — --- Input types ---
@@ -46,7 +46,7 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
   - `github` — SLOPE — Remote Git Analysis
   - `guard` — SLOPE Guard Framework
   - `handicap` — Compute par value from ticket count.
-  - ... and 23 more
+  - ... and 24 more
 
 ### `src/mcp`
 - Source files: 3 | Test files: 4
@@ -130,6 +130,13 @@ Re-exports from `src/core/index.ts`:
 **Guard Framework:**
 - `GUARD_DEFINITIONS`, `formatPreToolUseOutput`, `formatPostToolUseOutput`, `formatStopOutput`, `generateClaudeCodeHooksConfig`, `registerCustomGuard`, `getAllGuardDefinitions`, `getCustomGuard`, `clearCustomGuards`
 - `HookInput`, `PreToolUseOutput`, `PostToolUseOutput`, `StopOutput`, `GuardResult`, `GuardName`, `GuardDefinition`, `GuidanceConfig`, `CustomGuardDefinition`, `AnyGuardDefinition` (types)
+**Harness Adapter Framework:**
+- `TOOL_CATEGORIES`, `CLAUDE_CODE_TOOLS`, `registerAdapter`, `getAdapter`, `listAdapters`, `detectAdapter`, `clearAdapters`, `resolveToolMatcher`
+- `HarnessId`, `ToolCategory`, `ToolNameMap`, `HarnessAdapter` (types)
+**Adapters:**
+- `ClaudeCodeAdapter`, `claudeCodeAdapter`
+- `GenericAdapter`, `genericAdapter`
+- `GuardManifestEntry` (types)
 **Report:**
 - `buildReportData`, `generateHtmlReport`, `REPORT_CSS`, `escapeHtml`, `svgLine`, `svgRect`, `svgText`, `renderSummaryCards`, `renderHandicapTrendChart`, `renderDispersionChart`, `renderAreaPerformanceChart`, `renderNutritionChart`, `renderSprintTable`
 - `ReportData`, `SprintTrendEntry`, `NutritionTrendEntry` (types)
@@ -266,6 +273,7 @@ Re-exports from `src/core/index.ts`:
 | `next-action` | Stop | — | Suggest next actions before session end |
 | `pr-review` | PostToolUse | Bash | Prompt for review workflow after PR creation |
 | `transcript` | PostToolUse | — | Append tool call metadata to session transcript |
+| `branch-before-commit` | PreToolUse | Bash | Block git commit on main/master — create a feature branch first |
 <!-- AUTO-GENERATED: END guards -->
 
 ## MCP Tools
@@ -285,14 +293,14 @@ Re-exports from `src/core/index.ts`:
 
 | Directory | Test Files | Command |
 |-----------|-----------|---------|
-| tests/cli | 23 | `pnpm test` |
-| tests/core | 53 | `pnpm test` |
+| tests/cli | 24 | `pnpm test` |
+| tests/core | 56 | `pnpm test` |
 | tests/mcp | 4 | `pnpm test` |
 | tests/store | 1 | `pnpm test` |
 | tests/store-pg | 2 | `pnpm test` |
 | tests/tokens | 1 | `pnpm test` |
 
-**Total test files:** 84
+**Total test files:** 88
 **Run all:** `pnpm -r test`
 **Typecheck:** `pnpm -r typecheck`
 <!-- AUTO-GENERATED: END tests -->
@@ -303,11 +311,11 @@ Re-exports from `src/core/index.ts`:
 
 | Sprint | Theme | Tickets | Score |
 |--------|-------|---------|-------|
-| **28** | The Pro Tour — Content & Interactive Features | 4 | par |
 | **29** | Fix NPM Publishing Pipeline | 6 | par |
 | **31** | The Course Designer | 4 | par |
 | **32** | The Scout | 4 | bogey |
 | **33** | The Transcript | 4 | par |
+| **34** | The Universal Caddy | 5 | par |
 <!-- AUTO-GENERATED: END history -->
 
 ## Known Gotchas

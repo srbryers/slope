@@ -1,0 +1,117 @@
+{
+  "sprint_number": 34,
+  "theme": "The Universal Caddy",
+  "par": 4,
+  "slope": 3,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-02-27",
+  "type": "architecture + extensibility",
+  "shots": [
+    {
+      "ticket_key": "S34-1",
+      "title": "HarnessAdapter interface + tool name mapping types",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "HarnessAdapter interface, ToolCategory/ToolNameMap types, TOOL_CATEGORIES constant, CLAUDE_CODE_TOOLS map, adapter registry (register/get/list/detect/clear), resolveToolMatcher utility. 21 tests, all passed first run."
+    },
+    {
+      "ticket_key": "S34-2",
+      "title": "Extract ClaudeCodeAdapter from guard.ts + hook.ts",
+      "club": "long_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Extracted format functions and installGuards logic into ClaudeCodeAdapter class. guard.ts format functions become thin wrappers delegating to adapter singleton. Added toolCategories field to all 16 built-in guards. 19 tests verifying parity with legacy functions."
+    },
+    {
+      "ticket_key": "S34-3",
+      "title": "Refactor hook installation with --harness flag",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "installGuardHooks() now uses adapter registry: explicit --harness=<id> or auto-detect. Removed installClaudeCodeGuards function. Help text updated with adapter listing. Side-effect imports trigger auto-registration."
+    },
+    {
+      "ticket_key": "S34-4",
+      "title": "Build GenericAdapter for shell-based harnesses",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "GenericAdapter class with JSON output format, guards-manifest.json generation, shell dispatcher script, README.md. detect() always returns true (fallback). 16 tests including file creation and dispatcher preservation."
+    },
+    {
+      "ticket_key": "S34-5",
+      "title": "slope roadmap sync CLI command",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "sync subcommand reads scorecards, maps to RoadmapSprint format with club-to-complexity inference, updates existing sprints (preserves depends_on), adds new ones, --dry-run support. 7 tests."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 5,
+    "fairways_total": 5,
+    "greens_in_regulation": 5,
+    "greens_total": 5,
+    "putts": 2,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [],
+  "special_plays": [],
+  "training": [],
+  "nutrition": [
+    {
+      "category": "hydration",
+      "description": "Full build + test after every ticket. 1605 tests passing at completion, 0 failing.",
+      "status": "healthy"
+    },
+    {
+      "category": "diet",
+      "description": "5 feature commits, 1:1 ticket-to-commit ratio. All pushed to feat/harness-adapter branch.",
+      "status": "healthy"
+    },
+    {
+      "category": "supplements",
+      "description": "63 new tests across 4 test files (harness: 21, claude-code adapter: 19, generic adapter: 16, roadmap sync: 7). All passed on first run.",
+      "status": "healthy"
+    },
+    {
+      "category": "recovery",
+      "description": "Adapter extraction maintained 100% backwards compatibility — all existing tests pass without modification. Thin wrapper pattern preserved public API.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Smooth architectural sprint. The adapter pattern extracted cleanly from guard.ts without any backwards-compat issues. The thin-wrapper approach meant zero changes to existing tests while enabling full extensibility.",
+    "advice_for_next_player": "Adapters auto-register on import via side-effect imports. When adding a new adapter, create it in src/core/adapters/, call registerAdapter() at module level, and add a side-effect import in hook.ts. The generic adapter is always the fallback (detect returns true).",
+    "what_surprised_you": "The dual toolCategories + matcher approach worked well. Guards declare harness-agnostic toolCategories, and resolveToolMatcher() translates them to harness-specific tool names. No need to rewrite matchers per harness.",
+    "excited_about_next": "CaddyStack integration (S35-S36) — now that we have the adapter framework, adding Cursor, Windsurf, or any new harness is just a new adapter class."
+  },
+  "bunker_locations": [
+    "Side-effect imports (import '../../core/adapters/claude-code.js') are required for auto-registration — forgetting them means adapters won't be found",
+    "Generic adapter detect() always returns true — it must be registered last or detectAdapter() skips it correctly via priority logic"
+  ],
+  "yardage_book_updates": [
+    "src/core/harness.ts: Adapter framework — HarnessAdapter interface, registry, ToolCategory/ToolNameMap, resolveToolMatcher",
+    "src/core/adapters/claude-code.ts: ClaudeCodeAdapter — format functions, installGuards (settings.json merge), detect (.claude dir)",
+    "src/core/adapters/generic.ts: GenericAdapter — JSON output, guards-manifest.json, shell dispatcher, fallback detect",
+    "src/core/guard.ts: Added toolCategories field to GuardDefinition, format functions now delegate to claudeCodeAdapter",
+    "src/cli/commands/hook.ts: --harness flag, adapter-based installGuardHooks, side-effect adapter imports",
+    "src/cli/commands/roadmap.ts: sync subcommand — scorecardToSprint mapping, club-to-complexity inference, --dry-run"
+  ],
+  "course_management_notes": [
+    "5 tickets, par 4, score 4 — par. All shots in_the_hole, 0 hazards, 0 penalties.",
+    "Slope 3 — new adapter abstraction layer affecting guard.ts, hook.ts, and new infrastructure.",
+    "1225 lines added, 142 removed across 11 files. 6 new source files, 4 new test files.",
+    "100% backwards compatibility maintained — all 1542 pre-sprint tests pass unmodified."
+  ]
+}

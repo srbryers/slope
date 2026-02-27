@@ -260,6 +260,29 @@ export type {
   AnyGuardDefinition,
 } from './guard.js';
 
+// Harness Adapter Framework
+export {
+  TOOL_CATEGORIES,
+  CLAUDE_CODE_TOOLS,
+  registerAdapter,
+  getAdapter,
+  listAdapters,
+  detectAdapter,
+  clearAdapters,
+  resolveToolMatcher,
+} from './harness.js';
+export type {
+  HarnessId,
+  ToolCategory,
+  ToolNameMap,
+  HarnessAdapter,
+} from './harness.js';
+
+// Adapters
+export { ClaudeCodeAdapter, claudeCodeAdapter } from './adapters/claude-code.js';
+export { GenericAdapter, genericAdapter } from './adapters/generic.js';
+export type { GuardManifestEntry } from './adapters/generic.js';
+
 // Report
 export {
   buildReportData,
