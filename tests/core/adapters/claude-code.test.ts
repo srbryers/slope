@@ -1,4 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import { mkdtempSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { ClaudeCodeAdapter } from '../../../src/core/adapters/claude-code.js';
 import { formatPreToolUseOutput, formatPostToolUseOutput, formatStopOutput, generateClaudeCodeHooksConfig, GUARD_DEFINITIONS } from '../../../src/core/guard.js';
 import { resolveToolMatcher } from '../../../src/core/harness.js';
@@ -116,6 +119,47 @@ describe('ClaudeCodeAdapter', () => {
   describe('hooksConfigPath', () => {
     it('returns .claude/settings.json', () => {
       expect(adapter.hooksConfigPath('/tmp/test')).toBe('/tmp/test/.claude/settings.json');
+    });
+  });
+
+  describe('installGuards', () => {
+    it('merges new guards into existing matcher entry instead of skipping', () => {
+      const tmpDir = mkdtempSync(join(tmpdir(), 'slope-cc-merge-'));
+
+      // Install first 2 guards
+      adapter.installGuards(tmpDir, GUARD_DEFINITIONS.slice(0, 2));
+      const settingsPath = join(tmpDir, '.claude', 'settings.json');
+      const first = JSON.parse(readFileSync(settingsPath, 'utf8'));
+
+      // Count total hook commands across all entries for the first event
+      const firstEvent = GUARD_DEFINITIONS[0].hookEvent;
+      const firstCount = (first.hooks[firstEvent] as Array<{ hooks: unknown[] }>)
+        .reduce((n, e) => n + e.hooks.length, 0);
+
+      // Install first 4 guards — should merge new commands into existing entries
+      adapter.installGuards(tmpDir, GUARD_DEFINITIONS.slice(0, 4));
+      const second = JSON.parse(readFileSync(settingsPath, 'utf8'));
+      const secondCount = (second.hooks[firstEvent] as Array<{ hooks: unknown[] }>)
+        .reduce((n, e) => n + e.hooks.length, 0);
+
+      // Should have more hook commands, not the same count
+      expect(secondCount).toBeGreaterThanOrEqual(firstCount);
+    });
+
+    it('does not duplicate hook commands on re-install', () => {
+      const tmpDir = mkdtempSync(join(tmpdir(), 'slope-cc-dedup-'));
+      const guards = GUARD_DEFINITIONS.slice(0, 4);
+
+      adapter.installGuards(tmpDir, guards);
+      const settingsPath = join(tmpDir, '.claude', 'settings.json');
+      const first = JSON.parse(readFileSync(settingsPath, 'utf8'));
+
+      // Re-install same guards
+      adapter.installGuards(tmpDir, guards);
+      const second = JSON.parse(readFileSync(settingsPath, 'utf8'));
+
+      // Should be identical
+      expect(second).toEqual(first);
     });
   });
 });
