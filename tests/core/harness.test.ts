@@ -18,6 +18,7 @@ import type { GuardResult } from '../../src/core/guard.js';
 import { ClaudeCodeAdapter } from '../../src/core/adapters/claude-code.js';
 import { CursorAdapter } from '../../src/core/adapters/cursor.js';
 import { WindsurfAdapter } from '../../src/core/adapters/windsurf.js';
+import { ClineAdapter } from '../../src/core/adapters/cline.js';
 import { GenericAdapter } from '../../src/core/adapters/generic.js';
 
 function makeAdapter(id: string, detectResult = false): HarnessAdapter {
@@ -271,6 +272,7 @@ describe('adapter interface contract — new members', () => {
     registerAdapter(new ClaudeCodeAdapter());
     registerAdapter(new CursorAdapter());
     registerAdapter(new WindsurfAdapter());
+    registerAdapter(new ClineAdapter());
     registerAdapter(new GenericAdapter());
   });
 
@@ -304,6 +306,7 @@ describe('adapter registration completeness', () => {
     registerAdapter(new ClaudeCodeAdapter());
     registerAdapter(new CursorAdapter());
     registerAdapter(new WindsurfAdapter());
+    registerAdapter(new ClineAdapter());
     registerAdapter(new GenericAdapter());
 
     for (const id of ADAPTER_PRIORITY) {
@@ -315,6 +318,7 @@ describe('adapter registration completeness', () => {
     registerAdapter(new ClaudeCodeAdapter());
     registerAdapter(new CursorAdapter());
     registerAdapter(new WindsurfAdapter());
+    registerAdapter(new ClineAdapter());
     registerAdapter(new GenericAdapter());
 
     const registered = listAdapters();
