@@ -1,4 +1,4 @@
-// CLI Command Registry — single source of truth for all slope CLI commands
+// CLI Command Registry — metadata for CLI commands (map generation, documentation, slope-web)
 
 export interface CliCommandMeta {
   /** Command name as invoked: e.g. "init", "auto-card" */
@@ -8,6 +8,9 @@ export interface CliCommandMeta {
   /** Functional category */
   category: 'lifecycle' | 'scoring' | 'analysis' | 'tooling' | 'planning';
 }
+
+/** Command files that are internal implementation modules, not user-invocable top-level commands. */
+export const CLI_INTERNAL_MODULES = ['review-state'] as const;
 
 export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
   // ── Lifecycle ──────────────────────────────────────────────────
@@ -25,7 +28,6 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
   { cmd: 'auto-card',    desc: 'Generate scorecard from git + CI signals',     category: 'scoring' },
   { cmd: 'classify',     desc: 'Classify a shot from execution trace',         category: 'scoring' },
   { cmd: 'tournament',   desc: 'Build tournament review from sprints',         category: 'scoring' },
-  { cmd: 'review-state', desc: 'Manage plan review lifecycle and findings',    category: 'scoring' },
 
   // ── Analysis ───────────────────────────────────────────────────
   { cmd: 'briefing',   desc: 'Pre-round briefing with hazards and nutrition',  category: 'analysis' },
@@ -49,4 +51,4 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
   // ── Planning ───────────────────────────────────────────────────
   { cmd: 'roadmap',  desc: 'Strategic planning and roadmap tools',            category: 'planning' },
   { cmd: 'vision',   desc: 'Display project vision document',                category: 'planning' },
-] as const;
+];

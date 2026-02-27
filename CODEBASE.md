@@ -1,10 +1,10 @@
 ---
-generated_at: "2026-02-27T00:02:55.961Z"
-git_sha: "ed1f6df6b8b4f6a4ff55045e18e15002ecd53986"
+generated_at: "2026-02-27T00:12:06.784Z"
+git_sha: "8247b74f06a2727acf871f90ef0e290a31687ea6"
 sprint: 33
 source_files: 130
 test_files: 84
-cli_commands: 30
+cli_commands: 29
 guards: 15
 flows: 0
 ---
@@ -24,7 +24,7 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
   - `hooks-config`
   - `loader`
   - `metaphor` — CLI metaphor resolution
-  - `registry` — CLI Command Registry — single source of truth for all slope CLI commands
+  - `registry` — CLI Command Registry — metadata for CLI commands (map generation, documentation, slope-web)
   - `store`
   - `template-generator` — SLOPE Template Generator
 
@@ -226,7 +226,6 @@ Re-exports from `src/core/index.ts`:
 - `slope auto-card` — Generate scorecard from git + CI signals
 - `slope classify` — Classify a shot from execution trace
 - `slope tournament` — Build tournament review from sprints
-- `slope review-state` — Manage plan review lifecycle and findings
 - `slope briefing` — Pre-round briefing with hazards and nutrition
 - `slope plan` — Pre-shot advisor (club + training + hazards)
 - `slope report` — Generate HTML performance report
