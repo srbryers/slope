@@ -46,6 +46,7 @@ import { reviewStateCommand } from './commands/review-state.js';
 import { analyzeCommand } from './commands/analyze.js';
 import { visionCommand } from './commands/vision.js';
 import { transcriptCommand } from './commands/transcript.js';
+import { storeCommand } from './commands/store.js';
 
 const subcommand = process.argv[2];
 
@@ -227,6 +228,12 @@ switch (subcommand) {
       process.exit(1);
     });
     break;
+  case 'store':
+    storeCommand(process.argv.slice(3)).catch(err => {
+      console.error('Error:', err.message);
+      process.exit(1);
+    });
+    break;
   default:
     console.log(`
 SLOPE CLI — Sprint Lifecycle & Operational Performance Engine
@@ -273,6 +280,10 @@ Usage:
   slope flows init|list|check               Manage user flow definitions
   slope analyze [--json] [--analyzers=...]  Scan repo and generate profile
   slope vision [--json]                     Display project vision document
+  slope store status [--json]                Store diagnostics (type, schema, stats)
+  slope store migrate status                Show schema version and migration status
+  slope store backup [--output=<path>]      Back up the store
+  slope store restore --from=<path>         Restore from a backup
   slope transcript list|show|stats          View session transcript data
   slope plugin list|validate                Manage custom plugins
 
