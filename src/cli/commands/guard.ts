@@ -290,8 +290,8 @@ export async function guardManageCommand(args: string[]): Promise<void> {
 
       // Show capabilities
       const hasContext = adapter?.supportsContextInjection ?? false;
-      const hasStop = adapter?.supportedEvents.has('Stop') ?? true;
-      const hasPreCompact = adapter?.supportedEvents.has('PreCompact') ?? true;
+      const hasStop = adapter?.supportedEvents.has('Stop') ?? false;
+      const hasPreCompact = adapter?.supportedEvents.has('PreCompact') ?? false;
 
       console.log('\nCapabilities:');
       console.log(`  Context injection: ${hasContext ? 'yes' : 'no'}`);
