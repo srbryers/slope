@@ -123,6 +123,24 @@ Create `src/core/adapters/generic.ts`:
 - Create `src/core/adapters/generic.ts`
 - Create `src/core/adapters/__tests__/generic.test.ts`
 
+### S34-5: `slope roadmap sync` CLI command
+
+**Club:** wedge | **Complexity:** small
+
+Add `sync` subcommand to `src/cli/commands/roadmap.ts`:
+
+- Reads all scorecards via `loadScorecards()`, maps to `RoadmapSprint` format
+- Updates existing sprints in roadmap.json (preserves phases, dependencies, manually-authored fields)
+- Adds new sprints from scorecards not yet in roadmap
+- `--dry-run` flag shows diff without writing
+- Wire into post-hole routine docs in `.claude/rules/sprint-checklist.md`
+
+**Tests:** sync adds new sprint, sync updates existing sprint, dry-run doesn't write.
+
+**Files:**
+- Edit `src/cli/commands/roadmap.ts` (add `sync` subcommand)
+- Create `src/core/__tests__/roadmap-sync.test.ts`
+
 ## Verification
 
 - `pnpm build && pnpm test && pnpm typecheck` — all pass

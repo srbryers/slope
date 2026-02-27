@@ -33,6 +33,7 @@ S34 ──→ S35
 | S34-2 | short_iron | Extract `ClaudeCodeAdapter` from existing guard.ts + hook.ts |
 | S34-3 | short_iron | Refactor `slope hook add --level=full` to accept `--harness` flag |
 | S34-4 | short_iron | Build `GenericAdapter` for shell-compatible guard scripts |
+| S34-5 | wedge | `slope roadmap sync` CLI command — sync scorecards into roadmap.json |
 
 #### S34-1: HarnessAdapter interface + tool name mapping
 - **Club:** short_iron | **Complexity:** standard
