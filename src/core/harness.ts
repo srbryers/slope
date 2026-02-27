@@ -52,6 +52,12 @@ export interface HarnessAdapter {
   installGuards(cwd: string, guards: AnyGuardDefinition[]): void;
   /** Detect whether this harness is active in the given directory */
   detect(cwd: string): boolean;
+  /** Hook events this harness supports (e.g. PreToolUse, PostToolUse, Stop, PreCompact) */
+  readonly supportedEvents: ReadonlySet<string>;
+  /** Whether the harness can inject additionalContext into the agent's context */
+  readonly supportsContextInjection: boolean;
+  /** Return the path to this harness's hooks config file, or null if N/A */
+  hooksConfigPath(cwd: string): string | null;
 }
 
 // --- Claude Code Tool Name Map ---

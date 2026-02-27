@@ -54,6 +54,12 @@ export class CursorAdapter implements HarnessAdapter {
   readonly id = 'cursor' as const;
   readonly displayName = 'Cursor';
   readonly toolNames: ToolNameMap = CURSOR_TOOLS;
+  readonly supportedEvents = new Set(['PreToolUse', 'PostToolUse', 'Stop']);
+  readonly supportsContextInjection = true;
+
+  hooksConfigPath(cwd: string): string | null {
+    return join(cwd, '.cursor', 'hooks.json');
+  }
 
   formatPreToolOutput(result: GuardResult): CursorHookOutput {
     if (result.decision === 'deny' || result.blockReason) {

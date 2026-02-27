@@ -33,6 +33,12 @@ export class GenericAdapter implements HarnessAdapter {
   readonly id = 'generic' as const;
   readonly displayName = 'Generic (Shell)';
   readonly toolNames: ToolNameMap = GENERIC_TOOLS;
+  readonly supportedEvents = new Set(['PreToolUse', 'PostToolUse', 'Stop']);
+  readonly supportsContextInjection = false;
+
+  hooksConfigPath(_cwd: string): string | null {
+    return null;
+  }
 
   formatPreToolOutput(result: GuardResult): unknown {
     const action = result.decision === 'deny' ? 'deny'

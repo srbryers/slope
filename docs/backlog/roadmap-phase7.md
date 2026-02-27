@@ -271,6 +271,14 @@ All tickets are largely independent. S40-3 may reference patterns from S40-2 but
 
 **Total:** 16 tickets across 4 sprints. Critical path: S37 → S39 → S40 (3 sprints).
 
+### Follow-ups from S37
+
+| Item | Target | Description |
+|------|--------|-------------|
+| Remove deprecated static maps | S39 or S40 | Delete `HARNESS_EVENT_SUPPORT`, `isEventSupported()`, `getHooksConfigPath()` and their tests from `guard.ts`. All consumers migrated in S37-3. |
+| Document breaking change in release notes | Next version bump | `HarnessAdapter` has 3 new required members (`supportedEvents`, `supportsContextInjection`, `hooksConfigPath`). Note for external adapter authors. |
+| Consider `HOOK_EVENT_MAP` unification | S39 | Each adapter's internal `HOOK_EVENT_MAP` duplicates event names. `supportedEvents` could carry harness-native event name mappings (`Map<string, string>`) to unify declaration with translation in `generateHooksConfig`. |
+
 ### Key Architectural Decisions
 
 1. **Adapter interface enrichment over static maps**: Move per-harness metadata (supported events, config paths) onto the `HarnessAdapter` interface. This eliminates the duplication flagged in S36 review and makes adapters fully self-describing.

@@ -249,6 +249,12 @@ export class MyAdapter implements HarnessAdapter {
   readonly id = 'my-harness' as const;
   readonly displayName = 'My Harness';
   readonly toolNames: ToolNameMap = MY_TOOLS;
+  readonly supportedEvents = new Set(['PreToolUse', 'PostToolUse', 'Stop']);
+  readonly supportsContextInjection = true;
+
+  hooksConfigPath(cwd: string): string | null {
+    return join(cwd, '.my-harness', 'hooks.json');
+  }
 
   formatPreToolOutput(result: GuardResult): unknown { /* ... */ }
   formatPostToolOutput(result: GuardResult): unknown { /* ... */ }
@@ -288,6 +294,9 @@ Add the adapter id to the `ADAPTER_PRIORITY` array in `src/core/harness.ts` (bef
 
 Create `tests/core/adapters/my-harness.test.ts` following the patterns in `claude-code.test.ts` and `generic.test.ts`. Test:
 - `id` and `displayName`
+- `supportedEvents` — contains expected events, does not contain unsupported ones
+- `supportsContextInjection` — correct boolean value
+- `hooksConfigPath(cwd)` — returns expected path or null
 - `formatPreToolOutput` — all decision branches (allow, deny, context, empty)
 - `formatPostToolOutput` — block, context, empty
 - `formatStopOutput` — block, empty

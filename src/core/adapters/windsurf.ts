@@ -57,6 +57,12 @@ export class WindsurfAdapter implements HarnessAdapter {
   readonly id = 'windsurf' as const;
   readonly displayName = 'Windsurf';
   readonly toolNames: ToolNameMap = WINDSURF_TOOLS;
+  readonly supportedEvents = new Set(['PreToolUse', 'PostToolUse']);
+  readonly supportsContextInjection = false;
+
+  hooksConfigPath(cwd: string): string | null {
+    return join(cwd, '.windsurf', 'hooks.json');
+  }
 
   formatPreToolOutput(result: GuardResult): WindsurfHookOutput {
     if (result.decision === 'deny' || result.blockReason) {

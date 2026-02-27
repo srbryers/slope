@@ -26,7 +26,10 @@ import '../../core/adapters/cursor.js';
 import '../../core/adapters/windsurf.js';
 import '../../core/adapters/generic.js';
 
-/** Static map of which hook events each harness supports */
+/**
+ * Static map of which hook events each harness supports.
+ * @deprecated Use `adapter.supportedEvents` instead. Will be removed in a future version.
+ */
 export const HARNESS_EVENT_SUPPORT: Record<string, Set<string>> = {
   'claude-code': new Set(['PreToolUse', 'PostToolUse', 'Stop', 'PreCompact']),
   'cursor':      new Set(['PreToolUse', 'PostToolUse', 'Stop']),
@@ -34,12 +37,18 @@ export const HARNESS_EVENT_SUPPORT: Record<string, Set<string>> = {
   'generic':     new Set(['PreToolUse', 'PostToolUse', 'Stop']),
 };
 
-/** Check if a hook event is supported by a given harness. Unknown harnesses default to supported. */
+/**
+ * Check if a hook event is supported by a given harness. Unknown harnesses default to supported.
+ * @deprecated Use `adapter.supportedEvents.has(event)` instead. Will be removed in a future version.
+ */
 export function isEventSupported(harnessId: string, hookEvent: string): boolean {
   return HARNESS_EVENT_SUPPORT[harnessId]?.has(hookEvent) ?? true;
 }
 
-/** Get the hooks config file path for a given harness. Returns null for unknown harnesses. */
+/**
+ * Get the hooks config file path for a given harness. Returns null for unknown harnesses.
+ * @deprecated Use `adapter.hooksConfigPath(cwd)` instead. Will be removed in a future version.
+ */
 export function getHooksConfigPath(cwd: string, harnessId: string): string | null {
   switch (harnessId) {
     case 'claude-code': return join(cwd, '.claude', 'settings.json');
@@ -248,7 +257,7 @@ export async function guardManageCommand(args: string[]): Promise<void> {
       console.log(`\nDetected harness: ${harnessName} (${harnessId})`);
 
       // Show hooks config path + entry count
-      const configPath = getHooksConfigPath(cwd, harnessId);
+      const configPath = adapter?.hooksConfigPath(cwd) ?? null;
       if (configPath && existsSync(configPath)) {
         try {
           const raw = JSON.parse(readFileSync(configPath, 'utf8'));
@@ -273,16 +282,16 @@ export async function guardManageCommand(args: string[]): Promise<void> {
       console.log('\nGuards:\n');
       for (const d of getAllGuardDefinitions()) {
         const disabled = statusDisabled.includes(d.name);
-        const supported = isEventSupported(harnessId, d.hookEvent);
+        const supported = adapter?.supportedEvents.has(d.hookEvent) ?? true;
         const marker = disabled ? '[-]' : !supported ? '[~]' : '[+]';
         const state = disabled ? 'disabled' : !supported ? 'unsupported' : 'active';
         console.log(`  ${marker} ${d.name.padEnd(22)} ${d.hookEvent.padEnd(13)} ${state}`);
       }
 
       // Show capabilities
-      const hasContext = harnessId === 'claude-code' || harnessId === 'cursor';
-      const hasStop = isEventSupported(harnessId, 'Stop');
-      const hasPreCompact = isEventSupported(harnessId, 'PreCompact');
+      const hasContext = adapter?.supportsContextInjection ?? false;
+      const hasStop = adapter?.supportedEvents.has('Stop') ?? false;
+      const hasPreCompact = adapter?.supportedEvents.has('PreCompact') ?? false;
 
       console.log('\nCapabilities:');
       console.log(`  Context injection: ${hasContext ? 'yes' : 'no'}`);
