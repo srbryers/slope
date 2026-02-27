@@ -285,8 +285,6 @@ export { CursorAdapter, cursorAdapter } from './adapters/cursor.js';
 export { WindsurfAdapter, windsurfAdapter } from './adapters/windsurf.js';
 export { GenericAdapter, genericAdapter } from './adapters/generic.js';
 export type { GuardManifestEntry } from './adapters/generic.js';
-export type { CursorHookEntry, CursorHooksConfig, CursorHookOutput } from './adapters/cursor.js';
-export type { WindsurfHookEntry, WindsurfHooksConfig, WindsurfHookOutput } from './adapters/windsurf.js';
 
 // Report
 export {
