@@ -140,6 +140,10 @@ export type { SprintRegistry } from './registry.js';
 export { SlopeStoreError } from './store.js';
 export type { SlopeStore, SlopeSession, StoreErrorCode, StoreStats } from './store.js';
 
+// Store Health
+export { checkStoreHealth } from './store-health.js';
+export type { StoreHealthResult } from './store-health.js';
+
 // Tournament Review
 export {
   buildTournamentReview,

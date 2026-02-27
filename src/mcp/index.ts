@@ -22,11 +22,11 @@ import { z } from 'zod';
 import { SLOPE_REGISTRY, SLOPE_TYPES } from './registry.js';
 import { runInSandbox } from './sandbox.js';
 import type { SlopeStore } from '../core/index.js';
-import { checkConflicts, loadFlows, checkFlowStaleness } from '../core/index.js';
+import { checkConflicts, loadFlows, checkFlowStaleness, checkStoreHealth } from '../core/index.js';
 import type { ClaimScope, FlowsFile, FlowDefinition } from '../core/index.js';
 
 /** Tool names exposed by this MCP server (for tests and tool discovery). */
-export const SLOPE_MCP_TOOL_NAMES = ['search', 'execute', 'session_status', 'acquire_claim', 'check_conflicts'] as const;
+export const SLOPE_MCP_TOOL_NAMES = ['search', 'execute', 'session_status', 'acquire_claim', 'check_conflicts', 'store_status'] as const;
 
 /** Detection results for hook/settings activation status. */
 export interface SetupHints {
@@ -235,6 +235,21 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
           content: [{
             type: 'text' as const,
             text: JSON.stringify({ claims: claims.length, conflicts }, null, 2),
+          }],
+        };
+      },
+    );
+
+    server.tool(
+      'store_status',
+      'Check store health: schema version, row counts, and error status.',
+      {},
+      async () => {
+        const result = await checkStoreHealth(store, 'sqlite');
+        return {
+          content: [{
+            type: 'text' as const,
+            text: JSON.stringify(result, null, 2),
           }],
         };
       },
