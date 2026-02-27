@@ -1,9 +1,9 @@
 ---
-generated_at: "2026-02-26T23:08:25.856Z"
-git_sha: "5887790d0512a38a345cd987ee29af922d1fe94d"
+generated_at: "2026-02-27T00:02:55.961Z"
+git_sha: "ed1f6df6b8b4f6a4ff55045e18e15002ecd53986"
 sprint: 33
-source_files: 129
-test_files: 83
+source_files: 130
+test_files: 84
 cli_commands: 30
 guards: 15
 flows: 0
@@ -18,12 +18,13 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
 <!-- AUTO-GENERATED: START packages -->
 
 ### `src/cli`
-- Source files: 54 | Test files: 22
+- Source files: 55 | Test files: 23
 - Key modules:
   - `config`
   - `hooks-config`
   - `loader`
   - `metaphor` — CLI metaphor resolution
+  - `registry` — CLI Command Registry — single source of truth for all slope CLI commands
   - `store`
   - `template-generator` — SLOPE Template Generator
 
@@ -213,36 +214,36 @@ Re-exports from `src/core/index.ts`:
 
 <!-- AUTO-GENERATED: START cli -->
 
-- `slope analyze` — SLOPE — slope analyze: run repo profile analyzers
-- `slope auto-card` — Build per-agent breakdowns by mapping commits to swarm sessions via branch.
-- `slope briefing`
-- `slope card`
-- `slope claim`
-- `slope classify`
-- `slope dashboard`
-- `slope distill`
-- `slope escalate`
-- `slope extract`
-- `slope flows` — slope flows — Manage user flow definitions
-- `slope guard` — Registry of guard handler implementations
-- `slope hook`
-- `slope init` — Detect platforms present in the project directory
-- `slope map` — ── Helpers ─────────────────────────────────────────────────────
-- `slope next`
-- `slope plan`
-- `slope plugin`
-- `slope release`
-- `slope report`
-- `slope review-state` — --- Findings File Management ---
-- `slope review`
-- `slope roadmap` — --- Helpers ---
-- `slope session`
-- `slope standup`
-- `slope status`
-- `slope tournament`
-- `slope transcript` — slope transcript — View session transcript data
-- `slope validate`
-- `slope vision` — SLOPE — slope vision: display project vision document
+- `slope init` — Initialize .slope/ directory
+- `slope session` — Manage live sessions
+- `slope claim` — Claim a ticket or area for the sprint
+- `slope release` — Release a claim by ID or target
+- `slope status` — Show sprint course status and conflicts
+- `slope next` — Show next sprint number (auto-detect)
+- `slope card` — Display handicap card
+- `slope validate` — Validate scorecard(s)
+- `slope review` — Format sprint review or manage review state
+- `slope auto-card` — Generate scorecard from git + CI signals
+- `slope classify` — Classify a shot from execution trace
+- `slope tournament` — Build tournament review from sprints
+- `slope review-state` — Manage plan review lifecycle and findings
+- `slope briefing` — Pre-round briefing with hazards and nutrition
+- `slope plan` — Pre-shot advisor (club + training + hazards)
+- `slope report` — Generate HTML performance report
+- `slope dashboard` — Live local performance dashboard
+- `slope standup` — Generate or ingest standup report
+- `slope analyze` — Scan repo and generate profile
+- `slope hook` — Manage lifecycle hooks
+- `slope guard` — Run guard handler or manage guard activation
+- `slope extract` — Extract events into SLOPE store
+- `slope distill` — Promote event patterns to common issues
+- `slope map` — Generate/update codebase map
+- `slope flows` — Manage user flow definitions
+- `slope plugin` — Manage custom plugins
+- `slope escalate` — Escalate issues based on severity triggers
+- `slope transcript` — View session transcript data
+- `slope roadmap` — Strategic planning and roadmap tools
+- `slope vision` — Display project vision document
 <!-- AUTO-GENERATED: END cli -->
 
 ## Guard Definitions
@@ -285,14 +286,14 @@ Re-exports from `src/core/index.ts`:
 
 | Directory | Test Files | Command |
 |-----------|-----------|---------|
-| tests/cli | 22 | `pnpm test` |
+| tests/cli | 23 | `pnpm test` |
 | tests/core | 53 | `pnpm test` |
 | tests/mcp | 4 | `pnpm test` |
 | tests/store | 1 | `pnpm test` |
 | tests/store-pg | 2 | `pnpm test` |
 | tests/tokens | 1 | `pnpm test` |
 
-**Total test files:** 83
+**Total test files:** 84
 **Run all:** `pnpm -r test`
 **Typecheck:** `pnpm -r typecheck`
 <!-- AUTO-GENERATED: END tests -->
