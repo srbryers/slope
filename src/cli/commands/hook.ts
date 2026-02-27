@@ -1,10 +1,11 @@
 import { writeFileSync, readFileSync, existsSync, unlinkSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { loadHooksConfig, saveHooksConfig } from '../hooks-config.js';
-import { getAllGuardDefinitions, loadPluginGuards, loadConfig, detectAdapter } from '../../core/index.js';
-import type { AnyGuardDefinition } from '../../core/index.js';
-// Import to trigger auto-registration of Claude Code adapter
+import { getAllGuardDefinitions, loadPluginGuards, loadConfig, detectAdapter, getAdapter, listAdapters } from '../../core/index.js';
+import type { AnyGuardDefinition, HarnessId } from '../../core/index.js';
+// Import to trigger auto-registration of adapters
 import '../../core/adapters/claude-code.js';
+import '../../core/adapters/generic.js';
 
 const HOOK_TEMPLATES: Record<string, { description: string; managed: string[] }> = {
   'session-start': {
@@ -94,7 +95,7 @@ export async function hookCommand(args: string[]): Promise<void> {
   switch (sub) {
     case 'add':
       if (flags.level === 'full' || flags.level === 'scoring') {
-        installGuardHooks(cwd, flags.level as 'scoring' | 'full');
+        installGuardHooks(cwd, flags.level as 'scoring' | 'full', flags.harness as HarnessId | undefined);
       } else {
         addHook(hookName, cwd);
       }
@@ -113,10 +114,13 @@ export async function hookCommand(args: string[]): Promise<void> {
 slope hook — Manage SLOPE lifecycle hooks
 
 Usage:
-  slope hook add <name>           Install a hook from the catalog
-  slope hook remove <name>        Remove an installed hook
-  slope hook list [--available]   Show installed hooks (or full catalog)
-  slope hook show <name>          Display hook file contents
+  slope hook add <name>                         Install a hook from the catalog
+  slope hook add --level=full [--harness=<id>]  Install guard hooks (auto-detect or specify harness)
+  slope hook remove <name>                      Remove an installed hook
+  slope hook list [--available]                  Show installed hooks (or full catalog)
+  slope hook show <name>                        Display hook file contents
+
+Harness adapters: ${listAdapters().join(', ') || '(none registered)'}
 
 Available hooks:
 ${Object.entries(HOOK_TEMPLATES).map(([k, v]) => `  ${k.padEnd(20)} ${v.description}`).join('\n')}
@@ -239,7 +243,7 @@ function showHook(name: string, cwd: string): void {
   process.exit(1);
 }
 
-function installGuardHooks(cwd: string, level: 'scoring' | 'full'): void {
+function installGuardHooks(cwd: string, level: 'scoring' | 'full', harnessId?: HarnessId): void {
   // Load custom guard plugins
   const config = loadConfig(cwd);
   loadPluginGuards(cwd, config.plugins);
@@ -254,12 +258,21 @@ function installGuardHooks(cwd: string, level: 'scoring' | 'full'): void {
     return;
   }
 
-  // Detect adapter (or fall back to provider detection for backwards compat)
-  const adapter = detectAdapter(cwd);
+  // Resolve adapter: explicit --harness flag, auto-detect, or error
+  let adapter;
+  if (harnessId) {
+    adapter = getAdapter(harnessId);
+    if (!adapter) {
+      const available = listAdapters().join(', ');
+      console.error(`\n  Unknown harness: "${harnessId}". Available: ${available}\n`);
+      process.exit(1);
+    }
+  } else {
+    adapter = detectAdapter(cwd);
+  }
   if (!adapter) {
-    const provider = detectProvider(cwd);
-    console.log(`\n  Guard hooks for ${provider} are not yet supported.`);
-    console.log('  Guards are currently available for Claude Code.\n');
+    console.log('\n  No harness adapter detected.');
+    console.log('  Use --harness=<id> to specify one. Available: ' + listAdapters().join(', ') + '\n');
     return;
   }
 
