@@ -3,6 +3,7 @@ import { join, relative } from 'node:path';
 import { execSync } from 'node:child_process';
 import { loadConfig, loadScorecards, detectLatestSprint, GUARD_DEFINITIONS, loadFlows, checkFlowStaleness } from '../../core/index.js';
 import type { SlopeConfig } from '../../core/index.js';
+import { CLI_COMMAND_REGISTRY } from '../registry.js';
 
 // ── Helpers ─────────────────────────────────────────────────────
 
@@ -62,11 +63,8 @@ function gatherMetadata(cwd: string, config: SlopeConfig): MapMetadata {
   // Count test files in tests/
   const { test: testFiles } = countSourceFiles(join(cwd, 'tests'));
 
-  // Count CLI commands
-  const commandsDir = join(cwd, 'src', 'cli', 'commands');
-  const cliCommands = existsSync(commandsDir)
-    ? readdirSync(commandsDir).filter(f => f.endsWith('.ts')).length
-    : 0;
+  // Count CLI commands from registry
+  const cliCommands = CLI_COMMAND_REGISTRY.length;
 
   // Count flows
   const flowsPath = join(cwd, config.flowsPath ?? '.slope/flows.json');
@@ -184,21 +182,11 @@ function generateApiSurface(cwd: string): string {
   return lines.join('\n');
 }
 
-function generateCliCommands(cwd: string): string {
-  const commandsDir = join(cwd, 'src', 'cli', 'commands');
-  if (!existsSync(commandsDir)) return '';
-
+function generateCliCommands(): string {
   const lines: string[] = [''];
 
-  const files = readdirSync(commandsDir)
-    .filter(f => f.endsWith('.ts'))
-    .sort();
-
-  for (const file of files) {
-    const name = file.replace('.ts', '');
-    const filePath = join(commandsDir, file);
-    const firstLine = readFirstComment(filePath);
-    lines.push(`- \`slope ${name}\`${firstLine ? ` — ${firstLine}` : ''}`);
+  for (const entry of CLI_COMMAND_REGISTRY) {
+    lines.push(`- \`slope ${entry.cmd}\` — ${entry.desc}`);
   }
 
   return lines.join('\n');
@@ -428,7 +416,7 @@ ${generateApiSurface(cwd)}
 ## CLI Commands
 
 <!-- AUTO-GENERATED: START cli -->
-${generateCliCommands(cwd)}
+${generateCliCommands()}
 <!-- AUTO-GENERATED: END cli -->
 
 ## Guard Definitions
@@ -623,7 +611,7 @@ export async function mapCommand(args: string[]): Promise<void> {
     content = updateMetadataBlock(content, meta);
     content = replaceAutoSection(content, 'packages', generatePackageInventory(cwd));
     content = replaceAutoSection(content, 'api', generateApiSurface(cwd));
-    content = replaceAutoSection(content, 'cli', generateCliCommands(cwd));
+    content = replaceAutoSection(content, 'cli', generateCliCommands());
     content = replaceAutoSection(content, 'guards', generateGuardsList());
     content = replaceAutoSection(content, 'mcp', generateMcpTools(cwd));
     content = replaceAutoSection(content, 'flows', generateFlowsSummary(cwd, config));
