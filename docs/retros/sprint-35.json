@@ -1,0 +1,121 @@
+{
+  "sprint_number": 35,
+  "theme": "The Equipment Room",
+  "par": 4,
+  "slope": 3,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-02-27",
+  "type": "adapters + documentation",
+  "shots": [
+    {
+      "ticket_key": "S35-1",
+      "title": "Research doc — harness hook formats",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Created harness-research.md with compatibility matrix, hook config schemas for Cursor/Windsurf/OpenCode, tool name mappings, guard execution flow Mermaid diagram, and adapter authoring guide. 7 sections covering 6 harnesses."
+    },
+    {
+      "ticket_key": "S35-2",
+      "title": "CursorAdapter + ADAPTER_PRIORITY detection ordering",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added ADAPTER_PRIORITY constant for deterministic detection (claude-code > cursor > windsurf > generic). CursorAdapter with JSON stdin/stdout protocol, .cursor/hooks.json config gen, Cursor-specific tool names, dispatcher script. 28 tests (24 adapter + 4 priority)."
+    },
+    {
+      "ticket_key": "S35-3",
+      "title": "WindsurfAdapter — exit-code-based guard integration",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "description": "Dispatcher grep pattern initially used literal JSON format — wouldn't match prettified output with spaces around colons. Fixed in review."
+        },
+        {
+          "type": "rough",
+          "description": "2>/dev/null on slope guard stderr swallowed errors silently. Fixed to use SLOPE_GUARD_LOG env var."
+        }
+      ],
+      "notes": "WindsurfAdapter with JSON formatting, exit-code dispatcher script (exit 0=allow, exit 2=block), .windsurf/hooks.json config gen, guards manifest. Documented no-context-injection limitation. 25 tests. Two review findings caught and fixed."
+    },
+    {
+      "ticket_key": "S35-4",
+      "title": "Documentation — compatibility matrix + authoring guide + codebase map",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Updated CODEBASE.md via slope map. Compatibility matrix and authoring guide were already in the research doc from S35-1."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 3,
+    "greens_total": 4,
+    "putts": 3,
+    "penalties": 0,
+    "hazards_hit": 2,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [],
+  "special_plays": [
+    "Ran code + architect review (both tiers) after implementation — caught 2 HIGH, 4 MEDIUM, and 6 LOW/NIT issues before merge"
+  ],
+  "training": [],
+  "nutrition": [
+    {
+      "category": "hydration",
+      "description": "Full build + test after every ticket and after review fixes. 1668 tests passing at completion, 0 failing.",
+      "status": "healthy"
+    },
+    {
+      "category": "diet",
+      "description": "7 commits: 4 feature + 3 review fix commits. All pushed before merge.",
+      "status": "healthy"
+    },
+    {
+      "category": "supplements",
+      "description": "83 new tests across 3 test files (cursor adapter: 26, windsurf adapter: 26, harness: 31 including 5 integration + 2 registration completeness). 1668 total, up from 1637.",
+      "status": "healthy"
+    },
+    {
+      "category": "recovery",
+      "description": "Review process caught stale Provider type in hook.ts (HIGH) and fragile grep pattern in Windsurf dispatcher (HIGH). Both fixed before merge. Review pays for itself.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Smooth sprint building on the S34 adapter framework. CursorAdapter was clean — same JSON protocol, just different tool names and config format. WindsurfAdapter was trickier due to the exit-code translation layer, which is where both HIGH review findings came from.",
+    "advice_for_next_player": "The Windsurf dispatcher uses shell grep to parse JSON — test with both compact and prettified output. Use [[:space:]]* for optional whitespace. Always check slope guard exit code before parsing output. Set SLOPE_GUARD_LOG=/tmp/slope-guard.log for debugging.",
+    "what_surprised_you": "The stale Provider type in hook.ts was a real bug — Windsurf users running lifecycle hooks (slope hook add session-start) would have had their hooks installed to .claude/hooks/ instead of .windsurf/hooks/. Architect review caught it.",
+    "excited_about_next": "The adapter framework now covers Claude Code, Cursor, and Windsurf with a documented authoring guide. Any new harness with hook support is just a new adapter file."
+  },
+  "bunker_locations": [
+    "Windsurf dispatcher grep must handle prettified JSON — use [[:space:]]* not literal format",
+    "Windsurf can't inject context — guards that rely on additionalContext are allow-only on Windsurf",
+    "Stale parallel detection systems: if you add a new harness, update resolveHarnessId/getHooksDir in hook.ts too, not just the adapter",
+    "HOOK_EVENT_MAP filtering silently drops unsupported events (PreCompact, Stop on Windsurf) — test for exclusion explicitly"
+  ],
+  "yardage_book_updates": [
+    "src/core/harness.ts: Added ADAPTER_PRIORITY constant, detectAdapter() now iterates by priority",
+    "src/core/adapters/cursor.ts: CursorAdapter — JSON protocol, .cursor/hooks.json, Cursor tool names",
+    "src/core/adapters/windsurf.ts: WindsurfAdapter — JSON + exit-code dispatcher, .windsurf/hooks.json, Windsurf tool names",
+    "src/cli/commands/hook.ts: Replaced stale Provider/detectProvider with adapter-based resolveHarnessId",
+    "docs/backlog/harness-research.md: Harness hook research — compat matrix, config schemas, authoring guide"
+  ],
+  "course_management_notes": [
+    "4 tickets, par 4, score 4 — par. 3 in_the_hole, 1 green (Windsurf had 2 rough hazards caught in review).",
+    "Slope 3 — external API research done in pre-sprint, new adapter classes following established patterns.",
+    "1352 lines added, 34 removed across 10 files. 3 new source files, 2 new test files, 1 new doc.",
+    "Both-tier review (code + architect) caught 12 findings total, all addressed before merge."
+  ]
+}
