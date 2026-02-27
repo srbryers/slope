@@ -280,6 +280,8 @@ export type {
 
 // Adapters
 export { ClaudeCodeAdapter, claudeCodeAdapter } from './adapters/claude-code.js';
+export { GenericAdapter, genericAdapter } from './adapters/generic.js';
+export type { GuardManifestEntry } from './adapters/generic.js';
 
 // Report
 export {
