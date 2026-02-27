@@ -42,11 +42,14 @@ export interface WindsurfHookOutput {
   message?: string;
 }
 
-/** Map hook event names from SLOPE convention to Windsurf convention */
-const HOOK_EVENT_MAP: Record<string, string> = {
+/**
+ * Map SLOPE hook events to Windsurf hook events.
+ * Stop is intentionally omitted — Windsurf has no session-end hook.
+ * PreCompact is intentionally omitted — Windsurf has no pre-compaction hook.
+ */
+const HOOK_EVENT_MAP: Partial<Record<'PreToolUse' | 'PostToolUse' | 'Stop' | 'PreCompact', string>> = {
   PreToolUse: 'pre-tool-use',
   PostToolUse: 'post-tool-use',
-  // No Stop/on-stop support in Windsurf
 };
 
 /** Windsurf adapter — formats guard output for Windsurf's exit-code-based hook system. */
@@ -62,6 +65,7 @@ export class WindsurfAdapter implements HarnessAdapter {
         ...(result.blockReason && { message: result.blockReason }),
       };
     }
+    // 'ask' and context-only fall through to 'allow' — Windsurf can't inject context or prompt
     return { action: 'allow' };
   }
 
@@ -175,13 +179,17 @@ export class WindsurfAdapter implements HarnessAdapter {
     const manifestPath = join(hooksDir, 'guards-manifest.json');
     const manifest = guards
       .filter(g => HOOK_EVENT_MAP[g.hookEvent])
-      .map(g => ({
-        name: g.name,
-        description: g.description,
-        hookEvent: g.hookEvent,
-        level: g.level,
-        command: `${guardScript} ${g.name}`,
-      }));
+      .map(g => {
+        const matcher = resolveToolMatcher(this, 'toolCategories' in g ? g.toolCategories : undefined) ?? g.matcher;
+        return {
+          name: g.name,
+          description: g.description,
+          hookEvent: g.hookEvent,
+          ...(matcher && { matcher }),
+          level: g.level,
+          command: `${guardScript} ${g.name}`,
+        };
+      });
     writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
     console.log(`  Created ${manifestPath}`);
   }

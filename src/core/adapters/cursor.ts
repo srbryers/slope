@@ -34,13 +34,16 @@ export interface CursorHooksConfig {
 
 /** Cursor hook output protocol */
 export interface CursorHookOutput {
-  decision: 'allow' | 'block' | 'modify';
+  decision: 'allow' | 'block';
   reason?: string;
   context?: string;
 }
 
-/** Map hook event names from SLOPE convention to Cursor convention */
-const HOOK_EVENT_MAP: Record<string, string> = {
+/**
+ * Map SLOPE hook events to Cursor hook events.
+ * PreCompact is intentionally omitted — Cursor has no pre-compaction hook.
+ */
+const HOOK_EVENT_MAP: Partial<Record<'PreToolUse' | 'PostToolUse' | 'Stop' | 'PreCompact', string>> = {
   PreToolUse: 'pre-tool-use',
   PostToolUse: 'post-tool-use',
   Stop: 'on-stop',
@@ -60,6 +63,7 @@ export class CursorAdapter implements HarnessAdapter {
         ...(result.context && { context: result.context }),
       };
     }
+    // 'ask' falls through to 'allow' — Cursor has no user-confirmation prompt
     return {
       decision: 'allow',
       ...(result.context && { context: result.context }),
@@ -136,6 +140,7 @@ export class CursorAdapter implements HarnessAdapter {
     }
 
     // Generate hooks config and merge into .cursor/hooks.json
+    // Command paths are relative to the project root (cwd), not the hooks.json file
     const guardScript = '.cursor/hooks/slope-guard.sh';
     const hooksConfig = this.generateHooksConfig(guards, guardScript);
 

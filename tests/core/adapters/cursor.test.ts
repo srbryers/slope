@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { mkdtempSync, existsSync, readFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { CursorAdapter } from '../../../src/core/adapters/cursor.js';
@@ -141,6 +141,17 @@ describe('CursorAdapter', () => {
       }
     });
 
+    it('excludes PreCompact guards (unsupported by Cursor)', () => {
+      const config = adapter.generateHooksConfig(GUARD_DEFINITIONS, './g.sh') as CursorHooksConfig;
+      const preCompactGuards = GUARD_DEFINITIONS.filter(g => g.hookEvent === 'PreCompact');
+      if (preCompactGuards.length > 0) {
+        for (const pg of preCompactGuards) {
+          const found = config.hooks.some(h => h.command.endsWith(` ${pg.name}`));
+          expect(found, `PreCompact guard '${pg.name}' should be excluded`).toBe(false);
+        }
+      }
+    });
+
     it('resolves matcher from toolCategories using Cursor tool names', () => {
       const config = adapter.generateHooksConfig(GUARD_DEFINITIONS, './g.sh') as CursorHooksConfig;
       const explore = config.hooks.find(e => e.command.endsWith(' explore'));
@@ -203,7 +214,7 @@ describe('CursorAdapter', () => {
     it('returns true when .cursor directory exists', () => {
       const tmpDir = mkdtempSync(join(tmpdir(), 'slope-cursor-'));
       const cursorDir = join(tmpDir, '.cursor');
-      require('node:fs').mkdirSync(cursorDir);
+      mkdirSync(cursorDir);
       expect(adapter.detect(tmpDir)).toBe(true);
     });
 

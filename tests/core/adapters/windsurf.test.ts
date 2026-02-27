@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { mkdtempSync, existsSync, readFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { WindsurfAdapter } from '../../../src/core/adapters/windsurf.js';
@@ -114,6 +114,15 @@ describe('WindsurfAdapter', () => {
       }
     });
 
+    it('excludes PreCompact and Stop guards (unsupported by Windsurf)', () => {
+      const config = adapter.generateHooksConfig(GUARD_DEFINITIONS, './g.sh') as WindsurfHooksConfig;
+      const unsupportedGuards = GUARD_DEFINITIONS.filter(g => g.hookEvent === 'PreCompact' || g.hookEvent === 'Stop');
+      for (const ug of unsupportedGuards) {
+        const found = config.hooks.some(h => h.command.endsWith(` ${ug.name}`));
+        expect(found, `${ug.hookEvent} guard '${ug.name}' should be excluded`).toBe(false);
+      }
+    });
+
     it('each entry has required fields', () => {
       const config = adapter.generateHooksConfig(GUARD_DEFINITIONS, './guard.sh') as WindsurfHooksConfig;
       for (const entry of config.hooks) {
@@ -195,7 +204,7 @@ describe('WindsurfAdapter', () => {
     it('returns true when .windsurf directory exists', () => {
       const tmpDir = mkdtempSync(join(tmpdir(), 'slope-windsurf-'));
       const wsDir = join(tmpDir, '.windsurf');
-      require('node:fs').mkdirSync(wsDir);
+      mkdirSync(wsDir);
       expect(adapter.detect(tmpDir)).toBe(true);
     });
 

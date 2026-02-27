@@ -26,7 +26,7 @@
 
 Cursor (v1.7+) supports lifecycle hooks configured in `.cursor/hooks.json`. Hooks receive JSON on stdin and return JSON on stdout.
 
-**Source:** [Cursor Hooks Documentation](https://docs.cursor.com/configuration/hooks)
+**Source:** [Cursor Hooks Documentation](https://docs.cursor.com/configuration/hooks) *(verify URL against current Cursor docs)*
 
 ### Config Schema — `.cursor/hooks.json`
 
@@ -100,7 +100,7 @@ Decision values: `"allow"` (proceed), `"block"` (deny execution), `"modify"` (al
 
 Windsurf uses Cascade hooks — shell commands that run before/after tool execution. Pre-hooks can block via exit code 2. No JSON output protocol; the harness reads only the exit code.
 
-**Source:** [Windsurf Cascade Documentation](https://docs.windsurf.com/cascade/hooks)
+**Source:** [Windsurf Cascade Documentation](https://docs.windsurf.com/cascade/hooks) *(verify URL against current Windsurf docs)*
 
 ### Config Schema
 
@@ -159,7 +159,7 @@ OpenCode uses a plugin system in `.opencode/plugins/` with session-level lifecyc
 - `session.deleted` — Session deleted
 - `session.compacted` — Context compacted
 
-**Source:** [OpenCode Plugin Documentation](https://opencode.ai/docs/plugins)
+**Source:** [OpenCode Plugin Documentation](https://opencode.ai/docs/plugins) *(verify URL against current OpenCode docs)*
 
 ### Why No Dedicated Adapter
 
