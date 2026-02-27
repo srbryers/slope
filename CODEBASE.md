@@ -1,10 +1,10 @@
 ---
-generated_at: "2026-02-27T13:52:55.895Z"
-git_sha: "2f7ce336d5f4ff9b10087d69ca822036455410de"
-sprint: 36
-source_files: 137
-test_files: 93
-cli_commands: 29
+generated_at: "2026-02-27T18:03:44.026Z"
+git_sha: "42af8560c81196796fde5e556f679ddeeff6cdfb"
+sprint: 38
+source_files: 140
+test_files: 96
+cli_commands: 30
 guards: 16
 flows: 0
 ---
@@ -18,18 +18,18 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
 <!-- AUTO-GENERATED: START packages -->
 
 ### `src/cli`
-- Source files: 56 | Test files: 26
+- Source files: 57 | Test files: 27
 - Key modules:
   - `config`
   - `hooks-config`
   - `loader`
   - `metaphor` — CLI metaphor resolution
   - `registry` — CLI Command Registry — metadata for CLI commands (map generation, documentation, slope-web)
-  - `store`
+  - `store` — Store info from config — no store connection required
   - `template-generator` — SLOPE Template Generator
 
 ### `src/core`
-- Source files: 69 | Test files: 58
+- Source files: 71 | Test files: 60
 - Key modules:
   - `advisor` — --- Module-private constants ---
   - `briefing` — --- Input types ---
@@ -46,7 +46,7 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
   - `github` — SLOPE — Remote Git Analysis
   - `guard` — SLOPE Guard Framework
   - `handicap` — Compute par value from ticket count.
-  - ... and 24 more
+  - ... and 25 more
 
 ### `src/mcp`
 - Source files: 3 | Test files: 4
@@ -105,7 +105,10 @@ Re-exports from `src/core/index.ts`:
 - `SprintRegistry` (types)
 **Store:**
 - `SlopeStoreError`
-- `SlopeStore`, `SlopeSession`, `StoreErrorCode` (types)
+- `SlopeStore`, `SlopeSession`, `StoreErrorCode`, `StoreStats` (types)
+**Store Health:**
+- `checkStoreHealth`
+- `StoreHealthResult` (types)
 **Tournament Review:**
 - `buildTournamentReview`, `formatTournamentReview`
 - `TournamentReview`, `TournamentSprintEntry`, `TournamentScoring`, `TournamentStats`, `TournamentHazard` (types)
@@ -137,6 +140,7 @@ Re-exports from `src/core/index.ts`:
 - `ClaudeCodeAdapter`, `claudeCodeAdapter`
 - `CursorAdapter`, `cursorAdapter`
 - `WindsurfAdapter`, `windsurfAdapter`
+- `ClineAdapter`, `clineAdapter`
 - `GenericAdapter`, `genericAdapter`
 - `GuardManifestEntry` (types)
 **Report:**
@@ -248,6 +252,7 @@ Re-exports from `src/core/index.ts`:
 - `slope map` — Generate/update codebase map
 - `slope flows` — Manage user flow definitions
 - `slope plugin` — Manage custom plugins
+- `slope store` — Store diagnostics and management
 - `slope escalate` — Escalate issues based on severity triggers
 - `slope transcript` — View session transcript data
 - `slope roadmap` — Strategic planning and roadmap tools
@@ -287,6 +292,7 @@ Re-exports from `src/core/index.ts`:
 - `session_status`
 - `acquire_claim`
 - `check_conflicts`
+- `store_status`
 <!-- AUTO-GENERATED: END mcp -->
 
 ## Test Inventory
@@ -295,14 +301,14 @@ Re-exports from `src/core/index.ts`:
 
 | Directory | Test Files | Command |
 |-----------|-----------|---------|
-| tests/cli | 26 | `pnpm test` |
-| tests/core | 58 | `pnpm test` |
+| tests/cli | 27 | `pnpm test` |
+| tests/core | 60 | `pnpm test` |
 | tests/mcp | 4 | `pnpm test` |
 | tests/store | 1 | `pnpm test` |
 | tests/store-pg | 2 | `pnpm test` |
 | tests/tokens | 1 | `pnpm test` |
 
-**Total test files:** 92
+**Total test files:** 95
 **Run all:** `pnpm -r test`
 **Typecheck:** `pnpm -r typecheck`
 <!-- AUTO-GENERATED: END tests -->
@@ -313,11 +319,11 @@ Re-exports from `src/core/index.ts`:
 
 | Sprint | Theme | Tickets | Score |
 |--------|-------|---------|-------|
-| **32** | The Scout | 4 | bogey |
 | **33** | The Transcript | 4 | par |
 | **34** | The Universal Caddy | 5 | par |
 | **35** | The Equipment Room | 4 | par |
 | **36** | The Clubhouse Bridge | 4 | par |
+| **38** | The Vault | 4 | par |
 <!-- AUTO-GENERATED: END history -->
 
 ## Known Gotchas

@@ -29,6 +29,7 @@ import type { HarnessId } from '../../core/harness.js';
 import '../../core/adapters/claude-code.js';
 import '../../core/adapters/cursor.js';
 import '../../core/adapters/windsurf.js';
+import '../../core/adapters/cline.js';
 import '../../core/adapters/generic.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -127,6 +128,7 @@ export function detectProvidersFromArgs(args: string[]): InitProvider[] {
   if (args.includes('--claude-code')) providers.push('claude-code');
   if (args.includes('--cursor')) providers.push('cursor');
   if (args.includes('--windsurf')) providers.push('windsurf');
+  if (args.includes('--cline')) providers.push('cline');
   if (args.includes('--opencode')) providers.push('opencode');
   if (args.includes('--generic')) providers.push('generic');
   // Unified --harness=<id> flag
@@ -260,6 +262,74 @@ function installWindsurfTemplates(cwd: string, metaphor: MetaphorDefinition): vo
   }
 
   console.log('\n  Windsurf rules installed to .windsurf/rules/ and .windsurfrules');
+}
+
+/** Strip .mdc YAML frontmatter (Cursor-specific) so Cline sees plain markdown. */
+function stripMdcFrontmatter(content: string): string {
+  return content.replace(/^---[\s\S]*?---\n*/, '');
+}
+
+function installClineTemplates(cwd: string, metaphor: MetaphorDefinition): void {
+  const rulesDir = join(cwd, '.clinerules');
+  mkdirSync(rulesDir, { recursive: true });
+
+  // Cline reads .md files from .clinerules/ — reuse Cursor content with frontmatter stripped
+  const ruleGenerators: Record<string, string> = {
+    'slope-sprint-checklist.md': stripMdcFrontmatter(generateCursorSprintChecklist(metaphor)),
+    'slope-commit-discipline.md': stripMdcFrontmatter(generateCursorCommitDiscipline(metaphor)),
+    'slope-review-loop.md': stripMdcFrontmatter(generateCursorReviewLoop()),
+    'slope-codebase-context.md': stripMdcFrontmatter(generateCursorCodebaseContextRule()),
+  };
+  for (const [file, content] of Object.entries(ruleGenerators)) {
+    const dest = join(rulesDir, file);
+    if (!existsSync(dest)) {
+      writeFileSync(dest, content);
+      console.log(`  Created ${dest}`);
+    }
+  }
+
+  // Generate Cline-specific context file (references .clinerules/ paths, not .cursor/)
+  const clinerulesDest = join(cwd, '.clinerules', 'slope-context.md');
+  if (!existsSync(clinerulesDest)) {
+    const contextContent = [
+      '# SLOPE — Sprint Tracking',
+      '',
+      'This project uses SLOPE for sprint scoring and operational performance tracking.',
+      '',
+      '## Key Files',
+      '- `.slope/config.json` — SLOPE configuration',
+      '- `.clinerules/` — Sprint rules and checklists',
+      '- `.clinerules/hooks/` — SLOPE guard hooks',
+      '- `CODEBASE.md` — Auto-generated codebase map',
+      '- `docs/retros/` — Sprint scorecards',
+      '',
+      '## Commands',
+      '- `slope briefing` — Pre-sprint briefing',
+      '- `slope card` — Handicap card',
+      '- `slope validate` — Validate scorecard',
+      '- `slope map` — Regenerate codebase map',
+      '',
+      '## MCP Server',
+      'Add the SLOPE MCP server in Cline settings (VS Code extension storage):',
+      '- Server name: `slope`',
+      '- Command: `npx @slope-dev/slope/mcp`',
+      '',
+    ].join('\n');
+    writeFileSync(clinerulesDest, contextContent);
+    console.log(`  Created ${clinerulesDest}`);
+  }
+
+  console.log('\n  Cline rules installed to .clinerules/');
+}
+
+function installClineMcpConfig(_cwd: string): void {
+  // Cline MCP config lives in VS Code's extension storage (cline_mcp_settings.json),
+  // NOT in the workspace. We can't write to it from slope init.
+  // Users must add the SLOPE MCP server via Cline's UI or manually edit the global config.
+  console.log('\n  Note: Cline MCP config is stored in VS Code extension storage.');
+  console.log('  Add the SLOPE MCP server in Cline settings:');
+  console.log('    Server name: slope');
+  console.log('    Command: npx @slope-dev/slope/mcp');
 }
 
 function installGenericTemplates(cwd: string, metaphor: MetaphorDefinition): void {
@@ -397,7 +467,9 @@ function installDefaultHooks(cwd: string, provider: InitProvider): void {
     ? join(cwd, '.claude', 'hooks')
     : provider === 'windsurf'
       ? join(cwd, '.windsurf', 'hooks')
-      : join(cwd, '.cursor', 'hooks');
+      : provider === 'cline'
+        ? join(cwd, '.clinerules', 'hooks')
+        : join(cwd, '.cursor', 'hooks');
   mkdirSync(hooksDir, { recursive: true });
 
   const { loadHooksConfig } = { loadHooksConfig: (c: string) => {
@@ -445,6 +517,11 @@ function installForProvider(cwd: string, provider: InitProvider, metaphor: Metap
       installWindsurfTemplates(cwd, metaphor);
       installWindsurfMcpConfig(cwd);
       installDefaultHooks(cwd, 'windsurf');
+      break;
+    case 'cline':
+      installClineTemplates(cwd, metaphor);
+      installClineMcpConfig(cwd);
+      installDefaultHooks(cwd, 'cline');
       break;
     case 'opencode':
       installOpenCodeTemplates(cwd, metaphor);

@@ -76,7 +76,7 @@ export const CLAUDE_CODE_TOOLS: ToolNameMap = {
 // --- Adapter Priority ---
 
 /** Detection order for adapters. First match wins. Generic is always last (fallback). */
-export const ADAPTER_PRIORITY: HarnessId[] = ['claude-code', 'cursor', 'windsurf', 'generic'];
+export const ADAPTER_PRIORITY: HarnessId[] = ['claude-code', 'cursor', 'windsurf', 'cline', 'generic'];
 
 // --- Adapter Registry ---
 

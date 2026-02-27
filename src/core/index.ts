@@ -287,6 +287,7 @@ export type {
 export { ClaudeCodeAdapter, claudeCodeAdapter } from './adapters/claude-code.js';
 export { CursorAdapter, cursorAdapter } from './adapters/cursor.js';
 export { WindsurfAdapter, windsurfAdapter } from './adapters/windsurf.js';
+export { ClineAdapter, clineAdapter } from './adapters/cline.js';
 export { GenericAdapter, genericAdapter } from './adapters/generic.js';
 export type { GuardManifestEntry } from './adapters/generic.js';
 
