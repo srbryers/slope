@@ -4,15 +4,16 @@
 
 ## 1. Overview — Compatibility Matrix
 
-| Feature | Claude Code | Cursor | Windsurf | OpenCode | Generic |
-|---------|------------|--------|----------|----------|---------|
-| PreToolUse | ✓ | ✓ | ✓ (exit code) | ✗ | ✓ (JSON) |
-| PostToolUse | ✓ | ✓ | ✓ | ✗ | ✓ |
-| Stop | ✓ | ✓ | ✗ | ✗ | ✓ |
-| Context injection | ✓ | ✓ | ✗ | ✗ | ✓ |
-| Block/deny | ✓ | ✓ | ✓ | ✗ | ✓ |
-| Ask decision | ✓ | ✗ | ✗ | ✗ | ✓ |
-| Session events | ✓ | ✓ | ✓ | ✓ (plugin) | ✗ |
+| Feature | Claude Code | Cursor | Cline | Windsurf | OpenCode | Continue | Generic |
+|---------|------------|--------|-------|----------|----------|----------|---------|
+| PreToolUse | ✓ | ✓ | ✓ | ✓ (exit code) | ✗ | ✗ | ✓ (JSON) |
+| PostToolUse | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ |
+| Stop | ✓ | ✓ | ✓ (TaskCancel) | ✗ | ✗ | ✗ | ✓ |
+| PreCompact | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✓ |
+| Context injection | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ |
+| Block/deny | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ |
+| Ask decision | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ |
+| Session events | ✓ | ✓ | ✓ (8 events) | ✓ | ✓ (plugin) | ✗ | ✗ |
 
 **Legend:** ✓ = fully supported, ✗ = not available, (exit code) = supported via exit-code protocol rather than JSON output.
 
@@ -176,20 +177,182 @@ SLOPE already generates an OpenCode session plugin via `slope init --opencode`, 
 | Context injection | ✗ |
 | Tool blocking | ✗ |
 
-## 5. Cline / Continue / Aider
+## 5. Cline
 
-**Feasibility: Generic adapter only** — These tools have no lifecycle hook systems.
+**Feasibility: Full adapter** — Cline (v3.36+) has a comprehensive hook system with 8 lifecycle events, JSON stdin/stdout protocol, and the ability to block, modify, or inject context.
 
-### Cline
-No hook system. Operates as a VS Code extension with chat-based interaction. No configuration points for pre/post tool interception. Use `GenericAdapter` for manual integration.
+**Source:** [Cline Hooks Documentation](https://docs.cline.bot/features/hooks), [Cline v3.36 Blog Post](https://cline.bot/blog/cline-v3-36-hooks), [Cline GitHub](https://github.com/cline/cline) (v3.68.0, 2026-02-27)
 
-### Continue
-No hook system. VS Code/JetBrains extension with chat-based interaction. Has a `config.json` for model/provider configuration but no lifecycle hooks. Use `GenericAdapter`.
+### Hook System
 
-### Aider
+Cline supports **8 hook events**, defined in `src/core/hooks/hook-factory.ts` as the `Hooks` interface:
+
+| Event | Trigger | SLOPE Mapping |
+|---|---|---|
+| **PreToolUse** | Before tool execution | `PreToolUse` |
+| **PostToolUse** | After tool execution (even on error) | `PostToolUse` |
+| **TaskCancel** | User cancels running task | `Stop` |
+| **PreCompact** | Before conversation history truncation | `PreCompact` |
+| **UserPromptSubmit** | User sends a message | — (no SLOPE equivalent) |
+| **TaskStart** | New task initiated | — (session tracking only) |
+| **TaskResume** | Interrupted task resumed | — (session tracking only) |
+| **TaskComplete** | Task finishes successfully | — (not mapped to Stop — see note) |
+
+**Note:** `TaskComplete` is intentionally NOT mapped to SLOPE's `Stop` event. A completed task can't be blocked — it already finished. Only `TaskCancel` maps to `Stop` because cancellation can be intercepted.
+
+### Hook Discovery Model — Per-Event Scripts (git-style)
+
+Cline uses per-event script discovery, identical to git hooks. Each hook event maps to a **single executable file** named exactly after the event:
+
+```
+.clinerules/hooks/PreToolUse     (executable, no extension)
+.clinerules/hooks/PostToolUse
+.clinerules/hooks/TaskCancel
+.clinerules/hooks/PreCompact
+```
+
+Two directories are scanned (both optional):
+1. **Global:** `~/Documents/Cline/Rules/Hooks/`
+2. **Workspace:** `.clinerules/hooks/` in each workspace root
+
+Global hooks execute first, then workspace hooks. If either returns `cancel: true`, the operation stops.
+
+**Source:** `src/core/hooks/hook-factory.ts` (`findHookInHooksDir`, `findUnixHook`), `src/core/storage/disk.ts` (`getAllHooksDirs`)
+
+### Hook Protocol
+
+**Input (JSON on stdin):**
+```json
+{
+  "preToolUse": {
+    "tool": "write_to_file",
+    "parameters": { "path": "src/index.ts", "content": "..." }
+  },
+  "taskId": "abc123",
+  "clineVersion": "3.68.0",
+  "hookName": "PreToolUse",
+  "timestamp": "2026-02-27T12:00:00.000Z",
+  "workspaceRoots": ["/project"],
+  "userId": "user-id"
+}
+```
+
+**Output (JSON on stdout):**
+```json
+{
+  "cancel": true,
+  "errorMessage": "SLOPE guard: file is in a restricted area",
+  "contextModification": "Additional context injected into the agent's live context"
+}
+```
+
+- `cancel: boolean` — `true` blocks execution. For PreToolUse, prevents tool from running. For PostToolUse, cancels the task (tool already executed).
+- `contextModification: string` — injected into agent context. Truncated to 50KB (`MAX_CONTEXT_MODIFICATION_SIZE`).
+- `errorMessage: string` — user-visible denial message when `cancel: true`.
+- Hooks are **fail-open**: script errors (non-zero exit without valid JSON) allow execution to proceed.
+
+**Source:** `src/core/hooks/hook-factory.ts` (`validateHookOutput`), `src/core/hooks/PreToolUseHookCancellationError.ts`
+
+### Tool Name Mappings → ToolCategory
+
+Verified from Cline v3.68.0 system prompt and source:
+
+| ToolCategory | Cline Tool Name(s) |
+|-------------|-------------------|
+| `read_file` | `read_file` |
+| `write_file` | `write_to_file\|replace_in_file` |
+| `search_files` | `list_files` |
+| `search_content` | `search_files` |
+| `execute_command` | `execute_command` |
+| `create_subagent` | `use_mcp_tool` |
+| `exit_plan` | `plan_mode_response` |
+
+**Caution:** Cline's `search_files` is a **content search** (regex grep), NOT file listing. `list_files` is file/directory listing. This is the opposite of what you might guess from the names.
+
+### MCP Configuration
+
+MCP settings are stored in VS Code's extension storage directory: `cline_mcp_settings.json`. The path is resolved at runtime by `getMcpSettingsFilePath()` in `src/core/storage/disk.ts`. This is NOT a workspace-level file — it lives in VS Code's global storage.
+
+```json
+{
+  "mcpServers": {
+    "slope": {
+      "command": "npx",
+      "args": ["@slope-dev/slope/mcp"],
+      "alwaysAllow": [],
+      "disabled": false
+    }
+  }
+}
+```
+
+### Limitations
+
+- **One script per event** — no matcher-based routing. The SLOPE dispatcher script must handle all tool filtering internally.
+- **macOS/Linux only** — Windows hook execution is disabled in Cline source.
+- **No `"ask"` decision** — Cline has no user-confirmation prompt. `ask` maps to `cancel: false`.
+- **Per-event scripts mean no config file** — `hooksConfigPath` returns `null` (directory-based discovery, not a config file).
+
+### SLOPE Adapter Strategy
+
+- **Adapter type:** Full `ClineAdapter`
+- **Detection:** `.clinerules/hooks/` directory (stricter than just `.clinerules/` to avoid false-positives)
+- **Install model:** Write per-event dispatcher scripts to `.clinerules/hooks/PreToolUse`, `PostToolUse`, `TaskCancel`, `PreCompact`
+- **Each script:** Reads JSON stdin, extracts tool name, calls `slope guard <guard-name>`, returns `{ cancel, contextModification, errorMessage }`
+
+## 6. Continue
+
+**Feasibility: Generic adapter only** — Continue has no tool-level hook system. MCP support + rules provide partial integration.
+
+**Source:** [Continue GitHub](https://github.com/continuedev/continue), [Continue Docs](https://docs.continue.dev)
+
+### No Hook System
+
+Continue has NO mechanism to intercept tool calls. Verified by searching the entire codebase — no `beforeToolCall`, `afterToolCall`, `toolHook`, or event listener patterns for tool execution exist. The closest mechanisms are internal-only:
+- `preprocessArgs` — transforms arguments before execution (per-tool-definition, not configurable)
+- `evaluateToolCallPolicy` — permission level determination (internal)
+
+### MCP Support
+
+Continue supports MCP servers in Agent mode. Configuration:
+
+**`~/.continue/config.yaml`:**
+```yaml
+mcpServers:
+  - name: slope
+    command: npx
+    args: ["@slope-dev/slope/mcp"]
+```
+
+**Workspace-level:** `.continue/mcpServers/slope.yaml` in project root.
+
+### Rules System
+
+Continue has a rules system analogous to `.clinerules`:
+- `.continuerules` — raw text file at workspace root
+- `.continue/rules/*.md` — markdown with YAML frontmatter (globs, alwaysApply)
+- `~/.continue/rules/*.md` — global rules
+
+Continue does NOT read `.clinerules` files.
+
+### Why No Dedicated Adapter
+
+- No tool-level hooks → can't intercept, block, or inject context for guard evaluation
+- MCP provides read-only access to SLOPE data (scorecards, handicap, search)
+- Rules provide static instructions but not dynamic guard responses
+- Users should use `GenericAdapter` for manual guard integration
+
+### No `--continue` Init Flag
+
+Continue's config lives at `~/.continue/config.yaml` (global, not workspace-level). Path resolution requires user-specific home directory handling that doesn't fit `slope init`'s workspace-scoped design. Users should configure Continue manually per the setup guide.
+
+## 7. Aider
+
+**Feasibility: Generic adapter only** — No hook system.
+
 No hook system. CLI-based tool with `.aider.conf.yml` for configuration. No pre/post tool events. Aider's `/run` command could theoretically call `slope guard` but there's no automated hook mechanism. Use `GenericAdapter`.
 
-## 6. Guard Execution Flow
+## 8. Guard Execution Flow
 
 ```mermaid
 flowchart TD
@@ -220,7 +383,7 @@ flowchart TD
     end
 ```
 
-## 7. Adapter Authoring Guide
+## 9. Adapter Authoring Guide
 
 To add a new harness adapter to SLOPE:
 
