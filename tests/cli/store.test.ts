@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { storeCommand } from '../../src/cli/commands/store.js';
 import { getStoreInfo } from '../../src/cli/store.js';
+import { SqliteSlopeStore } from '../../src/store/index.js';
 
 let tmpDir: string;
 let originalCwd: string;
@@ -128,6 +129,135 @@ describe('slope store migrate status', () => {
     expect(output).toContain('Current schema version: 3');
     expect(output).toContain('Total migrations:       3');
     expect(output).toContain('up to date');
+  });
+});
+
+describe('slope store backup', () => {
+  it('creates backup file at expected path', async () => {
+    // Create the store first by resolving it
+    const store = new SqliteSlopeStore(join(tmpDir, '.slope', 'slope.db'));
+    await store.registerSession({ session_id: 'backup-test', role: 'primary', ide: 'vscode' });
+    store.close();
+
+    const logs: string[] = [];
+    const spy = vi.spyOn(console, 'log').mockImplementation((...args) => { logs.push(args.join(' ')); });
+
+    await storeCommand(['backup']);
+
+    const output = logs.join('\n');
+    spy.mockRestore();
+
+    expect(output).toContain('Backup created:');
+    // Extract the backup path from output
+    const match = output.match(/Backup created: (.+)/);
+    expect(match).toBeTruthy();
+    expect(existsSync(match![1].trim())).toBe(true);
+  });
+
+  it('creates backup at custom output path', async () => {
+    const store = new SqliteSlopeStore(join(tmpDir, '.slope', 'slope.db'));
+    store.close();
+
+    const customPath = join(tmpDir, 'my-backup.db');
+    const logs: string[] = [];
+    const spy = vi.spyOn(console, 'log').mockImplementation((...args) => { logs.push(args.join(' ')); });
+
+    await storeCommand(['backup', `--output=${customPath}`]);
+
+    spy.mockRestore();
+
+    expect(existsSync(customPath)).toBe(true);
+  });
+
+  it('fails gracefully for non-existent store', async () => {
+    // Don't create any store file
+    const errLogs: string[] = [];
+    const spy = vi.spyOn(console, 'error').mockImplementation((...args) => { errLogs.push(args.join(' ')); });
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => { throw new Error('exit'); });
+
+    await expect(storeCommand(['backup'])).rejects.toThrow('exit');
+
+    spy.mockRestore();
+    exitSpy.mockRestore();
+
+    expect(errLogs.join('\n')).toContain('Store not found');
+  });
+});
+
+describe('slope store restore', () => {
+  it('restores from a valid backup', async () => {
+    // Create a store and back it up
+    const dbPath = join(tmpDir, '.slope', 'slope.db');
+    const store = new SqliteSlopeStore(dbPath);
+    await store.registerSession({ session_id: 'restore-test', role: 'primary', ide: 'vscode' });
+    store.close();
+
+    const backupPath = join(tmpDir, 'backup.db');
+    const { copyFileSync: copy } = await import('node:fs');
+    copy(dbPath, backupPath);
+
+    // Delete the original store
+    rmSync(dbPath);
+    expect(existsSync(dbPath)).toBe(false);
+
+    // Restore
+    const logs: string[] = [];
+    const spy = vi.spyOn(console, 'log').mockImplementation((...args) => { logs.push(args.join(' ')); });
+
+    await storeCommand(['restore', `--from=${backupPath}`]);
+
+    spy.mockRestore();
+
+    expect(existsSync(dbPath)).toBe(true);
+    expect(logs.join('\n')).toContain('Store created from');
+
+    // Verify restored data
+    const restored = new SqliteSlopeStore(dbPath);
+    const sessions = await restored.getActiveSessions();
+    expect(sessions.find(s => s.session_id === 'restore-test')).toBeTruthy();
+    restored.close();
+  });
+
+  it('fails with clear error for invalid file', async () => {
+    const badFile = join(tmpDir, 'not-a-db.txt');
+    writeFileSync(badFile, 'this is not a database');
+
+    const errLogs: string[] = [];
+    const spy = vi.spyOn(console, 'error').mockImplementation((...args) => { errLogs.push(args.join(' ')); });
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => { throw new Error('exit'); });
+
+    await expect(storeCommand(['restore', `--from=${badFile}`])).rejects.toThrow('exit');
+
+    spy.mockRestore();
+    exitSpy.mockRestore();
+
+    expect(errLogs.join('\n')).toContain('Cannot read backup file');
+  });
+
+  it('fails when --from is missing', async () => {
+    const errLogs: string[] = [];
+    const spy = vi.spyOn(console, 'error').mockImplementation((...args) => { errLogs.push(args.join(' ')); });
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => { throw new Error('exit'); });
+
+    await expect(storeCommand(['restore'])).rejects.toThrow('exit');
+
+    spy.mockRestore();
+    exitSpy.mockRestore();
+
+    expect(errLogs.join('\n')).toContain('--from=<path> is required');
+  });
+
+  it('fails when backup file does not exist', async () => {
+    const errLogs: string[] = [];
+    const spy = vi.spyOn(console, 'error').mockImplementation((...args) => { errLogs.push(args.join(' ')); });
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => { throw new Error('exit'); });
+
+    await expect(storeCommand(['restore', '--from=/nonexistent/file.db'])).rejects.toThrow('exit');
+
+    spy.mockRestore();
+    exitSpy.mockRestore();
+
+    expect(errLogs.join('\n')).toContain('Backup file not found');
   });
 });
 
