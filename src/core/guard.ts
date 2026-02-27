@@ -2,7 +2,7 @@
 // Types and utilities for agent guidance hooks.
 
 import type { ToolCategory } from './harness.js';
-import { claudeCodeAdapter } from './adapters/claude-code.js';
+import { getAdapter } from './harness.js';
 
 /** Input from Claude Code PreToolUse/PostToolUse hooks (JSON on stdin) */
 export interface HookInput {
@@ -248,6 +248,8 @@ export interface CustomGuardDefinition {
   description: string;
   hookEvent: 'PreToolUse' | 'PostToolUse' | 'Stop' | 'PreCompact';
   matcher?: string;
+  /** Harness-agnostic tool categories this guard applies to */
+  toolCategories?: ToolCategory[];
   level: 'scoring' | 'full';
   command: string;
 }
@@ -278,21 +280,27 @@ export function clearCustomGuards(): void {
   customGuards.length = 0;
 }
 
-// --- Formatters (delegates to ClaudeCodeAdapter) ---
+// --- Formatters (delegates to ClaudeCodeAdapter via registry lookup) ---
+
+function getClaudeCodeAdapter() {
+  const adapter = getAdapter('claude-code');
+  if (!adapter) throw new Error('ClaudeCodeAdapter not registered — ensure adapters/claude-code.js is imported');
+  return adapter;
+}
 
 /** Format a GuardResult as PreToolUse JSON output */
 export function formatPreToolUseOutput(result: GuardResult): PreToolUseOutput {
-  return claudeCodeAdapter.formatPreToolOutput(result) as PreToolUseOutput;
+  return getClaudeCodeAdapter().formatPreToolOutput(result) as PreToolUseOutput;
 }
 
 /** Format a GuardResult as PostToolUse JSON output */
 export function formatPostToolUseOutput(result: GuardResult): PostToolUseOutput {
-  return claudeCodeAdapter.formatPostToolOutput(result) as PostToolUseOutput;
+  return getClaudeCodeAdapter().formatPostToolOutput(result) as PostToolUseOutput;
 }
 
 /** Format a GuardResult as Stop JSON output */
 export function formatStopOutput(result: GuardResult): StopOutput {
-  return claudeCodeAdapter.formatStopOutput(result) as StopOutput;
+  return getClaudeCodeAdapter().formatStopOutput(result) as StopOutput;
 }
 
 /**
@@ -303,5 +311,5 @@ export function generateClaudeCodeHooksConfig(
   guards: AnyGuardDefinition[],
   guardScriptPath: string,
 ): Record<string, Array<{ matcher?: string; hooks: Array<{ type: string; command: string; timeout?: number; statusMessage?: string }> }>> {
-  return claudeCodeAdapter.generateHooksConfig(guards, guardScriptPath) as ReturnType<typeof generateClaudeCodeHooksConfig>;
+  return getClaudeCodeAdapter().generateHooksConfig(guards, guardScriptPath) as ReturnType<typeof generateClaudeCodeHooksConfig>;
 }

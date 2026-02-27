@@ -38,6 +38,13 @@ describe('GenericAdapter', () => {
         reason: 'Not allowed',
       });
     });
+
+    it('returns ask for ask decision', () => {
+      const result: GuardResult = { decision: 'ask' };
+      expect(adapter.formatPreToolOutput(result)).toEqual({
+        action: 'ask',
+      });
+    });
   });
 
   describe('formatPostToolOutput', () => {
@@ -94,11 +101,13 @@ describe('GenericAdapter', () => {
       }
     });
 
-    it('includes matcher only when present', () => {
+    it('resolves matcher from toolCategories using generic tool names', () => {
       const manifest = adapter.generateHooksConfig(GUARD_DEFINITIONS, './g.sh') as Array<Record<string, unknown>>;
       const explore = manifest.find(e => e.name === 'explore');
       const transcript = manifest.find(e => e.name === 'transcript');
-      expect(explore?.matcher).toBe('Read|Glob|Grep');
+      // Generic adapter should resolve to generic tool names, not Claude Code names
+      const exploreMatcher = new Set((explore?.matcher as string)?.split('|'));
+      expect(exploreMatcher).toEqual(new Set(['read_file', 'search_files', 'search_content']));
       expect(transcript?.matcher).toBeUndefined();
     });
   });

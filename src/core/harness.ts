@@ -5,8 +5,8 @@ import type { GuardResult, AnyGuardDefinition } from './guard.js';
 
 // --- Types ---
 
-/** Supported AI coding harness identifiers */
-export type HarnessId = 'claude-code' | 'cursor' | 'cline' | 'windsurf' | 'continue' | 'aider' | 'generic';
+/** Known AI coding harness identifiers (extensible via string for third-party adapters) */
+export type HarnessId = 'claude-code' | 'cursor' | 'cline' | 'windsurf' | 'continue' | 'aider' | 'generic' | (string & {});
 
 /** Tool categories that guards can match against (harness-agnostic) */
 export type ToolCategory =

@@ -2,7 +2,7 @@ import { writeFileSync, readFileSync, existsSync, unlinkSync, mkdirSync } from '
 import { join } from 'node:path';
 import { loadHooksConfig, saveHooksConfig } from '../hooks-config.js';
 import { getAllGuardDefinitions, loadPluginGuards, loadConfig, detectAdapter, getAdapter, listAdapters } from '../../core/index.js';
-import type { AnyGuardDefinition, HarnessId } from '../../core/index.js';
+import type { AnyGuardDefinition } from '../../core/index.js';
 // Import to trigger auto-registration of adapters
 import '../../core/adapters/claude-code.js';
 import '../../core/adapters/generic.js';
@@ -95,7 +95,7 @@ export async function hookCommand(args: string[]): Promise<void> {
   switch (sub) {
     case 'add':
       if (flags.level === 'full' || flags.level === 'scoring') {
-        installGuardHooks(cwd, flags.level as 'scoring' | 'full', flags.harness as HarnessId | undefined);
+        installGuardHooks(cwd, flags.level as 'scoring' | 'full', flags.harness);
       } else {
         addHook(hookName, cwd);
       }
@@ -243,7 +243,7 @@ function showHook(name: string, cwd: string): void {
   process.exit(1);
 }
 
-function installGuardHooks(cwd: string, level: 'scoring' | 'full', harnessId?: HarnessId): void {
+function installGuardHooks(cwd: string, level: 'scoring' | 'full', harnessId?: string): void {
   // Load custom guard plugins
   const config = loadConfig(cwd);
   loadPluginGuards(cwd, config.plugins);
@@ -256,6 +256,12 @@ function installGuardHooks(cwd: string, level: 'scoring' | 'full', harnessId?: H
   if (guards.length === 0) {
     console.log('\n  No guards to install for this level.\n');
     return;
+  }
+
+  // Safety check: ensure at least one adapter is registered
+  if (listAdapters().length === 0) {
+    console.error('\n  No harness adapters registered. This is a bug — adapters should auto-register on import.\n');
+    process.exit(1);
   }
 
   // Resolve adapter: explicit --harness flag, auto-detect, or error

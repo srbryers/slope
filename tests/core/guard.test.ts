@@ -7,6 +7,8 @@ import {
   generateClaudeCodeHooksConfig,
 } from '../../src/core/guard.js';
 import type { GuardResult } from '../../src/core/guard.js';
+// Register adapter so format functions can look it up from the registry
+import '../../src/core/adapters/claude-code.js';
 
 describe('GUARD_DEFINITIONS', () => {
   it('has 16 guards defined', () => {

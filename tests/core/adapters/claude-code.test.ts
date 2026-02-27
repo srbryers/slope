@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ClaudeCodeAdapter } from '../../../src/core/adapters/claude-code.js';
 import { formatPreToolUseOutput, formatPostToolUseOutput, formatStopOutput, generateClaudeCodeHooksConfig, GUARD_DEFINITIONS } from '../../../src/core/guard.js';
+import { resolveToolMatcher } from '../../../src/core/harness.js';
 import type { GuardResult } from '../../../src/core/guard.js';
 
 describe('ClaudeCodeAdapter', () => {
@@ -113,6 +114,21 @@ describe('toolCategories on GUARD_DEFINITIONS', () => {
       // compaction, stop-check, next-action have no matcher and no toolCategories
       // transcript has no matcher and no toolCategories
       expect(g.toolCategories, `${g.name} should not have toolCategories`).toBeUndefined();
+    }
+  });
+
+  it('resolveToolMatcher(claudeCodeAdapter, toolCategories) matches matcher for all guards', () => {
+    const adapter = new ClaudeCodeAdapter();
+    for (const g of GUARD_DEFINITIONS) {
+      const resolved = resolveToolMatcher(adapter, g.toolCategories);
+      if (g.matcher) {
+        // Compare as sorted sets — order doesn't matter for pipe-separated matchers
+        const resolvedSet = new Set(resolved?.split('|'));
+        const matcherSet = new Set(g.matcher.split('|'));
+        expect(resolvedSet, `${g.name}: resolved toolCategories should match matcher`).toEqual(matcherSet);
+      } else {
+        expect(resolved, `${g.name}: no toolCategories should resolve to undefined`).toBeUndefined();
+      }
     }
   });
 });

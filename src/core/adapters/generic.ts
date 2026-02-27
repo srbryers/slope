@@ -4,7 +4,7 @@
 import { existsSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { HarnessAdapter, ToolNameMap } from '../harness.js';
-import { registerAdapter } from '../harness.js';
+import { registerAdapter, resolveToolMatcher } from '../harness.js';
 import type { GuardResult, AnyGuardDefinition } from '../guard.js';
 
 /** Generic tool name map — uses common operation names */
@@ -35,8 +35,12 @@ export class GenericAdapter implements HarnessAdapter {
   readonly toolNames: ToolNameMap = GENERIC_TOOLS;
 
   formatPreToolOutput(result: GuardResult): unknown {
+    const action = result.decision === 'deny' ? 'deny'
+      : result.decision === 'ask' ? 'ask'
+      : result.context ? 'context'
+      : 'allow';
     return {
-      action: result.decision === 'deny' ? 'deny' : result.context ? 'context' : 'allow',
+      action,
       ...(result.context && { message: result.context }),
       ...(result.blockReason && { reason: result.blockReason }),
     };
@@ -58,14 +62,18 @@ export class GenericAdapter implements HarnessAdapter {
   }
 
   generateHooksConfig(guards: AnyGuardDefinition[], guardScriptPath: string): GuardManifestEntry[] {
-    return guards.map(g => ({
-      name: g.name,
-      description: g.description,
-      hookEvent: g.hookEvent,
-      ...(g.matcher && { matcher: g.matcher }),
-      level: g.level,
-      command: `${guardScriptPath} ${g.name}`,
-    }));
+    return guards.map(g => {
+      // Resolve matcher via toolCategories (harness-agnostic) with fallback to raw matcher
+      const matcher = resolveToolMatcher(this, 'toolCategories' in g ? g.toolCategories : undefined) ?? g.matcher;
+      return {
+        name: g.name,
+        description: g.description,
+        hookEvent: g.hookEvent,
+        ...(matcher && { matcher }),
+        level: g.level,
+        command: `${guardScriptPath} ${g.name}`,
+      };
+    });
   }
 
   installGuards(cwd: string, guards: AnyGuardDefinition[]): void {
