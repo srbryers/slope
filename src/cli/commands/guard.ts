@@ -1,4 +1,6 @@
-import { GUARD_DEFINITIONS, formatPreToolUseOutput, formatPostToolUseOutput, formatStopOutput, getAllGuardDefinitions, getCustomGuard, loadPluginGuards } from '../../core/index.js';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { GUARD_DEFINITIONS, formatPreToolUseOutput, formatPostToolUseOutput, formatStopOutput, getAllGuardDefinitions, getCustomGuard, loadPluginGuards, detectAdapter } from '../../core/index.js';
 import type { HookInput, GuardResult, GuardName, AnyGuardDefinition } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { exploreGuard } from '../guards/explore.js';
@@ -17,6 +19,35 @@ import { prReviewGuard } from '../guards/pr-review.js';
 import { transcriptGuard } from '../guards/transcript.js';
 import { branchBeforeCommitGuard } from '../guards/branch-before-commit.js';
 import { execSync } from 'node:child_process';
+
+// Side-effect imports: ensure all adapters are registered for detectAdapter()
+import '../../core/adapters/claude-code.js';
+import '../../core/adapters/cursor.js';
+import '../../core/adapters/windsurf.js';
+import '../../core/adapters/generic.js';
+
+/** Static map of which hook events each harness supports */
+export const HARNESS_EVENT_SUPPORT: Record<string, Set<string>> = {
+  'claude-code': new Set(['PreToolUse', 'PostToolUse', 'Stop', 'PreCompact']),
+  'cursor':      new Set(['PreToolUse', 'PostToolUse', 'Stop']),
+  'windsurf':    new Set(['PreToolUse', 'PostToolUse']),
+  'generic':     new Set(['PreToolUse', 'PostToolUse', 'Stop']),
+};
+
+/** Check if a hook event is supported by a given harness. Unknown harnesses default to supported. */
+export function isEventSupported(harnessId: string, hookEvent: string): boolean {
+  return HARNESS_EVENT_SUPPORT[harnessId]?.has(hookEvent) ?? true;
+}
+
+/** Get the hooks config file path for a given harness. Returns null for unknown harnesses. */
+export function getHooksConfigPath(cwd: string, harnessId: string): string | null {
+  switch (harnessId) {
+    case 'claude-code': return join(cwd, '.claude', 'settings.json');
+    case 'cursor': return join(cwd, '.cursor', 'hooks.json');
+    case 'windsurf': return join(cwd, '.windsurf', 'hooks.json');
+    default: return null;
+  }
+}
 
 type GuardHandler = (input: HookInput, cwd: string) => Promise<GuardResult>;
 
@@ -169,6 +200,7 @@ slope guard — Execute a SLOPE guidance hook
 Usage:
   slope guard <name>          Run a guard (reads hook JSON from stdin)
   slope guard list            Show all available guards
+  slope guard status          Show per-harness guard installation state
   slope guard enable <name>   Enable a disabled guard
   slope guard disable <name>  Disable a guard
 
@@ -206,6 +238,60 @@ export async function guardManageCommand(args: string[]): Promise<void> {
         console.log(`  ${status} ${d.name.padEnd(16)} [${d.hookEvent}] ${d.description} [custom]`);
       }
       console.log('');
+      break;
+    }
+    case 'status': {
+      const adapter = detectAdapter(cwd);
+      const harnessId = adapter?.id ?? 'unknown';
+      const harnessName = adapter?.displayName ?? 'Unknown';
+
+      console.log(`\nDetected harness: ${harnessName} (${harnessId})`);
+
+      // Show hooks config path + entry count
+      const configPath = getHooksConfigPath(cwd, harnessId);
+      if (configPath && existsSync(configPath)) {
+        try {
+          const raw = JSON.parse(readFileSync(configPath, 'utf8'));
+          const count = harnessId === 'claude-code'
+            ? Object.keys(raw.hooks ?? {}).reduce((n: number, k: string) => n + (Array.isArray(raw.hooks[k]) ? (raw.hooks[k] as unknown[]).length : 0), 0)
+            : Array.isArray(raw.hooks) ? raw.hooks.length : 0;
+          console.log(`Hooks config: ${configPath} (${count} entries)`);
+        } catch {
+          console.log(`Hooks config: ${configPath} (unreadable)`);
+        }
+      } else if (configPath) {
+        console.log(`Hooks config: ${configPath} (not found)`);
+      } else {
+        console.log('Hooks config: N/A');
+      }
+
+      // Show guard table
+      const statusConfig = loadConfig();
+      const statusDisabled = statusConfig.guidance?.disabled ?? [];
+      loadPluginGuards(cwd, statusConfig.plugins);
+
+      console.log('\nGuards:\n');
+      for (const d of getAllGuardDefinitions()) {
+        const disabled = statusDisabled.includes(d.name);
+        const supported = isEventSupported(harnessId, d.hookEvent);
+        const marker = disabled ? '[-]' : !supported ? '[~]' : '[+]';
+        const state = disabled ? 'disabled' : !supported ? 'unsupported' : 'active';
+        console.log(`  ${marker} ${d.name.padEnd(22)} ${d.hookEvent.padEnd(13)} ${state}`);
+      }
+
+      // Show capabilities
+      const hasContext = harnessId === 'claude-code' || harnessId === 'cursor';
+      const hasBlock = harnessId !== 'generic' || harnessId === 'generic'; // all can block
+      const hasStop = isEventSupported(harnessId, 'Stop');
+      const hasPreCompact = isEventSupported(harnessId, 'PreCompact');
+
+      console.log('\nCapabilities:');
+      console.log(`  Context injection: ${hasContext ? 'yes' : 'no'}`);
+      console.log(`  Block/deny:        yes`);
+      console.log(`  Stop event:        ${hasStop ? 'yes' : 'no'}`);
+      console.log(`  PreCompact:        ${hasPreCompact ? 'yes' : 'no'}`);
+
+      console.log('\nLegend: [+] active  [-] disabled  [~] unsupported by harness\n');
       break;
     }
     case 'enable':
