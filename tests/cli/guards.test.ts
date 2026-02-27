@@ -291,23 +291,40 @@ describe('stopCheckGuard', () => {
     expect(result).toEqual({});
   });
 
-  it('blocks when uncommitted changes exist', async () => {
+  it('warns but does not block for untracked-only files', async () => {
     const { execSync } = await import('node:child_process');
     execSync('git init && git config user.email "test@test.com" && git config user.name "Test" && git commit -m "init" --allow-empty', { cwd: tmpDir, stdio: 'ignore' });
-    writeFileSync(join(tmpDir, 'dirty.txt'), 'uncommitted');
+    writeFileSync(join(tmpDir, 'orphan.txt'), 'untracked');
+
+    const result = await stopCheckGuard(makeInput(), tmpDir);
+    expect(result.blockReason).toBeUndefined();
+    expect(result.context).toContain('untracked');
+    expect(result.context).toContain('SLOPE');
+  });
+
+  it('blocks when modified (staged/unstaged) changes exist', async () => {
+    const { execSync } = await import('node:child_process');
+    execSync('git init && git config user.email "test@test.com" && git config user.name "Test"', { cwd: tmpDir, stdio: 'ignore' });
+    writeFileSync(join(tmpDir, 'tracked.txt'), 'original');
+    execSync('git add tracked.txt && git commit -m "add file"', { cwd: tmpDir, stdio: 'ignore' });
+    writeFileSync(join(tmpDir, 'tracked.txt'), 'modified');
 
     const result = await stopCheckGuard(makeInput(), tmpDir);
     expect(result.blockReason).toContain('uncommitted');
-    expect(result.blockReason).toContain('SLOPE');
+    expect(result.blockReason).toContain('Commit and push');
   });
 
-  it('mentions commit and push in block reason', async () => {
+  it('blocks and includes untracked count when both modified and untracked exist', async () => {
     const { execSync } = await import('node:child_process');
-    execSync('git init && git config user.email "test@test.com" && git config user.name "Test" && git commit -m "init" --allow-empty', { cwd: tmpDir, stdio: 'ignore' });
-    writeFileSync(join(tmpDir, 'dirty.txt'), 'uncommitted');
+    execSync('git init && git config user.email "test@test.com" && git config user.name "Test"', { cwd: tmpDir, stdio: 'ignore' });
+    writeFileSync(join(tmpDir, 'tracked.txt'), 'original');
+    execSync('git add tracked.txt && git commit -m "add file"', { cwd: tmpDir, stdio: 'ignore' });
+    writeFileSync(join(tmpDir, 'tracked.txt'), 'modified');
+    writeFileSync(join(tmpDir, 'orphan.txt'), 'untracked');
 
     const result = await stopCheckGuard(makeInput(), tmpDir);
-    expect(result.blockReason).toContain('Commit and push');
+    expect(result.blockReason).toContain('uncommitted');
+    expect(result.blockReason).toContain('untracked');
   });
 });
 
