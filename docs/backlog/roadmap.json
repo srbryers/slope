@@ -1,0 +1,1408 @@
+{
+  "name": "SLOPE Development Roadmap",
+  "description": "Comprehensive roadmap covering all 36 sprints across 10 phases — from initial extraction through harness-agnostic guards and CaddyStack integration.",
+  "phases": [
+    {
+      "name": "Foundation — Extraction & Core",
+      "sprints": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ]
+    },
+    {
+      "name": "Phase 1 — Course Strategy & Reach",
+      "sprints": [
+        7,
+        8,
+        9,
+        10
+      ]
+    },
+    {
+      "name": "Phase 2 — Telemetry & Guidance",
+      "sprints": [
+        11,
+        12,
+        13
+      ]
+    },
+    {
+      "name": "Phase 3 — Multi-Agent Orchestration",
+      "sprints": [
+        14,
+        15
+      ]
+    },
+    {
+      "name": "Bridge — Vision Refresh",
+      "sprints": [
+        16
+      ]
+    },
+    {
+      "name": "Phase 4 — Extensibility & Dashboard",
+      "sprints": [
+        17,
+        18,
+        19,
+        20
+      ]
+    },
+    {
+      "name": "Internal Tooling — Guards, Maps & Scoring",
+      "sprints": [
+        21,
+        22,
+        23,
+        24,
+        25,
+        26
+      ]
+    },
+    {
+      "name": "Go-to-Market — Design Tokens, Site & Publishing",
+      "sprints": [
+        27,
+        28,
+        29
+      ]
+    },
+    {
+      "name": "Phase 5 — Smart Onboarding & Recommendations",
+      "sprints": [
+        30,
+        31,
+        32,
+        33
+      ]
+    },
+    {
+      "name": "Phase 6 — Harness-Agnostic Guards & CaddyStack",
+      "sprints": [
+        34,
+        35,
+        36
+      ]
+    }
+  ],
+  "sprints": [
+    {
+      "id": 1,
+      "theme": "Open-source SLOPE extraction",
+      "par": 5,
+      "slope": 2,
+      "type": "feature",
+      "tickets": [
+        {
+          "key": "S1-1",
+          "title": "Repo scaffold + type extraction",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S1-2",
+          "title": "Core scoring engine",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S1-3",
+          "title": "Formatter + briefing",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S1-4",
+          "title": "Standalone CLI",
+          "club": "long_iron",
+          "complexity": "moderate"
+        },
+        {
+          "key": "S1-5",
+          "title": "Claude Code starter kit + docs",
+          "club": "wedge",
+          "complexity": "small"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "theme": "Sprint Claims Registry & Multi-Agent Coordination",
+      "par": 4,
+      "slope": 2,
+      "type": "feature",
+      "tickets": [
+        {
+          "key": "S2-1",
+          "title": "Core types + conflict detection engine",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S2-2",
+          "title": "Registry abstraction + file/API backends",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S2-3",
+          "title": "CLI commands: claim, release, status",
+          "club": "long_iron",
+          "complexity": "moderate"
+        },
+        {
+          "key": "S2-4",
+          "title": "Preflight conflict check + claim blocking",
+          "club": "short_iron",
+          "complexity": "standard"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "theme": "Publish MCP + Cursor DX",
+      "par": 4,
+      "slope": 2,
+      "type": "feature",
+      "tickets": [
+        {
+          "key": "S3-1",
+          "title": "Publish checklist for mcp-tools and CLI",
+          "club": "putter",
+          "complexity": "trivial"
+        },
+        {
+          "key": "S3-2",
+          "title": "slope init --cursor --mcp adds .cursor/mcp.json",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S3-3",
+          "title": "Unit tests for @srbryers/mcp-tools",
+          "club": "wedge",
+          "complexity": "small"
+        },
+        {
+          "key": "S3-4",
+          "title": "README and docs refresh",
+          "club": "putter",
+          "complexity": "trivial"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "theme": "Code Mode MCP Refactor",
+      "par": 4,
+      "slope": 3,
+      "type": "infra",
+      "tickets": [
+        {
+          "key": "S4-1",
+          "title": "Move config.ts and loader.ts from CLI to core",
+          "club": "long_iron",
+          "complexity": "moderate"
+        },
+        {
+          "key": "S4-2",
+          "title": "Build function registry and search() tool",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S4-3",
+          "title": "Build execute() tool and node:vm sandbox",
+          "club": "driver",
+          "complexity": "moderate"
+        },
+        {
+          "key": "S4-4",
+          "title": "Remove old tools, tests, docs, bump versions",
+          "club": "short_iron",
+          "complexity": "standard"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "theme": "Universal Dev Tooling + Dogfood",
+      "par": 4,
+      "slope": 1,
+      "type": "feature",
+      "tickets": [
+        {
+          "key": "S5-1",
+          "title": "Add installClaudeCodeMcpConfig() to CLI init",
+          "club": "wedge",
+          "complexity": "small"
+        },
+        {
+          "key": "S5-2",
+          "title": "Add CLAUDE.md template to slope init --claude-code",
+          "club": "putter",
+          "complexity": "trivial"
+        },
+        {
+          "key": "S5-3",
+          "title": "Dogfood — wire SLOPE into its own repo",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S5-4",
+          "title": "Update README + mcp-tools docs",
+          "club": "putter",
+          "complexity": "trivial"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "theme": "SLOPE v1.0 — SlopeStore + Sessions + Hooks + MCP Tools",
+      "par": 5,
+      "slope": 3,
+      "type": "feature",
+      "tickets": [
+        {
+          "key": "S6-1",
+          "title": "SlopeStore interface + extended SprintClaim in core",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S6-2",
+          "title": "Create store-sqlite package scaffold",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S6-3",
+          "title": "Implement SqliteSlopeStore",
+          "club": "long_iron",
+          "complexity": "moderate"
+        },
+        {
+          "key": "S6-4",
+          "title": "Store-SQLite tests — 22 tests",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S6-5",
+          "title": "slope session command + resolveStore()",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S6-6",
+          "title": "slope hook command — add/remove/list/show",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S6-7",
+          "title": "Enhanced init + migrate claim commands to store",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S6-8",
+          "title": "Deprecate old registries",
+          "club": "wedge",
+          "complexity": "small"
+        },
+        {
+          "key": "S6-9",
+          "title": "MCP session/claim tools + integration tests",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S6-10",
+          "title": "Final tests + CLAUDE.md update",
+          "club": "wedge",
+          "complexity": "small"
+        },
+        {
+          "key": "S6-11",
+          "title": "Bump all to v1.0.0 + publish prep",
+          "club": "putter",
+          "complexity": "trivial"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "theme": "The Yardage Book — Strategic Planning Tools",
+      "par": 4,
+      "slope": 2,
+      "type": "feature",
+      "tickets": [
+        {
+          "key": "S7-1",
+          "title": "Structured roadmap format + schema",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S7-2",
+          "title": "`slope roadmap` CLI command — validate/review/status/show",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S7-3",
+          "title": "MCP + briefing integration for roadmap",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S7-4",
+          "title": "Documentation + slope init integration",
+          "club": "wedge",
+          "complexity": "small"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "theme": "The Rosetta Stone — Metaphor Engine",
+      "par": 4,
+      "slope": 2,
+      "type": "feature",
+      "tickets": [
+        {
+          "key": "S8-1",
+          "title": "MetaphorDefinition interface + metaphor registry",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S8-2",
+          "title": "Metaphor-aware formatters",
+          "club": "long_iron",
+          "complexity": "moderate"
+        },
+        {
+          "key": "S8-3",
+          "title": "CLI metaphor resolution + config support",
+          "club": "wedge",
+          "complexity": "small"
+        },
+        {
+          "key": "S8-4",
+          "title": "Metaphor documentation + validation",
+          "club": "putter",
+          "complexity": "trivial"
+        }
+      ],
+      "depends_on": [
+        7
+      ]
+    },
+    {
+      "id": 9,
+      "theme": "Cross-Platform — Template Generators + OpenCode Support",
+      "par": 4,
+      "slope": 2,
+      "type": "feature",
+      "tickets": [
+        {
+          "key": "S9-1",
+          "title": "Template generators replace static templates",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S9-2",
+          "title": "Cursor .cursorrules + complete integration",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S9-3",
+          "title": "OpenCode AGENTS.md + opencode.json MCP config",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S9-4",
+          "title": "Platform detection + unified init",
+          "club": "wedge",
+          "complexity": "small"
+        }
+      ],
+      "depends_on": [
+        8
+      ]
+    },
+    {
+      "id": 10,
+      "theme": "Signal Intelligence — CI Parser + Combined Classification + Events",
+      "par": 4,
+      "slope": 2,
+      "type": "feature",
+      "tickets": [
+        {
+          "key": "S10-1",
+          "title": "Events table + schema migration framework",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S10-2",
+          "title": "CI/test signal parser for Vitest and Jest",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S10-3",
+          "title": "Combined signal shot classification",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S10-4",
+          "title": "Auto-card CI integration + documentation",
+          "club": "wedge",
+          "complexity": "small"
+        }
+      ],
+      "depends_on": [
+        7
+      ]
+    },
+    {
+      "id": 11,
+      "theme": "The Transcript — Event Pipeline + Briefing Events + OpenCode Plugin",
+      "par": 4,
+      "slope": 2,
+      "type": "feature",
+      "tickets": [
+        {
+          "key": "S11-1",
+          "title": "slope extract command + session-end-events hook",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S11-2",
+          "title": "Event-to-common-issues pipeline",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S11-3",
+          "title": "Briefing integration with events",
+          "club": "wedge",
+          "complexity": "small"
+        },
+        {
+          "key": "S11-4",
+          "title": "OpenCode plugin for session lifecycle hooks",
+          "club": "wedge",
+          "complexity": "small"
+        }
+      ],
+      "depends_on": [
+        10
+      ]
+    },
+    {
+      "id": 12,
+      "theme": "The Caddy — Agent Guidance Hooks",
+      "par": 4,
+      "slope": 2,
+      "type": "feature",
+      "tickets": [
+        {
+          "key": "S12-1",
+          "title": "Guard framework + hook generation",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S12-2",
+          "title": "PreToolUse guards — explore + hazard",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S12-3",
+          "title": "Discipline hooks — commit nudge + scope drift",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S12-4",
+          "title": "Session hooks — compaction checkpoint + stop check",
+          "club": "wedge",
+          "complexity": "small"
+        }
+      ],
+      "depends_on": [
+        11
+      ]
+    },
+    {
+      "id": 13,
+      "theme": "The Clubhouse — HTML Reports + Launch Polish",
+      "par": 4,
+      "slope": 2,
+      "type": "feature",
+      "tickets": [
+        {
+          "key": "S13-1",
+          "title": "Static HTML report generation",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S13-2",
+          "title": "Report metaphor awareness",
+          "club": "wedge",
+          "complexity": "small"
+        },
+        {
+          "key": "S13-3",
+          "title": "Documentation + README overhaul",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S13-4",
+          "title": "Launch checklist + version bump",
+          "club": "wedge",
+          "complexity": "small"
+        }
+      ],
+      "depends_on": [
+        9,
+        12
+      ]
+    },
+    {
+      "id": 14,
+      "theme": "The Foursome — Multi-Agent Orchestration Primitives",
+      "par": 4,
+      "slope": 2,
+      "type": "feature",
+      "tickets": [
+        {
+          "key": "S14-1",
+          "title": "Role definition types + registry",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S14-2",
+          "title": "Role-based context injection",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S14-3",
+          "title": "Communication protocol — standup format",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S14-4",
+          "title": "Swarm session management",
+          "club": "short_iron",
+          "complexity": "standard"
+        }
+      ],
+      "depends_on": [
+        13
+      ]
+    },
+    {
+      "id": 15,
+      "theme": "The Leaderboard — Team-level Scoring, Escalation, and Integration Surface",
+      "par": 4,
+      "slope": 2,
+      "type": "feature",
+      "tickets": [
+        {
+          "key": "S15-1",
+          "title": "Multi-agent scorecard aggregation",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S15-2",
+          "title": "Escalation rules",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S15-3",
+          "title": "Team handicap + swarm performance",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S15-4",
+          "title": "Integration surface + MCP orchestration tests",
+          "club": "short_iron",
+          "complexity": "standard"
+        }
+      ],
+      "depends_on": [
+        14
+      ]
+    },
+    {
+      "id": 16,
+      "theme": "The 19th Hole — Vision Refresh + Phase 4 Roadmap",
+      "par": 4,
+      "slope": 1,
+      "type": "docs",
+      "tickets": [
+        {
+          "key": "S16-1",
+          "title": "Vision doc content refresh",
+          "club": "wedge",
+          "complexity": "small"
+        },
+        {
+          "key": "S16-2",
+          "title": "Architecture diagram + CLI reference",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S16-3",
+          "title": "Phase 4 roadmap (S17-S20)",
+          "club": "wedge",
+          "complexity": "small"
+        },
+        {
+          "key": "S16-4",
+          "title": "Backlog index + consistency pass",
+          "club": "putter",
+          "complexity": "trivial"
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "theme": "The Plugin System",
+      "par": 4,
+      "slope": 2,
+      "type": "feature",
+      "tickets": [
+        {
+          "key": "S17-1",
+          "title": "Plugin discovery + loader framework",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S17-2",
+          "title": "Pluggable metaphor loaders",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S17-3",
+          "title": "Custom guard plugins",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S17-4",
+          "title": "Plugin CLI + init + MCP integration",
+          "club": "wedge",
+          "complexity": "small"
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "theme": "PR Signals",
+      "par": 4,
+      "slope": 2,
+      "type": "feature",
+      "tickets": [
+        {
+          "key": "S18-1",
+          "title": "PR metadata signal parser",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S18-2",
+          "title": "Review-based shot classification",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S18-3",
+          "title": "CI status integration from PR",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S18-4",
+          "title": "MCP + briefing + docs",
+          "club": "wedge",
+          "complexity": "small"
+        }
+      ],
+      "depends_on": [
+        17
+      ]
+    },
+    {
+      "id": 19,
+      "theme": "The Dashboard",
+      "par": 4,
+      "slope": 2,
+      "type": "feature",
+      "tickets": [
+        {
+          "key": "S19-1",
+          "title": "Dashboard server + data API",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S19-2",
+          "title": "Sprint timeline + interactive drill-down",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S19-3",
+          "title": "Miss pattern heatmap + area hazard overlay",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S19-4",
+          "title": "Configuration + docs",
+          "club": "wedge",
+          "complexity": "small"
+        }
+      ]
+    },
+    {
+      "id": 20,
+      "theme": "The Foursome",
+      "par": 4,
+      "slope": 2,
+      "type": "feature",
+      "tickets": [
+        {
+          "key": "S20-1",
+          "title": "Player identification + per-player handicaps",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S20-2",
+          "title": "Shared hazard indices with multi-reporter severity",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S20-3",
+          "title": "Team leaderboard + dashboard integration",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S20-4",
+          "title": "Documentation + onboarding",
+          "club": "wedge",
+          "complexity": "small"
+        }
+      ],
+      "depends_on": [
+        17,
+        19
+      ]
+    },
+    {
+      "id": 21,
+      "theme": "Dogfooding Fixes",
+      "par": 4,
+      "slope": 1,
+      "type": "bugfix",
+      "tickets": [
+        {
+          "key": "S21-1",
+          "title": "Numeric sort in loader.ts and review.ts",
+          "club": "wedge",
+          "complexity": "small"
+        },
+        {
+          "key": "S21-2",
+          "title": "Add --player flag to auto-card and ScorecardInput",
+          "club": "wedge",
+          "complexity": "small"
+        },
+        {
+          "key": "S21-4",
+          "title": "Thread reported_by in distill pipeline",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S21-3",
+          "title": "Config fields, reported_by data, sort bug pattern",
+          "club": "putter",
+          "complexity": "trivial"
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "theme": "Port CaddyStack Guards",
+      "par": 4,
+      "slope": 2,
+      "type": "feature",
+      "tickets": [
+        {
+          "key": "S22-1",
+          "title": "MCP setup hints for hook activation",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S22-2",
+          "title": "Subagent-gate guard",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S22-3",
+          "title": "Push-nudge guard",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S22-4",
+          "title": "Workflow-gate guard + compaction upgrade",
+          "club": "long_iron",
+          "complexity": "moderate"
+        }
+      ]
+    },
+    {
+      "id": 23,
+      "theme": "The Yardage Book: Codebase Map",
+      "par": 4,
+      "slope": 1,
+      "type": "feature",
+      "tickets": [
+        {
+          "key": "S23-1",
+          "title": "Map generator + staleness checker (slope map)",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S23-2",
+          "title": "MCP map module + search integration",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S23-3",
+          "title": "Explore guard upgrade + codebase context rules",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S23-4",
+          "title": "Review-tier guard (architect review hook)",
+          "club": "short_iron",
+          "complexity": "standard"
+        }
+      ]
+    },
+    {
+      "id": 24,
+      "theme": "Review State Writer",
+      "par": 3,
+      "slope": 0,
+      "type": "feature",
+      "tickets": [
+        {
+          "key": "S24-1",
+          "title": "Review state management commands",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S24-2",
+          "title": "CLI routing for review subcommands",
+          "club": "wedge",
+          "complexity": "small"
+        },
+        {
+          "key": "S24-3",
+          "title": "Tests for review state commands",
+          "club": "wedge",
+          "complexity": "small"
+        }
+      ]
+    },
+    {
+      "id": 25,
+      "theme": "Hazard Severity Scoring",
+      "par": 4,
+      "slope": 1,
+      "type": "feature",
+      "tickets": [
+        {
+          "key": "S25-1",
+          "title": "Add HazardSeverity type and penalty mapping",
+          "club": "wedge",
+          "complexity": "small"
+        },
+        {
+          "key": "S25-2",
+          "title": "Update scoring to include hazard penalties",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S25-3",
+          "title": "Update formatter and validation",
+          "club": "wedge",
+          "complexity": "small"
+        },
+        {
+          "key": "S25-4",
+          "title": "Tests for hazard severity scoring",
+          "club": "wedge",
+          "complexity": "small"
+        }
+      ]
+    },
+    {
+      "id": 26,
+      "theme": "The Fairway Map — User Flow Tracking",
+      "par": 4,
+      "slope": 2,
+      "type": "feature",
+      "tickets": [
+        {
+          "key": "S26-1",
+          "title": "Flow types + validation functions",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S26-2",
+          "title": "slope flows CLI command",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S26-3",
+          "title": "MCP search integration",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S26-4",
+          "title": "CODEBASE.md flows section + stale-flows guard",
+          "club": "wedge",
+          "complexity": "small"
+        },
+        {
+          "key": "S26-5",
+          "title": "Docs + sprint plan artifact",
+          "club": "putter",
+          "complexity": "trivial"
+        }
+      ]
+    },
+    {
+      "id": 27,
+      "theme": "The Clubhouse — Marketing Site & Design Tokens",
+      "par": 4,
+      "slope": 3,
+      "type": "feature",
+      "tickets": [
+        {
+          "key": "S27-1",
+          "title": "Create @srbryers/tokens design tokens package",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S27-2",
+          "title": "Refactor core HTML reports to use tokens",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S27-3",
+          "title": "Create slope-web repo with migrated site",
+          "club": "long_iron",
+          "complexity": "moderate"
+        },
+        {
+          "key": "S27-4",
+          "title": "Cloudflare Pages deployment",
+          "club": "wedge",
+          "complexity": "small"
+        },
+        {
+          "key": "S27-5",
+          "title": "Docs + sprint artifacts",
+          "club": "putter",
+          "complexity": "trivial"
+        }
+      ]
+    },
+    {
+      "id": 28,
+      "theme": "The Pro Tour — Content & Interactive Features",
+      "par": 4,
+      "slope": 2,
+      "type": "feature",
+      "tickets": [
+        {
+          "key": "S28-1",
+          "title": "Content audit & rewrite",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S28-2",
+          "title": "Install command toggle",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S28-3",
+          "title": "Metaphor switcher",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S28-4",
+          "title": "New sections & polish",
+          "club": "wedge",
+          "complexity": "small"
+        }
+      ],
+      "depends_on": [
+        27
+      ]
+    },
+    {
+      "id": 29,
+      "theme": "Fix NPM Publishing Pipeline",
+      "par": 5,
+      "slope": 1,
+      "type": "fix",
+      "tickets": [
+        {
+          "key": "S29-1",
+          "title": "Fix broken test mocks",
+          "club": "wedge",
+          "complexity": "small"
+        },
+        {
+          "key": "S29-2",
+          "title": "Update version-bump script",
+          "club": "putter",
+          "complexity": "trivial"
+        },
+        {
+          "key": "S29-3",
+          "title": "Create NPM granular access token",
+          "club": "wedge",
+          "complexity": "small"
+        },
+        {
+          "key": "S29-4",
+          "title": "Clean up stale publish artifacts",
+          "club": "putter",
+          "complexity": "trivial"
+        },
+        {
+          "key": "S29-5",
+          "title": "Add CI check on PRs",
+          "club": "putter",
+          "complexity": "trivial"
+        },
+        {
+          "key": "S29-6",
+          "title": "Test full release→publish flow",
+          "club": "short_iron",
+          "complexity": "standard"
+        }
+      ]
+    },
+    {
+      "id": 30,
+      "theme": "The Surveyor",
+      "par": 4,
+      "slope": 3,
+      "type": "architecture",
+      "tickets": [
+        {
+          "key": "S30-1",
+          "title": "Analyzer types + pipeline runner",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S30-2",
+          "title": "Stack + structure analyzers",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S30-3",
+          "title": "Git history + testing analyzers",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S30-4",
+          "title": "Vision document + slope analyze CLI command",
+          "club": "short_iron",
+          "complexity": "standard"
+        }
+      ]
+    },
+    {
+      "id": 31,
+      "theme": "The Course Designer",
+      "par": 4,
+      "slope": 2,
+      "type": "feature",
+      "tickets": [
+        {
+          "key": "S31-1",
+          "title": "Complexity Estimator",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S31-2",
+          "title": "Config + First Sprint Generators",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S31-3",
+          "title": "Backlog Analyzer + Common Issues Seed",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S31-4",
+          "title": "--smart Integration + Exports + MCP Registry",
+          "club": "long_iron",
+          "complexity": "moderate"
+        }
+      ],
+      "depends_on": [
+        30
+      ]
+    },
+    {
+      "id": 32,
+      "theme": "The Scout",
+      "par": 4,
+      "slope": 2,
+      "type": "feature",
+      "tickets": [
+        {
+          "key": "S32-1",
+          "title": "CI Pipeline + Documentation Analyzers",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S32-2",
+          "title": "GitHub Backlog Analyzer + Merged Backlog",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S32-3",
+          "title": "Roadmap Generator from GitHub Milestones",
+          "club": "long_iron",
+          "complexity": "moderate"
+        },
+        {
+          "key": "S32-4",
+          "title": "MCP Registry, Exports, CLI, PR-Review Guard",
+          "club": "short_iron",
+          "complexity": "standard"
+        }
+      ],
+      "depends_on": [
+        30
+      ]
+    },
+    {
+      "id": 33,
+      "theme": "The Transcript",
+      "par": 4,
+      "slope": 2,
+      "type": "feature",
+      "tickets": [
+        {
+          "key": "S33-1",
+          "title": "TranscriptTurn types + JSONL utilities",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S33-2",
+          "title": "PostToolUse transcript guard",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S33-3",
+          "title": "slope transcript CLI commands",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S33-4",
+          "title": "Config, guard installation, exports, version bump",
+          "club": "wedge",
+          "complexity": "small"
+        }
+      ],
+      "depends_on": [
+        31,
+        32
+      ]
+    },
+    {
+      "id": 34,
+      "theme": "The Universal Caddy",
+      "par": 4,
+      "slope": 2,
+      "type": "refactor",
+      "tickets": [
+        {
+          "key": "S34-1",
+          "title": "HarnessAdapter interface + tool name mapping types",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S34-2",
+          "title": "Extract ClaudeCodeAdapter from existing guard.ts + hook.ts",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S34-3",
+          "title": "Refactor slope hook add --level=full to accept --harness flag",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S34-4",
+          "title": "Build GenericAdapter for shell-compatible guard scripts",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S34-5",
+          "title": "slope roadmap sync CLI command",
+          "club": "wedge",
+          "complexity": "small"
+        }
+      ],
+      "depends_on": [
+        33
+      ]
+    },
+    {
+      "id": 35,
+      "theme": "The Equipment Room",
+      "par": 4,
+      "slope": 3,
+      "type": "research",
+      "depends_on": [
+        34
+      ],
+      "tickets": [
+        {
+          "key": "S35-1",
+          "title": "Research harness hook formats (Cursor, Cline, Windsurf, Continue, Aider)",
+          "club": "long_iron",
+          "complexity": "moderate"
+        },
+        {
+          "key": "S35-2",
+          "title": "Build adapter for best-supported harness from research",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S35-3",
+          "title": "Build adapter for second-best harness or enhance generic",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S35-4",
+          "title": "Docs: harness compatibility matrix, adapter authoring guide",
+          "club": "wedge",
+          "complexity": "small"
+        }
+      ]
+    },
+    {
+      "id": 36,
+      "theme": "The Clubhouse Bridge",
+      "par": 4,
+      "slope": 2,
+      "type": "feature",
+      "depends_on": [
+        34
+      ],
+      "tickets": [
+        {
+          "key": "S36-1",
+          "title": "Export harness adapter types + factory from npm package",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S36-2",
+          "title": "CaddyStack: harness selection in onboarding flow",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S36-3",
+          "title": "CaddyStack: guard status dashboard",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S36-4",
+          "title": "CaddyStack: Install SLOPE flow",
+          "club": "wedge",
+          "complexity": "small"
+        }
+      ]
+    }
+  ]
+}
