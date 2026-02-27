@@ -1,6 +1,6 @@
 {
   "name": "SLOPE Development Roadmap",
-  "description": "Comprehensive roadmap covering all 36 sprints across 10 phases — from initial extraction through harness-agnostic guards and CaddyStack integration.",
+  "description": "Comprehensive roadmap covering all 40 sprints across 11 phases — from initial extraction through harness-agnostic guards, hardening, and adoption readiness.",
   "phases": [
     {
       "name": "Foundation — Extraction & Core",
@@ -86,6 +86,15 @@
         34,
         35,
         36
+      ]
+    },
+    {
+      "name": "Phase 7 — Hardening & Adoption",
+      "sprints": [
+        37,
+        38,
+        39,
+        40
       ]
     }
   ],
@@ -1399,6 +1408,145 @@
         {
           "key": "S36-4",
           "title": "CaddyStack: Install SLOPE flow",
+          "club": "wedge",
+          "complexity": "small"
+        }
+      ]
+    },
+    {
+      "id": 37,
+      "theme": "The Adapter Interface",
+      "par": 4,
+      "slope": 2,
+      "type": "refactor",
+      "tickets": [
+        {
+          "key": "S37-1",
+          "title": "Add supportedEvents + hooksConfigPath() to HarnessAdapter interface",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S37-2",
+          "title": "Implement new methods on all 4 built-in adapters",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S37-3",
+          "title": "Migrate guard status + consumers to use adapter methods",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S37-4",
+          "title": "Deprecate static maps, update docs + tests",
+          "club": "wedge",
+          "complexity": "small"
+        }
+      ]
+    },
+    {
+      "id": 38,
+      "theme": "The Vault",
+      "par": 4,
+      "slope": 2,
+      "type": "feature",
+      "tickets": [
+        {
+          "key": "S38-1",
+          "title": "PostgreSQL store GA — production-ready with connection pooling",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S38-2",
+          "title": "Versioned schema migration framework with rollback",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S38-3",
+          "title": "slope store status — health check + diagnostics CLI",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S38-4",
+          "title": "Backup/restore utilities + store docs",
+          "club": "wedge",
+          "complexity": "small"
+        }
+      ]
+    },
+    {
+      "id": 39,
+      "theme": "The Open Field",
+      "par": 4,
+      "slope": 3,
+      "type": "feature",
+      "depends_on": [
+        37
+      ],
+      "tickets": [
+        {
+          "key": "S39-1",
+          "title": "Research Cline/Continue hook APIs (current state, feasibility)",
+          "club": "long_iron",
+          "complexity": "moderate"
+        },
+        {
+          "key": "S39-2",
+          "title": "Build ClineAdapter or enhanced generic for Cline",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S39-3",
+          "title": "Build ContinueAdapter or document limitations",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S39-4",
+          "title": "Update compatibility matrix + authoring guide + CODEBASE.md",
+          "club": "wedge",
+          "complexity": "small"
+        }
+      ]
+    },
+    {
+      "id": 40,
+      "theme": "The Welcome Mat",
+      "par": 4,
+      "slope": 2,
+      "type": "docs",
+      "depends_on": [
+        37,
+        38
+      ],
+      "tickets": [
+        {
+          "key": "S40-1",
+          "title": "Enhanced slope init — interactive interview with adapter auto-detection",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S40-2",
+          "title": "Getting Started guide — end-to-end walkthrough",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S40-3",
+          "title": "Your First Sprint tutorial — scaffolded sprint example",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S40-4",
+          "title": "README overhaul + npm package description + examples",
           "club": "wedge",
           "complexity": "small"
         }
