@@ -248,7 +248,7 @@ export async function guardManageCommand(args: string[]): Promise<void> {
       console.log(`\nDetected harness: ${harnessName} (${harnessId})`);
 
       // Show hooks config path + entry count
-      const configPath = getHooksConfigPath(cwd, harnessId);
+      const configPath = adapter?.hooksConfigPath(cwd) ?? null;
       if (configPath && existsSync(configPath)) {
         try {
           const raw = JSON.parse(readFileSync(configPath, 'utf8'));
@@ -273,16 +273,16 @@ export async function guardManageCommand(args: string[]): Promise<void> {
       console.log('\nGuards:\n');
       for (const d of getAllGuardDefinitions()) {
         const disabled = statusDisabled.includes(d.name);
-        const supported = isEventSupported(harnessId, d.hookEvent);
+        const supported = adapter?.supportedEvents.has(d.hookEvent) ?? true;
         const marker = disabled ? '[-]' : !supported ? '[~]' : '[+]';
         const state = disabled ? 'disabled' : !supported ? 'unsupported' : 'active';
         console.log(`  ${marker} ${d.name.padEnd(22)} ${d.hookEvent.padEnd(13)} ${state}`);
       }
 
       // Show capabilities
-      const hasContext = harnessId === 'claude-code' || harnessId === 'cursor';
-      const hasStop = isEventSupported(harnessId, 'Stop');
-      const hasPreCompact = isEventSupported(harnessId, 'PreCompact');
+      const hasContext = adapter?.supportsContextInjection ?? false;
+      const hasStop = adapter?.supportedEvents.has('Stop') ?? true;
+      const hasPreCompact = adapter?.supportedEvents.has('PreCompact') ?? true;
 
       console.log('\nCapabilities:');
       console.log(`  Context injection: ${hasContext ? 'yes' : 'no'}`);
