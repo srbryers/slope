@@ -1,9 +1,9 @@
 ---
-generated_at: "2026-02-27T11:26:30.321Z"
-git_sha: "4a105a77678f9f757ba23550be9e8d04660837ce"
-sprint: 34
-source_files: 136
-test_files: 90
+generated_at: "2026-02-27T12:58:53.874Z"
+git_sha: "df143306affc42b0d39b20976288b240b3c15f74"
+sprint: 35
+source_files: 137
+test_files: 93
 cli_commands: 29
 guards: 16
 flows: 0
@@ -18,7 +18,7 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
 <!-- AUTO-GENERATED: START packages -->
 
 ### `src/cli`
-- Source files: 56 | Test files: 24
+- Source files: 56 | Test files: 26
 - Key modules:
   - `config`
   - `hooks-config`
@@ -139,8 +139,6 @@ Re-exports from `src/core/index.ts`:
 - `WindsurfAdapter`, `windsurfAdapter`
 - `GenericAdapter`, `genericAdapter`
 - `GuardManifestEntry` (types)
-- `CursorHookEntry`, `CursorHooksConfig`, `CursorHookOutput` (types)
-- `WindsurfHookEntry`, `WindsurfHooksConfig`, `WindsurfHookOutput` (types)
 **Report:**
 - `buildReportData`, `generateHtmlReport`, `REPORT_CSS`, `escapeHtml`, `svgLine`, `svgRect`, `svgText`, `renderSummaryCards`, `renderHandicapTrendChart`, `renderDispersionChart`, `renderAreaPerformanceChart`, `renderNutritionChart`, `renderSprintTable`
 - `ReportData`, `SprintTrendEntry`, `NutritionTrendEntry` (types)
@@ -297,14 +295,14 @@ Re-exports from `src/core/index.ts`:
 
 | Directory | Test Files | Command |
 |-----------|-----------|---------|
-| tests/cli | 24 | `pnpm test` |
+| tests/cli | 26 | `pnpm test` |
 | tests/core | 58 | `pnpm test` |
 | tests/mcp | 4 | `pnpm test` |
 | tests/store | 1 | `pnpm test` |
 | tests/store-pg | 2 | `pnpm test` |
 | tests/tokens | 1 | `pnpm test` |
 
-**Total test files:** 90
+**Total test files:** 92
 **Run all:** `pnpm -r test`
 **Typecheck:** `pnpm -r typecheck`
 <!-- AUTO-GENERATED: END tests -->
@@ -315,11 +313,11 @@ Re-exports from `src/core/index.ts`:
 
 | Sprint | Theme | Tickets | Score |
 |--------|-------|---------|-------|
-| **29** | Fix NPM Publishing Pipeline | 6 | par |
 | **31** | The Course Designer | 4 | par |
 | **32** | The Scout | 4 | bogey |
 | **33** | The Transcript | 4 | par |
 | **34** | The Universal Caddy | 5 | par |
+| **35** | The Equipment Room | 4 | par |
 <!-- AUTO-GENERATED: END history -->
 
 ## Known Gotchas

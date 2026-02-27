@@ -264,13 +264,21 @@ registerAdapter(myAdapter);
 
 ### Step 2: Register via side-effect import
 
-Add to `src/cli/commands/hook.ts`:
+Add to `src/adapters.ts` (the `./adapters` subpath barrel) and `src/cli/commands/hook.ts`:
 
 ```typescript
 import '../../core/adapters/my-harness.js';
 ```
 
-This ensures the adapter auto-registers when the hook command loads.
+This ensures the adapter auto-registers when the hook command or barrel loads.
+
+**Consumer access:** External tools can import the adapter framework via the lightweight subpath export:
+```typescript
+import { getAdapter, detectAdapter, listAdapters } from '@slope-dev/slope/adapters';
+
+const adapter = getAdapter('my-harness');     // lookup by id
+const detected = detectAdapter(process.cwd()); // auto-detect from project dir
+```
 
 ### Step 3: Add to ADAPTER_PRIORITY
 
