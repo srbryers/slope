@@ -264,16 +264,21 @@ function installWindsurfTemplates(cwd: string, metaphor: MetaphorDefinition): vo
   console.log('\n  Windsurf rules installed to .windsurf/rules/ and .windsurfrules');
 }
 
+/** Strip .mdc YAML frontmatter (Cursor-specific) so Cline sees plain markdown. */
+function stripMdcFrontmatter(content: string): string {
+  return content.replace(/^---[\s\S]*?---\n*/, '');
+}
+
 function installClineTemplates(cwd: string, metaphor: MetaphorDefinition): void {
   const rulesDir = join(cwd, '.clinerules');
   mkdirSync(rulesDir, { recursive: true });
 
-  // Cline reads .md files from .clinerules/ — use Cursor-style content (minus .mdc frontmatter)
+  // Cline reads .md files from .clinerules/ — reuse Cursor content with frontmatter stripped
   const ruleGenerators: Record<string, string> = {
-    'slope-sprint-checklist.md': generateCursorSprintChecklist(metaphor),
-    'slope-commit-discipline.md': generateCursorCommitDiscipline(metaphor),
-    'slope-review-loop.md': generateCursorReviewLoop(),
-    'slope-codebase-context.md': generateCursorCodebaseContextRule(),
+    'slope-sprint-checklist.md': stripMdcFrontmatter(generateCursorSprintChecklist(metaphor)),
+    'slope-commit-discipline.md': stripMdcFrontmatter(generateCursorCommitDiscipline(metaphor)),
+    'slope-review-loop.md': stripMdcFrontmatter(generateCursorReviewLoop()),
+    'slope-codebase-context.md': stripMdcFrontmatter(generateCursorCodebaseContextRule()),
   };
   for (const [file, content] of Object.entries(ruleGenerators)) {
     const dest = join(rulesDir, file);
@@ -283,10 +288,34 @@ function installClineTemplates(cwd: string, metaphor: MetaphorDefinition): void 
     }
   }
 
-  // Generate .clinerules root context file
+  // Generate Cline-specific context file (references .clinerules/ paths, not .cursor/)
   const clinerulesDest = join(cwd, '.clinerules', 'slope-context.md');
   if (!existsSync(clinerulesDest)) {
-    writeFileSync(clinerulesDest, generateCursorrules(metaphor, 'cursor'));
+    const contextContent = [
+      '# SLOPE — Sprint Tracking',
+      '',
+      'This project uses SLOPE for sprint scoring and operational performance tracking.',
+      '',
+      '## Key Files',
+      '- `.slope/config.json` — SLOPE configuration',
+      '- `.clinerules/` — Sprint rules and checklists',
+      '- `.clinerules/hooks/` — SLOPE guard hooks',
+      '- `CODEBASE.md` — Auto-generated codebase map',
+      '- `docs/retros/` — Sprint scorecards',
+      '',
+      '## Commands',
+      '- `slope briefing` — Pre-sprint briefing',
+      '- `slope card` — Handicap card',
+      '- `slope validate` — Validate scorecard',
+      '- `slope map` — Regenerate codebase map',
+      '',
+      '## MCP Server',
+      'Add the SLOPE MCP server in Cline settings (VS Code extension storage):',
+      '- Server name: `slope`',
+      '- Command: `npx @slope-dev/slope/mcp`',
+      '',
+    ].join('\n');
+    writeFileSync(clinerulesDest, contextContent);
     console.log(`  Created ${clinerulesDest}`);
   }
 
