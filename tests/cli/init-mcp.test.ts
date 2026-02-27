@@ -268,9 +268,9 @@ describe('detectPlatforms', () => {
     expect(detectPlatforms(tmpDir)).toContain('claude-code');
   });
 
-  it('detects Claude Code from CLAUDE.md', () => {
+  it('does not detect Claude Code from CLAUDE.md alone (adapter requires .claude/)', () => {
     writeFileSync(join(tmpDir, 'CLAUDE.md'), '# Test');
-    expect(detectPlatforms(tmpDir)).toContain('claude-code');
+    expect(detectPlatforms(tmpDir)).not.toContain('claude-code');
   });
 
   it('detects Cursor from .cursor directory', () => {
@@ -278,9 +278,9 @@ describe('detectPlatforms', () => {
     expect(detectPlatforms(tmpDir)).toContain('cursor');
   });
 
-  it('detects Cursor from .cursorrules', () => {
+  it('does not detect Cursor from .cursorrules alone (adapter requires .cursor/)', () => {
     writeFileSync(join(tmpDir, '.cursorrules'), '# Test');
-    expect(detectPlatforms(tmpDir)).toContain('cursor');
+    expect(detectPlatforms(tmpDir)).not.toContain('cursor');
   });
 
   it('detects OpenCode from opencode.json', () => {

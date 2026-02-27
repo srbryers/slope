@@ -22,6 +22,14 @@ import {
   generateOpenCodePlugin,
   generateGenericChecklist,
 } from '../template-generator.js';
+import { getAdapter, ADAPTER_PRIORITY } from '../../core/harness.js';
+import type { HarnessId } from '../../core/harness.js';
+
+// Side-effect imports: ensure all adapters are registered for detectPlatforms()
+import '../../core/adapters/claude-code.js';
+import '../../core/adapters/cursor.js';
+import '../../core/adapters/windsurf.js';
+import '../../core/adapters/generic.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -111,27 +119,33 @@ const STARTER_ROADMAP = {
   ],
 };
 
-type Provider = 'claude-code' | 'cursor' | 'opencode' | 'generic';
+/** Init supports all harness adapters plus OpenCode (template-only, no adapter) */
+type InitProvider = HarnessId | 'opencode';
 
-function detectProvidersFromArgs(args: string[]): Provider[] {
-  const providers: Provider[] = [];
+export function detectProvidersFromArgs(args: string[]): InitProvider[] {
+  const providers: InitProvider[] = [];
   if (args.includes('--claude-code')) providers.push('claude-code');
   if (args.includes('--cursor')) providers.push('cursor');
+  if (args.includes('--windsurf')) providers.push('windsurf');
   if (args.includes('--opencode')) providers.push('opencode');
   if (args.includes('--generic')) providers.push('generic');
-  if (args.includes('--all')) return ['claude-code', 'cursor', 'opencode'];
+  // Unified --harness=<id> flag
+  const harnessArg = args.find(a => a.startsWith('--harness='));
+  if (harnessArg) providers.push(harnessArg.slice('--harness='.length));
+  if (args.includes('--all')) return ['claude-code', 'cursor', 'windsurf', 'opencode'];
   return providers;
 }
 
-/** Detect platforms present in the project directory */
-export function detectPlatforms(cwd: string): Provider[] {
-  const detected: Provider[] = [];
-  if (existsSync(join(cwd, '.claude')) || existsSync(join(cwd, 'CLAUDE.md'))) {
-    detected.push('claude-code');
+/** Detect platforms present in the project directory using the adapter framework */
+export function detectPlatforms(cwd: string): InitProvider[] {
+  const detected: InitProvider[] = [];
+  // Check all registered adapters via ADAPTER_PRIORITY
+  for (const id of ADAPTER_PRIORITY) {
+    if (id === 'generic') continue;
+    const a = getAdapter(id);
+    if (a?.detect(cwd)) detected.push(id);
   }
-  if (existsSync(join(cwd, '.cursor')) || existsSync(join(cwd, '.cursorrules'))) {
-    detected.push('cursor');
-  }
+  // OpenCode: no adapter, but has init templates
   if (existsSync(join(cwd, 'opencode.json')) || existsSync(join(cwd, 'AGENTS.md'))) {
     detected.push('opencode');
   }
@@ -215,6 +229,35 @@ function installCursorTemplates(cwd: string, metaphor: MetaphorDefinition): void
   console.log('\n  Cursor rules installed to .cursor/rules/ and .cursorrules');
 }
 
+function installWindsurfTemplates(cwd: string, metaphor: MetaphorDefinition): void {
+  const rulesDir = join(cwd, '.windsurf', 'rules');
+  mkdirSync(rulesDir, { recursive: true });
+
+  // Windsurf uses .mdc rule format (same as Cursor)
+  const ruleGenerators: Record<string, string> = {
+    'slope-sprint-checklist.mdc': generateCursorSprintChecklist(metaphor),
+    'slope-commit-discipline.mdc': generateCursorCommitDiscipline(metaphor),
+    'slope-review-loop.mdc': generateCursorReviewLoop(),
+    'slope-codebase-context.mdc': generateCursorCodebaseContextRule(),
+  };
+  for (const [file, content] of Object.entries(ruleGenerators)) {
+    const dest = join(rulesDir, file);
+    if (!existsSync(dest)) {
+      writeFileSync(dest, content);
+      console.log(`  Created ${dest}`);
+    }
+  }
+
+  // Generate .windsurfrules (project root context file — same content as .cursorrules)
+  const windsurfrulesDest = join(cwd, '.windsurfrules');
+  if (!existsSync(windsurfrulesDest)) {
+    writeFileSync(windsurfrulesDest, generateCursorrules(metaphor));
+    console.log(`  Created ${windsurfrulesDest}`);
+  }
+
+  console.log('\n  Windsurf rules installed to .windsurf/rules/ and .windsurfrules');
+}
+
 function installGenericTemplates(cwd: string, metaphor: MetaphorDefinition): void {
   const dest = join(cwd, 'SLOPE-CHECKLIST.md');
 
@@ -272,6 +315,27 @@ function installCursorMcpConfig(cwd: string): void {
   console.log(`  Created/updated ${mcpPath} (slope MCP server)`);
 }
 
+function installWindsurfMcpConfig(cwd: string): void {
+  const mcpPath = join(cwd, '.windsurf', 'mcp.json');
+  let config: { mcpServers?: Record<string, { command: string; args: string[] }> } = {};
+
+  if (existsSync(mcpPath)) {
+    try {
+      const raw = readFileSync(mcpPath, 'utf8');
+      config = JSON.parse(raw) as typeof config;
+    } catch {
+      config = {};
+    }
+  }
+
+  if (!config.mcpServers) config.mcpServers = {};
+  config.mcpServers.slope = SLOPE_MCP_ENTRY;
+
+  mkdirSync(join(cwd, '.windsurf'), { recursive: true });
+  writeFileSync(mcpPath, JSON.stringify(config, null, 2) + '\n');
+  console.log(`  Created/updated ${mcpPath} (slope MCP server)`);
+}
+
 function installOpenCodeTemplates(cwd: string, metaphor: MetaphorDefinition): void {
   // Generate AGENTS.md (OpenCode's project context file)
   const agentsMdDest = join(cwd, 'AGENTS.md');
@@ -318,7 +382,7 @@ function installOpenCodeMcpConfig(cwd: string): void {
   console.log(`  Created/updated ${mcpPath} (slope MCP server)`);
 }
 
-function installDefaultHooks(cwd: string, provider: Provider): void {
+function installDefaultHooks(cwd: string, provider: InitProvider): void {
   // Import hook templates inline to avoid circular deps
   const SESSION_HOOKS: Record<string, string[]> = {
     'session-start': ['slope session start --ide="$SLOPE_IDE" --role=primary', 'slope briefing --compact'],
@@ -327,7 +391,9 @@ function installDefaultHooks(cwd: string, provider: Provider): void {
 
   const hooksDir = provider === 'claude-code'
     ? join(cwd, '.claude', 'hooks')
-    : join(cwd, '.cursor', 'hooks');
+    : provider === 'windsurf'
+      ? join(cwd, '.windsurf', 'hooks')
+      : join(cwd, '.cursor', 'hooks');
   mkdirSync(hooksDir, { recursive: true });
 
   const { loadHooksConfig } = { loadHooksConfig: (c: string) => {
@@ -359,7 +425,7 @@ function installDefaultHooks(cwd: string, provider: Provider): void {
   saveHooksConfig(cwd, config);
 }
 
-function installForProvider(cwd: string, provider: Provider, metaphor: MetaphorDefinition): void {
+function installForProvider(cwd: string, provider: InitProvider, metaphor: MetaphorDefinition): void {
   switch (provider) {
     case 'claude-code':
       installClaudeCodeTemplates(cwd, metaphor);
@@ -371,6 +437,11 @@ function installForProvider(cwd: string, provider: Provider, metaphor: MetaphorD
       installCursorMcpConfig(cwd);
       installDefaultHooks(cwd, 'cursor');
       break;
+    case 'windsurf':
+      installWindsurfTemplates(cwd, metaphor);
+      installWindsurfMcpConfig(cwd);
+      installDefaultHooks(cwd, 'windsurf');
+      break;
     case 'opencode':
       installOpenCodeTemplates(cwd, metaphor);
       installOpenCodeMcpConfig(cwd);
@@ -378,6 +449,9 @@ function installForProvider(cwd: string, provider: Provider, metaphor: MetaphorD
       break;
     case 'generic':
       installGenericTemplates(cwd, metaphor);
+      break;
+    default:
+      console.warn(`  Warning: no templates for provider "${provider}". Use --generic for a basic setup.`);
       break;
   }
 }
