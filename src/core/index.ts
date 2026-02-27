@@ -138,7 +138,7 @@ export type { SprintRegistry } from './registry.js';
 
 // Store
 export { SlopeStoreError } from './store.js';
-export type { SlopeStore, SlopeSession, StoreErrorCode } from './store.js';
+export type { SlopeStore, SlopeSession, StoreErrorCode, StoreStats } from './store.js';
 
 // Tournament Review
 export {

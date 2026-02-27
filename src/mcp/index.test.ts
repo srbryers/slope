@@ -54,6 +54,8 @@ function createMockStore(): SlopeStore & { sessions: SlopeSession[]; claims: Spr
     async getEventsBySession() { return []; },
     async getEventsBySprint() { return []; },
     async getEventsByTicket() { return []; },
+    async getSchemaVersion() { return 3; },
+    async getStats() { return { sessions: sessions.length, claims: claims.length, scorecards: 0, events: 0, lastEventAt: null }; },
     close() {},
   };
 }
