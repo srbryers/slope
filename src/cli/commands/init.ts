@@ -29,6 +29,7 @@ import type { HarnessId } from '../../core/harness.js';
 import '../../core/adapters/claude-code.js';
 import '../../core/adapters/cursor.js';
 import '../../core/adapters/windsurf.js';
+import '../../core/adapters/cline.js';
 import '../../core/adapters/generic.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -127,6 +128,7 @@ export function detectProvidersFromArgs(args: string[]): InitProvider[] {
   if (args.includes('--claude-code')) providers.push('claude-code');
   if (args.includes('--cursor')) providers.push('cursor');
   if (args.includes('--windsurf')) providers.push('windsurf');
+  if (args.includes('--cline')) providers.push('cline');
   if (args.includes('--opencode')) providers.push('opencode');
   if (args.includes('--generic')) providers.push('generic');
   // Unified --harness=<id> flag
@@ -260,6 +262,45 @@ function installWindsurfTemplates(cwd: string, metaphor: MetaphorDefinition): vo
   }
 
   console.log('\n  Windsurf rules installed to .windsurf/rules/ and .windsurfrules');
+}
+
+function installClineTemplates(cwd: string, metaphor: MetaphorDefinition): void {
+  const rulesDir = join(cwd, '.clinerules');
+  mkdirSync(rulesDir, { recursive: true });
+
+  // Cline reads .md files from .clinerules/ — use Cursor-style content (minus .mdc frontmatter)
+  const ruleGenerators: Record<string, string> = {
+    'slope-sprint-checklist.md': generateCursorSprintChecklist(metaphor),
+    'slope-commit-discipline.md': generateCursorCommitDiscipline(metaphor),
+    'slope-review-loop.md': generateCursorReviewLoop(),
+    'slope-codebase-context.md': generateCursorCodebaseContextRule(),
+  };
+  for (const [file, content] of Object.entries(ruleGenerators)) {
+    const dest = join(rulesDir, file);
+    if (!existsSync(dest)) {
+      writeFileSync(dest, content);
+      console.log(`  Created ${dest}`);
+    }
+  }
+
+  // Generate .clinerules root context file
+  const clinerulesDest = join(cwd, '.clinerules', 'slope-context.md');
+  if (!existsSync(clinerulesDest)) {
+    writeFileSync(clinerulesDest, generateCursorrules(metaphor, 'cursor'));
+    console.log(`  Created ${clinerulesDest}`);
+  }
+
+  console.log('\n  Cline rules installed to .clinerules/');
+}
+
+function installClineMcpConfig(_cwd: string): void {
+  // Cline MCP config lives in VS Code's extension storage (cline_mcp_settings.json),
+  // NOT in the workspace. We can't write to it from slope init.
+  // Users must add the SLOPE MCP server via Cline's UI or manually edit the global config.
+  console.log('\n  Note: Cline MCP config is stored in VS Code extension storage.');
+  console.log('  Add the SLOPE MCP server in Cline settings:');
+  console.log('    Server name: slope');
+  console.log('    Command: npx @slope-dev/slope/mcp');
 }
 
 function installGenericTemplates(cwd: string, metaphor: MetaphorDefinition): void {
@@ -397,7 +438,9 @@ function installDefaultHooks(cwd: string, provider: InitProvider): void {
     ? join(cwd, '.claude', 'hooks')
     : provider === 'windsurf'
       ? join(cwd, '.windsurf', 'hooks')
-      : join(cwd, '.cursor', 'hooks');
+      : provider === 'cline'
+        ? join(cwd, '.clinerules', 'hooks')
+        : join(cwd, '.cursor', 'hooks');
   mkdirSync(hooksDir, { recursive: true });
 
   const { loadHooksConfig } = { loadHooksConfig: (c: string) => {
@@ -445,6 +488,11 @@ function installForProvider(cwd: string, provider: InitProvider, metaphor: Metap
       installWindsurfTemplates(cwd, metaphor);
       installWindsurfMcpConfig(cwd);
       installDefaultHooks(cwd, 'windsurf');
+      break;
+    case 'cline':
+      installClineTemplates(cwd, metaphor);
+      installClineMcpConfig(cwd);
+      installDefaultHooks(cwd, 'cline');
       break;
     case 'opencode':
       installOpenCodeTemplates(cwd, metaphor);

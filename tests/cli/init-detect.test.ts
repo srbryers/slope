@@ -6,6 +6,7 @@ import { clearAdapters, registerAdapter } from '../../src/core/harness.js';
 import { ClaudeCodeAdapter } from '../../src/core/adapters/claude-code.js';
 import { CursorAdapter } from '../../src/core/adapters/cursor.js';
 import { WindsurfAdapter } from '../../src/core/adapters/windsurf.js';
+import { ClineAdapter } from '../../src/core/adapters/cline.js';
 import { GenericAdapter } from '../../src/core/adapters/generic.js';
 import { detectPlatforms, detectProvidersFromArgs } from '../../src/cli/commands/init.js';
 
@@ -19,6 +20,7 @@ describe('detectPlatforms', () => {
     registerAdapter(new ClaudeCodeAdapter());
     registerAdapter(new CursorAdapter());
     registerAdapter(new WindsurfAdapter());
+    registerAdapter(new ClineAdapter());
     registerAdapter(new GenericAdapter());
   });
 
@@ -57,6 +59,18 @@ describe('detectPlatforms', () => {
     expect(result).toContain('windsurf');
   });
 
+  it('returns ["cline"] for dir with .clinerules/hooks/', () => {
+    const dir = makeTmpDir();
+    mkdirSync(join(dir, '.clinerules', 'hooks'), { recursive: true });
+    expect(detectPlatforms(dir)).toContain('cline');
+  });
+
+  it('does not detect cline for dir with only .clinerules/ (no hooks)', () => {
+    const dir = makeTmpDir();
+    mkdirSync(join(dir, '.clinerules'));
+    expect(detectPlatforms(dir)).not.toContain('cline');
+  });
+
   it('returns empty array for dir with no harness markers', () => {
     const dir = makeTmpDir();
     expect(detectPlatforms(dir)).toEqual([]);
@@ -72,12 +86,18 @@ describe('detectProvidersFromArgs', () => {
     expect(detectProvidersFromArgs(['--harness=cursor'])).toEqual(['cursor']);
   });
 
-  it('--all includes windsurf', () => {
+  it('returns ["cline"] for --cline', () => {
+    expect(detectProvidersFromArgs(['--cline'])).toEqual(['cline']);
+  });
+
+  it('--all includes windsurf but not cline', () => {
     const result = detectProvidersFromArgs(['--all']);
     expect(result).toContain('windsurf');
     expect(result).toContain('claude-code');
     expect(result).toContain('cursor');
     expect(result).toContain('opencode');
+    // Cline is NOT in --all (VS Code extension that coexists with other tools)
+    expect(result).not.toContain('cline');
   });
 
   it('returns multiple with combined flags', () => {
