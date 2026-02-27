@@ -142,8 +142,8 @@ describe('ClaudeCodeAdapter', () => {
       const secondCount = (second.hooks[firstEvent] as Array<{ hooks: unknown[] }>)
         .reduce((n, e) => n + e.hooks.length, 0);
 
-      // Should have more hook commands, not the same count
-      expect(secondCount).toBeGreaterThanOrEqual(firstCount);
+      // Should have more hook commands (scope-drift merges into hazard's Edit|Write entry)
+      expect(secondCount).toBeGreaterThan(firstCount);
     });
 
     it('does not duplicate hook commands on re-install', () => {
