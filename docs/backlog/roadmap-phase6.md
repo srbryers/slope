@@ -233,11 +233,11 @@ S36-1 (exports) first. S36-2, S36-3, S36-4 are parallel after that.
 
 | Sprint | Theme | Par | Slope | Tickets | Key Deliverable | Depends On |
 |--------|-------|-----|-------|---------|-----------------|------------|
-| **S34** | The Universal Caddy | 4 | 2 | 4 | Harness adapter interface + Claude Code adapter + generic adapter + `--harness` flag | — |
+| **S34** | The Universal Caddy | 4 | 2 | 5 | Harness adapter interface + Claude Code adapter + generic adapter + `--harness` flag + `roadmap sync` | — |
 | **S35** | The Equipment Room | 4 | 3 | 4 | Harness research + adapters for best-supported platforms + compatibility docs | S34 |
 | **S36** | The Clubhouse Bridge | 4 | 2 | 4 | CaddyStack integration: harness selection, guard dashboard, install flow | S34 |
 
-**Total:** 12 tickets across 3 sprints. Critical path: S34 → S35 (2 sprints).
+**Total:** 13 tickets across 3 sprints. Critical path: S34 → S35 (2 sprints).
 
 ### Key Architectural Decisions
 

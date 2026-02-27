@@ -1098,6 +1098,9 @@
           "club": "wedge",
           "complexity": "small"
         }
+      ],
+      "depends_on": [
+        27
       ]
     },
     {
@@ -1324,6 +1327,9 @@
           "club": "wedge",
           "complexity": "small"
         }
+      ],
+      "depends_on": [
+        33
       ]
     },
     {
