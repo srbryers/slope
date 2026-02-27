@@ -41,23 +41,24 @@ const HOOK_TEMPLATES: Record<string, { description: string; managed: string[] }>
   },
 };
 
-type Provider = 'claude-code' | 'cursor';
-
-function detectProvider(cwd: string): Provider {
-  if (existsSync(join(cwd, '.claude'))) return 'claude-code';
-  if (existsSync(join(cwd, '.cursor'))) return 'cursor';
-  return 'claude-code'; // default
-}
-
-function getHooksDir(cwd: string, provider: Provider): string {
-  switch (provider) {
+/** Map harness adapter id to its hooks directory */
+function getHooksDir(cwd: string, harnessId: string): string {
+  switch (harnessId) {
     case 'claude-code': return join(cwd, '.claude', 'hooks');
     case 'cursor': return join(cwd, '.cursor', 'hooks');
+    case 'windsurf': return join(cwd, '.windsurf', 'hooks');
+    default: return join(cwd, '.slope', 'hooks');
   }
 }
 
-function hookFilePath(cwd: string, provider: Provider, name: string): string {
-  return join(getHooksDir(cwd, provider), `slope-${name}.sh`);
+/** Resolve harness id for lifecycle hooks — uses adapter framework detection */
+function resolveHarnessId(cwd: string): string {
+  const adapter = detectAdapter(cwd);
+  return adapter?.id ?? 'claude-code';
+}
+
+function hookFilePath(cwd: string, harnessId: string, name: string): string {
+  return join(getHooksDir(cwd, harnessId), `slope-${name}.sh`);
 }
 
 function generateHookScript(name: string): string {
@@ -141,11 +142,11 @@ function addHook(name: string, cwd: string): void {
     process.exit(1);
   }
 
-  const provider = detectProvider(cwd);
-  const dir = getHooksDir(cwd, provider);
+  const harnessId = resolveHarnessId(cwd);
+  const dir = getHooksDir(cwd, harnessId);
   mkdirSync(dir, { recursive: true });
 
-  const filePath = hookFilePath(cwd, provider, name);
+  const filePath = hookFilePath(cwd, harnessId, name);
   if (existsSync(filePath)) {
     console.error(`Hook "${name}" already installed at ${filePath}`);
     console.error('Remove it first with: slope hook remove ' + name);
@@ -156,12 +157,12 @@ function addHook(name: string, cwd: string): void {
   writeFileSync(filePath, script, { mode: 0o755 });
 
   const config = loadHooksConfig(cwd);
-  config.installed[name] = { provider, installed_at: new Date().toISOString() };
+  config.installed[name] = { provider: harnessId, installed_at: new Date().toISOString() };
   saveHooksConfig(cwd, config);
 
   console.log(`\nInstalled hook: ${name}`);
   console.log(`  File: ${filePath}`);
-  console.log(`  Provider: ${provider}`);
+  console.log(`  Harness: ${harnessId}`);
   console.log(`\nEdit the file to add custom commands below the SLOPE END marker.\n`);
 }
 
@@ -178,7 +179,7 @@ function removeHook(name: string, cwd: string): void {
     process.exit(1);
   }
 
-  const filePath = hookFilePath(cwd, entry.provider as Provider, name);
+  const filePath = hookFilePath(cwd, entry.provider, name);
   if (existsSync(filePath)) {
     unlinkSync(filePath);
   }
@@ -226,7 +227,7 @@ function showHook(name: string, cwd: string): void {
   const entry = config.installed[name];
 
   if (entry) {
-    const filePath = hookFilePath(cwd, entry.provider as Provider, name);
+    const filePath = hookFilePath(cwd, entry.provider, name);
     if (existsSync(filePath)) {
       console.log(`\n--- ${filePath} ---\n`);
       console.log(readFileSync(filePath, 'utf8'));

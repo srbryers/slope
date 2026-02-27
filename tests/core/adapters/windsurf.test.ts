@@ -156,6 +156,12 @@ describe('WindsurfAdapter', () => {
       expect(dispatcher).toContain('exit 2');
       expect(dispatcher).toContain('exit 0');
       expect(dispatcher).toContain('"deny"');
+      // Should handle prettified JSON (spaces around colon)
+      expect(dispatcher).toContain('[[:space:]]*:[[:space:]]*');
+      // Should check slope guard exit code
+      expect(dispatcher).toContain('if [ $? -ne 0 ]');
+      // Should support SLOPE_GUARD_LOG for debugging
+      expect(dispatcher).toContain('SLOPE_GUARD_LOG');
     });
 
     it('does not overwrite existing dispatcher', () => {
