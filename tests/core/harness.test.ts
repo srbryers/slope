@@ -1,4 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import { mkdtempSync, mkdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import {
   registerAdapter,
   getAdapter,
@@ -8,9 +11,14 @@ import {
   resolveToolMatcher,
   CLAUDE_CODE_TOOLS,
   TOOL_CATEGORIES,
+  ADAPTER_PRIORITY,
 } from '../../src/core/harness.js';
 import type { HarnessAdapter, ToolNameMap, ToolCategory } from '../../src/core/harness.js';
 import type { GuardResult } from '../../src/core/guard.js';
+import { ClaudeCodeAdapter } from '../../src/core/adapters/claude-code.js';
+import { CursorAdapter } from '../../src/core/adapters/cursor.js';
+import { WindsurfAdapter } from '../../src/core/adapters/windsurf.js';
+import { GenericAdapter } from '../../src/core/adapters/generic.js';
 
 function makeAdapter(id: string, detectResult = false): HarnessAdapter {
   return {
@@ -103,6 +111,41 @@ describe('detectAdapter', () => {
   it('returns undefined when no adapters registered', () => {
     expect(detectAdapter('/tmp')).toBeUndefined();
   });
+
+  it('respects ADAPTER_PRIORITY order — claude-code wins over cursor', () => {
+    // Register in reverse priority order
+    registerAdapter(makeAdapter('cursor', true));
+    registerAdapter(makeAdapter('claude-code', true));
+    const result = detectAdapter('/tmp');
+    expect(result?.id).toBe('claude-code');
+  });
+
+  it('respects ADAPTER_PRIORITY order — cursor wins over windsurf', () => {
+    registerAdapter(makeAdapter('windsurf', true));
+    registerAdapter(makeAdapter('cursor', true));
+    const result = detectAdapter('/tmp');
+    expect(result?.id).toBe('cursor');
+  });
+
+  it('detects third-party adapters not in ADAPTER_PRIORITY', () => {
+    registerAdapter(makeAdapter('claude-code', false));
+    registerAdapter(makeAdapter('my-custom-harness', true));
+    registerAdapter(makeAdapter('generic', true));
+    const result = detectAdapter('/tmp');
+    expect(result?.id).toBe('my-custom-harness');
+  });
+});
+
+describe('ADAPTER_PRIORITY', () => {
+  it('starts with claude-code and ends with generic', () => {
+    expect(ADAPTER_PRIORITY[0]).toBe('claude-code');
+    expect(ADAPTER_PRIORITY[ADAPTER_PRIORITY.length - 1]).toBe('generic');
+  });
+
+  it('includes cursor and windsurf', () => {
+    expect(ADAPTER_PRIORITY).toContain('cursor');
+    expect(ADAPTER_PRIORITY).toContain('windsurf');
+  });
 });
 
 describe('CLAUDE_CODE_TOOLS', () => {
@@ -175,5 +218,73 @@ describe('resolveToolMatcher', () => {
 
   it('returns empty string for empty categories array', () => {
     expect(resolveToolMatcher(adapter, [])).toBe('');
+  });
+});
+
+describe('detectAdapter integration — coexisting directories', () => {
+  beforeEach(() => {
+    clearAdapters();
+  });
+
+  it('claude-code wins when both .claude and .cursor exist', () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), 'slope-detect-'));
+    mkdirSync(join(tmpDir, '.claude'));
+    mkdirSync(join(tmpDir, '.cursor'));
+
+    registerAdapter(new ClaudeCodeAdapter());
+    registerAdapter(new CursorAdapter());
+
+    const result = detectAdapter(tmpDir);
+    expect(result?.id).toBe('claude-code');
+  });
+
+  it('cursor wins when .cursor exists but .claude does not', () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), 'slope-detect-'));
+    mkdirSync(join(tmpDir, '.cursor'));
+
+    registerAdapter(new ClaudeCodeAdapter());
+    registerAdapter(new CursorAdapter());
+
+    const result = detectAdapter(tmpDir);
+    expect(result?.id).toBe('cursor');
+  });
+
+  it('windsurf detected when only .windsurf exists', () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), 'slope-detect-'));
+    mkdirSync(join(tmpDir, '.windsurf'));
+
+    registerAdapter(new ClaudeCodeAdapter());
+    registerAdapter(new CursorAdapter());
+    registerAdapter(new WindsurfAdapter());
+
+    const result = detectAdapter(tmpDir);
+    expect(result?.id).toBe('windsurf');
+  });
+});
+
+describe('adapter registration completeness', () => {
+  it('all ADAPTER_PRIORITY entries have a registered adapter after imports', () => {
+    // ESM imports at the top of this file trigger auto-registration
+    // Re-register to ensure clean state after clearAdapters in other tests
+    registerAdapter(new ClaudeCodeAdapter());
+    registerAdapter(new CursorAdapter());
+    registerAdapter(new WindsurfAdapter());
+    registerAdapter(new GenericAdapter());
+
+    for (const id of ADAPTER_PRIORITY) {
+      expect(getAdapter(id), `adapter '${id}' should be registered`).toBeDefined();
+    }
+  });
+
+  it('listAdapters includes all ADAPTER_PRIORITY entries', () => {
+    registerAdapter(new ClaudeCodeAdapter());
+    registerAdapter(new CursorAdapter());
+    registerAdapter(new WindsurfAdapter());
+    registerAdapter(new GenericAdapter());
+
+    const registered = listAdapters();
+    for (const id of ADAPTER_PRIORITY) {
+      expect(registered, `'${id}' should be in listAdapters()`).toContain(id);
+    }
   });
 });

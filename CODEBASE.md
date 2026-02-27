@@ -1,9 +1,9 @@
 ---
-generated_at: "2026-02-27T10:39:46.836Z"
-git_sha: "4192408ec7cebd7b5cffd1a6b6fb3befac377a53"
+generated_at: "2026-02-27T11:26:30.321Z"
+git_sha: "4a105a77678f9f757ba23550be9e8d04660837ce"
 sprint: 34
-source_files: 134
-test_files: 88
+source_files: 136
+test_files: 90
 cli_commands: 29
 guards: 16
 flows: 0
@@ -29,7 +29,7 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
   - `template-generator` — SLOPE Template Generator
 
 ### `src/core`
-- Source files: 67 | Test files: 56
+- Source files: 69 | Test files: 58
 - Key modules:
   - `advisor` — --- Module-private constants ---
   - `briefing` — --- Input types ---
@@ -131,12 +131,16 @@ Re-exports from `src/core/index.ts`:
 - `GUARD_DEFINITIONS`, `formatPreToolUseOutput`, `formatPostToolUseOutput`, `formatStopOutput`, `generateClaudeCodeHooksConfig`, `registerCustomGuard`, `getAllGuardDefinitions`, `getCustomGuard`, `clearCustomGuards`
 - `HookInput`, `PreToolUseOutput`, `PostToolUseOutput`, `StopOutput`, `GuardResult`, `GuardName`, `GuardDefinition`, `GuidanceConfig`, `CustomGuardDefinition`, `AnyGuardDefinition` (types)
 **Harness Adapter Framework:**
-- `TOOL_CATEGORIES`, `CLAUDE_CODE_TOOLS`, `registerAdapter`, `getAdapter`, `listAdapters`, `detectAdapter`, `clearAdapters`, `resolveToolMatcher`
+- `TOOL_CATEGORIES`, `CLAUDE_CODE_TOOLS`, `ADAPTER_PRIORITY`, `registerAdapter`, `getAdapter`, `listAdapters`, `detectAdapter`, `clearAdapters`, `resolveToolMatcher`
 - `HarnessId`, `ToolCategory`, `ToolNameMap`, `HarnessAdapter` (types)
 **Adapters:**
 - `ClaudeCodeAdapter`, `claudeCodeAdapter`
+- `CursorAdapter`, `cursorAdapter`
+- `WindsurfAdapter`, `windsurfAdapter`
 - `GenericAdapter`, `genericAdapter`
 - `GuardManifestEntry` (types)
+- `CursorHookEntry`, `CursorHooksConfig`, `CursorHookOutput` (types)
+- `WindsurfHookEntry`, `WindsurfHooksConfig`, `WindsurfHookOutput` (types)
 **Report:**
 - `buildReportData`, `generateHtmlReport`, `REPORT_CSS`, `escapeHtml`, `svgLine`, `svgRect`, `svgText`, `renderSummaryCards`, `renderHandicapTrendChart`, `renderDispersionChart`, `renderAreaPerformanceChart`, `renderNutritionChart`, `renderSprintTable`
 - `ReportData`, `SprintTrendEntry`, `NutritionTrendEntry` (types)
@@ -294,13 +298,13 @@ Re-exports from `src/core/index.ts`:
 | Directory | Test Files | Command |
 |-----------|-----------|---------|
 | tests/cli | 24 | `pnpm test` |
-| tests/core | 56 | `pnpm test` |
+| tests/core | 58 | `pnpm test` |
 | tests/mcp | 4 | `pnpm test` |
 | tests/store | 1 | `pnpm test` |
 | tests/store-pg | 2 | `pnpm test` |
 | tests/tokens | 1 | `pnpm test` |
 
-**Total test files:** 88
+**Total test files:** 90
 **Run all:** `pnpm -r test`
 **Typecheck:** `pnpm -r typecheck`
 <!-- AUTO-GENERATED: END tests -->

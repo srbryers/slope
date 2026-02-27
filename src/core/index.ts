@@ -264,6 +264,7 @@ export type {
 export {
   TOOL_CATEGORIES,
   CLAUDE_CODE_TOOLS,
+  ADAPTER_PRIORITY,
   registerAdapter,
   getAdapter,
   listAdapters,
@@ -280,6 +281,8 @@ export type {
 
 // Adapters
 export { ClaudeCodeAdapter, claudeCodeAdapter } from './adapters/claude-code.js';
+export { CursorAdapter, cursorAdapter } from './adapters/cursor.js';
+export { WindsurfAdapter, windsurfAdapter } from './adapters/windsurf.js';
 export { GenericAdapter, genericAdapter } from './adapters/generic.js';
 export type { GuardManifestEntry } from './adapters/generic.js';
 
