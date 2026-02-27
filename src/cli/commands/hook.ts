@@ -6,6 +6,7 @@ import type { AnyGuardDefinition } from '../../core/index.js';
 // Import to trigger auto-registration of adapters
 import '../../core/adapters/claude-code.js';
 import '../../core/adapters/cursor.js';
+import '../../core/adapters/windsurf.js';
 import '../../core/adapters/generic.js';
 
 const HOOK_TEMPLATES: Record<string, { description: string; managed: string[] }> = {
