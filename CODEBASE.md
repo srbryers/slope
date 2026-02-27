@@ -1,7 +1,7 @@
 ---
-generated_at: "2026-02-27T12:58:53.874Z"
-git_sha: "df143306affc42b0d39b20976288b240b3c15f74"
-sprint: 35
+generated_at: "2026-02-27T13:52:55.895Z"
+git_sha: "2f7ce336d5f4ff9b10087d69ca822036455410de"
+sprint: 36
 source_files: 137
 test_files: 93
 cli_commands: 29
@@ -313,11 +313,11 @@ Re-exports from `src/core/index.ts`:
 
 | Sprint | Theme | Tickets | Score |
 |--------|-------|---------|-------|
-| **31** | The Course Designer | 4 | par |
 | **32** | The Scout | 4 | bogey |
 | **33** | The Transcript | 4 | par |
 | **34** | The Universal Caddy | 5 | par |
 | **35** | The Equipment Room | 4 | par |
+| **36** | The Clubhouse Bridge | 4 | par |
 <!-- AUTO-GENERATED: END history -->
 
 ## Known Gotchas
