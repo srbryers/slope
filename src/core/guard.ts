@@ -67,7 +67,8 @@ export type GuardName =
   | 'stale-flows'
   | 'next-action'
   | 'pr-review'
-  | 'transcript';
+  | 'transcript'
+  | 'branch-before-commit';
 
 /** Guard registration entry */
 export interface GuardDefinition {
@@ -105,6 +106,8 @@ export interface GuidanceConfig {
   pushCommitThreshold?: number;
   /** Directory for compaction handoff files (default '.slope/handoffs') */
   handoffsDir?: string;
+  /** Commit message patterns allowed on main/master (branch-before-commit guard) */
+  allowMainCommitPatterns?: string[];
 }
 
 /** All guard definitions */
@@ -209,6 +212,13 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     description: 'Append tool call metadata to session transcript',
     hookEvent: 'PostToolUse',
     // no matcher → fires on all tools
+    level: 'full',
+  },
+  {
+    name: 'branch-before-commit',
+    description: 'Block git commit on main/master — create a feature branch first',
+    hookEvent: 'PreToolUse',
+    matcher: 'Bash',
     level: 'full',
   },
 ];

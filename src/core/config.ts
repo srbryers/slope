@@ -33,6 +33,7 @@ export interface SlopeConfig {
     subagentAllowModels?: string[];
     pushCommitThreshold?: number;
     handoffsDir?: string;
+    allowMainCommitPatterns?: string[];
   };
   orchestration?: {
     escalation?: EscalationConfig;

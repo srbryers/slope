@@ -36,6 +36,12 @@
             "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/slope-guard.sh version-check",
             "timeout": 10,
             "statusMessage": "SLOPE: Block push to main when package versions have not been bumped"
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/slope-guard.sh branch-before-commit",
+            "timeout": 10,
+            "statusMessage": "SLOPE: Block git commit on main/master — create a feature branch first"
           }
         ],
         "matcher": "Bash"
