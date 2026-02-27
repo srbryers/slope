@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   parseRoadmap,
@@ -9,7 +9,7 @@ import {
   formatStrategicContext,
   loadScorecards,
 } from '../../core/index.js';
-import type { RoadmapDefinition, GolfScorecard } from '../../core/index.js';
+import type { RoadmapDefinition, RoadmapSprint, RoadmapTicket, RoadmapClub, GolfScorecard } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 
 // --- Helpers ---
@@ -270,6 +270,106 @@ function showSubcommand(flags: Record<string, string>, cwd: string): void {
   console.log(formatRoadmapSummary(roadmap));
 }
 
+const CLUB_TO_COMPLEXITY: Record<string, RoadmapTicket['complexity']> = {
+  putter: 'trivial',
+  wedge: 'small',
+  short_iron: 'standard',
+  long_iron: 'moderate',
+  driver: 'moderate',
+};
+
+function scorecardToSprint(card: GolfScorecard): RoadmapSprint {
+  const tickets: RoadmapTicket[] = card.shots.map(shot => ({
+    key: shot.ticket_key,
+    title: shot.title,
+    club: shot.club as RoadmapClub,
+    complexity: CLUB_TO_COMPLEXITY[shot.club] ?? 'standard',
+  }));
+
+  return {
+    id: card.sprint_number,
+    theme: card.theme,
+    par: card.par as 3 | 4 | 5,
+    slope: card.slope,
+    type: card.type ?? 'standard',
+    tickets,
+  };
+}
+
+function syncSubcommand(flags: Record<string, string>, cwd: string): void {
+  const dryRun = flags['dry-run'] === 'true';
+  const path = resolveRoadmapPath(flags, cwd);
+  const config = loadConfig(cwd);
+  const scorecards = loadScorecards(config, cwd);
+
+  if (scorecards.length === 0) {
+    console.log('\nNo scorecards found. Nothing to sync.\n');
+    return;
+  }
+
+  // Load existing roadmap (or start fresh)
+  let roadmap: RoadmapDefinition;
+  let raw: unknown;
+  try {
+    raw = JSON.parse(readFileSync(path, 'utf8'));
+    const parsed = parseRoadmap(raw);
+    if (!parsed.roadmap) {
+      console.error('\nRoadmap file has structural errors — fix before syncing.\n');
+      process.exit(1);
+    }
+    roadmap = parsed.roadmap;
+  } catch {
+    console.error(`\nNo roadmap file found at: ${path}`);
+    console.error('Create one with "slope init" or specify --path=<file>\n');
+    process.exit(1);
+    return; // unreachable but satisfies TS
+  }
+
+  const existingById = new Map(roadmap.sprints.map(s => [s.id, s]));
+  let updated = 0;
+  let added = 0;
+
+  for (const card of scorecards) {
+    const fromCard = scorecardToSprint(card);
+    const existing = existingById.get(card.sprint_number);
+
+    if (existing) {
+      // Update scorecard-derived fields, preserve manually-authored fields
+      existing.theme = fromCard.theme;
+      existing.par = fromCard.par;
+      existing.slope = fromCard.slope;
+      existing.type = fromCard.type;
+      existing.tickets = fromCard.tickets;
+      // Preserve: depends_on (manually authored)
+      updated++;
+    } else {
+      roadmap.sprints.push(fromCard);
+      added++;
+    }
+  }
+
+  // Sort sprints by id
+  roadmap.sprints.sort((a, b) => a.id - b.id);
+
+  // Build output
+  const output = JSON.stringify(roadmap, null, 2) + '\n';
+
+  console.log(`\nRoadmap sync: ${path}`);
+  console.log('\u2550'.repeat(40));
+  console.log(`  Scorecards: ${scorecards.length}`);
+  console.log(`  Updated: ${updated}`);
+  console.log(`  Added: ${added}`);
+  console.log(`  Total sprints: ${roadmap.sprints.length}`);
+
+  if (dryRun) {
+    console.log('\n  --dry-run: no changes written.\n');
+    return;
+  }
+
+  writeFileSync(path, output);
+  console.log(`\n  Written to ${path}\n`);
+}
+
 // --- Main Command ---
 
 export async function roadmapCommand(args: string[]): Promise<void> {
@@ -290,6 +390,9 @@ export async function roadmapCommand(args: string[]): Promise<void> {
     case 'show':
       showSubcommand(flags, cwd);
       break;
+    case 'sync':
+      syncSubcommand(flags, cwd);
+      break;
     default:
       console.log(`
 slope roadmap — Strategic planning tools
@@ -299,10 +402,12 @@ Usage:
   slope roadmap review [--path=<file>]       Automated architect review
   slope roadmap status [--path=<file>] [--sprint=N]  Current progress
   slope roadmap show [--path=<file>]         Render summary (critical path, parallel tracks)
+  slope roadmap sync [--path=<file>] [--dry-run]     Sync scorecards into roadmap
 
 Options:
   --path=<file>    Path to roadmap JSON (default: docs/backlog/roadmap.json)
   --sprint=N       Override current sprint number (for status)
+  --dry-run        Show what would change without writing (for sync)
 `);
       if (sub) process.exit(1);
   }

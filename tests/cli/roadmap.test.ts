@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { RoadmapDefinition } from '../../src/core/index.js';
@@ -323,6 +323,149 @@ describe('slope roadmap show', () => {
   });
 });
 
+function writeScorecard(dir: string, sprint: number, overrides: Record<string, unknown> = {}): void {
+  mkdirSync(join(dir, 'docs', 'retros'), { recursive: true });
+  writeFileSync(join(dir, 'docs', 'retros', `sprint-${sprint}.json`), JSON.stringify({
+    sprint_number: sprint,
+    theme: `Sprint ${sprint}`,
+    par: 4,
+    slope: 2,
+    score: 4,
+    score_label: 'par',
+    type: 'feature',
+    shots: [
+      { ticket_key: `S${sprint}-1`, title: 'Ticket 1', club: 'short_iron', result: 'green', hazards: [] },
+      { ticket_key: `S${sprint}-2`, title: 'Ticket 2', club: 'wedge', result: 'in_the_hole', hazards: [] },
+      { ticket_key: `S${sprint}-3`, title: 'Ticket 3', club: 'putter', result: 'fairway', hazards: [] },
+    ],
+    conditions: [],
+    special_plays: [],
+    stats: { fairways_hit: 3, fairways_total: 3, greens_in_regulation: 3, greens_total: 3, putts: 0, penalties: 0, hazards_hit: 0, hazard_penalties: 0, miss_directions: {} },
+    date: '2025-01-01',
+    yardage_book_updates: [],
+    bunker_locations: [],
+    course_management_notes: [],
+    ...overrides,
+  }));
+}
+
+describe('slope roadmap sync', () => {
+  it('updates existing sprints from scorecards', () => {
+    const roadmap = makeRoadmapJson();
+    writeRoadmap(tmpDir, roadmap);
+    writeConfig(tmpDir, { scorecardDir: 'docs/retros', scorecardPattern: 'sprint-*.json', minSprint: 1 });
+    writeScorecard(tmpDir, 7, { theme: 'Updated Foundation', slope: 3 });
+
+    roadmapCommand(['sync']);
+
+    const output = consoleOutput.join('\n');
+    expect(output).toContain('Updated: 1');
+    expect(output).toContain('Added: 0');
+
+    // Verify the file was written with updated theme
+    const result = JSON.parse(readFileSync(join(tmpDir, 'docs', 'backlog', 'roadmap.json'), 'utf8'));
+    const s7 = result.sprints.find((s: { id: number }) => s.id === 7);
+    expect(s7.theme).toBe('Updated Foundation');
+    expect(s7.slope).toBe(3);
+  });
+
+  it('adds new sprints from scorecards', () => {
+    const roadmap = makeRoadmapJson();
+    writeRoadmap(tmpDir, roadmap);
+    writeConfig(tmpDir, { scorecardDir: 'docs/retros', scorecardPattern: 'sprint-*.json', minSprint: 1 });
+    writeScorecard(tmpDir, 10, { theme: 'New Sprint' });
+
+    roadmapCommand(['sync']);
+
+    const output = consoleOutput.join('\n');
+    expect(output).toContain('Added: 1');
+    expect(output).toContain('Total sprints: 4');
+
+    const result = JSON.parse(readFileSync(join(tmpDir, 'docs', 'backlog', 'roadmap.json'), 'utf8'));
+    const s10 = result.sprints.find((s: { id: number }) => s.id === 10);
+    expect(s10).toBeDefined();
+    expect(s10.theme).toBe('New Sprint');
+    expect(s10.tickets).toHaveLength(3);
+  });
+
+  it('preserves depends_on when updating', () => {
+    const roadmap = makeRoadmapJson();
+    writeRoadmap(tmpDir, roadmap);
+    writeConfig(tmpDir, { scorecardDir: 'docs/retros', scorecardPattern: 'sprint-*.json', minSprint: 1 });
+    writeScorecard(tmpDir, 8, { theme: 'Updated Platform' });
+
+    roadmapCommand(['sync']);
+
+    const result = JSON.parse(readFileSync(join(tmpDir, 'docs', 'backlog', 'roadmap.json'), 'utf8'));
+    const s8 = result.sprints.find((s: { id: number }) => s.id === 8);
+    expect(s8.theme).toBe('Updated Platform');
+    expect(s8.depends_on).toEqual([7]);
+  });
+
+  it('maps club to complexity correctly', () => {
+    const roadmap = makeRoadmapJson();
+    writeRoadmap(tmpDir, roadmap);
+    writeConfig(tmpDir, { scorecardDir: 'docs/retros', scorecardPattern: 'sprint-*.json', minSprint: 1 });
+    writeScorecard(tmpDir, 7, {
+      shots: [
+        { ticket_key: 'S7-1', title: 'Driver', club: 'driver', result: 'green', hazards: [] },
+        { ticket_key: 'S7-2', title: 'Long Iron', club: 'long_iron', result: 'green', hazards: [] },
+        { ticket_key: 'S7-3', title: 'Putter', club: 'putter', result: 'green', hazards: [] },
+      ],
+    });
+
+    roadmapCommand(['sync']);
+
+    const result = JSON.parse(readFileSync(join(tmpDir, 'docs', 'backlog', 'roadmap.json'), 'utf8'));
+    const s7 = result.sprints.find((s: { id: number }) => s.id === 7);
+    expect(s7.tickets[0].complexity).toBe('moderate'); // driver
+    expect(s7.tickets[1].complexity).toBe('moderate'); // long_iron
+    expect(s7.tickets[2].complexity).toBe('trivial');  // putter
+  });
+
+  it('dry-run shows changes without writing', () => {
+    const roadmap = makeRoadmapJson();
+    writeRoadmap(tmpDir, roadmap);
+    writeConfig(tmpDir, { scorecardDir: 'docs/retros', scorecardPattern: 'sprint-*.json', minSprint: 1 });
+    writeScorecard(tmpDir, 7, { theme: 'Should Not Persist' });
+
+    roadmapCommand(['sync', '--dry-run']);
+
+    const output = consoleOutput.join('\n');
+    expect(output).toContain('--dry-run');
+    expect(output).toContain('Updated: 1');
+
+    // Verify file was NOT written
+    const result = JSON.parse(readFileSync(join(tmpDir, 'docs', 'backlog', 'roadmap.json'), 'utf8'));
+    const s7 = result.sprints.find((s: { id: number }) => s.id === 7);
+    expect(s7.theme).toBe('Foundation'); // unchanged
+  });
+
+  it('reports no scorecards when retros dir is empty', () => {
+    writeRoadmap(tmpDir, makeRoadmapJson());
+    writeConfig(tmpDir, { scorecardDir: 'docs/retros', scorecardPattern: 'sprint-*.json', minSprint: 1 });
+
+    roadmapCommand(['sync']);
+
+    const output = consoleOutput.join('\n');
+    expect(output).toContain('No scorecards found');
+  });
+
+  it('sorts sprints by id after adding', () => {
+    const roadmap = makeRoadmapJson();
+    writeRoadmap(tmpDir, roadmap);
+    writeConfig(tmpDir, { scorecardDir: 'docs/retros', scorecardPattern: 'sprint-*.json', minSprint: 1 });
+    writeScorecard(tmpDir, 5, { theme: 'Earlier Sprint' });
+    writeScorecard(tmpDir, 10, { theme: 'Later Sprint' });
+
+    roadmapCommand(['sync']);
+
+    const result = JSON.parse(readFileSync(join(tmpDir, 'docs', 'backlog', 'roadmap.json'), 'utf8'));
+    const ids = result.sprints.map((s: { id: number }) => s.id);
+    expect(ids).toEqual([5, 7, 8, 9, 10]);
+  });
+});
+
 describe('slope roadmap (no subcommand)', () => {
   it('shows help text', () => {
     roadmapCommand([]);
@@ -333,5 +476,6 @@ describe('slope roadmap (no subcommand)', () => {
     expect(output).toContain('review');
     expect(output).toContain('status');
     expect(output).toContain('show');
+    expect(output).toContain('sync');
   });
 });
