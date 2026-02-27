@@ -93,6 +93,9 @@ const MIGRATIONS: Array<{ version: number; sql: string }> = [
   },
 ];
 
+/** Latest schema version — total number of migrations available. */
+export const LATEST_SCHEMA_VERSION = MIGRATIONS.length;
+
 export class SqliteSlopeStore implements SlopeStore {
   private db: DatabaseType;
 

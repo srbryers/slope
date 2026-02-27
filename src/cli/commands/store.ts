@@ -2,6 +2,7 @@ import { existsSync, copyFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import Database from 'better-sqlite3';
 import { resolveStore, getStoreInfo } from '../store.js';
+import { LATEST_SCHEMA_VERSION } from '../../store/index.js';
 
 function parseArgs(args: string[]): Record<string, string> {
   const result: Record<string, string> = {};
@@ -109,11 +110,11 @@ Usage:
   try {
     const version = await store.getSchemaVersion();
     console.log(`\nCurrent schema version: ${version}`);
-    console.log(`Total migrations:       3`);
-    if (version >= 3) {
+    console.log(`Total migrations:       ${LATEST_SCHEMA_VERSION}`);
+    if (version >= LATEST_SCHEMA_VERSION) {
       console.log(`Status:                 up to date`);
     } else {
-      console.log(`Status:                 ${3 - version} migration(s) pending`);
+      console.log(`Status:                 ${LATEST_SCHEMA_VERSION - version} migration(s) pending`);
     }
     console.log('');
   } finally {
@@ -125,11 +126,11 @@ async function backupStore(flags: Record<string, string>, cwd: string): Promise<
   const info = getStoreInfo(cwd);
 
   if (info.type === 'postgres') {
-    const dbName = info.sanitizedUrl ? new URL(info.sanitizedUrl).pathname.slice(1) : 'slope';
     console.log(`\nPostgreSQL backup — run manually:\n`);
-    console.log(`  pg_dump "${info.sanitizedUrl ?? '<connection-string>'}" > slope-backup-$(date +%Y%m%dT%H%M%S).sql`);
+    console.log(`  pg_dump "<connection-string>" > slope-backup-$(date +%Y%m%dT%H%M%S).sql`);
     console.log(`\nRestore with:`);
-    console.log(`  psql "<connection-string>" < slope-backup-TIMESTAMP.sql\n`);
+    console.log(`  psql "<connection-string>" < slope-backup-TIMESTAMP.sql`);
+    console.log(`\nReplace <connection-string> with your actual PostgreSQL URL.\n`);
     return;
   }
 
@@ -144,7 +145,7 @@ async function backupStore(flags: Record<string, string>, cwd: string): Promise<
   const output = flags.output ?? join(cwd, `.slope/slope-backup-${timestamp}.db`);
 
   // Checkpoint WAL to flush pending writes before copying
-  const db = new Database(dbPath, { readonly: true });
+  const db = new Database(dbPath);
   try {
     db.pragma('wal_checkpoint(TRUNCATE)');
   } finally {
