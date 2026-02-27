@@ -281,13 +281,12 @@ export async function guardManageCommand(args: string[]): Promise<void> {
 
       // Show capabilities
       const hasContext = harnessId === 'claude-code' || harnessId === 'cursor';
-      const hasBlock = harnessId !== 'generic' || harnessId === 'generic'; // all can block
       const hasStop = isEventSupported(harnessId, 'Stop');
       const hasPreCompact = isEventSupported(harnessId, 'PreCompact');
 
       console.log('\nCapabilities:');
       console.log(`  Context injection: ${hasContext ? 'yes' : 'no'}`);
-      console.log(`  Block/deny:        yes`);
+      console.log(`  Block/deny:        yes`); // All harnesses can block
       console.log(`  Stop event:        ${hasStop ? 'yes' : 'no'}`);
       console.log(`  PreCompact:        ${hasPreCompact ? 'yes' : 'no'}`);
 

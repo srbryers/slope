@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -90,21 +90,15 @@ describe('detectProvidersFromArgs', () => {
   });
 });
 
-describe('installForProvider with unknown provider', () => {
-  it('logs warning for unknown provider (does not crash)', async () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    // Dynamic import to call installForProvider indirectly via initCommand
-    // Instead, test that the warn path exists by importing the module
-    // and checking it doesn't throw
-    const { golf } = await import('../../src/core/metaphors/index.js');
+describe('detectProvidersFromArgs deduplication', () => {
+  it('--harness=cursor does not duplicate with --cursor', () => {
+    const result = detectProvidersFromArgs(['--cursor', '--harness=cursor']);
+    const cursorCount = result.filter(p => p === 'cursor').length;
+    expect(cursorCount).toBe(1);
+  });
 
-    // We can't directly call installForProvider (not exported), but we can
-    // verify via detectProvidersFromArgs + initCommand behavior.
-    // For now, just verify the warning spy works as expected.
-    const calls = warnSpy.mock.calls;
-    warnSpy.mockRestore();
-    // This test primarily verifies the module loads without error
-    // after our type changes (Provider -> InitProvider)
-    expect(golf).toBeDefined();
+  it('--harness= with empty value is ignored', () => {
+    const result = detectProvidersFromArgs(['--harness=']);
+    expect(result).toEqual([]);
   });
 });

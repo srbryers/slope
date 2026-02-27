@@ -131,7 +131,11 @@ export function detectProvidersFromArgs(args: string[]): InitProvider[] {
   if (args.includes('--generic')) providers.push('generic');
   // Unified --harness=<id> flag
   const harnessArg = args.find(a => a.startsWith('--harness='));
-  if (harnessArg) providers.push(harnessArg.slice('--harness='.length));
+  if (harnessArg) {
+    const id = harnessArg.slice('--harness='.length);
+    if (id && !providers.includes(id)) providers.push(id);
+  }
+  // --all includes all real harnesses + opencode; generic is a fallback, not included
   if (args.includes('--all')) return ['claude-code', 'cursor', 'windsurf', 'opencode'];
   return providers;
 }
@@ -248,10 +252,10 @@ function installWindsurfTemplates(cwd: string, metaphor: MetaphorDefinition): vo
     }
   }
 
-  // Generate .windsurfrules (project root context file — same content as .cursorrules)
+  // Generate .windsurfrules (project root context file)
   const windsurfrulesDest = join(cwd, '.windsurfrules');
   if (!existsSync(windsurfrulesDest)) {
-    writeFileSync(windsurfrulesDest, generateCursorrules(metaphor));
+    writeFileSync(windsurfrulesDest, generateCursorrules(metaphor, 'windsurf'));
     console.log(`  Created ${windsurfrulesDest}`);
   }
 

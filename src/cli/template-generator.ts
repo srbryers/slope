@@ -515,10 +515,12 @@ Delta review of Round 2 changes. Expected outcome: approval with minor notes.
 
 // --- Cursor .cursorrules (project root context file) ---
 
-export function generateCursorrules(m: MetaphorDefinition): string {
+export function generateCursorrules(m: MetaphorDefinition, harness: 'cursor' | 'windsurf' = 'cursor'): string {
   const r = routineNames(m);
   const clubs = m.clubs;
   const results = m.shotResults;
+  const mcpPath = harness === 'windsurf' ? '.windsurf/mcp.json' : '.cursor/mcp.json';
+  const rulesPath = harness === 'windsurf' ? '.windsurf/rules/' : '.cursor/rules/';
 
   return `# SLOPE Project
 
@@ -531,7 +533,7 @@ This project uses the SLOPE framework for sprint tracking.
 - \`slope briefing\` — ${r.briefing.toLowerCase()}
 
 ## MCP Tools
-A SLOPE MCP server is configured in \`.cursor/mcp.json\`. Two tools:
+A SLOPE MCP server is configured in \`${mcpPath}\`. Two tools:
 - \`search\` — discover API functions, types, constants
 - \`execute\` — run JS with full SLOPE API in sandbox
 
@@ -555,7 +557,7 @@ A SLOPE MCP server is configured in \`.cursor/mcp.json\`. Two tools:
 
 ## ${r.scorecard}s
 Stored in docs/retros/sprint-N.json. See .slope/config.json for configuration.
-See .cursor/rules/ for detailed checklists.
+See ${rulesPath} for detailed checklists.
 `;
 }
 
