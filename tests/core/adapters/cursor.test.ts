@@ -235,6 +235,28 @@ describe('CursorAdapter', () => {
     });
   });
 
+  describe('supportedEvents', () => {
+    it('contains PreToolUse, PostToolUse, Stop but not PreCompact', () => {
+      expect(adapter.supportedEvents).toEqual(new Set(['PreToolUse', 'PostToolUse', 'Stop']));
+    });
+
+    it('does not support PreCompact', () => {
+      expect(adapter.supportedEvents.has('PreCompact')).toBe(false);
+    });
+  });
+
+  describe('supportsContextInjection', () => {
+    it('is true', () => {
+      expect(adapter.supportsContextInjection).toBe(true);
+    });
+  });
+
+  describe('hooksConfigPath', () => {
+    it('returns .cursor/hooks.json', () => {
+      expect(adapter.hooksConfigPath('/tmp/test')).toBe('/tmp/test/.cursor/hooks.json');
+    });
+  });
+
   describe('toolCategories drift prevention', () => {
     it('resolveToolMatcher resolves Cursor tool names for all guards with toolCategories', () => {
       for (const g of GUARD_DEFINITIONS) {

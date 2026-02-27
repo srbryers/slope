@@ -96,6 +96,28 @@ describe('ClaudeCodeAdapter', () => {
       expect(adapter.toolNames.exit_plan).toBe('ExitPlanMode');
     });
   });
+
+  describe('supportedEvents', () => {
+    it('contains all 4 events', () => {
+      expect(adapter.supportedEvents).toEqual(new Set(['PreToolUse', 'PostToolUse', 'Stop', 'PreCompact']));
+    });
+
+    it('does not contain unknown events', () => {
+      expect(adapter.supportedEvents.has('Unknown')).toBe(false);
+    });
+  });
+
+  describe('supportsContextInjection', () => {
+    it('is true', () => {
+      expect(adapter.supportsContextInjection).toBe(true);
+    });
+  });
+
+  describe('hooksConfigPath', () => {
+    it('returns .claude/settings.json', () => {
+      expect(adapter.hooksConfigPath('/tmp/test')).toBe('/tmp/test/.claude/settings.json');
+    });
+  });
 });
 
 describe('toolCategories on GUARD_DEFINITIONS', () => {

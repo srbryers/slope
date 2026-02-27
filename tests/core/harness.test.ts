@@ -31,6 +31,9 @@ function makeAdapter(id: string, detectResult = false): HarnessAdapter {
     generateHooksConfig: () => ({}),
     installGuards: () => {},
     detect: () => detectResult,
+    supportedEvents: new Set(['PreToolUse', 'PostToolUse', 'Stop']),
+    supportsContextInjection: false,
+    hooksConfigPath: () => null,
   };
 }
 
@@ -259,6 +262,45 @@ describe('detectAdapter integration — coexisting directories', () => {
 
     const result = detectAdapter(tmpDir);
     expect(result?.id).toBe('windsurf');
+  });
+});
+
+describe('adapter interface contract — new members', () => {
+  it('all registered adapters have supportedEvents as a Set', () => {
+    registerAdapter(new ClaudeCodeAdapter());
+    registerAdapter(new CursorAdapter());
+    registerAdapter(new WindsurfAdapter());
+    registerAdapter(new GenericAdapter());
+
+    for (const id of ADAPTER_PRIORITY) {
+      const adapter = getAdapter(id)!;
+      expect(adapter.supportedEvents, `${id} supportedEvents`).toBeInstanceOf(Set);
+      expect(adapter.supportedEvents.size, `${id} supportedEvents should not be empty`).toBeGreaterThan(0);
+    }
+  });
+
+  it('all registered adapters have supportsContextInjection as boolean', () => {
+    registerAdapter(new ClaudeCodeAdapter());
+    registerAdapter(new CursorAdapter());
+    registerAdapter(new WindsurfAdapter());
+    registerAdapter(new GenericAdapter());
+
+    for (const id of ADAPTER_PRIORITY) {
+      const adapter = getAdapter(id)!;
+      expect(typeof adapter.supportsContextInjection, `${id} supportsContextInjection`).toBe('boolean');
+    }
+  });
+
+  it('all registered adapters have hooksConfigPath as function', () => {
+    registerAdapter(new ClaudeCodeAdapter());
+    registerAdapter(new CursorAdapter());
+    registerAdapter(new WindsurfAdapter());
+    registerAdapter(new GenericAdapter());
+
+    for (const id of ADAPTER_PRIORITY) {
+      const adapter = getAdapter(id)!;
+      expect(typeof adapter.hooksConfigPath, `${id} hooksConfigPath`).toBe('function');
+    }
   });
 });
 

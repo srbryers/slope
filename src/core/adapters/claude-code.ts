@@ -11,6 +11,12 @@ export class ClaudeCodeAdapter implements HarnessAdapter {
   readonly id = 'claude-code' as const;
   readonly displayName = 'Claude Code';
   readonly toolNames: ToolNameMap = CLAUDE_CODE_TOOLS;
+  readonly supportedEvents = new Set(['PreToolUse', 'PostToolUse', 'Stop', 'PreCompact']);
+  readonly supportsContextInjection = true;
+
+  hooksConfigPath(cwd: string): string | null {
+    return join(cwd, '.claude', 'settings.json');
+  }
 
   formatPreToolOutput(result: GuardResult): PreToolUseOutput {
     return {

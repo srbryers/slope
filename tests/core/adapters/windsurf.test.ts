@@ -225,6 +225,32 @@ describe('WindsurfAdapter', () => {
     });
   });
 
+  describe('supportedEvents', () => {
+    it('contains only PreToolUse and PostToolUse', () => {
+      expect(adapter.supportedEvents).toEqual(new Set(['PreToolUse', 'PostToolUse']));
+    });
+
+    it('does not support Stop', () => {
+      expect(adapter.supportedEvents.has('Stop')).toBe(false);
+    });
+
+    it('does not support PreCompact', () => {
+      expect(adapter.supportedEvents.has('PreCompact')).toBe(false);
+    });
+  });
+
+  describe('supportsContextInjection', () => {
+    it('is false', () => {
+      expect(adapter.supportsContextInjection).toBe(false);
+    });
+  });
+
+  describe('hooksConfigPath', () => {
+    it('returns .windsurf/hooks.json', () => {
+      expect(adapter.hooksConfigPath('/tmp/test')).toBe('/tmp/test/.windsurf/hooks.json');
+    });
+  });
+
   describe('toolCategories drift prevention', () => {
     it('resolveToolMatcher resolves Windsurf tool names for all guards with toolCategories', () => {
       for (const g of GUARD_DEFINITIONS) {

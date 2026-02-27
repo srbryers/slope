@@ -157,6 +157,28 @@ describe('GenericAdapter', () => {
     });
   });
 
+  describe('supportedEvents', () => {
+    it('contains PreToolUse, PostToolUse, Stop', () => {
+      expect(adapter.supportedEvents).toEqual(new Set(['PreToolUse', 'PostToolUse', 'Stop']));
+    });
+
+    it('does not support PreCompact', () => {
+      expect(adapter.supportedEvents.has('PreCompact')).toBe(false);
+    });
+  });
+
+  describe('supportsContextInjection', () => {
+    it('is false', () => {
+      expect(adapter.supportsContextInjection).toBe(false);
+    });
+  });
+
+  describe('hooksConfigPath', () => {
+    it('returns null', () => {
+      expect(adapter.hooksConfigPath('/tmp/test')).toBeNull();
+    });
+  });
+
   describe('toolNames', () => {
     it('uses generic operation names', () => {
       expect(adapter.toolNames.read_file).toBe('read_file');
