@@ -7,6 +7,7 @@ import type { AnyGuardDefinition } from '../../core/index.js';
 import '../../core/adapters/claude-code.js';
 import '../../core/adapters/cursor.js';
 import '../../core/adapters/windsurf.js';
+import '../../core/adapters/cline.js';
 import '../../core/adapters/generic.js';
 
 const HOOK_TEMPLATES: Record<string, { description: string; managed: string[] }> = {
@@ -47,6 +48,7 @@ function getHooksDir(cwd: string, harnessId: string): string {
     case 'claude-code': return join(cwd, '.claude', 'hooks');
     case 'cursor': return join(cwd, '.cursor', 'hooks');
     case 'windsurf': return join(cwd, '.windsurf', 'hooks');
+    case 'cline': return join(cwd, '.clinerules', 'hooks');
     default: return join(cwd, '.slope', 'hooks');
   }
 }
