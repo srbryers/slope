@@ -4,6 +4,7 @@
 
 import type { SprintClaim, GolfScorecard, SlopeEvent, EventType } from '../core/types.js';
 import type { CommonIssuesFile } from '../core/briefing.js';
+import type { StoreStats } from '../core/store.js';
 import { SlopeStoreError } from '../core/store.js';
 import type { SlopeStore, SlopeSession } from '../core/store.js';
 
@@ -174,6 +175,32 @@ export class PostgresSlopeStore implements SlopeStore {
     } finally {
       client.release();
     }
+  }
+
+  // --- Diagnostics ---
+
+  async getSchemaVersion(): Promise<number> {
+    const result = await this.pool.query('SELECT MAX(version) as v FROM schema_version');
+    return result.rows[0]?.v ?? 0;
+  }
+
+  async getStats(): Promise<StoreStats> {
+    const result = await this.pool.query(`
+      SELECT
+        (SELECT COUNT(*) FROM sessions WHERE project_id = $1) as sessions,
+        (SELECT COUNT(*) FROM claims WHERE project_id = $1) as claims,
+        (SELECT COUNT(*) FROM scorecards WHERE project_id = $1) as scorecards,
+        (SELECT COUNT(*) FROM events WHERE project_id = $1) as events,
+        (SELECT MAX(timestamp) FROM events WHERE project_id = $1) as "lastEventAt"
+    `, [this.projectId]);
+    const row = result.rows[0];
+    return {
+      sessions: parseInt(row.sessions, 10),
+      claims: parseInt(row.claims, 10),
+      scorecards: parseInt(row.scorecards, 10),
+      events: parseInt(row.events, 10),
+      lastEventAt: row.lastEventAt ?? null,
+    };
   }
 
   // --- Sessions ---
@@ -511,11 +538,32 @@ export async function createPostgresStore(opts: {
     pool = opts.pool as Pool;
     ownedPool = false;
   } else if (opts.connectionString) {
+    const url = opts.connectionString;
+    // Validate connection string format
+    if (!url.startsWith('postgres://') && !url.startsWith('postgresql://')) {
+      throw new Error('Invalid PostgreSQL connection string. Must start with "postgres://" or "postgresql://".');
+    }
+    try {
+      const parsed = new URL(url);
+      if (!parsed.hostname) throw new Error('must include hostname');
+      if (!parsed.pathname || parsed.pathname === '/') throw new Error('must include database name');
+    } catch (err) {
+      if (err instanceof Error && err.message.startsWith('Invalid PostgreSQL')) throw err;
+      throw new Error(`Invalid PostgreSQL connection string: ${(err as Error).message}`);
+    }
     // Dynamic import of pg — user must have it installed
     const pgModule = await import('pg');
     const PgPool = pgModule.default?.Pool ?? pgModule.Pool;
-    pool = new PgPool({ connectionString: opts.connectionString });
+    pool = new PgPool({ connectionString: url });
     ownedPool = true;
+
+    // Validate connection — fail fast with helpful message
+    try {
+      await pool.query('SELECT 1');
+    } catch (err) {
+      pool.end();
+      throw new Error(`PostgreSQL connection failed: ${(err as Error).message}. Check your connection string.`);
+    }
   } else {
     throw new Error('Either connectionString or pool is required');
   }

@@ -357,22 +357,22 @@ describe('Events', () => {
 });
 
 describe('Schema Migration', () => {
-  it('reports current schema version', () => {
-    expect(store.getSchemaVersion()).toBe(3);
+  it('reports current schema version', async () => {
+    expect(await store.getSchemaVersion()).toBe(3);
   });
 
-  it('is idempotent — reopening same DB does not fail', () => {
+  it('is idempotent — reopening same DB does not fail', async () => {
     const dbPath = join(tmpDir, 'reopen.db');
     const s1 = new SqliteSlopeStore(dbPath);
-    expect(s1.getSchemaVersion()).toBe(3);
+    expect(await s1.getSchemaVersion()).toBe(3);
     s1.close();
 
     const s2 = new SqliteSlopeStore(dbPath);
-    expect(s2.getSchemaVersion()).toBe(3);
+    expect(await s2.getSchemaVersion()).toBe(3);
     s2.close();
   });
 
-  it('migrates v1 database to v2 on reopen', () => {
+  it('migrates v1 database to v2 on reopen', async () => {
     // Create a v1-only database by manually setting up tables
     const dbPath = join(tmpDir, 'v1.db');
     const Database = require('better-sqlite3');
@@ -404,14 +404,14 @@ describe('Schema Migration', () => {
 
     // Reopen with SqliteSlopeStore — should auto-migrate to v2 and v3
     const upgraded = new SqliteSlopeStore(dbPath);
-    expect(upgraded.getSchemaVersion()).toBe(3);
+    expect(await upgraded.getSchemaVersion()).toBe(3);
 
     // Verify events table works
-    upgraded.insertEvent({ type: 'failure', data: { test: true } });
+    await upgraded.insertEvent({ type: 'failure', data: { test: true } });
     upgraded.close();
   });
 
-  it('migrates v2 database to v3 on reopen', () => {
+  it('migrates v2 database to v3 on reopen', async () => {
     // Create a v2 database (has events but no agent_role/swarm_id)
     const dbPath = join(tmpDir, 'v2.db');
     const Database = require('better-sqlite3');
@@ -452,18 +452,16 @@ describe('Schema Migration', () => {
 
     // Reopen — should auto-migrate to v3
     const upgraded = new SqliteSlopeStore(dbPath);
-    expect(upgraded.getSchemaVersion()).toBe(3);
+    expect(await upgraded.getSchemaVersion()).toBe(3);
 
     // Existing session should have null agent_role and swarm_id
-    const sessions = upgraded.getActiveSessions();
-    sessions.then(s => {
-      expect(s).toHaveLength(1);
-      expect(s[0].agent_role).toBeUndefined();
-      expect(s[0].swarm_id).toBeUndefined();
-    });
+    const sessions = await upgraded.getActiveSessions();
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0].agent_role).toBeUndefined();
+    expect(sessions[0].swarm_id).toBeUndefined();
 
     // New session with agent_role and swarm_id should work
-    upgraded.registerSession({
+    await upgraded.registerSession({
       session_id: 'post-v3',
       role: 'secondary',
       ide: 'claude-code',
@@ -472,6 +470,41 @@ describe('Schema Migration', () => {
     });
 
     upgraded.close();
+  });
+});
+
+describe('getStats', () => {
+  it('returns correct counts after inserts', async () => {
+    // Start with empty store
+    const stats0 = await store.getStats();
+    expect(stats0.sessions).toBe(0);
+    expect(stats0.claims).toBe(0);
+    expect(stats0.scorecards).toBe(0);
+    expect(stats0.events).toBe(0);
+    expect(stats0.lastEventAt).toBeNull();
+
+    // Add data
+    await store.registerSession({ session_id: 'stats-s1', role: 'primary', ide: 'vscode' });
+    await store.claim({ sprint_number: 1, player: 'alice', target: 'T-1', scope: 'ticket' });
+    await store.claim({ sprint_number: 1, player: 'bob', target: 'T-2', scope: 'ticket' });
+    await store.saveScorecard({
+      sprint_number: 1, theme: 'Test', par: 4, slope: 2, score: 4, score_label: 'par',
+      shots: [], conditions: [], special_plays: [],
+      stats: {
+        fairways_hit: 0, fairways_total: 0, greens_in_regulation: 0,
+        greens_total: 0, putts: 0, penalties: 0, hazards_hit: 0, hazard_penalties: 0,
+        miss_directions: { long: 0, short: 0, left: 0, right: 0 },
+      },
+      date: '2025-01-01', yardage_book_updates: [], bunker_locations: [], course_management_notes: [],
+    });
+    const evt = await store.insertEvent({ type: 'decision', data: { choice: 'test' }, sprint_number: 1 });
+
+    const stats = await store.getStats();
+    expect(stats.sessions).toBe(1);
+    expect(stats.claims).toBe(2);
+    expect(stats.scorecards).toBe(1);
+    expect(stats.events).toBe(1);
+    expect(stats.lastEventAt).toBe(evt.timestamp);
   });
 });
 

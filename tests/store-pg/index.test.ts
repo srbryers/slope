@@ -250,6 +250,38 @@ describe.skipIf(!PG_URL)('PostgresSlopeStore', () => {
     });
   });
 
+  describe('Diagnostics', () => {
+    it('getSchemaVersion returns 1', async () => {
+      const version = await store.getSchemaVersion();
+      expect(version).toBe(1);
+    });
+
+    it('getStats returns correct counts after inserts', async () => {
+      const sprint = uniqueSprint();
+      const sessId = `stats-sess-${Date.now()}`;
+      await store.registerSession({ session_id: sessId, role: 'primary', ide: 'vscode' });
+      await store.claim({ sprint_number: sprint, player: 'alice', target: 'STATS-1', scope: 'ticket' });
+      await store.saveScorecard({
+        sprint_number: sprint, theme: 'Stats Test', par: 4, slope: 2, score: 4, score_label: 'par',
+        shots: [], conditions: [], special_plays: [],
+        stats: {
+          fairways_hit: 0, fairways_total: 0, greens_in_regulation: 0,
+          greens_total: 0, putts: 0, penalties: 0, hazards_hit: 0, hazard_penalties: 0,
+          miss_directions: { long: 0, short: 0, left: 0, right: 0 },
+        },
+        date: '2025-01-01', yardage_book_updates: [], bunker_locations: [], course_management_notes: [],
+      });
+      const evt = await store.insertEvent({ type: 'decision', data: { choice: 'test' }, sprint_number: sprint });
+
+      const stats = await store.getStats();
+      expect(stats.sessions).toBeGreaterThanOrEqual(1);
+      expect(stats.claims).toBeGreaterThanOrEqual(1);
+      expect(stats.scorecards).toBeGreaterThanOrEqual(1);
+      expect(stats.events).toBeGreaterThanOrEqual(1);
+      expect(stats.lastEventAt).toBeTruthy();
+    });
+  });
+
   describe('Events', () => {
     it('inserts and retrieves events by session', async () => {
       const sessionId = `evt-sess-${Date.now()}`;

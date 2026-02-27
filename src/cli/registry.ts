@@ -45,6 +45,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
   { cmd: 'map',        desc: 'Generate/update codebase map',                 category: 'tooling' },
   { cmd: 'flows',      desc: 'Manage user flow definitions',                 category: 'tooling' },
   { cmd: 'plugin',     desc: 'Manage custom plugins',                        category: 'tooling' },
+  { cmd: 'store',      desc: 'Store diagnostics and management',              category: 'tooling' },
   { cmd: 'escalate',   desc: 'Escalate issues based on severity triggers',   category: 'tooling' },
   { cmd: 'transcript', desc: 'View session transcript data',                 category: 'tooling' },
 

@@ -54,6 +54,8 @@ function createMockStore(): SlopeStore & { sessions: SlopeSession[]; claims: Spr
     async getEventsBySession() { return []; },
     async getEventsBySprint() { return []; },
     async getEventsByTicket() { return []; },
+    async getSchemaVersion() { return 3; },
+    async getStats() { return { sessions: sessions.length, claims: claims.length, scorecards: 0, events: 0, lastEventAt: null }; },
     close() {},
   };
 }
@@ -70,13 +72,14 @@ describe('createSlopeToolsServer', () => {
     expect(server).toBeDefined();
   });
 
-  it('exposes exactly 5 tool names', () => {
-    expect(SLOPE_MCP_TOOL_NAMES).toHaveLength(5);
+  it('exposes exactly 6 tool names', () => {
+    expect(SLOPE_MCP_TOOL_NAMES).toHaveLength(6);
     expect(SLOPE_MCP_TOOL_NAMES).toContain('search');
     expect(SLOPE_MCP_TOOL_NAMES).toContain('execute');
     expect(SLOPE_MCP_TOOL_NAMES).toContain('session_status');
     expect(SLOPE_MCP_TOOL_NAMES).toContain('acquire_claim');
     expect(SLOPE_MCP_TOOL_NAMES).toContain('check_conflicts');
+    expect(SLOPE_MCP_TOOL_NAMES).toContain('store_status');
   });
 });
 
@@ -103,8 +106,8 @@ describe('registry', () => {
 
   it('store module entries exist', () => {
     const storeEntries = SLOPE_REGISTRY.filter((e) => e.module === 'store');
-    expect(storeEntries).toHaveLength(3);
-    expect(storeEntries.map(e => e.name)).toEqual(['session_status', 'acquire_claim', 'check_conflicts']);
+    expect(storeEntries).toHaveLength(4);
+    expect(storeEntries.map(e => e.name)).toEqual(['session_status', 'acquire_claim', 'check_conflicts', 'store_status']);
   });
 
   it('SLOPE_TYPES contains key type definitions', () => {

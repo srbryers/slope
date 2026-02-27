@@ -5,6 +5,15 @@ import type { SprintClaim, GolfScorecard, SlopeEvent } from './types.js';
 import type { CommonIssuesFile } from './briefing.js';
 import type { SprintRegistry } from './registry.js';
 
+/** Aggregate row counts from the store — used by health checks and diagnostics. */
+export interface StoreStats {
+  sessions: number;
+  claims: number;
+  scorecards: number;
+  events: number;
+  lastEventAt: string | null;
+}
+
 /** Live agent/IDE session — distinct from SessionEntry (journal-style briefing entries) */
 export interface SlopeSession {
   session_id: string;
@@ -53,6 +62,10 @@ export interface SlopeStore extends SprintRegistry {
   getEventsBySession(sessionId: string): Promise<SlopeEvent[]>;
   getEventsBySprint(sprintNumber: number): Promise<SlopeEvent[]>;
   getEventsByTicket(ticketKey: string): Promise<SlopeEvent[]>;
+
+  // Diagnostics
+  getSchemaVersion(): Promise<number>;
+  getStats(): Promise<StoreStats>;
 
   // Lifecycle
   close(): void;

@@ -28,7 +28,28 @@ describe('store-pg regression (no PG required)', () => {
     const { createPostgresStore } = await import('../../src/store-pg/index.js');
     await expect(createPostgresStore({
       connectionString: 'postgresql://localhost:1/nonexistent',
-    })).rejects.toThrow(); // connection refused, not MODULE_NOT_FOUND
+    })).rejects.toThrow(/PostgreSQL connection failed/);
+  });
+
+  it('rejects connection string with bad prefix', async () => {
+    const { createPostgresStore } = await import('../../src/store-pg/index.js');
+    await expect(createPostgresStore({
+      connectionString: 'mysql://localhost/db',
+    })).rejects.toThrow(/Must start with "postgres:\/\/" or "postgresql:\/\/"/);
+  });
+
+  it('rejects connection string missing hostname', async () => {
+    const { createPostgresStore } = await import('../../src/store-pg/index.js');
+    await expect(createPostgresStore({
+      connectionString: 'postgres:///db',
+    })).rejects.toThrow(/must include hostname/);
+  });
+
+  it('rejects connection string missing database name', async () => {
+    const { createPostgresStore } = await import('../../src/store-pg/index.js');
+    await expect(createPostgresStore({
+      connectionString: 'postgres://localhost/',
+    })).rejects.toThrow(/must include database name/);
   });
 
   it('resolveStore defaults to SQLite without postgres config', async () => {

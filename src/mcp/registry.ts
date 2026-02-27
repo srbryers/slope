@@ -619,6 +619,13 @@ export const SLOPE_REGISTRY: FunctionRegistryEntry[] = [
     signature: 'check_conflicts(sprintNumber?: number): { claims: number; conflicts: SprintConflict[] }',
     example: '// Called via MCP tool, not directly',
   },
+  {
+    name: 'store_status',
+    module: 'store',
+    description: 'MCP tool: Check store health — schema version, row counts, and error status.',
+    signature: 'store_status(): StoreHealthResult',
+    example: '// Called via MCP tool, not directly',
+  },
 
   // ─── Transcript ───
   {

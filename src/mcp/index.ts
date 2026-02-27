@@ -2,12 +2,13 @@
 /**
  * @slope-dev/slope — Code-mode MCP server for SLOPE.
  *
- * Exposes up to 5 tools:
+ * Exposes up to 6 tools:
  *   search()           — discover the SLOPE API (functions, types, constants)
  *   execute()          — run JS in a sandboxed node:vm with the full API pre-injected
  *   session_status()   — show active sessions and claims (requires store)
  *   acquire_claim()    — claim a ticket/area (requires store)
  *   check_conflicts()  — detect overlapping claims (requires store)
+ *   store_status()     — check store health, schema version, stats (requires store)
  *
  * Usage:
  *   npx @slope-dev/slope              # stdio transport
@@ -22,11 +23,11 @@ import { z } from 'zod';
 import { SLOPE_REGISTRY, SLOPE_TYPES } from './registry.js';
 import { runInSandbox } from './sandbox.js';
 import type { SlopeStore } from '../core/index.js';
-import { checkConflicts, loadFlows, checkFlowStaleness } from '../core/index.js';
+import { checkConflicts, loadFlows, checkFlowStaleness, checkStoreHealth } from '../core/index.js';
 import type { ClaimScope, FlowsFile, FlowDefinition } from '../core/index.js';
 
 /** Tool names exposed by this MCP server (for tests and tool discovery). */
-export const SLOPE_MCP_TOOL_NAMES = ['search', 'execute', 'session_status', 'acquire_claim', 'check_conflicts'] as const;
+export const SLOPE_MCP_TOOL_NAMES = ['search', 'execute', 'session_status', 'acquire_claim', 'check_conflicts', 'store_status'] as const;
 
 /** Detection results for hook/settings activation status. */
 export interface SetupHints {
@@ -106,7 +107,7 @@ export function buildSetupHint(hints: SetupHints): string | null {
   );
 }
 
-export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHints): McpServer {
+export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHints, storeType?: string): McpServer {
   const server = new McpServer({
     name: 'slope-tools',
     version: '1.0.0',
@@ -235,6 +236,21 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
           content: [{
             type: 'text' as const,
             text: JSON.stringify({ claims: claims.length, conflicts }, null, 2),
+          }],
+        };
+      },
+    );
+
+    server.tool(
+      'store_status',
+      'Check store health: schema version, row counts, and error status.',
+      {},
+      async () => {
+        const result = await checkStoreHealth(store, storeType ?? 'unknown');
+        return {
+          content: [{
+            type: 'text' as const,
+            text: JSON.stringify(result, null, 2),
           }],
         };
       },
@@ -413,17 +429,19 @@ function findProjectRoot(startDir: string): string {
 async function main(): Promise<void> {
   let store: SlopeStore | undefined;
   let hints: SetupHints | undefined;
+  let storeType: string | undefined;
   try {
     const { loadConfig } = await import('../core/index.js');
     const { createStore } = await import('../store/index.js');
     const cwd = findProjectRoot(process.cwd());
     const config = loadConfig(cwd);
     store = createStore({ storePath: config.store_path ?? '.slope/slope.db', cwd });
+    storeType = config.store ?? 'sqlite';
     hints = detectSetupHints(cwd);
   } catch {
     // No config or store — server runs without store tools
   }
-  const server = createSlopeToolsServer(store, hints);
+  const server = createSlopeToolsServer(store, hints, storeType);
   const transport = new StdioServerTransport();
   await server.connect(transport);
 }

@@ -7,7 +7,7 @@ import { dirname } from 'node:path';
 import Database from 'better-sqlite3';
 import type { Database as DatabaseType } from 'better-sqlite3';
 import type { SprintClaim, GolfScorecard, SlopeEvent, EventType } from '../core/index.js';
-import type { CommonIssuesFile } from '../core/index.js';
+import type { CommonIssuesFile, StoreStats } from '../core/index.js';
 import { SlopeStoreError } from '../core/index.js';
 import type { SlopeStore, SlopeSession } from '../core/index.js';
 
@@ -93,6 +93,9 @@ const MIGRATIONS: Array<{ version: number; sql: string }> = [
   },
 ];
 
+/** Latest schema version — total number of migrations available. */
+export const LATEST_SCHEMA_VERSION = MIGRATIONS.length;
+
 export class SqliteSlopeStore implements SlopeStore {
   private db: DatabaseType;
 
@@ -114,7 +117,7 @@ export class SqliteSlopeStore implements SlopeStore {
       );
     `);
 
-    const currentVersion = this.getSchemaVersion();
+    const currentVersion = this.getSchemaVersionSync();
 
     for (const migration of MIGRATIONS) {
       if (migration.version > currentVersion) {
@@ -125,10 +128,34 @@ export class SqliteSlopeStore implements SlopeStore {
     }
   }
 
-  /** Get current schema version (0 if no migrations applied) */
-  getSchemaVersion(): number {
+  /** Get current schema version synchronously (internal use by migrate()) */
+  private getSchemaVersionSync(): number {
     const row = this.db.prepare('SELECT MAX(version) as v FROM schema_version').get() as { v: number | null } | undefined;
     return row?.v ?? 0;
+  }
+
+  /** Get current schema version (0 if no migrations applied) */
+  async getSchemaVersion(): Promise<number> {
+    return this.getSchemaVersionSync();
+  }
+
+  /** Get aggregate row counts from all store tables */
+  async getStats(): Promise<StoreStats> {
+    const row = this.db.prepare(`
+      SELECT
+        (SELECT COUNT(*) FROM sessions) as sessions,
+        (SELECT COUNT(*) FROM claims) as claims,
+        (SELECT COUNT(*) FROM scorecards) as scorecards,
+        (SELECT COUNT(*) FROM events) as events,
+        (SELECT MAX(timestamp) FROM events) as lastEventAt
+    `).get() as { sessions: number; claims: number; scorecards: number; events: number; lastEventAt: string | null };
+    return {
+      sessions: row.sessions,
+      claims: row.claims,
+      scorecards: row.scorecards,
+      events: row.events,
+      lastEventAt: row.lastEventAt,
+    };
   }
 
   // --- Sessions ---
