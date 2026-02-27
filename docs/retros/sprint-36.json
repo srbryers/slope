@@ -1,0 +1,132 @@
+{
+  "sprint_number": 36,
+  "theme": "The Clubhouse Bridge",
+  "par": 4,
+  "slope": 2,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-02-27",
+  "type": "feature + refactor",
+  "shots": [
+    {
+      "ticket_key": "S36-1",
+      "title": "./adapters subpath export barrel",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Created src/adapters.ts barrel with side-effect imports for all 4 adapters, re-exports framework functions + types + adapter classes. Added ./adapters to package.json exports. 10 tests. Committed on main before branch creation (stop-check fix session created the branch race)."
+    },
+    {
+      "ticket_key": "S36-2",
+      "title": "Unify init.ts Provider with adapter framework",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "description": "detectPlatforms() behavioral change: adapter detect() only checks directories (.claude/, .cursor/), not standalone files (CLAUDE.md, .cursorrules). Updated 2 existing tests to match new behavior."
+        },
+        {
+          "type": "rough",
+          "description": "Concurrent session (stop-check fix) reverted init.ts mid-edit via merge to main. Had to re-apply all changes via full Write instead of incremental Edits."
+        }
+      ],
+      "notes": "Replaced stale Provider type with InitProvider = HarnessId | 'opencode'. Detection now delegates to adapter framework. Added --windsurf and --harness=<id> flags. Created installWindsurfTemplates() + installWindsurfMcpConfig(). Updated installDefaultHooks() for windsurf hooks dir. Added default case with console.warn to installForProvider(). 12 tests."
+    },
+    {
+      "ticket_key": "S36-3",
+      "title": "slope guard status subcommand",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "description": "CLI router only sent list/enable/disable to guardManageCommand — 'status' fell through to guardCommand which tried to run it as a guard name. Fixed in S36-4 verification."
+        }
+      ],
+      "notes": "Added HARNESS_EVENT_SUPPORT constant, isEventSupported() and getHooksConfigPath() helpers. Status subcommand shows detected harness, hooks config path + entry count, guard table with active/disabled/unsupported markers, and capabilities section. 14 tests."
+    },
+    {
+      "ticket_key": "S36-4",
+      "title": "End-to-end verification + docs",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Caught guard status routing bug via smoke test. Updated harness-research.md authoring guide with ./adapters subpath export. Regenerated CODEBASE.md. Full build + typecheck + 1706 tests pass. Both-tier review (code + architect) caught 2 HIGH, 5 MEDIUM, 4 LOW findings — all actionable items fixed."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 2,
+    "greens_total": 4,
+    "putts": 4,
+    "penalties": 0,
+    "hazards_hit": 3,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "wind",
+      "description": "Concurrent session editing same files (stop-check fix on main) — caused file revert mid-sprint requiring re-application of init.ts changes"
+    }
+  ],
+  "special_plays": [
+    "Both-tier review (code + architect) caught 11 findings: 2 HIGH (dead code tautology, unvalidated --harness input), 5 MEDIUM (detection narrowing, static event map, cursor branding in windsurf, no-op test, no E2E guard status test), 4 LOW. All actionable items fixed before merge."
+  ],
+  "training": [],
+  "nutrition": [
+    {
+      "category": "hydration",
+      "description": "Full build + typecheck after every ticket. Full test suite run at S36-4. 1706 tests passing at completion, 0 failing.",
+      "status": "healthy"
+    },
+    {
+      "category": "diet",
+      "description": "5 commits on feature branch + 1 on main (S36-1). All pushed before merge. Squash-merged PR #15.",
+      "status": "healthy"
+    },
+    {
+      "category": "supplements",
+      "description": "36 new tests across 3 test files (adapters: 10, init-detect: 12, guard-status: 14). Updated 2 existing tests. 1706 total, up from 1668.",
+      "status": "healthy"
+    },
+    {
+      "category": "recovery",
+      "description": "Review caught Cursor-specific branding in Windsurf templates (.cursor/mcp.json in .windsurfrules) — parameterized generateCursorrules(m, harness). Also caught dead hasBlock tautology and unvalidated --harness= input.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Clean sprint with good momentum from S34-S35 adapter work. The subpath export barrel was trivial. Init unification was straightforward but hit a snag with a concurrent session reverting the file. Guard status came together quickly — the main issue was the CLI router not knowing about the new subcommand.",
+    "advice_for_next_player": "When multiple sessions are working on the same repo, use feature branches before any commits. The S36-1 commit landed on main before the branch was created, which complicated the rebase. Also: always smoke-test new CLI subcommands — the router switch statement is a common miss.",
+    "what_surprised_you": "The Cursor template generators (generateCursorSprintChecklist etc) were actually harness-neutral despite the 'Cursor' prefix — only generateCursorrules had harness-specific paths. The .mdc format works identically for Windsurf.",
+    "excited_about_next": "The adapter framework is now fully consumable externally via @slope-dev/slope/adapters. The HARNESS_EVENT_SUPPORT and getHooksConfigPath should eventually move onto the HarnessAdapter interface — tracked as tech debt from review."
+  },
+  "bunker_locations": [
+    "CLI router switch for guard subcommands must be updated when adding new management subcommands (list/status/enable/disable)",
+    "generateCursorrules() has harness-specific paths — pass harness param when reusing for non-Cursor harnesses",
+    "Concurrent sessions editing the same file can revert changes — always use feature branches before first commit",
+    "HARNESS_EVENT_SUPPORT and getHooksConfigPath are static maps that duplicate adapter internals — tech debt to move onto HarnessAdapter interface"
+  ],
+  "yardage_book_updates": [
+    "src/adapters.ts: New subpath barrel for @slope-dev/slope/adapters — side-effect imports + re-exports",
+    "package.json: Added ./adapters export entry",
+    "src/cli/commands/init.ts: InitProvider type, detectPlatforms via adapter framework, --windsurf/--harness flags, Windsurf templates",
+    "src/cli/commands/guard.ts: HARNESS_EVENT_SUPPORT, isEventSupported(), getHooksConfigPath(), guard status subcommand",
+    "src/cli/index.ts: Added 'status' to guard management subcommand routing",
+    "src/cli/template-generator.ts: Parameterized generateCursorrules(m, harness) for Windsurf support"
+  ],
+  "course_management_notes": [
+    "4 tickets, par 4, score 4 — par. 2 in_the_hole, 2 green (S36-2 had detection change + concurrent session hazard, S36-3 had routing miss).",
+    "Slope 2 — consuming existing adapter API, small refactors, no new external deps. Matched estimate.",
+    "583 lines added, 60 removed across 14 files. 1 new source file, 3 new test files.",
+    "Both-tier review (code + architect) caught 11 findings total, all actionable items addressed before merge."
+  ]
+}
