@@ -1,6 +1,9 @@
 // SLOPE Guard Framework
 // Types and utilities for agent guidance hooks.
 
+import type { ToolCategory } from './harness.js';
+import { claudeCodeAdapter } from './adapters/claude-code.js';
+
 /** Input from Claude Code PreToolUse/PostToolUse hooks (JSON on stdin) */
 export interface HookInput {
   session_id: string;
@@ -76,7 +79,9 @@ export interface GuardDefinition {
   description: string;
   /** Which hook event this guard fires on */
   hookEvent: 'PreToolUse' | 'PostToolUse' | 'Stop' | 'PreCompact';
-  /** Regex matcher for tool name (PreToolUse/PostToolUse only) */
+  /** Harness-agnostic tool categories this guard matches (adapter resolves to tool names) */
+  toolCategories?: ToolCategory[];
+  /** Regex matcher for tool name (PreToolUse/PostToolUse only) — computed from toolCategories via adapter */
   matcher?: string;
   /** Which --level installs this guard */
   level: 'scoring' | 'full';
@@ -116,6 +121,7 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     name: 'explore',
     description: 'Suggest checking codebase index before deep exploration',
     hookEvent: 'PreToolUse',
+    toolCategories: ['read_file', 'search_files', 'search_content'],
     matcher: 'Read|Glob|Grep',
     level: 'full',
   },
@@ -123,6 +129,7 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     name: 'hazard',
     description: 'Warn about known issues in file areas being edited',
     hookEvent: 'PreToolUse',
+    toolCategories: ['write_file'],
     matcher: 'Edit|Write',
     level: 'full',
   },
@@ -130,6 +137,7 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     name: 'commit-nudge',
     description: 'Nudge to commit/push after prolonged editing',
     hookEvent: 'PostToolUse',
+    toolCategories: ['write_file'],
     matcher: 'Edit|Write',
     level: 'full',
   },
@@ -137,6 +145,7 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     name: 'scope-drift',
     description: 'Warn when editing files outside claimed ticket scope',
     hookEvent: 'PreToolUse',
+    toolCategories: ['write_file'],
     matcher: 'Edit|Write',
     level: 'full',
   },
@@ -156,6 +165,7 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     name: 'subagent-gate',
     description: 'Force haiku model and cap max_turns on Explore/Plan subagents',
     hookEvent: 'PreToolUse',
+    toolCategories: ['create_subagent'],
     matcher: 'Task',
     level: 'full',
   },
@@ -163,6 +173,7 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     name: 'push-nudge',
     description: 'Nudge to push after git commits when unpushed count or time is high',
     hookEvent: 'PostToolUse',
+    toolCategories: ['execute_command'],
     matcher: 'Bash',
     level: 'full',
   },
@@ -170,6 +181,7 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     name: 'workflow-gate',
     description: 'Block ExitPlanMode until review rounds are complete',
     hookEvent: 'PreToolUse',
+    toolCategories: ['exit_plan'],
     matcher: 'ExitPlanMode',
     level: 'full',
   },
@@ -177,6 +189,7 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     name: 'review-tier',
     description: 'Recommend review tier based on plan scope',
     hookEvent: 'PreToolUse',
+    toolCategories: ['exit_plan'],
     matcher: 'ExitPlanMode',
     level: 'full',
   },
@@ -184,6 +197,7 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     name: 'version-check',
     description: 'Block push to main when package versions have not been bumped',
     hookEvent: 'PreToolUse',
+    toolCategories: ['execute_command'],
     matcher: 'Bash',
     level: 'full',
   },
@@ -191,6 +205,7 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     name: 'stale-flows',
     description: 'Warn when editing files belonging to a stale flow definition',
     hookEvent: 'PreToolUse',
+    toolCategories: ['write_file'],
     matcher: 'Edit|Write',
     level: 'full',
   },
@@ -204,6 +219,7 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     name: 'pr-review',
     description: 'Prompt for review workflow after PR creation',
     hookEvent: 'PostToolUse',
+    toolCategories: ['execute_command'],
     matcher: 'Bash',
     level: 'full',
   },
@@ -211,13 +227,14 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     name: 'transcript',
     description: 'Append tool call metadata to session transcript',
     hookEvent: 'PostToolUse',
-    // no matcher → fires on all tools
+    // no toolCategories, no matcher → fires on all tools
     level: 'full',
   },
   {
     name: 'branch-before-commit',
     description: 'Block git commit on main/master — create a feature branch first',
     hookEvent: 'PreToolUse',
+    toolCategories: ['execute_command'],
     matcher: 'Bash',
     level: 'full',
   },
@@ -261,85 +278,30 @@ export function clearCustomGuards(): void {
   customGuards.length = 0;
 }
 
-// --- Formatters ---
+// --- Formatters (delegates to ClaudeCodeAdapter) ---
 
 /** Format a GuardResult as PreToolUse JSON output */
 export function formatPreToolUseOutput(result: GuardResult): PreToolUseOutput {
-  return {
-    hookSpecificOutput: {
-      hookEventName: 'PreToolUse',
-      ...(result.decision && { permissionDecision: result.decision }),
-      ...(result.blockReason && { permissionDecisionReason: result.blockReason }),
-      ...(result.context && { additionalContext: result.context }),
-    },
-  };
+  return claudeCodeAdapter.formatPreToolOutput(result) as PreToolUseOutput;
 }
 
 /** Format a GuardResult as PostToolUse JSON output */
 export function formatPostToolUseOutput(result: GuardResult): PostToolUseOutput {
-  if (result.blockReason) {
-    return {
-      decision: 'block',
-      reason: result.blockReason,
-      hookSpecificOutput: {
-        hookEventName: 'PostToolUse',
-        ...(result.context && { additionalContext: result.context }),
-      },
-    };
-  }
-  if (result.context) {
-    return {
-      hookSpecificOutput: {
-        hookEventName: 'PostToolUse',
-        additionalContext: result.context,
-      },
-    };
-  }
-  return {};
+  return claudeCodeAdapter.formatPostToolOutput(result) as PostToolUseOutput;
 }
 
 /** Format a GuardResult as Stop JSON output */
 export function formatStopOutput(result: GuardResult): StopOutput {
-  if (result.blockReason) {
-    return { decision: 'block', reason: result.blockReason };
-  }
-  return {};
+  return claudeCodeAdapter.formatStopOutput(result) as StopOutput;
 }
 
 /**
  * Generate Claude Code settings.json hooks configuration for installed guards.
- * Returns the `hooks` object to merge into .claude/settings.json.
+ * Delegates to ClaudeCodeAdapter.generateHooksConfig().
  */
 export function generateClaudeCodeHooksConfig(
   guards: AnyGuardDefinition[],
   guardScriptPath: string,
 ): Record<string, Array<{ matcher?: string; hooks: Array<{ type: string; command: string; timeout?: number; statusMessage?: string }> }>> {
-  const config: Record<string, Array<{ matcher?: string; hooks: Array<{ type: string; command: string; timeout?: number; statusMessage?: string }> }>> = {};
-
-  // Group guards by hookEvent + matcher
-  const groups = new Map<string, AnyGuardDefinition[]>();
-  for (const g of guards) {
-    const key = `${g.hookEvent}::${g.matcher ?? ''}`;
-    const list = groups.get(key) || [];
-    list.push(g);
-    groups.set(key, list);
-  }
-
-  for (const [key, defs] of groups) {
-    const [hookEvent, matcher] = key.split('::');
-    if (!config[hookEvent]) config[hookEvent] = [];
-
-    const hooks = defs.map(d => ({
-      type: 'command' as const,
-      command: `${guardScriptPath} ${d.name}`,
-      timeout: 10,
-      statusMessage: `SLOPE: ${d.description}`,
-    }));
-
-    const entry: { matcher?: string; hooks: typeof hooks } = { hooks };
-    if (matcher) entry.matcher = matcher;
-    config[hookEvent].push(entry);
-  }
-
-  return config;
+  return claudeCodeAdapter.generateHooksConfig(guards, guardScriptPath) as ReturnType<typeof generateClaudeCodeHooksConfig>;
 }

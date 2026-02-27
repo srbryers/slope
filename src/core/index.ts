@@ -278,6 +278,9 @@ export type {
   HarnessAdapter,
 } from './harness.js';
 
+// Adapters
+export { ClaudeCodeAdapter, claudeCodeAdapter } from './adapters/claude-code.js';
+
 // Report
 export {
   buildReportData,
