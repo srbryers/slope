@@ -1,0 +1,133 @@
+{
+  "sprint_number": 38,
+  "theme": "The Vault",
+  "par": 4,
+  "slope": 2,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-02-27",
+  "type": "feature + hardening",
+  "shots": [
+    {
+      "ticket_key": "S38-1",
+      "title": "Extend SlopeStore interface + PG hardening",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added StoreStats type and getSchemaVersion()/getStats() to SlopeStore interface. SQLite: renamed sync method to private getSchemaVersionSync(), added async wrapper and compound subquery for getStats(). PG: implemented both methods with project_id-scoped queries, added connection string validation (URL parsing) and SELECT 1 ping with pool cleanup on failure. Updated mock store in MCP tests. 4 new tests."
+    },
+    {
+      "ticket_key": "S38-2",
+      "title": "slope store CLI command (status + migrate)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Created src/cli/commands/store.ts following existing CLI patterns. Added getStoreInfo() helper that reads config without opening store (works even when store is broken). Subcommands: status (human + --json), migrate status. Wired into CLI router and registry. 6 tests."
+    },
+    {
+      "ticket_key": "S38-3",
+      "title": "Store health check + MCP exposure",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "description": "Two separate test files (src/mcp/index.test.ts and tests/mcp/index-src.test.ts) both had hardcoded tool count assertions — missed the second file on first pass, caught on test run."
+        }
+      ],
+      "notes": "Created src/core/store-health.ts with checkStoreHealth() utility and StoreHealthResult type. Added store_status MCP tool. Updated barrel exports. 5 new health check tests + updated 2 MCP test files for tool count (5→6) and store entries (3→4)."
+    },
+    {
+      "ticket_key": "S38-4",
+      "title": "Backup/restore + docs",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "description": "Code review caught WAL checkpoint using readonly DB handle — PRAGMA wal_checkpoint(TRUNCATE) requires write access. Fixed by removing { readonly: true }."
+        },
+        {
+          "type": "rough",
+          "description": "Code review caught MCP store_status hardcoding 'sqlite' instead of deriving type from config. Fixed by adding storeType parameter to createSlopeToolsServer()."
+        },
+        {
+          "type": "rough",
+          "description": "Architect review caught hardcoded migration count '3' and stale JSDoc (5 tools). Fixed with LATEST_SCHEMA_VERSION constant and updated header."
+        }
+      ],
+      "notes": "Added backup (WAL checkpoint + copyFileSync for SQLite, pg_dump hint for PG) and restore (validates schema_version before overwriting) subcommands. Created docs/store.md covering config, migrations, CLI, MCP, health check, PG hardening. Both-tier review (code + architect) caught 5 findings — all fixed before merge. 7 new tests."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 2,
+    "greens_total": 4,
+    "putts": 4,
+    "penalties": 0,
+    "hazards_hit": 4,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [],
+  "special_plays": [
+    "Both-tier review (code + architect) caught 5 findings: 2 critical (WAL checkpoint readonly, MCP hardcoded store type), 3 important (hardcoded migration count, stale JSDoc, unused variable). All fixed before merge."
+  ],
+  "training": [],
+  "nutrition": [
+    {
+      "category": "hydration",
+      "description": "Full build + typecheck after every ticket. Full test suite run at each step. 1764 tests passing at completion, 0 failing.",
+      "status": "healthy"
+    },
+    {
+      "category": "diet",
+      "description": "5 commits on feature branch (4 feat + 1 fix for review findings). All pushed before merge. PR #20.",
+      "status": "healthy"
+    },
+    {
+      "category": "supplements",
+      "description": "22 new tests across 4 test files (cli/store: 13, core/store-health: 5, store/index: 2, store-pg: 2). Updated 3 existing test files. 1764 total, up from 1706.",
+      "status": "healthy"
+    },
+    {
+      "category": "recovery",
+      "description": "Review caught WAL checkpoint on readonly handle — would have caused backup failures in production. Also caught hardcoded store type in MCP that would misreport PG stores as SQLite.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Clean sprint with predictable scope. Store layer work followed established patterns in both SQLite and PG. The CLI command mirrored session.ts patterns. MCP tool was a thin wrapper over the health check utility. Backup/restore was the most nuanced ticket (WAL checkpoint, validation).",
+    "advice_for_next_player": "Always open SQLite with write access when running PRAGMA wal_checkpoint — readonly handles silently fail or error. When adding MCP tools, check both src/mcp/index.test.ts AND tests/mcp/index-src.test.ts for hardcoded tool counts. Use constants (LATEST_SCHEMA_VERSION) over hardcoded numbers for values derived from array lengths.",
+    "what_surprised_you": "The PG connection string validation with URL parsing caught more edge cases than expected — missing hostname, missing database name, bad prefix all produce clear errors. The compound subquery pattern for getStats() works identically in SQLite and PG with just the project_id WHERE clause difference.",
+    "excited_about_next": "Store layer is now production-ready with full observability (CLI diagnostics, MCP health checks, backup/restore). S39 can build confidently on this foundation."
+  },
+  "bunker_locations": [
+    "SQLite WAL checkpoint requires write access — never use { readonly: true } before wal_checkpoint(TRUNCATE)",
+    "MCP test files exist in TWO locations (src/mcp/index.test.ts and tests/mcp/index-src.test.ts) — both have hardcoded tool/entry counts",
+    "When extending SlopeStore interface, all mock stores in tests must be updated (createMockStore in MCP tests)",
+    "PG backup prints pg_dump command with placeholder — cannot use sanitized URL since password masking makes it unusable"
+  ],
+  "yardage_book_updates": [
+    "src/core/store.ts: StoreStats interface, getSchemaVersion() and getStats() on SlopeStore interface",
+    "src/core/store-health.ts: checkStoreHealth() utility, StoreHealthResult type",
+    "src/store/index.ts: LATEST_SCHEMA_VERSION export, private getSchemaVersionSync(), async getSchemaVersion(), getStats()",
+    "src/store-pg/index.ts: getSchemaVersion(), getStats() with project_id scoping, connection string validation, SELECT 1 ping",
+    "src/cli/commands/store.ts: status, migrate status, backup, restore subcommands",
+    "src/cli/store.ts: getStoreInfo() helper, StoreInfo type",
+    "src/mcp/index.ts: store_status tool, storeType parameter on createSlopeToolsServer()",
+    "docs/store.md: Store configuration, migrations, CLI, MCP, health check, PG hardening docs"
+  ],
+  "course_management_notes": [
+    "4 tickets, par 4, score 4 — par. 2 in_the_hole (S38-1, S38-2), 2 green (S38-3 duplicate test miss, S38-4 review findings).",
+    "Slope 2 — store layer work with familiar patterns, no new external deps. Matched estimate.",
+    "1019 lines added, 37 removed across 19 files. 3 new source files, 3 new test files, 1 new doc file.",
+    "Both-tier review (code + architect) caught 5 findings total, all fixed in single review commit before merge."
+  ]
+}
