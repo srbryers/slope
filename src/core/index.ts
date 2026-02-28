@@ -459,11 +459,43 @@ export type {
 export {
   validateInitInput,
   initFromInterview,
+  initFromAnswers,
 } from './interview.js';
 export type {
   InitInput,
   InitResult,
+  InitFromAnswersResult,
 } from './interview.js';
+
+// Metaphor Preview
+export {
+  buildMetaphorPreview,
+  buildAllPreviews,
+  formatPreviewText,
+} from './metaphor-preview.js';
+export type { MetaphorPreview } from './metaphor-preview.js';
+
+// Interview Steps
+export {
+  generateInterviewSteps,
+} from './interview-steps.js';
+export type {
+  StepType,
+  StepOption,
+  InterviewStep,
+} from './interview-steps.js';
+
+// Interview Engine
+export {
+  runLightweightDetection,
+  buildInterviewContext,
+  validateInterviewAnswers,
+  answersToInitInput,
+} from './interview-engine.js';
+export type {
+  DetectedInfo,
+  InterviewContext,
+} from './interview-engine.js';
 
 // Project Registry (Multi-Project)
 export { FileProjectRegistry } from './project-registry.js';
