@@ -467,6 +467,14 @@ export type {
   InitFromAnswersResult,
 } from './interview.js';
 
+// Metaphor Preview
+export {
+  buildMetaphorPreview,
+  buildAllPreviews,
+  formatPreviewText,
+} from './metaphor-preview.js';
+export type { MetaphorPreview } from './metaphor-preview.js';
+
 // Interview Steps
 export {
   generateInterviewSteps,

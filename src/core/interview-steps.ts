@@ -3,6 +3,7 @@
 
 import type { InterviewContext } from './interview-engine.js';
 import { listMetaphors } from './metaphor.js';
+import { buildAllPreviews } from './metaphor-preview.js';
 
 export type StepType = 'text' | 'select' | 'multiselect' | 'confirm';
 
@@ -152,6 +153,8 @@ export function generateInterviewSteps(ctx: InterviewContext): InterviewStep[] {
  */
 function buildMetaphorStep(): InterviewStep {
   const allMetaphors = listMetaphors();
+  const previews = buildAllPreviews();
+  const previewMap = new Map(previews.map((p) => [p.id, p]));
 
   const builtins = BUILTIN_IDS
     .map((id) => allMetaphors.find((m) => m.id === id))
@@ -163,12 +166,14 @@ function buildMetaphorStep(): InterviewStep {
       value: m.id,
       label: m.name,
       description: m.description,
+      preview: previewMap.get(m.id),
     })),
     ...customs.map((m) => ({
       value: m.id,
       label: m.name,
       description: m.description,
       hint: '(custom)',
+      preview: previewMap.get(m.id),
     })),
     {
       value: 'custom',
