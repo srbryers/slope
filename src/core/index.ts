@@ -360,6 +360,9 @@ export {
   frontend,
   architect,
   devops,
+  ml_engineer,
+  database,
+  ux_designer,
 } from './roles.js';
 export type { RoleDefinition } from './roles.js';
 
