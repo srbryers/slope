@@ -5,5 +5,5 @@
 # === SLOPE MANAGED (do not edit above this line) ===
 # Note: Do NOT use `< /dev/stdin` — on WSL2 the /dev/stdin redirect
 # can fail when Claude Code pipes hook input. Use inherited stdin directly.
-node /home/srbryers/slope/dist/cli/index.js guard "$@"
+node "$CLAUDE_PROJECT_DIR/dist/cli/index.js" guard "$@"
 # === SLOPE END ===
