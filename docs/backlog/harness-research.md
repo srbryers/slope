@@ -278,7 +278,7 @@ MCP settings are stored in VS Code's extension storage directory: `cline_mcp_set
   "mcpServers": {
     "slope": {
       "command": "npx",
-      "args": ["@slope-dev/slope/mcp"],
+      "args": ["-y", "mcp-slope-tools"],
       "alwaysAllow": [],
       "disabled": false
     }
@@ -321,7 +321,7 @@ Continue supports MCP servers in Agent mode. Configuration:
 mcpServers:
   - name: slope
     command: npx
-    args: ["@slope-dev/slope/mcp"]
+    args: ["-y", "mcp-slope-tools"]
 ```
 
 **Workspace-level:** `.continue/mcpServers/slope.yaml` in project root.

@@ -11,14 +11,14 @@ Continue supports MCP servers in Agent mode. Add the SLOPE MCP server to your Co
 mcpServers:
   - name: slope
     command: npx
-    args: ["@slope-dev/slope/mcp"]
+    args: ["-y", "mcp-slope-tools"]
 ```
 
 **Or as a standalone file** (`.continue/mcpServers/slope.yaml` in your workspace):
 ```yaml
 name: slope
 command: npx
-args: ["@slope-dev/slope/mcp"]
+args: ["-y", "mcp-slope-tools"]
 ```
 
 This gives Continue's Agent mode access to SLOPE's search and execute tools for querying scorecards, handicap cards, and codebase maps.

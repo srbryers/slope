@@ -313,7 +313,7 @@ function installClineTemplates(cwd: string, metaphor: MetaphorDefinition): void 
       '## MCP Server',
       'Add the SLOPE MCP server in Cline settings (VS Code extension storage):',
       '- Server name: `slope`',
-      '- Command: `npx @slope-dev/slope/mcp`',
+      '- Command: `npx -y mcp-slope-tools`',
       '',
     ].join('\n');
     writeFileSync(clinerulesDest, contextContent);
@@ -330,7 +330,7 @@ function installClineMcpConfig(_cwd: string): void {
   console.log('\n  Note: Cline MCP config is stored in VS Code extension storage.');
   console.log('  Add the SLOPE MCP server in Cline settings:');
   console.log('    Server name: slope');
-  console.log('    Command: npx @slope-dev/slope/mcp');
+  console.log('    Command: npx -y mcp-slope-tools');
 }
 
 function installGenericTemplates(cwd: string, metaphor: MetaphorDefinition): void {
@@ -346,7 +346,7 @@ function installGenericTemplates(cwd: string, metaphor: MetaphorDefinition): voi
 
 const SLOPE_MCP_ENTRY = {
   command: 'npx',
-  args: ['@slope-dev/slope/mcp'],
+  args: ['-y', 'mcp-slope-tools'],
 };
 
 function installClaudeCodeMcpConfig(cwd: string): void {
@@ -450,7 +450,7 @@ function installOpenCodeMcpConfig(cwd: string): void {
   if (!config.mcp) config.mcp = {};
   config.mcp.slope = {
     type: 'local',
-    command: ['npx', '@slope-dev/slope/mcp'],
+    command: ['npx', '-y', 'mcp-slope-tools'],
   };
 
   writeFileSync(mcpPath, JSON.stringify(config, null, 2) + '\n');
