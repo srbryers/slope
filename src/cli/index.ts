@@ -47,6 +47,7 @@ import { analyzeCommand } from './commands/analyze.js';
 import { visionCommand } from './commands/vision.js';
 import { transcriptCommand } from './commands/transcript.js';
 import { storeCommand } from './commands/store.js';
+import { metaphorCommand } from './commands/metaphor.js';
 
 const subcommand = process.argv[2];
 
@@ -234,6 +235,12 @@ switch (subcommand) {
       process.exit(1);
     });
     break;
+  case 'metaphor':
+    metaphorCommand(process.argv.slice(3)).catch(err => {
+      console.error('Error:', err.message);
+      process.exit(1);
+    });
+    break;
   default:
     console.log(`
 SLOPE CLI — Sprint Lifecycle & Operational Performance Engine
@@ -285,6 +292,7 @@ Usage:
   slope store backup [--output=<path>]      Back up the store
   slope store restore --from=<path>         Restore from a backup
   slope transcript list|show|stats          View session transcript data
+  slope metaphor list|set|show              Manage metaphor display themes
   slope plugin list|validate                Manage custom plugins
 
 Examples:

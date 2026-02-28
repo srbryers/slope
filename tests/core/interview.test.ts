@@ -54,6 +54,11 @@ describe('validateInitInput', () => {
     expect(errors.some(e => e.includes('Unknown metaphor'))).toBe(true);
   });
 
+  it('accepts "custom" as a metaphor value (deferred generation)', () => {
+    const errors = validateInitInput({ projectName: 'app', metaphor: 'custom' });
+    expect(errors).toEqual([]);
+  });
+
   it('rejects invalid repoUrl', () => {
     const errors = validateInitInput({ projectName: 'app', repoUrl: 'not-a-url' });
     expect(errors.some(e => e.includes('repoUrl'))).toBe(true);

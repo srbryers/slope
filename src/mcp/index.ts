@@ -23,7 +23,8 @@ import { z } from 'zod';
 import { SLOPE_REGISTRY, SLOPE_TYPES } from './registry.js';
 import { runInSandbox } from './sandbox.js';
 import type { SlopeStore } from '../core/index.js';
-import { checkConflicts, loadFlows, checkFlowStaleness, checkStoreHealth } from '../core/index.js';
+import { checkConflicts, loadFlows, checkFlowStaleness, checkStoreHealth, METAPHOR_SCHEMA, listMetaphors } from '../core/index.js';
+import { gaming } from '../core/metaphors/gaming.js';
 import type { ClaimScope, FlowsFile, FlowDefinition } from '../core/index.js';
 
 /** Tool names exposed by this MCP server (for tests and tool discovery). */
@@ -118,12 +119,16 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
     'Discover SLOPE API functions, filesystem helpers, constants, and type definitions. Call with no args to see everything, or filter by query/module.',
     {
       query: z.string().optional().describe('Case-insensitive search term to filter by name or description'),
-      module: z.enum(['core', 'fs', 'constants', 'types', 'store', 'map', 'flows']).optional().describe('Filter by module category'),
+      module: z.enum(['core', 'fs', 'constants', 'types', 'store', 'map', 'flows', 'metaphor']).optional().describe('Filter by module category'),
     },
     async ({ query, module }) => {
       // Map module — return codebase map content
       if (module === 'map') {
         return { content: [{ type: 'text' as const, text: handleMapQuery(query) }] };
+      }
+      // Metaphor module — return schema, built-in list, and example
+      if (module === 'metaphor') {
+        return { content: [{ type: 'text' as const, text: handleMetaphorQuery() }] };
       }
       // Flows module — return flow definitions
       if (module === 'flows') {
@@ -258,6 +263,43 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
   }
 
   return server;
+}
+
+/** Handle search({ module: 'metaphor' }) — return schema, built-in list, and example for custom metaphor generation */
+function handleMetaphorQuery(): string {
+  // Ensure built-in metaphors are loaded
+  try { require('../core/metaphors/index.js'); } catch { /* ESM — metaphors loaded via import */ }
+
+  const builtins = listMetaphors();
+  const sections: string[] = [];
+
+  sections.push('# SLOPE Metaphor Schema\n');
+  sections.push('Use this schema to generate a valid custom MetaphorDefinition.\n');
+
+  sections.push('## Required Keys\n');
+  sections.push('Each category below lists the keys that must have a non-empty string value:\n');
+  for (const [category, keys] of Object.entries(METAPHOR_SCHEMA)) {
+    sections.push(`**${category}:** ${(keys as readonly string[]).join(', ')}`);
+  }
+
+  sections.push('\n## Built-in Metaphors\n');
+  for (const m of builtins) {
+    sections.push(`- **${m.id}** (${m.name}): ${m.description}`);
+  }
+
+  sections.push('\n## Example: Gaming Metaphor\n');
+  sections.push('Use this as a reference when generating a new metaphor:\n');
+  sections.push('```json');
+  sections.push(JSON.stringify(gaming, null, 2));
+  sections.push('```');
+
+  sections.push('\n## How to Create a Custom Metaphor\n');
+  sections.push('1. Generate a MetaphorDefinition object with all required keys filled in');
+  sections.push('2. Call `saveCustomMetaphor(definition, true)` to validate, save, and activate it');
+  sections.push('3. The metaphor will be saved to `.slope/plugins/metaphors/<id>.json`');
+  sections.push('4. If `setActive=true`, it becomes the active metaphor in config');
+
+  return sections.join('\n');
 }
 
 /** Handle search({ module: 'map' }) — return codebase map content with optional section filtering */
