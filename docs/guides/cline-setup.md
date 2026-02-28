@@ -34,7 +34,7 @@ Cline's MCP configuration lives in VS Code's extension storage (not in the works
 **Via Cline UI:** Settings > MCP Servers > Add Server
 - Name: `slope`
 - Command: `npx`
-- Args: `@slope-dev/slope/mcp`
+- Args: `-y mcp-slope-tools`
 
 **Manual config** (in `cline_mcp_settings.json` in VS Code extension storage):
 ```json
@@ -42,7 +42,7 @@ Cline's MCP configuration lives in VS Code's extension storage (not in the works
   "mcpServers": {
     "slope": {
       "command": "npx",
-      "args": ["@slope-dev/slope/mcp"],
+      "args": ["-y", "mcp-slope-tools"],
       "alwaysAllow": [],
       "disabled": false
     }
