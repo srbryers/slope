@@ -105,8 +105,8 @@ MiniMax M2.5 is the heavy hitter for complex tickets. At 230B params (10B active
 # Sign up at https://www.minimax.io and get an API key
 export MINIMAX_API_KEY="your-key-here"
 
-# Test via curl
-curl https://api.minimax.chat/v1/text/chatcompletion_v2 \
+# Test via curl (OpenAI-compatible endpoint)
+curl https://api.minimax.io/v1/chat/completions \
   -H "Authorization: Bearer $MINIMAX_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
