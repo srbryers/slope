@@ -1,0 +1,129 @@
+{
+  "generated_at": "2026-02-28T19:43:26.135Z",
+  "sprints": [
+    {
+      "id": "S-LOCAL-040",
+      "title": "Harden top hotspot modules",
+      "strategy": "hardening",
+      "par": 4,
+      "slope": 2,
+      "type": "bugfix",
+      "tickets": [
+        {
+          "key": "S-LOCAL-040-1",
+          "title": "Harden: Backup/restore + docs",
+          "club": "short_iron",
+          "description": "Address hazards in Backup/restore + docs: rough",
+          "acceptance_criteria": [
+            "pnpm test passes",
+            "pnpm typecheck passes",
+            "Reduce hazard surface in Backup/restore + docs"
+          ],
+          "modules": [
+            "Backup/restore + docs"
+          ],
+          "max_files": 2
+        },
+        {
+          "key": "S-LOCAL-040-2",
+          "title": "Harden: Final tests + CLAUDE.md update",
+          "club": "short_iron",
+          "description": "Address hazards in Final tests + CLAUDE.md update: rough",
+          "acceptance_criteria": [
+            "pnpm test passes",
+            "pnpm typecheck passes",
+            "Reduce hazard surface in Final tests + CLAUDE.md update"
+          ],
+          "modules": [
+            "Final tests + CLAUDE.md update"
+          ],
+          "max_files": 2
+        },
+        {
+          "key": "S-LOCAL-040-3",
+          "title": "Harden: `slope roadmap` CLI command — validate/review/status/show",
+          "club": "short_iron",
+          "description": "Address hazards in `slope roadmap` CLI command — validate/review/status/show: rough",
+          "acceptance_criteria": [
+            "pnpm test passes",
+            "pnpm typecheck passes",
+            "Reduce hazard surface in `slope roadmap` CLI command — validate/review/status/show"
+          ],
+          "modules": [
+            "`slope roadmap` CLI command — validate/review/status/show"
+          ],
+          "max_files": 2
+        }
+      ]
+    },
+    {
+      "id": "S-LOCAL-041",
+      "title": "Address recurring hazard patterns",
+      "strategy": "cleanup",
+      "par": 4,
+      "slope": 2,
+      "type": "bugfix",
+      "tickets": [
+        {
+          "key": "S-LOCAL-041-1",
+          "title": "Fix recurring: rough hazard",
+          "club": "short_iron",
+          "description": "Address recurring rough hazard (weighted score: 27.0, recent: 21)",
+          "acceptance_criteria": [
+            "pnpm test passes",
+            "pnpm typecheck passes",
+            "Reduce rough hazard occurrences"
+          ],
+          "modules": [],
+          "max_files": 2
+        }
+      ]
+    },
+    {
+      "id": "S-LOCAL-042",
+      "title": "Document high-complexity modules",
+      "strategy": "documentation",
+      "par": 3,
+      "slope": 1,
+      "type": "chore",
+      "tickets": [
+        {
+          "key": "S-LOCAL-042-1",
+          "title": "Add inline docs for complex modules",
+          "club": "wedge",
+          "description": "Add JSDoc comments to functions with driver/long_iron complexity that lack documentation",
+          "acceptance_criteria": [
+            "pnpm typecheck passes",
+            "Key functions have JSDoc comments"
+          ],
+          "modules": [],
+          "max_files": 3
+        }
+      ]
+    },
+    {
+      "id": "S-LOCAL-043",
+      "title": "Meta: improve scoring accuracy",
+      "strategy": "meta",
+      "par": 3,
+      "slope": 1,
+      "type": "feature",
+      "tickets": [
+        {
+          "key": "S-LOCAL-043-1",
+          "title": "Validate analysis.json against scorecard data",
+          "club": "wedge",
+          "description": "Cross-reference analysis outputs against raw scorecards to verify temporal weighting correctness",
+          "acceptance_criteria": [
+            "pnpm test passes",
+            "analysis.json validated"
+          ],
+          "modules": [
+            "slope-loop"
+          ],
+          "max_files": 1
+        }
+      ]
+    }
+  ]
+}

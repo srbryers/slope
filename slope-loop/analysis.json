@@ -1,0 +1,330 @@
+{
+  "generated_at": "2026-02-28T19:43:26.134Z",
+  "sprint_count": 39,
+  "handicap": {
+    "current": 0,
+    "trend": "improving",
+    "last_5": 0,
+    "last_10": 0.1,
+    "all_time": 0.2
+  },
+  "hazards": {
+    "frequency": [
+      {
+        "type": "rough",
+        "total_count": 41,
+        "recent_count": 21,
+        "weighted_score": 27
+      }
+    ],
+    "by_module": {
+      "Repo scaffold + type extraction": {
+        "rough": 1
+      },
+      "Core scoring engine": {
+        "bunker": 1
+      },
+      "Standalone CLI": {
+        "bunker": 1
+      },
+      "CLI commands: claim, release, status": {
+        "rough": 1
+      },
+      "Move config.ts and loader.ts from CLI to core": {
+        "rough": 1
+      },
+      "Build execute() tool and node:vm sandbox": {
+        "rough": 1
+      },
+      "Create store-sqlite package scaffold": {
+        "rough": 1
+      },
+      "Enhanced init + migrate claim commands to store": {
+        "bunker": 1
+      },
+      "Final tests + CLAUDE.md update": {
+        "rough": 2
+      },
+      "`slope roadmap` CLI command — validate/review/status/show": {
+        "rough": 2
+      },
+      "Metaphor-aware formatters": {
+        "rough": 1
+      },
+      "slope extract command + session-end-events hook": {
+        "rough": 1
+      },
+      "Event-to-common-issues pipeline": {
+        "rough": 1
+      },
+      "Pluggable metaphor loaders": {
+        "rough": 1
+      },
+      "Custom guard plugins": {
+        "bunker": 1
+      },
+      "Plugin CLI + init + MCP integration": {
+        "rough": 1
+      },
+      "Map generator + staleness checker (slope map)": {
+        "rough": 1
+      },
+      "Explore guard upgrade + codebase context rules": {
+        "rough": 1
+      },
+      "Review state management commands": {
+        "rough": 1
+      },
+      "Tests for review state commands": {
+        "rough": 1
+      },
+      "Update scoring to include hazard penalties": {
+        "rough": 1
+      },
+      "MCP search integration": {
+        "rough": 1
+      },
+      "CODEBASE.md flows section + stale-flows guard": {
+        "bunker": 1
+      },
+      "Refactor core HTML reports to use tokens": {
+        "dependency_hell": 1
+      },
+      "Create slope-web repo with migrated site": {
+        "api_changes": 1
+      },
+      "Content audit & rewrite": {
+        "whitespace_mismatch": 1
+      },
+      "Create NPM granular access token": {
+        "wrong_token_type": 1
+      },
+      "Test full release→publish flow": {
+        "publish_retry": 1
+      },
+      "Config + First Sprint Generators": {
+        "rough": 1
+      },
+      "--smart Integration + Exports + MCP Registry": {
+        "rough": 1
+      },
+      "Roadmap Generator from GitHub Milestones": {
+        "rough": 1
+      },
+      "MCP Registry, Exports, CLI, PR-Review Guard": {
+        "water": 1
+      },
+      "WindsurfAdapter — exit-code-based guard integration": {
+        "rough": 2
+      },
+      "Unify init.ts Provider with adapter framework": {
+        "rough": 2
+      },
+      "slope guard status subcommand": {
+        "rough": 1
+      },
+      "Store health check + MCP exposure": {
+        "rough": 1
+      },
+      "Backup/restore + docs": {
+        "rough": 3
+      },
+      "ClineAdapter with per-event hook scripts": {
+        "rough": 2
+      },
+      "--cline init flag, setup guides, installDefaultHooks fix": {
+        "rough": 2
+      },
+      "Enhanced slope init — post-install summary": {
+        "rough": 2
+      },
+      "README overhaul + package.json keywords": {
+        "rough": 1
+      },
+      "Rich CLI rendering with @clack/prompts": {
+        "rough": 1
+      },
+      "MCP agent API (getInitQuestions + submitInitAnswers)": {
+        "rough": 1
+      }
+    }
+  },
+  "misses": {
+    "frequency": [],
+    "by_club": {}
+  },
+  "scores": {
+    "par": 35,
+    "triple_plus": 1,
+    "birdie": 1,
+    "bogey": 2
+  },
+  "clubs": [
+    {
+      "club": "short_iron",
+      "total": 102,
+      "success": 102,
+      "success_rate": 100
+    },
+    {
+      "club": "wedge",
+      "total": 41,
+      "success": 41,
+      "success_rate": 100
+    },
+    {
+      "club": "putter",
+      "total": 13,
+      "success": 13,
+      "success_rate": 100
+    },
+    {
+      "club": "long_iron",
+      "total": 11,
+      "success": 11,
+      "success_rate": 100
+    },
+    {
+      "club": "driver",
+      "total": 1,
+      "success": 1,
+      "success_rate": 100
+    }
+  ],
+  "hotspots": [
+    {
+      "area": "Backup/restore + docs",
+      "risk_score": 3,
+      "hazard_types": {
+        "rough": 3
+      }
+    },
+    {
+      "area": "Final tests + CLAUDE.md update",
+      "risk_score": 2,
+      "hazard_types": {
+        "rough": 2
+      }
+    },
+    {
+      "area": "`slope roadmap` CLI command — validate/review/status/show",
+      "risk_score": 2,
+      "hazard_types": {
+        "rough": 2
+      }
+    },
+    {
+      "area": "WindsurfAdapter — exit-code-based guard integration",
+      "risk_score": 2,
+      "hazard_types": {
+        "rough": 2
+      }
+    },
+    {
+      "area": "Unify init.ts Provider with adapter framework",
+      "risk_score": 2,
+      "hazard_types": {
+        "rough": 2
+      }
+    },
+    {
+      "area": "ClineAdapter with per-event hook scripts",
+      "risk_score": 2,
+      "hazard_types": {
+        "rough": 2
+      }
+    },
+    {
+      "area": "--cline init flag, setup guides, installDefaultHooks fix",
+      "risk_score": 2,
+      "hazard_types": {
+        "rough": 2
+      }
+    },
+    {
+      "area": "Enhanced slope init — post-install summary",
+      "risk_score": 2,
+      "hazard_types": {
+        "rough": 2
+      }
+    },
+    {
+      "area": "Repo scaffold + type extraction",
+      "risk_score": 1,
+      "hazard_types": {
+        "rough": 1
+      }
+    },
+    {
+      "area": "Core scoring engine",
+      "risk_score": 1,
+      "hazard_types": {
+        "bunker": 1
+      }
+    },
+    {
+      "area": "Standalone CLI",
+      "risk_score": 1,
+      "hazard_types": {
+        "bunker": 1
+      }
+    },
+    {
+      "area": "CLI commands: claim, release, status",
+      "risk_score": 1,
+      "hazard_types": {
+        "rough": 1
+      }
+    },
+    {
+      "area": "Move config.ts and loader.ts from CLI to core",
+      "risk_score": 1,
+      "hazard_types": {
+        "rough": 1
+      }
+    },
+    {
+      "area": "Build execute() tool and node:vm sandbox",
+      "risk_score": 1,
+      "hazard_types": {
+        "rough": 1
+      }
+    },
+    {
+      "area": "Create store-sqlite package scaffold",
+      "risk_score": 1,
+      "hazard_types": {
+        "rough": 1
+      }
+    }
+  ],
+  "dispersion": {
+    "total_shots": 168,
+    "total_misses": 0,
+    "miss_rate_pct": 0,
+    "by_direction": {
+      "long": {
+        "count": 0,
+        "pct": 0,
+        "interpretation": "Over-scoping or over-engineering — tickets taking more work than estimated"
+      },
+      "short": {
+        "count": 0,
+        "pct": 0,
+        "interpretation": "Under-scoping — missing requirements or incomplete implementations"
+      },
+      "left": {
+        "count": 0,
+        "pct": 0,
+        "interpretation": "Wrong approach — choosing incorrect tools, patterns, or architecture"
+      },
+      "right": {
+        "count": 0,
+        "pct": 0,
+        "interpretation": "Scope creep — pulling in unrelated work or gold-plating"
+      }
+    },
+    "dominant_miss": null,
+    "systemic_issues": []
+  }
+}
