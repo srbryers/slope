@@ -65,6 +65,7 @@
     "node": ">=18"
   },
   "dependencies": {
+    "@clack/prompts": "^1.0.1",
     "@modelcontextprotocol/sdk": "^1.26.0",
     "better-sqlite3": "^11.0.0",
     "zod": "^3.24.0"

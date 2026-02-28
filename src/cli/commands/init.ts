@@ -5,9 +5,6 @@ import { createConfig } from '../config.js';
 import { saveHooksConfig } from '../hooks-config.js';
 import { resolveMetaphor } from '../metaphor.js';
 import type { MetaphorDefinition } from '../../core/index.js';
-import { listMetaphors } from '../../core/metaphor.js';
-import { saveVision } from '../../core/vision.js';
-import type { VisionDocument } from '../../core/analyzers/types.js';
 import {
   generateProjectContext,
   generateSprintChecklist,
@@ -652,215 +649,26 @@ export function printInstallSummary(providers: InitProvider[]): void {
   console.log('');
 }
 
-async function runInteractiveInit(cwd: string, args: string[]): Promise<void> {
-  const { createInterface } = await import('node:readline');
-  const { initFromInterview } = await import('../../core/interview.js');
-  const rl = createInterface({ input: process.stdin, output: process.stdout });
-
-  const ask = (question: string): Promise<string> =>
-    new Promise(resolve => rl.question(question, answer => resolve(answer.trim())));
+async function runInteractiveInit(cwd: string, _args: string[]): Promise<void> {
+  // Check for TTY — @clack/prompts requires an interactive terminal
+  if (!process.stdin.isTTY) {
+    console.error('Error: Interactive init requires a TTY (terminal).');
+    console.error('Use flag-based init instead: slope init --claude-code --metaphor=golf');
+    process.exit(1);
+  }
 
   try {
-    const projectName = await ask('Project name: ');
-    if (!projectName) {
-      console.error('Project name is required');
+    const { runInteractiveCli } = await import('../interactive-init.js');
+    await runInteractiveCli(cwd);
+  } catch (err: unknown) {
+    // Handle ERR_USE_AFTER_CLOSE from readline teardown
+    const code = (err as { code?: string })?.code;
+    if (code === 'ERR_USE_AFTER_CLOSE') {
+      console.error('\nInit cancelled (input stream closed).');
+      console.error('Use flag-based init instead: slope init --claude-code --metaphor=golf');
       process.exit(1);
     }
-
-    const repoUrl = await ask('GitHub repo URL (optional): ') || undefined;
-
-    // Build metaphor selection menu dynamically
-    // Ensure built-in metaphors are loaded
-    await import('../../core/metaphors/index.js');
-    const allMetaphors = listMetaphors();
-    const builtinIds = ['golf', 'tennis', 'baseball', 'gaming', 'dnd', 'matrix', 'agile'];
-    const builtins = builtinIds
-      .map(id => allMetaphors.find(m => m.id === id))
-      .filter((m): m is MetaphorDefinition => m !== undefined);
-    const customs = allMetaphors.filter(m => !builtinIds.includes(m.id));
-
-    const menuItems = [...builtins, ...customs];
-    console.log('\nChoose a metaphor (display theme for SLOPE output):\n');
-    menuItems.forEach((m, i) => {
-      const tag = builtinIds.includes(m.id) ? '' : ' [custom]';
-      console.log(`  ${i + 1}) ${m.id.padEnd(12)} — ${m.description}${tag}`);
-    });
-    const customIdx = menuItems.length + 1;
-    console.log(`  ${customIdx}) ${'custom'.padEnd(12)} — Describe a theme and your AI agent will generate it`);
-
-    const metaphorChoice = await ask(`\nChoose [1]: `);
-    let metaphor: string | undefined;
-    let customTheme: string | undefined;
-    if (!metaphorChoice) {
-      metaphor = 'golf';
-    } else {
-      const choiceNum = parseInt(metaphorChoice, 10);
-      if (choiceNum >= 1 && choiceNum <= menuItems.length) {
-        metaphor = menuItems[choiceNum - 1].id;
-      } else if (choiceNum === customIdx) {
-        customTheme = await ask('Describe your metaphor theme (e.g., "cooking", "Formula 1", "space exploration"): ');
-        metaphor = 'golf'; // temporary default until agent generates
-      } else {
-        // Try as a raw ID
-        const found = allMetaphors.find(m => m.id === metaphorChoice);
-        metaphor = found ? found.id : 'golf';
-      }
-    }
-
-    const sprintStr = await ask('Current sprint number [1]: ');
-    const currentSprint = sprintStr ? parseInt(sprintStr, 10) : undefined;
-
-    const teamStr = await ask('Team members (slug:name, comma-separated, optional): ');
-    let teamMembers: Record<string, string> | undefined;
-    if (teamStr) {
-      teamMembers = {};
-      for (const pair of teamStr.split(',')) {
-        const [slug, ...nameParts] = pair.trim().split(':');
-        if (slug && nameParts.length > 0) {
-          teamMembers[slug.trim()] = nameParts.join(':').trim();
-        }
-      }
-    }
-
-    const visionPurpose = await ask('Project vision / purpose (optional): ') || undefined;
-    let visionPriorities: string[] = [];
-    if (visionPurpose) {
-      const priStr = await ask('Priorities (comma-separated, optional): ');
-      if (priStr) {
-        visionPriorities = priStr.split(',').map(s => s.trim()).filter(Boolean);
-      }
-    }
-
-    const vision = visionPurpose || undefined;
-
-    // Run smart analysis if --smart flag is present
-    let smartConfig: {
-      projectName?: string; techStack?: string[];
-      sprintCadence?: 'weekly' | 'biweekly' | 'monthly';
-      team?: Record<string, string>;
-      roadmap?: import('../../core/roadmap.js').RoadmapDefinition;
-      commonIssues?: import('../../core/briefing.js').CommonIssuesFile;
-    } = {};
-    if (args.includes('--smart')) {
-      console.log('\nRunning repo analysis...\n');
-      const { runAnalyzers, saveRepoProfile } = await import('../../core/analyzers/index.js');
-      const { estimateComplexity } = await import('../../core/analyzers/complexity.js');
-      const { analyzeBacklog } = await import('../../core/analyzers/backlog.js');
-      const { generateConfig } = await import('../../core/generators/config.js');
-      const { generateFirstSprint } = await import('../../core/generators/first-sprint.js');
-      const { generateCommonIssues } = await import('../../core/generators/common-issues.js');
-
-      const profile = await runAnalyzers({ cwd });
-      saveRepoProfile(profile, cwd);
-
-      const complexity = estimateComplexity(profile);
-      const backlog = await analyzeBacklog(cwd);
-      const genConfig = generateConfig(profile);
-      const genSprint = generateFirstSprint(profile, complexity, backlog);
-      const genIssues = generateCommonIssues(profile, backlog);
-
-      // Use generated values as defaults (user input overrides)
-      smartConfig = {
-        projectName: genConfig.projectName,
-        techStack: genConfig.techStack,
-        sprintCadence: genConfig.sprintCadence,
-        team: genConfig.team,
-      };
-
-      // Store generated artifacts for writing after init
-      smartConfig.roadmap = genSprint.roadmap;
-      smartConfig.commonIssues = genIssues;
-
-      const stackParts = [profile.stack.primaryLanguage || 'unknown'];
-      if (profile.stack.packageManager) stackParts.push(profile.stack.packageManager);
-      if (profile.stack.runtime) stackParts.push(profile.stack.runtime);
-      if (profile.stack.frameworks.length > 0) stackParts.push(profile.stack.frameworks.slice(0, 3).join(', '));
-
-      const moduleInfo = profile.structure.modules.length > 0
-        ? `, ${profile.structure.modules.length} modules`
-        : '';
-
-      console.log('Smart Analysis Complete:');
-      console.log(`  Stack:       ${stackParts.join(', ')}`);
-      console.log(`  Structure:   ${profile.structure.sourceFiles} source files, ${profile.structure.testFiles} test files${moduleInfo}`);
-      console.log(`  Complexity:  par ${complexity.estimatedPar}, slope ${complexity.estimatedSlope}${complexity.slopeFactors.length > 0 ? ` (${complexity.slopeFactors.join(', ')})` : ''}`);
-      console.log(`  Backlog:     ${backlog.todos.length} TODOs across ${Object.keys(backlog.todosByModule).length} modules`);
-      console.log(`  Suggested:   ${genSprint.sprint.tickets.length} tickets for Sprint 1\n`);
-    }
-
-    console.log('\nInitializing SLOPE project...\n');
-
-    const result = await initFromInterview(cwd, {
-      projectName: projectName || smartConfig.projectName || 'my-project',
-      repoUrl,
-      metaphor,
-      currentSprint,
-      teamMembers: teamMembers ?? smartConfig.team,
-      techStack: smartConfig.techStack,
-      sprintCadence: smartConfig.sprintCadence,
-      vision,
-    });
-
-    console.log(`  Config: ${result.configPath}`);
-    for (const f of result.filesCreated.slice(1)) {
-      console.log(`  Created: ${f}`);
-    }
-
-    // Print custom metaphor request for agent pickup
-    if (customTheme) {
-      console.log(`\n  Custom metaphor requested: "${customTheme}"`);
-      console.log('  Your AI agent can generate it with: search({ module: \'metaphor\' })');
-      console.log('  Then call saveCustomMetaphor() with the generated definition.');
-    }
-
-    // Overwrite with smart-generated artifacts if available
-    if (smartConfig.roadmap) {
-      const roadmapPath = join(cwd, 'docs', 'backlog', 'roadmap.json');
-      mkdirSync(join(cwd, 'docs', 'backlog'), { recursive: true });
-      writeFileSync(roadmapPath, JSON.stringify(smartConfig.roadmap, null, 2) + '\n');
-      console.log(`  Updated: ${roadmapPath} (from smart analysis)`);
-    }
-    if (smartConfig.commonIssues) {
-      const issuesPath = join(cwd, '.slope', 'common-issues.json');
-      writeFileSync(issuesPath, JSON.stringify(smartConfig.commonIssues, null, 2) + '\n');
-      console.log(`  Updated: ${issuesPath} (from smart analysis)`);
-    }
-
-    // Save vision document if purpose was provided
-    if (visionPurpose) {
-      const now = new Date().toISOString();
-      const visionDoc: VisionDocument = {
-        purpose: visionPurpose,
-        priorities: visionPriorities,
-        createdAt: now,
-        updatedAt: now,
-      };
-      saveVision(visionDoc, cwd);
-      console.log(`  Created .slope/vision.json`);
-    }
-
-    // Handle store setup (infrastructure concern — CLI only)
-    const storeArg = args.find(a => a.startsWith('--store='));
-    const storeType = storeArg?.slice('--store='.length) ?? 'sqlite';
-
-    if (storeType === 'sqlite') {
-      const dbPath = join(cwd, '.slope', 'slope.db');
-      if (!existsSync(dbPath)) {
-        try {
-          const { createStore } = await import('../../store/index.js');
-          const store = createStore({ storePath: '.slope/slope.db', cwd });
-          store.close();
-          console.log(`  Created ${dbPath}`);
-        } catch (err) {
-          console.error(`  Warning: Could not create SQLite store: ${(err as Error).message}`);
-        }
-      }
-    }
-
-    // Continue with provider installation
-    return;
-  } finally {
-    rl.close();
+    throw err;
   }
 }
 
