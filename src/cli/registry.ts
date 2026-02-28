@@ -51,6 +51,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
   { cmd: 'transcript', desc: 'View session transcript data',                 category: 'tooling' },
 
   // ── Planning ───────────────────────────────────────────────────
-  { cmd: 'roadmap',  desc: 'Strategic planning and roadmap tools',            category: 'planning' },
-  { cmd: 'vision',   desc: 'Display project vision document',                category: 'planning' },
+  { cmd: 'roadmap',     desc: 'Strategic planning and roadmap tools',            category: 'planning' },
+  { cmd: 'vision',      desc: 'Display project vision document',                category: 'planning' },
+  { cmd: 'initiative',  desc: 'Multi-sprint initiative orchestration',           category: 'planning' },
 ];

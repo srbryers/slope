@@ -48,6 +48,7 @@ import { visionCommand } from './commands/vision.js';
 import { transcriptCommand } from './commands/transcript.js';
 import { storeCommand } from './commands/store.js';
 import { metaphorCommand } from './commands/metaphor.js';
+import { initiativeCommand } from './commands/initiative.js';
 
 const subcommand = process.argv[2];
 
@@ -241,6 +242,12 @@ switch (subcommand) {
       process.exit(1);
     });
     break;
+  case 'initiative':
+    initiativeCommand(process.argv.slice(3)).catch(err => {
+      console.error('Error:', err.message);
+      process.exit(1);
+    });
+    break;
   default:
     console.log(`
 SLOPE CLI — Sprint Lifecycle & Operational Performance Engine
@@ -294,6 +301,7 @@ Usage:
   slope transcript list|show|stats          View session transcript data
   slope metaphor list|set|show              Manage metaphor display themes
   slope plugin list|validate                Manage custom plugins
+  slope initiative create|status|next|advance|review  Multi-sprint initiative orchestration
 
 Examples:
   slope init                                Create .slope/ with config + example scorecard
