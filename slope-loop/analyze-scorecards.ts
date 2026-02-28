@@ -19,11 +19,7 @@ import {
   computeDispersion,
 } from '../dist/index.js';
 import type {
-  GolfScorecard,
-  HandicapCard,
   DispersionReport,
-  ShotRecord,
-  HazardHit,
 } from '../dist/index.js';
 import { writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -258,11 +254,11 @@ function analyze(): void {
     generated_at: new Date().toISOString(),
     sprint_count: scorecards.length,
     handicap: {
-      current: handicap.current,
-      trend: handicap.trend,
-      last_5: handicap.last5,
-      last_10: handicap.last10,
-      all_time: handicap.allTime,
+      current: handicap.last_5.handicap,
+      trend: handicap.last_5.handicap <= handicap.last_10.handicap ? 'improving' : 'declining',
+      last_5: handicap.last_5.handicap,
+      last_10: handicap.last_10.handicap,
+      all_time: handicap.all_time.handicap,
     },
     hazards: {
       frequency: hazardFrequency,
@@ -286,8 +282,10 @@ function analyze(): void {
   // --- Print summary ---
 
   console.log('=== Analysis Summary ===\n');
+  const currentHandicap = handicap.last_5.handicap;
+  const trend = handicap.last_5.handicap <= handicap.last_10.handicap ? 'improving' : 'declining';
   console.log(`Sprints analyzed: ${scorecards.length}`);
-  console.log(`Current handicap: ${handicap.current} (${handicap.trend})`);
+  console.log(`Current handicap: ${currentHandicap} (${trend})`);
   console.log(`Recency window: last ${RECENT_WINDOW} sprints (weight: ${RECENCY_WEIGHT})`);
   console.log(`Recurring threshold: ${recurringThreshold} (dynamic: ceil(${scorecards.length} * 0.1))`);
 
