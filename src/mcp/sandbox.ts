@@ -114,7 +114,23 @@ function buildFsHelpers(cwd: string) {
     return core.saveConfig(config, cwd);
   };
 
-  return { loadConfig, loadScorecards, loadCommonIssues, loadSessions, loadRoadmap, saveScorecard, readFile, writeFile, listFiles, saveCustomMetaphor, saveConfig };
+  const getInitQuestions = () => {
+    // Metaphors are registered via the core barrel import (import * as core)
+    // which re-exports from metaphors/index.js — registration happens at import time.
+    const ctx = core.buildInterviewContext(cwd);
+    const steps = core.generateInterviewSteps(ctx);
+    return { steps, context: ctx };
+  };
+
+  const submitInitAnswers = async (
+    answers: Record<string, unknown>,
+    providers?: string[],
+  ) => {
+    const effectiveProviders = providers ?? (answers.platforms as string[] | undefined);
+    return core.initFromAnswers(cwd, answers, effectiveProviders);
+  };
+
+  return { loadConfig, loadScorecards, loadCommonIssues, loadSessions, loadRoadmap, saveScorecard, readFile, writeFile, listFiles, saveCustomMetaphor, saveConfig, getInitQuestions, submitInitAnswers };
 }
 
 /**

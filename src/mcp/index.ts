@@ -23,7 +23,7 @@ import { z } from 'zod';
 import { SLOPE_REGISTRY, SLOPE_TYPES } from './registry.js';
 import { runInSandbox } from './sandbox.js';
 import type { SlopeStore } from '../core/index.js';
-import { checkConflicts, loadFlows, checkFlowStaleness, checkStoreHealth, METAPHOR_SCHEMA, listMetaphors } from '../core/index.js';
+import { checkConflicts, loadFlows, checkFlowStaleness, checkStoreHealth, METAPHOR_SCHEMA, listMetaphors, buildInterviewContext, generateInterviewSteps } from '../core/index.js';
 import { gaming } from '../core/metaphors/gaming.js';
 import type { ClaimScope, FlowsFile, FlowDefinition } from '../core/index.js';
 
@@ -119,7 +119,7 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
     'Discover SLOPE API functions, filesystem helpers, constants, and type definitions. Call with no args to see everything, or filter by query/module.',
     {
       query: z.string().optional().describe('Case-insensitive search term to filter by name or description'),
-      module: z.enum(['core', 'fs', 'constants', 'types', 'store', 'map', 'flows', 'metaphor']).optional().describe('Filter by module category'),
+      module: z.enum(['core', 'fs', 'constants', 'types', 'store', 'map', 'flows', 'metaphor', 'init']).optional().describe('Filter by module category'),
     },
     async ({ query, module }) => {
       // Map module — return codebase map content
@@ -129,6 +129,10 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
       // Metaphor module — return schema, built-in list, and example
       if (module === 'metaphor') {
         return { content: [{ type: 'text' as const, text: handleMetaphorQuery() }] };
+      }
+      // Init module — return interview step schema + agent workflow instructions
+      if (module === 'init') {
+        return { content: [{ type: 'text' as const, text: handleInitQuery() }] };
       }
       // Flows module — return flow definitions
       if (module === 'flows') {
@@ -451,6 +455,62 @@ function handleFlowsQuery(query?: string): string {
   }
 
   return sections.join('\n\n---\n\n');
+}
+
+/** Handle search({ module: 'init' }) — return interview steps schema + agent workflow instructions */
+function handleInitQuery(): string {
+  const cwd = process.cwd();
+
+  // Metaphors are registered via the barrel import of core (listMetaphors, etc.)
+  const ctx = buildInterviewContext(cwd);
+  const steps = generateInterviewSteps(ctx);
+
+  const sections: string[] = [];
+
+  sections.push('# SLOPE Init — Agent API\n');
+  sections.push('Use `getInitQuestions()` and `submitInitAnswers()` to drive `slope init` programmatically.\n');
+
+  sections.push('## Workflow\n');
+  sections.push('1. Call `getInitQuestions()` to get interview steps with smart defaults');
+  sections.push('2. Present each question to the user (use step descriptions for context)');
+  sections.push('3. Call `submitInitAnswers(answers, providers)` with collected answers');
+  sections.push('4. Report the result (files created, config path)\n');
+
+  sections.push('## Interview Steps\n');
+  for (const step of steps) {
+    const defaultVal = step.default !== undefined ? ` (default: ${JSON.stringify(step.default)})` : '';
+    const requiredTag = step.required ? ' **required**' : '';
+    sections.push(`### \`${step.id}\` (${step.type})${requiredTag}${defaultVal}`);
+    sections.push(`${step.question}`);
+    if (step.description) sections.push(`_${step.description}_`);
+    if (step.options && step.options.length > 0) {
+      sections.push('Options:');
+      for (const opt of step.options) {
+        sections.push(`  - \`${opt.value}\` — ${opt.label}${opt.description ? ': ' + opt.description : ''}`);
+      }
+    }
+    sections.push('');
+  }
+
+  sections.push('## Detected Project Info\n');
+  sections.push('```json');
+  sections.push(JSON.stringify(ctx.detected, null, 2));
+  sections.push('```\n');
+
+  sections.push('## Example\n');
+  sections.push('```javascript');
+  sections.push('// Get questions with smart defaults');
+  sections.push('const { steps, context } = getInitQuestions();');
+  sections.push('');
+  sections.push('// Submit answers');
+  sections.push('return await submitInitAnswers({');
+  sections.push('  "project-name": "My App",');
+  sections.push('  "metaphor": "gaming",');
+  sections.push('  "platforms": ["claude-code"],');
+  sections.push('}, ["claude-code"]);');
+  sections.push('```');
+
+  return sections.join('\n');
 }
 
 /** Walk up directories looking for .slope/config.json */

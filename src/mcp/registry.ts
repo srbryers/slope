@@ -4,7 +4,7 @@
 
 export interface FunctionRegistryEntry {
   name: string;
-  module: 'core' | 'fs' | 'constants' | 'store' | 'flows';
+  module: 'core' | 'fs' | 'constants' | 'store' | 'flows' | 'init';
   description: string;
   signature: string;
   example: string;
@@ -795,6 +795,22 @@ export const SLOPE_REGISTRY: FunctionRegistryEntry[] = [
     description: 'Write a complete SlopeConfig to .slope/config.json. Use loadConfig() first for read-modify-write.',
     signature: 'saveConfig(config: SlopeConfig): string',
     example: 'const config = loadConfig(); config.metaphor = "gaming"; return saveConfig(config);',
+  },
+
+  // ─── Init Interview ───
+  {
+    name: 'getInitQuestions',
+    module: 'core',
+    description: 'Get interview steps for slope init with smart defaults pre-filled. See also: submitInitAnswers().',
+    signature: 'getInitQuestions(): { steps: InterviewStep[], context: InterviewContext }',
+    example: 'return getInitQuestions();',
+  },
+  {
+    name: 'submitInitAnswers',
+    module: 'core',
+    description: 'Run slope init with provided answers. See also: getInitQuestions().',
+    signature: 'submitInitAnswers(answers: Record<string, unknown>, providers?: string[]): Promise<InitFromAnswersResult>',
+    example: 'return await submitInitAnswers({ "project-name": "my-app", "metaphor": "gaming" }, ["claude-code"]);',
   },
 ];
 
