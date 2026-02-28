@@ -125,6 +125,27 @@ describe('validateRoadmap', () => {
     expect(result.errors.some(e => e.message.includes('S7-99'))).toBe(true);
   });
 
+  it('accepts valid cross-sprint ticket dependencies', () => {
+    const roadmap = makeRoadmap({
+      sprints: [
+        makeSprint(7),
+        makeSprint(8, {
+          depends_on: [7],
+          tickets: [
+            makeTicket(8, 1, { depends_on: ['S7-1'] }),
+            makeTicket(8, 2),
+            makeTicket(8, 3),
+            makeTicket(8, 4),
+          ],
+        }),
+      ],
+      phases: [{ name: 'P1', sprints: [7, 8] }],
+    });
+    const result = validateRoadmap(roadmap);
+    expect(result.valid).toBe(true);
+    expect(result.errors).toHaveLength(0);
+  });
+
   it('detects missing sprint dependency', () => {
     const roadmap = makeRoadmap({
       sprints: [makeSprint(7, { depends_on: [99] })],

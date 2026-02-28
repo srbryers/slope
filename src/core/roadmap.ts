@@ -12,7 +12,7 @@ export interface RoadmapTicket {
   title: string;
   club: RoadmapClub;
   complexity: 'trivial' | 'small' | 'standard' | 'moderate';
-  depends_on?: string[]; // ticket keys within the same sprint
+  depends_on?: string[]; // ticket keys (intra-sprint or cross-sprint)
 }
 
 /** A sprint within the roadmap */
