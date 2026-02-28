@@ -538,7 +538,7 @@ function installForProvider(cwd: string, provider: InitProvider, metaphor: Metap
 }
 
 /** Provider-specific next-step guidance messages */
-const PROVIDER_NEXT_STEPS: Record<string, string[]> = {
+const PROVIDER_NEXT_STEPS: Partial<Record<InitProvider, string[]>> = {
   'claude-code': [
     'Restart Claude Code to load the SLOPE MCP server',
     'Rules installed to .claude/rules/ (auto-loaded)',
@@ -565,7 +565,7 @@ const PROVIDER_NEXT_STEPS: Record<string, string[]> = {
 };
 
 /** Provider-specific files that get created */
-const PROVIDER_FILES: Record<string, string[]> = {
+const PROVIDER_FILES: Partial<Record<InitProvider, string[]>> = {
   'claude-code': [
     '.claude/rules/ (sprint checklist, commit discipline, review loop, codebase context)',
     '.claude/hooks/ (pre-merge-check, session hooks)',
@@ -574,16 +574,19 @@ const PROVIDER_FILES: Record<string, string[]> = {
   ],
   cursor: [
     '.cursor/rules/ (sprint checklist, commit discipline, review loop, codebase context)',
+    '.cursor/hooks/ (session hooks)',
     '.cursor/mcp.json (SLOPE MCP server)',
     '.cursorrules (project context)',
   ],
   windsurf: [
     '.windsurf/rules/ (sprint checklist, commit discipline, review loop, codebase context)',
+    '.windsurf/hooks/ (session hooks)',
     '.windsurf/mcp.json (SLOPE MCP server)',
     '.windsurfrules (project context)',
   ],
   cline: [
     '.clinerules/ (sprint checklist, commit discipline, review loop, codebase context)',
+    '.clinerules/hooks/ (session hooks)',
     '.clinerules/slope-context.md (project context + MCP instructions)',
   ],
   opencode: [
@@ -597,7 +600,7 @@ const PROVIDER_FILES: Record<string, string[]> = {
 };
 
 /** Print a summary of what was installed after init completes */
-export function printInstallSummary(providers: InitProvider[], cwd: string): void {
+export function printInstallSummary(providers: InitProvider[]): void {
   console.log('\n' + '='.repeat(50));
   console.log('  SLOPE initialized successfully');
   console.log('='.repeat(50));
@@ -913,5 +916,5 @@ export async function initCommand(args: string[]): Promise<void> {
     installForProvider(cwd, p, metaphor);
   }
 
-  printInstallSummary(providers, cwd);
+  printInstallSummary(providers);
 }

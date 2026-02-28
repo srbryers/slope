@@ -109,6 +109,7 @@ slope init --cursor
 
 Installs:
 - `.cursor/rules/` — SLOPE methodology rules (`.mdc` format)
+- `.cursor/hooks/` — session lifecycle hooks
 - `.cursor/mcp.json` — SLOPE MCP server
 - `.cursorrules` — project context
 
@@ -120,6 +121,7 @@ slope init --windsurf
 
 Installs:
 - `.windsurf/rules/` — SLOPE methodology rules (`.mdc` format)
+- `.windsurf/hooks/` — session lifecycle hooks
 - `.windsurf/mcp.json` — SLOPE MCP server
 - `.windsurfrules` — project context
 
@@ -131,6 +133,7 @@ slope init --cline
 
 Installs:
 - `.clinerules/` — SLOPE methodology rules (`.md` format)
+- `.clinerules/hooks/` — session lifecycle hooks
 - `.clinerules/slope-context.md` — project context with MCP instructions
 
 **After install:** Add the SLOPE MCP server manually via Cline settings in VS Code. See [Cline setup guide](guides/cline-setup.md).
@@ -178,7 +181,7 @@ slope briefing --keywords=migration     # Filter by keyword
 slope session start                     # Start a tracked session
 slope claim --target=S5-1              # Claim a ticket
 slope status                            # View sprint status and conflicts
-slope release --id=<claim-id>          # Release a claim when done
+slope release --target=<ticket>          # Release a claim when done
 slope session end                       # End the session
 ```
 
