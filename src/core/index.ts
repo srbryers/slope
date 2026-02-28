@@ -181,7 +181,7 @@ export type {
 
 // Config
 export type { SlopeConfig } from './config.js';
-export { loadConfig, createConfig, resolveConfigPath } from './config.js';
+export { loadConfig, createConfig, saveConfig, resolveConfigPath } from './config.js';
 
 // Loader
 export { loadScorecards, detectLatestSprint, resolveCurrentSprint } from './loader.js';
@@ -193,6 +193,7 @@ export {
   listMetaphors,
   hasMetaphor,
   validateMetaphor,
+  METAPHOR_SCHEMA,
 } from './metaphor.js';
 export type {
   MetaphorDefinition,
@@ -399,6 +400,7 @@ export {
   loadPluginMetaphors,
   loadPluginGuards,
   isPluginEnabled,
+  saveCustomMetaphor,
 } from './plugins.js';
 export type {
   PluginType,
@@ -406,6 +408,7 @@ export type {
   DiscoveredPlugin,
   PluginLoadResult,
   PluginsConfig,
+  SaveMetaphorResult,
 } from './plugins.js';
 
 // Leaderboard (Multi-Developer)

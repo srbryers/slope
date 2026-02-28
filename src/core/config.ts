@@ -98,6 +98,15 @@ export function createConfig(cwd: string = process.cwd()): string {
   return configPath;
 }
 
+/** Write a complete SlopeConfig to .slope/config.json. Expects a full config object (use loadConfig() to read-modify-write). */
+export function saveConfig(config: SlopeConfig, cwd: string = process.cwd()): string {
+  const dir = join(cwd, CONFIG_DIR);
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  const configPath = join(dir, CONFIG_FILE);
+  writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n');
+  return configPath;
+}
+
 export function resolveConfigPath(config: SlopeConfig, relativePath: string, cwd: string = process.cwd()): string {
   return join(cwd, relativePath);
 }

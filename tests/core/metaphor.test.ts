@@ -4,6 +4,7 @@ import {
   listMetaphors,
   hasMetaphor,
   validateMetaphor,
+  METAPHOR_SCHEMA,
   golf,
   tennis,
   baseball,
@@ -189,6 +190,50 @@ describe('validateMetaphor', () => {
     const partial = { ...golf, clubs: { ...golf.clubs, driver: '' } } as MetaphorDefinition;
     const errors = validateMetaphor(partial);
     expect(errors).toContain('clubs: missing term for "driver"');
+  });
+});
+
+describe('METAPHOR_SCHEMA', () => {
+  it('contains all required key arrays', () => {
+    expect(METAPHOR_SCHEMA.vocabulary).toContain('sprint');
+    expect(METAPHOR_SCHEMA.vocabulary).toContain('ticket');
+    expect(METAPHOR_SCHEMA.vocabulary).toContain('scorecard');
+    expect(METAPHOR_SCHEMA.vocabulary).toContain('handicapCard');
+    expect(METAPHOR_SCHEMA.vocabulary).toContain('briefing');
+    expect(METAPHOR_SCHEMA.vocabulary).toContain('perfectScore');
+    expect(METAPHOR_SCHEMA.vocabulary).toContain('onTarget');
+    expect(METAPHOR_SCHEMA.vocabulary).toContain('review');
+
+    expect(METAPHOR_SCHEMA.clubs).toContain('driver');
+    expect(METAPHOR_SCHEMA.clubs).toContain('putter');
+    expect(METAPHOR_SCHEMA.shotResults).toContain('fairway');
+    expect(METAPHOR_SCHEMA.shotResults).toContain('in_the_hole');
+    expect(METAPHOR_SCHEMA.hazards).toContain('bunker');
+    expect(METAPHOR_SCHEMA.hazards).toContain('water');
+    expect(METAPHOR_SCHEMA.conditions).toContain('wind');
+    expect(METAPHOR_SCHEMA.specialPlays).toContain('gimme');
+    expect(METAPHOR_SCHEMA.missDirections).toContain('long');
+    expect(METAPHOR_SCHEMA.scoreLabels).toContain('eagle');
+    expect(METAPHOR_SCHEMA.scoreLabels).toContain('par');
+    expect(METAPHOR_SCHEMA.sprintTypes).toContain('feature');
+    expect(METAPHOR_SCHEMA.trainingTypes).toContain('driving_range');
+    expect(METAPHOR_SCHEMA.nutrition).toContain('hydration');
+  });
+
+  it('has all 11 categories', () => {
+    const keys = Object.keys(METAPHOR_SCHEMA);
+    expect(keys).toContain('vocabulary');
+    expect(keys).toContain('clubs');
+    expect(keys).toContain('shotResults');
+    expect(keys).toContain('hazards');
+    expect(keys).toContain('conditions');
+    expect(keys).toContain('specialPlays');
+    expect(keys).toContain('missDirections');
+    expect(keys).toContain('scoreLabels');
+    expect(keys).toContain('sprintTypes');
+    expect(keys).toContain('trainingTypes');
+    expect(keys).toContain('nutrition');
+    expect(keys).toHaveLength(11);
   });
 });
 

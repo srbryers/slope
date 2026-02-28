@@ -1,9 +1,10 @@
 // SLOPE Plugin System
 // Discovers and loads custom metaphor and guard plugins from .slope/plugins/
 
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { SlopeConfig } from './config.js';
+import { loadConfig, saveConfig } from './config.js';
 import { validateMetaphor, registerMetaphor } from './metaphor.js';
 import type { MetaphorDefinition } from './metaphor.js';
 import { registerCustomGuard } from './guard.js';
@@ -215,6 +216,82 @@ export function loadPluginGuards(cwd: string, config?: PluginsConfig): PluginLoa
   }
 
   return result;
+}
+
+// --- Custom Metaphor Save ---
+
+export interface SaveMetaphorResult {
+  filePath: string;
+  registered: boolean;
+  activated: boolean;
+  errors: string[];
+}
+
+const BUILTIN_IDS = ['golf', 'tennis', 'baseball', 'gaming', 'dnd', 'matrix', 'agile'];
+const METAPHOR_ID_PATTERN = /^[a-z][a-z0-9_-]*$/;
+
+/**
+ * Validate, save, register, and optionally activate a custom metaphor.
+ * Writes to .slope/plugins/metaphors/<id>.json and registers in-memory.
+ */
+export function saveCustomMetaphor(
+  definition: MetaphorDefinition,
+  cwd: string = process.cwd(),
+  setActive: boolean = false,
+): SaveMetaphorResult {
+  // Validate ID format
+  if (!definition.id || !METAPHOR_ID_PATTERN.test(definition.id)) {
+    return {
+      filePath: '',
+      registered: false,
+      activated: false,
+      errors: [`Invalid metaphor ID "${definition.id}". Must match ${METAPHOR_ID_PATTERN} (lowercase, starts with letter).`],
+    };
+  }
+
+  // Reject built-in ID collision
+  if (BUILTIN_IDS.includes(definition.id)) {
+    return {
+      filePath: '',
+      registered: false,
+      activated: false,
+      errors: [`Cannot overwrite built-in metaphor "${definition.id}". Choose a different ID.`],
+    };
+  }
+
+  // Validate completeness
+  const validationErrors = validateMetaphor(definition);
+  if (validationErrors.length > 0) {
+    return {
+      filePath: '',
+      registered: false,
+      activated: false,
+      errors: validationErrors,
+    };
+  }
+
+  // Write to .slope/plugins/metaphors/<id>.json
+  const dir = join(cwd, '.slope', 'plugins', 'metaphors');
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  const filePath = join(dir, `${definition.id}.json`);
+  const fileContent = { type: 'metaphor' as const, ...definition };
+  writeFileSync(filePath, JSON.stringify(fileContent, null, 2) + '\n');
+
+  // Register in-memory
+  registerMetaphor(definition);
+
+  // Optionally activate
+  if (setActive) {
+    const config = loadConfig(cwd);
+    saveConfig({ ...config, metaphor: definition.id }, cwd);
+  }
+
+  return {
+    filePath,
+    registered: true,
+    activated: setActive,
+    errors: [],
+  };
 }
 
 // --- Main loader ---

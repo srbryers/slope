@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
@@ -9,9 +9,11 @@ import {
   loadPluginMetaphors,
   loadPluginGuards,
   loadPlugins,
+  saveCustomMetaphor,
 } from '../../src/core/plugins.js';
 import type { PluginsConfig } from '../../src/core/plugins.js';
 import { hasMetaphor, getMetaphor } from '../../src/core/metaphor.js';
+import { loadConfig } from '../../src/core/config.js';
 import { getCustomGuard, clearCustomGuards, getAllGuardDefinitions, GUARD_DEFINITIONS } from '../../src/core/guard.js';
 import type { MetaphorDefinition } from '../../src/core/metaphor.js';
 
@@ -484,5 +486,101 @@ describe('loadPlugins (combined)', () => {
     const result = loadPlugins(tmpDir, { disabled: ['blocked-one'] });
     expect(result.loaded).toHaveLength(1);
     expect(result.loaded[0].manifest.id).toBe('enabled-one');
+  });
+});
+
+describe('saveCustomMetaphor', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'slope-save-metaphor-'));
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('validates, saves, and registers a valid metaphor', () => {
+    const metaphor = makeTestMetaphor('cooking', 'Cooking');
+    const result = saveCustomMetaphor(metaphor, tmpDir);
+
+    expect(result.errors).toEqual([]);
+    expect(result.registered).toBe(true);
+    expect(result.activated).toBe(false);
+    expect(result.filePath).toContain('cooking.json');
+    expect(existsSync(result.filePath)).toBe(true);
+    expect(hasMetaphor('cooking')).toBe(true);
+
+    // Verify file content includes type field
+    const written = JSON.parse(readFileSync(result.filePath, 'utf8'));
+    expect(written.type).toBe('metaphor');
+    expect(written.id).toBe('cooking');
+  });
+
+  it('rejects invalid metaphor with validation errors', () => {
+    const incomplete = {
+      id: 'bad-meta',
+      name: 'Bad',
+      description: 'Missing everything',
+      vocabulary: {} as MetaphorDefinition['vocabulary'],
+      clubs: {} as MetaphorDefinition['clubs'],
+      shotResults: {} as MetaphorDefinition['shotResults'],
+      hazards: {} as MetaphorDefinition['hazards'],
+      conditions: {} as MetaphorDefinition['conditions'],
+      specialPlays: {} as MetaphorDefinition['specialPlays'],
+      missDirections: {} as MetaphorDefinition['missDirections'],
+      scoreLabels: {} as MetaphorDefinition['scoreLabels'],
+      sprintTypes: {} as MetaphorDefinition['sprintTypes'],
+      trainingTypes: {} as MetaphorDefinition['trainingTypes'],
+      nutrition: {} as MetaphorDefinition['nutrition'],
+    } as MetaphorDefinition;
+
+    const result = saveCustomMetaphor(incomplete, tmpDir);
+    expect(result.errors.length).toBeGreaterThan(0);
+    expect(result.registered).toBe(false);
+    expect(result.filePath).toBe('');
+  });
+
+  it('rejects invalid ID format (uppercase, spaces)', () => {
+    const metaphor = makeTestMetaphor('Bad Name', 'Bad');
+    const result = saveCustomMetaphor(metaphor, tmpDir);
+
+    expect(result.errors.length).toBe(1);
+    expect(result.errors[0]).toContain('Invalid metaphor ID');
+    expect(result.registered).toBe(false);
+  });
+
+  it('rejects built-in ID collision', () => {
+    const metaphor = makeTestMetaphor('golf', 'Custom Golf');
+    const result = saveCustomMetaphor(metaphor, tmpDir);
+
+    expect(result.errors.length).toBe(1);
+    expect(result.errors[0]).toContain('Cannot overwrite built-in');
+    expect(result.registered).toBe(false);
+  });
+
+  it('with setActive=true updates config.metaphor', () => {
+    // Create initial config so loadConfig works
+    mkdirSync(join(tmpDir, '.slope'), { recursive: true });
+    writeFileSync(join(tmpDir, '.slope', 'config.json'), JSON.stringify({ metaphor: 'golf' }));
+
+    const metaphor = makeTestMetaphor('active-test', 'Active');
+    const result = saveCustomMetaphor(metaphor, tmpDir, true);
+
+    expect(result.activated).toBe(true);
+    const config = loadConfig(tmpDir);
+    expect(config.metaphor).toBe('active-test');
+  });
+
+  it('with setActive=false does not touch config', () => {
+    mkdirSync(join(tmpDir, '.slope'), { recursive: true });
+    writeFileSync(join(tmpDir, '.slope', 'config.json'), JSON.stringify({ metaphor: 'golf' }));
+
+    const metaphor = makeTestMetaphor('inactive-test', 'Inactive');
+    const result = saveCustomMetaphor(metaphor, tmpDir, false);
+
+    expect(result.activated).toBe(false);
+    const config = loadConfig(tmpDir);
+    expect(config.metaphor).toBe('golf');
   });
 });

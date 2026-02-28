@@ -139,6 +139,21 @@ const REQUIRED_SPRINT_TYPES: SprintType[] = ['feature', 'feedback', 'infra', 'bu
 const REQUIRED_TRAINING: TrainingType[] = ['driving_range', 'chipping_practice', 'putting_practice', 'lessons'];
 const REQUIRED_NUTRITION: NutritionCategory[] = ['hydration', 'diet', 'recovery', 'supplements', 'stretching'];
 
+/** Schema describing all required keys for each MetaphorDefinition category. Agents use this to generate valid custom metaphors. */
+export const METAPHOR_SCHEMA = {
+  vocabulary: ['sprint', 'ticket', 'scorecard', 'handicapCard', 'briefing', 'perfectScore', 'onTarget', 'review'] as const,
+  clubs: REQUIRED_CLUBS,
+  shotResults: REQUIRED_SHOTS,
+  hazards: REQUIRED_HAZARDS,
+  conditions: REQUIRED_CONDITIONS,
+  specialPlays: REQUIRED_SPECIALS,
+  missDirections: REQUIRED_MISS,
+  scoreLabels: REQUIRED_SCORES,
+  sprintTypes: REQUIRED_SPRINT_TYPES,
+  trainingTypes: REQUIRED_TRAINING,
+  nutrition: REQUIRED_NUTRITION,
+};
+
 /** Validate that a metaphor definition covers every required term */
 export function validateMetaphor(metaphor: MetaphorDefinition): string[] {
   const errors: string[] = [];
