@@ -395,6 +395,37 @@ describe('sandbox', () => {
   });
 });
 
+describe('sandbox — metaphor helpers', () => {
+  it('saveCustomMetaphor is available in sandbox context', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'slope-mcp-meta-'));
+    mkdirSync(join(tmp, '.slope'), { recursive: true });
+    writeFileSync(join(tmp, '.slope', 'config.json'), JSON.stringify({ metaphor: 'golf' }));
+
+    const code = `
+      return typeof saveCustomMetaphor;
+    `;
+    const { result } = await runInSandbox(code, tmp);
+    expect(result).toBe('function');
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  it('saveConfig is available in sandbox context', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'slope-mcp-cfg-'));
+    const code = `return typeof saveConfig;`;
+    const { result } = await runInSandbox(code, tmp);
+    expect(result).toBe('function');
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  it('METAPHOR_SCHEMA is available in sandbox context', async () => {
+    const code = `return Object.keys(METAPHOR_SCHEMA);`;
+    const { result } = await runInSandbox(code, process.cwd());
+    expect(result).toContain('vocabulary');
+    expect(result).toContain('clubs');
+    expect(result).toContain('nutrition');
+  });
+});
+
 describe('mock store tools', () => {
   it('session_status returns sessions and claims from mock', async () => {
     const store = createMockStore();

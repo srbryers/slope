@@ -773,6 +773,29 @@ export const SLOPE_REGISTRY: FunctionRegistryEntry[] = [
     signature: 'validateVision(vision: unknown): string[]',
     example: 'return validateVision({ purpose: "", priorities: [] });',
   },
+
+  // ─── Custom Metaphor ───
+  {
+    name: 'saveCustomMetaphor',
+    module: 'core',
+    description: 'Validate, save, register, and optionally activate a custom metaphor.',
+    signature: 'saveCustomMetaphor(definition: MetaphorDefinition, setActive?: boolean): SaveMetaphorResult',
+    example: 'return saveCustomMetaphor({ id: "cooking", name: "Cooking", description: "Meals, courses, ingredients", vocabulary: { sprint: "meal", ticket: "course", scorecard: "menu", handicapCard: "nutrition label", briefing: "mise en place", perfectScore: "Michelin star", onTarget: "well done", review: "tasting notes" }, clubs: { driver: "Flambé", long_iron: "Braise", short_iron: "Sauté", wedge: "Dice", putter: "Garnish" }, shotResults: { fairway: "Prep", green: "Plated", in_the_hole: "Chef Kiss", missed_long: "Overcooked", missed_short: "Raw", missed_left: "Burnt", missed_right: "Bland" }, hazards: { bunker: "Grease Fire", water: "Boil Over", ob: "Food Poisoning", rough: "Soggy", trees: "Wrong Ingredient" }, conditions: { wind: "Rush Hour", rain: "Power Outage", frost_delay: "Cold Kitchen", altitude: "Altitude Baking", pin_position: "Picky Eater" }, specialPlays: { gimme: "Shortcut", mulligan: "Do Over", provisional: "Plan B", lay_up: "Slow Cook", scramble: "Potluck" }, missDirections: { long: "Over-seasoned", short: "Under-seasoned", left: "Wrong recipe", right: "Substituted" }, scoreLabels: { eagle: "Michelin 2-Star", birdie: "Michelin 1-Star", par: "Solid Meal", bogey: "Leftovers", double_bogey: "Takeout", triple_plus: "Dumpster Fire" }, sprintTypes: { feature: "New Dish", feedback: "Tasting Menu", infra: "Kitchen Remodel", bugfix: "Fix Recipe", research: "R&D", flow: "Catering", "test-coverage": "Quality Control", audit: "Health Inspection" }, trainingTypes: { driving_range: "Knife Skills", chipping_practice: "Plating Practice", putting_practice: "Seasoning Drills", lessons: "Cooking Class" }, nutrition: { hydration: "Water", diet: "Ingredients", recovery: "Break", supplements: "Spices", stretching: "Warm-up" } }, true);',
+  },
+  {
+    name: 'METAPHOR_SCHEMA',
+    module: 'constants',
+    description: 'Schema showing all required keys for each MetaphorDefinition category. Use search({ module: "metaphor" }) for full details.',
+    signature: 'METAPHOR_SCHEMA: { vocabulary: string[], clubs: string[], shotResults: string[], hazards: string[], conditions: string[], specialPlays: string[], missDirections: string[], scoreLabels: string[], sprintTypes: string[], trainingTypes: string[], nutrition: string[] }',
+    example: 'return METAPHOR_SCHEMA;',
+  },
+  {
+    name: 'saveConfig',
+    module: 'fs',
+    description: 'Write a complete SlopeConfig to .slope/config.json. Use loadConfig() first for read-modify-write.',
+    signature: 'saveConfig(config: SlopeConfig): string',
+    example: 'const config = loadConfig(); config.metaphor = "gaming"; return saveConfig(config);',
+  },
 ];
 
 /**

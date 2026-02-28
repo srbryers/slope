@@ -106,7 +106,15 @@ function buildFsHelpers(cwd: string) {
     return entries.sort();
   };
 
-  return { loadConfig, loadScorecards, loadCommonIssues, loadSessions, loadRoadmap, saveScorecard, readFile, writeFile, listFiles };
+  const saveCustomMetaphor = (definition: core.MetaphorDefinition, setActive?: boolean) => {
+    return core.saveCustomMetaphor(definition, cwd, setActive);
+  };
+
+  const saveConfig = (config: core.SlopeConfig) => {
+    return core.saveConfig(config, cwd);
+  };
+
+  return { loadConfig, loadScorecards, loadCommonIssues, loadSessions, loadRoadmap, saveScorecard, readFile, writeFile, listFiles, saveCustomMetaphor, saveConfig };
 }
 
 /**
