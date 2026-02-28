@@ -39,7 +39,7 @@ export function validateInitInput(input: InitInput): string[] {
     errors.push('projectName is required and must be non-empty');
   }
 
-  if (input.metaphor !== undefined) {
+  if (input.metaphor !== undefined && input.metaphor !== 'custom') {
     // Import side-effects of metaphors happen at module load in the caller
     if (!hasMetaphor(input.metaphor)) {
       errors.push(`Unknown metaphor "${input.metaphor}". Use listMetaphors() to see available options.`);

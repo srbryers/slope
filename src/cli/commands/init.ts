@@ -5,6 +5,7 @@ import { createConfig } from '../config.js';
 import { saveHooksConfig } from '../hooks-config.js';
 import { resolveMetaphor } from '../metaphor.js';
 import type { MetaphorDefinition } from '../../core/index.js';
+import { listMetaphors } from '../../core/metaphor.js';
 import { saveVision } from '../../core/vision.js';
 import type { VisionDocument } from '../../core/analyzers/types.js';
 import {
@@ -667,7 +668,45 @@ async function runInteractiveInit(cwd: string, args: string[]): Promise<void> {
     }
 
     const repoUrl = await ask('GitHub repo URL (optional): ') || undefined;
-    const metaphor = await ask('Metaphor [golf]: ') || undefined;
+
+    // Build metaphor selection menu dynamically
+    // Ensure built-in metaphors are loaded
+    await import('../../core/metaphors/index.js');
+    const allMetaphors = listMetaphors();
+    const builtinIds = ['golf', 'tennis', 'baseball', 'gaming', 'dnd', 'matrix', 'agile'];
+    const builtins = builtinIds
+      .map(id => allMetaphors.find(m => m.id === id))
+      .filter((m): m is MetaphorDefinition => m !== undefined);
+    const customs = allMetaphors.filter(m => !builtinIds.includes(m.id));
+
+    const menuItems = [...builtins, ...customs];
+    console.log('\nChoose a metaphor (display theme for SLOPE output):\n');
+    menuItems.forEach((m, i) => {
+      const tag = builtinIds.includes(m.id) ? '' : ' [custom]';
+      console.log(`  ${i + 1}) ${m.id.padEnd(12)} — ${m.description}${tag}`);
+    });
+    const customIdx = menuItems.length + 1;
+    console.log(`  ${customIdx}) ${'custom'.padEnd(12)} — Describe a theme and your AI agent will generate it`);
+
+    const metaphorChoice = await ask(`\nChoose [1]: `);
+    let metaphor: string | undefined;
+    let customTheme: string | undefined;
+    if (!metaphorChoice) {
+      metaphor = 'golf';
+    } else {
+      const choiceNum = parseInt(metaphorChoice, 10);
+      if (choiceNum >= 1 && choiceNum <= menuItems.length) {
+        metaphor = menuItems[choiceNum - 1].id;
+      } else if (choiceNum === customIdx) {
+        customTheme = await ask('Describe your metaphor theme (e.g., "cooking", "Formula 1", "space exploration"): ');
+        metaphor = 'golf'; // temporary default until agent generates
+      } else {
+        // Try as a raw ID
+        const found = allMetaphors.find(m => m.id === metaphorChoice);
+        metaphor = found ? found.id : 'golf';
+      }
+    }
+
     const sprintStr = await ask('Current sprint number [1]: ');
     const currentSprint = sprintStr ? parseInt(sprintStr, 10) : undefined;
 
@@ -765,6 +804,13 @@ async function runInteractiveInit(cwd: string, args: string[]): Promise<void> {
     console.log(`  Config: ${result.configPath}`);
     for (const f of result.filesCreated.slice(1)) {
       console.log(`  Created: ${f}`);
+    }
+
+    // Print custom metaphor request for agent pickup
+    if (customTheme) {
+      console.log(`\n  Custom metaphor requested: "${customTheme}"`);
+      console.log('  Your AI agent can generate it with: search({ module: \'metaphor\' })');
+      console.log('  Then call saveCustomMetaphor() with the generated definition.');
     }
 
     // Overwrite with smart-generated artifacts if available
