@@ -202,7 +202,7 @@ cat .mcp.json            # MCP server config
 cat CODEBASE.md          # auto-generated codebase map
 
 # Verify SQLite store health
-slope store health
+slope store status
 ```
 
 **Key repo structure (already present — do not overwrite):**
@@ -1281,7 +1281,7 @@ flag. It evolves automatically as the loop discovers patterns. It supplements
 
 ## Error Handling
 - If `slope auto-card` fails: check that the sprint has commits on the branch
-- If `slope store health` reports issues: run `slope store backup` then `slope store restore`
+- If `slope store status` reports issues: run `slope store backup` then `slope store restore`
 - If Ollama returns empty responses: verify model is loaded with `ollama list`
 - If aider edit blocks fail to parse: try `--edit-format diff` or `--edit-format whole`
 
@@ -1863,7 +1863,7 @@ After all tickets are complete:
 - `slope auto-card` fails → verify sprint has commits on the working branch
 - `slope session start` fails → check if a session is already active: `slope session list`
 - Scorecard validation fails → run `slope validate` for detailed error messages
-- SQLite locked → `slope store health` then `slope store backup && slope store restore`
+- SQLite locked → `slope store status` then `slope store backup && slope store restore`
 
 ## When NOT to Use This Skill
 - Manual coding sessions (use CLAUDE.md guidance instead)
@@ -2384,7 +2384,7 @@ After each review session:
   - `aider --model ollama/qwen2.5-coder:32b --message "Add a JSDoc comment to src/index.ts" --yes`
   - If edit blocks don't parse: try `--edit-format diff` or `--edit-format whole`
   - If still broken: check Aider version, Ollama version, model chat template
-- **Day 1: Verify Slope framework** — `slope card`, `slope briefing`, `slope store health`
+- **Day 1: Verify Slope framework** — `slope card`, `slope briefing`, `slope store status`
 - **Day 2: Run `analyze.ts`** — review the generated backlog, check club and max_files assignments
 - **Days 3-5: Run 2-3 sprints manually** (watch them) — start with **local-only** (Qwen 32B)
 - Verify the aider → Ollama → Slope pipeline works end-to-end
@@ -2521,7 +2521,7 @@ VERIFY SLOPE FRAMEWORK
 □ slope card                  # Current handicap from 40+ sprints
 □ slope briefing              # Pre-sprint hazard state
 □ slope next                  # Next sprint number
-□ slope store health          # SQLite store healthy
+□ slope store status          # SQLite store healthy
 □ cat CLAUDE.md               # Existing agent guidance — DO NOT overwrite
 □ ls .claude/hooks/           # 16 guard hooks present
 □ cat .mcp.json               # MCP server config present
