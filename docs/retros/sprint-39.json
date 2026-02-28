@@ -1,0 +1,139 @@
+{
+  "sprint_number": 39,
+  "theme": "The Open Field",
+  "par": 4,
+  "slope": 1,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-02-27",
+  "type": "feature + docs",
+  "shots": [
+    {
+      "ticket_key": "S39-1",
+      "title": "Harness research update — Cline/Continue findings",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Verified Cline hook system (v3.36+, 8 events, JSON stdin/stdout, cancel/contextModification/errorMessage) and Continue limitations (no hooks) from primary sources. Updated harness-research.md with compatibility matrix including Cline and Continue columns."
+    },
+    {
+      "ticket_key": "S39-2",
+      "title": "ClineAdapter with per-event hook scripts",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "description": "Code review found jq tool name extraction needed fallback — Cline's nested event structure (preToolUse.tool / postToolUse.tool) required jq-with-fallback pattern."
+        },
+        {
+          "type": "rough",
+          "description": "Code review found missing json_escape() helper — special characters in tool output could cause printf injection. Added jq output for safe JSON encoding."
+        }
+      ],
+      "notes": "New ClineAdapter implementing HarnessAdapter interface: per-event script discovery (.clinerules/hooks/PreToolUse, etc.), JSON stdin/stdout with cancel/contextModification/errorMessage, tool names verified from Cline v3.68.0 source, stricter detection (.clinerules/hooks/ not just .clinerules/), hooksConfigPath returns null (directory-based). TaskComplete not mapped to Stop. 31 tests covering format, detect, install, drift. Wire-up: harness.ts (ADAPTER_PRIORITY), adapters.ts, hook.ts, core/index.ts."
+    },
+    {
+      "ticket_key": "S39-3",
+      "title": "--cline init flag, setup guides, installDefaultHooks fix",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "description": "Architect review found .mdc YAML frontmatter not stripped when writing .md rules to .clinerules/ — Cline uses plain .md, not Cursor's .mdc format."
+        },
+        {
+          "type": "rough",
+          "description": "Architect review found generateCursorrules() was used for Cline context file — needed Cline-specific context file referencing .clinerules/ paths instead of .cursor/."
+        }
+      ],
+      "notes": "Added --cline flag to slope init (not included in --all). installClineTemplates() writes rules to .clinerules/. installClineMcpConfig() prints manual instructions (global config). Fixed installDefaultHooks ternary: cline → .clinerules/hooks/. New docs/guides/cline-setup.md and continue-setup.md. Tests: .clinerules/hooks/ detection, --cline flag, --all excludes cline."
+    },
+    {
+      "ticket_key": "S39-4",
+      "title": "Test updates + CODEBASE.md regeneration",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Registered ClineAdapter in adapters.test.ts (count 4→5) and harness.test.ts (3 registration blocks). Added detection conflict test (.cursor/ + .clinerules/hooks/ → Cursor wins), cline-only detection test, ADAPTER_PRIORITY assertion. Regenerated CODEBASE.md (140 source files, 96 test files, 30 CLI commands). All 1802 tests pass."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 2,
+    "greens_total": 4,
+    "putts": 2,
+    "penalties": 0,
+    "hazards_hit": 4,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [],
+  "special_plays": [
+    "Both-tier review (code + architect) conducted. Code review caught jq tool name extraction and json_escape injection risk. Architect review caught .mdc frontmatter not stripped for Cline and wrong context file template. All 4 findings fixed in single review commit before merge."
+  ],
+  "training": [],
+  "nutrition": [
+    {
+      "category": "hydration",
+      "description": "Full build + typecheck + test suite after each ticket. 1802 tests passing at completion (up from 1764 in S38), 0 failing.",
+      "status": "healthy"
+    },
+    {
+      "category": "diet",
+      "description": "6 commits on feature branch (4 tickets + 1 CODEBASE.md regen + 1 review fix). All pushed before merge. PR #21 squash-merged.",
+      "status": "healthy"
+    },
+    {
+      "category": "supplements",
+      "description": "31 new ClineAdapter tests in tests/core/adapters/cline.test.ts covering format, detect, install, drift. Updated adapters.test.ts (count 4→5), harness.test.ts (3 registration blocks), init-detect.test.ts (--cline flag, --all excludes cline). Detection conflict tests added.",
+      "status": "healthy"
+    },
+    {
+      "category": "recovery",
+      "description": "Review caught .mdc frontmatter issue — Cline uses plain .md rules, not Cursor's .mdc format with YAML frontmatter. Also caught context file reusing Cursor paths. Both would have caused broken rules on Cline installations.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Clean adapter-building sprint. The HarnessAdapter interface from S37 made ClineAdapter straightforward to implement — detect, install, format, dispatch all followed established patterns. Per-event hook scripts were the main novelty vs Cursor/Windsurf's config-file approach.",
+    "advice_for_next_player": "When adapting templates from one harness to another, don't reuse the context file generator — each harness has different rule paths, hook locations, and config mechanisms. Strip format-specific metadata (.mdc YAML frontmatter) when converting between rule formats. Test detection conflicts when adding new adapters.",
+    "what_surprised_you": "Cline's hook system is more capable than expected — 8 lifecycle events with cancel/contextModification/errorMessage output gives fine-grained control. The per-event script approach (one script per event vs one config file) is different from Cursor/Windsurf but maps cleanly to the adapter interface.",
+    "excited_about_next": "All 5 harness adapters (Claude Code, Cursor, Windsurf, Cline, OpenCode) are now implemented. S40 can focus on external-facing onboarding docs and init UX since the adapter layer is complete."
+  },
+  "bunker_locations": [
+    "Cline uses plain .md rule files — strip .mdc YAML frontmatter before writing rules to .clinerules/",
+    "Cline MCP config is global (VS Code settings), not project-local — installClineMcpConfig() prints manual instructions instead of writing a file",
+    "--all flag does NOT include cline (intentional — Cline's MCP config is global and can't be auto-installed)",
+    "Detection requires .clinerules/hooks/ directory (not just .clinerules/) to avoid false positives on repos with only Cline rules but no SLOPE hooks"
+  ],
+  "yardage_book_updates": [
+    "src/core/adapters/cline.ts: ClineAdapter class, ClineHookOutput type, per-event hook scripts, JSON dispatch",
+    "src/adapters.ts: ClineAdapter and clineAdapter exports",
+    "src/core/index.ts: ClineAdapter, clineAdapter, ClineHookOutput exports",
+    "src/core/harness.ts: 'cline' added to ADAPTER_PRIORITY",
+    "src/cli/commands/init.ts: --cline flag, installClineTemplates(), installClineMcpConfig(), case 'cline' in installForProvider()",
+    "src/cli/commands/hook.ts: cline → .clinerules/hooks/ in getHooksDir()",
+    "tests/core/adapters/cline.test.ts: 31 tests for ClineAdapter",
+    "tests/adapters.test.ts: ClineAdapter registration (count 4→5)",
+    "tests/core/harness.test.ts: ClineAdapter registration, detection conflict tests",
+    "tests/cli/init-detect.test.ts: --cline flag, --all excludes cline",
+    "docs/backlog/harness-research.md: Cline/Continue compatibility matrix",
+    "docs/guides/cline-setup.md: Cline integration guide",
+    "docs/guides/continue-setup.md: Continue setup guide (GenericAdapter)",
+    "CODEBASE.md: Regenerated (140 source files, 96 test files, 30 CLI commands)"
+  ],
+  "course_management_notes": [
+    "4 tickets, par 4, score 4 — par. 2 in_the_hole (S39-1 research, S39-4 tests), 2 green (S39-2 review findings on jq/json_escape, S39-3 review findings on .mdc stripping/context file).",
+    "Slope 1 — new adapter with unfamiliar per-event hook protocol, but HarnessAdapter interface from S37 provided clear contract.",
+    "1091 lines added, 38 removed across 14 files. 1 new adapter, 1 new test file, 2 new guide docs.",
+    "Both-tier review caught 4 findings (2 code, 2 architect) — all fixed in single commit before merge."
+  ]
+}
