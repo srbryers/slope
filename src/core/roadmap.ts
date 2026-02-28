@@ -90,6 +90,9 @@ export function validateRoadmap(roadmap: RoadmapDefinition): RoadmapValidationRe
     errors.push({ type: 'error', message: 'Duplicate sprint IDs detected' });
   }
 
+  // Build a set of all ticket keys across all sprints for cross-sprint dependency validation
+  const allTicketKeys = new Set(roadmap.sprints.flatMap(s => s.tickets.map(t => t.key)));
+
   for (const sprint of roadmap.sprints) {
     // Check: ticket count (3-4 per sprint)
     if (sprint.tickets.length < 3) {
@@ -120,16 +123,15 @@ export function validateRoadmap(roadmap: RoadmapDefinition): RoadmapValidationRe
       }
     }
 
-    // Check: intra-sprint ticket dependencies exist
-    const ticketKeys = new Set(sprint.tickets.map(t => t.key));
+    // Check: ticket dependencies exist (intra-sprint or cross-sprint)
     for (const ticket of sprint.tickets) {
       for (const dep of ticket.depends_on ?? []) {
-        if (!ticketKeys.has(dep)) {
+        if (!allTicketKeys.has(dep)) {
           errors.push({
             type: 'error',
             sprint: sprint.id,
             ticket: ticket.key,
-            message: `Ticket ${ticket.key} depends on ${dep} which does not exist in S${sprint.id}`,
+            message: `Ticket ${ticket.key} depends on ${dep} which does not exist in the roadmap`,
           });
         }
       }
