@@ -121,7 +121,7 @@ const STARTER_ROADMAP = {
 };
 
 /** Init supports all harness adapters plus OpenCode (template-only, no adapter) */
-type InitProvider = HarnessId | 'opencode';
+export type InitProvider = HarnessId | 'opencode';
 
 export function detectProvidersFromArgs(args: string[]): InitProvider[] {
   const providers: InitProvider[] = [];
@@ -537,6 +537,117 @@ function installForProvider(cwd: string, provider: InitProvider, metaphor: Metap
   }
 }
 
+/** Provider-specific next-step guidance messages */
+const PROVIDER_NEXT_STEPS: Record<string, string[]> = {
+  'claude-code': [
+    'Restart Claude Code to load the SLOPE MCP server',
+    'Rules installed to .claude/rules/ (auto-loaded)',
+  ],
+  cursor: [
+    'MCP server configured in .cursor/mcp.json',
+    'Rules installed to .cursor/rules/ (auto-loaded)',
+  ],
+  windsurf: [
+    'MCP server configured in .windsurf/mcp.json',
+    'Rules installed to .windsurf/rules/ (auto-loaded)',
+  ],
+  cline: [
+    'Add the SLOPE MCP server via Cline settings (VS Code extension)',
+    'Rules installed to .clinerules/ (auto-loaded)',
+  ],
+  opencode: [
+    'MCP server configured in opencode.json',
+    'Plugin installed to .opencode/plugins/slope-plugin.ts',
+  ],
+  generic: [
+    'Checklist installed to SLOPE-CHECKLIST.md',
+  ],
+};
+
+/** Provider-specific files that get created */
+const PROVIDER_FILES: Record<string, string[]> = {
+  'claude-code': [
+    '.claude/rules/ (sprint checklist, commit discipline, review loop, codebase context)',
+    '.claude/hooks/ (pre-merge-check, session hooks)',
+    '.mcp.json (SLOPE MCP server)',
+    'CLAUDE.md (project context)',
+  ],
+  cursor: [
+    '.cursor/rules/ (sprint checklist, commit discipline, review loop, codebase context)',
+    '.cursor/mcp.json (SLOPE MCP server)',
+    '.cursorrules (project context)',
+  ],
+  windsurf: [
+    '.windsurf/rules/ (sprint checklist, commit discipline, review loop, codebase context)',
+    '.windsurf/mcp.json (SLOPE MCP server)',
+    '.windsurfrules (project context)',
+  ],
+  cline: [
+    '.clinerules/ (sprint checklist, commit discipline, review loop, codebase context)',
+    '.clinerules/slope-context.md (project context + MCP instructions)',
+  ],
+  opencode: [
+    'AGENTS.md (project context)',
+    'opencode.json (SLOPE MCP server)',
+    '.opencode/plugins/slope-plugin.ts (session lifecycle plugin)',
+  ],
+  generic: [
+    'SLOPE-CHECKLIST.md (sprint checklist)',
+  ],
+};
+
+/** Print a summary of what was installed after init completes */
+export function printInstallSummary(providers: InitProvider[], cwd: string): void {
+  console.log('\n' + '='.repeat(50));
+  console.log('  SLOPE initialized successfully');
+  console.log('='.repeat(50));
+
+  // Core files (always created)
+  console.log('\nCore files:');
+  console.log('  .slope/config.json      — configuration');
+  console.log('  .slope/slope.db         — SQLite store (sessions, claims, events)');
+  console.log('  .slope/common-issues.json — recurring patterns');
+  console.log('  .slope/hooks.json       — installed hook registry');
+  console.log('  .slope/plugins/         — custom plugin directories');
+  console.log('  docs/retros/            — sprint scorecards');
+  console.log('  docs/backlog/roadmap.json — project roadmap');
+
+  // Per-provider files
+  if (providers.length > 0) {
+    console.log(`\nPlatform${providers.length > 1 ? 's' : ''}: ${providers.join(', ')}`);
+    for (const p of providers) {
+      const files = PROVIDER_FILES[p];
+      if (files) {
+        console.log(`\n  ${p}:`);
+        for (const f of files) {
+          console.log(`    ${f}`);
+        }
+      }
+    }
+  }
+
+  // Per-provider next steps
+  if (providers.length > 0) {
+    console.log('\nNext steps:');
+    for (const p of providers) {
+      const steps = PROVIDER_NEXT_STEPS[p];
+      if (steps) {
+        for (const step of steps) {
+          console.log(`  - ${step}`);
+        }
+      }
+    }
+  }
+
+  // Suggested commands
+  console.log('\nGet started:');
+  console.log('  slope briefing    — pre-sprint briefing with hazards and gotchas');
+  console.log('  slope card        — view your handicap card');
+  console.log('  slope validate    — validate a scorecard');
+  console.log('  slope hook add --level=full — install all guidance hooks');
+  console.log('');
+}
+
 async function runInteractiveInit(cwd: string, args: string[]): Promise<void> {
   const { createInterface } = await import('node:readline');
   const { initFromInterview } = await import('../../core/interview.js');
@@ -802,8 +913,5 @@ export async function initCommand(args: string[]): Promise<void> {
     installForProvider(cwd, p, metaphor);
   }
 
-  console.log('\nSLOPE initialized. Try:');
-  console.log('  slope card');
-  console.log('  slope validate');
-  console.log('');
+  printInstallSummary(providers, cwd);
 }
