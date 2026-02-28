@@ -1,0 +1,126 @@
+{
+  "sprint_number": 40,
+  "theme": "The Welcome Mat",
+  "par": 4,
+  "slope": 0,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-02-28",
+  "type": "docs + feature",
+  "shots": [
+    {
+      "ticket_key": "S40-1",
+      "title": "Enhanced slope init — post-install summary",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "description": "PROVIDER_FILES maps omitted hooks directories for Cursor, Windsurf, and Cline — static maps drifted from actual installForProvider() behavior. Caught in code+architect review."
+        },
+        {
+          "type": "rough",
+          "description": "Unused cwd parameter accepted by printInstallSummary but never referenced. Caught in review."
+        }
+      ],
+      "notes": "Added printInstallSummary() with PROVIDER_FILES and PROVIDER_NEXT_STEPS maps (Partial<Record<InitProvider, ...>> for type safety). Exported InitProvider type for tests. 16 tests including edge case for unknown providers. Review caught 3 medium + 3 low findings — all fixed."
+    },
+    {
+      "ticket_key": "S40-2",
+      "title": "Getting Started guide",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Created docs/getting-started.md covering installation, quick start, core concepts, all 5 platform setups, common workflows, scorecard filing example, guard hooks, metaphors, troubleshooting, and next steps links. 351 lines."
+    },
+    {
+      "ticket_key": "S40-3",
+      "title": "First Sprint tutorial",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Created docs/tutorial-first-sprint.md with 6-part end-to-end walkthrough (setup, planning, during sprint, scoring, performance, planning sprint 2). Includes full annotated 4-ticket scorecard example and JSON schema appendix. 425 lines."
+    },
+    {
+      "ticket_key": "S40-4",
+      "title": "README overhaul + package.json keywords",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "description": "Removed 'slope' from package.json keywords during keyword update — caught in review nit."
+        }
+      ],
+      "notes": "Restructured README for external audience: value prop, quick start, core concepts, features by category, platform compatibility matrix, CLI quick reference, metaphor table, documentation links, contributing section. Updated package.json description and added keywords (ai-coding, agent-guidance, claude-code, cursor, windsurf, cline). 307 lines rewritten."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 2,
+    "greens_total": 4,
+    "putts": 2,
+    "penalties": 0,
+    "hazards_hit": 3,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [],
+  "special_plays": [
+    "Both-tier review (code + architect) conducted. Code review: 6 medium, 5 low, 5 nit findings. Architect review: 3 medium, 4 low. Overlap on key findings (PROVIDER_FILES drift, unused param, missing test assertions). All medium findings fixed before merge."
+  ],
+  "training": [],
+  "nutrition": [
+    {
+      "category": "hydration",
+      "description": "Full build + typecheck + test suite after S40-1 code changes. 1818 tests passing at completion (1 new test file, 16 new tests).",
+      "status": "healthy"
+    },
+    {
+      "category": "diet",
+      "description": "5 commits on feature branch (4 tickets + 1 review fix). All pushed before merge. PR #23 squash-merged.",
+      "status": "healthy"
+    },
+    {
+      "category": "supplements",
+      "description": "16 new tests in tests/cli/init-summary.test.ts covering all 6 providers, multiple providers, singular/plural labels, unknown provider edge case, and integration tests through initCommand.",
+      "status": "healthy"
+    },
+    {
+      "category": "recovery",
+      "description": "Review caught PROVIDER_FILES/PROVIDER_NEXT_STEPS drift from actual install functions — static maps will need manual updates when new providers are added. Potential future improvement: have install functions return manifests.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Clean docs-heavy sprint. The init summary was the only code change — straightforward extraction into a testable function. The three doc files wrote quickly because the codebase is well-understood after 40 sprints.",
+    "advice_for_next_player": "When adding static maps that describe dynamic behavior (like PROVIDER_FILES), use Partial<Record<T, ...>> for type safety and keep maps adjacent to the functions they describe. Review will catch drift between maps and install functions — the type system can't enforce this automatically.",
+    "what_surprised_you": "The linter/external modification reverted init.ts changes mid-session, requiring a branch switch dance. Git stash conflicts with untracked files already on the target branch — delete the conflicting file first, then stash and checkout.",
+    "excited_about_next": "Phase 7 complete. External-facing docs are now in place for adoption. The framework, getting-started, and tutorial form a coherent documentation hierarchy."
+  },
+  "bunker_locations": [
+    "Static PROVIDER_FILES maps drift from installForProvider() — when adding a new provider or changing what gets installed, update both the install function AND the summary maps",
+    "Interactive init (--interactive) does not install providers and therefore does not show the post-install summary — this is intentional but may confuse users expecting a summary",
+    "Metaphor tables in docs have pre-existing inaccuracies for several metaphors (Tennis, Baseball, Gaming, D&D, Matrix) — values don't match actual code definitions"
+  ],
+  "yardage_book_updates": [
+    "src/cli/commands/init.ts: printInstallSummary(), PROVIDER_FILES, PROVIDER_NEXT_STEPS maps, exported InitProvider type",
+    "tests/cli/init-summary.test.ts: 16 tests for summary output",
+    "docs/getting-started.md: Installation, core concepts, platform setup, workflows, troubleshooting",
+    "docs/tutorial-first-sprint.md: End-to-end first sprint walkthrough with annotated scorecard",
+    "README.md: Restructured for external audience with platform matrix and CLI reference",
+    "package.json: Updated description and keywords for discoverability"
+  ],
+  "course_management_notes": [
+    "4 tickets, par 4, score 4 — par. 2 in_the_hole (S40-2, S40-3 docs), 2 green (S40-1 review fixes, S40-4 keyword fix).",
+    "Slope 0 — single package, familiar patterns, docs-heavy sprint with one code change.",
+    "1202 lines added, 200 removed across 6 files. 2 new doc files, 1 new test file, 1 modified source file.",
+    "Both-tier review caught drift between static maps and install functions — fixed in review commit before merge."
+  ]
+}
