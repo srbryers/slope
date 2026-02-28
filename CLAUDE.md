@@ -6,12 +6,12 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
 - `packages/core` — scoring engine, types, config, metaphor engine, roles, standup protocol, CI signal parser, store interface, loader (v1.5.0)
 - `packages/tokens` — shared design tokens (colors, typography, spacing, CSS generation) (v1.5.0)
 - `packages/store-sqlite` — SQLite storage adapter (v1.5.0)
-- `packages/cli` — CLI tool (init, card, validate, review, report, briefing, plan, session, standup, escalate, hook, guard, extract, distill, map, dashboard, plugin, flows) (v1.5.0)
+- `packages/cli` — CLI tool (init, card, validate, review, report, briefing, plan, session, standup, escalate, hook, guard, extract, distill, map, dashboard, plugin, flows, initiative) (v1.5.0)
 - `packages/mcp-tools` — code-mode MCP server (search + execute + session/claim tools) (v1.5.0)
 
 ## Commands
 - `pnpm build` — build
-- `pnpm test` — run all tests (55 files, 1278 tests; PG store skipped without env var)
+- `pnpm test` — run all tests (106 files, 1985 tests; PG store skipped without env var)
 - `pnpm typecheck` — type check
 - `pnpm test:pg` — run PostgreSQL store tests (requires local PG, see below)
 
@@ -61,6 +61,26 @@ SLOPE maps user-facing workflows (OAuth, checkout, onboarding) to code paths for
 - MCP: `search({ module: 'flows' })` returns all flows, `search({ module: 'flows', query: 'oauth' })` filters by id/title/tags
 - Core: `packages/core/src/flows.ts` (types + validation), exported from `packages/core/src/index.ts`
 - Guard: `stale-flows` warns when editing files belonging to a stale flow definition
+
+## Initiative Orchestration
+Multi-sprint initiatives with structured review gates. Built on top of existing `slope review` system.
+- Core: `src/core/initiative.ts` — types, specialist selection, state machine, review checklists
+- CLI: `slope initiative create|status|next|advance|review|checklist`
+- State: `.slope/initiative.json` (mkdir-based locking via `.slope/.initiative.lock`)
+- Phases: `pending → planning → plan_review → executing → scoring → pr_review → complete`
+- Review gates: plan gate (architect + auto-selected specialist), PR gate (architect + code)
+- Specialist selection: keyword-based (`selectSpecialists()`) — backend, ml-engineer, database, frontend, ux-designer
+
+## Self-Development Loop
+Autonomous sprint execution scripts in `slope-loop/`.
+- `slope-loop/run.sh` — single sprint runner (tiered models: Qwen local + MiniMax M2.5 API)
+- `slope-loop/continuous.sh` — loop runner with backlog auto-regeneration (default max: 10 sprints)
+- `slope-loop/parallel.sh` — parallel runner with module overlap detection (git worktrees)
+- `slope-loop/analyze-scorecards.ts` — mines scorecard data → `analysis.json` + `backlog.json`
+- `slope-loop/model-selector.ts` — data-driven model tier recommendations → `model-config.json`
+- `slope-loop/dashboard.ts` — static HTML dashboard (handicap, model rates, costs, convergence)
+- `slope-loop/slope-loop-guide/SKILL.md` — agent guide skill for sprint execution
+- Limitation: guard hooks don't run during Aider execution; equivalent checks are in run.sh post-ticket steps
 
 ## Key Files
 - `.slope/config.json` — SLOPE configuration (includes `metaphor` field)
