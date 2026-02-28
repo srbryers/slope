@@ -104,7 +104,7 @@ describe('registry entries', () => {
   it('getInitQuestions entry has correct module and signature', () => {
     const entry = SLOPE_REGISTRY.find((e) => e.name === 'getInitQuestions');
     expect(entry).toBeDefined();
-    expect(entry!.module).toBe('core');
+    expect(entry!.module).toBe('init');
     expect(entry!.signature).toContain('InterviewStep');
     expect(entry!.signature).toContain('InterviewContext');
   });
@@ -112,7 +112,7 @@ describe('registry entries', () => {
   it('submitInitAnswers entry has correct module and signature', () => {
     const entry = SLOPE_REGISTRY.find((e) => e.name === 'submitInitAnswers');
     expect(entry).toBeDefined();
-    expect(entry!.module).toBe('core');
+    expect(entry!.module).toBe('init');
     expect(entry!.signature).toContain('InitFromAnswersResult');
   });
 });

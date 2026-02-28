@@ -800,14 +800,14 @@ export const SLOPE_REGISTRY: FunctionRegistryEntry[] = [
   // ─── Init Interview ───
   {
     name: 'getInitQuestions',
-    module: 'core',
+    module: 'init',
     description: 'Get interview steps for slope init with smart defaults pre-filled. See also: submitInitAnswers().',
     signature: 'getInitQuestions(): { steps: InterviewStep[], context: InterviewContext }',
     example: 'return getInitQuestions();',
   },
   {
     name: 'submitInitAnswers',
-    module: 'core',
+    module: 'init',
     description: 'Run slope init with provided answers. See also: getInitQuestions().',
     signature: 'submitInitAnswers(answers: Record<string, unknown>, providers?: string[]): Promise<InitFromAnswersResult>',
     example: 'return await submitInitAnswers({ "project-name": "my-app", "metaphor": "gaming" }, ["claude-code"]);',

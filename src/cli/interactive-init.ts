@@ -80,7 +80,8 @@ export function buildSummary(
 
   lines.push(`Sprint:    ${answers['sprint-number'] ?? '1'}`);
 
-  const platforms = answers['platforms'] as string[] | undefined;
+  const platformsRaw = answers['platforms'];
+  const platforms = Array.isArray(platformsRaw) ? platformsRaw as string[] : undefined;
   if (platforms && platforms.length > 0) {
     lines.push(`Platforms: ${platforms.join(', ')}`);
   }
@@ -139,7 +140,8 @@ export async function runInteractiveCli(cwd: string): Promise<void> {
 
   // 4. Run init with spinner
   s.start('Initializing project...');
-  const result = await initFromAnswers(cwd, answers, answers.platforms as string[] | undefined);
+  const platformsVal = answers.platforms;
+  const result = await initFromAnswers(cwd, answers, Array.isArray(platformsVal) ? platformsVal as string[] : undefined);
   s.stop('Project initialized');
 
   if (!result.success) {

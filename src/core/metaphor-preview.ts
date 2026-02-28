@@ -2,7 +2,7 @@
 // Generates preview data for metaphor selection during init.
 
 import type { MetaphorDefinition } from './metaphor.js';
-import { listMetaphors, validateMetaphor } from './metaphor.js';
+import { listMetaphors } from './metaphor.js';
 
 export interface MetaphorPreview {
   id: string;

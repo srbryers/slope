@@ -2,7 +2,7 @@
 // Structured project initialization from collected input fields.
 // Core defines only what it needs — no CLI/infrastructure concerns.
 
-import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createConfig } from './config.js';
 import type { SlopeConfig } from './config.js';
@@ -48,7 +48,7 @@ export function validateInitInput(input: InitInput): string[] {
   }
 
   if (input.repoUrl !== undefined) {
-    const ghPattern = /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+(\.git)?$/;
+    const ghPattern = /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+(\.git)?\/?$/;
     if (!ghPattern.test(input.repoUrl)) {
       errors.push(`repoUrl "${input.repoUrl}" does not match expected GitHub URL pattern`);
     }
@@ -72,7 +72,8 @@ export function validateInitInput(input: InitInput): string[] {
   return errors;
 }
 
-const EXAMPLE_SCORECARD = {
+function buildExampleScorecard() {
+  return {
   sprint_number: 1,
   theme: 'Getting Started',
   par: 3,
@@ -99,7 +100,8 @@ const EXAMPLE_SCORECARD = {
   yardage_book_updates: [],
   bunker_locations: [],
   course_management_notes: [],
-};
+  };
+}
 
 const EXAMPLE_COMMON_ISSUES = {
   recurring_patterns: [
@@ -127,7 +129,8 @@ export type InitFromAnswersResult =
 
 /**
  * Initialize a SLOPE project from raw interview answers.
- * Validates answers, creates core files, and installs provider templates.
+ * Validates answers and creates core files.
+ * Provider installation is the caller's responsibility (CLI or MCP layer).
  * Returns a structured result (never throws on validation errors).
  */
 export async function initFromAnswers(
@@ -141,27 +144,18 @@ export async function initFromAnswers(
   }
 
   const input = answersToInitInput(answers);
-  const result = await initFromInterview(cwd, input);
 
-  const effectiveProviders = providers ?? (answers.platforms as string[] | undefined) ?? [];
-
-  // Install provider templates if any
-  if (effectiveProviders.length > 0) {
-    try {
-      const { installForProvider, resolveMetaphor } = await import('../cli/commands/init.js') as {
-        installForProvider?: (cwd: string, provider: string, metaphor: unknown) => void;
-        resolveMetaphor?: (args: string[], id?: string) => unknown;
-      };
-      if (installForProvider && resolveMetaphor) {
-        const metaphor = resolveMetaphor([], input.metaphor);
-        for (const p of effectiveProviders) {
-          installForProvider(cwd, p, metaphor);
-        }
-      }
-    } catch {
-      // CLI module not available (e.g., in core-only context) — skip provider install
-    }
+  let result: InitResult;
+  try {
+    result = await initFromInterview(cwd, input);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { success: false, errors: [{ field: '_init', message }] };
   }
+
+  const platformsRaw = answers.platforms;
+  const effectiveProviders = providers
+    ?? (Array.isArray(platformsRaw) ? platformsRaw as string[] : []);
 
   return {
     success: true,
@@ -184,7 +178,6 @@ export async function initFromInterview(cwd: string, input: InitInput): Promise<
   filesCreated.push(configPath);
 
   // Read back the config and augment with interview data
-  const { readFileSync } = await import('node:fs');
   const configData = JSON.parse(readFileSync(configPath, 'utf8'));
 
   configData.projectName = input.projectName;
@@ -212,7 +205,7 @@ export async function initFromInterview(cwd: string, input: InitInput): Promise<
 
   const examplePath = join(scorecardDir, 'sprint-1.json');
   if (!existsSync(examplePath)) {
-    writeFileSync(examplePath, JSON.stringify(EXAMPLE_SCORECARD, null, 2) + '\n');
+    writeFileSync(examplePath, JSON.stringify(buildExampleScorecard(), null, 2) + '\n');
     filesCreated.push(examplePath);
   }
 

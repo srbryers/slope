@@ -271,9 +271,7 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
 
 /** Handle search({ module: 'metaphor' }) — return schema, built-in list, and example for custom metaphor generation */
 function handleMetaphorQuery(): string {
-  // Ensure built-in metaphors are loaded
-  try { require('../core/metaphors/index.js'); } catch { /* ESM — metaphors loaded via import */ }
-
+  // Built-in metaphors are loaded via the barrel import of core at the top of this file
   const builtins = listMetaphors();
   const sections: string[] = [];
 

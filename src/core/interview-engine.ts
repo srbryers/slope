@@ -4,6 +4,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, basename } from 'node:path';
 import { execSync } from 'node:child_process';
+import { hasMetaphor } from './metaphor.js';
 import type { InitInput } from './interview.js';
 
 export interface DetectedInfo {
@@ -151,10 +152,16 @@ export function validateInterviewAnswers(
     errors.push({ field: 'project-name', message: 'Project name is required' });
   }
 
+  // metaphor validation (if provided)
+  const metaphor = String(answers['metaphor'] ?? '').trim();
+  if (metaphor && metaphor !== 'custom' && !hasMetaphor(metaphor)) {
+    errors.push({ field: 'metaphor', message: `Unknown metaphor "${metaphor}". Use listMetaphors() to see available options.` });
+  }
+
   // repo-url validation (if provided)
   const repoUrl = String(answers['repo-url'] ?? '').trim();
   if (repoUrl) {
-    const ghPattern = /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+(\.git)?$/;
+    const ghPattern = /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+(\.git)?\/?$/;
     if (!ghPattern.test(repoUrl)) {
       errors.push({ field: 'repo-url', message: 'Must be a valid GitHub URL (https://github.com/owner/repo)' });
     }
