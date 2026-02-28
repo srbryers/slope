@@ -1,6 +1,6 @@
 {
   "name": "SLOPE Development Roadmap",
-  "description": "Comprehensive roadmap covering all 40 sprints across 11 phases — from initial extraction through harness-agnostic guards, hardening, and adoption readiness.",
+  "description": "Comprehensive roadmap covering 47 sprints across 13 phases — from initial extraction through guards, hardening, adoption readiness, metaphor studio, and the self-development loop.",
   "phases": [
     {
       "name": "Foundation — Extraction & Core",
@@ -95,6 +95,23 @@
         38,
         39,
         40
+      ]
+    },
+    {
+      "name": "Phase 8 — Metaphor Studio & Onboarding",
+      "sprints": [
+        41,
+        42
+      ]
+    },
+    {
+      "name": "Phase 9 — Self-Development Loop",
+      "sprints": [
+        43,
+        44,
+        45,
+        46,
+        47
       ]
     }
   ],
@@ -1547,6 +1564,231 @@
         {
           "key": "S40-4",
           "title": "README overhaul + npm package description + examples",
+          "club": "wedge",
+          "complexity": "small"
+        }
+      ]
+    },
+    {
+      "id": 41,
+      "theme": "The Metaphor Studio",
+      "par": 4,
+      "slope": 2,
+      "type": "feature",
+      "depends_on": [39],
+      "tickets": [
+        {
+          "key": "S41-1",
+          "title": "Selection UX — metaphor browser with preview + search",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S41-2",
+          "title": "Custom metaphor generation — LLM-powered vocabulary builder",
+          "club": "long_iron",
+          "complexity": "multi_package"
+        },
+        {
+          "key": "S41-3",
+          "title": "CLI metaphor management — list, show, create, validate commands",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S41-4",
+          "title": "MCP metaphor tools — search and generation via sandbox",
+          "club": "short_iron",
+          "complexity": "standard"
+        }
+      ]
+    },
+    {
+      "id": 42,
+      "theme": "The Caddy Interview",
+      "par": 4,
+      "slope": 2,
+      "type": "feature",
+      "depends_on": [41],
+      "tickets": [
+        {
+          "key": "S42-1",
+          "title": "InterviewStep abstraction + smart defaults engine",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S42-2",
+          "title": "Metaphor preview generator",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S42-3",
+          "title": "Rich CLI rendering with @clack/prompts",
+          "club": "long_iron",
+          "complexity": "multi_package"
+        },
+        {
+          "key": "S42-4",
+          "title": "MCP agent API (getInitQuestions + submitInitAnswers)",
+          "club": "short_iron",
+          "complexity": "standard"
+        }
+      ]
+    },
+    {
+      "id": 43,
+      "theme": "Loop Foundation",
+      "par": 4,
+      "slope": 2,
+      "type": "feature",
+      "tickets": [
+        {
+          "key": "S43-1",
+          "title": "analyze.ts — scorecard data mining + backlog generation",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S43-2",
+          "title": "run.sh — single-ticket execution harness with model selection",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S43-3",
+          "title": "continuous.sh — full sprint loop with auto-card + retro",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S43-4",
+          "title": "parallel.sh — concurrent ticket execution with job control",
+          "club": "short_iron",
+          "complexity": "standard"
+        }
+      ]
+    },
+    {
+      "id": 44,
+      "theme": "Agent Intelligence",
+      "par": 4,
+      "slope": 1,
+      "type": "feature",
+      "depends_on": [43],
+      "tickets": [
+        {
+          "key": "S44-1",
+          "title": "slope-loop-guide skill — auto-evolving agent knowledge base",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S44-2",
+          "title": "sprint-workflow skill — portable sprint lifecycle knowledge",
+          "club": "wedge",
+          "complexity": "small"
+        },
+        {
+          "key": "S44-3",
+          "title": "performance-analysis skill — handicap + miss pattern interpretation",
+          "club": "wedge",
+          "complexity": "small"
+        },
+        {
+          "key": "S44-4",
+          "title": "Model escalation logic — local fail → API retry pipeline",
+          "club": "short_iron",
+          "complexity": "standard"
+        }
+      ]
+    },
+    {
+      "id": 45,
+      "theme": "Ops Dashboard",
+      "par": 3,
+      "slope": 1,
+      "type": "feature",
+      "depends_on": [43],
+      "tickets": [
+        {
+          "key": "S45-1",
+          "title": "dashboard.ts — real-time sprint progress + model cost tracking",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S45-2",
+          "title": "model-selector.ts — club-to-model mapping with cost estimation",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S45-3",
+          "title": "model-config.json — configurable model registry + fallback chains",
+          "club": "wedge",
+          "complexity": "small"
+        }
+      ]
+    },
+    {
+      "id": 46,
+      "theme": "Semantic Index",
+      "par": 4,
+      "slope": 3,
+      "type": "feature",
+      "depends_on": [43],
+      "tickets": [
+        {
+          "key": "S46-1",
+          "title": "codebase_embeddings schema + nomic-embed-text integration",
+          "club": "long_iron",
+          "complexity": "multi_package"
+        },
+        {
+          "key": "S46-2",
+          "title": "slope index CLI — incremental codebase embedding pipeline",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S46-3",
+          "title": "slope context CLI — ticket-aware file retrieval via embeddings",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S46-4",
+          "title": "run.sh integration — replace repo map with slope context",
+          "club": "short_iron",
+          "complexity": "standard"
+        }
+      ]
+    },
+    {
+      "id": 47,
+      "theme": "Execution Plans",
+      "par": 3,
+      "slope": 2,
+      "type": "feature",
+      "depends_on": [46],
+      "tickets": [
+        {
+          "key": "S47-1",
+          "title": "slope prep CLI — structured execution plans from ticket + context",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S47-2",
+          "title": "slope enrich CLI — backlog pre-computation with context + plans",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S47-3",
+          "title": "run.sh integration — inject prep output via --read flag",
           "club": "wedge",
           "complexity": "small"
         }
