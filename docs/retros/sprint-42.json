@@ -1,0 +1,86 @@
+{
+  "sprint_number": 42,
+  "theme": "The Caddy Interview",
+  "par": 4,
+  "slope": 2,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-02-28",
+  "shots": [
+    {
+      "ticket_key": "S42-1",
+      "title": "InterviewStep abstraction + smart defaults engine",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": []
+    },
+    {
+      "ticket_key": "S42-2",
+      "title": "Metaphor preview generator",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": []
+    },
+    {
+      "ticket_key": "S42-3",
+      "title": "Rich CLI rendering with @clack/prompts",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "description": "TTY mock required workaround — process.exit mock did not halt execution, needed throw-based mock"
+        }
+      ]
+    },
+    {
+      "ticket_key": "S42-4",
+      "title": "MCP agent API (getInitQuestions + submitInitAnswers)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "description": "ESM/CJS boundary — require() call in sandbox failed, removed in favor of barrel import registration"
+        }
+      ]
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 2,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    "cross_package",
+    "new_dependency"
+  ],
+  "special_plays": [],
+  "bunker_locations": [
+    "Core→CLI layer violations: core modules must never import from cli/ — caught in review",
+    "Structured error contracts: functions returning Result types must catch all throws internally",
+    "Unsafe `as` casts on user input — always use Array.isArray() guard first"
+  ],
+  "yardage_book_updates": [
+    "interview-steps.ts / interview-engine.ts are the canonical step + detection system — do not inline detection into CLI or MCP layers",
+    "initFromAnswers() is core-only — provider installation belongs in CLI/MCP callers, not core",
+    "@clack/prompts ESM import works fine — no special config needed",
+    "Metaphor registration via barrel import (import * as core) handles side-effect registration in sandbox"
+  ],
+  "course_management_notes": [
+    "Review round caught 2 HIGH findings (core→CLI violation, uncaught throw) — validates standard review tier for 4-ticket sprints",
+    "Smart defaults engine is lightweight by design — no git log analysis, just file existence checks",
+    "Metaphor previews are generated from registered definitions — no hardcoded preview text per metaphor"
+  ]
+}
