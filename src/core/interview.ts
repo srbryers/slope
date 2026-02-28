@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { createConfig } from './config.js';
 import type { SlopeConfig } from './config.js';
 import { hasMetaphor } from './metaphor.js';
+import { validateInterviewAnswers, answersToInitInput } from './interview-engine.js';
 
 /** Core input — what initFromInterview() actually needs */
 export interface InitInput {
@@ -119,6 +120,57 @@ const EXAMPLE_COMMON_ISSUES = {
  * Creates config, example scorecard, roadmap, and common-issues.
  * Does NOT initialize a store — that's the caller's responsibility.
  */
+/** Structured result for agent-facing initFromAnswers */
+export type InitFromAnswersResult =
+  | { success: true; configPath: string; filesCreated: string[]; providers: string[] }
+  | { success: false; errors: Array<{ field: string; message: string }> };
+
+/**
+ * Initialize a SLOPE project from raw interview answers.
+ * Validates answers, creates core files, and installs provider templates.
+ * Returns a structured result (never throws on validation errors).
+ */
+export async function initFromAnswers(
+  cwd: string,
+  answers: Record<string, unknown>,
+  providers?: string[],
+): Promise<InitFromAnswersResult> {
+  const validationErrors = validateInterviewAnswers(answers);
+  if (validationErrors.length > 0) {
+    return { success: false, errors: validationErrors };
+  }
+
+  const input = answersToInitInput(answers);
+  const result = await initFromInterview(cwd, input);
+
+  const effectiveProviders = providers ?? (answers.platforms as string[] | undefined) ?? [];
+
+  // Install provider templates if any
+  if (effectiveProviders.length > 0) {
+    try {
+      const { installForProvider, resolveMetaphor } = await import('../cli/commands/init.js') as {
+        installForProvider?: (cwd: string, provider: string, metaphor: unknown) => void;
+        resolveMetaphor?: (args: string[], id?: string) => unknown;
+      };
+      if (installForProvider && resolveMetaphor) {
+        const metaphor = resolveMetaphor([], input.metaphor);
+        for (const p of effectiveProviders) {
+          installForProvider(cwd, p, metaphor);
+        }
+      }
+    } catch {
+      // CLI module not available (e.g., in core-only context) — skip provider install
+    }
+  }
+
+  return {
+    success: true,
+    configPath: result.configPath,
+    filesCreated: result.filesCreated,
+    providers: effectiveProviders,
+  };
+}
+
 export async function initFromInterview(cwd: string, input: InitInput): Promise<InitResult> {
   const errors = validateInitInput(input);
   if (errors.length > 0) {
