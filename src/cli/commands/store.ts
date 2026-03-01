@@ -157,9 +157,9 @@ async function backupStore(flags: Record<string, string>, cwd: string): Promise<
   }
 
   // Checkpoint WAL to flush pending writes before copying
-  let db: Database;
+  let db: ReturnType<typeof Database>;
   try {
-    db = new Database(dbPath, { readonly: true });
+    db = new Database(dbPath);
   } catch (err) {
     console.error(`Error: Cannot open database for backup: ${(err as Error).message}`);
     process.exit(1);
