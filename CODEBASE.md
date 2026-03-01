@@ -1,9 +1,9 @@
 ---
-generated_at: "2026-03-01T18:06:24.332Z"
-git_sha: "f994bc621969501a0dfbff0644660dd308b01c65"
-sprint: 46
-source_files: 153
-test_files: 109
+generated_at: "2026-03-01T19:28:15.894Z"
+git_sha: "0d9aa476b253987e6c6f3b02b77f36113f5e0dd6"
+sprint: 47
+source_files: 157
+test_files: 113
 cli_commands: 29
 guards: 16
 flows: 0
@@ -18,7 +18,7 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
 <!-- AUTO-GENERATED: START packages -->
 
 ### `src/cli`
-- Source files: 62 | Test files: 33
+- Source files: 64 | Test files: 35
 - Key modules:
   - `config`
   - `hooks-config`
@@ -30,7 +30,7 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
   - `template-generator` — SLOPE Template Generator
 
 ### `src/core`
-- Source files: 79 | Test files: 66
+- Source files: 81 | Test files: 68
 - Key modules:
   - `advisor` — --- Module-private constants ---
   - `briefing` — --- Input types ---
@@ -44,10 +44,10 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
   - `embedding-client` — SLOPE — HTTP Client for OpenAI-Compatible Embedding Endpoints
   - `embedding-store` — SLOPE — EmbeddingStore Interface
   - `embedding` — SLOPE — Embedding Types & Chunking Logic (pure — no HTTP calls)
+  - `enrich` — SLOPE — Backlog Enrichment
   - `escalation` — SLOPE — Escalation Rules
   - `event-ingestion` — SLOPE — Real-Time Event Ingestion
-  - `flows` — Flow tracking — map user-facing workflows to code paths.
-  - ... and 33 more
+  - ... and 35 more
 
 ### `src/mcp`
 - Source files: 3 | Test files: 5
@@ -241,6 +241,12 @@ Re-exports from `src/core/index.ts`:
 **Context:**
 - `deduplicateByFile`, `formatContextForAgent`
 - `ContextQuery`, `ContextResult` (types)
+**Prep (Execution Plans):**
+- `generatePrepPlan`, `formatPrepPlan`, `resolveTicket`, `buildQueryText`, `collectTestFiles`, `findSimilarTickets`, `extractHazards`
+- `PrepPlan`, `TicketData` (types)
+**Enrich (Backlog Enrichment):**
+- `enrichTicket`, `enrichBacklog`, `estimateTokens`
+- `EnrichedTicket`, `EnrichedBacklog` (types)
 **Built-in metaphors (auto-registers on import):**
 - `golf`, `tennis`, `baseball`, `gaming`, `dnd`, `matrix`, `agile`
 <!-- AUTO-GENERATED: END api -->
@@ -322,14 +328,14 @@ Re-exports from `src/core/index.ts`:
 
 | Directory | Test Files | Command |
 |-----------|-----------|---------|
-| tests/cli | 33 | `pnpm test` |
-| tests/core | 66 | `pnpm test` |
+| tests/cli | 35 | `pnpm test` |
+| tests/core | 68 | `pnpm test` |
 | tests/mcp | 5 | `pnpm test` |
 | tests/store | 1 | `pnpm test` |
 | tests/store-pg | 2 | `pnpm test` |
 | tests/tokens | 1 | `pnpm test` |
 
-**Total test files:** 108
+**Total test files:** 112
 **Run all:** `pnpm -r test`
 **Typecheck:** `pnpm -r typecheck`
 <!-- AUTO-GENERATED: END tests -->
@@ -340,11 +346,11 @@ Re-exports from `src/core/index.ts`:
 
 | Sprint | Theme | Tickets | Score |
 |--------|-------|---------|-------|
-| **42** | The Caddy Interview | 4 | par |
 | **43** | The Review Gate | 4 | par |
 | **44** | The Data Mine | 4 | bogey |
 | **45** | The Autopilot | 4 | triple_plus |
 | **46** | The Rangefinder | 4 | triple_plus |
+| **47** | The Yardage Book v2 | 4 | par |
 <!-- AUTO-GENERATED: END history -->
 
 ## Known Gotchas
