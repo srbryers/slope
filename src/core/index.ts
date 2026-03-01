@@ -648,5 +648,13 @@ export {
 } from './prep.js';
 export type { PrepPlan, TicketData } from './prep.js';
 
+// Enrich (Backlog Enrichment)
+export {
+  enrichTicket,
+  enrichBacklog,
+  estimateTokens,
+} from './enrich.js';
+export type { EnrichedTicket, EnrichedBacklog } from './enrich.js';
+
 // Built-in metaphors (auto-registers on import)
 export { golf, tennis, baseball, gaming, dnd, matrix, agile } from './metaphors/index.js';

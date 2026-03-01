@@ -52,6 +52,7 @@ import { initiativeCommand } from './commands/initiative.js';
 import { indexCommand } from './commands/index-cmd.js';
 import { contextCommand } from './commands/context.js';
 import { prepCommand } from './commands/prep.js';
+import { enrichCommand } from './commands/enrich.js';
 
 const subcommand = process.argv[2];
 
@@ -269,6 +270,12 @@ switch (subcommand) {
       process.exit(1);
     });
     break;
+  case 'enrich':
+    enrichCommand(process.argv.slice(3)).catch(err => {
+      console.error('Error:', err.message);
+      process.exit(1);
+    });
+    break;
   default:
     console.log(`
 SLOPE CLI — Sprint Lifecycle & Operational Performance Engine
@@ -325,6 +332,8 @@ Usage:
   slope initiative create|status|next|advance|review  Multi-sprint initiative orchestration
   slope index [--full|--status|--prune]               Semantic embedding index
   slope context "query" [options]                     Semantic context search
+  slope prep <ticket-id> [--json] [--top=5]          Generate execution plan for a ticket
+  slope enrich [backlog-path] [--output=<path>]      Batch-enrich backlog with file context
 
 Examples:
   slope init                                Create .slope/ with config + example scorecard
