@@ -28,6 +28,11 @@ export const SKIP_EXTENSIONS = new Set([
   '.so', '.dylib', '.lock', '.map',
 ]);
 
+/** Filenames to skip regardless of extension (lock files, generated output). */
+export const SKIP_FILENAMES = new Set([
+  'pnpm-lock.yaml', 'package-lock.json', 'yarn.lock', 'bun.lockb',
+]);
+
 export const SKIP_DIRS = new Set([
   'node_modules', 'dist', '.git', '.slope', 'coverage',
 ]);
@@ -138,6 +143,10 @@ export function shouldSkipFile(filePath: string): boolean {
   for (const part of parts) {
     if (SKIP_DIRS.has(part)) return true;
   }
+
+  // Check filename (lock files with non-.lock extensions)
+  const filename = parts[parts.length - 1];
+  if (SKIP_FILENAMES.has(filename)) return true;
 
   return false;
 }

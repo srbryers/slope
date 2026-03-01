@@ -59,8 +59,14 @@ export async function embed(
   return sorted.map(d => new Float32Array(d.embedding));
 }
 
+// Safety net: truncate chunks that exceed embedding model context.
+// nomic-embed-text has 8192 token context; dense content can tokenize
+// at ~2 chars/token, so 8000 chars is a safe per-chunk ceiling.
+const MAX_EMBED_CHARS = 8000;
+
 /**
  * Embed code chunks in batches, returning full EmbeddingResults.
+ * Truncates oversized chunks and retries failed batches individually.
  */
 export async function embedBatch(
   chunks: CodeChunk[],
@@ -71,16 +77,35 @@ export async function embedBatch(
 
   for (let i = 0; i < chunks.length; i += batchSize) {
     const batch = chunks.slice(i, i + batchSize);
-    const texts = batch.map(c => c.content);
-    const vectors = await embed(texts, config);
+    const texts = batch.map(c =>
+      c.content.length > MAX_EMBED_CHARS ? c.content.slice(0, MAX_EMBED_CHARS) : c.content,
+    );
 
-    for (let j = 0; j < batch.length; j++) {
-      results.push({
-        filePath: batch[j].filePath,
-        chunkIndex: batch[j].chunkIndex,
-        chunkText: batch[j].content,
-        vector: vectors[j],
-      });
+    try {
+      const vectors = await embed(texts, config);
+      for (let j = 0; j < batch.length; j++) {
+        results.push({
+          filePath: batch[j].filePath,
+          chunkIndex: batch[j].chunkIndex,
+          chunkText: batch[j].content,
+          vector: vectors[j],
+        });
+      }
+    } catch {
+      // Batch failed — retry each chunk individually, skip failures
+      for (let j = 0; j < batch.length; j++) {
+        try {
+          const [vector] = await embed([texts[j]], config);
+          results.push({
+            filePath: batch[j].filePath,
+            chunkIndex: batch[j].chunkIndex,
+            chunkText: batch[j].content,
+            vector,
+          });
+        } catch {
+          // Skip this chunk — content exceeds model context
+        }
+      }
     }
   }
 

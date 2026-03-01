@@ -613,6 +613,7 @@ export {
   shouldSkipFile,
   MAX_CHUNK_FILE_SIZE,
   SKIP_EXTENSIONS,
+  SKIP_FILENAMES,
   SKIP_DIRS,
 } from './embedding.js';
 export type {
