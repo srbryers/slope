@@ -30,8 +30,10 @@ Before starting each ticket:
 
 1. **Select your club** — Declare approach complexity: driver (risky/new), long_iron (multi-package), short_iron (standard), wedge (small), putter (trivial)
 2. **Check the yardage book** — Review relevant codebase sections for files you'll modify
-3. **Scan for hazards** — Check `bunker_locations` from recent scorecards and common issues for known gotchas
-4. **Commit the club selection** — Note it in your sprint tracking before writing code
+3. **Verify type shapes** — Before consuming any internal API or type, read the definition (LSP hover or source file). Do not assume property names or structure. This is the #1 recurring hazard source (S39, S42, S44).
+4. **Scan for hazards** — Check `bunker_locations` from recent scorecards and common issues for known gotchas
+5. **Shell script check** — If the ticket touches `.sh` files, review for: destructive git ops, missing tool preflight checks, unsafe branch deletion (`-D` vs `-d`), unvalidated inputs. Shell scripts lack type safety and test coverage — treat them as high-hazard.
+6. **Commit the club selection** — Note it in your sprint tracking before writing code
 
 ## Post-Shot Routine (Per-Ticket, After Completion)
 
@@ -40,8 +42,9 @@ After completing each ticket:
 1. **Score the shot** — Determine result: fairway (clean start), green (landed correctly), in_the_hole (perfect), or miss direction (long/short/left/right)
 2. **Record hazards** — Note any gotchas encountered
 3. **Check for penalties** — Tests break? Reverts needed? Each penalty adds to the score
-4. **Update sprint tracking** — Mark ticket status
-5. **Push** — The last push is the recovery point
+4. **Mid-sprint review check** — After complex tickets (driver/long_iron club), run a quick self-review of the diff before moving on. Reviews that only happen post-hole catch hazards too late — shifting detection left reduces score inflation.
+5. **Update sprint tracking** — Mark ticket status
+6. **Push** — The last push is the recovery point
 
 ## Post-Hole Routine (Sprint Completion)
 
