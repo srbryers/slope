@@ -3,8 +3,8 @@
   "theme": "The Autopilot",
   "par": 4,
   "slope": 1,
-  "score": 4,
-  "score_label": "par",
+  "score": 7,
+  "score_label": "triple_plus",
   "date": "2026-02-28",
   "shots": [
     {
@@ -12,14 +12,40 @@
       "title": "Single sprint runner script (run.sh)",
       "club": "short_iron",
       "result": "green",
-      "hazards": []
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "major",
+          "description": "[code review] Destructive git checkout/clean in run.sh escalation path",
+          "gotcha_id": "review:code"
+        }
+      ]
     },
     {
       "ticket_key": "S45-2",
       "title": "Continuous loop and parallel sprint runners",
       "club": "short_iron",
       "result": "green",
-      "hazards": []
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "moderate",
+          "description": "[code review] Failure counter reset logic broken in continuous.sh",
+          "gotcha_id": "review:code"
+        },
+        {
+          "type": "rough",
+          "severity": "moderate",
+          "description": "[code review] jq not validated in parallel.sh preflight",
+          "gotcha_id": "review:code"
+        },
+        {
+          "type": "rough",
+          "severity": "moderate",
+          "description": "[code review] git branch -D unsafe for unmerged branches in parallel.sh",
+          "gotcha_id": "review:code"
+        }
+      ]
     },
     {
       "ticket_key": "S45-3",
@@ -43,8 +69,8 @@
     "greens_total": 4,
     "putts": 0,
     "penalties": 0,
-    "hazards_hit": 0,
-    "hazard_penalties": 0,
+    "hazards_hit": 4,
+    "hazard_penalties": 2.5,
     "miss_directions": {
       "long": 0,
       "short": 0,
