@@ -55,8 +55,9 @@ After all tickets are complete:
 3. **Build the SLOPE scorecard** — Create scorecard JSON in your retros directory. Run `slope validate` to confirm no errors
 4. **Record review findings** — If reviews were done, run `slope review findings add` for each finding, then `slope review amend` to apply them as hazards
 5. **Distill learnings** — Update common-issues with new recurring patterns
-6. **Create PR and merge** — All artifacts travel with the PR
-7. **Review** — Run `slope review` to generate the sprint review markdown
+6. **Update codebase map** — Run `slope map` if any files, commands, or guards were added/removed. Commit the updated `CODEBASE.md` so it ships with the PR.
+7. **Create PR and merge** — All artifacts travel with the PR
+8. **Review** — Run `slope review` to generate the sprint review markdown
 
 ## Post-Round Routine (Per-Phase)
 
