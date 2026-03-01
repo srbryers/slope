@@ -1,0 +1,95 @@
+{
+  "sprint_number": 49,
+  "theme": "Harden Hotspot Modules (Autonomous)",
+  "par": 4,
+  "slope": 2,
+  "score": 7,
+  "score_label": "triple_plus",
+  "date": "2026-03-01",
+  "shots": [
+    {
+      "ticket_key": "S-LOCAL-040-1",
+      "title": "Harden: store.ts backup/restore",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "description": "TS2709: `let db: Database` — Database is a default-exported constructor, not a type. Used `ReturnType<typeof Database>` instead. Caught by manual typecheck.",
+          "penalty": 0.5
+        },
+        {
+          "type": "rough",
+          "description": "process.exit(1) inside try/finally skips db.close() — S46 hazard repeat. Restructured to validationError flag pattern. Caught by code review.",
+          "penalty": 0.5
+        }
+      ]
+    },
+    {
+      "ticket_key": "S-LOCAL-040-2",
+      "title": "Harden: final tests + CLAUDE.md update",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "description": "No code changes produced — Aider targeted docs/templates instead of source code. Ticket was a no-op.",
+          "penalty": 0
+        }
+      ]
+    },
+    {
+      "ticket_key": "S-LOCAL-040-3",
+      "title": "Harden: roadmap.ts validate/review/status/show",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "description": "Duplicated file-loading logic — validateSubcommand reimplemented loadRoadmapFile's error handling. Extracted loadRawRoadmap helper. Caught by code review.",
+          "penalty": 0.5
+        }
+      ]
+    }
+  ],
+  "stats": {
+    "fairways_hit": 2,
+    "fairways_total": 3,
+    "greens_in_regulation": 2,
+    "greens_total": 3,
+    "putts": 0,
+    "penalties": 1,
+    "hazards_hit": 4,
+    "hazard_penalties": 1.5,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    "autonomous: Executed via slope-loop/run.sh with Claude Sonnet via Aider"
+  ],
+  "special_plays": [],
+  "bunker_locations": [
+    "TS2709: better-sqlite3 Database is a constructor (default export), not a type — use ReturnType<typeof Database>",
+    "process.exit(1) inside try/finally skips cleanup — use flag pattern instead (S46 repeat, now S-LOCAL-040 repeat)",
+    "Autonomous agent duplicated existing abstractions — code review gate is essential for AI-generated code",
+    "Backlog file mappings were wrong — tickets targeted docs/templates instead of the actual source files"
+  ],
+  "yardage_book_updates": [
+    "store.ts backup: output dir validation, WAL checkpoint error handling, copy error handling",
+    "store.ts restore: schema_version table check, core tables validation, target dir check, validationError flag pattern",
+    "roadmap.ts: loadRawRoadmap helper (ENOENT vs parse error), sprint number validation, null-safe tickets/phases/theme access",
+    "run.sh autonomous execution: Claude Sonnet successfully produces Aider edit blocks; MiniMax M2.5 does not"
+  ],
+  "course_management_notes": [
+    "First successful autonomous sprint via slope-loop/run.sh — Claude Sonnet via Aider on all 3 tickets",
+    "Typecheck was failing after tickets 2+3 — run.sh detected but continued (expected: stop or fix)",
+    "Ticket 2 was a no-op — Aider targeted docs/templates per backlog file mappings, not source code",
+    "Manual code review found 2 blockers + 5 warnings — all fixed before merge (PR #50)",
+    "Post-hole steps not performed by run.sh: no codebase map, no scorecard, no distill, slope index/enrich failed silently",
+    "Scoring: par 4 (3 short_iron tickets + slope 2 for multi-module), score 7 (triple bogey) from 1.5 hazard penalties + 1 penalty stroke for broken typecheck"
+  ]
+}

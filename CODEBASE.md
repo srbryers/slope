@@ -1,6 +1,6 @@
 ---
-generated_at: "2026-03-01T20:22:49.930Z"
-git_sha: "2c091113ba86d0af04ba39fc8d3bf5271e56cf9b"
+generated_at: "2026-03-01T22:36:10.154Z"
+git_sha: "6f93a406e155e313dffc1054acf7892dd3f6401f"
 sprint: 48
 source_files: 157
 test_files: 114
@@ -366,5 +366,8 @@ Top recurring patterns from common-issues:
 
 <!-- AUTO-GENERATED: START gotchas -->
 
-- **Example pattern** (general, 1 sprint): This is an example recurring pattern. Replace with your own.
+- **Review-discovered hazards inflate scores** (process, 4 sprints): Every hazard since S43 was found by post-hole review, never during coding. The review gate works but is a trailing indicator.
+- **API shape assumptions** (types, 3 sprints): Assuming property names or structure of internal APIs without reading the definition. #1 hazard source across S39-S44.
+- **Shell script boundary values** (shell, 2 sprints): Shell arithmetic comparisons (-lt vs -le, -gt vs -ge) are error-prone. S48: -lt 500 excluded exactly 500 lines. S45: multiple shell hazards.
+- **Threshold/constant consistency across consumers** (calibration, 1 sprint): Changing a default value (e.g. minScore) in one consumer but not all consumers of the same pipeline. S48: context.ts threshold updated to 0.4 but enrich.ts still used 0.55.
 <!-- AUTO-GENERATED: END gotchas -->
