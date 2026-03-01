@@ -51,6 +51,7 @@ import { metaphorCommand } from './commands/metaphor.js';
 import { initiativeCommand } from './commands/initiative.js';
 import { indexCommand } from './commands/index-cmd.js';
 import { contextCommand } from './commands/context.js';
+import { prepCommand } from './commands/prep.js';
 
 const subcommand = process.argv[2];
 
@@ -258,6 +259,12 @@ switch (subcommand) {
     break;
   case 'context':
     contextCommand(process.argv.slice(3)).catch(err => {
+      console.error('Error:', err.message);
+      process.exit(1);
+    });
+    break;
+  case 'prep':
+    prepCommand(process.argv.slice(3)).catch(err => {
       console.error('Error:', err.message);
       process.exit(1);
     });

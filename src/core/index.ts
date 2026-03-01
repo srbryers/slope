@@ -636,5 +636,17 @@ export type {
 export { deduplicateByFile, formatContextForAgent } from './context.js';
 export type { ContextQuery, ContextResult } from './context.js';
 
+// Prep (Execution Plans)
+export {
+  generatePrepPlan,
+  formatPrepPlan,
+  resolveTicket,
+  buildQueryText,
+  collectTestFiles,
+  findSimilarTickets,
+  extractHazards,
+} from './prep.js';
+export type { PrepPlan, TicketData } from './prep.js';
+
 // Built-in metaphors (auto-registers on import)
 export { golf, tennis, baseball, gaming, dnd, matrix, agile } from './metaphors/index.js';
