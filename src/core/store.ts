@@ -28,7 +28,7 @@ export interface SlopeSession {
   swarm_id?: string;
 }
 
-export type StoreErrorCode = 'SESSION_CONFLICT' | 'CLAIM_EXISTS' | 'NOT_FOUND' | 'STORE_UNAVAILABLE';
+export type StoreErrorCode = 'SESSION_CONFLICT' | 'CLAIM_EXISTS' | 'NOT_FOUND' | 'STORE_UNAVAILABLE' | 'EXTENSION_UNAVAILABLE';
 
 export class SlopeStoreError extends Error {
   constructor(public code: StoreErrorCode, message: string) {

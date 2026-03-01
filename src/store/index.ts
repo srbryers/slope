@@ -1,15 +1,17 @@
 // SLOPE — SQLite Storage Adapter
-// Implements SlopeStore backed by better-sqlite3 with WAL mode.
+// Implements SlopeStore + EmbeddingStore backed by better-sqlite3 with WAL mode.
 
 import { join } from 'node:path';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
+import { createRequire } from 'node:module';
 import Database from 'better-sqlite3';
 import type { Database as DatabaseType } from 'better-sqlite3';
 import type { SprintClaim, GolfScorecard, SlopeEvent, EventType } from '../core/index.js';
 import type { CommonIssuesFile, StoreStats } from '../core/index.js';
 import { SlopeStoreError } from '../core/index.js';
 import type { SlopeStore, SlopeSession } from '../core/index.js';
+import type { EmbeddingStore, EmbeddingEntry, EmbeddingSearchResult, EmbeddingStats, IndexMeta } from '../core/embedding-store.js';
 
 function generateId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -91,20 +93,95 @@ const MIGRATIONS: Array<{ version: number; sql: string }> = [
       CREATE INDEX IF NOT EXISTS idx_sessions_swarm ON sessions(swarm_id);
     `,
   },
+  {
+    version: 4,
+    sql: `
+      CREATE TABLE IF NOT EXISTS embeddings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        file_path TEXT NOT NULL,
+        chunk_index INTEGER NOT NULL DEFAULT 0,
+        chunk_text TEXT NOT NULL,
+        git_sha TEXT NOT NULL,
+        model TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        UNIQUE(file_path, chunk_index, model)
+      );
+
+      CREATE TABLE IF NOT EXISTS index_meta (
+        id INTEGER PRIMARY KEY DEFAULT 1,
+        last_sha TEXT NOT NULL,
+        model TEXT NOT NULL,
+        dimensions INTEGER NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_embeddings_file ON embeddings(file_path);
+      CREATE INDEX IF NOT EXISTS idx_embeddings_sha ON embeddings(git_sha);
+      CREATE INDEX IF NOT EXISTS idx_embeddings_model ON embeddings(model);
+    `,
+  },
 ];
 
 /** Latest schema version — total number of migrations available. */
 export const LATEST_SCHEMA_VERSION = MIGRATIONS.length;
 
-export class SqliteSlopeStore implements SlopeStore {
+export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
   private db: DatabaseType;
+  private vecAvailable = false;
+  private vecLoaded = false;
+  private vecTableReady = false;
 
   constructor(dbPath: string) {
     mkdirSync(dirname(dbPath), { recursive: true });
     this.db = new Database(dbPath);
     this.db.pragma('journal_mode = WAL');
     this.db.pragma('foreign_keys = ON');
+    this.ensureVecLoaded();
     this.migrate();
+  }
+
+  /** Lazy-load sqlite-vec extension. Non-fatal if unavailable — embedding methods will throw. */
+  private ensureVecLoaded(): void {
+    if (this.vecLoaded) return;
+    this.vecLoaded = true;
+    try {
+      // Dynamic require — sqlite-vec is a native addon, needs require() not import()
+      const esmRequire = createRequire(import.meta.url);
+      const sqliteVec = esmRequire('sqlite-vec');
+      sqliteVec.load(this.db);
+      this.vecAvailable = true;
+    } catch {
+      // Extension not available — store still works for non-embedding operations
+    }
+  }
+
+  /** Require sqlite-vec to be available. Throws if not. */
+  private requireVec(): void {
+    this.ensureVecLoaded();
+    if (!this.vecAvailable) {
+      throw new SlopeStoreError('EXTENSION_UNAVAILABLE',
+        'sqlite-vec extension not available. Install sqlite-vec: npm install sqlite-vec');
+    }
+  }
+
+  /** Check if vec_embeddings virtual table exists, creating it if index_meta has dimensions. */
+  private ensureVecTable(): void {
+    if (this.vecTableReady) return;
+    // Check if the table already exists
+    const exists = this.db.prepare(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='vec_embeddings'"
+    ).get();
+    if (exists) {
+      this.vecTableReady = true;
+      return;
+    }
+    // Try to create from index_meta dimensions
+    const meta = this.db.prepare('SELECT dimensions FROM index_meta WHERE id = 1').get() as { dimensions: number } | undefined;
+    if (meta) {
+      this.db.exec(`CREATE VIRTUAL TABLE vec_embeddings USING vec0(embedding float[${meta.dimensions}])`);
+      this.vecTableReady = true;
+    }
+    // If no meta yet, table will be created by recreateVecTable() on first index
   }
 
   /** Versioned migration framework — runs each migration exactly once */
@@ -126,6 +203,10 @@ export class SqliteSlopeStore implements SlopeStore {
           .run(migration.version, nowISO());
       }
     }
+
+    // Note: vec_embeddings virtual table is NOT created in migrate() — it is created
+    // lazily by recreateVecTable() on first `slope index` with the configured dimensions.
+    // This avoids hardcoding a dimension size that may not match the user's model config.
   }
 
   /** Get current schema version synchronously (internal use by migrate()) */
@@ -371,6 +452,152 @@ export class SqliteSlopeStore implements SlopeStore {
     const rows = this.db.prepare('SELECT * FROM events WHERE ticket_key = ? ORDER BY timestamp')
       .all(ticketKey) as Array<Record<string, unknown>>;
     return rows.map(rowToEvent);
+  }
+
+  // --- Embeddings ---
+
+  async saveEmbeddings(entries: EmbeddingEntry[]): Promise<void> {
+    this.requireVec();
+    this.ensureVecTable();
+
+    const insertEmbedding = this.db.prepare(`
+      INSERT OR REPLACE INTO embeddings (file_path, chunk_index, chunk_text, git_sha, model, created_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `);
+    const deleteVec = this.db.prepare('DELETE FROM vec_embeddings WHERE rowid = ?');
+    const insertVec = this.db.prepare('INSERT INTO vec_embeddings(rowid, embedding) VALUES (?, ?)');
+
+    const txn = this.db.transaction((items: EmbeddingEntry[]) => {
+      for (const entry of items) {
+        const result = insertEmbedding.run(
+          entry.filePath, entry.chunkIndex, entry.chunkText,
+          entry.gitSha, entry.model, nowISO(),
+        );
+        // vec0 requires BigInt rowids — better-sqlite3 only sends true SQLite integers for BigInt
+        const rowid = typeof result.lastInsertRowid === 'bigint'
+          ? result.lastInsertRowid
+          : BigInt(result.lastInsertRowid);
+        deleteVec.run(rowid);
+        insertVec.run(rowid, entry.vector);
+      }
+    });
+
+    txn(entries);
+  }
+
+  async searchEmbeddings(queryVector: Float32Array, limit = 10): Promise<EmbeddingSearchResult[]> {
+    this.requireVec();
+    this.ensureVecTable();
+
+    const results = this.db.prepare(`
+      SELECT v.rowid, v.distance, e.file_path, e.chunk_index, e.chunk_text
+      FROM vec_embeddings v
+      JOIN embeddings e ON e.id = v.rowid
+      WHERE v.embedding MATCH ? AND k = ?
+      ORDER BY v.distance
+    `).all(queryVector, limit) as Array<{
+      rowid: number;
+      distance: number;
+      file_path: string;
+      chunk_index: number;
+      chunk_text: string;
+    }>;
+
+    return results.map(r => ({
+      id: r.rowid,
+      filePath: r.file_path,
+      chunkIndex: r.chunk_index,
+      chunkText: r.chunk_text,
+      score: 1 / (1 + r.distance),
+    }));
+  }
+
+  async getIndexedFiles(): Promise<Array<{ filePath: string; gitSha: string; model: string }>> {
+    const rows = this.db.prepare(`
+      SELECT DISTINCT file_path, git_sha, model FROM embeddings ORDER BY file_path
+    `).all() as Array<{ file_path: string; git_sha: string; model: string }>;
+
+    return rows.map(r => ({
+      filePath: r.file_path,
+      gitSha: r.git_sha,
+      model: r.model,
+    }));
+  }
+
+  async deleteEmbeddingsByFile(filePath: string): Promise<void> {
+    this.requireVec();
+    this.ensureVecTable();
+
+    const selectIds = this.db.prepare('SELECT id FROM embeddings WHERE file_path = ?');
+    const deleteVecRow = this.db.prepare('DELETE FROM vec_embeddings WHERE rowid = ?');
+    const deleteEmbRows = this.db.prepare('DELETE FROM embeddings WHERE file_path = ?');
+
+    const txn = this.db.transaction((fp: string) => {
+      const rows = selectIds.all(fp) as Array<{ id: number | bigint }>;
+      for (const row of rows) {
+        const rowid = typeof row.id === 'bigint' ? row.id : BigInt(row.id);
+        deleteVecRow.run(rowid);
+      }
+      deleteEmbRows.run(fp);
+    });
+
+    txn(filePath);
+  }
+
+  async getEmbeddingStats(): Promise<EmbeddingStats> {
+    const row = this.db.prepare(`
+      SELECT
+        COUNT(DISTINCT file_path) as fileCount,
+        COUNT(*) as chunkCount,
+        MAX(created_at) as lastIndexedAt
+      FROM embeddings
+    `).get() as { fileCount: number; chunkCount: number; lastIndexedAt: string | null };
+
+    const meta = await this.getIndexMeta();
+    return {
+      fileCount: row.fileCount,
+      chunkCount: row.chunkCount,
+      model: meta?.model ?? null,
+      dimensions: meta?.dimensions ?? null,
+      lastIndexedAt: row.lastIndexedAt,
+      lastIndexedSha: meta?.sha ?? null,
+    };
+  }
+
+  async setIndexMeta(sha: string, model: string, dimensions: number): Promise<void> {
+    this.db.prepare(`
+      INSERT INTO index_meta (id, last_sha, model, dimensions, updated_at)
+      VALUES (1, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET last_sha = excluded.last_sha, model = excluded.model,
+        dimensions = excluded.dimensions, updated_at = excluded.updated_at
+    `).run(sha, model, dimensions, nowISO());
+  }
+
+  async getIndexMeta(): Promise<IndexMeta | null> {
+    const row = this.db.prepare('SELECT last_sha, model, dimensions FROM index_meta WHERE id = 1')
+      .get() as { last_sha: string; model: string; dimensions: number } | undefined;
+
+    if (!row) return null;
+    return { sha: row.last_sha, model: row.model, dimensions: row.dimensions };
+  }
+
+  /** Recreate vec virtual table with new dimensions (used by `slope index --full`) */
+  recreateVecTable(dimensions: number): void {
+    if (!this.vecAvailable) {
+      throw new SlopeStoreError('EXTENSION_UNAVAILABLE',
+        'sqlite-vec extension not available. Install sqlite-vec: npm install sqlite-vec');
+    }
+    this.db.exec('DROP TABLE IF EXISTS vec_embeddings');
+    this.db.exec(`CREATE VIRTUAL TABLE vec_embeddings USING vec0(embedding float[${dimensions}])`);
+  }
+
+  /** Clear all embedding data (used by `slope index --full`) */
+  clearAllEmbeddings(): void {
+    this.db.exec('DELETE FROM embeddings');
+    this.db.exec('DELETE FROM index_meta');
+    if (this.vecAvailable) {
+      this.db.exec('DROP TABLE IF EXISTS vec_embeddings');
+    }
   }
 
   // --- Lifecycle ---

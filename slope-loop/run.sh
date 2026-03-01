@@ -120,9 +120,19 @@ run_ticket_with_model() {
     fi
   fi
 
-  # Inject CODEBASE.md for repo context
-  if [ -f "$SLOPE_DIR/CODEBASE.md" ]; then
-    aider_args+=(--read "$SLOPE_DIR/CODEBASE.md")
+  # Semantic context per ticket (fall back to CODEBASE.md)
+  CONTEXT_FILE="$LOG_DIR/${ticket_id}-context.md"
+  if pnpm slope context --ticket="$ticket_id" --format=snippets --top=8 > "$CONTEXT_FILE" 2>/dev/null; then
+    if [ -s "$CONTEXT_FILE" ]; then
+      aider_args+=(--read "$CONTEXT_FILE")
+      log "   Injected semantic context ($(wc -l < "$CONTEXT_FILE" | tr -d ' ') lines)"
+    else
+      log "   Warning: slope context returned empty — falling back to CODEBASE.md"
+      [ -f "$SLOPE_DIR/CODEBASE.md" ] && aider_args+=(--read "$SLOPE_DIR/CODEBASE.md")
+    fi
+  else
+    log "   Warning: slope context failed — falling back to CODEBASE.md"
+    [ -f "$SLOPE_DIR/CODEBASE.md" ] && aider_args+=(--read "$SLOPE_DIR/CODEBASE.md")
   fi
 
   timeout "$timeout_s" aider "${aider_args[@]}" \
@@ -233,6 +243,14 @@ fi
 # Create working branch
 BRANCH="$BRANCH_PREFIX/$SPRINT_ID"
 git checkout -b "$BRANCH" 2>/dev/null || git checkout "$BRANCH"
+
+# Ensure semantic index is current before starting tickets
+CURRENT_SHA=$(git rev-parse HEAD)
+INDEX_SHA=$(pnpm slope index --status --json 2>/dev/null | jq -r '.lastSha // empty' 2>/dev/null || true)
+if [ "$CURRENT_SHA" != "$INDEX_SHA" ]; then
+  log "Updating semantic index..."
+  timeout 120 pnpm slope index 2>/dev/null || log "Warning: slope index failed — using stale index"
+fi
 
 # Start Slope session
 slope session start --sprint="$SPRINT_ID" 2>/dev/null || true

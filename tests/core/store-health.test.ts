@@ -23,7 +23,7 @@ describe('checkStoreHealth', () => {
     const result = await checkStoreHealth(store, 'sqlite');
     expect(result.healthy).toBe(true);
     expect(result.type).toBe('sqlite');
-    expect(result.schemaVersion).toBe(3);
+    expect(result.schemaVersion).toBe(4);
     expect(result.stats.sessions).toBe(0);
     expect(result.stats.claims).toBe(0);
     expect(result.stats.scorecards).toBe(0);
@@ -47,7 +47,7 @@ describe('checkStoreHealth', () => {
     // Create a mock store with a broken getStats
     const brokenStore = {
       ...store,
-      async getSchemaVersion() { return 3; },
+      async getSchemaVersion() { return 4; },
       async getStats() { throw new Error('table corrupted'); },
     } as any;
 
@@ -56,7 +56,7 @@ describe('checkStoreHealth', () => {
     expect(result.errors).toHaveLength(1);
     expect(result.errors[0]).toContain('getStats failed');
     expect(result.errors[0]).toContain('table corrupted');
-    expect(result.schemaVersion).toBe(3);
+    expect(result.schemaVersion).toBe(4);
   });
 
   it('returns unhealthy when getSchemaVersion throws', async () => {

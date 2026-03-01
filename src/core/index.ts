@@ -607,5 +607,34 @@ export type {
   ReviewGate,
 } from './initiative.js';
 
+// Embedding
+export {
+  chunkFile,
+  shouldSkipFile,
+  MAX_CHUNK_FILE_SIZE,
+  SKIP_EXTENSIONS,
+  SKIP_DIRS,
+} from './embedding.js';
+export type {
+  EmbeddingConfig,
+  CodeChunk,
+  EmbeddingResult,
+} from './embedding.js';
+
+export { embed, embedBatch } from './embedding-client.js';
+
+export { hasEmbeddingSupport } from './embedding-store.js';
+export type {
+  EmbeddingStore,
+  EmbeddingEntry,
+  EmbeddingSearchResult,
+  EmbeddingStats,
+  IndexMeta,
+} from './embedding-store.js';
+
+// Context
+export { deduplicateByFile, formatContextForAgent } from './context.js';
+export type { ContextQuery, ContextResult } from './context.js';
+
 // Built-in metaphors (auto-registers on import)
 export { golf, tennis, baseball, gaming, dnd, matrix, agile } from './metaphors/index.js';
