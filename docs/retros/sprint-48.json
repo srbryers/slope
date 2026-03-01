@@ -1,0 +1,87 @@
+{
+  "sprint_number": 48,
+  "theme": "Pipeline Calibration",
+  "par": 3,
+  "slope": 1,
+  "score": 4,
+  "score_label": "bogey",
+  "date": "2026-03-01",
+  "shots": [
+    {
+      "ticket_key": "S48-1",
+      "title": "Align embedding score thresholds + deduplicate constraints",
+      "club": "putter",
+      "result": "green",
+      "hazards": []
+    },
+    {
+      "ticket_key": "S48-2",
+      "title": "Exclude slope-loop/ from semantic index",
+      "club": "putter",
+      "result": "green",
+      "hazards": []
+    },
+    {
+      "ticket_key": "S48-3",
+      "title": "Context injection validation in run.sh",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "description": "Off-by-one: -lt 500 should be -le 500 for inclusive line cap — caught by architect review",
+          "penalty": 0.5
+        }
+      ]
+    },
+    {
+      "ticket_key": "S48-4",
+      "title": "Re-index and E2E validation",
+      "club": "putter",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "description": "enrich.ts still used old 0.55 primary threshold — inconsistent with calibration rationale, caught by architect review",
+          "penalty": 0.5
+        }
+      ]
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 1,
+    "hazards_hit": 2,
+    "hazard_penalties": 1.0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [],
+  "special_plays": [],
+  "bunker_locations": [
+    "enrich.ts primary/related score tiers were inconsistent with context.ts default — always update all consumers when changing thresholds",
+    "Shell script arithmetic comparisons: -lt vs -le off-by-one — boundary values need explicit test or review"
+  ],
+  "yardage_book_updates": [
+    "context.ts default minScore: 0.55 → 0.4 (nomic-embed-text clusters relevant results at 0.45-0.55)",
+    "enrich.ts primary/related tiers: 0.55/0.4 → 0.4/0.3 (aligned with context.ts calibration)",
+    "prep.ts constraints: deduplicated against acceptance_criteria to avoid duplicate 'pnpm test passes'",
+    "embedding.ts SKIP_DIRS: added 'slope-loop' to exclude generated JSON, logs, scripts from index",
+    "run.sh: 500-line cap on semantic context injection, per-ticket timing, escalation reason logging"
+  ],
+  "course_management_notes": [
+    "All 4 tickets landed without reverts or test failures — clean execution",
+    "Architect review caught 2 warnings: enrich.ts threshold inconsistency and run.sh off-by-one — both fixed in follow-up commit",
+    "Pattern confirmed: review-discovered hazards continue to be the primary score inflator (S43-S48)",
+    "12 new tests added (10 embedding + 1 prep dedup + 1 enrich mock update), total suite: 2062 tests",
+    "Calibration sprint closed debt from S46-S47 embedding pipeline before next autonomous run"
+  ]
+}
