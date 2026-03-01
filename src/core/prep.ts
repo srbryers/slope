@@ -313,11 +313,11 @@ export async function generatePrepPlan(opts: {
   }
   const estimatedTokens = Math.ceil((totalBytes / 4) * 1.2);
 
-  // 7. Constraints
+  // 7. Constraints (deduplicate defaults against acceptance_criteria)
+  const defaults = ['pnpm test passes', 'pnpm typecheck passes'];
   const constraints = [
     ...(ticket.acceptance_criteria || []),
-    'pnpm test passes',
-    'pnpm typecheck passes',
+    ...defaults.filter(d => !(ticket.acceptance_criteria || []).includes(d)),
   ];
 
   return {

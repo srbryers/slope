@@ -34,7 +34,7 @@ export const SKIP_FILENAMES = new Set([
 ]);
 
 export const SKIP_DIRS = new Set([
-  'node_modules', 'dist', '.git', '.slope', 'coverage',
+  'node_modules', 'dist', '.git', '.slope', 'coverage', 'slope-loop',
 ]);
 
 const DEFAULT_MAX_LINES = 200;
