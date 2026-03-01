@@ -1,10 +1,10 @@
 ---
-generated_at: "2026-02-28T19:51:29.328Z"
-git_sha: "13bad34ebbed0458f8431cd0b18be80bac8dcc4e"
-sprint: 42
-source_files: 147
-test_files: 106
-cli_commands: 32
+generated_at: "2026-03-01T18:06:24.332Z"
+git_sha: "f994bc621969501a0dfbff0644660dd308b01c65"
+sprint: 46
+source_files: 153
+test_files: 109
+cli_commands: 29
 guards: 16
 flows: 0
 ---
@@ -18,7 +18,7 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
 <!-- AUTO-GENERATED: START packages -->
 
 ### `src/cli`
-- Source files: 60 | Test files: 31
+- Source files: 62 | Test files: 33
 - Key modules:
   - `config`
   - `hooks-config`
@@ -30,7 +30,7 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
   - `template-generator` — SLOPE Template Generator
 
 ### `src/core`
-- Source files: 75 | Test files: 65
+- Source files: 79 | Test files: 66
 - Key modules:
   - `advisor` — --- Module-private constants ---
   - `briefing` — --- Input types ---
@@ -38,16 +38,16 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
   - `ci-signals` — SLOPE — CI/Test Signal Parser
   - `config` — Write a complete SlopeConfig to .slope/config.json. Expects a full config object (use loadConfig() to read-modify-write).
   - `constants` — Maps ticket count ranges to par values
+  - `context` — SLOPE — Semantic Context Retrieval
   - `dashboard` — --- Dashboard Config ---
   - `dispersion` — --- Helpers ---
+  - `embedding-client` — SLOPE — HTTP Client for OpenAI-Compatible Embedding Endpoints
+  - `embedding-store` — SLOPE — EmbeddingStore Interface
+  - `embedding` — SLOPE — Embedding Types & Chunking Logic (pure — no HTTP calls)
   - `escalation` — SLOPE — Escalation Rules
   - `event-ingestion` — SLOPE — Real-Time Event Ingestion
   - `flows` — Flow tracking — map user-facing workflows to code paths.
-  - `formatter` — --- Input types ---
-  - `github` — SLOPE — Remote Git Analysis
-  - `guard` — SLOPE Guard Framework
-  - `handicap` — Compute par value from ticket count.
-  - ... and 29 more
+  - ... and 33 more
 
 ### `src/mcp`
 - Source files: 3 | Test files: 5
@@ -232,6 +232,15 @@ Re-exports from `src/core/index.ts`:
 **Initiative (Multi-Sprint Orchestration):**
 - `selectSpecialists`, `getReviewChecklist`, `getNextPhase`, `canAdvance`, `loadInitiative`, `saveInitiative`, `createInitiative`, `advanceSprint`, `recordReview`, `getNextSprint`, `formatInitiativeStatus`
 - `SpecialistType`, `InitiativeSprintPhase`, `ReviewGateConfig`, `ReviewRecord`, `InitiativeSprintStatus`, `InitiativeDefinition`, `ReviewChecklistItem`, `ReviewChecklistContext`, `ReviewChecklistType`, `ReviewGate` (types)
+**Embedding:**
+- `chunkFile`, `shouldSkipFile`, `MAX_CHUNK_FILE_SIZE`, `SKIP_EXTENSIONS`, `SKIP_DIRS`
+- `EmbeddingConfig`, `CodeChunk`, `EmbeddingResult` (types)
+- `embed`, `embedBatch`
+- `hasEmbeddingSupport`
+- `EmbeddingStore`, `EmbeddingEntry`, `EmbeddingSearchResult`, `EmbeddingStats`, `IndexMeta` (types)
+**Context:**
+- `deduplicateByFile`, `formatContextForAgent`
+- `ContextQuery`, `ContextResult` (types)
 **Built-in metaphors (auto-registers on import):**
 - `golf`, `tennis`, `baseball`, `gaming`, `dnd`, `matrix`, `agile`
 <!-- AUTO-GENERATED: END api -->
@@ -264,14 +273,11 @@ Re-exports from `src/core/index.ts`:
 - `slope distill` — Promote event patterns to common issues
 - `slope map` — Generate/update codebase map
 - `slope flows` — Manage user flow definitions
-- `slope metaphor` — Manage metaphor display themes
 - `slope plugin` — Manage custom plugins
-- `slope store` — Store diagnostics and management
 - `slope escalate` — Escalate issues based on severity triggers
 - `slope transcript` — View session transcript data
 - `slope roadmap` — Strategic planning and roadmap tools
 - `slope vision` — Display project vision document
-- `slope initiative` — Multi-sprint initiative orchestration
 <!-- AUTO-GENERATED: END cli -->
 
 ## Guard Definitions
@@ -316,14 +322,14 @@ Re-exports from `src/core/index.ts`:
 
 | Directory | Test Files | Command |
 |-----------|-----------|---------|
-| tests/cli | 31 | `pnpm test` |
-| tests/core | 65 | `pnpm test` |
+| tests/cli | 33 | `pnpm test` |
+| tests/core | 66 | `pnpm test` |
 | tests/mcp | 5 | `pnpm test` |
 | tests/store | 1 | `pnpm test` |
 | tests/store-pg | 2 | `pnpm test` |
 | tests/tokens | 1 | `pnpm test` |
 
-**Total test files:** 105
+**Total test files:** 108
 **Run all:** `pnpm -r test`
 **Typecheck:** `pnpm -r typecheck`
 <!-- AUTO-GENERATED: END tests -->
@@ -334,11 +340,11 @@ Re-exports from `src/core/index.ts`:
 
 | Sprint | Theme | Tickets | Score |
 |--------|-------|---------|-------|
-| **36** | The Clubhouse Bridge | 4 | par |
-| **38** | The Vault | 4 | par |
-| **39** | The Open Field | 4 | par |
-| **40** | The Welcome Mat | 4 | par |
 | **42** | The Caddy Interview | 4 | par |
+| **43** | The Review Gate | 4 | par |
+| **44** | The Data Mine | 4 | bogey |
+| **45** | The Autopilot | 4 | triple_plus |
+| **46** | The Rangefinder | 4 | triple_plus |
 <!-- AUTO-GENERATED: END history -->
 
 ## Known Gotchas
