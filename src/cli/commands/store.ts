@@ -1,5 +1,5 @@
 import { existsSync, copyFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join, resolve, dirname } from 'node:path';
 import Database from 'better-sqlite3';
 import { resolveStore, getStoreInfo } from '../store.js';
 import { LATEST_SCHEMA_VERSION } from '../../store/index.js';
@@ -144,16 +144,42 @@ async function backupStore(flags: Record<string, string>, cwd: string): Promise<
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').replace('T', '_').slice(0, 19);
   const output = flags.output ?? join(cwd, `.slope/slope-backup-${timestamp}.db`);
 
+  // Validate output path is writable
+  try {
+    const outputDir = dirname(output);
+    if (!existsSync(outputDir)) {
+      console.error(`Error: Output directory does not exist: ${outputDir}`);
+      process.exit(1);
+    }
+  } catch (err) {
+    console.error(`Error: Cannot access output path: ${(err as Error).message}`);
+    process.exit(1);
+  }
+
   // Checkpoint WAL to flush pending writes before copying
-  const db = new Database(dbPath);
+  let db: ReturnType<typeof Database>;
+  try {
+    db = new Database(dbPath);
+  } catch (err) {
+    console.error(`Error: Cannot open database for backup: ${(err as Error).message}`);
+    process.exit(1);
+  }
+
   try {
     db.pragma('wal_checkpoint(TRUNCATE)');
+  } catch (err) {
+    console.error(`Warning: WAL checkpoint failed: ${(err as Error).message}`);
   } finally {
     db.close();
   }
 
-  copyFileSync(dbPath, output);
-  console.log(`\nBackup created: ${output}\n`);
+  try {
+    copyFileSync(dbPath, output);
+    console.log(`\nBackup created: ${output}\n`);
+  } catch (err) {
+    console.error(`Error: Backup failed: ${(err as Error).message}`);
+    process.exit(1);
+  }
 }
 
 async function restoreStore(flags: Record<string, string>, cwd: string): Promise<void> {
@@ -179,15 +205,33 @@ async function restoreStore(flags: Record<string, string>, cwd: string): Promise
   // Validate the backup file is a valid SLOPE database
   try {
     const db = new Database(fromPath, { readonly: true });
+    let validationError: string | null = null;
     try {
-      const row = db.prepare('SELECT MAX(version) as v FROM schema_version').get() as { v: number | null } | undefined;
-      const version = row?.v ?? 0;
-      if (version === 0) {
-        console.error('Error: Backup file has no schema version — not a valid SLOPE database');
-        process.exit(1);
+      const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='schema_version'").get();
+      if (!tables) {
+        validationError = 'Backup file is not a valid SLOPE database (missing schema_version table)';
+      } else {
+        const row = db.prepare('SELECT MAX(version) as v FROM schema_version').get() as { v: number | null } | undefined;
+        const version = row?.v ?? 0;
+        if (version === 0) {
+          validationError = 'Backup file has no schema version — not a valid SLOPE database';
+        } else {
+          const coreTables = ['sessions', 'claims', 'scorecards', 'events'];
+          for (const table of coreTables) {
+            const exists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get(table);
+            if (!exists) {
+              validationError = `Backup file is missing required table: ${table}`;
+              break;
+            }
+          }
+        }
       }
     } finally {
       db.close();
+    }
+    if (validationError) {
+      console.error(`Error: ${validationError}`);
+      process.exit(1);
     }
   } catch (err) {
     console.error(`Error: Cannot read backup file: ${(err as Error).message}`);
@@ -197,7 +241,24 @@ async function restoreStore(flags: Record<string, string>, cwd: string): Promise
   const dbPath = resolve(cwd, info.path ?? '.slope/slope.db');
   const existed = existsSync(dbPath);
 
-  copyFileSync(fromPath, dbPath);
+  // Ensure target directory exists
+  try {
+    const dbDir = dirname(dbPath);
+    if (!existsSync(dbDir)) {
+      console.error(`Error: Target directory does not exist: ${dbDir}`);
+      process.exit(1);
+    }
+  } catch (err) {
+    console.error(`Error: Cannot access target directory: ${(err as Error).message}`);
+    process.exit(1);
+  }
+
+  try {
+    copyFileSync(fromPath, dbPath);
+  } catch (err) {
+    console.error(`Error: Restore failed: ${(err as Error).message}`);
+    process.exit(1);
+  }
 
   if (existed) {
     console.log(`\nStore restored from ${fromPath} (overwritten)\n`);

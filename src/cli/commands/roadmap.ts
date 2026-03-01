@@ -31,18 +31,32 @@ function resolveRoadmapPath(flags: Record<string, string>, cwd: string): string 
   return join(cwd, config.roadmapPath);
 }
 
-function loadRoadmapFile(flags: Record<string, string>, cwd: string): RoadmapDefinition | null {
+function loadRawRoadmap(flags: Record<string, string>, cwd: string): { path: string; raw: unknown } | null {
   const path = resolveRoadmapPath(flags, cwd);
-  let raw: unknown;
   try {
-    raw = JSON.parse(readFileSync(path, 'utf8'));
-  } catch {
-    console.error(`\nNo roadmap file found at: ${path}`);
-    console.error('Create one with "slope init" or specify --path=<file>\n');
+    const content = readFileSync(path, 'utf8');
+    if (!content.trim()) {
+      console.error(`\nRoadmap file is empty: ${path}\n`);
+      return null;
+    }
+    return { path, raw: JSON.parse(content) };
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      console.error(`\nNo roadmap file found at: ${path}`);
+      console.error('Create one with "slope init" or specify --path=<file>\n');
+    } else {
+      console.error(`\nFailed to parse roadmap file: ${path}`);
+      console.error(`Error: ${(error as Error).message}\n`);
+    }
     return null;
   }
+}
 
-  const { roadmap, validation } = parseRoadmap(raw);
+function loadRoadmapFile(flags: Record<string, string>, cwd: string): RoadmapDefinition | null {
+  const loaded = loadRawRoadmap(flags, cwd);
+  if (!loaded) return null;
+
+  const { roadmap, validation } = parseRoadmap(loaded.raw);
   if (!roadmap) {
     console.error('\nRoadmap file has structural errors:\n');
     for (const e of validation.errors) {
@@ -55,27 +69,30 @@ function loadRoadmapFile(flags: Record<string, string>, cwd: string): RoadmapDef
 }
 
 function resolveSprint(flags: Record<string, string>, cwd: string): number {
-  if (flags.sprint) return parseInt(flags.sprint, 10);
+  if (flags.sprint) {
+    const parsed = parseInt(flags.sprint, 10);
+    if (isNaN(parsed) || parsed < 1) {
+      console.error(`\nInvalid sprint number: ${flags.sprint}\n`);
+      process.exit(1);
+    }
+    return parsed;
+  }
   const config = loadConfig(cwd);
-  if (config.currentSprint) return config.currentSprint;
+  if (config.currentSprint && config.currentSprint > 0) return config.currentSprint;
   const scorecards = loadScorecards(config, cwd);
   if (scorecards.length === 0) return 1;
-  return Math.max(...scorecards.map(s => s.sprint_number)) + 1;
+  const sprintNumbers = scorecards.map(s => s.sprint_number).filter(n => typeof n === 'number' && n > 0);
+  if (sprintNumbers.length === 0) return 1;
+  return Math.max(...sprintNumbers) + 1;
 }
 
 // --- Subcommands ---
 
 function validateSubcommand(flags: Record<string, string>, cwd: string): void {
-  const path = resolveRoadmapPath(flags, cwd);
-  let raw: unknown;
-  try {
-    raw = JSON.parse(readFileSync(path, 'utf8'));
-  } catch {
-    console.error(`\nNo roadmap file found at: ${path}`);
-    console.error('Create one with "slope init" or specify --path=<file>\n');
-    process.exit(1);
-  }
+  const loaded = loadRawRoadmap(flags, cwd);
+  if (!loaded) process.exit(1);
 
+  const { path, raw } = loaded;
   const { roadmap, validation } = parseRoadmap(raw);
 
   console.log(`\nRoadmap: ${path}`);
@@ -139,31 +156,42 @@ function reviewSubcommand(flags: Record<string, string>, cwd: string): void {
 
   // 2. Scope balance
   console.log('\n## Scope Balance');
-  const ticketCounts = roadmap.sprints.map(s => s.tickets.length);
-  const avgTickets = ticketCounts.reduce((a, b) => a + b, 0) / ticketCounts.length;
-  const parValues = roadmap.sprints.map(s => s.par);
-  const avgPar = parValues.reduce((a, b) => a + b, 0) / parValues.length;
-  console.log(`  Tickets per sprint: min=${Math.min(...ticketCounts)} avg=${avgTickets.toFixed(1)} max=${Math.max(...ticketCounts)}`);
-  console.log(`  Par per sprint: min=${Math.min(...parValues)} avg=${avgPar.toFixed(1)} max=${Math.max(...parValues)}`);
+  if (roadmap.sprints.length === 0) {
+    console.log('  No sprints defined');
+  } else {
+    const ticketCounts = roadmap.sprints.map(s => s.tickets?.length ?? 0);
+    const avgTickets = ticketCounts.reduce((a, b) => a + b, 0) / ticketCounts.length;
+    const parValues = roadmap.sprints.map(s => s.par);
+    const avgPar = parValues.reduce((a, b) => a + b, 0) / parValues.length;
+    console.log(`  Tickets per sprint: min=${Math.min(...ticketCounts)} avg=${avgTickets.toFixed(1)} max=${Math.max(...ticketCounts)}`);
+    console.log(`  Par per sprint: min=${Math.min(...parValues)} avg=${avgPar.toFixed(1)} max=${Math.max(...parValues)}`);
 
-  // Flag outliers
-  for (const sprint of roadmap.sprints) {
-    if (sprint.tickets.length > 4) {
-      console.log(`  \u26A0 S${sprint.id} has ${sprint.tickets.length} tickets (over recommended 4)`);
+    // Flag outliers
+    for (const sprint of roadmap.sprints) {
+      const ticketCount = sprint.tickets?.length ?? 0;
+      if (ticketCount > 4) {
+        console.log(`  \u26A0 S${sprint.id} has ${ticketCount} tickets (over recommended 4)`);
+      }
+      if (ticketCount < 3) {
+        console.log(`  \u26A0 S${sprint.id} has ${ticketCount} tickets (under recommended 3)`);
+      }
     }
-    if (sprint.tickets.length < 3) {
-      console.log(`  \u26A0 S${sprint.id} has ${sprint.tickets.length} tickets (under recommended 3)`);
+
+    // Club distribution
+    const clubCounts: Record<string, number> = {};
+    for (const sprint of roadmap.sprints) {
+      if (sprint.tickets) {
+        for (const ticket of sprint.tickets) {
+          if (ticket.club) {
+            clubCounts[ticket.club] = (clubCounts[ticket.club] ?? 0) + 1;
+          }
+        }
+      }
+    }
+    if (Object.keys(clubCounts).length > 0) {
+      console.log(`  Club distribution: ${Object.entries(clubCounts).map(([k, v]) => `${k}=${v}`).join(', ')}`);
     }
   }
-
-  // Club distribution
-  const clubCounts: Record<string, number> = {};
-  for (const sprint of roadmap.sprints) {
-    for (const ticket of sprint.tickets) {
-      clubCounts[ticket.club] = (clubCounts[ticket.club] ?? 0) + 1;
-    }
-  }
-  console.log(`  Club distribution: ${Object.entries(clubCounts).map(([k, v]) => `${k}=${v}`).join(', ')}`);
 
   // 3. Critical path analysis
   console.log('\n## Critical Path');
@@ -181,11 +209,13 @@ function reviewSubcommand(flags: Record<string, string>, cwd: string): void {
 
   // 4. Parallel opportunities
   console.log('\n## Parallelism');
-  if (parallelGroups.length === 0) {
+  if (!parallelGroups || parallelGroups.length === 0) {
     console.log('  No parallel opportunities — all sprints are sequentially dependent');
   } else {
     for (const group of parallelGroups) {
-      console.log(`  \u2713 ${group.sprints.map(id => `S${id}`).join(', ')}: ${group.reason}`);
+      if (group.sprints && group.sprints.length > 0) {
+        console.log(`  \u2713 ${group.sprints.map(id => `S${id}`).join(', ')}: ${group.reason || 'No dependencies'}`);
+      }
     }
   }
 
@@ -224,10 +254,17 @@ function statusSubcommand(flags: Record<string, string>, cwd: string): void {
   console.log(`\nCurrent sprint: S${currentSprint}`);
   console.log('');
 
-  for (const phase of roadmap.phases) {
+  for (const phase of roadmap.phases || []) {
+    if (!phase.sprints || !Array.isArray(phase.sprints)) {
+      console.log(`## ${phase.name || 'Unnamed Phase'} (0/0)`);
+      console.log('  No sprints defined for this phase');
+      console.log('');
+      continue;
+    }
+
     const phaseSprints = roadmap.sprints.filter(s => phase.sprints.includes(s.id));
     const completed = phaseSprints.filter(s => completedSprints.has(s.id)).length;
-    console.log(`## ${phase.name} (${completed}/${phaseSprints.length})`);
+    console.log(`## ${phase.name || 'Unnamed Phase'} (${completed}/${phaseSprints.length})`);
 
     for (const sprint of phaseSprints) {
       const isCompleted = completedSprints.has(sprint.id);
@@ -248,7 +285,8 @@ function statusSubcommand(flags: Record<string, string>, cwd: string): void {
         status = '\u25CB pending';
       }
 
-      console.log(`  S${sprint.id} ${sprint.theme.padEnd(30)} ${status}`);
+      const theme = sprint.theme || 'Untitled Sprint';
+      console.log(`  S${sprint.id} ${theme.padEnd(30)} ${status}`);
     }
     console.log('');
   }
