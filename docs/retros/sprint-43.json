@@ -1,0 +1,74 @@
+{
+  "sprint_number": 43,
+  "theme": "The Review Gate",
+  "par": 4,
+  "slope": 2,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-02-28",
+  "shots": [
+    {
+      "ticket_key": "S43-1",
+      "title": "Initiative types, specialist selection, state machine",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": []
+    },
+    {
+      "ticket_key": "S43-2",
+      "title": "ml-engineer, database, ux-designer role definitions",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": []
+    },
+    {
+      "ticket_key": "S43-3",
+      "title": "Initiative CLI (create/status/next/advance/review/checklist)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": []
+    },
+    {
+      "ticket_key": "S43-4",
+      "title": "Initiative core + CLI tests (67 tests)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": []
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    "new_subsystem",
+    "cross_package"
+  ],
+  "special_plays": [],
+  "bunker_locations": [
+    "Initiative state machine requires careful transition validation — invalid transitions must be caught before file I/O",
+    "Specialist selection uses word-boundary matching — simple substring match would over-match (e.g., 'data' matching 'database')"
+  ],
+  "yardage_book_updates": [
+    "src/core/initiative.ts is the canonical initiative orchestration module — types, state machine, specialist selection, file I/O with mkdir-based locking",
+    "Initiative phases: pending → planning → plan_review → executing → scoring → pr_review → complete",
+    "Specialist roles (ml-engineer, database, ux-designer) are in src/core/roles.ts alongside existing role definitions"
+  ],
+  "course_management_notes": [
+    "Initiative orchestration scope pivoted from roadmap's Loop Foundation plan — review gate system prioritized for sprint quality",
+    "67 tests cover specialist selection edge cases (word boundary, multi-specialist, tie-breaking, fallback), state machine transitions, file I/O roundtrip, and CLI subcommands",
+    "mkdir-based locking pattern (.slope/.initiative.lock) chosen for simplicity over advisory file locks"
+  ]
+}

@@ -125,9 +125,48 @@ export const devops: RoleDefinition = {
   },
 };
 
+export const ml_engineer: RoleDefinition = {
+  id: 'ml-engineer',
+  name: 'ML Engineer',
+  description: 'Model integration, embeddings, and inference specialist',
+  focusAreas: ['src/**/ml*', 'src/**/embed*', 'src/**/model*', 'src/**/inference*'],
+  clubPreferences: { 'model-integration': 'short_iron', embeddings: 'wedge', inference: 'short_iron' },
+  briefingFilter: {
+    emphasize: ['model', 'embedding', 'inference', 'token', 'vector', 'prediction'],
+    deemphasize: ['styling', 'accessibility', 'component'],
+  },
+};
+
+export const database: RoleDefinition = {
+  id: 'database',
+  name: 'Database Engineer',
+  description: 'Schema design, migrations, query optimization specialist',
+  focusAreas: ['src/store*', 'src/**/migration*', 'src/**/schema*'],
+  clubPreferences: { migration: 'wedge', schema: 'short_iron', query: 'short_iron' },
+  briefingFilter: {
+    emphasize: ['schema', 'migration', 'query', 'store', 'database', 'index'],
+    deemphasize: ['styling', 'component', 'accessibility'],
+  },
+};
+
+export const ux_designer: RoleDefinition = {
+  id: 'ux-designer',
+  name: 'UX Designer',
+  description: 'User flows, onboarding, accessibility, and progressive disclosure specialist',
+  focusAreas: ['src/**/init*', 'src/**/interview*', 'src/**/template*', 'docs/tutorial*', 'docs/getting-started*'],
+  clubPreferences: { onboarding: 'short_iron', flow: 'short_iron', accessibility: 'wedge' },
+  briefingFilter: {
+    emphasize: ['flow', 'onboarding', 'accessibility', 'tutorial', 'ux', 'interview'],
+    deemphasize: ['schema', 'migration', 'query', 'database'],
+  },
+};
+
 // Auto-register built-in roles
 registerRole(generalist);
 registerRole(backend);
 registerRole(frontend);
 registerRole(architect);
 registerRole(devops);
+registerRole(ml_engineer);
+registerRole(database);
+registerRole(ux_designer);

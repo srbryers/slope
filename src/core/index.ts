@@ -360,6 +360,9 @@ export {
   frontend,
   architect,
   devops,
+  ml_engineer,
+  database,
+  ux_designer,
 } from './roles.js';
 export type { RoleDefinition } from './roles.js';
 
@@ -576,6 +579,33 @@ export type {
   TranscriptTurn,
   TranscriptLine,
 } from './types.js';
+
+// Initiative (Multi-Sprint Orchestration)
+export {
+  selectSpecialists,
+  getReviewChecklist,
+  getNextPhase,
+  canAdvance,
+  loadInitiative,
+  saveInitiative,
+  createInitiative,
+  advanceSprint,
+  recordReview,
+  getNextSprint,
+  formatInitiativeStatus,
+} from './initiative.js';
+export type {
+  SpecialistType,
+  InitiativeSprintPhase,
+  ReviewGateConfig,
+  ReviewRecord,
+  InitiativeSprintStatus,
+  InitiativeDefinition,
+  ReviewChecklistItem,
+  ReviewChecklistContext,
+  ReviewChecklistType,
+  ReviewGate,
+} from './initiative.js';
 
 // Built-in metaphors (auto-registers on import)
 export { golf, tennis, baseball, gaming, dnd, matrix, agile } from './metaphors/index.js';

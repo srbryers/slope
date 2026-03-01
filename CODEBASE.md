@@ -1,10 +1,10 @@
 ---
-generated_at: "2026-02-27T18:03:44.026Z"
-git_sha: "42af8560c81196796fde5e556f679ddeeff6cdfb"
-sprint: 38
-source_files: 140
-test_files: 96
-cli_commands: 30
+generated_at: "2026-02-28T19:51:29.328Z"
+git_sha: "13bad34ebbed0458f8431cd0b18be80bac8dcc4e"
+sprint: 42
+source_files: 147
+test_files: 106
+cli_commands: 32
 guards: 16
 flows: 0
 ---
@@ -18,10 +18,11 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
 <!-- AUTO-GENERATED: START packages -->
 
 ### `src/cli`
-- Source files: 57 | Test files: 27
+- Source files: 60 | Test files: 31
 - Key modules:
   - `config`
   - `hooks-config`
+  - `interactive-init` — SLOPE — Rich Interactive Init (powered by @clack/prompts)
   - `loader`
   - `metaphor` — CLI metaphor resolution
   - `registry` — CLI Command Registry — metadata for CLI commands (map generation, documentation, slope-web)
@@ -29,13 +30,13 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
   - `template-generator` — SLOPE Template Generator
 
 ### `src/core`
-- Source files: 71 | Test files: 60
+- Source files: 75 | Test files: 65
 - Key modules:
   - `advisor` — --- Module-private constants ---
   - `briefing` — --- Input types ---
   - `builder` — --- Helpers ---
   - `ci-signals` — SLOPE — CI/Test Signal Parser
-  - `config`
+  - `config` — Write a complete SlopeConfig to .slope/config.json. Expects a full config object (use loadConfig() to read-modify-write).
   - `constants` — Maps ticket count ranges to par values
   - `dashboard` — --- Dashboard Config ---
   - `dispersion` — --- Helpers ---
@@ -46,10 +47,10 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
   - `github` — SLOPE — Remote Git Analysis
   - `guard` — SLOPE Guard Framework
   - `handicap` — Compute par value from ticket count.
-  - ... and 25 more
+  - ... and 29 more
 
 ### `src/mcp`
-- Source files: 3 | Test files: 4
+- Source files: 3 | Test files: 5
 - Key modules:
   - `registry` — ─── Core Scoring Enums ───
   - `sandbox` — SLOPE sandbox — runs agent-written JS in a node:vm context
@@ -117,11 +118,11 @@ Re-exports from `src/core/index.ts`:
 - `RoadmapDefinition`, `RoadmapSprint`, `RoadmapTicket`, `RoadmapPhase`, `RoadmapClub`, `RoadmapValidationResult`, `RoadmapValidationError`, `RoadmapValidationWarning`, `CriticalPathResult`, `ParallelGroup` (types)
 **Config:**
 - `SlopeConfig` (types)
-- `loadConfig`, `createConfig`, `resolveConfigPath`
+- `loadConfig`, `createConfig`, `saveConfig`, `resolveConfigPath`
 **Loader:**
 - `loadScorecards`, `detectLatestSprint`, `resolveCurrentSprint`
 **Metaphor:**
-- `registerMetaphor`, `getMetaphor`, `listMetaphors`, `hasMetaphor`, `validateMetaphor`
+- `registerMetaphor`, `getMetaphor`, `listMetaphors`, `hasMetaphor`, `validateMetaphor`, `METAPHOR_SCHEMA`
 - `MetaphorDefinition`, `MetaphorVocabulary`, `ClubTerms`, `ShotResultTerms`, `HazardTerms`, `ConditionTerms`, `SpecialPlayTerms`, `MissDirectionTerms`, `ScoreLabelTerms`, `SprintTypeTerms`, `TrainingTypeTerms`, `NutritionTerms` (types)
 **Event Pipeline:**
 - `clusterEvents`, `findPromotionCandidates`, `runPipeline`
@@ -153,7 +154,7 @@ Re-exports from `src/core/index.ts`:
 - `extractRoleData`, `computeRoleHandicap`, `computeSwarmEfficiency`, `analyzeRoleCombinations`, `computeTeamHandicap`
 - `RoleHandicap`, `SwarmEfficiency`, `RoleCombinationStats`, `TeamHandicapCard` (types)
 **Roles:**
-- `registerRole`, `getRole`, `hasRole`, `listRoles`, `loadCustomRoles`, `generalist`, `backend`, `frontend`, `architect`, `devops`
+- `registerRole`, `getRole`, `hasRole`, `listRoles`, `loadCustomRoles`, `generalist`, `backend`, `frontend`, `architect`, `devops`, `ml_engineer`, `database`, `ux_designer`
 - `RoleDefinition` (types)
 **Escalation:**
 - `resolveEscalationConfig`, `detectEscalation`, `buildEscalationEvent`
@@ -162,8 +163,8 @@ Re-exports from `src/core/index.ts`:
 - `generateStandup`, `formatStandup`, `parseStandup`, `extractRelevantHandoffs`, `aggregateStandups`, `formatTeamStandup`
 - `StandupReport`, `HandoffEntry`, `TeamStandup` (types)
 **Plugin System:**
-- `validatePluginManifest`, `discoverPlugins`, `loadPlugins`, `loadPluginMetaphors`, `loadPluginGuards`, `isPluginEnabled`
-- `PluginType`, `PluginManifest`, `DiscoveredPlugin`, `PluginLoadResult`, `PluginsConfig` (types)
+- `validatePluginManifest`, `discoverPlugins`, `loadPlugins`, `loadPluginMetaphors`, `loadPluginGuards`, `isPluginEnabled`, `saveCustomMetaphor`
+- `PluginType`, `PluginManifest`, `DiscoveredPlugin`, `PluginLoadResult`, `PluginsConfig`, `SaveMetaphorResult` (types)
 **Leaderboard (Multi-Developer):**
 - `buildLeaderboard`, `formatLeaderboard`, `renderLeaderboardHtml`
 - `LeaderboardEntry`, `Leaderboard` (types)
@@ -177,8 +178,17 @@ Re-exports from `src/core/index.ts`:
 - `parseFlows`, `validateFlows`, `checkFlowStaleness`, `loadFlows`
 - `FlowStep`, `FlowDefinition`, `FlowsFile`, `FlowValidationResult`, `FlowStalenessResult` (types)
 **Interview (Init):**
-- `validateInitInput`, `initFromInterview`
-- `InitInput`, `InitResult` (types)
+- `validateInitInput`, `initFromInterview`, `initFromAnswers`
+- `InitInput`, `InitResult`, `InitFromAnswersResult` (types)
+**Metaphor Preview:**
+- `buildMetaphorPreview`, `buildAllPreviews`, `formatPreviewText`
+- `MetaphorPreview` (types)
+**Interview Steps:**
+- `generateInterviewSteps`
+- `StepType`, `StepOption`, `InterviewStep` (types)
+**Interview Engine:**
+- `runLightweightDetection`, `buildInterviewContext`, `validateInterviewAnswers`, `answersToInitInput`
+- `DetectedInfo`, `InterviewContext` (types)
 **Project Registry (Multi-Project):**
 - `FileProjectRegistry`
 - `ProjectRegistry` (types)
@@ -219,6 +229,9 @@ Re-exports from `src/core/index.ts`:
 **Transcript:**
 - `getTranscriptPath`, `appendTurn`, `readTranscript`, `listTranscripts`
 - `ToolCallSummary`, `TranscriptTurn`, `TranscriptLine` (types)
+**Initiative (Multi-Sprint Orchestration):**
+- `selectSpecialists`, `getReviewChecklist`, `getNextPhase`, `canAdvance`, `loadInitiative`, `saveInitiative`, `createInitiative`, `advanceSprint`, `recordReview`, `getNextSprint`, `formatInitiativeStatus`
+- `SpecialistType`, `InitiativeSprintPhase`, `ReviewGateConfig`, `ReviewRecord`, `InitiativeSprintStatus`, `InitiativeDefinition`, `ReviewChecklistItem`, `ReviewChecklistContext`, `ReviewChecklistType`, `ReviewGate` (types)
 **Built-in metaphors (auto-registers on import):**
 - `golf`, `tennis`, `baseball`, `gaming`, `dnd`, `matrix`, `agile`
 <!-- AUTO-GENERATED: END api -->
@@ -251,12 +264,14 @@ Re-exports from `src/core/index.ts`:
 - `slope distill` — Promote event patterns to common issues
 - `slope map` — Generate/update codebase map
 - `slope flows` — Manage user flow definitions
+- `slope metaphor` — Manage metaphor display themes
 - `slope plugin` — Manage custom plugins
 - `slope store` — Store diagnostics and management
 - `slope escalate` — Escalate issues based on severity triggers
 - `slope transcript` — View session transcript data
 - `slope roadmap` — Strategic planning and roadmap tools
 - `slope vision` — Display project vision document
+- `slope initiative` — Multi-sprint initiative orchestration
 <!-- AUTO-GENERATED: END cli -->
 
 ## Guard Definitions
@@ -301,14 +316,14 @@ Re-exports from `src/core/index.ts`:
 
 | Directory | Test Files | Command |
 |-----------|-----------|---------|
-| tests/cli | 27 | `pnpm test` |
-| tests/core | 60 | `pnpm test` |
-| tests/mcp | 4 | `pnpm test` |
+| tests/cli | 31 | `pnpm test` |
+| tests/core | 65 | `pnpm test` |
+| tests/mcp | 5 | `pnpm test` |
 | tests/store | 1 | `pnpm test` |
 | tests/store-pg | 2 | `pnpm test` |
 | tests/tokens | 1 | `pnpm test` |
 
-**Total test files:** 95
+**Total test files:** 105
 **Run all:** `pnpm -r test`
 **Typecheck:** `pnpm -r typecheck`
 <!-- AUTO-GENERATED: END tests -->
@@ -319,11 +334,11 @@ Re-exports from `src/core/index.ts`:
 
 | Sprint | Theme | Tickets | Score |
 |--------|-------|---------|-------|
-| **33** | The Transcript | 4 | par |
-| **34** | The Universal Caddy | 5 | par |
-| **35** | The Equipment Room | 4 | par |
 | **36** | The Clubhouse Bridge | 4 | par |
 | **38** | The Vault | 4 | par |
+| **39** | The Open Field | 4 | par |
+| **40** | The Welcome Mat | 4 | par |
+| **42** | The Caddy Interview | 4 | par |
 <!-- AUTO-GENERATED: END history -->
 
 ## Known Gotchas
@@ -332,14 +347,4 @@ Top recurring patterns from common-issues:
 
 <!-- AUTO-GENERATED: START gotchas -->
 
-- **Example pattern** (general, 1 sprint): This is an example recurring pattern. Replace with your own.
-- **Run full Post-Hole routine after every sprint** (general, 1 sprint): After filing the scorecard, it's easy to skip validate + review + common-issues.
-- **Workspace packages must use workspace:* protocol for local deps** (monorepo, 1 sprint): mcp-tools had @srbryers/core pinned to ^0.3.3 (npm), so TypeScript resolved the published version instead of the local workspace version with new exports.
-- **Core package needs @types/node when importing node: modules** (monorepo, 1 sprint): Moving config.ts/loader.ts to core failed to compile because core didn't have @types/node — it had been a pure-logic package until now.
-- **better-sqlite3 native build requires pnpm onlyBuiltDependencies approval** (monorepo, 1 sprint): pnpm ignores native build scripts by default. better-sqlite3 silently fails to compile, causing runtime errors. pnpm approve-builds is interactive and unusable in CI/agent contexts.
-- **Making sync functions async breaks callers that don't await** (general, 1 sprint): Changing initCommand from sync to async caused 5 CLI tests to fail — they called initCommand() without await, so assertions ran before the async work completed.
-- **tsconfig.json must exclude *.test.ts when tests live alongside source** (monorepo, 1 sprint): store-sqlite had tests in src/index.test.ts. The default include: ['src/**/*.ts'] pulled test files into the build, causing type errors from test-only types to surface during tsc.
-- **TypeScript strict mode rejects interface-to-Record<string,unknown> cast** (typescript, 1 sprint): SlopeConfig interface has no index signature, so TypeScript strict mode rejects `config as Record<string, unknown>`. The workaround is double-cast via unknown, but the real fix is adding the field to the interface.
-- **Async CLI commands need await/rejects in tests, not sync toThrow** (testing, 1 sprint): When a CLI command is async and mocks process.exit, using `expect(() => fn()).toThrow()` silently passes because the promise rejection is unhandled. Tests appear to pass but assertions never execute.
-- **Telemetry tables should not have FK constraints to session tables** (database, 1 sprint): Events table initially had REFERENCES sessions(session_id). This prevented inserting events with session IDs that don't exist in the sessions table (e.g., from external tools or after session cleanup).
 <!-- AUTO-GENERATED: END gotchas -->

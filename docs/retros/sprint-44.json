@@ -1,0 +1,79 @@
+{
+  "sprint_number": 44,
+  "theme": "The Data Mine",
+  "par": 4,
+  "slope": 1,
+  "score": 5,
+  "score_label": "bogey",
+  "date": "2026-02-28",
+  "shots": [
+    {
+      "ticket_key": "S44-1",
+      "title": "Scaffold slope-loop directory with agent guide skill",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": []
+    },
+    {
+      "ticket_key": "S44-2",
+      "title": "analyze-scorecards.ts with temporal weighting",
+      "club": "short_iron",
+      "result": "fairway",
+      "hazards": [
+        {
+          "type": "rough",
+          "description": "HandicapCard property access wrong — used current/trend instead of last_5/last_10/all_time.handicap. Required immediate fix commit."
+        }
+      ]
+    },
+    {
+      "ticket_key": "S44-3",
+      "title": "model-selector.ts and dashboard.ts scripts",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": []
+    },
+    {
+      "ticket_key": "S44-4",
+      "title": "Run analyze-scorecards against 39 existing scorecards",
+      "club": "putter",
+      "result": "in_the_hole",
+      "hazards": []
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 3,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 1,
+    "hazards_hit": 1,
+    "hazard_penalties": 1,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    "new_subsystem"
+  ],
+  "special_plays": [],
+  "bunker_locations": [
+    "HandicapCard API uses last_5/last_10/all_time nested objects, not flat current/trend fields — always verify core type shapes before consuming",
+    "Temporal weighting with recency decay requires careful threshold tuning — dynamic ceil(N * 0.1) scales better than fixed thresholds"
+  ],
+  "yardage_book_updates": [
+    "slope-loop/analyze-scorecards.ts mines scorecard data → analysis.json + backlog.json with 5 strategy types (hardening, testing, cleanup, docs, meta)",
+    "slope-loop/model-selector.ts reads *-models.jsonl for data-driven model tier recommendations with cost-per-success",
+    "slope-loop/dashboard.ts generates static HTML with handicap trends, model rates, escalation stats, cost tracking",
+    "slope-loop/slope-loop-guide/SKILL.md is the agent guide skill with YAML frontmatter following Agent Skills spec"
+  ],
+  "course_management_notes": [
+    "Bogey from HandicapCard property access miss — required a fix commit (28f32d4) immediately after the initial implementation",
+    "Analysis of 39 scorecards showed handicap 0 (improving), 100% club success rates, 'rough' as sole recurring hazard",
+    "Generated 4-sprint backlog covers hardening, cleanup, documentation, and meta strategies from mined scorecard data"
+  ]
+}
