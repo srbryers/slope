@@ -205,32 +205,33 @@ async function restoreStore(flags: Record<string, string>, cwd: string): Promise
   // Validate the backup file is a valid SLOPE database
   try {
     const db = new Database(fromPath, { readonly: true });
+    let validationError: string | null = null;
     try {
-      // Check if schema_version table exists
       const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='schema_version'").get();
       if (!tables) {
-        console.error('Error: Backup file is not a valid SLOPE database (missing schema_version table)');
-        process.exit(1);
-      }
-
-      const row = db.prepare('SELECT MAX(version) as v FROM schema_version').get() as { v: number | null } | undefined;
-      const version = row?.v ?? 0;
-      if (version === 0) {
-        console.error('Error: Backup file has no schema version — not a valid SLOPE database');
-        process.exit(1);
-      }
-
-      // Verify core tables exist
-      const coreTables = ['sessions', 'claims', 'scorecards', 'events'];
-      for (const table of coreTables) {
-        const exists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get(table);
-        if (!exists) {
-          console.error(`Error: Backup file is missing required table: ${table}`);
-          process.exit(1);
+        validationError = 'Backup file is not a valid SLOPE database (missing schema_version table)';
+      } else {
+        const row = db.prepare('SELECT MAX(version) as v FROM schema_version').get() as { v: number | null } | undefined;
+        const version = row?.v ?? 0;
+        if (version === 0) {
+          validationError = 'Backup file has no schema version — not a valid SLOPE database';
+        } else {
+          const coreTables = ['sessions', 'claims', 'scorecards', 'events'];
+          for (const table of coreTables) {
+            const exists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get(table);
+            if (!exists) {
+              validationError = `Backup file is missing required table: ${table}`;
+              break;
+            }
+          }
         }
       }
     } finally {
       db.close();
+    }
+    if (validationError) {
+      console.error(`Error: ${validationError}`);
+      process.exit(1);
     }
   } catch (err) {
     console.error(`Error: Cannot read backup file: ${(err as Error).message}`);

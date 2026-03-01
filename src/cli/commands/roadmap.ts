@@ -31,16 +31,15 @@ function resolveRoadmapPath(flags: Record<string, string>, cwd: string): string 
   return join(cwd, config.roadmapPath);
 }
 
-function loadRoadmapFile(flags: Record<string, string>, cwd: string): RoadmapDefinition | null {
+function loadRawRoadmap(flags: Record<string, string>, cwd: string): { path: string; raw: unknown } | null {
   const path = resolveRoadmapPath(flags, cwd);
-  let raw: unknown;
   try {
     const content = readFileSync(path, 'utf8');
     if (!content.trim()) {
       console.error(`\nRoadmap file is empty: ${path}\n`);
       return null;
     }
-    raw = JSON.parse(content);
+    return { path, raw: JSON.parse(content) };
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
       console.error(`\nNo roadmap file found at: ${path}`);
@@ -51,8 +50,13 @@ function loadRoadmapFile(flags: Record<string, string>, cwd: string): RoadmapDef
     }
     return null;
   }
+}
 
-  const { roadmap, validation } = parseRoadmap(raw);
+function loadRoadmapFile(flags: Record<string, string>, cwd: string): RoadmapDefinition | null {
+  const loaded = loadRawRoadmap(flags, cwd);
+  if (!loaded) return null;
+
+  const { roadmap, validation } = parseRoadmap(loaded.raw);
   if (!roadmap) {
     console.error('\nRoadmap file has structural errors:\n');
     for (const e of validation.errors) {
@@ -85,26 +89,10 @@ function resolveSprint(flags: Record<string, string>, cwd: string): number {
 // --- Subcommands ---
 
 function validateSubcommand(flags: Record<string, string>, cwd: string): void {
-  const path = resolveRoadmapPath(flags, cwd);
-  let raw: unknown;
-  try {
-    const content = readFileSync(path, 'utf8');
-    if (!content.trim()) {
-      console.error(`\nRoadmap file is empty: ${path}\n`);
-      process.exit(1);
-    }
-    raw = JSON.parse(content);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      console.error(`\nNo roadmap file found at: ${path}`);
-      console.error('Create one with "slope init" or specify --path=<file>\n');
-    } else {
-      console.error(`\nFailed to parse roadmap file: ${path}`);
-      console.error(`Error: ${(error as Error).message}\n`);
-    }
-    process.exit(1);
-  }
+  const loaded = loadRawRoadmap(flags, cwd);
+  if (!loaded) process.exit(1);
 
+  const { path, raw } = loaded;
   const { roadmap, validation } = parseRoadmap(raw);
 
   console.log(`\nRoadmap: ${path}`);
