@@ -45,6 +45,13 @@ log() { echo "[$(date '+%H:%M:%S')] $*" | tee -a "$LOG_DIR/loop.log"; }
 select_model() {
   local club="$1"
   local max_files="${2:-1}"
+  local est_tokens="${3:-0}"
+
+  # Token-based escalation: won't fit in Qwen 32K context
+  if [ "$est_tokens" -gt 24000 ]; then
+    echo "$MODEL_API"
+    return
+  fi
 
   # Multi-file routing: 2+ files -> escalate to API model
   # (lowered from 3 per ML review — Qwen struggles with multi-file coordination)
@@ -133,6 +140,24 @@ run_ticket_with_model() {
   else
     log "   Warning: slope context failed — falling back to CODEBASE.md"
     [ -f "$SLOPE_DIR/CODEBASE.md" ] && aider_args+=(--read "$SLOPE_DIR/CODEBASE.md")
+  fi
+
+  # Generate prep plan per ticket (fall back silently)
+  PREP_FILE="$LOG_DIR/${ticket_id}-prep.md"
+  if pnpm slope prep "${ticket_id}" --top=5 > "${PREP_FILE}" 2>"${PREP_FILE}.err"; then
+    if [ -s "${PREP_FILE}" ]; then
+      # Token budget check: ~400 tokens max (~1600 words)
+      PREP_WORDS=$(wc -w < "${PREP_FILE}" | tr -d ' ')
+      if [ "${PREP_WORDS}" -lt 1600 ]; then
+        aider_args+=(--read "${PREP_FILE}")
+        log "   Injected prep plan (~$((PREP_WORDS / 4)) tokens)"
+      else
+        log "   Prep plan too large (~$((PREP_WORDS / 4)) tokens) — skipping"
+      fi
+    fi
+  else
+    log "   Warning: slope prep failed — continuing without plan"
+    [ -s "${PREP_FILE}.err" ] && log "   $(head -1 "${PREP_FILE}.err")"
   fi
 
   timeout "$timeout_s" aider "${aider_args[@]}" \
@@ -231,9 +256,10 @@ if [ "$DRY_RUN" = "true" ]; then
   echo "$SPRINT" | jq -c '.tickets[]' | while read -r TICKET; do
     TICKET_CLUB=$(echo "$TICKET" | jq -r '.club')
     TICKET_MAX_FILES=$(echo "$TICKET" | jq -r '.max_files // 1')
-    TICKET_MODEL=$(select_model "$TICKET_CLUB" "$TICKET_MAX_FILES")
+    TICKET_EST_TOKENS=$(echo "$TICKET" | jq -r '.estimated_tokens // 0')
+    TICKET_MODEL=$(select_model "$TICKET_CLUB" "$TICKET_MAX_FILES" "$TICKET_EST_TOKENS")
     TICKET_KEY=$(echo "$TICKET" | jq -r '.key')
-    log "  $TICKET_KEY -> model: $TICKET_MODEL (club=$TICKET_CLUB, files=$TICKET_MAX_FILES)"
+    log "  $TICKET_KEY -> model: $TICKET_MODEL (club=$TICKET_CLUB, files=$TICKET_MAX_FILES, tokens=$TICKET_EST_TOKENS)"
   done
   log "--- Dry run complete ---"
   rmdir "$RESULTS_DIR/$SPRINT_ID.lock" 2>/dev/null || true
@@ -252,6 +278,13 @@ if [ "$CURRENT_SHA" != "$INDEX_SHA" ]; then
   timeout 120 pnpm slope index 2>/dev/null || log "Warning: slope index failed — using stale index"
 fi
 
+# Enrich backlog if not already enriched (check for _enrichMeta version field)
+ENRICH_VERSION=$(jq -r '._enrichMeta.version // 0' "$BACKLOG" 2>/dev/null)
+if [ "$ENRICH_VERSION" -lt 1 ] 2>/dev/null; then
+  log "Enriching backlog with file context..."
+  timeout 120 pnpm slope enrich "$BACKLOG" 2>/dev/null || log "Warning: slope enrich failed"
+fi
+
 # Start Slope session
 slope session start --sprint="$SPRINT_ID" 2>/dev/null || true
 
@@ -266,11 +299,12 @@ while read -r TICKET; do
   TICKET_ACCEPTANCE=$(echo "$TICKET" | jq -r '.acceptance_criteria | join("; ")')
   TICKET_CLUB=$(echo "$TICKET" | jq -r '.club')
   TICKET_MAX_FILES=$(echo "$TICKET" | jq -r '.max_files // 1')
+  EST_TOKENS=$(echo "$TICKET" | jq -r '.estimated_tokens // 0')
 
   log "-- Ticket: $TICKET_KEY — $TICKET_TITLE --"
-  log "   Club: $TICKET_CLUB (max_files: $TICKET_MAX_FILES)"
+  log "   Club: $TICKET_CLUB (max_files: $TICKET_MAX_FILES, est_tokens: $EST_TOKENS)"
 
-  TICKET_MODEL=$(select_model "$TICKET_CLUB" "$TICKET_MAX_FILES")
+  TICKET_MODEL=$(select_model "$TICKET_CLUB" "$TICKET_MAX_FILES" "$EST_TOKENS")
   TICKET_TIMEOUT=$(select_timeout "$TICKET_CLUB")
   log "   Model: $TICKET_MODEL (timeout: ${TICKET_TIMEOUT}s)"
 
