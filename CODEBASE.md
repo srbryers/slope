@@ -1,10 +1,10 @@
 ---
-generated_at: "2026-03-01T19:28:15.894Z"
-git_sha: "0d9aa476b253987e6c6f3b02b77f36113f5e0dd6"
-sprint: 47
+generated_at: "2026-03-01T20:22:49.930Z"
+git_sha: "2c091113ba86d0af04ba39fc8d3bf5271e56cf9b"
+sprint: 48
 source_files: 157
-test_files: 113
-cli_commands: 29
+test_files: 114
+cli_commands: 36
 guards: 16
 flows: 0
 ---
@@ -30,7 +30,7 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
   - `template-generator` — SLOPE Template Generator
 
 ### `src/core`
-- Source files: 81 | Test files: 68
+- Source files: 81 | Test files: 69
 - Key modules:
   - `advisor` — --- Module-private constants ---
   - `briefing` — --- Input types ---
@@ -233,7 +233,7 @@ Re-exports from `src/core/index.ts`:
 - `selectSpecialists`, `getReviewChecklist`, `getNextPhase`, `canAdvance`, `loadInitiative`, `saveInitiative`, `createInitiative`, `advanceSprint`, `recordReview`, `getNextSprint`, `formatInitiativeStatus`
 - `SpecialistType`, `InitiativeSprintPhase`, `ReviewGateConfig`, `ReviewRecord`, `InitiativeSprintStatus`, `InitiativeDefinition`, `ReviewChecklistItem`, `ReviewChecklistContext`, `ReviewChecklistType`, `ReviewGate` (types)
 **Embedding:**
-- `chunkFile`, `shouldSkipFile`, `MAX_CHUNK_FILE_SIZE`, `SKIP_EXTENSIONS`, `SKIP_DIRS`
+- `chunkFile`, `shouldSkipFile`, `MAX_CHUNK_FILE_SIZE`, `SKIP_EXTENSIONS`, `SKIP_FILENAMES`, `SKIP_DIRS`
 - `EmbeddingConfig`, `CodeChunk`, `EmbeddingResult` (types)
 - `embed`, `embedBatch`
 - `hasEmbeddingSupport`
@@ -279,11 +279,18 @@ Re-exports from `src/core/index.ts`:
 - `slope distill` — Promote event patterns to common issues
 - `slope map` — Generate/update codebase map
 - `slope flows` — Manage user flow definitions
+- `slope metaphor` — Manage metaphor display themes
 - `slope plugin` — Manage custom plugins
+- `slope store` — Store diagnostics and management
 - `slope escalate` — Escalate issues based on severity triggers
 - `slope transcript` — View session transcript data
 - `slope roadmap` — Strategic planning and roadmap tools
 - `slope vision` — Display project vision document
+- `slope initiative` — Multi-sprint initiative orchestration
+- `slope index-cmd` — Semantic embedding index management
+- `slope context` — Semantic context search for agents
+- `slope prep` — Generate execution plan for a ticket
+- `slope enrich` — Batch-enrich backlog with file context
 <!-- AUTO-GENERATED: END cli -->
 
 ## Guard Definitions
@@ -329,13 +336,13 @@ Re-exports from `src/core/index.ts`:
 | Directory | Test Files | Command |
 |-----------|-----------|---------|
 | tests/cli | 35 | `pnpm test` |
-| tests/core | 68 | `pnpm test` |
+| tests/core | 69 | `pnpm test` |
 | tests/mcp | 5 | `pnpm test` |
 | tests/store | 1 | `pnpm test` |
 | tests/store-pg | 2 | `pnpm test` |
 | tests/tokens | 1 | `pnpm test` |
 
-**Total test files:** 112
+**Total test files:** 113
 **Run all:** `pnpm -r test`
 **Typecheck:** `pnpm -r typecheck`
 <!-- AUTO-GENERATED: END tests -->
@@ -346,11 +353,11 @@ Re-exports from `src/core/index.ts`:
 
 | Sprint | Theme | Tickets | Score |
 |--------|-------|---------|-------|
-| **43** | The Review Gate | 4 | par |
 | **44** | The Data Mine | 4 | bogey |
 | **45** | The Autopilot | 4 | triple_plus |
 | **46** | The Rangefinder | 4 | triple_plus |
 | **47** | The Yardage Book v2 | 4 | par |
+| **48** | Pipeline Calibration | 4 | bogey |
 <!-- AUTO-GENERATED: END history -->
 
 ## Known Gotchas
@@ -359,4 +366,5 @@ Top recurring patterns from common-issues:
 
 <!-- AUTO-GENERATED: START gotchas -->
 
+- **Example pattern** (general, 1 sprint): This is an example recurring pattern. Replace with your own.
 <!-- AUTO-GENERATED: END gotchas -->
