@@ -77,8 +77,9 @@ function run(): void {
   const apiPassRate = apiTickets.length > 0
     ? Math.round(apiTickets.filter(r => r.tests_passing).length / apiTickets.length * 100) : 0;
 
-  // Rough cost estimate: ~$3 per API ticket
-  const estimatedAPICost = apiTickets.length * 3;
+  // Estimated cost per API ticket (MiniMax M2.5 @ ~$3/ticket avg based on ~2k input + 4k output tokens)
+  const API_COST_PER_TICKET = 3;
+  const estimatedAPICost = apiTickets.length * API_COST_PER_TICKET;
 
   const overallPassRate = totalTickets > 0 ? Math.round(passing / totalTickets * 100) : 0;
   const escSaveRate = escalated > 0 ? Math.round(escalatedSaved / escalated * 100) : 0;

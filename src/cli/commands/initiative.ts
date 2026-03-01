@@ -123,6 +123,10 @@ function advanceSubcommand(flags: Record<string, string>, cwd: string): void {
   }
 }
 
+const VALID_REVIEWERS = new Set([
+  'architect', 'code', 'backend', 'ml-engineer', 'database', 'frontend', 'ux-designer',
+]);
+
 function reviewSubcommand(flags: Record<string, string>, cwd: string): void {
   const sprintStr = flags.sprint;
   const gate = flags.gate as ReviewGate | undefined;
@@ -139,6 +143,11 @@ function reviewSubcommand(flags: Record<string, string>, cwd: string): void {
     process.exit(1);
   }
 
+  if (!VALID_REVIEWERS.has(reviewer)) {
+    console.error(`\n\u2717 Invalid reviewer: "${reviewer}". Valid: ${[...VALID_REVIEWERS].join(', ')}\n`);
+    process.exit(1);
+  }
+
   const sprintNumber = parseInt(sprintStr, 10);
   if (isNaN(sprintNumber)) {
     console.error(`\n\u2717 Invalid sprint number: ${sprintStr}\n`);
@@ -146,6 +155,10 @@ function reviewSubcommand(flags: Record<string, string>, cwd: string): void {
   }
 
   const findingsCount = findingsStr ? parseInt(findingsStr, 10) : 0;
+  if (isNaN(findingsCount) || findingsCount < 0) {
+    console.error(`\n\u2717 Invalid findings count: ${findingsStr}\n`);
+    process.exit(1);
+  }
 
   try {
     recordReview(cwd, sprintNumber, gate, reviewer, findingsCount);

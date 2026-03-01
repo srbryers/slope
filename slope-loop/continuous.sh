@@ -103,6 +103,7 @@ while [ "$completed" -lt "$MAX_SPRINTS" ]; do
   if "$RUNNER" "$next_sprint" $DRY_RUN 2>&1 | tee -a "$LOG_DIR/continuous.log"; then
     log "Sprint $next_sprint completed successfully"
     completed=$((completed + 1))
+    failures=0  # Reset consecutive failure counter on success
   else
     log "Sprint $next_sprint failed (exit $?)"
     failures=$((failures + 1))
@@ -119,11 +120,6 @@ while [ "$completed" -lt "$MAX_SPRINTS" ]; do
   if [ "$completed" -lt "$MAX_SPRINTS" ] && [ -z "$DRY_RUN" ]; then
     log "Pausing ${PAUSE_BETWEEN}s before next sprint..."
     sleep "$PAUSE_BETWEEN"
-  fi
-
-  # Reset failure counter on success
-  if [ "$failures" -gt 0 ] && [ -f "$RESULTS_DIR/${next_sprint}.json" ]; then
-    failures=0
   fi
 done
 

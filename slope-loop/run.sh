@@ -303,9 +303,13 @@ START by reading the relevant source files, then implement the change."
       FINAL_MODEL="$MODEL_API"
       ESCALATED="true"
 
-      # Reset changes from failed attempt
-      git checkout -- . 2>/dev/null || true
-      git clean -fd 2>/dev/null || true
+      # Reset changes from failed attempt (stash for recovery)
+      log "   Stashing failed changes for recovery (git stash)"
+      git stash push -m "slope-loop: failed $TICKET_KEY ($(date '+%Y%m%d-%H%M%S'))" 2>/dev/null || {
+        log "   Warning: git stash failed, resetting"
+        git checkout -- . 2>/dev/null || true
+        git clean -fd 2>/dev/null || true
+      }
 
       if run_ticket_with_model "$TICKET_KEY" "$MODEL_API" "$MODEL_API_TIMEOUT" "$PROMPT"; then
         log "   Tests passing for $TICKET_KEY after escalation to $MODEL_API"

@@ -5,6 +5,11 @@
 
 set -euo pipefail
 
+# Preflight: required tools
+for cmd in jq git pnpm; do
+  command -v "$cmd" >/dev/null 2>&1 || { echo "Required: $cmd"; exit 1; }
+done
+
 SLOPE_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 RUNNER="$SLOPE_DIR/slope-loop/run.sh"
 BACKLOG="$SLOPE_DIR/slope-loop/backlog.json"
@@ -132,7 +137,7 @@ else
   git -C "$SLOPE_DIR" worktree add "$WORKTREE_B" -b "$branch_b" 2>/dev/null || {
     log "Failed to create worktree B — cleaning up A, falling back to sequential"
     git -C "$SLOPE_DIR" worktree remove "$WORKTREE_A" --force 2>/dev/null || true
-    git -C "$SLOPE_DIR" branch -D "$branch_a" 2>/dev/null || true
+    git -C "$SLOPE_DIR" branch -d "$branch_a" 2>/dev/null || log "Note: branch $branch_a has unmerged changes, keeping"
     "$RUNNER" "$sprint_a" $DRY_RUN 2>&1 | tee -a "$LOG_DIR/parallel.log"
     "$RUNNER" "$sprint_b" $DRY_RUN 2>&1 | tee -a "$LOG_DIR/parallel.log"
     exit $?
@@ -181,8 +186,8 @@ else
   log "Cleaning up worktrees..."
   git -C "$SLOPE_DIR" worktree remove "$WORKTREE_A" --force 2>/dev/null || true
   git -C "$SLOPE_DIR" worktree remove "$WORKTREE_B" --force 2>/dev/null || true
-  git -C "$SLOPE_DIR" branch -D "$branch_a" 2>/dev/null || true
-  git -C "$SLOPE_DIR" branch -D "$branch_b" 2>/dev/null || true
+  git -C "$SLOPE_DIR" branch -d "$branch_a" 2>/dev/null || log "Note: branch $branch_a has unmerged changes, keeping"
+  git -C "$SLOPE_DIR" branch -d "$branch_b" 2>/dev/null || log "Note: branch $branch_b has unmerged changes, keeping"
 
   log "=== Parallel Runner Complete ==="
   log "Sprint A ($sprint_a): $([ $exit_a -eq 0 ] && echo 'PASS' || echo 'FAIL')"

@@ -1,7 +1,7 @@
 import type { ReviewType } from './types.js';
 // RoadmapDefinition used via parseRoadmap return type
 
-import { readFileSync, writeFileSync, mkdirSync, rmdirSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, rmSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { parseRoadmap } from './roadmap.js';
 
@@ -95,7 +95,7 @@ export function getNextPhase(current: InitiativeSprintPhase): InitiativeSprintPh
   return VALID_TRANSITIONS[current];
 }
 
-export function canAdvance(sprint: InitiativeSprintStatus, gates: ReviewGateConfig): { ok: boolean; reason?: string } {
+export function canAdvance(sprint: InitiativeSprintStatus, gates: ReviewGateConfig): { ok: true } | { ok: false; reason: string } {
   const next = getNextPhase(sprint.phase);
   if (!next) return { ok: false, reason: `Sprint is already complete` };
 
@@ -279,12 +279,29 @@ export function getReviewChecklist(
 const INITIATIVE_FILE = '.slope/initiative.json';
 const INITIATIVE_LOCK = '.slope/.initiative.lock';
 
+function isProcessAlive(pid: number): boolean {
+  try { process.kill(pid, 0); return true; } catch { return false; }
+}
+
 function acquireLock(cwd: string): boolean {
   const lockDir = join(cwd, INITIATIVE_LOCK);
+  const parent = join(cwd, '.slope');
+  if (!existsSync(parent)) {
+    mkdirSync(parent, { recursive: true });
+  }
   try {
     mkdirSync(lockDir, { recursive: false });
+    writeFileSync(join(lockDir, 'pid'), String(process.pid));
     return true;
   } catch {
+    // Check for stale lock
+    try {
+      const pid = parseInt(readFileSync(join(lockDir, 'pid'), 'utf8'), 10);
+      if (!isNaN(pid) && !isProcessAlive(pid)) {
+        rmSync(lockDir, { recursive: true });
+        return acquireLock(cwd); // retry once after removing stale lock
+      }
+    } catch { /* lock dir exists but no pid file — treat as held */ }
     return false;
   }
 }
@@ -292,7 +309,7 @@ function acquireLock(cwd: string): boolean {
 function releaseLock(cwd: string): void {
   const lockDir = join(cwd, INITIATIVE_LOCK);
   try {
-    rmdirSync(lockDir);
+    rmSync(lockDir, { recursive: true });
   } catch { /* lock already released */ }
 }
 
@@ -308,12 +325,13 @@ function withLock<T>(cwd: string, fn: () => T): T {
 }
 
 export function loadInitiative(cwd: string): InitiativeDefinition | null {
-  const path = join(cwd, INITIATIVE_FILE);
-  if (!existsSync(path)) return null;
+  const filePath = join(cwd, INITIATIVE_FILE);
+  if (!existsSync(filePath)) return null;
+  const raw = readFileSync(filePath, 'utf8');
   try {
-    return JSON.parse(readFileSync(path, 'utf8')) as InitiativeDefinition;
-  } catch {
-    return null;
+    return JSON.parse(raw) as InitiativeDefinition;
+  } catch (err) {
+    throw new Error(`Corrupted initiative file at ${INITIATIVE_FILE}: ${(err as Error).message}`);
   }
 }
 
@@ -389,10 +407,11 @@ export function advanceSprint(
   if (!sprint) throw new Error(`Sprint ${sprintNumber} not found in initiative.`);
 
   const check = canAdvance(sprint, initiative.review_gates);
-  if (!check.ok) throw new Error(check.reason!);
+  if (!check.ok) throw new Error(check.reason);
 
   const previous = sprint.phase;
-  const next = getNextPhase(sprint.phase)!;
+  const next = getNextPhase(sprint.phase);
+  if (!next) throw new Error(`Cannot advance sprint ${sprintNumber}: no next phase from "${sprint.phase}".`);
 
   // On transition to plan_review, populate expected review records if empty
   if (next === 'plan_review' && sprint.plan_reviews.length === 0) {
