@@ -122,7 +122,7 @@ run_ticket_with_model() {
 
   # Semantic context per ticket (fall back to CODEBASE.md)
   CONTEXT_FILE="$LOG_DIR/${ticket_id}-context.md"
-  if pnpm slope context --ticket="$ticket_id" --format=full --top=8 > "$CONTEXT_FILE" 2>/dev/null; then
+  if pnpm slope context --ticket="$ticket_id" --format=snippets --top=8 > "$CONTEXT_FILE" 2>/dev/null; then
     if [ -s "$CONTEXT_FILE" ]; then
       aider_args+=(--read "$CONTEXT_FILE")
       log "   Injected semantic context ($(wc -l < "$CONTEXT_FILE" | tr -d ' ') lines)"

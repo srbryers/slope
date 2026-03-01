@@ -16,12 +16,14 @@ function parseArgs(args: string[]): {
   file: string | null;
   top: number;
   format: 'paths' | 'snippets' | 'full';
+  minScore: number;
 } {
   let query: string | null = null;
   let ticket: string | null = null;
   let file: string | null = null;
   let top = 5;
   let format: 'paths' | 'snippets' | 'full' = 'snippets';
+  let minScore = 0.0;
 
   for (const arg of args) {
     if (arg.startsWith('--ticket=')) {
@@ -30,6 +32,8 @@ function parseArgs(args: string[]): {
       file = arg.slice('--file='.length);
     } else if (arg.startsWith('--top=')) {
       top = parseInt(arg.slice('--top='.length), 10) || 5;
+    } else if (arg.startsWith('--min-score=')) {
+      minScore = parseFloat(arg.slice('--min-score='.length)) || 0;
     } else if (arg.startsWith('--format=')) {
       const f = arg.slice('--format='.length);
       if (f === 'paths' || f === 'snippets' || f === 'full') {
@@ -40,7 +44,7 @@ function parseArgs(args: string[]): {
     }
   }
 
-  return { query, ticket, file, top, format };
+  return { query, ticket, file, top, format, minScore };
 }
 
 function resolveTicketQuery(ticketKey: string, cwd: string, config: ReturnType<typeof loadConfig>): string {
@@ -169,8 +173,11 @@ export async function contextCommand(args: string[]): Promise<void> {
       score: r.score,
     }));
 
-    // Deduplicate by file and limit
-    const deduped = deduplicateByFile(contextResults).slice(0, flags.top);
+    // Deduplicate by file, filter by min score, and limit
+    const threshold = flags.minScore > 0 ? flags.minScore : 0.55;
+    const deduped = deduplicateByFile(contextResults)
+      .filter(r => r.score >= threshold)
+      .slice(0, flags.top);
 
     if (deduped.length === 0) {
       // Output nothing — caller checks for empty
