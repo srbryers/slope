@@ -1,5 +1,5 @@
 import { existsSync, copyFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join, resolve, dirname } from 'node:path';
 import Database from 'better-sqlite3';
 import { resolveStore, getStoreInfo } from '../store.js';
 import { LATEST_SCHEMA_VERSION } from '../../store/index.js';
