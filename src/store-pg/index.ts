@@ -7,6 +7,7 @@ import type { CommonIssuesFile } from '../core/briefing.js';
 import type { StoreStats } from '../core/store.js';
 import { SlopeStoreError } from '../core/store.js';
 import type { SlopeStore, SlopeSession } from '../core/store.js';
+import type { EmbeddingStore, EmbeddingEntry, EmbeddingSearchResult, EmbeddingStats, IndexMeta } from '../core/embedding-store.js';
 
 // pg types — imported dynamically at runtime, typed here for compilation
 type Pool = import('pg').Pool;
@@ -107,6 +108,31 @@ const MIGRATIONS: Array<{ version: number; sql: string }> = [
       CREATE INDEX IF NOT EXISTS idx_events_type ON events(type);
     `,
   },
+  {
+    version: 2,
+    sql: `
+      CREATE TABLE IF NOT EXISTS embeddings (
+        id SERIAL PRIMARY KEY,
+        file_path TEXT NOT NULL,
+        chunk_index INTEGER NOT NULL DEFAULT 0,
+        chunk_text TEXT NOT NULL,
+        git_sha TEXT NOT NULL,
+        model TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        UNIQUE(file_path, chunk_index, model)
+      );
+
+      CREATE TABLE IF NOT EXISTS index_meta (
+        id INTEGER PRIMARY KEY DEFAULT 1,
+        last_sha TEXT NOT NULL,
+        model TEXT NOT NULL,
+        dimensions INTEGER NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_embeddings_file ON embeddings(file_path);
+    `,
+  },
 ];
 
 export interface PostgresStoreOptions {
@@ -115,7 +141,7 @@ export interface PostgresStoreOptions {
   projectId?: string;
 }
 
-export class PostgresSlopeStore implements SlopeStore {
+export class PostgresSlopeStore implements SlopeStore, EmbeddingStore {
   private pool: Pool;
   private ownedPool: boolean;
   private projectId: string;
@@ -470,6 +496,41 @@ export class PostgresSlopeStore implements SlopeStore {
       [ticketKey, this.projectId],
     );
     return result.rows.map(rowToEvent);
+  }
+
+  // --- Embeddings (stub — pgvector deferred) ---
+
+  private throwPgEmbeddingUnavailable(): never {
+    throw new SlopeStoreError('EXTENSION_UNAVAILABLE',
+      'PG embedding search requires pgvector. Use SQLite store or install pgvector.');
+  }
+
+  async saveEmbeddings(_entries: EmbeddingEntry[]): Promise<void> {
+    this.throwPgEmbeddingUnavailable();
+  }
+
+  async searchEmbeddings(_queryVector: Float32Array, _limit?: number): Promise<EmbeddingSearchResult[]> {
+    this.throwPgEmbeddingUnavailable();
+  }
+
+  async getIndexedFiles(): Promise<Array<{ filePath: string; gitSha: string; model: string }>> {
+    this.throwPgEmbeddingUnavailable();
+  }
+
+  async deleteEmbeddingsByFile(_filePath: string): Promise<void> {
+    this.throwPgEmbeddingUnavailable();
+  }
+
+  async getEmbeddingStats(): Promise<EmbeddingStats> {
+    this.throwPgEmbeddingUnavailable();
+  }
+
+  async setIndexMeta(_sha: string, _model: string, _dimensions: number): Promise<void> {
+    this.throwPgEmbeddingUnavailable();
+  }
+
+  async getIndexMeta(): Promise<IndexMeta | null> {
+    this.throwPgEmbeddingUnavailable();
   }
 
   // --- Lifecycle ---

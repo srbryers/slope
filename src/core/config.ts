@@ -54,6 +54,12 @@ export interface SlopeConfig {
     connectionString: string;
     projectId?: string;
   };
+  embedding?: {
+    endpoint: string;
+    model: string;
+    dimensions: number;
+    apiKey?: string;
+  };
 }
 
 const DEFAULT_CONFIG: SlopeConfig = {
