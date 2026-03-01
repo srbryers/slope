@@ -1,0 +1,79 @@
+{
+  "sprint_number": 47,
+  "theme": "The Yardage Book v2",
+  "par": 4,
+  "slope": 2,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-03-01",
+  "shots": [
+    {
+      "ticket_key": "S47-1",
+      "title": "Core prep module — types, plan generation, formatting",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": []
+    },
+    {
+      "ticket_key": "S47-2",
+      "title": "slope prep CLI command + tests",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": []
+    },
+    {
+      "ticket_key": "S47-3",
+      "title": "Core enrich module + slope enrich CLI + tests",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": []
+    },
+    {
+      "ticket_key": "S47-4",
+      "title": "run.sh integration — prep injection, token routing, auto-enrichment",
+      "club": "putter",
+      "result": "green",
+      "hazards": []
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    "cross_module"
+  ],
+  "special_plays": [],
+  "bunker_locations": [
+    "walkDir recursive traversal could be slow in large repos — acceptable for tests/ directory size",
+    "Token estimation bytes/4 * 1.2 is approximate — ±20% vs actual tokenizer count",
+    "extractHazards returns all bunker_locations when modules array is empty — intentional but potentially noisy"
+  ],
+  "yardage_book_updates": [
+    "src/core/prep.ts: PrepPlan/TicketData types, resolveTicket (roadmap→backlog), buildQueryText, collectTestFiles (recursive walk + stem matching), findSimilarTickets (keyword overlap), extractHazards (bunker_location substring match), generatePrepPlan, formatPrepPlan",
+    "src/core/enrich.ts: EnrichedTicket/EnrichedBacklog types, estimateTokens (bytes/4*1.2), enrichTicket (primary ≥0.55 / related ≥0.4 score tiers), enrichBacklog (batch + _enrichMeta versioning)",
+    "src/cli/commands/prep.ts: slope prep <ticket-id> [--json] [--top=5] — follows context.ts pattern with store lifecycle",
+    "src/cli/commands/enrich.ts: slope enrich [backlog-path] [--output] [--with-plans] [--top=5] — atomic write via tmp+rename",
+    "slope-loop/run.sh: select_model() token escalation (>24K→API), pre-sprint auto-enrichment (_enrichMeta version check), per-ticket prep plan injection (~400 token budget)"
+  ],
+  "course_management_notes": [
+    "All 4 tickets landed without reverts or test failures — clean execution",
+    "Both code and architect reviews approved with 0 blocking findings",
+    "4 low-severity notes + 6 informational observations — no action required for v1",
+    "Shared helpers factored into prep.ts and reused by enrich.ts — clean dependency direction (enrich→prep)",
+    "46 new tests added (25 core/prep + 11 core/enrich + 5 cli/prep + 5 cli/enrich), total suite: 2028 tests",
+    "Builds on S46 embedding infrastructure — embed(), deduplicateByFile(), hasEmbeddingSupport(), SqliteSlopeStore"
+  ]
+}
