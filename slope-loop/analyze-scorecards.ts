@@ -27,6 +27,26 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+// --- File Reference Extraction ---
+
+// Match patterns like "enrich.ts", "src/core/prep.ts", "run.sh"
+const FILE_REF_PATTERN = /\b((?:[\w.-]+\/)*[\w.-]+\.(?:ts|js|sh|json))\b/g;
+
+function extractFileRefs(texts: string[]): string[] {
+  const refs = new Set<string>();
+  for (const text of texts) {
+    for (const match of text.matchAll(FILE_REF_PATTERN)) {
+      const file = match[1];
+      // Skip non-source bare json files (e.g. "analysis.json")
+      if (file.endsWith('.json') && !file.includes('/')) continue;
+      // Skip docs, templates, and config directories
+      if (file.startsWith('docs/') || file.startsWith('templates/') || file.startsWith('.claude/')) continue;
+      refs.add(file);
+    }
+  }
+  return [...refs];
+}
+
 // --- Temporal Weighting ---
 
 const RECENCY_WEIGHT = 0.7;
@@ -65,6 +85,8 @@ interface HotspotModule {
   area: string;
   risk_score: number;
   hazard_types: Record<string, number>;
+  source_files: string[];
+  hazard_descriptions: string[];
 }
 
 interface Analysis {
@@ -80,6 +102,8 @@ interface Analysis {
   hazards: {
     frequency: HazardFrequency[];
     by_module: Record<string, Record<string, number>>;
+    type_files: Record<string, string[]>;
+    type_descriptions: Record<string, string[]>;
   };
   misses: {
     frequency: MissPattern[];
@@ -137,6 +161,12 @@ function analyze(): void {
   const hazardTotalCounts: Record<string, number> = {};
   const hazardRecentCounts: Record<string, number> = {};
   const hazardByModule: Record<string, Record<string, number>> = {};
+  // Track source files and descriptions per area
+  const hazardFileRefs: Record<string, Set<string>> = {};
+  const hazardDescs: Record<string, string[]> = {};
+  // Track file refs per hazard type (for cleanup strategy)
+  const hazardTypeFiles: Record<string, Set<string>> = {};
+  const hazardTypeDescs: Record<string, string[]> = {};
 
   for (const card of scorecards) {
     const isRecent = card.sprint_number >= recentCutoff;
@@ -152,7 +182,28 @@ function analyze(): void {
         const area = shot.title ?? 'unknown';
         if (!hazardByModule[area]) hazardByModule[area] = {};
         hazardByModule[area][type] = (hazardByModule[area][type] ?? 0) + 1;
+
+        // Extract file refs from hazard descriptions
+        const desc = hazard.description ?? '';
+        const refs = extractFileRefs([desc]);
+        if (!hazardFileRefs[area]) hazardFileRefs[area] = new Set();
+        for (const ref of refs) hazardFileRefs[area].add(ref);
+        if (!hazardDescs[area]) hazardDescs[area] = [];
+        if (desc) hazardDescs[area].push(desc);
+
+        // Track per hazard type (for cleanup strategy)
+        if (!hazardTypeFiles[type]) hazardTypeFiles[type] = new Set();
+        for (const ref of refs) hazardTypeFiles[type].add(ref);
+        if (!hazardTypeDescs[type]) hazardTypeDescs[type] = [];
+        if (desc) hazardTypeDescs[type].push(desc);
       }
+    }
+
+    // Extract file refs from bunker_locations
+    for (const bunker of card.bunker_locations ?? []) {
+      const refs = extractFileRefs([bunker]);
+      if (!hazardTypeFiles['rough']) hazardTypeFiles['rough'] = new Set();
+      for (const ref of refs) hazardTypeFiles['rough'].add(ref);
     }
   }
 
@@ -246,6 +297,8 @@ function analyze(): void {
       area,
       risk_score: data.score,
       hazard_types: data.hazards,
+      source_files: [...(hazardFileRefs[area] ?? [])],
+      hazard_descriptions: (hazardDescs[area] ?? []).slice(0, 5),
     }));
 
   // --- Build analysis output ---
@@ -263,6 +316,12 @@ function analyze(): void {
     hazards: {
       frequency: hazardFrequency,
       by_module: hazardByModule,
+      type_files: Object.fromEntries(
+        Object.entries(hazardTypeFiles).map(([k, v]) => [k, [...v]]),
+      ),
+      type_descriptions: Object.fromEntries(
+        Object.entries(hazardTypeDescs).map(([k, v]) => [k, v.slice(0, 10)]),
+      ),
     },
     misses: {
       frequency: missPatterns,
@@ -336,7 +395,10 @@ function generateBacklog(analysis: Analysis, sprintCount: number): void {
   const safeClub = (clubSuccessMap.short_iron ?? 100) < 60 ? 'wedge' : 'short_iron';
 
   // --- Strategy 1: Harden hotspot modules ---
-  const topHotspots = analysis.hotspots.slice(0, 3);
+  // Only include hotspots that have identifiable source files
+  const topHotspots = analysis.hotspots
+    .filter(h => h.source_files.length > 0)
+    .slice(0, 3);
   if (topHotspots.length > 0) {
     sprints.push({
       id: `S-LOCAL-${String(counter).padStart(3, '0')}`,
@@ -347,16 +409,16 @@ function generateBacklog(analysis: Analysis, sprintCount: number): void {
       type: 'bugfix',
       tickets: topHotspots.map((h, i) => ({
         key: `S-LOCAL-${String(counter).padStart(3, '0')}-${i + 1}`,
-        title: `Harden: ${h.area}`,
+        title: `Harden: ${h.source_files[0]}`,
         club: safeClub,
-        description: `Address hazards in ${h.area}: ${Object.keys(h.hazard_types).join(', ')}`,
+        description: `Harden ${h.source_files.join(', ')} against known hazards:\n${h.hazard_descriptions.slice(0, 3).map(d => `- ${d}`).join('\n')}`,
         acceptance_criteria: [
           'pnpm test passes',
           'pnpm typecheck passes',
-          `Reduce hazard surface in ${h.area}`,
+          ...h.source_files.slice(0, 2).map(f => `Review and harden ${f}`),
         ],
-        modules: [h.area],
-        max_files: 2,
+        modules: h.source_files,
+        max_files: Math.min(h.source_files.length, 3),
       })),
     });
     counter++;
@@ -390,7 +452,10 @@ function generateBacklog(analysis: Analysis, sprintCount: number): void {
   }
 
   // --- Strategy 3: Address recurring hazards (tech debt) ---
-  const topHazards = analysis.hazards.frequency.slice(0, 4);
+  // Only generate tickets for hazard types that have identifiable source files
+  const topHazards = analysis.hazards.frequency
+    .filter(h => (analysis.hazards.type_files[h.type] ?? []).length > 0)
+    .slice(0, 4);
   if (topHazards.length > 0) {
     sprints.push({
       id: `S-LOCAL-${String(counter).padStart(3, '0')}`,
@@ -399,26 +464,39 @@ function generateBacklog(analysis: Analysis, sprintCount: number): void {
       par: 4,
       slope: 2,
       type: 'bugfix',
-      tickets: topHazards.map((h, i) => ({
-        key: `S-LOCAL-${String(counter).padStart(3, '0')}-${i + 1}`,
-        title: `Fix recurring: ${h.type} hazard`,
-        club: safeClub,
-        description: `Address recurring ${h.type} hazard (weighted score: ${h.weighted_score.toFixed(1)}, recent: ${h.recent_count})`,
-        acceptance_criteria: [
-          'pnpm test passes',
-          'pnpm typecheck passes',
-          `Reduce ${h.type} hazard occurrences`,
-        ],
-        modules: [],
-        max_files: 2,
-      })),
+      tickets: topHazards.map((h, i) => {
+        const files = analysis.hazards.type_files[h.type] ?? [];
+        const descs = analysis.hazards.type_descriptions[h.type] ?? [];
+        return {
+          key: `S-LOCAL-${String(counter).padStart(3, '0')}-${i + 1}`,
+          title: `Fix ${h.type} hazards in ${files[0] ?? 'codebase'}`,
+          club: safeClub,
+          description: `Address ${h.type} hazards in: ${files.slice(0, 3).join(', ')}. Recent examples:\n${descs.slice(0, 3).map(d => `- ${d}`).join('\n')}`,
+          acceptance_criteria: [
+            'pnpm test passes',
+            'pnpm typecheck passes',
+            ...files.slice(0, 2).map(f => `Review and fix ${h.type} issues in ${f}`),
+          ],
+          modules: files.slice(0, 5),
+          max_files: Math.min(files.length, 3),
+        };
+      }),
     });
     counter++;
   }
 
   // --- Strategy 4: Documentation for high-complexity areas ---
-  const driverTickets = analysis.clubs.filter(c => c.club === 'driver' || c.club === 'long_iron');
-  if (driverTickets.length > 0) {
+  // Collect files from driver/long_iron hotspots (complex areas)
+  const complexFiles: string[] = [];
+  for (const h of analysis.hotspots) {
+    // Check if the area had driver/long_iron hazard patterns
+    if (h.source_files.length > 0 && h.risk_score >= 2) {
+      complexFiles.push(...h.source_files);
+    }
+  }
+  const uniqueComplexFiles = [...new Set(complexFiles)].slice(0, 3);
+  // Only generate docs sprint if we have specific files to target
+  if (uniqueComplexFiles.length > 0) {
     sprints.push({
       id: `S-LOCAL-${String(counter).padStart(3, '0')}`,
       title: 'Document high-complexity modules',
@@ -428,43 +506,60 @@ function generateBacklog(analysis: Analysis, sprintCount: number): void {
       type: 'chore',
       tickets: [{
         key: `S-LOCAL-${String(counter).padStart(3, '0')}-1`,
-        title: 'Add inline docs for complex modules',
+        title: `Add inline docs for ${uniqueComplexFiles[0]}`,
         club: 'wedge',
-        description: 'Add JSDoc comments to functions with driver/long_iron complexity that lack documentation',
+        description: `Add JSDoc comments to complex functions in: ${uniqueComplexFiles.join(', ')}. These files have high hazard risk scores and need better documentation.`,
         acceptance_criteria: [
           'pnpm typecheck passes',
-          'Key functions have JSDoc comments',
+          ...uniqueComplexFiles.map(f => `${f} has JSDoc on exported functions`),
         ],
-        modules: [],
-        max_files: 3,
+        modules: uniqueComplexFiles,
+        max_files: uniqueComplexFiles.length,
       }],
     });
     counter++;
   }
 
-  // --- Strategy 5: Meta — improve SLOPE itself ---
-  sprints.push({
-    id: `S-LOCAL-${String(counter).padStart(3, '0')}`,
-    title: 'Meta: improve scoring accuracy',
-    strategy: 'meta',
-    par: 3,
-    slope: 1,
-    type: 'feature',
-    tickets: [
-      {
-        key: `S-LOCAL-${String(counter).padStart(3, '0')}-1`,
-        title: 'Validate analysis.json against scorecard data',
-        club: 'wedge',
-        description: 'Cross-reference analysis outputs against raw scorecards to verify temporal weighting correctness',
-        acceptance_criteria: [
-          'pnpm test passes',
-          'analysis.json validated',
-        ],
-        modules: ['slope-loop'],
-        max_files: 1,
-      },
-    ],
-  });
+  // --- Strategy 5: Hardening overflow ---
+  // If there are hotspot files not already covered by strategies 1-4, add an overflow sprint
+  const coveredFiles = new Set<string>();
+  for (const sprint of sprints) {
+    for (const ticket of sprint.tickets) {
+      for (const m of ticket.modules) coveredFiles.add(m);
+    }
+  }
+  const overflowHotspots = analysis.hotspots
+    .filter(h => h.source_files.some(f => !coveredFiles.has(f)))
+    .slice(0, 3);
+  const overflowFiles = [...new Set(
+    overflowHotspots.flatMap(h => h.source_files.filter(f => !coveredFiles.has(f))),
+  )].slice(0, 4);
+  if (overflowFiles.length > 0) {
+    sprints.push({
+      id: `S-LOCAL-${String(counter).padStart(3, '0')}`,
+      title: 'Harden remaining hotspot files',
+      strategy: 'hardening-overflow',
+      par: 4,
+      slope: 2,
+      type: 'bugfix',
+      tickets: overflowFiles.map((f, i) => {
+        const hotspot = overflowHotspots.find(h => h.source_files.includes(f));
+        return {
+          key: `S-LOCAL-${String(counter).padStart(3, '0')}-${i + 1}`,
+          title: `Harden: ${f}`,
+          club: safeClub,
+          description: `Harden ${f} against known hazards:\n${(hotspot?.hazard_descriptions ?? []).slice(0, 3).map(d => `- ${d}`).join('\n')}`,
+          acceptance_criteria: [
+            'pnpm test passes',
+            'pnpm typecheck passes',
+            `Review and harden ${f}`,
+          ],
+          modules: [f],
+          max_files: 1,
+        };
+      }),
+    });
+  }
 
   writeFileSync(
     join(__dirname, 'backlog.json'),
