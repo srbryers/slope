@@ -50,6 +50,7 @@ import { storeCommand } from './commands/store.js';
 import { metaphorCommand } from './commands/metaphor.js';
 import { initiativeCommand } from './commands/initiative.js';
 import { indexCommand } from './commands/index-cmd.js';
+import { contextCommand } from './commands/context.js';
 
 const subcommand = process.argv[2];
 
@@ -251,6 +252,12 @@ switch (subcommand) {
     break;
   case 'index':
     indexCommand(process.argv.slice(3)).catch(err => {
+      console.error('Error:', err.message);
+      process.exit(1);
+    });
+    break;
+  case 'context':
+    contextCommand(process.argv.slice(3)).catch(err => {
       console.error('Error:', err.message);
       process.exit(1);
     });

@@ -482,9 +482,8 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
       SELECT v.rowid, v.distance, e.file_path, e.chunk_index, e.chunk_text
       FROM vec_embeddings v
       JOIN embeddings e ON e.id = v.rowid
-      WHERE v.embedding MATCH ?
+      WHERE v.embedding MATCH ? AND k = ?
       ORDER BY v.distance
-      LIMIT ?
     `).all(queryVector, limit) as Array<{
       rowid: number;
       distance: number;

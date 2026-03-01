@@ -57,4 +57,5 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
 
   // ── Indexing ──────────────────────────────────────────────────────
   { cmd: 'index-cmd',   desc: 'Semantic embedding index management',            category: 'tooling' },
+  { cmd: 'context',     desc: 'Semantic context search for agents',             category: 'tooling' },
 ];
