@@ -103,9 +103,9 @@ export async function enrichTicket(opts: {
 
   const deduped = deduplicateByFile(contextResults);
 
-  // Split into primary (>= 0.55) and related (>= 0.4)
-  const primary = deduped.filter(r => r.score >= 0.55).slice(0, topK);
-  const related = deduped.filter(r => r.score >= 0.4 && r.score < 0.55).slice(0, topK);
+  // Split into primary (>= 0.4) and related (>= 0.3)
+  const primary = deduped.filter(r => r.score >= 0.4).slice(0, topK);
+  const related = deduped.filter(r => r.score >= 0.3 && r.score < 0.4).slice(0, topK);
 
   const primaryPaths = primary.map(r => r.filePath);
   const relatedPaths = related.map(r => r.filePath);

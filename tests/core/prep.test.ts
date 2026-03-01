@@ -409,6 +409,38 @@ describe('generatePrepPlan', () => {
     expect(plan.similarTickets[0].key).toBe('S38-2');
   });
 
+  it('deduplicates constraints when acceptance_criteria includes defaults', async () => {
+    mkdirSync(join(tmpDir, 'slope-loop'), { recursive: true });
+    writeFileSync(join(tmpDir, 'slope-loop/backlog.json'), JSON.stringify({
+      sprints: [{
+        tickets: [{
+          key: 'T1',
+          title: 'Dedup test',
+          description: 'Test constraint dedup',
+          modules: [],
+          acceptance_criteria: ['pnpm test passes', 'custom criteria'],
+          club: 'putter',
+        }],
+      }],
+    }));
+
+    const store = createMockStore([]);
+
+    const plan = await generatePrepPlan({
+      ticketId: 'T1',
+      store,
+      embeddingConfig: mockEmbConfig,
+      scorecards: [],
+      cwd: tmpDir,
+    });
+
+    // 'pnpm test passes' should appear exactly once
+    const testPassCount = plan.constraints.filter(c => c === 'pnpm test passes').length;
+    expect(testPassCount).toBe(1);
+    expect(plan.constraints).toContain('custom criteria');
+    expect(plan.constraints).toContain('pnpm typecheck passes');
+  });
+
   it('includes hazards from scorecards', async () => {
     mkdirSync(join(tmpDir, 'slope-loop'), { recursive: true });
     writeFileSync(join(tmpDir, 'slope-loop/backlog.json'), JSON.stringify({

@@ -172,7 +172,7 @@ export async function contextCommand(args: string[]): Promise<void> {
     }));
 
     // Deduplicate by file, filter by min score, and limit
-    const threshold = flags.minScore > 0 ? flags.minScore : 0.55;
+    const threshold = flags.minScore > 0 ? flags.minScore : 0.4;
     const deduped = deduplicateByFile(contextResults)
       .filter(r => r.score >= threshold)
       .slice(0, flags.top);

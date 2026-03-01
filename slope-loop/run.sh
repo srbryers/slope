@@ -131,14 +131,20 @@ run_ticket_with_model() {
   CONTEXT_FILE="$LOG_DIR/${ticket_id}-context.md"
   if pnpm slope context --ticket="$ticket_id" --format=snippets --top=8 > "$CONTEXT_FILE" 2>/dev/null; then
     if [ -s "$CONTEXT_FILE" ]; then
-      aider_args+=(--read "$CONTEXT_FILE")
-      log "   Injected semantic context ($(wc -l < "$CONTEXT_FILE" | tr -d ' ') lines)"
+      CONTEXT_LINES=$(wc -l < "$CONTEXT_FILE" | tr -d ' ')
+      if [ "$CONTEXT_LINES" -le 500 ]; then
+        aider_args+=(--read "$CONTEXT_FILE")
+        log "   Injected semantic context ($CONTEXT_LINES lines)"
+      else
+        log "   Semantic context too large ($CONTEXT_LINES lines) — falling back to CODEBASE.md"
+        [ -f "$SLOPE_DIR/CODEBASE.md" ] && aider_args+=(--read "$SLOPE_DIR/CODEBASE.md")
+      fi
     else
-      log "   Warning: slope context returned empty — falling back to CODEBASE.md"
+      log "   Semantic context empty — falling back to CODEBASE.md"
       [ -f "$SLOPE_DIR/CODEBASE.md" ] && aider_args+=(--read "$SLOPE_DIR/CODEBASE.md")
     fi
   else
-    log "   Warning: slope context failed — falling back to CODEBASE.md"
+    log "   slope context failed — falling back to CODEBASE.md"
     [ -f "$SLOPE_DIR/CODEBASE.md" ] && aider_args+=(--read "$SLOPE_DIR/CODEBASE.md")
   fi
 
@@ -341,6 +347,7 @@ START by reading the relevant source files, then implement the change."
   FINAL_MODEL="$TICKET_MODEL"
   ESCALATED="false"
   TESTS_PASSING="false"
+  TICKET_START=$(date +%s)
 
   # Attempt 1: Primary model
   if run_ticket_with_model "$TICKET_KEY" "$TICKET_MODEL" "$TICKET_TIMEOUT" "$PROMPT"; then
@@ -351,7 +358,7 @@ START by reading the relevant source files, then implement the change."
 
     # Attempt 2: Escalate to API if local model failed
     if [ "$ESCALATE_ON_FAIL" = "true" ] && [ "$TICKET_MODEL" = "$MODEL_LOCAL" ]; then
-      log "   Escalating to $MODEL_API..."
+      log "   Escalating to $MODEL_API (reason: primary model failed on $TICKET_KEY)"
       FINAL_MODEL="$MODEL_API"
       ESCALATED="true"
 
@@ -371,6 +378,10 @@ START by reading the relevant source files, then implement the change."
       fi
     fi
   fi
+
+  TICKET_END=$(date +%s)
+  TICKET_ELAPSED=$((TICKET_END - TICKET_START))
+  log "   Completed in ${TICKET_ELAPSED}s"
 
   # Track model usage per ticket (JSONL)
   TICKET_RESULT="{\"ticket\":\"$TICKET_KEY\",\"title\":\"$TICKET_TITLE\",\"club\":\"$TICKET_CLUB\",\"max_files\":$TICKET_MAX_FILES,\"primary_model\":\"$TICKET_MODEL\",\"final_model\":\"$FINAL_MODEL\",\"escalated\":$ESCALATED,\"tests_passing\":$TESTS_PASSING}"
