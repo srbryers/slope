@@ -54,4 +54,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
   { cmd: 'roadmap',     desc: 'Strategic planning and roadmap tools',            category: 'planning' },
   { cmd: 'vision',      desc: 'Display project vision document',                category: 'planning' },
   { cmd: 'initiative',  desc: 'Multi-sprint initiative orchestration',           category: 'planning' },
+
+  // ── Indexing ──────────────────────────────────────────────────────
+  { cmd: 'index-cmd',   desc: 'Semantic embedding index management',            category: 'tooling' },
 ];

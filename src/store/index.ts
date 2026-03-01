@@ -4,6 +4,7 @@
 import { join } from 'node:path';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
+import { createRequire } from 'node:module';
 import Database from 'better-sqlite3';
 import type { Database as DatabaseType } from 'better-sqlite3';
 import type { SprintClaim, GolfScorecard, SlopeEvent, EventType } from '../core/index.js';
@@ -149,8 +150,9 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
     }
     this.vecLoaded = true;
     try {
-      // Dynamic require — sqlite-vec may not be installed
-      const sqliteVec = require('sqlite-vec');
+      // Dynamic require — sqlite-vec is a native addon, needs require() not import()
+      const esmRequire = createRequire(import.meta.url);
+      const sqliteVec = esmRequire('sqlite-vec');
       sqliteVec.load(this.db);
       this.vecAvailable = true;
     } catch {
@@ -458,7 +460,10 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
           entry.filePath, entry.chunkIndex, entry.chunkText,
           entry.gitSha, entry.model, nowISO(),
         );
-        const rowid = result.lastInsertRowid;
+        // vec0 requires BigInt rowids — better-sqlite3 only sends true SQLite integers for BigInt
+        const rowid = typeof result.lastInsertRowid === 'bigint'
+          ? result.lastInsertRowid
+          : BigInt(result.lastInsertRowid);
         deleteVec.run(rowid);
         insertVec.run(rowid, entry.vector);
       }
@@ -516,9 +521,10 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
     }
 
     const txn = this.db.transaction((fp: string) => {
-      const rows = this.db.prepare('SELECT id FROM embeddings WHERE file_path = ?').all(fp) as Array<{ id: number }>;
+      const rows = this.db.prepare('SELECT id FROM embeddings WHERE file_path = ?').all(fp) as Array<{ id: number | bigint }>;
       for (const row of rows) {
-        this.db.prepare('DELETE FROM vec_embeddings WHERE rowid = ?').run(row.id);
+        const rowid = typeof row.id === 'bigint' ? row.id : BigInt(row.id);
+        this.db.prepare('DELETE FROM vec_embeddings WHERE rowid = ?').run(rowid);
       }
       this.db.prepare('DELETE FROM embeddings WHERE file_path = ?').run(fp);
     });

@@ -49,6 +49,7 @@ import { transcriptCommand } from './commands/transcript.js';
 import { storeCommand } from './commands/store.js';
 import { metaphorCommand } from './commands/metaphor.js';
 import { initiativeCommand } from './commands/initiative.js';
+import { indexCommand } from './commands/index-cmd.js';
 
 const subcommand = process.argv[2];
 
@@ -248,6 +249,12 @@ switch (subcommand) {
       process.exit(1);
     });
     break;
+  case 'index':
+    indexCommand(process.argv.slice(3)).catch(err => {
+      console.error('Error:', err.message);
+      process.exit(1);
+    });
+    break;
   default:
     console.log(`
 SLOPE CLI — Sprint Lifecycle & Operational Performance Engine
@@ -302,6 +309,8 @@ Usage:
   slope metaphor list|set|show              Manage metaphor display themes
   slope plugin list|validate                Manage custom plugins
   slope initiative create|status|next|advance|review  Multi-sprint initiative orchestration
+  slope index [--full|--status|--prune]               Semantic embedding index
+  slope context "query" [options]                     Semantic context search
 
 Examples:
   slope init                                Create .slope/ with config + example scorecard
