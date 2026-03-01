@@ -124,7 +124,7 @@ function advanceSubcommand(flags: Record<string, string>, cwd: string): void {
 }
 
 const VALID_REVIEWERS = new Set([
-  'architect', 'code', 'backend', 'ml-engineer', 'database', 'frontend', 'ux-designer',
+  'architect', 'code', 'security', 'backend', 'ml-engineer', 'database', 'frontend', 'ux-designer',
 ]);
 
 function reviewSubcommand(flags: Record<string, string>, cwd: string): void {
