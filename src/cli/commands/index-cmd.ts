@@ -1,7 +1,7 @@
 // slope index — Semantic embedding index management
 // Subcommands: (default) incremental, --full, --status, --prune
 
-import { execSync } from 'node:child_process';
+import { execSync, execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { loadConfig } from '../../core/config.js';
 import { chunkFile, shouldSkipFile } from '../../core/embedding.js';
@@ -51,9 +51,17 @@ function getSourceFiles(cwd: string): string[] {
 }
 
 function getChangedFiles(lastSha: string, cwd: string): string[] {
-  const output = exec(`git diff --name-only ${lastSha}..HEAD`, cwd);
-  if (!output) return [];
-  return output.split('\n').filter(f => !shouldSkipFile(f));
+  // Validate SHA to prevent shell injection (use execFileSync for safety)
+  if (!/^[0-9a-f]{4,40}$/i.test(lastSha)) return [];
+  try {
+    const output = execFileSync('git', ['diff', '--name-only', `${lastSha}..HEAD`], {
+      cwd, encoding: 'utf8', timeout: 30000,
+    }).trim();
+    if (!output) return [];
+    return output.split('\n').filter(f => !shouldSkipFile(f));
+  } catch {
+    return [];
+  }
 }
 
 function getHeadSha(cwd: string): string {

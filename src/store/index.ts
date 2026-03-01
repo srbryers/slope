@@ -129,6 +129,7 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
   private db: DatabaseType;
   private vecAvailable = false;
   private vecLoaded = false;
+  private vecTableReady = false;
 
   constructor(dbPath: string) {
     mkdirSync(dirname(dbPath), { recursive: true });
@@ -141,13 +142,7 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
 
   /** Lazy-load sqlite-vec extension. Non-fatal if unavailable — embedding methods will throw. */
   private ensureVecLoaded(): void {
-    if (this.vecLoaded) {
-      if (!this.vecAvailable) {
-        throw new SlopeStoreError('EXTENSION_UNAVAILABLE',
-          'sqlite-vec extension not available. Install sqlite-vec: npm install sqlite-vec');
-      }
-      return;
-    }
+    if (this.vecLoaded) return;
     this.vecLoaded = true;
     try {
       // Dynamic require — sqlite-vec is a native addon, needs require() not import()
@@ -158,6 +153,35 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
     } catch {
       // Extension not available — store still works for non-embedding operations
     }
+  }
+
+  /** Require sqlite-vec to be available. Throws if not. */
+  private requireVec(): void {
+    this.ensureVecLoaded();
+    if (!this.vecAvailable) {
+      throw new SlopeStoreError('EXTENSION_UNAVAILABLE',
+        'sqlite-vec extension not available. Install sqlite-vec: npm install sqlite-vec');
+    }
+  }
+
+  /** Check if vec_embeddings virtual table exists, creating it if index_meta has dimensions. */
+  private ensureVecTable(): void {
+    if (this.vecTableReady) return;
+    // Check if the table already exists
+    const exists = this.db.prepare(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='vec_embeddings'"
+    ).get();
+    if (exists) {
+      this.vecTableReady = true;
+      return;
+    }
+    // Try to create from index_meta dimensions
+    const meta = this.db.prepare('SELECT dimensions FROM index_meta WHERE id = 1').get() as { dimensions: number } | undefined;
+    if (meta) {
+      this.db.exec(`CREATE VIRTUAL TABLE vec_embeddings USING vec0(embedding float[${meta.dimensions}])`);
+      this.vecTableReady = true;
+    }
+    // If no meta yet, table will be created by recreateVecTable() on first index
   }
 
   /** Versioned migration framework — runs each migration exactly once */
@@ -180,18 +204,9 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
       }
     }
 
-    // Create vec virtual table if extension is available and embeddings table exists
-    if (this.vecAvailable && this.getSchemaVersionSync() >= 4) {
-      try {
-        this.db.exec(`
-          CREATE VIRTUAL TABLE IF NOT EXISTS vec_embeddings USING vec0(
-            embedding float[768]
-          );
-        `);
-      } catch {
-        // Virtual table may already exist with different dimensions — that's OK
-      }
-    }
+    // Note: vec_embeddings virtual table is NOT created in migrate() — it is created
+    // lazily by recreateVecTable() on first `slope index` with the configured dimensions.
+    // This avoids hardcoding a dimension size that may not match the user's model config.
   }
 
   /** Get current schema version synchronously (internal use by migrate()) */
@@ -442,10 +457,8 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
   // --- Embeddings ---
 
   async saveEmbeddings(entries: EmbeddingEntry[]): Promise<void> {
-    if (!this.vecAvailable) {
-      throw new SlopeStoreError('EXTENSION_UNAVAILABLE',
-        'sqlite-vec extension not available. Install sqlite-vec: npm install sqlite-vec');
-    }
+    this.requireVec();
+    this.ensureVecTable();
 
     const insertEmbedding = this.db.prepare(`
       INSERT OR REPLACE INTO embeddings (file_path, chunk_index, chunk_text, git_sha, model, created_at)
@@ -473,10 +486,8 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
   }
 
   async searchEmbeddings(queryVector: Float32Array, limit = 10): Promise<EmbeddingSearchResult[]> {
-    if (!this.vecAvailable) {
-      throw new SlopeStoreError('EXTENSION_UNAVAILABLE',
-        'sqlite-vec extension not available. Install sqlite-vec: npm install sqlite-vec');
-    }
+    this.requireVec();
+    this.ensureVecTable();
 
     const results = this.db.prepare(`
       SELECT v.rowid, v.distance, e.file_path, e.chunk_index, e.chunk_text
@@ -514,18 +525,20 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
   }
 
   async deleteEmbeddingsByFile(filePath: string): Promise<void> {
-    if (!this.vecAvailable) {
-      throw new SlopeStoreError('EXTENSION_UNAVAILABLE',
-        'sqlite-vec extension not available. Install sqlite-vec: npm install sqlite-vec');
-    }
+    this.requireVec();
+    this.ensureVecTable();
+
+    const selectIds = this.db.prepare('SELECT id FROM embeddings WHERE file_path = ?');
+    const deleteVecRow = this.db.prepare('DELETE FROM vec_embeddings WHERE rowid = ?');
+    const deleteEmbRows = this.db.prepare('DELETE FROM embeddings WHERE file_path = ?');
 
     const txn = this.db.transaction((fp: string) => {
-      const rows = this.db.prepare('SELECT id FROM embeddings WHERE file_path = ?').all(fp) as Array<{ id: number | bigint }>;
+      const rows = selectIds.all(fp) as Array<{ id: number | bigint }>;
       for (const row of rows) {
         const rowid = typeof row.id === 'bigint' ? row.id : BigInt(row.id);
-        this.db.prepare('DELETE FROM vec_embeddings WHERE rowid = ?').run(rowid);
+        deleteVecRow.run(rowid);
       }
-      this.db.prepare('DELETE FROM embeddings WHERE file_path = ?').run(fp);
+      deleteEmbRows.run(fp);
     });
 
     txn(filePath);

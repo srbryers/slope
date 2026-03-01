@@ -7,7 +7,8 @@ import type { CommonIssuesFile } from '../core/briefing.js';
 import type { StoreStats } from '../core/store.js';
 import { SlopeStoreError } from '../core/store.js';
 import type { SlopeStore, SlopeSession } from '../core/store.js';
-import type { EmbeddingStore, EmbeddingEntry, EmbeddingSearchResult, EmbeddingStats, IndexMeta } from '../core/embedding-store.js';
+// EmbeddingStore not implemented for PG — hasEmbeddingSupport() returns false.
+// Deferred to a future pgvector sprint.
 
 // pg types — imported dynamically at runtime, typed here for compilation
 type Pool = import('pg').Pool;
@@ -141,7 +142,7 @@ export interface PostgresStoreOptions {
   projectId?: string;
 }
 
-export class PostgresSlopeStore implements SlopeStore, EmbeddingStore {
+export class PostgresSlopeStore implements SlopeStore {
   private pool: Pool;
   private ownedPool: boolean;
   private projectId: string;
@@ -496,41 +497,6 @@ export class PostgresSlopeStore implements SlopeStore, EmbeddingStore {
       [ticketKey, this.projectId],
     );
     return result.rows.map(rowToEvent);
-  }
-
-  // --- Embeddings (stub — pgvector deferred) ---
-
-  private throwPgEmbeddingUnavailable(): never {
-    throw new SlopeStoreError('EXTENSION_UNAVAILABLE',
-      'PG embedding search requires pgvector. Use SQLite store or install pgvector.');
-  }
-
-  async saveEmbeddings(_entries: EmbeddingEntry[]): Promise<void> {
-    this.throwPgEmbeddingUnavailable();
-  }
-
-  async searchEmbeddings(_queryVector: Float32Array, _limit?: number): Promise<EmbeddingSearchResult[]> {
-    this.throwPgEmbeddingUnavailable();
-  }
-
-  async getIndexedFiles(): Promise<Array<{ filePath: string; gitSha: string; model: string }>> {
-    this.throwPgEmbeddingUnavailable();
-  }
-
-  async deleteEmbeddingsByFile(_filePath: string): Promise<void> {
-    this.throwPgEmbeddingUnavailable();
-  }
-
-  async getEmbeddingStats(): Promise<EmbeddingStats> {
-    this.throwPgEmbeddingUnavailable();
-  }
-
-  async setIndexMeta(_sha: string, _model: string, _dimensions: number): Promise<void> {
-    this.throwPgEmbeddingUnavailable();
-  }
-
-  async getIndexMeta(): Promise<IndexMeta | null> {
-    this.throwPgEmbeddingUnavailable();
   }
 
   // --- Lifecycle ---
