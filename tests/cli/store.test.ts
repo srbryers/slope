@@ -108,7 +108,7 @@ describe('slope store status', () => {
 
     const parsed = JSON.parse(output);
     expect(parsed.type).toBe('sqlite');
-    expect(parsed.schemaVersion).toBe(3);
+    expect(parsed.schemaVersion).toBe(4);
     expect(typeof parsed.sessions).toBe('number');
     expect(typeof parsed.claims).toBe('number');
     expect(typeof parsed.scorecards).toBe('number');
@@ -117,7 +117,7 @@ describe('slope store status', () => {
 });
 
 describe('slope store migrate status', () => {
-  it('shows version 3 and up to date', async () => {
+  it('shows version 4 and up to date', async () => {
     const logs: string[] = [];
     const spy = vi.spyOn(console, 'log').mockImplementation((...args) => { logs.push(args.join(' ')); });
 
@@ -126,8 +126,8 @@ describe('slope store migrate status', () => {
     const output = logs.join('\n');
     spy.mockRestore();
 
-    expect(output).toContain('Current schema version: 3');
-    expect(output).toContain('Total migrations:       3');
+    expect(output).toContain('Current schema version: 4');
+    expect(output).toContain('Total migrations:       4');
     expect(output).toContain('up to date');
   });
 });

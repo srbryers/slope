@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { SqliteSlopeStore, createStore } from '../../src/store/index.js';
+import { SqliteSlopeStore, createStore, LATEST_SCHEMA_VERSION } from '../../src/store/index.js';
 import { SlopeStoreError, checkConflicts } from '../../src/core/index.js';
 import type { GolfScorecard } from '../../src/core/index.js';
 
@@ -358,17 +358,17 @@ describe('Events', () => {
 
 describe('Schema Migration', () => {
   it('reports current schema version', async () => {
-    expect(await store.getSchemaVersion()).toBe(3);
+    expect(await store.getSchemaVersion()).toBe(LATEST_SCHEMA_VERSION);
   });
 
   it('is idempotent — reopening same DB does not fail', async () => {
     const dbPath = join(tmpDir, 'reopen.db');
     const s1 = new SqliteSlopeStore(dbPath);
-    expect(await s1.getSchemaVersion()).toBe(3);
+    expect(await s1.getSchemaVersion()).toBe(LATEST_SCHEMA_VERSION);
     s1.close();
 
     const s2 = new SqliteSlopeStore(dbPath);
-    expect(await s2.getSchemaVersion()).toBe(3);
+    expect(await s2.getSchemaVersion()).toBe(LATEST_SCHEMA_VERSION);
     s2.close();
   });
 
@@ -402,9 +402,9 @@ describe('Schema Migration', () => {
     `);
     db.close();
 
-    // Reopen with SqliteSlopeStore — should auto-migrate to v2 and v3
+    // Reopen with SqliteSlopeStore — should auto-migrate to latest
     const upgraded = new SqliteSlopeStore(dbPath);
-    expect(await upgraded.getSchemaVersion()).toBe(3);
+    expect(await upgraded.getSchemaVersion()).toBe(LATEST_SCHEMA_VERSION);
 
     // Verify events table works
     await upgraded.insertEvent({ type: 'failure', data: { test: true } });
@@ -450,9 +450,9 @@ describe('Schema Migration', () => {
     `);
     db.close();
 
-    // Reopen — should auto-migrate to v3
+    // Reopen — should auto-migrate to latest
     const upgraded = new SqliteSlopeStore(dbPath);
-    expect(await upgraded.getSchemaVersion()).toBe(3);
+    expect(await upgraded.getSchemaVersion()).toBe(LATEST_SCHEMA_VERSION);
 
     // Existing session should have null agent_role and swarm_id
     const sessions = await upgraded.getActiveSessions();
