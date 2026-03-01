@@ -110,7 +110,7 @@ describe('enrichTicket', () => {
   it('returns correct structure', async () => {
     const store = createMockStore([
       { id: 1, filePath: 'src/core/store.ts', chunkIndex: 0, chunkText: 'code', score: 0.8 },
-      { id: 2, filePath: 'src/core/config.ts', chunkIndex: 0, chunkText: 'config', score: 0.45 },
+      { id: 2, filePath: 'src/core/config.ts', chunkIndex: 0, chunkText: 'config', score: 0.35 },
     ]);
 
     mkdirSync(join(tmpDir, 'src/core'), { recursive: true });

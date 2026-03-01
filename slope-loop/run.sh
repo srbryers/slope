@@ -132,7 +132,7 @@ run_ticket_with_model() {
   if pnpm slope context --ticket="$ticket_id" --format=snippets --top=8 > "$CONTEXT_FILE" 2>/dev/null; then
     if [ -s "$CONTEXT_FILE" ]; then
       CONTEXT_LINES=$(wc -l < "$CONTEXT_FILE" | tr -d ' ')
-      if [ "$CONTEXT_LINES" -lt 500 ]; then
+      if [ "$CONTEXT_LINES" -le 500 ]; then
         aider_args+=(--read "$CONTEXT_FILE")
         log "   Injected semantic context ($CONTEXT_LINES lines)"
       else
