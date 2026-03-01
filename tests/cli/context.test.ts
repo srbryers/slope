@@ -116,16 +116,7 @@ describe('slope context', () => {
   });
 
   it('errors when index is empty', async () => {
-    const errors: string[] = [];
-    vi.spyOn(console, 'error').mockImplementation((...args) => { errors.push(args.join(' ')); });
-    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => { throw new Error('exit'); });
-
-    await expect(contextCommand(['store logic'])).rejects.toThrow('exit');
-
-    expect(errors.join('\n')).toContain('empty');
-
-    vi.restoreAllMocks();
-    mockExit.mockRestore();
+    await expect(contextCommand(['store logic'])).rejects.toThrow('empty');
   });
 
   it('returns results after indexing', async () => {

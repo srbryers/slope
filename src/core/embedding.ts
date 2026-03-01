@@ -64,7 +64,7 @@ export function chunkFile(filePath: string, content: string, maxLines = DEFAULT_
  * Split TS/JS files by top-level declarations (export, function, class, const, interface, type).
  */
 function chunkByDeclarations(filePath: string, _content: string, lines: string[], maxLines: number): CodeChunk[] {
-  const declarationPattern = /^(export\s+)?(function|class|const|let|var|interface|type|enum|abstract)\s/;
+  const declarationPattern = /^(export\s+)?(default\s+)?(async\s+)?(function|class|const|let|var|interface|type|enum|abstract)\s/;
   const breakpoints: number[] = [0];
 
   for (let i = 1; i < lines.length; i++) {

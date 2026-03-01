@@ -148,15 +148,13 @@ export async function contextCommand(args: string[]): Promise<void> {
 
   try {
     if (!hasEmbeddingSupport(store)) {
-      console.error('Error: Store does not support embeddings. Run `slope index` first.');
-      process.exit(1);
+      throw new Error('Store does not support embeddings. Run `slope index` first.');
     }
 
     // Check if index exists
     const stats = await store.getEmbeddingStats();
     if (stats.chunkCount === 0) {
-      console.error('Error: Semantic index is empty. Run `slope index` first.');
-      process.exit(1);
+      throw new Error('Semantic index is empty. Run `slope index` first.');
     }
 
     // Embed the query

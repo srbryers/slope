@@ -38,6 +38,7 @@ export async function embed(
       model: config.model,
       input: texts,
     }),
+    signal: AbortSignal.timeout(60_000), // 60s timeout per batch
   });
 
   if (!response.ok) {
@@ -46,8 +47,12 @@ export async function embed(
   }
 
   const json = await response.json() as {
-    data: Array<{ embedding: number[]; index: number }>;
+    data?: Array<{ embedding: number[]; index: number }>;
   };
+
+  if (!json.data || !Array.isArray(json.data)) {
+    throw new Error('Unexpected embedding response shape: missing data array');
+  }
 
   // Sort by index to maintain input order
   const sorted = json.data.sort((a, b) => a.index - b.index);
