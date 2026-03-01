@@ -1,0 +1,122 @@
+{
+  "sprint_number": 46,
+  "theme": "The Rangefinder",
+  "par": 4,
+  "slope": 2,
+  "score": 7,
+  "score_label": "triple_plus",
+  "date": "2026-03-01",
+  "shots": [
+    {
+      "ticket_key": "S46-1",
+      "title": "Embedding schema, client, and store implementation",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "[architect review] Hardcoded 768-dim in migration creates silent dimension mismatch for non-768 models",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "rough",
+          "severity": "moderate",
+          "description": "[code review] PG store implements EmbeddingStore but all methods throw — hasEmbeddingSupport() gives false positive",
+          "gotcha_id": "review:code"
+        }
+      ]
+    },
+    {
+      "ticket_key": "S46-2",
+      "title": "slope index CLI command",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "water",
+          "severity": "moderate",
+          "description": "[code review] Shell injection via unsanitized git SHA interpolated into exec() command string",
+          "gotcha_id": "review:code"
+        }
+      ]
+    },
+    {
+      "ticket_key": "S46-3",
+      "title": "slope context CLI command",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "[code review] No score threshold filtering — low-quality results returned to agents",
+          "gotcha_id": "review:code"
+        },
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "[code review] process.exit(1) inside try block skips store.close() in finally",
+          "gotcha_id": "review:code"
+        }
+      ]
+    },
+    {
+      "ticket_key": "S46-4",
+      "title": "run.sh semantic context integration",
+      "club": "putter",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "[code review] --format=full --top=8 could inject thousands of lines into Aider context window",
+          "gotcha_id": "review:code"
+        }
+      ]
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 6,
+    "hazard_penalties": 3.0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    "new_subsystem",
+    "new_dependency"
+  ],
+  "special_plays": [],
+  "bunker_locations": [
+    "sqlite-vec requires BigInt rowids — better-sqlite3 sends Number as SQLite double which vec0 rejects",
+    "sqlite-vec KNN queries require `k = ?` constraint, not `LIMIT ?`",
+    "ESM modules cannot use require() — need createRequire(import.meta.url) for native addons like sqlite-vec",
+    "Hardcoding dimensions in schema migrations creates silent mismatch when user changes embedding model"
+  ],
+  "yardage_book_updates": [
+    "src/core/embedding.ts: pure types + chunking (declaration-based for TS/JS, line-based for others)",
+    "src/core/embedding-client.ts: OpenAI-compatible HTTP client with env:VAR_NAME apiKey resolution",
+    "src/core/embedding-store.ts: EmbeddingStore interface with hasEmbeddingSupport() type guard",
+    "src/store/index.ts: migration v4, lazy sqlite-vec loading via ensureVecLoaded(), vec table created lazily via ensureVecTable()",
+    "src/cli/commands/index-cmd.ts: incremental (git diff), full, status, prune subcommands",
+    "src/cli/commands/context.ts: semantic search with --ticket, --file, free-text; minScore filtering (default 0.55)",
+    "slope-loop/run.sh: pre-sprint index update + per-ticket slope context injection with CODEBASE.md fallback"
+  ],
+  "course_management_notes": [
+    "All 4 tickets landed without reverts or test failures during implementation",
+    "6 hazards found by post-implementation review (code + architect) — consistent with S43-S45 pattern of trailing-indicator reviews",
+    "First security hazard (water) since tracking began — shell injection in index-cmd.ts, fixed with execFileSync",
+    "First architecture hazard (bunker) — hardcoded dimensions, fixed with lazy vec table creation",
+    "sqlite-vec alpha dependency (0.1.7-alpha.2) — track for stable release upgrade"
+  ]
+}
