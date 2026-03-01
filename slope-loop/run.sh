@@ -5,6 +5,16 @@
 
 set -euo pipefail
 
+# Portable timeout: macOS has gtimeout (from coreutils), Linux has timeout
+if command -v timeout &>/dev/null; then
+  TIMEOUT_CMD="timeout"
+elif command -v gtimeout &>/dev/null; then
+  TIMEOUT_CMD="gtimeout"
+else
+  echo "Error: 'timeout' command not found. Install coreutils: brew install coreutils"
+  exit 1
+fi
+
 SLOPE_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 BACKLOG="$SLOPE_DIR/slope-loop/backlog.json"
 RESULTS_DIR="$SLOPE_DIR/slope-loop/results"
@@ -166,7 +176,7 @@ run_ticket_with_model() {
     [ -s "${PREP_FILE}.err" ] && log "   $(head -1 "${PREP_FILE}.err")"
   fi
 
-  timeout "$timeout_s" aider "${aider_args[@]}" \
+  $TIMEOUT_CMD "$timeout_s" aider "${aider_args[@]}" \
     2>&1 | tee "$aider_log" || {
       log "   Warning: Aider timed out or errored on $ticket_id (model: $model)"
     }
@@ -281,14 +291,14 @@ CURRENT_SHA=$(git rev-parse HEAD)
 INDEX_SHA=$(pnpm slope index --status --json 2>/dev/null | jq -r '.lastSha // empty' 2>/dev/null || true)
 if [ "$CURRENT_SHA" != "$INDEX_SHA" ]; then
   log "Updating semantic index..."
-  timeout 120 pnpm slope index 2>/dev/null || log "Warning: slope index failed — using stale index"
+  $TIMEOUT_CMD 120 pnpm slope index 2>/dev/null || log "Warning: slope index failed — using stale index"
 fi
 
 # Enrich backlog if not already enriched (check for _enrichMeta version field)
 ENRICH_VERSION=$(jq -r '._enrichMeta.version // 0' "$BACKLOG" 2>/dev/null)
 if [ "$ENRICH_VERSION" -lt 1 ] 2>/dev/null; then
   log "Enriching backlog with file context..."
-  timeout 120 pnpm slope enrich "$BACKLOG" 2>/dev/null || log "Warning: slope enrich failed"
+  $TIMEOUT_CMD 120 pnpm slope enrich "$BACKLOG" 2>/dev/null || log "Warning: slope enrich failed"
 fi
 
 # Start Slope session
