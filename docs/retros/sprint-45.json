@@ -1,0 +1,74 @@
+{
+  "sprint_number": 45,
+  "theme": "The Autopilot",
+  "par": 4,
+  "slope": 1,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-02-28",
+  "shots": [
+    {
+      "ticket_key": "S45-1",
+      "title": "Single sprint runner script (run.sh)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": []
+    },
+    {
+      "ticket_key": "S45-2",
+      "title": "Continuous loop and parallel sprint runners",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": []
+    },
+    {
+      "ticket_key": "S45-3",
+      "title": "Official Slope skills (sprint-workflow, performance-analysis)",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": []
+    },
+    {
+      "ticket_key": "S45-4",
+      "title": "CLAUDE.md updates + CODEBASE.md regeneration",
+      "club": "putter",
+      "result": "in_the_hole",
+      "hazards": []
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    "new_subsystem"
+  ],
+  "special_plays": [],
+  "bunker_locations": [
+    "Shell scripts need careful quoting for paths with spaces — run.sh uses double-quotes throughout for safety",
+    "Parallel runner must detect module overlap before launching worktrees — falls back to sequential if overlap found"
+  ],
+  "yardage_book_updates": [
+    "slope-loop/run.sh: tiered model selection (Qwen local for putter/wedge/short_iron, MiniMax M2.5 API for long_iron/driver), auto-escalation on local failure, --dry-run flag",
+    "slope-loop/continuous.sh: sprint loop with backlog auto-regeneration, default max 10 sprints, 3-failure circuit breaker",
+    "slope-loop/parallel.sh: two-stream parallel runner with git worktrees, module overlap detection",
+    "skills/slope-sprint-workflow/SKILL.md and skills/slope-performance-analysis/SKILL.md follow Agent Skills spec with YAML frontmatter"
+  ],
+  "course_management_notes": [
+    "Clean sprint — all 4 deliverables landed without issues",
+    "run.sh includes per-ticket JSONL tracking for model-selector.ts consumption in future sprints",
+    "Skills are portable across any agent that supports the Agent Skills spec — not SLOPE-specific tooling"
+  ]
+}
