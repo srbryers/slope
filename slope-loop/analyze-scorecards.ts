@@ -39,8 +39,9 @@ function extractFileRefs(texts: string[]): string[] {
       const file = match[1];
       // Skip non-source bare json files (e.g. "analysis.json")
       if (file.endsWith('.json') && !file.includes('/')) continue;
-      // Skip docs, templates, and config directories
-      if (file.startsWith('docs/') || file.startsWith('templates/') || file.startsWith('.claude/')) continue;
+      // Skip docs, templates, config, build output, and dotfile directories
+      // Note: \b in the regex strips leading dots, so .claude/ becomes claude/
+      if (/^(docs|templates|\.?claude|\.?slope|dist|node_modules)\//.test(file)) continue;
       refs.add(file);
     }
   }
@@ -199,11 +200,15 @@ function analyze(): void {
       }
     }
 
-    // Extract file refs from bunker_locations
+    // Extract file refs from bunker_locations (architectural hazards)
     for (const bunker of card.bunker_locations ?? []) {
       const refs = extractFileRefs([bunker]);
-      if (!hazardTypeFiles['rough']) hazardTypeFiles['rough'] = new Set();
-      for (const ref of refs) hazardTypeFiles['rough'].add(ref);
+      if (refs.length > 0) {
+        if (!hazardTypeFiles['bunker']) hazardTypeFiles['bunker'] = new Set();
+        for (const ref of refs) hazardTypeFiles['bunker'].add(ref);
+        if (!hazardTypeDescs['bunker']) hazardTypeDescs['bunker'] = [];
+        hazardTypeDescs['bunker'].push(bunker);
+      }
     }
   }
 
@@ -559,6 +564,7 @@ function generateBacklog(analysis: Analysis, sprintCount: number): void {
         };
       }),
     });
+    counter++;
   }
 
   writeFileSync(

@@ -178,8 +178,10 @@ run_ticket_with_model() {
 
   # Add primary files from enriched ticket as --file flags (editable context)
   if [ -n "${TICKET_PRIMARY_FILES:-}" ]; then
-    FILE_COUNT=0
+    local FILE_COUNT=0
+    local MAX_EDIT_FILES=5
     while IFS= read -r f; do
+      if [ "$FILE_COUNT" -ge "$MAX_EDIT_FILES" ]; then break; fi
       if [ -n "$f" ] && [ -f "$f" ] && [[ "$f" == *.ts || "$f" == *.js || "$f" == *.sh ]]; then
         aider_args+=(--file "$f")
         FILE_COUNT=$((FILE_COUNT + 1))
@@ -332,7 +334,6 @@ while read -r TICKET; do
   EST_TOKENS=$(echo "$TICKET" | jq -r '.estimated_tokens // 0')
   # Extract primary files from enriched ticket (set by slope enrich)
   TICKET_PRIMARY_FILES=$(echo "$TICKET" | jq -r '.files.primary[]? // empty' 2>/dev/null)
-  export TICKET_PRIMARY_FILES
 
   log "-- Ticket: $TICKET_KEY — $TICKET_TITLE --"
   log "   Club: $TICKET_CLUB (max_files: $TICKET_MAX_FILES, est_tokens: $EST_TOKENS)"
