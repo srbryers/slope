@@ -94,11 +94,11 @@ log "Max sprints: $MAX_SPRINTS"
 log "Pause between sprints: ${PAUSE_BETWEEN}s"
 [ -n "$DRY_RUN" ] && log "DRY RUN mode"
 
-# Validate dependencies
+# Validate dependencies early
 validate_jq
 
 completed=0
-failures=0  # Track consecutive failures to stop on cascade
+failures=0  # Track consecutive failures to stop on cascade (initialize before loop)
 start_count=$(count_completed)
 
 while [ "$completed" -lt "$MAX_SPRINTS" ]; do
@@ -131,7 +131,7 @@ while [ "$completed" -lt "$MAX_SPRINTS" ]; do
     failures=0  # Reset consecutive failure counter on success
   else
     log "Sprint $next_sprint failed (exit $sprint_exit)"
-    failures=$((failures + 1))
+    failures=$((${failures:-0} + 1))
 
     # Stop if 3+ consecutive failures
     if [ "$failures" -ge 3 ]; then

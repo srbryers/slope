@@ -5,7 +5,7 @@
 
 set -euo pipefail
 
-# Preflight: required tools
+# Preflight: required tools and validation
 missing_tools=()
 for cmd in jq git pnpm; do
   if ! command -v "$cmd" >/dev/null 2>&1; then
@@ -17,7 +17,7 @@ if [ "${#missing_tools[@]}" -gt 0 ]; then
   exit 1
 fi
 
-# Validate jq works
+# Validate jq works before using it
 if ! echo '{}' | jq . >/dev/null 2>&1; then
   echo "ERROR: jq validation failed — jq may be broken or missing required dependencies"
   exit 1
