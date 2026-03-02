@@ -347,16 +347,18 @@ run_ticket_with_model() {
 
   # Guard 1: Typecheck — catches wrong imports, missing types
   if ! pnpm typecheck > /dev/null 2>&1; then
-    log "   REVERT: typecheck failing after $ticket_id — reverting $(git rev-list --count "$pre_aider_sha".."$post_aider_sha") commit(s)"
+    log "   REVERT: typecheck failing after $ticket_id — reverting $(git rev-list --count "$pre_aider_sha".."$post_aider_sha" 2>/dev/null || echo '?') commit(s)"
     git reset --hard "$pre_aider_sha"
+    git clean -fd 2>/dev/null || true  # Remove untracked files Aider may have created
     return 1
   fi
 
   # Guard 2: Tests — catches broken behavior, removed used imports
   # Uses LOOP_TEST_CMD which excludes guards.test.ts (false positive from stop-check)
   if ! $LOOP_TEST_CMD > /dev/null 2>&1; then
-    log "   REVERT: tests failing after $ticket_id — reverting $(git rev-list --count "$pre_aider_sha".."$post_aider_sha") commit(s)"
+    log "   REVERT: tests failing after $ticket_id — reverting $(git rev-list --count "$pre_aider_sha".."$post_aider_sha" 2>/dev/null || echo '?') commit(s)"
     git reset --hard "$pre_aider_sha"
+    git clean -fd 2>/dev/null || true  # Remove untracked files Aider may have created
     return 1
   fi
 
@@ -668,13 +670,9 @@ START by reading the relevant source files, then implement the change."
       FINAL_MODEL="$MODEL_API"
       ESCALATED="true"
 
-      # Reset changes from failed attempt (stash for recovery)
-      log "   Stashing failed changes for recovery (git stash)"
-      git stash push -m "slope-loop: failed $TICKET_KEY ($(date '+%Y%m%d-%H%M%S'))" 2>/dev/null || {
-        log "   Warning: git stash failed, resetting"
-        git checkout -- . 2>/dev/null || true
-        git clean -fd 2>/dev/null || true
-      }
+      # run_ticket_with_model already reverted commits via git reset --hard,
+      # but clean up any untracked files that survived the reset
+      git clean -fd 2>/dev/null || true
 
       PRE_ESCALATION_SHA=$(git rev-parse HEAD)
       if run_ticket_with_model "$TICKET_KEY" "$MODEL_API" "$MODEL_API_TIMEOUT" "$PROMPT"; then
