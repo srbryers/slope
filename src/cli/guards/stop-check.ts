@@ -9,7 +9,14 @@ import type { HookInput, GuardResult } from '../../core/index.js';
  * Untracked-only files → warn via context (may be orphaned/intentional).
  * Unpushed commits → block (recovery point not preserved).
  */
-export async function stopCheckGuard(input: HookInput, cwd: string): Promise<GuardResult> {
+export async function stopCheckGuard(_input: HookInput, cwd: string): Promise<GuardResult> {
+  // If the autonomous loop is running, dirty state belongs to it — warn instead of blocking
+  let loopRunning = false;
+  try {
+    const psOut = execSync("ps aux | grep -E 'slope-loop/(run|continuous|parallel)\\.sh' | grep -v grep", { cwd, encoding: 'utf8' }).trim();
+    loopRunning = psOut.length > 0;
+  } catch { /* no matching process */ }
+
   const blockingIssues: string[] = [];
   const warningIssues: string[] = [];
 
@@ -67,9 +74,14 @@ export async function stopCheckGuard(input: HookInput, cwd: string): Promise<Gua
     }
   } catch { /* no upstream */ }
 
-  // Blocking issues take priority
+  // Blocking issues take priority — but downgrade to warning if the loop owns the changes
   if (blockingIssues.length > 0) {
     const allIssues = [...blockingIssues, ...warningIssues];
+    if (loopRunning) {
+      return {
+        context: `SLOPE: ${allIssues.join(' and ')} detected, but autonomous loop is running — changes belong to the loop.`,
+      };
+    }
     return {
       blockReason: `SLOPE: ${allIssues.join(' and ')} detected. Commit and push before stopping to preserve your recovery point.`,
     };

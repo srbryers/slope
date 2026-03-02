@@ -1,0 +1,56 @@
+{
+  "sprint_number": 57,
+  "theme": "Harden top hotspot modules",
+  "par": 3,
+  "slope": 1,
+  "score": 2,
+  "score_label": "birdie",
+  "date": "2026-03-02",
+  "shots": [
+    {
+      "ticket_key": "S57-1",
+      "title": "chore: harden builder.test.ts with explicit static import guards",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [],
+      "notes": "1 files changed (Clean git signals but no CI confirmation — defaulting to green)"
+    },
+    {
+      "ticket_key": "LOCAL-054",
+      "title": "S-LOCAL-054-1: Harden continuous.sh and parallel.sh against known hazards",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "2 files changed (Clean git signals but no CI confirmation — defaulting to green)"
+    }
+  ],
+  "stats": {
+    "fairways_hit": 2,
+    "fairways_total": 2,
+    "greens_in_regulation": 2,
+    "greens_total": 2,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [],
+  "special_plays": [],
+  "bunker_locations": [],
+  "yardage_book_updates": [],
+  "course_management_notes": [],
+  "slope_factors": [
+    "deployment"
+  ],
+  "_auto_generated": true,
+  "_commits": 2,
+  "_ci_signal": null,
+  "_pr_signal": null,
+  "_note": "Auto-generated from git only (no CI). Shots default to green. Provide --test-output for better scoring."
+}

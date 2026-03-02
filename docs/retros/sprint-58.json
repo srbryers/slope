@@ -1,0 +1,102 @@
+{
+  "sprint_number": 58,
+  "theme": "Harden top hotspot modules",
+  "par": 5,
+  "slope": 0,
+  "score": 8,
+  "score_label": "triple_plus",
+  "date": "2026-03-02",
+  "shots": [
+    {
+      "ticket_key": "S58-1",
+      "title": "fix: resolve undefined blockReason in stopCheckGuard when uncommitted changes exist",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [],
+      "notes": "1 files changed (Clean git signals but no CI confirmation — defaulting to green)"
+    },
+    {
+      "ticket_key": "LOCAL-055",
+      "title": "S-LOCAL-055-2: Add critical guard comment against dynamic imports in builder.test.ts",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [],
+      "notes": "1 files changed (Clean git signals but no CI confirmation — defaulting to green)"
+    },
+    {
+      "ticket_key": "S58-3",
+      "title": "fix: ensure stopCheckGuard returns blockReason for uncommitted changes",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [],
+      "notes": "1 files changed (Clean git signals but no CI confirmation — defaulting to green)"
+    },
+    {
+      "ticket_key": "S58-4",
+      "title": "fix: ensure stopCheckGuard returns blockReason for uncommitted changes",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [],
+      "notes": "1 files changed (Clean git signals but no CI confirmation — defaulting to green)"
+    },
+    {
+      "ticket_key": "LOCAL-055",
+      "title": "S-LOCAL-055-1: fix: initialize failures counter and harden tool validation",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "2 files changed (Clean git signals but no CI confirmation — defaulting to green)"
+    },
+    {
+      "ticket_key": "S58-6",
+      "title": "fix: ensure stopCheckGuard properly detects and reports uncommitted changes",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [],
+      "notes": "1 files changed (Clean git signals but no CI confirmation — defaulting to green)"
+    },
+    {
+      "ticket_key": "S58-7",
+      "title": "feat: add autonomous loop detection to stop-check guard",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [],
+      "notes": "1 files changed (Clean git signals but no CI confirmation — defaulting to green)"
+    },
+    {
+      "ticket_key": "LOCAL-055",
+      "title": "S-LOCAL-055-1: fix failure counter reset logic in continuous.sh and add pnpm validation in parallel.sh",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "2 files changed (Clean git signals but no CI confirmation — defaulting to green)"
+    }
+  ],
+  "stats": {
+    "fairways_hit": 8,
+    "fairways_total": 8,
+    "greens_in_regulation": 8,
+    "greens_total": 8,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [],
+  "special_plays": [],
+  "bunker_locations": [],
+  "yardage_book_updates": [],
+  "course_management_notes": [],
+  "slope_factors": [],
+  "_auto_generated": true,
+  "_commits": 8,
+  "_ci_signal": null,
+  "_pr_signal": null,
+  "_note": "Auto-generated from git only (no CI). Shots default to green. Provide --test-output for better scoring."
+}

@@ -1,0 +1,104 @@
+{
+  "sprint_number": 56,
+  "theme": "Harden top hotspot modules",
+  "par": 5,
+  "slope": 1,
+  "score": 8,
+  "score_label": "triple_plus",
+  "date": "2026-03-02",
+  "shots": [
+    {
+      "ticket_key": "LOCAL-053",
+      "title": "S-LOCAL-053-2: fix: remove duplicate import path hardening comment",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [],
+      "notes": "1 files changed (Clean git signals but no CI confirmation — defaulting to green)"
+    },
+    {
+      "ticket_key": "S56-2",
+      "title": "fix: import validateScorecard from core index instead of dynamic require",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [],
+      "notes": "1 files changed (Clean git signals but no CI confirmation — defaulting to green)"
+    },
+    {
+      "ticket_key": "S56-3",
+      "title": "refactor: remove redundant jq command check in parallel.sh",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [],
+      "notes": "1 files changed (Clean git signals but no CI confirmation — defaulting to green)"
+    },
+    {
+      "ticket_key": "S56-4",
+      "title": "fix: harden continuous.sh and parallel.sh against known hazards",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "2 files changed (Clean git signals but no CI confirmation — defaulting to green)"
+    },
+    {
+      "ticket_key": "S56-5",
+      "title": "fix: remove .js extension from validation module import",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [],
+      "notes": "1 files changed (Clean git signals but no CI confirmation — defaulting to green)"
+    },
+    {
+      "ticket_key": "LOCAL-053",
+      "title": "S-LOCAL-053-1: Harden continuous.sh and parallel.sh against known hazards",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "2 files changed (Clean git signals but no CI confirmation — defaulting to green)"
+    },
+    {
+      "ticket_key": "S56-7",
+      "title": "fix: Replace dynamic import with static import in builder.test.ts",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [],
+      "notes": "1 files changed (Clean git signals but no CI confirmation — defaulting to green)"
+    },
+    {
+      "ticket_key": "LOCAL-053",
+      "title": "S-LOCAL-053-1: Harden continuous.sh and parallel.sh against known hazards",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "2 files changed (Clean git signals but no CI confirmation — defaulting to green)"
+    }
+  ],
+  "stats": {
+    "fairways_hit": 8,
+    "fairways_total": 8,
+    "greens_in_regulation": 8,
+    "greens_total": 8,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [],
+  "special_plays": [],
+  "bunker_locations": [],
+  "yardage_book_updates": [],
+  "course_management_notes": [],
+  "slope_factors": [
+    "refactor"
+  ],
+  "_auto_generated": true,
+  "_commits": 8,
+  "_ci_signal": null,
+  "_pr_signal": null,
+  "_note": "Auto-generated from git only (no CI). Shots default to green. Provide --test-output for better scoring."
+}
