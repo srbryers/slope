@@ -71,7 +71,8 @@ export type GuardName =
   | 'next-action'
   | 'pr-review'
   | 'transcript'
-  | 'branch-before-commit';
+  | 'branch-before-commit'
+  | 'worktree-check';
 
 /** Guard registration entry */
 export interface GuardDefinition {
@@ -236,6 +237,14 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     hookEvent: 'PreToolUse',
     toolCategories: ['execute_command'],
     matcher: 'Bash',
+    level: 'full',
+  },
+  {
+    name: 'worktree-check',
+    description: 'Warn when editing in main repo instead of a worktree',
+    hookEvent: 'PreToolUse',
+    toolCategories: ['write_file'],
+    matcher: 'Edit|Write',
     level: 'full',
   },
 ];
