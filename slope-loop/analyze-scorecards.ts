@@ -30,9 +30,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // --- File Reference Extraction ---
 
 // Match patterns like "enrich.ts", "src/core/prep.ts", "run.sh"
-const FILE_REF_PATTERN = /\b((?:[\w.-]+\/)*[\w.-]+\.(?:ts|js|sh|json))\b/g;
+export const FILE_REF_PATTERN = /\b((?:[\w.-]+\/)*[\w.-]+\.(?:ts|js|sh|json))\b/g;
 
-function extractFileRefs(texts: string[]): string[] {
+export function extractFileRefs(texts: string[]): string[] {
   const refs = new Set<string>();
   for (const text of texts) {
     for (const match of text.matchAll(FILE_REF_PATTERN)) {
