@@ -17,6 +17,12 @@ if [ "${#missing_tools[@]}" -gt 0 ]; then
   exit 1
 fi
 
+# Validate jq works
+if ! echo '{}' | jq . >/dev/null 2>&1; then
+  echo "jq validation failed — jq may be broken or missing required dependencies"
+  exit 1
+fi
+
 SLOPE_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 RUNNER="$SLOPE_DIR/slope-loop/run.sh"
 BACKLOG="$SLOPE_DIR/slope-loop/backlog.json"
@@ -204,6 +210,7 @@ else
   git -C "$SLOPE_DIR" worktree remove "$WORKTREE_B" --force 2>/dev/null || log "Warning: failed to remove worktree B"
   
   # Only delete branches if they were successfully merged or have no commits
+  # Use -d (safe) not -D (force) to avoid losing unmerged work
   if git -C "$SLOPE_DIR" merge-base --is-ancestor "$branch_a" HEAD 2>/dev/null || \
      [ "$(git -C "$SLOPE_DIR" rev-list --count "$branch_a" 2>/dev/null)" = "0" ] 2>/dev/null; then
     git -C "$SLOPE_DIR" branch -d "$branch_a" 2>/dev/null || log "Note: keeping branch $branch_a (cleanup failed)"
