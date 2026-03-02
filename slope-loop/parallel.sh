@@ -17,11 +17,7 @@ if [ "${#missing_tools[@]}" -gt 0 ]; then
   exit 1
 fi
 
-# Validate jq works before using it
-if ! command -v jq >/dev/null 2>&1; then
-  echo "ERROR: jq is required but not installed"
-  exit 1
-fi
+# Validate jq works before using it (functional test in addition to command check)
 if ! echo '{}' | jq . >/dev/null 2>&1; then
   echo "ERROR: jq validation failed — jq may be broken or missing required dependencies"
   exit 1
