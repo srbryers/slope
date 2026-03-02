@@ -1,0 +1,62 @@
+{
+  "sprint_number": 55,
+  "theme": "Harden top hotspot modules",
+  "par": 4,
+  "slope": 0,
+  "score": 3,
+  "score_label": "birdie",
+  "date": "2026-03-02",
+  "shots": [
+    {
+      "ticket_key": "LOCAL-052",
+      "title": "S-LOCAL-052-2: Add comment to ensure static imports in builder.test.ts",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [],
+      "notes": "1 files changed (Clean git signals but no CI confirmation — defaulting to green)"
+    },
+    {
+      "ticket_key": "S55-2",
+      "title": "fix: remove duplicate git validation check in parallel.sh",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [],
+      "notes": "1 files changed (Clean git signals but no CI confirmation — defaulting to green)"
+    },
+    {
+      "ticket_key": "LOCAL-052",
+      "title": "S-LOCAL-052-1: fix continuous.sh failure counter reset and capture exit code properly",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "2 files changed (Clean git signals but no CI confirmation — defaulting to green)"
+    }
+  ],
+  "stats": {
+    "fairways_hit": 3,
+    "fairways_total": 3,
+    "greens_in_regulation": 3,
+    "greens_total": 3,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [],
+  "special_plays": [],
+  "bunker_locations": [],
+  "yardage_book_updates": [],
+  "course_management_notes": [],
+  "slope_factors": [],
+  "_auto_generated": true,
+  "_commits": 3,
+  "_ci_signal": null,
+  "_pr_signal": null,
+  "_note": "Auto-generated from git only (no CI). Shots default to green. Provide --test-output for better scoring."
+}

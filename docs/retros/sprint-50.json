@@ -1,0 +1,46 @@
+{
+  "sprint_number": 50,
+  "theme": "Address recurring hazard patterns",
+  "par": 3,
+  "slope": 0,
+  "score": 1,
+  "score_label": "eagle",
+  "date": "2026-03-02",
+  "shots": [
+    {
+      "ticket_key": "LOCAL-048",
+      "title": "fix: S-LOCAL-048-1: Improve sprint event retrieval and mock store completeness",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "2 files changed (Clean git signals but no CI confirmation — defaulting to green)"
+    }
+  ],
+  "stats": {
+    "fairways_hit": 1,
+    "fairways_total": 1,
+    "greens_in_regulation": 1,
+    "greens_total": 1,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [],
+  "special_plays": [],
+  "bunker_locations": [],
+  "yardage_book_updates": [],
+  "course_management_notes": [],
+  "slope_factors": [],
+  "_auto_generated": true,
+  "_commits": 1,
+  "_ci_signal": null,
+  "_pr_signal": null,
+  "_note": "Auto-generated from git only (no CI). Shots default to green. Provide --test-output for better scoring."
+}
