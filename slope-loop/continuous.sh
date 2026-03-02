@@ -98,7 +98,7 @@ log "Pause between sprints: ${PAUSE_BETWEEN}s"
 validate_jq
 
 completed=0
-failures=0  # Track consecutive failures
+failures=0  # Track consecutive failures to stop on cascade
 start_count=$(count_completed)
 
 while [ "$completed" -lt "$MAX_SPRINTS" ]; do
