@@ -43,6 +43,20 @@ validate_jq() {
   fi
 }
 
+# ─── Validate git is available and working ──────
+# @description Check that git is installed and functional
+# @returns 0 if git works, exits with 1 if not
+validate_git() {
+  if ! command -v git >/dev/null 2>&1; then
+    log "ERROR: git is required but not installed"
+    exit 1
+  fi
+  if ! git --version >/dev/null 2>&1; then
+    log "ERROR: git validation failed"
+    exit 1
+  fi
+}
+
 # ─── Count completed sprints from results ────────
 # @description Count the number of completed sprints by checking result files
 # @returns Number of .json files in the results directory
@@ -96,12 +110,13 @@ log "Pause between sprints: ${PAUSE_BETWEEN}s"
 
 # Validate dependencies early
 validate_jq
+validate_git
 
 completed=0
-failures=0  # Track consecutive failures to stop on cascade
 start_count=$(count_completed)
 
 while [ "$completed" -lt "$MAX_SPRINTS" ]; do
+  failures=0  # Reset consecutive failure counter at start of each iteration
   # Check remaining sprints in current backlog
   remaining=$(remaining_sprints)
 
@@ -128,7 +143,6 @@ while [ "$completed" -lt "$MAX_SPRINTS" ]; do
   
   if [ "$sprint_exit" -eq 0 ]; then
     log "Sprint $next_sprint completed successfully"
-    failures=0  # Reset consecutive failure counter on success
   else
     log "Sprint $next_sprint failed (exit $sprint_exit)"
     failures=$((failures + 1))

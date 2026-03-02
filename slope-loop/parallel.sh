@@ -5,29 +5,36 @@
 
 set -euo pipefail
 
-# Preflight: required tools and validation
-missing_tools=()
-for cmd in jq git pnpm; do
-  if ! command -v "$cmd" >/dev/null 2>&1; then
-    missing_tools+=("$cmd")
+# ─── Validate required tools ─────────────────────
+# @description Check that all required tools are installed and functional
+# @returns 0 if all tools work, exits with 1 if any are missing or broken
+validate_tools() {
+  local missing_tools=()
+  for cmd in jq git pnpm; do
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+      missing_tools+=("$cmd")
+    fi
+  done
+  if [ "${#missing_tools[@]}" -gt 0 ]; then
+    echo "Missing required tools: ${missing_tools[*]}"
+    exit 1
   fi
-done
-if [ "${#missing_tools[@]}" -gt 0 ]; then
-  echo "Missing required tools: ${missing_tools[*]}"
-  exit 1
-fi
 
-# Validate jq works before using it (functional test in addition to command check)
-if ! echo '{}' | jq . >/dev/null 2>&1; then
-  echo "ERROR: jq validation failed — jq may be broken or missing required dependencies"
-  exit 1
-fi
+  # Validate jq works (functional test in addition to command check)
+  if ! echo '{}' | jq . >/dev/null 2>&1; then
+    echo "ERROR: jq validation failed — jq may be broken or missing required dependencies"
+    exit 1
+  fi
 
-# Validate git works
-if ! git --version >/dev/null 2>&1; then
-  echo "ERROR: git validation failed"
-  exit 1
-fi
+  # Validate git works
+  if ! git --version >/dev/null 2>&1; then
+    echo "ERROR: git validation failed"
+    exit 1
+  fi
+}
+
+# Preflight: required tools and validation
+validate_tools
 
 SLOPE_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 RUNNER="$SLOPE_DIR/slope-loop/run.sh"
@@ -216,13 +223,13 @@ else
   git -C "$SLOPE_DIR" worktree remove "$WORKTREE_B" --force 2>/dev/null || log "Warning: failed to remove worktree B"
   
   # Only delete branches if they were successfully merged into current branch
-  # Use -d (safe) which refuses to delete unmerged branches
+  # Use -d (safe) which refuses to delete unmerged branches; never use -D
   if git -C "$SLOPE_DIR" branch -d "$branch_a" 2>/dev/null; then
     log "Deleted branch $branch_a"
   else
     log "Note: branch $branch_a has unmerged changes, keeping it for safety"
   fi
-  
+
   if git -C "$SLOPE_DIR" branch -d "$branch_b" 2>/dev/null; then
     log "Deleted branch $branch_b"
   else

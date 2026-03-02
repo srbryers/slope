@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest';
 
-// Ensure all import paths are static and do not use dynamic imports
+// HARDENED: All imports must be static (no dynamic import() calls)
+// This file is part of the builder test suite and must maintain static imports
+// to ensure proper module resolution and test isolation.
+// See: S-LOCAL-054-2 (hardening against dynamic import hazards)
 import { computeStatsFromShots, buildScorecard, buildAgentBreakdowns, validateScorecard } from '../../src/core/index.js';
 import type { ShotRecord } from '../../src/core/types.js';
 import type { AgentShotInput } from '../../src/core/builder.js';
