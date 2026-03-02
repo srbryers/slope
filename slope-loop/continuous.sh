@@ -1,6 +1,14 @@
 #!/bin/bash
 # slope-loop/continuous.sh — Run sprints in a loop, regenerating backlog when exhausted
-# Usage: ./slope-loop/continuous.sh [--max=N] [--dry-run]
+#
+# @description Continuously runs SLOPE sprints in a loop, regenerating the backlog
+#              when exhausted. Includes safety limits and failure detection.
+# @usage ./slope-loop/continuous.sh [--max=N] [--dry-run] [--pause=SECONDS]
+# @param --max=N Maximum number of sprints to run (default: 10)
+# @param --dry-run Run without executing sprints
+# @param --pause=SECONDS Pause duration between sprints in seconds (default: 30)
+# @returns 0 on successful completion, 1 on error or 3+ consecutive failures
+#
 # Default safety limit: 10 sprints
 
 set -euo pipefail
