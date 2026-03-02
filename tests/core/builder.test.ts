@@ -313,8 +313,8 @@ describe('buildScorecard', () => {
   });
 
   it('produces a valid scorecard that passes validation', () => {
-    // Import validator statically
-    const { validateScorecard } = require('../../src/core/validation.js');
+    // Import validator from TypeScript source
+    const { validateScorecard } = require('../../src/core/validation');
     const shots = [
       makeShot({ result: 'green' }),
       makeShot({ result: 'in_the_hole' }),
