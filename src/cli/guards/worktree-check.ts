@@ -1,12 +1,22 @@
 import { execSync } from 'node:child_process';
+import { existsSync, writeFileSync, mkdirSync, unlinkSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import type { HookInput, GuardResult } from '../../core/index.js';
 
-/** Module-level flag: only fire once per session (process lifetime) */
-let hasFired = false;
+/** Get the sentinel file path for a session (persists across process invocations) */
+function sentinelPath(sessionId: string): string {
+  const dir = join(tmpdir(), 'slope-guards');
+  mkdirSync(dir, { recursive: true });
+  return join(dir, `worktree-check-${sessionId}`);
+}
 
-/** Reset fired state (for testing) */
-export function resetWorktreeCheckState(): void {
-  hasFired = false;
+/** Reset fired state for a session (for testing) */
+export function resetWorktreeCheckState(sessionId = ''): void {
+  if (sessionId) {
+    const p = sentinelPath(sessionId);
+    try { unlinkSync(p); } catch { /* ignore */ }
+  }
 }
 
 /**
@@ -14,10 +24,12 @@ export function resetWorktreeCheckState(): void {
  * Warns (soft 'ask') when editing in the main repo on main/master.
  * Suggests using EnterWorktree for isolation.
  */
-export async function worktreeCheckGuard(_input: HookInput, cwd: string): Promise<GuardResult> {
-  // Only fire once per session
-  if (hasFired) return {};
-  hasFired = true;
+export async function worktreeCheckGuard(input: HookInput, cwd: string): Promise<GuardResult> {
+  // Only fire once per session — use temp file since each invocation is a new process
+  const sessionId = input.session_id || 'unknown';
+  const sentinel = sentinelPath(sessionId);
+  if (existsSync(sentinel)) return {};
+  writeFileSync(sentinel, new Date().toISOString());
 
   // Check if we're in a worktree: git-common-dir returns '.git' for main repo,
   // or a path like '../../.git' for a worktree
