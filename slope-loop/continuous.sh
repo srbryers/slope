@@ -122,9 +122,9 @@ validate_git
 
 completed=0
 start_count=$(count_completed)
+failures=0  # Initialize failure counter before the loop
 
 while [ "$completed" -lt "$MAX_SPRINTS" ]; do
-  failures=0  # Reset consecutive failure counter at start of each iteration
   # Check remaining sprints in current backlog
   remaining=$(remaining_sprints)
 
@@ -151,6 +151,7 @@ while [ "$completed" -lt "$MAX_SPRINTS" ]; do
   
   if [ "$sprint_exit" -eq 0 ]; then
     log "Sprint $next_sprint completed successfully"
+    failures=0  # Reset failure counter on success
   else
     log "Sprint $next_sprint failed (exit $sprint_exit)"
     failures=$((failures + 1))
