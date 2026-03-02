@@ -16,6 +16,7 @@ else
 fi
 
 SLOPE_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+MAIN_REPO="$SLOPE_DIR"
 BACKLOG="$SLOPE_DIR/slope-loop/backlog.json"
 RESULTS_DIR="$SLOPE_DIR/slope-loop/results"
 LOG_DIR="$SLOPE_DIR/slope-loop/logs"
@@ -499,9 +500,25 @@ if [ "$DRY_RUN" = "true" ]; then
   exit 0
 fi
 
-# Create working branch
+# Create working branch in a worktree (isolates from main repo)
 BRANCH="$BRANCH_PREFIX/$SPRINT_ID"
-git checkout -b "$BRANCH" 2>/dev/null || git checkout "$BRANCH"
+WORKTREE_DIR="$SLOPE_DIR/.slope-loop-worktree-$SPRINT_ID"
+git -C "$SLOPE_DIR" worktree prune 2>/dev/null || true
+
+if [ -d "$WORKTREE_DIR" ]; then
+  log "Reusing existing worktree: $WORKTREE_DIR"
+  cd "$WORKTREE_DIR"
+else
+  git -C "$SLOPE_DIR" worktree add "$WORKTREE_DIR" -b "$BRANCH" 2>/dev/null || {
+    log "Error: Failed to create worktree"
+    rmdir "$RESULTS_DIR/$SPRINT_ID.lock" 2>/dev/null || true
+    exit 1
+  }
+  cd "$WORKTREE_DIR"
+  pnpm install --frozen-lockfile 2>/dev/null || true
+  pnpm build 2>/dev/null || true
+fi
+SLOPE_DIR="$WORKTREE_DIR"
 
 # Ensure semantic index is current before starting tickets
 CURRENT_SHA=$(git rev-parse HEAD)
@@ -572,7 +589,9 @@ log "Ticket validation: $VALID_COUNT valid, $SKIPPED skipped"
 if [ "$VALID_COUNT" -eq 0 ]; then
   log "All tickets failed validation — skipping sprint $SPRINT_ID"
   slope session end 2>/dev/null || true
-  git checkout main 2>/dev/null || true
+  cd "$MAIN_REPO"
+  git -C "$MAIN_REPO" worktree remove "$WORKTREE_DIR" --force 2>/dev/null || true
+  git -C "$MAIN_REPO" branch -D "$BRANCH" 2>/dev/null || true
   rmdir "$RESULTS_DIR/$SPRINT_ID.lock" 2>/dev/null || true
   exit 0
 fi
@@ -939,13 +958,17 @@ EOF
 # Clean up lock file
 rmdir "$RESULTS_DIR/$SPRINT_ID.lock" 2>/dev/null || true
 
-# Return to main after merge (deferred until after auto-evolve + results write)
+# Return to main after merge — clean up worktree
 if [ "${MERGED:-false}" = "true" ]; then
-  git checkout main 2>/dev/null && git pull 2>/dev/null || true
-  git branch -d "$BRANCH" 2>/dev/null || true
-  log "=== Sprint $SPRINT_ID done (merged) ==="
+  cd "$MAIN_REPO"
+  git -C "$MAIN_REPO" worktree remove "$WORKTREE_DIR" --force 2>/dev/null || true
+  git -C "$MAIN_REPO" branch -d "$BRANCH" 2>/dev/null || true
+  git -C "$MAIN_REPO" pull 2>/dev/null || true
+  log "=== Sprint $SPRINT_ID done (merged, worktree cleaned) ==="
 else
   log "=== Sprint $SPRINT_ID done ==="
-  log "Review: slope card && git log --oneline $BRANCH"
-  log "Merge:  git checkout main && git merge $BRANCH"
+  log "Worktree preserved at: $WORKTREE_DIR"
+  log "To merge manually:"
+  log "  cd $MAIN_REPO && git merge $BRANCH"
+  log "  git worktree remove $WORKTREE_DIR"
 fi

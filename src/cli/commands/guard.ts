@@ -18,6 +18,7 @@ import { nextActionGuard } from '../guards/next-action.js';
 import { prReviewGuard } from '../guards/pr-review.js';
 import { transcriptGuard } from '../guards/transcript.js';
 import { branchBeforeCommitGuard } from '../guards/branch-before-commit.js';
+import { worktreeCheckGuard } from '../guards/worktree-check.js';
 import { execSync } from 'node:child_process';
 
 // Side-effect imports: ensure all adapters are registered for detectAdapter()
@@ -77,6 +78,7 @@ const handlers: Partial<Record<GuardName, GuardHandler>> = {
   'pr-review': prReviewGuard,
   transcript: transcriptGuard,
   'branch-before-commit': branchBeforeCommitGuard,
+  'worktree-check': worktreeCheckGuard,
 };
 
 /** Register a guard handler */
