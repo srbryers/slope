@@ -29,6 +29,12 @@ if ! git --version >/dev/null 2>&1; then
   exit 1
 fi
 
+# Validate git works
+if ! git --version >/dev/null 2>&1; then
+  echo "ERROR: git validation failed"
+  exit 1
+fi
+
 SLOPE_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 RUNNER="$SLOPE_DIR/slope-loop/run.sh"
 BACKLOG="$SLOPE_DIR/slope-loop/backlog.json"
