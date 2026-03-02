@@ -94,8 +94,6 @@ while [ "$completed" -lt "$MAX_SPRINTS" ]; do
       log "Backlog regeneration failed. Stopping."
       break
     fi
-    # Reset failure counter after successful backlog regeneration
-    failures=0
     remaining=$(remaining_sprints)
     if [ -z "$remaining" ]; then
       log "No sprints in regenerated backlog. Nothing to do."
