@@ -81,7 +81,7 @@ log "Pause between sprints: ${PAUSE_BETWEEN}s"
 [ -n "$DRY_RUN" ] && log "DRY RUN mode"
 
 completed=0
-failures=0
+failures=0  # Track consecutive failures
 start_count=$(count_completed)
 
 while [ "$completed" -lt "$MAX_SPRINTS" ]; do
