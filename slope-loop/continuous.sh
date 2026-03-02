@@ -123,11 +123,14 @@ while [ "$completed" -lt "$MAX_SPRINTS" ]; do
   log "── Sprint $((completed + 1))/$MAX_SPRINTS: $next_sprint ──"
 
   # Run the sprint
-  if "$RUNNER" "$next_sprint" $DRY_RUN 2>&1 | tee -a "$LOG_DIR/continuous.log"; then
+  sprint_exit=0
+  "$RUNNER" "$next_sprint" $DRY_RUN 2>&1 | tee -a "$LOG_DIR/continuous.log" || sprint_exit=$?
+  
+  if [ "$sprint_exit" -eq 0 ]; then
     log "Sprint $next_sprint completed successfully"
     failures=0  # Reset consecutive failure counter on success
   else
-    log "Sprint $next_sprint failed (exit $?)"
+    log "Sprint $next_sprint failed (exit $sprint_exit)"
     failures=$((failures + 1))
 
     # Stop if 3+ consecutive failures
