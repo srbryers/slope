@@ -176,6 +176,22 @@ run_ticket_with_model() {
     [ -s "${PREP_FILE}.err" ] && log "   $(head -1 "${PREP_FILE}.err")"
   fi
 
+  # Add primary files from enriched ticket as --file flags (editable context)
+  if [ -n "${TICKET_PRIMARY_FILES:-}" ]; then
+    local FILE_COUNT=0
+    local MAX_EDIT_FILES=5
+    while IFS= read -r f; do
+      if [ "$FILE_COUNT" -ge "$MAX_EDIT_FILES" ]; then break; fi
+      if [ -n "$f" ] && [ -f "$f" ] && [[ "$f" == *.ts || "$f" == *.js || "$f" == *.sh ]]; then
+        aider_args+=(--file "$f")
+        FILE_COUNT=$((FILE_COUNT + 1))
+      fi
+    done <<< "$TICKET_PRIMARY_FILES"
+    if [ "$FILE_COUNT" -gt 0 ]; then
+      log "   Added $FILE_COUNT primary files to Aider edit context"
+    fi
+  fi
+
   $TIMEOUT_CMD "$timeout_s" aider "${aider_args[@]}" \
     2>&1 | tee "$aider_log" || {
       log "   Warning: Aider timed out or errored on $ticket_id (model: $model)"
@@ -316,6 +332,8 @@ while read -r TICKET; do
   TICKET_CLUB=$(echo "$TICKET" | jq -r '.club')
   TICKET_MAX_FILES=$(echo "$TICKET" | jq -r '.max_files // 1')
   EST_TOKENS=$(echo "$TICKET" | jq -r '.estimated_tokens // 0')
+  # Extract primary files from enriched ticket (set by slope enrich)
+  TICKET_PRIMARY_FILES=$(echo "$TICKET" | jq -r '.files.primary[]? // empty' 2>/dev/null)
 
   log "-- Ticket: $TICKET_KEY — $TICKET_TITLE --"
   log "   Club: $TICKET_CLUB (max_files: $TICKET_MAX_FILES, est_tokens: $EST_TOKENS)"
@@ -349,6 +367,14 @@ APPROACH: Plan before coding. List files to modify, changes per file, verificati
   else
     PROMPT+="
 APPROACH: Make the smallest possible change. Focus on a single file at a time. Keep edits minimal."
+  fi
+
+  # Add file guidance if enriched files are available
+  if [ -n "$TICKET_PRIMARY_FILES" ]; then
+    PROMPT+="
+
+FILES TO MODIFY:
+$(echo "$TICKET_PRIMARY_FILES" | head -5 | sed 's/^/- /')"
   fi
 
   PROMPT+="
