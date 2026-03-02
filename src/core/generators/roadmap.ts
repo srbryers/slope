@@ -235,17 +235,29 @@ function inferSprintType(issues: GitHubIssue[]): string {
 // ─── Priority Keyword Synonyms ───
 
 const PRIORITY_SYNONYMS: Record<string, string[]> = {
-  speed: ['performance', 'optimize', 'fast', 'latency', 'benchmark', 'perf'],
-  performance: ['speed', 'optimize', 'fast', 'latency', 'benchmark', 'perf'],
-  reliability: ['test', 'error', 'coverage', 'monitoring', 'resilient', 'stable', 'robust'],
-  security: ['auth', 'vulnerability', 'permission', 'encrypt', 'secure', 'access'],
-  'developer experience': ['dx', 'cli', 'tooling', 'ergonomic', 'developer', 'devex'],
-  dx: ['developer', 'cli', 'tooling', 'ergonomic', 'devex', 'developer experience'],
-  scalability: ['scale', 'distributed', 'horizontal', 'throughput', 'capacity'],
-  testing: ['test', 'coverage', 'spec', 'e2e', 'integration', 'unit'],
-  documentation: ['docs', 'readme', 'guide', 'tutorial', 'api-docs'],
-  observability: ['monitoring', 'logging', 'tracing', 'metrics', 'alert'],
-  ux: ['ui', 'design', 'usability', 'accessibility', 'a11y', 'user experience'],
+  // Quality attributes (expanded)
+  speed: ['performance', 'optimize', 'fast', 'latency', 'benchmark', 'perf', 'cache', 'cron', 'batch', 'async', 'concurrent', 'parallel', 'queue', 'index', 'throttle'],
+  performance: ['speed', 'optimize', 'fast', 'latency', 'benchmark', 'perf', 'cache', 'cron', 'batch', 'async', 'concurrent', 'parallel', 'queue', 'index', 'throttle'],
+  reliability: ['test', 'error', 'coverage', 'monitoring', 'resilient', 'stable', 'robust', 'retry', 'fallback', 'validate', 'check', 'hash', 'dedup', 'backup', 'recovery', 'logging', 'status'],
+  security: ['auth', 'vulnerability', 'permission', 'encrypt', 'secure', 'access', 'token', 'jwt', 'oauth', 'credential', 'secret', 'cors', 'csrf', 'sanitize'],
+  scalability: ['scale', 'distributed', 'horizontal', 'throughput', 'capacity', 'shard', 'partition', 'replicate', 'cluster', 'load-balance'],
+  testing: ['test', 'coverage', 'spec', 'e2e', 'integration', 'unit', 'mock', 'fixture', 'assert', 'snapshot'],
+  observability: ['monitoring', 'logging', 'tracing', 'metrics', 'alert', 'dashboard', 'health', 'uptime'],
+  ux: ['ui', 'design', 'usability', 'accessibility', 'a11y', 'user experience', 'email', 'notification', 'subscriber', 'onboarding', 'welcome', 'template', 'layout', 'responsive', 'mobile', 'theme', 'deliver'],
+  'developer experience': ['dx', 'cli', 'tooling', 'ergonomic', 'developer', 'devex', 'lint', 'format', 'config', 'scaffold'],
+  dx: ['developer', 'cli', 'tooling', 'ergonomic', 'devex', 'developer experience', 'lint', 'format', 'config', 'scaffold'],
+  documentation: ['docs', 'readme', 'guide', 'tutorial', 'api-docs', 'changelog', 'jsdoc', 'typedoc'],
+
+  // Implementation domains
+  api: ['endpoint', 'route', 'rest', 'graphql', 'webhook', 'fetch', 'request', 'response', 'middleware', 'handler', 'controller'],
+  data: ['database', 'db', 'supabase', 'postgres', 'sqlite', 'mongo', 'redis', 'query', 'insert', 'migration', 'schema', 'model', 'orm', 'prisma', 'drizzle'],
+  ai: ['summarize', 'summarization', 'claude', 'openai', 'gpt', 'llm', 'embedding', 'relevance', 'scoring', 'ml', 'inference', 'prompt', 'generate', 'classify'],
+  delivery: ['email', 'notification', 'send', 'smtp', 'resend', 'mailgun', 'push', 'sms', 'alert', 'subscribe', 'newsletter', 'briefing'],
+  ingestion: ['feed', 'rss', 'news', 'scrape', 'crawl', 'import', 'ingest', 'source', 'poll', 'newsapi'],
+  pipeline: ['cron', 'processing', 'batch', 'queue', 'job', 'worker', 'scheduler', 'schedule', 'pipeline', 'workflow', 'step'],
+  infra: ['deploy', 'ci', 'cd', 'docker', 'env', 'setup', 'install', 'build', 'vercel', 'aws', 'terraform', 'k8s'],
+  payments: ['stripe', 'billing', 'subscription', 'invoice', 'checkout', 'payment', 'price', 'plan', 'charge'],
+  auth: ['login', 'signup', 'register', 'session', 'token', 'oauth', 'sso', 'password', 'mfa', '2fa', 'clerk', 'nextauth'],
 };
 
 function matchesPriority(text: string, priority: string): boolean {
@@ -253,7 +265,12 @@ function matchesPriority(text: string, priority: string): boolean {
   const priorityLower = priority.toLowerCase();
   if (lower.includes(priorityLower)) return true;
   const synonyms = PRIORITY_SYNONYMS[priorityLower] ?? [];
-  return synonyms.some(s => lower.includes(s));
+  if (synonyms.some(s => lower.includes(s))) return true;
+  // Check if any path segments exactly match the priority or its synonyms
+  // e.g., "src/lib/delivery/deliver.ts" → segments ["src", "lib", "delivery", "deliver"]
+  const segments = lower.split(/[/\\.]/).filter(s => s.length > 2);
+  if (segments.some(seg => seg === priorityLower || priorityLower === seg)) return true;
+  return synonyms.some(syn => segments.some(seg => seg === syn));
 }
 
 /**
