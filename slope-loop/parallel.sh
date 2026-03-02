@@ -36,6 +36,9 @@ mkdir -p "$RESULTS_DIR" "$LOG_DIR"
 log() { echo "[$(date '+%H:%M:%S')] [parallel] $*" | tee -a "$LOG_DIR/parallel.log"; }
 
 # ─── Get modules for a sprint ID ─────────────────
+# @description Extract unique module names for a given sprint from backlog
+# @param sprint_id The sprint identifier to look up
+# @returns Sorted list of unique module names, one per line
 get_sprint_modules() {
   local sprint_id="$1"
   jq -r --arg sid "$sprint_id" '
@@ -45,6 +48,10 @@ get_sprint_modules() {
 }
 
 # ─── Check if two sprints have overlapping modules ─
+# @description Determine if two sprints would conflict by touching the same modules
+# @param sprint_a First sprint ID to compare
+# @param sprint_b Second sprint ID to compare
+# @returns "true" if modules overlap, "false" if safe to run in parallel
 has_module_overlap() {
   local sprint_a="$1"
   local sprint_b="$2"
@@ -70,6 +77,8 @@ has_module_overlap() {
 }
 
 # ─── Get next two unscored sprints ───────────────
+# @description Find the next two sprints that don't have result files yet
+# @returns Space-separated pair of sprint IDs, or single ID, or empty string
 get_next_pair() {
   if [ ! -f "$BACKLOG" ]; then
     echo ""

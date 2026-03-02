@@ -239,6 +239,13 @@ if [ "$DRY_RUN" = "false" ]; then
   log "Ollama healthy, model available"
 fi
 
+# gh CLI check (non-blocking — PR creation is optional)
+if ! command -v gh >/dev/null 2>&1; then
+  log "Warning: gh CLI not found — PR creation will be skipped"
+elif ! gh auth status >/dev/null 2>&1; then
+  log "Warning: gh CLI not authenticated — PR creation will be skipped"
+fi
+
 # ─── Sprint selection ─────────────────────────────
 
 get_sprint() {
@@ -285,14 +292,51 @@ if [ "$DRY_RUN" = "true" ]; then
   log "--- Dry run: would process $TICKET_COUNT tickets ---"
   echo "$SPRINT" | jq -r '.tickets[] | "  \(.key): \(.title) [club=\(.club), max_files=\(.max_files)]"'
   echo ""
-  echo "$SPRINT" | jq -c '.tickets[]' | while read -r TICKET; do
+
+  # Dry-run ticket validation
+  log "--- Ticket validation ---"
+  DRY_VALID=0
+  DRY_SKIPPED=0
+  while read -r TICKET; do
+    TICKET_KEY=$(echo "$TICKET" | jq -r '.key')
+    TICKET_TITLE=$(echo "$TICKET" | jq -r '.title')
+    TICKET_MODULES=$(echo "$TICKET" | jq -r '.modules[]?' 2>/dev/null)
+
+    if [ -z "$TICKET_MODULES" ]; then
+      log "  SKIP $TICKET_KEY: no modules specified"
+      DRY_SKIPPED=$((DRY_SKIPPED + 1))
+      continue
+    fi
+
+    FOUND_FILE=false
+    while IFS= read -r mod; do
+      [ -z "$mod" ] && continue
+      if [ -f "$mod" ]; then FOUND_FILE=true; break; fi
+      if ! echo "$mod" | grep -q '/'; then
+        MATCH=$(find . -name "$mod" -not -path '*/node_modules/*' -not -path '*/dist/*' -print -quit 2>/dev/null)
+        if [ -n "$MATCH" ]; then FOUND_FILE=true; break; fi
+      fi
+    done <<< "$TICKET_MODULES"
+
+    if [ "$FOUND_FILE" = "false" ]; then
+      log "  SKIP $TICKET_KEY: no module files found on disk"
+      DRY_SKIPPED=$((DRY_SKIPPED + 1))
+      continue
+    fi
+
+    DRY_VALID=$((DRY_VALID + 1))
     TICKET_CLUB=$(echo "$TICKET" | jq -r '.club')
     TICKET_MAX_FILES=$(echo "$TICKET" | jq -r '.max_files // 1')
     TICKET_EST_TOKENS=$(echo "$TICKET" | jq -r '.estimated_tokens // 0')
     TICKET_MODEL=$(select_model "$TICKET_CLUB" "$TICKET_MAX_FILES" "$TICKET_EST_TOKENS")
-    TICKET_KEY=$(echo "$TICKET" | jq -r '.key')
-    log "  $TICKET_KEY -> model: $TICKET_MODEL (club=$TICKET_CLUB, files=$TICKET_MAX_FILES, tokens=$TICKET_EST_TOKENS)"
-  done
+    log "  VALID $TICKET_KEY -> model: $TICKET_MODEL (club=$TICKET_CLUB, files=$TICKET_MAX_FILES, tokens=$TICKET_EST_TOKENS)"
+  done < <(echo "$SPRINT" | jq -c '.tickets[]')
+  log "Validation: $DRY_VALID valid, $DRY_SKIPPED skipped"
+
+  if [ "$DRY_VALID" -eq 0 ]; then
+    log "All tickets would fail validation — sprint would be skipped"
+  fi
+
   log "--- Dry run complete ---"
   rmdir "$RESULTS_DIR/$SPRINT_ID.lock" 2>/dev/null || true
   exit 0
@@ -319,6 +363,60 @@ fi
 
 # Start Slope session
 slope session start --sprint="$SPRINT_ID" 2>/dev/null || true
+
+# ─── Pre-Sprint Ticket Validation ────────────────
+
+VALID_TICKETS="[]"
+SKIPPED=0
+
+while read -r TICKET; do
+  TICKET_KEY=$(echo "$TICKET" | jq -r '.key')
+  TICKET_TITLE=$(echo "$TICKET" | jq -r '.title')
+  TICKET_MODULES=$(echo "$TICKET" | jq -r '.modules[]?' 2>/dev/null)
+
+  # Check 1: Has modules
+  if [ -z "$TICKET_MODULES" ]; then
+    log "   SKIP $TICKET_KEY: no modules specified"
+    SKIPPED=$((SKIPPED + 1))
+    continue
+  fi
+
+  # Check 2: At least one module file exists on disk
+  FOUND_FILE=false
+  while IFS= read -r mod; do
+    [ -z "$mod" ] && continue
+    if [ -f "$mod" ]; then
+      FOUND_FILE=true
+      break
+    fi
+    # Try finding bare basenames in the repo
+    if ! echo "$mod" | grep -q '/'; then
+      MATCH=$(find . -name "$mod" -not -path '*/node_modules/*' -not -path '*/dist/*' -print -quit 2>/dev/null)
+      if [ -n "$MATCH" ]; then
+        FOUND_FILE=true
+        break
+      fi
+    fi
+  done <<< "$TICKET_MODULES"
+
+  if [ "$FOUND_FILE" = "false" ]; then
+    log "   SKIP $TICKET_KEY: no module files found on disk"
+    SKIPPED=$((SKIPPED + 1))
+    continue
+  fi
+
+  VALID_TICKETS=$(echo "$VALID_TICKETS" | jq ". + [$(echo "$TICKET" | jq -c '.')]")
+  log "   VALID $TICKET_KEY: $TICKET_TITLE"
+done < <(echo "$SPRINT" | jq -c '.tickets[]')
+
+VALID_COUNT=$(echo "$VALID_TICKETS" | jq 'length')
+log "Ticket validation: $VALID_COUNT valid, $SKIPPED skipped"
+
+if [ "$VALID_COUNT" -eq 0 ]; then
+  log "All tickets failed validation — skipping sprint $SPRINT_ID"
+  rmdir "$RESULTS_DIR/$SPRINT_ID.lock" 2>/dev/null || true
+  exit 0
+fi
 
 # ─── Process Each Ticket ──────────────────────────
 
@@ -456,7 +554,7 @@ START by reading the relevant source files, then implement the change."
   git push -u origin "$BRANCH" 2>/dev/null || log "   Warning: git push failed for $TICKET_KEY"
 
   log "-- Ticket $TICKET_KEY complete --"
-done < <(echo "$SPRINT" | jq -c '.tickets[]')
+done < <(echo "$VALID_TICKETS" | jq -c '.[]')
 
 # ─── Post-Sprint: Score, Review & Evolve ──────────
 
@@ -467,6 +565,50 @@ slope auto-card --sprint="$SPRINT_ID" 2>/dev/null || {
   log "Auto-card generation failed — manual review needed"
 }
 slope review 2>/dev/null || true
+
+# ─── Create Pull Request ─────────────────────────
+
+PASSING_COUNT=$(echo "$TICKET_RESULTS" | jq '[.[] | select(.tests_passing == true and .noop != true)] | length')
+NOOP_COUNT=$(echo "$TICKET_RESULTS" | jq '[.[] | select(.noop == true)] | length')
+
+if [ "$PASSING_COUNT" -gt 0 ] && command -v gh >/dev/null 2>&1; then
+  # Check if branch has commits ahead of main
+  AHEAD=$(git rev-list --count main.."$BRANCH" 2>/dev/null || echo 0)
+  if [ "$AHEAD" -gt 0 ]; then
+    # Build PR body from ticket results
+    PR_BODY="## Sprint $SPRINT_ID — $SPRINT_TITLE
+
+**Strategy:** $SPRINT_STRATEGY | **Tickets:** $TICKET_COUNT | **Passing:** $PASSING_COUNT | **No-ops:** $NOOP_COUNT
+
+### Tickets
+$(echo "$TICKET_RESULTS" | jq -r '.[] | "- **\(.ticket)**: \(.title) — \(if .noop then "no-op" elif .tests_passing then "pass" else "fail" end) (\(.final_model | split("/") | last))"')
+
+### Verification
+- Tests: $([ "$PASSING_COUNT" -gt 0 ] && echo 'passing' || echo 'failing')
+- Generated by autonomous loop (\`slope-loop/run.sh\`)"
+
+    PR_URL=$(gh pr create \
+      --base main \
+      --head "$BRANCH" \
+      --title "feat($SPRINT_ID): $SPRINT_TITLE" \
+      --body "$PR_BODY" 2>&1) || {
+      log "Warning: PR creation failed — create manually"
+      PR_URL=""
+    }
+
+    if [ -n "$PR_URL" ]; then
+      log "PR created: $PR_URL"
+    fi
+  else
+    log "No commits ahead of main — skipping PR creation"
+  fi
+else
+  if [ "$PASSING_COUNT" -eq 0 ]; then
+    log "No passing tickets — skipping PR creation"
+  else
+    log "Warning: gh CLI not available — skipping PR creation"
+  fi
+fi
 
 # ─── Auto-evolve agent guide skill ────────────────
 
