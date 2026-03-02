@@ -30,6 +30,8 @@ mkdir -p "$RESULTS_DIR" "$LOG_DIR"
 log() { echo "[$(date '+%H:%M:%S')] $*" | tee -a "$LOG_DIR/continuous.log"; }
 
 # ─── Count completed sprints from results ────────
+# @description Count the number of completed sprints by checking result files
+# @returns Number of .json files in the results directory
 count_completed() {
   if [ -d "$RESULTS_DIR" ]; then
     find "$RESULTS_DIR" -name '*.json' -type f | wc -l | tr -d ' '
@@ -39,6 +41,8 @@ count_completed() {
 }
 
 # ─── Get remaining sprint IDs from backlog ───────
+# @description Extract sprint IDs from backlog that don't have result files yet
+# @returns Newline-separated list of unprocessed sprint IDs
 remaining_sprints() {
   if [ ! -f "$BACKLOG" ]; then
     echo ""
@@ -54,6 +58,8 @@ remaining_sprints() {
 }
 
 # ─── Regenerate backlog from fresh analysis ──────
+# @description Rebuild the sprint backlog by analyzing existing scorecards
+# @returns 0 on success, 1 if backlog.json was not created
 regenerate_backlog() {
   log "Regenerating backlog from scorecard analysis..."
   cd "$SLOPE_DIR"
