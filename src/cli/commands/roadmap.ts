@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   parseRoadmap,
@@ -8,6 +8,12 @@ import {
   formatRoadmapSummary,
   formatStrategicContext,
   loadScorecards,
+  loadVision,
+  analyzeBacklog,
+  mergeBacklogs,
+  runAnalyzers,
+  estimateComplexity,
+  generateRoadmapFromVision,
 } from '../../core/index.js';
 import type { RoadmapDefinition, RoadmapSprint, RoadmapTicket, RoadmapClub, GolfScorecard } from '../../core/index.js';
 import { loadConfig } from '../config.js';
@@ -408,6 +414,58 @@ function syncSubcommand(flags: Record<string, string>, cwd: string): void {
   console.log(`\n  Written to ${path}\n`);
 }
 
+async function generateSubcommand(flags: Record<string, string>, cwd: string): Promise<void> {
+  const vision = loadVision(cwd);
+  if (!vision) {
+    console.error('\nNo vision found. Create one first:');
+    console.error('  slope vision create --purpose="..." --priorities="a,b,c"\n');
+    process.exit(1);
+  }
+
+  console.log('\nGenerating roadmap from vision + backlog...');
+
+  const localBacklog = await analyzeBacklog(cwd);
+  const backlog = mergeBacklogs(localBacklog);
+
+  let complexity;
+  try {
+    const profile = await runAnalyzers({ cwd, analyzers: ['stack', 'structure', 'git', 'testing', 'ci', 'docs'] });
+    complexity = estimateComplexity(profile);
+  } catch {
+    console.log('  Warning: Could not estimate complexity, using defaults.');
+  }
+
+  const roadmap = generateRoadmapFromVision(vision, backlog, complexity);
+
+  const validation = validateRoadmap(roadmap);
+  if (!validation.valid) {
+    console.error('\nGenerated roadmap has validation errors:');
+    for (const e of validation.errors) {
+      console.error(`  \u2717 ${e.message}`);
+    }
+    console.error('');
+    process.exit(1);
+  }
+
+  const path = resolveRoadmapPath(flags, cwd);
+  const dir = join(cwd, 'docs', 'backlog');
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  writeFileSync(path, JSON.stringify(roadmap, null, 2) + '\n');
+
+  console.log(`\n  Roadmap written to ${path}`);
+  console.log(`  Sprints: ${roadmap.sprints.length}`);
+  console.log(`  Tickets: ${roadmap.sprints.reduce((s: number, sp: RoadmapSprint) => s + sp.tickets.length, 0)}`);
+  console.log(`  Phases: ${roadmap.phases.length}`);
+
+  if (validation.warnings.length > 0) {
+    console.log('\nWarnings:');
+    for (const w of validation.warnings) {
+      console.log(`  \u26A0 ${w.message}`);
+    }
+  }
+  console.log('');
+}
+
 // --- Main Command ---
 
 export async function roadmapCommand(args: string[]): Promise<void> {
@@ -431,6 +489,9 @@ export async function roadmapCommand(args: string[]): Promise<void> {
     case 'sync':
       syncSubcommand(flags, cwd);
       break;
+    case 'generate':
+      await generateSubcommand(flags, cwd);
+      break;
     default:
       console.log(`
 slope roadmap — Strategic planning tools
@@ -441,6 +502,7 @@ Usage:
   slope roadmap status [--path=<file>] [--sprint=N]  Current progress
   slope roadmap show [--path=<file>]         Render summary (critical path, parallel tracks)
   slope roadmap sync [--path=<file>] [--dry-run]     Sync scorecards into roadmap
+  slope roadmap generate [--path=<file>]     Generate from vision + backlog analysis
 
 Options:
   --path=<file>    Path to roadmap JSON (default: docs/backlog/roadmap.json)

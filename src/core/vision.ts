@@ -26,6 +26,47 @@ export function saveVision(vision: VisionDocument, cwd?: string): void {
   writeFileSync(filePath, JSON.stringify(vision, null, 2) + '\n');
 }
 
+/** Create a new vision document with timestamps. Validates, saves, and returns it. */
+export function createVision(fields: {
+  purpose: string;
+  priorities: string[];
+  audience?: string;
+  techDirection?: string;
+  nonGoals?: string[];
+}, cwd?: string): VisionDocument {
+  const existing = loadVision(cwd);
+  if (existing) throw new Error('Vision already exists. Use updateVision() to modify it.');
+  const now = new Date().toISOString();
+  const vision: VisionDocument = {
+    purpose: fields.purpose,
+    priorities: fields.priorities,
+    audience: fields.audience,
+    techDirection: fields.techDirection,
+    nonGoals: fields.nonGoals,
+    createdAt: now,
+    updatedAt: now,
+  };
+  const errors = validateVision(vision);
+  if (errors.length > 0) throw new Error(`Invalid vision: ${errors.join(', ')}`);
+  saveVision(vision, cwd);
+  return vision;
+}
+
+/** Update fields of an existing vision document. Preserves createdAt, bumps updatedAt. */
+export function updateVision(fields: Partial<Omit<VisionDocument, 'createdAt' | 'updatedAt'>>, cwd?: string): VisionDocument {
+  const existing = loadVision(cwd);
+  if (!existing) throw new Error('No vision exists. Use createVision() first.');
+  const updated: VisionDocument = {
+    ...existing,
+    ...Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined)),
+    updatedAt: new Date().toISOString(),
+  };
+  const errors = validateVision(updated);
+  if (errors.length > 0) throw new Error(`Invalid vision: ${errors.join(', ')}`);
+  saveVision(updated, cwd);
+  return updated;
+}
+
 export function validateVision(vision: unknown): string[] {
   const errors: string[] = [];
 

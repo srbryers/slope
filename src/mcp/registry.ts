@@ -812,6 +812,36 @@ export const SLOPE_REGISTRY: FunctionRegistryEntry[] = [
     signature: 'submitInitAnswers(answers: Record<string, unknown>, providers?: string[]): Promise<InitFromAnswersResult>',
     example: 'return await submitInitAnswers({ "project-name": "my-app", "metaphor": "gaming" }, ["claude-code"]);',
   },
+
+  // ─── Onboarding Helpers ───
+  {
+    name: 'detectPackageManager',
+    module: 'init',
+    description: 'Detect package manager from lock files (pnpm-lock.yaml, package-lock.json, bun.lockb, etc.). Returns "pnpm", "npm", "bun", "yarn", or null.',
+    signature: 'detectPackageManager(cwd?: string): string | null',
+    example: 'return detectPackageManager();',
+  },
+  {
+    name: 'createVision',
+    module: 'init',
+    description: 'Create a vision document. Saves to .slope/vision.json. Errors if vision already exists.',
+    signature: 'createVision(fields: { purpose: string; priorities: string[]; audience?: string; techDirection?: string; nonGoals?: string[] }, cwd?: string): VisionDocument',
+    example: 'return createVision({ purpose: "Build a sprint scoring engine", priorities: ["reliability", "developer experience"] });',
+  },
+  {
+    name: 'updateVision',
+    module: 'init',
+    description: 'Update fields of the existing vision document. Errors if no vision exists.',
+    signature: 'updateVision(fields: { purpose?: string; priorities?: string[]; audience?: string; techDirection?: string; nonGoals?: string[] }, cwd?: string): VisionDocument',
+    example: 'return updateVision({ priorities: ["reliability", "speed", "dx"] });',
+  },
+  {
+    name: 'generateRoadmapFromVision',
+    module: 'init',
+    description: 'Generate a roadmap from vision + backlog. Run after createVision. Uses backlog analysis to create concrete sprints aligned with vision priorities.',
+    signature: 'generateRoadmapFromVision(vision: VisionDocument, backlog: MergedBacklog, complexity?: ComplexityProfile): RoadmapDefinition',
+    example: 'const v = loadVision(); const bl = mergeBacklogs(await analyzeBacklog()); return generateRoadmapFromVision(v, bl);',
+  },
 ];
 
 /**

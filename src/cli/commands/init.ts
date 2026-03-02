@@ -1,9 +1,11 @@
 import { writeFileSync, mkdirSync, existsSync, cpSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { execSync } from 'node:child_process';
 import { createConfig } from '../config.js';
 import { saveHooksConfig } from '../hooks-config.js';
 import { resolveMetaphor } from '../metaphor.js';
+import { detectPackageManager, createVision } from '../../core/index.js';
 import type { MetaphorDefinition } from '../../core/index.js';
 import {
   generateProjectContext,
@@ -697,6 +699,34 @@ export async function initCommand(args: string[]): Promise<void> {
   const metaphorId = metaphorArg?.slice('--metaphor='.length);
   const metaphor = resolveMetaphor(args, metaphorId || undefined);
 
+  // Auto-install: detect package manager and install SLOPE as devDep
+  if (args.includes('--auto-install')) {
+    const pm = detectPackageManager(cwd);
+    if (pm) {
+      const pkgJsonPath = join(cwd, 'package.json');
+      if (existsSync(pkgJsonPath)) {
+        try {
+          const pkgJson = JSON.parse(readFileSync(pkgJsonPath, 'utf8'));
+          const devDeps = pkgJson.devDependencies ?? {};
+          if (!devDeps['@slope-dev/slope']) {
+            const installCmd = pm === 'npm' ? 'npm install -D @slope-dev/slope'
+              : pm === 'yarn' ? 'yarn add -D @slope-dev/slope'
+              : pm === 'bun' ? 'bun add -D @slope-dev/slope'
+              : 'pnpm add -D @slope-dev/slope';
+            console.log(`  Auto-installing: ${installCmd}`);
+            execSync(installCmd, { cwd, stdio: 'inherit' });
+          } else {
+            console.log('  @slope-dev/slope already installed.');
+          }
+        } catch (err) {
+          console.error(`  Warning: Auto-install failed: ${(err as Error).message}`);
+        }
+      }
+    } else {
+      console.log('  Warning: No package manager detected, skipping auto-install.');
+    }
+  }
+
   const configPath = createConfig(cwd);
 
   // Apply metaphor and team config
@@ -768,6 +798,30 @@ export async function initCommand(args: string[]): Promise<void> {
 
   for (const p of providers) {
     installForProvider(cwd, p, metaphor);
+  }
+
+  // Save structured vision if provided via flags
+  const visionPurpose = args.find(a => a.startsWith('--vision-purpose='))?.slice('--vision-purpose='.length);
+  const visionPriorities = args.find(a => a.startsWith('--vision-priorities='))?.slice('--vision-priorities='.length);
+  if (visionPurpose && visionPriorities) {
+    try {
+      createVision({
+        purpose: visionPurpose,
+        priorities: visionPriorities.split(',').map(s => s.trim()).filter(Boolean),
+      }, cwd);
+      console.log('  Created .slope/vision.json');
+    } catch (err) {
+      console.error(`  Warning: Could not create vision: ${(err as Error).message}`);
+    }
+  }
+
+  // Auto-map: generate CODEBASE.md after all artifacts are created
+  try {
+    const { mapCommand } = await import('./map.js');
+    await mapCommand([]);
+    console.log('  Generated CODEBASE.md');
+  } catch {
+    // map command may not exist yet or may fail — non-fatal
   }
 
   printInstallSummary(providers);
