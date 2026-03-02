@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 
 // Ensure all import paths are static and do not use dynamic imports
 // Ensure all import paths are static and do not use dynamic imports
-import { computeStatsFromShots, buildScorecard, buildAgentBreakdowns } from '../../src/core/builder.js';
+import { computeStatsFromShots, buildScorecard, buildAgentBreakdowns, validateScorecard } from '../../src/core/index.js';
 import type { ShotRecord } from '../../src/core/types.js';
 import type { AgentShotInput } from '../../src/core/builder.js';
 
@@ -313,8 +313,6 @@ describe('buildScorecard', () => {
   });
 
   it('produces a valid scorecard that passes validation', () => {
-    // Import validator from TypeScript source
-    const { validateScorecard } = require('../../src/core/validation');
     const shots = [
       makeShot({ result: 'green' }),
       makeShot({ result: 'in_the_hole' }),
