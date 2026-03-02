@@ -451,6 +451,10 @@ START by reading the relevant source files, then implement the change."
   TICKET_RESULTS=$(echo "$TICKET_RESULTS" | jq ". + [$TICKET_RESULT]")
 
   slope release --target="$TICKET_KEY" 2>/dev/null || true
+
+  # Push after each ticket — last push is the recovery point
+  git push -u origin "$BRANCH" 2>/dev/null || log "   Warning: git push failed for $TICKET_KEY"
+
   log "-- Ticket $TICKET_KEY complete --"
 done < <(echo "$SPRINT" | jq -c '.tickets[]')
 
