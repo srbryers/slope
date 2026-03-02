@@ -12,7 +12,7 @@ for cmd in jq git pnpm; do
     missing_tools+=("$cmd")
   fi
 done
-if [ ${#missing_tools[@]} -gt 0 ]; then
+if [ "${#missing_tools[@]}" -gt 0 ]; then
   echo "Missing required tools: ${missing_tools[*]}"
   exit 1
 fi
@@ -204,16 +204,18 @@ else
   git -C "$SLOPE_DIR" worktree remove "$WORKTREE_B" --force 2>/dev/null || log "Warning: failed to remove worktree B"
   
   # Only delete branches if they were successfully merged or have no commits
-  if git -C "$SLOPE_DIR" merge-base --is-ancestor "$branch_a" HEAD 2>/dev/null; then
+  if git -C "$SLOPE_DIR" merge-base --is-ancestor "$branch_a" HEAD 2>/dev/null || \
+     [ "$(git -C "$SLOPE_DIR" rev-list --count "$branch_a" 2>/dev/null)" = "0" ] 2>/dev/null; then
     git -C "$SLOPE_DIR" branch -d "$branch_a" 2>/dev/null || log "Note: keeping branch $branch_a (cleanup failed)"
   else
-    log "Note: keeping branch $branch_a (has unmerged changes)"
+    log "Note: keeping branch $branch_a (has unmerged changes or commits)"
   fi
   
-  if git -C "$SLOPE_DIR" merge-base --is-ancestor "$branch_b" HEAD 2>/dev/null; then
+  if git -C "$SLOPE_DIR" merge-base --is-ancestor "$branch_b" HEAD 2>/dev/null || \
+     [ "$(git -C "$SLOPE_DIR" rev-list --count "$branch_b" 2>/dev/null)" = "0" ] 2>/dev/null; then
     git -C "$SLOPE_DIR" branch -d "$branch_b" 2>/dev/null || log "Note: keeping branch $branch_b (cleanup failed)"
   else
-    log "Note: keeping branch $branch_b (has unmerged changes)"
+    log "Note: keeping branch $branch_b (has unmerged changes or commits)"
   fi
 
   log "=== Parallel Runner Complete ==="
