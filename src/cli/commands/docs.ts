@@ -83,8 +83,29 @@ function getTagDate(cwd: string, tag: string): string {
   return date ? date.slice(0, 10) : '';
 }
 
+/** Parse git log output lines into ChangelogChange[] */
+function parseLogLines(raw: string): ChangelogChange[] {
+  return raw.split('\n').filter(Boolean).map(line => {
+    const [hash, ...rest] = line.split('|||');
+    const subject = rest.join('|||');
+    const change = parseCommitType(subject);
+    change.hash = hash;
+    return change;
+  });
+}
+
+/** Validate a git ref name to prevent shell injection */
+function isValidGitRef(ref: string): boolean {
+  return /^[\w./@-]+$/.test(ref);
+}
+
 export function parseChangelog(cwd: string, since?: string): ChangelogSection {
   try {
+    // Validate user-supplied ref
+    if (since && !isValidGitRef(since)) {
+      return { status: 'unavailable', entries: [], reason: `Invalid git ref: ${since}` };
+    }
+
     // Check if we're in a git repo
     const gitCheck = exec('git rev-parse --is-inside-work-tree', cwd);
     if (gitCheck !== 'true') {
@@ -103,15 +124,7 @@ export function parseChangelog(cwd: string, since?: string): ChangelogSection {
 
     // Unreleased commits (HEAD..latest tag or all if no tags)
     if (raw) {
-      const lines = raw.split('\n').filter(Boolean);
-      const changes: ChangelogChange[] = lines.map(line => {
-        const [hash, ...rest] = line.split('|||');
-        const subject = rest.join('|||');
-        const change = parseCommitType(subject);
-        change.hash = hash;
-        return change;
-      });
-
+      const changes = parseLogLines(raw);
       if (changes.length > 0) {
         entries.push({
           version: 'Unreleased',
@@ -129,15 +142,7 @@ export function parseChangelog(cwd: string, since?: string): ChangelogSection {
       const tagLog = exec(`git log ${tagRange} --format=%H%x7C%x7C%x7C%s --no-merges`, cwd);
       if (!tagLog) continue;
 
-      const lines = tagLog.split('\n').filter(Boolean);
-      const changes: ChangelogChange[] = lines.map(line => {
-        const [hash, ...rest] = line.split('|||');
-        const subject = rest.join('|||');
-        const change = parseCommitType(subject);
-        change.hash = hash;
-        return change;
-      });
-
+      const changes = parseLogLines(tagLog);
       if (changes.length > 0) {
         entries.push({
           version: tag,
