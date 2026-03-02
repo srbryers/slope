@@ -107,9 +107,11 @@ select_timeout() {
 # ─── PR Structural Review ────────────────────────
 # Returns finding count via echo; all log output goes to stderr to avoid
 # corrupting the captured return value.
+# Args: pr_url sprint_id sprint_num
 review_pr() {
   local pr_url="$1"
   local sprint_id="$2"
+  local sprint_num="${3:-0}"
   local finding_count=0
 
   # Get PR diff
@@ -149,7 +151,7 @@ review_pr() {
     slope review findings add \
       --type=code --ticket="${sprint_id}-0" --severity=minor \
       --description="$type_escapes type escape(s) found (as any / @ts-ignore)" \
-      2>/dev/null || true
+      --sprint="$sprint_num" 2>/dev/null || true
     finding_count=$((finding_count + 1))
   fi
 
@@ -160,7 +162,7 @@ review_pr() {
     slope review findings add \
       --type=code --ticket="${sprint_id}-0" --severity=minor \
       --description="$console_logs console.log statement(s) in production code" \
-      2>/dev/null || true
+      --sprint="$sprint_num" 2>/dev/null || true
     finding_count=$((finding_count + 1))
   fi
 
@@ -180,7 +182,7 @@ review_pr() {
       slope review findings add \
         --type=code --ticket="${sprint_id}-0" --severity=moderate \
         --description="$untested_count source file(s) changed without corresponding test changes" \
-        2>/dev/null || true
+        --sprint="$sprint_num" 2>/dev/null || true
       finding_count=$((finding_count + 1))
     fi
   fi
@@ -194,7 +196,7 @@ review_pr() {
     slope review findings add \
       --type=security --ticket="${sprint_id}-0" --severity=moderate \
       --description="$sec_count security-sensitive file(s) changed" \
-      2>/dev/null || true
+      --sprint="$sprint_num" 2>/dev/null || true
     finding_count=$((finding_count + 1))
   fi
 
@@ -208,7 +210,7 @@ review_pr() {
     slope review findings add \
       --type=architect --ticket="${sprint_id}-0" --severity=minor \
       --description="$large_count file(s) with >500 lines added — review for scope creep" \
-      2>/dev/null || true
+      --sprint="$sprint_num" 2>/dev/null || true
     finding_count=$((finding_count + 1))
   fi
 
@@ -674,9 +676,18 @@ done < <(echo "$VALID_TICKETS" | jq -c '.[]')
 log "=== Sprint $SPRINT_ID complete — scoring ==="
 
 slope session end 2>/dev/null || true
-slope auto-card --sprint="$SPRINT_ID" 2>/dev/null || {
-  log "Auto-card generation failed — manual review needed"
-}
+
+# Detect next available numeric sprint number (avoids colliding with main sprint scorecards)
+SPRINT_NUM=$(slope next 2>/dev/null | grep -o 'Next sprint: S[0-9]*' | grep -o '[0-9]*')
+SPRINT_NUM="${SPRINT_NUM:-0}"
+
+if [ "$SPRINT_NUM" -gt 0 ]; then
+  slope auto-card --sprint="$SPRINT_NUM" --theme="$SPRINT_TITLE" --branch="main..$BRANCH" 2>/dev/null || {
+    log "Auto-card generation failed — manual review needed"
+  }
+else
+  log "Warning: could not detect next sprint number — skipping auto-card"
+fi
 slope review 2>/dev/null || true
 
 # ─── Create Pull Request ─────────────────────────
@@ -733,12 +744,12 @@ if [ -n "${PR_URL:-}" ] && [ -n "${PR_NUMBER:-}" ]; then
   slope review findings clear 2>/dev/null || true
 
   # Run structural review
-  FINDING_COUNT=$(review_pr "$PR_URL" "$SPRINT_ID")
+  FINDING_COUNT=$(review_pr "$PR_URL" "$SPRINT_ID" "${SPRINT_NUM:-0}")
   log "Structural review: $FINDING_COUNT finding(s)"
 
   # Amend scorecard with findings (if any)
   if [ "$FINDING_COUNT" -gt 0 ]; then
-    slope review amend 2>/dev/null && log "Scorecard amended with review findings" || \
+    slope review amend --sprint="${SPRINT_NUM:-0}" 2>/dev/null && log "Scorecard amended with review findings" || \
       log "Warning: scorecard amendment failed"
   fi
 
