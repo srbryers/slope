@@ -24,11 +24,14 @@ SPRINT_HISTORY="$SLOPE_DIR/slope-loop/slope-loop-guide/references/sprint-history
 BRANCH_PREFIX="slope-loop"
 
 # ─── Model Tier Configuration ─────────────────────
-MODEL_LOCAL="${MODEL_LOCAL:-ollama/qwen3-coder-next}"
+MODEL_LOCAL="${MODEL_LOCAL:-ollama/qwen3-coder-next-fast}"
 MODEL_API="${MODEL_API:-openrouter/anthropic/claude-haiku-4-5}"
 export OLLAMA_API_BASE="${OLLAMA_API_BASE:-http://localhost:11434}"
+export OLLAMA_FLASH_ATTENTION="${OLLAMA_FLASH_ATTENTION:-1}"
+export OLLAMA_KV_CACHE_TYPE="${OLLAMA_KV_CACHE_TYPE:-q8_0}"
+export AIDER_TIMEOUT="${AIDER_TIMEOUT:-3600}"
 MODEL_API_TIMEOUT=1800                              # 30min for complex tickets
-MODEL_LOCAL_TIMEOUT=900                             # 15min for simple tickets
+MODEL_LOCAL_TIMEOUT=1800                            # 30min for local (MoE prefill is slow)
 ESCALATE_ON_FAIL="${ESCALATE_ON_FAIL:-true}"
 
 # Agent guide token budget — keep SKILL.md under 5000 words per spec
@@ -235,13 +238,15 @@ run_ticket_with_model() {
     --yes
   )
 
-  # Suppress streaming and model warnings for local models (cleaner logs, no browser popup)
+  # Local model optimizations: suppress warnings, reduce repo-map, skip heavy context
+  local is_local=false
   if [[ "$model" == *"ollama"* ]]; then
-    aider_args+=(--no-stream --no-show-model-warnings)
+    aider_args+=(--no-stream --no-show-model-warnings --map-tokens 1024)
+    is_local=true
   fi
 
-  # Inject agent guide skill if within token budget
-  if [ -f "$AGENT_GUIDE" ]; then
+  # Inject agent guide skill if within token budget (skip for local — saves ~5k tokens)
+  if [ "$is_local" = "false" ] && [ -f "$AGENT_GUIDE" ]; then
     local guide_words
     guide_words=$(wc -w < "$AGENT_GUIDE")
     if [ "$guide_words" -le "$AGENT_GUIDE_MAX_WORDS" ]; then
@@ -252,11 +257,19 @@ run_ticket_with_model() {
   fi
 
   # Semantic context per ticket (fall back to CODEBASE.md)
+  # Local models get tighter line limits to keep prefill manageable
+  local context_line_limit=500
+  local context_top=8
+  if [ "$is_local" = "true" ]; then
+    context_line_limit=200
+    context_top=4
+  fi
+
   CONTEXT_FILE="$LOG_DIR/${ticket_id}-context.md"
-  if pnpm slope context --ticket="$ticket_id" --format=snippets --top=8 > "$CONTEXT_FILE" 2>/dev/null; then
+  if pnpm slope context --ticket="$ticket_id" --format=snippets --top="$context_top" > "$CONTEXT_FILE" 2>/dev/null; then
     if [ -s "$CONTEXT_FILE" ]; then
       CONTEXT_LINES=$(wc -l < "$CONTEXT_FILE" | tr -d ' ')
-      if [ "$CONTEXT_LINES" -le 500 ]; then
+      if [ "$CONTEXT_LINES" -le "$context_line_limit" ]; then
         aider_args+=(--read "$CONTEXT_FILE")
         log "   Injected semantic context ($CONTEXT_LINES lines)"
       else
