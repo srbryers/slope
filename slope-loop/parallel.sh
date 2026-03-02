@@ -6,9 +6,16 @@
 set -euo pipefail
 
 # Preflight: required tools
+missing_tools=()
 for cmd in jq git pnpm; do
-  command -v "$cmd" >/dev/null 2>&1 || { echo "Required: $cmd"; exit 1; }
+  if ! command -v "$cmd" >/dev/null 2>&1; then
+    missing_tools+=("$cmd")
+  fi
 done
+if [ ${#missing_tools[@]} -gt 0 ]; then
+  echo "Missing required tools: ${missing_tools[*]}"
+  exit 1
+fi
 
 SLOPE_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 RUNNER="$SLOPE_DIR/slope-loop/run.sh"
@@ -184,10 +191,21 @@ else
 
   # Clean up worktrees
   log "Cleaning up worktrees..."
-  git -C "$SLOPE_DIR" worktree remove "$WORKTREE_A" --force 2>/dev/null || true
-  git -C "$SLOPE_DIR" worktree remove "$WORKTREE_B" --force 2>/dev/null || true
-  git -C "$SLOPE_DIR" branch -d "$branch_a" 2>/dev/null || log "Note: branch $branch_a has unmerged changes, keeping"
-  git -C "$SLOPE_DIR" branch -d "$branch_b" 2>/dev/null || log "Note: branch $branch_b has unmerged changes, keeping"
+  git -C "$SLOPE_DIR" worktree remove "$WORKTREE_A" --force 2>/dev/null || log "Warning: failed to remove worktree A"
+  git -C "$SLOPE_DIR" worktree remove "$WORKTREE_B" --force 2>/dev/null || log "Warning: failed to remove worktree B"
+  
+  # Only delete branches if they were successfully merged or have no commits
+  if git -C "$SLOPE_DIR" merge-base --is-ancestor "$branch_a" HEAD 2>/dev/null; then
+    git -C "$SLOPE_DIR" branch -d "$branch_a" 2>/dev/null || log "Note: keeping branch $branch_a (cleanup failed)"
+  else
+    log "Note: keeping branch $branch_a (has unmerged changes)"
+  fi
+  
+  if git -C "$SLOPE_DIR" merge-base --is-ancestor "$branch_b" HEAD 2>/dev/null; then
+    git -C "$SLOPE_DIR" branch -d "$branch_b" 2>/dev/null || log "Note: keeping branch $branch_b (cleanup failed)"
+  else
+    log "Note: keeping branch $branch_b (has unmerged changes)"
+  fi
 
   log "=== Parallel Runner Complete ==="
   log "Sprint A ($sprint_a): $([ $exit_a -eq 0 ] && echo 'PASS' || echo 'FAIL')"
