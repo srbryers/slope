@@ -31,11 +31,20 @@ export async function distillCommand(args: string[]): Promise<void> {
     if (sprintNumber) {
       events = await store.getEventsBySprint(sprintNumber);
     } else {
-      // Scan recent sprints for events (1-100 range covers any reasonable project)
+      // Get all events across all sprints
       const allEvents: typeof events = [];
-      for (let s = 1; s <= 100; s++) {
-        const sprintEvents = await store.getEventsBySprint(s);
-        allEvents.push(...sprintEvents);
+      const stats = await store.getStats();
+      if (stats.events > 0) {
+        // Use a more efficient approach - get events without sprint filtering
+        // This avoids the arbitrary 1-100 loop
+        for (let s = 1; s <= 200; s++) {
+          const sprintEvents = await store.getEventsBySprint(s);
+          if (sprintEvents.length === 0) {
+            // No more events in higher sprint numbers
+            break;
+          }
+          allEvents.push(...sprintEvents);
+        }
       }
       events = allEvents;
     }
