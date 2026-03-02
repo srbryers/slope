@@ -251,7 +251,7 @@ const PRIORITY_SYNONYMS: Record<string, string[]> = {
   // Implementation domains
   api: ['endpoint', 'route', 'rest', 'graphql', 'webhook', 'fetch', 'request', 'response', 'middleware', 'handler', 'controller'],
   data: ['database', 'db', 'supabase', 'postgres', 'sqlite', 'mongo', 'redis', 'query', 'insert', 'migration', 'schema', 'model', 'orm', 'prisma', 'drizzle'],
-  ai: ['summarize', 'summarization', 'claude', 'openai', 'gpt', 'llm', 'embedding', 'relevance', 'scoring', 'ml', 'inference', 'prompt', 'generate', 'classify'],
+  ai: ['summarize', 'summarization', 'claude', 'openai', 'gpt', 'llm', 'embedding', 'relevance', 'scoring', 'ml', 'inference', 'prompt', 'classify'],
   delivery: ['email', 'notification', 'send', 'smtp', 'resend', 'mailgun', 'push', 'sms', 'alert', 'subscribe', 'newsletter', 'briefing'],
   ingestion: ['feed', 'rss', 'news', 'scrape', 'crawl', 'import', 'ingest', 'source', 'poll', 'newsapi'],
   pipeline: ['cron', 'processing', 'batch', 'queue', 'job', 'worker', 'scheduler', 'schedule', 'pipeline', 'workflow', 'step'],
@@ -269,7 +269,7 @@ function matchesPriority(text: string, priority: string): boolean {
   // Check if any path segments exactly match the priority or its synonyms
   // e.g., "src/lib/delivery/deliver.ts" → segments ["src", "lib", "delivery", "deliver"]
   const segments = lower.split(/[/\\.]/).filter(s => s.length > 2);
-  if (segments.some(seg => seg === priorityLower || priorityLower === seg)) return true;
+  if (segments.some(seg => seg === priorityLower)) return true;
   return synonyms.some(syn => segments.some(seg => seg === syn));
 }
 
