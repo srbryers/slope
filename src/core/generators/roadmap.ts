@@ -1,11 +1,12 @@
 // SLOPE — Roadmap Generator
 // Generates a RoadmapDefinition from repo analysis, complexity, and merged backlog data.
 
-import type { RepoProfile } from '../analyzers/types.js';
+import type { RepoProfile, VisionDocument } from '../analyzers/types.js';
 import type { ComplexityProfile } from '../analyzers/complexity.js';
 import type { MergedBacklog } from '../analyzers/backlog-merged.js';
 import type { RoadmapDefinition, RoadmapSprint, RoadmapTicket, RoadmapClub, RoadmapPhase } from '../roadmap.js';
 import type { GitHubIssue } from '../github.js';
+import type { TodoEntry } from '../analyzers/backlog.js';
 
 const ISSUE_REF_PATTERN = /(?:depends\s+on\s+#(\d+)|blocked\s+by\s+#(\d+)|requires\s+#(\d+)|after\s+#(\d+))/gi;
 
@@ -229,6 +230,157 @@ function inferSprintType(issues: GitHubIssue[]): string {
   if (hasBugs) return 'bugfix';
   if (hasFeatures) return 'feature';
   return 'general';
+}
+
+// ─── Priority Keyword Synonyms ───
+
+const PRIORITY_SYNONYMS: Record<string, string[]> = {
+  speed: ['performance', 'optimize', 'fast', 'latency', 'benchmark', 'perf'],
+  performance: ['speed', 'optimize', 'fast', 'latency', 'benchmark', 'perf'],
+  reliability: ['test', 'error', 'coverage', 'monitoring', 'resilient', 'stable', 'robust'],
+  security: ['auth', 'vulnerability', 'permission', 'encrypt', 'secure', 'access'],
+  'developer experience': ['dx', 'cli', 'tooling', 'ergonomic', 'developer', 'devex'],
+  dx: ['developer', 'cli', 'tooling', 'ergonomic', 'devex', 'developer experience'],
+  scalability: ['scale', 'distributed', 'horizontal', 'throughput', 'capacity'],
+  testing: ['test', 'coverage', 'spec', 'e2e', 'integration', 'unit'],
+  documentation: ['docs', 'readme', 'guide', 'tutorial', 'api-docs'],
+  observability: ['monitoring', 'logging', 'tracing', 'metrics', 'alert'],
+  ux: ['ui', 'design', 'usability', 'accessibility', 'a11y', 'user experience'],
+};
+
+function matchesPriority(text: string, priority: string): boolean {
+  const lower = text.toLowerCase();
+  const priorityLower = priority.toLowerCase();
+  if (lower.includes(priorityLower)) return true;
+  const synonyms = PRIORITY_SYNONYMS[priorityLower] ?? [];
+  return synonyms.some(s => lower.includes(s));
+}
+
+/**
+ * Generate a roadmap from a vision document + merged backlog.
+ * Groups backlog items into sprints aligned with vision priorities.
+ */
+export function generateRoadmapFromVision(
+  vision: VisionDocument,
+  backlog: MergedBacklog,
+  complexity?: ComplexityProfile,
+): RoadmapDefinition {
+  const par = complexity?.estimatedPar ?? 4;
+  const slope = complexity?.estimatedSlope ?? 3;
+  const phases: RoadmapPhase[] = [];
+  const sprints: RoadmapSprint[] = [];
+  let sprintNum = 1;
+
+  const assignedIssueNumbers = new Set<number>();
+  const assignedTodoKeys = new Set<string>();
+
+  for (const priority of vision.priorities) {
+    const matchedIssues: GitHubIssue[] = [];
+    const matchedTodos: TodoEntry[] = [];
+
+    if (backlog.remote) {
+      for (const issue of backlog.remote.issues) {
+        if (assignedIssueNumbers.has(issue.number)) continue;
+        const searchText = [issue.title, ...issue.labels].join(' ');
+        if (matchesPriority(searchText, priority)) {
+          matchedIssues.push(issue);
+          assignedIssueNumbers.add(issue.number);
+        }
+      }
+    }
+
+    for (const todo of backlog.local.todos) {
+      const key = `${todo.file}:${todo.line}`;
+      if (assignedTodoKeys.has(key)) continue;
+      const searchText = `${todo.file} ${todo.text}`;
+      if (matchesPriority(searchText, priority)) {
+        matchedTodos.push(todo);
+        assignedTodoKeys.add(key);
+      }
+    }
+
+    const tickets: RoadmapTicket[] = [];
+
+    for (const issue of matchedIssues) {
+      tickets.push(issueToTicket(issue, `S${sprintNum}-${tickets.length + 1}`));
+    }
+
+    for (const todo of matchedTodos) {
+      tickets.push({
+        key: `S${sprintNum}-${tickets.length + 1}`,
+        title: `${todo.type}: ${todo.text}`,
+        club: 'wedge' as RoadmapClub,
+        complexity: 'small',
+      });
+    }
+
+    if (tickets.length === 0) {
+      tickets.push({
+        key: `S${sprintNum}-1`,
+        title: `Investigate and plan ${priority} improvements`,
+        club: 'short_iron' as RoadmapClub,
+        complexity: 'standard',
+      });
+    }
+
+    sprints.push({
+      id: sprintNum,
+      theme: priority,
+      par,
+      slope,
+      type: 'feature',
+      tickets,
+    });
+
+    phases.push({
+      name: `Phase ${phases.length + 1} — ${priority.charAt(0).toUpperCase() + priority.slice(1)}`,
+      sprints: [sprintNum],
+    });
+
+    sprintNum++;
+  }
+
+  const overflowTickets: RoadmapTicket[] = [];
+
+  if (backlog.remote) {
+    for (const issue of backlog.remote.issues) {
+      if (assignedIssueNumbers.has(issue.number)) continue;
+      overflowTickets.push(issueToTicket(issue, `S${sprintNum}-${overflowTickets.length + 1}`));
+    }
+  }
+
+  for (const todo of backlog.local.todos) {
+    const key = `${todo.file}:${todo.line}`;
+    if (assignedTodoKeys.has(key)) continue;
+    overflowTickets.push({
+      key: `S${sprintNum}-${overflowTickets.length + 1}`,
+      title: `${todo.type}: ${todo.text}`,
+      club: 'wedge' as RoadmapClub,
+      complexity: 'small',
+    });
+  }
+
+  if (overflowTickets.length > 0) {
+    sprints.push({
+      id: sprintNum,
+      theme: 'General',
+      par,
+      slope,
+      type: 'general',
+      tickets: overflowTickets,
+    });
+    phases.push({
+      name: `Phase ${phases.length + 1} — General`,
+      sprints: [sprintNum],
+    });
+  }
+
+  return {
+    name: vision.purpose,
+    description: `Roadmap generated from vision priorities: ${vision.priorities.join(', ')}`,
+    phases,
+    sprints,
+  };
 }
 
 function resolveDependencies(

@@ -537,6 +537,7 @@ export type { EventIngestionResult } from './event-ingestion.js';
 
 // Analyzers
 export { runAnalyzers, loadRepoProfile, saveRepoProfile } from './analyzers/index.js';
+export { analyzeStack, detectPackageManager } from './analyzers/stack.js';
 export type { RepoProfile, StackProfile, StructureProfile, GitProfile, TestProfile, CIProfile, DocsProfile, AnalyzerName } from './analyzers/types.js';
 
 // Complexity
@@ -559,12 +560,12 @@ export type { MergedBacklog } from './analyzers/backlog-merged.js';
 export { generateConfig } from './generators/config.js';
 export { generateFirstSprint } from './generators/first-sprint.js';
 export { generateCommonIssues } from './generators/common-issues.js';
-export { generateRoadmap } from './generators/roadmap.js';
+export { generateRoadmap, generateRoadmapFromVision } from './generators/roadmap.js';
 export type { GeneratedConfig } from './generators/config.js';
 export type { GeneratedSprint } from './generators/first-sprint.js';
 
 // Vision
-export { loadVision, saveVision, validateVision } from './vision.js';
+export { loadVision, saveVision, validateVision, createVision, updateVision } from './vision.js';
 export type { VisionDocument } from './analyzers/types.js';
 
 // Transcript
@@ -656,6 +657,19 @@ export {
   estimateTokens,
 } from './enrich.js';
 export type { EnrichedTicket, EnrichedBacklog } from './enrich.js';
+
+// Docs (Documentation Manifest)
+export {
+  buildDocsManifest,
+  computeSectionChecksum,
+} from './docs.js';
+export type {
+  DocsManifest,
+  DocsManifestInput,
+  ChangelogSection,
+  ChangelogEntry,
+  ChangelogChange,
+} from './docs.js';
 
 // Built-in metaphors (auto-registers on import)
 export { golf, tennis, baseball, gaming, dnd, matrix, agile } from './metaphors/index.js';

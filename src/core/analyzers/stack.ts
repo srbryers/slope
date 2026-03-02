@@ -53,6 +53,14 @@ function readJson(path: string): Record<string, unknown> | null {
   }
 }
 
+/** Detect package manager from lock files in the given directory. */
+export function detectPackageManager(cwd: string): string | null {
+  for (const [lockFile, pm] of Object.entries(LOCK_TO_PM)) {
+    if (existsSync(join(cwd, lockFile))) return pm;
+  }
+  return null;
+}
+
 export async function analyzeStack(cwd: string): Promise<StackProfile> {
   const languages: Record<string, number> = {};
   const frameworks: string[] = [];
@@ -84,12 +92,7 @@ export async function analyzeStack(cwd: string): Promise<StackProfile> {
   }
 
   // Detect package manager from lock files
-  for (const [lockFile, pm] of Object.entries(LOCK_TO_PM)) {
-    if (existsSync(join(cwd, lockFile))) {
-      packageManager = pm;
-      break;
-    }
-  }
+  packageManager = detectPackageManager(cwd) ?? undefined;
 
   // Parse package.json for frameworks and runtime
   const pkgJson = readJson(join(cwd, 'package.json'));
