@@ -32,6 +32,13 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // Match patterns like "enrich.ts", "src/core/prep.ts", "run.sh"
 export const FILE_REF_PATTERN = /\b((?:[\w.-]+\/)*[\w.-]+\.(?:ts|js|sh|json))\b/g;
 
+// Bare basenames that are too ambiguous — could match dozens of files in any project.
+// Only filtered when they appear without a path component (no '/').
+export const AMBIGUOUS_BASENAMES = new Set([
+  'test', 'index', 'init', 'utils', 'helpers', 'types', 'config',
+  'constants', 'main', 'app', 'server', 'client', 'store', 'router',
+]);
+
 export function extractFileRefs(texts: string[]): string[] {
   const refs = new Set<string>();
   for (const text of texts) {
@@ -42,10 +49,24 @@ export function extractFileRefs(texts: string[]): string[] {
       // Skip docs, templates, config, build output, and dotfile directories
       // Note: \b in the regex strips leading dots, so .claude/ becomes claude/
       if (/^(docs|templates|\.?claude|\.?slope|dist|node_modules)\//.test(file)) continue;
+      // Skip bare basenames that are too ambiguous (no path component)
+      // e.g., "test.ts", "init.ts", "index.ts" — could match dozens of files
+      if (!file.includes('/') && AMBIGUOUS_BASENAMES.has(file.replace(/\.[^.]+$/, ''))) continue;
       refs.add(file);
     }
   }
-  return [...refs];
+
+  // Prefer path-qualified refs over bare basenames
+  // e.g., if we have both "enrich.ts" and "src/core/enrich.ts", keep only the path
+  const pathQualified = new Map<string, string>();
+  for (const ref of refs) {
+    const base = ref.split('/').pop()!;
+    const existing = pathQualified.get(base);
+    if (!existing || (ref.includes('/') && !existing.includes('/'))) {
+      pathQualified.set(base, ref);
+    }
+  }
+  return [...new Set(pathQualified.values())];
 }
 
 // --- Temporal Weighting ---

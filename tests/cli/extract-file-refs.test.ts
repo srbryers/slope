@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { extractFileRefs, FILE_REF_PATTERN } from '../../slope-loop/analyze-scorecards.js';
+import { extractFileRefs, FILE_REF_PATTERN, AMBIGUOUS_BASENAMES } from '../../slope-loop/analyze-scorecards.js';
 
 describe('extractFileRefs', () => {
   it('extracts bare filenames and relative paths', () => {
@@ -79,6 +79,58 @@ describe('extractFileRefs', () => {
     expect(result).toContain('run.sh');
     expect(result).toContain('continuous.sh');
     expect(result).toHaveLength(2);
+  });
+
+  it('filters ambiguous bare basenames like test.ts, init.ts, index.js', () => {
+    const result = extractFileRefs([
+      'test.ts init.ts index.js types.ts config.ts utils.js helpers.ts',
+    ]);
+    expect(result).toEqual([]);
+  });
+
+  it('accepts ambiguous names when they have a path prefix', () => {
+    const result = extractFileRefs([
+      'src/cli/commands/init.ts',
+      'packages/core/src/index.ts',
+      'src/store/test.ts',
+    ]);
+    expect(result).toContain('src/cli/commands/init.ts');
+    expect(result).toContain('packages/core/src/index.ts');
+    expect(result).toContain('src/store/test.ts');
+  });
+
+  it('prefers path-qualified refs over bare basenames', () => {
+    const result = extractFileRefs([
+      'Fixed enrich.ts in src/core/enrich.ts',
+    ]);
+    expect(result).toEqual(['src/core/enrich.ts']);
+    expect(result).not.toContain('enrich.ts');
+  });
+
+  it('non-ambiguous bare names still pass', () => {
+    const result = extractFileRefs([
+      'enrich.ts run.sh continuous.sh dashboard.ts',
+    ]);
+    expect(result).toContain('enrich.ts');
+    expect(result).toContain('run.sh');
+    expect(result).toContain('continuous.sh');
+    expect(result).toContain('dashboard.ts');
+  });
+});
+
+describe('AMBIGUOUS_BASENAMES', () => {
+  it('contains expected common basenames', () => {
+    expect(AMBIGUOUS_BASENAMES.has('test')).toBe(true);
+    expect(AMBIGUOUS_BASENAMES.has('index')).toBe(true);
+    expect(AMBIGUOUS_BASENAMES.has('init')).toBe(true);
+    expect(AMBIGUOUS_BASENAMES.has('types')).toBe(true);
+    expect(AMBIGUOUS_BASENAMES.has('config')).toBe(true);
+  });
+
+  it('does not contain non-ambiguous names', () => {
+    expect(AMBIGUOUS_BASENAMES.has('enrich')).toBe(false);
+    expect(AMBIGUOUS_BASENAMES.has('dashboard')).toBe(false);
+    expect(AMBIGUOUS_BASENAMES.has('continuous')).toBe(false);
   });
 });
 

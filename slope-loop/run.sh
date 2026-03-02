@@ -386,9 +386,22 @@ START by reading the relevant source files, then implement the change."
   TICKET_START=$(date +%s)
 
   # Attempt 1: Primary model
+  NOOP="false"
   if run_ticket_with_model "$TICKET_KEY" "$TICKET_MODEL" "$TICKET_TIMEOUT" "$PROMPT"; then
     log "   Tests passing for $TICKET_KEY (model: $TICKET_MODEL)"
     TESTS_PASSING="true"
+
+    # Check if Aider actually made code changes
+    CHANGED_FILES=$(git diff --name-only HEAD 2>/dev/null | wc -l | tr -d ' ')
+    STAGED_FILES=$(git diff --cached --name-only 2>/dev/null | wc -l | tr -d ' ')
+    TOTAL_CHANGES=$((CHANGED_FILES + STAGED_FILES))
+
+    if [ "$TOTAL_CHANGES" -eq 0 ]; then
+      log "   WARNING: No code changes produced for $TICKET_KEY (no-op)"
+      NOOP="true"
+    else
+      log "   $TOTAL_CHANGES file(s) changed for $TICKET_KEY"
+    fi
   else
     log "   Tests failing for $TICKET_KEY (model: $TICKET_MODEL)"
 
@@ -409,6 +422,18 @@ START by reading the relevant source files, then implement the change."
       if run_ticket_with_model "$TICKET_KEY" "$MODEL_API" "$MODEL_API_TIMEOUT" "$PROMPT"; then
         log "   Tests passing for $TICKET_KEY after escalation to $MODEL_API"
         TESTS_PASSING="true"
+
+        # Check if escalated model actually made code changes
+        CHANGED_FILES=$(git diff --name-only HEAD 2>/dev/null | wc -l | tr -d ' ')
+        STAGED_FILES=$(git diff --cached --name-only 2>/dev/null | wc -l | tr -d ' ')
+        TOTAL_CHANGES=$((CHANGED_FILES + STAGED_FILES))
+
+        if [ "$TOTAL_CHANGES" -eq 0 ]; then
+          log "   WARNING: No code changes produced for $TICKET_KEY after escalation (no-op)"
+          NOOP="true"
+        else
+          log "   $TOTAL_CHANGES file(s) changed for $TICKET_KEY"
+        fi
       else
         log "   Tests still failing for $TICKET_KEY even after escalation"
       fi
@@ -420,7 +445,7 @@ START by reading the relevant source files, then implement the change."
   log "   Completed in ${TICKET_ELAPSED}s"
 
   # Track model usage per ticket (JSONL)
-  TICKET_RESULT="{\"ticket\":\"$TICKET_KEY\",\"title\":\"$TICKET_TITLE\",\"club\":\"$TICKET_CLUB\",\"max_files\":$TICKET_MAX_FILES,\"primary_model\":\"$TICKET_MODEL\",\"final_model\":\"$FINAL_MODEL\",\"escalated\":$ESCALATED,\"tests_passing\":$TESTS_PASSING}"
+  TICKET_RESULT="{\"ticket\":\"$TICKET_KEY\",\"title\":\"$TICKET_TITLE\",\"club\":\"$TICKET_CLUB\",\"max_files\":$TICKET_MAX_FILES,\"primary_model\":\"$TICKET_MODEL\",\"final_model\":\"$FINAL_MODEL\",\"escalated\":$ESCALATED,\"tests_passing\":$TESTS_PASSING,\"noop\":$NOOP}"
   echo "$TICKET_RESULT" >> "$LOG_DIR/${SPRINT_ID}-models.jsonl"
   TICKET_RESULTS=$(echo "$TICKET_RESULTS" | jq ". + [$TICKET_RESULT]")
 
