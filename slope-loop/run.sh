@@ -25,7 +25,7 @@ BRANCH_PREFIX="slope-loop"
 
 # ─── Model Tier Configuration ─────────────────────
 MODEL_LOCAL="${MODEL_LOCAL:-ollama/qwen2.5-coder:32b}"
-MODEL_API="${MODEL_API:-openrouter/anthropic/claude-sonnet-4}"
+MODEL_API="${MODEL_API:-openrouter/anthropic/claude-haiku-4-5}"
 MODEL_API_TIMEOUT=1800                              # 30min for complex tickets
 MODEL_LOCAL_TIMEOUT=900                             # 15min for simple tickets
 ESCALATE_ON_FAIL="${ESCALATE_ON_FAIL:-true}"
