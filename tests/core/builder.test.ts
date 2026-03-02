@@ -311,7 +311,7 @@ describe('buildScorecard', () => {
 
   it('produces a valid scorecard that passes validation', async () => {
     // Import validator
-    const { validateScorecard } = await import('../../src/core/validation.js');
+    const { validateScorecard } = await import('../../src/core/validation.ts');
     const shots = [
       makeShot({ result: 'green' }),
       makeShot({ result: 'in_the_hole' }),
