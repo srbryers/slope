@@ -385,10 +385,25 @@ START by reading the relevant source files, then implement the change."
   TESTS_PASSING="false"
   TICKET_START=$(date +%s)
 
+  # Capture pre-Aider SHA to detect no-ops (Aider uses --auto-commits,
+  # so git diff HEAD is always empty after a successful run)
+  PRE_AIDER_SHA=$(git rev-parse HEAD)
+
   # Attempt 1: Primary model
+  NOOP="false"
   if run_ticket_with_model "$TICKET_KEY" "$TICKET_MODEL" "$TICKET_TIMEOUT" "$PROMPT"; then
     log "   Tests passing for $TICKET_KEY (model: $TICKET_MODEL)"
     TESTS_PASSING="true"
+
+    # Check if Aider actually made code changes (compare commit SHAs)
+    POST_AIDER_SHA=$(git rev-parse HEAD)
+    if [ "$PRE_AIDER_SHA" = "$POST_AIDER_SHA" ]; then
+      log "   WARNING: No code changes produced for $TICKET_KEY (no-op)"
+      NOOP="true"
+    else
+      COMMIT_COUNT=$(git rev-list --count "$PRE_AIDER_SHA".."$POST_AIDER_SHA")
+      log "   $COMMIT_COUNT commit(s) produced for $TICKET_KEY"
+    fi
   else
     log "   Tests failing for $TICKET_KEY (model: $TICKET_MODEL)"
 
@@ -406,9 +421,20 @@ START by reading the relevant source files, then implement the change."
         git clean -fd 2>/dev/null || true
       }
 
+      PRE_ESCALATION_SHA=$(git rev-parse HEAD)
       if run_ticket_with_model "$TICKET_KEY" "$MODEL_API" "$MODEL_API_TIMEOUT" "$PROMPT"; then
         log "   Tests passing for $TICKET_KEY after escalation to $MODEL_API"
         TESTS_PASSING="true"
+
+        # Check if escalated model actually made code changes (compare commit SHAs)
+        POST_ESCALATION_SHA=$(git rev-parse HEAD)
+        if [ "$PRE_ESCALATION_SHA" = "$POST_ESCALATION_SHA" ]; then
+          log "   WARNING: No code changes produced for $TICKET_KEY after escalation (no-op)"
+          NOOP="true"
+        else
+          COMMIT_COUNT=$(git rev-list --count "$PRE_ESCALATION_SHA".."$POST_ESCALATION_SHA")
+          log "   $COMMIT_COUNT commit(s) produced for $TICKET_KEY after escalation"
+        fi
       else
         log "   Tests still failing for $TICKET_KEY even after escalation"
       fi
@@ -420,7 +446,7 @@ START by reading the relevant source files, then implement the change."
   log "   Completed in ${TICKET_ELAPSED}s"
 
   # Track model usage per ticket (JSONL)
-  TICKET_RESULT="{\"ticket\":\"$TICKET_KEY\",\"title\":\"$TICKET_TITLE\",\"club\":\"$TICKET_CLUB\",\"max_files\":$TICKET_MAX_FILES,\"primary_model\":\"$TICKET_MODEL\",\"final_model\":\"$FINAL_MODEL\",\"escalated\":$ESCALATED,\"tests_passing\":$TESTS_PASSING}"
+  TICKET_RESULT="{\"ticket\":\"$TICKET_KEY\",\"title\":\"$TICKET_TITLE\",\"club\":\"$TICKET_CLUB\",\"max_files\":$TICKET_MAX_FILES,\"primary_model\":\"$TICKET_MODEL\",\"final_model\":\"$FINAL_MODEL\",\"escalated\":$ESCALATED,\"tests_passing\":$TESTS_PASSING,\"noop\":$NOOP}"
   echo "$TICKET_RESULT" >> "$LOG_DIR/${SPRINT_ID}-models.jsonl"
   TICKET_RESULTS=$(echo "$TICKET_RESULTS" | jq ". + [$TICKET_RESULT]")
 
@@ -512,7 +538,8 @@ cat > "$RESULTS_DIR/$SPRINT_ID.json" << EOF
   "completed_at": "$(date -Iseconds)",
   "branch": "$BRANCH",
   "tickets_total": $TICKET_COUNT,
-  "tickets_passing": $(echo "$TICKET_RESULTS" | jq '[.[] | select(.tests_passing == true)] | length'),
+  "tickets_passing": $(echo "$TICKET_RESULTS" | jq '[.[] | select(.tests_passing == true and .noop != true)] | length'),
+  "tickets_noop": $(echo "$TICKET_RESULTS" | jq '[.[] | select(.noop == true)] | length'),
   "tickets": $(echo "$TICKET_RESULTS" | jq '.')
 }
 EOF
