@@ -104,6 +104,117 @@ select_timeout() {
   esac
 }
 
+# ─── PR Structural Review ────────────────────────
+# Returns finding count via echo; all log output goes to stderr to avoid
+# corrupting the captured return value.
+review_pr() {
+  local pr_url="$1"
+  local sprint_id="$2"
+  local finding_count=0
+
+  # Get PR diff
+  local pr_number
+  pr_number=$(echo "$pr_url" | grep -o '[0-9]*$')
+  if [ -z "$pr_number" ]; then
+    log "   Warning: Could not extract PR number from $pr_url" >&2
+    echo 0
+    return 0
+  fi
+
+  local diff
+  diff=$(gh pr diff "$pr_number" 2>/dev/null) || {
+    log "   Warning: Could not fetch PR diff" >&2
+    echo 0
+    return 0
+  }
+
+  # Added lines only (lines starting with +, excluding +++ headers)
+  local added_lines
+  added_lines=$(echo "$diff" | grep '^+' | grep -v '^+++' || true)
+
+  # Changed files
+  local changed_files
+  changed_files=$(echo "$diff" | grep '^diff --git' | sed 's|.*b/||' || true)
+
+  local changed_ts_files
+  changed_ts_files=$(echo "$changed_files" | grep '\.ts$' | grep -v '\.test\.ts$' | grep -v '\.d\.ts$' || true)
+
+  local changed_test_files
+  changed_test_files=$(echo "$changed_files" | grep '\.test\.ts$' || true)
+
+  # --- Check: as any / @ts-ignore / @ts-expect-error ---
+  local type_escapes
+  type_escapes=$(echo "$added_lines" | { grep -cE '(as any|\b@ts-ignore\b|\b@ts-expect-error\b)' || true; })
+  if [ "$type_escapes" -gt 0 ]; then
+    slope review findings add \
+      --type=code --ticket="${sprint_id}-0" --severity=minor \
+      --description="$type_escapes type escape(s) found (as any / @ts-ignore)" \
+      2>/dev/null || true
+    finding_count=$((finding_count + 1))
+  fi
+
+  # --- Check: console.log in production code ---
+  local console_logs
+  console_logs=$(echo "$diff" | awk '/^diff --git/{file=$0} /^\+.*console\.log/{if(file !~ /\.test\.ts/) print}' | wc -l | tr -d ' ')
+  if [ "$console_logs" -gt 0 ]; then
+    slope review findings add \
+      --type=code --ticket="${sprint_id}-0" --severity=minor \
+      --description="$console_logs console.log statement(s) in production code" \
+      2>/dev/null || true
+    finding_count=$((finding_count + 1))
+  fi
+
+  # --- Check: changed source files without test changes ---
+  if [ -n "$changed_ts_files" ]; then
+    local untested_count=0
+    while IFS= read -r src_file; do
+      [ -z "$src_file" ] && continue
+      local base_name
+      base_name=$(basename "$src_file" .ts)
+      if ! echo "$changed_test_files" | grep -qF "${base_name}.test.ts"; then
+        untested_count=$((untested_count + 1))
+      fi
+    done <<< "$changed_ts_files"
+
+    if [ "$untested_count" -gt 0 ]; then
+      slope review findings add \
+        --type=code --ticket="${sprint_id}-0" --severity=moderate \
+        --description="$untested_count source file(s) changed without corresponding test changes" \
+        2>/dev/null || true
+      finding_count=$((finding_count + 1))
+    fi
+  fi
+
+  # --- Check: security-sensitive file changes ---
+  local security_files
+  security_files=$(echo "$changed_files" | grep -iE '(auth/|oauth|jwt|secret|crypto|password|credential)' || true)
+  if [ -n "$security_files" ]; then
+    local sec_count
+    sec_count=$(echo "$security_files" | wc -l | tr -d ' ')
+    slope review findings add \
+      --type=security --ticket="${sprint_id}-0" --severity=moderate \
+      --description="$sec_count security-sensitive file(s) changed" \
+      2>/dev/null || true
+    finding_count=$((finding_count + 1))
+  fi
+
+  # --- Check: large file diffs (>500 additions per file) ---
+  local large_files
+  large_files=$(gh pr view "$pr_number" --json files \
+    --jq '[.files[] | select(.additions > 500)] | .[].path' 2>/dev/null || true)
+  if [ -n "$large_files" ]; then
+    local large_count
+    large_count=$(echo "$large_files" | wc -l | tr -d ' ')
+    slope review findings add \
+      --type=architect --ticket="${sprint_id}-0" --severity=minor \
+      --description="$large_count file(s) with >500 lines added — review for scope creep" \
+      2>/dev/null || true
+    finding_count=$((finding_count + 1))
+  fi
+
+  echo "$finding_count"
+}
+
 # ─── Run a single ticket with a given model ───────
 run_ticket_with_model() {
   local ticket_id="$1"
@@ -414,6 +525,8 @@ log "Ticket validation: $VALID_COUNT valid, $SKIPPED skipped"
 
 if [ "$VALID_COUNT" -eq 0 ]; then
   log "All tickets failed validation — skipping sprint $SPRINT_ID"
+  slope session end 2>/dev/null || true
+  git checkout main 2>/dev/null || true
   rmdir "$RESULTS_DIR/$SPRINT_ID.lock" 2>/dev/null || true
   exit 0
 fi
@@ -597,7 +710,8 @@ $(echo "$TICKET_RESULTS" | jq -r '.[] | "- **\(.ticket)**: \(.title) — \(if .n
     }
 
     if [ -n "$PR_URL" ]; then
-      log "PR created: $PR_URL"
+      PR_NUMBER=$(echo "$PR_URL" | grep -o '[0-9]*$')
+      log "PR created: $PR_URL (PR #$PR_NUMBER)"
     fi
   else
     log "No commits ahead of main — skipping PR creation"
@@ -607,6 +721,87 @@ else
     log "No passing tickets — skipping PR creation"
   else
     log "Warning: gh CLI not available — skipping PR creation"
+  fi
+fi
+
+# ─── Post-PR Review & Merge ──────────────────────
+
+if [ -n "${PR_URL:-}" ] && [ -n "${PR_NUMBER:-}" ]; then
+  log "=== Running structural review ==="
+
+  # Clear any stale findings
+  slope review findings clear 2>/dev/null || true
+
+  # Run structural review
+  FINDING_COUNT=$(review_pr "$PR_URL" "$SPRINT_ID")
+  log "Structural review: $FINDING_COUNT finding(s)"
+
+  # Amend scorecard with findings (if any)
+  if [ "$FINDING_COUNT" -gt 0 ]; then
+    slope review amend 2>/dev/null && log "Scorecard amended with review findings" || \
+      log "Warning: scorecard amendment failed"
+  fi
+
+  # ─── Auto-Merge Safeguards ───────────────────
+  MERGE_OK=true
+  MERGE_BLOCK_REASON=""
+
+  # Safeguard 1: No critical or major findings
+  if [ "$FINDING_COUNT" -gt 0 ]; then
+    CRITICAL_MAJOR=$(slope review findings list 2>/dev/null | { grep -cE '\b(critical|major)\b' || true; })
+    CRITICAL_MAJOR="${CRITICAL_MAJOR:-0}"
+    if [ "$CRITICAL_MAJOR" -gt 0 ]; then
+      MERGE_OK=false
+      MERGE_BLOCK_REASON="$CRITICAL_MAJOR critical/major finding(s)"
+    fi
+  fi
+
+  # Safeguard 2: Tests still pass
+  if [ "$MERGE_OK" = "true" ]; then
+    if ! pnpm test > /dev/null 2>&1; then
+      MERGE_OK=false
+      MERGE_BLOCK_REASON="tests failing"
+    fi
+  fi
+
+  # Safeguard 3: Typecheck passes
+  if [ "$MERGE_OK" = "true" ]; then
+    if ! pnpm typecheck > /dev/null 2>&1; then
+      MERGE_OK=false
+      MERGE_BLOCK_REASON="typecheck failing"
+    fi
+  fi
+
+  # Safeguard 4: PR is not too large (< 20 files changed)
+  if [ "$MERGE_OK" = "true" ]; then
+    FILES_CHANGED=$(gh pr view "$PR_NUMBER" --json changedFiles --jq '.changedFiles' 2>/dev/null || echo 0)
+    FILES_CHANGED="${FILES_CHANGED:-0}"
+    if [ "$FILES_CHANGED" -gt 20 ]; then
+      MERGE_OK=false
+      MERGE_BLOCK_REASON="$FILES_CHANGED files changed (threshold: 20)"
+    fi
+  fi
+
+  # Safeguard 5: Must have at least one passing non-noop ticket
+  if [ "$MERGE_OK" = "true" ] && [ "$PASSING_COUNT" -eq 0 ]; then
+    MERGE_OK=false
+    MERGE_BLOCK_REASON="no passing tickets"
+  fi
+
+  # Merge or flag
+  MERGED=false
+  if [ "$MERGE_OK" = "true" ]; then
+    log "All safeguards passed — auto-merging"
+    if gh pr merge "$PR_NUMBER" --squash --delete-branch > /dev/null 2>&1; then
+      log "PR merged successfully"
+      MERGED=true
+    else
+      log "Warning: auto-merge failed — merge manually"
+    fi
+  else
+    log "Auto-merge blocked: $MERGE_BLOCK_REASON"
+    log "Manual review required: $PR_URL"
+    gh pr comment "$PR_NUMBER" --body "Auto-merge blocked: $MERGE_BLOCK_REASON. Manual review required." 2>/dev/null || true
   fi
 fi
 
@@ -693,6 +888,13 @@ EOF
 # Clean up lock file
 rmdir "$RESULTS_DIR/$SPRINT_ID.lock" 2>/dev/null || true
 
-log "=== Sprint $SPRINT_ID done ==="
-log "Review: slope card && git log --oneline $BRANCH"
-log "Merge:  git checkout main && git merge $BRANCH"
+# Return to main after merge (deferred until after auto-evolve + results write)
+if [ "${MERGED:-false}" = "true" ]; then
+  git checkout main 2>/dev/null && git pull 2>/dev/null || true
+  git branch -d "$BRANCH" 2>/dev/null || true
+  log "=== Sprint $SPRINT_ID done (merged) ==="
+else
+  log "=== Sprint $SPRINT_ID done ==="
+  log "Review: slope card && git log --oneline $BRANCH"
+  log "Merge:  git checkout main && git merge $BRANCH"
+fi
