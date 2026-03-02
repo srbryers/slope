@@ -60,4 +60,5 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
   { cmd: 'context',     desc: 'Semantic context search for agents',             category: 'tooling' },
   { cmd: 'prep',        desc: 'Generate execution plan for a ticket',           category: 'tooling' },
   { cmd: 'enrich',      desc: 'Batch-enrich backlog with file context',         category: 'tooling' },
+  { cmd: 'docs',        desc: 'Generate documentation manifest and changelog',  category: 'tooling' },
 ];

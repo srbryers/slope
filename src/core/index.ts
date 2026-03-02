@@ -657,5 +657,18 @@ export {
 } from './enrich.js';
 export type { EnrichedTicket, EnrichedBacklog } from './enrich.js';
 
+// Docs (Documentation Manifest)
+export {
+  buildDocsManifest,
+  computeSectionChecksum,
+} from './docs.js';
+export type {
+  DocsManifest,
+  DocsManifestInput,
+  ChangelogSection,
+  ChangelogEntry,
+  ChangelogChange,
+} from './docs.js';
+
 // Built-in metaphors (auto-registers on import)
 export { golf, tennis, baseball, gaming, dnd, matrix, agile } from './metaphors/index.js';
