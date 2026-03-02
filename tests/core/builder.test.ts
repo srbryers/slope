@@ -312,9 +312,9 @@ describe('buildScorecard', () => {
     expect(card.bunker_locations).toEqual(['test bunker']);
   });
 
-  it('produces a valid scorecard that passes validation', async () => {
-    // Import validator
-    const { validateScorecard } = await import('../../src/core/validation.ts');
+  it('produces a valid scorecard that passes validation', () => {
+    // Import validator statically
+    const { validateScorecard } = require('../../src/core/validation.js');
     const shots = [
       makeShot({ result: 'green' }),
       makeShot({ result: 'in_the_hole' }),
