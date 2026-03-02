@@ -24,7 +24,7 @@ SPRINT_HISTORY="$SLOPE_DIR/slope-loop/slope-loop-guide/references/sprint-history
 BRANCH_PREFIX="slope-loop"
 
 # ─── Model Tier Configuration ─────────────────────
-MODEL_LOCAL="${MODEL_LOCAL:-ollama/qwen3-coder:30b}"
+MODEL_LOCAL="${MODEL_LOCAL:-ollama/qwen3-coder-next}"
 MODEL_API="${MODEL_API:-openrouter/anthropic/claude-haiku-4-5}"
 MODEL_API_TIMEOUT=1800                              # 30min for complex tickets
 MODEL_LOCAL_TIMEOUT=900                             # 15min for simple tickets
