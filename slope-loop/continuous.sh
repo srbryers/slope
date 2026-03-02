@@ -29,6 +29,20 @@ mkdir -p "$RESULTS_DIR" "$LOG_DIR"
 
 log() { echo "[$(date '+%H:%M:%S')] $*" | tee -a "$LOG_DIR/continuous.log"; }
 
+# ─── Validate jq is available and working ────────
+# @description Check that jq is installed and functional
+# @returns 0 if jq works, exits with 1 if not
+validate_jq() {
+  if ! command -v jq >/dev/null 2>&1; then
+    log "ERROR: jq is required but not installed"
+    exit 1
+  fi
+  if ! echo '{}' | jq . >/dev/null 2>&1; then
+    log "ERROR: jq validation failed — jq may be broken or missing dependencies"
+    exit 1
+  fi
+}
+
 # ─── Count completed sprints from results ────────
 # @description Count the number of completed sprints by checking result files
 # @returns Number of .json files in the results directory
@@ -79,6 +93,9 @@ log "=== Continuous Loop Starting ==="
 log "Max sprints: $MAX_SPRINTS"
 log "Pause between sprints: ${PAUSE_BETWEEN}s"
 [ -n "$DRY_RUN" ] && log "DRY RUN mode"
+
+# Validate dependencies
+validate_jq
 
 completed=0
 failures=0  # Track consecutive failures
