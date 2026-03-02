@@ -13,7 +13,7 @@ export async function stopCheckGuard(_input: HookInput, cwd: string): Promise<Gu
   // If the autonomous loop is running, dirty state belongs to it — warn instead of blocking
   let loopRunning = false;
   try {
-    const psOut = execSync("ps aux | grep -E 'slope-loop/(run|continuous|parallel)\\.sh' | grep -v grep", { cwd, encoding: 'utf8' }).trim();
+    const psOut = execSync("pgrep -f 'bash.*slope-loop/(run|continuous|parallel)\\.sh'", { cwd, encoding: 'utf8' }).trim();
     loopRunning = psOut.length > 0;
   } catch { /* no matching process */ }
 
