@@ -1,6 +1,12 @@
 #!/bin/bash
 # slope-loop/parallel.sh — Run two sprint streams with module overlap detection
-# Usage: ./slope-loop/parallel.sh [--dry-run]
+#
+# @description Runs two SLOPE sprints in parallel using git worktrees, with automatic
+#              fallback to sequential execution if module overlap is detected.
+# @usage ./slope-loop/parallel.sh [--dry-run]
+# @param --dry-run Run without executing sprints
+# @returns 0 on successful completion, 1 on error or if fallback to sequential occurs
+#
 # Falls back to sequential if module overlap is detected between sprints.
 
 set -euo pipefail

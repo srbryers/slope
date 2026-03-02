@@ -233,16 +233,19 @@ run_ticket_with_model() {
     --model "$model"
     --message "$prompt"
     --auto-commits
-    --auto-test
-    --test-cmd "pnpm test"
     --yes
   )
 
-  # Local model optimizations: suppress warnings, reduce repo-map, skip heavy context
+  # Local model optimizations: no streaming, no model warnings, smaller repo-map,
+  # and disable --auto-test (test output balloons context from ~40k to 126k+,
+  # making the second prefill infeasible due to quadratic attention scaling).
+  # The loop runs pnpm typecheck post-ticket as a guard equivalent.
   local is_local=false
   if [[ "$model" == *"ollama"* ]]; then
     aider_args+=(--no-stream --no-show-model-warnings --map-tokens 1024)
     is_local=true
+  else
+    aider_args+=(--auto-test --test-cmd "pnpm test")
   fi
 
   # Inject agent guide skill if within token budget (skip for local — saves ~5k tokens)
@@ -257,7 +260,7 @@ run_ticket_with_model() {
   fi
 
   # Semantic context per ticket (fall back to CODEBASE.md)
-  # Local models get tighter line limits to keep prefill manageable
+  # Local models get tighter limits to keep prefill manageable
   local context_line_limit=500
   local context_top=8
   if [ "$is_local" = "true" ]; then
