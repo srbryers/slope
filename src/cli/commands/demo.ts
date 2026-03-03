@@ -3,7 +3,9 @@ import { readFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { resolve, basename, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import * as p from '@clack/prompts';
-import { detectPackageManager, analyzeStack } from '../../core/analyzers/stack.js';
+import { runAnalyzers, loadRepoProfile } from '../../core/analyzers/index.js';
+import { estimateComplexity } from '../../core/analyzers/complexity.js';
+import { detectPackageManager } from '../../core/analyzers/stack.js';
 import { analyzeBacklog } from '../../core/analyzers/backlog.js';
 import { mergeBacklogs } from '../../core/analyzers/backlog-merged.js';
 import { createVision, updateVision } from '../../core/vision.js';
@@ -11,7 +13,7 @@ import { generateRoadmapFromVision, PRIORITY_SYNONYMS } from '../../core/generat
 import {
   createColors, sleep, wordWrap,
   typewrite, mcpCall, revealLines, typewriteVision,
-  sideBySide, renderCtaBox, renderRoadmapPhases,
+  renderProfileSummary, sideBySide, renderCtaBox, renderRoadmapPhases,
 } from '../display.js';
 
 // --- Types ---
@@ -157,20 +159,25 @@ Answers file format:
     const pm = detectPackageManager(cwd);
     await mcpCall('detectPackageManager()', pm ? `"${pm}"` : '"unknown"', pause, c);
 
-    const stack = await analyzeStack(cwd);
+    let profile = loadRepoProfile(cwd);
+    if (!profile) {
+      profile = await runAnalyzers({ cwd });
+    }
+    const complexity = estimateComplexity(profile);
+    const stack = profile.stack;
     const displayFrameworks = stack.frameworks
       .filter(f => !['vitest', 'jest', 'mocha'].includes(f));
     const stackParts = [stack.primaryLanguage, ...displayFrameworks].filter(Boolean);
     const stackStr = stackParts.length > 1
       ? `${stackParts[0]} \u00b7 ${stackParts.slice(1).join(', ')}`
       : stackParts[0] || 'Unknown';
-    await mcpCall('analyzeStack()', stackStr, pause, c);
+    await mcpCall('runAnalyzers()', stackStr, pause, c);
 
     console.log('');
     const statsLines = [
       `  ${c.dim('Project:')}  ${c.boldWhite(projectName)}`,
-      `  ${c.dim('Stack:')}    ${c.boldWhite(stackStr)}`,
-      ...(pm ? [`  ${c.dim('PM:')}       ${c.boldWhite(pm)}`] : []),
+      ...renderProfileSummary(profile, c),
+      ...(pm ? [`  ${c.dim('PM:')}        ${c.boldWhite(pm)}`] : []),
     ];
     await revealLines(statsLines, isTTY ? 150 : 0);
     console.log('');
@@ -293,7 +300,7 @@ Answers file format:
     console.log('');
 
     const merged = mergeBacklogs(backlog);
-    const roadmap = generateRoadmapFromVision(vision, merged);
+    const roadmap = generateRoadmapFromVision(vision, merged, complexity, profile);
 
     await mcpCall('generateRoadmapFromVision(vision, backlog)', '', pause, c);
 
@@ -332,16 +339,25 @@ Answers file format:
     const firstTheme = roadmap.sprints[0]?.theme ?? 'Start';
     const themeDisplay = firstTheme.charAt(0).toUpperCase() + firstTheme.slice(1);
 
-    const beforeLines = [
-      c.dim(`${todoCount} scattered TODOs`),
-      c.dim(`${moduleCount} module${moduleCount !== 1 ? 's' : ''}`),
-      c.dim('No priorities'),
-      c.dim('No structure'),
-    ];
+    const beforeLines = todoCount > 0
+      ? [
+          c.dim(`${todoCount} scattered TODOs`),
+          c.dim(`${moduleCount} module${moduleCount !== 1 ? 's' : ''}`),
+          c.dim('No priorities'),
+          c.dim('No structure'),
+        ]
+      : [
+          c.dim(`${profile.structure.sourceFiles} source files`),
+          c.dim('No priorities'),
+          c.dim('No roadmap'),
+          c.dim('No structure'),
+        ];
     const afterLines = [
       `${c.boldGreen('\u2713')} ${c.boldWhite('Vision locked in')}`,
       `${c.boldGreen('\u2713')} ${c.boldWhite(`${prioritySprints} priority sprint${prioritySprints !== 1 ? 's' : ''}`)}`,
-      `${c.boldGreen('\u2713')} ${c.boldWhite(`${matchedCount}/${todoCount} TODOs mapped`)}`,
+      ...(todoCount > 0
+        ? [`${c.boldGreen('\u2713')} ${c.boldWhite(`${matchedCount}/${todoCount} TODOs mapped`)}`]
+        : []),
       `${c.boldGreen('\u2713')} ${c.boldWhite(`Sprint 1 (${themeDisplay}) ready`)}`,
     ];
 
