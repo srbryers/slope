@@ -1,0 +1,4 @@
+{
+  "vision": "It's a briefing tool for busy professionals. I want to help executives and researchers who don't have time to read 50 articles a day \u2014 they get a single AI-powered summary every morning. The tech is Next.js on Vercel, and I care most about speed, reliability, and a great UX. I don't want to build social features or real-time collaboration \u2014 just clean, fast briefings.",
+  "priorities": ["speed", "reliability", "ux"]
+}
