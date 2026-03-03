@@ -557,6 +557,19 @@ Answers file format:
     await typewrite('       ', c.bold('Every sprint gets scored. Every ticket is tracked.'), charDelay);
     await typewrite('       ', c.bold("That's SLOPE \u2014 the AI agent harness."), charDelay);
     console.log('');
+    await sleep(pause);
+
+    await typewrite(c.boldCyan('Agent') + '  ', 'Open your editor and start with:', charDelay);
+    console.log('');
+    const prompt = 'Run slope briefing, then execute Sprint 1.';
+    const bw = prompt.length + 4;
+    const b = (s: string) => c.dimCyan(s);
+    console.log('       ' + b('\u256d') + b('\u2500'.repeat(bw)) + b('\u256e'));
+    console.log('       ' + b('\u2502') + ' '.repeat(bw) + b('\u2502'));
+    console.log('       ' + b('\u2502') + '  ' + c.boldWhite(prompt) + '  ' + b('\u2502'));
+    console.log('       ' + b('\u2502') + ' '.repeat(bw) + b('\u2502'));
+    console.log('       ' + b('\u2570') + b('\u2500'.repeat(bw)) + b('\u256f'));
+    console.log('');
 
     p.outro('slope.sh');
   } catch (err) {
