@@ -496,7 +496,7 @@ async function runAider(
 
 // ── Prompt Builder ─────────────────────────────────
 
-function buildPrompt(ticket: BacklogTicket, model: string): string {
+export function buildPrompt(ticket: BacklogTicket, model: string): string {
   const acceptance = ticket.acceptance_criteria.join('; ');
 
   let prompt = `You are working on the SLOPE project (Sprint Lifecycle & Operational Performance Engine).
