@@ -15,9 +15,19 @@ function resolveGitDir(cwd: string): string {
 }
 
 /**
- * Check if another session has dirty state in the main checkout.
- * Returns true if cwd is the main repo and other worktrees exist,
- * meaning dirty files may belong to another session.
+ * Check if the session is in the main checkout (not a worktree).
+ * In the main checkout, --git-common-dir returns '.git' (relative).
+ * In a worktree, it returns an absolute path to the main repo's .git.
+ */
+function isMainCheckout(cwd: string): boolean {
+  try {
+    const commonDir = execSync('git rev-parse --git-common-dir 2>/dev/null', { cwd, encoding: 'utf8' }).trim();
+    return commonDir === '.git';
+  } catch { return true; }
+}
+
+/**
+ * Check if other worktrees exist beyond the main checkout.
  */
 function hasOtherWorktrees(cwd: string): boolean {
   try {
@@ -37,7 +47,8 @@ function hasOtherWorktrees(cwd: string): boolean {
  *
  * Worktree-aware: if running inside a worktree, checks that worktree's
  * status. If running in the main checkout while other worktrees exist,
- * downgrades blocks to warnings (dirty state may belong to another session).
+ * downgrades uncommitted-change blocks to warnings (dirty state may belong
+ * to another session). Unpushed commits always block — they're branch-specific.
  */
 export async function stopCheckGuard(_input: HookInput, cwd: string): Promise<GuardResult> {
   // Resolve the actual git root — may differ from cwd if inside a worktree
@@ -50,8 +61,10 @@ export async function stopCheckGuard(_input: HookInput, cwd: string): Promise<Gu
     loopRunning = psOut.length > 0;
   } catch { /* no matching process */ }
 
-  // Check if other worktrees exist — dirty state in main checkout may belong to another session
-  const otherWorktreesExist = hasOtherWorktrees(gitDir);
+  // Only downgrade dirty-state blocks when we're in the main checkout and other worktrees exist.
+  // Worktree sessions own their own dirty state — no downgrade for them.
+  const inMainCheckout = isMainCheckout(gitDir);
+  const otherWorktreesExist = inMainCheckout && hasOtherWorktrees(gitDir);
 
   const blockingIssues: string[] = [];
   const warningIssues: string[] = [];
@@ -119,6 +132,16 @@ export async function stopCheckGuard(_input: HookInput, cwd: string): Promise<Gu
       };
     }
     if (otherWorktreesExist) {
+      // Unpushed commits are branch-specific — always block. Only downgrade uncommitted changes.
+      const unpushedBlocks = blockingIssues.filter(i => i.includes('unpushed'));
+      const uncommittedBlocks = blockingIssues.filter(i => !i.includes('unpushed'));
+      if (unpushedBlocks.length > 0) {
+        return {
+          blockReason: `SLOPE: ${unpushedBlocks.join(' and ')} detected. Push before stopping to preserve your recovery point.` +
+            (uncommittedBlocks.length > 0 ? ` (${uncommittedBlocks.join(' and ')} may belong to another session)` : ''),
+        };
+      }
+      // All blocking issues are uncommitted changes — downgrade to warning
       return {
         context: `SLOPE: ${allIssues.join(' and ')} detected, but other worktrees exist — changes may belong to another session.`,
       };
