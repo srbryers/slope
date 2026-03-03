@@ -2,27 +2,76 @@ import { execSync } from 'node:child_process';
 import type { HookInput, GuardResult } from '../../core/index.js';
 
 /**
+ * Detect the effective git working directory for this session.
+ * If the session is running inside a worktree, use that worktree's root.
+ * Otherwise fall back to the provided cwd.
+ */
+function resolveGitDir(cwd: string): string {
+  try {
+    const toplevel = execSync('git rev-parse --show-toplevel 2>/dev/null', { cwd, encoding: 'utf8' }).trim();
+    if (toplevel) return toplevel;
+  } catch { /* not a git repo */ }
+  return cwd;
+}
+
+/**
+ * Check if the session is in the main checkout (not a worktree).
+ * In the main checkout, --git-common-dir returns '.git' (relative).
+ * In a worktree, it returns an absolute path to the main repo's .git.
+ */
+function isMainCheckout(cwd: string): boolean {
+  try {
+    const commonDir = execSync('git rev-parse --git-common-dir 2>/dev/null', { cwd, encoding: 'utf8' }).trim();
+    return commonDir === '.git';
+  } catch { return true; }
+}
+
+/**
+ * Check if other worktrees exist beyond the main checkout.
+ */
+function hasOtherWorktrees(cwd: string): boolean {
+  try {
+    const output = execSync('git worktree list --porcelain 2>/dev/null', { cwd, encoding: 'utf8' });
+    const worktrees = output.split('\n\n').filter(Boolean);
+    return worktrees.length > 1;
+  } catch { return false; }
+}
+
+/**
  * Stop check guard: fires on Stop.
  * Checks for uncommitted/unpushed work before session end.
  *
  * Modified/staged/deleted files → block (real uncommitted work).
  * Untracked-only files → warn via context (may be orphaned/intentional).
  * Unpushed commits → block (recovery point not preserved).
+ *
+ * Worktree-aware: if running inside a worktree, checks that worktree's
+ * status. If running in the main checkout while other worktrees exist,
+ * downgrades uncommitted-change blocks to warnings (dirty state may belong
+ * to another session). Unpushed commits always block — they're branch-specific.
  */
 export async function stopCheckGuard(_input: HookInput, cwd: string): Promise<GuardResult> {
+  // Resolve the actual git root — may differ from cwd if inside a worktree
+  const gitDir = resolveGitDir(cwd);
+
   // If the autonomous loop is running, dirty state belongs to it — warn instead of blocking
   let loopRunning = false;
   try {
-    const psOut = execSync("pgrep -f 'bash.*slope-loop/(run|continuous|parallel)\\.sh'", { cwd, encoding: 'utf8' }).trim();
+    const psOut = execSync("pgrep -f 'bash.*slope-loop/(run|continuous|parallel)\\.sh'", { cwd: gitDir, encoding: 'utf8' }).trim();
     loopRunning = psOut.length > 0;
   } catch { /* no matching process */ }
+
+  // Only downgrade dirty-state blocks when we're in the main checkout and other worktrees exist.
+  // Worktree sessions own their own dirty state — no downgrade for them.
+  const inMainCheckout = isMainCheckout(gitDir);
+  const otherWorktreesExist = inMainCheckout && hasOtherWorktrees(gitDir);
 
   const blockingIssues: string[] = [];
   const warningIssues: string[] = [];
 
   // Check for uncommitted changes (excluding gitignored files)
   try {
-    const status = execSync('git status --porcelain 2>/dev/null', { cwd, encoding: 'utf8' }).trim();
+    const status = execSync('git status --porcelain 2>/dev/null', { cwd: gitDir, encoding: 'utf8' }).trim();
     if (status.length > 0) {
       const lines = status.split('\n').filter(Boolean);
 
@@ -44,7 +93,7 @@ export async function stopCheckGuard(_input: HookInput, cwd: string): Promise<Gu
       const ignoredSet = new Set<string>();
       if (allPaths.length > 0) {
         try {
-          const ignored = execSync(`git check-ignore ${allPaths.map(p => `'${p}'`).join(' ')} 2>/dev/null`, { cwd, encoding: 'utf8' }).trim();
+          const ignored = execSync(`git check-ignore ${allPaths.map(p => `'${p}'`).join(' ')} 2>/dev/null`, { cwd: gitDir, encoding: 'utf8' }).trim();
           for (const p of ignored.split('\n').filter(Boolean)) {
             ignoredSet.add(p);
           }
@@ -65,7 +114,7 @@ export async function stopCheckGuard(_input: HookInput, cwd: string): Promise<Gu
 
   // Check for unpushed commits
   try {
-    const unpushed = execSync('git log @{u}..HEAD --oneline 2>/dev/null', { cwd, encoding: 'utf8' }).trim();
+    const unpushed = execSync('git log @{u}..HEAD --oneline 2>/dev/null', { cwd: gitDir, encoding: 'utf8' }).trim();
     if (unpushed) {
       const lines = unpushed.split('\n').filter(Boolean);
       if (lines.length > 0) {
@@ -74,12 +123,27 @@ export async function stopCheckGuard(_input: HookInput, cwd: string): Promise<Gu
     }
   } catch { /* no upstream */ }
 
-  // Blocking issues take priority — but downgrade to warning if the loop owns the changes
+  // Blocking issues take priority — but downgrade to warning if changes belong to another context
   if (blockingIssues.length > 0) {
     const allIssues = [...blockingIssues, ...warningIssues];
     if (loopRunning) {
       return {
         context: `SLOPE: ${allIssues.join(' and ')} detected, but autonomous loop is running — changes belong to the loop.`,
+      };
+    }
+    if (otherWorktreesExist) {
+      // Unpushed commits are branch-specific — always block. Only downgrade uncommitted changes.
+      const unpushedBlocks = blockingIssues.filter(i => i.includes('unpushed'));
+      const uncommittedBlocks = blockingIssues.filter(i => !i.includes('unpushed'));
+      if (unpushedBlocks.length > 0) {
+        return {
+          blockReason: `SLOPE: ${unpushedBlocks.join(' and ')} detected. Push before stopping to preserve your recovery point.` +
+            (uncommittedBlocks.length > 0 ? ` (${uncommittedBlocks.join(' and ')} may belong to another session)` : ''),
+        };
+      }
+      // All blocking issues are uncommitted changes — downgrade to warning
+      return {
+        context: `SLOPE: ${allIssues.join(' and ')} detected, but other worktrees exist — changes may belong to another session.`,
       };
     }
     return {
