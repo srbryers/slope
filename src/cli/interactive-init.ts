@@ -180,7 +180,7 @@ export async function runInteractiveCli(cwd: string): Promise<InteractiveResult 
   const todoCount = backlog.todos.length;
   if (todoCount > 0) {
     console.log('');
-    console.log(`  Found ${c.boldYellow(String(todoCount))} TODOs scattered across your codebase:`);
+    console.log(`  Found ${c.boldYellow(String(todoCount))} TODO${todoCount !== 1 ? 's' : ''} scattered across your codebase:`);
     const sample = backlog.todos.slice(0, 5);
     const maxLen = Math.max(...sample.map(t => t.file.length));
     for (const todo of sample) {
@@ -424,7 +424,7 @@ export async function runInteractiveCli(cwd: string): Promise<InteractiveResult 
 
     const beforeLines = todoCount > 0
       ? [
-          c.dim(`${todoCount} scattered TODOs`),
+          c.dim(`${todoCount} scattered TODO${todoCount !== 1 ? 's' : ''}`),
           c.dim(`${moduleCount} module${moduleCount !== 1 ? 's' : ''}`),
           c.dim('No priorities'),
           c.dim('No structure'),
@@ -439,7 +439,7 @@ export async function runInteractiveCli(cwd: string): Promise<InteractiveResult 
       `${c.boldGreen('\u2713')} ${c.boldWhite('Vision locked in')}`,
       `${c.boldGreen('\u2713')} ${c.boldWhite(`${prioritySprints} priority sprint${prioritySprints !== 1 ? 's' : ''}`)}`,
       ...(todoCount > 0
-        ? [`${c.boldGreen('\u2713')} ${c.boldWhite(`${matchedCount}/${todoCount} TODOs mapped`)}`]
+        ? [`${c.boldGreen('\u2713')} ${c.boldWhite(`${matchedCount}/${todoCount} TODO${todoCount !== 1 ? 's' : ''} mapped`)}`]
         : []),
       `${c.boldGreen('\u2713')} ${c.boldWhite(`Sprint 1 (${themeDisplay}) ready`)}`,
     ];

@@ -186,7 +186,7 @@ Answers file format:
     const todoCount = backlog.todos.length;
 
     if (todoCount > 0) {
-      await typewrite(c.boldCyan('Agent') + '  ', `I found ${c.boldYellow(String(todoCount))} TODOs scattered across your codebase:`, charDelay);
+      await typewrite(c.boldCyan('Agent') + '  ', `I found ${c.boldYellow(String(todoCount))} TODO${todoCount !== 1 ? 's' : ''} scattered across your codebase:`, charDelay);
       console.log('');
 
       const sample = backlog.todos.slice(0, 5);
@@ -327,7 +327,9 @@ Answers file format:
     const phaseLines = renderRoadmapPhases(roadmap, c, overrides);
     await revealLines(phaseLines, isTTY ? 150 : 0);
 
-    console.log(`  Matched ${c.boldGreen(`${matchedCount}/${todoCount}`)} TODOs to your vision priorities.`);
+    if (todoCount > 0) {
+      console.log(`  Matched ${c.boldGreen(`${Math.min(matchedCount, todoCount)}/${todoCount}`)} TODO${todoCount !== 1 ? 's' : ''} to your vision priorities.`);
+    }
     console.log('');
     await sleep(pause * 2);
 
@@ -341,7 +343,7 @@ Answers file format:
 
     const beforeLines = todoCount > 0
       ? [
-          c.dim(`${todoCount} scattered TODOs`),
+          c.dim(`${todoCount} scattered TODO${todoCount !== 1 ? 's' : ''}`),
           c.dim(`${moduleCount} module${moduleCount !== 1 ? 's' : ''}`),
           c.dim('No priorities'),
           c.dim('No structure'),
@@ -356,7 +358,7 @@ Answers file format:
       `${c.boldGreen('\u2713')} ${c.boldWhite('Vision locked in')}`,
       `${c.boldGreen('\u2713')} ${c.boldWhite(`${prioritySprints} priority sprint${prioritySprints !== 1 ? 's' : ''}`)}`,
       ...(todoCount > 0
-        ? [`${c.boldGreen('\u2713')} ${c.boldWhite(`${matchedCount}/${todoCount} TODOs mapped`)}`]
+        ? [`${c.boldGreen('\u2713')} ${c.boldWhite(`${Math.min(matchedCount, todoCount)}/${todoCount} TODO${todoCount !== 1 ? 's' : ''} mapped`)}`]
         : []),
       `${c.boldGreen('\u2713')} ${c.boldWhite(`Sprint 1 (${themeDisplay}) ready`)}`,
     ];
