@@ -65,6 +65,13 @@ These are recurring patterns that feel natural:
 
 The Seb version is longer, less precise, but sounds like a real person explaining what's about to happen.
 
+## TTS tips (ElevenLabs)
+
+- **Ellipsis (`...`) creates a natural pause.** "Hey everyone... this is Slope" sounds much more natural than a comma there. Use ellipsis where you'd take a breath or pause for emphasis.
+- **Quoted words get pronounced more carefully.** `"To-dos"` instead of `TODOs` — helps with acronyms and technical terms.
+- **Commas are often ignored by TTS.** If you need a real pause, use an ellipsis or a period instead.
+- **Double newlines between segments** add slight pauses when generating as one clip.
+
 ## How to use this guide
 
 When writing narrator segments for `NARRATOR_SEGMENTS` in `demo.ts`:
