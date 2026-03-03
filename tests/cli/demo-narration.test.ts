@@ -89,25 +89,25 @@ describe('demo narration timing', () => {
       for (const [cue, ms] of Object.entries(NARRATOR_CUE_PAUSES)) {
         expect(ms, `CUE ${cue}: pause must be positive`).toBeGreaterThan(0);
         expect(ms % 1000, `CUE ${cue}: pause ${ms}ms not a whole-second multiple`).toBe(0);
-        expect(ms, `CUE ${cue}: pause ${ms}ms exceeds 10s max`).toBeLessThanOrEqual(10000);
+        expect(ms, `CUE ${cue}: pause ${ms}ms exceeds 12s max`).toBeLessThanOrEqual(12000);
       }
     });
   });
 
   // --- Group 3: Total runtime ---
   describe('total runtime', () => {
-    it('total pause time is reasonable (60-120s)', () => {
+    it('total pause time is reasonable (60-180s)', () => {
       const totalPauseMs = Object.values(NARRATOR_CUE_PAUSES).reduce((a, b) => a + b, 0);
       const totalPauseS = totalPauseMs / 1000;
       expect(totalPauseS, `Total pause time ${totalPauseS}s too short`).toBeGreaterThanOrEqual(60);
-      expect(totalPauseS, `Total pause time ${totalPauseS}s too long`).toBeLessThanOrEqual(120);
+      expect(totalPauseS, `Total pause time ${totalPauseS}s too long`).toBeLessThanOrEqual(180);
     });
 
-    it('narrated demo total stays within 2:50-4:00 (170-240s)', () => {
+    it('narrated demo total stays within 2:50-5:00 (170-300s)', () => {
       const totalPauseS = Object.values(NARRATOR_CUE_PAUSES).reduce((a, b) => a + b, 0) / 1000;
       const totalNarratedS = totalPauseS + SILENT_BASELINE_S;
       expect(totalNarratedS, `Narrated total ${totalNarratedS}s < 170s — too rushed`).toBeGreaterThanOrEqual(170);
-      expect(totalNarratedS, `Narrated total ${totalNarratedS}s > 240s — too long`).toBeLessThanOrEqual(240);
+      expect(totalNarratedS, `Narrated total ${totalNarratedS}s > 300s — too long`).toBeLessThanOrEqual(300);
     });
 
     it('total word count fits within total pause time', () => {

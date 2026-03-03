@@ -36,14 +36,15 @@ interface DemoAnswers {
 
 // --- Narrator pause config ---
 
-/** Narrator pause windows (ms) keyed by CUE ID. Used by --narrated flag. */
+/** Narrator pause windows (ms) keyed by CUE ID. Used by --narrated flag.
+ *  Tuned to ElevenLabs Daniel voice durations + ~1s breathing room. */
 export const NARRATOR_CUE_PAUSES: Record<string, number> = {
-  '1a': 6000, '1b': 6000,
-  '2':  6000,
-  '3a': 6000, '3b': 6000, '3c': 6000, '3d': 5000, '3e': 6000,
-  '4a': 6000, '4b': 4000, '4c': 6000, '4d': 4000, '4e': 3000,
-  '5a': 5000, '5b': 6000, '5c': 5000, '5d': 3000,
-  '6a': 4000, '6b': 4000,
+  '1a':  7000, '1b': 10000,
+  '2':  10000,
+  '3a': 10000, '3b':  8000, '3c':  9000, '3d':  8000, '3e': 10000,
+  '4a': 10000, '4b':  4000, '4c':  9000, '4d':  4000, '4e':  4000,
+  '5a': 10000, '5b': 12000, '5c':  9000, '5d':  5000,
+  '6a': 10000, '6b':  6000,
 };
 
 /** Narrator voiceover text keyed by CUE ID, matching NARRATOR_CUE_PAUSES. */
