@@ -19,4 +19,4 @@ Hide
 Type "slope demo --project=$HOME/Development/justbriefme --answers=docs/demo/demo-answers.json --speed=slow"
 Enter
 Show
-Sleep 90s
+Sleep 120s

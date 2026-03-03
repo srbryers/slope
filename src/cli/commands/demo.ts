@@ -6,14 +6,25 @@ import * as p from '@clack/prompts';
 import { detectPackageManager, analyzeStack } from '../../core/analyzers/stack.js';
 import { analyzeBacklog } from '../../core/analyzers/backlog.js';
 import { mergeBacklogs } from '../../core/analyzers/backlog-merged.js';
-import { createVision } from '../../core/vision.js';
+import { createVision, updateVision } from '../../core/vision.js';
 import { generateRoadmapFromVision, PRIORITY_SYNONYMS } from '../../core/generators/roadmap.js';
 
 // --- Types ---
 
+interface DemoClarification { question: string; answer: string; }
+interface DemoPushback {
+  comment: string;
+  revised: { audience?: string; nonGoals?: string[] };
+  approval: string;
+}
 interface DemoAnswers {
   vision: string;
   priorities: string[];
+  clarifications: DemoClarification[];
+  audience: string;
+  nonGoals: string[];
+  pushback: DemoPushback;
+  ticketOverrides?: Record<string, string>;
 }
 
 // --- Speed config ---
@@ -90,6 +101,23 @@ async function mcpCall(label: string, result: string, delay: number, c: Colors):
   await sleep(delay);
 }
 
+function displayVision(
+  purpose: string, audience: string, priorities: string[],
+  nonGoals: string[], tech: string, c: Colors,
+): void {
+  const w = 50;
+  const truncate = (s: string, max: number) =>
+    s.length > max ? s.slice(0, max).replace(/\s+\S*$/, '') + '...' : s;
+  const lines = [
+    `${c.dim('Purpose:')}      ${c.boldWhite(truncate(purpose, w))}`,
+    `${c.dim('Audience:')}     ${c.boldWhite(truncate(audience, w))}`,
+    `${c.dim('Priorities:')}   ${c.boldWhite(priorities.join(', '))}`,
+    `${c.dim('Non-goals:')}    ${c.boldWhite(truncate(nonGoals.join(', '), w))}`,
+    `${c.dim('Tech:')}         ${c.boldWhite(tech)}`,
+  ];
+  p.note(lines.join('\n'), 'Vision');
+}
+
 // --- Args ---
 
 function parseArgs(args: string[]) {
@@ -123,7 +151,36 @@ function loadAnswers(path: string): DemoAnswers {
       !obj.priorities.every((v: unknown) => typeof v === 'string'))
     throw new Error('Answers file must contain a non-empty "priorities" string array.');
 
-  return { vision: obj.vision, priorities: obj.priorities as string[] };
+  if (!Array.isArray(obj.clarifications) ||
+      !obj.clarifications.every((c: unknown) =>
+        typeof c === 'object' && c !== null &&
+        typeof (c as Record<string, unknown>).question === 'string' &&
+        typeof (c as Record<string, unknown>).answer === 'string'))
+    throw new Error('Answers file must contain a "clarifications" array of {question, answer}.');
+
+  if (!obj.audience || typeof obj.audience !== 'string')
+    throw new Error('Answers file must contain an "audience" string.');
+
+  if (!Array.isArray(obj.nonGoals) ||
+      !obj.nonGoals.every((v: unknown) => typeof v === 'string'))
+    throw new Error('Answers file must contain a "nonGoals" string array.');
+
+  const pb = obj.pushback as Record<string, unknown> | undefined;
+  if (!pb || typeof pb !== 'object' ||
+      typeof pb.comment !== 'string' ||
+      typeof pb.approval !== 'string' ||
+      !pb.revised || typeof pb.revised !== 'object')
+    throw new Error('Answers file must contain a "pushback" object with {comment, revised, approval}.');
+
+  return {
+    vision: obj.vision as string,
+    priorities: obj.priorities as string[],
+    clarifications: obj.clarifications as DemoClarification[],
+    audience: obj.audience as string,
+    nonGoals: obj.nonGoals as string[],
+    pushback: obj.pushback as DemoPushback,
+    ticketOverrides: obj.ticketOverrides as Record<string, string> | undefined,
+  };
 }
 
 // --- Main ---
@@ -239,15 +296,69 @@ Answers file format:
 
     await typewrite(c.boldCyan('Agent') + '  ', `Got it. I've extracted your priorities: ${answers.priorities.join(', ')}.`, charDelay);
     console.log('');
+    await sleep(pause);
 
+    // Clarifying Q&A
+    for (const cl of answers.clarifications) {
+      await typewrite(c.boldCyan('Agent') + '  ', wordWrap(cl.question, 60), charDelay);
+      console.log('');
+      await sleep(isTTY ? 400 : 0);
+      await typewrite(c.boldGreen('You') + '    ', wordWrap(cl.answer, 60), charDelay);
+      console.log('');
+      await sleep(pause);
+    }
+
+    // Create vision with full fields
     tmpDir = mkdtempSync(join(tmpdir(), 'slope-demo-'));
     const vision = createVision({
       purpose: answers.vision,
       priorities: answers.priorities,
+      audience: answers.audience,
+      nonGoals: answers.nonGoals,
+      techDirection: stackStr,
     }, tmpDir);
 
     await mcpCall('createVision()', '', pause, c);
-    console.log(`  ${c.green('\u2713 Vision created')}`);
+
+    // Display vision
+    displayVision(vision.purpose, answers.audience, answers.priorities, answers.nonGoals, stackStr, c);
+    console.log('');
+    await sleep(pause * 2);
+
+    // Pushback
+    await typewrite(c.boldGreen('You') + '    ', wordWrap(answers.pushback.comment, 60), charDelay);
+    console.log('');
+    await sleep(pause);
+
+    // Revision
+    await typewrite(c.boldCyan('Agent') + '  ', 'Good call. Let me update that.', charDelay);
+    console.log('');
+
+    const revised = answers.pushback.revised;
+    updateVision({
+      audience: revised.audience,
+      nonGoals: revised.nonGoals,
+    }, tmpDir);
+
+    await mcpCall('updateVision()', '', pause, c);
+
+    // Revised vision display
+    displayVision(
+      vision.purpose,
+      revised.audience ?? answers.audience,
+      answers.priorities,
+      revised.nonGoals ?? answers.nonGoals,
+      stackStr,
+      c,
+    );
+    console.log('');
+    await sleep(pause);
+
+    // Approval
+    await typewrite(c.boldGreen('You') + '    ', answers.pushback.approval, charDelay);
+    console.log('');
+    await sleep(pause);
+    await typewrite(c.boldCyan('Agent') + '  ', 'Locked in.', charDelay);
     console.log('');
     await sleep(pause * 2);
 
@@ -278,13 +389,26 @@ Answers file format:
       }
     }
 
-    for (const sprint of roadmap.sprints) {
-      const shown = sprint.tickets.slice(0, 5);
-      const extra = sprint.tickets.length - shown.length;
-      const theme = sprint.theme.charAt(0).toUpperCase() + sprint.theme.slice(1);
-      console.log(`  ${c.boldYellow(`Sprint ${sprint.id} \u2014 ${theme}`)} ${c.dim(`(${sprint.tickets.length} ticket${sprint.tickets.length !== 1 ? 's' : ''})`)}`);
-      for (const t of shown) console.log(`    ${c.dim(t.key)}  ${t.title}`);
-      if (extra > 0) console.log(`    ${c.dim(`... +${extra} more`)}`);
+    // Phase-based display with ticket overrides
+    const overrides = answers.ticketOverrides ?? {};
+    const cleanTitle = (key: string, raw: string): string => {
+      if (overrides[key]) return overrides[key];
+      return raw.replace(/^(TODO|FIXME|HACK):\s*/i, '');
+    };
+
+    for (const phase of roadmap.phases) {
+      console.log(`  ${c.boldYellow(phase.name)}`);
+      for (const sprintId of phase.sprints) {
+        const sprint = roadmap.sprints.find(s => s.id === sprintId);
+        if (!sprint) continue;
+        console.log(`    ${c.dim(`Sprint ${sprint.id} (${sprint.tickets.length} ticket${sprint.tickets.length !== 1 ? 's' : ''}, par ${sprint.par})`)}`);
+        const shown = sprint.tickets.slice(0, 5);
+        const extra = sprint.tickets.length - shown.length;
+        for (const t of shown) {
+          console.log(`      ${c.dim(t.key)}  ${cleanTitle(t.key, t.title)}`);
+        }
+        if (extra > 0) console.log(`      ${c.dim(`... +${extra} more`)}`);
+      }
       console.log('');
     }
 

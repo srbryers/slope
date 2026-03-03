@@ -1,4 +1,35 @@
 {
-  "vision": "It's a briefing tool for busy professionals. I want to help executives and researchers who don't have time to read 50 articles a day \u2014 they get a single AI-powered summary every morning. The tech is Next.js on Vercel, and I care most about speed, reliability, and a great UX. I don't want to build social features or real-time collaboration \u2014 just clean, fast briefings.",
-  "priorities": ["speed", "reliability", "ux"]
+  "vision": "It's a briefing tool for busy professionals. I want to help executives and researchers who don't have time to read 50 articles a day — they get a single AI-powered summary every morning. The tech is Next.js on Vercel, and I care most about speed, reliability, and a great UX. I don't want to build social features or real-time collaboration — just clean, fast briefings.",
+  "priorities": ["speed", "reliability", "ux"],
+  "clarifications": [
+    {
+      "question": "Who's the primary audience — executives scanning headlines over coffee, or researchers doing deep technical dives?",
+      "answer": "Mostly executives and team leads. They check it on their phone during their commute — so it has to be fast and scannable. No long-form deep dives."
+    },
+    {
+      "question": "You mentioned no social features or real-time collab. Anything else you want to explicitly rule out so I keep the scope tight?",
+      "answer": "No content creation tools, no multi-user dashboards. It's single-player — you get your briefing, you read it, done."
+    }
+  ],
+  "audience": "Executives and team leads who consume briefings on mobile",
+  "nonGoals": ["Social features", "Real-time collaboration", "Content creation tools", "Multi-user dashboards"],
+  "pushback": {
+    "comment": "Almost — add multi-language support to non-goals, English only for now. And say 'time-poor professionals' instead of just executives, it's broader than that.",
+    "revised": {
+      "audience": "Time-poor professionals who consume briefings on mobile",
+      "nonGoals": ["Social features", "Real-time collaboration", "Content creation tools", "Multi-user dashboards", "Multi-language support"]
+    },
+    "approval": "That nails it. Let's go."
+  },
+  "ticketOverrides": {
+    "S1-1": "Set up delivery cron with <5min end-to-end target",
+    "S1-2": "Build processing pipeline with async queue",
+    "S2-1": "Add briefing status tracking in Supabase",
+    "S2-2": "Implement content deduplication via hashing",
+    "S3-1": "Build subscriber signup with welcome email",
+    "S3-2": "Integrate Resend for transactional email",
+    "S3-3": "Wire up email delivery pipeline",
+    "S3-4": "End-to-end delivery: ingest → summarize → deliver",
+    "S3-5": "Add user-configurable delivery scheduling"
+  }
 }
