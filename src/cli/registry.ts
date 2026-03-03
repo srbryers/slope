@@ -55,6 +55,9 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
   { cmd: 'vision',      desc: 'Display project vision document',                category: 'planning' },
   { cmd: 'initiative',  desc: 'Multi-sprint initiative orchestration',           category: 'planning' },
 
+  // ── Loop ─────────────────────────────────────────────
+  { cmd: 'loop',       desc: 'Autonomous sprint execution loop',               category: 'tooling' },
+
   // ── Indexing ──────────────────────────────────────────────────────
   { cmd: 'index-cmd',   desc: 'Semantic embedding index management',            category: 'tooling' },
   { cmd: 'context',     desc: 'Semantic context search for agents',             category: 'tooling' },

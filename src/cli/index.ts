@@ -54,6 +54,9 @@ import { contextCommand } from './commands/context.js';
 import { prepCommand } from './commands/prep.js';
 import { enrichCommand } from './commands/enrich.js';
 import { docsCommand } from './commands/docs.js';
+import { demoCommand } from './commands/demo.js';
+import { narrateCommand } from './commands/narrate.js';
+import { loopCommand } from './commands/loop.js';
 
 const subcommand = process.argv[2];
 
@@ -283,6 +286,24 @@ switch (subcommand) {
       process.exit(1);
     });
     break;
+  case 'demo':
+    demoCommand(process.argv.slice(3)).catch(err => {
+      console.error('Error:', err.message);
+      process.exit(1);
+    });
+    break;
+  case 'narrate':
+    narrateCommand(process.argv.slice(3)).catch(err => {
+      console.error('Error:', err.message);
+      process.exit(1);
+    });
+    break;
+  case 'loop':
+    loopCommand(process.argv.slice(3)).catch(err => {
+      console.error('Error:', err.message);
+      process.exit(1);
+    });
+    break;
   default:
     console.log(`
 SLOPE CLI — Sprint Lifecycle & Operational Performance Engine
@@ -342,6 +363,7 @@ Usage:
   slope prep <ticket-id> [--json] [--top=5]          Generate execution plan for a ticket
   slope enrich [backlog-path] [--output=<path>]      Batch-enrich backlog with file context
   slope docs generate|changelog|check                Documentation manifest and changelog
+  slope loop status|config|run|continuous|...        Autonomous sprint execution loop
 
 Examples:
   slope init                                Create .slope/ with config + example scorecard
