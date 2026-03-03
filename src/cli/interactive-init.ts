@@ -7,16 +7,19 @@ import { basename } from 'node:path';
 import { buildInterviewContext } from '../core/interview-engine.js';
 import { generateInterviewSteps } from '../core/interview-steps.js';
 import { formatPreviewText } from '../core/metaphor-preview.js';
-import { analyzeStack, detectPackageManager } from '../core/analyzers/stack.js';
+import { runAnalyzers, loadRepoProfile } from '../core/analyzers/index.js';
+import { estimateComplexity } from '../core/analyzers/complexity.js';
+import { detectPackageManager } from '../core/analyzers/stack.js';
 import { analyzeBacklog } from '../core/analyzers/backlog.js';
 import { mergeBacklogs } from '../core/analyzers/backlog-merged.js';
 import { generateRoadmapFromVision, PRIORITY_SYNONYMS } from '../core/generators/roadmap.js';
 import {
-  createColors, renderVisionBox, sideBySide, renderCtaBox, renderRoadmapPhases, revealLines,
+  createColors, renderVisionBox, renderProfileSummary, sideBySide, renderCtaBox, renderRoadmapPhases, revealLines,
 } from './display.js';
 import type { InterviewStep, StepOption } from '../core/interview-steps.js';
 import type { MetaphorPreview } from '../core/metaphor-preview.js';
 import type { RoadmapDefinition } from '../core/roadmap.js';
+import type { RepoProfile } from '../core/analyzers/types.js';
 
 // Ensure built-in metaphors are registered
 import '../core/metaphors/index.js';
@@ -36,6 +39,7 @@ export interface InteractiveResult {
   };
   roadmap: RoadmapDefinition | null;  // null = use starter
   backlogStats: { todoCount: number; moduleCount: number; matchedCount: number } | null;
+  profile: RepoProfile;
 }
 
 // --- Helpers ---
@@ -152,22 +156,26 @@ export async function runInteractiveCli(cwd: string): Promise<InteractiveResult 
   const ctx = buildInterviewContext(cwd);
   const projectName = ctx.detected.projectName ?? basename(cwd);
   const pm = detectPackageManager(cwd);
-  const stack = await analyzeStack(cwd);
+  let profile = loadRepoProfile(cwd);
+  if (!profile) {
+    profile = await runAnalyzers({ cwd });
+  }
   const backlog = await analyzeBacklog(cwd);
+  const complexity = estimateComplexity(profile);
+  const stack = profile.stack;
 
   s.stop('Project detected');
 
-  const displayFrameworks = stack.frameworks
-    .filter(f => !['vitest', 'jest', 'mocha'].includes(f));
-  const stackParts = [stack.primaryLanguage, ...displayFrameworks].filter(Boolean);
+  console.log('');
+  console.log(`  ${c.dim('Project:')}  ${c.boldWhite(projectName)}`);
+  const profileLines = renderProfileSummary(profile, c);
+  for (const line of profileLines) console.log(line);
+  if (pm) console.log(`  ${c.dim('PM:')}        ${c.boldWhite(pm)}`);
+
+  const stackParts = [stack.primaryLanguage, ...stack.frameworks.filter(f => !['vitest', 'jest', 'mocha'].includes(f))].filter(Boolean);
   const stackStr = stackParts.length > 1
     ? `${stackParts[0]} \u00b7 ${stackParts.slice(1).join(', ')}`
     : stackParts[0] || 'Unknown';
-
-  console.log('');
-  console.log(`  ${c.dim('Project:')}  ${c.boldWhite(projectName)}`);
-  console.log(`  ${c.dim('Stack:')}    ${c.boldWhite(stackStr)}`);
-  if (pm) console.log(`  ${c.dim('PM:')}       ${c.boldWhite(pm)}`);
 
   const todoCount = backlog.todos.length;
   if (todoCount > 0) {
@@ -352,9 +360,9 @@ export async function runInteractiveCli(cwd: string): Promise<InteractiveResult 
   let roadmap: RoadmapDefinition | null = null;
   let matchedCount = 0;
 
-  if (todoCount > 0 && currentVision.priorities.length > 0) {
+  if (currentVision.priorities.length > 0) {
     const s2 = p.spinner();
-    s2.start('Matching TODOs to vision priorities...');
+    s2.start(todoCount > 0 ? 'Matching TODOs to vision priorities...' : 'Generating roadmap from profile...');
     const merged = mergeBacklogs(backlog);
     roadmap = generateRoadmapFromVision(
       {
@@ -367,6 +375,8 @@ export async function runInteractiveCli(cwd: string): Promise<InteractiveResult 
         updatedAt: new Date().toISOString(),
       },
       merged,
+      complexity,
+      profile,
     );
     s2.stop('Roadmap generated');
 
@@ -385,10 +395,12 @@ export async function runInteractiveCli(cwd: string): Promise<InteractiveResult 
     }
 
     // Count matched TODOs
-    for (const sprint of roadmap.sprints) {
-      if (sprint.theme.toLowerCase() !== 'general') {
-        matchedCount += sprint.tickets
-          .filter(t => !t.title.startsWith('Investigate and plan')).length;
+    if (todoCount > 0) {
+      for (const sprint of roadmap.sprints) {
+        if (sprint.theme.toLowerCase() !== 'general') {
+          matchedCount += sprint.tickets
+            .filter(t => !t.title.startsWith('Investigate and plan')).length;
+        }
       }
     }
 
@@ -396,28 +408,39 @@ export async function runInteractiveCli(cwd: string): Promise<InteractiveResult 
     const phaseLines = renderRoadmapPhases(roadmap, c);
     await revealLines(phaseLines, 0);
 
-    console.log(`  Matched ${c.boldGreen(`${matchedCount}/${todoCount}`)} TODOs to your vision priorities.`);
+    if (todoCount > 0) {
+      console.log(`  Matched ${c.boldGreen(`${matchedCount}/${todoCount}`)} TODOs to your vision priorities.`);
+    }
     console.log('');
   }
 
   // ─── Phase 6: Before/After ───
 
-  if (todoCount > 0 && roadmap) {
+  if (roadmap) {
     const moduleCount = Object.keys(backlog.todosByModule).length;
     const prioritySprints = roadmap.sprints.filter(s2 => s2.theme.toLowerCase() !== 'general').length;
     const firstTheme = roadmap.sprints[0]?.theme ?? 'Start';
     const themeDisplay = firstTheme.charAt(0).toUpperCase() + firstTheme.slice(1);
 
-    const beforeLines = [
-      c.dim(`${todoCount} scattered TODOs`),
-      c.dim(`${moduleCount} module${moduleCount !== 1 ? 's' : ''}`),
-      c.dim('No priorities'),
-      c.dim('No structure'),
-    ];
+    const beforeLines = todoCount > 0
+      ? [
+          c.dim(`${todoCount} scattered TODOs`),
+          c.dim(`${moduleCount} module${moduleCount !== 1 ? 's' : ''}`),
+          c.dim('No priorities'),
+          c.dim('No structure'),
+        ]
+      : [
+          c.dim(`${profile.structure.sourceFiles} source files`),
+          c.dim('No priorities'),
+          c.dim('No roadmap'),
+          c.dim('No structure'),
+        ];
     const afterLines = [
       `${c.boldGreen('\u2713')} ${c.boldWhite('Vision locked in')}`,
       `${c.boldGreen('\u2713')} ${c.boldWhite(`${prioritySprints} priority sprint${prioritySprints !== 1 ? 's' : ''}`)}`,
-      `${c.boldGreen('\u2713')} ${c.boldWhite(`${matchedCount}/${todoCount} TODOs mapped`)}`,
+      ...(todoCount > 0
+        ? [`${c.boldGreen('\u2713')} ${c.boldWhite(`${matchedCount}/${todoCount} TODOs mapped`)}`]
+        : []),
       `${c.boldGreen('\u2713')} ${c.boldWhite(`Sprint 1 (${themeDisplay}) ready`)}`,
     ];
 
@@ -435,6 +458,7 @@ export async function runInteractiveCli(cwd: string): Promise<InteractiveResult 
     backlogStats: todoCount > 0
       ? { todoCount, moduleCount: Object.keys(backlog.todosByModule).length, matchedCount }
       : null,
+    profile,
   };
 }
 

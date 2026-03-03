@@ -6,6 +6,7 @@ import { createConfig } from '../config.js';
 import { saveHooksConfig } from '../hooks-config.js';
 import { resolveMetaphor } from '../metaphor.js';
 import { detectPackageManager, createVision } from '../../core/index.js';
+import { saveRepoProfile } from '../../core/analyzers/index.js';
 import type { MetaphorDefinition } from '../../core/index.js';
 import {
   generateProjectContext,
@@ -698,7 +699,10 @@ async function runInteractiveInit(cwd: string, _args: string[]): Promise<void> {
       // vision already exists or validation error — skip
     }
 
-    // 3. Save real roadmap (overwrite starter if we generated one)
+    // 3. Save repo profile
+    saveRepoProfile(result.profile, cwd);
+
+    // 4. Save real roadmap (overwrite starter if we generated one)
     if (result.roadmap) {
       const { writeFileSync: writeFs, mkdirSync: mkFs } = await import('node:fs');
       const { join: joinPath } = await import('node:path');
@@ -708,7 +712,7 @@ async function runInteractiveInit(cwd: string, _args: string[]): Promise<void> {
       // roadmap.json already in filesCreated from initFromAnswers
     }
 
-    // 4. SQLite store
+    // 5. SQLite store
     const dbPath = join(cwd, '.slope', 'slope.db');
     if (!existsSync(dbPath)) {
       try {
@@ -721,7 +725,7 @@ async function runInteractiveInit(cwd: string, _args: string[]): Promise<void> {
       }
     }
 
-    // 5. Provider templates + hooks + MCP
+    // 6. Provider templates + hooks + MCP
     for (const provider of result.platforms) {
       try {
         installForProvider(cwd, provider as InitProvider, metaphor);
@@ -730,7 +734,7 @@ async function runInteractiveInit(cwd: string, _args: string[]): Promise<void> {
       }
     }
 
-    // 6. CODEBASE.md
+    // 7. CODEBASE.md
     try {
       const { mapCommand } = await import('./map.js');
       await mapCommand([]);

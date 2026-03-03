@@ -80,6 +80,72 @@ export async function revealLines(lines: string[], lineDelay: number): Promise<v
   }
 }
 
+// --- Profile Summary ---
+
+import type { RepoProfile } from '../core/analyzers/types.js';
+
+/** Render a profile summary for the interactive init display. */
+export function renderProfileSummary(
+  profile: RepoProfile,
+  c: Colors,
+): string[] {
+  const lines: string[] = [];
+
+  // Stack
+  const displayFrameworks = profile.stack.frameworks
+    .filter(f => !['vitest', 'jest', 'mocha'].includes(f));
+  const stackParts = [profile.stack.primaryLanguage, ...displayFrameworks].filter(Boolean);
+  if (stackParts.length > 0) {
+    const stackStr = stackParts.length > 1
+      ? `${stackParts[0]} \u00b7 ${stackParts.slice(1).join(', ')}`
+      : stackParts[0];
+    lines.push(`  ${c.dim('Stack:')}      ${c.boldWhite(stackStr)}`);
+  }
+
+  // Structure
+  const parts: string[] = [];
+  if (profile.structure.sourceFiles > 0) parts.push(`${profile.structure.sourceFiles} source files`);
+  if (profile.structure.testFiles > 0) parts.push(`${profile.structure.testFiles} tests`);
+  if (profile.structure.modules.length > 0) parts.push(`${profile.structure.modules.length} modules`);
+  if (parts.length > 0) {
+    lines.push(`  ${c.dim('Structure:')}  ${c.boldWhite(parts.join(', '))}`);
+  }
+
+  // Testing
+  if (profile.testing.framework || profile.testing.testFileCount > 0) {
+    const testParts: string[] = [];
+    if (profile.testing.framework) testParts.push(profile.testing.framework);
+    if (profile.testing.hasCoverage) testParts.push('with coverage');
+    lines.push(`  ${c.dim('Testing:')}    ${c.boldWhite(testParts.join(' (') + (testParts.length > 1 ? ')' : ''))}`);
+  }
+
+  // CI
+  if (profile.ci.system) {
+    const stages: string[] = [];
+    if (profile.ci.hasTestStage) stages.push('test');
+    if (profile.ci.hasBuildStage) stages.push('build');
+    if (profile.ci.hasDeployStage) stages.push('deploy');
+    const ciName = profile.ci.system === 'github-actions' ? 'GitHub Actions'
+      : profile.ci.system === 'circleci' ? 'CircleCI'
+      : profile.ci.system === 'gitlab-ci' ? 'GitLab CI'
+      : profile.ci.system;
+    const ciStr = stages.length > 0 ? `${ciName} (${stages.join(', ')})` : ciName;
+    lines.push(`  ${c.dim('CI:')}         ${c.boldWhite(ciStr)}`);
+  }
+
+  // Docs
+  const docParts: string[] = [];
+  if (profile.docs.hasReadme) docParts.push('README');
+  if (profile.docs.hasChangelog) docParts.push('CHANGELOG');
+  if (profile.docs.hasContributing) docParts.push('CONTRIBUTING');
+  if (profile.docs.hasApiDocs) docParts.push('API docs');
+  if (docParts.length > 0) {
+    lines.push(`  ${c.dim('Docs:')}       ${c.boldWhite(docParts.join(', '))}`);
+  }
+
+  return lines;
+}
+
 // --- Vision Box ---
 
 /** Render a static vision box (no typewriter animation). */

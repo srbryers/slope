@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   stripAnsi, createColors, wordWrap, sleep,
-  renderVisionBox, sideBySide, renderCtaBox, renderRoadmapPhases,
+  renderVisionBox, renderProfileSummary, sideBySide, renderCtaBox, renderRoadmapPhases,
 } from '../../src/cli/display.js';
+import type { RepoProfile } from '../../src/core/analyzers/types.js';
 
 describe('stripAnsi', () => {
   it('removes ANSI escape sequences', () => {
@@ -231,6 +232,75 @@ describe('renderRoadmapPhases', () => {
   });
 });
 
+function makeProfile(overrides?: Partial<RepoProfile>): RepoProfile {
+  return {
+    analyzedAt: '2026-01-01T00:00:00Z',
+    analyzersRun: ['stack', 'structure', 'git', 'testing', 'ci', 'docs'],
+    stack: { primaryLanguage: 'TypeScript', languages: { TypeScript: 80 }, frameworks: ['react', 'next', 'vitest'] },
+    structure: { totalFiles: 100, sourceFiles: 48, testFiles: 12, maxDepth: 5, isMonorepo: false, modules: [{ name: 'src', path: 'src', fileCount: 48 }], largeFiles: [] },
+    git: { totalCommits: 200, commitsLast90d: 50, commitsPerWeek: 5, contributors: [{ name: 'Dev', email: 'dev@test.com', commits: 200 }], activeBranches: ['main'], inferredCadence: 'weekly' },
+    testing: { framework: 'vitest', testFileCount: 12, hasTestScript: true, hasCoverage: true, testDirs: ['tests'] },
+    ci: { system: 'github-actions', configFiles: ['.github/workflows/ci.yml'], hasTestStage: true, hasBuildStage: true, hasDeployStage: false },
+    docs: { hasReadme: true, hasContributing: false, hasChangelog: true, hasAdr: false, hasApiDocs: false },
+    ...overrides,
+  };
+}
+
+describe('renderProfileSummary', () => {
+  it('renders stack, structure, testing, CI, and docs lines', () => {
+    const c = createColors(false);
+    const profile = makeProfile();
+    const lines = renderProfileSummary(profile, c);
+    const output = lines.join('\n');
+
+    expect(output).toContain('Stack:');
+    expect(output).toContain('TypeScript');
+    expect(output).toContain('react, next');
+    expect(output).toContain('Structure:');
+    expect(output).toContain('48 source files');
+    expect(output).toContain('12 tests');
+    expect(output).toContain('Testing:');
+    expect(output).toContain('vitest');
+    expect(output).toContain('CI:');
+    expect(output).toContain('GitHub Actions');
+    expect(output).toContain('test, build');
+    expect(output).toContain('Docs:');
+    expect(output).toContain('README');
+    expect(output).toContain('CHANGELOG');
+  });
+
+  it('skips sections with no data', () => {
+    const c = createColors(false);
+    const profile = makeProfile({
+      ci: { configFiles: [], hasTestStage: false, hasBuildStage: false, hasDeployStage: false },
+      docs: { hasReadme: false, hasContributing: false, hasChangelog: false, hasAdr: false, hasApiDocs: false },
+    });
+    const lines = renderProfileSummary(profile, c);
+    const output = lines.join('\n');
+
+    expect(output).not.toContain('CI:');
+    expect(output).not.toContain('Docs:');
+    // Stack and structure should still be present
+    expect(output).toContain('Stack:');
+    expect(output).toContain('Structure:');
+  });
+
+  it('handles minimal profile (all empty analyzers)', () => {
+    const c = createColors(false);
+    const profile = makeProfile({
+      stack: { primaryLanguage: '', languages: {}, frameworks: [] },
+      structure: { totalFiles: 0, sourceFiles: 0, testFiles: 0, maxDepth: 0, isMonorepo: false, modules: [], largeFiles: [] },
+      testing: { testFileCount: 0, hasTestScript: false, hasCoverage: false, testDirs: [] },
+      ci: { configFiles: [], hasTestStage: false, hasBuildStage: false, hasDeployStage: false },
+      docs: { hasReadme: false, hasContributing: false, hasChangelog: false, hasAdr: false, hasApiDocs: false },
+    });
+    const lines = renderProfileSummary(profile, c);
+
+    // All sections should be skipped for truly empty profile
+    expect(lines).toEqual([]);
+  });
+});
+
 describe('InteractiveResult type', () => {
   it('can be constructed with all required fields', () => {
     // Import and type-check the InteractiveResult interface
@@ -247,12 +317,14 @@ describe('InteractiveResult type', () => {
       },
       roadmap: null,
       backlogStats: null,
+      profile: makeProfile(),
     };
 
     expect(result.projectName).toBe('test-app');
     expect(result.vision.priorities).toHaveLength(2);
     expect(result.roadmap).toBeNull();
     expect(result.backlogStats).toBeNull();
+    expect(result.profile.stack.primaryLanguage).toBe('TypeScript');
   });
 
   it('can include backlog stats', () => {
@@ -267,6 +339,7 @@ describe('InteractiveResult type', () => {
       },
       roadmap: null,
       backlogStats: { todoCount: 23, moduleCount: 5, matchedCount: 18 },
+      profile: makeProfile(),
     };
 
     expect(result.backlogStats!.todoCount).toBe(23);
