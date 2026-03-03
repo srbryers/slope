@@ -549,7 +549,7 @@ function dryRunSprint(sprint: BacklogSprint, config: LoopConfig, cwd: string, lo
   return null;
 }
 
-function saveResult(result: SprintResult, cwd: string, config: LoopConfig): void {
+export function saveResult(result: SprintResult, cwd: string, config: LoopConfig): void {
   const dir = join(cwd, config.resultsDir);
   mkdirSync(dir, { recursive: true });
   const tmpPath = join(dir, `${result.sprint_id}.tmp.json`);

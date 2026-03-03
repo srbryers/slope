@@ -7,8 +7,11 @@ import { describe, it, expect } from 'vitest';
  * We also test isShuttingDown (the only pure exported function).
  */
 
-import { isShuttingDown, buildPrompt } from '../../../src/cli/loop/executor.js';
-import type { BacklogTicket } from '../../../src/cli/loop/types.js';
+import { isShuttingDown, buildPrompt, saveResult } from '../../../src/cli/loop/executor.js';
+import type { BacklogTicket, SprintResult, LoopConfig } from '../../../src/cli/loop/types.js';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 describe('isShuttingDown', () => {
   it('returns false initially', () => {
@@ -136,6 +139,105 @@ describe('buildPrompt', () => {
     const prompt = buildPrompt(baseTicket, 'qwen2.5:32b');
     
     expect(prompt).toContain('START by reading the relevant source files');
+  });
+});
+
+describe('saveResult', () => {
+  it('writes result to correct path with proper JSON formatting', () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), 'slope-test-'));
+    try {
+      const config: LoopConfig = {
+        modelLocal: 'qwen2.5:32b',
+        modelApi: 'minimax/api-key',
+        ollamaApiBase: 'http://localhost:11434',
+        ollamaFlashAttention: false,
+        ollamaKvCacheType: 'q8',
+        modelApiTimeout: 120,
+        modelLocalTimeout: 60,
+        escalateOnFail: true,
+        agentGuideMaxWords: 2000,
+        resultsDir: 'results',
+        logDir: 'logs',
+        backlogPath: '.slope/backlog.json',
+        agentGuide: 'slope-loop/SKILL.md',
+        sprintHistory: 'slope-loop/sprint-history.md',
+        loopTestCmd: 'pnpm test',
+        modelRegenThreshold: 10,
+      };
+
+      const result: SprintResult = {
+        sprint_id: 'S-001',
+        title: 'Test Sprint',
+        strategy: 'balanced',
+        completed_at: '2026-03-03T12:00:00Z',
+        branch: 'sprint/S-001',
+        tickets_total: 2,
+        tickets_passing: 2,
+        tickets_noop: 0,
+        tickets: [],
+      };
+
+      saveResult(result, tmpDir, config);
+
+      const finalPath = join(tmpDir, 'results', 'S-001.json');
+      const content = readFileSync(finalPath, 'utf8');
+      const parsed = JSON.parse(content);
+
+      expect(parsed.sprint_id).toBe('S-001');
+      expect(parsed.title).toBe('Test Sprint');
+      expect(parsed.tickets_passing).toBe(2);
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it('performs atomic write using tmp file and rename', () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), 'slope-test-'));
+    try {
+      const config: LoopConfig = {
+        modelLocal: 'qwen2.5:32b',
+        modelApi: 'minimax/api-key',
+        ollamaApiBase: 'http://localhost:11434',
+        ollamaFlashAttention: false,
+        ollamaKvCacheType: 'q8',
+        modelApiTimeout: 120,
+        modelLocalTimeout: 60,
+        escalateOnFail: true,
+        agentGuideMaxWords: 2000,
+        resultsDir: 'results',
+        logDir: 'logs',
+        backlogPath: '.slope/backlog.json',
+        agentGuide: 'slope-loop/SKILL.md',
+        sprintHistory: 'slope-loop/sprint-history.md',
+        loopTestCmd: 'pnpm test',
+        modelRegenThreshold: 10,
+      };
+
+      const result: SprintResult = {
+        sprint_id: 'S-002',
+        title: 'Atomic Test',
+        strategy: 'balanced',
+        completed_at: '2026-03-03T13:00:00Z',
+        branch: 'sprint/S-002',
+        tickets_total: 1,
+        tickets_passing: 1,
+        tickets_noop: 0,
+        tickets: [],
+      };
+
+      saveResult(result, tmpDir, config);
+
+      const finalPath = join(tmpDir, 'results', 'S-002.json');
+      const tmpPath = join(tmpDir, 'results', 'S-002.tmp.json');
+
+      // Final file should exist
+      expect(() => readFileSync(finalPath, 'utf8')).not.toThrow();
+
+      // Tmp file should not exist (renamed away)
+      expect(() => readFileSync(tmpPath, 'utf8')).toThrow();
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 });
 
