@@ -133,7 +133,54 @@ export function generateInterviewSteps(ctx: InterviewContext): InterviewStep[] {
     required: false,
   });
 
-  // 8. Deep analysis (CLI-only, skipped in agent mode)
+  // 8. Vision conversation steps (interactive CLI only, skipped in agent mode)
+  steps.push({
+    id: 'vision-text',
+    question: 'Tell me about your vision for this project. What\'s it for, who uses it, why does it matter?',
+    type: 'text',
+    description: 'Freeform vision description. Get free and loose with it.',
+    required: false,
+    condition: (answers) => answers._mode !== 'agent',
+  });
+
+  steps.push({
+    id: 'priorities',
+    question: 'What are your top priorities?',
+    type: 'multiselect',
+    description: 'Select the priorities that matter most for your project.',
+    options: [
+      { value: 'speed', label: 'Speed / Performance', description: 'Optimize for fast execution and low latency' },
+      { value: 'reliability', label: 'Reliability', description: 'Tests, error handling, monitoring' },
+      { value: 'security', label: 'Security', description: 'Auth, encryption, access control' },
+      { value: 'scalability', label: 'Scalability', description: 'Horizontal scale, throughput, capacity' },
+      { value: 'ux', label: 'UX', description: 'User experience, accessibility, design' },
+      { value: 'dx', label: 'Developer Experience', description: 'CLI, tooling, ergonomics' },
+      { value: 'testing', label: 'Testing', description: 'Coverage, E2E, integration tests' },
+      { value: 'observability', label: 'Observability', description: 'Monitoring, logging, tracing' },
+      { value: 'documentation', label: 'Documentation', description: 'Docs, guides, API docs' },
+    ],
+    condition: (answers) => answers._mode !== 'agent',
+  });
+
+  steps.push({
+    id: 'audience',
+    question: 'Who\'s the target audience? (optional)',
+    type: 'text',
+    description: 'Optional. Helps shape roadmap priorities.',
+    required: false,
+    condition: (answers) => answers._mode !== 'agent',
+  });
+
+  steps.push({
+    id: 'non-goals',
+    question: 'Anything explicitly out of scope? (optional, comma-separated)',
+    type: 'text',
+    description: 'Optional. Helps keep the roadmap focused.',
+    required: false,
+    condition: (answers) => answers._mode !== 'agent',
+  });
+
+  // 9. Deep analysis (CLI-only, skipped in agent mode)
   steps.push({
     id: 'deep-analysis',
     question: 'Run repo analysis for better suggestions?',

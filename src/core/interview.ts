@@ -19,6 +19,9 @@ export interface InitInput {
   techStack?: string[];
   vision?: string;
   priorities?: string[];
+  audience?: string;
+  nonGoals?: string[];
+  techDirection?: string;
   currentSprint?: number;
 }
 
