@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { worktreeCheckGuard, resetWorktreeCheckState } from '../../../src/cli/guards/worktree-check.js';
 import type { HookInput } from '../../../src/core/index.js';
+import { STALE_SESSION_THRESHOLD_MS } from '../../../src/core/constants.js';
 import { SlopeStoreError } from '../../../src/core/store.js';
 import type { SlopeStore, SlopeSession } from '../../../src/core/store.js';
 
@@ -41,10 +42,12 @@ vi.mock('../../../src/cli/store.js', () => ({
 }));
 
 import { execSync } from 'node:child_process';
+import { writeFileSync } from 'node:fs';
 import { resolveStore } from '../../../src/cli/store.js';
 
 const mockExecSync = vi.mocked(execSync);
 const mockResolveStore = vi.mocked(resolveStore);
+const mockWriteFileSync = vi.mocked(writeFileSync);
 
 function makeInput(sessionId = 'test-session'): HookInput {
   return {
@@ -65,6 +68,13 @@ function makeSession(overrides: Partial<SlopeSession> = {}): SlopeSession {
     last_heartbeat_at: new Date().toISOString(),
     ...overrides,
   };
+}
+
+/** Set up execSync to return main repo on a given branch */
+function mockGitMainRepo(branch = 'feat/foo'): void {
+  mockExecSync
+    .mockReturnValueOnce('.git' as never)       // git-common-dir
+    .mockReturnValueOnce(branch as never);       // branch
 }
 
 describe('worktreeCheckGuard', () => {
@@ -185,7 +195,7 @@ describe('worktreeCheckGuard', () => {
     ]);
 
     await worktreeCheckGuard(makeInput(), '/tmp/test');
-    expect(mockStore.cleanStaleSessions).toHaveBeenCalledWith(7_200_000);
+    expect(mockStore.cleanStaleSessions).toHaveBeenCalledWith(STALE_SESSION_THRESHOLD_MS);
   });
 
   it('handles SESSION_CONFLICT on register (session already exists)', async () => {
@@ -229,22 +239,62 @@ describe('worktreeCheckGuard', () => {
     expect(mockStore.close).toHaveBeenCalled();
   });
 
-  it('fires only once per session (sentinel file)', async () => {
-    mockExecSync
-      .mockReturnValueOnce('.git' as never)
-      .mockReturnValueOnce('main' as never);
-
+  it('writes sentinel only on pass, not on deny', async () => {
+    mockGitMainRepo();
     (mockStore.getActiveSessions as ReturnType<typeof vi.fn>).mockResolvedValue([
       makeSession({ session_id: 'test-session' }),
       makeSession({ session_id: 'other-session' }),
     ]);
 
+    const result = await worktreeCheckGuard(makeInput(), '/tmp/test');
+    expect(result.decision).toBe('deny');
+    // Sentinel should NOT be written on deny
+    expect(mockWriteFileSync).not.toHaveBeenCalled();
+  });
+
+  it('writes sentinel on pass', async () => {
+    mockGitMainRepo();
+    (mockStore.getActiveSessions as ReturnType<typeof vi.fn>).mockResolvedValue([
+      makeSession({ session_id: 'test-session' }),
+    ]);
+
+    const result = await worktreeCheckGuard(makeInput(), '/tmp/test');
+    expect(result).toEqual({});
+    expect(mockWriteFileSync).toHaveBeenCalled();
+  });
+
+  it('re-checks after deny when conflict resolves', async () => {
+    // First call: conflict exists -> deny, no sentinel
+    mockGitMainRepo();
+    (mockStore.getActiveSessions as ReturnType<typeof vi.fn>).mockResolvedValue([
+      makeSession({ session_id: 'test-session' }),
+      makeSession({ session_id: 'other-session' }),
+    ]);
     const first = await worktreeCheckGuard(makeInput(), '/tmp/test');
     expect(first.decision).toBe('deny');
 
-    // Second invocation with same session_id — sentinel exists, should be silent
+    // Second call: conflict resolved -> pass
+    mockGitMainRepo();
+    (mockStore.getActiveSessions as ReturnType<typeof vi.fn>).mockResolvedValue([
+      makeSession({ session_id: 'test-session' }),
+    ]);
     const second = await worktreeCheckGuard(makeInput(), '/tmp/test');
     expect(second).toEqual({});
+  });
+
+  it('fires only once per session after pass (sentinel file)', async () => {
+    mockGitMainRepo();
+    (mockStore.getActiveSessions as ReturnType<typeof vi.fn>).mockResolvedValue([
+      makeSession({ session_id: 'test-session' }),
+    ]);
+
+    const first = await worktreeCheckGuard(makeInput(), '/tmp/test');
+    expect(first).toEqual({});
+
+    // Second invocation — sentinel exists, should be silent without hitting store
+    const second = await worktreeCheckGuard(makeInput(), '/tmp/test');
+    expect(second).toEqual({});
+    expect(mockResolveStore).toHaveBeenCalledTimes(1);
   });
 
   it('fires separately for different sessions', async () => {
@@ -294,10 +344,7 @@ describe('worktreeCheckGuard', () => {
   });
 
   it('auto-registers current session with correct params', async () => {
-    mockExecSync
-      .mockReturnValueOnce('.git' as never)
-      .mockReturnValueOnce('feat/my-branch' as never);
-
+    mockGitMainRepo('feat/my-branch');
     (mockStore.getActiveSessions as ReturnType<typeof vi.fn>).mockResolvedValue([
       makeSession({ session_id: 'test-session' }),
     ]);
@@ -309,5 +356,54 @@ describe('worktreeCheckGuard', () => {
       ide: 'claude-code',
       branch: 'feat/my-branch',
     });
+  });
+
+  it('allows when other session is in the same swarm', async () => {
+    mockGitMainRepo();
+    (mockStore.registerSession as ReturnType<typeof vi.fn>).mockResolvedValue({
+      session_id: 'test-session',
+      role: 'primary',
+      ide: 'claude-code',
+      swarm_id: 'swarm-1',
+      started_at: new Date().toISOString(),
+      last_heartbeat_at: new Date().toISOString(),
+    });
+    (mockStore.getActiveSessions as ReturnType<typeof vi.fn>).mockResolvedValue([
+      makeSession({ session_id: 'test-session', swarm_id: 'swarm-1' }),
+      makeSession({ session_id: 'other-session', swarm_id: 'swarm-1' }),
+    ]);
+
+    const result = await worktreeCheckGuard(makeInput(), '/tmp/test');
+    expect(result).toEqual({});
+  });
+
+  it('denies when other session is in a different swarm', async () => {
+    mockGitMainRepo();
+    (mockStore.registerSession as ReturnType<typeof vi.fn>).mockResolvedValue({
+      session_id: 'test-session',
+      role: 'primary',
+      ide: 'claude-code',
+      swarm_id: 'swarm-1',
+      started_at: new Date().toISOString(),
+      last_heartbeat_at: new Date().toISOString(),
+    });
+    (mockStore.getActiveSessions as ReturnType<typeof vi.fn>).mockResolvedValue([
+      makeSession({ session_id: 'test-session', swarm_id: 'swarm-1' }),
+      makeSession({ session_id: 'other-session', swarm_id: 'swarm-2' }),
+    ]);
+
+    const result = await worktreeCheckGuard(makeInput(), '/tmp/test');
+    expect(result.decision).toBe('deny');
+  });
+
+  it('generates random session ID when input has none', async () => {
+    mockGitMainRepo();
+    (mockStore.getActiveSessions as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+
+    await worktreeCheckGuard(makeInput(''), '/tmp/test');
+    const call = (mockStore.registerSession as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(call.session_id).not.toBe('unknown');
+    expect(call.session_id).not.toBe('');
+    expect(call.session_id).toMatch(/^[0-9a-f-]{36}$/);
   });
 });
