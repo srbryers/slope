@@ -234,7 +234,7 @@ function inferSprintType(issues: GitHubIssue[]): string {
 
 // ─── Priority Keyword Synonyms ───
 
-const PRIORITY_SYNONYMS: Record<string, string[]> = {
+export const PRIORITY_SYNONYMS: Record<string, string[]> = {
   // Quality attributes (expanded)
   speed: ['performance', 'optimize', 'fast', 'latency', 'benchmark', 'perf', 'cache', 'cron', 'batch', 'async', 'concurrent', 'parallel', 'queue', 'index', 'throttle'],
   performance: ['speed', 'optimize', 'fast', 'latency', 'benchmark', 'perf', 'cache', 'cron', 'batch', 'async', 'concurrent', 'parallel', 'queue', 'index', 'throttle'],
