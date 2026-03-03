@@ -37,37 +37,39 @@ interface DemoAnswers {
 // --- Narrator pause config ---
 
 /** Narrator pause windows (ms) keyed by CUE ID. Used by --narrated flag.
- *  Tuned to ElevenLabs Daniel voice durations + ~1s breathing room. */
+ *  Sized for conversational-length segments + ~2s breathing room.
+ *  Re-tune after generating clips: slope narrate generate → check durations. */
 export const NARRATOR_CUE_PAUSES: Record<string, number> = {
-  '1a':  7000, '1b': 10000,
-  '2':  10000,
-  '3a': 10000, '3b':  8000, '3c':  9000, '3d':  8000, '3e': 10000,
-  '4a': 10000, '4b':  4000, '4c':  9000, '4d':  4000, '4e':  4000,
-  '5a': 10000, '5b': 12000, '5c':  9000, '5d':  5000,
-  '6a': 10000, '6b':  6000,
+  '1a': 13000, '1b': 17000,
+  '2':  19000,
+  '3a': 22000, '3b': 13000, '3c': 14000, '3d': 13000, '3e': 14000,
+  '4a': 13000, '4b': 13000, '4c': 14000, '4d':  9000, '4e': 10000,
+  '5a': 17000, '5b': 15000, '5c': 14000, '5d': 11000,
+  '6a': 14000, '6b': 15000,
 };
 
-/** Narrator voiceover text keyed by CUE ID, matching NARRATOR_CUE_PAUSES. */
+/** Narrator voiceover text keyed by CUE ID, matching NARRATOR_CUE_PAUSES.
+ *  Written in Seb's conversational style — see docs/demo/narrator-voice-guide.md */
 export const NARRATOR_SEGMENTS: Record<string, { text: string; label: string }> = {
-  '1a': { label: 'hook',     text: "This is SLOPE, the AI agent harness. I'm going to set it up on a real project." },
-  '1b': { label: 'scan',     text: 'It scans the codebase — stack, structure, test coverage, CI. A full profile of where the project stands today.' },
-  '2':  { label: 'todo',     text: "One TODO here, but on bigger projects that's hundreds. No structure, no priorities. That's what we're fixing." },
-  '3a': { label: 'vision',   text: "It asks you to describe your vision. SLOPE recommends dictating — just talk naturally about what you're building and why." },
-  '3b': { label: 'priorities', text: "It pulls out the priorities automatically. You don't rank them in a form — you talk, it listens." },
-  '3c': { label: 'clarify',  text: 'Follow-up questions — not generic ones. Based on what it found in the codebase and what you just said.' },
-  '3d': { label: 'bottleneck', text: "Delivery is the bottleneck. If it's late, nothing else matters. SLOPE is going to remember that." },
-  '3e': { label: 'gap',      text: 'No tests, no CI. The founder knows it. SLOPE picked up the gap from the profile scan and asked directly.' },
-  '4a': { label: 'structure', text: 'It structures everything into a vision document — purpose, audience, priorities, non-goals. All from one conversation.' },
-  '4b': { label: 'checkin',  text: 'And it checks in. You get to push back.' },
-  '4c': { label: 'pushback', text: "Audience was too narrow, a couple of non-goals missing. Small corrections, but they'll drive every sprint after this." },
-  '4d': { label: 'updated',  text: 'Updated instantly. No re-doing a form.' },
-  '4e': { label: 'locked',   text: 'Vision locked. Watch what happens next.' },
-  '5a': { label: 'roadmap',  text: 'It takes the vision, the profile, and generates a sprint roadmap. Each priority maps to real work.' },
-  '5b': { label: 'sprint1',  text: 'Sprint 1 focuses on speed — the delivery cron, the processing pipeline. Tickets come from priorities and profile gaps.' },
-  '5c': { label: 'sprints',  text: 'Testing, reliability, documentation — each gets its own sprint. Real tickets. Ready to execute.' },
-  '5d': { label: 'done',     text: 'Five sprints, mapped to what the founder said matters.' },
-  '6a': { label: 'before-after', text: 'Before: no priorities, no structure. After: vision locked, five sprints, Sprint 1 ready.' },
-  '6b': { label: 'closing',  text: 'One conversation. Structure, accountability, and a scored roadmap.' },
+  '1a': { label: 'hook',     text: "Hey everyone, this is Slope. It's an AI agent harness, and in this video I'm going to show you how we can set it up on a real project." },
+  '1b': { label: 'scan',     text: "All right, so what you see here is that it's scanning the codebase. It's going through the stack, the structure, test coverage, all of that, and it's coming up with a full profile of where the project stands today." },
+  '2':  { label: 'todo',     text: "Now you can see it's found some TODOs. On bigger projects there could be a lot of these, but on smaller ones there might be none. Either way, it's going to pull from your codebase and your profile and then ask you some questions." },
+  '3a': { label: 'vision',   text: "Now Slope is going to ask you to describe your vision. It really recommends dictating here, and the reason I say that is because it's much easier to just talk naturally about what you're trying to build. Feel free to ramble, it's going to interpret all of that and pull it together." },
+  '3b': { label: 'priorities', text: "You can see here it's pulled out the priorities automatically. You don't have to rank them in a form or anything like that. You just talk, and it listens." },
+  '3c': { label: 'clarify',  text: "Now it's going to ask some clarifying questions, and these aren't generic. They're based on what it found in the codebase and what you just told it about your vision." },
+  '3d': { label: 'bottleneck', text: "You can see here it's trying to understand where there might be bottlenecks in your system. It's going to remember things like this when it puts the roadmap together." },
+  '3e': { label: 'gap',      text: "And it's also picking up that there are some gaps, things like testing or CI that might be missing. It pulled that from the profile scan and asked about it directly." },
+  '4a': { label: 'structure', text: "So now it's going to try and put together your vision document. You can see it's laid out the purpose, audience, priorities, non-goals, all from that one conversation." },
+  '4b': { label: 'checkin',  text: "And this is one of the key things about Slope. Once it's done, you have the opportunity to review it and push back. We really recommend doing that." },
+  '4c': { label: 'pushback', text: "So here, the audience was a bit too narrow, a couple of non-goals were missing. Small corrections, but these are going to drive every sprint after this, so it's worth getting right." },
+  '4d': { label: 'updated',  text: "You can see it's come back with the updates right away. No re-doing a form or starting over." },
+  '4e': { label: 'locked',   text: "All right, so we've agreed with this and we're going to go ahead with it. Now watch what it does next." },
+  '5a': { label: 'roadmap',  text: "Now what it's going to do is take that whole vision, look at your codebase, and say, well, let's see what might be open, what could potentially go on this roadmap. And then it'll put something together for you." },
+  '5b': { label: 'sprint1',  text: "You can see it's breaking it down into sprints. The first one is focused on the top priority, and the tickets are coming from both what you said and what it found in the profile." },
+  '5c': { label: 'sprints',  text: "And then you've got the rest of the sprints, each focused on a different area. Testing, reliability, documentation, they each get their own sprint with real tickets, ready to go." },
+  '5d': { label: 'done',     text: "So that's your starting point. Of course, you can push back on this roadmap as well, but it's a solid foundation to work from." },
+  '6a': { label: 'before-after', text: "And this is kind of the before and after. You went from no priorities, no structure, to a locked-in vision and a full roadmap with Sprint 1 ready to execute." },
+  '6b': { label: 'closing',  text: "That's it. All from one conversation. If you want to dive deeper, I'd recommend booting it up in your agent and using it to refine from there. Let me know what you think." },
 };
 
 // --- Speed config ---
