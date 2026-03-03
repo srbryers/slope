@@ -559,16 +559,29 @@ Answers file format:
     console.log('');
     await sleep(pause);
 
-    await typewrite(c.boldCyan('Agent') + '  ', 'Open your editor and start with:', charDelay);
+    await typewrite(c.boldCyan('Agent') + '  ', 'Get started:', charDelay);
     console.log('');
-    const prompt = 'Run slope briefing, then execute Sprint 1.';
-    const bw = prompt.length + 4;
-    const b = (s: string) => c.dimCyan(s);
-    console.log('       ' + b('\u256d') + b('\u2500'.repeat(bw)) + b('\u256e'));
-    console.log('       ' + b('\u2502') + ' '.repeat(bw) + b('\u2502'));
-    console.log('       ' + b('\u2502') + '  ' + c.boldWhite(prompt) + '  ' + b('\u2502'));
-    console.log('       ' + b('\u2502') + ' '.repeat(bw) + b('\u2502'));
-    console.log('       ' + b('\u2570') + b('\u2500'.repeat(bw)) + b('\u256f'));
+    const slopePrompt = 'Run slope briefing, then execute Sprint 1.';
+    const tools = [
+      { name: 'Claude Code', cmd: `$ claude "${slopePrompt}"` },
+      { name: 'Cursor', cmd: `> ${slopePrompt}` },
+      { name: 'OpenCode', cmd: `$ opencode "${slopePrompt}"` },
+    ];
+    const maxCmd = Math.max(...tools.map(t => t.cmd.length));
+    const bw = maxCmd + 4;
+    const bf = (s: string) => c.dimCyan(s);
+    console.log('       ' + bf('\u256d') + bf('\u2500 Get Started ') + bf('\u2500'.repeat(bw - 14)) + bf('\u256e'));
+    console.log('       ' + bf('\u2502') + ' '.repeat(bw) + bf('\u2502'));
+    for (let i = 0; i < tools.length; i++) {
+      const { name, cmd } = tools[i];
+      console.log('       ' + bf('\u2502') + '  ' + c.dim(name) + ' '.repeat(bw - name.length - 2) + bf('\u2502'));
+      console.log('       ' + bf('\u2502') + '  ' + c.boldWhite(cmd) + ' '.repeat(bw - cmd.length - 2) + bf('\u2502'));
+      if (i < tools.length - 1) {
+        console.log('       ' + bf('\u2502') + ' '.repeat(bw) + bf('\u2502'));
+      }
+    }
+    console.log('       ' + bf('\u2502') + ' '.repeat(bw) + bf('\u2502'));
+    console.log('       ' + bf('\u2570') + bf('\u2500'.repeat(bw)) + bf('\u256f'));
     console.log('');
 
     p.outro('slope.sh');
