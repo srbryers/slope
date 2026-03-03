@@ -20,6 +20,30 @@ interface DemoAnswers {
 
 const SPEED: Record<string, number> = { slow: 40, normal: 20, fast: 5 };
 
+// --- Color helpers (raw ANSI, TTY-aware) ---
+
+function stripAnsi(s: string): string {
+  return s.replace(/\x1b\[[0-9;]*m/g, '');
+}
+
+type Colors = ReturnType<typeof createColors>;
+
+function createColors(enabled: boolean) {
+  const wrap = (code: string) => enabled
+    ? (s: string) => `\x1b[${code}m${s}\x1b[0m`
+    : (s: string) => s;
+  return {
+    bold: wrap('1'),
+    dim: wrap('2'),
+    green: wrap('32'),
+    boldCyan: wrap('1;36'),
+    boldGreen: wrap('1;32'),
+    boldYellow: wrap('1;33'),
+    boldWhite: wrap('1;37'),
+    dimItalic: wrap('2;3'),
+  };
+}
+
 // --- Helpers ---
 
 function sleep(ms: number): Promise<void> {
@@ -43,23 +67,25 @@ function wordWrap(text: string, width: number): string {
 }
 
 async function typewrite(prefix: string, text: string, charDelay: number): Promise<void> {
-  const indent = ' '.repeat(prefix.length);
+  const indent = ' '.repeat(stripAnsi(prefix).length);
   const lines = text.split('\n');
   for (let i = 0; i < lines.length; i++) {
     const lp = i === 0 ? prefix : indent;
     process.stdout.write(lp);
-    for (const ch of lines[i]) {
-      process.stdout.write(ch);
-      if (charDelay > 0) await sleep(charDelay);
+    // Emit ANSI escape sequences atomically so colors don't break typewriter effect
+    const tokens = lines[i].match(/\x1b\[[0-9;]*m|./gs) ?? [];
+    for (const tok of tokens) {
+      process.stdout.write(tok);
+      if (charDelay > 0 && !tok.startsWith('\x1b')) await sleep(charDelay);
     }
     process.stdout.write('\n');
   }
 }
 
-async function mcpCall(label: string, result: string, delay: number): Promise<void> {
+async function mcpCall(label: string, result: string, delay: number, c: Colors): Promise<void> {
   const line = result
-    ? `  \u25b8 ${label.padEnd(32)} \u2192 ${result}`
-    : `  \u25b8 ${label}`;
+    ? `  ${c.dim('\u25b8 ' + label.padEnd(32))} \u2192 ${c.bold(result)}`
+    : `  ${c.dim('\u25b8 ' + label)}`;
   console.log(line);
   await sleep(delay);
 }
@@ -136,6 +162,7 @@ Answers file format:
   const answers = loadAnswers(answersPath);
   const cwd = resolve(opts.project);
   const isTTY = process.stdout.isTTY ?? false;
+  const c = createColors(isTTY);
   const charDelay = isTTY ? (SPEED[opts.speed] ?? SPEED.normal) : 0;
   const pause = isTTY ? 300 : 0;
   const projectName = basename(cwd);
@@ -149,11 +176,11 @@ Answers file format:
       'SLOPE'
     );
     console.log('');
-    await typewrite('Agent  ', 'Let me take a look at this project...', charDelay);
+    await typewrite(c.boldCyan('Agent') + '  ', 'Let me take a look at this project...', charDelay);
     console.log('');
 
     const pm = detectPackageManager(cwd);
-    await mcpCall('detectPackageManager()', pm ? `"${pm}"` : '"unknown"', pause);
+    await mcpCall('detectPackageManager()', pm ? `"${pm}"` : '"unknown"', pause, c);
 
     const stack = await analyzeStack(cwd);
     const displayFrameworks = stack.frameworks
@@ -162,31 +189,31 @@ Answers file format:
     const stackStr = stackParts.length > 1
       ? `${stackParts[0]} \u00b7 ${stackParts.slice(1).join(', ')}`
       : stackParts[0] || 'Unknown';
-    await mcpCall('analyzeStack()', stackStr, pause);
+    await mcpCall('analyzeStack()', stackStr, pause, c);
 
     console.log('');
-    console.log(`  Project:  ${projectName}`);
-    console.log(`  Stack:    ${stackStr}`);
-    if (pm) console.log(`  PM:       ${pm}`);
+    console.log(`  ${c.dim('Project:')}  ${c.boldWhite(projectName)}`);
+    console.log(`  ${c.dim('Stack:')}    ${c.boldWhite(stackStr)}`);
+    if (pm) console.log(`  ${c.dim('PM:')}       ${c.boldWhite(pm)}`);
     console.log('');
 
     const backlog = await analyzeBacklog(cwd);
     const todoCount = backlog.todos.length;
 
     if (todoCount > 0) {
-      await typewrite('Agent  ', `I found ${todoCount} TODOs scattered across your codebase:`, charDelay);
+      await typewrite(c.boldCyan('Agent') + '  ', `I found ${c.boldYellow(String(todoCount))} TODOs scattered across your codebase:`, charDelay);
       console.log('');
 
       const sample = backlog.todos.slice(0, 5);
       const maxLen = Math.max(...sample.map(t => t.file.length));
       for (const todo of sample) {
-        console.log(`  ${todo.file.padEnd(maxLen + 2)}${todo.type}: ${todo.text}`);
+        console.log(`  ${c.dim(todo.file.padEnd(maxLen + 2))}${todo.type}: ${todo.text}`);
       }
-      if (todoCount > 5) console.log(`  ... and ${todoCount - 5} more`);
+      if (todoCount > 5) console.log(`  ${c.dim(`... and ${todoCount - 5} more`)}`);
       console.log('');
-      await typewrite('  ', "There's real work here, but no structure. Let's fix that.", charDelay);
+      await typewrite('  ', c.dimItalic("There's real work here, but no structure. Let's fix that."), charDelay);
     } else {
-      await typewrite('Agent  ', "Clean codebase \u2014 no scattered TODOs. Let's set up structure.", charDelay);
+      await typewrite(c.boldCyan('Agent') + '  ', "Clean codebase \u2014 no scattered TODOs. Let's set up structure.", charDelay);
     }
 
     console.log('');
@@ -201,16 +228,16 @@ Answers file format:
       "a full stream of consciousness of what you're trying to achieve.",
       60
     );
-    await typewrite('Agent  ', agentQ, charDelay);
+    await typewrite(c.boldCyan('Agent') + '  ', agentQ, charDelay);
     console.log('');
     await sleep(isTTY ? 500 : 0);
 
     const wrappedVision = wordWrap(answers.vision, 60);
-    await typewrite('You    ', wrappedVision, charDelay);
+    await typewrite(c.boldGreen('You') + '    ', wrappedVision, charDelay);
     console.log('');
     await sleep(pause);
 
-    await typewrite('Agent  ', `Got it. I've extracted your priorities: ${answers.priorities.join(', ')}.`, charDelay);
+    await typewrite(c.boldCyan('Agent') + '  ', `Got it. I've extracted your priorities: ${answers.priorities.join(', ')}.`, charDelay);
     console.log('');
 
     tmpDir = mkdtempSync(join(tmpdir(), 'slope-demo-'));
@@ -219,20 +246,20 @@ Answers file format:
       priorities: answers.priorities,
     }, tmpDir);
 
-    await mcpCall('createVision()', '', pause);
-    console.log('  \u2713 Vision created');
+    await mcpCall('createVision()', '', pause, c);
+    console.log(`  ${c.green('\u2713 Vision created')}`);
     console.log('');
     await sleep(pause * 2);
 
     // ─── Step 3: Roadmap Generation — The Wow Moment ───
 
-    await typewrite('Agent  ', 'Now let me map your backlog to your priorities...', charDelay);
+    await typewrite(c.boldCyan('Agent') + '  ', 'Now let me map your backlog to your priorities...', charDelay);
     console.log('');
 
     const merged = mergeBacklogs(backlog);
     const roadmap = generateRoadmapFromVision(vision, merged);
 
-    await mcpCall('generateRoadmapFromVision(vision, backlog)', '', pause);
+    await mcpCall('generateRoadmapFromVision(vision, backlog)', '', pause, c);
 
     console.log('  Matching TODOs to vision priorities...');
     for (const priority of answers.priorities) {
@@ -255,19 +282,19 @@ Answers file format:
       const shown = sprint.tickets.slice(0, 5);
       const extra = sprint.tickets.length - shown.length;
       const theme = sprint.theme.charAt(0).toUpperCase() + sprint.theme.slice(1);
-      console.log(`  Sprint ${sprint.id} \u2014 ${theme} (${sprint.tickets.length} ticket${sprint.tickets.length !== 1 ? 's' : ''})`);
-      for (const t of shown) console.log(`    ${t.key}  ${t.title}`);
-      if (extra > 0) console.log(`    ... +${extra} more`);
+      console.log(`  ${c.boldYellow(`Sprint ${sprint.id} \u2014 ${theme}`)} ${c.dim(`(${sprint.tickets.length} ticket${sprint.tickets.length !== 1 ? 's' : ''})`)}`);
+      for (const t of shown) console.log(`    ${c.dim(t.key)}  ${t.title}`);
+      if (extra > 0) console.log(`    ${c.dim(`... +${extra} more`)}`);
       console.log('');
     }
 
-    console.log(`  Matched ${matchedCount}/${todoCount} TODOs to your vision priorities.`);
+    console.log(`  Matched ${c.boldGreen(`${matchedCount}/${todoCount}`)} TODOs to your vision priorities.`);
     console.log('');
     await sleep(pause * 2);
 
     // ─── Step 4: Before/After Summary ───
 
-    await typewrite('Agent  ', 'From scattered TODOs to a structured roadmap:', charDelay);
+    await typewrite(c.boldCyan('Agent') + '  ', 'From scattered TODOs to a structured roadmap:', charDelay);
     console.log('');
 
     const moduleCount = Object.keys(backlog.todosByModule).length;
@@ -306,9 +333,9 @@ Answers file format:
 
     // ─── Step 5: What's Next ───
 
-    await typewrite('Agent  ', 'Your agent is ready to execute Sprint 1.', charDelay);
-    await typewrite('       ', 'Every sprint gets scored. Every ticket is tracked.', charDelay);
-    await typewrite('       ', "That's SLOPE \u2014 the AI agent harness.", charDelay);
+    await typewrite(c.boldCyan('Agent') + '  ', c.bold('Your agent is ready to execute Sprint 1.'), charDelay);
+    await typewrite('       ', c.bold('Every sprint gets scored. Every ticket is tracked.'), charDelay);
+    await typewrite('       ', c.bold("That's SLOPE \u2014 the AI agent harness."), charDelay);
     console.log('');
 
     p.outro('slope.sh');
