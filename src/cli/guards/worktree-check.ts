@@ -12,7 +12,9 @@ import { resolveStore } from '../store.js';
 function sentinelPath(sessionId: string): string {
   const dir = join(tmpdir(), 'slope-guards');
   mkdirSync(dir, { recursive: true });
-  return join(dir, `worktree-check-${sessionId}`);
+  // Sanitize sessionId to prevent path traversal
+  const safe = sessionId.replace(/[^a-zA-Z0-9_-]/g, '_');
+  return join(dir, `worktree-check-${safe}`);
 }
 
 /** Reset fired state for a session (for testing) */
@@ -78,6 +80,7 @@ export async function worktreeCheckGuard(input: HookInput, cwd: string): Promise
 
     // Auto-register the current session
     let currentSwarmId: string | undefined;
+    let active: Awaited<ReturnType<typeof store.getActiveSessions>> | undefined;
     try {
       const registered = await store.registerSession({
         session_id: sessionId,
@@ -89,9 +92,9 @@ export async function worktreeCheckGuard(input: HookInput, cwd: string): Promise
     } catch (err) {
       // SESSION_CONFLICT means this session is already registered — that's fine
       if (err instanceof SlopeStoreError && err.code === 'SESSION_CONFLICT') {
-        // Look up existing session to get its swarm_id
-        const sessions = await store.getActiveSessions();
-        const existing = sessions.find(s => s.session_id === sessionId);
+        // Fetch active sessions once — reuse for both swarm lookup and conflict check
+        active = await store.getActiveSessions();
+        const existing = active.find(s => s.session_id === sessionId);
         currentSwarmId = existing?.swarm_id;
       } else {
         throw err;
@@ -100,7 +103,7 @@ export async function worktreeCheckGuard(input: HookInput, cwd: string): Promise
 
     // Check for concurrent sessions in the same store (no worktree_path).
     // Swarm members are excluded — they coordinate via claims, not worktrees.
-    const active = await store.getActiveSessions();
+    if (!active) active = await store.getActiveSessions();
     const others = active.filter(s => s.session_id !== sessionId);
     const conflicting = others.filter(s =>
       !s.worktree_path &&

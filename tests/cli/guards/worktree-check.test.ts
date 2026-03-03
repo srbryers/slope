@@ -406,4 +406,60 @@ describe('worktreeCheckGuard', () => {
     expect(call.session_id).not.toBe('');
     expect(call.session_id).toMatch(/^[0-9a-f-]{36}$/);
   });
+
+  it('recovers swarm_id via SESSION_CONFLICT and still allows same-swarm', async () => {
+    mockGitMainRepo();
+    // registerSession throws SESSION_CONFLICT (session already exists)
+    (mockStore.registerSession as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      new SlopeStoreError('SESSION_CONFLICT', 'session already exists'),
+    );
+    // getActiveSessions returns both sessions in same swarm
+    (mockStore.getActiveSessions as ReturnType<typeof vi.fn>).mockResolvedValue([
+      makeSession({ session_id: 'test-session', swarm_id: 'swarm-1' }),
+      makeSession({ session_id: 'other-session', swarm_id: 'swarm-1' }),
+    ]);
+
+    const result = await worktreeCheckGuard(makeInput(), '/tmp/test');
+    // Same swarm — should pass despite SESSION_CONFLICT recovery path
+    expect(result).toEqual({});
+  });
+
+  it('falls back to soft ask when registerSession throws non-SlopeStoreError', async () => {
+    mockGitMainRepo();
+    (mockStore.registerSession as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      new Error('database disk image is malformed'),
+    );
+
+    const result = await worktreeCheckGuard(makeInput(), '/tmp/test');
+    expect(result.decision).toBe('ask');
+    expect(result.context).toContain('database disk image is malformed');
+  });
+
+  it('uses branch unknown fallback when git branch fails', async () => {
+    mockExecSync
+      .mockReturnValueOnce('.git' as never)                              // git-common-dir
+      .mockImplementationOnce(() => { throw new Error('detached'); });    // branch fails
+
+    (mockStore.getActiveSessions as ReturnType<typeof vi.fn>).mockResolvedValue([
+      makeSession({ session_id: 'test-session' }),
+    ]);
+
+    await worktreeCheckGuard(makeInput(), '/tmp/test');
+    const call = (mockStore.registerSession as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(call.branch).toBe('unknown');
+  });
+
+  it('caches getActiveSessions on SESSION_CONFLICT path (single call)', async () => {
+    mockGitMainRepo();
+    (mockStore.registerSession as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      new SlopeStoreError('SESSION_CONFLICT', 'session already exists'),
+    );
+    (mockStore.getActiveSessions as ReturnType<typeof vi.fn>).mockResolvedValue([
+      makeSession({ session_id: 'test-session' }),
+    ]);
+
+    await worktreeCheckGuard(makeInput(), '/tmp/test');
+    // getActiveSessions should be called only once (cached from conflict recovery)
+    expect(mockStore.getActiveSessions).toHaveBeenCalledTimes(1);
+  });
 });
