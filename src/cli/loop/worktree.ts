@@ -1,5 +1,5 @@
 import { execSync, execFileSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdirSync, copyFileSync, symlinkSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Logger } from './logger.js';
 
@@ -9,6 +9,46 @@ export interface WorktreeInfo {
   path: string;
   branch: string;
   created: boolean;
+}
+
+/**
+ * Mirror .slope/ directory from main repo into worktree.
+ * - Config files (*.json) are copied (small, static)
+ * - Database files (*.db) are symlinked (shared state, embeddings)
+ * - WAL/SHM files are NOT symlinked (SQLite manages them per-connection)
+ */
+function mirrorSlopeDir(mainRepo: string, worktreePath: string, log: Logger): void {
+  const srcDir = join(mainRepo, '.slope');
+  if (!existsSync(srcDir)) return;
+
+  const destDir = join(worktreePath, '.slope');
+  try {
+    mkdirSync(destDir, { recursive: true });
+  } catch { return; }
+
+  try {
+    const entries = readdirSync(srcDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isFile()) continue;
+      const srcPath = join(srcDir, entry.name);
+      const destPath = join(destDir, entry.name);
+
+      if (entry.name.endsWith('.db')) {
+        // Symlink database so worktree shares the same store
+        try {
+          symlinkSync(srcPath, destPath);
+        } catch { /* already exists or permission issue */ }
+      } else if (entry.name.endsWith('.json')) {
+        // Copy config files
+        try {
+          copyFileSync(srcPath, destPath);
+        } catch { /* ok */ }
+      }
+    }
+    log.info('Mirrored .slope/ config into worktree');
+  } catch {
+    log.warn('Failed to mirror .slope/ into worktree — index/context may be unavailable');
+  }
 }
 
 /**
@@ -43,6 +83,9 @@ export function createWorktree(
   }
 
   log.info(`Created worktree: ${worktreePath} (branch: ${branch})`);
+
+  // Mirror .slope/ config into worktree (gitignored, so not present by default)
+  mirrorSlopeDir(mainRepo, worktreePath, log);
 
   // Install deps and build in the new worktree
   log.info('Installing dependencies in worktree...');
