@@ -51,9 +51,9 @@ export const NARRATOR_CUE_PAUSES: Record<string, number> = {
 /** Narrator voiceover text keyed by CUE ID, matching NARRATOR_CUE_PAUSES.
  *  Written in Seb's conversational style — see docs/demo/narrator-voice-guide.md */
 export const NARRATOR_SEGMENTS: Record<string, { text: string; label: string }> = {
-  '1a': { label: 'hook',     text: "Hey everyone, this is Slope. It's an AI agent harness, and in this video I'm going to show you how we can set it up on a real project." },
+  '1a': { label: 'hook',     text: "Hey everyone... this is Slope. It's an AI agent harness and workflow protocol, and in this video I'm going to show you how we can set it up on a real project." },
   '1b': { label: 'scan',     text: "All right, so what you can see here is that it's gone through the codebase. It's looked at the stack, the structure, test coverage, all of that, and it's put together a full profile of where the project stands today." },
-  '2':  { label: 'todo',     text: "Now you can see it's found some TODOs. On bigger projects there could be a lot of these, but on smaller ones there might be none. Either way, it's going to pull from your codebase and your profile and then ask you some questions." },
+  '2':  { label: 'todo',     text: "Now you can see it's found some \"To-dos\". On bigger projects there could be a lot of these, but on smaller ones there might be none. Either way, it's going to pull from your codebase and your profile and then ask you some questions." },
   '3a': { label: 'vision',   text: "So you can see here it's asking you to describe your vision. Slope really recommends dictating, and the reason I say that is because it's much easier to just talk naturally about what you're trying to build. Feel free to ramble, it's going to interpret all of that and pull it together." },
   '3b': { label: 'priorities', text: "You can see here it's pulled out the priorities automatically. You don't have to rank them in a form or anything like that. You just talk, and it listens." },
   '3c': { label: 'clarify',  text: "And now you can see it's asking some clarifying questions. These aren't generic, they're based on what it found in the codebase and what you just told it about your vision." },
