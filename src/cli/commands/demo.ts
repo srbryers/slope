@@ -51,6 +51,7 @@ function createColors(enabled: boolean) {
     boldGreen: wrap('1;32'),
     boldYellow: wrap('1;33'),
     boldWhite: wrap('1;37'),
+    dimCyan: wrap('2;36'),
     dimItalic: wrap('2;3'),
   };
 }
@@ -101,11 +102,18 @@ async function mcpCall(label: string, result: string, delay: number, c: Colors):
   await sleep(delay);
 }
 
+async function revealLines(lines: string[], lineDelay: number): Promise<void> {
+  for (const line of lines) {
+    console.log(line);
+    if (lineDelay > 0) await sleep(lineDelay);
+  }
+}
+
 function displayVision(
   purpose: string, audience: string, priorities: string[],
   nonGoals: string[], tech: string, c: Colors,
 ): void {
-  const w = 50;
+  const w = 46;
   const truncate = (s: string, max: number) =>
     s.length > max ? s.slice(0, max).replace(/\s+\S*$/, '') + '...' : s;
   const lines = [
@@ -115,7 +123,11 @@ function displayVision(
     `${c.dim('Non-goals:')}    ${c.boldWhite(truncate(nonGoals.join(', '), w))}`,
     `${c.dim('Tech:')}         ${c.boldWhite(tech)}`,
   ];
-  p.note(lines.join('\n'), 'Vision');
+  p.box(lines.join('\n'), 'Vision', {
+    rounded: true,
+    contentPadding: 1,
+    formatBorder: (border) => c.dimCyan(border),
+  });
 }
 
 // --- Args ---
@@ -249,9 +261,12 @@ Answers file format:
     await mcpCall('analyzeStack()', stackStr, pause, c);
 
     console.log('');
-    console.log(`  ${c.dim('Project:')}  ${c.boldWhite(projectName)}`);
-    console.log(`  ${c.dim('Stack:')}    ${c.boldWhite(stackStr)}`);
-    if (pm) console.log(`  ${c.dim('PM:')}       ${c.boldWhite(pm)}`);
+    const statsLines = [
+      `  ${c.dim('Project:')}  ${c.boldWhite(projectName)}`,
+      `  ${c.dim('Stack:')}    ${c.boldWhite(stackStr)}`,
+      ...(pm ? [`  ${c.dim('PM:')}       ${c.boldWhite(pm)}`] : []),
+    ];
+    await revealLines(statsLines, isTTY ? 80 : 0);
     console.log('');
 
     const backlog = await analyzeBacklog(cwd);
@@ -263,10 +278,11 @@ Answers file format:
 
       const sample = backlog.todos.slice(0, 5);
       const maxLen = Math.max(...sample.map(t => t.file.length));
-      for (const todo of sample) {
-        console.log(`  ${c.dim(todo.file.padEnd(maxLen + 2))}${todo.type}: ${todo.text}`);
-      }
-      if (todoCount > 5) console.log(`  ${c.dim(`... and ${todoCount - 5} more`)}`);
+      const todoLines = sample.map(todo =>
+        `  ${c.dim(todo.file.padEnd(maxLen + 2))}${todo.type}: ${todo.text}`
+      );
+      if (todoCount > 5) todoLines.push(`  ${c.dim(`... and ${todoCount - 5} more`)}`);
+      await revealLines(todoLines, isTTY ? 80 : 0);
       console.log('');
       await typewrite('  ', c.dimItalic("There's real work here, but no structure. Let's fix that."), charDelay);
     } else {
@@ -372,13 +388,14 @@ Answers file format:
 
     await mcpCall('generateRoadmapFromVision(vision, backlog)', '', pause, c);
 
-    console.log('  Matching TODOs to vision priorities...');
+    const matchLines = ['  Matching TODOs to vision priorities...'];
     for (const priority of answers.priorities) {
       const synonyms = PRIORITY_SYNONYMS[priority.toLowerCase()];
       if (synonyms) {
-        console.log(`    "${priority}"`.padEnd(20) + `\u2192 ${synonyms.slice(0, 4).join(', ')}`);
+        matchLines.push(`    "${priority}"`.padEnd(20) + `\u2192 ${synonyms.slice(0, 4).join(', ')}`);
       }
     }
+    await revealLines(matchLines, isTTY ? 100 : 0);
     console.log('');
 
     let matchedCount = 0;
@@ -397,18 +414,19 @@ Answers file format:
     };
 
     for (const phase of roadmap.phases) {
-      console.log(`  ${c.boldYellow(phase.name)}`);
+      const phaseLines: string[] = [`  ${c.boldYellow(phase.name)}`];
       for (const sprintId of phase.sprints) {
         const sprint = roadmap.sprints.find(s => s.id === sprintId);
         if (!sprint) continue;
-        console.log(`    ${c.dim(`Sprint ${sprint.id} (${sprint.tickets.length} ticket${sprint.tickets.length !== 1 ? 's' : ''}, par ${sprint.par})`)}`);
+        phaseLines.push(`    ${c.dim(`Sprint ${sprint.id} (${sprint.tickets.length} ticket${sprint.tickets.length !== 1 ? 's' : ''}, par ${sprint.par})`)}`);
         const shown = sprint.tickets.slice(0, 5);
         const extra = sprint.tickets.length - shown.length;
         for (const t of shown) {
-          console.log(`      ${c.dim(t.key)}  ${cleanTitle(t.key, t.title)}`);
+          phaseLines.push(`      ${c.dim(t.key)}  ${cleanTitle(t.key, t.title)}`);
         }
-        if (extra > 0) console.log(`      ${c.dim(`... +${extra} more`)}`);
+        if (extra > 0) phaseLines.push(`      ${c.dim(`... +${extra} more`)}`);
       }
+      await revealLines(phaseLines, isTTY ? 80 : 0);
       console.log('');
     }
 
