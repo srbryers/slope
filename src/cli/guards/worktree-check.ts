@@ -2,7 +2,9 @@ import { execSync } from 'node:child_process';
 import { existsSync, writeFileSync, mkdirSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { randomUUID } from 'node:crypto';
 import type { HookInput, GuardResult } from '../../core/index.js';
+import { STALE_SESSION_THRESHOLD_MS } from '../../core/constants.js';
 import { SlopeStoreError } from '../../core/store.js';
 import { resolveStore } from '../store.js';
 
@@ -23,16 +25,19 @@ export function resetWorktreeCheckState(sessionId = ''): void {
 
 /**
  * Worktree-check guard: fires PreToolUse on Edit|Write.
- * Hard-blocks (deny) when a concurrent session exists in the same working
- * directory without worktree isolation. Auto-registers the current session
+ * Hard-blocks (deny) when a concurrent session exists in the same store
+ * without worktree isolation. Auto-registers the current session
  * in the store on first fire to close the detection gap.
+ *
+ * Sentinel file is only written on pass — denied sessions re-check
+ * on subsequent invocations so they can recover once conflicts resolve.
  */
 export async function worktreeCheckGuard(input: HookInput, cwd: string): Promise<GuardResult> {
-  // Only fire once per session — use temp file since each invocation is a new process
-  const sessionId = input.session_id || 'unknown';
+  // Use stable session ID, or generate one for unidentified sessions
+  const sessionId = input.session_id || randomUUID();
   const sentinel = sentinelPath(sessionId);
+  // Only fire once per session on pass — denied sessions re-check next time
   if (existsSync(sentinel)) return {};
-  writeFileSync(sentinel, new Date().toISOString());
 
   // Check if we're in a worktree: git-common-dir returns '.git' for main repo,
   // or a path like '../../.git' for a worktree
@@ -69,51 +74,59 @@ export async function worktreeCheckGuard(input: HookInput, cwd: string): Promise
 
   try {
     // Clean stale sessions first to reduce false positives
-    await store.cleanStaleSessions(7_200_000); // 2 hours
+    await store.cleanStaleSessions(STALE_SESSION_THRESHOLD_MS);
 
     // Auto-register the current session
+    let currentSwarmId: string | undefined;
     try {
-      await store.registerSession({
+      const registered = await store.registerSession({
         session_id: sessionId,
         role: 'primary',
         ide: 'claude-code',
         branch,
       });
+      currentSwarmId = registered.swarm_id;
     } catch (err) {
       // SESSION_CONFLICT means this session is already registered — that's fine
-      if (!(err instanceof SlopeStoreError && err.code === 'SESSION_CONFLICT')) {
+      if (err instanceof SlopeStoreError && err.code === 'SESSION_CONFLICT') {
+        // Look up existing session to get its swarm_id
+        const sessions = await store.getActiveSessions();
+        const existing = sessions.find(s => s.session_id === sessionId);
+        currentSwarmId = existing?.swarm_id;
+      } else {
         throw err;
       }
     }
 
-    // Check for concurrent sessions in the same repo (no worktree_path)
+    // Check for concurrent sessions in the same store (no worktree_path).
+    // Swarm members are excluded — they coordinate via claims, not worktrees.
     const active = await store.getActiveSessions();
     const others = active.filter(s => s.session_id !== sessionId);
-    const conflicting = others.filter(s => !s.worktree_path);
+    const conflicting = others.filter(s =>
+      !s.worktree_path &&
+      !(currentSwarmId && s.swarm_id === currentSwarmId),
+    );
 
     if (conflicting.length > 0) {
       const sessionList = conflicting
         .map(s => `  - ${s.session_id} [${s.role}] ${s.ide} (branch: ${s.branch ?? '-'})`)
         .join('\n');
+      // Do NOT write sentinel — denied sessions should re-check next invocation
       return {
         decision: 'deny',
         context: `Concurrent session(s) detected in the same working directory without worktree isolation:\n${sessionList}\n\nUse \`EnterWorktree\` to create an isolated working copy, or end the other session(s) with \`slope session end --session-id=<id>\`.`,
       };
     }
 
+    // No conflict — write sentinel so we don't re-check this session
+    writeFileSync(sentinel, new Date().toISOString());
     return {};
   } catch (err) {
-    // If anything goes wrong querying the store, fall back to soft warning
-    if (store) {
-      try { store.close(); } catch { /* ignore */ }
-    }
     return {
       decision: 'ask',
       context: `Could not check for concurrent sessions (${err instanceof Error ? err.message : 'unknown error'}). Consider using a worktree for isolation: use \`EnterWorktree\` to create an isolated working copy.`,
     };
   } finally {
-    if (store) {
-      try { store.close(); } catch { /* ignore */ }
-    }
+    try { store.close(); } catch { /* ignore */ }
   }
 }
