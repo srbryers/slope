@@ -113,14 +113,18 @@ function displayVision(
   purpose: string, audience: string, priorities: string[],
   nonGoals: string[], tech: string, c: Colors,
 ): void {
-  const w = 46;
-  const truncate = (s: string, max: number) =>
-    s.length > max ? s.slice(0, max).replace(/\s+\S*$/, '') + '...' : s;
+  const valWidth = 48;
+  const indent = ' '.repeat(15); // aligns with value start after label column
+  const wrapValue = (s: string): string => {
+    const wrapped = wordWrap(s, valWidth);
+    const parts = wrapped.split('\n');
+    return parts.map((line, i) => i === 0 ? line : `${indent}${line}`).join('\n');
+  };
   const lines = [
-    `${c.dim('Purpose:')}      ${c.boldWhite(truncate(purpose, w))}`,
-    `${c.dim('Audience:')}     ${c.boldWhite(truncate(audience, w))}`,
+    `${c.dim('Purpose:')}      ${c.boldWhite(wrapValue(purpose))}`,
+    `${c.dim('Audience:')}     ${c.boldWhite(wrapValue(audience))}`,
     `${c.dim('Priorities:')}   ${c.boldWhite(priorities.join(', '))}`,
-    `${c.dim('Non-goals:')}    ${c.boldWhite(truncate(nonGoals.join(', '), w))}`,
+    `${c.dim('Non-goals:')}    ${c.boldWhite(wrapValue(nonGoals.join(', ')))}`,
     `${c.dim('Tech:')}         ${c.boldWhite(tech)}`,
   ];
   p.box(lines.join('\n'), 'Vision', {
