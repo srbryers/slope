@@ -238,6 +238,9 @@ Answers file format:
     }
 
     // Create vision with full fields
+    await typewrite(c.boldCyan('Agent') + '  ', "Great. Let me structure that into a vision document.", charDelay);
+    console.log('');
+
     tmpDir = mkdtempSync(join(tmpdir(), 'slope-demo-'));
     const vision = createVision({
       purpose: answers.vision,
@@ -248,6 +251,7 @@ Answers file format:
     }, tmpDir);
 
     await mcpCall('createVision()', '', pause, c);
+    console.log('');
 
     // Display vision (typed in)
     const visionFields = (aud: string, ng: string[]) => [
@@ -259,7 +263,11 @@ Answers file format:
     ];
     await typewriteVision(visionFields(answers.audience, answers.nonGoals), charDelay, c, isTTY);
     console.log('');
-    await sleep(pause * 2);
+    await sleep(pause);
+
+    await typewrite(c.boldCyan('Agent') + '  ', "How does that look? Anything you'd change?", charDelay);
+    console.log('');
+    await sleep(pause);
 
     // Pushback
     await typewrite(c.boldGreen('You') + '    ', wordWrap(answers.pushback.comment, 60), charDelay);
