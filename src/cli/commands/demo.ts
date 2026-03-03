@@ -561,7 +561,7 @@ Answers file format:
 
     await typewrite(c.boldCyan('Agent') + '  ', 'Get started:', charDelay);
     console.log('');
-    const slopePrompt = 'Run slope briefing, then execute Sprint 1.';
+    const slopePrompt = 'Run slope briefing, then plan Sprint 1.';
     const tools = [
       { name: 'Claude Code', cmd: `$ claude "${slopePrompt}"` },
       { name: 'Cursor', cmd: `> ${slopePrompt}` },
