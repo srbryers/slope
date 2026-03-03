@@ -49,6 +49,9 @@ export const REVIEW_TYPE_HAZARD_MAP: Record<ReviewType, HazardType> = {
   ux: 'trees',
 };
 
+/** Stale session cleanup threshold (2 hours in ms) */
+export const STALE_SESSION_THRESHOLD_MS = 7_200_000;
+
 /** Default nutrition items to assess per sprint */
 export const NUTRITION_CHECKLIST: NutritionCategory[] = [
   'hydration',
