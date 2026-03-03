@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { checkConflicts } from '../../core/index.js';
+import { STALE_SESSION_THRESHOLD_MS } from '../../core/constants.js';
 import { resolveStore } from '../store.js';
 
 function parseArgs(args: string[]): Record<string, string> {
@@ -54,6 +55,8 @@ async function startSession(flags: Record<string, string>, cwd: string): Promise
     const worktreePath = flags['worktree-path'];
     const swarmId = flags.swarm;
     const agentRole = flags['agent-role'];
+
+    await store.cleanStaleSessions(STALE_SESSION_THRESHOLD_MS);
 
     const session = await store.registerSession({
       session_id: sessionId,

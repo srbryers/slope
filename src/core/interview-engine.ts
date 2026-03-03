@@ -202,6 +202,18 @@ export function answersToInitInput(answers: Record<string, unknown>): InitInput 
   const vision = String(answers['vision'] ?? '').trim();
   if (vision) input.vision = vision;
 
+  const audience = String(answers['audience'] ?? '').trim();
+  if (audience) input.audience = audience;
+
+  const priorities = answers['priorities'];
+  if (Array.isArray(priorities)) input.priorities = priorities as string[];
+
+  const nonGoals = String(answers['non-goals'] ?? '').trim();
+  if (nonGoals) input.nonGoals = nonGoals.split(',').map(s => s.trim()).filter(Boolean);
+
+  const techDirection = String(answers['tech-direction'] ?? '').trim();
+  if (techDirection) input.techDirection = techDirection;
+
   // Parse team members: "alice:Alice Smith, bob:Bob Jones"
   const teamStr = String(answers['team-members'] ?? '').trim();
   if (teamStr) {

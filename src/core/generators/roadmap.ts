@@ -234,7 +234,7 @@ function inferSprintType(issues: GitHubIssue[]): string {
 
 // ─── Priority Keyword Synonyms ───
 
-const PRIORITY_SYNONYMS: Record<string, string[]> = {
+export const PRIORITY_SYNONYMS: Record<string, string[]> = {
   // Quality attributes (expanded)
   speed: ['performance', 'optimize', 'fast', 'latency', 'benchmark', 'perf', 'cache', 'cron', 'batch', 'async', 'concurrent', 'parallel', 'queue', 'index', 'throttle'],
   performance: ['speed', 'optimize', 'fast', 'latency', 'benchmark', 'perf', 'cache', 'cron', 'batch', 'async', 'concurrent', 'parallel', 'queue', 'index', 'throttle'],
@@ -281,6 +281,7 @@ export function generateRoadmapFromVision(
   vision: VisionDocument,
   backlog: MergedBacklog,
   complexity?: ComplexityProfile,
+  profile?: RepoProfile,
 ): RoadmapDefinition {
   const par = complexity?.estimatedPar ?? 4;
   const slope = complexity?.estimatedSlope ?? 3;
@@ -332,12 +333,19 @@ export function generateRoadmapFromVision(
     }
 
     if (tickets.length === 0) {
-      tickets.push({
-        key: `S${sprintNum}-1`,
-        title: `Investigate and plan ${priority} improvements`,
-        club: 'short_iron' as RoadmapClub,
-        complexity: 'standard',
-      });
+      const gapTickets = profile
+        ? profileGapTickets(priority, profile, sprintNum)
+        : [];
+      if (gapTickets.length > 0) {
+        tickets.push(...gapTickets);
+      } else {
+        tickets.push({
+          key: `S${sprintNum}-1`,
+          title: `Investigate and plan ${priority} improvements`,
+          club: 'short_iron' as RoadmapClub,
+          complexity: 'standard',
+        });
+      }
     }
 
     sprints.push({
@@ -398,6 +406,70 @@ export function generateRoadmapFromVision(
     phases,
     sprints,
   };
+}
+
+/**
+ * Generate concrete tickets from profile gaps for a given priority.
+ * Returns empty array if no conditions match (caller falls back to generic).
+ */
+function profileGapTickets(
+  priority: string,
+  profile: RepoProfile,
+  sprintNum: number,
+): RoadmapTicket[] {
+  const tickets: RoadmapTicket[] = [];
+  const p = priority.toLowerCase();
+
+  const add = (title: string, club: RoadmapClub = 'short_iron', complexity: 'trivial' | 'small' | 'standard' | 'moderate' = 'standard') => {
+    tickets.push({
+      key: `S${sprintNum}-${tickets.length + 1}`,
+      title,
+      club,
+      complexity,
+    });
+  };
+
+  switch (p) {
+    case 'testing':
+      if (profile.testing.testFileCount === 0) {
+        add('Set up testing framework and write initial tests');
+      } else if (!profile.testing.hasCoverage) {
+        add('Configure test coverage reporting', 'wedge', 'small');
+      }
+      break;
+    case 'reliability':
+      if (!profile.ci.system) add('Set up CI pipeline');
+      if (profile.testing.testFileCount === 0) add('Add test infrastructure for reliability');
+      break;
+    case 'security':
+      if (!profile.ci.hasDeployStage) add('Add security scanning to CI pipeline');
+      break;
+    case 'documentation':
+      if (!profile.docs.hasReadme) add('Create project README', 'wedge', 'small');
+      if (!profile.docs.hasChangelog) add('Set up CHANGELOG', 'wedge', 'small');
+      break;
+    case 'observability':
+      if (!profile.ci.system) add('Set up monitoring and health check infrastructure');
+      else if (!profile.ci.hasDeployStage) add('Add deployment health checks');
+      break;
+    case 'dx':
+    case 'developer experience':
+      if (!profile.stack.buildTool) add('Configure build tooling');
+      if (profile.testing.testFileCount === 0) add('Set up developer testing workflow');
+      break;
+    case 'speed':
+    case 'performance':
+      if (profile.structure.sourceFiles > 50) add('Profile and benchmark critical code paths');
+      break;
+    case 'ux':
+      if (!profile.docs.hasReadme) add('Create user-facing documentation');
+      break;
+    case 'scalability':
+      if (profile.structure.isMonorepo) add('Review monorepo build and dependency optimization');
+      break;
+  }
+
+  return tickets;
 }
 
 function resolveDependencies(

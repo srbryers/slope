@@ -6,6 +6,7 @@ import { createConfig } from '../config.js';
 import { saveHooksConfig } from '../hooks-config.js';
 import { resolveMetaphor } from '../metaphor.js';
 import { detectPackageManager, createVision } from '../../core/index.js';
+import { saveRepoProfile } from '../../core/analyzers/index.js';
 import type { MetaphorDefinition } from '../../core/index.js';
 import {
   generateProjectContext,
@@ -501,7 +502,7 @@ function installDefaultHooks(cwd: string, provider: InitProvider): void {
   saveHooksConfig(cwd, config);
 }
 
-function installForProvider(cwd: string, provider: InitProvider, metaphor: MetaphorDefinition): void {
+export function installForProvider(cwd: string, provider: InitProvider, metaphor: MetaphorDefinition): void {
   switch (provider) {
     case 'claude-code':
       installClaudeCodeTemplates(cwd, metaphor);
@@ -660,8 +661,92 @@ async function runInteractiveInit(cwd: string, _args: string[]): Promise<void> {
   }
 
   try {
-    const { runInteractiveCli } = await import('../interactive-init.js');
-    await runInteractiveCli(cwd);
+    const { runInteractiveCli, renderPostSetup } = await import('../interactive-init.js');
+    const result = await runInteractiveCli(cwd);
+    if (!result) return; // user cancelled
+
+    // --- Infrastructure setup (inside spinner) ---
+    const p = await import('@clack/prompts');
+    const s = p.spinner();
+    s.start('Setting up SLOPE...');
+
+    const metaphor = resolveMetaphor([], result.metaphor);
+    const filesCreated: string[] = [];
+
+    // 1. Core files via initFromAnswers
+    const { initFromAnswers } = await import('../../core/interview.js');
+    const answers: Record<string, unknown> = {
+      'project-name': result.projectName,
+      metaphor: result.metaphor,
+      platforms: result.platforms,
+    };
+    const initResult = await initFromAnswers(cwd, answers, result.platforms);
+    if (initResult.success) {
+      filesCreated.push(...initResult.filesCreated);
+    }
+
+    // 2. Vision (try/catch — non-fatal if vision already exists)
+    try {
+      createVision({
+        purpose: result.vision.purpose,
+        priorities: result.vision.priorities,
+        audience: result.vision.audience,
+        nonGoals: result.vision.nonGoals,
+        techDirection: result.vision.techDirection,
+      }, cwd);
+      filesCreated.push('.slope/vision.json');
+    } catch {
+      // vision already exists or validation error — skip
+    }
+
+    // 3. Save repo profile
+    saveRepoProfile(result.profile, cwd);
+
+    // 4. Save real roadmap (overwrite starter if we generated one)
+    if (result.roadmap) {
+      const { writeFileSync: writeFs, mkdirSync: mkFs } = await import('node:fs');
+      const { join: joinPath } = await import('node:path');
+      const backlogDir = joinPath(cwd, 'docs', 'backlog');
+      mkFs(backlogDir, { recursive: true });
+      writeFs(joinPath(backlogDir, 'roadmap.json'), JSON.stringify(result.roadmap, null, 2) + '\n');
+      // roadmap.json already in filesCreated from initFromAnswers
+    }
+
+    // 5. SQLite store
+    const dbPath = join(cwd, '.slope', 'slope.db');
+    if (!existsSync(dbPath)) {
+      try {
+        const { createStore } = await import('../../store/index.js');
+        const store = createStore({ storePath: '.slope/slope.db', cwd });
+        store.close();
+        filesCreated.push('.slope/slope.db');
+      } catch {
+        // non-fatal
+      }
+    }
+
+    // 6. Provider templates + hooks + MCP
+    for (const provider of result.platforms) {
+      try {
+        installForProvider(cwd, provider as InitProvider, metaphor);
+      } catch {
+        // log warning, continue
+      }
+    }
+
+    // 7. CODEBASE.md
+    try {
+      const { mapCommand } = await import('./map.js');
+      await mapCommand([]);
+      filesCreated.push('CODEBASE.md');
+    } catch {
+      // non-fatal
+    }
+
+    s.stop('Project initialized');
+
+    // --- Post-setup display ---
+    renderPostSetup(result, filesCreated);
   } catch (err: unknown) {
     // Handle ERR_USE_AFTER_CLOSE from readline teardown
     const code = (err as { code?: string })?.code;
