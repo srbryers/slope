@@ -45,13 +45,15 @@ function parseArgs(args: string[]) {
   let answers = '';
   let speed = 'normal';
   let help = false;
+  let narrated = false;
   for (const arg of args) {
     if (arg === '--help' || arg === '-h') help = true;
+    else if (arg === '--narrated') narrated = true;
     else if (arg.startsWith('--project=')) project = arg.slice('--project='.length);
     else if (arg.startsWith('--answers=')) answers = arg.slice('--answers='.length);
     else if (arg.startsWith('--speed=')) speed = arg.slice('--speed='.length);
   }
-  return { project, answers, speed, help };
+  return { project, answers, speed, help, narrated };
 }
 
 // --- Validation ---
@@ -119,6 +121,7 @@ Options:
   --answers=<path>           JSON file with vision answers (required)
   --project=<path>           Target project directory (default: cwd)
   --speed=slow|normal|fast   Typewriter delay (default: normal)
+  --narrated                 Insert longer pauses for voiceover narration
   --help, -h                 Show this help
 
 Answers file format:
@@ -143,6 +146,7 @@ Answers file format:
   const charDelay = isTTY ? (SPEED[opts.speed] ?? SPEED.normal) : 0;
   const pause = isTTY ? 300 : 0;
   const projectName = basename(cwd);
+  const nPause = (ms: number) => sleep(opts.narrated ? ms : 0);
   let tmpDir: string | null = null;
 
   try {
@@ -153,6 +157,7 @@ Answers file format:
       'SLOPE'
     );
     console.log('');
+    await nPause(6000); // CUE 1a: "This is SLOPE..."
     await typewrite(c.boldCyan('Agent') + '  ', 'Let me take a look at this project...', charDelay);
     console.log('');
 
@@ -181,6 +186,7 @@ Answers file format:
     ];
     await revealLines(statsLines, isTTY ? 150 : 0);
     console.log('');
+    await nPause(6000); // CUE 1b: "It scans the codebase..."
 
     const backlog = await analyzeBacklog(cwd);
     const todoCount = backlog.todos.length;
@@ -203,6 +209,7 @@ Answers file format:
     }
 
     console.log('');
+    await nPause(6000); // CUE 2: "One TODO here..."
     await sleep(pause * 2);
 
     // ─── Step 2: Vision Conversation ───
@@ -216,6 +223,7 @@ Answers file format:
     );
     await typewrite(c.boldCyan('Agent') + '  ', agentQ, charDelay);
     console.log('');
+    await nPause(6000); // CUE 3a: "It asks you to describe your vision..."
     await sleep(isTTY ? 500 : 0);
 
     const wrappedVision = wordWrap(answers.vision, 60);
@@ -225,15 +233,19 @@ Answers file format:
 
     await typewrite(c.boldCyan('Agent') + '  ', `Got it. I've extracted your priorities: ${answers.priorities.join(', ')}.`, charDelay);
     console.log('');
+    await nPause(6000); // CUE 3b: "It pulls out the priorities..."
     await sleep(pause);
 
-    // Clarifying Q&A
-    for (const cl of answers.clarifications) {
+    // Clarifying Q&A — narrator cues after each Q and A
+    for (let ci = 0; ci < answers.clarifications.length; ci++) {
+      const cl = answers.clarifications[ci];
       await typewrite(c.boldCyan('Agent') + '  ', wordWrap(cl.question, 60), charDelay);
       console.log('');
+      if (ci === 0) await nPause(6000); // CUE 3c: "Follow-up questions..."
       await sleep(isTTY ? 400 : 0);
       await typewrite(c.boldGreen('You') + '    ', wordWrap(cl.answer, 60), charDelay);
       console.log('');
+      await nPause(5000); // CUE 3d/3e: answer commentary
       await sleep(pause);
     }
 
@@ -263,15 +275,18 @@ Answers file format:
     ];
     await typewriteVision(visionFields(answers.audience, answers.nonGoals), charDelay, c, isTTY);
     console.log('');
+    await nPause(6000); // CUE 4a: "It structures everything..."
     await sleep(pause);
 
     await typewrite(c.boldCyan('Agent') + '  ', "How does that look? Anything you'd change?", charDelay);
     console.log('');
+    await nPause(4000); // CUE 4b: "And it checks in..."
     await sleep(pause);
 
     // Pushback
     await typewrite(c.boldGreen('You') + '    ', wordWrap(answers.pushback.comment, 60), charDelay);
     console.log('');
+    await nPause(5000); // CUE 4c: "Audience was too narrow..."
     await sleep(pause);
 
     // Revision
@@ -292,6 +307,7 @@ Answers file format:
       charDelay, c, isTTY,
     );
     console.log('');
+    await nPause(4000); // CUE 4d: "Updated instantly..."
     await sleep(pause);
 
     // Approval
@@ -300,6 +316,7 @@ Answers file format:
     await sleep(pause);
     await typewrite(c.boldCyan('Agent') + '  ', 'Locked in.', charDelay);
     console.log('');
+    await nPause(3000); // CUE 4e: "Vision locked..."
     await sleep(pause * 2);
 
     // ─── Step 3: Roadmap Generation — The Wow Moment ───
@@ -321,6 +338,7 @@ Answers file format:
     }
     await revealLines(matchLines, isTTY ? 150 : 0);
     console.log('');
+    await nPause(5000); // CUE 5a: "It takes the vision..."
 
     let matchedCount = 0;
     for (const sprint of roadmap.sprints) {
@@ -330,10 +348,32 @@ Answers file format:
       }
     }
 
-    // Phase-based display with ticket overrides
+    // Phase-based display with ticket overrides — split into groups for narrator pauses
     const overrides = answers.ticketOverrides ?? {};
     const phaseLines = renderRoadmapPhases(roadmap, c, overrides);
-    await revealLines(phaseLines, isTTY ? 150 : 0);
+
+    // Split phaseLines into groups at blank-line boundaries (between phases)
+    const phaseGroups: string[][] = [];
+    let currentGroup: string[] = [];
+    for (const line of phaseLines) {
+      if (line === '' && currentGroup.length > 0) {
+        currentGroup.push('');
+        phaseGroups.push(currentGroup);
+        currentGroup = [];
+      } else {
+        currentGroup.push(line);
+      }
+    }
+    if (currentGroup.length > 0) phaseGroups.push(currentGroup);
+
+    // Reveal each group with narrator pauses between them
+    // CUE 5b after first group, CUE 5c after middle groups, CUE 5d after last
+    const narratorRoadmapPauses = [6000, 5000, 3000]; // 5b, 5c, 5d
+    for (let gi = 0; gi < phaseGroups.length; gi++) {
+      await revealLines(phaseGroups[gi], isTTY ? 150 : 0);
+      const pauseIdx = gi === 0 ? 0 : gi >= phaseGroups.length - 1 ? 2 : 1;
+      await nPause(narratorRoadmapPauses[pauseIdx]);
+    }
 
     if (todoCount > 0) {
       console.log(`  Matched ${c.boldGreen(`${Math.min(matchedCount, todoCount)}/${todoCount}`)} TODO${todoCount !== 1 ? 's' : ''} to your vision priorities.`);
@@ -375,6 +415,7 @@ Answers file format:
     await revealLines(comparison, isTTY ? 60 : 0);
 
     console.log('');
+    await nPause(4000); // CUE 6a: "Before: no priorities..."
     await sleep(pause * 2);
 
     // ─── Step 5: What's Next ───
@@ -394,6 +435,7 @@ Answers file format:
       { name: 'OpenCode', cmd: `$ opencode "${slopePrompt}"` },
     ], c);
     console.log('');
+    await nPause(4000); // CUE 6b: "One conversation..."
 
     p.outro('slope.sh');
   } catch (err) {
