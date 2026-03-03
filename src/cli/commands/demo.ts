@@ -46,6 +46,29 @@ export const NARRATOR_CUE_PAUSES: Record<string, number> = {
   '6a': 4000, '6b': 4000,
 };
 
+/** Narrator voiceover text keyed by CUE ID, matching NARRATOR_CUE_PAUSES. */
+export const NARRATOR_SEGMENTS: Record<string, { text: string; label: string }> = {
+  '1a': { label: 'hook',     text: "This is SLOPE, the AI agent harness. I'm going to set it up on a real project." },
+  '1b': { label: 'scan',     text: 'It scans the codebase — stack, structure, test coverage, CI. A full profile of where the project stands today.' },
+  '2':  { label: 'todo',     text: "One TODO here, but on bigger projects that's hundreds. No structure, no priorities. That's what we're fixing." },
+  '3a': { label: 'vision',   text: "It asks you to describe your vision. SLOPE recommends dictating — just talk naturally about what you're building and why." },
+  '3b': { label: 'priorities', text: "It pulls out the priorities automatically. You don't rank them in a form — you talk, it listens." },
+  '3c': { label: 'clarify',  text: 'Follow-up questions — not generic ones. Based on what it found in the codebase and what you just said.' },
+  '3d': { label: 'bottleneck', text: "Delivery is the bottleneck. If it's late, nothing else matters. SLOPE is going to remember that." },
+  '3e': { label: 'gap',      text: 'No tests, no CI. The founder knows it. SLOPE picked up the gap from the profile scan and asked directly.' },
+  '4a': { label: 'structure', text: 'It structures everything into a vision document — purpose, audience, priorities, non-goals. All from one conversation.' },
+  '4b': { label: 'checkin',  text: 'And it checks in. You get to push back.' },
+  '4c': { label: 'pushback', text: "Audience was too narrow, a couple of non-goals missing. Small corrections, but they'll drive every sprint after this." },
+  '4d': { label: 'updated',  text: 'Updated instantly. No re-doing a form.' },
+  '4e': { label: 'locked',   text: 'Vision locked. Watch what happens next.' },
+  '5a': { label: 'roadmap',  text: 'It takes the vision, the profile, and generates a sprint roadmap. Each priority maps to real work.' },
+  '5b': { label: 'sprint1',  text: 'Sprint 1 focuses on speed — the delivery cron, the processing pipeline. Tickets come from priorities and profile gaps.' },
+  '5c': { label: 'sprints',  text: 'Testing, reliability, documentation — each gets its own sprint. Real tickets. Ready to execute.' },
+  '5d': { label: 'done',     text: 'Five sprints, mapped to what the founder said matters.' },
+  '6a': { label: 'before-after', text: 'Before: no priorities, no structure. After: vision locked, five sprints, Sprint 1 ready.' },
+  '6b': { label: 'closing',  text: 'One conversation. Structure, accountability, and a scored roadmap.' },
+};
+
 // --- Speed config ---
 
 const SPEED: Record<string, number> = { slow: 30, normal: 15, fast: 3 };

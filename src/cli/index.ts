@@ -55,6 +55,7 @@ import { prepCommand } from './commands/prep.js';
 import { enrichCommand } from './commands/enrich.js';
 import { docsCommand } from './commands/docs.js';
 import { demoCommand } from './commands/demo.js';
+import { narrateCommand } from './commands/narrate.js';
 
 const subcommand = process.argv[2];
 
@@ -286,6 +287,12 @@ switch (subcommand) {
     break;
   case 'demo':
     demoCommand(process.argv.slice(3)).catch(err => {
+      console.error('Error:', err.message);
+      process.exit(1);
+    });
+    break;
+  case 'narrate':
+    narrateCommand(process.argv.slice(3)).catch(err => {
       console.error('Error:', err.message);
       process.exit(1);
     });
