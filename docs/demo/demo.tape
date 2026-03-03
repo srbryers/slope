@@ -16,7 +16,7 @@ Set CursorBlink false
 Sleep 500ms
 
 Hide
-Type "slope demo --project=$HOME/Development/justbriefme --answers=docs/demo/demo-answers.json --speed=normal"
+Type "slope demo --project=$HOME/Development/justbriefme --answers=docs/demo/demo-answers.json --speed=slow"
 Enter
 Show
-Sleep 50s
+Sleep 90s
