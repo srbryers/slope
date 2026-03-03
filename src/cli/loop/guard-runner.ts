@@ -1,4 +1,4 @@
-import { execSync } from 'node:child_process';
+import { execSync, execFileSync } from 'node:child_process';
 import type { LoopConfig } from './types.js';
 import type { Logger } from './logger.js';
 
@@ -6,6 +6,8 @@ export interface GuardResult {
   passed: boolean;
   failedGuard?: 'typecheck' | 'tests';
 }
+
+const SHA_PATTERN = /^[0-9a-f]{40}$/;
 
 /**
  * Run post-ticket guards: typecheck + tests.
@@ -44,17 +46,18 @@ export function runGuards(
 
 /** Revert to a given SHA (hard reset + clean) */
 function revert(sha: string, cwd: string): void {
-  execSync(`git reset --hard ${sha}`, { cwd, stdio: 'pipe' });
+  if (!SHA_PATTERN.test(sha)) throw new Error(`Invalid SHA: ${sha}`);
+  execFileSync('git', ['reset', '--hard', sha], { cwd, stdio: 'pipe' });
   try {
-    execSync('git clean -fd', { cwd, stdio: 'pipe' });
+    execFileSync('git', ['clean', '-fd'], { cwd, stdio: 'pipe' });
   } catch { /* ok */ }
 }
 
 /** Count commits that would be reverted */
 function countRevertable(preSha: string, cwd: string): number {
   try {
-    const head = execSync('git rev-parse HEAD', { cwd, encoding: 'utf8' }).trim();
-    const count = execSync(`git rev-list --count ${preSha}..${head}`, { cwd, encoding: 'utf8' }).trim();
+    const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd, encoding: 'utf8' }).trim();
+    const count = execFileSync('git', ['rev-list', '--count', `${preSha}..${head}`], { cwd, encoding: 'utf8' }).trim();
     return parseInt(count, 10) || 0;
   } catch {
     return 0;

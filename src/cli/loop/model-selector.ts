@@ -44,15 +44,9 @@ export function selectModel(
   }
 }
 
-/** Select timeout based on club complexity */
-export function selectTimeout(club: Club, config: LoopConfig): number {
-  switch (club) {
-    case 'long_iron':
-    case 'driver':
-      return config.modelApiTimeout;
-    default:
-      return config.modelLocalTimeout;
-  }
+/** Select timeout based on the resolved model */
+export function selectTimeout(model: string, config: LoopConfig): number {
+  return isLocalModel(model) ? config.modelLocalTimeout : config.modelApiTimeout;
 }
 
 /** Check if a model string refers to a local (ollama) model */

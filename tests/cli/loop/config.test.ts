@@ -18,7 +18,7 @@ afterEach(() => {
   delete process.env.MODEL_LOCAL;
   delete process.env.MODEL_API;
   delete process.env.OLLAMA_API_BASE;
-  delete process.env.AIDER_TIMEOUT;
+  delete process.env.MODEL_API_TIMEOUT;
   delete process.env.ESCALATE_ON_FAIL;
   delete process.env.OLLAMA_FLASH_ATTENTION;
 });
@@ -35,13 +35,13 @@ describe('loadLoopConfig', () => {
   it('loads from .slope/loop.config.json', () => {
     writeFileSync(
       join(tmpDir, '.slope/loop.config.json'),
-      JSON.stringify({ modelLocal: 'ollama/custom-model', aiderTimeout: 7200 }),
+      JSON.stringify({ modelLocal: 'ollama/custom-model', modelApiTimeout: 7200 }),
     );
     const { config, sources } = loadLoopConfig(tmpDir);
     expect(config.modelLocal).toBe('ollama/custom-model');
     expect(sources.modelLocal).toBe('file');
-    expect(config.aiderTimeout).toBe(7200);
-    expect(sources.aiderTimeout).toBe('file');
+    expect(config.modelApiTimeout).toBe(7200);
+    expect(sources.modelApiTimeout).toBe('file');
     // Non-overridden keys remain default
     expect(config.modelApi).toBe(DEFAULT_LOOP_CONFIG.modelApi);
     expect(sources.modelApi).toBe('default');
@@ -66,15 +66,15 @@ describe('loadLoopConfig', () => {
   });
 
   it('parses numeric env vars', () => {
-    process.env.AIDER_TIMEOUT = '1800';
+    process.env.MODEL_API_TIMEOUT = '900';
     const { config } = loadLoopConfig(tmpDir);
-    expect(config.aiderTimeout).toBe(1800);
+    expect(config.modelApiTimeout).toBe(900);
   });
 
   it('ignores invalid numeric env vars', () => {
-    process.env.AIDER_TIMEOUT = 'not-a-number';
+    process.env.MODEL_API_TIMEOUT = 'not-a-number';
     const { config } = loadLoopConfig(tmpDir);
-    expect(config.aiderTimeout).toBe(DEFAULT_LOOP_CONFIG.aiderTimeout);
+    expect(config.modelApiTimeout).toBe(DEFAULT_LOOP_CONFIG.modelApiTimeout);
   });
 
   it('handles malformed JSON config file gracefully', () => {

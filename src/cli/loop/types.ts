@@ -8,7 +8,6 @@ export interface LoopConfig {
   ollamaApiBase: string;
   ollamaFlashAttention: boolean;
   ollamaKvCacheType: string;
-  aiderTimeout: number;
   modelApiTimeout: number;
   modelLocalTimeout: number;
   escalateOnFail: boolean;
@@ -28,7 +27,6 @@ export const DEFAULT_LOOP_CONFIG: LoopConfig = {
   ollamaApiBase: 'http://localhost:11434',
   ollamaFlashAttention: true,
   ollamaKvCacheType: 'q8_0',
-  aiderTimeout: 3600,
   modelApiTimeout: 1800,
   modelLocalTimeout: 1800,
   escalateOnFail: true,
@@ -49,7 +47,8 @@ export const ENV_VAR_MAP: Record<string, keyof LoopConfig> = {
   OLLAMA_API_BASE: 'ollamaApiBase',
   OLLAMA_FLASH_ATTENTION: 'ollamaFlashAttention',
   OLLAMA_KV_CACHE_TYPE: 'ollamaKvCacheType',
-  AIDER_TIMEOUT: 'aiderTimeout',
+  MODEL_API_TIMEOUT: 'modelApiTimeout',
+  MODEL_LOCAL_TIMEOUT: 'modelLocalTimeout',
   ESCALATE_ON_FAIL: 'escalateOnFail',
   AGENT_GUIDE_MAX_WORDS: 'agentGuideMaxWords',
   MODEL_REGEN_THRESHOLD: 'modelRegenThreshold',
@@ -140,16 +139,3 @@ export interface ModelConfig {
   notes: string[];
 }
 
-// === Error Classification ===
-
-export type LoopErrorKind = 'fatal' | 'skip' | 'retry';
-
-export class LoopError extends Error {
-  constructor(
-    message: string,
-    public readonly kind: LoopErrorKind,
-  ) {
-    super(message);
-    this.name = 'LoopError';
-  }
-}

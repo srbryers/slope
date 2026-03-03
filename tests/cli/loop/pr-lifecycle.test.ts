@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { execSync } from 'node:child_process';
+import { execSync, execFileSync } from 'node:child_process';
 
 vi.mock('node:child_process', () => ({
   execSync: vi.fn(),
+  execFileSync: vi.fn(),
 }));
 
 import { checkGhCli, hasCommitsAhead, createPr, runStructuralReview, autoMerge } from '../../../src/cli/loop/pr-lifecycle.js';
@@ -28,12 +29,12 @@ beforeEach(() => {
 
 describe('checkGhCli', () => {
   it('returns true when gh is available and authenticated', () => {
-    (execSync as ReturnType<typeof vi.fn>).mockReturnValue('');
+    (execFileSync as ReturnType<typeof vi.fn>).mockReturnValue('');
     expect(checkGhCli(mockLog)).toBe(true);
   });
 
   it('returns false when gh is not installed', () => {
-    (execSync as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {
+    (execFileSync as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {
       throw new Error('not found');
     });
     expect(checkGhCli(mockLog)).toBe(false);
@@ -41,7 +42,7 @@ describe('checkGhCli', () => {
   });
 
   it('returns false when gh is not authenticated', () => {
-    (execSync as ReturnType<typeof vi.fn>)
+    (execFileSync as ReturnType<typeof vi.fn>)
       .mockReturnValueOnce('') // gh --version
       .mockImplementationOnce(() => { throw new Error('not authenticated'); }); // gh auth status
     expect(checkGhCli(mockLog)).toBe(false);
@@ -53,17 +54,17 @@ describe('checkGhCli', () => {
 
 describe('hasCommitsAhead', () => {
   it('returns true when branch has commits ahead', () => {
-    (execSync as ReturnType<typeof vi.fn>).mockReturnValue('3\n');
+    (execFileSync as ReturnType<typeof vi.fn>).mockReturnValue('3\n');
     expect(hasCommitsAhead('feat/x', '/repo')).toBe(true);
   });
 
   it('returns false when branch has no commits ahead', () => {
-    (execSync as ReturnType<typeof vi.fn>).mockReturnValue('0\n');
+    (execFileSync as ReturnType<typeof vi.fn>).mockReturnValue('0\n');
     expect(hasCommitsAhead('feat/x', '/repo')).toBe(false);
   });
 
   it('returns false on error', () => {
-    (execSync as ReturnType<typeof vi.fn>).mockImplementation(() => { throw new Error('fail'); });
+    (execFileSync as ReturnType<typeof vi.fn>).mockImplementation(() => { throw new Error('fail'); });
     expect(hasCommitsAhead('feat/x', '/repo')).toBe(false);
   });
 });
@@ -77,7 +78,7 @@ describe('createPr', () => {
   ];
 
   it('creates PR and returns info on success', () => {
-    (execSync as ReturnType<typeof vi.fn>).mockReturnValue('https://github.com/org/repo/pull/42\n');
+    (execFileSync as ReturnType<typeof vi.fn>).mockReturnValue('https://github.com/org/repo/pull/42\n');
     const result = createPr('feat/x', 'S-1', 'Fix things', 'hardening', tickets, '/repo', mockLog);
     expect(result).not.toBeNull();
     expect(result!.number).toBe(42);
@@ -85,7 +86,7 @@ describe('createPr', () => {
   });
 
   it('returns null on PR creation failure', () => {
-    (execSync as ReturnType<typeof vi.fn>).mockImplementation(() => { throw new Error('gh failed'); });
+    (execFileSync as ReturnType<typeof vi.fn>).mockImplementation(() => { throw new Error('gh failed'); });
     const result = createPr('feat/x', 'S-1', 'Fix things', 'hardening', tickets, '/repo', mockLog);
     expect(result).toBeNull();
     expect(mockLog.warn).toHaveBeenCalled();
@@ -96,7 +97,7 @@ describe('createPr', () => {
 
 describe('runStructuralReview', () => {
   it('returns 0 findings for clean diff', () => {
-    (execSync as ReturnType<typeof vi.fn>)
+    (execFileSync as ReturnType<typeof vi.fn>)
       .mockReturnValueOnce('diff --git a/src/foo.ts b/src/foo.ts\n+const x = 1;\n') // gh pr diff
       .mockReturnValue(''); // slope review findings add (if called)
     const count = runStructuralReview(42, 'S-1', 1, '/repo', mockLog);
@@ -111,7 +112,7 @@ describe('runStructuralReview', () => {
       '+const x = y as any;',
       '+// @ts-ignore',
     ].join('\n');
-    (execSync as ReturnType<typeof vi.fn>)
+    (execFileSync as ReturnType<typeof vi.fn>)
       .mockReturnValueOnce(diff) // gh pr diff
       .mockReturnValue(''); // slope review findings add
     const count = runStructuralReview(42, 'S-1', 1, '/repo', mockLog);
@@ -119,7 +120,7 @@ describe('runStructuralReview', () => {
   });
 
   it('returns 0 when diff fetch fails', () => {
-    (execSync as ReturnType<typeof vi.fn>).mockImplementation(() => { throw new Error('fail'); });
+    (execFileSync as ReturnType<typeof vi.fn>).mockImplementation(() => { throw new Error('fail'); });
     const count = runStructuralReview(42, 'S-1', 1, '/repo', mockLog);
     expect(count).toBe(0);
   });
@@ -129,9 +130,11 @@ describe('runStructuralReview', () => {
 
 describe('autoMerge', () => {
   it('merges when all safeguards pass', () => {
+    // Safeguard 2 (tests) and 3 (typecheck) use execSync; safeguards 4 and merge use execFileSync
     (execSync as ReturnType<typeof vi.fn>)
       .mockReturnValueOnce('') // loopTestCmd
-      .mockReturnValueOnce('') // pnpm typecheck
+      .mockReturnValueOnce(''); // pnpm typecheck
+    (execFileSync as ReturnType<typeof vi.fn>)
       .mockReturnValueOnce('5\n') // gh pr view changedFiles
       .mockReturnValueOnce(''); // gh pr merge
     const result = autoMerge(42, 0, 3, mockConfig, '/repo', mockLog);
@@ -151,7 +154,8 @@ describe('autoMerge', () => {
   it('blocks when no passing tickets', () => {
     (execSync as ReturnType<typeof vi.fn>)
       .mockReturnValueOnce('') // tests
-      .mockReturnValueOnce('') // typecheck
+      .mockReturnValueOnce(''); // typecheck
+    (execFileSync as ReturnType<typeof vi.fn>)
       .mockReturnValueOnce('3\n'); // changedFiles
     const result = autoMerge(42, 0, 0, mockConfig, '/repo', mockLog);
     expect(result.merged).toBe(false);
@@ -161,7 +165,8 @@ describe('autoMerge', () => {
   it('blocks when too many files changed', () => {
     (execSync as ReturnType<typeof vi.fn>)
       .mockReturnValueOnce('') // tests
-      .mockReturnValueOnce('') // typecheck
+      .mockReturnValueOnce(''); // typecheck
+    (execFileSync as ReturnType<typeof vi.fn>)
       .mockReturnValueOnce('25\n'); // changedFiles > 20
     const result = autoMerge(42, 0, 3, mockConfig, '/repo', mockLog);
     expect(result.merged).toBe(false);
@@ -169,7 +174,7 @@ describe('autoMerge', () => {
   });
 
   it('blocks on critical findings', () => {
-    (execSync as ReturnType<typeof vi.fn>)
+    (execFileSync as ReturnType<typeof vi.fn>)
       .mockReturnValueOnce('critical: type escape\n'); // slope review findings list
     const result = autoMerge(42, 2, 3, mockConfig, '/repo', mockLog);
     expect(result.merged).toBe(false);

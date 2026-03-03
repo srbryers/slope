@@ -44,7 +44,7 @@ describe('createWorktree', () => {
       expect.arrayContaining(['worktree', 'add']),
       expect.any(Object),
     );
-    // Should install deps and build
+    // Should install deps and build (still uses execSync for shell commands)
     expect(execSync).toHaveBeenCalledWith(
       'pnpm install --frozen-lockfile',
       expect.any(Object),
@@ -67,20 +67,22 @@ describe('createWorktree', () => {
 
 describe('removeWorktree', () => {
   it('removes worktree and deletes branch', () => {
-    (execSync as ReturnType<typeof vi.fn>).mockReturnValue('');
+    (execFileSync as ReturnType<typeof vi.fn>).mockReturnValue('');
     removeWorktree('/repo/.slope-loop-worktree-S-001', 'slope-loop/S-001', '/repo', mockLog);
-    expect(execSync).toHaveBeenCalledWith(
-      expect.stringContaining('git worktree remove'),
+    expect(execFileSync).toHaveBeenCalledWith(
+      'git',
+      expect.arrayContaining(['worktree', 'remove']),
       expect.any(Object),
     );
-    expect(execSync).toHaveBeenCalledWith(
-      expect.stringContaining('git branch -d'),
+    expect(execFileSync).toHaveBeenCalledWith(
+      'git',
+      expect.arrayContaining(['branch', '-d', 'slope-loop/S-001']),
       expect.any(Object),
     );
   });
 
   it('warns but does not throw on removal failure', () => {
-    (execSync as ReturnType<typeof vi.fn>).mockImplementation(() => {
+    (execFileSync as ReturnType<typeof vi.fn>).mockImplementation(() => {
       throw new Error('failed');
     });
     expect(() =>
@@ -92,19 +94,19 @@ describe('removeWorktree', () => {
 
 describe('getHeadSha', () => {
   it('returns trimmed SHA', () => {
-    (execSync as ReturnType<typeof vi.fn>).mockReturnValue('abc123\n');
+    (execFileSync as ReturnType<typeof vi.fn>).mockReturnValue('abc123\n');
     expect(getHeadSha('/repo')).toBe('abc123');
   });
 });
 
 describe('countCommits', () => {
   it('returns commit count between SHAs', () => {
-    (execSync as ReturnType<typeof vi.fn>).mockReturnValue('3\n');
+    (execFileSync as ReturnType<typeof vi.fn>).mockReturnValue('3\n');
     expect(countCommits('aaa', 'bbb', '/repo')).toBe(3);
   });
 
   it('returns 0 on error', () => {
-    (execSync as ReturnType<typeof vi.fn>).mockImplementation(() => {
+    (execFileSync as ReturnType<typeof vi.fn>).mockImplementation(() => {
       throw new Error('fail');
     });
     expect(countCommits('aaa', 'bbb', '/repo')).toBe(0);
@@ -113,12 +115,12 @@ describe('countCommits', () => {
 
 describe('pushBranch', () => {
   it('returns true on success', () => {
-    (execSync as ReturnType<typeof vi.fn>).mockReturnValue('');
+    (execFileSync as ReturnType<typeof vi.fn>).mockReturnValue('');
     expect(pushBranch('feat/x', '/repo', mockLog)).toBe(true);
   });
 
   it('returns false on failure', () => {
-    (execSync as ReturnType<typeof vi.fn>).mockImplementation(() => {
+    (execFileSync as ReturnType<typeof vi.fn>).mockImplementation(() => {
       throw new Error('push failed');
     });
     expect(pushBranch('feat/x', '/repo', mockLog)).toBe(false);
@@ -128,21 +130,21 @@ describe('pushBranch', () => {
 
 describe('refreshIndex', () => {
   it('skips refresh when index is current', () => {
-    (execSync as ReturnType<typeof vi.fn>)
+    (execFileSync as ReturnType<typeof vi.fn>)
       .mockReturnValueOnce('abc123\n') // git rev-parse HEAD
       .mockReturnValueOnce(JSON.stringify({ lastSha: 'abc123' })); // slope index --status
     refreshIndex('/repo', mockLog);
-    // Should NOT have called slope index (the full refresh)
-    expect(execSync).toHaveBeenCalledTimes(2);
+    // Should NOT have called slope index (the full refresh) — only 2 execFileSync calls
+    expect(execFileSync).toHaveBeenCalledTimes(2);
   });
 
   it('refreshes when index is stale', () => {
-    (execSync as ReturnType<typeof vi.fn>)
+    (execFileSync as ReturnType<typeof vi.fn>)
       .mockReturnValueOnce('abc123\n') // git rev-parse HEAD
       .mockReturnValueOnce(JSON.stringify({ lastSha: 'old-sha' })) // slope index --status
       .mockReturnValueOnce(''); // slope index (refresh)
     refreshIndex('/repo', mockLog);
-    expect(execSync).toHaveBeenCalledTimes(3);
+    expect(execFileSync).toHaveBeenCalledTimes(3);
     expect(mockLog.info).toHaveBeenCalledWith('Updating semantic index...');
   });
 });

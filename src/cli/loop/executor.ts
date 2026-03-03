@@ -1,4 +1,4 @@
-import { spawn, execSync } from 'node:child_process';
+import { spawn, execSync, execFileSync } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { existsSync, readFileSync, mkdirSync, writeFileSync, renameSync, appendFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -13,7 +13,7 @@ import type { LoopConfig, BacklogSprint, BacklogTicket, TicketResult, SprintResu
 import type { Logger } from './logger.js';
 
 let shuttingDown = false;
-let childPid: number | undefined;
+const activeChildPids = new Set<number>();
 
 export function isShuttingDown(): boolean {
   return shuttingDown;
@@ -24,6 +24,9 @@ export function isShuttingDown(): boolean {
  * Main entry point for `slope loop run`.
  */
 export async function runSprint(flags: Record<string, string>, cwd: string): Promise<SprintResult | null> {
+  // Reset shutdown flag (allows continuous loop recovery after transient signals)
+  shuttingDown = false;
+
   const config = resolveLoopConfig(cwd);
   const dryRun = flags['dry-run'] === 'true';
   const mainRepo = cwd;
@@ -33,16 +36,19 @@ export async function runSprint(flags: Record<string, string>, cwd: string): Pro
 
   const log = createLogger('loop', join(cwd, config.logDir, 'loop.log'));
 
-  // Signal handling — set flag and kill child process group
+  // Signal handling — set flag and kill all active child process groups
   const cleanup = () => {
     shuttingDown = true;
     log.warn('Shutting down...');
-    if (childPid) {
-      try { process.kill(-childPid, 'SIGTERM'); } catch { /* already gone */ }
-      setTimeout(() => {
-        try { process.kill(-childPid!, 'SIGKILL'); } catch { /* ok */ }
-      }, 5000);
+    const pidsToKill = [...activeChildPids];
+    for (const pid of pidsToKill) {
+      try { process.kill(-pid, 'SIGTERM'); } catch { /* already gone */ }
     }
+    setTimeout(() => {
+      for (const pid of pidsToKill) {
+        try { process.kill(-pid, 'SIGKILL'); } catch { /* ok */ }
+      }
+    }, 5000);
   };
   process.on('SIGINT', cleanup);
   process.on('SIGTERM', cleanup);
@@ -84,7 +90,7 @@ export async function runSprint(flags: Record<string, string>, cwd: string): Pro
 
       // Start session
       try {
-        execSync(`pnpm slope session start --sprint=${sprint.id}`, { cwd: worktreeCwd, stdio: 'pipe' });
+        execFileSync('pnpm', ['slope', 'session', 'start', `--sprint=${sprint.id}`], { cwd: worktreeCwd, stdio: 'pipe' });
       } catch { /* non-blocking */ }
 
       // Validate tickets
@@ -114,7 +120,7 @@ export async function runSprint(flags: Record<string, string>, cwd: string): Pro
 
       // End session
       try {
-        execSync('pnpm slope session end', { cwd: worktreeCwd, stdio: 'pipe' });
+        execFileSync('pnpm', ['slope', 'session', 'end'], { cwd: worktreeCwd, stdio: 'pipe' });
       } catch { /* non-blocking */ }
 
       // Generate scorecard
@@ -139,7 +145,7 @@ export async function runSprint(flags: Record<string, string>, cwd: string): Pro
 
             // Clear stale findings
             try {
-              execSync('pnpm slope review findings clear', { cwd: worktreeCwd, stdio: 'pipe' });
+              execFileSync('pnpm', ['slope', 'review', 'findings', 'clear'], { cwd: worktreeCwd, stdio: 'pipe' });
             } catch { /* ok */ }
 
             const sprintNum = extractSprintNum(worktreeCwd);
@@ -148,7 +154,7 @@ export async function runSprint(flags: Record<string, string>, cwd: string): Pro
 
             if (findingCount > 0) {
               try {
-                execSync(`pnpm slope review amend --sprint=${sprintNum}`, { cwd: worktreeCwd, stdio: 'pipe' });
+                execFileSync('pnpm', ['slope', 'review', 'amend', `--sprint=${sprintNum}`], { cwd: worktreeCwd, stdio: 'pipe' });
                 log.info('Scorecard amended with review findings');
               } catch {
                 log.warn('Scorecard amendment failed');
@@ -192,7 +198,7 @@ export async function runSprint(flags: Record<string, string>, cwd: string): Pro
       // Cleanup worktree if merged
       if (mergeStatus === 'merged') {
         removeWorktree(wt.path, wt.branch, mainRepo, log);
-        try { execSync('git pull', { cwd: mainRepo, stdio: 'pipe' }); } catch { /* ok */ }
+        try { execFileSync('git', ['pull'], { cwd: mainRepo, stdio: 'pipe' }); } catch { /* ok */ }
         log.info(`=== Sprint ${sprint.id} done (merged, worktree cleaned) ===`);
       } else {
         log.info(`=== Sprint ${sprint.id} done ===`);
@@ -222,11 +228,11 @@ async function processTicket(
   tLog.info(`Club: ${ticket.club} (max_files: ${ticket.max_files}, est_tokens: ${ticket.estimated_tokens ?? 0})`);
 
   const primaryModel = selectModel(ticket.club, ticket.max_files, ticket.estimated_tokens ?? 0, config, cwd);
-  const timeout = selectTimeout(ticket.club, config);
+  const timeout = selectTimeout(primaryModel, config);
   tLog.info(`Model: ${primaryModel} (timeout: ${timeout}s)`);
 
   // Claim ticket
-  try { execSync(`pnpm slope claim --target=${ticket.key}`, { cwd, stdio: 'pipe' }); } catch { /* ok */ }
+  try { execFileSync('pnpm', ['slope', 'claim', `--target=${ticket.key}`], { cwd, stdio: 'pipe' }); } catch { /* ok */ }
 
   const prompt = buildPrompt(ticket, primaryModel);
   const preSha = getHeadSha(cwd);
@@ -241,6 +247,8 @@ async function processTicket(
   if (attempt1.passed) {
     testsPassing = true;
     noop = attempt1.noop;
+  } else if (attempt1.spawnFailed) {
+    tLog.error('Aider failed to start — skipping ticket');
   } else if (config.escalateOnFail && isLocalModel(primaryModel)) {
     // Attempt 2: Escalate to API model
     tLog.info(`Escalating to ${config.modelApi}`);
@@ -262,7 +270,7 @@ async function processTicket(
   }
 
   // Release claim
-  try { execSync(`pnpm slope release --target=${ticket.key}`, { cwd, stdio: 'pipe' }); } catch { /* ok */ }
+  try { execFileSync('pnpm', ['slope', 'release', `--target=${ticket.key}`], { cwd, stdio: 'pipe' }); } catch { /* ok */ }
 
   tLog.info(`-- ${ticket.key} complete --`);
 
@@ -284,6 +292,7 @@ async function processTicket(
 interface AiderGuardResult {
   passed: boolean;
   noop: boolean;
+  spawnFailed: boolean;
 }
 
 async function runAiderWithGuards(
@@ -297,23 +306,29 @@ async function runAiderWithGuards(
   cwd: string,
   log: Logger,
 ): Promise<AiderGuardResult> {
-  await runAider(ticketKey, model, timeout, prompt, ticket, config, cwd, log);
+  const outcome = await runAider(ticketKey, model, timeout, prompt, ticket, config, cwd, log);
+
+  if (outcome === 'error') {
+    return { passed: false, noop: false, spawnFailed: true };
+  }
 
   const postSha = getHeadSha(cwd);
   if (preSha === postSha) {
     log.warn('No code changes produced (no-op)');
-    return { passed: true, noop: true };
+    return { passed: true, noop: true, spawnFailed: false };
   }
 
   const guardResult = runGuards(preSha, config, cwd, log);
   if (guardResult.passed) {
     log.info('Guards passed');
-    return { passed: true, noop: false };
+    return { passed: true, noop: false, spawnFailed: false };
   }
 
   log.warn(`Guard failed: ${guardResult.failedGuard}`);
-  return { passed: false, noop: false };
+  return { passed: false, noop: false, spawnFailed: false };
 }
+
+type AiderOutcome = 'completed' | 'error' | 'timeout';
 
 async function runAider(
   ticketKey: string,
@@ -324,7 +339,7 @@ async function runAider(
   config: LoopConfig,
   cwd: string,
   log: Logger,
-): Promise<void> {
+): Promise<AiderOutcome> {
   const aiderArgs = [
     '--model', model,
     '--message', prompt,
@@ -353,30 +368,31 @@ async function runAider(
     }
   }
 
-  // Semantic context injection
+  // Semantic context injection (capture output instead of shell redirect)
   const contextLineLimit = local ? 200 : 500;
   const contextTop = local ? 4 : 8;
   const contextFile = join(cwd, config.logDir, `${ticketKey}-context.md`);
 
   try {
-    execSync(
-      `pnpm slope context --ticket="${ticketKey}" --format=snippets --top=${contextTop} > "${contextFile}"`,
-      { cwd, stdio: ['pipe', 'pipe', 'pipe'], shell: '/bin/sh' },
-    );
-    if (existsSync(contextFile)) {
-      const content = readFileSync(contextFile, 'utf8');
-      const lines = content.split('\n').length;
-      if (lines > 0 && lines <= contextLineLimit) {
-        aiderArgs.push('--read', contextFile);
-        log.info(`Injected semantic context (${lines} lines)`);
-      } else if (lines > contextLineLimit) {
-        log.info(`Semantic context too large (${lines} lines) — falling back to CODEBASE.md`);
-        const codemap = join(cwd, 'CODEBASE.md');
-        if (existsSync(codemap)) aiderArgs.push('--read', codemap);
-      } else {
-        const codemap = join(cwd, 'CODEBASE.md');
-        if (existsSync(codemap)) aiderArgs.push('--read', codemap);
-      }
+    const contextOutput = execFileSync('pnpm', [
+      'slope', 'context',
+      `--ticket=${ticketKey}`,
+      '--format=snippets',
+      `--top=${contextTop}`,
+    ], { cwd, encoding: 'utf8' });
+    writeFileSync(contextFile, contextOutput);
+
+    const lines = contextOutput.split('\n').length;
+    if (lines > 0 && lines <= contextLineLimit) {
+      aiderArgs.push('--read', contextFile);
+      log.info(`Injected semantic context (${lines} lines)`);
+    } else if (lines > contextLineLimit) {
+      log.info(`Semantic context too large (${lines} lines) — falling back to CODEBASE.md`);
+      const codemap = join(cwd, 'CODEBASE.md');
+      if (existsSync(codemap)) aiderArgs.push('--read', codemap);
+    } else {
+      const codemap = join(cwd, 'CODEBASE.md');
+      if (existsSync(codemap)) aiderArgs.push('--read', codemap);
     }
   } catch {
     log.info('slope context failed — falling back to CODEBASE.md');
@@ -384,21 +400,20 @@ async function runAider(
     if (existsSync(codemap)) aiderArgs.push('--read', codemap);
   }
 
-  // Prep plan injection
+  // Prep plan injection (capture output instead of shell redirect)
   const prepFile = join(cwd, config.logDir, `${ticketKey}-prep.md`);
   try {
-    execSync(
-      `pnpm slope prep "${ticketKey}" --top=5 > "${prepFile}"`,
-      { cwd, stdio: ['pipe', 'pipe', 'pipe'], shell: '/bin/sh' },
-    );
-    if (existsSync(prepFile)) {
-      const words = readFileSync(prepFile, 'utf8').split(/\s+/).length;
-      if (words > 0 && words < 1600) {
-        aiderArgs.push('--read', prepFile);
-        log.info(`Injected prep plan (~${Math.round(words / 4)} tokens)`);
-      } else if (words >= 1600) {
-        log.info(`Prep plan too large (~${Math.round(words / 4)} tokens) — skipping`);
-      }
+    const prepOutput = execFileSync('pnpm', [
+      'slope', 'prep', ticketKey, '--top=5',
+    ], { cwd, encoding: 'utf8' });
+    writeFileSync(prepFile, prepOutput);
+
+    const words = prepOutput.split(/\s+/).length;
+    if (words > 0 && words < 1600) {
+      aiderArgs.push('--read', prepFile);
+      log.info(`Injected prep plan (~${Math.round(words / 4)} tokens)`);
+    } else if (words >= 1600) {
+      log.info(`Prep plan too large (~${Math.round(words / 4)} tokens) — skipping`);
     }
   } catch {
     log.info('slope prep failed — continuing without plan');
@@ -421,22 +436,24 @@ async function runAider(
 
   // Spawn Aider with detached process group for clean shutdown
   const aiderLogPath = join(cwd, config.logDir, `${ticketKey}-${model.split('/').pop()}.log`);
-  const env: Record<string, string> = {
-    ...(process.env as Record<string, string>),
+  const env = {
+    ...process.env,
     OLLAMA_API_BASE: config.ollamaApiBase,
     OLLAMA_FLASH_ATTENTION: config.ollamaFlashAttention ? '1' : '0',
     OLLAMA_KV_CACHE_TYPE: config.ollamaKvCacheType,
   };
 
-  return new Promise<void>((resolve) => {
+  return new Promise<AiderOutcome>((resolve) => {
     const child = spawn('aider', aiderArgs, {
       cwd,
       env,
-      stdio: ['inherit', 'pipe', 'pipe'],
+      stdio: ['ignore', 'pipe', 'pipe'],
       detached: true,
     });
 
-    childPid = child.pid;
+    if (child.pid) {
+      activeChildPids.add(child.pid);
+    }
 
     // Stream draining — avoid 64KB buffer deadlock
     const logLines: string[] = [];
@@ -452,24 +469,27 @@ async function runAider(
     // Timeout
     const timer = setTimeout(() => {
       log.warn(`Aider timed out after ${timeout}s`);
-      try { process.kill(-child.pid!, 'SIGTERM'); } catch { /* ok */ }
+      if (child.pid) {
+        try { process.kill(-child.pid, 'SIGTERM'); } catch { /* ok */ }
+      }
+      // Don't resolve here — let the 'close' event handle it
     }, timeout * 1000);
 
     child.on('close', (code) => {
       clearTimeout(timer);
-      childPid = undefined;
+      if (child.pid) activeChildPids.delete(child.pid);
       if (code !== 0) {
         log.warn(`Aider exited with code ${code}`);
       }
       try { writeFileSync(aiderLogPath, logLines.join('\n')); } catch { /* ok */ }
-      resolve();
+      resolve('completed');
     });
 
     child.on('error', (err) => {
       clearTimeout(timer);
-      childPid = undefined;
+      if (child.pid) activeChildPids.delete(child.pid);
       log.error(`Aider spawn error: ${err.message}`);
-      resolve();
+      resolve('error');
     });
   });
 }
@@ -540,25 +560,27 @@ function saveResult(result: SprintResult, cwd: string, config: LoopConfig): void
 
 function generateScorecard(sprint: BacklogSprint, branch: string, cwd: string, log: Logger): void {
   try {
-    const nextOutput = execSync('pnpm slope next', { cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
+    const nextOutput = execFileSync('pnpm', ['slope', 'next'], { cwd, encoding: 'utf8' });
     const match = nextOutput.match(/Next sprint: S(\d+)/);
     const sprintNum = match?.[1] ?? '0';
     if (parseInt(sprintNum, 10) > 0) {
-      execSync(
-        `pnpm slope auto-card --sprint=${sprintNum} --theme="${sprint.title}" --branch="main..${branch}"`,
-        { cwd, stdio: 'pipe' },
-      );
+      execFileSync('pnpm', [
+        'slope', 'auto-card',
+        `--sprint=${sprintNum}`,
+        `--theme=${sprint.title}`,
+        `--branch=main..${branch}`,
+      ], { cwd, stdio: 'pipe' });
       log.info(`Auto-card generated for sprint ${sprintNum}`);
     }
   } catch {
     log.warn('Auto-card generation failed');
   }
-  try { execSync('pnpm slope review', { cwd, stdio: 'pipe' }); } catch { /* ok */ }
+  try { execFileSync('pnpm', ['slope', 'review'], { cwd, stdio: 'pipe' }); } catch { /* ok */ }
 }
 
 function extractSprintNum(cwd: string): number {
   try {
-    const output = execSync('pnpm slope next', { cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
+    const output = execFileSync('pnpm', ['slope', 'next'], { cwd, encoding: 'utf8' });
     const match = output.match(/Next sprint: S(\d+)/);
     return parseInt(match?.[1] ?? '0', 10);
   } catch {

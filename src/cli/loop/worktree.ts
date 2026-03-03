@@ -25,7 +25,7 @@ export function createWorktree(
 
   // Prune stale worktree refs
   try {
-    execSync('git worktree prune', { cwd: mainRepo, stdio: 'pipe' });
+    execFileSync('git', ['worktree', 'prune'], { cwd: mainRepo, stdio: 'pipe' });
   } catch { /* ok */ }
 
   if (existsSync(worktreePath)) {
@@ -67,13 +67,12 @@ export function createWorktree(
  */
 export function refreshIndex(worktreePath: string, log: Logger): void {
   try {
-    const currentSha = execSync('git rev-parse HEAD', { cwd: worktreePath, encoding: 'utf8' }).trim();
+    const currentSha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: worktreePath, encoding: 'utf8' }).trim();
     let indexSha = '';
     try {
-      const statusJson = execSync('pnpm slope index --status --json', {
+      const statusJson = execFileSync('pnpm', ['slope', 'index', '--status', '--json'], {
         cwd: worktreePath,
         encoding: 'utf8',
-        stdio: ['pipe', 'pipe', 'pipe'],
       });
       const parsed = JSON.parse(statusJson);
       indexSha = parsed.lastSha ?? '';
@@ -81,7 +80,7 @@ export function refreshIndex(worktreePath: string, log: Logger): void {
 
     if (currentSha !== indexSha) {
       log.info('Updating semantic index...');
-      execSync('pnpm slope index', { cwd: worktreePath, stdio: 'pipe', timeout: 120_000 });
+      execFileSync('pnpm', ['slope', 'index'], { cwd: worktreePath, stdio: 'pipe', timeout: 120_000 });
     }
   } catch {
     log.warn('Semantic index refresh failed — using stale index');
@@ -94,7 +93,7 @@ export function refreshIndex(worktreePath: string, log: Logger): void {
 export function enrichBacklog(backlogPath: string, worktreePath: string, log: Logger): void {
   log.info('Enriching backlog with file context...');
   try {
-    execSync(`pnpm slope enrich "${backlogPath}"`, {
+    execFileSync('pnpm', ['slope', 'enrich', backlogPath], {
       cwd: worktreePath,
       stdio: 'pipe',
       timeout: 120_000,
@@ -114,7 +113,7 @@ export function removeWorktree(
   log: Logger,
 ): void {
   try {
-    execSync(`git worktree remove "${worktreePath}" --force`, { cwd: mainRepo, stdio: 'pipe' });
+    execFileSync('git', ['worktree', 'remove', worktreePath, '--force'], { cwd: mainRepo, stdio: 'pipe' });
     log.info(`Removed worktree: ${worktreePath}`);
   } catch {
     log.warn(`Failed to remove worktree: ${worktreePath}`);
@@ -122,7 +121,7 @@ export function removeWorktree(
 
   // Safe branch delete (-d, not -D) — refuses if unmerged
   try {
-    execSync(`git branch -d "${branch}"`, { cwd: mainRepo, stdio: 'pipe' });
+    execFileSync('git', ['branch', '-d', branch], { cwd: mainRepo, stdio: 'pipe' });
     log.info(`Deleted branch: ${branch}`);
   } catch {
     log.info(`Branch ${branch} has unmerged changes — keeping`);
@@ -131,13 +130,13 @@ export function removeWorktree(
 
 /** Get the current HEAD SHA */
 export function getHeadSha(cwd: string): string {
-  return execSync('git rev-parse HEAD', { cwd, encoding: 'utf8' }).trim();
+  return execFileSync('git', ['rev-parse', 'HEAD'], { cwd, encoding: 'utf8' }).trim();
 }
 
 /** Count commits between two SHAs */
 export function countCommits(fromSha: string, toSha: string, cwd: string): number {
   try {
-    const count = execSync(`git rev-list --count ${fromSha}..${toSha}`, { cwd, encoding: 'utf8' }).trim();
+    const count = execFileSync('git', ['rev-list', '--count', `${fromSha}..${toSha}`], { cwd, encoding: 'utf8' }).trim();
     return parseInt(count, 10) || 0;
   } catch {
     return 0;
@@ -147,7 +146,7 @@ export function countCommits(fromSha: string, toSha: string, cwd: string): numbe
 /** Push branch to origin */
 export function pushBranch(branch: string, cwd: string, log: Logger): boolean {
   try {
-    execSync(`git push -u origin "${branch}"`, { cwd, stdio: 'pipe' });
+    execFileSync('git', ['push', '-u', 'origin', branch], { cwd, stdio: 'pipe' });
     return true;
   } catch {
     log.warn(`git push failed for branch ${branch}`);

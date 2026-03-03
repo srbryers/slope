@@ -123,24 +123,16 @@ describe('selectModel', () => {
 });
 
 describe('selectTimeout', () => {
-  it('returns API timeout for long_iron', () => {
-    expect(selectTimeout('long_iron', config)).toBe(config.modelApiTimeout);
+  it('returns API timeout for API models', () => {
+    expect(selectTimeout('openrouter/anthropic/claude-haiku-4-5', config)).toBe(config.modelApiTimeout);
   });
 
-  it('returns API timeout for driver', () => {
-    expect(selectTimeout('driver', config)).toBe(config.modelApiTimeout);
+  it('returns local timeout for ollama models', () => {
+    expect(selectTimeout('ollama/qwen3-coder-next-fast', config)).toBe(config.modelLocalTimeout);
   });
 
-  it('returns local timeout for wedge', () => {
-    expect(selectTimeout('wedge', config)).toBe(config.modelLocalTimeout);
-  });
-
-  it('returns local timeout for putter', () => {
-    expect(selectTimeout('putter', config)).toBe(config.modelLocalTimeout);
-  });
-
-  it('returns local timeout for short_iron', () => {
-    expect(selectTimeout('short_iron', config)).toBe(config.modelLocalTimeout);
+  it('returns API timeout for non-ollama models', () => {
+    expect(selectTimeout('minimax/m2-5', config)).toBe(config.modelApiTimeout);
   });
 });
 
