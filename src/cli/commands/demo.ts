@@ -29,7 +29,7 @@ interface DemoAnswers {
 
 // --- Speed config ---
 
-const SPEED: Record<string, number> = { slow: 40, normal: 20, fast: 5 };
+const SPEED: Record<string, number> = { slow: 30, normal: 15, fast: 3 };
 
 // --- Color helpers (raw ANSI, TTY-aware) ---
 
@@ -51,6 +51,7 @@ function createColors(enabled: boolean) {
     boldGreen: wrap('1;32'),
     boldYellow: wrap('1;33'),
     boldWhite: wrap('1;37'),
+    boldRed: wrap('1;31'),
     dimCyan: wrap('2;36'),
     dimItalic: wrap('2;3'),
   };
@@ -109,29 +110,111 @@ async function revealLines(lines: string[], lineDelay: number): Promise<void> {
   }
 }
 
-function displayVision(
-  purpose: string, audience: string, priorities: string[],
-  nonGoals: string[], tech: string, c: Colors,
-): void {
-  const valWidth = 48;
-  const indent = ' '.repeat(15); // aligns with value start after label column
-  const wrapValue = (s: string): string => {
-    const wrapped = wordWrap(s, valWidth);
-    const parts = wrapped.split('\n');
-    return parts.map((line, i) => i === 0 ? line : `${indent}${line}`).join('\n');
+async function typewriteVision(
+  fields: { heading: string; value: string }[],
+  charDelay: number, c: Colors, isTTY: boolean,
+): Promise<void> {
+  const contentWidth = 52;
+  const innerWidth = contentWidth + 4; // 2-char pad each side
+  const b = (s: string) => c.dimCyan(s);
+
+  const printBoxLine = (text: string, ansiCode?: string) => {
+    const styled = ansiCode && isTTY
+      ? `\x1b[${ansiCode}m${text}\x1b[0m`
+      : text;
+    const rightPad = ' '.repeat(Math.max(0, contentWidth - text.length + 2));
+    console.log(b('│') + '  ' + styled + rightPad + b('│'));
   };
-  const lines = [
-    `${c.dim('Purpose:')}      ${c.boldWhite(wrapValue(purpose))}`,
-    `${c.dim('Audience:')}     ${c.boldWhite(wrapValue(audience))}`,
-    `${c.dim('Priorities:')}   ${c.boldWhite(priorities.join(', '))}`,
-    `${c.dim('Non-goals:')}    ${c.boldWhite(wrapValue(nonGoals.join(', ')))}`,
-    `${c.dim('Tech:')}         ${c.boldWhite(tech)}`,
-  ];
-  p.box(lines.join('\n'), 'Vision', {
-    rounded: true,
-    contentPadding: 1,
-    formatBorder: (border) => c.dimCyan(border),
-  });
+
+  const typeInBox = async (text: string, ansiCode: string) => {
+    const display = text.slice(0, contentWidth);
+    const rightPad = ' '.repeat(Math.max(0, contentWidth - display.length + 2));
+    process.stdout.write(b('│') + '  ');
+    if (charDelay > 0 && isTTY) {
+      process.stdout.write(`\x1b[${ansiCode}m`);
+      for (const ch of display) {
+        process.stdout.write(ch);
+        await sleep(Math.max(1, Math.floor(charDelay * 0.4)));
+      }
+      process.stdout.write('\x1b[0m');
+    } else {
+      process.stdout.write(isTTY ? `\x1b[${ansiCode}m${display}\x1b[0m` : display);
+    }
+    process.stdout.write(rightPad + b('│') + '\n');
+  };
+
+  const emptyLine = () => console.log(
+    b('│') + ' '.repeat(innerWidth) + b('│')
+  );
+
+  // Top border
+  const title = ' Vision ';
+  const topRule = '─'.repeat(innerWidth - title.length - 2);
+  console.log(b('╭─') + b(title) + b(topRule) + b('╮'));
+  emptyLine();
+
+  for (let i = 0; i < fields.length; i++) {
+    const { heading, value } = fields[i];
+    printBoxLine(heading, '2'); // dim heading
+    const lines = wordWrap(value, contentWidth).split('\n');
+    for (const line of lines) {
+      await typeInBox(line, '1;37'); // bold white value
+    }
+    emptyLine(); // spacing between fields
+  }
+
+  // Bottom border
+  console.log(b('╰') + b('─'.repeat(innerWidth)) + b('╯'));
+}
+
+function sideBySide(
+  leftTitle: string, leftContent: string[],
+  rightTitle: string, rightContent: string[],
+  c: Colors,
+): string[] {
+  const lw = 30;
+  const rw = 38;
+  const gap = '     ';
+  const arrow = '  \u2192  ';
+
+  const pad = (s: string, w: number) => {
+    const vis = stripAnsi(s).length;
+    return s + ' '.repeat(Math.max(0, w - vis));
+  };
+
+  // Pad content to equal height with top/bottom spacing
+  const lPad = ['', ...leftContent, ''];
+  const rPad = ['', ...rightContent, ''];
+  while (lPad.length < rPad.length) lPad.splice(lPad.length - 1, 0, '');
+  while (rPad.length < lPad.length) rPad.splice(rPad.length - 1, 0, '');
+  const h = lPad.length;
+  const mid = Math.floor(h / 2);
+
+  const out: string[] = [];
+
+  // Top borders
+  const lTop = c.dim('\u256d\u2500 ' + leftTitle + ' ' + '\u2500'.repeat(Math.max(0, lw - leftTitle.length - 3)) + '\u256e');
+  const rTop = c.boldCyan('\u256d\u2500 ' + rightTitle + ' ' + '\u2500'.repeat(Math.max(0, rw - rightTitle.length - 3)) + '\u256e');
+  out.push('  ' + lTop + gap + rTop);
+
+  // Content rows
+  for (let i = 0; i < h; i++) {
+    const g = i === mid ? arrow : gap;
+    out.push(
+      '  ' + c.dim('\u2502') + pad('  ' + (lPad[i] || ''), lw) + c.dim('\u2502') +
+      g +
+      c.boldCyan('\u2502') + pad('  ' + (rPad[i] || ''), rw) + c.boldCyan('\u2502')
+    );
+  }
+
+  // Bottom borders
+  out.push(
+    '  ' + c.dim('\u2570' + '\u2500'.repeat(lw) + '\u256f') +
+    gap +
+    c.boldCyan('\u2570' + '\u2500'.repeat(rw) + '\u256f')
+  );
+
+  return out;
 }
 
 // --- Args ---
@@ -270,7 +353,7 @@ Answers file format:
       `  ${c.dim('Stack:')}    ${c.boldWhite(stackStr)}`,
       ...(pm ? [`  ${c.dim('PM:')}       ${c.boldWhite(pm)}`] : []),
     ];
-    await revealLines(statsLines, isTTY ? 80 : 0);
+    await revealLines(statsLines, isTTY ? 150 : 0);
     console.log('');
 
     const backlog = await analyzeBacklog(cwd);
@@ -286,7 +369,7 @@ Answers file format:
         `  ${c.dim(todo.file.padEnd(maxLen + 2))}${todo.type}: ${todo.text}`
       );
       if (todoCount > 5) todoLines.push(`  ${c.dim(`... and ${todoCount - 5} more`)}`);
-      await revealLines(todoLines, isTTY ? 80 : 0);
+      await revealLines(todoLines, isTTY ? 150 : 0);
       console.log('');
       await typewrite('  ', c.dimItalic("There's real work here, but no structure. Let's fix that."), charDelay);
     } else {
@@ -340,8 +423,15 @@ Answers file format:
 
     await mcpCall('createVision()', '', pause, c);
 
-    // Display vision
-    displayVision(vision.purpose, answers.audience, answers.priorities, answers.nonGoals, stackStr, c);
+    // Display vision (typed in)
+    const visionFields = (aud: string, ng: string[]) => [
+      { heading: 'Purpose', value: vision.purpose },
+      { heading: 'Audience', value: aud },
+      { heading: 'Priorities', value: answers.priorities.join(', ') },
+      { heading: 'Non-goals', value: ng.join(', ') },
+      { heading: 'Tech', value: stackStr },
+    ];
+    await typewriteVision(visionFields(answers.audience, answers.nonGoals), charDelay, c, isTTY);
     console.log('');
     await sleep(pause * 2);
 
@@ -363,13 +453,9 @@ Answers file format:
     await mcpCall('updateVision()', '', pause, c);
 
     // Revised vision display
-    displayVision(
-      vision.purpose,
-      revised.audience ?? answers.audience,
-      answers.priorities,
-      revised.nonGoals ?? answers.nonGoals,
-      stackStr,
-      c,
+    await typewriteVision(
+      visionFields(revised.audience ?? answers.audience, revised.nonGoals ?? answers.nonGoals),
+      charDelay, c, isTTY,
     );
     console.log('');
     await sleep(pause);
@@ -399,7 +485,7 @@ Answers file format:
         matchLines.push(`    "${priority}"`.padEnd(20) + `\u2192 ${synonyms.slice(0, 4).join(', ')}`);
       }
     }
-    await revealLines(matchLines, isTTY ? 100 : 0);
+    await revealLines(matchLines, isTTY ? 150 : 0);
     console.log('');
 
     let matchedCount = 0;
@@ -430,7 +516,7 @@ Answers file format:
         }
         if (extra > 0) phaseLines.push(`      ${c.dim(`... +${extra} more`)}`);
       }
-      await revealLines(phaseLines, isTTY ? 80 : 0);
+      await revealLines(phaseLines, isTTY ? 150 : 0);
       console.log('');
     }
 
@@ -440,39 +526,27 @@ Answers file format:
 
     // ─── Step 4: Before/After Summary ───
 
-    await typewrite(c.boldCyan('Agent') + '  ', 'From scattered TODOs to a structured roadmap:', charDelay);
     console.log('');
-
     const moduleCount = Object.keys(backlog.todosByModule).length;
-    p.note(
-      `${todoCount} TODOs across ${moduleCount} module${moduleCount !== 1 ? 's' : ''}. No priorities. No structure.`,
-      'Before'
-    );
-
-    console.log('                          \u2193');
-
     const prioritySprints = roadmap.sprints.filter(s => s.theme.toLowerCase() !== 'general').length;
-    const generalSprints = roadmap.sprints.filter(s => s.theme.toLowerCase() === 'general').length;
-    const sprintDesc = generalSprints > 0
-      ? `${prioritySprints} priority sprint${prioritySprints !== 1 ? 's' : ''} + ${generalSprints} general sprint${generalSprints !== 1 ? 's' : ''}`
-      : `${prioritySprints} priority sprint${prioritySprints !== 1 ? 's' : ''}`;
-
-    const purposeFirst = answers.vision.split(/[.!?]/)[0].trim();
-    const purposeShort = purposeFirst.length > 50
-      ? purposeFirst.slice(0, 50).replace(/\s+\S*$/, '') + '...'
-      : purposeFirst;
     const firstTheme = roadmap.sprints[0]?.theme ?? 'Start';
     const themeDisplay = firstTheme.charAt(0).toUpperCase() + firstTheme.slice(1);
 
-    p.note(
-      [
-        `Vision:    ${purposeShort}`,
-        `Roadmap:   ${sprintDesc}`,
-        `Matched:   ${matchedCount}/${todoCount} TODOs aligned to your priorities`,
-        `Ready:     Sprint 1 (${themeDisplay}) is ready to execute`,
-      ].join('\n'),
-      'After'
-    );
+    const beforeLines = [
+      c.dim(`${todoCount} scattered TODOs`),
+      c.dim(`${moduleCount} module${moduleCount !== 1 ? 's' : ''}`),
+      c.dim('No priorities'),
+      c.dim('No structure'),
+    ];
+    const afterLines = [
+      `${c.boldGreen('\u2713')} ${c.boldWhite('Vision locked in')}`,
+      `${c.boldGreen('\u2713')} ${c.boldWhite(`${prioritySprints} priority sprint${prioritySprints !== 1 ? 's' : ''}`)}`,
+      `${c.boldGreen('\u2713')} ${c.boldWhite(`${matchedCount}/${todoCount} TODOs mapped`)}`,
+      `${c.boldGreen('\u2713')} ${c.boldWhite(`Sprint 1 (${themeDisplay}) ready`)}`,
+    ];
+
+    const comparison = sideBySide('Before', beforeLines, 'After', afterLines, c);
+    await revealLines(comparison, isTTY ? 60 : 0);
 
     console.log('');
     await sleep(pause * 2);
