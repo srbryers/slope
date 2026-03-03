@@ -55,6 +55,8 @@ async function startSession(flags: Record<string, string>, cwd: string): Promise
     const swarmId = flags.swarm;
     const agentRole = flags['agent-role'];
 
+    await store.cleanStaleSessions(7_200_000); // 2 hours
+
     const session = await store.registerSession({
       session_id: sessionId,
       role,
