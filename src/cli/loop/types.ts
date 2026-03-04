@@ -19,6 +19,7 @@ export interface LoopConfig {
   logDir: string;
   agentGuide: string;
   sprintHistory: string;
+  stagingBranch: string;
 }
 
 export const DEFAULT_LOOP_CONFIG: LoopConfig = {
@@ -38,6 +39,7 @@ export const DEFAULT_LOOP_CONFIG: LoopConfig = {
   logDir: 'slope-loop/logs',
   agentGuide: 'slope-loop/slope-loop-guide/SKILL.md',
   sprintHistory: 'slope-loop/slope-loop-guide/references/sprint-history.md',
+  stagingBranch: '',
 };
 
 // Mapping from LoopConfig keys to environment variable names

@@ -59,6 +59,7 @@ export function createWorktree(
   sprintId: string,
   mainRepo: string,
   log: Logger,
+  baseBranch?: string,
 ): WorktreeInfo {
   const branch = `${BRANCH_PREFIX}/${sprintId}`;
   const worktreePath = join(mainRepo, `.slope-loop-worktree-${sprintId}`);
@@ -74,7 +75,9 @@ export function createWorktree(
   }
 
   try {
-    execFileSync('git', ['worktree', 'add', worktreePath, '-b', branch], {
+    const args = ['worktree', 'add', worktreePath, '-b', branch];
+    if (baseBranch) args.push(baseBranch);
+    execFileSync('git', args, {
       cwd: mainRepo,
       stdio: 'pipe',
     });
