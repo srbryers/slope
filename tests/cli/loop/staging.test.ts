@@ -86,6 +86,7 @@ describe('createUmbrellaPr', () => {
 
   it('creates umbrella PR with batch summary', () => {
     (execFileSync as ReturnType<typeof vi.fn>)
+      .mockReturnValueOnce('') // git fetch staging ref
       .mockReturnValueOnce('5\n') // rev-list --count
       .mockReturnValueOnce('https://github.com/org/repo/pull/42\n'); // gh pr create
     const pr = createUmbrellaPr('loop/batch-067', results, '/repo', mockLog);
@@ -98,7 +99,9 @@ describe('createUmbrellaPr', () => {
   });
 
   it('returns null when staging has no commits ahead of main', () => {
-    (execFileSync as ReturnType<typeof vi.fn>).mockReturnValueOnce('0\n'); // rev-list
+    (execFileSync as ReturnType<typeof vi.fn>)
+      .mockReturnValueOnce('') // git fetch staging ref
+      .mockReturnValueOnce('0\n'); // rev-list
     const pr = createUmbrellaPr('loop/batch-067', results, '/repo', mockLog);
     expect(pr).toBeNull();
     expect(mockLog.info).toHaveBeenCalledWith(expect.stringContaining('no commits ahead'));
@@ -106,6 +109,7 @@ describe('createUmbrellaPr', () => {
 
   it('returns null when gh pr create fails', () => {
     (execFileSync as ReturnType<typeof vi.fn>)
+      .mockReturnValueOnce('') // git fetch staging ref
       .mockReturnValueOnce('5\n') // rev-list
       .mockImplementationOnce(() => { throw new Error('gh failed'); }); // gh pr create
     const pr = createUmbrellaPr('loop/batch-067', results, '/repo', mockLog);
