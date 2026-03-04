@@ -49,6 +49,8 @@ export function extractFileRefs(texts: string[]): string[] {
       // Skip docs, templates, config, build output, and dotfile directories
       // Note: \b in the regex strips leading dots, so .claude/ becomes claude/
       if (/^(docs|templates|\.?claude|\.?slope|dist|node_modules)\//.test(file)) continue;
+      // Skip test files — hotspots should target production code, not tests
+      if (/\.(test|spec)\.(ts|js)$/.test(file)) continue;
       // Skip bare basenames that are too ambiguous (no path component)
       // e.g., "test.ts", "init.ts", "index.ts" — could match dozens of files
       if (!file.includes('/') && AMBIGUOUS_BASENAMES.has(file.replace(/\.[^.]+$/, ''))) continue;
