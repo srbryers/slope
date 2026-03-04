@@ -32,6 +32,13 @@ export async function prReviewGuard(input: HookInput, _cwd: string): Promise<Gua
       '5. Skip / Merge Now — No review needed, proceed to merge',
       '',
       'Wait for the user\'s choice before taking any further action.',
+      '',
+      'After the review is complete, capture findings:',
+      '1. For each issue found: `slope review findings add --type=<type> --ticket=<key> --severity=<sev> --description="..."`',
+      '2. After all findings recorded: `slope review amend` to apply to scorecard',
+      '3. Run `slope distill --auto` to promote recurring patterns',
+      '',
+      'Review type to finding type mapping: architect→architect, code→code',
     ].join('\n'),
   };
 }
