@@ -28,15 +28,11 @@ Sprint plans and backlog items for the SLOPE framework (core, CLI, MCP tools).
 | 27 | [sprint-27-plan.md](sprint-27-plan.md) | The Clubhouse — Marketing Site & Design Tokens |
 | 34 | [sprint-34-plan.md](sprint-34-plan.md) | The Universal Caddy — Harness Adapter Interface |
 
-## Roadmaps
+## Roadmap
 
-| Phase | Sprints | Status | Link |
-|-------|---------|--------|------|
-| Phase 1-3 | S7-S15 | Complete | [roadmap.md](roadmap.md) |
-| Phase 4 | S17-S20 | Complete | [roadmap-phase4.md](roadmap-phase4.md) |
-| Phase 5 | S30-S33 | Planned | [roadmap-phase5.md](roadmap-phase5.md) |
-| Phase 6 | S34-S36 | Complete | [roadmap-phase6.md](roadmap-phase6.md) |
-| Phase 7 | S37-S40 | Planned | [roadmap-phase7.md](roadmap-phase7.md) |
+Unified roadmap covering all 13 phases (S1-S58) plus active Phase 10 (Loop Quality): [roadmap.md](roadmap.md)
+
+Machine-readable version: [roadmap.json](roadmap.json)
 
 ## Research
 
