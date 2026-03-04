@@ -1,10 +1,11 @@
-import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdirSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ReviewFinding, ReviewType, HazardSeverity } from '../../core/types.js';
 import { recommendReviews, amendScorecardWithFindings } from '../../core/review.js';
 import { loadConfig, detectLatestSprint } from '../../core/index.js';
 import { HAZARD_SEVERITY_PENALTIES } from '../../core/constants.js';
 import type { GolfScorecard } from '../../core/types.js';
+import { findPlanContent, countTickets, countPackageRefs } from '../guards/plan-analysis.js';
 
 export interface ReviewState {
   rounds_required: number;
@@ -37,43 +38,6 @@ export function saveReviewState(cwd: string, state: ReviewState): void {
   const dir = join(cwd, '.slope');
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(cwd, REVIEW_STATE_FILE), JSON.stringify(state, null, 2) + '\n');
-}
-
-function findPlanFile(cwd: string): { path: string; content: string } | null {
-  const plansDir = join(cwd, '.claude', 'plans');
-  if (!existsSync(plansDir)) return null;
-
-  try {
-    const files = readdirSync(plansDir)
-      .filter(f => f.endsWith('.md'))
-      .map(f => ({
-        name: f,
-        path: join('.claude', 'plans', f),
-        fullPath: join(plansDir, f),
-        mtime: (() => { try { return statSync(join(plansDir, f)).mtimeMs; } catch { return 0; } })(),
-      }))
-      .sort((a, b) => b.mtime - a.mtime);
-
-    if (files.length > 0) {
-      return { path: files[0].path, content: readFileSync(files[0].fullPath, 'utf8') };
-    }
-  } catch { /* can't read plans dir */ }
-
-  return null;
-}
-
-function countTickets(content: string): number {
-  const ticketHeaders = content.match(/^###\s+S\d+-\d+/gm) ?? [];
-  if (ticketHeaders.length > 0) return ticketHeaders.length;
-  const h3Headers = content.match(/^###\s+/gm) ?? [];
-  return h3Headers.length;
-}
-
-function countPackageRefs(content: string): number {
-  const refs = new Set<string>();
-  const matches = content.matchAll(/packages\/(\w[\w-]*)/g);
-  for (const m of matches) refs.add(m[1]);
-  return refs.size;
 }
 
 function detectTier(content: string): { tier: string; rounds: number } {
@@ -119,7 +83,7 @@ function startCommand(args: string[], cwd: string): void {
     rounds = TIER_ROUNDS[tier];
   } else {
     // Auto-detect from plan file
-    const plan = findPlanFile(cwd);
+    const plan = findPlanContent(cwd);
     if (plan) {
       const detected = detectTier(plan.content);
       tier = detected.tier;
@@ -133,7 +97,7 @@ function startCommand(args: string[], cwd: string): void {
 
   // Find plan file if not already set
   if (!planFile) {
-    const plan = findPlanFile(cwd);
+    const plan = findPlanContent(cwd);
     if (plan) planFile = plan.path;
   }
 
@@ -216,7 +180,7 @@ function saveFindings(cwd: string, data: FindingsFile): void {
 // --- Review Recommend ---
 
 function recommendCommand(cwd: string): void {
-  const plan = findPlanFile(cwd);
+  const plan = findPlanContent(cwd);
   let ticketCount = 0;
   let slope = 0;
   let filePatterns: string[] = [];
