@@ -4,6 +4,7 @@ import type { Logger } from './logger.js';
 
 export interface GuardResult {
   passed: boolean;
+  // diff_scope is forward-looking — currently warn-only, may become a hard guard
   failedGuard?: 'typecheck' | 'tests' | 'substantiveness' | 'diff_scope';
 }
 
@@ -44,8 +45,6 @@ export function isDiffInScope(preSha: string, modules: string[], cwd: string): D
       if (file === mod) return true;
       // File is under a module directory
       if (file.startsWith(mod.endsWith('/') ? mod : mod + '/')) return true;
-      // Module is a directory prefix (e.g., module "src/cli/loop" matches "src/cli/loop/planner.ts")
-      if (file.startsWith(mod + '/')) return true;
       // Test file for an in-scope module: test path mirrors src path
       // e.g., "tests/cli/loop/planner.test.ts" is in scope for "src/cli/loop/planner.ts"
       if (file.includes('.test.')) {
@@ -66,8 +65,9 @@ export function isDiffInScope(preSha: string, modules: string[], cwd: string): D
     }
   }
 
-  // Threshold: >50% of files must be out of scope to flag
-  const inScope = outOfScopeFiles.length <= changedFiles.length / 2;
+  // Threshold: more than half of files must be out of scope to flag (warn-only)
+  const SCOPE_THRESHOLD = 0.5;
+  const inScope = outOfScopeFiles.length / changedFiles.length <= SCOPE_THRESHOLD;
   return { inScope, outOfScopeFiles };
 }
 

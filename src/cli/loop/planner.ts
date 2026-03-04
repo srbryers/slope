@@ -101,13 +101,14 @@ export function tier15Modules(ticket: BacklogTicket, cwd: string): PlanFileEntry
       matchedFiles.add(mod);
     }
 
-    // Grep keywords within the module path (file or parent directory)
+    // Grep keywords within the module path (file's parent dir or directory itself)
     const keywords = extractKeywords(`${ticket.title} ${ticket.description}`);
-    const searchDir = existsSync(fullPath) && !mod.endsWith('/')
-      ? join(cwd, mod, '..')  // parent dir of file
-      : fullPath;             // directory itself
+    // Use relative path for grep so output is relative to cwd
+    const relSearchDir = existsSync(fullPath) && !mod.endsWith('/')
+      ? join(mod, '..')   // parent dir of file (relative)
+      : mod;              // directory itself (relative)
 
-    if (!existsSync(searchDir)) continue;
+    if (!existsSync(join(cwd, relSearchDir))) continue;
 
     for (const keyword of keywords) {
       if (matchedFiles.size >= 5) break;
@@ -115,15 +116,13 @@ export function tier15Modules(ticket: BacklogTicket, cwd: string): PlanFileEntry
         const output = execFileSync('grep', [
           '-rl', '--include=*.ts', '--include=*.js',
           keyword,
-          searchDir,
+          relSearchDir,
         ], { cwd, encoding: 'utf8', timeout: 5000 });
 
         for (const line of output.split('\n')) {
           const trimmed = line.trim();
           if (!trimmed || trimmed.includes('.test.') || trimmed.includes('node_modules')) continue;
-          // Make path relative to cwd
-          const rel = trimmed.startsWith(cwd) ? trimmed.slice(cwd.length + 1) : trimmed;
-          matchedFiles.add(rel);
+          matchedFiles.add(trimmed);
           if (matchedFiles.size >= 5) break;
         }
       } catch {
@@ -220,7 +219,7 @@ function buildApproach(model: string): string {
 }
 
 /**
- * Generate a concrete execution plan for a ticket using 3-tier file discovery.
+ * Generate a concrete execution plan for a ticket using 4-tier file discovery.
  * No embeddings required.
  */
 export function generatePlan(

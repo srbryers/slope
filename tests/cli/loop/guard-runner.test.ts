@@ -162,6 +162,14 @@ describe('isDiffInScope', () => {
     expect(result.outOfScopeFiles).toEqual([]);
   });
 
+  it('returns inScope at exactly 50% out-of-scope (boundary)', () => {
+    mockDiffOutput(['src/cli/loop/planner.ts', 'src/cli/loop/executor.ts', 'src/core/types.ts', 'src/core/scoring.ts']);
+    const result = isDiffInScope(PRE_SHA, ['src/cli/loop'], '/repo');
+    // 2 out of 4 = 50% — at boundary, treated as in scope
+    expect(result.inScope).toBe(true);
+    expect(result.outOfScopeFiles).toEqual(['src/core/types.ts', 'src/core/scoring.ts']);
+  });
+
   it('returns inScope when git diff fails (conservative fallback)', () => {
     (execFileSync as ReturnType<typeof vi.fn>)
       .mockImplementationOnce(() => { throw new Error('not a git repo'); });

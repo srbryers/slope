@@ -16,7 +16,7 @@ import type { Logger } from './logger.js';
 // Context budget constants — cap injected context to avoid token overflow
 const MAX_PRIMARY_FILES = 3;
 const CONTEXT_LINE_LIMIT_LOCAL = 200;
-const CONTEXT_LINE_LIMIT_API = 500;
+const CONTEXT_LINE_LIMIT_API = 750;
 
 let shuttingDown = false;
 const activeChildPids = new Set<number>();
