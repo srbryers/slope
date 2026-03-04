@@ -204,7 +204,12 @@ export async function runSprint(flags: Record<string, string>, cwd: string): Pro
       // Cleanup worktree if merged
       if (mergeStatus === 'merged') {
         removeWorktree(wt.path, wt.branch, mainRepo, log);
-        try { execFileSync('git', ['pull'], { cwd: mainRepo, stdio: 'pipe' }); } catch { /* ok */ }
+        if (stagingBranch) {
+          // Update local staging ref so next worktree branches from the latest
+          try { execFileSync('git', ['fetch', 'origin', `${stagingBranch}:${stagingBranch}`], { cwd: mainRepo, stdio: 'pipe' }); } catch { /* ok */ }
+        } else {
+          try { execFileSync('git', ['pull'], { cwd: mainRepo, stdio: 'pipe' }); } catch { /* ok */ }
+        }
         log.info(`=== Sprint ${sprint.id} done (merged, worktree cleaned) ===`);
       } else {
         log.info(`=== Sprint ${sprint.id} done ===`);

@@ -24,22 +24,34 @@ beforeEach(() => {
 // ── initStagingBranch ─────────────────────────────
 
 describe('initStagingBranch', () => {
-  it('creates staging branch from main and returns branch name', () => {
+  it('creates staging branch from origin/main and returns branch name', () => {
     (execFileSync as ReturnType<typeof vi.fn>).mockReturnValue('');
     const branch = initStagingBranch('067', '/repo', mockLog);
     expect(branch).toBe('loop/batch-067');
     // fetch, branch create, push
     expect(execFileSync).toHaveBeenCalledTimes(3);
     expect(execFileSync).toHaveBeenCalledWith(
-      'git', ['branch', 'loop/batch-067', 'main'],
+      'git', ['branch', 'loop/batch-067', 'origin/main'],
       expect.objectContaining({ cwd: '/repo' }),
     );
   });
 
-  it('throws when branch creation fails', () => {
+  it('reuses existing branch on re-run (idempotent)', () => {
     (execFileSync as ReturnType<typeof vi.fn>)
       .mockReturnValueOnce('') // fetch
-      .mockImplementationOnce(() => { throw new Error('branch exists'); }); // branch create
+      .mockImplementationOnce(() => { throw new Error('already exists'); }) // branch create fails
+      .mockReturnValueOnce('') // rev-parse succeeds (branch exists)
+      .mockReturnValueOnce(''); // push
+    const branch = initStagingBranch('067', '/repo', mockLog);
+    expect(branch).toBe('loop/batch-067');
+    expect(mockLog.info).toHaveBeenCalledWith(expect.stringContaining('Reusing existing'));
+  });
+
+  it('throws when branch creation fails and branch does not exist', () => {
+    (execFileSync as ReturnType<typeof vi.fn>)
+      .mockReturnValueOnce('') // fetch
+      .mockImplementationOnce(() => { throw new Error('failed'); }) // branch create
+      .mockImplementationOnce(() => { throw new Error('not found'); }); // rev-parse fails
     expect(() => initStagingBranch('067', '/repo', mockLog)).toThrow('Failed to create staging branch');
   });
 

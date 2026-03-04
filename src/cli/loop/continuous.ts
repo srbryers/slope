@@ -4,7 +4,7 @@ import { execSync } from 'node:child_process';
 import { resolveLoopConfig } from './config.js';
 import { loadBacklog, getRemainingSprintIds } from './backlog.js';
 import { runSprint, isShuttingDown } from './executor.js';
-import { initStagingBranch, createUmbrellaPr } from './staging.js';
+import { initStagingBranch, createUmbrellaPr, cleanupStagingBranch } from './staging.js';
 import { checkGhCli } from './pr-lifecycle.js';
 import { createLogger } from './logger.js';
 import type { LoopConfig, SprintResult } from './types.js';
@@ -109,13 +109,15 @@ export async function runContinuous(flags: Record<string, string>, cwd: string):
     }
   }
 
-  // Create umbrella PR if staging mode was used
+  // Create umbrella PR if staging mode was used (requires manual review and merge)
   if (stagingBranch && collectedResults.length > 0 && checkGhCli(log)) {
     log.info('Creating umbrella PR for staging branch...');
     const umbrella = createUmbrellaPr(stagingBranch, collectedResults, cwd, log);
     if (umbrella) {
-      log.info(`Umbrella PR: ${umbrella.url}`);
+      log.info(`Umbrella PR: ${umbrella.url} (requires manual review)`);
     }
+    // Cleanup staging branch if umbrella PR was created — safe delete refuses if unmerged
+    cleanupStagingBranch(stagingBranch, cwd, log);
   }
 
   log.info('=== Continuous Loop Complete ===');

@@ -14,11 +14,18 @@ export function initStagingBranch(firstSprintId: string, cwd: string, log: Logge
     execFileSync('git', ['fetch', 'origin', 'main'], { cwd, stdio: 'pipe' });
   } catch { /* ok — may be offline */ }
 
-  // Create branch from main
+  // Create branch from origin/main (not local main which may be stale)
+  // If branch already exists (interrupted re-run), reuse it
   try {
-    execFileSync('git', ['branch', branch, 'main'], { cwd, stdio: 'pipe' });
-  } catch (err) {
-    throw new Error(`Failed to create staging branch ${branch}: ${(err as Error).message}`);
+    execFileSync('git', ['branch', branch, 'origin/main'], { cwd, stdio: 'pipe' });
+  } catch {
+    // Check if branch already exists — reuse for idempotent re-runs
+    try {
+      execFileSync('git', ['rev-parse', '--verify', branch], { cwd, stdio: 'pipe' });
+      log.info(`Reusing existing staging branch: ${branch}`);
+    } catch {
+      throw new Error(`Failed to create staging branch ${branch}`);
+    }
   }
 
   // Push to origin so sprint worktrees can branch from it
@@ -41,6 +48,11 @@ export function createUmbrellaPr(
   cwd: string,
   log: Logger,
 ): { url: string; number: number } | null {
+  // Fetch latest staging ref so local matches remote after sprint merges
+  try {
+    execFileSync('git', ['fetch', 'origin', `${stagingBranch}:${stagingBranch}`], { cwd, stdio: 'pipe' });
+  } catch { /* ok */ }
+
   // Check if staging has commits ahead of main
   try {
     const count = execFileSync('git', ['rev-list', '--count', `main..${stagingBranch}`], {
