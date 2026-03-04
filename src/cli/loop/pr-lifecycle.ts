@@ -29,10 +29,10 @@ export function checkGhCli(log: Logger): boolean {
   return true;
 }
 
-/** Check if branch has commits ahead of main */
-export function hasCommitsAhead(branch: string, cwd: string): boolean {
+/** Check if branch has commits ahead of base (default: main) */
+export function hasCommitsAhead(branch: string, cwd: string, baseBranch = 'main'): boolean {
   try {
-    const count = execFileSync('git', ['rev-list', '--count', `main..${branch}`], {
+    const count = execFileSync('git', ['rev-list', '--count', `${baseBranch}..${branch}`], {
       cwd,
       encoding: 'utf8',
     }).trim();
