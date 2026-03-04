@@ -394,6 +394,61 @@ function analyze(): void {
   generateBacklog(analysis, scorecards.length);
 }
 
+// --- Roadmap Fallback ---
+
+/**
+ * Convert planned sprints from roadmap.json into BacklogSprint format.
+ * Caps at 3 sprints per cycle to force a regression re-check between batches
+ * (if a roadmap sprint introduces a hazard, the next analyze cycle picks it up as Strategy 1).
+ */
+export function convertPlannedSprints(
+  planned: PlannedSprint[],
+  startCounter: number,
+  repoRoot: string,
+): { sprints: BacklogSprint[]; counter: number } {
+  const sprints: BacklogSprint[] = [];
+  let counter = startCounter;
+  const resultsDir = join(repoRoot, 'slope-loop/results');
+
+  for (const ps of planned) {
+    // Skip malformed sprints
+    if (!ps.tickets || !Array.isArray(ps.tickets) || ps.tickets.length === 0) continue;
+
+    const sprintId = `S-LOCAL-${String(counter).padStart(3, '0')}`;
+
+    // Skip already-completed planned sprints (check by result file)
+    if (existsSync(join(resultsDir, `${sprintId}.json`))) {
+      counter++;
+      continue;
+    }
+
+    sprints.push({
+      id: sprintId,
+      title: ps.theme,
+      strategy: 'roadmap',
+      par: ps.par,
+      slope: ps.slope,
+      type: ps.type as BacklogSprint['type'],
+      tickets: ps.tickets
+        .filter(t => t.acceptance_criteria?.length > 0)
+        .map((t, i) => ({
+          key: `${sprintId}-${i + 1}`,
+          title: t.title,
+          club: t.club,
+          description: t.description,
+          acceptance_criteria: t.acceptance_criteria,
+          modules: t.modules.filter(m => existsSync(join(repoRoot, m))),
+          max_files: t.max_files,
+        })),
+    });
+    counter++;
+
+    if (sprints.length >= 3) break;
+  }
+
+  return { sprints, counter };
+}
+
 // --- Backlog Generation ---
 
 function generateBacklog(analysis: Analysis, sprintCount: number): void {
@@ -584,51 +639,14 @@ function generateBacklog(analysis: Analysis, sprintCount: number): void {
 
   // --- Strategy 6: Roadmap-driven sprints (when scorecard data is exhausted) ---
   // Only fires when scorecard strategies produce 0 sprints — regressions always take priority.
-  // Caps at 3 sprints per regeneration cycle to force a regression re-check between batches
-  // (if a roadmap sprint introduces a hazard, the next cycle picks it up as Strategy 1).
   if (sprints.length === 0) {
     const repoRoot = join(__dirname, '..');
     const roadmapPath = join(repoRoot, 'docs/backlog/roadmap.json');
     if (existsSync(roadmapPath)) {
       const roadmap = JSON.parse(readFileSync(roadmapPath, 'utf8'));
-      const planned: PlannedSprint[] = roadmap.planned ?? [];
-      const resultsDir = join(repoRoot, 'slope-loop/results');
-
-      for (const ps of planned) {
-        // Skip malformed sprints
-        if (!ps.tickets || !Array.isArray(ps.tickets) || ps.tickets.length === 0) continue;
-
-        const sprintId = `S-LOCAL-${String(counter).padStart(3, '0')}`;
-
-        // Skip already-completed planned sprints (check by result file)
-        if (existsSync(join(resultsDir, `${sprintId}.json`))) {
-          counter++;
-          continue;
-        }
-
-        sprints.push({
-          id: sprintId,
-          title: ps.theme,
-          strategy: 'roadmap',
-          par: ps.par,
-          slope: ps.slope,
-          type: ps.type as BacklogSprint['type'],
-          tickets: ps.tickets
-            .filter(t => t.acceptance_criteria?.length > 0)
-            .map((t, i) => ({
-              key: `${sprintId}-${i + 1}`,
-              title: t.title,
-              club: t.club,
-              description: t.description,
-              acceptance_criteria: t.acceptance_criteria,
-              modules: t.modules.filter(m => existsSync(join(repoRoot, m))),
-              max_files: t.max_files,
-            })),
-        });
-        counter++;
-
-        if (sprints.length >= 3) break;
-      }
+      const result = convertPlannedSprints(roadmap.planned ?? [], counter, repoRoot);
+      sprints.push(...result.sprints);
+      counter = result.counter;
     }
   }
 
