@@ -10,6 +10,7 @@ import {
   countPackageRefs,
   extractFilePatterns,
   extractTicketInfo,
+  type PlanFile,
 } from './plan-analysis.js';
 
 interface ReviewState {
@@ -35,8 +36,17 @@ export async function reviewTierGuard(input: HookInput, cwd: string): Promise<Gu
     return {};
   }
 
-  // Read the plan content (use the just-written file directly)
-  const plan = findPlanContent(cwd);
+  // Read the plan content — prefer the just-written file path directly,
+  // since findPlanContent(cwd) only searches repo-local .claude/plans/ and
+  // Claude Code writes plans to ~/.claude/plans/ (global user directory).
+  let plan: PlanFile | null = null;
+  try {
+    const content = readFileSync(filePath, 'utf8');
+    plan = { path: normalizedPath, content };
+  } catch {
+    // File not readable — fall back to directory scan
+    plan = findPlanContent(cwd);
+  }
   if (!plan) return {};
 
   // Analyze the plan

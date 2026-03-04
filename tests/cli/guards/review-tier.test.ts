@@ -1,10 +1,16 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdirSync, writeFileSync, rmSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { reviewTierGuard } from '../../../src/cli/guards/review-tier.js';
 import type { HookInput } from '../../../src/core/index.js';
 
 const TMP = join(import.meta.dirname ?? __dirname, '..', '..', '..', '.test-tmp-review-tier');
+
+// Mock homedir so findPlanContent's global fallback doesn't find real user plans
+vi.mock('node:os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:os')>();
+  return { ...actual, homedir: () => TMP };
+});
 
 function makeInput(filePath: string): HookInput {
   return {
@@ -239,5 +245,47 @@ describe('reviewTierGuard', () => {
     const input = makeInput(planPath);
     const result = await reviewTierGuard(input, TMP);
     expect(result.context).toContain('3 tickets');
+  });
+
+  it('reads plan from tool_input.file_path outside cwd (global plans dir)', async () => {
+    // Simulate Claude Code writing to ~/.claude/plans/ by using a separate tmp dir
+    const globalDir = join(TMP, '.global-home', '.claude', 'plans');
+    mkdirSync(globalDir, { recursive: true });
+    const globalPlanPath = join(globalDir, 'sprint-99-plan.md');
+    writeFileSync(globalPlanPath, [
+      '# Sprint 99 Plan',
+      '### T1: Add feature to `src/utils/foo.ts`',
+      '### T2: Fix bug in `src/utils/bar.ts`',
+    ].join('\n'));
+
+    // file_path points to global dir, not {cwd}/.claude/plans/
+    const input = makeInput(globalPlanPath);
+    const result = await reviewTierGuard(input, TMP);
+    expect(result.context).toContain('2 tickets');
+    expect(result.context).toContain('Light');
+  });
+
+  it('falls back to findPlanContent when tool_input.file_path is unreadable', async () => {
+    // Write plan in cwd (repo-local) so findPlanContent can find it
+    writePlan([
+      '# Sprint Plan',
+      '### T1: Task one',
+      '### T2: Task two',
+      '### T3: Task three',
+    ].join('\n'));
+
+    // Point file_path to a non-existent file — should fall back to findPlanContent
+    const input = makeInput(join(TMP, '.claude', 'plans', 'does-not-exist.md'));
+    const result = await reviewTierGuard(input, TMP);
+    expect(result.context).toContain('3 tickets');
+    expect(result.context).toContain('Standard');
+  });
+
+  it('returns empty when file_path is unreadable and no plan exists anywhere', async () => {
+    // file_path points to a non-existent file, and homedir is mocked to TMP
+    // which has no plans either — should return empty.
+    const input = makeInput(join(TMP, '.claude', 'plans', 'nonexistent.md'));
+    const result = await reviewTierGuard(input, TMP);
+    expect(result).toEqual({});
   });
 });

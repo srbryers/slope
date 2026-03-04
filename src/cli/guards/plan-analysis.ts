@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { homedir } from 'node:os';
 
 /** Result of finding a plan file */
 export interface PlanFile {
@@ -15,26 +16,44 @@ export interface TicketInfo {
 
 /**
  * Find the most recently modified plan file in .claude/plans/.
+ * Searches repo-local first ({cwd}/.claude/plans/), then falls back
+ * to global (~/.claude/plans/) since Claude Code writes plans there.
  */
 export function findPlanContent(cwd: string): PlanFile | null {
-  const plansDir = join(cwd, '.claude', 'plans');
-  if (!existsSync(plansDir)) return null;
+  const repoLocal = join(cwd, '.claude', 'plans');
+  const global = join(homedir(), '.claude', 'plans');
 
-  try {
-    const files = readdirSync(plansDir)
-      .filter(f => f.endsWith('.md'))
-      .map(f => ({
-        name: f,
-        path: join('.claude', 'plans', f),
-        fullPath: join(plansDir, f),
-        mtime: (() => { try { return statSync(join(plansDir, f)).mtimeMs; } catch { return 0; } })(),
-      }))
-      .sort((a, b) => b.mtime - a.mtime);
+  // Deduplicate when cwd is the home directory
+  const searchDirs: Array<{ dir: string; relative: boolean }> = [
+    { dir: repoLocal, relative: true },
+  ];
+  if (global.replace(/\\/g, '/') !== repoLocal.replace(/\\/g, '/')) {
+    searchDirs.push({ dir: global, relative: false });
+  }
 
-    if (files.length > 0) {
-      return { path: files[0].path, content: readFileSync(files[0].fullPath, 'utf8') };
-    }
-  } catch { /* can't read plans dir */ }
+  for (const { dir: plansDir, relative } of searchDirs) {
+    if (!existsSync(plansDir)) continue;
+
+    try {
+      const files = readdirSync(plansDir)
+        .filter(f => f.endsWith('.md'))
+        .map(f => ({
+          name: f,
+          // Repo-local: relative path (preserves original behavior for review-state storage)
+          // Global: absolute path (needed since it's outside the repo)
+          path: relative
+            ? join('.claude', 'plans', f).replace(/\\/g, '/')
+            : join(plansDir, f).replace(/\\/g, '/'),
+          fullPath: join(plansDir, f),
+          mtime: (() => { try { return statSync(join(plansDir, f)).mtimeMs; } catch { return 0; } })(),
+        }))
+        .sort((a, b) => b.mtime - a.mtime);
+
+      if (files.length > 0) {
+        return { path: files[0].path, content: readFileSync(files[0].fullPath, 'utf8') };
+      }
+    } catch { /* can't read plans dir */ }
+  }
 
   return null;
 }

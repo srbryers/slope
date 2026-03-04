@@ -7,6 +7,12 @@ import { loadReviewState, saveReviewState } from '../../src/cli/commands/review-
 import type { ReviewState } from '../../src/cli/commands/review-state.js';
 
 let tmpDir: string;
+
+// Mock homedir so findPlanContent's global fallback doesn't find real user plans
+vi.mock('node:os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:os')>();
+  return { ...actual, homedir: () => tmpDir };
+});
 let origCwd: typeof process.cwd;
 let origExit: typeof process.exit;
 let origArgv: string[];
