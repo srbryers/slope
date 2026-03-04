@@ -1,0 +1,96 @@
+{
+  "sprint_number": 41,
+  "theme": "The Metaphor Studio",
+  "par": 4,
+  "slope": 2,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-02-28",
+  "type": "feature",
+  "backfilled": true,
+  "shots": [
+    {
+      "ticket_key": "S41-1",
+      "title": "Selection UX — metaphor browser with preview + search",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Added saveConfig(), METAPHOR_SCHEMA, and saveCustomMetaphor() to core. Validate, save, register, and activate custom metaphors in one call."
+    },
+    {
+      "ticket_key": "S41-2",
+      "title": "Custom metaphor generation — LLM-powered vocabulary builder",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Replaced free-text metaphor prompt in slope init --interactive with a numbered menu built from listMetaphors(), including a 'custom' option that prints agent generation instructions."
+    },
+    {
+      "ticket_key": "S41-3",
+      "title": "CLI metaphor management — list, show, create, validate commands",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Added metaphor module to MCP search tool returning schema, built-in list, and example definition. Added saveCustomMetaphor and saveConfig sandbox helpers with cwd pre-bound."
+    },
+    {
+      "ticket_key": "S41-4",
+      "title": "MCP metaphor tools — search and generation via sandbox",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added slope metaphor list|set|show CLI command for metaphor management with [active] and [custom] markers."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 3,
+    "greens_total": 4,
+    "putts": 1,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "altitude",
+      "description": "First time building interactive metaphor selection UX and custom metaphor generation",
+      "impact": "none"
+    }
+  ],
+  "special_plays": [],
+  "training": [],
+  "nutrition": [
+    {
+      "category": "hydration",
+      "description": "Build + typecheck + 1842 tests passing at completion. 22 new tests added.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Smooth sprint. The metaphor system was already well-structured from earlier work — this sprint extended it with management tooling and interactive selection.",
+    "advice_for_next_player": "Custom metaphors are saved to .slope/metaphors/ and auto-registered. The METAPHOR_SCHEMA validates vocabulary completeness.",
+    "what_surprised_you": "No scorecard was filed — the post-hole routine was skipped after PR merge.",
+    "excited_about_next": "S42 (The Caddy Interview) extends the interactive init flow with smart defaults from the analyzer pipeline."
+  },
+  "bunker_locations": [],
+  "yardage_book_updates": [
+    "src/core/metaphor.ts: saveCustomMetaphor(), METAPHOR_SCHEMA — custom metaphor persistence + validation",
+    "src/core/config.ts: saveConfig() — write config back to disk",
+    "src/cli/commands/metaphor.ts: slope metaphor list|set|show",
+    "slope init --interactive: numbered metaphor menu with custom option",
+    "MCP: metaphor module in search tool, saveCustomMetaphor + saveConfig sandbox helpers"
+  ],
+  "course_management_notes": [
+    "4 tickets, par 4, score 4 — clean par with no hazards",
+    "Backfilled retroactively — scorecard was missed during original sprint execution",
+    "Merged via PR #26 on 2026-02-28"
+  ]
+}
