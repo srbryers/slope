@@ -135,7 +135,7 @@ export interface ExecutionPlan {
   files: PlanFileEntry[];   // concrete file-level changes
   testFiles: string[];      // matched test files
   approach: string;         // model-specific approach text
-  generated: 'enriched' | 'grep' | 'generic'; // which tier produced the plan
+  generated: 'enriched' | 'modules' | 'grep' | 'generic'; // which tier produced the plan
 }
 
 export interface PlanFileEntry {

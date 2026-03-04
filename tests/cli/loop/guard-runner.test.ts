@@ -6,8 +6,8 @@ vi.mock('node:child_process', () => ({
   execFileSync: vi.fn(),
 }));
 
-import { runGuards, isSubstantive } from '../../../src/cli/loop/guard-runner.js';
-import type { LoopConfig } from '../../../src/cli/loop/types.js';
+import { runGuards, isSubstantive, isDiffInScope } from '../../../src/cli/loop/guard-runner.js';
+import type { BacklogTicket, LoopConfig } from '../../../src/cli/loop/types.js';
 import type { Logger } from '../../../src/cli/loop/logger.js';
 
 const mockLog: Logger = {
@@ -112,6 +112,112 @@ describe('runGuards', () => {
     expect(execFileSync).toHaveBeenCalledWith(
       'git', ['reset', '--hard', PRE_SHA], expect.any(Object),
     );
+  });
+});
+
+describe('isDiffInScope', () => {
+  function mockDiffOutput(files: string[]): void {
+    (execFileSync as ReturnType<typeof vi.fn>)
+      .mockReturnValueOnce(files.join('\n') + '\n');
+  }
+
+  it('returns inScope when all files match module paths', () => {
+    mockDiffOutput(['src/cli/loop/planner.ts', 'src/cli/loop/executor.ts']);
+    const result = isDiffInScope(PRE_SHA, ['src/cli/loop'], '/repo');
+    expect(result.inScope).toBe(true);
+    expect(result.outOfScopeFiles).toEqual([]);
+  });
+
+  it('returns not inScope when all files are outside modules', () => {
+    mockDiffOutput(['src/core/scoring.ts', 'src/core/types.ts']);
+    const result = isDiffInScope(PRE_SHA, ['src/cli/loop'], '/repo');
+    expect(result.inScope).toBe(false);
+    expect(result.outOfScopeFiles).toEqual(['src/core/scoring.ts', 'src/core/types.ts']);
+  });
+
+  it('returns inScope when majority of files are in scope (threshold)', () => {
+    mockDiffOutput(['src/cli/loop/planner.ts', 'src/cli/loop/executor.ts', 'src/core/types.ts']);
+    const result = isDiffInScope(PRE_SHA, ['src/cli/loop'], '/repo');
+    expect(result.inScope).toBe(true);
+    expect(result.outOfScopeFiles).toEqual(['src/core/types.ts']);
+  });
+
+  it('returns inScope when modules array is empty', () => {
+    const result = isDiffInScope(PRE_SHA, [], '/repo');
+    expect(result.inScope).toBe(true);
+    expect(result.outOfScopeFiles).toEqual([]);
+  });
+
+  it('treats test files for in-scope modules as in scope', () => {
+    mockDiffOutput(['tests/cli/loop/planner.test.ts']);
+    const result = isDiffInScope(PRE_SHA, ['src/cli/loop/planner.ts'], '/repo');
+    expect(result.inScope).toBe(true);
+    expect(result.outOfScopeFiles).toEqual([]);
+  });
+
+  it('treats test files under module test dir as in scope', () => {
+    mockDiffOutput(['tests/cli/loop/guard-runner.test.ts']);
+    const result = isDiffInScope(PRE_SHA, ['src/cli/loop'], '/repo');
+    expect(result.inScope).toBe(true);
+    expect(result.outOfScopeFiles).toEqual([]);
+  });
+
+  it('returns inScope at exactly 50% out-of-scope (boundary)', () => {
+    mockDiffOutput(['src/cli/loop/planner.ts', 'src/cli/loop/executor.ts', 'src/core/types.ts', 'src/core/scoring.ts']);
+    const result = isDiffInScope(PRE_SHA, ['src/cli/loop'], '/repo');
+    // 2 out of 4 = 50% — at boundary, treated as in scope
+    expect(result.inScope).toBe(true);
+    expect(result.outOfScopeFiles).toEqual(['src/core/types.ts', 'src/core/scoring.ts']);
+  });
+
+  it('returns inScope when git diff fails (conservative fallback)', () => {
+    (execFileSync as ReturnType<typeof vi.fn>)
+      .mockImplementationOnce(() => { throw new Error('not a git repo'); });
+    const result = isDiffInScope(PRE_SHA, ['src/cli/loop'], '/repo');
+    expect(result.inScope).toBe(true);
+  });
+});
+
+describe('runGuards with ticket scope', () => {
+  function mockSubstantiveDiff(): void {
+    (execFileSync as ReturnType<typeof vi.fn>)
+      .mockReturnValueOnce(
+        '+import { foo } from "./bar";\n+export function doStuff() {\n+  return foo();\n+}\n',
+      );
+  }
+
+  const makeTicket = (modules: string[]): BacklogTicket => ({
+    key: 'TEST-1',
+    title: 'Test ticket',
+    club: 'short_iron',
+    description: 'Test',
+    acceptance_criteria: ['test'],
+    modules,
+    max_files: 2,
+  });
+
+  it('still passes when diff is out of scope (warn-only)', () => {
+    // isDiffInScope call (git diff --name-only)
+    (execFileSync as ReturnType<typeof vi.fn>)
+      .mockReturnValueOnce('src/core/scoring.ts\nsrc/core/types.ts\n');
+    // isSubstantive call (git diff -w)
+    mockSubstantiveDiff();
+    (execSync as ReturnType<typeof vi.fn>).mockReturnValue('');
+
+    const ticket = makeTicket(['src/cli/loop']);
+    const result = runGuards(PRE_SHA, mockConfig, '/repo', mockLog, ticket);
+
+    expect(result.passed).toBe(true);
+    expect(mockLog.warn).toHaveBeenCalledWith(expect.stringContaining('Diff scope warning'));
+  });
+
+  it('does not warn when no ticket is provided', () => {
+    mockSubstantiveDiff();
+    (execSync as ReturnType<typeof vi.fn>).mockReturnValue('');
+
+    const result = runGuards(PRE_SHA, mockConfig, '/repo', mockLog);
+    expect(result.passed).toBe(true);
+    expect(mockLog.warn).not.toHaveBeenCalled();
   });
 });
 

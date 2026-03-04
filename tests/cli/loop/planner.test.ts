@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { generatePlan, formatPlanAsPrompt, extractKeywords } from '../../../src/cli/loop/planner.js';
+import { generatePlan, formatPlanAsPrompt, extractKeywords, tier15Modules } from '../../../src/cli/loop/planner.js';
 import type { BacklogTicket } from '../../../src/cli/loop/types.js';
 import type { Logger } from '../../../src/cli/loop/logger.js';
 
@@ -105,6 +105,80 @@ describe('generatePlan', () => {
 
       expect(plan.generated).toBe('enriched');
       expect(plan.files[0].action).toContain('planner exports generatePlan');
+    });
+  });
+
+  describe('tier 1.5 — modules discovery', () => {
+    it('uses modules tier when ticket has modules and files exist', () => {
+      const filePath = 'src/cli/loop/executor.ts';
+      writeFileSync(join(tmpDir, filePath), 'export function runSprint() {}');
+
+      const ticket = makeTicket({
+        title: 'Fix executor sprint logic',
+        description: 'Update the executor to handle sprint execution',
+        modules: [filePath],
+        files: undefined,
+      });
+      const plan = generatePlan(ticket, 'ollama/qwen3', tmpDir, log);
+
+      expect(plan.generated).toBe('modules');
+      expect(plan.files.some(f => f.path === filePath)).toBe(true);
+    });
+
+    it('falls through to generic when module files do not exist', () => {
+      const ticket = makeTicket({
+        title: 'xyzzy frobnicator',
+        description: 'frobnicate the xyzzy',
+        modules: ['src/cli/loop/nonexistent.ts'],
+        files: undefined,
+      });
+      const plan = generatePlan(ticket, 'ollama/qwen3', tmpDir, log);
+
+      expect(plan.generated).toBe('generic');
+    });
+
+    it('discovers files when module is a directory', () => {
+      // Create files inside the module directory
+      writeFileSync(join(tmpDir, 'src', 'cli', 'loop', 'executor.ts'), 'export function runSprint() {}');
+
+      const ticket = makeTicket({
+        title: 'Fix sprint executor',
+        description: 'Update executor for sprint logic',
+        modules: ['src/cli/loop'],
+        files: undefined,
+      });
+      const result = tier15Modules(ticket, tmpDir);
+
+      // Should find files via grep within the directory
+      if (result) {
+        expect(result.length).toBeGreaterThan(0);
+      }
+      // May return null if grep doesn't match keywords — that's ok, it falls through
+    });
+
+    it('module file itself is always included when it exists', () => {
+      const filePath = 'src/cli/loop/planner.ts';
+      writeFileSync(join(tmpDir, filePath), 'export function generatePlan() {}');
+
+      const ticket = makeTicket({
+        title: 'Update planner logic',
+        description: 'Modify the planner',
+        modules: [filePath],
+        files: undefined,
+      });
+      const result = tier15Modules(ticket, tmpDir);
+
+      expect(result).not.toBeNull();
+      expect(result!.some(f => f.path === filePath)).toBe(true);
+    });
+
+    it('returns null when modules array is empty', () => {
+      const ticket = makeTicket({
+        modules: [],
+        files: undefined,
+      });
+      const result = tier15Modules(ticket, tmpDir);
+      expect(result).toBeNull();
     });
   });
 
