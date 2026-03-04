@@ -19,6 +19,7 @@ import { prReviewGuard } from '../guards/pr-review.js';
 import { transcriptGuard } from '../guards/transcript.js';
 import { branchBeforeCommitGuard } from '../guards/branch-before-commit.js';
 import { worktreeCheckGuard } from '../guards/worktree-check.js';
+import { sprintCompletionGuard } from '../guards/sprint-completion.js';
 import { execSync } from 'node:child_process';
 
 // Side-effect imports: ensure all adapters are registered for detectAdapter()
@@ -79,6 +80,7 @@ const handlers: Partial<Record<GuardName, GuardHandler>> = {
   transcript: transcriptGuard,
   'branch-before-commit': branchBeforeCommitGuard,
   'worktree-check': worktreeCheckGuard,
+  'sprint-completion': sprintCompletionGuard,
 };
 
 /** Register a guard handler */
@@ -110,24 +112,35 @@ export async function guardCommand(args: string[]): Promise<void> {
   // Load custom guard plugins
   loadPluginGuards(cwd, config.plugins);
 
-  // Find guard definition (built-in or custom)
-  const def: AnyGuardDefinition | undefined = getAllGuardDefinitions().find(d => d.name === name);
-  if (!def) {
-    console.error(`Unknown guard: "${name}". Available: ${getAllGuardDefinitions().map(d => d.name).join(', ')}`);
-    process.exit(1);
-  }
-
   // Read hook input from stdin
   let input: HookInput;
+  let stdinParsed = true;
   try {
     input = await readStdin();
   } catch {
-    // No stdin or invalid JSON — run with minimal input (for manual testing)
+    stdinParsed = false;
     input = {
       session_id: '',
       cwd,
-      hook_event_name: def.hookEvent,
+      hook_event_name: '',
     };
+  }
+
+  // Find guard definition (built-in or custom).
+  // When multiple definitions share a name (e.g. sprint-completion fires on
+  // PreToolUse, PostToolUse, and Stop), prefer the one matching the actual
+  // hook_event_name from stdin so the output formatter is correct.
+  const allDefs = getAllGuardDefinitions().filter(d => d.name === name);
+  if (allDefs.length === 0) {
+    console.error(`Unknown guard: "${name}". Available: ${getAllGuardDefinitions().map(d => d.name).join(', ')}`);
+    process.exit(1);
+  }
+  const hookEvent = input.hook_event_name.replace(/:.*$/, ''); // "PreToolUse:Bash" → "PreToolUse"
+  const def = allDefs.find(d => d.hookEvent === hookEvent) ?? allDefs[0];
+
+  // If no stdin was parsed, fill in the hook event from the definition
+  if (!stdinParsed) {
+    input.hook_event_name = def.hookEvent;
   }
 
   // Find and run the handler
