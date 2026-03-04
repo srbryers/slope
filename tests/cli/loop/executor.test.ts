@@ -28,58 +28,50 @@ describe('buildPrompt', () => {
     club: 'short_iron',
     max_files: 3,
     estimated_tokens: 1200,
+    modules: ['src/auth/login.ts', 'src/auth/middleware.ts'],
     files: {
       primary: ['src/auth/login.ts', 'src/auth/middleware.ts'],
-      related: ['src/types/user.ts'],
     },
   };
 
   it('includes basic prompt structure with ticket metadata', () => {
     const prompt = buildPrompt(baseTicket, 'qwen2.5:32b');
-    
+
     expect(prompt).toContain('SLOPE project');
     expect(prompt).toContain('TypeScript monorepo');
-    expect(prompt).toContain('TICKET: Add user authentication');
-    expect(prompt).toContain('DESCRIPTION: Implement JWT-based authentication for API endpoints');
+    expect(prompt).toContain('S-001-1: Add user authentication');
+    expect(prompt).toContain('Implement JWT-based authentication for API endpoints');
     expect(prompt).toContain('S-001-1');
   });
 
-  it('formats acceptance criteria as semicolon-separated list', () => {
+  it('formats acceptance criteria as checkbox list', () => {
     const prompt = buildPrompt(baseTicket, 'qwen2.5:32b');
-    
-    expect(prompt).toContain('ACCEPTANCE CRITERIA: Users can log in with email/password; JWT tokens are validated on protected routes');
+
+    expect(prompt).toContain('[ ] Users can log in with email/password');
+    expect(prompt).toContain('[ ] JWT tokens are validated on protected routes');
   });
 
-  it('includes planning approach for minimax model', () => {
-    const prompt = buildPrompt(baseTicket, 'minimax/api-key');
-    
-    expect(prompt).toContain('APPROACH: Plan before coding');
-    expect(prompt).toContain('List files to modify');
-    expect(prompt).toContain('changes per file');
-    expect(prompt).toContain('verification steps');
-  });
-
-  it('includes planning approach for claude model', () => {
-    const prompt = buildPrompt(baseTicket, 'claude-3.5-sonnet');
-    
-    expect(prompt).toContain('APPROACH: Plan before coding');
-    expect(prompt).toContain('List files to modify');
-  });
-
-  it('includes minimal approach for local models', () => {
+  it('includes target files section with primary files', () => {
     const prompt = buildPrompt(baseTicket, 'qwen2.5:32b');
-    
-    expect(prompt).toContain('APPROACH: Make the smallest possible change');
-    expect(prompt).toContain('Focus on a single file at a time');
-    expect(prompt).toContain('Keep edits minimal');
+
+    expect(prompt).toContain('## Target Files');
+    expect(prompt).toContain('src/auth/login.ts');
+    expect(prompt).toContain('src/auth/middleware.ts');
   });
 
-  it('injects primary files when available', () => {
-    const prompt = buildPrompt(baseTicket, 'qwen2.5:32b');
-    
-    expect(prompt).toContain('FILES TO MODIFY:');
-    expect(prompt).toContain('- src/auth/login.ts');
-    expect(prompt).toContain('- src/auth/middleware.ts');
+  it('includes plan-then-execute approach for API models', () => {
+    const prompt = buildPrompt(baseTicket, 'openrouter/anthropic/claude-haiku-4-5');
+
+    expect(prompt).toContain('plan then execute');
+    expect(prompt).toContain('List the specific changes needed per file');
+  });
+
+  it('includes simple approach for local (ollama) models', () => {
+    const prompt = buildPrompt(baseTicket, 'ollama/qwen3-coder-next-fast');
+
+    expect(prompt).toContain('local model');
+    expect(prompt).toContain('ONE file at a time');
+    expect(prompt).toContain('smallest possible change');
   });
 
   it('limits file list to first 5 files', () => {
@@ -87,58 +79,67 @@ describe('buildPrompt', () => {
       ...baseTicket,
       files: {
         primary: [
-          'src/file1.ts',
-          'src/file2.ts',
-          'src/file3.ts',
-          'src/file4.ts',
-          'src/file5.ts',
-          'src/file6.ts',
-          'src/file7.ts',
+          'src/file1.ts', 'src/file2.ts', 'src/file3.ts',
+          'src/file4.ts', 'src/file5.ts', 'src/file6.ts', 'src/file7.ts',
         ],
-        related: [],
       },
     };
-    
+
     const prompt = buildPrompt(ticketWithManyFiles, 'qwen2.5:32b');
-    
-    expect(prompt).toContain('- src/file1.ts');
-    expect(prompt).toContain('- src/file5.ts');
-    expect(prompt).not.toContain('- src/file6.ts');
+
+    expect(prompt).toContain('src/file1.ts');
+    expect(prompt).toContain('src/file5.ts');
+    expect(prompt).not.toContain('src/file6.ts');
   });
 
-  it('omits FILES TO MODIFY section when no primary files', () => {
+  it('falls back to modules when no primary files', () => {
     const ticketNoFiles: BacklogTicket = {
       ...baseTicket,
-      files: {
-        primary: [],
-        related: [],
-      },
+      files: undefined,
+      modules: ['src/core/auth.ts'],
     };
-    
+
     const prompt = buildPrompt(ticketNoFiles, 'qwen2.5:32b');
-    
-    expect(prompt).not.toContain('FILES TO MODIFY:');
+
+    expect(prompt).toContain('src/core/auth.ts');
+  });
+
+  it('shows placeholder when no files or modules', () => {
+    const ticketNoFiles: BacklogTicket = {
+      ...baseTicket,
+      files: undefined,
+      modules: [],
+    };
+
+    const prompt = buildPrompt(ticketNoFiles, 'qwen2.5:32b');
+
+    expect(prompt).toContain('read the description to identify target files');
   });
 
   it('includes commit message guidance with ticket key', () => {
     const prompt = buildPrompt(baseTicket, 'qwen2.5:32b');
-    
-    expect(prompt).toContain('Commit with a message starting with \'S-001-1:\'');
+
+    expect(prompt).toContain("S-001-1: <what you changed>");
   });
 
-  it('includes standard rules for all models', () => {
+  it('includes substantiveness rule', () => {
     const prompt = buildPrompt(baseTicket, 'qwen2.5:32b');
-    
-    expect(prompt).toContain('Make minimal, focused changes');
-    expect(prompt).toContain('do not refactor unrelated code');
-    expect(prompt).toContain('pnpm test');
+
+    expect(prompt).toContain('substantive changes');
+    expect(prompt).toContain('do NOT add only comments');
+  });
+
+  it('includes verification commands', () => {
+    const prompt = buildPrompt(baseTicket, 'qwen2.5:32b');
+
     expect(prompt).toContain('pnpm typecheck');
+    expect(prompt).toContain('pnpm test');
   });
 
-  it('includes final instruction to read source files first', () => {
+  it('instructs to read files before modifying', () => {
     const prompt = buildPrompt(baseTicket, 'qwen2.5:32b');
-    
-    expect(prompt).toContain('START by reading the relevant source files');
+
+    expect(prompt).toContain('Read each target file BEFORE modifying it');
   });
 });
 
@@ -240,8 +241,3 @@ describe('saveResult', () => {
     }
   });
 });
-
-// The executor's runSprint requires heavy mocking of child_process, fs, and
-// all loop modules. We test the individual components (worktree, guard-runner,
-// pr-lifecycle) separately and verify integration via dry-run in a later
-// integration test.

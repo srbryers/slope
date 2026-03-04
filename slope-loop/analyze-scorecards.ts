@@ -437,19 +437,24 @@ function generateBacklog(analysis: Analysis, sprintCount: number): void {
       par: 4,
       slope: 2,
       type: 'bugfix',
-      tickets: topHotspots.map((h, i) => ({
-        key: `S-LOCAL-${String(counter).padStart(3, '0')}-${i + 1}`,
-        title: `Harden: ${h.source_files[0]}`,
-        club: safeClub,
-        description: `Harden ${h.source_files.join(', ')} against known hazards:\n${h.hazard_descriptions.slice(0, 3).map(d => `- ${d}`).join('\n')}`,
-        acceptance_criteria: [
-          'pnpm test passes',
-          'pnpm typecheck passes',
-          ...h.source_files.slice(0, 2).map(f => `Review and harden ${f}`),
-        ],
-        modules: h.source_files,
-        max_files: Math.min(h.source_files.length, 3),
-      })),
+      tickets: topHotspots.map((h, i) => {
+        const primary = h.source_files[0];
+        const hazardList = h.hazard_descriptions.slice(0, 3).map(d => `- ${d}`).join('\n');
+        return {
+          key: `S-LOCAL-${String(counter).padStart(3, '0')}-${i + 1}`,
+          title: `Harden: ${primary}`,
+          club: safeClub,
+          description: `Harden ${h.source_files.join(', ')} against known hazards:\n${hazardList}\n\nAction: Read each file, identify the hazard patterns described above, and add defensive code (input validation, error handling, edge case guards, or tests) to prevent recurrence.`,
+          acceptance_criteria: [
+            'pnpm test passes',
+            'pnpm typecheck passes',
+            ...h.source_files.slice(0, 2).map(f => `At least one substantive code change in ${f}`),
+            'New or updated test(s) covering the hardened path',
+          ],
+          modules: h.source_files,
+          max_files: Math.min(h.source_files.length, 3),
+        };
+      }),
     });
     counter++;
   }
@@ -497,15 +502,17 @@ function generateBacklog(analysis: Analysis, sprintCount: number): void {
       tickets: topHazards.map((h, i) => {
         const files = analysis.hazards.type_files[h.type] ?? [];
         const descs = analysis.hazards.type_descriptions[h.type] ?? [];
+        const descList = descs.slice(0, 3).map(d => `- ${d}`).join('\n');
         return {
           key: `S-LOCAL-${String(counter).padStart(3, '0')}-${i + 1}`,
           title: `Fix ${h.type} hazards in ${files[0] ?? 'codebase'}`,
           club: safeClub,
-          description: `Address ${h.type} hazards in: ${files.slice(0, 3).join(', ')}. Recent examples:\n${descs.slice(0, 3).map(d => `- ${d}`).join('\n')}`,
+          description: `Address ${h.type} hazards in: ${files.slice(0, 3).join(', ')}.\n\nRecent examples:\n${descList}\n\nAction: Read each file, find code matching these hazard patterns, and fix with proper error handling, type safety, or validation. Add tests for the fixed paths.`,
           acceptance_criteria: [
             'pnpm test passes',
             'pnpm typecheck passes',
-            ...files.slice(0, 2).map(f => `Review and fix ${h.type} issues in ${f}`),
+            ...files.slice(0, 2).map(f => `At least one substantive fix in ${f}`),
+            'New or updated test(s) covering the fixed hazard',
           ],
           modules: files.slice(0, 5),
           max_files: Math.min(files.length, 3),

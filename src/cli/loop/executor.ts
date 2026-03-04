@@ -502,35 +502,58 @@ async function runAider(
 // ── Prompt Builder ─────────────────────────────────
 
 export function buildPrompt(ticket: BacklogTicket, model: string): string {
-  const acceptance = ticket.acceptance_criteria.join('; ');
+  const local = isLocalModel(model);
+
+  // Build structured file list from enriched primary files or modules
+  const targetFiles = ticket.files?.primary?.slice(0, 5) ?? ticket.modules?.slice(0, 5) ?? [];
+  const fileSection = targetFiles.length > 0
+    ? targetFiles.map(f => `  - ${f}`).join('\n')
+    : '  (read the description to identify target files)';
+
+  // Build structured acceptance criteria — each on its own line with checkbox
+  const acSection = ticket.acceptance_criteria
+    .map(ac => `  [ ] ${ac}`)
+    .join('\n');
 
   let prompt = `You are working on the SLOPE project (Sprint Lifecycle & Operational Performance Engine).
 This is a TypeScript monorepo using pnpm, vitest for tests, and strict TypeScript.
 
-TICKET: ${ticket.title}
-DESCRIPTION: ${ticket.description}
-ACCEPTANCE CRITERIA: ${acceptance}
+## Task
+${ticket.key}: ${ticket.title}
 
-RULES:
-- Make minimal, focused changes — do not refactor unrelated code
-- Read the relevant source files FIRST before making changes
-- Run 'pnpm test' to verify your changes
-- Run 'pnpm typecheck' to check types
-- Commit with a message starting with '${ticket.key}:'
+## Description
+${ticket.description}
+
+## Target Files
+${fileSection}
+
+## Acceptance Criteria (ALL must pass)
+${acSection}
+
+## Verification Commands
+  1. pnpm typecheck
+  2. pnpm test
+
+## Rules
+- Read each target file BEFORE modifying it — understand existing patterns
+- Make real, substantive changes — do NOT add only comments, whitespace, or no-op edits
+- If a file already satisfies the criteria, move to the next file — do not force changes
+- Keep changes minimal and focused on this ticket only
+- Commit with message: '${ticket.key}: <what you changed>'
 `;
 
-  if (model.includes('minimax') || model.includes('claude')) {
-    prompt += `\nAPPROACH: Plan before coding. List files to modify, changes per file, verification steps. Then execute step by step.`;
+  if (local) {
+    prompt += `\n## Approach (local model — keep it simple)
+- Focus on ONE file at a time
+- Make the smallest possible change that satisfies the criteria
+- Prefer editing existing code over adding new files`;
   } else {
-    prompt += `\nAPPROACH: Make the smallest possible change. Focus on a single file at a time. Keep edits minimal.`;
+    prompt += `\n## Approach (plan then execute)
+1. List the specific changes needed per file
+2. For each file: read it, make the change, verify
+3. Run verification commands after all changes`;
   }
 
-  if (ticket.files?.primary && ticket.files.primary.length > 0) {
-    const fileList = ticket.files.primary.slice(0, 5).map(f => `- ${f}`).join('\n');
-    prompt += `\n\nFILES TO MODIFY:\n${fileList}`;
-  }
-
-  prompt += `\nSTART by reading the relevant source files, then implement the change.`;
   return prompt;
 }
 
