@@ -90,7 +90,7 @@ function startCommand(args: string[], cwd: string): void {
       rounds = detected.rounds;
       planFile = plan.path;
     } else {
-      console.error('Error: No plan file found in .claude/plans/. Use --rounds=N or --tier=<tier>.');
+      console.error('Error: No plan file found in .claude/plans/ or ~/.claude/plans/. Use --rounds=N or --tier=<tier>.');
       process.exit(1);
     }
   }

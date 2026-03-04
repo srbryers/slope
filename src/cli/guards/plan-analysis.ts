@@ -20,12 +20,18 @@ export interface TicketInfo {
  * to global (~/.claude/plans/) since Claude Code writes plans there.
  */
 export function findPlanContent(cwd: string): PlanFile | null {
-  const searchDirs = [
-    join(cwd, '.claude', 'plans'),
-    join(homedir(), '.claude', 'plans'),
-  ];
+  const repoLocal = join(cwd, '.claude', 'plans');
+  const global = join(homedir(), '.claude', 'plans');
 
-  for (const plansDir of searchDirs) {
+  // Deduplicate when cwd is the home directory
+  const searchDirs: Array<{ dir: string; relative: boolean }> = [
+    { dir: repoLocal, relative: true },
+  ];
+  if (global.replace(/\\/g, '/') !== repoLocal.replace(/\\/g, '/')) {
+    searchDirs.push({ dir: global, relative: false });
+  }
+
+  for (const { dir: plansDir, relative } of searchDirs) {
     if (!existsSync(plansDir)) continue;
 
     try {
@@ -33,7 +39,11 @@ export function findPlanContent(cwd: string): PlanFile | null {
         .filter(f => f.endsWith('.md'))
         .map(f => ({
           name: f,
-          path: join(plansDir, f).replace(/\\/g, '/'),
+          // Repo-local: relative path (preserves original behavior for review-state storage)
+          // Global: absolute path (needed since it's outside the repo)
+          path: relative
+            ? join('.claude', 'plans', f).replace(/\\/g, '/')
+            : join(plansDir, f).replace(/\\/g, '/'),
           fullPath: join(plansDir, f),
           mtime: (() => { try { return statSync(join(plansDir, f)).mtimeMs; } catch { return 0; } })(),
         }))

@@ -1,10 +1,16 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdirSync, writeFileSync, rmSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { reviewTierGuard } from '../../../src/cli/guards/review-tier.js';
 import type { HookInput } from '../../../src/core/index.js';
 
 const TMP = join(import.meta.dirname ?? __dirname, '..', '..', '..', '.test-tmp-review-tier');
+
+// Mock homedir so findPlanContent's global fallback doesn't find real user plans
+vi.mock('node:os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:os')>();
+  return { ...actual, homedir: () => TMP };
+});
 
 function makeInput(filePath: string): HookInput {
   return {
@@ -275,15 +281,11 @@ describe('reviewTierGuard', () => {
     expect(result.context).toContain('Standard');
   });
 
-  it('returns empty when file_path is unreadable and no repo-local plan exists', async () => {
-    // file_path points to a non-existent file, and no plans in cwd either.
-    // Note: findPlanContent may find real plans in ~/.claude/plans/ due to the
-    // homedir fallback, so we only test that the file_path read fails gracefully
-    // and the guard doesn't crash — it either returns {} or falls through to
-    // findPlanContent which may find global plans.
+  it('returns empty when file_path is unreadable and no plan exists anywhere', async () => {
+    // file_path points to a non-existent file, and homedir is mocked to TMP
+    // which has no plans either — should return empty.
     const input = makeInput(join(TMP, '.claude', 'plans', 'nonexistent.md'));
     const result = await reviewTierGuard(input, TMP);
-    // Should not throw — either returns {} or context from fallback
-    expect(result).toBeDefined();
+    expect(result).toEqual({});
   });
 });
