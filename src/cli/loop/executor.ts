@@ -495,6 +495,17 @@ async function runAider(
 export function buildPrompt(ticket: BacklogTicket, model: string): string {
   const local = isLocalModel(model);
 
+  // Calculate token budget based on club and model tier
+  const clubBudgets: Record<string, number> = {
+    putter: 4000,
+    wedge: 4000,
+    short_iron: 8000,
+    long_iron: 16000,
+    driver: 24000,
+  };
+  const baseBudget = clubBudgets[ticket.club] ?? 8000;
+  const tokenBudget = local ? Math.floor(baseBudget / 2) : baseBudget;
+
   // Build structured file list from enriched primary files or modules
   const targetFiles = ticket.files?.primary?.slice(0, 5) ?? ticket.modules?.slice(0, 5) ?? [];
   const fileSection = targetFiles.length > 0
@@ -520,6 +531,9 @@ ${fileSection}
 
 ## Acceptance Criteria (ALL must pass)
 ${acSection}
+
+## Token Budget
+You have ~${tokenBudget} tokens — focus on the core change. Avoid verbose explanations or refactoring unrelated code.
 
 ## Verification Commands
   1. pnpm typecheck
