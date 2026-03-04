@@ -1,5 +1,5 @@
 // Planner — generates concrete execution plans for Aider without embeddings.
-// 3-tier file discovery: enriched → grep → generic.
+// 4-tier file discovery: enriched → modules → grep → generic.
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
@@ -82,6 +82,65 @@ function tier1Enriched(ticket: BacklogTicket, cwd: string): PlanFileEntry[] | nu
   }
 
   return entries.length > 0 ? entries : null;
+}
+
+/**
+ * Tier 1.5: Use ticket.modules for scoped file discovery.
+ * Includes module files themselves (if they exist on disk) plus grep within module paths.
+ */
+export function tier15Modules(ticket: BacklogTicket, cwd: string): PlanFileEntry[] | null {
+  if (!ticket.modules || ticket.modules.length === 0) return null;
+
+  const matchedFiles = new Set<string>();
+
+  for (const mod of ticket.modules) {
+    const fullPath = join(cwd, mod);
+
+    // Include the module file itself if it exists
+    if (existsSync(fullPath) && !mod.endsWith('/')) {
+      matchedFiles.add(mod);
+    }
+
+    // Grep keywords within the module path (file or parent directory)
+    const keywords = extractKeywords(`${ticket.title} ${ticket.description}`);
+    const searchDir = existsSync(fullPath) && !mod.endsWith('/')
+      ? join(cwd, mod, '..')  // parent dir of file
+      : fullPath;             // directory itself
+
+    if (!existsSync(searchDir)) continue;
+
+    for (const keyword of keywords) {
+      if (matchedFiles.size >= 5) break;
+      try {
+        const output = execFileSync('grep', [
+          '-rl', '--include=*.ts', '--include=*.js',
+          keyword,
+          searchDir,
+        ], { cwd, encoding: 'utf8', timeout: 5000 });
+
+        for (const line of output.split('\n')) {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed.includes('.test.') || trimmed.includes('node_modules')) continue;
+          // Make path relative to cwd
+          const rel = trimmed.startsWith(cwd) ? trimmed.slice(cwd.length + 1) : trimmed;
+          matchedFiles.add(rel);
+          if (matchedFiles.size >= 5) break;
+        }
+      } catch {
+        // grep returns exit code 1 when no matches — not an error
+      }
+    }
+  }
+
+  if (matchedFiles.size === 0) return null;
+
+  const entries: PlanFileEntry[] = [];
+  for (const f of matchedFiles) {
+    const { action, reason } = inferAction(f, ticket, cwd);
+    entries.push({ path: f, action, reason });
+  }
+
+  return entries;
 }
 
 /**
@@ -181,6 +240,20 @@ export function generatePlan(
       testFiles: collectTestFiles(enriched.map(e => e.path), cwd),
       approach: buildApproach(model),
       generated: 'enriched',
+    };
+  }
+
+  // Tier 1.5: module-scoped discovery
+  const modules = tier15Modules(ticket, cwd);
+  if (modules) {
+    log.info(`Plan tier: modules (${modules.length} files)`);
+    return {
+      ticket: ticket.key,
+      title: ticket.title,
+      files: modules,
+      testFiles: collectTestFiles(modules.map(e => e.path), cwd),
+      approach: buildApproach(model),
+      generated: 'modules',
     };
   }
 
