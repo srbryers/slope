@@ -1,0 +1,99 @@
+{
+  "sprint_number": 37,
+  "theme": "The Adapter Interface",
+  "par": 4,
+  "slope": 2,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-02-27",
+  "type": "feature",
+  "backfilled": true,
+  "shots": [
+    {
+      "ticket_key": "S37-1",
+      "title": "Add supportedEvents + hooksConfigPath() to HarnessAdapter interface",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Extended HarnessAdapter interface with supportedEvents, supportsContextInjection, and hooksConfigPath(cwd) — three self-describing members."
+    },
+    {
+      "ticket_key": "S37-2",
+      "title": "Implement new methods on all 4 built-in adapters",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Implemented on claude-code, cursor, windsurf, and generic adapters. Each adapter now declares its own capabilities rather than relying on static maps."
+    },
+    {
+      "ticket_key": "S37-3",
+      "title": "Migrate guard status + consumers to use adapter methods",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Migrated guard status command from HARNESS_EVENT_SUPPORT static map and isEventSupported()/getHooksConfigPath() to adapter.supportedEvents and adapter.hooksConfigPath(). Output unchanged — pure refactor."
+    },
+    {
+      "ticket_key": "S37-4",
+      "title": "Deprecate static maps, update docs + tests",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added @deprecated JSDoc to static maps. Updated harness-research.md authoring guide. Regenerated CODEBASE.md. 62 new tests passing."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 2,
+    "greens_total": 4,
+    "putts": 2,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "wind",
+      "description": "Motivated by S36 review finding — tech debt flagged in HARNESS_EVENT_SUPPORT static maps",
+      "impact": "tailwind"
+    }
+  ],
+  "special_plays": [],
+  "training": [],
+  "nutrition": [
+    {
+      "category": "hydration",
+      "description": "Build + typecheck + 1740 tests passing at completion.",
+      "status": "healthy"
+    },
+    {
+      "category": "supplements",
+      "description": "62 new tests across adapter and guard status test files.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Clean refactor sprint. The adapter interface extension was well-scoped — each ticket had a clear boundary. Moving from static maps to adapter methods was straightforward.",
+    "advice_for_next_player": "When adding new harness adapters, implement all three self-describing members. The deprecated static maps will eventually be removed.",
+    "what_surprised_you": "No scorecard was filed — the post-hole routine was skipped after PR merge.",
+    "excited_about_next": "S38 (The Vault) builds the PostgreSQL store, completing the persistence layer."
+  },
+  "bunker_locations": [],
+  "yardage_book_updates": [
+    "src/core/harness.ts: HarnessAdapter — supportedEvents, supportsContextInjection, hooksConfigPath(cwd)",
+    "src/core/harness.ts: HARNESS_EVENT_SUPPORT, isEventSupported(), getHooksConfigPath() — @deprecated",
+    "All 4 adapters (claude-code, cursor, windsurf, generic) now self-describing"
+  ],
+  "course_management_notes": [
+    "4 tickets, par 4, score 4 — clean par with no hazards",
+    "Backfilled retroactively — scorecard was missed during original sprint execution",
+    "Merged via PR #18 on 2026-02-27"
+  ]
+}

@@ -1,0 +1,97 @@
+{
+  "sprint_number": 30,
+  "theme": "The Surveyor",
+  "par": 4,
+  "slope": 2,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-02-25",
+  "type": "feature",
+  "backfilled": true,
+  "shots": [
+    {
+      "ticket_key": "S30-1",
+      "title": "Analyzer types + pipeline runner",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "AnalyzerType union, RepoProfile aggregate type, and runAnalyzerPipeline orchestrator. Clean single-commit implementation."
+    },
+    {
+      "ticket_key": "S30-2",
+      "title": "Stack + structure analyzers",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "walkDir utility for recursive file traversal, stack analyzer (package.json detection, framework inference), structure analyzer (directory depth, file count, monorepo detection)."
+    },
+    {
+      "ticket_key": "S30-3",
+      "title": "Git history + testing analyzers",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Git analyzer (commit count, contributors, cadence, latest tag), testing analyzer (framework detection, coverage config, test file patterns)."
+    },
+    {
+      "ticket_key": "S30-4",
+      "title": "Vision document + slope analyze CLI command",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Two commits — vision document + CLI wiring, then MCP registry entries. Wired slope analyze command and added analyzer + vision entries to MCP search."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 3,
+    "greens_total": 4,
+    "putts": 1,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "altitude",
+      "description": "New analyzers/ subsystem — first time building repo introspection in SLOPE",
+      "impact": "none"
+    }
+  ],
+  "special_plays": [],
+  "training": [],
+  "nutrition": [
+    {
+      "category": "hydration",
+      "description": "Build + test verified. All tickets committed individually with conventional commit messages.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Clean sprint — all 4 tickets landed without hazards. The analyzer pipeline pattern (type + runner + individual analyzers) proved to be a solid foundation that S31 built on directly.",
+    "advice_for_next_player": "walkDir utility is reusable beyond analyzers. The RepoProfile type aggregates all analyzer outputs — add new analyzers by extending the profile interface.",
+    "what_surprised_you": "No scorecard was filed for this sprint — it was bundled into the S31 PR and the post-hole routine was skipped.",
+    "excited_about_next": "S31 (Course Designer) will use these analyzers to auto-generate SLOPE configuration from any repo."
+  },
+  "bunker_locations": [],
+  "yardage_book_updates": [
+    "src/core/analyzers/types.ts: AnalyzerType, RepoProfile, individual analyzer result types",
+    "src/core/analyzers/stack.ts: detectStack — package.json, framework, language inference",
+    "src/core/analyzers/structure.ts: analyzeStructure — depth, file counts, monorepo detection",
+    "src/core/analyzers/git.ts: analyzeGit — commits, contributors, cadence, tags",
+    "src/core/analyzers/testing.ts: analyzeTesting — test framework, coverage, patterns",
+    "src/core/analyzers/walk.ts: walkDir — recursive file traversal utility"
+  ],
+  "course_management_notes": [
+    "4 tickets, par 4, score 4 — clean par with no hazards",
+    "Backfilled retroactively — scorecard was missed during original sprint execution",
+    "Work was committed 2026-02-25 and merged as part of the S31 Course Designer PR"
+  ]
+}
