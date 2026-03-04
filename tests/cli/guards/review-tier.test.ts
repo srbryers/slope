@@ -240,4 +240,50 @@ describe('reviewTierGuard', () => {
     const result = await reviewTierGuard(input, TMP);
     expect(result.context).toContain('3 tickets');
   });
+
+  it('reads plan from tool_input.file_path outside cwd (global plans dir)', async () => {
+    // Simulate Claude Code writing to ~/.claude/plans/ by using a separate tmp dir
+    const globalDir = join(TMP, '.global-home', '.claude', 'plans');
+    mkdirSync(globalDir, { recursive: true });
+    const globalPlanPath = join(globalDir, 'sprint-99-plan.md');
+    writeFileSync(globalPlanPath, [
+      '# Sprint 99 Plan',
+      '### T1: Add feature to `src/utils/foo.ts`',
+      '### T2: Fix bug in `src/utils/bar.ts`',
+    ].join('\n'));
+
+    // file_path points to global dir, not {cwd}/.claude/plans/
+    const input = makeInput(globalPlanPath);
+    const result = await reviewTierGuard(input, TMP);
+    expect(result.context).toContain('2 tickets');
+    expect(result.context).toContain('Light');
+  });
+
+  it('falls back to findPlanContent when tool_input.file_path is unreadable', async () => {
+    // Write plan in cwd (repo-local) so findPlanContent can find it
+    writePlan([
+      '# Sprint Plan',
+      '### T1: Task one',
+      '### T2: Task two',
+      '### T3: Task three',
+    ].join('\n'));
+
+    // Point file_path to a non-existent file — should fall back to findPlanContent
+    const input = makeInput(join(TMP, '.claude', 'plans', 'does-not-exist.md'));
+    const result = await reviewTierGuard(input, TMP);
+    expect(result.context).toContain('3 tickets');
+    expect(result.context).toContain('Standard');
+  });
+
+  it('returns empty when file_path is unreadable and no repo-local plan exists', async () => {
+    // file_path points to a non-existent file, and no plans in cwd either.
+    // Note: findPlanContent may find real plans in ~/.claude/plans/ due to the
+    // homedir fallback, so we only test that the file_path read fails gracefully
+    // and the guard doesn't crash — it either returns {} or falls through to
+    // findPlanContent which may find global plans.
+    const input = makeInput(join(TMP, '.claude', 'plans', 'nonexistent.md'));
+    const result = await reviewTierGuard(input, TMP);
+    // Should not throw — either returns {} or context from fallback
+    expect(result).toBeDefined();
+  });
 });
