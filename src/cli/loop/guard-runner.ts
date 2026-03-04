@@ -1,13 +1,75 @@
 import { execSync, execFileSync } from 'node:child_process';
-import type { LoopConfig } from './types.js';
+import type { BacklogTicket, LoopConfig } from './types.js';
 import type { Logger } from './logger.js';
 
 export interface GuardResult {
   passed: boolean;
-  failedGuard?: 'typecheck' | 'tests' | 'substantiveness';
+  failedGuard?: 'typecheck' | 'tests' | 'substantiveness' | 'diff_scope';
+}
+
+export interface DiffScopeResult {
+  inScope: boolean;
+  outOfScopeFiles: string[];
 }
 
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
+
+/**
+ * Check if the diff since preSha is within the ticket's module scope.
+ * A file is in scope if it matches a module path, is under a module directory,
+ * or is a test file for an in-scope module.
+ */
+export function isDiffInScope(preSha: string, modules: string[], cwd: string): DiffScopeResult {
+  if (modules.length === 0) return { inScope: true, outOfScopeFiles: [] };
+
+  let changedFiles: string[];
+  try {
+    const output = execFileSync('git', ['diff', '--name-only', preSha, 'HEAD'], {
+      cwd,
+      encoding: 'utf8',
+    });
+    changedFiles = output.split('\n').map(f => f.trim()).filter(Boolean);
+  } catch {
+    // If diff fails, assume in scope (don't block on errors)
+    return { inScope: true, outOfScopeFiles: [] };
+  }
+
+  if (changedFiles.length === 0) return { inScope: true, outOfScopeFiles: [] };
+
+  const outOfScopeFiles: string[] = [];
+
+  for (const file of changedFiles) {
+    const fileInScope = modules.some(mod => {
+      // Direct path match
+      if (file === mod) return true;
+      // File is under a module directory
+      if (file.startsWith(mod.endsWith('/') ? mod : mod + '/')) return true;
+      // Module is a directory prefix (e.g., module "src/cli/loop" matches "src/cli/loop/planner.ts")
+      if (file.startsWith(mod + '/')) return true;
+      // Test file for an in-scope module: test path mirrors src path
+      // e.g., "tests/cli/loop/planner.test.ts" is in scope for "src/cli/loop/planner.ts"
+      if (file.includes('.test.')) {
+        const srcEquiv = file
+          .replace(/^tests\//, 'src/')
+          .replace(/\.test\.(ts|js)$/, '.$1');
+        if (srcEquiv === mod) return true;
+        if (srcEquiv.startsWith(mod + '/')) return true;
+        // Also check if the test is under a module directory in tests/
+        const testDir = mod.replace(/^src\//, 'tests/');
+        if (file.startsWith(testDir + '/') || file.startsWith(testDir)) return true;
+      }
+      return false;
+    });
+
+    if (!fileInScope) {
+      outOfScopeFiles.push(file);
+    }
+  }
+
+  // Threshold: >50% of files must be out of scope to flag
+  const inScope = outOfScopeFiles.length <= changedFiles.length / 2;
+  return { inScope, outOfScopeFiles };
+}
 
 /**
  * Run post-ticket guards: typecheck + tests.
@@ -20,8 +82,18 @@ export function runGuards(
   config: LoopConfig,
   cwd: string,
   log: Logger,
+  ticket?: BacklogTicket,
 ): GuardResult {
-  // Guard 0: Substantiveness — detect stub/whitespace-only changes
+  // Guard 0a: Diff scope — warn if changes are outside ticket modules
+  if (ticket && ticket.modules.length > 0) {
+    const scopeResult = isDiffInScope(preSha, ticket.modules, cwd);
+    if (!scopeResult.inScope) {
+      log.warn(`Diff scope warning: ${scopeResult.outOfScopeFiles.length} file(s) outside ticket modules: ${scopeResult.outOfScopeFiles.join(', ')}`);
+      // Warn only — do NOT return failure
+    }
+  }
+
+  // Guard 0b: Substantiveness — detect stub/whitespace-only changes
   if (!isSubstantive(preSha, cwd)) {
     log.warn('Changes are not substantive (comments/whitespace only) — reverting');
     revert(preSha, cwd);

@@ -344,7 +344,7 @@ async function runAiderWithGuards(
     return { passed: true, noop: true, spawnFailed: false };
   }
 
-  const guardResult = runGuards(preSha, config, cwd, log);
+  const guardResult = runGuards(preSha, config, cwd, log, ticket);
   if (guardResult.passed) {
     log.info('Guards passed');
     return { passed: true, noop: false, spawnFailed: false };
