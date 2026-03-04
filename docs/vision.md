@@ -270,21 +270,7 @@ All 22 commands grouped by category:
 - **S14 — Multi-agent primitives** — Role definitions, standardized standup/communication protocol, swarm session management. **Shipped.**
 - **S15 — Team scoring + integration** — Multi-agent scorecard aggregation, escalation rules, per-role handicaps, swarm performance metrics, Caddystack integration surface. **Shipped.**
 
-See [docs/backlog/roadmap.md](docs/backlog/roadmap.md) for the detailed Phase 1-3 roadmap (complete).
-
-### Next (S17-S20) — Phase 4
-
-See [docs/backlog/roadmap.md](docs/backlog/roadmap.md) for the unified roadmap.
-
-- **S17 — The Plugin System** — Pluggable metaphor loaders, custom guard plugins, hook extensibility
-- **S18 — PR Signals** — PR-as-scorecard: scoring signals from PR metadata, review comments, CI status
-- **S19 — The Dashboard** — Local HTML dashboard: handicap trends, miss pattern heatmap, sprint timeline
-- **S20 — The Foursome** — Multi-developer support: per-player handicaps, team leaderboard, shared hazard indices
-
-### Later
-- **Shared hazard indices** — Multiple developers (not agents) contributing to the same project's common issues. The event pipeline handles automated pattern detection; this is the multi-human sharing layer on top.
-- **Local dashboard** — Interactive web UI served locally (`slope dashboard`). Static HTML reports exist; the dashboard adds interactivity and a local server.
-- **Plugin system** — Formalized plugin architecture for custom metaphor loaders, guard plugins, and hook extensibility.
+See [docs/backlog/roadmap.md](docs/backlog/roadmap.md) for the unified roadmap covering all phases (0-10).
 
 ### Open Questions
 - **Multi-human workflow** — Per-role and per-agent handicaps for multi-agent swarms are shipped (S14-S15). The multi-human team layer (different developers, not agents, contributing scorecards) still needs design work. Separate handicaps with shared hazards is the likely starting point.

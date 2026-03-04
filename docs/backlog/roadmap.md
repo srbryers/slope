@@ -1,6 +1,6 @@
 # SLOPE Roadmap
 
-> 55 sprints completed (S1-S58). 13 phases spanning foundation through self-development loop.
+> 55 scorecards filed (S1-S58, with gaps). 10 numbered phases + 3 internal sprint groups.
 > Last updated: 2026-03-04 (v1.17.0)
 
 ## Phase Summary
@@ -80,6 +80,10 @@ Design tokens package, marketing site, npm publishing.
 ### Phase 9: Self-Development Loop (S43-S58)
 Autonomous sprint execution system — originally shell scripts, rewritten as TypeScript `slope loop` CLI (v1.16.0-v1.17.0).
 
+- **S43-S47:** Loop foundation — shell scripts for run/continuous/parallel, model selection, analyze pipeline
+- **S48-S53:** TypeScript rewrite — `slope loop` CLI with config, backlog, executor, guards, PR lifecycle
+- **S54-S58:** Hardening — structured prompts, substantiveness guard, test file filtering, stale ref pruning
+
 **Delivered:**
 - `slope loop run` — single sprint execution with worktree isolation
 - `slope loop continuous` — multi-sprint loop with backlog auto-regeneration
@@ -92,7 +96,7 @@ Autonomous sprint execution system — originally shell scripts, rewritten as Ty
 - Substantiveness guard — detects and reverts comment-only/whitespace-only changes
 - Actionable ticket descriptions — explicit action instructions in generated backlog
 
-**Stats:** 58 autonomous sprints completed. Current handicap: 0.4 (declining). 100% club success rates.
+**Stats:** Last sprint: S58. Current handicap: 0.4 (declining). 100% club success rates.
 
 ---
 
@@ -107,6 +111,11 @@ Inspired by [Cursor's Scaling Agents](https://cursor.com/blog/scaling-agents) an
 - **Test file filter** — `extractFileRefs()` excludes `.test.ts`/`.spec.ts` from hotspot source files
 
 ### Next: Medium-Effort, High-Value
+
+#### Roadmap-driven backlog generation
+The scorecard-driven analyze pipeline produces diminishing returns once hazard hotspots are resolved (all files pruned, 100% success rates). Add a roadmap-driven backlog source that generates tickets from this roadmap when scorecard data is exhausted.
+
+**Files:** `slope-loop/analyze-scorecards.ts`, `src/cli/loop/backlog.ts`
 
 #### Context budget per ticket
 Inject a "you have N tokens, focus on the core change" instruction into the Aider prompt based on club/model. Local models need tighter budgets than API models.
@@ -140,11 +149,6 @@ Separate planning from execution into distinct agent roles with different models
 
 **Files:** new architecture — would require significant refactor of executor.ts
 
-#### Roadmap-driven backlog generation
-The scorecard-driven analyze pipeline produces diminishing returns once hazard hotspots are resolved (all files pruned, 100% success rates). Add a roadmap-driven backlog source that generates tickets from this roadmap when scorecard data is exhausted.
-
-**Files:** `slope-loop/analyze-scorecards.ts`, `src/cli/loop/backlog.ts`
-
 ---
 
 ## Architecture Reference
@@ -154,11 +158,11 @@ The scorecard-driven analyze pipeline produces diminishing returns once hazard h
 |------|-------|
 | Loop CLI | `src/cli/loop/` (executor, guards, backlog, config, worktree, PR lifecycle) |
 | Loop Scripts | `slope-loop/` (analyze-scorecards, model-selector, dashboard) |
-| Core | `packages/core/src/` (scoring, metaphors, flows, initiative, roles, signals) |
-| CLI | `packages/cli/src/` (38 commands) |
+| Core | `src/core/` (scoring, metaphors, flows, initiative, roles, signals) |
+| CLI | `src/cli/` (38 commands) |
 | Guards | 17 built-in guards + adapter framework |
 | MCP | `packages/mcp-tools/` (search + execute + session/claim tools) |
 | Store | `packages/store-sqlite/`, `packages/store-pg/` |
 
 ### Machine-Readable Roadmap
-`docs/backlog/roadmap.json` — 47 sprints across 13 phases. Consumed by `slope roadmap validate|review|status|show`.
+`docs/backlog/roadmap.json` — Consumed by `slope roadmap validate|review|status|show`. Covers S1-S47 (phases 0-9); Phase 10 and S48+ not yet added.
