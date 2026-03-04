@@ -107,7 +107,7 @@ export async function runSprint(flags: Record<string, string>, cwd: string): Pro
           log.warn('Shutdown requested — stopping ticket processing');
           break;
         }
-        const result = await processTicket(ticket, config, worktreeCwd, log);
+        const result = await processTicket(ticket, config, worktreeCwd, log, sprint.strategy);
         ticketResults.push(result);
 
         // Log model usage (JSONL)
@@ -222,12 +222,13 @@ async function processTicket(
   config: LoopConfig,
   cwd: string,
   log: Logger,
+  strategy?: BacklogSprint['strategy'],
 ): Promise<TicketResult> {
   const tLog = log.child(`ticket:${ticket.key}`);
   tLog.info(`-- ${ticket.key}: ${ticket.title} --`);
   tLog.info(`Club: ${ticket.club} (max_files: ${ticket.max_files}, est_tokens: ${ticket.estimated_tokens ?? 0})`);
 
-  const primaryModel = selectModel(ticket.club, ticket.max_files, ticket.estimated_tokens ?? 0, config, cwd);
+  const primaryModel = selectModel(ticket.club, ticket.max_files, ticket.estimated_tokens ?? 0, config, cwd, strategy);
   const timeout = selectTimeout(primaryModel, config);
   tLog.info(`Model: ${primaryModel} (timeout: ${timeout}s)`);
 
@@ -534,7 +535,7 @@ RULES:
 function dryRunSprint(sprint: BacklogSprint, config: LoopConfig, cwd: string, log: Logger): null {
   log.info('--- Dry run mode ---');
   for (const t of sprint.tickets) {
-    const model = selectModel(t.club, t.max_files, t.estimated_tokens ?? 0, config, cwd);
+    const model = selectModel(t.club, t.max_files, t.estimated_tokens ?? 0, config, cwd, sprint.strategy);
     const modelShort = model.split('/').pop();
     log.info(`  ${t.key}: ${t.title} [club=${t.club}, files=${t.max_files}] → ${modelShort}`);
   }

@@ -1,13 +1,14 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import type { Club, LoopConfig, ModelConfig } from './types.js';
+import type { Club, LoopConfig, ModelConfig, BacklogSprint } from './types.js';
 
 /**
- * Multi-factor model routing matching run.sh logic exactly:
+ * Multi-factor model routing:
  *  1. Token-based: est_tokens > 24000 → API
  *  2. File-based: max_files >= 2 → API
- *  3. Data-driven: check model-config.json recommendations per club
- *  4. Club defaults: putter/wedge/short_iron → local, long_iron/driver → API
+ *  3. Strategy-based: documentation → API (local models can't reliably edit prose)
+ *  4. Data-driven: check model-config.json recommendations per club
+ *  5. Club defaults: putter/wedge/short_iron → local, long_iron/driver → API
  */
 export function selectModel(
   club: Club,
@@ -15,6 +16,7 @@ export function selectModel(
   estTokens: number,
   config: LoopConfig,
   cwd: string,
+  strategy?: BacklogSprint['strategy'],
 ): string {
   // 1. Token-based escalation: won't fit in Qwen 32K context
   if (estTokens > 24000) return config.modelApi;
@@ -22,7 +24,10 @@ export function selectModel(
   // 2. Multi-file routing: 2+ files → API
   if (maxFiles >= 2) return config.modelApi;
 
-  // 3. Data-driven overrides from model-config.json
+  // 3. Strategy-based: documentation tickets need API model
+  if (strategy === 'documentation') return config.modelApi;
+
+  // 4. Data-driven overrides from model-config.json
   const modelConfig = loadModelConfig(cwd);
   if (modelConfig) {
     const rec = modelConfig.recommendations[club];
@@ -30,7 +35,7 @@ export function selectModel(
     if (rec?.model === 'local') return config.modelLocal;
   }
 
-  // 4. Club defaults
+  // 5. Club defaults
   switch (club) {
     case 'putter':
     case 'wedge':

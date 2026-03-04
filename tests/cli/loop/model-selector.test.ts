@@ -96,6 +96,35 @@ describe('selectModel', () => {
     expect(selectModel('driver', 1, 0, config, tmpDir)).toBe(config.modelApi);
   });
 
+  // Factor 5: Strategy-based routing
+  it('routes documentation strategy to API regardless of club', () => {
+    expect(selectModel('putter', 1, 0, config, tmpDir, 'documentation')).toBe(config.modelApi);
+  });
+
+  it('does not escalate non-documentation strategies', () => {
+    expect(selectModel('putter', 1, 0, config, tmpDir, 'hardening')).toBe(config.modelLocal);
+  });
+
+  it('strategy is optional (backward compat)', () => {
+    expect(selectModel('putter', 1, 0, config, tmpDir)).toBe(config.modelLocal);
+  });
+
+  it('documentation strategy beats model-config.json local recommendation', () => {
+    writeFileSync(join(tmpDir, 'slope-loop/model-config.json'), JSON.stringify({
+      generated_at: '2026-01-01T00:00:00Z',
+      ticket_count: 20,
+      escalation_save_rate: 0.5,
+      success_rates: {},
+      cost_per_success: {},
+      recommendations: {
+        putter: { model: 'local', reason: 'high local success rate' },
+      },
+      notes: [],
+    }));
+    const model = selectModel('putter', 1, 0, config, tmpDir, 'documentation');
+    expect(model).toBe(config.modelApi);
+  });
+
   // Priority: token check beats club default
   it('token escalation takes priority over club default', () => {
     const model = selectModel('putter', 1, 30000, config, tmpDir);
