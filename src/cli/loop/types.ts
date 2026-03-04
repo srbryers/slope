@@ -161,7 +161,7 @@ export interface PlannedSprint {
   theme: string;
   par: number;
   slope: number;
-  type: string;
+  type: 'feature' | 'bugfix' | 'chore';
   tickets: PlannedTicket[];
 }
 

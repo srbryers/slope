@@ -77,6 +77,11 @@ export function extractFileRefs(texts: string[]): string[] {
 const RECENCY_WEIGHT = 0.7;
 const RECENT_WINDOW = 10; // last N sprints weighted higher
 
+// Max roadmap sprints per regeneration cycle — forces a regression re-check
+// between batches. If a roadmap sprint introduces a hazard, the next analyze
+// cycle surfaces it as Strategy 1 before more roadmap sprints run.
+export const ROADMAP_SPRINT_CAP = 3;
+
 function temporalWeight(
   totalCount: number,
   recentCount: number,
@@ -398,8 +403,15 @@ function analyze(): void {
 
 /**
  * Convert planned sprints from roadmap.json into BacklogSprint format.
- * Caps at 3 sprints per cycle to force a regression re-check between batches
- * (if a roadmap sprint introduces a hazard, the next analyze cycle picks it up as Strategy 1).
+ * Caps at ROADMAP_SPRINT_CAP sprints per cycle to force a regression re-check
+ * between batches (if a roadmap sprint introduces a hazard, the next analyze
+ * cycle picks it up as Strategy 1).
+ *
+ * **Known limitation:** Completion is tracked by sequential counter position,
+ * not by the planned sprint's display ID. If the `planned` array in
+ * roadmap.json is reordered between analyze cycles, sprints may be skipped
+ * or re-run. This is acceptable since the array is author-maintained and
+ * rarely changes.
  */
 export function convertPlannedSprints(
   planned: PlannedSprint[],
@@ -428,7 +440,7 @@ export function convertPlannedSprints(
       strategy: 'roadmap',
       par: ps.par,
       slope: ps.slope,
-      type: ps.type as BacklogSprint['type'],
+      type: ps.type,
       tickets: ps.tickets
         .filter(t => t.acceptance_criteria?.length > 0)
         .map((t, i) => ({
@@ -443,7 +455,7 @@ export function convertPlannedSprints(
     });
     counter++;
 
-    if (sprints.length >= 3) break;
+    if (sprints.length >= ROADMAP_SPRINT_CAP) break;
   }
 
   return { sprints, counter };
@@ -643,10 +655,14 @@ function generateBacklog(analysis: Analysis, sprintCount: number): void {
     const repoRoot = join(__dirname, '..');
     const roadmapPath = join(repoRoot, 'docs/backlog/roadmap.json');
     if (existsSync(roadmapPath)) {
-      const roadmap = JSON.parse(readFileSync(roadmapPath, 'utf8'));
-      const result = convertPlannedSprints(roadmap.planned ?? [], counter, repoRoot);
-      sprints.push(...result.sprints);
-      counter = result.counter;
+      try {
+        const roadmap = JSON.parse(readFileSync(roadmapPath, 'utf8'));
+        const result = convertPlannedSprints(roadmap.planned ?? [], counter, repoRoot);
+        sprints.push(...result.sprints);
+        counter = result.counter;
+      } catch (err) {
+        console.error(`Warning: failed to parse roadmap.json: ${err instanceof Error ? err.message : err}`);
+      }
     }
   }
 
