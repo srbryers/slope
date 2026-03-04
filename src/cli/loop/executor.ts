@@ -13,6 +13,11 @@ import { generatePlan, formatPlanAsPrompt } from './planner.js';
 import type { LoopConfig, BacklogSprint, BacklogTicket, TicketResult, SprintResult } from './types.js';
 import type { Logger } from './logger.js';
 
+// Context budget constants — cap injected context to avoid token overflow
+const MAX_PRIMARY_FILES = 3;
+const CONTEXT_LINE_LIMIT_LOCAL = 200;
+const CONTEXT_LINE_LIMIT_API = 500;
+
 let shuttingDown = false;
 const activeChildPids = new Set<number>();
 
@@ -390,7 +395,7 @@ async function runAider(
   }
 
   // Semantic context injection (capture output instead of shell redirect)
-  const contextLineLimit = local ? 200 : 1000;
+  const contextLineLimit = local ? CONTEXT_LINE_LIMIT_LOCAL : CONTEXT_LINE_LIMIT_API;
   const contextTop = local ? 4 : 8;
   const contextFile = join(cwd, config.logDir, `${ticketKey}-context.md`);
 
@@ -429,8 +434,8 @@ async function runAider(
   if (ticket.files?.primary) {
     let fileCount = 0;
     for (const f of ticket.files.primary) {
-      if (fileCount >= 5) break;
-      if (f && existsSync(join(cwd, f)) && /\.(ts|js|sh)$/.test(f)) {
+      if (fileCount >= MAX_PRIMARY_FILES) break;
+      if (f && existsSync(join(cwd, f)) && /\.(ts|js|sh)$/.test(f) && !f.includes('.test.')) {
         aiderArgs.push('--file', f);
         fileCount++;
       }
