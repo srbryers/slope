@@ -1,3 +1,4 @@
+import { execSync } from 'node:child_process';
 import type { HookInput, GuardResult } from '../../core/index.js';
 import { loadSprintState, updateGate, isSprintComplete, pendingGates } from '../sprint-state.js';
 
@@ -27,6 +28,25 @@ export async function sprintCompletionGuard(input: HookInput, cwd: string): Prom
   return {};
 }
 
+/** Check if sprint-state matches the current branch. Returns a warning string or null. */
+function checkStaleness(sprint: number, cwd: string): string | null {
+  try {
+    const branch = execSync('git rev-parse --abbrev-ref HEAD', { cwd, encoding: 'utf8' }).trim();
+    // Match patterns like S22, s22, sprint-22, worktree-s22-*
+    const branchMatch = branch.match(/(?:^|[-/])s(?:print-?)?(\d+)/i);
+    if (branchMatch) {
+      const branchSprint = parseInt(branchMatch[1], 10);
+      if (branchSprint !== sprint) {
+        return `Warning: sprint-state is for Sprint ${sprint} but branch "${branch}" suggests Sprint ${branchSprint}. Run \`slope sprint reset\` if stale.`;
+      }
+    }
+    // No sprint number in branch name — can't verify, don't warn
+  } catch {
+    // git not available — skip check
+  }
+  return null;
+}
+
 /** Block `gh pr create` when gates are incomplete. */
 function handlePreToolUse(input: HookInput, cwd: string): GuardResult {
   const command = input.tool_input?.command as string | undefined;
@@ -36,10 +56,18 @@ function handlePreToolUse(input: HookInput, cwd: string): GuardResult {
   if (!state) return {};
   if (state.phase === 'complete' || isSprintComplete(state)) return {};
 
+  const staleWarning = checkStaleness(state.sprint, cwd);
   const pending = pendingGates(state);
+  const lines = [
+    `SLOPE sprint-completion: Cannot create PR — Sprint ${state.sprint} has incomplete gates:`,
+    ...pending.map(g => `  - ${g}`),
+    '',
+    'Complete these gates before creating the PR.',
+  ];
+  if (staleWarning) lines.push('', staleWarning);
   return {
     decision: 'deny',
-    blockReason: `SLOPE sprint-completion: Cannot create PR — Sprint ${state.sprint} has incomplete gates:\n${pending.map(g => `  - ${g}`).join('\n')}\n\nComplete these gates before creating the PR.`,
+    blockReason: lines.join('\n'),
   };
 }
 
@@ -52,22 +80,23 @@ function handleStop(cwd: string): GuardResult {
   // Only block during implementing/scoring phases — don't block during planning/reviewing
   if (state.phase !== 'implementing' && state.phase !== 'scoring') return {};
 
+  const staleWarning = checkStaleness(state.sprint, cwd);
   const pending = pendingGates(state);
-  return {
-    blockReason: [
-      `SLOPE sprint-completion: Sprint ${state.sprint} is incomplete. Remaining gates:`,
-      ...pending.map(g => `  - ${g}`),
-      '',
-      'Complete these before ending the session:',
-      '  - `slope sprint gate tests` — mark tests passing',
-      '  - `slope sprint gate code_review` — mark code review done',
-      '  - `slope sprint gate architect_review` — mark architect review done',
-      '  - `slope validate` — validates scorecard (auto-marks gate)',
-      '  - `slope review` — generates review markdown (auto-marks gate)',
-      '',
-      'Or use `slope sprint reset` to clear sprint state if this sprint was abandoned.',
-    ].join('\n'),
-  };
+  const lines = [
+    `SLOPE sprint-completion: Sprint ${state.sprint} is incomplete. Remaining gates:`,
+    ...pending.map(g => `  - ${g}`),
+    '',
+    'Complete these before ending the session:',
+    '  - `slope sprint gate tests` — mark tests passing',
+    '  - `slope sprint gate code_review` — mark code review done',
+    '  - `slope sprint gate architect_review` — mark architect review done',
+    '  - `slope validate` — validates scorecard (auto-marks gate)',
+    '  - `slope review` — generates review markdown (auto-marks gate)',
+    '',
+    'Or use `slope sprint reset` to clear sprint state if this sprint was abandoned.',
+  ];
+  if (staleWarning) lines.push('', staleWarning);
+  return { blockReason: lines.join('\n') };
 }
 
 /** Auto-detect test pass from Bash output and mark gate. */

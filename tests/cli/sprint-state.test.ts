@@ -41,6 +41,34 @@ describe('loadSprintState', () => {
     writeFileSync(join(dir, 'sprint-state.json'), JSON.stringify({ foo: 'bar' }));
     expect(loadSprintState(tmpDir)).toBeNull();
   });
+
+  it('returns null when gate keys are missing', () => {
+    const dir = join(tmpDir, '.slope');
+    mkdirSync(dir, { recursive: true });
+    const { writeFileSync } = require('node:fs');
+    writeFileSync(join(dir, 'sprint-state.json'), JSON.stringify({
+      sprint: 22,
+      phase: 'implementing',
+      gates: { tests: true }, // missing 4 other keys
+      started_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+    }));
+    expect(loadSprintState(tmpDir)).toBeNull();
+  });
+
+  it('returns null when gate value is not boolean', () => {
+    const dir = join(tmpDir, '.slope');
+    mkdirSync(dir, { recursive: true });
+    const { writeFileSync } = require('node:fs');
+    writeFileSync(join(dir, 'sprint-state.json'), JSON.stringify({
+      sprint: 22,
+      phase: 'implementing',
+      gates: { tests: 'yes', code_review: false, architect_review: false, scorecard: false, review_md: false },
+      started_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+    }));
+    expect(loadSprintState(tmpDir)).toBeNull();
+  });
 });
 
 describe('saveSprintState', () => {

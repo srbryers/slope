@@ -39,6 +39,12 @@ export function loadSprintState(cwd: string): SprintState | null {
     if (typeof raw.sprint !== 'number' || typeof raw.phase !== 'string' || typeof raw.gates !== 'object') {
       return null;
     }
+    // Validate all 5 gate keys exist and are booleans
+    for (const gate of ALL_GATES) {
+      if (typeof raw.gates[gate] !== 'boolean') {
+        return null;
+      }
+    }
     return raw as SprintState;
   } catch {
     return null;

@@ -250,9 +250,15 @@ export async function guardManageCommand(args: string[]): Promise<void> {
       loadPluginGuards(cwd, config.plugins);
 
       console.log('\nSLOPE Guards:\n');
+      // Deduplicate multi-hook guards (e.g. sprint-completion fires on 3 events)
+      const seen = new Set<string>();
       for (const d of GUARD_DEFINITIONS) {
+        if (seen.has(d.name)) continue;
+        seen.add(d.name);
         const status = disabled.includes(d.name) ? '[disabled]' : '[enabled] ';
-        console.log(`  ${status} ${d.name.padEnd(16)} [${d.hookEvent}] ${d.description}`);
+        const events = GUARD_DEFINITIONS.filter(g => g.name === d.name).map(g => g.hookEvent);
+        const eventStr = events.length > 1 ? `[${events.join(',')}]` : `[${d.hookEvent}]`;
+        console.log(`  ${status} ${d.name.padEnd(22)} ${eventStr.padEnd(35)} ${d.description}`);
       }
       // Show custom guards
       const allDefs = getAllGuardDefinitions();
@@ -295,12 +301,17 @@ export async function guardManageCommand(args: string[]): Promise<void> {
       loadPluginGuards(cwd, statusConfig.plugins);
 
       console.log('\nGuards:\n');
+      const statusSeen = new Set<string>();
       for (const d of getAllGuardDefinitions()) {
+        if (statusSeen.has(d.name)) continue;
+        statusSeen.add(d.name);
         const disabled = statusDisabled.includes(d.name);
-        const supported = adapter?.supportedEvents.has(d.hookEvent) ?? true;
+        const allEvents = getAllGuardDefinitions().filter(g => g.name === d.name).map(g => g.hookEvent);
+        const supported = allEvents.some(e => adapter?.supportedEvents.has(e) ?? true);
         const marker = disabled ? '[-]' : !supported ? '[~]' : '[+]';
         const state = disabled ? 'disabled' : !supported ? 'unsupported' : 'active';
-        console.log(`  ${marker} ${d.name.padEnd(22)} ${d.hookEvent.padEnd(13)} ${state}`);
+        const eventStr = allEvents.length > 1 ? allEvents.join(',') : d.hookEvent;
+        console.log(`  ${marker} ${d.name.padEnd(22)} ${eventStr.padEnd(35)} ${state}`);
       }
 
       // Show capabilities

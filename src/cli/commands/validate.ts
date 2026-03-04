@@ -5,6 +5,7 @@ import { loadConfig } from '../config.js';
 import { updateGate } from '../sprint-state.js';
 
 export function validateCommand(path?: string): void {
+  const cwd = process.cwd();
   const config = loadConfig();
   const files: string[] = [];
 
@@ -12,7 +13,7 @@ export function validateCommand(path?: string): void {
     files.push(path);
   } else {
     // Validate all scorecards matching config
-    const dir = join(process.cwd(), config.scorecardDir);
+    const dir = join(cwd, config.scorecardDir);
     const patternParts = config.scorecardPattern.split('*');
     const prefix = patternParts[0] ?? '';
     const suffix = patternParts[1] ?? '';
@@ -78,7 +79,7 @@ export function validateCommand(path?: string): void {
 
   // Mark scorecard gate complete on successful validation
   if (allValid) {
-    updateGate(process.cwd(), 'scorecard', true);
+    updateGate(cwd, 'scorecard', true);
   }
 
   process.exit(allValid ? 0 : 1);
