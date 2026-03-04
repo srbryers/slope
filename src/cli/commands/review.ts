@@ -4,6 +4,7 @@ import { formatSprintReview } from '../../core/index.js';
 import type { GolfScorecard, ProjectStats } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { resolveMetaphor } from '../metaphor.js';
+import { updateGate } from '../sprint-state.js';
 
 export function reviewCommand(path?: string, mode?: string, metaphorFlag?: string): void {
   const config = loadConfig();
@@ -54,4 +55,7 @@ export function reviewCommand(path?: string, mode?: string, metaphorFlag?: strin
   const review = formatSprintReview(card, undefined, undefined, reviewMode, metaphor);
   console.log('');
   console.log(review);
+
+  // Mark review_md gate complete
+  updateGate(cwd, 'review_md', true);
 }

@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { HookInput, GuardResult } from '../../core/index.js';
+import { loadSprintState, saveSprintState } from '../sprint-state.js';
 
 interface ReviewState {
   rounds_required: number;
@@ -30,7 +31,15 @@ export async function workflowGateGuard(input: HookInput, cwd: string): Promise<
     return {};
   }
 
-  if (state.rounds_completed >= state.rounds_required) return {};
+  if (state.rounds_completed >= state.rounds_required) {
+    // Transition sprint-state to implementing when review is complete
+    const sprintState = loadSprintState(cwd);
+    if (sprintState && (sprintState.phase === 'planning' || sprintState.phase === 'reviewing')) {
+      sprintState.phase = 'implementing';
+      saveSprintState(cwd, sprintState);
+    }
+    return {};
+  }
 
   const planRef = state.plan_file ? ` (${state.plan_file})` : '';
   return {

@@ -2,6 +2,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { validateScorecard } from '../../core/index.js';
 import { loadConfig } from '../config.js';
+import { updateGate } from '../sprint-state.js';
 
 export function validateCommand(path?: string): void {
   const config = loadConfig();
@@ -74,5 +75,11 @@ export function validateCommand(path?: string): void {
   }
 
   console.log('');
+
+  // Mark scorecard gate complete on successful validation
+  if (allValid) {
+    updateGate(process.cwd(), 'scorecard', true);
+  }
+
   process.exit(allValid ? 0 : 1);
 }
