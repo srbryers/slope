@@ -122,7 +122,7 @@ function printSprintSummary(sprint: BacklogSprint, config: LoopConfig, cwd: stri
   console.log(`  Strategy: ${sprint.strategy} | Par: ${sprint.par} | Slope: ${sprint.slope} | Type: ${sprint.type}`);
   console.log(`  Tickets (${sprint.tickets.length}):`);
   for (const t of sprint.tickets) {
-    const model = selectModel(t.club, t.max_files, t.estimated_tokens ?? 0, config, cwd);
+    const model = selectModel(t.club, t.max_files, t.estimated_tokens ?? 0, config, cwd, sprint.strategy);
     const modelShort = model.split('/').pop();
     console.log(`    ${t.key}: ${t.title} [${t.club}, ${t.max_files} file(s) → ${modelShort}]`);
   }
