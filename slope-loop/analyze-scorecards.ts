@@ -21,9 +21,10 @@ import {
 import type {
   DispersionReport,
 } from '../dist/index.js';
-import { writeFileSync, existsSync } from 'node:fs';
+import { writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { BacklogSprint, PlannedSprint } from '../src/cli/loop/types.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -137,26 +138,6 @@ interface Analysis {
   clubs: ClubStats[];
   hotspots: HotspotModule[];
   dispersion: DispersionReport;
-}
-
-interface BacklogTicket {
-  key: string;
-  title: string;
-  club: string;
-  description: string;
-  acceptance_criteria: string[];
-  modules: string[];
-  max_files: number;
-}
-
-interface BacklogSprint {
-  id: string;
-  title: string;
-  strategy: string;
-  par: number;
-  slope: number;
-  type: string;
-  tickets: BacklogTicket[];
 }
 
 function analyze(): void {
@@ -599,6 +580,56 @@ function generateBacklog(analysis: Analysis, sprintCount: number): void {
       }),
     });
     counter++;
+  }
+
+  // --- Strategy 6: Roadmap-driven sprints (when scorecard data is exhausted) ---
+  // Only fires when scorecard strategies produce 0 sprints — regressions always take priority.
+  // Caps at 3 sprints per regeneration cycle to force a regression re-check between batches
+  // (if a roadmap sprint introduces a hazard, the next cycle picks it up as Strategy 1).
+  if (sprints.length === 0) {
+    const repoRoot = join(__dirname, '..');
+    const roadmapPath = join(repoRoot, 'docs/backlog/roadmap.json');
+    if (existsSync(roadmapPath)) {
+      const roadmap = JSON.parse(readFileSync(roadmapPath, 'utf8'));
+      const planned: PlannedSprint[] = roadmap.planned ?? [];
+      const resultsDir = join(repoRoot, 'slope-loop/results');
+
+      for (const ps of planned) {
+        // Skip malformed sprints
+        if (!ps.tickets || !Array.isArray(ps.tickets) || ps.tickets.length === 0) continue;
+
+        const sprintId = `S-LOCAL-${String(counter).padStart(3, '0')}`;
+
+        // Skip already-completed planned sprints (check by result file)
+        if (existsSync(join(resultsDir, `${sprintId}.json`))) {
+          counter++;
+          continue;
+        }
+
+        sprints.push({
+          id: sprintId,
+          title: ps.theme,
+          strategy: 'roadmap',
+          par: ps.par,
+          slope: ps.slope,
+          type: ps.type as BacklogSprint['type'],
+          tickets: ps.tickets
+            .filter(t => t.acceptance_criteria?.length > 0)
+            .map((t, i) => ({
+              key: `${sprintId}-${i + 1}`,
+              title: t.title,
+              club: t.club,
+              description: t.description,
+              acceptance_criteria: t.acceptance_criteria,
+              modules: t.modules.filter(m => existsSync(join(repoRoot, m))),
+              max_files: t.max_files,
+            })),
+        });
+        counter++;
+
+        if (sprints.length >= 3) break;
+      }
+    }
   }
 
   writeFileSync(

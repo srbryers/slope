@@ -77,7 +77,7 @@ export interface BacklogFile {
 export interface BacklogSprint {
   id: string;
   title: string;
-  strategy: 'hardening' | 'testing' | 'cleanup' | 'documentation' | 'hardening-overflow';
+  strategy: 'hardening' | 'testing' | 'cleanup' | 'documentation' | 'hardening-overflow' | 'roadmap';
   par: number;
   slope: number;
   type: 'feature' | 'bugfix' | 'chore';
@@ -142,6 +142,27 @@ export interface PlanFileEntry {
   path: string;             // relative file path
   action: string;           // what to do: "add export", "modify function X", etc.
   reason: string;           // why: maps to which acceptance criterion
+}
+
+// === Planned Sprints (roadmap-driven backlog source) ===
+
+export interface PlannedTicket {
+  key: string;
+  title: string;
+  club: Club;
+  description: string;
+  acceptance_criteria: string[];
+  modules: string[];
+  max_files: number;
+}
+
+export interface PlannedSprint {
+  id: string;              // display ID in roadmap.json (e.g., "P10-1")
+  theme: string;
+  par: number;
+  slope: number;
+  type: string;
+  tickets: PlannedTicket[];
 }
 
 // === Model Config ===
