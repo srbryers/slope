@@ -72,15 +72,55 @@ Multi-sprint initiatives with structured review gates. Built on top of existing 
 - Specialist selection: keyword-based (`selectSpecialists()`) — backend, ml-engineer, database, frontend, ux-designer
 
 ## Self-Development Loop
-Autonomous sprint execution scripts in `slope-loop/`.
-- `slope-loop/run.sh` — single sprint runner (tiered models: Qwen local + MiniMax M2.5 API)
-- `slope-loop/continuous.sh` — loop runner with backlog auto-regeneration (default max: 10 sprints)
-- `slope-loop/parallel.sh` — parallel runner with module overlap detection (git worktrees)
+Autonomous sprint execution via the `slope loop` CLI command. The loop orchestrates multi-sprint execution with tiered model selection (local Qwen 32B + MiniMax M2.5 API escalation), backlog regeneration, and result tracking.
+
+### slope loop Subcommands
+
+**Execution:**
+- `slope loop run [--sprint=ID] [--dry-run]` — Execute a single sprint with tiered model selection (local → escalate on fail)
+- `slope loop continuous [--max=N] [--pause=S] [--dry-run]` — Run sprints in a loop, regenerating backlog when exhausted (default: 10 sprints)
+- `slope loop parallel [--dry-run]` — Run multiple sprints in parallel using git worktrees with module overlap detection
+
+**Status & Configuration:**
+- `slope loop status [--sprint=ID]` — Show current loop state, completed sprints, and next sprint in queue
+- `slope loop config [--show] [--set k=v]` — Display or update loop configuration (model tiers, timeouts, escalation rules)
+- `slope loop results [--sprint=ID] [--json]` — View sprint results and execution details
+
+**Analysis & Reporting:**
+- `slope loop analyze [--regenerate]` — Mine scorecard data and regenerate backlog (runs automatically in continuous mode)
+- `slope loop models [--analyze] [--show]` — Show model selection analytics and success rates per tier
+- `slope loop guide [--check] [--synthesize]` — Validate agent guide (SKILL.md) word count and content
+
+**Maintenance:**
+- `slope loop clean [--results] [--logs] [--worktrees] [--all]` — Clean up loop artifacts (results, logs, git worktrees)
+
+### Model Tier Rules (Loop Context)
+- **Putter/Wedge** → local Qwen 32B (fast, free)
+- **Short Iron** → local Qwen 32B (default), escalate to M2.5 on failure
+- **Long Iron/Driver** → MiniMax M2.5 API (architect-level planning)
+- **Multi-file tickets** → always M2.5 regardless of club
+- **Local model failure** → auto-escalate to M2.5 before marking as miss
+
+### Loop Infrastructure (Reference)
 - `slope-loop/analyze-scorecards.ts` — mines scorecard data → `analysis.json` + `backlog.json`
 - `slope-loop/model-selector.ts` — data-driven model tier recommendations → `model-config.json`
 - `slope-loop/dashboard.ts` — static HTML dashboard (handicap, model rates, costs, convergence)
-- `slope-loop/slope-loop-guide/SKILL.md` — agent guide skill for sprint execution
-- Limitation: guard hooks don't run during Aider execution; equivalent checks are in run.sh post-ticket steps
+- `slope-loop/slope-loop-guide/SKILL.md` — agent guide skill for sprint execution (auto-injected via Aider `--read` flag)
+
+### Guard Hooks in Loop Context
+Guard hooks are auto-injected into every automated sprint via Aider's `--read` flag (see SKILL.md). The loop respects guard decisions:
+- `branch-before-commit` — blocks commits to main/master
+- `version-check` — blocks push when versions not bumped
+- `stop-check` — checks for uncommitted/unpushed work before session end
+- Other guards provide context nudges and warnings
+
+### Legacy/Fallback (Shell Scripts)
+The original shell script runners are deprecated but available as fallback:
+- `slope-loop/run.sh` — single sprint runner (legacy)
+- `slope-loop/continuous.sh` — loop runner with backlog auto-regeneration (legacy)
+- `slope-loop/parallel.sh` — parallel runner with module overlap detection (legacy)
+
+**Note:** Use `slope loop` CLI commands instead of shell scripts. Shell scripts are maintained for backward compatibility but are not the primary interface.
 
 ## Key Files
 - `.slope/config.json` — SLOPE configuration (includes `metaphor` field)
