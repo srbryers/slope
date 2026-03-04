@@ -127,6 +127,23 @@ export interface SprintResult {
   merge_block_reason?: string;
 }
 
+// === Execution Plan ===
+
+export interface ExecutionPlan {
+  ticket: string;           // ticket key
+  title: string;
+  files: PlanFileEntry[];   // concrete file-level changes
+  testFiles: string[];      // matched test files
+  approach: string;         // model-specific approach text
+  generated: 'enriched' | 'grep' | 'generic'; // which tier produced the plan
+}
+
+export interface PlanFileEntry {
+  path: string;             // relative file path
+  action: string;           // what to do: "add export", "modify function X", etc.
+  reason: string;           // why: maps to which acceptance criterion
+}
+
 // === Model Config ===
 
 export interface ModelConfig {
