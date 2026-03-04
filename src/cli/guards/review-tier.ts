@@ -1,6 +1,16 @@
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { HookInput, GuardResult } from '../../core/index.js';
+import { selectSpecialists } from '../../core/index.js';
+import type { CommonIssuesFile } from '../../core/index.js';
+import { loadConfig } from '../config.js';
+import {
+  findPlanContent,
+  countTickets,
+  countPackageRefs,
+  extractFilePatterns,
+  extractTicketInfo,
+} from './plan-analysis.js';
 
 interface ReviewState {
   rounds_required: number;
@@ -9,20 +19,32 @@ interface ReviewState {
 }
 
 /**
- * Review-tier guard: fires PreToolUse on ExitPlanMode.
- * Recommends a review tier based on plan scope (context-only, never deny).
+ * Review-tier guard: fires PostToolUse on Write.
+ * When a plan file is written to .claude/plans/*.md, recommends review tier
+ * with specialist reviewers, surfaces relevant gotchas, and instructs
+ * Claude to use AskUserQuestion for review setup.
  */
 export async function reviewTierGuard(input: HookInput, cwd: string): Promise<GuardResult> {
-  // Find the plan file
-  const planContent = findPlanContent(input, cwd);
-  if (!planContent) return {};
+  // Only fire when a plan file is written
+  const filePath = input.tool_input?.file_path as string | undefined;
+  if (!filePath) return {};
+
+  // Check if the written file is a plan file
+  const normalizedPath = filePath.replace(/\\/g, '/');
+  if (!normalizedPath.includes('.claude/plans/') || !normalizedPath.endsWith('.md')) {
+    return {};
+  }
+
+  // Read the plan content (use the just-written file directly)
+  const plan = findPlanContent(cwd);
+  if (!plan) return {};
 
   // Analyze the plan
-  const ticketCount = countTickets(planContent);
-  const packageRefs = countPackageRefs(planContent);
-  const hasSchemaOrApi = /\b(schema|migration|api|endpoint)\b/i.test(planContent);
-  const hasInfra = /\b(infrastructure|new package|new service|architect)\b/i.test(planContent);
-  const isResearchOrDocs = /^#+\s*(research|docs|documentation|infra|spike)\b/im.test(planContent)
+  const ticketCount = countTickets(plan.content);
+  const packageRefs = countPackageRefs(plan.content);
+  const hasSchemaOrApi = /\b(schema|migration|api|endpoint)\b/i.test(plan.content);
+  const hasInfra = /\b(infrastructure|new package|new service|architect)\b/i.test(plan.content);
+  const isResearchOrDocs = /^#+\s*(research|docs|documentation|infra|spike)\b/im.test(plan.content)
     && ticketCount === 0;
 
   // Determine recommended tier
@@ -39,24 +61,22 @@ export async function reviewTierGuard(input: HookInput, cwd: string): Promise<Gu
     tier = 'Deep';
     rounds = 3;
   } else {
-    // 3-4 tickets, or multi-package, or schema/API changes
     tier = 'Standard';
     rounds = 2;
   }
 
-  // Check if review-state.json already matches
+  // Check if review-state.json already meets/exceeds tier
   const statePath = join(cwd, '.slope', 'review-state.json');
   if (existsSync(statePath)) {
     try {
       const state: ReviewState = JSON.parse(readFileSync(statePath, 'utf8'));
       if (state.rounds_required >= rounds) {
-        // Already set to at least the recommended level — silent passthrough
         return {};
       }
-    } catch { /* malformed — proceed with recommendation */ }
+    } catch { /* malformed — proceed */ }
   }
 
-  // Build context message
+  // Build scope description
   const scopeDesc = [
     `${ticketCount} ticket${ticketCount !== 1 ? 's' : ''}`,
     packageRefs > 1 ? `${packageRefs} packages` : null,
@@ -64,53 +84,71 @@ export async function reviewTierGuard(input: HookInput, cwd: string): Promise<Gu
     hasInfra ? 'new infrastructure' : null,
   ].filter(Boolean).join(', ');
 
-  return {
-    context: `SLOPE review-tier: Plan has ${scopeDesc} — recommend ${tier} review (${rounds} round${rounds !== 1 ? 's' : ''}). Set rounds_required: ${rounds} in .slope/review-state.json`,
-  };
+  // Select specialists from ticket info
+  const ticketInfo = extractTicketInfo(plan.content);
+  const specialists = selectSpecialists(ticketInfo);
+  const specialistList = specialists.length > 0 ? specialists.join(', ') : 'none detected';
+
+  // Load relevant gotchas (capped at 5)
+  const gotchas = loadRelevantGotchas(cwd, plan.content);
+
+  // Build context
+  const lines: string[] = [
+    `SLOPE plan-review: Plan detected with ${ticketCount} tickets, ${scopeDesc}.`,
+    `Recommended tier: ${tier} (${rounds} round${rounds !== 1 ? 's' : ''}).`,
+    `Recommended reviewers: architect + ${specialistList}.`,
+  ];
+
+  if (gotchas.length > 0) {
+    lines.push('');
+    lines.push('Relevant gotchas from past sprints:');
+    for (const g of gotchas) {
+      lines.push(`  - ${g}`);
+    }
+  }
+
+  lines.push('');
+  lines.push('IMPORTANT: You MUST now ask the user how they want to handle the plan review using AskUserQuestion.');
+  lines.push('Present these options:');
+  lines.push(`1. Architect + ${specialistList} review (Recommended)`);
+  lines.push('2. Architect review only');
+  lines.push('3. Custom reviewers — user specifies');
+  lines.push('4. Skip review');
+
+  return { context: lines.join('\n') };
 }
 
-function findPlanContent(input: HookInput, cwd: string): string | null {
-  // Try to find plan file from tool_input (ExitPlanMode context)
-  // Claude Code stores plans in .claude/plans/
-  const plansDir = join(cwd, '.claude', 'plans');
+/**
+ * Load gotchas from common-issues.json that are relevant to plan file patterns.
+ * Returns at most 5 entries.
+ */
+function loadRelevantGotchas(cwd: string, planContent: string): string[] {
+  try {
+    const config = loadConfig(cwd);
+    const issuesPath = join(cwd, config.commonIssuesPath);
+    if (!existsSync(issuesPath)) return [];
 
-  if (existsSync(plansDir)) {
-    // Find the most recently modified .md file
-    try {
-      const files = readdirSync(plansDir)
-        .filter(f => f.endsWith('.md'))
-        .map(f => ({
-          name: f,
-          path: join(plansDir, f),
-          mtime: (() => { try { return statSync(join(plansDir, f)).mtimeMs; } catch { return 0; } })(),
-        }))
-        .sort((a, b) => b.mtime - a.mtime);
+    const issues: CommonIssuesFile = JSON.parse(readFileSync(issuesPath, 'utf8'));
+    const filePatterns = extractFilePatterns(planContent);
+    const warnings: string[] = [];
 
-      if (files.length > 0) {
-        return readFileSync(files[0].path, 'utf8');
+    for (const pattern of issues.recurring_patterns) {
+      const text = `${pattern.title} ${pattern.description} ${pattern.prevention}`.toLowerCase();
+
+      // Check if any plan file pattern segments match the issue
+      const isRelevant = filePatterns.some(fp => {
+        const segments = fp.toLowerCase().split('/').filter(Boolean);
+        return segments.some(seg => text.includes(seg));
+      });
+
+      if (isRelevant) {
+        const lastSprint = Math.max(...pattern.sprints_hit);
+        warnings.push(`[${pattern.category}] ${pattern.title} (last: S${lastSprint}) — ${pattern.prevention.slice(0, 100)}`);
       }
-    } catch { /* no plans dir or can't read */ }
-  }
 
-  return null;
-}
+      if (warnings.length >= 5) break;
+    }
 
-function countTickets(content: string): number {
-  // Match ticket patterns: ### S\d+-\d+, ### Ticket, numbered ticket headers
-  const ticketHeaders = content.match(/^###\s+S\d+-\d+/gm) ?? [];
-  if (ticketHeaders.length > 0) return ticketHeaders.length;
-
-  // Fallback: count ### level headers that look like tickets
-  const h3Headers = content.match(/^###\s+/gm) ?? [];
-  return h3Headers.length;
-}
-
-function countPackageRefs(content: string): number {
-  // Count distinct packages/ references
-  const refs = new Set<string>();
-  const matches = content.matchAll(/packages\/(\w[\w-]*)/g);
-  for (const m of matches) {
-    refs.add(m[1]);
-  }
-  return refs.size;
+    return warnings;
+  } catch { return []; }
 }
