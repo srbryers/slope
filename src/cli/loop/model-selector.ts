@@ -24,8 +24,9 @@ export function selectModel(
   // 2. Multi-file routing: 2+ files → API
   if (maxFiles >= 2) return config.modelApi;
 
-  // 3. Strategy-based: documentation tickets need API model
-  if (strategy === 'documentation') return config.modelApi;
+  // 3. Strategy-based: documentation and roadmap tickets need API model
+  //    (local models struggle with prose; roadmap tickets are curated features)
+  if (strategy === 'documentation' || strategy === 'roadmap') return config.modelApi;
 
   // 4. Data-driven overrides from model-config.json
   const modelConfig = loadModelConfig(cwd);
