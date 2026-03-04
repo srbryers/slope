@@ -78,8 +78,9 @@ export async function runSprint(flags: Record<string, string>, cwd: string): Pro
       return dryRunSprint(sprint, config, cwd, log);
     }
 
-    // Create worktree
-    const wt = createWorktree(sprint.id, mainRepo, log);
+    // Create worktree (branch from staging if in staging mode)
+    const stagingBranch = flags.stagingBranch || '';
+    const wt = createWorktree(sprint.id, mainRepo, log, stagingBranch || undefined);
     const worktreeCwd = wt.path;
 
     try {
@@ -134,11 +135,12 @@ export async function runSprint(flags: Record<string, string>, cwd: string): Pro
       let mergeStatus: SprintResult['merge_status'];
       let mergeBlockReason: string | undefined;
 
+      const prBaseBranch = stagingBranch || 'main';
       if (passingCount > 0 && checkGhCli(log)) {
-        if (hasCommitsAhead(wt.branch, worktreeCwd)) {
+        if (hasCommitsAhead(wt.branch, worktreeCwd, prBaseBranch)) {
           const pr = createPr(
             wt.branch, sprint.id, sprint.title, sprint.strategy,
-            ticketResults, worktreeCwd, log,
+            ticketResults, worktreeCwd, log, prBaseBranch,
           );
 
           if (pr) {
@@ -162,7 +164,10 @@ export async function runSprint(flags: Record<string, string>, cwd: string): Pro
               }
             }
 
-            const mergeResult = autoMerge(pr.number, findingCount, passingCount, config, worktreeCwd, log);
+            const mergeResult = autoMerge(
+              pr.number, findingCount, passingCount, config, worktreeCwd, log,
+              stagingBranch ? { isStagingMerge: true } : undefined,
+            );
             mergeStatus = mergeResult.merged ? 'merged' : 'blocked';
             mergeBlockReason = mergeResult.blockReason;
           }

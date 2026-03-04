@@ -51,6 +51,7 @@ export function createPr(
   ticketResults: TicketResult[],
   cwd: string,
   log: Logger,
+  baseBranch = 'main',
 ): PrInfo | null {
   const passingCount = ticketResults.filter(t => t.tests_passing && !t.noop).length;
   const noopCount = ticketResults.filter(t => t.noop).length;
@@ -76,7 +77,7 @@ ${ticketLines}
   try {
     const url = execFileSync('gh', [
       'pr', 'create',
-      '--base', 'main',
+      '--base', baseBranch,
       '--head', branch,
       '--title', `feat(${sprintId}): ${title}`,
       '--body', body,
@@ -220,6 +221,7 @@ export function autoMerge(
   config: LoopConfig,
   cwd: string,
   log: Logger,
+  opts?: { isStagingMerge?: boolean },
 ): MergeResult {
   // Safeguard 1: No critical/major findings
   if (findingCount > 0) {
@@ -252,18 +254,20 @@ export function autoMerge(
     return block(prNumber, 'typecheck failing', cwd, log);
   }
 
-  // Safeguard 4: PR not too large (<20 files changed)
-  try {
-    const filesChanged = execFileSync('gh', [
-      'pr', 'view', String(prNumber),
-      '--json', 'changedFiles',
-      '--jq', '.changedFiles',
-    ], { cwd, encoding: 'utf8' }).trim();
-    const count = parseInt(filesChanged, 10) || 0;
-    if (count > 20) {
-      return block(prNumber, `${count} files changed (threshold: 20)`, cwd, log);
-    }
-  } catch { /* ok — proceed if check fails */ }
+  // Safeguard 4: PR not too large (<20 files changed) — skip for staging merges
+  if (!opts?.isStagingMerge) {
+    try {
+      const filesChanged = execFileSync('gh', [
+        'pr', 'view', String(prNumber),
+        '--json', 'changedFiles',
+        '--jq', '.changedFiles',
+      ], { cwd, encoding: 'utf8' }).trim();
+      const count = parseInt(filesChanged, 10) || 0;
+      if (count > 20) {
+        return block(prNumber, `${count} files changed (threshold: 20)`, cwd, log);
+      }
+    } catch { /* ok — proceed if check fails */ }
+  }
 
   // Safeguard 5: At least one passing non-noop ticket
   if (passingCount <= 0) {
