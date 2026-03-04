@@ -4,8 +4,10 @@ import { execSync } from 'node:child_process';
 import { resolveLoopConfig } from './config.js';
 import { loadBacklog, getRemainingSprintIds } from './backlog.js';
 import { runSprint, isShuttingDown } from './executor.js';
+import { initStagingBranch, createUmbrellaPr, cleanupStagingBranch } from './staging.js';
+import { checkGhCli } from './pr-lifecycle.js';
 import { createLogger } from './logger.js';
-import type { LoopConfig } from './types.js';
+import type { LoopConfig, SprintResult } from './types.js';
 import type { Logger } from './logger.js';
 
 /**
@@ -17,6 +19,7 @@ export async function runContinuous(flags: Record<string, string>, cwd: string):
   const maxSprints = parseInt(flags.max ?? '10', 10);
   const pauseSeconds = parseInt(flags.pause ?? '30', 10);
   const dryRun = flags['dry-run'] === 'true';
+  const useStaging = flags.staging === 'true';
 
   mkdirSync(join(cwd, config.resultsDir), { recursive: true });
   mkdirSync(join(cwd, config.logDir), { recursive: true });
@@ -26,10 +29,25 @@ export async function runContinuous(flags: Record<string, string>, cwd: string):
   log.info('=== Continuous Loop Starting ===');
   log.info(`Max sprints: ${maxSprints}`);
   log.info(`Pause between sprints: ${pauseSeconds}s`);
+  if (useStaging) log.info('Staging branch mode enabled');
   if (dryRun) log.info('DRY RUN mode');
+
+  // Initialize staging branch if requested
+  let stagingBranch = '';
+  if (useStaging && !dryRun) {
+    // Peek at backlog to get first sprint ID for branch naming
+    const peekBacklog = loadBacklogSafe(cwd, config, log);
+    const peekRemaining = peekBacklog ? getRemainingSprintIds(peekBacklog, cwd, config) : [];
+    if (peekRemaining.length > 0) {
+      stagingBranch = initStagingBranch(peekRemaining[0], cwd, log);
+    } else {
+      log.warn('No sprints in backlog — skipping staging branch');
+    }
+  }
 
   let completed = 0;
   let failures = 0;
+  const collectedResults: SprintResult[] = [];
 
   while (completed < maxSprints) {
     if (isShuttingDown()) {
@@ -61,10 +79,12 @@ export async function runContinuous(flags: Record<string, string>, cwd: string):
     try {
       const runFlags: Record<string, string> = { sprint: nextSprint };
       if (dryRun) runFlags['dry-run'] = 'true';
+      if (stagingBranch) runFlags.stagingBranch = stagingBranch;
 
       const result = await runSprint(runFlags, cwd);
       if (result) {
         log.info(`Sprint ${nextSprint} completed successfully`);
+        collectedResults.push(result);
         failures = 0;
       } else {
         log.warn(`Sprint ${nextSprint} returned no result`);
@@ -89,9 +109,24 @@ export async function runContinuous(flags: Record<string, string>, cwd: string):
     }
   }
 
+  // Create umbrella PR if staging mode was used (requires manual review and merge)
+  if (stagingBranch && collectedResults.length > 0 && checkGhCli(log)) {
+    log.info('Creating umbrella PR for staging branch...');
+    const umbrella = createUmbrellaPr(stagingBranch, collectedResults, cwd, log);
+    if (umbrella) {
+      log.info(`Umbrella PR: ${umbrella.url} (requires manual review)`);
+    }
+    // Cleanup staging branch if umbrella PR was created — safe delete refuses if unmerged
+    cleanupStagingBranch(stagingBranch, cwd, log);
+  }
+
   log.info('=== Continuous Loop Complete ===');
   log.info(`Sprints attempted: ${completed}`);
   log.info(`Failures: ${failures}`);
+  if (stagingBranch) {
+    log.info(`Staging branch: ${stagingBranch}`);
+    log.info(`Sprint results collected: ${collectedResults.length}`);
+  }
 }
 
 function loadBacklogSafe(cwd: string, config: LoopConfig, log: Logger) {

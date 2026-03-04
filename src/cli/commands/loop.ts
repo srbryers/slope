@@ -60,7 +60,7 @@ Usage:
   slope loop status [--sprint=ID]           Show loop progress, next sprint, config
   slope loop config [--show] [--set k=v]    Loop configuration management
   slope loop run [--sprint=ID] [--dry-run]  Single sprint execution
-  slope loop continuous [--max=N] [--pause=S] [--dry-run]  Multi-sprint loop
+  slope loop continuous [--max=N] [--pause=S] [--staging] [--dry-run]  Multi-sprint loop
   slope loop parallel [--dry-run]           Dual-sprint parallel execution
   slope loop results [--sprint=ID] [--json] Format/display sprint results
   slope loop analyze [--regenerate]         Mine scorecards → generate backlog
