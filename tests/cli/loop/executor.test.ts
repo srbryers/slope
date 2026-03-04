@@ -129,6 +129,50 @@ describe('buildPrompt', () => {
     expect(prompt).toContain('do NOT add only comments');
   });
 
+  it('includes token budget section', () => {
+    const prompt = buildPrompt(baseTicket, 'qwen2.5:32b');
+
+    expect(prompt).toContain('Token Budget');
+    expect(prompt).toContain('tokens');
+    expect(prompt).toContain('focus on the core change');
+  });
+
+  it('calculates budget based on club (short_iron = 8K for API)', () => {
+    const prompt = buildPrompt(baseTicket, 'openrouter/anthropic/claude-haiku-4-5');
+
+    expect(prompt).toContain('~8000 tokens');
+  });
+
+  it('halves budget for local models (short_iron = 4K for local)', () => {
+    const prompt = buildPrompt(baseTicket, 'ollama/qwen3-coder-next-fast');
+
+    expect(prompt).toContain('~4000 tokens');
+  });
+
+  it('uses putter budget (4K API, 2K local)', () => {
+    const putterTicket: BacklogTicket = {
+      ...baseTicket,
+      club: 'putter',
+    };
+    const apiPrompt = buildPrompt(putterTicket, 'openrouter/anthropic/claude-haiku-4-5');
+    const localPrompt = buildPrompt(putterTicket, 'ollama/qwen3-coder-next-fast');
+
+    expect(apiPrompt).toContain('~4000 tokens');
+    expect(localPrompt).toContain('~2000 tokens');
+  });
+
+  it('uses driver budget (24K API, 12K local)', () => {
+    const driverTicket: BacklogTicket = {
+      ...baseTicket,
+      club: 'driver',
+    };
+    const apiPrompt = buildPrompt(driverTicket, 'openrouter/anthropic/claude-haiku-4-5');
+    const localPrompt = buildPrompt(driverTicket, 'ollama/qwen3-coder-next-fast');
+
+    expect(apiPrompt).toContain('~24000 tokens');
+    expect(localPrompt).toContain('~12000 tokens');
+  });
+
   it('includes verification commands', () => {
     const prompt = buildPrompt(baseTicket, 'qwen2.5:32b');
 
