@@ -72,7 +72,8 @@ export type GuardName =
   | 'pr-review'
   | 'transcript'
   | 'branch-before-commit'
-  | 'worktree-check';
+  | 'worktree-check'
+  | 'sprint-completion';
 
 /** Guard registration entry */
 export interface GuardDefinition {
@@ -245,6 +246,28 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     hookEvent: 'PreToolUse',
     toolCategories: ['write_file'],
     matcher: 'Edit|Write',
+    level: 'full',
+  },
+  {
+    name: 'sprint-completion',
+    description: 'Block PR creation when sprint gates are incomplete',
+    hookEvent: 'PreToolUse',
+    toolCategories: ['execute_command'],
+    matcher: 'Bash',
+    level: 'full',
+  },
+  {
+    name: 'sprint-completion',
+    description: 'Block session end when sprint gates are incomplete',
+    hookEvent: 'Stop',
+    level: 'full',
+  },
+  {
+    name: 'sprint-completion',
+    description: 'Auto-detect test pass and mark gate complete',
+    hookEvent: 'PostToolUse',
+    toolCategories: ['execute_command'],
+    matcher: 'Bash',
     level: 'full',
   },
 ];
