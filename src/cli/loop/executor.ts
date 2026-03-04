@@ -9,6 +9,7 @@ import { createWorktree, refreshIndex, enrichBacklog, removeWorktree, getHeadSha
 import { runGuards } from './guard-runner.js';
 import { checkGhCli, hasCommitsAhead, createPr, runStructuralReview, autoMerge } from './pr-lifecycle.js';
 import { createLogger } from './logger.js';
+import { generatePlan, formatPlanAsPrompt } from './planner.js';
 import type { LoopConfig, BacklogSprint, BacklogTicket, TicketResult, SprintResult } from './types.js';
 import type { Logger } from './logger.js';
 
@@ -235,7 +236,16 @@ async function processTicket(
   // Claim ticket
   try { execFileSync('pnpm', ['slope', 'claim', `--target=${ticket.key}`], { cwd, stdio: 'pipe' }); } catch { /* ok */ }
 
-  const prompt = buildPrompt(ticket, primaryModel);
+  // Generate execution plan (planner) with fallback to generic prompt
+  let prompt: string;
+  try {
+    const plan = generatePlan(ticket, primaryModel, cwd, tLog);
+    prompt = formatPlanAsPrompt(plan, ticket);
+    tLog.info(`Plan generated (${plan.generated} tier, ${plan.files.length} files)`);
+  } catch (err) {
+    tLog.warn(`Planner failed, falling back to buildPrompt: ${err instanceof Error ? err.message : err}`);
+    prompt = buildPrompt(ticket, primaryModel);
+  }
   const preSha = getHeadSha(cwd);
   let finalModel = primaryModel;
   let escalated = false;
@@ -403,25 +413,6 @@ async function runAider(
     log.info('slope context failed — falling back to CODEBASE.md');
     const codemap = join(cwd, 'CODEBASE.md');
     if (existsSync(codemap)) aiderArgs.push('--read', codemap);
-  }
-
-  // Prep plan injection (capture output instead of shell redirect)
-  const prepFile = join(cwd, config.logDir, `${ticketKey}-prep.md`);
-  try {
-    const prepOutput = execFileSync('pnpm', [
-      'slope', 'prep', ticketKey, '--top=5',
-    ], { cwd, encoding: 'utf8' });
-    writeFileSync(prepFile, prepOutput);
-
-    const words = prepOutput.split(/\s+/).length;
-    if (words > 0 && words < 1600) {
-      aiderArgs.push('--read', prepFile);
-      log.info(`Injected prep plan (~${Math.round(words / 4)} tokens)`);
-    } else if (words >= 1600) {
-      log.info(`Prep plan too large (~${Math.round(words / 4)} tokens) — skipping`);
-    }
-  } catch {
-    log.info('slope prep failed — continuing without plan');
   }
 
   // Primary files from enriched ticket as --file flags (editable)
