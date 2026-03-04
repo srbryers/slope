@@ -1,0 +1,90 @@
+{
+  "sprint_number": 59,
+  "theme": "Post-implementation workflow gate (sprint-completion guard)",
+  "par": 4,
+  "slope": 2,
+  "score": 5,
+  "score_label": "bogey",
+  "date": "2026-03-04",
+  "shots": [
+    {
+      "ticket_key": "S22-T1",
+      "title": "Sprint state schema + read/write helpers",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "description": "Committed T1 directly to main before creating feature branch",
+          "gotcha_id": "process:branch-before-commit"
+        }
+      ],
+      "notes": "Created sprint-state.ts with SprintState schema, load/save/updateGate/isSprintComplete/pendingGates helpers. Added GuardName union + 3 GUARD_DEFINITIONS entries."
+    },
+    {
+      "ticket_key": "S22-T2",
+      "title": "sprint-completion guard with multi-hook dispatch",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Single handler branching on hook_event_name. Updated guard dispatcher to handle multi-definition guards by matching hookEvent from stdin."
+    },
+    {
+      "ticket_key": "S22-T3",
+      "title": "State writers + sprint CLI command",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Integrated updateGate into validate, review, workflow-gate, review-tier. Created slope sprint start/gate/status/reset CLI."
+    },
+    {
+      "ticket_key": "S22-T4",
+      "title": "Tests + next-action integration + test fixes",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "description": "3 existing tests broke: guard count (17→20), unique names (multi-hook), windsurf adapter (Stop exclusion logic), registry (new command file)",
+          "gotcha_id": "testing:guard-count-assertion"
+        }
+      ],
+      "notes": "33 new tests. Fixed guard.test.ts count+uniqueness, windsurf adapter exclusion logic, registry. next-action defers to sprint-completion when sprint-state active."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 1,
+    "hazards_hit": 2,
+    "hazard_penalties": 1,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    "First multi-hook guard (3 GUARD_DEFINITIONS for one handler)",
+    "Guard dispatcher needed update for multi-definition name matching"
+  ],
+  "special_plays": [],
+  "bunker_locations": ["tests/core/guard.test.ts", "tests/core/adapters/windsurf.test.ts", "tests/cli/registry.test.ts"],
+  "yardage_book_updates": [
+    "Multi-hook guards need unique name+hookEvent pairs, not unique names",
+    "Adding GUARD_DEFINITIONS entries breaks guard count assertion and uniqueness test",
+    "Windsurf adapter exclusion test assumes guards with unsupported events are fully excluded — not true for multi-hook guards"
+  ],
+  "course_management_notes": [
+    "Review findings (4 minor + 1 moderate) all addressed in a follow-up commit",
+    "T1 committed on main before branch — branch-before-commit guard caught it for T2 onward"
+  ],
+  "slope_factors": [
+    "New guard pattern (multi-hook) required dispatcher update",
+    "4 existing tests needed adaptation"
+  ]
+}

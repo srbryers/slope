@@ -4,6 +4,7 @@ import type { HookInput, GuardResult, SlopeConfig } from '../../core/index.js';
 import { loadConfig, loadScorecards, detectLatestSprint, parseRoadmap, formatStrategicContext } from '../../core/index.js';
 import { resolveStore } from '../store.js';
 import { loadFindings } from '../commands/review-state.js';
+import { loadSprintState } from '../sprint-state.js';
 
 /** Sprint state types for next-action detection */
 type SprintState =
@@ -56,6 +57,20 @@ export async function nextActionGuard(input: HookInput, cwd: string): Promise<Gu
 
 /** Detect current sprint state via store then filesystem fallback */
 export async function detectSprintState(cwd: string): Promise<SprintState> {
+  // If sprint-state.json exists and sprint is active, defer to sprint-completion guard.
+  // That guard handles the hard block on Stop with gate-level detail.
+  // next-action returns between-sprints to avoid duplicate messaging.
+  const sprintState = loadSprintState(cwd);
+  if (sprintState && sprintState.phase !== 'complete') {
+    let config: SlopeConfig;
+    try {
+      config = loadConfig(cwd);
+    } catch {
+      return { type: 'between-sprints' };
+    }
+    return buildBetweenSprints(config, cwd, sprintState.sprint);
+  }
+
   // Try store first for active claims
   let claimsFromStore: { sprint_number: number; target: string }[] | null = null;
   try {

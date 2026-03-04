@@ -19,6 +19,7 @@ import { prReviewGuard } from '../guards/pr-review.js';
 import { transcriptGuard } from '../guards/transcript.js';
 import { branchBeforeCommitGuard } from '../guards/branch-before-commit.js';
 import { worktreeCheckGuard } from '../guards/worktree-check.js';
+import { sprintCompletionGuard } from '../guards/sprint-completion.js';
 import { execSync } from 'node:child_process';
 
 // Side-effect imports: ensure all adapters are registered for detectAdapter()
@@ -79,6 +80,7 @@ const handlers: Partial<Record<GuardName, GuardHandler>> = {
   transcript: transcriptGuard,
   'branch-before-commit': branchBeforeCommitGuard,
   'worktree-check': worktreeCheckGuard,
+  'sprint-completion': sprintCompletionGuard,
 };
 
 /** Register a guard handler */
@@ -110,24 +112,35 @@ export async function guardCommand(args: string[]): Promise<void> {
   // Load custom guard plugins
   loadPluginGuards(cwd, config.plugins);
 
-  // Find guard definition (built-in or custom)
-  const def: AnyGuardDefinition | undefined = getAllGuardDefinitions().find(d => d.name === name);
-  if (!def) {
-    console.error(`Unknown guard: "${name}". Available: ${getAllGuardDefinitions().map(d => d.name).join(', ')}`);
-    process.exit(1);
-  }
-
   // Read hook input from stdin
   let input: HookInput;
+  let stdinParsed = true;
   try {
     input = await readStdin();
   } catch {
-    // No stdin or invalid JSON — run with minimal input (for manual testing)
+    stdinParsed = false;
     input = {
       session_id: '',
       cwd,
-      hook_event_name: def.hookEvent,
+      hook_event_name: '',
     };
+  }
+
+  // Find guard definition (built-in or custom).
+  // When multiple definitions share a name (e.g. sprint-completion fires on
+  // PreToolUse, PostToolUse, and Stop), prefer the one matching the actual
+  // hook_event_name from stdin so the output formatter is correct.
+  const allDefs = getAllGuardDefinitions().filter(d => d.name === name);
+  if (allDefs.length === 0) {
+    console.error(`Unknown guard: "${name}". Available: ${getAllGuardDefinitions().map(d => d.name).join(', ')}`);
+    process.exit(1);
+  }
+  const hookEvent = input.hook_event_name.replace(/:.*$/, ''); // "PreToolUse:Bash" → "PreToolUse"
+  const def = allDefs.find(d => d.hookEvent === hookEvent) ?? allDefs[0];
+
+  // If no stdin was parsed, fill in the hook event from the definition
+  if (!stdinParsed) {
+    input.hook_event_name = def.hookEvent;
   }
 
   // Find and run the handler
@@ -237,9 +250,15 @@ export async function guardManageCommand(args: string[]): Promise<void> {
       loadPluginGuards(cwd, config.plugins);
 
       console.log('\nSLOPE Guards:\n');
+      // Deduplicate multi-hook guards (e.g. sprint-completion fires on 3 events)
+      const seen = new Set<string>();
       for (const d of GUARD_DEFINITIONS) {
+        if (seen.has(d.name)) continue;
+        seen.add(d.name);
         const status = disabled.includes(d.name) ? '[disabled]' : '[enabled] ';
-        console.log(`  ${status} ${d.name.padEnd(16)} [${d.hookEvent}] ${d.description}`);
+        const events = GUARD_DEFINITIONS.filter(g => g.name === d.name).map(g => g.hookEvent);
+        const eventStr = events.length > 1 ? `[${events.join(',')}]` : `[${d.hookEvent}]`;
+        console.log(`  ${status} ${d.name.padEnd(22)} ${eventStr.padEnd(35)} ${d.description}`);
       }
       // Show custom guards
       const allDefs = getAllGuardDefinitions();
@@ -282,12 +301,17 @@ export async function guardManageCommand(args: string[]): Promise<void> {
       loadPluginGuards(cwd, statusConfig.plugins);
 
       console.log('\nGuards:\n');
+      const statusSeen = new Set<string>();
       for (const d of getAllGuardDefinitions()) {
+        if (statusSeen.has(d.name)) continue;
+        statusSeen.add(d.name);
         const disabled = statusDisabled.includes(d.name);
-        const supported = adapter?.supportedEvents.has(d.hookEvent) ?? true;
+        const allEvents = getAllGuardDefinitions().filter(g => g.name === d.name).map(g => g.hookEvent);
+        const supported = allEvents.some(e => adapter?.supportedEvents.has(e) ?? true);
         const marker = disabled ? '[-]' : !supported ? '[~]' : '[+]';
         const state = disabled ? 'disabled' : !supported ? 'unsupported' : 'active';
-        console.log(`  ${marker} ${d.name.padEnd(22)} ${d.hookEvent.padEnd(13)} ${state}`);
+        const eventStr = allEvents.length > 1 ? allEvents.join(',') : d.hookEvent;
+        console.log(`  ${marker} ${d.name.padEnd(22)} ${eventStr.padEnd(35)} ${state}`);
       }
 
       // Show capabilities

@@ -20,6 +20,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
   { cmd: 'release',   desc: 'Release a claim by ID or target',                 category: 'lifecycle' },
   { cmd: 'status',    desc: 'Show sprint course status and conflicts',         category: 'lifecycle' },
   { cmd: 'next',      desc: 'Show next sprint number (auto-detect)',           category: 'lifecycle' },
+  { cmd: 'sprint',    desc: 'Manage sprint lifecycle state and gates',         category: 'lifecycle' },
 
   // ── Scoring ────────────────────────────────────────────────────
   { cmd: 'card',         desc: 'Display handicap card',                        category: 'scoring' },

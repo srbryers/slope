@@ -11,8 +11,8 @@ import type { GuardResult } from '../../src/core/guard.js';
 import '../../src/core/adapters/claude-code.js';
 
 describe('GUARD_DEFINITIONS', () => {
-  it('has 17 guards defined', () => {
-    expect(GUARD_DEFINITIONS).toHaveLength(17);
+  it('has 20 guard definitions', () => {
+    expect(GUARD_DEFINITIONS).toHaveLength(20);
   });
 
   it('all guards have required fields', () => {
@@ -24,9 +24,9 @@ describe('GUARD_DEFINITIONS', () => {
     }
   });
 
-  it('has unique guard names', () => {
-    const names = GUARD_DEFINITIONS.map(d => d.name);
-    expect(new Set(names).size).toBe(names.length);
+  it('has unique guard name+hookEvent pairs', () => {
+    const keys = GUARD_DEFINITIONS.map(d => `${d.name}:${d.hookEvent}`);
+    expect(new Set(keys).size).toBe(keys.length);
   });
 
   it('all current guards are level=full', () => {
