@@ -116,6 +116,25 @@ describe('extractFileRefs', () => {
     expect(result).toContain('continuous.sh');
     expect(result).toContain('dashboard.ts');
   });
+
+  it('excludes .test.ts and .spec.ts files (hotspots target production code)', () => {
+    const result = extractFileRefs([
+      'src/mcp/index.test.ts',
+      'tests/mcp/index-src.test.ts',
+      'src/core/scoring.spec.ts',
+      'guard-runner.test.ts',
+    ]);
+    expect(result).toEqual([]);
+  });
+
+  it('keeps production files that contain "test" in path but not as suffix', () => {
+    const result = extractFileRefs([
+      'src/store/test.ts',
+      'src/test-utils/helpers.ts',
+    ]);
+    expect(result).toContain('src/store/test.ts');
+    expect(result).toContain('src/test-utils/helpers.ts');
+  });
 });
 
 describe('AMBIGUOUS_BASENAMES', () => {
