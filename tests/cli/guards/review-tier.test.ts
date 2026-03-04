@@ -164,37 +164,37 @@ describe('reviewTierGuard', () => {
   it('includes relevant gotchas when common issues exist', async () => {
     writeCommonIssues([
       {
-        title: 'Config type mismatch',
-        description: 'SlopeConfig has nested guidance field',
-        prevention: 'Always read type definition before using config',
+        title: 'Guard hook timeout',
+        description: 'Guards in cli/guards often timeout when loading large files',
+        prevention: 'Always cap file reads in guards to avoid timeout',
         category: 'type-safety',
         sprints_hit: [39, 42],
       },
     ]);
     const planPath = writePlan([
       '# Sprint Plan',
-      '### T1: Update config in `src/core/config.ts`',
-      'Modify config handling.',
+      '### T1: Update guard in `src/cli/guards/hazard.ts`',
+      'Modify guard handling.',
     ].join('\n'));
     const input = makeInput(planPath);
     const result = await reviewTierGuard(input, TMP);
     expect(result.context).toContain('Relevant gotchas');
-    expect(result.context).toContain('Config type mismatch');
+    expect(result.context).toContain('Guard hook timeout');
   });
 
   it('caps gotchas at 5 entries', async () => {
     const patterns = Array.from({ length: 10 }, (_, i) => ({
-      title: `Issue ${i}`,
-      description: `Description for core module issue ${i}`,
-      prevention: `Prevention for core issue ${i}`,
+      title: `Guards issue ${i}`,
+      description: `Description for guards module issue ${i}`,
+      prevention: `Prevention for guards issue ${i}`,
       category: 'type-safety',
       sprints_hit: [40 + i],
     }));
     writeCommonIssues(patterns);
     const planPath = writePlan([
       '# Sprint Plan',
-      '### T1: Update `src/core/something.ts`',
-      'Changes to core.',
+      '### T1: Update `src/cli/guards/something.ts`',
+      'Changes to guards.',
     ].join('\n'));
     const input = makeInput(planPath);
     const result = await reviewTierGuard(input, TMP);
