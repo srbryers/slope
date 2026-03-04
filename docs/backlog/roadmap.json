@@ -1794,5 +1794,151 @@
         }
       ]
     }
+  ],
+  "planned": [
+    {
+      "id": "P10-1",
+      "theme": "Context budget per ticket",
+      "par": 3,
+      "slope": 2,
+      "type": "feature",
+      "tickets": [
+        {
+          "key": "P10-1-1",
+          "title": "Add token budget instruction to Aider prompt based on club/model",
+          "club": "short_iron",
+          "description": "Inject a context budget instruction into the Aider prompt in buildPrompt(). Local models get tighter budgets (8K tokens) than API models (24K). Budget derived from club: putter/wedge=4K, short_iron=8K, long_iron=16K, driver=24K. Local models halve the budget.",
+          "acceptance_criteria": [
+            "buildPrompt() includes a token budget line like 'You have ~NK tokens — focus on the core change'",
+            "Budget varies by club and model tier (local vs API)",
+            "pnpm test passes",
+            "pnpm typecheck passes"
+          ],
+          "modules": ["src/cli/loop/executor.ts"],
+          "max_files": 1
+        }
+      ]
+    },
+    {
+      "id": "P10-2",
+      "theme": "Analysis paralysis timeout",
+      "par": 3,
+      "slope": 2,
+      "type": "feature",
+      "tickets": [
+        {
+          "key": "P10-2-1",
+          "title": "Add early-kill timeout when Aider produces no file changes",
+          "club": "short_iron",
+          "description": "In runAider(), monitor the working directory for file changes. If no files are modified within the first 50% of the timeout, kill the Aider process early and escalate to the next model tier. This saves 15+ minutes per stuck ticket.",
+          "acceptance_criteria": [
+            "runAider() kills Aider process if no file changes within 50% of timeout",
+            "Early kill triggers escalation (same path as normal failure)",
+            "Ticket result records the early kill reason",
+            "pnpm test passes",
+            "pnpm typecheck passes"
+          ],
+          "modules": ["src/cli/loop/executor.ts"],
+          "max_files": 1
+        }
+      ]
+    },
+    {
+      "id": "P10-3",
+      "theme": "Pass planner files as --file flags",
+      "par": 4,
+      "slope": 2,
+      "type": "feature",
+      "tickets": [
+        {
+          "key": "P10-3-1",
+          "title": "Thread planner file list into executor --file flags",
+          "club": "short_iron",
+          "description": "The planner already identifies concrete files per ticket. Pass these as Aider --file flags so the model starts with the right files in context instead of searching. Read planner output from ExecutionPlan.files and map to --file arguments in buildAiderArgs().",
+          "acceptance_criteria": [
+            "buildAiderArgs() includes --file flags from ExecutionPlan.files",
+            "Falls back gracefully when no execution plan exists",
+            "pnpm test passes",
+            "pnpm typecheck passes"
+          ],
+          "modules": ["src/cli/loop/executor.ts", "src/cli/loop/planner.ts"],
+          "max_files": 2
+        }
+      ]
+    },
+    {
+      "id": "P10-4",
+      "theme": "Add hazards and similar tickets to planner context",
+      "par": 4,
+      "slope": 2,
+      "type": "feature",
+      "tickets": [
+        {
+          "key": "P10-4-1",
+          "title": "Inject hazard history and similar past tickets into planner prompt",
+          "club": "long_iron",
+          "description": "Enrich the planner prompt with relevant hazards from common-issues and similar completed tickets from sprint history. Load common-issues via loadCommonIssues(), filter by module overlap. Load past sprint results and find tickets with similar modules/descriptions. Include top 3 hazards and top 2 similar tickets as context.",
+          "acceptance_criteria": [
+            "Planner prompt includes relevant hazards from common-issues",
+            "Planner prompt includes similar past tickets when available",
+            "Gracefully handles missing common-issues or sprint history",
+            "pnpm test passes",
+            "pnpm typecheck passes"
+          ],
+          "modules": ["src/cli/loop/planner.ts", "src/core/prep.ts"],
+          "max_files": 2
+        }
+      ]
+    },
+    {
+      "id": "P10-5",
+      "theme": "Context monitoring hook",
+      "par": 4,
+      "slope": 3,
+      "type": "feature",
+      "tickets": [
+        {
+          "key": "P10-5-1",
+          "title": "Create context-monitor guard that warns at token thresholds",
+          "club": "long_iron",
+          "description": "Create a new guard at src/cli/guards/context-monitor.ts that tracks remaining context during Aider execution. Inject warnings at 35% and 25% remaining context thresholds. Register as a PostToolUse hook. Integrate with executor.ts to enable during sprint execution.",
+          "acceptance_criteria": [
+            "New guard file src/cli/guards/context-monitor.ts exists",
+            "Guard warns at 35% and 25% remaining context",
+            "Guard registered in hook system",
+            "Executor enables the guard during sprint execution",
+            "pnpm test passes",
+            "pnpm typecheck passes"
+          ],
+          "modules": ["src/cli/loop/executor.ts"],
+          "max_files": 2
+        }
+      ]
+    },
+    {
+      "id": "P10-6",
+      "theme": "Wave-based parallelism",
+      "par": 4,
+      "slope": 3,
+      "type": "feature",
+      "tickets": [
+        {
+          "key": "P10-6-1",
+          "title": "Replace binary overlap detection with dependency-graph wave scheduling",
+          "club": "driver",
+          "description": "Replace the current binary module overlap detection in parallel.ts with a dependency graph approach. Build a graph of ticket-to-module edges, compute independent waves (tickets with no shared modules), and execute each wave in parallel. Fall back to sequential only for truly overlapping tickets within a wave.",
+          "acceptance_criteria": [
+            "parallel.ts builds a module dependency graph across tickets",
+            "Independent tickets run in parallel waves",
+            "Overlapping tickets within a wave run sequentially",
+            "Existing parallel test cases still pass",
+            "pnpm test passes",
+            "pnpm typecheck passes"
+          ],
+          "modules": ["src/cli/loop/parallel.ts"],
+          "max_files": 1
+        }
+      ]
+    }
   ]
 }
