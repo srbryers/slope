@@ -4,7 +4,7 @@ import type { Logger } from './logger.js';
 
 export interface GuardResult {
   passed: boolean;
-  failedGuard?: 'typecheck' | 'tests';
+  failedGuard?: 'typecheck' | 'tests' | 'substantiveness';
 }
 
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
@@ -21,6 +21,13 @@ export function runGuards(
   cwd: string,
   log: Logger,
 ): GuardResult {
+  // Guard 0: Substantiveness — detect stub/whitespace-only changes
+  if (!isSubstantive(preSha, cwd)) {
+    log.warn('Changes are not substantive (comments/whitespace only) — reverting');
+    revert(preSha, cwd);
+    return { passed: false, failedGuard: 'substantiveness' };
+  }
+
   // Guard 1: Typecheck
   try {
     execSync('pnpm typecheck', { cwd, stdio: 'pipe', timeout: 120_000 });
@@ -51,6 +58,44 @@ function revert(sha: string, cwd: string): void {
   try {
     execFileSync('git', ['clean', '-fd'], { cwd, stdio: 'pipe' });
   } catch { /* ok */ }
+}
+
+/**
+ * Check if changes since preSha are substantive (not just comments/whitespace).
+ * Uses `git diff --stat` to count insertions/deletions, then checks
+ * if the non-comment/non-whitespace diff is meaningful.
+ */
+export function isSubstantive(preSha: string, cwd: string): boolean {
+  try {
+    // Get the actual code diff (ignore whitespace changes)
+    const diff = execFileSync('git', ['diff', '-w', '--no-color', preSha, 'HEAD'], {
+      cwd,
+      encoding: 'utf8',
+      maxBuffer: 1024 * 1024,
+    });
+
+    // Extract only added/removed lines (not diff headers)
+    const changedLines = diff.split('\n').filter(line =>
+      (line.startsWith('+') || line.startsWith('-')) &&
+      !line.startsWith('+++') && !line.startsWith('---'),
+    );
+
+    // Filter out comment-only and empty lines
+    const substantiveLines = changedLines.filter(line => {
+      const content = line.slice(1).trim(); // Remove +/- prefix
+      if (content === '') return false;
+      // Skip pure comment lines
+      if (content.startsWith('//') || content.startsWith('/*') || content.startsWith('*') || content.startsWith('#')) return false;
+      // Skip JSDoc-only lines
+      if (content.startsWith('/**') || content === '*/') return false;
+      return true;
+    });
+
+    return substantiveLines.length >= 3;
+  } catch {
+    // If diff fails, assume substantive (don't block on errors)
+    return true;
+  }
 }
 
 /** Count commits that would be reverted */
