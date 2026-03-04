@@ -72,7 +72,7 @@ Multi-sprint initiatives with structured review gates. Built on top of existing 
 - Specialist selection: keyword-based (`selectSpecialists()`) — backend, ml-engineer, database, frontend, ux-designer
 
 ## Self-Development Loop
-Autonomous sprint execution via the `slope loop` CLI command. The loop orchestrates multi-sprint execution with tiered model selection (local Qwen 32B + MiniMax M2.5 API escalation), backlog regeneration, and result tracking.
+Autonomous sprint execution via the `slope loop` CLI command. The loop orchestrates multi-sprint execution with tiered model selection, backlog regeneration, and result tracking.
 
 ### slope loop Subcommands
 
@@ -94,12 +94,14 @@ Autonomous sprint execution via the `slope loop` CLI command. The loop orchestra
 **Maintenance:**
 - `slope loop clean [--results] [--logs] [--worktrees] [--all]` — Clean up loop artifacts (results, logs, git worktrees)
 
-### Model Tier Rules (Loop Context)
-- **Putter/Wedge** → local Qwen 32B (fast, free)
-- **Short Iron** → local Qwen 32B (default), escalate to M2.5 on failure
-- **Long Iron/Driver** → MiniMax M2.5 API (architect-level planning)
-- **Multi-file tickets** → always M2.5 regardless of club
-- **Local model failure** → auto-escalate to M2.5 before marking as miss
+### Model Routing Rules (Loop Context)
+Model selection is configurable via `slope loop config`. Default routing:
+- **Putter/Wedge/Short Iron** → local model (configurable, default: ollama/qwen3-coder-next-fast)
+- **Long Iron/Driver** → API model (configurable, default: openrouter/anthropic/claude-haiku-4-5)
+- **Multi-file tickets (max_files >= 2)** → API model regardless of club
+- **Documentation strategy** → API model regardless of club (local models struggle with prose)
+- **Token escalation (>24K tokens)** → API model
+- **Local model failure** → auto-escalate to API model before marking as miss
 
 ### Loop Infrastructure (Reference)
 - `slope-loop/analyze-scorecards.ts` — mines scorecard data → `analysis.json` + `backlog.json`
@@ -108,11 +110,11 @@ Autonomous sprint execution via the `slope loop` CLI command. The loop orchestra
 - `slope-loop/slope-loop-guide/SKILL.md` — agent guide skill for sprint execution (auto-injected via Aider `--read` flag)
 
 ### Guard Hooks in Loop Context
-Guard hooks are auto-injected into every automated sprint via Aider's `--read` flag (see SKILL.md). The loop respects guard decisions:
-- `branch-before-commit` — blocks commits to main/master
-- `version-check` — blocks push when versions not bumped
-- `stop-check` — checks for uncommitted/unpushed work before session end
-- Other guards provide context nudges and warnings
+Guard hooks don't run during Aider execution. The loop runs equivalent post-ticket checks:
+- **typecheck**: `pnpm typecheck` after each ticket
+- **tests**: configurable test command (default: `pnpm vitest run`)
+- **auto-revert**: if guards fail, all ticket commits are reverted to pre-ticket SHA
+- **escalation**: failed ticket retried with API model before marking as miss
 
 ### Legacy/Fallback (Shell Scripts)
 The original shell script runners are deprecated but available as fallback:
