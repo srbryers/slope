@@ -188,10 +188,10 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
   },
   {
     name: 'review-tier',
-    description: 'Recommend review tier based on plan scope',
-    hookEvent: 'PreToolUse',
-    toolCategories: ['exit_plan'],
-    matcher: 'ExitPlanMode',
+    description: 'Suggest plan review with specialist reviewers after plan file write',
+    hookEvent: 'PostToolUse',
+    toolCategories: ['write_file'],
+    matcher: 'Edit|Write',
     level: 'full',
   },
   {
