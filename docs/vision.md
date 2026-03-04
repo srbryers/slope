@@ -274,7 +274,7 @@ See [docs/backlog/roadmap.md](docs/backlog/roadmap.md) for the detailed Phase 1-
 
 ### Next (S17-S20) — Phase 4
 
-See [docs/backlog/roadmap-phase4.md](docs/backlog/roadmap-phase4.md) for the detailed sprint-by-sprint plan.
+See [docs/backlog/roadmap.md](docs/backlog/roadmap.md) for the unified roadmap.
 
 - **S17 — The Plugin System** — Pluggable metaphor loaders, custom guard plugins, hook extensibility
 - **S18 — PR Signals** — PR-as-scorecard: scoring signals from PR metadata, review comments, CI status
