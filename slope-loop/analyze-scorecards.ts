@@ -21,7 +21,7 @@ import {
 import type {
   DispersionReport,
 } from '../dist/index.js';
-import { writeFileSync } from 'node:fs';
+import { writeFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -323,7 +323,7 @@ function analyze(): void {
       area,
       risk_score: data.score,
       hazard_types: data.hazards,
-      source_files: [...(hazardFileRefs[area] ?? [])],
+      source_files: [...(hazardFileRefs[area] ?? [])].filter(f => existsSync(join(cwd, f))),
       hazard_descriptions: (hazardDescs[area] ?? []).slice(0, 5),
     }));
 
@@ -343,7 +343,7 @@ function analyze(): void {
       frequency: hazardFrequency,
       by_module: hazardByModule,
       type_files: Object.fromEntries(
-        Object.entries(hazardTypeFiles).map(([k, v]) => [k, [...v]]),
+        Object.entries(hazardTypeFiles).map(([k, v]) => [k, [...v].filter(f => existsSync(join(cwd, f)))]),
       ),
       type_descriptions: Object.fromEntries(
         Object.entries(hazardTypeDescs).map(([k, v]) => [k, v.slice(0, 10)]),
@@ -382,9 +382,13 @@ function analyze(): void {
   }
 
   if (hotspots.length > 0) {
-    console.log(`\nHotspot areas:`);
+    // Count file refs pruned by existence check
+    const totalRefs = Object.values(hazardFileRefs).reduce((n, s) => n + s.size, 0);
+    const validRefs = hotspots.reduce((n, h) => n + h.source_files.length, 0);
+    const pruned = totalRefs - validRefs;
+    console.log(`\nHotspot areas (${pruned > 0 ? `${pruned} stale file ref(s) pruned` : 'all refs valid'}):`);
     for (const h of hotspots.slice(0, 5)) {
-      console.log(`  ${h.area}: risk score ${h.risk_score}`);
+      console.log(`  ${h.area}: risk score ${h.risk_score}, ${h.source_files.length} file(s)`);
     }
   }
 
