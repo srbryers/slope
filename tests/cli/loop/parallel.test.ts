@@ -196,5 +196,68 @@ describe('parallel module overlap detection', () => {
 
       expect(overlap).toBe(false);
     });
+
+    it('treats module paths as distinct (cli vs cli/commands)', () => {
+      const sprintA = createMockSprint('S1', ['cli']);
+      const sprintB = createMockSprint('S2', ['cli/commands']);
+      const backlog = createMockBacklog([sprintA, sprintB]);
+
+      const overlap = hasModuleOverlap(backlog, 'S1', 'S2');
+
+      expect(overlap).toBe(false);
+    });
+
+    it('is case-sensitive for module names', () => {
+      const sprintA = createMockSprint('S1', ['CLI']);
+      const sprintB = createMockSprint('S2', ['cli']);
+      const backlog = createMockBacklog([sprintA, sprintB]);
+
+      const overlap = hasModuleOverlap(backlog, 'S1', 'S2');
+
+      expect(overlap).toBe(false);
+    });
+
+    it('detects overlap with single-module sprints', () => {
+      const sprintA = createMockSprint('S1', ['core']);
+      const sprintB = createMockSprint('S2', ['core']);
+      const backlog = createMockBacklog([sprintA, sprintB]);
+
+      const overlap = hasModuleOverlap(backlog, 'S1', 'S2');
+
+      expect(overlap).toBe(true);
+    });
+
+    it('handles large module sets correctly', () => {
+      const largeModuleSet = Array.from({ length: 50 }, (_, i) => `module-${i}`);
+      const sprintA = createMockSprint('S1', largeModuleSet);
+      const sprintB = createMockSprint('S2', [...largeModuleSet.slice(0, 10), 'unique-module']);
+      const backlog = createMockBacklog([sprintA, sprintB]);
+
+      const overlap = hasModuleOverlap(backlog, 'S1', 'S2');
+
+      expect(overlap).toBe(true);
+    });
+
+    it('returns false when sprints have no overlap in large module sets', () => {
+      const modulesA = Array.from({ length: 25 }, (_, i) => `module-a-${i}`);
+      const modulesB = Array.from({ length: 25 }, (_, i) => `module-b-${i}`);
+      const sprintA = createMockSprint('S1', modulesA);
+      const sprintB = createMockSprint('S2', modulesB);
+      const backlog = createMockBacklog([sprintA, sprintB]);
+
+      const overlap = hasModuleOverlap(backlog, 'S1', 'S2');
+
+      expect(overlap).toBe(false);
+    });
+
+    it('detects overlap when one sprint has single module matching many in other', () => {
+      const sprintA = createMockSprint('S1', ['core']);
+      const sprintB = createMockSprint('S2', ['cli', 'core', 'store', 'mcp']);
+      const backlog = createMockBacklog([sprintA, sprintB]);
+
+      const overlap = hasModuleOverlap(backlog, 'S1', 'S2');
+
+      expect(overlap).toBe(true);
+    });
   });
 });
