@@ -370,7 +370,7 @@ async function runAider(
   }
 
   // Semantic context injection (capture output instead of shell redirect)
-  const contextLineLimit = local ? 200 : 500;
+  const contextLineLimit = local ? 200 : 1000;
   const contextTop = local ? 4 : 8;
   const contextFile = join(cwd, config.logDir, `${ticketKey}-context.md`);
 
@@ -381,19 +381,23 @@ async function runAider(
       '--format=snippets',
       `--top=${contextTop}`,
     ], { cwd, encoding: 'utf8' });
-    writeFileSync(contextFile, contextOutput);
 
-    const lines = contextOutput.split('\n').length;
-    if (lines > 0 && lines <= contextLineLimit) {
-      aiderArgs.push('--read', contextFile);
-      log.info(`Injected semantic context (${lines} lines)`);
-    } else if (lines > contextLineLimit) {
-      log.info(`Semantic context too large (${lines} lines) — falling back to CODEBASE.md`);
+    if (contextOutput.trim().length === 0) {
       const codemap = join(cwd, 'CODEBASE.md');
       if (existsSync(codemap)) aiderArgs.push('--read', codemap);
     } else {
-      const codemap = join(cwd, 'CODEBASE.md');
-      if (existsSync(codemap)) aiderArgs.push('--read', codemap);
+      const contextLines = contextOutput.split('\n');
+      if (contextLines.length <= contextLineLimit) {
+        writeFileSync(contextFile, contextOutput);
+        aiderArgs.push('--read', contextFile);
+        log.info(`Injected semantic context (${contextLines.length} lines)`);
+      } else {
+        // Truncate to limit instead of discarding — top results are most relevant
+        const truncated = contextLines.slice(0, contextLineLimit).join('\n');
+        writeFileSync(contextFile, truncated);
+        aiderArgs.push('--read', contextFile);
+        log.info(`Injected semantic context (${contextLines.length} lines, truncated to ${contextLineLimit})`);
+      }
     }
   } catch {
     log.info('slope context failed — falling back to CODEBASE.md');
