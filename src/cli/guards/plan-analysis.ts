@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { homedir } from 'node:os';
 
 /** Result of finding a plan file */
 export interface PlanFile {
@@ -15,26 +16,34 @@ export interface TicketInfo {
 
 /**
  * Find the most recently modified plan file in .claude/plans/.
+ * Searches repo-local first ({cwd}/.claude/plans/), then falls back
+ * to global (~/.claude/plans/) since Claude Code writes plans there.
  */
 export function findPlanContent(cwd: string): PlanFile | null {
-  const plansDir = join(cwd, '.claude', 'plans');
-  if (!existsSync(plansDir)) return null;
+  const searchDirs = [
+    join(cwd, '.claude', 'plans'),
+    join(homedir(), '.claude', 'plans'),
+  ];
 
-  try {
-    const files = readdirSync(plansDir)
-      .filter(f => f.endsWith('.md'))
-      .map(f => ({
-        name: f,
-        path: join('.claude', 'plans', f),
-        fullPath: join(plansDir, f),
-        mtime: (() => { try { return statSync(join(plansDir, f)).mtimeMs; } catch { return 0; } })(),
-      }))
-      .sort((a, b) => b.mtime - a.mtime);
+  for (const plansDir of searchDirs) {
+    if (!existsSync(plansDir)) continue;
 
-    if (files.length > 0) {
-      return { path: files[0].path, content: readFileSync(files[0].fullPath, 'utf8') };
-    }
-  } catch { /* can't read plans dir */ }
+    try {
+      const files = readdirSync(plansDir)
+        .filter(f => f.endsWith('.md'))
+        .map(f => ({
+          name: f,
+          path: join(plansDir, f).replace(/\\/g, '/'),
+          fullPath: join(plansDir, f),
+          mtime: (() => { try { return statSync(join(plansDir, f)).mtimeMs; } catch { return 0; } })(),
+        }))
+        .sort((a, b) => b.mtime - a.mtime);
+
+      if (files.length > 0) {
+        return { path: files[0].path, content: readFileSync(files[0].fullPath, 'utf8') };
+      }
+    } catch { /* can't read plans dir */ }
+  }
 
   return null;
 }
