@@ -21,7 +21,7 @@ import {
 import type {
   DispersionReport,
 } from '../dist/index.js';
-import { writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { writeFileSync, readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { BacklogSprint, PlannedSprint } from '../src/cli/loop/types.js';
@@ -465,7 +465,19 @@ export function convertPlannedSprints(
 
 function generateBacklog(analysis: Analysis, sprintCount: number): void {
   const sprints: BacklogSprint[] = [];
-  let counter = sprintCount + 1;
+
+  // Start counter after both scorecards AND existing result files.
+  // The loop may have run sprints that don't have scorecards yet,
+  // so we need to check both to avoid ID collisions.
+  const resultsDir = join(__dirname, 'results');
+  let maxResultNum = 0;
+  if (existsSync(resultsDir)) {
+    for (const f of readdirSync(resultsDir)) {
+      const m = f.match(/^S-LOCAL-(\d+)\.json$/);
+      if (m) maxResultNum = Math.max(maxResultNum, Number(m[1]));
+    }
+  }
+  let counter = Math.max(sprintCount, maxResultNum) + 1;
 
   // Determine safe club from success rates
   const clubSuccessMap: Record<string, number> = {};
