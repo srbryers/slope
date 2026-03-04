@@ -116,10 +116,18 @@ describe('WindsurfAdapter', () => {
 
     it('excludes PreCompact and Stop guards (unsupported by Windsurf)', () => {
       const config = adapter.generateHooksConfig(GUARD_DEFINITIONS, './g.sh') as WindsurfHooksConfig;
-      const unsupportedGuards = GUARD_DEFINITIONS.filter(g => g.hookEvent === 'PreCompact' || g.hookEvent === 'Stop');
-      for (const ug of unsupportedGuards) {
-        const found = config.hooks.some(h => h.command.endsWith(` ${ug.name}`));
-        expect(found, `${ug.hookEvent} guard '${ug.name}' should be excluded`).toBe(false);
+      // Guards that ONLY have unsupported events should be fully excluded.
+      // Guards that have both supported and unsupported events (e.g. sprint-completion
+      // with PreToolUse + PostToolUse + Stop) will appear for their supported events.
+      const supportedEvents = new Set(['PreToolUse', 'PostToolUse']);
+      const guardNames = new Set(GUARD_DEFINITIONS.map(g => g.name));
+      const exclusivelyUnsupported = [...guardNames].filter(name => {
+        const defs = GUARD_DEFINITIONS.filter(g => g.name === name);
+        return defs.every(d => !supportedEvents.has(d.hookEvent));
+      });
+      for (const name of exclusivelyUnsupported) {
+        const found = config.hooks.some(h => h.command.endsWith(` ${name}`));
+        expect(found, `Guard '${name}' (only unsupported events) should be excluded`).toBe(false);
       }
     });
 
