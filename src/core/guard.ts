@@ -73,7 +73,8 @@ export type GuardName =
   | 'transcript'
   | 'branch-before-commit'
   | 'worktree-check'
-  | 'sprint-completion';
+  | 'sprint-completion'
+  | 'worktree-merge';
 
 /** Guard registration entry */
 export interface GuardDefinition {
@@ -266,6 +267,14 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     name: 'sprint-completion',
     description: 'Auto-detect test pass and mark gate complete',
     hookEvent: 'PostToolUse',
+    toolCategories: ['execute_command'],
+    matcher: 'Bash',
+    level: 'full',
+  },
+  {
+    name: 'worktree-merge',
+    description: 'Block gh pr merge --delete-branch in worktrees (causes false failure)',
+    hookEvent: 'PreToolUse',
     toolCategories: ['execute_command'],
     matcher: 'Bash',
     level: 'full',

@@ -20,6 +20,7 @@ import { transcriptGuard } from '../guards/transcript.js';
 import { branchBeforeCommitGuard } from '../guards/branch-before-commit.js';
 import { worktreeCheckGuard } from '../guards/worktree-check.js';
 import { sprintCompletionGuard } from '../guards/sprint-completion.js';
+import { worktreeMergeGuard } from '../guards/worktree-merge.js';
 import { execSync } from 'node:child_process';
 
 // Side-effect imports: ensure all adapters are registered for detectAdapter()
@@ -81,6 +82,7 @@ const handlers: Partial<Record<GuardName, GuardHandler>> = {
   'branch-before-commit': branchBeforeCommitGuard,
   'worktree-check': worktreeCheckGuard,
   'sprint-completion': sprintCompletionGuard,
+  'worktree-merge': worktreeMergeGuard,
 };
 
 /** Register a guard handler */
