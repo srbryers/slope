@@ -1,6 +1,6 @@
 import { execSync } from 'node:child_process';
 import type { HookInput, GuardResult } from '../../core/index.js';
-import { loadSprintState, updateGate, isSprintComplete, pendingGates } from '../sprint-state.js';
+import { loadSprintState, saveSprintState, updateGate, isSprintComplete, pendingGates } from '../sprint-state.js';
 
 /**
  * Sprint-completion guard: enforces post-implementation gates.
@@ -99,10 +99,15 @@ function handleStop(cwd: string): GuardResult {
   return { blockReason: lines.join('\n') };
 }
 
-/** Auto-detect test pass from Bash output and mark gate. */
+/** Auto-detect test pass and PR merge from Bash output. */
 function handlePostToolUse(input: HookInput, cwd: string): GuardResult {
   const command = input.tool_input?.command as string | undefined;
   if (!command) return {};
+
+  // Detect PR merge → transition to scoring phase
+  if (/gh\s+pr\s+merge/.test(command)) {
+    return handlePrMerge(input, cwd);
+  }
 
   // Check if command looks like a test runner
   const isTestCommand = /\b(jest|vitest|bun\s+test|npx\s+jest|npx\s+vitest)\b/.test(command);
@@ -123,4 +128,31 @@ function handlePostToolUse(input: HookInput, cwd: string): GuardResult {
   }
 
   return {};
+}
+
+/** Transition sprint to scoring phase after PR merge. */
+function handlePrMerge(input: HookInput, cwd: string): GuardResult {
+  const state = loadSprintState(cwd);
+  if (!state) return {};
+  if (state.phase === 'scoring' || state.phase === 'complete') return {};
+
+  // Check merge succeeded (exit code 0)
+  const response = input.tool_response ?? {};
+  const exitCode = response.exit_code ?? response.exitCode;
+  if (exitCode !== 0 && exitCode !== '0' && exitCode !== undefined) return {};
+
+  state.phase = 'scoring';
+  saveSprintState(cwd, state);
+
+  const pending = pendingGates(state);
+  return {
+    context: [
+      `SLOPE: PR merged — sprint phase is now 'scoring'. Remaining gates:`,
+      ...pending.map(g => `  - ${g}`),
+      '',
+      'Complete these before ending the session:',
+      '  1. Create scorecard → `slope validate`',
+      '  2. Generate review → `slope review`',
+    ].join('\n'),
+  };
 }
