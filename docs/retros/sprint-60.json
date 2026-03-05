@@ -1,0 +1,86 @@
+{
+  "sprint_number": 60,
+  "theme": "Compaction-proof review gates + worktree-merge guard",
+  "par": 3,
+  "slope": 1,
+  "score": 3,
+  "score_label": "par",
+  "date": "2026-03-05",
+  "shots": [
+    {
+      "ticket_key": "S60-1",
+      "title": "review-tier guard writes review-state.json on plan detection",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Imported canonical ReviewState + saveReviewState from review-state.ts, removed local duplicate interface. Writes state after sprint-state block, before return."
+    },
+    {
+      "ticket_key": "S60-2",
+      "title": "compaction guard includes review + sprint phase in handoff",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Extended HandoffData with review (tier, rounds) and sprint_phase. Best-effort reads from .slope/ files."
+    },
+    {
+      "ticket_key": "S60-3",
+      "title": "workflow-gate message includes actionable recovery steps",
+      "club": "putter",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Replaced single-line blockReason with multi-line actionable instructions including exact commands."
+    },
+    {
+      "ticket_key": "S60-4",
+      "title": "Add compaction drops pending gates to common-issues",
+      "club": "putter",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added id 7 to .slope/common-issues.json (gitignored local state)."
+    },
+    {
+      "ticket_key": "S60-5",
+      "title": "worktree-merge guard blocks --delete-branch in worktrees",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "New guard: PreToolUse on Bash, detects gh pr merge --delete-branch in worktree, blocks with corrected command. Registered in GUARD_DEFINITIONS + handler map. 6 unit tests."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 5,
+    "fairways_total": 5,
+    "greens_in_regulation": 5,
+    "greens_total": 5,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    "Worktree isolation required for edits (hook blocked main repo)",
+    "PR #117 merged via first attempt but --delete-branch caused exit 1 — motivated S60-5"
+  ],
+  "special_plays": [],
+  "bunker_locations": [],
+  "yardage_book_updates": [
+    "gh pr merge --delete-branch fails in worktrees — merge succeeds but exit code 1 from local branch cleanup",
+    "Advisory guard context is lost on compaction — disk state is the only reliable enforcement mechanism"
+  ],
+  "course_management_notes": [
+    "All 5 tickets clean — no hazards, no penalties",
+    "S60-5 was unplanned but directly motivated by hitting the bug during S60-1 merge",
+    "Guard count assertion in guard.test.ts needs updating when adding GUARD_DEFINITIONS entries"
+  ],
+  "slope_factors": [
+    "Single package, familiar guard patterns",
+    "All wedge/putter except S60-5 (short_iron for new guard file)"
+  ]
+}
