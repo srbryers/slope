@@ -41,9 +41,16 @@ export async function workflowGateGuard(input: HookInput, cwd: string): Promise<
     return {};
   }
 
-  const planRef = state.plan_file ? ` (${state.plan_file})` : '';
+  const remaining = state.rounds_required - state.rounds_completed;
   return {
     decision: 'deny',
-    blockReason: `SLOPE workflow-gate: Review incomplete. ${state.rounds_completed}/${state.rounds_required} rounds done${planRef}. Complete remaining review rounds before exiting plan mode.`,
+    blockReason: [
+      `SLOPE workflow-gate: Review incomplete (${state.rounds_completed}/${state.rounds_required} rounds). You MUST:`,
+      `1. Ask the user to confirm or change the review tier (slope review start --tier=<tier>)`,
+      `2. Conduct each review round, then run \`slope review round\` after each`,
+      `3. Only call ExitPlanMode after all ${remaining} remaining round${remaining !== 1 ? 's are' : ' is'} complete`,
+      ``,
+      `To skip reviews: run \`slope review start --tier=skip\``,
+    ].join('\n'),
   };
 }

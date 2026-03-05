@@ -5,6 +5,7 @@ import { selectSpecialists } from '../../core/index.js';
 import type { CommonIssuesFile } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { loadSprintState, saveSprintState, createSprintState } from '../sprint-state.js';
+import { saveReviewState, type ReviewState } from '../commands/review-state.js';
 import {
   findPlanContent,
   countTickets,
@@ -13,12 +14,6 @@ import {
   extractTicketInfo,
   type PlanFile,
 } from './plan-analysis.js';
-
-interface ReviewState {
-  rounds_required: number;
-  rounds_completed: number;
-  plan_file?: string;
-}
 
 /**
  * Review-tier guard: fires PostToolUse on Write.
@@ -80,8 +75,8 @@ export async function reviewTierGuard(input: HookInput, cwd: string): Promise<Gu
   const statePath = join(cwd, '.slope', 'review-state.json');
   if (existsSync(statePath)) {
     try {
-      const state: ReviewState = JSON.parse(readFileSync(statePath, 'utf8'));
-      if (state.rounds_required >= rounds) {
+      const existing: ReviewState = JSON.parse(readFileSync(statePath, 'utf8'));
+      if (existing.rounds_required >= rounds) {
         return {};
       }
     } catch { /* malformed — proceed */ }
@@ -136,6 +131,18 @@ export async function reviewTierGuard(input: HookInput, cwd: string): Promise<Gu
       saveSprintState(cwd, state);
     }
   }
+
+  // Write review-state.json so workflow-gate can mechanically block ExitPlanMode
+  // until reviews are complete. Advisory context can be lost to compaction;
+  // disk state cannot.
+  const reviewState: ReviewState = {
+    rounds_required: rounds,
+    rounds_completed: 0,
+    plan_file: plan.path,
+    tier: tier.toLowerCase(),
+    started_at: new Date().toISOString(),
+  };
+  saveReviewState(cwd, reviewState);
 
   return { context: lines.join('\n') };
 }
