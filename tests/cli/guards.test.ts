@@ -532,7 +532,7 @@ describe('workflowGateGuard', () => {
     expect(result).toEqual({});
   });
 
-  it('includes plan_file in deny message', async () => {
+  it('includes actionable recovery steps in deny message', async () => {
     mkdirSync(join(tmpDir, '.slope'), { recursive: true });
     writeFileSync(join(tmpDir, '.slope/review-state.json'), JSON.stringify({
       rounds_required: 2,
@@ -542,7 +542,10 @@ describe('workflowGateGuard', () => {
 
     const result = await workflowGateGuard(makeInput(), tmpDir);
     expect(result.decision).toBe('deny');
-    expect(result.blockReason).toContain('sprint-22-plan.md');
+    expect(result.blockReason).toContain('0/2');
+    expect(result.blockReason).toContain('slope review start --tier=');
+    expect(result.blockReason).toContain('slope review round');
+    expect(result.blockReason).toContain('slope review start --tier=skip');
   });
 
   it('passes through when state has invalid types', async () => {

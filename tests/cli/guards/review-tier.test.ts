@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdirSync, writeFileSync, rmSync, existsSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { reviewTierGuard } from '../../../src/cli/guards/review-tier.js';
+import { workflowGateGuard } from '../../../src/cli/guards/workflow-gate.js';
 import type { HookInput } from '../../../src/core/index.js';
 
 const TMP = join(import.meta.dirname ?? __dirname, '..', '..', '..', '.test-tmp-review-tier');
@@ -286,6 +287,103 @@ describe('reviewTierGuard', () => {
     // which has no plans either — should return empty.
     const input = makeInput(join(TMP, '.claude', 'plans', 'nonexistent.md'));
     const result = await reviewTierGuard(input, TMP);
+    expect(result).toEqual({});
+  });
+
+  it('writes review-state.json when plan is detected', async () => {
+    const planPath = writePlan([
+      '# Sprint 60 Plan',
+      '### S60-1: First ticket',
+      '### S60-2: Second ticket',
+      '### S60-3: Third ticket',
+    ].join('\n'));
+    const input = makeInput(planPath);
+    await reviewTierGuard(input, TMP);
+
+    const statePath = join(TMP, '.slope', 'review-state.json');
+    expect(existsSync(statePath)).toBe(true);
+    const state = JSON.parse(readFileSync(statePath, 'utf8'));
+    expect(state.rounds_required).toBe(2); // Standard tier
+    expect(state.rounds_completed).toBe(0);
+    expect(state.tier).toBe('standard');
+    expect(state.started_at).toBeDefined();
+  });
+
+  it('does not overwrite review-state.json when re-fired with same tier', async () => {
+    const planPath = writePlan([
+      '# Sprint Plan',
+      '### T1: Task one',
+      '### T2: Task two',
+      '### T3: Task three',
+    ].join('\n'));
+    const input = makeInput(planPath);
+
+    // First fire — creates state
+    await reviewTierGuard(input, TMP);
+    const statePath = join(TMP, '.slope', 'review-state.json');
+    const firstState = JSON.parse(readFileSync(statePath, 'utf8'));
+
+    // Second fire — same plan, same tier → early return, no overwrite
+    const result = await reviewTierGuard(input, TMP);
+    expect(result).toEqual({});
+    const secondState = JSON.parse(readFileSync(statePath, 'utf8'));
+    expect(secondState.started_at).toBe(firstState.started_at);
+  });
+
+  it('does not write review-state.json for Skip tier (0 rounds)', async () => {
+    const planPath = writePlan('# Research Spike\n\nJust exploring ideas.');
+    const input = makeInput(planPath);
+    await reviewTierGuard(input, TMP);
+
+    const statePath = join(TMP, '.slope', 'review-state.json');
+    // Skip tier writes 0 rounds — file is still created but gate won't block
+    if (existsSync(statePath)) {
+      const state = JSON.parse(readFileSync(statePath, 'utf8'));
+      expect(state.rounds_required).toBe(0);
+    }
+  });
+});
+
+describe('workflowGateGuard', () => {
+  beforeEach(() => {
+    mkdirSync(TMP, { recursive: true });
+  });
+
+  afterEach(() => {
+    if (existsSync(TMP)) {
+      rmSync(TMP, { recursive: true, force: true });
+    }
+  });
+
+  function makeGateInput(): HookInput {
+    return {
+      session_id: 'test-session',
+      cwd: TMP,
+      hook_event_name: 'PreToolUse',
+      tool_name: 'ExitPlanMode',
+      tool_input: {},
+      tool_response: {},
+    };
+  }
+
+  it('allows ExitPlanMode when no review-state exists', async () => {
+    const result = await workflowGateGuard(makeGateInput(), TMP);
+    expect(result).toEqual({});
+  });
+
+  it('blocks ExitPlanMode when rounds_completed < rounds_required', async () => {
+    writeReviewState({ rounds_required: 3, rounds_completed: 0 });
+    const result = await workflowGateGuard(makeGateInput(), TMP);
+    expect(result.decision).toBe('deny');
+    expect(result.blockReason).toContain('0/3');
+    expect(result.blockReason).toContain('slope review start --tier=');
+    expect(result.blockReason).toContain('slope review round');
+    expect(result.blockReason).toContain('slope review start --tier=skip');
+  });
+
+  it('allows ExitPlanMode when rounds are complete', async () => {
+    writeReviewState({ rounds_required: 2, rounds_completed: 2 });
+    const result = await workflowGateGuard(makeGateInput(), TMP);
     expect(result).toEqual({});
   });
 });

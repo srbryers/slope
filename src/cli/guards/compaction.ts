@@ -18,6 +18,12 @@ interface HandoffData {
     number?: number;
   };
   claims?: Array<{ target: string; scope: string; player: string }>;
+  review?: {
+    tier: string;
+    rounds_required: number;
+    rounds_completed: number;
+  };
+  sprint_phase?: string;
 }
 
 /**
@@ -79,6 +85,32 @@ export async function compactionGuard(input: HookInput, cwd: string): Promise<Gu
     }
     store.close();
   } catch { /* store not available */ }
+
+  // Gather review state (defense-in-depth: survives compaction)
+  try {
+    const reviewPath = join(cwd, '.slope', 'review-state.json');
+    if (existsSync(reviewPath)) {
+      const rs = JSON.parse(readFileSync(reviewPath, 'utf8'));
+      if (typeof rs.rounds_required === 'number' && typeof rs.rounds_completed === 'number') {
+        handoff.review = {
+          tier: rs.tier ?? 'unknown',
+          rounds_required: rs.rounds_required,
+          rounds_completed: rs.rounds_completed,
+        };
+      }
+    }
+  } catch { /* best-effort */ }
+
+  // Gather sprint phase
+  try {
+    const sprintStatePath = join(cwd, '.slope', 'sprint-state.json');
+    if (existsSync(sprintStatePath)) {
+      const ss = JSON.parse(readFileSync(sprintStatePath, 'utf8'));
+      if (ss.phase) {
+        handoff.sprint_phase = ss.phase;
+      }
+    }
+  } catch { /* best-effort */ }
 
   // Write handoff file (primary output)
   try {
