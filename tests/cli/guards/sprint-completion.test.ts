@@ -197,4 +197,39 @@ describe('sprint-completion guard', () => {
       expect(result).toEqual({});
     });
   });
+
+  describe('PostToolUse PR merge detection', () => {
+    beforeEach(() => {
+      saveSprintState(tmpDir, createSprintState(22, 'implementing'));
+    });
+
+    it('transitions phase to scoring on gh pr merge exit 0', async () => {
+      const result = await sprintCompletionGuard(makePostToolUse('gh pr merge 117 --squash', 0), tmpDir);
+      expect(result.context).toContain('scoring');
+      expect(result.context).toContain('Scorecard validated');
+      const state = loadSprintState(tmpDir)!;
+      expect(state.phase).toBe('scoring');
+    });
+
+    it('does not transition on merge failure (exit 1)', async () => {
+      const result = await sprintCompletionGuard(makePostToolUse('gh pr merge 117 --squash', 1), tmpDir);
+      expect(result).toEqual({});
+      const state = loadSprintState(tmpDir)!;
+      expect(state.phase).toBe('implementing');
+    });
+
+    it('no-ops if already in scoring phase', async () => {
+      const state = createSprintState(22, 'scoring');
+      saveSprintState(tmpDir, state);
+      const result = await sprintCompletionGuard(makePostToolUse('gh pr merge 117 --squash', 0), tmpDir);
+      expect(result).toEqual({});
+    });
+
+    it('no-ops if already complete', async () => {
+      const state = createSprintState(22, 'complete');
+      saveSprintState(tmpDir, state);
+      const result = await sprintCompletionGuard(makePostToolUse('gh pr merge 117 --squash', 0), tmpDir);
+      expect(result).toEqual({});
+    });
+  });
 });
