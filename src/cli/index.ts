@@ -56,6 +56,7 @@ import { enrichCommand } from './commands/enrich.js';
 import { docsCommand } from './commands/docs.js';
 import { loopCommand } from './commands/loop.js';
 import { sprintCommand } from './commands/sprint.js';
+import { doctorCommand } from './commands/doctor.js';
 
 const subcommand = process.argv[2];
 
@@ -297,6 +298,12 @@ switch (subcommand) {
       process.exit(1);
     });
     break;
+  case 'doctor':
+    doctorCommand(process.argv.slice(3)).catch(err => {
+      console.error('Error:', err.message);
+      process.exit(1);
+    });
+    break;
   default:
     console.log(`
 SLOPE CLI — Sprint Lifecycle & Operational Performance Engine
@@ -358,6 +365,7 @@ Usage:
   slope docs generate|changelog|check                Documentation manifest and changelog
   slope sprint start|gate|status|reset               Manage sprint lifecycle state
   slope loop status|config|run|continuous|...        Autonomous sprint execution loop
+  slope doctor [--fix]                               Check repo health and fix issues
 
 Examples:
   slope init                                Create .slope/ with config + example scorecard

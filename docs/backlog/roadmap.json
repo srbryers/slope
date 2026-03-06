@@ -1,1944 +1,474 @@
 {
   "name": "SLOPE Development Roadmap",
-  "description": "Comprehensive roadmap covering 47 sprints across 13 phases — from initial extraction through guards, hardening, adoption readiness, metaphor studio, and the self-development loop.",
+  "description": "Forward-looking roadmap from S61+. Phases 1-9 (S1-S47) are complete. S48-S60 were hardening, guard enforcement, and process sprints. This roadmap covers adoption, observability, guard maturity, multi-project, and loop evolution.",
   "phases": [
     {
-      "name": "Foundation — Extraction & Core",
-      "sprints": [
-        1,
-        2,
-        3,
-        4,
-        5,
-        6
-      ]
+      "name": "Phase 10 — Adoption & Repair",
+      "sprints": [61, 62, 63]
     },
     {
-      "name": "Phase 1 — Course Strategy & Reach",
-      "sprints": [
-        7,
-        8,
-        9,
-        10
-      ]
+      "name": "Phase 11 — Observability & Analytics",
+      "sprints": [64, 65, 66]
     },
     {
-      "name": "Phase 2 — Telemetry & Guidance",
-      "sprints": [
-        11,
-        12,
-        13
-      ]
+      "name": "Phase 12 — Guard Maturity",
+      "sprints": [67, 68]
     },
     {
-      "name": "Phase 3 — Multi-Agent Orchestration",
-      "sprints": [
-        14,
-        15
-      ]
+      "name": "Phase 13 — Multi-Project & Teams",
+      "sprints": [69, 70, 71]
     },
     {
-      "name": "Bridge — Vision Refresh",
-      "sprints": [
-        16
-      ]
-    },
-    {
-      "name": "Phase 4 — Extensibility & Dashboard",
-      "sprints": [
-        17,
-        18,
-        19,
-        20
-      ]
-    },
-    {
-      "name": "Internal Tooling — Guards, Maps & Scoring",
-      "sprints": [
-        21,
-        22,
-        23,
-        24,
-        25,
-        26
-      ]
-    },
-    {
-      "name": "Go-to-Market — Design Tokens, Site & Publishing",
-      "sprints": [
-        27,
-        28,
-        29
-      ]
-    },
-    {
-      "name": "Phase 5 — Smart Onboarding & Recommendations",
-      "sprints": [
-        30,
-        31,
-        32,
-        33
-      ]
-    },
-    {
-      "name": "Phase 6 — Harness-Agnostic Guards & CaddyStack",
-      "sprints": [
-        34,
-        35,
-        36
-      ]
-    },
-    {
-      "name": "Phase 7 — Hardening & Adoption",
-      "sprints": [
-        37,
-        38,
-        39,
-        40
-      ]
-    },
-    {
-      "name": "Phase 8 — Metaphor Studio & Onboarding",
-      "sprints": [
-        41,
-        42
-      ]
-    },
-    {
-      "name": "Phase 9 — Self-Development Loop",
-      "sprints": [
-        43,
-        44,
-        45,
-        46,
-        47
-      ]
+      "name": "Phase 14 — Loop Evolution",
+      "sprints": [72, 73, 74]
     }
   ],
   "sprints": [
     {
-      "id": 1,
-      "theme": "Open-source SLOPE extraction",
-      "par": 5,
-      "slope": 2,
-      "type": "feature",
-      "tickets": [
-        {
-          "key": "S1-1",
-          "title": "Repo scaffold + type extraction",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S1-2",
-          "title": "Core scoring engine",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S1-3",
-          "title": "Formatter + briefing",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S1-4",
-          "title": "Standalone CLI",
-          "club": "long_iron",
-          "complexity": "moderate"
-        },
-        {
-          "key": "S1-5",
-          "title": "Claude Code starter kit + docs",
-          "club": "wedge",
-          "complexity": "small"
-        }
-      ]
-    },
-    {
-      "id": 2,
-      "theme": "Sprint Claims Registry & Multi-Agent Coordination",
-      "par": 4,
-      "slope": 2,
-      "type": "feature",
-      "tickets": [
-        {
-          "key": "S2-1",
-          "title": "Core types + conflict detection engine",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S2-2",
-          "title": "Registry abstraction + file/API backends",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S2-3",
-          "title": "CLI commands: claim, release, status",
-          "club": "long_iron",
-          "complexity": "moderate"
-        },
-        {
-          "key": "S2-4",
-          "title": "Preflight conflict check + claim blocking",
-          "club": "short_iron",
-          "complexity": "standard"
-        }
-      ]
-    },
-    {
-      "id": 3,
-      "theme": "Publish MCP + Cursor DX",
-      "par": 4,
-      "slope": 2,
-      "type": "feature",
-      "tickets": [
-        {
-          "key": "S3-1",
-          "title": "Publish checklist for mcp-tools and CLI",
-          "club": "putter",
-          "complexity": "trivial"
-        },
-        {
-          "key": "S3-2",
-          "title": "slope init --cursor --mcp adds .cursor/mcp.json",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S3-3",
-          "title": "Unit tests for @srbryers/mcp-tools",
-          "club": "wedge",
-          "complexity": "small"
-        },
-        {
-          "key": "S3-4",
-          "title": "README and docs refresh",
-          "club": "putter",
-          "complexity": "trivial"
-        }
-      ]
-    },
-    {
-      "id": 4,
-      "theme": "Code Mode MCP Refactor",
-      "par": 4,
-      "slope": 3,
-      "type": "infra",
-      "tickets": [
-        {
-          "key": "S4-1",
-          "title": "Move config.ts and loader.ts from CLI to core",
-          "club": "long_iron",
-          "complexity": "moderate"
-        },
-        {
-          "key": "S4-2",
-          "title": "Build function registry and search() tool",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S4-3",
-          "title": "Build execute() tool and node:vm sandbox",
-          "club": "driver",
-          "complexity": "moderate"
-        },
-        {
-          "key": "S4-4",
-          "title": "Remove old tools, tests, docs, bump versions",
-          "club": "short_iron",
-          "complexity": "standard"
-        }
-      ]
-    },
-    {
-      "id": 5,
-      "theme": "Universal Dev Tooling + Dogfood",
+      "id": 61,
+      "theme": "The Doctor — Repo Health Checks & Repair",
       "par": 4,
       "slope": 1,
-      "type": "feature",
+      "type": "feature + dx",
       "tickets": [
         {
-          "key": "S5-1",
-          "title": "Add installClaudeCodeMcpConfig() to CLI init",
+          "key": "S61-1",
+          "title": "slope doctor command — check .gitignore, config, hooks, guards",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S61-2",
+          "title": "slope init --repair — fix missing/outdated config in existing repos",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S61-3",
+          "title": "slope doctor --fix — auto-repair common issues (gitignore, hooks, guards)",
           "club": "wedge",
           "complexity": "small"
         },
         {
-          "key": "S5-2",
-          "title": "Add CLAUDE.md template to slope init --claude-code",
-          "club": "putter",
-          "complexity": "trivial"
-        },
-        {
-          "key": "S5-3",
-          "title": "Dogfood — wire SLOPE into its own repo",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S5-4",
-          "title": "Update README + mcp-tools docs",
-          "club": "putter",
-          "complexity": "trivial"
-        }
-      ]
-    },
-    {
-      "id": 6,
-      "theme": "SLOPE v1.0 — SlopeStore + Sessions + Hooks + MCP Tools",
-      "par": 5,
-      "slope": 3,
-      "type": "feature",
-      "tickets": [
-        {
-          "key": "S6-1",
-          "title": "SlopeStore interface + extended SprintClaim in core",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S6-2",
-          "title": "Create store-sqlite package scaffold",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S6-3",
-          "title": "Implement SqliteSlopeStore",
-          "club": "long_iron",
-          "complexity": "moderate"
-        },
-        {
-          "key": "S6-4",
-          "title": "Store-SQLite tests — 22 tests",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S6-5",
-          "title": "slope session command + resolveStore()",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S6-6",
-          "title": "slope hook command — add/remove/list/show",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S6-7",
-          "title": "Enhanced init + migrate claim commands to store",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S6-8",
-          "title": "Deprecate old registries",
-          "club": "wedge",
-          "complexity": "small"
-        },
-        {
-          "key": "S6-9",
-          "title": "MCP session/claim tools + integration tests",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S6-10",
-          "title": "Final tests + CLAUDE.md update",
-          "club": "wedge",
-          "complexity": "small"
-        },
-        {
-          "key": "S6-11",
-          "title": "Bump all to v1.0.0 + publish prep",
-          "club": "putter",
-          "complexity": "trivial"
-        }
-      ]
-    },
-    {
-      "id": 7,
-      "theme": "The Yardage Book — Strategic Planning Tools",
-      "par": 4,
-      "slope": 2,
-      "type": "feature",
-      "tickets": [
-        {
-          "key": "S7-1",
-          "title": "Structured roadmap format + schema",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S7-2",
-          "title": "`slope roadmap` CLI command — validate/review/status/show",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S7-3",
-          "title": "MCP + briefing integration for roadmap",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S7-4",
-          "title": "Documentation + slope init integration",
+          "key": "S61-4",
+          "title": "Guard installation audit — detect missing guards and suggest additions",
           "club": "wedge",
           "complexity": "small"
         }
       ]
     },
     {
-      "id": 8,
-      "theme": "The Rosetta Stone — Metaphor Engine",
-      "par": 4,
-      "slope": 2,
-      "type": "feature",
-      "tickets": [
-        {
-          "key": "S8-1",
-          "title": "MetaphorDefinition interface + metaphor registry",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S8-2",
-          "title": "Metaphor-aware formatters",
-          "club": "long_iron",
-          "complexity": "moderate"
-        },
-        {
-          "key": "S8-3",
-          "title": "CLI metaphor resolution + config support",
-          "club": "wedge",
-          "complexity": "small"
-        },
-        {
-          "key": "S8-4",
-          "title": "Metaphor documentation + validation",
-          "club": "putter",
-          "complexity": "trivial"
-        }
-      ],
-      "depends_on": [
-        7
-      ]
-    },
-    {
-      "id": 9,
-      "theme": "Cross-Platform — Template Generators + OpenCode Support",
-      "par": 4,
-      "slope": 2,
-      "type": "feature",
-      "tickets": [
-        {
-          "key": "S9-1",
-          "title": "Template generators replace static templates",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S9-2",
-          "title": "Cursor .cursorrules + complete integration",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S9-3",
-          "title": "OpenCode AGENTS.md + opencode.json MCP config",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S9-4",
-          "title": "Platform detection + unified init",
-          "club": "wedge",
-          "complexity": "small"
-        }
-      ],
-      "depends_on": [
-        8
-      ]
-    },
-    {
-      "id": 10,
-      "theme": "Signal Intelligence — CI Parser + Combined Classification + Events",
-      "par": 4,
-      "slope": 2,
-      "type": "feature",
-      "tickets": [
-        {
-          "key": "S10-1",
-          "title": "Events table + schema migration framework",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S10-2",
-          "title": "CI/test signal parser for Vitest and Jest",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S10-3",
-          "title": "Combined signal shot classification",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S10-4",
-          "title": "Auto-card CI integration + documentation",
-          "club": "wedge",
-          "complexity": "small"
-        }
-      ],
-      "depends_on": [
-        7
-      ]
-    },
-    {
-      "id": 11,
-      "theme": "The Transcript — Event Pipeline + Briefing Events + OpenCode Plugin",
-      "par": 4,
-      "slope": 2,
-      "type": "feature",
-      "tickets": [
-        {
-          "key": "S11-1",
-          "title": "slope extract command + session-end-events hook",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S11-2",
-          "title": "Event-to-common-issues pipeline",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S11-3",
-          "title": "Briefing integration with events",
-          "club": "wedge",
-          "complexity": "small"
-        },
-        {
-          "key": "S11-4",
-          "title": "OpenCode plugin for session lifecycle hooks",
-          "club": "wedge",
-          "complexity": "small"
-        }
-      ],
-      "depends_on": [
-        10
-      ]
-    },
-    {
-      "id": 12,
-      "theme": "The Caddy — Agent Guidance Hooks",
-      "par": 4,
-      "slope": 2,
-      "type": "feature",
-      "tickets": [
-        {
-          "key": "S12-1",
-          "title": "Guard framework + hook generation",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S12-2",
-          "title": "PreToolUse guards — explore + hazard",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S12-3",
-          "title": "Discipline hooks — commit nudge + scope drift",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S12-4",
-          "title": "Session hooks — compaction checkpoint + stop check",
-          "club": "wedge",
-          "complexity": "small"
-        }
-      ],
-      "depends_on": [
-        11
-      ]
-    },
-    {
-      "id": 13,
-      "theme": "The Clubhouse — HTML Reports + Launch Polish",
-      "par": 4,
-      "slope": 2,
-      "type": "feature",
-      "tickets": [
-        {
-          "key": "S13-1",
-          "title": "Static HTML report generation",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S13-2",
-          "title": "Report metaphor awareness",
-          "club": "wedge",
-          "complexity": "small"
-        },
-        {
-          "key": "S13-3",
-          "title": "Documentation + README overhaul",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S13-4",
-          "title": "Launch checklist + version bump",
-          "club": "wedge",
-          "complexity": "small"
-        }
-      ],
-      "depends_on": [
-        9,
-        12
-      ]
-    },
-    {
-      "id": 14,
-      "theme": "The Foursome — Multi-Agent Orchestration Primitives",
-      "par": 4,
-      "slope": 2,
-      "type": "feature",
-      "tickets": [
-        {
-          "key": "S14-1",
-          "title": "Role definition types + registry",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S14-2",
-          "title": "Role-based context injection",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S14-3",
-          "title": "Communication protocol — standup format",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S14-4",
-          "title": "Swarm session management",
-          "club": "short_iron",
-          "complexity": "standard"
-        }
-      ],
-      "depends_on": [
-        13
-      ]
-    },
-    {
-      "id": 15,
-      "theme": "The Leaderboard — Team-level Scoring, Escalation, and Integration Surface",
-      "par": 4,
-      "slope": 2,
-      "type": "feature",
-      "tickets": [
-        {
-          "key": "S15-1",
-          "title": "Multi-agent scorecard aggregation",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S15-2",
-          "title": "Escalation rules",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S15-3",
-          "title": "Team handicap + swarm performance",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S15-4",
-          "title": "Integration surface + MCP orchestration tests",
-          "club": "short_iron",
-          "complexity": "standard"
-        }
-      ],
-      "depends_on": [
-        14
-      ]
-    },
-    {
-      "id": 16,
-      "theme": "The 19th Hole — Vision Refresh + Phase 4 Roadmap",
+      "id": 62,
+      "theme": "The Welcome Mat v2 — Streamlined First-Run Experience",
       "par": 4,
       "slope": 1,
-      "type": "docs",
+      "type": "dx",
       "tickets": [
         {
-          "key": "S16-1",
-          "title": "Vision doc content refresh",
-          "club": "wedge",
-          "complexity": "small"
-        },
-        {
-          "key": "S16-2",
-          "title": "Architecture diagram + CLI reference",
+          "key": "S62-1",
+          "title": "Auto-detect existing repo profile during init (stack, test runner, CI)",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
-          "key": "S16-3",
-          "title": "Phase 4 roadmap (S17-S20)",
+          "key": "S62-2",
+          "title": "Recommend guards based on detected stack and workflow",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S62-3",
+          "title": "slope init --migrate — upgrade config from older SLOPE versions",
           "club": "wedge",
           "complexity": "small"
         },
         {
-          "key": "S16-4",
-          "title": "Backlog index + consistency pass",
+          "key": "S62-4",
+          "title": "Post-init validation — run doctor checks after init to confirm setup",
           "club": "putter",
           "complexity": "trivial"
         }
       ]
     },
     {
-      "id": 17,
-      "theme": "The Plugin System",
-      "par": 4,
-      "slope": 2,
-      "type": "feature",
-      "tickets": [
-        {
-          "key": "S17-1",
-          "title": "Plugin discovery + loader framework",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S17-2",
-          "title": "Pluggable metaphor loaders",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S17-3",
-          "title": "Custom guard plugins",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S17-4",
-          "title": "Plugin CLI + init + MCP integration",
-          "club": "wedge",
-          "complexity": "small"
-        }
-      ]
-    },
-    {
-      "id": 18,
-      "theme": "PR Signals",
-      "par": 4,
-      "slope": 2,
-      "type": "feature",
-      "tickets": [
-        {
-          "key": "S18-1",
-          "title": "PR metadata signal parser",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S18-2",
-          "title": "Review-based shot classification",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S18-3",
-          "title": "CI status integration from PR",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S18-4",
-          "title": "MCP + briefing + docs",
-          "club": "wedge",
-          "complexity": "small"
-        }
-      ],
-      "depends_on": [
-        17
-      ]
-    },
-    {
-      "id": 19,
-      "theme": "The Dashboard",
-      "par": 4,
-      "slope": 2,
-      "type": "feature",
-      "tickets": [
-        {
-          "key": "S19-1",
-          "title": "Dashboard server + data API",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S19-2",
-          "title": "Sprint timeline + interactive drill-down",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S19-3",
-          "title": "Miss pattern heatmap + area hazard overlay",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S19-4",
-          "title": "Configuration + docs",
-          "club": "wedge",
-          "complexity": "small"
-        }
-      ]
-    },
-    {
-      "id": 20,
-      "theme": "The Foursome",
-      "par": 4,
-      "slope": 2,
-      "type": "feature",
-      "tickets": [
-        {
-          "key": "S20-1",
-          "title": "Player identification + per-player handicaps",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S20-2",
-          "title": "Shared hazard indices with multi-reporter severity",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S20-3",
-          "title": "Team leaderboard + dashboard integration",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S20-4",
-          "title": "Documentation + onboarding",
-          "club": "wedge",
-          "complexity": "small"
-        }
-      ],
-      "depends_on": [
-        17,
-        19
-      ]
-    },
-    {
-      "id": 21,
-      "theme": "Dogfooding Fixes",
-      "par": 4,
-      "slope": 1,
-      "type": "bugfix",
-      "tickets": [
-        {
-          "key": "S21-1",
-          "title": "Numeric sort in loader.ts and review.ts",
-          "club": "wedge",
-          "complexity": "small"
-        },
-        {
-          "key": "S21-2",
-          "title": "Add --player flag to auto-card and ScorecardInput",
-          "club": "wedge",
-          "complexity": "small"
-        },
-        {
-          "key": "S21-4",
-          "title": "Thread reported_by in distill pipeline",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S21-3",
-          "title": "Config fields, reported_by data, sort bug pattern",
-          "club": "putter",
-          "complexity": "trivial"
-        }
-      ]
-    },
-    {
-      "id": 22,
-      "theme": "Port CaddyStack Guards",
-      "par": 4,
-      "slope": 2,
-      "type": "feature",
-      "tickets": [
-        {
-          "key": "S22-1",
-          "title": "MCP setup hints for hook activation",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S22-2",
-          "title": "Subagent-gate guard",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S22-3",
-          "title": "Push-nudge guard",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S22-4",
-          "title": "Workflow-gate guard + compaction upgrade",
-          "club": "long_iron",
-          "complexity": "moderate"
-        }
-      ]
-    },
-    {
-      "id": 23,
-      "theme": "The Yardage Book: Codebase Map",
-      "par": 4,
-      "slope": 1,
-      "type": "feature",
-      "tickets": [
-        {
-          "key": "S23-1",
-          "title": "Map generator + staleness checker (slope map)",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S23-2",
-          "title": "MCP map module + search integration",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S23-3",
-          "title": "Explore guard upgrade + codebase context rules",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S23-4",
-          "title": "Review-tier guard (architect review hook)",
-          "club": "short_iron",
-          "complexity": "standard"
-        }
-      ]
-    },
-    {
-      "id": 24,
-      "theme": "Review State Writer",
+      "id": 63,
+      "theme": "The Handbook — CLI Help & Documentation Polish",
       "par": 3,
-      "slope": 0,
-      "type": "feature",
-      "tickets": [
-        {
-          "key": "S24-1",
-          "title": "Review state management commands",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S24-2",
-          "title": "CLI routing for review subcommands",
-          "club": "wedge",
-          "complexity": "small"
-        },
-        {
-          "key": "S24-3",
-          "title": "Tests for review state commands",
-          "club": "wedge",
-          "complexity": "small"
-        }
-      ]
-    },
-    {
-      "id": 25,
-      "theme": "Hazard Severity Scoring",
-      "par": 4,
       "slope": 1,
-      "type": "feature",
+      "type": "docs + dx",
       "tickets": [
         {
-          "key": "S25-1",
-          "title": "Add HazardSeverity type and penalty mapping",
-          "club": "wedge",
-          "complexity": "small"
-        },
-        {
-          "key": "S25-2",
-          "title": "Update scoring to include hazard penalties",
+          "key": "S63-1",
+          "title": "slope help <command> — detailed usage, examples, and flags for each command",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
-          "key": "S25-3",
-          "title": "Update formatter and validation",
-          "club": "wedge",
-          "complexity": "small"
+          "key": "S63-2",
+          "title": "slope quickstart — interactive tutorial for new users",
+          "club": "short_iron",
+          "complexity": "standard"
         },
         {
-          "key": "S25-4",
-          "title": "Tests for hazard severity scoring",
+          "key": "S63-3",
+          "title": "Guard documentation — explain each guard's purpose, triggers, and config",
           "club": "wedge",
           "complexity": "small"
         }
       ]
     },
     {
-      "id": 26,
-      "theme": "The Fairway Map — User Flow Tracking",
+      "id": 64,
+      "theme": "The Scorekeeper — Sprint Analytics Dashboard",
       "par": 4,
       "slope": 2,
       "type": "feature",
       "tickets": [
         {
-          "key": "S26-1",
-          "title": "Flow types + validation functions",
+          "key": "S64-1",
+          "title": "Handicap trend API — time-series data for handicap, GIR, fairway hit",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
-          "key": "S26-2",
-          "title": "slope flows CLI command",
+          "key": "S64-2",
+          "title": "Guard effectiveness metrics — track block/allow ratios per guard",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
-          "key": "S26-3",
-          "title": "MCP search integration",
+          "key": "S64-3",
+          "title": "Sprint velocity tracking — tickets/sprint, score trends, par accuracy",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
-          "key": "S26-4",
-          "title": "CODEBASE.md flows section + stale-flows guard",
+          "key": "S64-4",
+          "title": "Dashboard widgets for new metrics — guard stats, velocity, trend charts",
+          "club": "long_iron",
+          "complexity": "moderate"
+        }
+      ],
+      "depends_on": [61]
+    },
+    {
+      "id": 65,
+      "theme": "The Auditor — Cost & Token Tracking",
+      "par": 3,
+      "slope": 2,
+      "type": "feature",
+      "tickets": [
+        {
+          "key": "S65-1",
+          "title": "Token usage tracking per sprint — estimate from transcript data",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S65-2",
+          "title": "Cost estimation — model-aware pricing for tracked token usage",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S65-3",
+          "title": "slope cost — CLI report of token/cost trends across sprints",
           "club": "wedge",
           "complexity": "small"
-        },
-        {
-          "key": "S26-5",
-          "title": "Docs + sprint plan artifact",
-          "club": "putter",
-          "complexity": "trivial"
         }
       ]
     },
     {
-      "id": 27,
-      "theme": "The Clubhouse — Marketing Site & Design Tokens",
+      "id": 66,
+      "theme": "The Replay — Session Insights & Debugging",
       "par": 4,
-      "slope": 3,
+      "slope": 2,
       "type": "feature",
       "tickets": [
         {
-          "key": "S27-1",
-          "title": "Create @srbryers/tokens design tokens package",
+          "key": "S66-1",
+          "title": "Enhanced transcript viewer — filter by tool, show timing, highlight errors",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
-          "key": "S27-2",
-          "title": "Refactor core HTML reports to use tokens",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S27-3",
-          "title": "Create slope-web repo with migrated site",
+          "key": "S66-2",
+          "title": "Session replay summary — auto-generate narrative of what happened",
           "club": "long_iron",
           "complexity": "moderate"
         },
         {
-          "key": "S27-4",
-          "title": "Cloudflare Pages deployment",
+          "key": "S66-3",
+          "title": "Compaction event tracking — log what was lost and recovered",
           "club": "wedge",
           "complexity": "small"
         },
         {
-          "key": "S27-5",
-          "title": "Docs + sprint artifacts",
-          "club": "putter",
-          "complexity": "trivial"
-        }
-      ]
-    },
-    {
-      "id": 28,
-      "theme": "The Pro Tour — Content & Interactive Features",
-      "par": 4,
-      "slope": 2,
-      "type": "feature",
-      "tickets": [
-        {
-          "key": "S28-1",
-          "title": "Content audit & rewrite",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S28-2",
-          "title": "Install command toggle",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S28-3",
-          "title": "Metaphor switcher",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S28-4",
-          "title": "New sections & polish",
+          "key": "S66-4",
+          "title": "Guard fire log — persistent record of every guard decision per session",
           "club": "wedge",
           "complexity": "small"
         }
       ],
-      "depends_on": [
-        27
-      ]
+      "depends_on": [64]
     },
     {
-      "id": 29,
-      "theme": "Fix NPM Publishing Pipeline",
-      "par": 5,
-      "slope": 1,
-      "type": "fix",
+      "id": 67,
+      "theme": "The Fence — Guard Testing Framework",
+      "par": 4,
+      "slope": 2,
+      "type": "infrastructure",
       "tickets": [
         {
-          "key": "S29-1",
-          "title": "Fix broken test mocks",
-          "club": "wedge",
-          "complexity": "small"
+          "key": "S67-1",
+          "title": "Guard test harness — simulate PreToolUse/PostToolUse/Stop with fixtures",
+          "club": "long_iron",
+          "complexity": "moderate"
         },
         {
-          "key": "S29-2",
-          "title": "Update version-bump script",
-          "club": "putter",
-          "complexity": "trivial"
-        },
-        {
-          "key": "S29-3",
-          "title": "Create NPM granular access token",
-          "club": "wedge",
-          "complexity": "small"
-        },
-        {
-          "key": "S29-4",
-          "title": "Clean up stale publish artifacts",
-          "club": "putter",
-          "complexity": "trivial"
-        },
-        {
-          "key": "S29-5",
-          "title": "Add CI check on PRs",
-          "club": "putter",
-          "complexity": "trivial"
-        },
-        {
-          "key": "S29-6",
-          "title": "Test full release→publish flow",
+          "key": "S67-2",
+          "title": "Guard snapshot testing — verify guard output stability across changes",
           "club": "short_iron",
           "complexity": "standard"
+        },
+        {
+          "key": "S67-3",
+          "title": "Custom guard validation — check custom guards for common errors",
+          "club": "wedge",
+          "complexity": "small"
+        },
+        {
+          "key": "S67-4",
+          "title": "Guard dry-run mode — show what guards would fire without blocking",
+          "club": "wedge",
+          "complexity": "small"
         }
       ]
     },
     {
-      "id": 30,
-      "theme": "The Surveyor",
+      "id": 68,
+      "theme": "The Referee — Advisory-to-Mechanical Guard Conversion",
+      "par": 4,
+      "slope": 2,
+      "type": "hardening",
+      "tickets": [
+        {
+          "key": "S68-1",
+          "title": "Audit all advisory guards — identify which return context-only with no disk state",
+          "club": "wedge",
+          "complexity": "small"
+        },
+        {
+          "key": "S68-2",
+          "title": "Convert hazard guard to write disk state for compaction survival",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S68-3",
+          "title": "Convert scope-drift guard to write disk state for compaction survival",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S68-4",
+          "title": "Guard enforcement report — slope doctor check for advisory vs mechanical guards",
+          "club": "wedge",
+          "complexity": "small"
+        }
+      ],
+      "depends_on": [67]
+    },
+    {
+      "id": 69,
+      "theme": "The Clubhouse Network — Multi-Repo Aggregation",
       "par": 4,
       "slope": 3,
       "type": "architecture",
       "tickets": [
         {
-          "key": "S30-1",
-          "title": "Analyzer types + pipeline runner",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S30-2",
-          "title": "Stack + structure analyzers",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S30-3",
-          "title": "Git history + testing analyzers",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S30-4",
-          "title": "Vision document + slope analyze CLI command",
-          "club": "short_iron",
-          "complexity": "standard"
-        }
-      ]
-    },
-    {
-      "id": 31,
-      "theme": "The Course Designer",
-      "par": 4,
-      "slope": 2,
-      "type": "feature",
-      "tickets": [
-        {
-          "key": "S31-1",
-          "title": "Complexity Estimator",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S31-2",
-          "title": "Config + First Sprint Generators",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S31-3",
-          "title": "Backlog Analyzer + Common Issues Seed",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S31-4",
-          "title": "--smart Integration + Exports + MCP Registry",
-          "club": "long_iron",
-          "complexity": "moderate"
-        }
-      ],
-      "depends_on": [
-        30
-      ]
-    },
-    {
-      "id": 32,
-      "theme": "The Scout",
-      "par": 4,
-      "slope": 2,
-      "type": "feature",
-      "tickets": [
-        {
-          "key": "S32-1",
-          "title": "CI Pipeline + Documentation Analyzers",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S32-2",
-          "title": "GitHub Backlog Analyzer + Merged Backlog",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S32-3",
-          "title": "Roadmap Generator from GitHub Milestones",
+          "key": "S69-1",
+          "title": "Cross-repo scorecard collection — aggregate from multiple .slope/ directories",
           "club": "long_iron",
           "complexity": "moderate"
         },
         {
-          "key": "S32-4",
-          "title": "MCP Registry, Exports, CLI, PR-Review Guard",
-          "club": "short_iron",
-          "complexity": "standard"
-        }
-      ],
-      "depends_on": [
-        30
-      ]
-    },
-    {
-      "id": 33,
-      "theme": "The Transcript",
-      "par": 4,
-      "slope": 2,
-      "type": "feature",
-      "tickets": [
-        {
-          "key": "S33-1",
-          "title": "TranscriptTurn types + JSONL utilities",
+          "key": "S69-2",
+          "title": "Org-level handicap card — compute combined stats across repos",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
-          "key": "S33-2",
-          "title": "PostToolUse transcript guard",
+          "key": "S69-3",
+          "title": "slope org status — show all repos, their handicaps, and active sprints",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
-          "key": "S33-3",
-          "title": "slope transcript CLI commands",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S33-4",
-          "title": "Config, guard installation, exports, version bump",
-          "club": "wedge",
-          "complexity": "small"
-        }
-      ],
-      "depends_on": [
-        31,
-        32
-      ]
-    },
-    {
-      "id": 34,
-      "theme": "The Universal Caddy",
-      "par": 4,
-      "slope": 2,
-      "type": "refactor",
-      "tickets": [
-        {
-          "key": "S34-1",
-          "title": "HarnessAdapter interface + tool name mapping types",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S34-2",
-          "title": "Extract ClaudeCodeAdapter from existing guard.ts + hook.ts",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S34-3",
-          "title": "Refactor slope hook add --level=full to accept --harness flag",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S34-4",
-          "title": "Build GenericAdapter for shell-compatible guard scripts",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S34-5",
-          "title": "slope roadmap sync CLI command",
-          "club": "wedge",
-          "complexity": "small"
-        }
-      ],
-      "depends_on": [
-        33
-      ]
-    },
-    {
-      "id": 35,
-      "theme": "The Equipment Room",
-      "par": 4,
-      "slope": 3,
-      "type": "research",
-      "depends_on": [
-        34
-      ],
-      "tickets": [
-        {
-          "key": "S35-1",
-          "title": "Research harness hook formats (Cursor, Cline, Windsurf, Continue, Aider)",
-          "club": "long_iron",
-          "complexity": "moderate"
-        },
-        {
-          "key": "S35-2",
-          "title": "Build adapter for best-supported harness from research",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S35-3",
-          "title": "Build adapter for second-best harness or enhance generic",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S35-4",
-          "title": "Docs: harness compatibility matrix, adapter authoring guide",
+          "key": "S69-4",
+          "title": "Cross-repo common-issues — promote patterns that appear in multiple repos",
           "club": "wedge",
           "complexity": "small"
         }
       ]
     },
     {
-      "id": 36,
-      "theme": "The Clubhouse Bridge",
-      "par": 4,
-      "slope": 2,
-      "type": "feature",
-      "depends_on": [
-        34
-      ],
-      "tickets": [
-        {
-          "key": "S36-1",
-          "title": "Export harness adapter types + factory from npm package",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S36-2",
-          "title": "CaddyStack: harness selection in onboarding flow",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S36-3",
-          "title": "CaddyStack: guard status dashboard",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S36-4",
-          "title": "CaddyStack: Install SLOPE flow",
-          "club": "wedge",
-          "complexity": "small"
-        }
-      ]
-    },
-    {
-      "id": 37,
-      "theme": "The Adapter Interface",
-      "par": 4,
-      "slope": 2,
-      "type": "refactor",
-      "tickets": [
-        {
-          "key": "S37-1",
-          "title": "Add supportedEvents + hooksConfigPath() to HarnessAdapter interface",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S37-2",
-          "title": "Implement new methods on all 4 built-in adapters",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S37-3",
-          "title": "Migrate guard status + consumers to use adapter methods",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S37-4",
-          "title": "Deprecate static maps, update docs + tests",
-          "club": "wedge",
-          "complexity": "small"
-        }
-      ]
-    },
-    {
-      "id": 38,
-      "theme": "The Vault",
-      "par": 4,
-      "slope": 2,
-      "type": "feature",
-      "tickets": [
-        {
-          "key": "S38-1",
-          "title": "PostgreSQL store GA — production-ready with connection pooling",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S38-2",
-          "title": "Versioned schema migration framework with rollback",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S38-3",
-          "title": "slope store status — health check + diagnostics CLI",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S38-4",
-          "title": "Backup/restore utilities + store docs",
-          "club": "wedge",
-          "complexity": "small"
-        }
-      ]
-    },
-    {
-      "id": 39,
-      "theme": "The Open Field",
+      "id": 70,
+      "theme": "The Foursome v2 — Multi-Agent Session Coordination",
       "par": 4,
       "slope": 3,
       "type": "feature",
-      "depends_on": [
-        37
-      ],
       "tickets": [
         {
-          "key": "S39-1",
-          "title": "Research Cline/Continue hook APIs (current state, feasibility)",
+          "key": "S70-1",
+          "title": "Session conflict detection across worktrees — real-time claim overlap alerts",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S70-2",
+          "title": "Agent handoff protocol — structured session transfer between agents",
           "club": "long_iron",
           "complexity": "moderate"
         },
         {
-          "key": "S39-2",
-          "title": "Build ClineAdapter or enhanced generic for Cline",
-          "club": "short_iron",
-          "complexity": "standard"
+          "key": "S70-3",
+          "title": "Parallel sprint orchestration — coordinate multiple agents on independent tickets",
+          "club": "long_iron",
+          "complexity": "moderate"
         },
         {
-          "key": "S39-3",
-          "title": "Build ContinueAdapter or document limitations",
+          "key": "S70-4",
+          "title": "Agent session dashboard — live view of all active agent sessions",
           "club": "short_iron",
           "complexity": "standard"
-        },
-        {
-          "key": "S39-4",
-          "title": "Update compatibility matrix + authoring guide + CODEBASE.md",
-          "club": "wedge",
-          "complexity": "small"
         }
-      ]
-    },
-    {
-      "id": 40,
-      "theme": "The Welcome Mat",
-      "par": 4,
-      "slope": 2,
-      "type": "docs",
-      "depends_on": [
-        37,
-        38
       ],
-      "tickets": [
-        {
-          "key": "S40-1",
-          "title": "Enhanced slope init — interactive interview with adapter auto-detection",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S40-2",
-          "title": "Getting Started guide — end-to-end walkthrough",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S40-3",
-          "title": "Your First Sprint tutorial — scaffolded sprint example",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S40-4",
-          "title": "README overhaul + npm package description + examples",
-          "club": "wedge",
-          "complexity": "small"
-        }
-      ]
+      "depends_on": [69]
     },
     {
-      "id": 41,
-      "theme": "The Metaphor Studio",
-      "par": 4,
-      "slope": 2,
-      "type": "feature",
-      "depends_on": [39],
-      "tickets": [
-        {
-          "key": "S41-1",
-          "title": "Selection UX — metaphor browser with preview + search",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S41-2",
-          "title": "Custom metaphor generation — LLM-powered vocabulary builder",
-          "club": "long_iron",
-          "complexity": "multi_package"
-        },
-        {
-          "key": "S41-3",
-          "title": "CLI metaphor management — list, show, create, validate commands",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S41-4",
-          "title": "MCP metaphor tools — search and generation via sandbox",
-          "club": "short_iron",
-          "complexity": "standard"
-        }
-      ]
-    },
-    {
-      "id": 42,
-      "theme": "The Caddy Interview",
-      "par": 4,
-      "slope": 2,
-      "type": "feature",
-      "depends_on": [41],
-      "tickets": [
-        {
-          "key": "S42-1",
-          "title": "InterviewStep abstraction + smart defaults engine",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S42-2",
-          "title": "Metaphor preview generator",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S42-3",
-          "title": "Rich CLI rendering with @clack/prompts",
-          "club": "long_iron",
-          "complexity": "multi_package"
-        },
-        {
-          "key": "S42-4",
-          "title": "MCP agent API (getInitQuestions + submitInitAnswers)",
-          "club": "short_iron",
-          "complexity": "standard"
-        }
-      ]
-    },
-    {
-      "id": 43,
-      "theme": "Loop Foundation",
-      "par": 4,
-      "slope": 2,
-      "type": "feature",
-      "tickets": [
-        {
-          "key": "S43-1",
-          "title": "analyze.ts — scorecard data mining + backlog generation",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S43-2",
-          "title": "run.sh — single-ticket execution harness with model selection",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S43-3",
-          "title": "continuous.sh — full sprint loop with auto-card + retro",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S43-4",
-          "title": "parallel.sh — concurrent ticket execution with job control",
-          "club": "short_iron",
-          "complexity": "standard"
-        }
-      ]
-    },
-    {
-      "id": 44,
-      "theme": "Agent Intelligence",
-      "par": 4,
-      "slope": 1,
-      "type": "feature",
-      "depends_on": [43],
-      "tickets": [
-        {
-          "key": "S44-1",
-          "title": "slope-loop-guide skill — auto-evolving agent knowledge base",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S44-2",
-          "title": "sprint-workflow skill — portable sprint lifecycle knowledge",
-          "club": "wedge",
-          "complexity": "small"
-        },
-        {
-          "key": "S44-3",
-          "title": "performance-analysis skill — handicap + miss pattern interpretation",
-          "club": "wedge",
-          "complexity": "small"
-        },
-        {
-          "key": "S44-4",
-          "title": "Model escalation logic — local fail → API retry pipeline",
-          "club": "short_iron",
-          "complexity": "standard"
-        }
-      ]
-    },
-    {
-      "id": 45,
-      "theme": "Ops Dashboard",
-      "par": 3,
-      "slope": 1,
-      "type": "feature",
-      "depends_on": [43],
-      "tickets": [
-        {
-          "key": "S45-1",
-          "title": "dashboard.ts — real-time sprint progress + model cost tracking",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S45-2",
-          "title": "model-selector.ts — club-to-model mapping with cost estimation",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S45-3",
-          "title": "model-config.json — configurable model registry + fallback chains",
-          "club": "wedge",
-          "complexity": "small"
-        }
-      ]
-    },
-    {
-      "id": 46,
-      "theme": "Semantic Index",
-      "par": 4,
-      "slope": 3,
-      "type": "feature",
-      "depends_on": [43],
-      "tickets": [
-        {
-          "key": "S46-1",
-          "title": "codebase_embeddings schema + nomic-embed-text integration",
-          "club": "long_iron",
-          "complexity": "multi_package"
-        },
-        {
-          "key": "S46-2",
-          "title": "slope index CLI — incremental codebase embedding pipeline",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S46-3",
-          "title": "slope context CLI — ticket-aware file retrieval via embeddings",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S46-4",
-          "title": "run.sh integration — replace repo map with slope context",
-          "club": "short_iron",
-          "complexity": "standard"
-        }
-      ]
-    },
-    {
-      "id": 47,
-      "theme": "Execution Plans",
-      "par": 3,
-      "slope": 2,
-      "type": "feature",
-      "depends_on": [46],
-      "tickets": [
-        {
-          "key": "S47-1",
-          "title": "slope prep CLI — structured execution plans from ticket + context",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S47-2",
-          "title": "slope enrich CLI — backlog pre-computation with context + plans",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S47-3",
-          "title": "run.sh integration — inject prep output via --read flag",
-          "club": "wedge",
-          "complexity": "small"
-        }
-      ]
-    }
-  ],
-  "planned": [
-    {
-      "id": "P10-1",
-      "theme": "Context budget per ticket",
+      "id": 71,
+      "theme": "The Tournament — Team Scoring & Competition",
       "par": 3,
       "slope": 2,
       "type": "feature",
       "tickets": [
         {
-          "key": "P10-1-1",
-          "title": "Add token budget instruction to Aider prompt based on club/model",
+          "key": "S71-1",
+          "title": "Team sprint scoring — combine individual agent scores into team score",
           "club": "short_iron",
-          "description": "Inject a context budget instruction into the Aider prompt in buildPrompt(). Local models get tighter budgets (8K tokens) than API models (24K). Budget derived from club: putter/wedge=4K, short_iron=8K, long_iron=16K, driver=24K. Local models halve the budget.",
-          "acceptance_criteria": [
-            "buildPrompt() includes a token budget line like 'You have ~NK tokens — focus on the core change'",
-            "Budget varies by club and model tier (local vs API)",
-            "pnpm test passes",
-            "pnpm typecheck passes"
-          ],
-          "modules": ["src/cli/loop/executor.ts"],
-          "max_files": 1
+          "complexity": "standard"
+        },
+        {
+          "key": "S71-2",
+          "title": "Inter-team leaderboard — compare team performance across orgs",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S71-3",
+          "title": "Sprint retrospective generator — auto-generate retro from scorecard data",
+          "club": "wedge",
+          "complexity": "small"
         }
-      ]
+      ],
+      "depends_on": [69, 70]
     },
     {
-      "id": "P10-2",
-      "theme": "Analysis paralysis timeout",
+      "id": 72,
+      "theme": "The Autopilot v2 — Smart Model Routing",
+      "par": 4,
+      "slope": 2,
+      "type": "feature",
+      "tickets": [
+        {
+          "key": "S72-1",
+          "title": "Model success rate tracking — per-club, per-ticket-type success data",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S72-2",
+          "title": "Adaptive model selection — use historical data to pick optimal model per ticket",
+          "club": "long_iron",
+          "complexity": "moderate"
+        },
+        {
+          "key": "S72-3",
+          "title": "Model cost-performance tradeoff — factor cost into routing decisions",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S72-4",
+          "title": "slope loop config recommend — suggest optimal model config from data",
+          "club": "wedge",
+          "complexity": "small"
+        }
+      ],
+      "depends_on": [65]
+    },
+    {
+      "id": 73,
+      "theme": "The Assembly Line — Batch Sprint Execution",
+      "par": 4,
+      "slope": 3,
+      "type": "feature",
+      "tickets": [
+        {
+          "key": "S73-1",
+          "title": "Dependency-aware sprint scheduling — respect depends_on in continuous mode",
+          "club": "long_iron",
+          "complexity": "moderate"
+        },
+        {
+          "key": "S73-2",
+          "title": "Parallel worktree management — auto-create/cleanup worktrees for parallel sprints",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S73-3",
+          "title": "Sprint failure recovery — auto-retry with different strategy on failure",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S73-4",
+          "title": "Batch execution report — summary of all sprints run in a batch",
+          "club": "wedge",
+          "complexity": "small"
+        }
+      ],
+      "depends_on": [72]
+    },
+    {
+      "id": 74,
+      "theme": "The Convergence — Loop Self-Improvement",
       "par": 3,
-      "slope": 2,
-      "type": "feature",
-      "tickets": [
-        {
-          "key": "P10-2-1",
-          "title": "Add early-kill timeout when Aider produces no file changes",
-          "club": "short_iron",
-          "description": "In runAider(), monitor the working directory for file changes. If no files are modified within the first 50% of the timeout, kill the Aider process early and escalate to the next model tier. This saves 15+ minutes per stuck ticket.",
-          "acceptance_criteria": [
-            "runAider() kills Aider process if no file changes within 50% of timeout",
-            "Early kill triggers escalation (same path as normal failure)",
-            "Ticket result records the early kill reason",
-            "pnpm test passes",
-            "pnpm typecheck passes"
-          ],
-          "modules": ["src/cli/loop/executor.ts"],
-          "max_files": 1
-        }
-      ]
-    },
-    {
-      "id": "P10-3",
-      "theme": "Pass planner files as --file flags",
-      "par": 4,
-      "slope": 2,
-      "type": "feature",
-      "tickets": [
-        {
-          "key": "P10-3-1",
-          "title": "Thread planner file list into executor --file flags",
-          "club": "short_iron",
-          "description": "The planner already identifies concrete files per ticket. Pass these as Aider --file flags so the model starts with the right files in context instead of searching. Read planner output from ExecutionPlan.files and map to --file arguments in buildAiderArgs().",
-          "acceptance_criteria": [
-            "buildAiderArgs() includes --file flags from ExecutionPlan.files",
-            "Falls back gracefully when no execution plan exists",
-            "pnpm test passes",
-            "pnpm typecheck passes"
-          ],
-          "modules": ["src/cli/loop/executor.ts", "src/cli/loop/planner.ts"],
-          "max_files": 2
-        }
-      ]
-    },
-    {
-      "id": "P10-4",
-      "theme": "Add hazards and similar tickets to planner context",
-      "par": 4,
-      "slope": 2,
-      "type": "feature",
-      "tickets": [
-        {
-          "key": "P10-4-1",
-          "title": "Inject hazard history and similar past tickets into planner prompt",
-          "club": "long_iron",
-          "description": "Enrich the planner prompt with relevant hazards from common-issues and similar completed tickets from sprint history. Load common-issues via loadCommonIssues(), filter by module overlap. Load past sprint results and find tickets with similar modules/descriptions. Include top 3 hazards and top 2 similar tickets as context.",
-          "acceptance_criteria": [
-            "Planner prompt includes relevant hazards from common-issues",
-            "Planner prompt includes similar past tickets when available",
-            "Gracefully handles missing common-issues or sprint history",
-            "pnpm test passes",
-            "pnpm typecheck passes"
-          ],
-          "modules": ["src/cli/loop/planner.ts", "src/core/prep.ts"],
-          "max_files": 2
-        }
-      ]
-    },
-    {
-      "id": "P10-5",
-      "theme": "Context monitoring hook",
-      "par": 4,
       "slope": 3,
-      "type": "feature",
+      "type": "architecture",
       "tickets": [
         {
-          "key": "P10-5-1",
-          "title": "Create context-monitor guard that warns at token thresholds",
+          "key": "S74-1",
+          "title": "Backlog quality scoring — rate backlog tickets by likelihood of clean execution",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S74-2",
+          "title": "Auto-generate backlog from common-issues and guard data",
           "club": "long_iron",
-          "description": "Create a new guard at src/cli/guards/context-monitor.ts that tracks remaining context during Aider execution. Inject warnings at 35% and 25% remaining context thresholds. Register as a PostToolUse hook. Integrate with executor.ts to enable during sprint execution.",
-          "acceptance_criteria": [
-            "New guard file src/cli/guards/context-monitor.ts exists",
-            "Guard warns at 35% and 25% remaining context",
-            "Guard registered in hook system",
-            "Executor enables the guard during sprint execution",
-            "pnpm test passes",
-            "pnpm typecheck passes"
-          ],
-          "modules": ["src/cli/loop/executor.ts"],
-          "max_files": 2
-        }
-      ]
-    },
-    {
-      "id": "P10-6",
-      "theme": "Wave-based parallelism",
-      "par": 4,
-      "slope": 3,
-      "type": "feature",
-      "tickets": [
+          "complexity": "moderate"
+        },
         {
-          "key": "P10-6-1",
-          "title": "Replace binary overlap detection with dependency-graph wave scheduling",
-          "club": "driver",
-          "description": "Replace the current binary module overlap detection in parallel.ts with a dependency graph approach. Build a graph of ticket-to-module edges, compute independent waves (tickets with no shared modules), and execute each wave in parallel. Fall back to sequential only for truly overlapping tickets within a wave.",
-          "acceptance_criteria": [
-            "parallel.ts builds a module dependency graph across tickets",
-            "Independent tickets run in parallel waves",
-            "Overlapping tickets within a wave run sequentially",
-            "Existing parallel test cases still pass",
-            "pnpm test passes",
-            "pnpm typecheck passes"
-          ],
-          "modules": ["src/cli/loop/parallel.ts"],
-          "max_files": 1
+          "key": "S74-3",
+          "title": "Convergence metrics — track handicap improvement rate, predict plateau",
+          "club": "short_iron",
+          "complexity": "standard"
         }
-      ]
+      ],
+      "depends_on": [72, 73]
     }
   ]
 }
