@@ -23,12 +23,12 @@ import { z } from 'zod';
 import { SLOPE_REGISTRY, SLOPE_TYPES } from './registry.js';
 import { runInSandbox } from './sandbox.js';
 import type { SlopeStore } from '../core/index.js';
-import { checkConflicts, loadFlows, checkFlowStaleness, checkStoreHealth, METAPHOR_SCHEMA, listMetaphors, buildInterviewContext, generateInterviewSteps } from '../core/index.js';
+import { checkConflicts, loadFlows, checkFlowStaleness, checkStoreHealth, METAPHOR_SCHEMA, listMetaphors, buildInterviewContext, generateInterviewSteps, loadConfig } from '../core/index.js';
 import { gaming } from '../core/metaphors/gaming.js';
 import type { ClaimScope, FlowsFile, FlowDefinition } from '../core/index.js';
 
 /** Tool names exposed by this MCP server (for tests and tool discovery). */
-export const SLOPE_MCP_TOOL_NAMES = ['search', 'execute', 'session_status', 'acquire_claim', 'check_conflicts', 'store_status'] as const;
+export const SLOPE_MCP_TOOL_NAMES = ['search', 'execute', 'session_status', 'acquire_claim', 'check_conflicts', 'store_status', 'testing_session_start', 'testing_session_finding', 'testing_session_end', 'testing_session_status'] as const;
 
 /** Detection results for hook/settings activation status. */
 export interface SetupHints {
@@ -119,7 +119,7 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
     'Discover SLOPE API functions, filesystem helpers, constants, and type definitions. Call with no args to see everything, or filter by query/module.',
     {
       query: z.string().optional().describe('Case-insensitive search term to filter by name or description'),
-      module: z.enum(['core', 'fs', 'constants', 'types', 'store', 'map', 'flows', 'metaphor', 'init']).optional().describe('Filter by module category'),
+      module: z.enum(['core', 'fs', 'constants', 'types', 'store', 'map', 'flows', 'metaphor', 'init', 'testing']).optional().describe('Filter by module category'),
     },
     async ({ query, module }) => {
       // Map module — return codebase map content
@@ -262,6 +262,278 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
             text: JSON.stringify(result, null, 2),
           }],
         };
+      },
+    );
+
+    // ─── Testing Session Tools ───
+
+    server.tool(
+      'testing_session_start',
+      'Start a manual testing session. Creates a fresh git worktree for testing, returns setup steps from config. Only one active session allowed at a time.',
+      {
+        purpose: z.string().optional().describe('Purpose or focus area for this testing session'),
+        sprint: z.number().optional().describe('Associated sprint number'),
+      },
+      async ({ purpose, sprint }) => {
+        // Check for existing active session
+        const existing = await store.getActiveTestingSession();
+        if (existing) {
+          return {
+            content: [{ type: 'text' as const, text: `Error: Active testing session already exists (${existing.id}, started ${existing.started_at}). End it first with testing_session_end.` }],
+            isError: true,
+          };
+        }
+
+        let projectRoot: string;
+        try {
+          projectRoot = findProjectRoot(process.cwd());
+        } catch {
+          projectRoot = process.cwd();
+        }
+
+        // Clean up stale testing worktrees (best-effort)
+        const worktreeDir = join(projectRoot, '.claude', 'worktrees');
+        try {
+          const { readdirSync, existsSync: dirExists } = await import('node:fs');
+          if (dirExists(worktreeDir)) {
+            const entries = readdirSync(worktreeDir).filter(e => e.startsWith('testing-'));
+            for (const entry of entries) {
+              try {
+                // Check if branch is merged and no active session references it
+                const wtPath = join(worktreeDir, entry);
+                execSync(`git worktree remove ${JSON.stringify(wtPath)} --force 2>/dev/null`, { cwd: projectRoot, timeout: 10000 });
+              } catch { /* best-effort cleanup */ }
+            }
+            execSync('git worktree prune 2>/dev/null', { cwd: projectRoot, timeout: 5000 });
+          }
+        } catch { /* best-effort cleanup */ }
+
+        // Create fresh worktree
+        const timestamp = Date.now();
+        const branchName = `testing/${timestamp}`;
+        const worktreePath = join(worktreeDir, `testing-${timestamp}`);
+        try {
+          // Ensure worktree parent directory exists
+          const { mkdirSync: mkdirS } = await import('node:fs');
+          mkdirS(worktreeDir, { recursive: true });
+
+          // Get the default branch (main or master)
+          let baseBranch = 'main';
+          try {
+            baseBranch = execSync('git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null', { cwd: projectRoot, encoding: 'utf8', timeout: 5000 }).trim().replace('refs/remotes/origin/', '');
+          } catch {
+            try {
+              execSync('git rev-parse --verify origin/main 2>/dev/null', { cwd: projectRoot, timeout: 5000 });
+            } catch {
+              baseBranch = 'master';
+            }
+          }
+
+          execSync(`git worktree add ${JSON.stringify(worktreePath)} -b ${branchName} origin/${baseBranch}`, { cwd: projectRoot, timeout: 30000 });
+
+          // Mirror .slope directory for store access
+          const slopeDir = join(projectRoot, '.slope');
+          const wtSlopeDir = join(worktreePath, '.slope');
+          const { cpSync } = await import('node:fs');
+          if (existsSync(slopeDir)) {
+            cpSync(slopeDir, wtSlopeDir, { recursive: true });
+          }
+        } catch (err) {
+          return {
+            content: [{ type: 'text' as const, text: `Error creating testing worktree: ${err instanceof Error ? err.message : String(err)}` }],
+            isError: true,
+          };
+        }
+
+        // Detect current branch for session record
+        let currentBranch: string | undefined;
+        try {
+          currentBranch = execSync('git rev-parse --abbrev-ref HEAD 2>/dev/null', { cwd: projectRoot, encoding: 'utf8', timeout: 5000 }).trim();
+        } catch { /* not in git repo */ }
+
+        // Create session in store
+        const session = await store.createTestingSession({
+          branch: currentBranch,
+          sprint,
+          purpose,
+          worktree_path: worktreePath,
+          branch_name: branchName,
+        });
+
+        // Load config for setup steps
+        let setupSteps: string[] = [];
+        try {
+          const config = loadConfig(projectRoot);
+          if (config.testing?.setup_steps) {
+            setupSteps = config.testing.setup_steps.map(step =>
+              step.replace(/\{projectRoot\}/g, projectRoot).replace(/\{worktreeRoot\}/g, worktreePath),
+            );
+          }
+        } catch { /* no config — no setup steps */ }
+
+        const response: Record<string, unknown> = {
+          session_id: session.id,
+          started_at: session.started_at,
+          worktree_path: worktreePath,
+          branch_name: branchName,
+          setup_steps: setupSteps,
+          prompt: `Testing session started. The testing worktree is at: ${worktreePath}\n\n` +
+            (setupSteps.length > 0
+              ? `Walk the user through these setup steps in the worktree:\n${setupSteps.map((s, i) => `${i + 1}. ${s}`).join('\n')}\n\n`
+              : '') +
+            'Once setup is complete, the user can begin testing. Use testing_session_finding to record any bugs or observations found during testing.\n' +
+            'When done testing, remind the user to run any teardown steps BEFORE calling testing_session_end.',
+        };
+
+        return { content: [{ type: 'text' as const, text: JSON.stringify(response, null, 2) }] };
+      },
+    );
+
+    server.tool(
+      'testing_session_finding',
+      'Record a finding (bug, observation, issue) during an active testing session.',
+      {
+        description: z.string().describe('Description of the finding'),
+        severity: z.enum(['low', 'medium', 'high', 'critical']).optional().describe('Severity level (default: medium)'),
+        ticket: z.string().optional().describe('Associated ticket key'),
+      },
+      async ({ description, severity, ticket }) => {
+        const session = await store.getActiveTestingSession();
+        if (!session) {
+          return {
+            content: [{ type: 'text' as const, text: 'Error: No active testing session. Start one with testing_session_start.' }],
+            isError: true,
+          };
+        }
+
+        const finding = await store.addTestingFinding({
+          session_id: session.id,
+          description,
+          severity: severity ?? 'medium',
+          ticket,
+        });
+
+        const findings = await store.getTestingFindings(session.id);
+
+        const response = {
+          finding_id: finding.id,
+          session_id: session.id,
+          running_count: findings.length,
+          prompt: `Finding recorded (${findings.length} total). Is there more to test, or would you like to end the session? Remember to run teardown steps before calling testing_session_end.`,
+        };
+
+        return { content: [{ type: 'text' as const, text: JSON.stringify(response, null, 2) }] };
+      },
+    );
+
+    server.tool(
+      'testing_session_end',
+      'End the active testing session. Returns a summary of findings and runs worktree cleanup. Run any teardown steps BEFORE calling this tool.',
+      {
+        session_id: z.string().optional().describe('Session ID to end (defaults to active session)'),
+        skip_cleanup: z.boolean().optional().describe('Skip worktree removal (default: false)'),
+      },
+      async ({ session_id, skip_cleanup }) => {
+        // Resolve session
+        let sessionId = session_id;
+        if (!sessionId) {
+          const active = await store.getActiveTestingSession();
+          if (!active) {
+            return {
+              content: [{ type: 'text' as const, text: 'Error: No active testing session to end.' }],
+              isError: true,
+            };
+          }
+          sessionId = active.id;
+        }
+
+        // Get findings before ending
+        const findings = await store.getTestingFindings(sessionId);
+
+        // End session in store
+        const result = await store.endTestingSession(sessionId);
+
+        // Load teardown steps
+        let teardownSteps: string[] = [];
+        let projectRoot: string;
+        try {
+          projectRoot = findProjectRoot(process.cwd());
+          const config = loadConfig(projectRoot);
+          if (config.testing?.teardown_steps) {
+            teardownSteps = config.testing.teardown_steps.map(step =>
+              step.replace(/\{projectRoot\}/g, projectRoot).replace(/\{worktreeRoot\}/g, result.worktree_path ?? ''),
+            );
+          }
+        } catch {
+          projectRoot = process.cwd();
+        }
+
+        // Worktree cleanup
+        let cleanupStatus = 'skipped';
+        if (!skip_cleanup && result.worktree_path) {
+          try {
+            execSync(`git worktree remove ${JSON.stringify(result.worktree_path)} --force 2>/dev/null`, { cwd: projectRoot, timeout: 15000 });
+            if (result.branch_name) {
+              execSync(`git branch -D ${result.branch_name} 2>/dev/null`, { cwd: projectRoot, timeout: 5000 });
+            }
+            execSync('git worktree prune 2>/dev/null', { cwd: projectRoot, timeout: 5000 });
+            cleanupStatus = 'success';
+          } catch {
+            cleanupStatus = 'failed — manual cleanup may be needed';
+          }
+        }
+
+        // Build summary
+        const severityCounts: Record<string, number> = {};
+        for (const f of findings) {
+          severityCounts[f.severity] = (severityCounts[f.severity] ?? 0) + 1;
+        }
+
+        const response = {
+          session_id: sessionId,
+          ended_at: result.ended_at,
+          finding_count: result.finding_count,
+          severity_counts: severityCounts,
+          findings: findings.map(f => ({
+            id: f.id,
+            description: f.description,
+            severity: f.severity,
+            ticket: f.ticket,
+          })),
+          teardown_steps: teardownSteps,
+          worktree_cleanup: cleanupStatus,
+          prompt: result.finding_count > 0
+            ? `Testing session ended with ${result.finding_count} finding(s). Suggested next actions:\n` +
+              '1. File issues for critical/high findings\n' +
+              '2. Start a sprint to fix the bugs found\n' +
+              '3. Add findings to the backlog'
+            : 'Testing session ended with no findings. Clean run!',
+        };
+
+        return { content: [{ type: 'text' as const, text: JSON.stringify(response, null, 2) }] };
+      },
+    );
+
+    server.tool(
+      'testing_session_status',
+      'Show active testing session info and findings, or indicate no active session.',
+      {},
+      async () => {
+        const session = await store.getActiveTestingSession();
+        if (!session) {
+          return { content: [{ type: 'text' as const, text: JSON.stringify({ active: false, message: 'No active testing session.' }, null, 2) }] };
+        }
+
+        const findings = await store.getTestingFindings(session.id);
+
+        const response = {
+          active: true,
+          session,
+          findings,
+          finding_count: findings.length,
+        };
+
+        return { content: [{ type: 'text' as const, text: JSON.stringify(response, null, 2) }] };
       },
     );
   }

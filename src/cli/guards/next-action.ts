@@ -12,6 +12,7 @@ type SprintState =
   | { type: 'sprint-complete'; sprintNumber: number }
   | { type: 'needs-review'; sprintNumber: number }
   | { type: 'needs-amend'; sprintNumber: number; findingCount: number }
+  | { type: 'testing-active' }
   | { type: 'between-sprints'; roadmapContext?: string };
 
 /**
@@ -57,6 +58,19 @@ export async function nextActionGuard(input: HookInput, cwd: string): Promise<Gu
 
 /** Detect current sprint state via store then filesystem fallback */
 export async function detectSprintState(cwd: string): Promise<SprintState> {
+  // Check for active testing session
+  try {
+    const store = await resolveStore(cwd);
+    try {
+      const testingSession = await store.getActiveTestingSession();
+      if (testingSession) {
+        return { type: 'testing-active' };
+      }
+    } finally {
+      store.close();
+    }
+  } catch { /* store unavailable — continue */ }
+
   // If sprint-state.json exists and sprint is active, defer to sprint-completion guard.
   // That guard handles the hard block on Stop with gate-level detail.
   // next-action returns between-sprints to avoid duplicate messaging.
@@ -246,6 +260,20 @@ export function buildSuggestions(state: SprintState): string {
         'Present these using AskUserQuestion. If the user chooses to end the session, stop without further action.',
       ].join('\n');
     }
+
+    case 'testing-active':
+      return [
+        header,
+        '',
+        'Current state: Testing session active',
+        '',
+        'Suggested options:',
+        '1. Continue testing',
+        '2. End testing session (testing_session_end)',
+        '3. End session — nothing more to do right now',
+        '',
+        'Present these using AskUserQuestion.',
+      ].join('\n');
 
     case 'between-sprints': {
       const contextLine = state.roadmapContext

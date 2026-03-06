@@ -4,7 +4,7 @@
 
 export interface FunctionRegistryEntry {
   name: string;
-  module: 'core' | 'fs' | 'constants' | 'store' | 'flows' | 'init';
+  module: 'core' | 'fs' | 'constants' | 'store' | 'flows' | 'init' | 'testing';
   description: string;
   signature: string;
   example: string;
@@ -841,6 +841,36 @@ export const SLOPE_REGISTRY: FunctionRegistryEntry[] = [
     description: 'Generate a roadmap from vision + backlog. Run after createVision. Uses backlog analysis to create concrete sprints aligned with vision priorities.',
     signature: 'generateRoadmapFromVision(vision: VisionDocument, backlog: MergedBacklog, complexity?: ComplexityProfile): RoadmapDefinition',
     example: 'const v = loadVision(); const bl = mergeBacklogs(await analyzeBacklog()); return generateRoadmapFromVision(v, bl);',
+  },
+
+  // ─── Testing ───
+  {
+    name: 'testing_session_start',
+    module: 'testing',
+    description: 'Start a manual testing session. Creates a git worktree, returns setup steps from config. One active session at a time.',
+    signature: 'testing_session_start({ purpose?: string, sprint?: number })',
+    example: 'Call via MCP: testing_session_start({ purpose: "Test checkout flow" })',
+  },
+  {
+    name: 'testing_session_finding',
+    module: 'testing',
+    description: 'Record a finding (bug, observation) during an active testing session.',
+    signature: 'testing_session_finding({ description: string, severity?: "low"|"medium"|"high"|"critical", ticket?: string })',
+    example: 'Call via MCP: testing_session_finding({ description: "Button unresponsive on mobile", severity: "high" })',
+  },
+  {
+    name: 'testing_session_end',
+    module: 'testing',
+    description: 'End the active testing session. Returns summary of findings and cleans up worktree. Run teardown steps BEFORE calling this.',
+    signature: 'testing_session_end({ session_id?: string, skip_cleanup?: boolean })',
+    example: 'Call via MCP: testing_session_end()',
+  },
+  {
+    name: 'testing_session_status',
+    module: 'testing',
+    description: 'Show active testing session info and findings, or indicate no active session.',
+    signature: 'testing_session_status()',
+    example: 'Call via MCP: testing_session_status()',
   },
 ];
 
