@@ -134,6 +134,36 @@ const MIGRATIONS: Array<{ version: number; sql: string }> = [
       CREATE INDEX IF NOT EXISTS idx_embeddings_file ON embeddings(file_path);
     `,
   },
+  {
+    version: 3,
+    sql: `
+      CREATE TABLE IF NOT EXISTS testing_sessions (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL DEFAULT 'default',
+        branch TEXT,
+        sprint INTEGER,
+        purpose TEXT,
+        worktree_path TEXT,
+        branch_name TEXT,
+        started_at TEXT NOT NULL,
+        ended_at TEXT,
+        status TEXT NOT NULL DEFAULT 'active'
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_testing_sessions_project ON testing_sessions(project_id);
+
+      CREATE TABLE IF NOT EXISTS testing_findings (
+        id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL REFERENCES testing_sessions(id) ON DELETE CASCADE,
+        description TEXT NOT NULL,
+        severity TEXT NOT NULL DEFAULT 'medium',
+        ticket TEXT,
+        created_at TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_testing_findings_session ON testing_findings(session_id);
+    `,
+  },
 ];
 
 export interface PostgresStoreOptions {
@@ -497,6 +527,78 @@ export class PostgresSlopeStore implements SlopeStore {
       [ticketKey, this.projectId],
     );
     return result.rows.map(rowToEvent);
+  }
+
+  // --- Testing Sessions ---
+
+  async createTestingSession(session: { branch?: string; sprint?: number; purpose?: string; worktree_path?: string; branch_name?: string }): Promise<{ id: string; started_at: string }> {
+    const id = generateId('tsess');
+    const started_at = nowISO();
+    await this.pool.query(`
+      INSERT INTO testing_sessions (id, project_id, branch, sprint, purpose, worktree_path, branch_name, started_at, status)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'active')
+    `, [id, this.projectId, session.branch ?? null, session.sprint ?? null, session.purpose ?? null, session.worktree_path ?? null, session.branch_name ?? null, started_at]);
+    return { id, started_at };
+  }
+
+  async endTestingSession(sessionId: string): Promise<{ ended_at: string; finding_count: number; worktree_path?: string; branch_name?: string }> {
+    const ended_at = nowISO();
+    const { rows } = await this.pool.query(
+      'SELECT worktree_path, branch_name FROM testing_sessions WHERE id = $1 AND status = $2 AND project_id = $3',
+      [sessionId, 'active', this.projectId],
+    );
+    if (rows.length === 0) {
+      throw new SlopeStoreError('NOT_FOUND', `Active testing session "${sessionId}" not found`);
+    }
+    await this.pool.query('UPDATE testing_sessions SET status = $1, ended_at = $2 WHERE id = $3', ['ended', ended_at, sessionId]);
+    const countResult = await this.pool.query('SELECT COUNT(*) as c FROM testing_findings WHERE session_id = $1', [sessionId]);
+    return {
+      ended_at,
+      finding_count: parseInt(countResult.rows[0].c, 10),
+      worktree_path: rows[0].worktree_path ?? undefined,
+      branch_name: rows[0].branch_name ?? undefined,
+    };
+  }
+
+  async getActiveTestingSession(): Promise<{ id: string; branch?: string; sprint?: number; purpose?: string; worktree_path?: string; branch_name?: string; started_at: string } | null> {
+    const { rows } = await this.pool.query(
+      'SELECT * FROM testing_sessions WHERE status = $1 AND project_id = $2 ORDER BY started_at DESC LIMIT 1',
+      ['active', this.projectId],
+    );
+    if (rows.length === 0) return null;
+    const row = rows[0];
+    return {
+      id: row.id,
+      branch: row.branch ?? undefined,
+      sprint: row.sprint ?? undefined,
+      purpose: row.purpose ?? undefined,
+      worktree_path: row.worktree_path ?? undefined,
+      branch_name: row.branch_name ?? undefined,
+      started_at: row.started_at,
+    };
+  }
+
+  async addTestingFinding(finding: { session_id: string; description: string; severity?: string; ticket?: string }): Promise<{ id: string }> {
+    const id = generateId('tfind');
+    await this.pool.query(`
+      INSERT INTO testing_findings (id, session_id, description, severity, ticket, created_at)
+      VALUES ($1, $2, $3, $4, $5, $6)
+    `, [id, finding.session_id, finding.description, finding.severity ?? 'medium', finding.ticket ?? null, nowISO()]);
+    return { id };
+  }
+
+  async getTestingFindings(sessionId: string): Promise<Array<{ id: string; description: string; severity: string; ticket?: string; created_at: string }>> {
+    const { rows } = await this.pool.query(
+      'SELECT * FROM testing_findings WHERE session_id = $1 ORDER BY created_at',
+      [sessionId],
+    );
+    return rows.map((r: Record<string, unknown>) => ({
+      id: r.id as string,
+      description: r.description as string,
+      severity: r.severity as string,
+      ticket: (r.ticket as string | null) ?? undefined,
+      created_at: r.created_at as string,
+    }));
   }
 
   // --- Lifecycle ---

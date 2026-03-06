@@ -60,6 +60,10 @@ export interface SlopeConfig {
     dimensions: number;
     apiKey?: string;
   };
+  testing?: {
+    setup_steps?: string[];
+    teardown_steps?: string[];
+  };
 }
 
 const DEFAULT_CONFIG: SlopeConfig = {
