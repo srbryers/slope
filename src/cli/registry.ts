@@ -15,6 +15,7 @@ export const CLI_INTERNAL_MODULES = ['review-state'] as const;
 export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
   // ── Lifecycle ──────────────────────────────────────────────────
   { cmd: 'init',      desc: 'Initialize .slope/ directory',                    category: 'lifecycle' },
+  { cmd: 'doctor',    desc: 'Check repo health and auto-fix issues',           category: 'lifecycle' },
   { cmd: 'session',   desc: 'Manage live sessions',                            category: 'lifecycle' },
   { cmd: 'claim',     desc: 'Claim a ticket or area for the sprint',           category: 'lifecycle' },
   { cmd: 'release',   desc: 'Release a claim by ID or target',                 category: 'lifecycle' },
