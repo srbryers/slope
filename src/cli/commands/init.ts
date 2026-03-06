@@ -158,6 +158,21 @@ export function detectPlatforms(cwd: string): InitProvider[] {
   return detected;
 }
 
+/** Ensure .slope/ is in .gitignore. Idempotent — skips if already present. */
+function ensureGitignore(cwd: string): void {
+  const gitignorePath = join(cwd, '.gitignore');
+  let content = '';
+  if (existsSync(gitignorePath)) {
+    content = readFileSync(gitignorePath, 'utf8');
+    // Check if .slope/ or .slope is already ignored
+    if (/^\/?\.slope\/?$/m.test(content)) return;
+  }
+
+  const entry = '\n# SLOPE local state (sessions, handoffs, sprint-state, DB)\n.slope/\n';
+  writeFileSync(gitignorePath, content + entry);
+  console.log('  Added .slope/ to .gitignore');
+}
+
 function getTemplatesRoot(): string {
   return join(__dirname, '..', '..', '..', '..', 'templates');
 }
@@ -739,6 +754,9 @@ export async function initCommand(args: string[]): Promise<void> {
   writeFileSync(configPath, JSON.stringify(configData, null, 2) + '\n');
 
   console.log(`  Created ${configPath}`);
+
+  // Ensure .slope/ is gitignored (contains local state: handoffs, sprint-state, DB)
+  ensureGitignore(cwd);
 
   const scorecardDir = join(cwd, 'docs', 'retros');
   if (!existsSync(scorecardDir)) {

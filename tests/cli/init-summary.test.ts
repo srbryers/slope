@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { printInstallSummary } from '../../src/cli/commands/init.js';
@@ -177,5 +177,33 @@ describe('initCommand prints summary', () => {
     expect(output).toContain('cursor');
     expect(output).toContain('windsurf');
     expect(output).toContain('opencode');
+  });
+
+  it('creates .gitignore with .slope/ entry', async () => {
+    await initCommand([]);
+
+    const gitignorePath = join(tmpDir, '.gitignore');
+    expect(existsSync(gitignorePath)).toBe(true);
+    const content = readFileSync(gitignorePath, 'utf8');
+    expect(content).toContain('.slope/');
+  });
+
+  it('appends to existing .gitignore without duplicating', async () => {
+    writeFileSync(join(tmpDir, '.gitignore'), 'node_modules/\n');
+    await initCommand([]);
+
+    const content = readFileSync(join(tmpDir, '.gitignore'), 'utf8');
+    expect(content).toContain('node_modules/');
+    expect(content).toContain('.slope/');
+  });
+
+  it('skips .gitignore if .slope/ already present', async () => {
+    writeFileSync(join(tmpDir, '.gitignore'), 'node_modules/\n.slope/\n');
+    await initCommand([]);
+
+    const content = readFileSync(join(tmpDir, '.gitignore'), 'utf8');
+    // Should not have duplicate entries
+    const matches = content.match(/\.slope\//g);
+    expect(matches).toHaveLength(1);
   });
 });
