@@ -98,7 +98,7 @@ const EXAMPLE_COMMON_ISSUES = {
   ],
 };
 
-const STARTER_ROADMAP = {
+export const STARTER_ROADMAP = {
   name: 'Project Roadmap',
   description: 'Replace this with your project roadmap. Run "slope roadmap validate" to check.',
   phases: [

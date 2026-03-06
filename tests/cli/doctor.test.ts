@@ -94,6 +94,17 @@ describe('runDoctorChecks', () => {
     expect(roadmapCheck?.status).toBe('fail');
   });
 
+  it('detects invalid config JSON as non-fixable failure', () => {
+    mkdirSync(join(tmpDir, '.slope'), { recursive: true });
+    writeFileSync(join(tmpDir, '.slope', 'config.json'), '{ invalid json }');
+
+    const checks = runDoctorChecks(tmpDir);
+    const configCheck = checks.find(c => c.name === 'config');
+    expect(configCheck?.status).toBe('fail');
+    expect(configCheck?.fixable).toBeUndefined();
+    expect(configCheck?.message).toContain('invalid JSON');
+  });
+
   it('detects no guards installed', () => {
     mkdirSync(join(tmpDir, '.slope'), { recursive: true });
     writeFileSync(join(tmpDir, '.slope', 'hooks.json'), JSON.stringify({ installed: {} }));

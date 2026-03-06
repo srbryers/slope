@@ -1,6 +1,5 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { loadConfig } from '../config.js';
 import { detectPlatforms, type InitProvider } from './init.js';
 import { GUARD_DEFINITIONS } from '../../core/guard.js';
 
@@ -51,13 +50,11 @@ function checkConfig(cwd: string): DoctorCheck {
     return { name: 'config', status: 'fail', message: '.slope/config.json missing — run `slope init`', fixable: true };
   }
   try {
-    const config = loadConfig(cwd);
-    if (!config) {
-      return { name: 'config', status: 'fail', message: '.slope/config.json exists but could not be loaded', fixable: true };
-    }
+    JSON.parse(readFileSync(configPath, 'utf8'));
     return { name: 'config', status: 'ok', message: '.slope/config.json valid' };
   } catch {
-    return { name: 'config', status: 'fail', message: '.slope/config.json exists but is invalid JSON', fixable: true };
+    // Corrupt config — not auto-fixable (would lose custom settings)
+    return { name: 'config', status: 'fail', message: '.slope/config.json is invalid JSON — fix manually or delete and run `slope init`' };
   }
 }
 
@@ -238,21 +235,19 @@ export async function runDoctorFixes(cwd: string, checks: DoctorCheck[]): Promis
   for (const check of fixableFailures) {
     switch (check.name) {
       case 'config': {
-        // Re-run init to recreate config
         const { createConfig } = await import('../config.js');
         createConfig(cwd);
         fixed.push('Created .slope/config.json');
         break;
       }
       case 'gitignore': {
-        const { existsSync: ex, readFileSync: rf, writeFileSync: wf } = await import('node:fs');
         const gitignorePath = join(cwd, '.gitignore');
         let content = '';
-        if (ex(gitignorePath)) {
-          content = rf(gitignorePath, 'utf8');
+        if (existsSync(gitignorePath)) {
+          content = readFileSync(gitignorePath, 'utf8');
         }
         if (!/^\/?\.slope\/?$/m.test(content)) {
-          wf(gitignorePath, content + '\n# SLOPE local state (sessions, handoffs, sprint-state, DB)\n.slope/\n');
+          writeFileSync(gitignorePath, content + '\n# SLOPE local state (sessions, handoffs, sprint-state, DB)\n.slope/\n');
           fixed.push('Added .slope/ to .gitignore');
         }
         break;
@@ -269,31 +264,20 @@ export async function runDoctorFixes(cwd: string, checks: DoctorCheck[]): Promis
         break;
       }
       case 'common-issues': {
-        const { writeFileSync: wf, mkdirSync: mk } = await import('node:fs');
-        mk(join(cwd, '.slope'), { recursive: true });
-        wf(join(cwd, '.slope', 'common-issues.json'), JSON.stringify({ recurring_patterns: [] }, null, 2) + '\n');
+        mkdirSync(join(cwd, '.slope'), { recursive: true });
+        writeFileSync(join(cwd, '.slope', 'common-issues.json'), JSON.stringify({ recurring_patterns: [] }, null, 2) + '\n');
         fixed.push('Created .slope/common-issues.json');
         break;
       }
       case 'retros-dir': {
-        const { mkdirSync: mk } = await import('node:fs');
-        mk(join(cwd, 'docs', 'retros'), { recursive: true });
+        mkdirSync(join(cwd, 'docs', 'retros'), { recursive: true });
         fixed.push('Created docs/retros/');
         break;
       }
       case 'roadmap': {
-        const { writeFileSync: wf, mkdirSync: mk } = await import('node:fs');
-        mk(join(cwd, 'docs', 'backlog'), { recursive: true });
-        const starter = {
-          name: 'Project Roadmap',
-          description: 'Replace this with your project roadmap.',
-          phases: [{ name: 'Phase 1', sprints: [1] }],
-          sprints: [{
-            id: 1, theme: 'Getting Started', par: 3, slope: 0, type: 'feature',
-            tickets: [{ key: 'S1-1', title: 'Set up project', club: 'short_iron', complexity: 'standard' }],
-          }],
-        };
-        wf(join(cwd, 'docs', 'backlog', 'roadmap.json'), JSON.stringify(starter, null, 2) + '\n');
+        mkdirSync(join(cwd, 'docs', 'backlog'), { recursive: true });
+        const { STARTER_ROADMAP } = await import('./init.js');
+        writeFileSync(join(cwd, 'docs', 'backlog', 'roadmap.json'), JSON.stringify(STARTER_ROADMAP, null, 2) + '\n');
         fixed.push('Created docs/backlog/roadmap.json');
         break;
       }
@@ -312,7 +296,6 @@ export async function runDoctorFixes(cwd: string, checks: DoctorCheck[]): Promis
         break;
       }
       default: {
-        // MCP config fixes — re-run init for the platform
         if (check.name.startsWith('mcp-')) {
           const platform = check.name.slice(4);
           fixed.push(`Run \`slope init --${platform}\` to configure MCP`);
@@ -351,7 +334,7 @@ function formatResults(checks: DoctorCheck[]): void {
 
 export async function doctorCommand(args: string[]): Promise<void> {
   const cwd = process.cwd();
-  const checks = runDoctorChecks(cwd);
+  let checks = runDoctorChecks(cwd);
   const shouldFix = args.includes('--fix');
 
   formatResults(checks);
@@ -371,13 +354,12 @@ export async function doctorCommand(args: string[]): Promise<void> {
     console.log('');
 
     // Re-run checks to show updated status
-    const recheck = runDoctorChecks(cwd);
-    formatResults(recheck);
+    checks = runDoctorChecks(cwd);
+    formatResults(checks);
   }
 
-  // Exit with non-zero if any failures
-  const hasFails = checks.some(c => c.status === 'fail');
-  if (hasFails && !shouldFix) {
+  // Exit with non-zero if any failures remain
+  if (checks.some(c => c.status === 'fail')) {
     process.exit(1);
   }
 }
