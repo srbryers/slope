@@ -1,5 +1,6 @@
 import { execSync } from 'node:child_process';
 import type { HookInput, GuardResult } from '../../core/index.js';
+import { headIsOnMain } from './git-utils.js';
 
 /**
  * Detect the effective git working directory for this session.
@@ -115,13 +116,7 @@ export async function stopCheckGuard(_input: HookInput, cwd: string): Promise<Gu
   // Check for unpushed commits
   // Skip if HEAD is already on origin/main (e.g., after squash merge + reset)
   // The tracking branch (@{u}) may be stale after squash merges, causing false positives
-  let headIsOnMain = false;
-  try {
-    execSync('git merge-base --is-ancestor HEAD origin/main 2>/dev/null', { cwd: gitDir, encoding: 'utf8' });
-    headIsOnMain = true;
-  } catch { /* HEAD is ahead of main — check for unpushed */ }
-
-  if (!headIsOnMain) {
+  if (!headIsOnMain(gitDir)) {
     try {
       const unpushed = execSync('git log @{u}..HEAD --oneline 2>/dev/null', { cwd: gitDir, encoding: 'utf8' }).trim();
       if (unpushed) {

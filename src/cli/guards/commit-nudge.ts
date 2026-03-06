@@ -1,6 +1,7 @@
 import { execSync } from 'node:child_process';
 import type { HookInput, GuardResult } from '../../core/index.js';
 import { loadConfig } from '../config.js';
+import { headIsOnMain } from './git-utils.js';
 
 /**
  * Commit nudge guard: fires PostToolUse on Edit|Write.
@@ -37,23 +38,25 @@ export async function commitNudgeGuard(input: HookInput, cwd: string): Promise<G
     }
   } catch { /* not a git repo or git not available */ }
 
-  // Check time since last push
-  try {
-    const unpushed = execSync('git log @{u}..HEAD --oneline 2>/dev/null', { cwd, encoding: 'utf8' }).trim();
-    if (unpushed) {
-      const lines = unpushed.split('\n').filter(Boolean);
-      if (lines.length > 0) {
-        // Get age of oldest unpushed commit
-        const oldestUnpushedTime = execSync('git log @{u}..HEAD --format=%ct --reverse 2>/dev/null', { cwd, encoding: 'utf8' }).trim().split('\n')[0];
-        if (oldestUnpushedTime) {
-          const minutesSincePush = (Date.now() / 1000 - parseInt(oldestUnpushedTime, 10)) / 60;
-          if (minutesSincePush >= pushInterval) {
-            nudges.push(`${lines.length} unpushed commit${lines.length === 1 ? '' : 's'} (~${Math.round(minutesSincePush)} min) — consider pushing.`);
+  // Check time since last push (skip if HEAD is at origin/main — tracking branch may be stale)
+  if (!headIsOnMain(cwd)) {
+    try {
+      const unpushed = execSync('git log @{u}..HEAD --oneline 2>/dev/null', { cwd, encoding: 'utf8' }).trim();
+      if (unpushed) {
+        const lines = unpushed.split('\n').filter(Boolean);
+        if (lines.length > 0) {
+          // Get age of oldest unpushed commit
+          const oldestUnpushedTime = execSync('git log @{u}..HEAD --format=%ct --reverse 2>/dev/null', { cwd, encoding: 'utf8' }).trim().split('\n')[0];
+          if (oldestUnpushedTime) {
+            const minutesSincePush = (Date.now() / 1000 - parseInt(oldestUnpushedTime, 10)) / 60;
+            if (minutesSincePush >= pushInterval) {
+              nudges.push(`${lines.length} unpushed commit${lines.length === 1 ? '' : 's'} (~${Math.round(minutesSincePush)} min) — consider pushing.`);
+            }
           }
         }
       }
-    }
-  } catch { /* no upstream or git not available */ }
+    } catch { /* no upstream or git not available */ }
+  }
 
   if (nudges.length === 0) return {};
 
