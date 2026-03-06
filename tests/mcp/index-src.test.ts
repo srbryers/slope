@@ -56,6 +56,11 @@ function createMockStore(): SlopeStore & { sessions: SlopeSession[]; claims: Spr
     async getEventsByTicket() { return []; },
     async getSchemaVersion() { return 3; },
     async getStats() { return { sessions: sessions.length, claims: claims.length, scorecards: 0, events: 0, lastEventAt: null }; },
+    async createTestingSession(s) { return { id: `tsess-${Date.now()}`, started_at: new Date().toISOString() }; },
+    async endTestingSession() { return { ended_at: new Date().toISOString(), finding_count: 0 }; },
+    async getActiveTestingSession() { return null; },
+    async addTestingFinding() { return { id: `tfind-${Date.now()}` }; },
+    async getTestingFindings() { return []; },
     close() {},
   };
 }
@@ -73,7 +78,7 @@ describe('createSlopeToolsServer', () => {
   });
 
   it('exposes all expected tool names', () => {
-    const expectedTools = ['search', 'execute', 'session_status', 'acquire_claim', 'check_conflicts', 'store_status'];
+    const expectedTools = ['search', 'execute', 'session_status', 'acquire_claim', 'check_conflicts', 'store_status', 'testing_session_start', 'testing_session_finding', 'testing_session_end', 'testing_session_status'];
     expect(SLOPE_MCP_TOOL_NAMES).toEqual(expect.arrayContaining(expectedTools));
     expect(SLOPE_MCP_TOOL_NAMES.length).toBe(expectedTools.length);
   });
