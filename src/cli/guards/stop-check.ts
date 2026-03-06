@@ -1,5 +1,6 @@
 import { execSync } from 'node:child_process';
 import type { HookInput, GuardResult } from '../../core/index.js';
+import { headIsOnMain } from './git-utils.js';
 
 /**
  * Detect the effective git working directory for this session.
@@ -113,15 +114,19 @@ export async function stopCheckGuard(_input: HookInput, cwd: string): Promise<Gu
   } catch { /* not a git repo */ }
 
   // Check for unpushed commits
-  try {
-    const unpushed = execSync('git log @{u}..HEAD --oneline 2>/dev/null', { cwd: gitDir, encoding: 'utf8' }).trim();
-    if (unpushed) {
-      const lines = unpushed.split('\n').filter(Boolean);
-      if (lines.length > 0) {
-        blockingIssues.push(`${lines.length} unpushed commit${lines.length === 1 ? '' : 's'}`);
+  // Skip if HEAD is already on origin/main (e.g., after squash merge + reset)
+  // The tracking branch (@{u}) may be stale after squash merges, causing false positives
+  if (!headIsOnMain(gitDir)) {
+    try {
+      const unpushed = execSync('git log @{u}..HEAD --oneline 2>/dev/null', { cwd: gitDir, encoding: 'utf8' }).trim();
+      if (unpushed) {
+        const lines = unpushed.split('\n').filter(Boolean);
+        if (lines.length > 0) {
+          blockingIssues.push(`${lines.length} unpushed commit${lines.length === 1 ? '' : 's'}`);
+        }
       }
-    }
-  } catch { /* no upstream */ }
+    } catch { /* no upstream */ }
+  }
 
   // Blocking issues take priority — but downgrade to warning if changes belong to another context
   if (blockingIssues.length > 0) {
