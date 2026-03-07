@@ -56,6 +56,11 @@ function createMockStore(): SlopeStore & { sessions: SlopeSession[]; claims: Spr
     async getEventsByTicket() { return []; },
     async getSchemaVersion() { return 3; },
     async getStats() { return { sessions: sessions.length, claims: claims.length, scorecards: 0, events: 0, lastEventAt: null }; },
+    async createTestingSession(s) { return { id: `tsess-${Date.now()}`, started_at: new Date().toISOString() }; },
+    async endTestingSession() { return { ended_at: new Date().toISOString(), finding_count: 0 }; },
+    async getActiveTestingSession() { return null; },
+    async addTestingFinding() { return { id: `tfind-${Date.now()}` }; },
+    async getTestingFindings() { return []; },
     close() {},
   };
 }

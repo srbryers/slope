@@ -12,6 +12,7 @@ type SprintState =
   | { type: 'sprint-complete'; sprintNumber: number }
   | { type: 'needs-review'; sprintNumber: number }
   | { type: 'needs-amend'; sprintNumber: number; findingCount: number }
+  | { type: 'testing-active' }
   | { type: 'between-sprints'; roadmapContext?: string };
 
 /**
@@ -71,11 +72,17 @@ export async function detectSprintState(cwd: string): Promise<SprintState> {
     return buildBetweenSprints(config, cwd, sprintState.sprint);
   }
 
-  // Try store first for active claims
+  // Try store for active testing session + claims (single connection)
   let claimsFromStore: { sprint_number: number; target: string }[] | null = null;
   try {
     const store = await resolveStore(cwd);
     try {
+      // Check for active testing session
+      const testingSession = await store.getActiveTestingSession();
+      if (testingSession) {
+        return { type: 'testing-active' };
+      }
+
       const claims = await store.getActiveClaims();
       if (claims.length > 0) {
         const sprintNumber = Math.max(...claims.map(c => c.sprint_number));
@@ -246,6 +253,20 @@ export function buildSuggestions(state: SprintState): string {
         'Present these using AskUserQuestion. If the user chooses to end the session, stop without further action.',
       ].join('\n');
     }
+
+    case 'testing-active':
+      return [
+        header,
+        '',
+        'Current state: Testing session active',
+        '',
+        'Suggested options:',
+        '1. Continue testing',
+        '2. End testing session (testing_session_end)',
+        '3. End session — nothing more to do right now',
+        '',
+        'Present these using AskUserQuestion.',
+      ].join('\n');
 
     case 'between-sprints': {
       const contextLine = state.roadmapContext

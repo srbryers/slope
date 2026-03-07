@@ -11,6 +11,7 @@ vi.spyOn(process, 'cwd').mockImplementation(() => tmpDir);
 
 // Mock resolveStore — default: no store available
 const mockStore = {
+  getActiveTestingSession: vi.fn().mockResolvedValue(null),
   getActiveClaims: vi.fn().mockResolvedValue([]),
   close: vi.fn(),
 };

@@ -120,6 +120,33 @@ const MIGRATIONS: Array<{ version: number; sql: string }> = [
       CREATE INDEX IF NOT EXISTS idx_embeddings_model ON embeddings(model);
     `,
   },
+  {
+    version: 5,
+    sql: `
+      CREATE TABLE IF NOT EXISTS testing_sessions (
+        id TEXT PRIMARY KEY,
+        branch TEXT,
+        sprint INTEGER,
+        purpose TEXT,
+        worktree_path TEXT,
+        branch_name TEXT,
+        started_at TEXT NOT NULL,
+        ended_at TEXT,
+        status TEXT NOT NULL DEFAULT 'active'
+      );
+
+      CREATE TABLE IF NOT EXISTS testing_findings (
+        id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL REFERENCES testing_sessions(id) ON DELETE CASCADE,
+        description TEXT NOT NULL,
+        severity TEXT NOT NULL DEFAULT 'medium',
+        ticket TEXT,
+        created_at TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_testing_findings_session ON testing_findings(session_id);
+    `,
+  },
 ];
 
 /** Latest schema version — total number of migrations available. */
@@ -452,6 +479,68 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
     const rows = this.db.prepare('SELECT * FROM events WHERE ticket_key = ? ORDER BY timestamp')
       .all(ticketKey) as Array<Record<string, unknown>>;
     return rows.map(rowToEvent);
+  }
+
+  // --- Testing Sessions ---
+
+  async createTestingSession(session: { branch?: string; sprint?: number; purpose?: string; worktree_path?: string; branch_name?: string }): Promise<{ id: string; started_at: string }> {
+    const id = generateId('tsess');
+    const started_at = nowISO();
+    this.db.prepare(`
+      INSERT INTO testing_sessions (id, branch, sprint, purpose, worktree_path, branch_name, started_at, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'active')
+    `).run(id, session.branch ?? null, session.sprint ?? null, session.purpose ?? null, session.worktree_path ?? null, session.branch_name ?? null, started_at);
+    return { id, started_at };
+  }
+
+  async endTestingSession(sessionId: string): Promise<{ ended_at: string; finding_count: number; worktree_path?: string; branch_name?: string }> {
+    const ended_at = nowISO();
+    const row = this.db.prepare('SELECT worktree_path, branch_name FROM testing_sessions WHERE id = ? AND status = ?').get(sessionId, 'active') as { worktree_path: string | null; branch_name: string | null } | undefined;
+    if (!row) {
+      throw new SlopeStoreError('NOT_FOUND', `Active testing session "${sessionId}" not found`);
+    }
+    this.db.prepare('UPDATE testing_sessions SET status = ?, ended_at = ? WHERE id = ?').run('ended', ended_at, sessionId);
+    const countRow = this.db.prepare('SELECT COUNT(*) as c FROM testing_findings WHERE session_id = ?').get(sessionId) as { c: number };
+    return {
+      ended_at,
+      finding_count: countRow.c,
+      worktree_path: row.worktree_path ?? undefined,
+      branch_name: row.branch_name ?? undefined,
+    };
+  }
+
+  async getActiveTestingSession(): Promise<{ id: string; branch?: string; sprint?: number; purpose?: string; worktree_path?: string; branch_name?: string; started_at: string } | null> {
+    const row = this.db.prepare('SELECT * FROM testing_sessions WHERE status = ? ORDER BY started_at DESC LIMIT 1').get('active') as Record<string, unknown> | undefined;
+    if (!row) return null;
+    return {
+      id: row.id as string,
+      branch: (row.branch as string | null) ?? undefined,
+      sprint: (row.sprint as number | null) ?? undefined,
+      purpose: (row.purpose as string | null) ?? undefined,
+      worktree_path: (row.worktree_path as string | null) ?? undefined,
+      branch_name: (row.branch_name as string | null) ?? undefined,
+      started_at: row.started_at as string,
+    };
+  }
+
+  async addTestingFinding(finding: { session_id: string; description: string; severity?: string; ticket?: string }): Promise<{ id: string }> {
+    const id = generateId('tfind');
+    this.db.prepare(`
+      INSERT INTO testing_findings (id, session_id, description, severity, ticket, created_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(id, finding.session_id, finding.description, finding.severity ?? 'medium', finding.ticket ?? null, nowISO());
+    return { id };
+  }
+
+  async getTestingFindings(sessionId: string): Promise<Array<{ id: string; description: string; severity: string; ticket?: string; created_at: string }>> {
+    const rows = this.db.prepare('SELECT * FROM testing_findings WHERE session_id = ? ORDER BY created_at').all(sessionId) as Array<Record<string, unknown>>;
+    return rows.map(r => ({
+      id: r.id as string,
+      description: r.description as string,
+      severity: r.severity as string,
+      ticket: (r.ticket as string | null) ?? undefined,
+      created_at: r.created_at as string,
+    }));
   }
 
   // --- Embeddings ---

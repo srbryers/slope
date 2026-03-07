@@ -63,6 +63,13 @@ export interface SlopeStore extends SprintRegistry {
   getEventsBySprint(sprintNumber: number): Promise<SlopeEvent[]>;
   getEventsByTicket(ticketKey: string): Promise<SlopeEvent[]>;
 
+  // Testing sessions
+  createTestingSession(session: { branch?: string; sprint?: number; purpose?: string; worktree_path?: string; branch_name?: string }): Promise<{ id: string; started_at: string }>;
+  endTestingSession(sessionId: string): Promise<{ ended_at: string; finding_count: number; worktree_path?: string; branch_name?: string }>;
+  getActiveTestingSession(): Promise<{ id: string; branch?: string; sprint?: number; purpose?: string; worktree_path?: string; branch_name?: string; started_at: string } | null>;
+  addTestingFinding(finding: { session_id: string; description: string; severity?: string; ticket?: string }): Promise<{ id: string }>;
+  getTestingFindings(sessionId: string): Promise<Array<{ id: string; description: string; severity: string; ticket?: string; created_at: string }>>;
+
   // Diagnostics
   getSchemaVersion(): Promise<number>;
   getStats(): Promise<StoreStats>;
