@@ -58,19 +58,6 @@ export async function nextActionGuard(input: HookInput, cwd: string): Promise<Gu
 
 /** Detect current sprint state via store then filesystem fallback */
 export async function detectSprintState(cwd: string): Promise<SprintState> {
-  // Check for active testing session
-  try {
-    const store = await resolveStore(cwd);
-    try {
-      const testingSession = await store.getActiveTestingSession();
-      if (testingSession) {
-        return { type: 'testing-active' };
-      }
-    } finally {
-      store.close();
-    }
-  } catch { /* store unavailable — continue */ }
-
   // If sprint-state.json exists and sprint is active, defer to sprint-completion guard.
   // That guard handles the hard block on Stop with gate-level detail.
   // next-action returns between-sprints to avoid duplicate messaging.
@@ -85,11 +72,17 @@ export async function detectSprintState(cwd: string): Promise<SprintState> {
     return buildBetweenSprints(config, cwd, sprintState.sprint);
   }
 
-  // Try store first for active claims
+  // Try store for active testing session + claims (single connection)
   let claimsFromStore: { sprint_number: number; target: string }[] | null = null;
   try {
     const store = await resolveStore(cwd);
     try {
+      // Check for active testing session
+      const testingSession = await store.getActiveTestingSession();
+      if (testingSession) {
+        return { type: 'testing-active' };
+      }
+
       const claims = await store.getActiveClaims();
       if (claims.length > 0) {
         const sprintNumber = Math.max(...claims.map(c => c.sprint_number));

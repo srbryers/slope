@@ -2,13 +2,17 @@
 /**
  * @slope-dev/slope — Code-mode MCP server for SLOPE.
  *
- * Exposes up to 6 tools:
+ * Exposes up to 10 tools:
  *   search()           — discover the SLOPE API (functions, types, constants)
  *   execute()          — run JS in a sandboxed node:vm with the full API pre-injected
  *   session_status()   — show active sessions and claims (requires store)
  *   acquire_claim()    — claim a ticket/area (requires store)
  *   check_conflicts()  — detect overlapping claims (requires store)
  *   store_status()     — check store health, schema version, stats (requires store)
+ *   testing_session_start()   — start a testing session with worktree (requires store)
+ *   testing_session_finding() — record a finding during testing (requires store)
+ *   testing_session_end()     — end session, return summary, cleanup (requires store)
+ *   testing_session_status()  — show active session and findings (requires store)
  *
  * Usage:
  *   npx @slope-dev/slope              # stdio transport
@@ -331,12 +335,15 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
 
           execSync(`git worktree add ${JSON.stringify(worktreePath)} -b ${branchName} origin/${baseBranch}`, { cwd: projectRoot, timeout: 30000 });
 
-          // Mirror .slope directory for store access
+          // Mirror .slope config files (exclude DB files to avoid split-brain)
           const slopeDir = join(projectRoot, '.slope');
           const wtSlopeDir = join(worktreePath, '.slope');
           const { cpSync } = await import('node:fs');
           if (existsSync(slopeDir)) {
-            cpSync(slopeDir, wtSlopeDir, { recursive: true });
+            cpSync(slopeDir, wtSlopeDir, {
+              recursive: true,
+              filter: (src: string) => !src.match(/\.db(-wal|-shm)?$|\.db$/),
+            });
           }
         } catch (err) {
           return {
@@ -474,7 +481,7 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
           try {
             execSync(`git worktree remove ${JSON.stringify(result.worktree_path)} --force 2>/dev/null`, { cwd: projectRoot, timeout: 15000 });
             if (result.branch_name) {
-              execSync(`git branch -D ${result.branch_name} 2>/dev/null`, { cwd: projectRoot, timeout: 5000 });
+              execSync(`git branch -d ${JSON.stringify(result.branch_name)} 2>/dev/null`, { cwd: projectRoot, timeout: 5000 });
             }
             execSync('git worktree prune 2>/dev/null', { cwd: projectRoot, timeout: 5000 });
             cleanupStatus = 'success';
