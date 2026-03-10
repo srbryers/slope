@@ -872,6 +872,13 @@ export const SLOPE_REGISTRY: FunctionRegistryEntry[] = [
     signature: 'testing_session_status()',
     example: 'Call via MCP: testing_session_status()',
   },
+  {
+    name: 'testing_plan_status',
+    module: 'testing',
+    description: 'Show test plan coverage summary: tested, untested, stale, and issue counts per section. Reads the markdown test plan configured in .slope/config.json testing.testPlanPath.',
+    signature: 'testing_plan_status()',
+    example: 'Call via MCP: testing_plan_status()',
+  },
 ];
 
 /**

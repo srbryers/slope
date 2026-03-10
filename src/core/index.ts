@@ -183,6 +183,10 @@ export type {
 export type { SlopeConfig } from './config.js';
 export { loadConfig, createConfig, saveConfig, resolveConfigPath } from './config.js';
 
+// Test Plan
+export { parseTestPlan, getTestPlanSummary, getAreasNeedingTest } from './test-plan.js';
+export type { TestPlanArea, TestPlanSection, TestPlanSummary, ParsedTestPlan } from './test-plan.js';
+
 // Loader
 export { loadScorecards, detectLatestSprint, resolveCurrentSprint } from './loader.js';
 

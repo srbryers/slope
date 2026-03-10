@@ -63,6 +63,8 @@ export interface SlopeConfig {
   testing?: {
     setup_steps?: string[];
     teardown_steps?: string[];
+    testPlanPath?: string;
+    sessionLogDir?: string;
   };
 }
 
