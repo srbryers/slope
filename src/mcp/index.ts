@@ -13,6 +13,7 @@
  *   testing_session_finding() — record a finding during testing (requires store)
  *   testing_session_end()     — end session, return summary, cleanup (requires store)
  *   testing_session_status()  — show active session and findings (requires store)
+ *   testing_plan_status()     — test plan coverage summary (requires store)
  *
  * Usage:
  *   npx @slope-dev/slope              # stdio transport
@@ -27,12 +28,12 @@ import { z } from 'zod';
 import { SLOPE_REGISTRY, SLOPE_TYPES } from './registry.js';
 import { runInSandbox } from './sandbox.js';
 import type { SlopeStore } from '../core/index.js';
-import { checkConflicts, loadFlows, checkFlowStaleness, checkStoreHealth, METAPHOR_SCHEMA, listMetaphors, buildInterviewContext, generateInterviewSteps, loadConfig } from '../core/index.js';
+import { checkConflicts, loadFlows, checkFlowStaleness, checkStoreHealth, METAPHOR_SCHEMA, listMetaphors, buildInterviewContext, generateInterviewSteps, loadConfig, parseTestPlan, getAreasNeedingTest } from '../core/index.js';
 import { gaming } from '../core/metaphors/gaming.js';
 import type { ClaimScope, FlowsFile, FlowDefinition } from '../core/index.js';
 
 /** Tool names exposed by this MCP server (for tests and tool discovery). */
-export const SLOPE_MCP_TOOL_NAMES = ['search', 'execute', 'session_status', 'acquire_claim', 'check_conflicts', 'store_status', 'testing_session_start', 'testing_session_finding', 'testing_session_end', 'testing_session_status'] as const;
+export const SLOPE_MCP_TOOL_NAMES = ['search', 'execute', 'session_status', 'acquire_claim', 'check_conflicts', 'store_status', 'testing_session_start', 'testing_session_finding', 'testing_session_end', 'testing_session_status', 'testing_plan_status'] as const;
 
 /** Detection results for hook/settings activation status. */
 export interface SetupHints {
@@ -367,8 +368,9 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
           branch_name: branchName,
         });
 
-        // Load config for setup steps
+        // Load config for setup steps + test plan
         let setupSteps: string[] = [];
+        let testPlanData: Record<string, unknown> | undefined;
         try {
           const config = loadConfig(projectRoot);
           if (config.testing?.setup_steps) {
@@ -376,7 +378,41 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
               step.replace(/\{projectRoot\}/g, projectRoot).replace(/\{worktreeRoot\}/g, worktreePath),
             );
           }
+          // Read test plan if configured
+          if (config.testing?.testPlanPath) {
+            const planPath = join(projectRoot, config.testing.testPlanPath);
+            if (existsSync(planPath)) {
+              const planMarkdown = readFileSync(planPath, 'utf8');
+              const parsed = parseTestPlan(planMarkdown);
+              const needsTest = getAreasNeedingTest(parsed.sections);
+              testPlanData = {
+                path: config.testing.testPlanPath,
+                summary: parsed.summary,
+                areas_needing_test: needsTest,
+              };
+            }
+          }
         } catch { /* no config — no setup steps */ }
+
+        // Build test plan prompt section
+        let testPlanPrompt = '';
+        if (testPlanData) {
+          const summary = testPlanData.summary as { total: number; untested: number; passed: number; issues: number; stale: number; fixed: number };
+          const needs = testPlanData.areas_needing_test as Array<{ section: string; area: string; status: string }>;
+          testPlanPrompt = `\n\n**Test Plan Coverage:** ${summary.passed} passed / ${summary.total} total (${summary.untested} untested, ${summary.stale} stale, ${summary.fixed} needs re-test)\n\n`;
+          if (needs.length > 0) {
+            testPlanPrompt += 'Suggested focus areas:\n';
+            // Group by section
+            const grouped = new Map<string, Array<{ area: string; status: string }>>();
+            for (const n of needs) {
+              if (!grouped.has(n.section)) grouped.set(n.section, []);
+              grouped.get(n.section)!.push({ area: n.area, status: n.status });
+            }
+            for (const [section, areas] of grouped) {
+              testPlanPrompt += `- **${section}:** ${areas.map(a => `${a.area} (${a.status})`).join(', ')}\n`;
+            }
+          }
+        }
 
         const response: Record<string, unknown> = {
           session_id: session.id,
@@ -384,12 +420,14 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
           worktree_path: worktreePath,
           branch_name: branchName,
           setup_steps: setupSteps,
+          test_plan: testPlanData,
           prompt: `Testing session started. The testing worktree is at: ${worktreePath}\n\n` +
             (setupSteps.length > 0
               ? `Walk the user through these setup steps in the worktree:\n${setupSteps.map((s, i) => `${i + 1}. ${s}`).join('\n')}\n\n`
               : '') +
             'Once setup is complete, the user can begin testing. Use testing_session_finding to record any bugs or observations found during testing.\n' +
-            'When done testing, remind the user to run any teardown steps BEFORE calling testing_session_end.',
+            'When done testing, remind the user to run any teardown steps BEFORE calling testing_session_end.' +
+            testPlanPrompt,
         };
 
         return { content: [{ type: 'text' as const, text: JSON.stringify(response, null, 2) }] };
@@ -460,9 +498,10 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
         // End session in store
         const result = await store.endTestingSession(sessionId);
 
-        // Load teardown steps
+        // Load teardown steps + test plan info
         let teardownSteps: string[] = [];
         let projectRoot: string;
+        let testPlanUpdatePrompt = '';
         try {
           projectRoot = findProjectRoot(process.cwd());
           const config = loadConfig(projectRoot);
@@ -470,6 +509,30 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
             teardownSteps = config.testing.teardown_steps.map(step =>
               step.replace(/\{projectRoot\}/g, projectRoot).replace(/\{worktreeRoot\}/g, result.worktree_path ?? ''),
             );
+          }
+          // Read test plan for update instructions
+          if (config.testing?.testPlanPath) {
+            const planPath = join(projectRoot, config.testing.testPlanPath);
+            if (existsSync(planPath)) {
+              const planMarkdown = readFileSync(planPath, 'utf8');
+              const parsed = parseTestPlan(planMarkdown);
+              const today = new Date().toISOString().slice(0, 10);
+              const sessionLogDir = config.testing.sessionLogDir ?? 'docs/testing/sessions';
+              const sessionLogFile = `${sessionLogDir}/${today}-session.md`;
+
+              testPlanUpdatePrompt = `\n\n**Test plan update required** (\`${config.testing.testPlanPath}\`):\n` +
+                `Update the tested areas in the markdown table:\n` +
+                `- Set Status to \`passed\` (no findings) or \`issues\` (has findings)\n` +
+                `- Set Last Tested to \`${today}\`\n` +
+                `- Add notes referencing the session log file\n\n` +
+                `**Create session log** at \`${sessionLogFile}\` with:\n` +
+                `- Date, focus areas, device info\n` +
+                `- All findings listed with severity\n` +
+                `- Resolution status for each finding\n\n` +
+                `**Update session log table** at the bottom of \`${config.testing.testPlanPath}\`:\n` +
+                `Add a row with: session number, date (${today}), focus areas, finding count, and session file path.\n\n` +
+                `Current coverage: ${parsed.summary.passed} passed / ${parsed.summary.total} total`;
+            }
           }
         } catch {
           projectRoot = process.cwd();
@@ -509,12 +572,13 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
           })),
           teardown_steps: teardownSteps,
           worktree_cleanup: cleanupStatus,
-          prompt: result.finding_count > 0
+          prompt: (result.finding_count > 0
             ? `Testing session ended with ${result.finding_count} finding(s). Suggested next actions:\n` +
               '1. File issues for critical/high findings\n' +
               '2. Start a sprint to fix the bugs found\n' +
               '3. Add findings to the backlog'
-            : 'Testing session ended with no findings. Clean run!',
+            : 'Testing session ended with no findings. Clean run!') +
+            testPlanUpdatePrompt,
         };
 
         return { content: [{ type: 'text' as const, text: JSON.stringify(response, null, 2) }] };
@@ -538,6 +602,60 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
           session,
           findings,
           finding_count: findings.length,
+        };
+
+        return { content: [{ type: 'text' as const, text: JSON.stringify(response, null, 2) }] };
+      },
+    );
+
+    server.tool(
+      'testing_plan_status',
+      'Show test plan coverage summary: how many areas are tested, untested, stale, or have issues. Does not require an active testing session.',
+      {},
+      async () => {
+        let projectRoot: string;
+        try {
+          projectRoot = findProjectRoot(process.cwd());
+        } catch {
+          projectRoot = process.cwd();
+        }
+
+        const config = loadConfig(projectRoot);
+        if (!config.testing?.testPlanPath) {
+          return {
+            content: [{ type: 'text' as const, text: JSON.stringify({ error: 'No testing.testPlanPath configured in .slope/config.json' }, null, 2) }],
+            isError: true,
+          };
+        }
+
+        const planPath = join(projectRoot, config.testing.testPlanPath);
+        if (!existsSync(planPath)) {
+          return {
+            content: [{ type: 'text' as const, text: JSON.stringify({ error: `Test plan not found at ${config.testing.testPlanPath}` }, null, 2) }],
+            isError: true,
+          };
+        }
+
+        const planMarkdown = readFileSync(planPath, 'utf8');
+        const parsed = parseTestPlan(planMarkdown);
+        const needsTest = getAreasNeedingTest(parsed.sections);
+
+        const response = {
+          path: config.testing.testPlanPath,
+          summary: parsed.summary,
+          sections: parsed.sections.map(s => ({
+            name: s.name,
+            total: s.areas.length,
+            passed: s.areas.filter(a => a.status === 'passed').length,
+            untested: s.areas.filter(a => a.status === 'untested').length,
+            issues: s.areas.filter(a => a.status === 'issues').length,
+          })),
+          areas_needing_test: needsTest,
+          prompt: `Test plan coverage: ${parsed.summary.passed}/${parsed.summary.total} passed` +
+            (parsed.summary.untested > 0 ? `, ${parsed.summary.untested} untested` : '') +
+            (parsed.summary.stale > 0 ? `, ${parsed.summary.stale} stale` : '') +
+            (parsed.summary.issues > 0 ? `, ${parsed.summary.issues} with issues` : '') +
+            (parsed.summary.fixed > 0 ? `, ${parsed.summary.fixed} fixed (needs re-test)` : ''),
         };
 
         return { content: [{ type: 'text' as const, text: JSON.stringify(response, null, 2) }] };
