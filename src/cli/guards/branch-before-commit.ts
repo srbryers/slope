@@ -2,9 +2,25 @@ import { execSync } from 'node:child_process';
 import type { HookInput, GuardResult } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 
+const DEFAULT_PROTECTED = ['main', 'master'];
+
+/**
+ * Extract commit message from a command string.
+ * Handles inline -m "...", -m '...', and heredoc -m "$(cat <<'EOF'...EOF)"
+ */
+function extractCommitMessage(command: string): string | undefined {
+  // Try heredoc pattern first: -m "$(cat <<'EOF'\n...\nEOF\n)"
+  const heredocMatch = command.match(/-m\s+"?\$\(cat\s+<<'?EOF'?\s*\n([\s\S]*?)\nEOF\s*\)"/);
+  if (heredocMatch) return heredocMatch[1].trim();
+
+  // Inline -m "..." or -m '...'
+  const inlineMatch = command.match(/-m\s+(?:"([^"]+)"|'([^']+)')/);
+  return inlineMatch?.[1] ?? inlineMatch?.[2];
+}
+
 /**
  * Branch-before-commit guard: fires PreToolUse on Bash.
- * Blocks `git commit` on main/master — create a feature branch first.
+ * Blocks `git commit` on protected branches — create a feature branch first.
  */
 export async function branchBeforeCommitGuard(input: HookInput, cwd: string): Promise<GuardResult> {
   const command = (input.tool_input?.command as string) ?? '';
@@ -21,16 +37,17 @@ export async function branchBeforeCommitGuard(input: HookInput, cwd: string): Pr
     return {};
   }
 
-  // Only block on main/master (HEAD means initial repo with no commits)
-  if (branch !== 'main' && branch !== 'master') return {};
+  // Check against protected branches (configurable, default: main/master)
+  const config = loadConfig();
+  const protectedBranches = config.guidance?.protectedBranches ?? DEFAULT_PROTECTED;
+
+  // HEAD means initial repo with no commits — allow
+  if (!protectedBranches.includes(branch)) return {};
 
   // Check allowMainCommitPatterns — let allowlisted messages through
-  const config = loadConfig();
   const patterns = config.guidance?.allowMainCommitPatterns;
   if (patterns && patterns.length > 0) {
-    // Extract commit message from -m "..." or -m '...'
-    const msgMatch = command.match(/-m\s+(?:"([^"]+)"|'([^']+)')/);
-    const message = msgMatch?.[1] ?? msgMatch?.[2];
+    const message = extractCommitMessage(command);
     if (message) {
       for (const pat of patterns) {
         if (new RegExp(pat).test(message)) return {};

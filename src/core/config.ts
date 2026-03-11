@@ -34,6 +34,7 @@ export interface SlopeConfig {
     pushCommitThreshold?: number;
     handoffsDir?: string;
     allowMainCommitPatterns?: string[];
+    protectedBranches?: string[];
   };
   orchestration?: {
     escalation?: EscalationConfig;
