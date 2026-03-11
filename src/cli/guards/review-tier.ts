@@ -58,8 +58,16 @@ export async function reviewTierGuard(input: HookInput, cwd: string): Promise<Gu
   let rounds: number;
 
   if (isResearchOrDocs || ticketCount === 0) {
-    tier = 'Skip';
-    rounds = 0;
+    // Skip tier — inform but don't block (no review needed)
+    const reviewState: ReviewState = {
+      rounds_required: 0,
+      rounds_completed: 0,
+      plan_file: plan.path,
+      tier: 'skip',
+      started_at: new Date().toISOString(),
+    };
+    saveReviewState(cwd, reviewState);
+    return { context: `SLOPE plan-review: Plan detected with ${ticketCount} tickets. Tier: Skip (no review needed).` };
   } else if (ticketCount <= 2 && packageRefs <= 1) {
     tier = 'Light';
     rounds = 1;
@@ -114,7 +122,7 @@ export async function reviewTierGuard(input: HookInput, cwd: string): Promise<Gu
   }
 
   lines.push('');
-  lines.push('IMPORTANT: You MUST now ask the user how they want to handle the plan review using AskUserQuestion.');
+  lines.push('You MUST now ask the user how they want to handle the plan review using AskUserQuestion.');
   lines.push('Present these options:');
   lines.push(`1. Architect + ${specialistList} review (Recommended)`);
   lines.push('2. Architect review only');
@@ -144,7 +152,7 @@ export async function reviewTierGuard(input: HookInput, cwd: string): Promise<Gu
   };
   saveReviewState(cwd, reviewState);
 
-  return { context: lines.join('\n') };
+  return { blockReason: lines.join('\n') };
 }
 
 /**

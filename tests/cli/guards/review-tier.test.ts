@@ -86,12 +86,13 @@ describe('reviewTierGuard', () => {
     expect(result).toEqual({});
   });
 
-  it('suggests Skip for plan with 0 tickets', async () => {
+  it('suggests Skip for plan with 0 tickets (context, not block)', async () => {
     const planPath = writePlan('# Research Spike\n\nJust exploring ideas.');
     const input = makeInput(planPath);
     const result = await reviewTierGuard(input, TMP);
     expect(result.context).toContain('0 tickets');
     expect(result.context).toContain('Skip');
+    expect(result.blockReason).toBeUndefined();
   });
 
   it('suggests Light for plan with 2 tickets, single package', async () => {
@@ -104,8 +105,8 @@ describe('reviewTierGuard', () => {
     ].join('\n'));
     const input = makeInput(planPath);
     const result = await reviewTierGuard(input, TMP);
-    expect(result.context).toContain('2 tickets');
-    expect(result.context).toContain('Light');
+    expect(result.blockReason).toContain('2 tickets');
+    expect(result.blockReason).toContain('Light');
   });
 
   it('suggests Standard for plan with 3 tickets, multi-package', async () => {
@@ -120,8 +121,8 @@ describe('reviewTierGuard', () => {
     ].join('\n'));
     const input = makeInput(planPath);
     const result = await reviewTierGuard(input, TMP);
-    expect(result.context).toContain('3 tickets');
-    expect(result.context).toContain('Standard');
+    expect(result.blockReason).toContain('3 tickets');
+    expect(result.blockReason).toContain('Standard');
   });
 
   it('suggests Deep for plan with 5+ tickets', async () => {
@@ -135,8 +136,8 @@ describe('reviewTierGuard', () => {
     ].join('\n'));
     const input = makeInput(planPath);
     const result = await reviewTierGuard(input, TMP);
-    expect(result.context).toContain('5 tickets');
-    expect(result.context).toContain('Deep');
+    expect(result.blockReason).toContain('5 tickets');
+    expect(result.blockReason).toContain('Deep');
   });
 
   it('includes specialist reviewers in context', async () => {
@@ -151,7 +152,7 @@ describe('reviewTierGuard', () => {
     ].join('\n'));
     const input = makeInput(planPath);
     const result = await reviewTierGuard(input, TMP);
-    expect(result.context).toContain('Recommended reviewers: architect +');
+    expect(result.blockReason).toContain('Recommended reviewers: architect +');
   });
 
   it('includes AskUserQuestion instruction', async () => {
@@ -162,10 +163,10 @@ describe('reviewTierGuard', () => {
     ].join('\n'));
     const input = makeInput(planPath);
     const result = await reviewTierGuard(input, TMP);
-    expect(result.context).toContain('AskUserQuestion');
-    expect(result.context).toContain('Architect review only');
-    expect(result.context).toContain('Custom reviewers');
-    expect(result.context).toContain('Skip review');
+    expect(result.blockReason).toContain('AskUserQuestion');
+    expect(result.blockReason).toContain('Architect review only');
+    expect(result.blockReason).toContain('Custom reviewers');
+    expect(result.blockReason).toContain('Skip review');
   });
 
   it('includes relevant gotchas when common issues exist', async () => {
@@ -185,8 +186,8 @@ describe('reviewTierGuard', () => {
     ].join('\n'));
     const input = makeInput(planPath);
     const result = await reviewTierGuard(input, TMP);
-    expect(result.context).toContain('Relevant gotchas');
-    expect(result.context).toContain('Guard hook timeout');
+    expect(result.blockReason).toContain('Relevant gotchas');
+    expect(result.blockReason).toContain('Guard hook timeout');
   });
 
   it('caps gotchas at 5 entries', async () => {
@@ -205,8 +206,8 @@ describe('reviewTierGuard', () => {
     ].join('\n'));
     const input = makeInput(planPath);
     const result = await reviewTierGuard(input, TMP);
-    if (result.context) {
-      const gotchaLines = result.context.split('\n').filter(l => l.trim().startsWith('- ['));
+    if (result.blockReason) {
+      const gotchaLines = result.blockReason.split('\n').filter(l => l.trim().startsWith('- ['));
       expect(gotchaLines.length).toBeLessThanOrEqual(5);
     }
   });
@@ -219,8 +220,8 @@ describe('reviewTierGuard', () => {
     ].join('\n'));
     const input = makeInput(planPath);
     const result = await reviewTierGuard(input, TMP);
-    expect(result.context).toBeDefined();
-    expect(result.context).not.toContain('gotchas');
+    expect(result.blockReason).toBeDefined();
+    expect(result.blockReason).not.toContain('gotchas');
   });
 
   it('returns empty when review-state already meets tier', async () => {
@@ -245,7 +246,7 @@ describe('reviewTierGuard', () => {
     ].join('\n'));
     const input = makeInput(planPath);
     const result = await reviewTierGuard(input, TMP);
-    expect(result.context).toContain('3 tickets');
+    expect(result.blockReason).toContain('3 tickets');
   });
 
   it('reads plan from tool_input.file_path outside cwd (global plans dir)', async () => {
@@ -262,8 +263,8 @@ describe('reviewTierGuard', () => {
     // file_path points to global dir, not {cwd}/.claude/plans/
     const input = makeInput(globalPlanPath);
     const result = await reviewTierGuard(input, TMP);
-    expect(result.context).toContain('2 tickets');
-    expect(result.context).toContain('Light');
+    expect(result.blockReason).toContain('2 tickets');
+    expect(result.blockReason).toContain('Light');
   });
 
   it('falls back to findPlanContent when tool_input.file_path is unreadable', async () => {
@@ -278,8 +279,8 @@ describe('reviewTierGuard', () => {
     // Point file_path to a non-existent file — should fall back to findPlanContent
     const input = makeInput(join(TMP, '.claude', 'plans', 'does-not-exist.md'));
     const result = await reviewTierGuard(input, TMP);
-    expect(result.context).toContain('3 tickets');
-    expect(result.context).toContain('Standard');
+    expect(result.blockReason).toContain('3 tickets');
+    expect(result.blockReason).toContain('Standard');
   });
 
   it('returns empty when file_path is unreadable and no plan exists anywhere', async () => {
