@@ -58,8 +58,16 @@ export async function reviewTierGuard(input: HookInput, cwd: string): Promise<Gu
   let rounds: number;
 
   if (isResearchOrDocs || ticketCount === 0) {
-    tier = 'Skip';
-    rounds = 0;
+    // Skip tier — inform but don't block (no review needed)
+    const reviewState: ReviewState = {
+      rounds_required: 0,
+      rounds_completed: 0,
+      plan_file: plan.path,
+      tier: 'skip',
+      started_at: new Date().toISOString(),
+    };
+    saveReviewState(cwd, reviewState);
+    return { context: `SLOPE plan-review: Plan detected with ${ticketCount} tickets. Tier: Skip (no review needed).` };
   } else if (ticketCount <= 2 && packageRefs <= 1) {
     tier = 'Light';
     rounds = 1;

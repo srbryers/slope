@@ -86,12 +86,13 @@ describe('reviewTierGuard', () => {
     expect(result).toEqual({});
   });
 
-  it('suggests Skip for plan with 0 tickets', async () => {
+  it('suggests Skip for plan with 0 tickets (context, not block)', async () => {
     const planPath = writePlan('# Research Spike\n\nJust exploring ideas.');
     const input = makeInput(planPath);
     const result = await reviewTierGuard(input, TMP);
-    expect(result.blockReason).toContain('0 tickets');
-    expect(result.blockReason).toContain('Skip');
+    expect(result.context).toContain('0 tickets');
+    expect(result.context).toContain('Skip');
+    expect(result.blockReason).toBeUndefined();
   });
 
   it('suggests Light for plan with 2 tickets, single package', async () => {
