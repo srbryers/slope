@@ -5,6 +5,7 @@ import {
 } from '../../src/core/docs.js';
 import type { DocsManifestInput, ChangelogSection } from '../../src/core/docs.js';
 import { CLI_COMMAND_REGISTRY } from '../../src/cli/registry.js';
+import { MCP_TOOL_REGISTRY } from '../../src/mcp/registry.js';
 import { GUARD_DEFINITIONS } from '../../src/core/guard.js';
 
 // Ensure built-in metaphors are registered
@@ -16,6 +17,7 @@ function makeInput(overrides?: Partial<DocsManifestInput>): DocsManifestInput {
     gitSha: 'abc123',
     changelog: { status: 'success', entries: [] },
     commands: CLI_COMMAND_REGISTRY,
+    mcpTools: MCP_TOOL_REGISTRY,
     ...overrides,
   };
 }
@@ -168,5 +170,39 @@ describe('buildDocsManifest', () => {
     const manifest = buildDocsManifest(makeInput());
     expect(manifest.checksums.changelog).toBeTruthy();
     expect(manifest.checksums.changelog).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it('includes mcpTools when provided', () => {
+    const manifest = buildDocsManifest(makeInput());
+    expect(manifest.mcpTools.length).toBe(MCP_TOOL_REGISTRY.length);
+    expect(manifest.checksums.mcpTools).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it('defaults mcpTools to empty array when not provided', () => {
+    const manifest = buildDocsManifest(makeInput({ mcpTools: undefined }));
+    expect(manifest.mcpTools).toEqual([]);
+    expect(manifest.checksums.mcpTools).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it('commands with subcommands have valid structure', () => {
+    const withSubs = CLI_COMMAND_REGISTRY.filter(c => c.subcommands);
+    expect(withSubs.length).toBeGreaterThan(0);
+    for (const cmd of withSubs) {
+      for (const sub of cmd.subcommands!) {
+        expect(sub.name.length).toBeGreaterThan(0);
+        expect(sub.desc.length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('commands with flags have valid structure', () => {
+    const withFlags = CLI_COMMAND_REGISTRY.filter(c => c.flags);
+    expect(withFlags.length).toBeGreaterThan(0);
+    for (const cmd of withFlags) {
+      for (const flag of cmd.flags!) {
+        expect(flag.flag.length).toBeGreaterThan(0);
+        expect(flag.desc.length).toBeGreaterThan(0);
+      }
+    }
   });
 });

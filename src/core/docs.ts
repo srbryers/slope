@@ -16,6 +16,22 @@ import {
   HAZARD_SEVERITY_PENALTIES,
 } from './constants.js';
 
+// ── MCP Tool Metadata (for documentation manifest) ────────────
+
+export interface McpToolParam {
+  name: string;
+  type: string;
+  desc: string;
+  required?: boolean;
+}
+
+export interface McpToolMeta {
+  name: string;
+  desc: string;
+  params: McpToolParam[];
+  requiresStore: boolean;
+}
+
 // ── Types ──────────────────────────────────────────────────────
 
 export interface ChangelogChange {
@@ -38,21 +54,25 @@ export interface ChangelogSection {
   reason?: string;
 }
 
+export type ManifestSection = 'commands' | 'guards' | 'mcpTools' | 'metaphors' | 'roles' | 'constants' | 'changelog';
+
 export interface DocsManifestInput {
   version: string;
   gitSha: string;
   changelog: ChangelogSection;
   commands: readonly CliCommandMeta[];
+  mcpTools?: readonly McpToolMeta[];
 }
 
 export interface DocsManifest {
   version: string;
   generatedAt: string;
   gitSha: string;
-  checksums: Record<string, string>;
+  checksums: Record<ManifestSection, string>;
 
   commands: readonly CliCommandMeta[];
   guards: GuardDefinition[];
+  mcpTools: readonly McpToolMeta[];
   metaphors: MetaphorDefinition[];
   roles: RoleDefinition[];
   constants: {
@@ -95,6 +115,7 @@ export function buildDocsManifest(input: DocsManifestInput): DocsManifest {
 
   const roles = listRoles();
   const guards = [...GUARD_DEFINITIONS];
+  const mcpTools = input.mcpTools ?? [];
   const constants = {
     parThresholds: PAR_THRESHOLDS,
     slopeFactors: SLOPE_FACTORS,
@@ -102,18 +123,19 @@ export function buildDocsManifest(input: DocsManifestInput): DocsManifest {
     hazardPenalties: HAZARD_SEVERITY_PENALTIES,
   };
 
-  const sections: Record<string, unknown> = {
+  const sections: Record<ManifestSection, unknown> = {
     commands: input.commands,
     guards,
+    mcpTools,
     metaphors,
     roles,
     constants,
     changelog: input.changelog,
   };
 
-  const checksums: Record<string, string> = {};
-  for (const [key, value] of Object.entries(sections)) {
-    checksums[key] = computeSectionChecksum(value);
+  const checksums = {} as Record<ManifestSection, string>;
+  for (const key of Object.keys(sections) as ManifestSection[]) {
+    checksums[key] = computeSectionChecksum(sections[key]);
   }
 
   return {
@@ -123,6 +145,7 @@ export function buildDocsManifest(input: DocsManifestInput): DocsManifest {
     checksums,
     commands: input.commands,
     guards,
+    mcpTools,
     metaphors,
     roles,
     constants,

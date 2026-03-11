@@ -119,4 +119,47 @@ describe('branchBeforeCommitGuard', () => {
     );
     expect(result).toEqual({});
   });
+
+  it('allows heredoc commit messages matching pattern', async () => {
+    mockExecSync.mockReturnValue('main');
+    mockLoadConfig.mockReturnValue({
+      guidance: { allowMainCommitPatterns: ['^chore\\(release\\)'] },
+    } as ReturnType<typeof loadConfig>);
+
+    const heredocCmd = `git commit -m "$(cat <<'EOF'\nchore(release): bump version to 2.0.0\n\nCo-Authored-By: Claude\nEOF\n)"`;
+    const result = await branchBeforeCommitGuard(makeInput(heredocCmd), '/tmp/test');
+    expect(result).toEqual({});
+  });
+
+  it('denies heredoc commit messages not matching pattern', async () => {
+    mockExecSync.mockReturnValue('main');
+    mockLoadConfig.mockReturnValue({
+      guidance: { allowMainCommitPatterns: ['^chore\\(release\\)'] },
+    } as ReturnType<typeof loadConfig>);
+
+    const heredocCmd = `git commit -m "$(cat <<'EOF'\nfeat: new feature\nEOF\n)"`;
+    const result = await branchBeforeCommitGuard(makeInput(heredocCmd), '/tmp/test');
+    expect(result.decision).toBe('deny');
+  });
+
+  it('uses custom protectedBranches from config', async () => {
+    mockExecSync.mockReturnValue('develop');
+    mockLoadConfig.mockReturnValue({
+      guidance: { protectedBranches: ['main', 'master', 'develop'] },
+    } as ReturnType<typeof loadConfig>);
+
+    const result = await branchBeforeCommitGuard(makeInput('git commit -m "feat: stuff"'), '/tmp/test');
+    expect(result.decision).toBe('deny');
+    expect(result.blockReason).toContain('develop');
+  });
+
+  it('allows commit on main when protectedBranches overrides default', async () => {
+    mockExecSync.mockReturnValue('main');
+    mockLoadConfig.mockReturnValue({
+      guidance: { protectedBranches: ['production'] },
+    } as ReturnType<typeof loadConfig>);
+
+    const result = await branchBeforeCommitGuard(makeInput('git commit -m "feat: stuff"'), '/tmp/test');
+    expect(result).toEqual({});
+  });
 });

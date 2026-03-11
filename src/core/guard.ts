@@ -116,6 +116,8 @@ export interface GuidanceConfig {
   handoffsDir?: string;
   /** Commit message patterns allowed on main/master (branch-before-commit guard) */
   allowMainCommitPatterns?: string[];
+  /** Branch names treated as protected (default: ['main', 'master']) */
+  protectedBranches?: string[];
 }
 
 /** All guard definitions */

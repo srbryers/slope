@@ -42,6 +42,7 @@ This repo uses SLOPE to score its own sprints:
 ## Conventions
 - `workspace:*` protocol for intra-monorepo deps
 - Conventional commits (feat/fix/chore)
+- Branch naming: `feat/`, `fix/`, `chore/` prefixes — never commit directly to main (see `.claude/rules/branch-discipline.md`)
 - Always run full build + test + typecheck before committing
 - Core package needs `@types/node` for `node:` module imports
 

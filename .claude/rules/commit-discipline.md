@@ -3,6 +3,8 @@
 **Commit early, commit often.** Lost context from uncommitted work is the #1 risk.
 The last push is the recovery point — everything since the last push is lost on crash or context loss.
 
+> **Where to commit:** See `branch-discipline.md` — all work goes through feature branches, never directly on main.
+
 ## Commit triggers:
 
 Commit immediately after ANY of these:
