@@ -106,8 +106,8 @@ describe('worktreeCheckGuard', () => {
 
     const result = await worktreeCheckGuard(makeInput(), '/tmp/test');
     expect(result.decision).toBe('deny');
-    expect(result.context).toContain('other-session');
-    expect(result.context).toContain('EnterWorktree');
+    expect(result.blockReason).toContain('other-session');
+    expect(result.blockReason).toContain('EnterWorktree');
   });
 
   it('allows when other session has worktree_path (isolated)', async () => {

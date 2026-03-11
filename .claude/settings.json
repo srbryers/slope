@@ -16,6 +16,17 @@
         "hooks": [
           {
             "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/slope-guard.sh worktree-check",
+            "timeout": 10,
+            "statusMessage": "SLOPE: Block concurrent sessions without worktree isolation"
+          }
+        ],
+        "matcher": "Read|Glob|Grep|Edit|Write|Bash"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
             "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/slope-guard.sh hazard",
             "timeout": 10,
             "statusMessage": "SLOPE: Warn about known issues in file areas being edited"
@@ -25,12 +36,6 @@
             "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/slope-guard.sh scope-drift",
             "timeout": 10,
             "statusMessage": "SLOPE: Warn when editing files outside claimed ticket scope"
-          },
-          {
-            "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/slope-guard.sh worktree-check",
-            "timeout": 10,
-            "statusMessage": "SLOPE: Warn when editing in main repo instead of a worktree"
           }
         ],
         "matcher": "Edit|Write"
