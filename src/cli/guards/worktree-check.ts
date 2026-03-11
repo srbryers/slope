@@ -117,7 +117,7 @@ export async function worktreeCheckGuard(input: HookInput, cwd: string): Promise
       // Do NOT write sentinel — denied sessions should re-check next invocation
       return {
         decision: 'deny',
-        context: `Concurrent session(s) detected in the same working directory without worktree isolation:\n${sessionList}\n\nUse \`EnterWorktree\` to create an isolated working copy, or end the other session(s) with \`slope session end --session-id=<id>\`.`,
+        blockReason: `BLOCKED: Another session is active in this directory:\n${sessionList}\n\nYou MUST use \`EnterWorktree\` to create an isolated working copy before proceeding. Do not attempt any other tool calls until you are in a worktree.`,
       };
     }
 

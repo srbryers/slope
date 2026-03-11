@@ -245,10 +245,10 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
   },
   {
     name: 'worktree-check',
-    description: 'Warn when editing in main repo instead of a worktree',
+    description: 'Block concurrent sessions without worktree isolation',
     hookEvent: 'PreToolUse',
-    toolCategories: ['write_file'],
-    matcher: 'Edit|Write',
+    toolCategories: ['read_file', 'search_files', 'search_content', 'write_file', 'execute_command'],
+    matcher: 'Read|Glob|Grep|Edit|Write|Bash',
     level: 'full',
   },
   {
