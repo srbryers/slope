@@ -670,9 +670,12 @@ export {
 export type {
   DocsManifest,
   DocsManifestInput,
+  ManifestSection,
   ChangelogSection,
   ChangelogEntry,
   ChangelogChange,
+  McpToolParam,
+  McpToolMeta,
 } from './docs.js';
 
 // Built-in metaphors (auto-registers on import)

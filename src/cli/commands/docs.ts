@@ -313,6 +313,7 @@ async function checkSubcommand(args: string[]): Promise<void> {
 async function syncSubcommand(args: string[]): Promise<void> {
   const cwd = process.cwd();
   const targetArg = args.find(a => a.startsWith('--target='));
+  const destArg = args.find(a => a.startsWith('--dest='));
 
   // Default: look for adjacent slope-web repo
   const targetDir = targetArg
@@ -325,17 +326,21 @@ async function syncSubcommand(args: string[]): Promise<void> {
     process.exit(1);
   }
 
+  // Destination subpath within target (default: src/data/docs-manifest.json)
+  const destSubpath = destArg
+    ? destArg.slice('--dest='.length)
+    : 'src/data/docs-manifest.json';
+
   // Generate manifest
   const manifest = buildManifest(cwd, false);
   const json = JSON.stringify(manifest, null, 2);
 
-  // Write to target's src/data/docs-manifest.json
-  const dataDir = join(targetDir, 'src', 'data');
-  if (!existsSync(dataDir)) {
-    mkdirSync(dataDir, { recursive: true });
+  // Write to target at the configured destination subpath
+  const destPath = join(targetDir, destSubpath);
+  const destDir = dirname(destPath);
+  if (!existsSync(destDir)) {
+    mkdirSync(destDir, { recursive: true });
   }
-
-  const destPath = join(dataDir, 'docs-manifest.json');
   writeFileSync(destPath, json + '\n', 'utf8');
 
   console.log(`Manifest synced to ${destPath}`);
@@ -378,7 +383,7 @@ Usage:
   slope docs generate [--output=path] [--pretty] [--incremental] [--stdout]
   slope docs changelog [--since=version] [--format=markdown|json]
   slope docs check [--manifest=path]
-  slope docs sync [--target=path]
+  slope docs sync [--target=path] [--dest=subpath]
 
 Subcommands:
   generate      Build manifest JSON from registries + git history
@@ -395,6 +400,7 @@ Options:
   --format=FORMAT     Changelog output format: markdown (default) or json
   --manifest=path     Path to saved manifest for check (default: .slope/docs.json)
   --target=path       Target directory for sync (default: ../slope-web)
+  --dest=subpath      Destination subpath within target (default: src/data/docs-manifest.json)
 `);
       if (sub) process.exit(1);
   }

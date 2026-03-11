@@ -30,8 +30,17 @@ jobs:
       - name: Build
         run: pnpm build
 
+      - name: Test
+        run: pnpm test
+
+      - name: Typecheck
+        run: pnpm typecheck
+
       - name: Generate manifest
         run: node dist/cli/index.js docs generate --pretty --stdout > docs-manifest.json
+
+      - name: Validate manifest
+        run: node -e "const m = JSON.parse(require('fs').readFileSync('docs-manifest.json','utf8')); if (!m.commands || !m.guards || !m.mcpTools) { console.error('Invalid manifest'); process.exit(1); } console.log('Manifest valid:', m.commands.length, 'commands,', m.guards.length, 'guards,', m.mcpTools.length, 'MCP tools');"
 
       - name: Checkout slope-web
         uses: actions/checkout@v4
@@ -43,11 +52,14 @@ jobs:
       - name: Copy manifest
         run: cp docs-manifest.json slope-web/src/data/docs-manifest.json
 
+      # SLOPE_WEB_PAT requires repo scope (read/write) on srbryers/slope-web
+      # to checkout, push commits, and create pull requests.
       - name: Create PR on slope-web
         uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.SLOPE_WEB_PAT }}
           path: slope-web
+          base: main
           commit-message: "chore: update docs manifest from slope ${{ github.event.release.tag_name || 'manual' }}"
           title: "chore: update docs manifest from slope ${{ github.event.release.tag_name || 'manual' }}"
           body: |

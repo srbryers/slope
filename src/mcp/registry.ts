@@ -1028,19 +1028,8 @@ interface VisionDocument { purpose: string; audience?: string; priorities: strin
 
 // ── MCP Tool Metadata (for documentation manifest) ────────────────
 
-export interface McpToolParam {
-  name: string;
-  type: string;
-  desc: string;
-  required?: boolean;
-}
-
-export interface McpToolMeta {
-  name: string;
-  desc: string;
-  params: McpToolParam[];
-  requiresStore: boolean;
-}
+import type { McpToolParam, McpToolMeta } from '../core/docs.js';
+export type { McpToolParam, McpToolMeta };
 
 export const MCP_TOOL_REGISTRY: readonly McpToolMeta[] = [
   {
@@ -1129,6 +1118,6 @@ export const MCP_TOOL_REGISTRY: readonly McpToolMeta[] = [
     name: 'testing_plan_status',
     desc: 'Show test plan coverage summary: tested, untested, stale, and issue counts per section',
     params: [],
-    requiresStore: true,
+    requiresStore: false,
   },
 ];

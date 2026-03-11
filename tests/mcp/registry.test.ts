@@ -78,12 +78,19 @@ describe('MCP_TOOL_REGISTRY', () => {
 
   it('store tools require store', () => {
     const storeTools = MCP_TOOL_REGISTRY.filter(t =>
-      t.name.startsWith('testing_') || ['session_status', 'acquire_claim', 'check_conflicts', 'store_status'].includes(t.name)
+      (t.name.startsWith('testing_') && t.name !== 'testing_plan_status') ||
+      ['session_status', 'acquire_claim', 'check_conflicts', 'store_status'].includes(t.name)
     );
     expect(storeTools.length).toBeGreaterThan(0);
     for (const tool of storeTools) {
       expect(tool.requiresStore).toBe(true);
     }
+  });
+
+  it('testing_plan_status does not require store', () => {
+    const tool = MCP_TOOL_REGISTRY.find(t => t.name === 'testing_plan_status');
+    expect(tool).toBeDefined();
+    expect(tool!.requiresStore).toBe(false);
   });
 
   it('params have name, type, and desc', () => {

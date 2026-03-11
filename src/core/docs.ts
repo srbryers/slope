@@ -6,7 +6,6 @@ import type { CliCommandMeta } from '../cli/registry.js';
 import type { GuardDefinition } from './guard.js';
 import type { MetaphorDefinition } from './metaphor.js';
 import type { RoleDefinition } from './roles.js';
-import type { McpToolMeta } from '../mcp/registry.js';
 import { GUARD_DEFINITIONS } from './guard.js';
 import { listMetaphors } from './metaphor.js';
 import { listRoles } from './roles.js';
@@ -16,6 +15,22 @@ import {
   SCORE_LABELS,
   HAZARD_SEVERITY_PENALTIES,
 } from './constants.js';
+
+// ── MCP Tool Metadata (for documentation manifest) ────────────
+
+export interface McpToolParam {
+  name: string;
+  type: string;
+  desc: string;
+  required?: boolean;
+}
+
+export interface McpToolMeta {
+  name: string;
+  desc: string;
+  params: McpToolParam[];
+  requiresStore: boolean;
+}
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -39,6 +54,8 @@ export interface ChangelogSection {
   reason?: string;
 }
 
+export type ManifestSection = 'commands' | 'guards' | 'mcpTools' | 'metaphors' | 'roles' | 'constants' | 'changelog';
+
 export interface DocsManifestInput {
   version: string;
   gitSha: string;
@@ -51,7 +68,7 @@ export interface DocsManifest {
   version: string;
   generatedAt: string;
   gitSha: string;
-  checksums: Record<string, string>;
+  checksums: Record<ManifestSection, string>;
 
   commands: readonly CliCommandMeta[];
   guards: GuardDefinition[];
@@ -106,7 +123,7 @@ export function buildDocsManifest(input: DocsManifestInput): DocsManifest {
     hazardPenalties: HAZARD_SEVERITY_PENALTIES,
   };
 
-  const sections: Record<string, unknown> = {
+  const sections: Record<ManifestSection, unknown> = {
     commands: input.commands,
     guards,
     mcpTools,
@@ -116,9 +133,9 @@ export function buildDocsManifest(input: DocsManifestInput): DocsManifest {
     changelog: input.changelog,
   };
 
-  const checksums: Record<string, string> = {};
-  for (const [key, value] of Object.entries(sections)) {
-    checksums[key] = computeSectionChecksum(value);
+  const checksums = {} as Record<ManifestSection, string>;
+  for (const key of Object.keys(sections) as ManifestSection[]) {
+    checksums[key] = computeSectionChecksum(sections[key]);
   }
 
   return {
