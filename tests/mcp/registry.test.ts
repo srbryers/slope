@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { SLOPE_REGISTRY, SLOPE_TYPES } from '../../src/mcp/registry.js';
+import { SLOPE_REGISTRY, SLOPE_TYPES, MCP_TOOL_REGISTRY } from '../../src/mcp/registry.js';
+import { SLOPE_MCP_TOOL_NAMES } from '../../src/mcp/index.js';
 
 describe('MCP registry — PR signal entries', () => {
   it('includes parsePRJson', () => {
@@ -46,6 +47,53 @@ describe('MCP registry — metaphor entries', () => {
     const entry = SLOPE_REGISTRY.find(e => e.name === 'saveConfig');
     expect(entry).toBeDefined();
     expect(entry!.module).toBe('fs');
+  });
+});
+
+describe('MCP_TOOL_REGISTRY', () => {
+  it('matches SLOPE_MCP_TOOL_NAMES', () => {
+    const registryNames = MCP_TOOL_REGISTRY.map(t => t.name).sort();
+    const toolNames = [...SLOPE_MCP_TOOL_NAMES].sort();
+    expect(registryNames).toEqual(toolNames);
+  });
+
+  it('every tool has a non-empty description', () => {
+    for (const tool of MCP_TOOL_REGISTRY) {
+      expect(tool.desc.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('every tool has a requiresStore boolean', () => {
+    for (const tool of MCP_TOOL_REGISTRY) {
+      expect(typeof tool.requiresStore).toBe('boolean');
+    }
+  });
+
+  it('search and execute do not require store', () => {
+    const search = MCP_TOOL_REGISTRY.find(t => t.name === 'search');
+    const execute = MCP_TOOL_REGISTRY.find(t => t.name === 'execute');
+    expect(search?.requiresStore).toBe(false);
+    expect(execute?.requiresStore).toBe(false);
+  });
+
+  it('store tools require store', () => {
+    const storeTools = MCP_TOOL_REGISTRY.filter(t =>
+      t.name.startsWith('testing_') || ['session_status', 'acquire_claim', 'check_conflicts', 'store_status'].includes(t.name)
+    );
+    expect(storeTools.length).toBeGreaterThan(0);
+    for (const tool of storeTools) {
+      expect(tool.requiresStore).toBe(true);
+    }
+  });
+
+  it('params have name, type, and desc', () => {
+    for (const tool of MCP_TOOL_REGISTRY) {
+      for (const param of tool.params) {
+        expect(param.name.length).toBeGreaterThan(0);
+        expect(param.type.length).toBeGreaterThan(0);
+        expect(param.desc.length).toBeGreaterThan(0);
+      }
+    }
   });
 });
 

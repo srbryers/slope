@@ -2,11 +2,12 @@
 // All I/O (git, filesystem) lives here. Core is pure.
 
 import { execSync } from 'node:child_process';
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { resolve, join, dirname } from 'node:path';
 import { buildDocsManifest } from '../../core/index.js';
 import type { ChangelogSection, ChangelogEntry, ChangelogChange, DocsManifest } from '../../core/index.js';
 import { CLI_COMMAND_REGISTRY } from '../registry.js';
+import { MCP_TOOL_REGISTRY } from '../../mcp/registry.js';
 
 // Ensure metaphors are registered before manifest build
 import '../../core/metaphors/index.js';
@@ -204,6 +205,22 @@ function formatChangelogMarkdown(changelog: ChangelogSection): string {
 
 // ── Subcommands ────────────────────────────────────────────────
 
+function buildManifest(cwd: string, incremental: boolean): DocsManifest {
+  const version = getPackageVersion(cwd);
+  const gitSha = getGitSha(cwd);
+  const changelog: ChangelogSection = incremental
+    ? { status: 'unavailable', entries: [], reason: 'Skipped (--incremental)' }
+    : parseChangelog(cwd);
+
+  return buildDocsManifest({
+    version,
+    gitSha,
+    changelog,
+    commands: CLI_COMMAND_REGISTRY,
+    mcpTools: MCP_TOOL_REGISTRY,
+  });
+}
+
 async function generateSubcommand(args: string[]): Promise<void> {
   const cwd = process.cwd();
   const outputArg = args.find(a => a.startsWith('--output='));
@@ -212,23 +229,20 @@ async function generateSubcommand(args: string[]): Promise<void> {
   const incremental = args.includes('--incremental');
   const toStdout = args.includes('--stdout');
 
-  const version = getPackageVersion(cwd);
-  const gitSha = getGitSha(cwd);
-  const changelog: ChangelogSection = incremental
-    ? { status: 'unavailable', entries: [], reason: 'Skipped (--incremental)' }
-    : parseChangelog(cwd);
-
-  const manifest = buildDocsManifest({ version, gitSha, changelog, commands: CLI_COMMAND_REGISTRY });
+  const manifest = buildManifest(cwd, incremental);
   const json = JSON.stringify(manifest, null, pretty ? 2 : undefined);
 
   if (toStdout) {
     console.log(json);
   } else {
+    const dir = dirname(outputPath);
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
     writeFileSync(outputPath, json + '\n', 'utf8');
     console.log(`Manifest written to ${outputPath}`);
     console.log(`  Version: ${manifest.version}`);
     console.log(`  Commands: ${manifest.commands.length}`);
     console.log(`  Guards: ${manifest.guards.length}`);
+    console.log(`  MCP Tools: ${manifest.mcpTools.length}`);
     console.log(`  Metaphors: ${manifest.metaphors.length}`);
     console.log(`  Roles: ${manifest.roles.length}`);
     console.log(`  Changelog: ${manifest.changelog.status} (${manifest.changelog.entries.length} entries)`);
@@ -273,14 +287,10 @@ async function checkSubcommand(args: string[]): Promise<void> {
   }
 
   // Generate fresh manifest for comparison
-  const version = getPackageVersion(cwd);
-  const gitSha = getGitSha(cwd);
-  // Skip changelog for check — only compare structural sections
-  const changelog: ChangelogSection = { status: 'unavailable', entries: [], reason: 'Skipped for check' };
-  const fresh = buildDocsManifest({ version, gitSha, changelog, commands: CLI_COMMAND_REGISTRY });
+  const fresh = buildManifest(cwd, true);
 
   // Compare per-section checksums (skip changelog — it's git-dependent)
-  const sectionsToCheck = ['commands', 'guards', 'metaphors', 'roles', 'constants'] as const;
+  const sectionsToCheck = ['commands', 'guards', 'mcpTools', 'metaphors', 'roles', 'constants'] as const;
   const drifted: string[] = [];
 
   for (const section of sectionsToCheck) {
@@ -300,6 +310,51 @@ async function checkSubcommand(args: string[]): Promise<void> {
   }
 }
 
+async function syncSubcommand(args: string[]): Promise<void> {
+  const cwd = process.cwd();
+  const targetArg = args.find(a => a.startsWith('--target='));
+
+  // Default: look for adjacent slope-web repo
+  const targetDir = targetArg
+    ? resolve(targetArg.slice('--target='.length))
+    : resolve(cwd, '..', 'slope-web');
+
+  if (!existsSync(targetDir)) {
+    console.error(`Target directory not found: ${targetDir}`);
+    console.error('Use --target=<path> to specify the slope-web directory.');
+    process.exit(1);
+  }
+
+  // Generate manifest
+  const manifest = buildManifest(cwd, false);
+  const json = JSON.stringify(manifest, null, 2);
+
+  // Write to target's src/data/docs-manifest.json
+  const dataDir = join(targetDir, 'src', 'data');
+  if (!existsSync(dataDir)) {
+    mkdirSync(dataDir, { recursive: true });
+  }
+
+  const destPath = join(dataDir, 'docs-manifest.json');
+  writeFileSync(destPath, json + '\n', 'utf8');
+
+  console.log(`Manifest synced to ${destPath}`);
+  console.log(`  Version: ${manifest.version}`);
+  console.log(`  Commands: ${manifest.commands.length} (${manifest.commands.filter(c => c.subcommands).length} with subcommands)`);
+  console.log(`  Guards: ${manifest.guards.length}`);
+  console.log(`  MCP Tools: ${manifest.mcpTools.length}`);
+  console.log(`  Metaphors: ${manifest.metaphors.length}`);
+  console.log(`  Roles: ${manifest.roles.length}`);
+  console.log(`  Changelog: ${manifest.changelog.status} (${manifest.changelog.entries.length} entries)`);
+
+  // Also save locally
+  const localPath = resolve(cwd, '.slope', 'docs.json');
+  const localDir = dirname(localPath);
+  if (!existsSync(localDir)) mkdirSync(localDir, { recursive: true });
+  writeFileSync(localPath, json + '\n', 'utf8');
+  console.log(`  Local copy: ${localPath}`);
+}
+
 // ── Dispatcher ─────────────────────────────────────────────────
 
 export async function docsCommand(args: string[]): Promise<void> {
@@ -313,6 +368,8 @@ export async function docsCommand(args: string[]): Promise<void> {
       return changelogSubcommand(subArgs);
     case 'check':
       return checkSubcommand(subArgs);
+    case 'sync':
+      return syncSubcommand(subArgs);
     default:
       console.log(`
 slope docs — Generate documentation manifest and changelog
@@ -321,11 +378,13 @@ Usage:
   slope docs generate [--output=path] [--pretty] [--incremental] [--stdout]
   slope docs changelog [--since=version] [--format=markdown|json]
   slope docs check [--manifest=path]
+  slope docs sync [--target=path]
 
 Subcommands:
   generate      Build manifest JSON from registries + git history
   changelog     Generate changelog from conventional commits
   check         Compare saved manifest against current state (exit 1 on drift)
+  sync          Generate manifest and copy to slope-web (or --target directory)
 
 Options:
   --output=path       Write manifest to path (default: .slope/docs.json)
@@ -335,6 +394,7 @@ Options:
   --since=version     Changelog since this version/tag
   --format=FORMAT     Changelog output format: markdown (default) or json
   --manifest=path     Path to saved manifest for check (default: .slope/docs.json)
+  --target=path       Target directory for sync (default: ../slope-web)
 `);
       if (sub) process.exit(1);
   }

@@ -1025,3 +1025,110 @@ interface GeneratedSprint { roadmap: RoadmapDefinition; sprint: RoadmapSprint; }
 // ─── Vision ───
 interface VisionDocument { purpose: string; audience?: string; priorities: string[]; techDirection?: string; nonGoals?: string[]; createdAt: string; updatedAt: string; }
 `;
+
+// ── MCP Tool Metadata (for documentation manifest) ────────────────
+
+export interface McpToolParam {
+  name: string;
+  type: string;
+  desc: string;
+  required?: boolean;
+}
+
+export interface McpToolMeta {
+  name: string;
+  desc: string;
+  params: McpToolParam[];
+  requiresStore: boolean;
+}
+
+export const MCP_TOOL_REGISTRY: readonly McpToolMeta[] = [
+  {
+    name: 'search',
+    desc: 'Discover the SLOPE API — functions, types, constants, flows, and codebase map',
+    params: [
+      { name: 'query', type: 'string', desc: 'Search term to filter results' },
+      { name: 'module', type: 'string', desc: 'Filter by module (core, fs, constants, store, flows, init, testing, types, map)' },
+    ],
+    requiresStore: false,
+  },
+  {
+    name: 'execute',
+    desc: 'Run JavaScript in a sandboxed node:vm with the full SLOPE API pre-injected',
+    params: [
+      { name: 'code', type: 'string', desc: 'JavaScript code to execute (must return a value)', required: true },
+    ],
+    requiresStore: false,
+  },
+  {
+    name: 'session_status',
+    desc: 'Show active sessions and claims from the SLOPE store',
+    params: [],
+    requiresStore: true,
+  },
+  {
+    name: 'acquire_claim',
+    desc: 'Claim a ticket or area for the current sprint',
+    params: [
+      { name: 'target', type: 'string', desc: 'File or directory to claim', required: true },
+      { name: 'scope', type: 'string', desc: 'Claim scope (file, directory, module, ticket)' },
+      { name: 'ticket', type: 'string', desc: 'Ticket key (e.g. S48-1)' },
+      { name: 'sprint', type: 'number', desc: 'Sprint number' },
+    ],
+    requiresStore: true,
+  },
+  {
+    name: 'check_conflicts',
+    desc: 'Detect overlapping and adjacent conflicts among active claims',
+    params: [
+      { name: 'sprint', type: 'number', desc: 'Filter to a specific sprint' },
+    ],
+    requiresStore: true,
+  },
+  {
+    name: 'store_status',
+    desc: 'Check store health — schema version, row counts, and error status',
+    params: [],
+    requiresStore: true,
+  },
+  {
+    name: 'testing_session_start',
+    desc: 'Start a manual testing session with git worktree isolation',
+    params: [
+      { name: 'purpose', type: 'string', desc: 'Purpose of the testing session' },
+      { name: 'sprint', type: 'number', desc: 'Sprint number' },
+    ],
+    requiresStore: true,
+  },
+  {
+    name: 'testing_session_finding',
+    desc: 'Record a finding (bug, observation) during an active testing session',
+    params: [
+      { name: 'description', type: 'string', desc: 'Finding description', required: true },
+      { name: 'severity', type: 'string', desc: 'Severity (low, medium, high, critical)' },
+      { name: 'ticket', type: 'string', desc: 'Related ticket key' },
+    ],
+    requiresStore: true,
+  },
+  {
+    name: 'testing_session_end',
+    desc: 'End the active testing session, return summary, cleanup worktree',
+    params: [
+      { name: 'session_id', type: 'string', desc: 'Specific session ID to end' },
+      { name: 'skip_cleanup', type: 'boolean', desc: 'Skip worktree cleanup' },
+    ],
+    requiresStore: true,
+  },
+  {
+    name: 'testing_session_status',
+    desc: 'Show active testing session info and findings',
+    params: [],
+    requiresStore: true,
+  },
+  {
+    name: 'testing_plan_status',
+    desc: 'Show test plan coverage summary: tested, untested, stale, and issue counts per section',
+    params: [],
+    requiresStore: true,
+  },
+];

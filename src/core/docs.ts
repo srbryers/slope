@@ -6,6 +6,7 @@ import type { CliCommandMeta } from '../cli/registry.js';
 import type { GuardDefinition } from './guard.js';
 import type { MetaphorDefinition } from './metaphor.js';
 import type { RoleDefinition } from './roles.js';
+import type { McpToolMeta } from '../mcp/registry.js';
 import { GUARD_DEFINITIONS } from './guard.js';
 import { listMetaphors } from './metaphor.js';
 import { listRoles } from './roles.js';
@@ -43,6 +44,7 @@ export interface DocsManifestInput {
   gitSha: string;
   changelog: ChangelogSection;
   commands: readonly CliCommandMeta[];
+  mcpTools?: readonly McpToolMeta[];
 }
 
 export interface DocsManifest {
@@ -53,6 +55,7 @@ export interface DocsManifest {
 
   commands: readonly CliCommandMeta[];
   guards: GuardDefinition[];
+  mcpTools: readonly McpToolMeta[];
   metaphors: MetaphorDefinition[];
   roles: RoleDefinition[];
   constants: {
@@ -95,6 +98,7 @@ export function buildDocsManifest(input: DocsManifestInput): DocsManifest {
 
   const roles = listRoles();
   const guards = [...GUARD_DEFINITIONS];
+  const mcpTools = input.mcpTools ?? [];
   const constants = {
     parThresholds: PAR_THRESHOLDS,
     slopeFactors: SLOPE_FACTORS,
@@ -105,6 +109,7 @@ export function buildDocsManifest(input: DocsManifestInput): DocsManifest {
   const sections: Record<string, unknown> = {
     commands: input.commands,
     guards,
+    mcpTools,
     metaphors,
     roles,
     constants,
@@ -123,6 +128,7 @@ export function buildDocsManifest(input: DocsManifestInput): DocsManifest {
     checksums,
     commands: input.commands,
     guards,
+    mcpTools,
     metaphors,
     roles,
     constants,
