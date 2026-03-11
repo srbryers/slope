@@ -21,6 +21,7 @@ import { branchBeforeCommitGuard } from '../guards/branch-before-commit.js';
 import { worktreeCheckGuard } from '../guards/worktree-check.js';
 import { sprintCompletionGuard } from '../guards/sprint-completion.js';
 import { worktreeMergeGuard } from '../guards/worktree-merge.js';
+import { recordBaseline } from '../guards/git-utils.js';
 import { execSync } from 'node:child_process';
 
 // Side-effect imports: ensure all adapters are registered for detectAdapter()
@@ -127,6 +128,10 @@ export async function guardCommand(args: string[]): Promise<void> {
       hook_event_name: '',
     };
   }
+
+  // Record git status baseline on first guard call for this session.
+  // Used by stop-check to distinguish pre-existing dirty files from session changes.
+  recordBaseline(input.session_id, cwd);
 
   // Find guard definition (built-in or custom).
   // When multiple definitions share a name (e.g. sprint-completion fires on

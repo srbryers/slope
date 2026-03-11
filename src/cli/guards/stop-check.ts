@@ -1,6 +1,6 @@
 import { execSync } from 'node:child_process';
 import type { HookInput, GuardResult } from '../../core/index.js';
-import { headIsOnMain } from './git-utils.js';
+import { headIsOnMain, loadBaseline, removeBaseline } from './git-utils.js';
 
 /**
  * Detect the effective git working directory for this session.
@@ -104,11 +104,21 @@ export async function stopCheckGuard(_input: HookInput, cwd: string): Promise<Gu
       const filteredModified = modifiedPaths.filter(p => !ignoredSet.has(p));
       const filteredUntracked = untrackedPaths.filter(p => !ignoredSet.has(p));
 
-      if (filteredModified.length > 0) {
-        blockingIssues.push(`${filteredModified.length} uncommitted change${filteredModified.length === 1 ? '' : 's'}`);
+      // Separate session changes from pre-existing dirty files using baseline
+      const baseline = loadBaseline(_input.session_id, cwd);
+      const sessionModified = filteredModified.filter(p => !baseline.has(p));
+      const sessionUntracked = filteredUntracked.filter(p => !baseline.has(p));
+      const preExistingCount = (filteredModified.length - sessionModified.length) +
+        (filteredUntracked.length - sessionUntracked.length);
+
+      if (sessionModified.length > 0) {
+        blockingIssues.push(`${sessionModified.length} uncommitted change${sessionModified.length === 1 ? '' : 's'}`);
       }
-      if (filteredUntracked.length > 0) {
-        warningIssues.push(`${filteredUntracked.length} untracked file${filteredUntracked.length === 1 ? '' : 's'}`);
+      if (sessionUntracked.length > 0) {
+        warningIssues.push(`${sessionUntracked.length} untracked file${sessionUntracked.length === 1 ? '' : 's'}`);
+      }
+      if (preExistingCount > 0) {
+        warningIssues.push(`${preExistingCount} pre-existing dirty file${preExistingCount === 1 ? '' : 's'} (not from this session)`);
       }
     }
   } catch { /* not a git repo */ }
@@ -158,10 +168,13 @@ export async function stopCheckGuard(_input: HookInput, cwd: string): Promise<Gu
 
   // Untracked-only: warn but don't block
   if (warningIssues.length > 0) {
+    removeBaseline(_input.session_id, cwd);
     return {
       context: `SLOPE: ${warningIssues.join(' and ')} detected. Consider committing or cleaning up untracked files.`,
     };
   }
 
+  // Clean session — remove baseline
+  removeBaseline(_input.session_id, cwd);
   return {};
 }
