@@ -21,21 +21,21 @@ describe('prReviewGuard', () => {
     );
 
     const result = await prReviewGuard(input, '/tmp/test');
-    expect(result.context).toBeDefined();
-    expect(result.context).toContain('pr-review');
-    expect(result.context).toContain('pull/42');
-    expect(result.context).toContain('Code Review');
-    expect(result.context).toContain('Architect Review');
-    expect(result.context).toContain('Both');
-    expect(result.context).toContain('Manual Review');
-    expect(result.context).toContain('Skip / Merge Now');
+    expect(result.blockReason).toBeDefined();
+    expect(result.blockReason).toContain('pr-review');
+    expect(result.blockReason).toContain('pull/42');
+    expect(result.blockReason).toContain('Code Review');
+    expect(result.blockReason).toContain('Architect Review');
+    expect(result.blockReason).toContain('Both');
+    expect(result.blockReason).toContain('Manual Review');
+    expect(result.blockReason).toContain('Skip / Merge Now');
   });
 
   it('does not fire for non-PR commands', async () => {
     const input = makeInput('git push -u origin main', 'Everything up-to-date');
 
     const result = await prReviewGuard(input, '/tmp/test');
-    expect(result.context).toBeUndefined();
+    expect(result.blockReason).toBeUndefined();
   });
 
   it('does not fire when gh pr create fails (no PR URL)', async () => {
@@ -45,7 +45,7 @@ describe('prReviewGuard', () => {
     );
 
     const result = await prReviewGuard(input, '/tmp/test');
-    expect(result.context).toBeUndefined();
+    expect(result.blockReason).toBeUndefined();
   });
 
   it('extracts PR URL from multiline output', async () => {
@@ -55,7 +55,7 @@ describe('prReviewGuard', () => {
     );
 
     const result = await prReviewGuard(input, '/tmp/test');
-    expect(result.context).toContain('pull/99');
+    expect(result.blockReason).toContain('pull/99');
   });
 
   it('handles response in result field', async () => {
@@ -69,7 +69,7 @@ describe('prReviewGuard', () => {
     };
 
     const result = await prReviewGuard(input, '/tmp/test');
-    expect(result.context).toBeDefined();
-    expect(result.context).toContain('pull/7');
+    expect(result.blockReason).toBeDefined();
+    expect(result.blockReason).toContain('pull/7');
   });
 });

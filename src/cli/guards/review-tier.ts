@@ -114,7 +114,7 @@ export async function reviewTierGuard(input: HookInput, cwd: string): Promise<Gu
   }
 
   lines.push('');
-  lines.push('IMPORTANT: You MUST now ask the user how they want to handle the plan review using AskUserQuestion.');
+  lines.push('You MUST now ask the user how they want to handle the plan review using AskUserQuestion.');
   lines.push('Present these options:');
   lines.push(`1. Architect + ${specialistList} review (Recommended)`);
   lines.push('2. Architect review only');
@@ -144,7 +144,7 @@ export async function reviewTierGuard(input: HookInput, cwd: string): Promise<Gu
   };
   saveReviewState(cwd, reviewState);
 
-  return { context: lines.join('\n') };
+  return { blockReason: lines.join('\n') };
 }
 
 /**

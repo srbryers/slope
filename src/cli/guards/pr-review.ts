@@ -19,10 +19,10 @@ export async function prReviewGuard(input: HookInput, _cwd: string): Promise<Gua
   const prUrl = urlMatch ? urlMatch[1] : 'the PR';
 
   return {
-    context: [
+    blockReason: [
       `SLOPE pr-review: A pull request was just created (${prUrl}).`,
       '',
-      'IMPORTANT: You MUST now ask the user how they want to handle the PR review using AskUserQuestion.',
+      'You MUST now ask the user how they want to handle the PR review using AskUserQuestion.',
       'Present these options:',
       '',
       '1. Code Review — Detailed line-by-line code review of the diff',
