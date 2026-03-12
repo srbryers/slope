@@ -24,10 +24,20 @@ import type { Logger } from './logger.js';
 
 // ── Constants ───────────────────────────────────────
 
-const MAX_TURNS = 50;
+const MAX_TURNS_DEFAULT = 50;
 const MAX_REPEATED_CALLS = 3;
 const MAX_GUARD_RETRIES = 2;
 const MAX_OVERLOAD_RETRIES = 3;
+const MAX_CONSECUTIVE_BASH = 5;
+
+/** Turn budget per club — smaller tickets get fewer turns to prevent flailing */
+const CLUB_TURN_LIMITS: Record<string, number> = {
+  putter: 20,
+  wedge: 30,
+  short_iron: 40,
+  long_iron: 50,
+  driver: 50,
+};
 const DEFAULT_MAX_TOKENS = 8192;
 const TOOL_BASH_TIMEOUT = 60_000;
 const TOOL_OUTPUT_CAP = 50_000;
@@ -196,15 +206,17 @@ export const slopeExecutor: ExecutorAdapter = {
       { role: 'user', content: ctx.prompt },
     ];
 
+    const maxTurns = CLUB_TURN_LIMITS[ctx.ticket.club] ?? MAX_TURNS_DEFAULT;
     const recentSigs: string[] = [];
     let outcome: ExecutionResult['outcome'] = 'completed';
     let turn = 0;
     let guardRetries = 0;
     let overloadRetries = 0;
     let innerGuardsPassed = false;
+    let consecutiveBash = 0;
 
     // ── Agent loop ──
-    while (turn < MAX_TURNS) {
+    while (turn < maxTurns) {
       const remaining = deadline - Date.now();
       if (remaining <= 0) {
         log.warn(`Timed out after ${ctx.timeout}s`);
@@ -333,10 +345,23 @@ export const slopeExecutor: ExecutorAdapter = {
       messages.push({ role: 'assistant', content: response.content });
       messages.push({ role: 'user', content: toolResults });
       log.info(`Turn ${turn}: ${toolBlocks.map(b => b.name).join(', ')}`);
+
+      // Bash-loop breaker: if the model runs bash N+ times in a row without
+      // reading or editing files, inject a nudge to break the spiral
+      const allBash = toolBlocks.every(b => b.name === 'bash');
+      consecutiveBash = allBash ? consecutiveBash + 1 : 0;
+      if (consecutiveBash >= MAX_CONSECUTIVE_BASH) {
+        log.warn(`Bash loop detected (${consecutiveBash} consecutive) — injecting nudge`);
+        messages.push({
+          role: 'user',
+          content: `You have run ${consecutiveBash} consecutive bash commands without reading or editing any files. This is usually a sign you are stuck. Stop and think about what is actually failing. Use read_file to examine the error, or use grep/glob to find the right file to edit. Do not run another bash command until you have read the relevant code.`,
+        });
+        consecutiveBash = 0;
+      }
     }
 
-    if (turn >= MAX_TURNS) {
-      log.warn(`Hit max turns (${MAX_TURNS})`);
+    if (turn >= maxTurns) {
+      log.warn(`Hit max turns (${maxTurns})`);
       if (outcome === 'completed') outcome = 'stuck';
     }
 
@@ -376,20 +401,30 @@ export function buildSystemPrompt(
     }
   }
 
+  const modules = ctx.ticket.modules;
+  const scopeSection = modules.length > 0
+    ? `\n## Allowed Files (scope)\nOnly modify files in or related to these modules:\n${modules.map(m => `- ${m}`).join('\n')}\nYou may create new test files for these modules. Do NOT edit files outside this scope.`
+    : '';
+
   return `You are an autonomous coding agent working on the SLOPE project.
 This is a TypeScript monorepo (pnpm, vitest, strict TypeScript).
 
 ## Working Directory
 ${cwd}
 
+## Ticket: ${ctx.ticketKey}
+${ctx.ticket.title}
+${scopeSection}
+
 ## Rules
 - ALWAYS read a file before editing it — understand existing patterns first
 - Make real, substantive changes — never add only comments or whitespace
 - Keep changes minimal and focused on this ticket only
+- Do NOT edit files outside the allowed scope above
 - After all changes, run: pnpm typecheck && pnpm test
-- If tests fail, read the error and fix the issue
+- If tests fail, read the error output carefully before attempting a fix
+- If stuck after multiple bash attempts, stop and re-read the relevant source files
 - Do NOT run git commit — the system auto-commits after verification
-- You are working on ticket: ${ctx.ticketKey}
 
 ## Tools
 - read_file: Read file contents (always do this first)

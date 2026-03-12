@@ -278,10 +278,11 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain(tmpDir);
   });
 
-  it('includes the ticket key', () => {
+  it('includes the ticket key and title', () => {
     const ctx = { ticketKey: 'TEST-1', ticket: baseTicket } as ExecutionContext;
     const prompt = buildSystemPrompt(ctx, mockConfig, tmpDir);
-    expect(prompt).toContain('ticket: TEST-1');
+    expect(prompt).toContain('Ticket: TEST-1');
+    expect(prompt).toContain('Test ticket');
   });
 
   it('includes rules about reading files first', () => {
@@ -321,6 +322,27 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('bash');
     expect(prompt).toContain('glob');
     expect(prompt).toContain('grep');
+  });
+
+  it('includes allowed files scope from ticket modules', () => {
+    const ctx = { ticketKey: 'TEST-1', ticket: baseTicket } as ExecutionContext;
+    const prompt = buildSystemPrompt(ctx, mockConfig, tmpDir);
+    expect(prompt).toContain('Allowed Files');
+    expect(prompt).toContain('src/test.ts');
+    expect(prompt).toContain('Do NOT edit files outside');
+  });
+
+  it('omits scope section when modules is empty', () => {
+    const emptyModulesTicket = { ...baseTicket, modules: [] as string[] };
+    const ctx = { ticketKey: 'TEST-1', ticket: emptyModulesTicket } as ExecutionContext;
+    const prompt = buildSystemPrompt(ctx, mockConfig, tmpDir);
+    expect(prompt).not.toContain('Allowed Files');
+  });
+
+  it('includes stuck-prevention guidance', () => {
+    const ctx = { ticketKey: 'TEST-1', ticket: baseTicket } as ExecutionContext;
+    const prompt = buildSystemPrompt(ctx, mockConfig, tmpDir);
+    expect(prompt).toContain('re-read the relevant source');
   });
 });
 

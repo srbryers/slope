@@ -293,6 +293,7 @@ async function processTicket(
   tokens_out += result1.tokens_out;
   cost_usd += result1.cost_usd;
   duration_s += result1.duration_s;
+  const transcript = [...result1.transcript];
 
   if (result1.outcome === 'error') {
     tLog.error('Executor failed to start — skipping ticket');
@@ -341,6 +342,7 @@ async function processTicket(
     tokens_out += result2.tokens_out;
     cost_usd += result2.cost_usd;
     duration_s += result2.duration_s;
+    transcript.push(...result2.transcript);
 
     const postEscSha = getHeadSha(cwd);
     if (preEscSha === postEscSha) {
@@ -377,6 +379,7 @@ async function processTicket(
     tokens_out: tokens_out || undefined,
     cost_usd: cost_usd || undefined,
     duration_s: duration_s || undefined,
+    transcript: transcript.length > 0 ? transcript : undefined,
   };
 }
 
