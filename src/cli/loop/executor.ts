@@ -12,6 +12,10 @@ import { generatePlan, formatPlanAsPrompt } from './planner.js';
 import { registerExecutor, selectExecutor } from './executor-adapter.js';
 import { aiderExecutor, getActiveChildPids } from './aider-executor.js';
 import { slopeExecutor } from './slope-executor.js';
+import { loadConfig } from '../../core/config.js';
+import type { SlopeConfig } from '../../core/config.js';
+import { loadScorecards } from '../../core/loader.js';
+import { computeHandicapCard } from '../../core/handicap.js';
 import type { LoopConfig, BacklogSprint, BacklogTicket, TicketResult, SprintResult, ExecutionContext } from './types.js';
 import type { Logger } from './logger.js';
 
@@ -95,6 +99,9 @@ export async function runSprint(flags: Record<string, string>, cwd: string): Pro
         enrichBacklog(config.backlogPath, worktreeCwd, log);
       }
 
+      // Pre-sprint briefing (Layer 3)
+      runPreSprintBriefing(sprint.id, worktreeCwd, log);
+
       // Start session
       try {
         execFileSync('pnpm', ['slope', 'session', 'start', `--sprint=${sprint.id}`], { cwd: worktreeCwd, stdio: 'pipe' });
@@ -132,6 +139,9 @@ export async function runSprint(flags: Record<string, string>, cwd: string): Pro
 
       // Generate scorecard
       generateScorecard(sprint, wt.branch, worktreeCwd, log);
+
+      // Post-sprint analysis (Layer 3) — distill + handicap delta
+      const handicapDelta = runPostSprintAnalysis(worktreeCwd, log);
 
       // PR lifecycle
       const passingCount = ticketResults.filter(t => t.tests_passing && !t.noop).length;
@@ -198,6 +208,7 @@ export async function runSprint(flags: Record<string, string>, cwd: string): Pro
         ...(prNumber !== undefined ? { pr_number: prNumber } : {}),
         ...(mergeStatus ? { merge_status: mergeStatus } : {}),
         ...(mergeBlockReason ? { merge_block_reason: mergeBlockReason } : {}),
+        ...(handicapDelta !== undefined ? { handicap_delta: handicapDelta } : {}),
       };
 
       // Atomic result write
@@ -511,6 +522,65 @@ function extractSprintNum(cwd: string): number {
     return parseInt(match?.[1] ?? '0', 10);
   } catch {
     return 0;
+  }
+}
+
+// ── Layer 3: Sprint-level SLOPE orchestration ──────────────────────
+
+/**
+ * Pre-sprint: run briefing and log top hazards.
+ * Non-blocking — failures are logged and skipped.
+ */
+function runPreSprintBriefing(sprintId: string, cwd: string, log: Logger): void {
+  try {
+    const output = execFileSync('pnpm', ['slope', 'briefing'], {
+      cwd,
+      encoding: 'utf8',
+      timeout: 30_000,
+    });
+    // Extract top hazards (lines starting with ⚠ or containing "hazard")
+    const hazardLines = output.split('\n')
+      .filter(l => l.includes('⚠') || l.toLowerCase().includes('hazard'))
+      .slice(0, 3);
+    if (hazardLines.length > 0) {
+      log.info(`Pre-sprint hazards for ${sprintId}:`);
+      for (const line of hazardLines) {
+        log.info(`  ${line.trim()}`);
+      }
+    }
+  } catch {
+    log.warn('Pre-sprint briefing failed (non-blocking)');
+  }
+}
+
+/**
+ * Post-sprint: run distill + compute handicap delta.
+ * Returns handicap delta (positive = worse, negative = better).
+ */
+function runPostSprintAnalysis(cwd: string, log: Logger): number | undefined {
+  // Run distill to promote event patterns to common issues
+  try {
+    execFileSync('pnpm', ['slope', 'distill'], { cwd, stdio: 'pipe', timeout: 30_000 });
+    log.info('Post-sprint distill completed');
+  } catch {
+    log.warn('Post-sprint distill failed (non-blocking)');
+  }
+
+  // Compute handicap delta
+  try {
+    const slopeConfig: SlopeConfig = loadConfig(cwd);
+    const scorecards = loadScorecards(slopeConfig, cwd);
+    if (scorecards.length < 2) return undefined;
+
+    const card = computeHandicapCard(scorecards);
+    const last5 = card.last_5.handicap;
+    const allTime = card.all_time.handicap;
+    const delta = Math.round((last5 - allTime) * 10) / 10;
+    log.info(`Handicap delta: ${delta >= 0 ? '+' : ''}${delta} (last5: ${last5.toFixed(1)}, all-time: ${allTime.toFixed(1)})`);
+    return delta;
+  } catch {
+    log.warn('Handicap delta computation failed (non-blocking)');
+    return undefined;
   }
 }
 

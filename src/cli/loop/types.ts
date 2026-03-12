@@ -179,6 +179,7 @@ export interface SprintResult {
   pr_number?: number;
   merge_status?: 'merged' | 'blocked' | 'skipped';
   merge_block_reason?: string;
+  handicap_delta?: number;
 }
 
 // === Execution Plan ===

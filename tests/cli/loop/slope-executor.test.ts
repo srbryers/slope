@@ -10,6 +10,8 @@ import {
   lookupCost,
   runTool,
   buildSystemPrompt,
+  buildSlopeContext,
+  extractMapSection,
 } from '../../../src/cli/loop/slope-executor.js';
 import type { ExecutionContext, LoopConfig, BacklogTicket } from '../../../src/cli/loop/types.js';
 import type { Logger } from '../../../src/cli/loop/logger.js';
@@ -313,7 +315,7 @@ describe('buildSystemPrompt', () => {
     expect(prompt).not.toContain('Agent Guide');
   });
 
-  it('lists available tools', () => {
+  it('lists available tools including slope', () => {
     const ctx = { ticketKey: 'TEST-1', ticket: baseTicket } as ExecutionContext;
     const prompt = buildSystemPrompt(ctx, mockConfig, tmpDir);
     expect(prompt).toContain('read_file');
@@ -322,6 +324,7 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('bash');
     expect(prompt).toContain('glob');
     expect(prompt).toContain('grep');
+    expect(prompt).toContain('slope');
   });
 
   it('includes allowed files scope from ticket modules', () => {
@@ -343,6 +346,151 @@ describe('buildSystemPrompt', () => {
     const ctx = { ticketKey: 'TEST-1', ticket: baseTicket } as ExecutionContext;
     const prompt = buildSystemPrompt(ctx, mockConfig, tmpDir);
     expect(prompt).toContain('re-read the relevant source');
+  });
+});
+
+// ── slope tool ──────────────────────────────────────
+
+describe('runTool — slope', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'slope-tool-test-'));
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('blocks commands not in the allowlist', () => {
+    const result = runTool('slope', { command: 'init' }, tmpDir, mockLog);
+    expect(result.isError).toBe(true);
+    expect(result.output).toContain('not in allowlist');
+  });
+
+  it('blocks empty command', () => {
+    const result = runTool('slope', { command: '' }, tmpDir, mockLog);
+    expect(result.isError).toBe(true);
+    expect(result.output).toContain('not in allowlist');
+  });
+
+  it('blocks destructive commands like review', () => {
+    const result = runTool('slope', { command: 'review amend' }, tmpDir, mockLog);
+    expect(result.isError).toBe(true);
+    expect(result.output).toContain('not in allowlist');
+  });
+});
+
+// ── bash blocks slope ───────────────────────────────
+
+describe('runTool — bash blocks slope', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'slope-bash-block-'));
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('blocks pnpm slope via bash', () => {
+    const result = runTool('bash', { command: 'pnpm slope briefing' }, tmpDir, mockLog);
+    expect(result.isError).toBe(true);
+    expect(result.output).toContain('slope tool');
+  });
+
+  it('blocks direct slope command via bash', () => {
+    const result = runTool('bash', { command: 'slope search --query=test' }, tmpDir, mockLog);
+    expect(result.isError).toBe(true);
+    expect(result.output).toContain('slope tool');
+  });
+});
+
+// ── extractMapSection ───────────────────────────────
+
+describe('extractMapSection', () => {
+  it('extracts section matching module path', () => {
+    const map = `# Codebase Map
+
+## Core Package
+Core scoring engine.
+
+## CLI Package
+CLI commands and handlers.
+
+## Store Package
+Storage adapters.`;
+
+    const result = extractMapSection(map, ['src/core/scoring.ts']);
+    expect(result).toContain('Core Package');
+    expect(result).toContain('Core scoring engine');
+    expect(result).not.toContain('Store Package');
+  });
+
+  it('returns null for empty modules', () => {
+    expect(extractMapSection('# Map\n## Core\nstuff', [])).toBeNull();
+  });
+
+  it('returns null when no sections match', () => {
+    const map = `# Codebase Map\n## Core Package\nstuff`;
+    expect(extractMapSection(map, ['src/unrelated/foo.ts'])).toBeNull();
+  });
+
+  it('captures nested subsections', () => {
+    const map = `## CLI Package
+Main CLI entry.
+
+### Commands
+All command handlers.
+
+## Core Package
+Core logic.`;
+
+    const result = extractMapSection(map, ['src/cli/commands/init.ts']);
+    expect(result).toContain('CLI Package');
+    expect(result).toContain('Commands');
+    expect(result).not.toContain('Core Package');
+  });
+});
+
+// ── buildSlopeContext ───────────────────────────────
+
+describe('buildSlopeContext', () => {
+  const baseTicket: BacklogTicket = {
+    key: 'TEST-1',
+    title: 'Test ticket',
+    club: 'short_iron',
+    description: 'Do something',
+    acceptance_criteria: ['It works'],
+    modules: ['src/test.ts'],
+    max_files: 1,
+  };
+
+  const mockConfig = {
+    agentGuide: 'SKILL.md',
+    agentGuideMaxWords: 5000,
+  } as LoopConfig;
+
+  it('returns empty string when word budget is exhausted', () => {
+    const result = buildSlopeContext(baseTicket, mockConfig, '/nonexistent', 5000);
+    expect(result).toBe('');
+  });
+
+  it('returns empty string when loadConfig fails (no .slope dir)', () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), 'slope-ctx-test-'));
+    try {
+      const result = buildSlopeContext(baseTicket, mockConfig, tmpDir);
+      expect(result).toBe('');
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it('respects word budget parameter', () => {
+    // With guideWordCount of 4600, budget = min(2000, 5000 - 4600 - 500) = -100 → empty
+    const result = buildSlopeContext(baseTicket, mockConfig, '/tmp', 4600);
+    expect(result).toBe('');
   });
 });
 
