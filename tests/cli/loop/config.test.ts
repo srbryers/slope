@@ -10,6 +10,13 @@ let tmpDir: string;
 beforeEach(() => {
   tmpDir = mkdtempSync(join(tmpdir(), 'slope-loop-config-'));
   mkdirSync(join(tmpDir, '.slope'), { recursive: true });
+  // Clean up env vars BEFORE each test to ensure clean state
+  delete process.env.MODEL_LOCAL;
+  delete process.env.MODEL_API;
+  delete process.env.OLLAMA_API_BASE;
+  delete process.env.MODEL_API_TIMEOUT;
+  delete process.env.ESCALATE_ON_FAIL;
+  delete process.env.OLLAMA_FLASH_ATTENTION;
 });
 
 afterEach(() => {

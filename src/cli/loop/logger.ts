@@ -15,6 +15,10 @@ function timestamp(): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
 }
 
+export function isoTimestamp(): string {
+  return new Date().toISOString();
+}
+
 export function createLogger(prefix: string = 'loop', logFile?: string): Logger {
   if (logFile) {
     const dir = dirname(logFile);
