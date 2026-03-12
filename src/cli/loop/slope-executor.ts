@@ -120,7 +120,7 @@ const TOOLS: Anthropic.Tool[] = [
 
 // ── Path security ───────────────────────────────────
 
-function safePath(relPath: string, cwd: string): string {
+export function safePath(relPath: string, cwd: string): string {
   const abs = resolve(cwd, relPath);
   if (!abs.startsWith(resolve(cwd))) {
     throw new Error(`Path traversal blocked: ${relPath}`);
@@ -130,13 +130,13 @@ function safePath(relPath: string, cwd: string): string {
 
 // ── Model ID resolution ─────────────────────────────
 
-function resolveModelId(model: string): string {
+export function resolveModelId(model: string): string {
   return model
     .replace(/^openrouter\/anthropic\//, '')
     .replace(/^anthropic\//, '');
 }
 
-function lookupCost(modelId: string): { in: number; out: number } {
+export function lookupCost(modelId: string): { in: number; out: number } {
   for (const [key, cost] of Object.entries(COST_TABLE)) {
     if (modelId.includes(key)) return cost;
   }
@@ -320,7 +320,7 @@ export const slopeExecutor: ExecutorAdapter = {
 
 // ── System prompt ───────────────────────────────────
 
-function buildSystemPrompt(
+export function buildSystemPrompt(
   ctx: ExecutionContext,
   config: LoopConfig,
   cwd: string,
@@ -359,12 +359,12 @@ ${cwd}
 
 // ── Tool runner ─────────────────────────────────────
 
-interface ToolResult {
+export interface ToolResult {
   output: string;
   isError: boolean;
 }
 
-function runTool(
+export function runTool(
   name: string,
   input: Record<string, unknown>,
   cwd: string,
