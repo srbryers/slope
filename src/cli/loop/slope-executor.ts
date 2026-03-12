@@ -19,8 +19,17 @@ import type {
   ExecutionContext,
   TranscriptEvent,
   LoopConfig,
+  BacklogTicket,
 } from './types.js';
 import type { Logger } from './logger.js';
+import { loadConfig } from '../../core/config.js';
+import type { SlopeConfig } from '../../core/config.js';
+import { loadScorecards } from '../../core/loader.js';
+import { computeHandicapCard } from '../../core/handicap.js';
+import { extractHazardIndex, filterCommonIssues } from '../../core/briefing.js';
+import type { CommonIssuesFile } from '../../core/briefing.js';
+import type { GolfScorecard } from '../../core/types.js';
+import { extractKeywords } from './planner.js';
 
 // ── Constants ───────────────────────────────────────
 
@@ -62,6 +71,7 @@ const BLOCKED_COMMANDS: [RegExp, string][] = [
   [/\bdd\b.*\bof=\//, 'dd write to absolute path is not allowed'],
   [/\b(shutdown|reboot|halt|poweroff)\b/, 'system power commands are not allowed'],
   [/\bcurl\b.*\|\s*(ba)?sh/, 'piping curl to shell is not allowed'],
+  [/\bpnpm\s+slope\b|\bslope\s+/, 'use the slope tool instead of running slope via bash'],
 ];
 
 // ── Tool definitions (Anthropic API format) ─────────
@@ -138,7 +148,32 @@ const TOOLS: Anthropic.Tool[] = [
       required: ['pattern'],
     },
   },
+  {
+    name: 'slope',
+    description:
+      'Run a SLOPE CLI command (read-only). Available: search, context, briefing, card, validate, map, plan, prep, status, next, flows, doctor. Example: slope({ command: "briefing --categories=testing" })',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        command: {
+          type: 'string',
+          description:
+            'SLOPE subcommand and flags (e.g., "search --query=handicap", "briefing", "map")',
+        },
+      },
+      required: ['command'],
+    },
+  },
 ];
+
+/** Allowlisted read-only slope subcommands */
+const SLOPE_ALLOWLIST = new Set([
+  'search', 'context', 'briefing', 'card', 'validate',
+  'map', 'plan', 'prep', 'status', 'next', 'flows',
+  'doctor', 'version',
+]);
+
+const SLOPE_TOOL_OUTPUT_CAP = 4000;
 
 // ── Path security ───────────────────────────────────
 
@@ -393,18 +428,27 @@ export function buildSystemPrompt(
   cwd: string,
 ): string {
   let guide = '';
+  let guideWordCount = 0;
   const guidePath = join(cwd, config.agentGuide);
   if (existsSync(guidePath)) {
     const raw = readFileSync(guidePath, 'utf8');
-    if (raw.split(/\s+/).length <= config.agentGuideMaxWords) {
+    guideWordCount = raw.split(/\s+/).length;
+    if (guideWordCount <= config.agentGuideMaxWords) {
       guide = `\n\n## Agent Guide\n${raw}`;
     }
   }
 
   const modules = ctx.ticket.modules;
   const scopeSection = modules.length > 0
-    ? `\n## Allowed Files (scope)\nOnly modify files in or related to these modules:\n${modules.map(m => `- ${m}`).join('\n')}\nYou may create new test files for these modules. Do NOT edit files outside this scope.`
+    ? `\n## Allowed Files (scope)\nOnly modify files in or related to these modules:\n${modules.map((m: string) => `- ${m}`).join('\n')}\nYou may create new test files for these modules. Do NOT edit files outside this scope.`
     : '';
+
+  // SLOPE sprint context (Layer 1) — hazards, common issues, handicap
+  let slopeContext = '';
+  try {
+    slopeContext = buildSlopeContext(ctx.ticket, config, cwd, guideWordCount);
+    if (slopeContext) slopeContext = '\n\n' + slopeContext;
+  } catch { /* non-blocking */ }
 
   return `You are an autonomous coding agent working on the SLOPE project.
 This is a TypeScript monorepo (pnpm, vitest, strict TypeScript).
@@ -432,7 +476,162 @@ ${scopeSection}
 - write_file: Create new files or full rewrites only
 - bash: Shell commands (tests, typecheck, git, etc.)
 - glob: Find files by pattern
-- grep: Search file contents${guide}`;
+- grep: Search file contents
+- slope: Query SLOPE sprint data (briefing, search, card, map, etc.)${guide}${slopeContext}`;
+}
+
+// ── SLOPE Context Injection (Layer 1) ───────────────
+
+/**
+ * Build SLOPE sprint context for injection into the system prompt.
+ * Each section is independently wrapped in try/catch for graceful degradation.
+ */
+export function buildSlopeContext(
+  ticket: BacklogTicket,
+  config: LoopConfig,
+  cwd: string,
+  guideWordCount: number = 0,
+): string {
+  const wordBudget = Math.min(2000, config.agentGuideMaxWords - guideWordCount - 500);
+  if (wordBudget <= 0) return '';
+
+  const sections: string[] = [];
+  const keywords = extractKeywords(
+    `${ticket.title} ${ticket.description} ${ticket.modules.join(' ')}`,
+    5,
+  );
+
+  let slopeConfig: SlopeConfig;
+  try {
+    slopeConfig = loadConfig(cwd);
+  } catch {
+    return '';
+  }
+
+  let scorecards: GolfScorecard[];
+  try {
+    scorecards = loadScorecards(slopeConfig, cwd);
+  } catch {
+    scorecards = [];
+  }
+
+  // Section 1: Hazard briefing
+  try {
+    if (scorecards.length > 0) {
+      const hazards = extractHazardIndex(scorecards);
+      const recentHazards = hazards.shot_hazards
+        .filter(h => keywords.some(kw => h.description.toLowerCase().includes(kw)))
+        .slice(0, 5);
+      if (recentHazards.length > 0) {
+        sections.push('### Hazard Warnings');
+        for (const h of recentHazards) {
+          sections.push(`- [S${h.sprint}] ${h.type}: ${h.description}`);
+        }
+      }
+    }
+  } catch { /* skip section */ }
+
+  // Section 2: Common issues
+  try {
+    const issuesPath = join(cwd, slopeConfig.commonIssuesPath);
+    if (existsSync(issuesPath)) {
+      const issues: CommonIssuesFile = JSON.parse(readFileSync(issuesPath, 'utf8'));
+      const filtered = filterCommonIssues(issues, { keywords });
+      if (filtered.length > 0) {
+        sections.push('### Known Gotchas');
+        for (const p of filtered.slice(0, 5)) {
+          sections.push(`- [${p.category}] ${p.title}`);
+          sections.push(`  Prevention: ${p.prevention.slice(0, 120)}`);
+        }
+      }
+    }
+  } catch { /* skip section */ }
+
+  // Section 3: Codebase map section
+  try {
+    const mapPath = join(cwd, 'CODEBASE.md');
+    if (existsSync(mapPath)) {
+      const mapContent = readFileSync(mapPath, 'utf8');
+      const relevantSection = extractMapSection(mapContent, ticket.modules);
+      if (relevantSection) {
+        sections.push('### Codebase Context');
+        sections.push(relevantSection);
+      }
+    }
+  } catch { /* skip section */ }
+
+  // Section 4: Handicap snapshot
+  try {
+    if (scorecards.length > 0) {
+      const card = computeHandicapCard(scorecards);
+      const last5 = card.last_5;
+      sections.push('### Handicap Snapshot (last 5)');
+      sections.push(`- Handicap: +${last5.handicap.toFixed(1)}`);
+      sections.push(`- GIR: ${last5.gir_pct.toFixed(1)}%`);
+      sections.push(`- Avg Putts: ${last5.avg_putts.toFixed(1)}`);
+      sections.push(`- Penalties: ${last5.penalties_per_round.toFixed(1)}/round`);
+      const mp = last5.miss_pattern;
+      const totalMisses = mp.long + mp.short + mp.left + mp.right;
+      if (totalMisses > 0) {
+        const dirs = (['long', 'short', 'left', 'right'] as const)
+          .filter(d => mp[d] > 0)
+          .map(d => `${d}:${mp[d]}`);
+        sections.push(`- Miss pattern: ${dirs.join(' ')}`);
+      }
+    }
+  } catch { /* skip section */ }
+
+  if (sections.length === 0) return '';
+
+  let result = '## Sprint Context\n\n' + sections.join('\n');
+  const words = result.split(/\s+/);
+  if (words.length > wordBudget) {
+    result = words.slice(0, wordBudget).join(' ') + '\n...(truncated)';
+  }
+  return result;
+}
+
+/**
+ * Extract the relevant section from CODEBASE.md based on module paths.
+ */
+export function extractMapSection(mapContent: string, modules: string[]): string | null {
+  if (modules.length === 0) return null;
+
+  const lines = mapContent.split('\n');
+  const matchedLines: string[] = [];
+  let capturing = false;
+  let captureDepth = 0;
+
+  for (const line of lines) {
+    const headingMatch = line.match(/^(#{1,3})\s+(.+)/);
+    if (headingMatch) {
+      const depth = headingMatch[1].length;
+      const title = headingMatch[2].toLowerCase();
+      const matches = modules.some(mod => {
+        const parts = mod.split('/').filter(p => p.length > 2 && !p.includes('.'));
+        return parts.some(part => title.includes(part.toLowerCase()));
+      });
+      if (matches && !capturing) {
+        capturing = true;
+        captureDepth = depth;
+        matchedLines.push(line);
+      } else if (capturing && depth <= captureDepth) {
+        capturing = false;
+        if (matches) {
+          capturing = true;
+          captureDepth = depth;
+          matchedLines.push(line);
+        }
+      } else if (capturing) {
+        matchedLines.push(line);
+      }
+    } else if (capturing) {
+      matchedLines.push(line);
+    }
+  }
+
+  const result = matchedLines.join('\n').trim();
+  return result.length > 0 ? result : null;
 }
 
 // ── Tool runner ─────────────────────────────────────
@@ -456,6 +655,7 @@ export function runTool(
       case 'bash': return toolBash(input, cwd);
       case 'glob': return toolGlob(input, cwd);
       case 'grep': return toolGrep(input, cwd);
+      case 'slope': return toolSlope(input, cwd);
       default: return { output: `Unknown tool: ${name}`, isError: true };
     }
   } catch (err) {
@@ -569,6 +769,35 @@ function toolGrep(input: Record<string, unknown>, cwd: string): ToolResult {
   } catch {
     // grep exit code 1 = no matches
     return { output: '(no matches)', isError: false };
+  }
+}
+
+function toolSlope(input: Record<string, unknown>, cwd: string): ToolResult {
+  const command = (input.command as string ?? '').trim();
+  const parts = command.split(/\s+/);
+  const subcommand = parts[0];
+
+  if (!subcommand || !SLOPE_ALLOWLIST.has(subcommand)) {
+    return {
+      output: `Command "${subcommand ?? ''}" not in allowlist. Use one of: ${[...SLOPE_ALLOWLIST].join(', ')}`,
+      isError: true,
+    };
+  }
+
+  try {
+    const output = execFileSync('pnpm', ['slope', ...parts], {
+      cwd,
+      encoding: 'utf8',
+      timeout: 30_000,
+    });
+
+    if (output.length > SLOPE_TOOL_OUTPUT_CAP) {
+      return { output: output.slice(0, SLOPE_TOOL_OUTPUT_CAP) + '\n...(output truncated)', isError: false };
+    }
+    return { output: output || '(no output)', isError: false };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { output: `slope ${command} failed: ${msg.slice(0, 200)}`, isError: true };
   }
 }
 
