@@ -11,11 +11,13 @@ import { createLogger } from './logger.js';
 import { generatePlan, formatPlanAsPrompt } from './planner.js';
 import { registerExecutor, selectExecutor } from './executor-adapter.js';
 import { aiderExecutor, getActiveChildPids } from './aider-executor.js';
+import { slopeExecutor } from './slope-executor.js';
 import type { LoopConfig, BacklogSprint, BacklogTicket, TicketResult, SprintResult, ExecutionContext } from './types.js';
 import type { Logger } from './logger.js';
 
-// Register the Aider executor on module load
+// Register executors on module load
 registerExecutor(aiderExecutor);
+registerExecutor(slopeExecutor);
 
 let shuttingDown = false;
 
