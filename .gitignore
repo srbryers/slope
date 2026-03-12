@@ -5,3 +5,9 @@ dist/
 .env
 .aider*
 .claude/worktrees/
+.claude/hooks/session-*.sh
+.cursor/
+.ob1/
+.slope-loop-worktree-*/
+docs/demo/
+docs/issues/

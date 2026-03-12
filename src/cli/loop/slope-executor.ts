@@ -850,18 +850,22 @@ function runInnerGuards(
   // Guard 1: Typecheck
   try {
     execSync('pnpm typecheck', { cwd, stdio: 'pipe', timeout: 120_000 });
+    log.info('Inner guard: typecheck passed');
   } catch (err: unknown) {
     const e = err as { stderr?: string; stdout?: string };
     const output = ((e.stderr || '') + (e.stdout || '')).slice(0, 3000) || 'typecheck failed';
+    log.warn(`Inner guard failed: typecheck`);
     return { guard: 'typecheck', output };
   }
 
   // Guard 2: Tests
   try {
     execSync(config.loopTestCmd, { cwd, stdio: 'pipe', timeout: 300_000 });
+    log.info('Inner guard: tests passed');
   } catch (err: unknown) {
     const e = err as { stderr?: string; stdout?: string };
     const output = ((e.stderr || '') + (e.stdout || '')).slice(0, 3000) || 'tests failed';
+    log.warn(`Inner guard failed: tests`);
     return { guard: 'tests', output };
   }
 

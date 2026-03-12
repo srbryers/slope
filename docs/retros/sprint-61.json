@@ -1,0 +1,74 @@
+{
+  "sprint_number": 61,
+  "theme": "The Terminal Caddy — OB1 Adapter",
+  "par": 3,
+  "slope": 1,
+  "score": 2,
+  "score_label": "birdie",
+  "date": "2026-03-12",
+  "shots": [
+    {
+      "ticket_key": "S61-1",
+      "title": "OB1Adapter implementing HarnessAdapter interface",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Full adapter with {output, error} protocol, per-event hook scripts, OB1 tool mappings, detection via .ob1/hooks/. Reviewed by harness engineer sub-agent before implementation — 3 critical findings addressed."
+    },
+    {
+      "ticket_key": "S61-2",
+      "title": "Registry + barrel registration, init --ob1, doctor MCP check",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added ob1 to HarnessId, ADAPTER_PRIORITY, adapters barrel. Added --ob1 flag to init, MCP config installer, doctor MCP path. Fixed all MCP installers to preserve existing slope entries."
+    },
+    {
+      "ticket_key": "S61-3",
+      "title": "Test suite for OB1Adapter + init MCP tests",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "36 adapter tests + 4 init-mcp tests. Covers format output, hook generation, installGuards, detect, toolNames, MCP preserve behavior."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 3,
+    "fairways_total": 3,
+    "greens_in_regulation": 3,
+    "greens_total": 3,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    "First sprint executed in OB1 terminal tool",
+    "Adapter engineer sub-agent review caught 3 critical issues pre-implementation"
+  ],
+  "special_plays": [
+    "MCP preserve fix applied across all 5 existing adapters as bonus improvement"
+  ],
+  "bunker_locations": [],
+  "yardage_book_updates": [
+    "OB1 uses {output, error} protocol — not {decision, reason, context} like Cursor",
+    "OB1 hooks live at ~/.ob1 globally but .ob1/hooks at project level for detection",
+    "slope init auto-detect can't find OB1 until hooks are installed (chicken-and-egg) — use --ob1 flag"
+  ],
+  "course_management_notes": [
+    "All 3 tickets clean — no hazards, no penalties, no reverts",
+    "Sub-agent review workflow (plan → review → fix → implement) caught protocol mismatch before writing code",
+    "MCP installer overwrite bug discovered during verification — fixed across all adapters"
+  ],
+  "slope_factors": [
+    "Established adapter pattern made implementation straightforward (slope 1)",
+    "Cline adapter was the closest reference for per-event script generation",
+    "Cursor adapter was closest for JSON protocol structure"
+  ]
+}
