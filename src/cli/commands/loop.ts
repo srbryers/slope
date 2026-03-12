@@ -5,7 +5,7 @@ import { loadLoopConfig, resolveLoopConfig } from '../loop/config.js';
 import { loadBacklog, getRemainingSprintIds } from '../loop/backlog.js';
 import { selectModel } from '../loop/model-selector.js';
 import { createLogger } from '../loop/logger.js';
-import type { LoopConfig, ConfigSource, BacklogSprint } from '../loop/types.js';
+import type { LoopConfig, ConfigSource, BacklogSprint, SprintResult } from '../loop/types.js';
 
 function parseArgs(args: string[]): Record<string, string> {
   const result: Record<string, string> = {};
@@ -52,6 +52,9 @@ export async function loopCommand(args: string[]): Promise<void> {
     case 'clean':
       cleanSubcommand(flags, cwd);
       break;
+    case 'ab':
+      await abSubcommand(flags, cwd);
+      break;
     default:
       console.log(`
 slope loop — Autonomous sprint execution loop
@@ -59,9 +62,10 @@ slope loop — Autonomous sprint execution loop
 Usage:
   slope loop status [--sprint=ID]           Show loop progress, next sprint, config
   slope loop config [--show] [--set k=v]    Loop configuration management
-  slope loop run [--sprint=ID] [--dry-run]  Single sprint execution
+  slope loop run [--sprint=ID] [--dry-run] [--executor=aider|slope]  Single sprint execution
   slope loop continuous [--max=N] [--pause=S] [--staging] [--dry-run]  Multi-sprint loop
   slope loop parallel [--dry-run]           Dual-sprint parallel execution
+  slope loop ab --sprint=ID                 A/B test: run same sprint with both executors
   slope loop results [--sprint=ID] [--json] Format/display sprint results
   slope loop analyze [--regenerate]         Mine scorecards → generate backlog
   slope loop models [--analyze] [--show]    Model selection analytics
@@ -418,4 +422,168 @@ function cleanSubcommand(flags: Record<string, string>, cwd: string): void {
   }
 
   log.info('Clean complete');
+}
+
+// ── ab (A/B test) ────────────────────────────────────
+
+async function abSubcommand(flags: Record<string, string>, cwd: string): Promise<void> {
+  const sprintId = flags.sprint;
+  if (!sprintId) {
+    console.error('Usage: slope loop ab --sprint=ID');
+    process.exit(1);
+  }
+
+  const config = resolveLoopConfig(cwd);
+  const resultsDir = join(cwd, config.resultsDir);
+  mkdirSync(resultsDir, { recursive: true });
+
+  const executors = ['aider', 'slope'];
+  const abResults: Record<string, SprintResult> = {};
+
+  for (const exec of executors) {
+    console.log(`\n${'='.repeat(60)}`);
+    console.log(`  A/B Test — executor: ${exec}`);
+    console.log('='.repeat(60));
+
+    // Clean stale worktree + branch from previous run
+    const wtPath = join(cwd, `.slope-loop-worktree-${sprintId}`);
+    cleanWorktreeForAb(wtPath, sprintId, cwd);
+
+    // Remove previous result so runSprint doesn't short-circuit
+    const resultPath = join(resultsDir, `${sprintId}.json`);
+    try { unlinkSync(resultPath); } catch { /* ok */ }
+
+    // Run sprint with this executor
+    const { runSprint } = await import('../loop/executor.js');
+    const result = await runSprint({ sprint: sprintId, executor: exec }, cwd);
+
+    if (result) {
+      abResults[exec] = result;
+      // Save tagged copy
+      const taggedPath = join(resultsDir, `${sprintId}-ab-${exec}.json`);
+      if (existsSync(resultPath)) {
+        writeFileSync(taggedPath, readFileSync(resultPath, 'utf8'));
+      }
+    }
+
+    // Clean up worktree after run (don't leave branches around)
+    cleanWorktreeForAb(wtPath, sprintId, cwd);
+  }
+
+  // Print comparison
+  if (Object.keys(abResults).length === 2) {
+    printAbComparison(abResults, sprintId);
+  } else {
+    const ran = Object.keys(abResults).join(', ') || 'none';
+    console.log(`\nA/B test incomplete — only ${ran} produced results.`);
+  }
+}
+
+function cleanWorktreeForAb(wtPath: string, sprintId: string, cwd: string): void {
+  try {
+    execSync(`git worktree remove "${wtPath}" --force`, { cwd, stdio: 'pipe' });
+  } catch { /* ok */ }
+  try {
+    execSync('git worktree prune', { cwd, stdio: 'pipe' });
+  } catch { /* ok */ }
+  try {
+    execSync(`git branch -D slope-loop/${sprintId}`, { cwd, stdio: 'pipe' });
+  } catch { /* ok */ }
+}
+
+function printAbComparison(
+  results: Record<string, SprintResult>,
+  sprintId: string,
+): void {
+  const a = results['aider'];
+  const b = results['slope'];
+
+  console.log(`\n${'='.repeat(60)}`);
+  console.log(`  A/B Comparison — Sprint ${sprintId}`);
+  console.log('='.repeat(60));
+
+  // Aggregate metrics
+  const aiderMetrics = aggregateMetrics(a);
+  const slopeMetrics = aggregateMetrics(b);
+
+  const rows: [string, string, string][] = [
+    ['Metric', 'Aider', 'SlopeExecutor'],
+    ['─'.repeat(20), '─'.repeat(15), '─'.repeat(15)],
+    ['Tickets passing', `${a.tickets_passing}/${a.tickets_total}`, `${b.tickets_passing}/${b.tickets_total}`],
+    ['Tickets noop', String(a.tickets_noop), String(b.tickets_noop)],
+    ['Tokens in', fmtNum(aiderMetrics.tokens_in), fmtNum(slopeMetrics.tokens_in)],
+    ['Tokens out', fmtNum(aiderMetrics.tokens_out), fmtNum(slopeMetrics.tokens_out)],
+    ['Cost (USD)', `$${aiderMetrics.cost_usd.toFixed(4)}`, `$${slopeMetrics.cost_usd.toFixed(4)}`],
+    ['Duration (s)', String(aiderMetrics.duration_s), String(slopeMetrics.duration_s)],
+    ['Escalations', String(aiderMetrics.escalated), String(slopeMetrics.escalated)],
+  ];
+
+  for (const [label, aVal, bVal] of rows) {
+    console.log(`  ${label.padEnd(20)} ${aVal.padStart(15)} ${bVal.padStart(15)}`);
+  }
+
+  // Per-ticket breakdown
+  console.log(`\n  Per-ticket breakdown:`);
+  console.log(`  ${'Ticket'.padEnd(12)} ${'Aider'.padStart(10)} ${'Slope'.padStart(10)} ${'Winner'.padStart(10)}`);
+  console.log(`  ${'─'.repeat(12)} ${'─'.repeat(10)} ${'─'.repeat(10)} ${'─'.repeat(10)}`);
+
+  for (let i = 0; i < a.tickets.length; i++) {
+    const at = a.tickets[i];
+    const bt = b.tickets[i];
+    if (!at || !bt) continue;
+
+    const aStatus = at.noop ? 'noop' : at.tests_passing ? 'pass' : 'FAIL';
+    const bStatus = bt.noop ? 'noop' : bt.tests_passing ? 'pass' : 'FAIL';
+
+    let winner = '—';
+    if (aStatus === 'pass' && bStatus !== 'pass') winner = 'aider';
+    else if (bStatus === 'pass' && aStatus !== 'pass') winner = 'slope';
+    else if (aStatus === 'pass' && bStatus === 'pass') {
+      // Both passed — compare cost
+      const aCost = at.cost_usd ?? 0;
+      const bCost = bt.cost_usd ?? 0;
+      if (aCost > 0 && bCost > 0) {
+        winner = aCost < bCost ? 'aider' : bCost < aCost ? 'slope' : 'tie';
+      } else {
+        winner = 'tie';
+      }
+    }
+
+    console.log(`  ${at.ticket.padEnd(12)} ${aStatus.padStart(10)} ${bStatus.padStart(10)} ${winner.padStart(10)}`);
+  }
+
+  console.log(`\n  Results saved to:`);
+  console.log(`    ${sprintId}-ab-aider.json`);
+  console.log(`    ${sprintId}-ab-slope.json`);
+  console.log('');
+}
+
+interface AggregatedMetrics {
+  tokens_in: number;
+  tokens_out: number;
+  cost_usd: number;
+  duration_s: number;
+  escalated: number;
+}
+
+function aggregateMetrics(result: SprintResult): AggregatedMetrics {
+  let tokens_in = 0;
+  let tokens_out = 0;
+  let cost_usd = 0;
+  let duration_s = 0;
+  let escalated = 0;
+  for (const t of result.tickets) {
+    tokens_in += t.tokens_in ?? 0;
+    tokens_out += t.tokens_out ?? 0;
+    cost_usd += t.cost_usd ?? 0;
+    duration_s += t.duration_s ?? 0;
+    if (t.escalated) escalated++;
+  }
+  return { tokens_in, tokens_out, cost_usd, duration_s, escalated };
+}
+
+function fmtNum(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
+  return String(n);
 }
