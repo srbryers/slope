@@ -62,6 +62,25 @@ describe('init --cursor (includes MCP)', () => {
     const mcpPath = join(tmpDir, '.cursor', 'mcp.json');
     expect(existsSync(mcpPath)).toBe(false);
   });
+
+  it('preserves existing custom slope MCP entry', async () => {
+    const cursorDir = join(tmpDir, '.cursor');
+    const mcpPath = join(cursorDir, 'mcp.json');
+    mkdirSync(cursorDir, { recursive: true });
+    writeFileSync(
+      mcpPath,
+      JSON.stringify({
+        mcpServers: {
+          slope: { command: 'node', args: ['dist/mcp/index.js'] },
+        },
+      }, null, 2)
+    );
+
+    await initCommand(['--cursor']);
+
+    const content = JSON.parse(readFileSync(mcpPath, 'utf8'));
+    expect(content.mcpServers.slope).toEqual({ command: 'node', args: ['dist/mcp/index.js'] });
+  });
 });
 
 describe('init --claude-code (includes MCP)', () => {
@@ -105,6 +124,23 @@ describe('init --claude-code (includes MCP)', () => {
 
     const mcpPath = join(tmpDir, '.mcp.json');
     expect(existsSync(mcpPath)).toBe(false);
+  });
+
+  it('preserves existing custom slope MCP entry', async () => {
+    const mcpPath = join(tmpDir, '.mcp.json');
+    writeFileSync(
+      mcpPath,
+      JSON.stringify({
+        mcpServers: {
+          slope: { command: 'node', args: ['dist/mcp/index.js'] },
+        },
+      }, null, 2)
+    );
+
+    await initCommand(['--claude-code']);
+
+    const content = JSON.parse(readFileSync(mcpPath, 'utf8'));
+    expect(content.mcpServers.slope).toEqual({ command: 'node', args: ['dist/mcp/index.js'] });
   });
 
   it('creates CLAUDE.md when file does not exist', async () => {
@@ -225,6 +261,23 @@ describe('init --opencode', () => {
     });
   });
 
+  it('preserves existing custom slope MCP entry', async () => {
+    const mcpPath = join(tmpDir, 'opencode.json');
+    writeFileSync(
+      mcpPath,
+      JSON.stringify({
+        mcp: {
+          slope: { type: 'local', command: ['node', 'dist/mcp/index.js'] },
+        },
+      }, null, 2)
+    );
+
+    await initCommand(['--opencode']);
+
+    const content = JSON.parse(readFileSync(mcpPath, 'utf8'));
+    expect(content.mcp.slope).toEqual({ type: 'local', command: ['node', 'dist/mcp/index.js'] });
+  });
+
   it('uses metaphor vocabulary in AGENTS.md', async () => {
     await initCommand(['--opencode', '--metaphor=gaming']);
 
@@ -259,6 +312,71 @@ describe('init --opencode', () => {
 
     const content = readFileSync(join(pluginsDir, 'slope-plugin.ts'), 'utf8');
     expect(content).toBe('// custom plugin\n');
+  });
+});
+
+describe('init --ob1 (includes MCP)', () => {
+  it('creates .ob1/mcp.json with slope server when file does not exist', async () => {
+    await initCommand(['--ob1']);
+
+    const mcpPath = join(tmpDir, '.ob1', 'mcp.json');
+    expect(existsSync(mcpPath)).toBe(true);
+
+    const content = JSON.parse(readFileSync(mcpPath, 'utf8'));
+    expect(content.mcpServers).toBeDefined();
+    expect(content.mcpServers.slope).toEqual({
+      command: 'npx',
+      args: ['-y', 'mcp-slope-tools'],
+    });
+  });
+
+  it('merges slope into existing .ob1/mcp.json without removing other servers', async () => {
+    const ob1Dir = join(tmpDir, '.ob1');
+    const mcpPath = join(ob1Dir, 'mcp.json');
+    mkdirSync(ob1Dir, { recursive: true });
+    writeFileSync(
+      mcpPath,
+      JSON.stringify({
+        mcpServers: {
+          other: { command: 'echo', args: [] },
+        },
+      }, null, 2)
+    );
+
+    await initCommand(['--ob1']);
+
+    const content = JSON.parse(readFileSync(mcpPath, 'utf8'));
+    expect(content.mcpServers.other).toEqual({ command: 'echo', args: [] });
+    expect(content.mcpServers.slope).toEqual({
+      command: 'npx',
+      args: ['-y', 'mcp-slope-tools'],
+    });
+  });
+
+  it('does not create .ob1/mcp.json when --ob1 is not used', async () => {
+    await initCommand(['--generic']);
+
+    const mcpPath = join(tmpDir, '.ob1', 'mcp.json');
+    expect(existsSync(mcpPath)).toBe(false);
+  });
+
+  it('preserves existing custom slope MCP entry', async () => {
+    const ob1Dir = join(tmpDir, '.ob1');
+    const mcpPath = join(ob1Dir, 'mcp.json');
+    mkdirSync(ob1Dir, { recursive: true });
+    writeFileSync(
+      mcpPath,
+      JSON.stringify({
+        mcpServers: {
+          slope: { command: 'node', args: ['dist/mcp/index.js'] },
+        },
+      }, null, 2)
+    );
+
+    await initCommand(['--ob1']);
+
+    const content = JSON.parse(readFileSync(mcpPath, 'utf8'));
+    expect(content.mcpServers.slope).toEqual({ command: 'node', args: ['dist/mcp/index.js'] });
   });
 });
 
@@ -306,10 +424,15 @@ describe('detectPlatforms', () => {
   it('returns empty array when no platforms detected', () => {
     expect(detectPlatforms(tmpDir)).toEqual([]);
   });
+
+  it('detects OB1 from .ob1/hooks directory', () => {
+    mkdirSync(join(tmpDir, '.ob1', 'hooks'), { recursive: true });
+    expect(detectPlatforms(tmpDir)).toContain('ob1');
+  });
 });
 
 describe('init --all', () => {
-  it('installs for all three platforms', async () => {
+  it('installs for all platforms', async () => {
     await initCommand(['--all']);
 
     // Claude Code
@@ -325,6 +448,9 @@ describe('init --all', () => {
     // OpenCode
     expect(existsSync(join(tmpDir, 'AGENTS.md'))).toBe(true);
     expect(existsSync(join(tmpDir, 'opencode.json'))).toBe(true);
+
+    // OB1
+    expect(existsSync(join(tmpDir, '.ob1', 'mcp.json'))).toBe(true);
   });
 });
 

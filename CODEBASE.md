@@ -1,9 +1,9 @@
 ---
-generated_at: "2026-03-10T20:20:53.050Z"
-git_sha: "3ddc378c420de57d371c10945636ea58dda70ae2"
+generated_at: "2026-03-12T23:31:55.974Z"
+git_sha: "0280e807491513d0328b3cdff401ec1de411d45d"
 sprint: 60
-source_files: 184
-test_files: 141
+source_files: 188
+test_files: 145
 cli_commands: 41
 guards: 21
 flows: 0
@@ -18,7 +18,7 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
 <!-- AUTO-GENERATED: START packages -->
 
 ### `src/cli`
-- Source files: 89 | Test files: 56
+- Source files: 92 | Test files: 59
 - Key modules:
   - `config`
   - `hooks-config`
@@ -31,7 +31,7 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
   - `template-generator` — SLOPE Template Generator
 
 ### `src/core`
-- Source files: 83 | Test files: 74
+- Source files: 84 | Test files: 75
 - Key modules:
   - `advisor` — --- Module-private constants ---
   - `briefing` — --- Input types ---
@@ -254,7 +254,7 @@ Re-exports from `src/core/index.ts`:
 - `EnrichedTicket`, `EnrichedBacklog` (types)
 **Docs (Documentation Manifest):**
 - `buildDocsManifest`, `computeSectionChecksum`
-- `DocsManifest`, `DocsManifestInput`, `ChangelogSection`, `ChangelogEntry`, `ChangelogChange` (types)
+- `DocsManifest`, `DocsManifestInput`, `ManifestSection`, `ChangelogSection`, `ChangelogEntry`, `ChangelogChange`, `McpToolParam`, `McpToolMeta` (types)
 **Built-in metaphors (auto-registers on import):**
 - `golf`, `tennis`, `baseball`, `gaming`, `dnd`, `matrix`, `agile`
 <!-- AUTO-GENERATED: END api -->
@@ -328,7 +328,7 @@ Re-exports from `src/core/index.ts`:
 | `pr-review` | PostToolUse | Bash | Prompt for review workflow after PR creation |
 | `transcript` | PostToolUse | — | Append tool call metadata to session transcript |
 | `branch-before-commit` | PreToolUse | Bash | Block git commit on main/master — create a feature branch first |
-| `worktree-check` | PreToolUse | Edit|Write | Warn when editing in main repo instead of a worktree |
+| `worktree-check` | PreToolUse | Read|Glob|Grep|Edit|Write|Bash | Block concurrent sessions without worktree isolation |
 | `sprint-completion` | PreToolUse | Bash | Block PR creation when sprint gates are incomplete |
 | `sprint-completion` | Stop | — | Block session end when sprint gates are incomplete |
 | `sprint-completion` | PostToolUse | Bash | Auto-detect test pass and mark gate complete |
@@ -358,14 +358,14 @@ Re-exports from `src/core/index.ts`:
 
 | Directory | Test Files | Command |
 |-----------|-----------|---------|
-| tests/cli | 56 | `pnpm test` |
-| tests/core | 74 | `pnpm test` |
+| tests/cli | 59 | `pnpm test` |
+| tests/core | 75 | `pnpm test` |
 | tests/mcp | 6 | `pnpm test` |
 | tests/store | 1 | `pnpm test` |
 | tests/store-pg | 2 | `pnpm test` |
 | tests/tokens | 1 | `pnpm test` |
 
-**Total test files:** 140
+**Total test files:** 144
 **Run all:** `pnpm -r test`
 **Typecheck:** `pnpm -r typecheck`
 <!-- AUTO-GENERATED: END tests -->

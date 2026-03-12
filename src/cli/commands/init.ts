@@ -30,6 +30,7 @@ import '../../core/adapters/claude-code.js';
 import '../../core/adapters/cursor.js';
 import '../../core/adapters/windsurf.js';
 import '../../core/adapters/cline.js';
+import '../../core/adapters/ob1.js';
 import '../../core/adapters/generic.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -131,6 +132,7 @@ export function detectProvidersFromArgs(args: string[]): InitProvider[] {
   if (args.includes('--cline')) providers.push('cline');
   if (args.includes('--opencode')) providers.push('opencode');
   if (args.includes('--generic')) providers.push('generic');
+  if (args.includes('--ob1')) providers.push('ob1');
   // Unified --harness=<id> flag
   const harnessArg = args.find(a => a.startsWith('--harness='));
   if (harnessArg) {
@@ -138,7 +140,7 @@ export function detectProvidersFromArgs(args: string[]): InitProvider[] {
     if (id && !providers.includes(id)) providers.push(id);
   }
   // --all includes all real harnesses + opencode; generic is a fallback, not included
-  if (args.includes('--all')) return ['claude-code', 'cursor', 'windsurf', 'opencode'];
+  if (args.includes('--all')) return ['claude-code', 'cursor', 'windsurf', 'opencode', 'ob1'];
   return providers;
 }
 
@@ -377,10 +379,14 @@ function installClaudeCodeMcpConfig(cwd: string): void {
   }
 
   if (!config.mcpServers) config.mcpServers = {};
-  config.mcpServers.slope = SLOPE_MCP_ENTRY;
+  if (!config.mcpServers.slope) {
+    config.mcpServers.slope = SLOPE_MCP_ENTRY;
+    console.log(`  Created/updated ${mcpPath} (slope MCP server)`);
+  } else {
+    console.log(`  Preserved existing slope MCP entry in ${mcpPath}`);
+  }
 
   writeFileSync(mcpPath, JSON.stringify(config, null, 2) + '\n');
-  console.log(`  Created/updated ${mcpPath} (slope MCP server)`);
 }
 
 function installCursorMcpConfig(cwd: string): void {
@@ -397,11 +403,15 @@ function installCursorMcpConfig(cwd: string): void {
   }
 
   if (!config.mcpServers) config.mcpServers = {};
-  config.mcpServers.slope = SLOPE_MCP_ENTRY;
+  if (!config.mcpServers.slope) {
+    config.mcpServers.slope = SLOPE_MCP_ENTRY;
+    console.log(`  Created/updated ${mcpPath} (slope MCP server)`);
+  } else {
+    console.log(`  Preserved existing slope MCP entry in ${mcpPath}`);
+  }
 
   mkdirSync(join(cwd, '.cursor'), { recursive: true });
   writeFileSync(mcpPath, JSON.stringify(config, null, 2) + '\n');
-  console.log(`  Created/updated ${mcpPath} (slope MCP server)`);
 }
 
 function installWindsurfMcpConfig(cwd: string): void {
@@ -418,11 +428,46 @@ function installWindsurfMcpConfig(cwd: string): void {
   }
 
   if (!config.mcpServers) config.mcpServers = {};
-  config.mcpServers.slope = SLOPE_MCP_ENTRY;
+  if (!config.mcpServers.slope) {
+    config.mcpServers.slope = SLOPE_MCP_ENTRY;
+    console.log(`  Created/updated ${mcpPath} (slope MCP server)`);
+  } else {
+    console.log(`  Preserved existing slope MCP entry in ${mcpPath}`);
+  }
 
   mkdirSync(join(cwd, '.windsurf'), { recursive: true });
   writeFileSync(mcpPath, JSON.stringify(config, null, 2) + '\n');
-  console.log(`  Created/updated ${mcpPath} (slope MCP server)`);
+}
+
+function installOB1McpConfig(cwd: string): void {
+  const mcpPath = join(cwd, '.ob1', 'mcp.json');
+  let config: { mcpServers?: Record<string, { command: string; args: string[] }> } = {};
+
+  if (existsSync(mcpPath)) {
+    try {
+      const raw = readFileSync(mcpPath, 'utf8');
+      config = JSON.parse(raw) as typeof config;
+    } catch {
+      config = {};
+    }
+  }
+
+  if (!config.mcpServers) config.mcpServers = {};
+  if (!config.mcpServers.slope) {
+    config.mcpServers.slope = SLOPE_MCP_ENTRY;
+    console.log(`  Created/updated ${mcpPath} (slope MCP server)`);
+  } else {
+    console.log(`  Preserved existing slope MCP entry in ${mcpPath}`);
+  }
+
+  mkdirSync(join(cwd, '.ob1'), { recursive: true });
+  writeFileSync(mcpPath, JSON.stringify(config, null, 2) + '\n');
+}
+
+function installOB1Templates(_cwd: string, _metaphor: MetaphorDefinition): void {
+  // OB1 doesn't have a project-level rules system yet.
+  // The MCP config and hooks are sufficient for now.
+  console.log('\n  OB1 hooks and MCP server configured.');
 }
 
 function installOpenCodeTemplates(cwd: string, metaphor: MetaphorDefinition): void {
@@ -462,13 +507,17 @@ function installOpenCodeMcpConfig(cwd: string): void {
 
   if (!config.$schema) config.$schema = 'https://opencode.ai/config.json';
   if (!config.mcp) config.mcp = {};
-  config.mcp.slope = {
-    type: 'local',
-    command: ['npx', '-y', 'mcp-slope-tools'],
-  };
+  if (!config.mcp.slope) {
+    config.mcp.slope = {
+      type: 'local',
+      command: ['npx', '-y', 'mcp-slope-tools'],
+    };
+    console.log(`  Created/updated ${mcpPath} (slope MCP server)`);
+  } else {
+    console.log(`  Preserved existing slope MCP entry in ${mcpPath}`);
+  }
 
   writeFileSync(mcpPath, JSON.stringify(config, null, 2) + '\n');
-  console.log(`  Created/updated ${mcpPath} (slope MCP server)`);
 }
 
 function installDefaultHooks(cwd: string, provider: InitProvider): void {
@@ -484,7 +533,9 @@ function installDefaultHooks(cwd: string, provider: InitProvider): void {
       ? join(cwd, '.windsurf', 'hooks')
       : provider === 'cline'
         ? join(cwd, '.clinerules', 'hooks')
-        : join(cwd, '.cursor', 'hooks');
+        : provider === 'ob1'
+          ? join(cwd, '.ob1', 'hooks')
+          : join(cwd, '.cursor', 'hooks');
   mkdirSync(hooksDir, { recursive: true });
 
   const { loadHooksConfig } = { loadHooksConfig: (c: string) => {
@@ -543,6 +594,11 @@ function installForProvider(cwd: string, provider: InitProvider, metaphor: Metap
       installOpenCodeMcpConfig(cwd);
       installOpenCodePlugin(cwd);
       break;
+    case 'ob1':
+      installOB1Templates(cwd, metaphor);
+      installOB1McpConfig(cwd);
+      installDefaultHooks(cwd, 'ob1');
+      break;
     case 'generic':
       installGenericTemplates(cwd, metaphor);
       break;
@@ -573,6 +629,11 @@ const PROVIDER_NEXT_STEPS: Partial<Record<InitProvider, string[]>> = {
   opencode: [
     'MCP server configured in opencode.json',
     'Plugin installed to .opencode/plugins/slope-plugin.ts',
+  ],
+  ob1: [
+    'Restart OB1 to load the SLOPE MCP server',
+    'MCP config installed to .ob1/mcp.json',
+    'Guard hooks installed to .ob1/hooks/',
   ],
   generic: [
     'Checklist installed to SLOPE-CHECKLIST.md',

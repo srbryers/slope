@@ -6,7 +6,7 @@ import type { GuardResult, AnyGuardDefinition } from './guard.js';
 // --- Types ---
 
 /** Known AI coding harness identifiers (extensible via string for third-party adapters) */
-export type HarnessId = 'claude-code' | 'cursor' | 'cline' | 'windsurf' | 'continue' | 'aider' | 'generic' | (string & {});
+export type HarnessId = 'claude-code' | 'cursor' | 'cline' | 'windsurf' | 'continue' | 'aider' | 'ob1' | 'generic' | (string & {});
 
 /** Tool categories that guards can match against (harness-agnostic) */
 export type ToolCategory =
@@ -76,7 +76,7 @@ export const CLAUDE_CODE_TOOLS: ToolNameMap = {
 // --- Adapter Priority ---
 
 /** Detection order for adapters. First match wins. Generic is always last (fallback). */
-export const ADAPTER_PRIORITY: HarnessId[] = ['claude-code', 'cursor', 'windsurf', 'cline', 'generic'];
+export const ADAPTER_PRIORITY: HarnessId[] = ['claude-code', 'cursor', 'windsurf', 'cline', 'ob1', 'generic'];
 
 // --- Adapter Registry ---
 

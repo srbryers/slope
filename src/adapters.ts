@@ -6,6 +6,7 @@ import './core/adapters/claude-code.js';
 import './core/adapters/cursor.js';
 import './core/adapters/windsurf.js';
 import './core/adapters/cline.js';
+import './core/adapters/ob1.js';
 import './core/adapters/generic.js';
 
 // Framework functions
@@ -19,8 +20,10 @@ export { ClaudeCodeAdapter, claudeCodeAdapter } from './core/adapters/claude-cod
 export { CursorAdapter, cursorAdapter } from './core/adapters/cursor.js';
 export { WindsurfAdapter, windsurfAdapter } from './core/adapters/windsurf.js';
 export { ClineAdapter, clineAdapter } from './core/adapters/cline.js';
+export { OB1Adapter, ob1Adapter } from './core/adapters/ob1.js';
 export { GenericAdapter, genericAdapter } from './core/adapters/generic.js';
 
 // Adapter-specific types (for consumers building harness integrations)
 export type { ClineHookOutput } from './core/adapters/cline.js';
+export type { OB1HookOutput } from './core/adapters/ob1.js';
 export type { GuardManifestEntry } from './core/adapters/generic.js';

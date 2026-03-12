@@ -180,6 +180,7 @@ function checkMcpConfig(cwd: string): DoctorCheck[] {
     cursor: '.cursor/mcp.json',
     windsurf: '.windsurf/mcp.json',
     opencode: 'opencode.json',
+    ob1: '.ob1/mcp.json',
   };
 
   for (const platform of platforms) {

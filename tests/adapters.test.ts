@@ -22,6 +22,8 @@ import {
   windsurfAdapter,
   ClineAdapter,
   clineAdapter,
+  OB1Adapter,
+  ob1Adapter,
   GenericAdapter,
   genericAdapter,
 } from '../src/adapters.js';
@@ -36,6 +38,7 @@ describe('adapters barrel export', () => {
     registerAdapter(new CursorAdapter());
     registerAdapter(new WindsurfAdapter());
     registerAdapter(new ClineAdapter());
+    registerAdapter(new OB1Adapter());
     registerAdapter(new GenericAdapter());
   });
 
@@ -73,14 +76,15 @@ describe('adapters barrel export', () => {
     expect(getAdapter('unknown-harness')).toBeUndefined();
   });
 
-  it('listAdapters() includes all 5 built-in adapters', () => {
+  it('listAdapters() includes all 6 built-in adapters', () => {
     const ids = listAdapters();
     expect(ids).toContain('claude-code');
     expect(ids).toContain('cursor');
     expect(ids).toContain('windsurf');
     expect(ids).toContain('cline');
+    expect(ids).toContain('ob1');
     expect(ids).toContain('generic');
-    expect(ids.length).toBeGreaterThanOrEqual(5);
+    expect(ids.length).toBeGreaterThanOrEqual(6);
   });
 
   it('detectAdapter() works after barrel import (side-effect registration)', () => {
@@ -109,6 +113,7 @@ describe('adapters barrel export', () => {
     expect(cursorAdapter).toBeInstanceOf(CursorAdapter);
     expect(windsurfAdapter).toBeInstanceOf(WindsurfAdapter);
     expect(clineAdapter).toBeInstanceOf(ClineAdapter);
+    expect(ob1Adapter).toBeInstanceOf(OB1Adapter);
     expect(genericAdapter).toBeInstanceOf(GenericAdapter);
   });
 
@@ -133,5 +138,26 @@ describe('adapters barrel export', () => {
     const detected = detectAdapter(tmpDir);
     expect(detected).toBeDefined();
     expect(detected!.id).toBe('cline');
+  });
+
+  it('getAdapter("ob1") returns OB1Adapter instance', () => {
+    const adapter = getAdapter('ob1');
+    expect(adapter).toBeDefined();
+    expect(adapter).toBeInstanceOf(OB1Adapter);
+  });
+
+  it('detection: .ob1/hooks/ only → OB1Adapter', () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), 'slope-ob1-only-'));
+    mkdirSync(join(tmpDir, '.ob1', 'hooks'), { recursive: true });
+    const detected = detectAdapter(tmpDir);
+    expect(detected).toBeDefined();
+    expect(detected!.id).toBe('ob1');
+  });
+
+  it('ADAPTER_PRIORITY has ob1 before generic', () => {
+    const ob1Idx = ADAPTER_PRIORITY.indexOf('ob1');
+    const genericIdx = ADAPTER_PRIORITY.indexOf('generic');
+    expect(ob1Idx).toBeGreaterThan(-1);
+    expect(ob1Idx).toBeLessThan(genericIdx);
   });
 });
