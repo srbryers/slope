@@ -145,6 +145,9 @@ export interface ExecutionResult {
   duration_s: number;
   transcript: TranscriptEvent[];
   files_changed: string[];
+  /** If true, the executor's inner guards (typecheck + tests) passed and no
+   *  additional changes were made after verification. Outer guards can be skipped. */
+  innerGuardsPassed?: boolean;
 }
 
 /** Context passed to an executor for a single ticket attempt */

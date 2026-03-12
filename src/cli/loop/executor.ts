@@ -303,6 +303,10 @@ async function processTicket(
       tLog.warn('No code changes produced (no-op)');
       noop = true;
       testsPassing = true;
+    } else if (result1.innerGuardsPassed) {
+      // Inner guards already verified typecheck + tests — skip outer guards
+      tLog.info('Inner guards passed — skipping outer guards');
+      testsPassing = true;
     } else {
       // Run post-ticket guards
       const guardResult = runGuards(preSha, config, cwd, tLog, ticket);

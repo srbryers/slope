@@ -9,7 +9,7 @@
  * - Timeout enforcement
  */
 
-import Anthropic from '@anthropic-ai/sdk';
+import type Anthropic from '@anthropic-ai/sdk';
 import { execSync, execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
@@ -27,11 +27,13 @@ import type { Logger } from './logger.js';
 const MAX_TURNS = 50;
 const MAX_REPEATED_CALLS = 3;
 const MAX_GUARD_RETRIES = 2;
+const MAX_OVERLOAD_RETRIES = 3;
 const DEFAULT_MAX_TOKENS = 8192;
 const TOOL_BASH_TIMEOUT = 60_000;
 const TOOL_OUTPUT_CAP = 50_000;
 const FILE_READ_CAP = 100_000;
 const TRANSCRIPT_CAP = 2000;
+const TRUNCATE_KEEP_RECENT = 20; // keep last 10 turns fully intact
 
 // Approximate cost per million tokens — not intended to be precise
 const COST_TABLE: Record<string, { in: number; out: number }> = {
@@ -41,6 +43,16 @@ const COST_TABLE: Record<string, { in: number; out: number }> = {
   'claude-opus-4-6': { in: 15.00, out: 75.00 },
 };
 const DEFAULT_COST = { in: 1.00, out: 5.00 };
+
+// Destructive command blocklist — [pattern, human-readable reason]
+const BLOCKED_COMMANDS: [RegExp, string][] = [
+  [/\brm\s+-\w*r\w*\s+\//, 'rm with recursive flag targeting absolute path'],
+  [/\bgit\s+push\b/, 'push is handled by the loop, not the executor'],
+  [/\bmkfs\b/, 'filesystem format commands are not allowed'],
+  [/\bdd\b.*\bof=\//, 'dd write to absolute path is not allowed'],
+  [/\b(shutdown|reboot|halt|poweroff)\b/, 'system power commands are not allowed'],
+  [/\bcurl\b.*\|\s*(ba)?sh/, 'piping curl to shell is not allowed'],
+];
 
 // ── Tool definitions (Anthropic API format) ─────────
 
@@ -161,9 +173,16 @@ export const slopeExecutor: ExecutorAdapter = {
 
     let client: Anthropic;
     try {
-      client = new Anthropic(); // reads ANTHROPIC_API_KEY from env
+      const { default: AnthropicSDK } = await import('@anthropic-ai/sdk');
+      // Supports ANTHROPIC_API_KEY and ANTHROPIC_BASE_URL from env
+      const baseURL = process.env.ANTHROPIC_BASE_URL;
+      client = new AnthropicSDK(baseURL ? { baseURL } : undefined);
     } catch (err) {
-      log.error(`Anthropic client init failed (is ANTHROPIC_API_KEY set?): ${err instanceof Error ? err.message : err}`);
+      const msg = err instanceof Error ? err.message : String(err);
+      const hint = msg.includes('Cannot find') || msg.includes('MODULE_NOT_FOUND')
+        ? 'Install: pnpm add @anthropic-ai/sdk'
+        : 'Is ANTHROPIC_API_KEY set?';
+      log.error(`Anthropic client init failed (${hint}): ${msg}`);
       return errorResult(transcript, start);
     }
 
@@ -181,10 +200,13 @@ export const slopeExecutor: ExecutorAdapter = {
     let outcome: ExecutionResult['outcome'] = 'completed';
     let turn = 0;
     let guardRetries = 0;
+    let overloadRetries = 0;
+    let innerGuardsPassed = false;
 
     // ── Agent loop ──
     while (turn < MAX_TURNS) {
-      if (Date.now() > deadline) {
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) {
         log.warn(`Timed out after ${ctx.timeout}s`);
         outcome = 'timeout';
         break;
@@ -192,24 +214,42 @@ export const slopeExecutor: ExecutorAdapter = {
 
       turn++;
 
+      // Truncate old tool results to stay within context limits
+      truncateOldMessages(messages);
+
+      // AbortSignal for per-call timeout
+      const controller = new AbortController();
+      const callTimeout = setTimeout(() => controller.abort(), remaining);
+
       let response: Anthropic.Message;
       try {
-        response = await client.messages.create({
-          model: modelId,
-          max_tokens: DEFAULT_MAX_TOKENS,
-          system: systemPrompt,
-          tools: TOOLS,
-          messages,
-        });
+        response = await client.messages.create(
+          {
+            model: modelId,
+            max_tokens: DEFAULT_MAX_TOKENS,
+            system: systemPrompt,
+            tools: TOOLS,
+            messages,
+          },
+          { signal: controller.signal },
+        );
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
+        if (controller.signal.aborted) {
+          log.warn(`API call aborted (deadline reached)`);
+          outcome = 'timeout';
+          break;
+        }
         log.error(`API error (turn ${turn}): ${msg}`);
-        if (msg.includes('overloaded') && turn < MAX_TURNS) {
-          await sleep(5000);
+        if (msg.includes('overloaded') && overloadRetries < MAX_OVERLOAD_RETRIES) {
+          overloadRetries++;
+          await sleep(5000 * overloadRetries);
           continue;
         }
         outcome = 'error';
         break;
+      } finally {
+        clearTimeout(callTimeout);
       }
 
       // Accumulate usage
@@ -230,6 +270,7 @@ export const slopeExecutor: ExecutorAdapter = {
         const guardFailure = runInnerGuards(config, cwd, log);
         if (!guardFailure) {
           log.info('Inner guards passed');
+          innerGuardsPassed = true;
           break;
         }
 
@@ -314,6 +355,7 @@ export const slopeExecutor: ExecutorAdapter = {
       duration_s,
       transcript,
       files_changed: filesChanged,
+      innerGuardsPassed: innerGuardsPassed && filesChanged.length === 0,
     };
   },
 };
@@ -346,7 +388,8 @@ ${cwd}
 - Keep changes minimal and focused on this ticket only
 - After all changes, run: pnpm typecheck && pnpm test
 - If tests fail, read the error and fix the issue
-- Commit with: git add <files> && git commit -m '${ctx.ticketKey}: <summary>'
+- Do NOT run git commit — the system auto-commits after verification
+- You are working on ticket: ${ctx.ticketKey}
 
 ## Tools
 - read_file: Read file contents (always do this first)
@@ -421,12 +464,11 @@ function toolEditFile(input: Record<string, unknown>, cwd: string): ToolResult {
 
 function toolBash(input: Record<string, unknown>, cwd: string): ToolResult {
   const cmd = input.command as string;
-  // Block destructive commands
-  if (/\brm\s+-rf\s+\/(?!\w)/.test(cmd)) {
-    return { output: 'Blocked: rm -rf / is not allowed', isError: true };
-  }
-  if (/\bgit\s+push\b.*--force/.test(cmd)) {
-    return { output: 'Blocked: force push is not allowed', isError: true };
+  // Block destructive commands — the model should not push (loop handles it),
+  // delete broad filesystem paths, or run system-level commands
+  const blocked = BLOCKED_COMMANDS.find(([re]) => re.test(cmd));
+  if (blocked) {
+    return { output: `Blocked: ${blocked[1]}`, isError: true };
   }
   try {
     const output = execSync(cmd, {
@@ -477,7 +519,7 @@ function toolGrep(input: Record<string, unknown>, cwd: string): ToolResult {
     if (include) {
       args.push(`--include=${include}`);
     } else {
-      args.push('--include=*.ts', '--include=*.js', '--include=*.json', '--include=*.md');
+      args.push('--include=*.ts', '--include=*.js', '--include=*.json', '--include=*.md', '--include=*.sh');
     }
     args.push('--', pattern, searchPath);
     const output = execFileSync('grep', args, {
@@ -560,6 +602,32 @@ function runInnerGuards(
   }
 
   return null;
+}
+
+// ── Message truncation ──────────────────────────────
+
+/**
+ * Truncate old tool result contents to prevent context window overflow.
+ * Keeps the first message (task prompt) and recent turns fully intact.
+ * Older tool results are shrunk to 200 chars.
+ */
+function truncateOldMessages(messages: Anthropic.MessageParam[]): void {
+  if (messages.length <= TRUNCATE_KEEP_RECENT + 2) return;
+
+  for (let i = 2; i < messages.length - TRUNCATE_KEEP_RECENT; i++) {
+    const msg = messages[i];
+    if (msg.role === 'user' && Array.isArray(msg.content)) {
+      for (const block of msg.content as Array<{ type: string; content?: string }>) {
+        if (
+          block.type === 'tool_result' &&
+          typeof block.content === 'string' &&
+          block.content.length > 200
+        ) {
+          block.content = block.content.slice(0, 200) + '\n[truncated]';
+        }
+      }
+    }
+  }
 }
 
 // ── Utilities ───────────────────────────────────────

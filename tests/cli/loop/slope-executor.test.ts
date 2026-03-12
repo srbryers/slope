@@ -278,10 +278,10 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain(tmpDir);
   });
 
-  it('includes the ticket key in commit guidance', () => {
+  it('includes the ticket key', () => {
     const ctx = { ticketKey: 'TEST-1', ticket: baseTicket } as ExecutionContext;
     const prompt = buildSystemPrompt(ctx, mockConfig, tmpDir);
-    expect(prompt).toContain("TEST-1: <summary>");
+    expect(prompt).toContain('ticket: TEST-1');
   });
 
   it('includes rules about reading files first', () => {

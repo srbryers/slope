@@ -527,10 +527,12 @@ function printAbComparison(
   console.log(`  ${'Ticket'.padEnd(12)} ${'Aider'.padStart(10)} ${'Slope'.padStart(10)} ${'Winner'.padStart(10)}`);
   console.log(`  ${'─'.repeat(12)} ${'─'.repeat(10)} ${'─'.repeat(10)} ${'─'.repeat(10)}`);
 
-  for (let i = 0; i < a.tickets.length; i++) {
-    const at = a.tickets[i];
-    const bt = b.tickets[i];
-    if (!at || !bt) continue;
+  // Build a map of slope tickets by key for O(1) lookup
+  const slopeByKey = new Map(b.tickets.map(t => [t.ticket, t]));
+
+  for (const at of a.tickets) {
+    const bt = slopeByKey.get(at.ticket);
+    if (!bt) continue;
 
     const aStatus = at.noop ? 'noop' : at.tests_passing ? 'pass' : 'FAIL';
     const bStatus = bt.noop ? 'noop' : bt.tests_passing ? 'pass' : 'FAIL';
