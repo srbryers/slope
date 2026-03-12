@@ -26,6 +26,7 @@ import type { Logger } from './logger.js';
 
 const MAX_TURNS = 50;
 const MAX_REPEATED_CALLS = 3;
+const MAX_GUARD_RETRIES = 2;
 const DEFAULT_MAX_TOKENS = 8192;
 const TOOL_BASH_TIMEOUT = 60_000;
 const TOOL_OUTPUT_CAP = 50_000;
@@ -179,6 +180,7 @@ export const slopeExecutor: ExecutorAdapter = {
     const recentSigs: string[] = [];
     let outcome: ExecutionResult['outcome'] = 'completed';
     let turn = 0;
+    let guardRetries = 0;
 
     // ── Agent loop ──
     while (turn < MAX_TURNS) {
@@ -216,10 +218,29 @@ export const slopeExecutor: ExecutorAdapter = {
         totalOut += response.usage.output_tokens;
       }
 
-      // Model is done
+      // Model thinks it's done — run inner guards before accepting
       if (response.stop_reason === 'end_turn') {
         messages.push({ role: 'assistant', content: response.content });
-        break;
+
+        // Skip inner guards if we've exhausted retries or are past deadline
+        if (guardRetries >= MAX_GUARD_RETRIES || Date.now() > deadline) {
+          break;
+        }
+
+        const guardFailure = runInnerGuards(config, cwd, log);
+        if (!guardFailure) {
+          log.info('Inner guards passed');
+          break;
+        }
+
+        // Feed the error back so the model can self-correct
+        guardRetries++;
+        log.warn(`Inner guard failed (attempt ${guardRetries}/${MAX_GUARD_RETRIES}): ${guardFailure.guard}`);
+        messages.push({
+          role: 'user',
+          content: `Your changes have an issue that must be fixed before this ticket is complete.\n\n## ${guardFailure.guard} failed\n\`\`\`\n${guardFailure.output}\n\`\`\`\n\nPlease fix the issue and verify again.`,
+        });
+        continue;
       }
 
       if (response.stop_reason !== 'tool_use') {
@@ -501,6 +522,44 @@ function gitCommit(
     log.warn(`Commit helper failed: ${err instanceof Error ? err.message : err}`);
     return [];
   }
+}
+
+// ── Inner guards ────────────────────────────────────
+
+interface GuardFailure {
+  guard: 'typecheck' | 'tests';
+  output: string;
+}
+
+/**
+ * Run typecheck + tests inside the executor loop, giving the model
+ * a chance to self-correct before the outer guards revert everything.
+ * Returns null on success, or the failure details.
+ */
+function runInnerGuards(
+  config: LoopConfig,
+  cwd: string,
+  log: Logger,
+): GuardFailure | null {
+  // Guard 1: Typecheck
+  try {
+    execSync('pnpm typecheck', { cwd, stdio: 'pipe', timeout: 120_000 });
+  } catch (err: unknown) {
+    const e = err as { stderr?: string; stdout?: string };
+    const output = ((e.stderr || '') + (e.stdout || '')).slice(0, 3000) || 'typecheck failed';
+    return { guard: 'typecheck', output };
+  }
+
+  // Guard 2: Tests
+  try {
+    execSync(config.loopTestCmd, { cwd, stdio: 'pipe', timeout: 300_000 });
+  } catch (err: unknown) {
+    const e = err as { stderr?: string; stdout?: string };
+    const output = ((e.stderr || '') + (e.stdout || '')).slice(0, 3000) || 'tests failed';
+    return { guard: 'tests', output };
+  }
+
+  return null;
 }
 
 // ── Utilities ───────────────────────────────────────
