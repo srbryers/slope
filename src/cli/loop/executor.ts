@@ -1,5 +1,4 @@
-import { spawn, execSync, execFileSync } from 'node:child_process';
-import { createInterface } from 'node:readline';
+import { execSync, execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, mkdirSync, writeFileSync, renameSync, appendFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { resolveLoopConfig } from './config.js';
@@ -10,16 +9,15 @@ import { runGuards } from './guard-runner.js';
 import { checkGhCli, hasCommitsAhead, createPr, runStructuralReview, autoMerge } from './pr-lifecycle.js';
 import { createLogger } from './logger.js';
 import { generatePlan, formatPlanAsPrompt } from './planner.js';
-import type { LoopConfig, BacklogSprint, BacklogTicket, TicketResult, SprintResult } from './types.js';
+import { registerExecutor, selectExecutor } from './executor-adapter.js';
+import { aiderExecutor, getActiveChildPids } from './aider-executor.js';
+import type { LoopConfig, BacklogSprint, BacklogTicket, TicketResult, SprintResult, ExecutionContext } from './types.js';
 import type { Logger } from './logger.js';
 
-// Context budget constants — cap injected context to avoid token overflow
-const MAX_PRIMARY_FILES = 3;
-const CONTEXT_LINE_LIMIT_LOCAL = 200;
-const CONTEXT_LINE_LIMIT_API = 750;
+// Register the Aider executor on module load
+registerExecutor(aiderExecutor);
 
 let shuttingDown = false;
-const activeChildPids = new Set<number>();
 
 export function isShuttingDown(): boolean {
   return shuttingDown;
@@ -46,7 +44,7 @@ export async function runSprint(flags: Record<string, string>, cwd: string): Pro
   const cleanup = () => {
     shuttingDown = true;
     log.warn('Shutting down...');
-    const pidsToKill = [...activeChildPids];
+    const pidsToKill = [...getActiveChildPids()];
     for (const pid of pidsToKill) {
       try { process.kill(-pid, 'SIGTERM'); } catch { /* already gone */ }
     }
@@ -114,7 +112,7 @@ export async function runSprint(flags: Record<string, string>, cwd: string): Pro
           log.warn('Shutdown requested — stopping ticket processing');
           break;
         }
-        const result = await processTicket(ticket, config, worktreeCwd, log, sprint.strategy);
+        const result = await processTicket(ticket, config, worktreeCwd, log, sprint.strategy, flags.executor);
         ticketResults.push(result);
 
         // Log model usage (JSONL)
@@ -231,7 +229,7 @@ export async function runSprint(flags: Record<string, string>, cwd: string): Pro
   }
 }
 
-// ── Ticket Processing ──────────────────────────────
+// ── Ticket Processing (adapter-based) ──────────────────────────────
 
 async function processTicket(
   ticket: BacklogTicket,
@@ -239,6 +237,7 @@ async function processTicket(
   cwd: string,
   log: Logger,
   strategy?: BacklogSprint['strategy'],
+  executorOverride?: string,
 ): Promise<TicketResult> {
   const tLog = log.child(`ticket:${ticket.key}`);
   tLog.info(`-- ${ticket.key}: ${ticket.title} --`);
@@ -247,6 +246,10 @@ async function processTicket(
   const primaryModel = selectModel(ticket.club, ticket.max_files, ticket.estimated_tokens ?? 0, config, cwd, strategy);
   const timeout = selectTimeout(primaryModel, config);
   tLog.info(`Model: ${primaryModel} (timeout: ${timeout}s)`);
+
+  // Select executor based on model and config
+  const executor = selectExecutor(primaryModel, executorOverride);
+  tLog.info(`Executor: ${executor.id}`);
 
   // Claim ticket
   try { execFileSync('pnpm', ['slope', 'claim', `--target=${ticket.key}`], { cwd, stdio: 'pipe' }); } catch { /* ok */ }
@@ -261,37 +264,91 @@ async function processTicket(
     tLog.warn(`Planner failed, falling back to buildPrompt: ${err instanceof Error ? err.message : err}`);
     prompt = buildPrompt(ticket, primaryModel);
   }
+
   const preSha = getHeadSha(cwd);
   let finalModel = primaryModel;
   let escalated = false;
   let testsPassing = false;
   let noop = false;
+  let tokens_in = 0;
+  let tokens_out = 0;
+  let cost_usd = 0;
+  let duration_s = 0;
+
+  // Build execution context
+  const ctx: ExecutionContext = {
+    ticketKey: ticket.key,
+    model: primaryModel,
+    timeout,
+    prompt,
+    ticket,
+    preSha,
+  };
 
   // Attempt 1: Primary model
-  const attempt1 = await runAiderWithGuards(ticket.key, primaryModel, timeout, prompt, ticket, preSha, config, cwd, tLog);
+  const result1 = await executor.execute(ctx, config, cwd, tLog);
+  tokens_in += result1.tokens_in;
+  tokens_out += result1.tokens_out;
+  cost_usd += result1.cost_usd;
+  duration_s += result1.duration_s;
 
-  if (attempt1.passed) {
-    testsPassing = true;
-    noop = attempt1.noop;
-  } else if (attempt1.spawnFailed) {
-    tLog.error('Aider failed to start — skipping ticket');
-  } else if (config.escalateOnFail && isLocalModel(primaryModel)) {
-    // Attempt 2: Escalate to API model
+  if (result1.outcome === 'error') {
+    tLog.error('Executor failed to start — skipping ticket');
+  } else {
+    // Check for noop (no SHA change)
+    const postSha = getHeadSha(cwd);
+    if (preSha === postSha) {
+      tLog.warn('No code changes produced (no-op)');
+      noop = true;
+      testsPassing = true;
+    } else {
+      // Run post-ticket guards
+      const guardResult = runGuards(preSha, config, cwd, tLog, ticket);
+      if (guardResult.passed) {
+        tLog.info('Guards passed');
+        testsPassing = true;
+      } else {
+        tLog.warn(`Guard failed: ${guardResult.failedGuard}`);
+      }
+    }
+  }
+
+  // Attempt 2: Escalate if primary failed
+  if (!testsPassing && !noop && result1.outcome !== 'error' && config.escalateOnFail && isLocalModel(primaryModel)) {
     tLog.info(`Escalating to ${config.modelApi}`);
     finalModel = config.modelApi;
     escalated = true;
 
     const preEscSha = getHeadSha(cwd);
-    const attempt2 = await runAiderWithGuards(
-      ticket.key, config.modelApi, config.modelApiTimeout,
-      prompt, ticket, preEscSha, config, cwd, tLog,
-    );
+    const escExecutor = selectExecutor(config.modelApi, executorOverride);
+    const escCtx: ExecutionContext = {
+      ticketKey: ticket.key,
+      model: config.modelApi,
+      timeout: config.modelApiTimeout,
+      prompt,
+      ticket,
+      preSha: preEscSha,
+    };
 
-    if (attempt2.passed) {
+    const result2 = await escExecutor.execute(escCtx, config, cwd, tLog);
+    tokens_in += result2.tokens_in;
+    tokens_out += result2.tokens_out;
+    cost_usd += result2.cost_usd;
+    duration_s += result2.duration_s;
+
+    const postEscSha = getHeadSha(cwd);
+    if (preEscSha === postEscSha) {
+      tLog.warn('No code changes after escalation (no-op)');
+      noop = true;
       testsPassing = true;
-      noop = attempt2.noop;
     } else {
-      tLog.warn('Tests still failing after escalation');
+      const guardResult = runGuards(preEscSha, config, cwd, tLog, ticket);
+      if (guardResult.passed) {
+        tLog.info('Guards passed after escalation');
+        testsPassing = true;
+      } else {
+        tLog.warn('Tests still failing after escalation');
+      }
     }
   }
 
@@ -310,199 +367,11 @@ async function processTicket(
     escalated,
     tests_passing: testsPassing,
     noop,
+    tokens_in: tokens_in || undefined,
+    tokens_out: tokens_out || undefined,
+    cost_usd: cost_usd || undefined,
+    duration_s: duration_s || undefined,
   };
-}
-
-// ── Aider + Guards ─────────────────────────────────
-
-interface AiderGuardResult {
-  passed: boolean;
-  noop: boolean;
-  spawnFailed: boolean;
-}
-
-async function runAiderWithGuards(
-  ticketKey: string,
-  model: string,
-  timeout: number,
-  prompt: string,
-  ticket: BacklogTicket,
-  preSha: string,
-  config: LoopConfig,
-  cwd: string,
-  log: Logger,
-): Promise<AiderGuardResult> {
-  const outcome = await runAider(ticketKey, model, timeout, prompt, ticket, config, cwd, log);
-
-  if (outcome === 'error') {
-    return { passed: false, noop: false, spawnFailed: true };
-  }
-
-  const postSha = getHeadSha(cwd);
-  if (preSha === postSha) {
-    log.warn('No code changes produced (no-op)');
-    return { passed: true, noop: true, spawnFailed: false };
-  }
-
-  const guardResult = runGuards(preSha, config, cwd, log, ticket);
-  if (guardResult.passed) {
-    log.info('Guards passed');
-    return { passed: true, noop: false, spawnFailed: false };
-  }
-
-  log.warn(`Guard failed: ${guardResult.failedGuard}`);
-  return { passed: false, noop: false, spawnFailed: false };
-}
-
-type AiderOutcome = 'completed' | 'error' | 'timeout';
-
-async function runAider(
-  ticketKey: string,
-  model: string,
-  timeout: number,
-  prompt: string,
-  ticket: BacklogTicket,
-  config: LoopConfig,
-  cwd: string,
-  log: Logger,
-): Promise<AiderOutcome> {
-  const aiderArgs = [
-    '--model', model,
-    '--message', prompt,
-    '--auto-commits',
-    '--yes',
-  ];
-
-  const local = isLocalModel(model);
-
-  if (local) {
-    aiderArgs.push('--no-stream', '--no-show-model-warnings', '--map-tokens', '1024');
-  } else {
-    aiderArgs.push('--auto-test', '--test-cmd', config.loopTestCmd);
-  }
-
-  // Agent guide (API only, within word budget)
-  if (!local) {
-    const guidePath = join(cwd, config.agentGuide);
-    if (existsSync(guidePath)) {
-      const words = readFileSync(guidePath, 'utf8').split(/\s+/).length;
-      if (words <= config.agentGuideMaxWords) {
-        aiderArgs.push('--read', guidePath);
-      } else {
-        log.warn(`SKILL.md exceeds ${config.agentGuideMaxWords} words — skipping`);
-      }
-    }
-  }
-
-  // Semantic context injection (capture output instead of shell redirect)
-  const contextLineLimit = local ? CONTEXT_LINE_LIMIT_LOCAL : CONTEXT_LINE_LIMIT_API;
-  const contextTop = local ? 4 : 8;
-  const contextFile = join(cwd, config.logDir, `${ticketKey}-context.md`);
-
-  try {
-    const contextOutput = execFileSync('pnpm', [
-      'slope', 'context',
-      `--ticket=${ticketKey}`,
-      '--format=snippets',
-      `--top=${contextTop}`,
-    ], { cwd, encoding: 'utf8' });
-
-    if (contextOutput.trim().length === 0) {
-      const codemap = join(cwd, 'CODEBASE.md');
-      if (existsSync(codemap)) aiderArgs.push('--read', codemap);
-    } else {
-      const contextLines = contextOutput.split('\n');
-      if (contextLines.length <= contextLineLimit) {
-        writeFileSync(contextFile, contextOutput);
-        aiderArgs.push('--read', contextFile);
-        log.info(`Injected semantic context (${contextLines.length} lines)`);
-      } else {
-        // Truncate to limit instead of discarding — top results are most relevant
-        const truncated = contextLines.slice(0, contextLineLimit).join('\n');
-        writeFileSync(contextFile, truncated);
-        aiderArgs.push('--read', contextFile);
-        log.info(`Injected semantic context (${contextLines.length} lines, truncated to ${contextLineLimit})`);
-      }
-    }
-  } catch {
-    log.info('slope context failed — falling back to CODEBASE.md');
-    const codemap = join(cwd, 'CODEBASE.md');
-    if (existsSync(codemap)) aiderArgs.push('--read', codemap);
-  }
-
-  // Primary files from enriched ticket as --file flags (editable)
-  if (ticket.files?.primary) {
-    let fileCount = 0;
-    for (const f of ticket.files.primary) {
-      if (fileCount >= MAX_PRIMARY_FILES) break;
-      if (f && existsSync(join(cwd, f)) && /\.(ts|js|sh)$/.test(f) && !f.includes('.test.')) {
-        aiderArgs.push('--file', f);
-        fileCount++;
-      }
-    }
-    if (fileCount > 0) {
-      log.info(`Added ${fileCount} primary files to Aider edit context`);
-    }
-  }
-
-  // Spawn Aider with detached process group for clean shutdown
-  const aiderLogPath = join(cwd, config.logDir, `${ticketKey}-${model.split('/').pop()}.log`);
-  const env = {
-    ...process.env,
-    OLLAMA_API_BASE: config.ollamaApiBase,
-    OLLAMA_FLASH_ATTENTION: config.ollamaFlashAttention ? '1' : '0',
-    OLLAMA_KV_CACHE_TYPE: config.ollamaKvCacheType,
-  };
-
-  return new Promise<AiderOutcome>((resolve) => {
-    const child = spawn('aider', aiderArgs, {
-      cwd,
-      env,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      detached: true,
-    });
-
-    if (child.pid) {
-      activeChildPids.add(child.pid);
-    }
-
-    // Stream draining — avoid 64KB buffer deadlock
-    const logLines: string[] = [];
-    if (child.stdout) {
-      const rl = createInterface({ input: child.stdout });
-      rl.on('line', (line) => logLines.push(line));
-    }
-    if (child.stderr) {
-      const rl = createInterface({ input: child.stderr });
-      rl.on('line', (line) => logLines.push(line));
-    }
-
-    // Timeout
-    const timer = setTimeout(() => {
-      log.warn(`Aider timed out after ${timeout}s`);
-      if (child.pid) {
-        try { process.kill(-child.pid, 'SIGTERM'); } catch { /* ok */ }
-      }
-      // Don't resolve here — let the 'close' event handle it
-    }, timeout * 1000);
-
-    child.on('close', (code) => {
-      clearTimeout(timer);
-      if (child.pid) activeChildPids.delete(child.pid);
-      if (code !== 0) {
-        log.warn(`Aider exited with code ${code}`);
-      }
-      try { writeFileSync(aiderLogPath, logLines.join('\n')); } catch { /* ok */ }
-      resolve('completed');
-    });
-
-    child.on('error', (err) => {
-      clearTimeout(timer);
-      if (child.pid) activeChildPids.delete(child.pid);
-      log.error(`Aider spawn error: ${err.message}`);
-      resolve('error');
-    });
-  });
 }
 
 // ── Prompt Builder ─────────────────────────────────

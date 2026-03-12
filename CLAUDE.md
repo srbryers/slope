@@ -2,6 +2,11 @@
 
 Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint scoring.
 
+## General Note on tone and style
+- Call out assumptions.
+- Be Critical, Thoughtful, and Constructive.
+- Ask Questions!!
+
 ## Monorepo Structure
 - `packages/core` — scoring engine, types, config, metaphor engine, roles, standup protocol, CI signal parser, store interface, loader (v1.5.0)
 - `packages/tokens` — shared design tokens (colors, typography, spacing, CSS generation) (v1.5.0)

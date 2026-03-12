@@ -1,5 +1,7 @@
 // Loop orchestration types — derived from actual backlog.json, model-config.json, and result schemas
 
+import type { Logger } from './logger.js';
+
 // === Config ===
 
 export interface LoopConfig {
@@ -110,6 +112,55 @@ export interface TicketResult {
   escalated: boolean;
   tests_passing: boolean;
   noop: boolean;
+  // Added by SlopeExecutor (optional for AiderExecutor backward compat)
+  tokens_in?: number;
+  tokens_out?: number;
+  cost_usd?: number;
+  duration_s?: number;
+  transcript?: TranscriptEvent[];
+}
+
+// === Executor Adapter ===
+
+/** Which executor backend to use */
+export type ExecutorId = 'aider' | 'slope';
+
+/** Structured record of a single tool call during execution */
+export interface TranscriptEvent {
+  timestamp: string;
+  tool: string;
+  input: Record<string, unknown>;
+  output?: string;
+  duration_ms?: number;
+  guard_warning?: string;
+}
+
+/** Result from a single executor run (one model attempt on one ticket) */
+export interface ExecutionResult {
+  outcome: 'completed' | 'stuck' | 'error' | 'timeout';
+  noop: boolean;
+  tokens_in: number;
+  tokens_out: number;
+  cost_usd: number;
+  duration_s: number;
+  transcript: TranscriptEvent[];
+  files_changed: string[];
+}
+
+/** Context passed to an executor for a single ticket attempt */
+export interface ExecutionContext {
+  ticketKey: string;
+  model: string;
+  timeout: number;
+  prompt: string;
+  ticket: BacklogTicket;
+  preSha: string;
+}
+
+/** Adapter interface — both AiderExecutor and SlopeExecutor implement this */
+export interface ExecutorAdapter {
+  readonly id: ExecutorId;
+  execute(ctx: ExecutionContext, config: LoopConfig, cwd: string, log: Logger): Promise<ExecutionResult>;
 }
 
 export interface SprintResult {
