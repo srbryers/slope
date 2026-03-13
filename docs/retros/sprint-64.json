@@ -1,0 +1,100 @@
+{
+  "sprint_number": 64,
+  "theme": "Claim Hygiene, Worktree Safety & Loop Planner Context",
+  "par": 5,
+  "slope": 1,
+  "score": 5,
+  "score_label": "par",
+  "date": "2026-03-13",
+  "shots": [
+    {
+      "ticket_key": "S64-1",
+      "title": "Fix stale claims: session cleanup parity + expiry filtering",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "SQLite removeSession/cleanStaleSessions now clean claims (parity with PG). getActiveClaims filters expired claims in both stores. Next-action guard scopes claims to current session."
+    },
+    {
+      "ticket_key": "S64-2",
+      "title": "worktree-self-remove guard: block git worktree remove on own cwd",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "New guard following worktree-merge pattern. Resolves target path, compares to cwd, blocks with ExitWorktree guidance."
+    },
+    {
+      "ticket_key": "S64-3",
+      "title": "slope worktree cleanup CLI command",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [
+        {
+          "type": "rough",
+          "description": "Unused function getMainWorktreePath left in initial implementation",
+          "severity": "minor",
+          "source": "code-review"
+        }
+      ],
+      "notes": "New command with --path, --all, --dry-run. Parses git worktree list --porcelain, checks PR merge status via gh, graceful fallback if gh unavailable."
+    },
+    {
+      "ticket_key": "S64-4",
+      "title": "Inject hazards + similar-ticket context into loop prompt (--lite fallback)",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added --lite flag to slope prep. Outputs hazards + similar tickets without embedding index. Injected as fallback in run.sh."
+    },
+    {
+      "ticket_key": "S64-5",
+      "title": "Pass prep-plan-discovered files as Aider --file flags",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "run.sh now calls slope prep --json, extracts files via jq, adds as --file flags. Deduplicates against TICKET_PRIMARY_FILES."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 5,
+    "fairways_total": 5,
+    "greens_in_regulation": 5,
+    "greens_total": 5,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 1,
+    "hazard_penalties": 0.25,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    "Worked in worktree isolation while another session was active on main",
+    "Deep review (3 rounds) completed before implementation — 12 findings total",
+    "All 5 tickets implemented with test coverage, build + typecheck + tests passing"
+  ],
+  "special_plays": [
+    "Used newly-created slope worktree cleanup command to clean stale worktrees immediately after implementation",
+    "3-round deep review caught PG/SQLite parity gap, cleanStaleSessions claim leak, and fragile markdown parsing — all fixed in plan before coding"
+  ],
+  "bunker_locations": [],
+  "yardage_book_updates": [
+    "SQLite store now has full claim lifecycle parity with PG store",
+    "worktree-self-remove guard protects against shell-breaking worktree removal",
+    "slope worktree cleanup available for branch/worktree housekeeping",
+    "slope prep --lite provides embedding-free hazard context fallback"
+  ],
+  "course_management_notes": [
+    "Review found 1 minor code quality issue (unused function) — removed before merge",
+    "Architect review confirmed plan-to-implementation fidelity was high",
+    "No penalties or reverts needed"
+  ],
+  "slope_factors": [
+    "Deep plan review (3 rounds, 12 findings) de-risked implementation significantly",
+    "Existing guard pattern (worktree-merge) made S64-2 straightforward",
+    "PG store already had correct claim cleanup — SQLite just needed parity"
+  ]
+}

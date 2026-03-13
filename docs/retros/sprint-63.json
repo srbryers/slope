@@ -1,0 +1,97 @@
+{
+  "sprint_number": 63,
+  "theme": "The Handbook + Template Integration — CLI Help & Documentation Polish",
+  "par": 5,
+  "slope": 1,
+  "score": 3,
+  "score_label": "eagle",
+  "date": "2026-03-12",
+  "shots": [
+    {
+      "ticket_key": "S63-1",
+      "title": "slope help <command> — detailed usage, examples, and flags for each command",
+      "club": "short_iron",
+      "result": null,
+      "hazards": [],
+      "notes": ""
+    },
+    {
+      "ticket_key": "S63-2",
+      "title": "slope quickstart — interactive tutorial for new users",
+      "club": "short_iron",
+      "result": null,
+      "hazards": [],
+      "notes": ""
+    },
+    {
+      "ticket_key": "S63-3",
+      "title": "Guard documentation — explain each guard's purpose, triggers, and config",
+      "club": "wedge",
+      "result": null,
+      "hazards": [],
+      "notes": ""
+    },
+    {
+      "ticket_key": "S63-4",
+      "title": "Integrate ticket templates into sprint-checklist.md — reference .slope/templates/ in Pre-Shot routine",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Updated Pre-Round and Pre-Shot routines to mention .slope/templates/ticket.md and slope plan --sprint=N"
+    },
+    {
+      "ticket_key": "S63-5",
+      "title": "Update CLAUDE.md and harness-specific context files to mention templates and slope plan",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Updated CLAUDE.md (root), AGENTS.md, and templates/claude-code/CLAUDE.md with template and plan command references"
+    },
+    {
+      "ticket_key": "S63-6",
+      "title": "Add slope plan --sprint=N to show full ticket specs from roadmap",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added --sprint flag to plan command. Shows I WANT TO, SO THAT, OBJECTIVES, ACCEPTANCE CRITERIA, GOTCHAS, DEPENDENCIES for each ticket"
+    }
+  ],
+  "stats": {
+    "fairways_hit": 3,
+    "fairways_total": 6,
+    "greens_in_regulation": 3,
+    "greens_total": 6,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    "S63-4: Template references added to Pre-Round and Pre-Shot routines",
+    "S63-5: Updated 3 context files (CLAUDE.md, AGENTS.md, templates/claude-code/CLAUDE.md)",
+    "S63-6: plan --sprint now shows full ticket specs from roadmap"
+  ],
+  "special_plays": [
+    "Template integration tasks completed (S63-4, S63-5, S63-6)",
+    "Remaining: S63-1 (help), S63-2 (quickstart), S63-3 (guard docs)"
+  ],
+  "bunker_locations": [],
+  "yardage_book_updates": [
+    "Sprint templates now integrate into SLOPE routines",
+    "Users should run 'slope plan --sprint=N' to see full ticket specs"
+  ],
+  "course_management_notes": [
+    "Clean execution on 3 template integration tickets",
+    "Handbook tasks (S63-1, S63-2, S63-3) remain for future work"
+  ],
+  "slope_factors": [
+    "template-generator.ts provided foundation for CLAUDE.md updates",
+    "Existing roadmap structure supported new --sprint flag"
+  ]
+}
