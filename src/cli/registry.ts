@@ -266,6 +266,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
       { name: '<name>', desc: 'Run a guard (reads hook JSON from stdin)' },
       { name: 'list', desc: 'Show all available guards' },
       { name: 'status', desc: 'Show per-harness guard installation state' },
+      { name: 'recommend', desc: 'Show missing guards with relevance to your workflow' },
       { name: 'docs', desc: 'Show detailed guard documentation', flags: [
         { flag: '<name>', desc: 'Guard name (optional — shows all if omitted)' },
       ]},

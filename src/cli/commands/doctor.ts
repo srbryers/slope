@@ -1,7 +1,18 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { detectPlatforms, type InitProvider } from './init.js';
 import { GUARD_DEFINITIONS } from '../../core/guard.js';
+import { hasMetaphor } from '../../core/metaphor.js';
+import { detectAdapter, SLOPE_BIN_PREAMBLE, writeOrUpdateManagedScript } from '../../core/harness.js';
+
+// Side-effect imports: ensure adapters are registered for detectAdapter()
+import '../../core/adapters/claude-code.js';
+import '../../core/adapters/cursor.js';
+import '../../core/adapters/windsurf.js';
+import '../../core/adapters/generic.js';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export interface DoctorCheck {
   name: string;
@@ -35,10 +46,19 @@ export function runDoctorChecks(cwd: string): DoctorCheck[] {
   // 7. Check CODEBASE.md exists and is not stale
   checks.push(checkCodebaseMap(cwd));
 
-  // 8. Check guards are installed for detected platforms
+  // 8. Check version drift
+  checks.push(checkVersion(cwd));
+
+  // 9. Check config schema validity
+  checks.push(...checkConfigSchema(cwd));
+
+  // 10. Check guards are installed for detected platforms
   checks.push(...checkGuards(cwd));
 
-  // 9. Check MCP config for detected platforms
+  // 11. Check hook script staleness
+  checks.push(...checkHookScripts(cwd));
+
+  // 12. Check MCP config for detected platforms
   checks.push(...checkMcpConfig(cwd));
 
   return checks;
@@ -126,6 +146,201 @@ function checkCodebaseMap(cwd: string): DoctorCheck {
   return { name: 'codebase-map', status: 'ok', message: 'CODEBASE.md exists and is recent' };
 }
 
+/** Read the current SLOPE package version from package.json */
+function getPackageVersion(): string {
+  const pkgPath = join(__dirname, '..', '..', '..', 'package.json');
+  const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
+  return pkg.version;
+}
+
+function checkVersion(cwd: string): DoctorCheck {
+  const configPath = join(cwd, '.slope', 'config.json');
+  if (!existsSync(configPath)) {
+    return { name: 'version', status: 'warn', message: 'Cannot check version — .slope/config.json missing', fixable: false };
+  }
+  try {
+    const config = JSON.parse(readFileSync(configPath, 'utf8'));
+    const pkgVersion = getPackageVersion();
+    if (!config.slopeVersion) {
+      return { name: 'version', status: 'warn', message: `config.slopeVersion missing — should be ${pkgVersion}`, fixable: true };
+    }
+    if (config.slopeVersion !== pkgVersion) {
+      return { name: 'version', status: 'warn', message: `config.slopeVersion (${config.slopeVersion}) differs from package (${pkgVersion}) — run \`slope doctor --fix\``, fixable: true };
+    }
+    return { name: 'version', status: 'ok', message: `config.slopeVersion matches package (${pkgVersion})` };
+  } catch {
+    return { name: 'version', status: 'warn', message: 'Cannot check version — .slope/config.json unreadable', fixable: false };
+  }
+}
+
+function checkConfigSchema(cwd: string): DoctorCheck[] {
+  const checks: DoctorCheck[] = [];
+  const configPath = join(cwd, '.slope', 'config.json');
+  if (!existsSync(configPath)) return checks;
+
+  let config: Record<string, unknown>;
+  try {
+    config = JSON.parse(readFileSync(configPath, 'utf8'));
+  } catch {
+    return checks; // JSON parse failure is already caught by checkConfig
+  }
+
+  // Required string fields
+  if (config.scorecardDir !== undefined && typeof config.scorecardDir !== 'string') {
+    checks.push({ name: 'config-schema', status: 'warn', message: 'config.scorecardDir should be a string', fixable: false });
+  }
+  if (config.scorecardPattern !== undefined && typeof config.scorecardPattern !== 'string') {
+    checks.push({ name: 'config-schema', status: 'warn', message: 'config.scorecardPattern should be a string', fixable: false });
+  }
+
+  // Metaphor validation
+  if (config.metaphor !== undefined) {
+    if (typeof config.metaphor !== 'string') {
+      checks.push({ name: 'config-schema', status: 'warn', message: 'config.metaphor should be a string — will reset to "golf"', fixable: true });
+    } else if (!hasMetaphor(config.metaphor as string)) {
+      checks.push({ name: 'config-schema', status: 'warn', message: `config.metaphor "${config.metaphor}" is not a registered metaphor — will reset to "golf"`, fixable: true });
+    }
+  }
+
+  // slopeVersion type check
+  if (config.slopeVersion !== undefined && typeof config.slopeVersion !== 'string') {
+    checks.push({ name: 'config-schema', status: 'warn', message: 'config.slopeVersion should be a string', fixable: false });
+  }
+
+  // Optional detectedStack type checks
+  if (config.detectedStack !== undefined && typeof config.detectedStack === 'object' && config.detectedStack !== null) {
+    const stack = config.detectedStack as Record<string, unknown>;
+    if (stack.language !== undefined && typeof stack.language !== 'string') {
+      checks.push({ name: 'config-schema', status: 'warn', message: 'config.detectedStack.language should be a string', fixable: false });
+    }
+    if (stack.packageManager !== undefined && typeof stack.packageManager !== 'string') {
+      checks.push({ name: 'config-schema', status: 'warn', message: 'config.detectedStack.packageManager should be a string', fixable: false });
+    }
+  }
+
+  if (checks.length === 0) {
+    checks.push({ name: 'config-schema', status: 'ok', message: 'Config schema valid' });
+  }
+
+  return checks;
+}
+
+/** Generate the expected guard dispatcher script content */
+function generateGuardDispatcherScript(): string {
+  return [
+    '#!/usr/bin/env bash',
+    '# SLOPE guard dispatcher — routes hook events to slope guard handlers',
+    '# Auto-generated by slope hook add --level=full',
+    '',
+    '# === SLOPE MANAGED (do not edit above this line) ===',
+    ...SLOPE_BIN_PREAMBLE,
+    '',
+    'slope guard "$@"',
+    '# === SLOPE END ===',
+    '',
+  ].join('\n');
+}
+
+/** Generate the expected session hook script content */
+function generateSessionHookScript(name: string, commands: string[]): string {
+  return [
+    '#!/usr/bin/env bash',
+    `# SLOPE hook: ${name}`,
+    '',
+    '# === SLOPE MANAGED (do not edit above this line) ===',
+    ...SLOPE_BIN_PREAMBLE,
+    '',
+    ...commands,
+    '# === SLOPE END ===',
+    '',
+    '# Add your custom commands below:',
+    '',
+  ].join('\n');
+}
+
+const MANAGED_START = '# === SLOPE MANAGED (do not edit above this line) ===';
+const MANAGED_END = '# === SLOPE END ===';
+
+function checkHookScripts(cwd: string): DoctorCheck[] {
+  const checks: DoctorCheck[] = [];
+  const adapter = detectAdapter(cwd);
+  if (!adapter) return checks;
+
+  // Determine the hooks directory for this adapter
+  const hooksDirMap: Record<string, string> = {
+    'claude-code': join(cwd, '.claude', 'hooks'),
+    cursor: join(cwd, '.cursor', 'hooks'),
+    windsurf: join(cwd, '.windsurf', 'hooks'),
+    cline: join(cwd, '.clinerules', 'hooks'),
+    ob1: join(cwd, '.ob1', 'hooks'),
+  };
+  const hooksDir = hooksDirMap[adapter.id];
+  if (!hooksDir) return checks;
+
+  // Check guard dispatcher
+  const dispatcherPath = join(hooksDir, 'slope-guard.sh');
+  if (existsSync(dispatcherPath)) {
+    const existing = readFileSync(dispatcherPath, 'utf8');
+    if (existing.includes(MANAGED_START) && existing.includes(MANAGED_END)) {
+      const expected = generateGuardDispatcherScript();
+      const existingManaged = existing.slice(
+        existing.indexOf(MANAGED_START) + MANAGED_START.length,
+        existing.indexOf(MANAGED_END),
+      );
+      const expectedManaged = expected.slice(
+        expected.indexOf(MANAGED_START) + MANAGED_START.length,
+        expected.indexOf(MANAGED_END),
+      );
+      if (existingManaged !== expectedManaged) {
+        checks.push({
+          name: 'hook-scripts',
+          status: 'warn',
+          message: 'slope-guard.sh managed section is outdated — run `slope doctor --fix` to update',
+          fixable: true,
+        });
+      }
+    }
+  }
+
+  // Check session hooks
+  const sessionHooks: Record<string, string[]> = {
+    'session-start': ['slope session start --ide="$SLOPE_IDE" --role=primary', 'slope briefing --compact'],
+    'session-end': ['slope session end --session-id="$SLOPE_SESSION_ID"'],
+  };
+
+  for (const [name, commands] of Object.entries(sessionHooks)) {
+    const filePath = join(hooksDir, `slope-${name}.sh`);
+    if (!existsSync(filePath)) continue;
+
+    const existing = readFileSync(filePath, 'utf8');
+    if (existing.includes(MANAGED_START) && existing.includes(MANAGED_END)) {
+      const expected = generateSessionHookScript(name, commands);
+      const existingManaged = existing.slice(
+        existing.indexOf(MANAGED_START) + MANAGED_START.length,
+        existing.indexOf(MANAGED_END),
+      );
+      const expectedManaged = expected.slice(
+        expected.indexOf(MANAGED_START) + MANAGED_START.length,
+        expected.indexOf(MANAGED_END),
+      );
+      if (existingManaged !== expectedManaged) {
+        checks.push({
+          name: 'hook-scripts',
+          status: 'warn',
+          message: `slope-${name}.sh managed section is outdated — run \`slope doctor --fix\` to update`,
+          fixable: true,
+        });
+      }
+    }
+  }
+
+  if (checks.length === 0 && existsSync(dispatcherPath)) {
+    checks.push({ name: 'hook-scripts', status: 'ok', message: 'Hook scripts are up to date' });
+  }
+
+  return checks;
+}
+
 function checkGuards(cwd: string): DoctorCheck[] {
   const checks: DoctorCheck[] = [];
   const hooksPath = join(cwd, '.slope', 'hooks.json');
@@ -151,6 +366,12 @@ function checkGuards(cwd: string): DoctorCheck[] {
         status: 'warn',
         message: `No guards active (${totalGuards} available) — run \`slope hook add --level=full\``,
         fixable: true,
+      });
+    } else if (installedCount < totalGuards) {
+      checks.push({
+        name: 'guards',
+        status: 'ok',
+        message: `${installedCount} hooks installed (${totalGuards} guards available) — run \`slope guard recommend\` to see suggestions`,
       });
     } else {
       checks.push({
@@ -289,6 +510,72 @@ export async function runDoctorFixes(cwd: string, checks: DoctorCheck[]): Promis
           fixed.push('Generated CODEBASE.md');
         } catch {
           // map command may fail in some contexts — non-fatal
+        }
+        break;
+      }
+      case 'version': {
+        const configPath = join(cwd, '.slope', 'config.json');
+        if (existsSync(configPath)) {
+          const config = JSON.parse(readFileSync(configPath, 'utf8'));
+          config.slopeVersion = getPackageVersion();
+          writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n');
+          fixed.push(`Updated config.slopeVersion to ${config.slopeVersion}`);
+        }
+        break;
+      }
+      case 'config-schema': {
+        const schemaConfigPath = join(cwd, '.slope', 'config.json');
+        if (existsSync(schemaConfigPath)) {
+          const config = JSON.parse(readFileSync(schemaConfigPath, 'utf8'));
+          let changed = false;
+          // Fix invalid metaphor
+          if (typeof config.metaphor !== 'string' || !hasMetaphor(config.metaphor)) {
+            config.metaphor = 'golf';
+            changed = true;
+          }
+          // Fix missing slopeVersion
+          if (!config.slopeVersion) {
+            config.slopeVersion = getPackageVersion();
+            changed = true;
+          }
+          if (changed) {
+            writeFileSync(schemaConfigPath, JSON.stringify(config, null, 2) + '\n');
+            fixed.push('Fixed config schema issues (metaphor/slopeVersion)');
+          }
+        }
+        break;
+      }
+      case 'hook-scripts': {
+        const adapter = detectAdapter(cwd);
+        if (!adapter) break;
+        const hooksDirMap: Record<string, string> = {
+          'claude-code': join(cwd, '.claude', 'hooks'),
+          cursor: join(cwd, '.cursor', 'hooks'),
+          windsurf: join(cwd, '.windsurf', 'hooks'),
+          cline: join(cwd, '.clinerules', 'hooks'),
+          ob1: join(cwd, '.ob1', 'hooks'),
+        };
+        const hooksDir = hooksDirMap[adapter.id];
+        if (!hooksDir) break;
+
+        // Update guard dispatcher
+        const dispatcherPath = join(hooksDir, 'slope-guard.sh');
+        if (existsSync(dispatcherPath)) {
+          const result = writeOrUpdateManagedScript(dispatcherPath, generateGuardDispatcherScript());
+          if (result === 'updated') fixed.push('Updated slope-guard.sh managed section');
+        }
+
+        // Update session hooks
+        const sessionHooks: Record<string, string[]> = {
+          'session-start': ['slope session start --ide="$SLOPE_IDE" --role=primary', 'slope briefing --compact'],
+          'session-end': ['slope session end --session-id="$SLOPE_SESSION_ID"'],
+        };
+        for (const [name, commands] of Object.entries(sessionHooks)) {
+          const filePath = join(hooksDir, `slope-${name}.sh`);
+          if (existsSync(filePath)) {
+            const result = writeOrUpdateManagedScript(filePath, generateSessionHookScript(name, commands));
+            if (result === 'updated') fixed.push(`Updated slope-${name}.sh managed section`);
+          }
         }
         break;
       }

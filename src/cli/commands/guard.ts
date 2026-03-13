@@ -235,6 +235,7 @@ Usage:
   slope guard <name>          Run a guard (reads hook JSON from stdin)
   slope guard list            Show all available guards
   slope guard status          Show per-harness guard installation state
+  slope guard recommend       Show missing guards with relevance
   slope guard enable <name>   Enable a disabled guard
   slope guard disable <name>  Disable a guard
 
@@ -338,6 +339,10 @@ export async function guardManageCommand(args: string[]): Promise<void> {
       console.log('\nLegend: [+] active  [-] disabled  [~] unsupported by harness\n');
       break;
     }
+    case 'recommend': {
+      guardRecommendCommand(cwd);
+      break;
+    }
     case 'docs': {
       formatGuardDocs(name);
       break;
@@ -363,5 +368,154 @@ export async function guardManageCommand(args: string[]): Promise<void> {
     }
     default:
       printUsage();
+  }
+}
+
+/** Guard relevance metadata: when each guard is useful and why */
+const GUARD_RELEVANCE: Record<string, { when: string; why: string }> = {
+  'explore': { when: 'always', why: 'Prevents unnecessary codebase exploration when map is available' },
+  'hazard': { when: 'always', why: 'Warns about known issues before editing affected files' },
+  'commit-nudge': { when: 'always', why: 'Prevents lost work from uncommitted changes' },
+  'branch-before-commit': { when: 'always', why: 'Enforces branch discipline — never commit to main' },
+  'push-nudge': { when: 'always', why: 'Ensures work is pushed for recovery' },
+  'stop-check': { when: 'always', why: 'Catches uncommitted/unpushed work before session end' },
+  'worktree-check': { when: 'multi-session', why: 'Required for concurrent agent sessions' },
+  'worktree-merge': { when: 'multi-session', why: 'Prevents gh pr merge failures in worktrees' },
+  'worktree-self-remove': { when: 'multi-session', why: 'Prevents shell breakage from self-removing worktree' },
+  'scope-drift': { when: 'sprint-workflow', why: 'Keeps work focused on claimed tickets' },
+  'sprint-completion': { when: 'sprint-workflow', why: 'Blocks PR until tests pass and scorecard exists' },
+  'review-tier': { when: 'sprint-workflow', why: 'Prompts for plan review after writing plan files' },
+  'workflow-gate': { when: 'sprint-workflow', why: 'Blocks plan exit until review rounds complete' },
+  'pr-review': { when: 'sprint-workflow', why: 'Prompts for implementation review after PR creation' },
+  'next-action': { when: 'sprint-workflow', why: 'Suggests next steps at session end' },
+  'version-check': { when: 'monorepo', why: 'Blocks push when package versions not bumped' },
+  'stale-flows': { when: 'has-flows', why: 'Warns when editing files in stale flow definitions' },
+  'subagent-gate': { when: 'always', why: 'Caps subagent model/turns to control cost' },
+  'compaction': { when: 'always', why: 'Extracts events before context window compression' },
+  'transcript': { when: 'always', why: 'Records tool call metadata for session replay' },
+};
+
+/** Detect which workflow profiles apply to this repo */
+function detectWorkflowProfiles(cwd: string): Set<string> {
+  const profiles = new Set<string>();
+
+  // multi-session: worktree dirs exist
+  try {
+    const gitDir = join(cwd, '.git', 'worktrees');
+    if (existsSync(gitDir)) profiles.add('multi-session');
+  } catch { /* ignore */ }
+
+  // sprint-workflow: roadmap.json + scorecards exist
+  if (existsSync(join(cwd, 'docs', 'backlog', 'roadmap.json')) &&
+      existsSync(join(cwd, 'docs', 'retros'))) {
+    profiles.add('sprint-workflow');
+  }
+
+  // monorepo: packages/ dir or workspaces in package.json
+  if (existsSync(join(cwd, 'packages'))) {
+    profiles.add('monorepo');
+  } else {
+    try {
+      const pkg = JSON.parse(readFileSync(join(cwd, 'package.json'), 'utf8'));
+      if (pkg.workspaces) profiles.add('monorepo');
+    } catch { /* no package.json */ }
+  }
+
+  // has-flows: .slope/flows.json exists and non-empty
+  try {
+    const flowsPath = join(cwd, '.slope', 'flows.json');
+    if (existsSync(flowsPath)) {
+      const flows = JSON.parse(readFileSync(flowsPath, 'utf8'));
+      if (Array.isArray(flows) ? flows.length > 0 : Object.keys(flows).length > 0) {
+        profiles.add('has-flows');
+      }
+    }
+  } catch { /* ignore */ }
+
+  return profiles;
+}
+
+/** slope guard recommend — show missing guards with relevance */
+function guardRecommendCommand(cwd: string): void {
+  const config = loadConfig();
+  const disabled = config.guidance?.disabled ?? [];
+
+  // Load custom guard plugins
+  loadPluginGuards(cwd, config.plugins);
+
+  // Detect workflow profiles
+  const profiles = detectWorkflowProfiles(cwd);
+
+  // Deduplicate guard names
+  const seen = new Set<string>();
+  const allGuards: Array<{ name: string; description: string }> = [];
+  for (const d of getAllGuardDefinitions()) {
+    if (seen.has(d.name)) continue;
+    seen.add(d.name);
+    allGuards.push({ name: d.name, description: d.description });
+  }
+
+  // Find missing guards with relevance
+  const missing: Array<{ name: string; relevant: boolean; when: string; why: string }> = [];
+  for (const guard of allGuards) {
+    if (disabled.includes(guard.name)) continue;
+    const relevance = GUARD_RELEVANCE[guard.name];
+    if (!relevance) continue;
+
+    // Check if installed — guard names in hooks.json may differ from guard names
+    // (hooks.json uses hook event names like "session-start", not guard names)
+    // Check if the guard is configured in the harness hooks config
+    const isInstalled = isGuardInstalled(cwd, guard.name);
+    if (isInstalled) continue;
+
+    const relevant = relevance.when === 'always' || profiles.has(relevance.when);
+    missing.push({ name: guard.name, relevant, when: relevance.when, why: relevance.why });
+  }
+
+  if (missing.length === 0) {
+    console.log('\nAll relevant guards are installed. Nothing to recommend.\n');
+    return;
+  }
+
+  // Sort: relevant first, then alphabetical
+  missing.sort((a, b) => {
+    if (a.relevant !== b.relevant) return a.relevant ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
+
+  const profileList = profiles.size > 0 ? [...profiles].join(', ') : 'none detected';
+  console.log(`\nWorkflow profiles: ${profileList}\n`);
+  console.log('Missing guards:\n');
+  console.log(`  ${'Guard'.padEnd(24)} ${'Relevant'.padEnd(10)} ${'When'.padEnd(18)} Why`);
+  console.log(`  ${'─'.repeat(24)} ${'─'.repeat(10)} ${'─'.repeat(18)} ${'─'.repeat(40)}`);
+
+  for (const g of missing) {
+    const marker = g.relevant ? 'YES' : 'no';
+    console.log(`  ${g.name.padEnd(24)} ${marker.padEnd(10)} ${g.when.padEnd(18)} ${g.why}`);
+  }
+
+  const relevantCount = missing.filter(g => g.relevant).length;
+  if (relevantCount > 0) {
+    console.log(`\n  ${relevantCount} guard${relevantCount > 1 ? 's' : ''} recommended for your workflow.`);
+    console.log('  Run `slope hook add --level=full` to install all guards.\n');
+  } else {
+    console.log('\n  No guards are specifically recommended for your detected workflow.\n');
+  }
+}
+
+/** Check if a guard is installed in the harness hooks config */
+function isGuardInstalled(cwd: string, guardName: string): boolean {
+  const adapter = detectAdapter(cwd);
+  if (!adapter) return false;
+
+  const configPath = adapter.hooksConfigPath(cwd);
+  if (!configPath || !existsSync(configPath)) return false;
+
+  try {
+    const raw = readFileSync(configPath, 'utf8');
+    // Check if the guard name appears in the hooks config (e.g. slope-guard.sh <name>)
+    return raw.includes(`slope-guard.sh ${guardName}`) || raw.includes(`guard ${guardName}`);
+  } catch {
+    return false;
   }
 }

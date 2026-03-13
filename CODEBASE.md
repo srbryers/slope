@@ -1,11 +1,11 @@
 ---
-generated_at: "2026-03-13T02:44:16.264Z"
-git_sha: "56c71307ca659a621e2a4d09115a29e2f08104ba"
-sprint: 61
-source_files: 188
-test_files: 145
-cli_commands: 41
-guards: 21
+generated_at: "2026-03-13T18:01:47.442Z"
+git_sha: "6be511eaceec57ec10c467cc14d270b648a17f9b"
+sprint: 64
+source_files: 193
+test_files: 149
+cli_commands: 44
+guards: 22
 flows: 0
 ---
 
@@ -18,7 +18,7 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
 <!-- AUTO-GENERATED: START packages -->
 
 ### `src/cli`
-- Source files: 92 | Test files: 59
+- Source files: 97 | Test files: 63
 - Key modules:
   - `config`
   - `hooks-config`
@@ -139,7 +139,7 @@ Re-exports from `src/core/index.ts`:
 - `GUARD_DEFINITIONS`, `formatPreToolUseOutput`, `formatPostToolUseOutput`, `formatStopOutput`, `generateClaudeCodeHooksConfig`, `registerCustomGuard`, `getAllGuardDefinitions`, `getCustomGuard`, `clearCustomGuards`
 - `HookInput`, `PreToolUseOutput`, `PostToolUseOutput`, `StopOutput`, `GuardResult`, `GuardName`, `GuardDefinition`, `GuidanceConfig`, `CustomGuardDefinition`, `AnyGuardDefinition` (types)
 **Harness Adapter Framework:**
-- `TOOL_CATEGORIES`, `CLAUDE_CODE_TOOLS`, `ADAPTER_PRIORITY`, `registerAdapter`, `getAdapter`, `listAdapters`, `detectAdapter`, `clearAdapters`, `resolveToolMatcher`
+- `TOOL_CATEGORIES`, `CLAUDE_CODE_TOOLS`, `ADAPTER_PRIORITY`, `registerAdapter`, `getAdapter`, `listAdapters`, `detectAdapter`, `clearAdapters`, `resolveToolMatcher`, `SLOPE_BIN_PREAMBLE`, `writeOrUpdateManagedScript`
 - `HarnessId`, `ToolCategory`, `ToolNameMap`, `HarnessAdapter` (types)
 **Adapters:**
 - `ClaudeCodeAdapter`, `claudeCodeAdapter`
@@ -264,6 +264,8 @@ Re-exports from `src/core/index.ts`:
 <!-- AUTO-GENERATED: START cli -->
 
 - `slope init` — Initialize .slope/ directory
+- `slope help` — Show detailed per-command usage
+- `slope quickstart` — Interactive tutorial for new users
 - `slope doctor` — Check repo health and auto-fix issues
 - `slope version` — Show version or bump with automated PR workflow
 - `slope session` — Manage live sessions
@@ -299,6 +301,7 @@ Re-exports from `src/core/index.ts`:
 - `slope vision` — Display project vision document
 - `slope initiative` — Multi-sprint initiative orchestration
 - `slope loop` — Autonomous sprint execution loop
+- `slope worktree` — Manage git worktrees
 - `slope index-cmd` — Semantic embedding index management
 - `slope context` — Semantic context search for agents
 - `slope prep` — Generate execution plan for a ticket
@@ -333,6 +336,7 @@ Re-exports from `src/core/index.ts`:
 | `sprint-completion` | Stop | — | Block session end when sprint gates are incomplete |
 | `sprint-completion` | PostToolUse | Bash | Auto-detect test pass and mark gate complete |
 | `worktree-merge` | PreToolUse | Bash | Block gh pr merge --delete-branch in worktrees (causes false failure) |
+| `worktree-self-remove` | PreToolUse | Bash | Block git worktree remove when targeting own cwd |
 <!-- AUTO-GENERATED: END guards -->
 
 ## MCP Tools
@@ -358,14 +362,14 @@ Re-exports from `src/core/index.ts`:
 
 | Directory | Test Files | Command |
 |-----------|-----------|---------|
-| tests/cli | 59 | `pnpm test` |
+| tests/cli | 63 | `pnpm test` |
 | tests/core | 75 | `pnpm test` |
 | tests/mcp | 6 | `pnpm test` |
 | tests/store | 1 | `pnpm test` |
 | tests/store-pg | 2 | `pnpm test` |
 | tests/tokens | 1 | `pnpm test` |
 
-**Total test files:** 144
+**Total test files:** 148
 **Run all:** `pnpm -r test`
 **Typecheck:** `pnpm -r typecheck`
 <!-- AUTO-GENERATED: END tests -->
@@ -376,11 +380,11 @@ Re-exports from `src/core/index.ts`:
 
 | Sprint | Theme | Tickets | Score |
 |--------|-------|---------|-------|
-| **57** | Harden top hotspot modules | 2 | birdie |
-| **58** | Harden top hotspot modules | 8 | triple_plus |
-| **59** | Post-implementation workflow gate (sprint-completion guard) | 4 | bogey |
 | **60** | Compaction-proof review gates + worktree-merge guard | 5 | par |
 | **61** | The Terminal Caddy — OB1 Adapter | 3 | birdie |
+| **62** | The Welcome Mat v2 + Templates — Streamlined First-Run Experience & Sprint/Ticket Templates | 5 | par |
+| **63** | The Handbook + Template Integration — CLI Help & Documentation Polish | 6 | eagle |
+| **64** | Claim Hygiene, Worktree Safety & Loop Planner Context | 5 | par |
 <!-- AUTO-GENERATED: END history -->
 
 ## Known Gotchas
