@@ -112,7 +112,7 @@ export async function stopCheckGuard(_input: HookInput, cwd: string): Promise<Gu
         (filteredUntracked.length - sessionUntracked.length);
 
       if (sessionModified.length > 0) {
-        blockingIssues.push(`${sessionModified.length} uncommitted change${sessionModified.length === 1 ? '' : 's'}`);
+        warningIssues.push(`${sessionModified.length} uncommitted change${sessionModified.length === 1 ? '' : 's'}`);
       }
       if (sessionUntracked.length > 0) {
         warningIssues.push(`${sessionUntracked.length} untracked file${sessionUntracked.length === 1 ? '' : 's'}`);
