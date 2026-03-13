@@ -1,7 +1,7 @@
 import { writeFileSync, readFileSync, existsSync, unlinkSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { loadHooksConfig, saveHooksConfig } from '../hooks-config.js';
-import { getAllGuardDefinitions, loadPluginGuards, loadConfig, detectAdapter, getAdapter, listAdapters } from '../../core/index.js';
+import { getAllGuardDefinitions, loadPluginGuards, loadConfig, detectAdapter, getAdapter, listAdapters, SLOPE_BIN_PREAMBLE } from '../../core/index.js';
 import type { AnyGuardDefinition } from '../../core/index.js';
 // Import to trigger auto-registration of adapters
 import '../../core/adapters/claude-code.js';
@@ -73,6 +73,8 @@ function generateHookScript(name: string): string {
     `# ${template.description}`,
     '',
     '# === SLOPE MANAGED (do not edit above this line) ===',
+    ...SLOPE_BIN_PREAMBLE,
+    '',
     ...template.managed,
     '# === SLOPE END ===',
     '',

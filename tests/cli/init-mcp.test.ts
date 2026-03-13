@@ -299,8 +299,9 @@ describe('init --opencode', () => {
     expect(content).toContain('session.created');
     expect(content).toContain('session.idle');
     expect(content).toContain('session.compacted');
-    expect(content).toContain('slope session start');
-    expect(content).toContain('slope briefing');
+    expect(content).toContain('session start --ide=opencode');
+    expect(content).toContain('briefing --compact');
+    expect(content).toContain('resolveSlopeBin');
   });
 
   it('does not overwrite existing plugin', async () => {

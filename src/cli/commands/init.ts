@@ -5,7 +5,7 @@ import { execSync } from 'node:child_process';
 import { createConfig } from '../config.js';
 import { saveHooksConfig } from '../hooks-config.js';
 import { resolveMetaphor } from '../metaphor.js';
-import { detectPackageManager, createVision, analyzeStack } from '../../core/index.js';
+import { detectPackageManager, createVision, analyzeStack, SLOPE_BIN_PREAMBLE } from '../../core/index.js';
 import type { StackProfile } from '../../core/analyzers/types.js';
 import type { MetaphorDefinition } from '../../core/index.js';
 import {
@@ -583,6 +583,8 @@ function installDefaultHooks(cwd: string, provider: InitProvider): void {
         `# SLOPE hook: ${name}`,
         '',
         '# === SLOPE MANAGED (do not edit above this line) ===',
+        ...SLOPE_BIN_PREAMBLE,
+        '',
         ...commands,
         '# === SLOPE END ===',
         '',
