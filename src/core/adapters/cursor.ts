@@ -4,7 +4,7 @@
 import { existsSync, writeFileSync, readFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { HarnessAdapter, ToolNameMap } from '../harness.js';
-import { registerAdapter, resolveToolMatcher } from '../harness.js';
+import { registerAdapter, resolveToolMatcher, SLOPE_BIN_PREAMBLE } from '../harness.js';
 import type { GuardResult, AnyGuardDefinition } from '../guard.js';
 
 /** Cursor tool name mappings */
@@ -137,6 +137,8 @@ export class CursorAdapter implements HarnessAdapter {
         '# Cursor passes JSON on stdin and reads JSON from stdout.',
         '',
         '# === SLOPE MANAGED (do not edit above this line) ===',
+        ...SLOPE_BIN_PREAMBLE,
+        '',
         'slope guard "$@"',
         '# === SLOPE END ===',
         '',

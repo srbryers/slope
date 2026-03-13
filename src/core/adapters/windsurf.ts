@@ -8,7 +8,7 @@
 import { existsSync, writeFileSync, readFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { HarnessAdapter, ToolNameMap } from '../harness.js';
-import { registerAdapter, resolveToolMatcher } from '../harness.js';
+import { registerAdapter, resolveToolMatcher, SLOPE_BIN_PREAMBLE } from '../harness.js';
 import type { GuardResult, AnyGuardDefinition } from '../guard.js';
 
 /** Windsurf tool name mappings */
@@ -137,6 +137,8 @@ export class WindsurfAdapter implements HarnessAdapter {
         '#   other  = error (logged, tool proceeds)',
         '',
         '# === SLOPE MANAGED (do not edit above this line) ===',
+        ...SLOPE_BIN_PREAMBLE,
+        '',
         'OUTPUT=$(slope guard "$@" 2>"${SLOPE_GUARD_LOG:-/dev/null}")',
         'if [ $? -ne 0 ]; then',
         '  exit 0  # Guard errored — allow tool to proceed',

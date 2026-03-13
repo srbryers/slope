@@ -8,7 +8,7 @@
 import { existsSync, writeFileSync, mkdirSync, chmodSync } from 'node:fs';
 import { join } from 'node:path';
 import type { HarnessAdapter, ToolNameMap } from '../harness.js';
-import { registerAdapter, resolveToolMatcher } from '../harness.js';
+import { registerAdapter, resolveToolMatcher, SLOPE_BIN_PREAMBLE } from '../harness.js';
 import type { GuardResult, AnyGuardDefinition } from '../guard.js';
 
 /**
@@ -276,6 +276,8 @@ export class ClineAdapter implements HarnessAdapter {
         '# Receives JSON on stdin, passes to slope guard, returns JSON on stdout.',
         '',
         '# === SLOPE MANAGED (do not edit above this line) ===',
+        ...SLOPE_BIN_PREAMBLE,
+        '',
         'slope guard "$@"',
         '# === SLOPE END ===',
         '',

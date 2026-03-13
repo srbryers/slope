@@ -280,6 +280,7 @@ export {
   detectAdapter,
   clearAdapters,
   resolveToolMatcher,
+  SLOPE_BIN_PREAMBLE,
 } from './harness.js';
 export type {
   HarnessId,
