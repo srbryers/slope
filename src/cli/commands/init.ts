@@ -5,7 +5,8 @@ import { execSync } from 'node:child_process';
 import { createConfig } from '../config.js';
 import { saveHooksConfig } from '../hooks-config.js';
 import { resolveMetaphor } from '../metaphor.js';
-import { detectPackageManager, createVision } from '../../core/index.js';
+import { detectPackageManager, createVision, analyzeStack } from '../../core/index.js';
+import type { StackProfile } from '../../core/analyzers/types.js';
 import type { MetaphorDefinition } from '../../core/index.js';
 import {
   generateProjectContext,
@@ -158,6 +159,36 @@ export function detectPlatforms(cwd: string): InitProvider[] {
     detected.push('opencode');
   }
   return detected;
+}
+
+/** Recommend guards based on detected stack profile */
+function getRecommendedGuards(stack: StackProfile, cwd: string): string[] {
+  const recommended: string[] = [];
+
+  // TypeScript/JS projects
+  if (stack.primaryLanguage === 'TypeScript' || stack.primaryLanguage === 'JavaScript') {
+    recommended.push('typecheck', 'test');
+    if (stack.frameworks.includes('react') || stack.frameworks.includes('next')) {
+      recommended.push('jsx-a11y');
+    }
+  }
+
+  // Python projects
+  if (stack.primaryLanguage === 'Python') {
+    recommended.push('pytest', 'ruff');
+  }
+
+  // Databases
+  if (stack.frameworks.includes('prisma') || stack.frameworks.includes('drizzle')) {
+    recommended.push('migration', 'schema-guard');
+  }
+
+  // CI detected
+  if (existsSync(join(cwd, '.github/workflows'))) {
+    recommended.push('ci-check');
+  }
+
+  return [...new Set(recommended)];
 }
 
 /** Ensure .slope/ is in .gitignore. Idempotent — skips if already present. */
@@ -808,6 +839,78 @@ export async function initCommand(args: string[]): Promise<void> {
   // Apply metaphor and team config
   const configData = JSON.parse(readFileSync(configPath, 'utf8'));
   configData.metaphor = metaphor.id;
+
+  // Auto-detect stack profile and recommend guards
+  let stack: StackProfile | null = null;
+  try {
+    stack = await analyzeStack(cwd);
+    if (stack.primaryLanguage || stack.packageManager) {
+      const stackInfo: string[] = [];
+      if (stack.primaryLanguage) stackInfo.push(stack.primaryLanguage);
+      if (stack.frameworks.length > 0) stackInfo.push(...stack.frameworks.slice(0, 2));
+      if (stack.packageManager) stackInfo.push(stack.packageManager);
+      console.log(`  Detected stack: ${stackInfo.join(', ')}`);
+
+      // Recommend guards based on detected stack
+      const recommendedGuards = getRecommendedGuards(stack, cwd);
+      if (recommendedGuards.length > 0) {
+        console.log(`  Recommended guards: ${recommendedGuards.join(', ')}`);
+        console.log(`  Run: slope hook add --guard=${recommendedGuards[0]} (or --level=recommended)`);
+      }
+
+      // Store in config for future reference
+      configData.detectedStack = {
+        language: stack.primaryLanguage,
+        frameworks: stack.frameworks,
+        packageManager: stack.packageManager,
+        runtime: stack.runtime,
+      };
+    }
+  } catch (err) {
+    // Non-fatal — stack detection is best-effort
+    console.log(`  Note: Stack detection skipped (${(err as Error).message})`);
+  }
+
+  // Handle --migrate flag: upgrade config from older SLOPE versions
+  if (args.includes('--migrate')) {
+    const configPath = join(cwd, '.slope/config.json');
+    if (existsSync(configPath)) {
+      try {
+        const oldConfig = JSON.parse(readFileSync(configPath, 'utf8'));
+        const oldVersion = oldConfig.slopeVersion;
+
+        // Migration: add slopeVersion if missing
+        if (!oldConfig.slopeVersion) {
+          oldConfig.slopeVersion = '1.25.0';
+          console.log(`  Migrated config: added slopeVersion`);
+        }
+
+        // Migration: ensure detectedStack exists for older configs
+        if (!oldConfig.detectedStack && stack) {
+          oldConfig.detectedStack = {
+            language: stack.primaryLanguage,
+            frameworks: stack.frameworks,
+            packageManager: stack.packageManager,
+            runtime: stack.runtime,
+          };
+          console.log(`  Migrated config: added detectedStack`);
+        }
+
+        // Write migrated config
+        writeFileSync(configPath, JSON.stringify(oldConfig, null, 2) + '\n');
+        console.log(`  Migration complete (from ${oldVersion || 'unknown'} to ${oldConfig.slopeVersion})`);
+        return; // Exit early after migration
+      } catch (err) {
+        console.log(`  Migration skipped: ${(err as Error).message}`);
+      }
+    } else {
+      console.log(`  No existing config found, skipping migration`);
+    }
+  }
+
+  // First-time init: set current version
+  configData.slopeVersion = '1.25.4';
+
   if (args.includes('--team')) {
     configData.team = { players: {} };
     console.log('  Team mode enabled — add players to .slope/config.json team.players');

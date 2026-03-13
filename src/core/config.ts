@@ -67,6 +67,13 @@ export interface SlopeConfig {
     testPlanPath?: string;
     sessionLogDir?: string;
   };
+  detectedStack?: {
+    language?: string;
+    frameworks?: string[];
+    packageManager?: string;
+    runtime?: string;
+  };
+  slopeVersion?: string;
 }
 
 const DEFAULT_CONFIG: SlopeConfig = {
