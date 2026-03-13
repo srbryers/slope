@@ -1,7 +1,7 @@
 import { writeFileSync, readFileSync, existsSync, unlinkSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { loadHooksConfig, saveHooksConfig } from '../hooks-config.js';
-import { getAllGuardDefinitions, loadPluginGuards, loadConfig, detectAdapter, getAdapter, listAdapters, SLOPE_BIN_PREAMBLE } from '../../core/index.js';
+import { getAllGuardDefinitions, loadPluginGuards, loadConfig, detectAdapter, getAdapter, listAdapters, SLOPE_BIN_PREAMBLE, writeOrUpdateManagedScript } from '../../core/index.js';
 import type { AnyGuardDefinition } from '../../core/index.js';
 // Import to trigger auto-registration of adapters
 import '../../core/adapters/claude-code.js';
@@ -151,20 +151,19 @@ function addHook(name: string, cwd: string): void {
   mkdirSync(dir, { recursive: true });
 
   const filePath = hookFilePath(cwd, harnessId, name);
-  if (existsSync(filePath)) {
-    console.error(`Hook "${name}" already installed at ${filePath}`);
-    console.error('Remove it first with: slope hook remove ' + name);
-    process.exit(1);
-  }
-
   const script = generateHookScript(name);
-  writeFileSync(filePath, script, { mode: 0o755 });
+  const result = writeOrUpdateManagedScript(filePath, script);
+
+  if (result === 'unchanged') {
+    console.log(`\nHook "${name}" is already up to date at ${filePath}\n`);
+    return;
+  }
 
   const config = loadHooksConfig(cwd);
   config.installed[name] = { provider: harnessId, installed_at: new Date().toISOString() };
   saveHooksConfig(cwd, config);
 
-  console.log(`\nInstalled hook: ${name}`);
+  console.log(`\n${result === 'created' ? 'Installed' : 'Updated'} hook: ${name}`);
   console.log(`  File: ${filePath}`);
   console.log(`  Harness: ${harnessId}`);
   console.log(`\nEdit the file to add custom commands below the SLOPE END marker.\n`);
