@@ -74,7 +74,8 @@ export type GuardName =
   | 'branch-before-commit'
   | 'worktree-check'
   | 'sprint-completion'
-  | 'worktree-merge';
+  | 'worktree-merge'
+  | 'worktree-self-remove';
 
 /** Guard registration entry */
 export interface GuardDefinition {
@@ -276,6 +277,14 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
   {
     name: 'worktree-merge',
     description: 'Block gh pr merge --delete-branch in worktrees (causes false failure)',
+    hookEvent: 'PreToolUse',
+    toolCategories: ['execute_command'],
+    matcher: 'Bash',
+    level: 'full',
+  },
+  {
+    name: 'worktree-self-remove',
+    description: 'Block git worktree remove when targeting own cwd',
     hookEvent: 'PreToolUse',
     toolCategories: ['execute_command'],
     matcher: 'Bash',
