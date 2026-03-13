@@ -21,6 +21,7 @@ import { branchBeforeCommitGuard } from '../guards/branch-before-commit.js';
 import { worktreeCheckGuard } from '../guards/worktree-check.js';
 import { sprintCompletionGuard } from '../guards/sprint-completion.js';
 import { worktreeMergeGuard } from '../guards/worktree-merge.js';
+import { worktreeSelfRemoveGuard } from '../guards/worktree-self-remove.js';
 import { formatGuardDocs } from '../guards/docs.js';
 import { recordBaseline } from '../guards/git-utils.js';
 import { execSync } from 'node:child_process';
@@ -85,6 +86,7 @@ const handlers: Partial<Record<GuardName, GuardHandler>> = {
   'worktree-check': worktreeCheckGuard,
   'sprint-completion': sprintCompletionGuard,
   'worktree-merge': worktreeMergeGuard,
+  'worktree-self-remove': worktreeSelfRemoveGuard,
 };
 
 /** Register a guard handler */

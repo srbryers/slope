@@ -347,6 +347,45 @@ export async function generatePrepPlan(opts: {
 }
 
 /**
+ * Format a lite prep plan (hazards + similar tickets only, no embedding search).
+ * Used as fallback when full prep fails or embedding index is unavailable.
+ */
+export function formatLitePrepPlan(
+  ticketId: string,
+  title: string,
+  similarTickets: Array<{ key: string; title: string; result: string; sprint: number }>,
+  hazards: string[],
+): string {
+  const lines: string[] = [];
+
+  lines.push(`# Context: ${ticketId}`);
+  lines.push(`## ${title}`);
+  lines.push('');
+
+  if (similarTickets.length > 0) {
+    lines.push('## Similar Past Tickets');
+    for (const st of similarTickets) {
+      lines.push(`- ${st.key}: "${st.title}" \u2192 ${st.result} (sprint ${st.sprint})`);
+    }
+    lines.push('');
+  }
+
+  if (hazards.length > 0) {
+    lines.push('## Hazards');
+    for (const h of hazards) {
+      lines.push(`- ${h}`);
+    }
+    lines.push('');
+  }
+
+  if (similarTickets.length === 0 && hazards.length === 0) {
+    lines.push('No similar tickets or hazards found.');
+  }
+
+  return lines.join('\n');
+}
+
+/**
  * Format a PrepPlan as markdown for Aider --read injection.
  */
 export function formatPrepPlan(plan: PrepPlan): string {

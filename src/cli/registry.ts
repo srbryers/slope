@@ -468,6 +468,17 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     ],
   },
 
+  {
+    cmd: 'worktree', desc: 'Manage git worktrees', category: 'tooling',
+    subcommands: [
+      { name: 'cleanup', desc: 'Clean up stale worktrees (remove, delete branch, delete remote)', flags: [
+        { flag: '--path=<path>', desc: 'Target a specific worktree' },
+        { flag: '--all', desc: 'Clean up all secondary worktrees' },
+        { flag: '--dry-run', desc: 'Preview without making changes' },
+      ]},
+    ],
+  },
+
   // ── Indexing ──────────────────────────────────────────────────────
   {
     cmd: 'index-cmd', desc: 'Semantic embedding index management', category: 'tooling',
@@ -493,6 +504,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     flags: [
       { flag: '<ticket-id>', desc: 'Ticket ID to prepare' },
       { flag: '--json', desc: 'Output as JSON' },
+      { flag: '--lite', desc: 'Hazards + similar tickets only (no embedding required)' },
       { flag: '--top=<N>', desc: 'Limit context results (default: 5)' },
     ],
   },

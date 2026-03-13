@@ -4,22 +4,26 @@
 import { loadConfig } from '../../core/config.js';
 import { hasEmbeddingSupport } from '../../core/embedding-store.js';
 import { loadScorecards } from '../../core/loader.js';
-import { generatePrepPlan, formatPrepPlan } from '../../core/prep.js';
+import { generatePrepPlan, formatPrepPlan, resolveTicket, findSimilarTickets, extractHazards, formatLitePrepPlan } from '../../core/prep.js';
 import type { EmbeddingConfig } from '../../core/embedding.js';
 import { SqliteSlopeStore } from '../../store/index.js';
 
 function parseArgs(args: string[]): {
   ticketId: string | null;
   json: boolean;
+  lite: boolean;
   top: number;
 } {
   let ticketId: string | null = null;
   let json = false;
+  let lite = false;
   let top = 5;
 
   for (const arg of args) {
     if (arg === '--json') {
       json = true;
+    } else if (arg === '--lite') {
+      lite = true;
     } else if (arg.startsWith('--top=')) {
       top = parseInt(arg.slice('--top='.length), 10) || 5;
     } else if (!arg.startsWith('-')) {
@@ -27,7 +31,7 @@ function parseArgs(args: string[]): {
     }
   }
 
-  return { ticketId, json, top };
+  return { ticketId, json, lite, top };
 }
 
 export async function prepCommand(args: string[]): Promise<void> {
@@ -44,6 +48,22 @@ export async function prepCommand(args: string[]): Promise<void> {
   if (!flags.ticketId) {
     console.error('Error: Provide a ticket ID. Usage: slope prep <ticket-id>');
     process.exit(1);
+  }
+
+  // --lite mode: hazards + similar tickets only (no embedding required)
+  if (flags.lite) {
+    const ticket = resolveTicket(flags.ticketId, cwd, undefined, config.roadmapPath);
+    if (!ticket) {
+      console.error(`Ticket not found: ${flags.ticketId}`);
+      process.exit(1);
+    }
+
+    const scorecards = loadScorecards(config, cwd);
+    const similarTickets = findSimilarTickets(ticket.title, scorecards);
+    const hazards = extractHazards(ticket.modules, scorecards);
+
+    console.log(formatLitePrepPlan(flags.ticketId, ticket.title, similarTickets, hazards));
+    return;
   }
 
   // Resolve embedding config
@@ -103,9 +123,11 @@ slope prep — Generate execution plan for a ticket
 Usage:
   slope prep <ticket-id>              Generate execution plan
   slope prep <ticket-id> --json       Output as JSON
+  slope prep <ticket-id> --lite       Hazards + similar tickets only (no embedding)
   slope prep <ticket-id> --top=5      Max context files (default: 5)
 
-Requires a built semantic index. Run \`slope index\` first.
+Full mode requires a built semantic index. Run \`slope index\` first.
+--lite mode works without embeddings (uses scorecard keyword matching).
 Looks up ticket in roadmap.json and slope-loop/backlog.json.
 `);
 }

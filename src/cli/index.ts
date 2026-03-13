@@ -60,6 +60,7 @@ import { doctorCommand } from './commands/doctor.js';
 import { versionCommand } from './commands/version.js';
 import { helpCommand } from './commands/help.js';
 import { quickstartCommand } from './commands/quickstart.js';
+import { worktreeCommand } from './commands/worktree.js';
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -357,6 +358,12 @@ switch (subcommand) {
       process.exit(1);
     });
     break;
+  case 'worktree':
+    worktreeCommand(process.argv.slice(3)).catch(err => {
+      console.error('Error:', err.message);
+      process.exit(1);
+    });
+    break;
   default:
     console.log(`
 SLOPE CLI — Sprint Lifecycle & Operational Performance Engine
@@ -417,6 +424,7 @@ Usage:
   slope enrich [backlog-path] [--output=<path>]      Batch-enrich backlog with file context
   slope docs generate|changelog|check                Documentation manifest and changelog
   slope sprint start|gate|status|reset               Manage sprint lifecycle state
+  slope worktree cleanup [--path|--all] [--dry-run]  Clean up stale worktrees
   slope loop status|config|run|continuous|...        Autonomous sprint execution loop
   slope doctor [--fix]                               Check repo health and fix issues
   slope version                                      Show current version
