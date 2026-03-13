@@ -170,45 +170,52 @@ describe('parseChangelog', () => {
 // ── compareManifests ────────────────────────────────────────────
 
 describe('compareManifests', () => {
-  const base = {
-    version: '1.26.0',
-    commands: [{}, {}, {}] as any[],
-    guards: [{}, {}] as any[],
-    mcpTools: [{}] as any[],
-    metaphors: [{}, {}, {}] as any[],
+  const checksums = {
+    commands: 'aaa',
+    guards: 'bbb',
+    mcpTools: 'ccc',
+    metaphors: 'ddd',
+    roles: 'eee',
+    constants: 'fff',
+    changelog: 'ggg',
   };
+
+  const base = { version: '1.26.0', checksums };
 
   it('returns empty array when manifests match', () => {
     expect(compareManifests(base, { ...base })).toEqual([]);
   });
 
   it('detects version mismatch', () => {
-    const remote = { ...base, version: '1.24.0' };
-    const result = compareManifests(remote, base);
+    const saved = { ...base, version: '1.24.0' };
+    const result = compareManifests(saved, base);
     expect(result).toHaveLength(1);
     expect(result[0]).toContain('version');
     expect(result[0]).toContain('1.24.0');
     expect(result[0]).toContain('1.26.0');
   });
 
-  it('detects command count mismatch', () => {
-    const remote = { ...base, commands: [{}] as any[] };
-    const result = compareManifests(remote, base);
+  it('detects checksum mismatch in a section', () => {
+    const saved = { ...base, checksums: { ...checksums, commands: 'zzz' } };
+    const result = compareManifests(saved, base);
     expect(result).toHaveLength(1);
-    expect(result[0]).toContain('commands');
+    expect(result[0]).toBe('commands');
   });
 
-  it('detects multiple mismatches', () => {
-    const remote = {
-      ...base,
+  it('detects multiple mismatches (version + sections)', () => {
+    const saved = {
       version: '1.0.0',
-      guards: [] as any[],
-      metaphors: [{}, {}, {}, {}] as any[],
+      checksums: { ...checksums, guards: 'changed', metaphors: 'changed' },
     };
-    const result = compareManifests(remote, base);
+    const result = compareManifests(saved, base);
     expect(result).toHaveLength(3);
-    expect(result.map(m => m.split(':')[0])).toEqual(
-      expect.arrayContaining(['version', 'guards', 'metaphors']),
-    );
+    expect(result).toEqual(expect.arrayContaining(['version: 1.0.0 vs 1.26.0', 'guards', 'metaphors']));
+  });
+
+  it('checks roles and constants sections', () => {
+    const saved = { ...base, checksums: { ...checksums, roles: 'changed', constants: 'changed' } };
+    const result = compareManifests(saved, base);
+    expect(result).toHaveLength(2);
+    expect(result).toEqual(expect.arrayContaining(['roles', 'constants']));
   });
 });

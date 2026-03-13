@@ -288,49 +288,37 @@ async function checkSubcommand(args: string[]): Promise<void> {
 
   // Generate fresh manifest for comparison
   const fresh = buildManifest(cwd, true);
+  const mismatches = compareManifests(saved, fresh);
 
-  // Compare per-section checksums (skip changelog — it's git-dependent)
-  const sectionsToCheck = ['commands', 'guards', 'mcpTools', 'metaphors', 'roles', 'constants'] as const;
-  const drifted: string[] = [];
-
-  for (const section of sectionsToCheck) {
-    const savedChecksum = saved.checksums?.[section];
-    const freshChecksum = fresh.checksums?.[section];
-    if (savedChecksum !== freshChecksum) {
-      drifted.push(section);
-    }
-  }
-
-  if (drifted.length === 0) {
+  if (mismatches.length === 0) {
     console.log('Manifest is current. No drift detected.');
   } else {
-    console.error(`Drift detected in ${drifted.length} section(s): ${drifted.join(', ')}`);
+    console.error(`Drift detected in ${mismatches.length} section(s): ${mismatches.join(', ')}`);
     console.error('Run "slope docs generate" to update.');
     process.exit(1);
   }
 }
 
-/** Compare two manifests and return a list of mismatches. Pure function — no I/O. */
+/** Sections to compare via checksum (skip changelog — it's git-dependent). */
+const SECTIONS_TO_CHECK = ['commands', 'guards', 'mcpTools', 'metaphors', 'roles', 'constants'] as const;
+
+/** Compare two manifests via version + per-section checksums. Pure function — no I/O. */
 export function compareManifests(
-  remote: Pick<DocsManifest, 'version' | 'commands' | 'guards' | 'mcpTools' | 'metaphors'>,
-  local: Pick<DocsManifest, 'version' | 'commands' | 'guards' | 'mcpTools' | 'metaphors'>,
+  saved: Pick<DocsManifest, 'version' | 'checksums'>,
+  fresh: Pick<DocsManifest, 'version' | 'checksums'>,
 ): string[] {
   const mismatches: string[] = [];
 
-  if (remote.version !== local.version) {
-    mismatches.push(`version: remote=${remote.version} local=${local.version}`);
+  if (saved.version !== fresh.version) {
+    mismatches.push(`version: ${saved.version} vs ${fresh.version}`);
   }
-  if (remote.commands.length !== local.commands.length) {
-    mismatches.push(`commands: remote=${remote.commands.length} local=${local.commands.length}`);
-  }
-  if (remote.guards.length !== local.guards.length) {
-    mismatches.push(`guards: remote=${remote.guards.length} local=${local.guards.length}`);
-  }
-  if (remote.mcpTools.length !== local.mcpTools.length) {
-    mismatches.push(`mcpTools: remote=${remote.mcpTools.length} local=${local.mcpTools.length}`);
-  }
-  if (remote.metaphors.length !== local.metaphors.length) {
-    mismatches.push(`metaphors: remote=${remote.metaphors.length} local=${local.metaphors.length}`);
+
+  for (const section of SECTIONS_TO_CHECK) {
+    const savedChecksum = saved.checksums?.[section];
+    const freshChecksum = fresh.checksums?.[section];
+    if (savedChecksum !== freshChecksum) {
+      mismatches.push(section);
+    }
   }
 
   return mismatches;
@@ -342,6 +330,12 @@ async function validateSubcommand(args: string[]): Promise<void> {
   const remoteUrl = urlArg
     ? urlArg.slice('--url='.length)
     : 'https://raw.githubusercontent.com/srbryers/slope-web/main/src/data/docs-manifest.json';
+
+  // Validate URL protocol
+  if (!remoteUrl.startsWith('https://')) {
+    console.error('--url must be an HTTPS URL');
+    process.exit(1);
+  }
 
   // Fetch remote manifest
   let remote: DocsManifest;
@@ -355,6 +349,13 @@ async function validateSubcommand(args: string[]): Promise<void> {
     remote = await res.json() as DocsManifest;
   } catch (err) {
     console.error(`Failed to fetch remote manifest: ${err instanceof Error ? err.message : err}`);
+    console.error(`  URL: ${remoteUrl}`);
+    process.exit(1);
+  }
+
+  // Validate remote manifest shape
+  if (!remote.version || !remote.checksums) {
+    console.error('Remote manifest has unexpected shape — is the URL correct?');
     console.error(`  URL: ${remoteUrl}`);
     process.exit(1);
   }
