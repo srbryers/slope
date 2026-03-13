@@ -302,7 +302,7 @@ describe('stopCheckGuard', () => {
     expect(result.context).toContain('SLOPE');
   });
 
-  it('blocks when modified (staged/unstaged) changes exist', async () => {
+  it('warns but does not block when modified (staged/unstaged) changes exist', async () => {
     const { execSync } = await import('node:child_process');
     execSync('git init && git config user.email "test@test.com" && git config user.name "Test"', { cwd: tmpDir, stdio: 'ignore' });
     writeFileSync(join(tmpDir, 'tracked.txt'), 'original');
@@ -310,11 +310,11 @@ describe('stopCheckGuard', () => {
     writeFileSync(join(tmpDir, 'tracked.txt'), 'modified');
 
     const result = await stopCheckGuard(makeInput(), tmpDir);
-    expect(result.blockReason).toContain('uncommitted');
-    expect(result.blockReason).toContain('Commit and push');
+    expect(result.blockReason).toBeUndefined();
+    expect(result.context).toContain('uncommitted');
   });
 
-  it('blocks and includes untracked count when both modified and untracked exist', async () => {
+  it('warns with both uncommitted and untracked when both exist', async () => {
     const { execSync } = await import('node:child_process');
     execSync('git init && git config user.email "test@test.com" && git config user.name "Test"', { cwd: tmpDir, stdio: 'ignore' });
     writeFileSync(join(tmpDir, 'tracked.txt'), 'original');
@@ -323,8 +323,9 @@ describe('stopCheckGuard', () => {
     writeFileSync(join(tmpDir, 'orphan.txt'), 'untracked');
 
     const result = await stopCheckGuard(makeInput(), tmpDir);
-    expect(result.blockReason).toContain('uncommitted');
-    expect(result.blockReason).toContain('untracked');
+    expect(result.blockReason).toBeUndefined();
+    expect(result.context).toContain('uncommitted');
+    expect(result.context).toContain('untracked');
   });
 });
 

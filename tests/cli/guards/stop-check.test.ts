@@ -42,12 +42,13 @@ describe('stop-check guard', () => {
     expect(result.blockReason).toBeUndefined();
   });
 
-  it('blocks on uncommitted changes', async () => {
+  it('warns on uncommitted changes', async () => {
     writeFileSync(join(tmpDir, 'file.txt'), 'modified');
     git('add file.txt');
 
     const result = await stopCheckGuard(makeStop(), tmpDir);
-    expect(result.blockReason).toContain('uncommitted');
+    expect(result.blockReason).toBeUndefined();
+    expect(result.context).toContain('uncommitted');
   });
 
   it('warns on untracked files only', async () => {
