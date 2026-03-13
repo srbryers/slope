@@ -36,7 +36,7 @@ export async function nextActionGuard(input: HookInput, cwd: string): Promise<Gu
   }
 
   // Detect sprint state
-  const state = await detectSprintState(cwd);
+  const state = await detectSprintState(cwd, input.session_id);
 
   // Build suggestion text
   const suggestion = buildSuggestions(state);
@@ -57,7 +57,7 @@ export async function nextActionGuard(input: HookInput, cwd: string): Promise<Gu
 }
 
 /** Detect current sprint state via store then filesystem fallback */
-export async function detectSprintState(cwd: string): Promise<SprintState> {
+export async function detectSprintState(cwd: string, sessionId?: string): Promise<SprintState> {
   // If sprint-state.json exists and sprint is active, defer to sprint-completion guard.
   // That guard handles the hard block on Stop with gate-level detail.
   // next-action returns between-sprints to avoid duplicate messaging.
@@ -83,7 +83,11 @@ export async function detectSprintState(cwd: string): Promise<SprintState> {
         return { type: 'testing-active' };
       }
 
-      const claims = await store.getActiveClaims();
+      const allClaims = await store.getActiveClaims();
+      // If session_id is available, filter to claims for this session only
+      const claims = sessionId
+        ? allClaims.filter(c => c.session_id === sessionId)
+        : allClaims;
       if (claims.length > 0) {
         const sprintNumber = Math.max(...claims.map(c => c.sprint_number));
         return {

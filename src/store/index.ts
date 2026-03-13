@@ -303,6 +303,8 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
   }
 
   async removeSession(sessionId: string): Promise<boolean> {
+    // Delete claims first (parity with PG store)
+    this.db.prepare('DELETE FROM claims WHERE session_id = ?').run(sessionId);
     const result = this.db.prepare('DELETE FROM sessions WHERE session_id = ?').run(sessionId);
     return result.changes > 0;
   }
@@ -328,6 +330,8 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
 
   async cleanStaleSessions(maxAgeMs: number): Promise<number> {
     const cutoff = new Date(Date.now() - maxAgeMs).toISOString();
+    // Delete claims for stale sessions first (parity with PG store)
+    this.db.prepare('DELETE FROM claims WHERE session_id IN (SELECT session_id FROM sessions WHERE last_heartbeat_at < ?)').run(cutoff);
     const result = this.db.prepare('DELETE FROM sessions WHERE last_heartbeat_at < ?').run(cutoff);
     return result.changes;
   }
@@ -387,8 +391,9 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
     if (sprintNumber !== undefined) {
       return this.list(sprintNumber);
     }
-    const rows = this.db.prepare('SELECT * FROM claims ORDER BY sprint_number, claimed_at')
-      .all() as Array<Record<string, unknown>>;
+    const rows = this.db.prepare(
+      "SELECT * FROM claims WHERE (expires_at IS NULL OR expires_at > datetime('now')) ORDER BY sprint_number, claimed_at"
+    ).all() as Array<Record<string, unknown>>;
     return rows.map(rowToClaim);
   }
 

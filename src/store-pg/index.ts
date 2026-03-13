@@ -416,7 +416,7 @@ export class PostgresSlopeStore implements SlopeStore {
       return this.list(sprintNumber);
     }
     const result = await this.pool.query(
-      'SELECT * FROM claims WHERE project_id = $1 ORDER BY sprint_number, claimed_at',
+      'SELECT * FROM claims WHERE project_id = $1 AND (expires_at IS NULL OR expires_at > NOW()) ORDER BY sprint_number, claimed_at',
       [this.projectId],
     );
     return result.rows.map(rowToClaim);
