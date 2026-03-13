@@ -120,11 +120,13 @@ export async function guardCommand(args: string[]): Promise<void> {
 
   // Read hook input from stdin
   let input: HookInput;
-  let stdinParsed = true;
   try {
     input = await readStdin();
+    // Backfill required fields that Claude Code may omit from hook JSON
+    if (!input.session_id) input.session_id = '';
+    if (!input.cwd) input.cwd = cwd;
+    if (!input.hook_event_name) input.hook_event_name = '';
   } catch {
-    stdinParsed = false;
     input = {
       session_id: '',
       cwd,
@@ -148,8 +150,8 @@ export async function guardCommand(args: string[]): Promise<void> {
   const hookEvent = input.hook_event_name.replace(/:.*$/, ''); // "PreToolUse:Bash" → "PreToolUse"
   const def = allDefs.find(d => d.hookEvent === hookEvent) ?? allDefs[0];
 
-  // If no stdin was parsed, fill in the hook event from the definition
-  if (!stdinParsed) {
+  // If hook_event_name was missing from stdin, fill from the guard definition
+  if (!hookEvent) {
     input.hook_event_name = def.hookEvent;
   }
 
