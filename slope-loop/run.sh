@@ -315,6 +315,15 @@ run_ticket_with_model() {
     [ -s "${PREP_FILE}.err" ] && log "   $(head -1 "${PREP_FILE}.err")"
   fi
 
+  # Fallback: if full prep failed or too large, get hazards + similar tickets only
+  if [ ! -s "${PREP_FILE}" ] || [ "${PREP_WORDS:-0}" -ge 1600 ]; then
+    LITE_FILE="$LOG_DIR/${ticket_id}-prep-lite.md"
+    if pnpm slope prep "${ticket_id}" --lite > "$LITE_FILE" 2>/dev/null && [ -s "$LITE_FILE" ]; then
+      aider_args+=(--read "$LITE_FILE")
+      log "   Injected lite prep (hazards + similar tickets)"
+    fi
+  fi
+
   # Add primary files from enriched ticket as --file flags (editable context)
   if [ -n "${TICKET_PRIMARY_FILES:-}" ]; then
     local FILE_COUNT=0
