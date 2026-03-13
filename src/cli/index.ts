@@ -58,6 +58,8 @@ import { loopCommand } from './commands/loop.js';
 import { sprintCommand } from './commands/sprint.js';
 import { doctorCommand } from './commands/doctor.js';
 import { versionCommand } from './commands/version.js';
+import { helpCommand } from './commands/help.js';
+import { quickstartCommand } from './commands/quickstart.js';
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -216,7 +218,7 @@ switch (subcommand) {
   case 'guard': {
     const guardArgs = process.argv.slice(3);
     const guardSub = guardArgs[0];
-    if (guardSub === 'list' || guardSub === 'status' || guardSub === 'enable' || guardSub === 'disable') {
+    if (guardSub === 'list' || guardSub === 'status' || guardSub === 'enable' || guardSub === 'disable' || guardSub === 'docs') {
       guardManageCommand(guardArgs).catch(err => {
         console.error('Error:', err.message);
         process.exit(1);
@@ -339,6 +341,18 @@ switch (subcommand) {
     break;
   case 'version':
     versionCommand(process.argv.slice(3)).catch(err => {
+      console.error('Error:', err.message);
+      process.exit(1);
+    });
+    break;
+  case 'help':
+    helpCommand(process.argv.slice(3)).catch(err => {
+      console.error('Error:', err.message);
+      process.exit(1);
+    });
+    break;
+  case 'quickstart':
+    quickstartCommand(process.argv.slice(3)).catch(err => {
       console.error('Error:', err.message);
       process.exit(1);
     });
