@@ -70,7 +70,7 @@ export const CLAUDE_CODE_TOOLS: ToolNameMap = {
   search_files: 'Glob',
   search_content: 'Grep',
   execute_command: 'Bash',
-  create_subagent: 'Task',
+  create_subagent: 'Agent',
   exit_plan: 'ExitPlanMode',
 };
 
