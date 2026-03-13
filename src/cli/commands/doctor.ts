@@ -148,7 +148,7 @@ function checkCodebaseMap(cwd: string): DoctorCheck {
 
 /** Read the current SLOPE package version from package.json */
 function getPackageVersion(): string {
-  const pkgPath = join(__dirname, '..', '..', '..', '..', 'package.json');
+  const pkgPath = join(__dirname, '..', '..', '..', 'package.json');
   const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
   return pkg.version;
 }
