@@ -910,8 +910,9 @@ export async function initCommand(args: string[]): Promise<void> {
     }
   }
 
-  // First-time init: set current version
-  configData.slopeVersion = '1.25.4';
+  // First-time init: set current version from package.json
+  const { version: pkgVersion } = JSON.parse(readFileSync(join(__dirname, '..', '..', '..', '..', 'package.json'), 'utf8'));
+  configData.slopeVersion = pkgVersion;
 
   if (args.includes('--team')) {
     configData.team = { players: {} };
