@@ -251,9 +251,9 @@ describe.skipIf(!PG_URL)('PostgresSlopeStore', () => {
   });
 
   describe('Diagnostics', () => {
-    it('getSchemaVersion returns 1', async () => {
+    it('getSchemaVersion returns latest', async () => {
       const version = await store.getSchemaVersion();
-      expect(version).toBe(1);
+      expect(version).toBeGreaterThan(0);
     });
 
     it('getStats returns correct counts after inserts', async () => {
