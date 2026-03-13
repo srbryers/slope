@@ -63,7 +63,7 @@ jobs:
           commit-message: "chore: update docs manifest from slope ${{ github.event.release.tag_name || 'manual' }}"
           title: "chore: update docs manifest from slope ${{ github.event.release.tag_name || 'manual' }}"
           body: |
-            Automated manifest sync from [slope release](${{ github.event.release.html_url || github.server_url + '/' + github.repository }}).
+            Automated manifest sync from [slope release](${{ github.event.release.html_url || format('{0}/{1}', github.server_url, github.repository) }}).
 
             Updates `src/data/docs-manifest.json` with the latest CLI commands, guards, MCP tools, metaphors, and changelog.
 
