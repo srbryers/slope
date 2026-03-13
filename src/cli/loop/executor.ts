@@ -267,13 +267,16 @@ async function processTicket(
   // Claim ticket
   try { execFileSync('pnpm', ['slope', 'claim', `--target=${ticket.key}`], { cwd, stdio: 'pipe' }); } catch { /* ok */ }
 
-  // Generate execution plan (planner) with fallback to generic prompt
+  // Generate execution plan (planner) with fallback to generic prompt (unless forcePlannerExecutor is set)
   let prompt: string;
   try {
     const plan = generatePlan(ticket, primaryModel, cwd, tLog);
     prompt = formatPlanAsPrompt(plan, ticket);
     tLog.info(`Plan generated (${plan.generated} tier, ${plan.files.length} files)`);
   } catch (err) {
+    if (config.forcePlannerExecutor) {
+      throw new Error(`Planner failed (forcePlannerExecutor enabled): ${err instanceof Error ? err.message : err}`);
+    }
     tLog.warn(`Planner failed, falling back to buildPrompt: ${err instanceof Error ? err.message : err}`);
     prompt = buildPrompt(ticket, primaryModel);
   }
@@ -306,8 +309,9 @@ async function processTicket(
   duration_s += result1.duration_s;
   const transcript = [...result1.transcript];
 
-  if (result1.outcome === 'error') {
-    tLog.error('Executor failed to start — skipping ticket');
+  if (result1.outcome === 'error' || result1.outcome === 'stuck') {
+    const reason = result1.outcome === 'stuck' ? 'Analysis paralysis (no progress at checkpoint)' : 'Executor failed to start';
+    tLog.error(`${reason} — skipping ticket`);
   } else {
     // Check for noop (no SHA change)
     const postSha = getHeadSha(cwd);
@@ -331,8 +335,8 @@ async function processTicket(
     }
   }
 
-  // Attempt 2: Escalate if primary failed
-  if (!testsPassing && !noop && result1.outcome !== 'error' && config.escalateOnFail && isLocalModel(primaryModel)) {
+  // Attempt 2: Escalate if primary failed or got stuck
+  if (!testsPassing && !noop && (result1.outcome === 'stuck' || (result1.outcome !== 'error' && config.escalateOnFail && isLocalModel(primaryModel)))) {
     tLog.info(`Escalating to ${config.modelApi}`);
     finalModel = config.modelApi;
     escalated = true;

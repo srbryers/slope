@@ -21,6 +21,7 @@ export interface LoopConfig {
   logDir: string;
   agentGuide: string;
   sprintHistory: string;
+  forcePlannerExecutor: boolean; // If true, always use planner before executor
 }
 
 export const DEFAULT_LOOP_CONFIG: LoopConfig = {
@@ -40,6 +41,7 @@ export const DEFAULT_LOOP_CONFIG: LoopConfig = {
   logDir: 'slope-loop/logs',
   agentGuide: 'slope-loop/slope-loop-guide/SKILL.md',
   sprintHistory: 'slope-loop/slope-loop-guide/references/sprint-history.md',
+  forcePlannerExecutor: false,
 };
 
 // Mapping from LoopConfig keys to environment variable names
@@ -58,6 +60,7 @@ export const ENV_VAR_MAP: Record<string, keyof LoopConfig> = {
   LOOP_BACKLOG_PATH: 'backlogPath',
   LOOP_RESULTS_DIR: 'resultsDir',
   LOOP_LOG_DIR: 'logDir',
+  LOOP_FORCE_PLANNER_EXECUTOR: 'forcePlannerExecutor',
 };
 
 /** Source of a config value (for --show display) */

@@ -87,7 +87,7 @@ export const aiderExecutor: ExecutorAdapter = {
 // ── Aider internals (extracted from executor.ts) ──────────────────
 
 interface AiderOutcome {
-  type: 'completed' | 'error' | 'timeout';
+  type: 'completed' | 'error' | 'timeout' | 'stuck';
   parsedTokens: { tokens_in: number; tokens_out: number };
   filesChanged: string[];
 }
@@ -214,6 +214,12 @@ async function runAider(
     }
 
     let timedOut = false;
+    let stuck = false;
+
+    // Analysis paralysis timeout: check for file changes at 50% of timeout
+    const CHECKPOINT_PERCENT = 0.5;
+    const checkpointMs = timeout * 1000 * CHECKPOINT_PERCENT;
+    let checkpointChecked = false;
 
     // Timeout
     const timer = setTimeout(() => {
@@ -224,10 +230,28 @@ async function runAider(
       }
     }, timeout * 1000);
 
+    // Checkpoint polling: if no file changes by 50% timeout, kill early as "stuck"
+    const checkpointTimer = setTimeout(() => {
+      if (checkpointChecked) return; // already resolved
+      checkpointChecked = true;
+
+      const currentFiles = parseAiderFiles(logLines);
+      if (currentFiles.length === 0) {
+        stuck = true;
+        log.warn(`Analysis paralysis detected: no file changes at ${CHECKPOINT_PERCENT * 100}% of timeout (${Math.round(timeout * CHECKPOINT_PERCENT)}s)`);
+        if (child.pid) {
+          try { process.kill(-child.pid, 'SIGTERM'); } catch { /* ok */ }
+        }
+      } else {
+        log.info(`Checkpoint passed: ${currentFiles.length} file(s) changed`);
+      }
+    }, checkpointMs);
+
     child.on('close', (code) => {
       clearTimeout(timer);
+      clearTimeout(checkpointTimer);
       if (child.pid) activeChildPids.delete(child.pid);
-      if (code !== 0) {
+      if (code !== 0 && !stuck) {
         log.warn(`Aider exited with code ${code}`);
       }
       try { writeFileSync(aiderLogPath, logLines.join('\n')); } catch { /* ok */ }
@@ -239,7 +263,7 @@ async function runAider(
       const filesChanged = parseAiderFiles(logLines);
 
       resolve({
-        type: timedOut ? 'timeout' : 'completed',
+        type: stuck ? 'stuck' : (timedOut ? 'timeout' : 'completed'),
         parsedTokens,
         filesChanged,
       });
