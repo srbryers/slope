@@ -59,7 +59,39 @@ import { sprintCommand } from './commands/sprint.js';
 import { doctorCommand } from './commands/doctor.js';
 import { versionCommand } from './commands/version.js';
 
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 const subcommand = process.argv[2];
+
+// Handle --help and -h flags globally
+if (subcommand === '--help' || subcommand === '-h') {
+  console.log(`
+SLOPE CLI — Sprint Lifecycle & Operational Performance Engine
+
+Usage:
+  slope init [--claude-code|--cursor|--opencode|--generic|--all]  Initialize .slope/ directory
+  slope init --team                         Enable multi-developer team mode
+  slope card                                Show handicap card
+  slope card --player=<name>                Show handicap for a specific player
+  slope card --team                         Show per-player comparison table
+  slope validate [path]                     Validate scorecard(s)
+  slope review [path] [--plain]             Format sprint review markdown
+  slope briefing                            Pre-round briefing
+  slope version                             Show current version
+  slope doctor                              Check repo health
+
+For full command list, run: slope
+`);
+  process.exit(0);
+}
+
+// Handle --version flag
+if (subcommand === '--version') {
+  const pkg = JSON.parse(readFileSync(join(import.meta.dirname, '../../package.json'), 'utf8'));
+  console.log(`@slope-dev/slope v${pkg.version ?? 'unknown'}`);
+  process.exit(0);
+}
 
 switch (subcommand) {
   case 'init':

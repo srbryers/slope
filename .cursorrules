@@ -1,0 +1,36 @@
+# SLOPE Project
+
+This project uses the SLOPE framework for sprint tracking.
+
+## Commands
+- `slope card` — view handicap card
+- `slope validate` — validate scorecards
+- `slope review` — generate sprint review
+- `slope briefing` — pre-round briefing
+
+## MCP Tools
+A SLOPE MCP server is configured in `.cursor/mcp.json`. Two tools:
+- `search` — discover API functions, types, constants
+- `execute` — run JS with full SLOPE API in sandbox
+
+## Sprint Workflow
+- **Pre-Hole:** `slope briefing` for handicap, hazards, gotchas
+- **Per-Shot:** classify each ticket with approach + result + hazards
+- **Post-Hole:** `slope validate` scorecard, `slope review`, update common-issues
+
+## Approach Complexity
+- Driver: risky/new territory
+- Long Iron: multi-package changes
+- Short Iron: standard work
+- Wedge: small tasks
+- Putter: trivial changes
+
+## Shot Results
+- In the Hole: perfect execution
+- Green: landed correctly
+- Fairway: clean start, needs finishing
+- Miss directions: over-scoped, under-scoped, wrong approach, drift
+
+## Scorecards
+Stored in docs/retros/sprint-N.json. See .slope/config.json for configuration.
+See .cursor/rules/ for detailed checklists.

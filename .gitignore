@@ -11,3 +11,6 @@ dist/
 .slope-loop-worktree-*/
 docs/demo/
 docs/issues/
+
+# SLOPE session hooks
+.claude/hooks/slope-session-*.sh

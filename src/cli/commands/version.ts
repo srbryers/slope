@@ -20,10 +20,18 @@ export async function versionCommand(args: string[]): Promise<void> {
     return;
   }
 
+  if (sub === '--help' || sub === '-h') {
+    console.log(`
+slope version                                      Show current version
+slope version bump [<version>] [--dry-run]         Bump version, create PR, merge
+`);
+    return;
+  }
+
   // Default: show current version
   const cwd = process.cwd();
   const version = getCurrentVersion(cwd);
-  console.log(`@slope-dev/slope v${version}`);
+  console.log(`@slope-dev/slope v${version ?? 'unknown'}`);
 }
 
 async function versionBump(args: string[]): Promise<void> {

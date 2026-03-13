@@ -2,7 +2,9 @@
   "mcpServers": {
     "slope": {
       "command": "node",
-      "args": ["dist/mcp/index.js"]
+      "args": [
+        "dist/mcp/index.js"
+      ]
     }
   }
 }

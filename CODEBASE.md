@@ -1,7 +1,7 @@
 ---
-generated_at: "2026-03-12T23:31:55.974Z"
-git_sha: "0280e807491513d0328b3cdff401ec1de411d45d"
-sprint: 60
+generated_at: "2026-03-13T00:24:04.707Z"
+git_sha: "964db4368a156595f1463fc8610e3d70b00333d0"
+sprint: 61
 source_files: 188
 test_files: 145
 cli_commands: 41
@@ -376,11 +376,11 @@ Re-exports from `src/core/index.ts`:
 
 | Sprint | Theme | Tickets | Score |
 |--------|-------|---------|-------|
-| **56** | Harden top hotspot modules | 8 | triple_plus |
 | **57** | Harden top hotspot modules | 2 | birdie |
 | **58** | Harden top hotspot modules | 8 | triple_plus |
 | **59** | Post-implementation workflow gate (sprint-completion guard) | 4 | bogey |
 | **60** | Compaction-proof review gates + worktree-merge guard | 5 | par |
+| **61** | The Terminal Caddy — OB1 Adapter | 3 | birdie |
 <!-- AUTO-GENERATED: END history -->
 
 ## Known Gotchas
