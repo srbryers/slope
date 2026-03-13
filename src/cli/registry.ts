@@ -42,6 +42,13 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     ],
   },
   {
+    cmd: 'help', desc: 'Show detailed per-command usage', category: 'lifecycle',
+    flags: [{ flag: '<command>', desc: 'Command name to show details for' }],
+  },
+  {
+    cmd: 'quickstart', desc: 'Interactive tutorial for new users', category: 'lifecycle',
+  },
+  {
     cmd: 'doctor', desc: 'Check repo health and auto-fix issues', category: 'lifecycle',
     flags: [{ flag: '--fix', desc: 'Auto-fix detected issues' }],
   },
@@ -200,6 +207,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
       { flag: '--complexity=<level>', desc: 'Complexity (trivial, small, medium, large)' },
       { flag: '--slope-factors=<list>', desc: 'Comma-separated slope factors' },
       { flag: '--areas=<list>', desc: 'Comma-separated code areas' },
+      { flag: '--sprint=<N>', desc: 'Sprint number for context' },
     ],
   },
   {
@@ -258,6 +266,9 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
       { name: '<name>', desc: 'Run a guard (reads hook JSON from stdin)' },
       { name: 'list', desc: 'Show all available guards' },
       { name: 'status', desc: 'Show per-harness guard installation state' },
+      { name: 'docs', desc: 'Show detailed guard documentation', flags: [
+        { flag: '<name>', desc: 'Guard name (optional — shows all if omitted)' },
+      ]},
       { name: 'enable', desc: 'Enable a disabled guard', flags: [
         { flag: '<name>', desc: 'Guard name to enable' },
       ]},

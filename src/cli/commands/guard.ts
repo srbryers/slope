@@ -21,6 +21,7 @@ import { branchBeforeCommitGuard } from '../guards/branch-before-commit.js';
 import { worktreeCheckGuard } from '../guards/worktree-check.js';
 import { sprintCompletionGuard } from '../guards/sprint-completion.js';
 import { worktreeMergeGuard } from '../guards/worktree-merge.js';
+import { formatGuardDocs } from '../guards/docs.js';
 import { recordBaseline } from '../guards/git-utils.js';
 import { execSync } from 'node:child_process';
 
@@ -333,6 +334,10 @@ export async function guardManageCommand(args: string[]): Promise<void> {
       console.log(`  PreCompact:        ${hasPreCompact ? 'yes' : 'no'}`);
 
       console.log('\nLegend: [+] active  [-] disabled  [~] unsupported by harness\n');
+      break;
+    }
+    case 'docs': {
+      formatGuardDocs(name);
       break;
     }
     case 'enable':
