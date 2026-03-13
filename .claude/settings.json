@@ -36,6 +36,12 @@
             "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/slope-guard.sh scope-drift",
             "timeout": 10,
             "statusMessage": "SLOPE: Warn when editing files outside claimed ticket scope"
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/slope-guard.sh stale-flows",
+            "timeout": 10,
+            "statusMessage": "SLOPE: Warn when editing files belonging to a stale flow definition"
           }
         ],
         "matcher": "Edit|Write"
@@ -53,6 +59,18 @@
             "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/slope-guard.sh branch-before-commit",
             "timeout": 10,
             "statusMessage": "SLOPE: Block git commit on main/master — create a feature branch first"
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/slope-guard.sh sprint-completion",
+            "timeout": 10,
+            "statusMessage": "SLOPE: Block PR creation when sprint gates are incomplete"
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/slope-guard.sh worktree-merge",
+            "timeout": 10,
+            "statusMessage": "SLOPE: Block gh pr merge --delete-branch in worktrees (causes false failure)"
           }
         ],
         "matcher": "Bash"
@@ -111,9 +129,25 @@
             "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/slope-guard.sh pr-review",
             "timeout": 10,
             "statusMessage": "SLOPE: Prompt for review workflow after PR creation"
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/slope-guard.sh sprint-completion",
+            "timeout": 10,
+            "statusMessage": "SLOPE: Auto-detect test pass and mark gate complete"
           }
         ],
         "matcher": "Bash"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/slope-guard.sh transcript",
+            "timeout": 10,
+            "statusMessage": "SLOPE: Append tool call metadata to session transcript"
+          }
+        ]
       }
     ],
     "PreCompact": [
@@ -136,6 +170,18 @@
             "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/slope-guard.sh stop-check",
             "timeout": 10,
             "statusMessage": "SLOPE: Check for uncommitted/unpushed work before session end"
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/slope-guard.sh next-action",
+            "timeout": 10,
+            "statusMessage": "SLOPE: Suggest next actions before session end"
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/slope-guard.sh sprint-completion",
+            "timeout": 10,
+            "statusMessage": "SLOPE: Block session end when sprint gates are incomplete"
           }
         ]
       }
