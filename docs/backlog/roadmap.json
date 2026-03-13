@@ -1,57 +1,55 @@
 {
   "name": "SLOPE Development Roadmap",
-  "description": "Forward-looking roadmap from S61+. Phases 1-9 (S1-S47) are complete. S48-S60 were hardening, guard enforcement, and process sprints. This roadmap covers adoption, observability, guard maturity, multi-project, and loop evolution.",
+  "description": "Forward-looking roadmap from S61+. Phases 1-9 (S1-S47) are complete. S48-S60 were hardening, guard enforcement, and process sprints. This roadmap covers adoption, observability, guard maturity, multi-project, and loop evolution. S61-S64 reflect what actually shipped (themes diverged from original plan).",
   "phases": [
     {
-      "name": "Phase 10 — Adoption & Repair",
-      "sprints": [61, 62, 63]
+      "name": "Phase 10 — Adoption & Onboarding",
+      "sprints": [61, 62, 63, 64],
+      "status": "complete"
     },
     {
-      "name": "Phase 11 — Observability & Analytics",
-      "sprints": [64, 65, 66]
+      "name": "Phase 11 — Repair & Observability",
+      "sprints": [65, 66, 67]
     },
     {
       "name": "Phase 12 — Guard Maturity",
-      "sprints": [67, 68]
+      "sprints": [68, 69]
     },
     {
       "name": "Phase 13 — Multi-Project & Teams",
-      "sprints": [69, 70, 71]
+      "sprints": [70, 71, 72]
     },
     {
       "name": "Phase 14 — Loop Evolution",
-      "sprints": [72, 73, 74]
+      "sprints": [73, 74, 75]
     }
   ],
   "sprints": [
     {
       "id": 61,
-      "theme": "The Doctor — Repo Health Checks & Repair",
-      "par": 4,
+      "theme": "The Terminal Caddy — OB1 Adapter",
+      "par": 3,
       "slope": 1,
-      "type": "feature + dx",
+      "type": "feature",
+      "status": "complete",
+      "score": 2,
+      "score_label": "birdie",
       "tickets": [
         {
           "key": "S61-1",
-          "title": "slope doctor command — check .gitignore, config, hooks, guards",
+          "title": "OB1Adapter implementing HarnessAdapter interface",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
           "key": "S61-2",
-          "title": "slope init --repair — fix missing/outdated config in existing repos",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S61-3",
-          "title": "slope doctor --fix — auto-repair common issues (gitignore, hooks, guards)",
+          "title": "Registry + barrel registration, init --ob1, doctor MCP check",
           "club": "wedge",
           "complexity": "small"
         },
         {
-          "key": "S61-4",
-          "title": "Guard installation audit — detect missing guards and suggest additions",
+          "key": "S61-3",
+          "title": "Test suite for OB1Adapter + init MCP tests",
           "club": "wedge",
           "complexity": "small"
         }
@@ -59,20 +57,29 @@
     },
     {
       "id": 62,
-      "theme": "The Welcome Mat v2 — Streamlined First-Run Experience",
-      "par": 4,
+      "theme": "The Welcome Mat v2 + Templates — Streamlined First-Run Experience",
+      "par": 5,
       "slope": 1,
       "type": "dx",
+      "status": "complete",
+      "score": 5,
+      "score_label": "par",
       "tickets": [
         {
+          "key": "S62-0",
+          "title": "Sprint & ticket templates — standard templates for sprint plans and tickets",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
           "key": "S62-1",
-          "title": "Auto-detect existing repo profile during init (stack, test runner, CI)",
+          "title": "Auto-detect coding harness during init (env vars, CLI, project files)",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
           "key": "S62-2",
-          "title": "Recommend guards based on detected stack and workflow",
+          "title": "Install relevant harness plugin/adapter based on detected harness",
           "club": "short_iron",
           "complexity": "standard"
         },
@@ -92,10 +99,13 @@
     },
     {
       "id": 63,
-      "theme": "The Handbook — CLI Help & Documentation Polish",
-      "par": 3,
+      "theme": "The Handbook + Template Integration — CLI Help & Documentation Polish",
+      "par": 5,
       "slope": 1,
       "type": "docs + dx",
+      "status": "complete",
+      "score": 3,
+      "score_label": "eagle",
       "tickets": [
         {
           "key": "S63-1",
@@ -114,65 +124,97 @@
           "title": "Guard documentation — explain each guard's purpose, triggers, and config",
           "club": "wedge",
           "complexity": "small"
+        },
+        {
+          "key": "S63-4",
+          "title": "Integrate ticket templates into sprint-checklist.md",
+          "club": "wedge",
+          "complexity": "small"
+        },
+        {
+          "key": "S63-5",
+          "title": "Update CLAUDE.md and harness context files for templates and slope plan",
+          "club": "wedge",
+          "complexity": "small"
+        },
+        {
+          "key": "S63-6",
+          "title": "slope plan --sprint=N — show full ticket specs from roadmap",
+          "club": "short_iron",
+          "complexity": "standard"
         }
       ]
     },
     {
       "id": 64,
-      "theme": "The Scorekeeper — Sprint Analytics Dashboard",
-      "par": 4,
-      "slope": 2,
-      "type": "feature",
+      "theme": "Claim Hygiene, Worktree Safety & Loop Planner Context",
+      "par": 5,
+      "slope": 1,
+      "type": "bug fix + guard + feature",
+      "status": "complete",
+      "score": 5,
+      "score_label": "par",
       "tickets": [
         {
           "key": "S64-1",
-          "title": "Handicap trend API — time-series data for handicap, GIR, fairway hit",
+          "title": "Fix stale claims: session cleanup parity + expiry filtering",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
           "key": "S64-2",
-          "title": "Guard effectiveness metrics — track block/allow ratios per guard",
-          "club": "short_iron",
-          "complexity": "standard"
+          "title": "worktree-self-remove guard: block git worktree remove on own cwd",
+          "club": "wedge",
+          "complexity": "small"
         },
         {
           "key": "S64-3",
-          "title": "Sprint velocity tracking — tickets/sprint, score trends, par accuracy",
+          "title": "slope worktree cleanup CLI command",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
           "key": "S64-4",
-          "title": "Dashboard widgets for new metrics — guard stats, velocity, trend charts",
-          "club": "long_iron",
-          "complexity": "moderate"
+          "title": "slope prep --lite — hazards + similar tickets without embedding index",
+          "club": "wedge",
+          "complexity": "small"
+        },
+        {
+          "key": "S64-5",
+          "title": "Pass prep-plan-discovered files as Aider --file flags",
+          "club": "wedge",
+          "complexity": "small"
         }
-      ],
-      "depends_on": [61]
+      ]
     },
     {
       "id": 65,
-      "theme": "The Auditor — Cost & Token Tracking",
-      "par": 3,
-      "slope": 2,
-      "type": "feature",
+      "theme": "The Doctor — Repo Health Checks & Repair",
+      "par": 4,
+      "slope": 1,
+      "type": "feature + dx",
       "tickets": [
         {
           "key": "S65-1",
-          "title": "Token usage tracking per sprint — estimate from transcript data",
+          "title": "slope doctor command — check .gitignore, config, hooks, guards",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
           "key": "S65-2",
-          "title": "Cost estimation — model-aware pricing for tracked token usage",
+          "title": "slope init --repair — fix missing/outdated config in existing repos",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
           "key": "S65-3",
-          "title": "slope cost — CLI report of token/cost trends across sprints",
+          "title": "slope doctor --fix — auto-repair common issues (gitignore, hooks, guards)",
+          "club": "wedge",
+          "complexity": "small"
+        },
+        {
+          "key": "S65-4",
+          "title": "Guard installation audit — detect missing guards and suggest additions",
           "club": "wedge",
           "complexity": "small"
         }
@@ -180,66 +222,60 @@
     },
     {
       "id": 66,
-      "theme": "The Replay — Session Insights & Debugging",
+      "theme": "The Scorekeeper — Sprint Analytics Dashboard",
       "par": 4,
       "slope": 2,
       "type": "feature",
       "tickets": [
         {
           "key": "S66-1",
-          "title": "Enhanced transcript viewer — filter by tool, show timing, highlight errors",
+          "title": "Handicap trend API — time-series data for handicap, GIR, fairway hit",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
           "key": "S66-2",
-          "title": "Session replay summary — auto-generate narrative of what happened",
-          "club": "long_iron",
-          "complexity": "moderate"
+          "title": "Guard effectiveness metrics — track block/allow ratios per guard",
+          "club": "short_iron",
+          "complexity": "standard"
         },
         {
           "key": "S66-3",
-          "title": "Compaction event tracking — log what was lost and recovered",
-          "club": "wedge",
-          "complexity": "small"
+          "title": "Sprint velocity tracking — tickets/sprint, score trends, par accuracy",
+          "club": "short_iron",
+          "complexity": "standard"
         },
         {
           "key": "S66-4",
-          "title": "Guard fire log — persistent record of every guard decision per session",
-          "club": "wedge",
-          "complexity": "small"
+          "title": "Dashboard widgets for new metrics — guard stats, velocity, trend charts",
+          "club": "long_iron",
+          "complexity": "moderate"
         }
       ],
-      "depends_on": [64]
+      "depends_on": [65]
     },
     {
       "id": 67,
-      "theme": "The Fence — Guard Testing Framework",
-      "par": 4,
+      "theme": "The Auditor — Cost & Token Tracking",
+      "par": 3,
       "slope": 2,
-      "type": "infrastructure",
+      "type": "feature",
       "tickets": [
         {
           "key": "S67-1",
-          "title": "Guard test harness — simulate PreToolUse/PostToolUse/Stop with fixtures",
-          "club": "long_iron",
-          "complexity": "moderate"
+          "title": "Token usage tracking per sprint — estimate from transcript data",
+          "club": "short_iron",
+          "complexity": "standard"
         },
         {
           "key": "S67-2",
-          "title": "Guard snapshot testing — verify guard output stability across changes",
+          "title": "Cost estimation — model-aware pricing for tracked token usage",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
           "key": "S67-3",
-          "title": "Custom guard validation — check custom guards for common errors",
-          "club": "wedge",
-          "complexity": "small"
-        },
-        {
-          "key": "S67-4",
-          "title": "Guard dry-run mode — show what guards would fire without blocking",
+          "title": "slope cost — CLI report of token/cost trends across sprints",
           "club": "wedge",
           "complexity": "small"
         }
@@ -247,65 +283,132 @@
     },
     {
       "id": 68,
+      "theme": "The Fence — Guard Testing Framework",
+      "par": 4,
+      "slope": 2,
+      "type": "infrastructure",
+      "tickets": [
+        {
+          "key": "S68-1",
+          "title": "Guard test harness — simulate PreToolUse/PostToolUse/Stop with fixtures",
+          "club": "long_iron",
+          "complexity": "moderate"
+        },
+        {
+          "key": "S68-2",
+          "title": "Guard snapshot testing — verify guard output stability across changes",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S68-3",
+          "title": "Custom guard validation — check custom guards for common errors",
+          "club": "wedge",
+          "complexity": "small"
+        },
+        {
+          "key": "S68-4",
+          "title": "Guard dry-run mode — show what guards would fire without blocking",
+          "club": "wedge",
+          "complexity": "small"
+        }
+      ]
+    },
+    {
+      "id": 69,
       "theme": "The Referee — Advisory-to-Mechanical Guard Conversion",
       "par": 4,
       "slope": 2,
       "type": "hardening",
       "tickets": [
         {
-          "key": "S68-1",
+          "key": "S69-1",
           "title": "Audit all advisory guards — identify which return context-only with no disk state",
           "club": "wedge",
           "complexity": "small"
         },
         {
-          "key": "S68-2",
+          "key": "S69-2",
           "title": "Convert hazard guard to write disk state for compaction survival",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
-          "key": "S68-3",
+          "key": "S69-3",
           "title": "Convert scope-drift guard to write disk state for compaction survival",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
-          "key": "S68-4",
+          "key": "S69-4",
           "title": "Guard enforcement report — slope doctor check for advisory vs mechanical guards",
           "club": "wedge",
           "complexity": "small"
         }
       ],
-      "depends_on": [67]
+      "depends_on": [68]
     },
     {
-      "id": 69,
+      "id": 70,
+      "theme": "The Replay — Session Insights & Debugging",
+      "par": 4,
+      "slope": 2,
+      "type": "feature",
+      "tickets": [
+        {
+          "key": "S70-1",
+          "title": "Enhanced transcript viewer — filter by tool, show timing, highlight errors",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S70-2",
+          "title": "Session replay summary — auto-generate narrative of what happened",
+          "club": "long_iron",
+          "complexity": "moderate"
+        },
+        {
+          "key": "S70-3",
+          "title": "Compaction event tracking — log what was lost and recovered",
+          "club": "wedge",
+          "complexity": "small"
+        },
+        {
+          "key": "S70-4",
+          "title": "Guard fire log — persistent record of every guard decision per session",
+          "club": "wedge",
+          "complexity": "small"
+        }
+      ],
+      "depends_on": [66]
+    },
+    {
+      "id": 71,
       "theme": "The Clubhouse Network — Multi-Repo Aggregation",
       "par": 4,
       "slope": 3,
       "type": "architecture",
       "tickets": [
         {
-          "key": "S69-1",
+          "key": "S71-1",
           "title": "Cross-repo scorecard collection — aggregate from multiple .slope/ directories",
           "club": "long_iron",
           "complexity": "moderate"
         },
         {
-          "key": "S69-2",
+          "key": "S71-2",
           "title": "Org-level handicap card — compute combined stats across repos",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
-          "key": "S69-3",
+          "key": "S71-3",
           "title": "slope org status — show all repos, their handicaps, and active sprints",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
-          "key": "S69-4",
+          "key": "S71-4",
           "title": "Cross-repo common-issues — promote patterns that appear in multiple repos",
           "club": "wedge",
           "complexity": "small"
@@ -313,162 +416,134 @@
       ]
     },
     {
-      "id": 70,
+      "id": 72,
       "theme": "The Foursome v2 — Multi-Agent Session Coordination",
       "par": 4,
       "slope": 3,
       "type": "feature",
       "tickets": [
         {
-          "key": "S70-1",
+          "key": "S72-1",
           "title": "Session conflict detection across worktrees — real-time claim overlap alerts",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
-          "key": "S70-2",
+          "key": "S72-2",
           "title": "Agent handoff protocol — structured session transfer between agents",
           "club": "long_iron",
           "complexity": "moderate"
         },
         {
-          "key": "S70-3",
+          "key": "S72-3",
           "title": "Parallel sprint orchestration — coordinate multiple agents on independent tickets",
           "club": "long_iron",
           "complexity": "moderate"
         },
         {
-          "key": "S70-4",
+          "key": "S72-4",
           "title": "Agent session dashboard — live view of all active agent sessions",
           "club": "short_iron",
           "complexity": "standard"
         }
       ],
-      "depends_on": [69]
+      "depends_on": [71]
     },
     {
-      "id": 71,
-      "theme": "The Tournament — Team Scoring & Competition",
-      "par": 3,
-      "slope": 2,
-      "type": "feature",
-      "tickets": [
-        {
-          "key": "S71-1",
-          "title": "Team sprint scoring — combine individual agent scores into team score",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S71-2",
-          "title": "Inter-team leaderboard — compare team performance across orgs",
-          "club": "short_iron",
-          "complexity": "standard"
-        },
-        {
-          "key": "S71-3",
-          "title": "Sprint retrospective generator — auto-generate retro from scorecard data",
-          "club": "wedge",
-          "complexity": "small"
-        }
-      ],
-      "depends_on": [69, 70]
-    },
-    {
-      "id": 72,
+      "id": 73,
       "theme": "The Autopilot v2 — Smart Model Routing",
       "par": 4,
       "slope": 2,
       "type": "feature",
       "tickets": [
         {
-          "key": "S72-1",
+          "key": "S73-1",
           "title": "Model success rate tracking — per-club, per-ticket-type success data",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
-          "key": "S72-2",
+          "key": "S73-2",
           "title": "Adaptive model selection — use historical data to pick optimal model per ticket",
           "club": "long_iron",
           "complexity": "moderate"
         },
         {
-          "key": "S72-3",
+          "key": "S73-3",
           "title": "Model cost-performance tradeoff — factor cost into routing decisions",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
-          "key": "S72-4",
+          "key": "S73-4",
           "title": "slope loop config recommend — suggest optimal model config from data",
           "club": "wedge",
           "complexity": "small"
         }
       ],
-      "depends_on": [65]
+      "depends_on": [67]
     },
     {
-      "id": 73,
+      "id": 74,
       "theme": "The Assembly Line — Batch Sprint Execution",
       "par": 4,
       "slope": 3,
       "type": "feature",
       "tickets": [
         {
-          "key": "S73-1",
+          "key": "S74-1",
           "title": "Dependency-aware sprint scheduling — respect depends_on in continuous mode",
           "club": "long_iron",
           "complexity": "moderate"
         },
         {
-          "key": "S73-2",
+          "key": "S74-2",
           "title": "Parallel worktree management — auto-create/cleanup worktrees for parallel sprints",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
-          "key": "S73-3",
+          "key": "S74-3",
           "title": "Sprint failure recovery — auto-retry with different strategy on failure",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
-          "key": "S73-4",
+          "key": "S74-4",
           "title": "Batch execution report — summary of all sprints run in a batch",
           "club": "wedge",
           "complexity": "small"
         }
       ],
-      "depends_on": [72]
+      "depends_on": [73]
     },
     {
-      "id": 74,
+      "id": 75,
       "theme": "The Convergence — Loop Self-Improvement",
       "par": 3,
       "slope": 3,
       "type": "architecture",
       "tickets": [
         {
-          "key": "S74-1",
+          "key": "S75-1",
           "title": "Backlog quality scoring — rate backlog tickets by likelihood of clean execution",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
-          "key": "S74-2",
+          "key": "S75-2",
           "title": "Auto-generate backlog from common-issues and guard data",
           "club": "long_iron",
           "complexity": "moderate"
         },
         {
-          "key": "S74-3",
+          "key": "S75-3",
           "title": "Convergence metrics — track handicap improvement rate, predict plateau",
           "club": "short_iron",
           "complexity": "standard"
         }
       ],
-      "depends_on": [72, 73]
+      "depends_on": [73, 74]
     }
   ]
 }

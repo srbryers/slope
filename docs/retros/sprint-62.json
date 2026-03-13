@@ -1,0 +1,90 @@
+{
+  "sprint_number": 62,
+  "theme": "The Welcome Mat v2 + Templates — Streamlined First-Run Experience & Sprint/Ticket Templates",
+  "par": 5,
+  "slope": 1,
+  "score": 5,
+  "score_label": "par",
+  "date": "2026-03-12",
+  "shots": [
+    {
+      "ticket_key": "S62-0",
+      "title": "Sprint & ticket templates — define standard templates for sprint plans and tickets with full specs (I WANT TO, SO THAT, BACKGROUND, OBJECTIVES, ACCEPTANCE CRITERIA, TECHNICAL NOTES, DEPENDENCIES, GOTCHAS)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Created .slope/templates/sprint-plan.md and .slope/templates/ticket.md with full template specs. Added ticket.schema.json for machine-readable validation. Updated roadmap.json with extended ticket format."
+    },
+    {
+      "ticket_key": "S62-1",
+      "title": "Auto-detect coding harness during init — detect from CLI flags, env vars, or prompt via harness",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added detectHarnessFromEnvironment() and detectHarnessFromCLI() functions. Enhanced detectAllHarnesses() to combine env vars, CLI presence, and project files. Priority: env > CLI > project files."
+    },
+    {
+      "ticket_key": "S62-2",
+      "title": "Install relevant harness plugin/adapter based on detected harness — slope init installs the correct MCP/server adapter automatically",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Already implemented in existing init flow - detectAllHarnesses() feeds directly into installForProvider() loop. Works for all supported harnesses."
+    },
+    {
+      "ticket_key": "S62-3",
+      "title": "slope init --migrate — upgrade config from older SLOPE versions",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Already implemented! Handles slopeVersion migration and detectedStack addition. Exit early after migration."
+    },
+    {
+      "ticket_key": "S62-4",
+      "title": "Post-init validation — run doctor checks after init to confirm setup",
+      "club": "putter",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added automatic doctor command run at end of init (unless --skip-doctor flag is passed). Shows post-init validation summary."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 5,
+    "fairways_total": 5,
+    "greens_in_regulation": 5,
+    "greens_total": 5,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    "S62-1 detection covers: Claude Code (ANTHROPIC_API_KEY), OpenCode (OPENCODE_API_KEY), Cursor (CURSOR_SESSION_ID), Cline (CLANE_API_KEY), Windsurf (CODEIUM_EXTENSION), OB1 (OB1_API_KEY)",
+    "S62-1 also checks CLI presence: claude, opencode, cursor, cline, windsurf, ob1 commands"
+  ],
+  "special_plays": [
+    "S62-2 and S62-3 were already partially implemented - just needed integration",
+    "All 5 tickets completed in one session"
+  ],
+  "bunker_locations": [],
+  "yardage_book_updates": [
+    "Environment variables are the most reliable detection signal - checked first",
+    "CLI presence helps when env vars aren't set but harness is installed",
+    "Project directory detection is fallback for existing projects"
+  ],
+  "course_management_notes": [
+    "Clean sweep - all 5 tickets completed with no hazards",
+    "S62-0 templates provide foundation for future ticket planning",
+    "S62-1 S62-2 S62-4 work together for seamless init experience"
+  ],
+  "slope_factors": [
+    "Existing adapter framework made S62-1 integration straightforward",
+    "Metaphor-aware templates in template-generator.ts informed S62-0 structure"
+  ]
+}
