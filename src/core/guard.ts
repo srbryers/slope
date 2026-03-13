@@ -169,10 +169,10 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
   },
   {
     name: 'subagent-gate',
-    description: 'Force haiku model and cap max_turns on Explore/Plan subagents',
+    description: 'Enforce model selection on Explore/Plan subagents',
     hookEvent: 'PreToolUse',
     toolCategories: ['create_subagent'],
-    matcher: 'Task',
+    matcher: 'Agent',
     level: 'full',
   },
   {
