@@ -8,9 +8,6 @@ importers:
 
   .:
     dependencies:
-      '@anthropic-ai/sdk':
-        specifier: ^0.78.0
-        version: 0.78.0(zod@3.25.76)
       '@clack/prompts':
         specifier: ^1.0.1
         version: 1.0.1
@@ -27,6 +24,9 @@ importers:
         specifier: ^3.24.0
         version: 3.25.76
     devDependencies:
+      '@anthropic-ai/sdk':
+        specifier: ^0.78.0
+        version: 0.78.0(zod@3.25.76)
       '@types/better-sqlite3':
         specifier: ^7.6.0
         version: 7.6.13
