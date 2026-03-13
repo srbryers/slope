@@ -3,7 +3,7 @@ import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execSync } from 'node:child_process';
-import { parseChangelog } from '../../src/cli/commands/docs.js';
+import { parseChangelog, compareManifests } from '../../src/cli/commands/docs.js';
 
 // ── Fixture helpers ────────────────────────────────────────────
 
@@ -164,5 +164,58 @@ describe('parseChangelog', () => {
     expect(result.status).toBe('success');
     const versions = result.entries.map(e => e.version);
     expect(versions).toContain('Unreleased');
+  });
+});
+
+// ── compareManifests ────────────────────────────────────────────
+
+describe('compareManifests', () => {
+  const checksums = {
+    commands: 'aaa',
+    guards: 'bbb',
+    mcpTools: 'ccc',
+    metaphors: 'ddd',
+    roles: 'eee',
+    constants: 'fff',
+    changelog: 'ggg',
+  };
+
+  const base = { version: '1.26.0', checksums };
+
+  it('returns empty array when manifests match', () => {
+    expect(compareManifests(base, { ...base })).toEqual([]);
+  });
+
+  it('detects version mismatch', () => {
+    const saved = { ...base, version: '1.24.0' };
+    const result = compareManifests(saved, base);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toContain('version');
+    expect(result[0]).toContain('1.24.0');
+    expect(result[0]).toContain('1.26.0');
+  });
+
+  it('detects checksum mismatch in a section', () => {
+    const saved = { ...base, checksums: { ...checksums, commands: 'zzz' } };
+    const result = compareManifests(saved, base);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toBe('commands');
+  });
+
+  it('detects multiple mismatches (version + sections)', () => {
+    const saved = {
+      version: '1.0.0',
+      checksums: { ...checksums, guards: 'changed', metaphors: 'changed' },
+    };
+    const result = compareManifests(saved, base);
+    expect(result).toHaveLength(3);
+    expect(result).toEqual(expect.arrayContaining(['version: 1.0.0 vs 1.26.0', 'guards', 'metaphors']));
+  });
+
+  it('checks roles and constants sections', () => {
+    const saved = { ...base, checksums: { ...checksums, roles: 'changed', constants: 'changed' } };
+    const result = compareManifests(saved, base);
+    expect(result).toHaveLength(2);
+    expect(result).toEqual(expect.arrayContaining(['roles', 'constants']));
   });
 });
