@@ -95,7 +95,7 @@ describe('ClaudeCodeAdapter', () => {
       expect(adapter.toolNames.read_file).toBe('Read');
       expect(adapter.toolNames.write_file).toBe('Edit|Write');
       expect(adapter.toolNames.execute_command).toBe('Bash');
-      expect(adapter.toolNames.create_subagent).toBe('Task');
+      expect(adapter.toolNames.create_subagent).toBe('Agent');
       expect(adapter.toolNames.exit_plan).toBe('ExitPlanMode');
     });
   });

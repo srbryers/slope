@@ -167,7 +167,7 @@ describe('CLAUDE_CODE_TOOLS', () => {
     expect(CLAUDE_CODE_TOOLS.search_files).toBe('Glob');
     expect(CLAUDE_CODE_TOOLS.search_content).toBe('Grep');
     expect(CLAUDE_CODE_TOOLS.execute_command).toBe('Bash');
-    expect(CLAUDE_CODE_TOOLS.create_subagent).toBe('Task');
+    expect(CLAUDE_CODE_TOOLS.create_subagent).toBe('Agent');
     expect(CLAUDE_CODE_TOOLS.exit_plan).toBe('ExitPlanMode');
   });
 });

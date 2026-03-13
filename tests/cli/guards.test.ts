@@ -330,7 +330,7 @@ describe('stopCheckGuard', () => {
 });
 
 describe('subagentGateGuard', () => {
-  it('passes through non-Task tool types', async () => {
+  it('passes through non-Explore/Plan agent types', async () => {
     const result = await subagentGateGuard(
       makeInput({ tool_input: { subagent_type: 'Bash', command: 'ls' } }),
       tmpDir,
@@ -348,7 +348,7 @@ describe('subagentGateGuard', () => {
 
   it('denies non-haiku Explore agent', async () => {
     const result = await subagentGateGuard(
-      makeInput({ tool_input: { subagent_type: 'Explore', model: 'sonnet', max_turns: 5 } }),
+      makeInput({ tool_input: { subagent_type: 'Explore', model: 'sonnet' } }),
       tmpDir,
     );
     expect(result.decision).toBe('deny');
@@ -356,27 +356,18 @@ describe('subagentGateGuard', () => {
     expect(result.blockReason).toContain('sonnet');
   });
 
-  it('denies missing max_turns', async () => {
+  it('allows haiku Explore agent without model set', async () => {
     const result = await subagentGateGuard(
-      makeInput({ tool_input: { subagent_type: 'Explore', model: 'haiku' } }),
+      makeInput({ tool_input: { subagent_type: 'Explore' } }),
       tmpDir,
     );
-    expect(result.decision).toBe('deny');
-    expect(result.blockReason).toContain('max_turns');
-  });
-
-  it('denies exceeded max_turns', async () => {
-    const result = await subagentGateGuard(
-      makeInput({ tool_input: { subagent_type: 'Explore', model: 'haiku', max_turns: 50 } }),
-      tmpDir,
-    );
-    expect(result.decision).toBe('deny');
-    expect(result.blockReason).toContain('max_turns');
+    expect(result.decision).toBeUndefined();
+    expect(result.context).toContain('SLOPE subagent tip');
   });
 
   it('allows correct Explore agent with orientation context', async () => {
     const result = await subagentGateGuard(
-      makeInput({ tool_input: { subagent_type: 'Explore', model: 'haiku', max_turns: 8 } }),
+      makeInput({ tool_input: { subagent_type: 'Explore', model: 'haiku' } }),
       tmpDir,
     );
     expect(result.decision).toBeUndefined();
@@ -385,7 +376,7 @@ describe('subagentGateGuard', () => {
 
   it('allows correct Plan agent with orientation context', async () => {
     const result = await subagentGateGuard(
-      makeInput({ tool_input: { subagent_type: 'Plan', model: 'haiku', max_turns: 12 } }),
+      makeInput({ tool_input: { subagent_type: 'Plan', model: 'haiku' } }),
       tmpDir,
     );
     expect(result.decision).toBeUndefined();
@@ -405,7 +396,7 @@ describe('subagentGateGuard', () => {
     writeFileSync(join(tmpDir, 'CODEBASE.md'), frontmatter);
 
     const result = await subagentGateGuard(
-      makeInput({ tool_input: { subagent_type: 'Explore', model: 'haiku', max_turns: 8 } }),
+      makeInput({ tool_input: { subagent_type: 'Explore', model: 'haiku' } }),
       tmpDir,
     );
     expect(result.context).toContain('27 CLI commands');
@@ -416,7 +407,7 @@ describe('subagentGateGuard', () => {
 
   it('returns fallback context when CODEBASE.md is missing', async () => {
     const result = await subagentGateGuard(
-      makeInput({ tool_input: { subagent_type: 'Explore', model: 'haiku', max_turns: 8 } }),
+      makeInput({ tool_input: { subagent_type: 'Explore', model: 'haiku' } }),
       tmpDir,
     );
     expect(result.context).toContain('Glob/Grep');
@@ -425,30 +416,28 @@ describe('subagentGateGuard', () => {
 
   it('returns no context for non-Explore/Plan agents', async () => {
     const result = await subagentGateGuard(
-      makeInput({ tool_input: { subagent_type: 'Bash', model: 'haiku', max_turns: 5 } }),
+      makeInput({ tool_input: { subagent_type: 'Bash', model: 'haiku' } }),
       tmpDir,
     );
     expect(result).toEqual({});
   });
 
-  it('respects custom config thresholds', async () => {
+  it('respects custom config allowed models', async () => {
     mockConfig.guidance = {
-      subagentExploreTurns: 5,
-      subagentPlanTurns: 8,
       subagentAllowModels: ['haiku', 'sonnet'],
     };
 
     // sonnet allowed with custom config
     const result1 = await subagentGateGuard(
-      makeInput({ tool_input: { subagent_type: 'Explore', model: 'sonnet', max_turns: 4 } }),
+      makeInput({ tool_input: { subagent_type: 'Explore', model: 'sonnet' } }),
       tmpDir,
     );
     expect(result1.decision).toBeUndefined();
     expect(result1.context).toContain('SLOPE subagent tip');
 
-    // exceeds custom Explore limit
+    // opus denied even with custom config
     const result2 = await subagentGateGuard(
-      makeInput({ tool_input: { subagent_type: 'Explore', model: 'haiku', max_turns: 6 } }),
+      makeInput({ tool_input: { subagent_type: 'Explore', model: 'opus' } }),
       tmpDir,
     );
     expect(result2.decision).toBe('deny');
