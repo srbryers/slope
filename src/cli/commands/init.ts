@@ -5,7 +5,7 @@ import { execSync } from 'node:child_process';
 import { createConfig } from '../config.js';
 import { saveHooksConfig } from '../hooks-config.js';
 import { resolveMetaphor } from '../metaphor.js';
-import { detectPackageManager, createVision, analyzeStack, SLOPE_BIN_PREAMBLE } from '../../core/index.js';
+import { detectPackageManager, createVision, analyzeStack, SLOPE_BIN_PREAMBLE, writeOrUpdateManagedScript } from '../../core/index.js';
 import type { StackProfile } from '../../core/analyzers/types.js';
 import type { MetaphorDefinition } from '../../core/index.js';
 import {
@@ -577,23 +577,23 @@ function installDefaultHooks(cwd: string, provider: InitProvider): void {
 
   for (const [name, commands] of Object.entries(SESSION_HOOKS)) {
     const filePath = join(hooksDir, `slope-${name}.sh`);
-    if (!existsSync(filePath)) {
-      const script = [
-        '#!/usr/bin/env bash',
-        `# SLOPE hook: ${name}`,
-        '',
-        '# === SLOPE MANAGED (do not edit above this line) ===',
-        ...SLOPE_BIN_PREAMBLE,
-        '',
-        ...commands,
-        '# === SLOPE END ===',
-        '',
-        '# Add your custom commands below:',
-        '',
-      ].join('\n');
-      writeFileSync(filePath, script, { mode: 0o755 });
+    const script = [
+      '#!/usr/bin/env bash',
+      `# SLOPE hook: ${name}`,
+      '',
+      '# === SLOPE MANAGED (do not edit above this line) ===',
+      ...SLOPE_BIN_PREAMBLE,
+      '',
+      ...commands,
+      '# === SLOPE END ===',
+      '',
+      '# Add your custom commands below:',
+      '',
+    ].join('\n');
+    const result = writeOrUpdateManagedScript(filePath, script);
+    if (result !== 'unchanged') {
       config.installed[name] = { provider, installed_at: new Date().toISOString() };
-      console.log(`  Installed hook: ${name}`);
+      console.log(`  ${result === 'created' ? 'Installed' : 'Updated'} hook: ${name}`);
     }
   }
 

@@ -281,6 +281,7 @@ export {
   clearAdapters,
   resolveToolMatcher,
   SLOPE_BIN_PREAMBLE,
+  writeOrUpdateManagedScript,
 } from './harness.js';
 export type {
   HarnessId,

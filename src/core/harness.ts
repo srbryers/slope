@@ -1,6 +1,7 @@
 // SLOPE Harness Adapter Framework
 // Abstracts guard/hook integration from Claude Code to support multiple AI coding harnesses.
 
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import type { GuardResult, AnyGuardDefinition } from './guard.js';
 
 // --- Types ---
@@ -142,6 +143,52 @@ export const SLOPE_BIN_PREAMBLE: string[] = [
   'fi',
   'slope() { "$_SLOPE_BIN" "$@"; }',
 ];
+
+const MANAGED_START = '# === SLOPE MANAGED (do not edit above this line) ===';
+const MANAGED_END = '# === SLOPE END ===';
+
+/**
+ * Write or update a SLOPE-managed shell script.
+ * - New file: writes `fullScript` as-is.
+ * - Existing file with markers: replaces content between MANAGED START and
+ *   MANAGED END while preserving header (above START) and user content (below END).
+ * - Existing file without markers: leaves unchanged (user fully customized).
+ *
+ * @param filePath  Path to the shell script
+ * @param fullScript  Complete script content (used for new files)
+ * @returns 'created' | 'updated' | 'unchanged'
+ */
+export function writeOrUpdateManagedScript(filePath: string, fullScript: string): 'created' | 'updated' | 'unchanged' {
+  if (!existsSync(filePath)) {
+    writeFileSync(filePath, fullScript, { mode: 0o755 });
+    return 'created';
+  }
+
+  const existing = readFileSync(filePath, 'utf8');
+  const startIdx = existing.indexOf(MANAGED_START);
+  const endIdx = existing.indexOf(MANAGED_END);
+  if (startIdx === -1 || endIdx === -1) {
+    // No markers — leave the file alone (user fully customized)
+    return 'unchanged';
+  }
+
+  // Extract managed body from the new full script
+  const newStartIdx = fullScript.indexOf(MANAGED_START);
+  const newEndIdx = fullScript.indexOf(MANAGED_END);
+  if (newStartIdx === -1 || newEndIdx === -1) return 'unchanged';
+
+  const newManaged = fullScript.slice(newStartIdx + MANAGED_START.length, newEndIdx);
+  const oldManaged = existing.slice(startIdx + MANAGED_START.length, endIdx);
+
+  if (newManaged === oldManaged) return 'unchanged';
+
+  // Preserve header + user content, replace only the managed section
+  const header = existing.slice(0, startIdx + MANAGED_START.length);
+  const userContent = existing.slice(endIdx); // includes MANAGED_END + everything after
+  const updated = header + newManaged + userContent;
+  writeFileSync(filePath, updated, { mode: 0o755 });
+  return 'updated';
+}
 
 /**
  * Resolve tool categories to a matcher string for a specific harness.
