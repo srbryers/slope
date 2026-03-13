@@ -297,22 +297,48 @@ run_ticket_with_model() {
     [ -f "$SLOPE_DIR/CODEBASE.md" ] && aider_args+=(--read "$SLOPE_DIR/CODEBASE.md")
   fi
 
-  # Generate prep plan per ticket (fall back silently)
+  # Generate prep plan (JSON for file extraction, markdown for --read)
+  PREP_JSON="$LOG_DIR/${ticket_id}-prep.json"
   PREP_FILE="$LOG_DIR/${ticket_id}-prep.md"
-  if pnpm slope prep "${ticket_id}" --top=5 > "${PREP_FILE}" 2>"${PREP_FILE}.err"; then
-    if [ -s "${PREP_FILE}" ]; then
-      # Token budget check: ~400 tokens max (~1600 words)
-      PREP_WORDS=$(wc -w < "${PREP_FILE}" | tr -d ' ')
-      if [ "${PREP_WORDS}" -lt 1600 ]; then
-        aider_args+=(--read "${PREP_FILE}")
-        log "   Injected prep plan (~$((PREP_WORDS / 4)) tokens)"
-      else
-        log "   Prep plan too large (~$((PREP_WORDS / 4)) tokens) — skipping"
+  PREP_WORDS=0
+
+  if pnpm slope prep "${ticket_id}" --json --top=5 > "${PREP_JSON}" 2>"${PREP_JSON}.err"; then
+    if [ -s "${PREP_JSON}" ]; then
+      # Generate markdown for --read injection
+      if pnpm slope prep "${ticket_id}" --top=5 > "${PREP_FILE}" 2>/dev/null && [ -s "${PREP_FILE}" ]; then
+        PREP_WORDS=$(wc -w < "${PREP_FILE}" | tr -d ' ')
+        if [ "${PREP_WORDS}" -lt 1600 ]; then
+          aider_args+=(--read "${PREP_FILE}")
+          log "   Injected prep plan (~$((PREP_WORDS / 4)) tokens)"
+        else
+          log "   Prep plan too large (~$((PREP_WORDS / 4)) tokens) — skipping markdown"
+        fi
+      fi
+
+      # Extract discovered files from JSON and add as --file flags
+      PREP_DISCOVERED=$(jq -r '.files.modify[].path' "${PREP_JSON}" 2>/dev/null || true)
+      if [ -n "$PREP_DISCOVERED" ]; then
+        local PREP_FILE_COUNT=0
+        local MAX_EDIT_FILES=5
+        while IFS= read -r pf; do
+          if [ "$PREP_FILE_COUNT" -ge "$MAX_EDIT_FILES" ]; then break; fi
+          if [ -n "$pf" ] && [ -f "$pf" ] && [[ "$pf" == *.ts || "$pf" == *.js || "$pf" == *.sh ]]; then
+            # Skip if already in TICKET_PRIMARY_FILES (avoid duplicate --file flags)
+            if [ -n "${TICKET_PRIMARY_FILES:-}" ] && echo "$TICKET_PRIMARY_FILES" | grep -qF "$pf"; then
+              continue
+            fi
+            aider_args+=(--file "$pf")
+            PREP_FILE_COUNT=$((PREP_FILE_COUNT + 1))
+          fi
+        done <<< "$PREP_DISCOVERED"
+        if [ "$PREP_FILE_COUNT" -gt 0 ]; then
+          log "   Added $PREP_FILE_COUNT prep-discovered files to Aider edit context"
+        fi
       fi
     fi
   else
     log "   Warning: slope prep failed — continuing without plan"
-    [ -s "${PREP_FILE}.err" ] && log "   $(head -1 "${PREP_FILE}.err")"
+    [ -s "${PREP_JSON}.err" ] && log "   $(head -1 "${PREP_JSON}.err")"
   fi
 
   # Fallback: if full prep failed or too large, get hazards + similar tickets only
