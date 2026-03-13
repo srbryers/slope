@@ -2,6 +2,7 @@
   "hooks": {
     "PreToolUse": [
       {
+        "matcher": "Read|Glob|Grep",
         "hooks": [
           {
             "type": "command",
@@ -9,10 +10,10 @@
             "timeout": 10,
             "statusMessage": "SLOPE: Suggest checking codebase index before deep exploration"
           }
-        ],
-        "matcher": "Read|Glob|Grep"
+        ]
       },
       {
+        "matcher": "Read|Glob|Grep|Edit|Write|Bash",
         "hooks": [
           {
             "type": "command",
@@ -20,10 +21,10 @@
             "timeout": 10,
             "statusMessage": "SLOPE: Block concurrent sessions without worktree isolation"
           }
-        ],
-        "matcher": "Read|Glob|Grep|Edit|Write|Bash"
+        ]
       },
       {
+        "matcher": "Edit|Write",
         "hooks": [
           {
             "type": "command",
@@ -43,10 +44,10 @@
             "timeout": 10,
             "statusMessage": "SLOPE: Warn when editing files belonging to a stale flow definition"
           }
-        ],
-        "matcher": "Edit|Write"
+        ]
       },
       {
+        "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
@@ -71,11 +72,17 @@
             "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/slope-guard.sh worktree-merge",
             "timeout": 10,
             "statusMessage": "SLOPE: Block gh pr merge --delete-branch in worktrees (causes false failure)"
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/slope-guard.sh worktree-self-remove",
+            "timeout": 10,
+            "statusMessage": "SLOPE: Block git worktree remove when targeting own cwd"
           }
-        ],
-        "matcher": "Bash"
+        ]
       },
       {
+        "matcher": "Agent",
         "hooks": [
           {
             "type": "command",
@@ -83,10 +90,10 @@
             "timeout": 10,
             "statusMessage": "SLOPE: Force haiku model and cap max_turns on Explore/Plan subagents"
           }
-        ],
-        "matcher": "Task"
+        ]
       },
       {
+        "matcher": "ExitPlanMode",
         "hooks": [
           {
             "type": "command",
@@ -94,12 +101,12 @@
             "timeout": 10,
             "statusMessage": "SLOPE: Block ExitPlanMode until review rounds are complete"
           }
-        ],
-        "matcher": "ExitPlanMode"
+        ]
       }
     ],
     "PostToolUse": [
       {
+        "matcher": "Edit|Write",
         "hooks": [
           {
             "type": "command",
@@ -113,10 +120,10 @@
             "timeout": 10,
             "statusMessage": "SLOPE: Suggest plan review with specialist reviewers"
           }
-        ],
-        "matcher": "Edit|Write"
+        ]
       },
       {
+        "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
@@ -136,8 +143,7 @@
             "timeout": 10,
             "statusMessage": "SLOPE: Auto-detect test pass and mark gate complete"
           }
-        ],
-        "matcher": "Bash"
+        ]
       },
       {
         "hooks": [
