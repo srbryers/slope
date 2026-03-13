@@ -3,7 +3,7 @@ import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execSync } from 'node:child_process';
-import { parseChangelog } from '../../src/cli/commands/docs.js';
+import { parseChangelog, compareManifests } from '../../src/cli/commands/docs.js';
 
 // ── Fixture helpers ────────────────────────────────────────────
 
@@ -164,5 +164,51 @@ describe('parseChangelog', () => {
     expect(result.status).toBe('success');
     const versions = result.entries.map(e => e.version);
     expect(versions).toContain('Unreleased');
+  });
+});
+
+// ── compareManifests ────────────────────────────────────────────
+
+describe('compareManifests', () => {
+  const base = {
+    version: '1.26.0',
+    commands: [{}, {}, {}] as any[],
+    guards: [{}, {}] as any[],
+    mcpTools: [{}] as any[],
+    metaphors: [{}, {}, {}] as any[],
+  };
+
+  it('returns empty array when manifests match', () => {
+    expect(compareManifests(base, { ...base })).toEqual([]);
+  });
+
+  it('detects version mismatch', () => {
+    const remote = { ...base, version: '1.24.0' };
+    const result = compareManifests(remote, base);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toContain('version');
+    expect(result[0]).toContain('1.24.0');
+    expect(result[0]).toContain('1.26.0');
+  });
+
+  it('detects command count mismatch', () => {
+    const remote = { ...base, commands: [{}] as any[] };
+    const result = compareManifests(remote, base);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toContain('commands');
+  });
+
+  it('detects multiple mismatches', () => {
+    const remote = {
+      ...base,
+      version: '1.0.0',
+      guards: [] as any[],
+      metaphors: [{}, {}, {}, {}] as any[],
+    };
+    const result = compareManifests(remote, base);
+    expect(result).toHaveLength(3);
+    expect(result.map(m => m.split(':')[0])).toEqual(
+      expect.arrayContaining(['version', 'guards', 'metaphors']),
+    );
   });
 });

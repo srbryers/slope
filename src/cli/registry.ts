@@ -534,6 +534,9 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
       { name: 'check', desc: 'Compare saved manifest against current state (exit 1 on drift)', flags: [
         { flag: '--manifest=<path>', desc: 'Path to saved manifest (default: .slope/docs.json)' },
       ]},
+      { name: 'validate', desc: 'Fetch remote manifest and compare against local (exit 1 on drift)', flags: [
+        { flag: '--url=<url>', desc: 'Remote manifest URL (default: slope-web GitHub raw)' },
+      ]},
       { name: 'sync', desc: 'Copy manifest to slope-web or target directory', flags: [
         { flag: '--target=<path>', desc: 'Target directory (default: adjacent slope-web repo)' },
       ]},

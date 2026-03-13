@@ -310,6 +310,75 @@ async function checkSubcommand(args: string[]): Promise<void> {
   }
 }
 
+/** Compare two manifests and return a list of mismatches. Pure function — no I/O. */
+export function compareManifests(
+  remote: Pick<DocsManifest, 'version' | 'commands' | 'guards' | 'mcpTools' | 'metaphors'>,
+  local: Pick<DocsManifest, 'version' | 'commands' | 'guards' | 'mcpTools' | 'metaphors'>,
+): string[] {
+  const mismatches: string[] = [];
+
+  if (remote.version !== local.version) {
+    mismatches.push(`version: remote=${remote.version} local=${local.version}`);
+  }
+  if (remote.commands.length !== local.commands.length) {
+    mismatches.push(`commands: remote=${remote.commands.length} local=${local.commands.length}`);
+  }
+  if (remote.guards.length !== local.guards.length) {
+    mismatches.push(`guards: remote=${remote.guards.length} local=${local.guards.length}`);
+  }
+  if (remote.mcpTools.length !== local.mcpTools.length) {
+    mismatches.push(`mcpTools: remote=${remote.mcpTools.length} local=${local.mcpTools.length}`);
+  }
+  if (remote.metaphors.length !== local.metaphors.length) {
+    mismatches.push(`metaphors: remote=${remote.metaphors.length} local=${local.metaphors.length}`);
+  }
+
+  return mismatches;
+}
+
+async function validateSubcommand(args: string[]): Promise<void> {
+  const cwd = process.cwd();
+  const urlArg = args.find(a => a.startsWith('--url='));
+  const remoteUrl = urlArg
+    ? urlArg.slice('--url='.length)
+    : 'https://raw.githubusercontent.com/srbryers/slope-web/main/src/data/docs-manifest.json';
+
+  // Fetch remote manifest
+  let remote: DocsManifest;
+  try {
+    const res = await fetch(remoteUrl);
+    if (!res.ok) {
+      console.error(`Failed to fetch remote manifest: ${res.status} ${res.statusText}`);
+      console.error(`  URL: ${remoteUrl}`);
+      process.exit(1);
+    }
+    remote = await res.json() as DocsManifest;
+  } catch (err) {
+    console.error(`Failed to fetch remote manifest: ${err instanceof Error ? err.message : err}`);
+    console.error(`  URL: ${remoteUrl}`);
+    process.exit(1);
+  }
+
+  const local = buildManifest(cwd, true);
+  const mismatches = compareManifests(remote, local);
+
+  if (mismatches.length === 0) {
+    console.log('Remote manifest is current. No drift detected.');
+    console.log(`  Version: ${local.version}`);
+    console.log(`  Commands: ${local.commands.length}`);
+    console.log(`  Guards: ${local.guards.length}`);
+    console.log(`  MCP Tools: ${local.mcpTools.length}`);
+    console.log(`  Metaphors: ${local.metaphors.length}`);
+  } else {
+    console.error(`Drift detected — ${mismatches.length} mismatch(es):`);
+    for (const m of mismatches) {
+      console.error(`  - ${m}`);
+    }
+    console.error('\nRun "slope docs sync" to update the remote manifest.');
+    process.exit(1);
+  }
+}
+
 async function syncSubcommand(args: string[]): Promise<void> {
   const cwd = process.cwd();
   const targetArg = args.find(a => a.startsWith('--target='));
@@ -373,6 +442,8 @@ export async function docsCommand(args: string[]): Promise<void> {
       return changelogSubcommand(subArgs);
     case 'check':
       return checkSubcommand(subArgs);
+    case 'validate':
+      return validateSubcommand(subArgs);
     case 'sync':
       return syncSubcommand(subArgs);
     default:
@@ -383,12 +454,14 @@ Usage:
   slope docs generate [--output=path] [--pretty] [--incremental] [--stdout]
   slope docs changelog [--since=version] [--format=markdown|json]
   slope docs check [--manifest=path]
+  slope docs validate [--url=<manifest-url>]
   slope docs sync [--target=path] [--dest=subpath]
 
 Subcommands:
   generate      Build manifest JSON from registries + git history
   changelog     Generate changelog from conventional commits
   check         Compare saved manifest against current state (exit 1 on drift)
+  validate      Fetch remote manifest and compare against local (exit 1 on drift)
   sync          Generate manifest and copy to slope-web (or --target directory)
 
 Options:
@@ -399,6 +472,7 @@ Options:
   --since=version     Changelog since this version/tag
   --format=FORMAT     Changelog output format: markdown (default) or json
   --manifest=path     Path to saved manifest for check (default: .slope/docs.json)
+  --url=URL           Remote manifest URL for validate (default: slope-web GitHub raw)
   --target=path       Target directory for sync (default: ../slope-web)
   --dest=subpath      Destination subpath within target (default: src/data/docs-manifest.json)
 `);
