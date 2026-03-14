@@ -62,8 +62,13 @@ export interface RoadmapValidationResult {
   warnings: RoadmapValidationWarning[];
 }
 
-/** Validate a roadmap definition for structural correctness */
-export function validateRoadmap(roadmap: RoadmapDefinition): RoadmapValidationResult {
+/** Validate a roadmap definition for structural correctness.
+ *  Optionally cross-check sprint status against scorecards when provided.
+ */
+export function validateRoadmap(
+  roadmap: RoadmapDefinition,
+  scorecards?: { sprint_number: number }[],
+): RoadmapValidationResult {
   const errors: RoadmapValidationError[] = [];
   const warnings: RoadmapValidationWarning[] = [];
   const sprintIds = new Set(roadmap.sprints.map(s => s.id));
@@ -174,6 +179,32 @@ export function validateRoadmap(roadmap: RoadmapDefinition): RoadmapValidationRe
         errors.push({
           type: 'error',
           message: `Phase "${phase.name}" references S${sid} which does not exist`,
+        });
+      }
+    }
+  }
+
+  // Cross-validate sprint status against scorecards when provided
+  if (scorecards && scorecards.length > 0) {
+    const scorecardSprintIds = new Set(scorecards.map(s => s.sprint_number));
+
+    for (const sprint of roadmap.sprints) {
+      const hasScorecard = scorecardSprintIds.has(sprint.id);
+      const status = (sprint as RoadmapSprint & { status?: string }).status;
+
+      if (hasScorecard && status !== 'complete') {
+        warnings.push({
+          type: 'warning',
+          sprint: sprint.id,
+          message: `S${sprint.id} has a scorecard but roadmap status is "${status ?? 'planned'}" — expected "complete"`,
+        });
+      }
+
+      if (!hasScorecard && status === 'complete') {
+        warnings.push({
+          type: 'warning',
+          sprint: sprint.id,
+          message: `S${sprint.id} is marked "complete" in roadmap but no scorecard exists (phantom sprint)`,
         });
       }
     }
