@@ -4,26 +4,202 @@
 
 Quantified sprint metrics for AI-assisted development. Scorecards, handicap tracking, and real-time agent guidance for Claude Code, Cursor, Windsurf, Cline, OB1, and OpenCode.
 
-## Quick Start
+## Setup
+
+Install SLOPE as a dev dependency in your project:
 
 ```bash
-npm install -g @slope-dev/slope
-
-# Auto-detects your AI coding tool and installs everything
-slope init
-
-# Or target a specific platform
-slope init --claude-code
-slope init --cursor
-slope init --windsurf
-slope init --cline
-slope init --opencode
-slope init --all          # Install for all detected platforms
+npm install --save-dev @slope-dev/slope
 ```
 
-> Installed locally? Use `npx slope` instead.
+Then initialize from inside your AI coding tool. Pick your platform below and paste the prompt.
 
-`slope init` auto-detects which AI coding tools are active in your repo and installs platform-specific rules, hooks, guard scripts, and MCP configuration. See [Platform Setup](#platform-setup) for details on what each platform gets.
+---
+
+### Claude Code
+
+The most fully-featured integration — context injection, guard hooks, slash commands, and MCP.
+
+**Paste this prompt into Claude Code:**
+
+```
+Install and initialize SLOPE for this project. Run:
+
+1. npx slope init --claude-code --interactive --smart
+2. npx slope hook add --level=full
+3. npx slope map
+
+This will create .claude/rules/, .claude/hooks/, .claude/commands/, .mcp.json, and CLAUDE.md.
+After init, verify the MCP server works by running the `search` MCP tool with an empty query.
+```
+
+**What you get:**
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| Rules | `.claude/rules/*.md` | Sprint checklist, commit discipline, review loop, codebase context |
+| Guard hooks | `.claude/hooks/slope-guard.sh` | 22 real-time guards configured in `.claude/settings.json` |
+| Slash commands | `.claude/commands/*.md` | `/start-sprint`, `/post-sprint`, `/review-pr` workflow automation |
+| MCP server | `.mcp.json` | `search()` to discover API, `execute()` to run SLOPE commands |
+| Project context | `CLAUDE.md` | Project-wide context with SLOPE workflow summary |
+| Codebase map | `CODEBASE.md` | Auto-generated index for agent navigation |
+
+**Slash commands** (Claude Code exclusive):
+- `/start-sprint` — pre-sprint setup: briefing, branch creation, sprint state, prior scorecard verification
+- `/post-sprint` — scorecard creation, validation, review, common-issues distillation
+- `/review-pr` — structured PR review with finding tracking and scorecard amendment
+
+---
+
+### Cursor
+
+Full guard support with context injection and MCP.
+
+**Paste this prompt into Cursor:**
+
+```
+Install and initialize SLOPE for this project. Run these commands in the terminal:
+
+1. npx slope init --cursor --interactive --smart
+2. npx slope hook add --level=full --harness=cursor
+3. npx slope map
+
+This will create .cursor/rules/, .cursor/hooks/, .cursor/mcp.json, .cursorrules, and CODEBASE.md.
+```
+
+**What you get:**
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| Rules | `.cursor/rules/*.mdc` | Sprint checklist, commit discipline, review loop, codebase context |
+| Guard hooks | `.cursor/hooks/slope-guard.sh` | Guards configured in `.cursor/hooks.json` |
+| MCP server | `.cursor/mcp.json` | API search and command execution |
+| Project context | `.cursorrules` | Project-wide context |
+
+---
+
+### Windsurf
+
+Guard support with blocking (no context injection).
+
+**Paste this prompt into Windsurf:**
+
+```
+Install and initialize SLOPE for this project. Run these commands in the terminal:
+
+1. npx slope init --windsurf --interactive --smart
+2. npx slope hook add --level=full --harness=windsurf
+3. npx slope map
+
+This will create .windsurf/rules/, .windsurf/hooks/, .windsurf/mcp.json, .windsurfrules, and CODEBASE.md.
+```
+
+**What you get:**
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| Rules | `.windsurf/rules/*.mdc` | Sprint checklist, commit discipline, review loop, codebase context |
+| Guard hooks | `.windsurf/hooks/slope-guard.sh` | Exit-code based guards in `.windsurf/hooks.json` |
+| MCP server | `.windsurf/mcp.json` | API search and command execution |
+| Project context | `.windsurfrules` | Project-wide context |
+
+**Note:** Guards can block/allow actions but cannot inject guidance text into agent context.
+
+---
+
+### Cline
+
+Full guard support with per-event hook scripts. MCP requires manual setup.
+
+**Paste this prompt into Cline:**
+
+```
+Install and initialize SLOPE for this project. Run these commands in the terminal:
+
+1. npx slope init --cline --interactive --smart
+2. npx slope hook add --level=full --harness=cline
+3. npx slope map
+
+This will create .clinerules/, .clinerules/hooks/, and CODEBASE.md.
+
+After init, I need to manually add the MCP server through the Cline VS Code extension.
+Read .clinerules/slope-context.md for the MCP configuration instructions.
+```
+
+**What you get:**
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| Rules | `.clinerules/*.md` | Sprint checklist, commit discipline, review loop, codebase context |
+| Guard hooks | `.clinerules/hooks/` | Per-event scripts (PreToolUse, PostToolUse, TaskCancel, PreCompact) |
+| MCP instructions | `.clinerules/slope-context.md` | Setup guide for manual MCP configuration |
+
+**Note:** MCP server must be configured manually through the Cline VS Code extension UI.
+
+---
+
+### OB1
+
+Guard support with per-event hook scripts and MCP.
+
+**Paste this prompt into OB1:**
+
+```
+Install and initialize SLOPE for this project. Run these commands:
+
+1. npx slope init --ob1
+2. npx slope hook add --level=full --harness=ob1
+3. npx slope map
+
+This will create .ob1/hooks/, .ob1/mcp.json, and CODEBASE.md.
+```
+
+**What you get:**
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| Guard hooks | `.ob1/hooks/` | Per-event scripts (pre_tool, post_tool, post_agent) |
+| MCP server | `.ob1/mcp.json` | API search and command execution |
+
+---
+
+### OpenCode
+
+Plugin-based integration with MCP.
+
+**Paste this prompt into OpenCode:**
+
+```
+Install and initialize SLOPE for this project. Run these commands:
+
+1. npx slope init --opencode
+2. npx slope map
+
+This will create opencode.json, .opencode/plugins/, AGENTS.md, and CODEBASE.md.
+```
+
+**What you get:**
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| Plugin | `.opencode/plugins/slope-plugin.ts` | Session lifecycle hooks |
+| MCP server | `opencode.json` | API search and command execution |
+| Project context | `AGENTS.md` | Project-wide context |
+
+---
+
+### Platform Capabilities
+
+| | Claude Code | Cursor | Windsurf | Cline | OB1 | OpenCode |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|
+| Context injection | Yes | Yes | -- | Yes | Yes | -- |
+| PreToolUse guards | Yes | Yes | Yes | Yes | Yes | -- |
+| PostToolUse guards | Yes | Yes | Yes | Yes | Yes | -- |
+| Stop/session-end | Yes | Yes | -- | Yes | Yes | Yes |
+| PreCompact | Yes | -- | -- | Yes | -- | -- |
+| Slash commands | Yes | -- | -- | -- | -- | -- |
+| MCP auto-install | Yes | Yes | Yes | Manual | Yes | Yes |
+| Rules/context files | Yes | Yes | Yes | Yes | -- | Yes |
 
 ## What SLOPE Does
 
@@ -44,112 +220,9 @@ For AI-assisted development, SLOPE also provides **real-time agent guidance**: 2
 
 > Don't like golf terms? SLOPE supports 7 [pluggable metaphors](#metaphors) — same math, your vocabulary.
 
-## Platform Setup
-
-### Claude Code
-
-The most fully-featured integration. `slope init --claude-code` installs:
-
-| Component | Location | Purpose |
-|-----------|----------|---------|
-| Rules | `.claude/rules/*.md` | Sprint checklist, commit discipline, review loop, codebase context |
-| Guard hooks | `.claude/hooks/slope-guard.sh` | 22 real-time guards (configured in `.claude/settings.json`) |
-| Slash commands | `.claude/commands/*.md` | `/start-sprint`, `/post-sprint`, `/review-pr` workflow automation |
-| MCP server | `.mcp.json` | `search()` to discover API, `execute()` to run SLOPE commands |
-| Project context | `CLAUDE.md` | Project-wide context with SLOPE workflow summary |
-
-**Capabilities:** Context injection, all hook events (PreToolUse, PostToolUse, Stop, PreCompact), slash commands, full MCP integration.
-
-**Slash commands** (Claude Code exclusive):
-- `/start-sprint` — pre-sprint setup: briefing, branch creation, sprint state, prior scorecard verification
-- `/post-sprint` — scorecard creation, validation, review, common-issues distillation
-- `/review-pr` — structured PR review with finding tracking and scorecard amendment
-
-### Cursor
-
-Full guard support with context injection. `slope init --cursor` installs:
-
-| Component | Location | Purpose |
-|-----------|----------|---------|
-| Rules | `.cursor/rules/*.mdc` | Sprint checklist, commit discipline, review loop, codebase context |
-| Guard hooks | `.cursor/hooks/slope-guard.sh` | Guards configured in `.cursor/hooks.json` |
-| MCP server | `.cursor/mcp.json` | API search and command execution |
-| Project context | `.cursorrules` | Project-wide context |
-
-**Capabilities:** Context injection, PreToolUse/PostToolUse/Stop events, MCP integration.
-
-### Windsurf
-
-Guard support with blocking only (no context injection). `slope init --windsurf` installs:
-
-| Component | Location | Purpose |
-|-----------|----------|---------|
-| Rules | `.windsurf/rules/*.mdc` | Sprint checklist, commit discipline, review loop, codebase context |
-| Guard hooks | `.windsurf/hooks/slope-guard.sh` | Exit-code based guards in `.windsurf/hooks.json` |
-| MCP server | `.windsurf/mcp.json` | API search and command execution |
-| Project context | `.windsurfrules` | Project-wide context |
-
-**Capabilities:** PreToolUse/PostToolUse events, MCP integration. **Limitation:** Guards can block/allow actions but cannot inject guidance text into agent context.
-
-### Cline
-
-Full guard support with per-event hook scripts. `slope init --cline` installs:
-
-| Component | Location | Purpose |
-|-----------|----------|---------|
-| Rules | `.clinerules/*.md` | Sprint checklist, commit discipline, review loop, codebase context |
-| Guard hooks | `.clinerules/hooks/` | Per-event scripts (PreToolUse, PostToolUse, TaskCancel, PreCompact) |
-| MCP instructions | `.clinerules/slope-context.md` | Setup guide for manual MCP configuration |
-
-**Capabilities:** Context injection, all hook events including PreCompact. **Note:** MCP server must be configured manually through the Cline VS Code extension UI — SLOPE cannot auto-install it.
-
-### OB1 (Terminal Caddy)
-
-Guard support with per-event hook scripts. `slope init --ob1` installs:
-
-| Component | Location | Purpose |
-|-----------|----------|---------|
-| Guard hooks | `.ob1/hooks/` | Per-event scripts (pre_tool, post_tool, post_agent) |
-| MCP server | `.ob1/mcp.json` | API search and command execution |
-
-**Capabilities:** Context injection, PreToolUse/PostToolUse/Stop events, MCP integration.
-
-### OpenCode
-
-Plugin-based integration. `slope init --opencode` installs:
-
-| Component | Location | Purpose |
-|-----------|----------|---------|
-| Plugin | `.opencode/plugins/slope-plugin.ts` | Session lifecycle hooks |
-| MCP server | `opencode.json` | API search and command execution |
-| Project context | `AGENTS.md` | Project-wide context |
-
-### Platform Capabilities Matrix
-
-| | Claude Code | Cursor | Windsurf | Cline | OB1 | OpenCode |
-|---|:---:|:---:|:---:|:---:|:---:|:---:|
-| Context injection | Yes | Yes | -- | Yes | Yes | -- |
-| PreToolUse guards | Yes | Yes | Yes | Yes | Yes | -- |
-| PostToolUse guards | Yes | Yes | Yes | Yes | Yes | -- |
-| Stop/session-end | Yes | Yes | -- | Yes | Yes | Yes |
-| PreCompact | Yes | -- | -- | Yes | -- | -- |
-| Slash commands | Yes | -- | -- | -- | -- | -- |
-| MCP auto-install | Yes | Yes | Yes | Manual | Yes | Yes |
-| Rules/context files | Yes | Yes | Yes | Yes | -- | Yes |
-
 ## Guard Hooks
 
-Guards are the real-time guidance system. They fire on specific tool calls and inject context, warnings, or blocks into your agent's workflow.
-
-```bash
-# Install all guards (auto-detects platform)
-slope hook add --level=full
-
-# Or specify the harness explicitly
-slope hook add --level=full --harness=cursor
-```
-
-### What Guards Do
+Guards are the real-time guidance system. They fire on specific tool calls and inject context, warnings, or blocks into your agent's workflow. They're installed automatically by `slope hook add --level=full`.
 
 | Guard | Fires on | What it does |
 |-------|----------|-------------|
@@ -166,13 +239,13 @@ slope hook add --level=full --harness=cursor
 | `stop-check` | Session end | Warns about uncommitted/unpushed work |
 | `next-action` | Session end | Suggests next actions before session ends |
 
-Plus 10 more for review workflows, transcript recording, worktree safety, and flow staleness detection. Run `slope guard list` to see all available guards.
+Plus 10 more for review workflows, transcript recording, worktree safety, and flow staleness detection. Run `npx slope guard list` to see all available guards.
 
 ## MCP Server
 
-The SLOPE MCP server gives your agent direct access to the scoring engine:
+The SLOPE MCP server gives your agent direct access to the scoring engine. It's auto-configured during `slope init` for all platforms except Cline.
 
-```bash
+```
 # Discover all available API functions
 search({})
 
@@ -184,67 +257,67 @@ search({ module: 'map' })          # Get the codebase map
 execute({ code: 'return computeHandicapCard(loadScorecards())' })
 ```
 
-The MCP server is auto-configured during `slope init` for all platforms except Cline (manual setup required).
+## CLI Reference
 
-## CLI Quick Reference
+All commands use `npx slope` when installed locally.
 
-### Setup & Config
+### Setup
 
 | Command | Description |
 |---------|-------------|
-| `slope init` | Initialize SLOPE (auto-detects platform) |
-| `slope init --interactive --smart` | Guided setup with repo analysis |
-| `slope hook add --level=full` | Install all guidance hooks |
-| `slope map` | Generate/update codebase map |
+| `npx slope init` | Initialize SLOPE (auto-detects platform) |
+| `npx slope init --interactive --smart` | Guided setup with repo analysis |
+| `npx slope hook add --level=full` | Install all guidance hooks |
+| `npx slope map` | Generate/update codebase map |
 
 ### Scoring
 
 | Command | Description |
 |---------|-------------|
-| `slope card` | Display handicap card |
-| `slope validate [path]` | Validate scorecard(s) |
-| `slope review [path]` | Generate sprint review markdown |
-| `slope auto-card --sprint=N` | Generate scorecard from git + CI signals |
-| `slope report --html` | Generate HTML performance report |
-| `slope dashboard` | Live local performance dashboard |
+| `npx slope card` | Display handicap card |
+| `npx slope validate [path]` | Validate scorecard(s) |
+| `npx slope review [path]` | Generate sprint review markdown |
+| `npx slope auto-card --sprint=N` | Generate scorecard from git + CI signals |
+| `npx slope report --html` | Generate HTML performance report |
+| `npx slope dashboard` | Live local performance dashboard |
 
 ### Planning
 
 | Command | Description |
 |---------|-------------|
-| `slope briefing` | Pre-sprint hazard index, nutrition alerts, filtered gotchas |
-| `slope plan --complexity=<level>` | Club recommendation + training plan |
-| `slope next` | Show next sprint number |
-| `slope roadmap validate` | Validate roadmap dependencies and sprint status |
+| `npx slope briefing` | Pre-sprint hazard index, nutrition alerts, filtered gotchas |
+| `npx slope plan --complexity=<level>` | Club recommendation + training plan |
+| `npx slope next` | Show next sprint number |
+| `npx slope roadmap validate` | Validate roadmap dependencies and sprint status |
 
 ### Review & Findings
 
 | Command | Description |
 |---------|-------------|
-| `slope review recommend` | Which review types to run based on sprint characteristics |
-| `slope review findings add` | Record a review finding |
-| `slope review amend` | Inject findings as hazards into scorecard |
-| `slope review defer --from=N --to=M` | Defer a finding to a future sprint |
-| `slope review deferred --sprint=N` | List deferred findings targeting a sprint |
-| `slope review resolve --id=<uuid>` | Mark a deferred finding as resolved |
+| `npx slope review recommend` | Which review types to run based on sprint characteristics |
+| `npx slope review findings add` | Record a review finding |
+| `npx slope review amend` | Inject findings as hazards into scorecard |
+| `npx slope review defer --from=N --to=M` | Defer a finding to a future sprint |
+| `npx slope review deferred --sprint=N` | List deferred findings targeting a sprint |
+| `npx slope review resolve --id=<uuid>` | Mark a deferred finding as resolved |
 
 ### Sessions
 
 | Command | Description |
 |---------|-------------|
-| `slope session start\|end\|list` | Manage live sessions |
-| `slope claim --target=<t>` | Claim a ticket or area |
-| `slope status` | Sprint status + conflicts |
-| `slope sprint start --number=N` | Initialize sprint state with gate tracking |
+| `npx slope session start\|end\|list` | Manage live sessions |
+| `npx slope claim --target=<t>` | Claim a ticket or area |
+| `npx slope status` | Sprint status + conflicts |
+| `npx slope sprint start --number=N` | Initialize sprint state with gate tracking |
 
 ### Maintenance
 
 | Command | Description |
 |---------|-------------|
-| `slope extract --file=<path>` | Extract events into store |
-| `slope distill` | Promote patterns to common issues |
-| `slope store health\|backup\|restore` | Store diagnostics and management |
-| `slope flows init\|list\|check` | Manage user flow definitions |
+| `npx slope extract --file=<path>` | Extract events into store |
+| `npx slope distill` | Promote patterns to common issues |
+| `npx slope store health\|backup\|restore` | Store diagnostics and management |
+| `npx slope flows init\|list\|check` | Manage user flow definitions |
 
 ## Metaphors
 
@@ -261,8 +334,8 @@ The MCP server is auto-configured during `slope init` for all platforms except C
 | **Agile** | Sprint | Story | Shipped | Accepted |
 
 ```bash
-slope init --metaphor=gaming          # Set during init
-slope card --metaphor=tennis          # Override per-command
+npx slope init --metaphor=gaming          # Set during init
+npx slope card --metaphor=tennis          # Override per-command
 ```
 
 ## Core API
