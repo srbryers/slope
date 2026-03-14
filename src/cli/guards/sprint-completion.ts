@@ -57,10 +57,11 @@ function handlePreToolUse(input: HookInput, cwd: string): GuardResult {
 
   const state = loadSprintState(cwd);
   if (!state) return {};
+  if (state.phase === 'complete') return {}; // Sprint fully complete — skip all checks
 
   // Check scorecard existence independently of gates
   const scorecardMissing = !scorecardExists(state.sprint, cwd);
-  const gatesComplete = state.phase === 'complete' || isSprintComplete(state);
+  const gatesComplete = isSprintComplete(state);
 
   if (gatesComplete && !scorecardMissing) return {};
 

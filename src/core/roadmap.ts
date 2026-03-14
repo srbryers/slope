@@ -185,7 +185,7 @@ export function validateRoadmap(
   }
 
   // Cross-validate sprint status against scorecards when provided
-  if (scorecards && scorecards.length > 0) {
+  if (scorecards) {
     const scorecardSprintIds = new Set(scorecards.map(s => s.sprint_number));
 
     for (const sprint of roadmap.sprints) {

@@ -17,7 +17,7 @@ const DEFAULT_STALE_BLOCK_AT = 31;
  *   31+ commits stale   → block Edit/Write (don't block Read/Glob/Grep)
  */
 export async function exploreGuard(input: HookInput, cwd: string): Promise<GuardResult> {
-  const config = loadConfig();
+  const config = loadConfig(cwd);
   const indexPaths = config.guidance?.indexPaths ?? DEFAULT_INDEX_PATHS;
 
   // Find which index files exist

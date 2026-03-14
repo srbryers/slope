@@ -102,6 +102,7 @@ describe('sprint-completion guard', () => {
       state.gates.scorecard = true;
       state.gates.review_md = true;
       saveSprintState(tmpDir, state);
+      writeScorecard(22); // scorecard must exist too
     });
 
     it('allows gh pr create', async () => {

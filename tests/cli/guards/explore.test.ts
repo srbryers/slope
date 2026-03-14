@@ -1,8 +1,28 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { exploreGuard } from '../../../src/cli/guards/explore.js';
 import type { HookInput } from '../../../src/core/index.js';
+
+// Mock child_process before importing the guard
+let mockExecSyncReturn: string | Error = '0\n';
+
+vi.mock('node:child_process', async (importOriginal) => {
+  const orig = await importOriginal() as Record<string, unknown>;
+  return {
+    ...orig,
+    execSync: (...args: unknown[]) => {
+      const cmd = args[0] as string;
+      if (cmd.includes('git rev-list')) {
+        if (mockExecSyncReturn instanceof Error) throw mockExecSyncReturn;
+        return mockExecSyncReturn;
+      }
+      return (orig.execSync as Function)(...args);
+    },
+  };
+});
+
+// Import after mock setup
+const { exploreGuard } = await import('../../../src/cli/guards/explore.js');
 
 const tmpDir = join(import.meta.dirname ?? __dirname, '.tmp-explore-test');
 
@@ -31,13 +51,16 @@ Some content here for token estimation.
 
 beforeEach(() => {
   mkdirSync(join(tmpDir, '.slope'), { recursive: true });
-  // Write default config
-  writeFileSync(join(tmpDir, '.slope', 'config.json'), JSON.stringify({ scorecardDir: 'docs/retros', scorecardPattern: 'sprint-*.json', minSprint: 1 }));
+  writeFileSync(join(tmpDir, '.slope', 'config.json'), JSON.stringify({
+    scorecardDir: 'docs/retros',
+    scorecardPattern: 'sprint-*.json',
+    minSprint: 1,
+  }));
+  mockExecSyncReturn = '0\n';
 });
 
 afterEach(() => {
   rmSync(tmpDir, { recursive: true, force: true });
-  vi.restoreAllMocks();
 });
 
 describe('explore guard — tiered staleness', () => {
@@ -47,7 +70,6 @@ describe('explore guard — tiered staleness', () => {
   });
 
   it('returns context with token estimate for current map', async () => {
-    // Write a CODEBASE.md with no frontmatter (can't check staleness → treated as current)
     writeFileSync(join(tmpDir, 'CODEBASE.md'), '# Map\nSome content');
     const result = await exploreGuard(makeInput('Read'), tmpDir);
     expect(result.context).toContain('CODEBASE.md');
@@ -55,18 +77,14 @@ describe('explore guard — tiered staleness', () => {
   });
 
   it('returns warning context when map is in warn range (11-30 commits)', async () => {
-    // Mock execSync to return 15 commits
-    const { execSync } = await import('node:child_process');
-    vi.spyOn(await import('node:child_process'), 'execSync').mockReturnValue('15\n');
-
+    mockExecSyncReturn = '15\n';
     writeCodebaseMap('abc123');
     const result = await exploreGuard(makeInput('Read'), tmpDir);
     expect(result.context).toContain('15 commits stale');
   });
 
   it('blocks Edit when map is in block range (31+ commits)', async () => {
-    vi.spyOn(await import('node:child_process'), 'execSync').mockReturnValue('35\n');
-
+    mockExecSyncReturn = '35\n';
     writeCodebaseMap('abc123');
     const result = await exploreGuard(makeInput('Edit'), tmpDir);
     expect(result.decision).toBe('deny');
@@ -75,8 +93,7 @@ describe('explore guard — tiered staleness', () => {
   });
 
   it('blocks Write when map is in block range', async () => {
-    vi.spyOn(await import('node:child_process'), 'execSync').mockReturnValue('50\n');
-
+    mockExecSyncReturn = '50\n';
     writeCodebaseMap('abc123');
     const result = await exploreGuard(makeInput('Write'), tmpDir);
     expect(result.decision).toBe('deny');
@@ -84,8 +101,7 @@ describe('explore guard — tiered staleness', () => {
   });
 
   it('warns but does not block Read when map is in block range', async () => {
-    vi.spyOn(await import('node:child_process'), 'execSync').mockReturnValue('40\n');
-
+    mockExecSyncReturn = '40\n';
     writeCodebaseMap('abc123');
     const result = await exploreGuard(makeInput('Read'), tmpDir);
     expect(result.decision).toBeUndefined();
@@ -94,8 +110,7 @@ describe('explore guard — tiered staleness', () => {
   });
 
   it('warns but does not block Grep when map is in block range', async () => {
-    vi.spyOn(await import('node:child_process'), 'execSync').mockReturnValue('40\n');
-
+    mockExecSyncReturn = '40\n';
     writeCodebaseMap('abc123');
     const result = await exploreGuard(makeInput('Grep'), tmpDir);
     expect(result.decision).toBeUndefined();
@@ -103,17 +118,14 @@ describe('explore guard — tiered staleness', () => {
   });
 
   it('no warning when within tolerance (0-10 commits)', async () => {
-    vi.spyOn(await import('node:child_process'), 'execSync').mockReturnValue('5\n');
-
+    mockExecSyncReturn = '5\n';
     writeCodebaseMap('abc123');
     const result = await exploreGuard(makeInput('Read'), tmpDir);
-    // Should show the normal "read the map" context, not a stale warning
     expect(result.context).toContain('k tokens');
     expect(result.context).not.toContain('stale');
   });
 
   it('respects custom thresholds from config', async () => {
-    // Set custom thresholds: warn at 5, block at 10
     writeFileSync(
       join(tmpDir, '.slope', 'config.json'),
       JSON.stringify({
@@ -123,9 +135,7 @@ describe('explore guard — tiered staleness', () => {
         guidance: { mapStaleWarnAt: 5, mapStaleBlockAt: 10 },
       }),
     );
-
-    vi.spyOn(await import('node:child_process'), 'execSync').mockReturnValue('7\n');
-
+    mockExecSyncReturn = '7\n';
     writeCodebaseMap('abc123');
     const result = await exploreGuard(makeInput('Read'), tmpDir);
     expect(result.context).toContain('7 commits stale');
