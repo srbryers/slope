@@ -40,7 +40,7 @@ function buildOrientation(cwd: string): string {
 
 /**
  * Subagent gate guard: fires PreToolUse on Agent.
- * Enforces model selection on Explore/Plan subagents (Agent tool has no max_turns).
+ * Enforces model selection on Explore/Plan subagents.
  */
 export async function subagentGateGuard(input: HookInput, _cwd: string): Promise<GuardResult> {
   const toolInput = input.tool_input ?? {};
