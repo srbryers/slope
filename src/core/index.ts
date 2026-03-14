@@ -680,5 +680,22 @@ export type {
   McpToolMeta,
 } from './docs.js';
 
+// Deferred Findings
+export {
+  loadDeferred,
+  saveDeferred,
+  createDeferred,
+  resolveDeferred,
+  listDeferred,
+  formatDeferredForBriefing,
+  deferredPath,
+} from './deferred.js';
+export type {
+  DeferredFinding,
+  DeferredFindingsFile,
+  DeferredSeverity,
+  DeferredStatus,
+} from './deferred.js';
+
 // Built-in metaphors (auto-registers on import)
 export { golf, tennis, baseball, gaming, dnd, matrix, agile } from './metaphors/index.js';

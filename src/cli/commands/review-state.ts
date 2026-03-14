@@ -3,6 +3,8 @@ import { join } from 'node:path';
 import type { ReviewFinding, ReviewType, HazardSeverity } from '../../core/types.js';
 import { recommendReviews, amendScorecardWithFindings } from '../../core/review.js';
 import { loadConfig, detectLatestSprint } from '../../core/index.js';
+import { createDeferred, listDeferred, resolveDeferred } from '../../core/deferred.js';
+import type { DeferredSeverity } from '../../core/deferred.js';
 import { HAZARD_SEVERITY_PENALTIES } from '../../core/constants.js';
 import type { GolfScorecard } from '../../core/types.js';
 import { findPlanContent, countTickets, countPackageRefs } from '../guards/plan-analysis.js';
@@ -460,8 +462,126 @@ export async function reviewStateCommand(args: string[]): Promise<void> {
     case 'amend':
       amendCommand(args.slice(1), cwd);
       break;
+    case 'defer':
+      deferCommand(args.slice(1), cwd);
+      break;
+    case 'deferred':
+      deferredCommand(args.slice(1), cwd);
+      break;
+    case 'resolve':
+      resolveCommand(args.slice(1), cwd);
+      break;
     default:
-      console.error(`Unknown review subcommand: ${sub}. Use start, round, status, reset, recommend, findings, amend.`);
+      console.error(`Unknown review subcommand: ${sub}. Use start, round, status, reset, recommend, findings, amend, defer, deferred, resolve.`);
       process.exit(1);
   }
+}
+
+// --- Deferred Findings CLI ---
+
+function deferCommand(args: string[], cwd: string): void {
+  let from: number | undefined;
+  let to: number | undefined;
+  let severity: DeferredSeverity = 'medium';
+  let description = '';
+  let category: string | undefined;
+
+  for (const arg of args) {
+    if (arg.startsWith('--from=')) from = parseInt(arg.slice('--from='.length), 10);
+    else if (arg.startsWith('--to=')) to = parseInt(arg.slice('--to='.length), 10);
+    else if (arg.startsWith('--severity=')) severity = arg.slice('--severity='.length) as DeferredSeverity;
+    else if (arg.startsWith('--description=')) description = arg.slice('--description='.length);
+    else if (arg.startsWith('--category=')) category = arg.slice('--category='.length);
+  }
+
+  if (!from) {
+    console.error('Missing --from=<sprint> (source sprint where finding was discovered)');
+    process.exit(1);
+  }
+
+  if (!description) {
+    console.error('Missing --description="..." (what needs to be addressed)');
+    process.exit(1);
+  }
+
+  if (!['low', 'medium', 'high', 'critical'].includes(severity)) {
+    console.error(`Invalid severity: ${severity}. Use low, medium, high, or critical.`);
+    process.exit(1);
+  }
+
+  const finding = createDeferred(cwd, {
+    source_sprint: from,
+    target_sprint: to ?? null,
+    severity,
+    description,
+    category,
+  });
+
+  const targetLabel = finding.target_sprint ? `S${finding.target_sprint}` : 'unscheduled';
+  console.log(`\nDeferred finding created:`);
+  console.log(`  ID: ${finding.id}`);
+  console.log(`  S${finding.source_sprint} → ${targetLabel} [${severity.toUpperCase()}]`);
+  console.log(`  ${description}`);
+  if (category) console.log(`  Category: ${category}`);
+  console.log('');
+}
+
+function deferredCommand(args: string[], cwd: string): void {
+  let sprint: number | undefined;
+  let status: string | undefined;
+
+  for (const arg of args) {
+    if (arg.startsWith('--sprint=')) sprint = parseInt(arg.slice('--sprint='.length), 10);
+    else if (arg.startsWith('--status=')) status = arg.slice('--status='.length);
+  }
+
+  const findings = listDeferred(cwd, {
+    sprint,
+    status: status as 'open' | 'resolved' | 'wontfix' | undefined,
+  });
+
+  if (findings.length === 0) {
+    const filter = sprint ? ` targeting Sprint ${sprint}` : '';
+    const statusFilter = status ? ` with status "${status}"` : '';
+    console.log(`\nNo deferred findings found${filter}${statusFilter}.\n`);
+    return;
+  }
+
+  const label = sprint ? `Deferred findings for Sprint ${sprint}` : 'All deferred findings';
+  console.log(`\n${label} (${findings.length}):\n`);
+
+  for (const f of findings) {
+    const targetLabel = f.target_sprint ? `S${f.target_sprint}` : 'unscheduled';
+    const statusTag = f.status === 'open' ? '' : ` [${f.status}]`;
+    const cat = f.category ? ` (${f.category})` : '';
+    console.log(`  [${f.severity.toUpperCase()}] S${f.source_sprint} → ${targetLabel}: ${f.description}${cat}${statusTag}`);
+    console.log(`    ID: ${f.id.slice(0, 8)}...`);
+  }
+  console.log('');
+}
+
+function resolveCommand(args: string[], cwd: string): void {
+  let id: string | undefined;
+  let status: 'resolved' | 'wontfix' = 'resolved';
+
+  for (const arg of args) {
+    if (arg.startsWith('--id=')) id = arg.slice('--id='.length);
+    else if (arg.startsWith('--status=')) status = arg.slice('--status='.length) as 'resolved' | 'wontfix';
+  }
+
+  if (!id) {
+    console.error('Missing --id=<uuid> (finding ID or prefix)');
+    process.exit(1);
+  }
+
+  const finding = resolveDeferred(cwd, id, status);
+  if (!finding) {
+    console.error(`No finding found matching ID: ${id}`);
+    process.exit(1);
+  }
+
+  console.log(`\nFinding ${status}:`);
+  console.log(`  ID: ${finding.id}`);
+  console.log(`  ${finding.description}`);
+  console.log('');
 }
