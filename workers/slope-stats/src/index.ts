@@ -5,8 +5,8 @@ interface Env {
 }
 
 const ALLOWED_ORIGINS = [
-  'https://slope.dev',
-  'https://www.slope.dev',
+  'https://getslope.dev',
+  'https://www.getslope.dev',
   'http://localhost:4321',  // Astro dev
   'http://localhost:3000',
 ];
