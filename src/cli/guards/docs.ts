@@ -57,10 +57,10 @@ export const GUARD_DOCS: Record<string, GuardDoc> = {
     level: 'full',
   },
   'subagent-gate': {
-    purpose: 'Controls subagent resource usage by forcing haiku model and capping max_turns on Explore/Plan subagents. Prevents expensive long-running subagent calls.',
-    triggers: 'PreToolUse on Task (Agent tool). Fires when the agent launches a subagent.',
-    behavior: 'Modifies input — overrides model to haiku and caps max_turns for Explore and Plan subagent types.',
-    configuration: 'guidance.subagentExploreTurns (default: 10), guidance.subagentPlanTurns (default: 15), guidance.subagentAllowModels (default: [\'haiku\']). Disable: add "subagent-gate" to guidance.disabled.',
+    purpose: 'Controls subagent resource usage by enforcing model selection on Explore/Plan subagents. Prevents expensive long-running subagent calls.',
+    triggers: 'PreToolUse on Agent. Fires when the agent launches a subagent.',
+    behavior: 'Blocks subagents using models not in the allowed list. Injects codebase orientation context for allowed subagents.',
+    configuration: 'guidance.subagentAllowModels (default: [\'haiku\']). Disable: add "subagent-gate" to guidance.disabled.',
     level: 'full',
   },
   'push-nudge': {
