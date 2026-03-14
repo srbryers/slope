@@ -45,6 +45,11 @@ A SLOPE MCP server is configured in \`.mcp.json\`. Two tools:
 
 See .claude/rules/ for detailed checklists.
 
+## Slash Commands
+- \`/start-sprint\` — pre-sprint setup: briefing, branch creation, sprint state
+- \`/post-sprint\` — post-sprint: scorecard, validation, review, distill
+- \`/review-pr\` — structured PR review with finding tracking
+
 ## ${r.scorecard}s
 Stored in docs/retros/sprint-N.json. See .slope/config.json for configuration.
 `;

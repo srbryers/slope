@@ -244,6 +244,19 @@ function installClaudeCodeTemplates(cwd: string, metaphor: MetaphorDefinition): 
     }
   }
 
+  // Install slash commands (sprint workflow automation)
+  const commandsDir = join(cwd, '.claude', 'commands');
+  mkdirSync(commandsDir, { recursive: true });
+  const commandFiles = ['post-sprint.md', 'review-pr.md', 'start-sprint.md'];
+  for (const file of commandFiles) {
+    const src = join(templatesRoot, 'commands', file);
+    const dest = join(commandsDir, file);
+    if (existsSync(src) && !existsSync(dest)) {
+      cpSync(src, dest);
+      console.log(`  Created ${dest}`);
+    }
+  }
+
   // Generate CLAUDE.md
   const claudeMdDest = join(cwd, 'CLAUDE.md');
   if (!existsSync(claudeMdDest)) {
@@ -251,7 +264,7 @@ function installClaudeCodeTemplates(cwd: string, metaphor: MetaphorDefinition): 
     console.log(`  Created ${claudeMdDest}`);
   }
 
-  console.log('\n  Claude Code templates installed to .claude/rules/ and .claude/hooks/');
+  console.log('\n  Claude Code templates installed to .claude/rules/, .claude/hooks/, and .claude/commands/');
 }
 
 function installCursorTemplates(cwd: string, metaphor: MetaphorDefinition): void {
@@ -678,6 +691,7 @@ const PROVIDER_FILES: Partial<Record<InitProvider, string[]>> = {
   'claude-code': [
     '.claude/rules/ (sprint checklist, commit discipline, review loop, codebase context)',
     '.claude/hooks/ (pre-merge-check, session hooks)',
+    '.claude/commands/ (post-sprint, review-pr, start-sprint slash commands)',
     '.mcp.json (SLOPE MCP server)',
     'CLAUDE.md (project context)',
   ],
