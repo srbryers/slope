@@ -155,11 +155,11 @@ describe('CursorAdapter', () => {
     it('resolves matcher from toolCategories using Cursor tool names', () => {
       const config = adapter.generateHooksConfig(GUARD_DEFINITIONS, './g.sh') as CursorHooksConfig;
       const explore = config.hooks.find(e => e.command.endsWith(' explore'));
-      // explore guard targets read_file, search_files, search_content
-      // In Cursor: read_file, list_directory, grep_search
+      // explore guard targets read_file, search_files, search_content, write_file
+      // In Cursor: read_file, list_directory, grep_search, create_file, file_edit
       if (explore?.matcher) {
         const matcherSet = new Set(explore.matcher.split('|'));
-        expect(matcherSet).toEqual(new Set(['read_file', 'list_directory', 'grep_search']));
+        expect(matcherSet).toEqual(new Set(['read_file', 'list_directory', 'grep_search', 'create_file', 'file_edit']));
       }
     });
   });

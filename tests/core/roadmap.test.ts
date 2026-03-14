@@ -338,6 +338,62 @@ describe('formatRoadmapSummary', () => {
   });
 });
 
+// --- validateRoadmap with scorecards cross-check ---
+
+describe('validateRoadmap with scorecards', () => {
+  it('warns when sprint has scorecard but status is not complete', () => {
+    const roadmap = makeRoadmap({
+      sprints: [
+        { ...makeSprint(7), status: 'planned' } as any,
+        makeSprint(8, { depends_on: [7] }),
+        makeSprint(9, { depends_on: [8] }),
+      ],
+    });
+    const scorecards = [{ sprint_number: 7 }];
+    const result = validateRoadmap(roadmap, scorecards);
+    expect(result.warnings.some(w => w.message.includes('S7') && w.message.includes('scorecard') && w.message.includes('planned'))).toBe(true);
+  });
+
+  it('warns when sprint is marked complete but no scorecard exists', () => {
+    const roadmap = makeRoadmap({
+      sprints: [
+        { ...makeSprint(7), status: 'complete' } as any,
+        makeSprint(8, { depends_on: [7] }),
+        makeSprint(9, { depends_on: [8] }),
+      ],
+    });
+    const scorecards: { sprint_number: number }[] = []; // no scorecards at all
+    const result = validateRoadmap(roadmap, scorecards);
+    expect(result.warnings.some(w => w.message.includes('S7') && w.message.includes('phantom'))).toBe(true);
+  });
+
+  it('no warnings when sprint status matches scorecard presence', () => {
+    const roadmap = makeRoadmap({
+      sprints: [
+        { ...makeSprint(7), status: 'complete' } as any,
+        makeSprint(8, { depends_on: [7] }),
+        makeSprint(9, { depends_on: [8] }),
+      ],
+    });
+    const scorecards = [{ sprint_number: 7 }];
+    const result = validateRoadmap(roadmap, scorecards);
+    // Should only have warnings about ticket count, not about status mismatch
+    expect(result.warnings.filter(w => w.message.includes('scorecard') || w.message.includes('phantom'))).toHaveLength(0);
+  });
+
+  it('skips cross-validation when scorecards not provided', () => {
+    const roadmap = makeRoadmap({
+      sprints: [
+        { ...makeSprint(7), status: 'planned' } as any,
+        makeSprint(8, { depends_on: [7] }),
+        makeSprint(9, { depends_on: [8] }),
+      ],
+    });
+    const result = validateRoadmap(roadmap);
+    expect(result.warnings.filter(w => w.message.includes('scorecard'))).toHaveLength(0);
+  });
+});
+
 // --- formatStrategicContext ---
 
 describe('formatStrategicContext', () => {

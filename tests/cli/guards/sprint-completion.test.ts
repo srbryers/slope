@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdirSync, rmSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { sprintCompletionGuard } from '../../../src/cli/guards/sprint-completion.js';
 import { saveSprintState, createSprintState, loadSprintState } from '../../../src/cli/sprint-state.js';
@@ -36,8 +36,39 @@ function makePostToolUse(command: string, exitCode: number | string): HookInput 
   };
 }
 
+function writeConfig(): void {
+  mkdirSync(join(tmpDir, '.slope'), { recursive: true });
+  writeFileSync(join(tmpDir, '.slope', 'config.json'), JSON.stringify({
+    scorecardDir: 'docs/retros',
+    scorecardPattern: 'sprint-*.json',
+    minSprint: 1,
+    roadmapPath: 'docs/backlog/roadmap.json',
+  }));
+}
+
+function writeScorecard(sprint: number): void {
+  const dir = join(tmpDir, 'docs', 'retros');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, `sprint-${sprint}.json`), JSON.stringify({ sprint_number: sprint, score: 4, par: 4 }));
+}
+
+function writeRoadmap(sprints: Array<{ id: number; status?: string }>): void {
+  const dir = join(tmpDir, 'docs', 'backlog');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'roadmap.json'), JSON.stringify({
+    name: 'Test',
+    phases: [{ name: 'P1', sprints: sprints.map(s => s.id) }],
+    sprints: sprints.map(s => ({
+      id: s.id, theme: `S${s.id}`, par: 4, slope: 2, type: 'feature',
+      tickets: [{ key: `S${s.id}-1`, title: 'T1', club: 'short_iron', complexity: 'standard' }],
+      status: s.status ?? 'planned',
+    })),
+  }));
+}
+
 beforeEach(() => {
   mkdirSync(tmpDir, { recursive: true });
+  writeConfig();
 });
 
 afterEach(() => {
@@ -71,6 +102,7 @@ describe('sprint-completion guard', () => {
       state.gates.scorecard = true;
       state.gates.review_md = true;
       saveSprintState(tmpDir, state);
+      writeScorecard(22); // scorecard must exist too
     });
 
     it('allows gh pr create', async () => {
@@ -229,6 +261,115 @@ describe('sprint-completion guard', () => {
       const state = createSprintState(22, 'complete');
       saveSprintState(tmpDir, state);
       const result = await sprintCompletionGuard(makePostToolUse('gh pr merge 117 --squash', 0), tmpDir);
+      expect(result).toEqual({});
+    });
+  });
+
+  describe('scorecard existence check', () => {
+    it('blocks PR when scorecard is missing even if gates are complete', async () => {
+      const state = createSprintState(22, 'implementing');
+      state.gates.tests = true;
+      state.gates.code_review = true;
+      state.gates.architect_review = true;
+      state.gates.scorecard = true;
+      state.gates.review_md = true;
+      saveSprintState(tmpDir, state);
+      // No scorecard file written
+
+      const result = await sprintCompletionGuard(makePreToolUse('gh pr create --title "t"'), tmpDir);
+      expect(result.decision).toBe('deny');
+      expect(result.blockReason).toContain('scorecard not found');
+      expect(result.blockReason).toContain('slope auto-card');
+    });
+
+    it('allows PR when scorecard exists and gates are complete', async () => {
+      const state = createSprintState(22, 'implementing');
+      state.gates.tests = true;
+      state.gates.code_review = true;
+      state.gates.architect_review = true;
+      state.gates.scorecard = true;
+      state.gates.review_md = true;
+      saveSprintState(tmpDir, state);
+      writeScorecard(22);
+
+      const result = await sprintCompletionGuard(makePreToolUse('gh pr create --title "t"'), tmpDir);
+      expect(result).toEqual({});
+    });
+
+    it('blocks Stop when scorecard is missing during implementing phase', async () => {
+      const state = createSprintState(22, 'implementing');
+      state.gates.tests = true;
+      state.gates.code_review = true;
+      state.gates.architect_review = true;
+      state.gates.scorecard = true;
+      state.gates.review_md = true;
+      saveSprintState(tmpDir, state);
+      // No scorecard file
+
+      const result = await sprintCompletionGuard(makeStop(), tmpDir);
+      expect(result.blockReason).toContain('scorecard not found');
+    });
+
+    it('shows both scorecard and gate errors when both are missing', async () => {
+      saveSprintState(tmpDir, createSprintState(22, 'implementing'));
+
+      const result = await sprintCompletionGuard(makePreToolUse('gh pr create --title "t"'), tmpDir);
+      expect(result.decision).toBe('deny');
+      expect(result.blockReason).toContain('scorecard not found');
+      expect(result.blockReason).toContain('incomplete gates');
+    });
+  });
+
+  describe('PostToolUse roadmap auto-update', () => {
+    it('updates roadmap sprint status on slope validate exit 0', async () => {
+      saveSprintState(tmpDir, createSprintState(22, 'implementing'));
+      writeRoadmap([{ id: 22, status: 'planned' }]);
+
+      const result = await sprintCompletionGuard(makePostToolUse('slope validate', 0), tmpDir);
+      expect(result.context).toContain('Updated roadmap');
+      expect(result.context).toContain('Sprint 22');
+
+      const roadmap = JSON.parse(readFileSync(join(tmpDir, 'docs', 'backlog', 'roadmap.json'), 'utf8'));
+      expect(roadmap.sprints[0].status).toBe('complete');
+    });
+
+    it('does not update roadmap on slope validate failure', async () => {
+      saveSprintState(tmpDir, createSprintState(22, 'implementing'));
+      writeRoadmap([{ id: 22, status: 'planned' }]);
+
+      const result = await sprintCompletionGuard(makePostToolUse('slope validate', 1), tmpDir);
+      expect(result).toEqual({});
+
+      const roadmap = JSON.parse(readFileSync(join(tmpDir, 'docs', 'backlog', 'roadmap.json'), 'utf8'));
+      expect(roadmap.sprints[0].status).toBe('planned');
+    });
+
+    it('no-ops when roadmap sprint is already complete', async () => {
+      saveSprintState(tmpDir, createSprintState(22, 'implementing'));
+      writeRoadmap([{ id: 22, status: 'complete' }]);
+
+      const result = await sprintCompletionGuard(makePostToolUse('slope validate', 0), tmpDir);
+      expect(result).toEqual({});
+    });
+
+    it('updates phase status when all sprints complete', async () => {
+      saveSprintState(tmpDir, createSprintState(22, 'implementing'));
+      writeRoadmap([
+        { id: 21, status: 'complete' },
+        { id: 22, status: 'planned' },
+      ]);
+
+      await sprintCompletionGuard(makePostToolUse('slope validate', 0), tmpDir);
+
+      const roadmap = JSON.parse(readFileSync(join(tmpDir, 'docs', 'backlog', 'roadmap.json'), 'utf8'));
+      expect(roadmap.phases[0].status).toBe('complete');
+    });
+
+    it('no-ops when no roadmap exists', async () => {
+      saveSprintState(tmpDir, createSprintState(22, 'implementing'));
+      // No roadmap file
+
+      const result = await sprintCompletionGuard(makePostToolUse('slope validate', 0), tmpDir);
       expect(result).toEqual({});
     });
   });

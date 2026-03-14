@@ -144,11 +144,11 @@ describe('WindsurfAdapter', () => {
     it('resolves matcher from toolCategories using Windsurf tool names', () => {
       const config = adapter.generateHooksConfig(GUARD_DEFINITIONS, './g.sh') as WindsurfHooksConfig;
       const explore = config.hooks.find(e => e.command.endsWith(' explore'));
-      // explore guard targets read_file, search_files, search_content
-      // In Windsurf: read_file, find_files, search
+      // explore guard targets read_file, search_files, search_content, write_file
+      // In Windsurf: read_file, find_files, search, create_file, edit_file
       if (explore?.matcher) {
         const matcherSet = new Set(explore.matcher.split('|'));
-        expect(matcherSet).toEqual(new Set(['read_file', 'find_files', 'search']));
+        expect(matcherSet).toEqual(new Set(['read_file', 'find_files', 'search', 'create_file', 'edit_file']));
       }
     });
   });

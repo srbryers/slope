@@ -107,7 +107,7 @@ describe('GenericAdapter', () => {
       const transcript = manifest.find(e => e.name === 'transcript');
       // Generic adapter should resolve to generic tool names, not Claude Code names
       const exploreMatcher = new Set((explore?.matcher as string)?.split('|'));
-      expect(exploreMatcher).toEqual(new Set(['read_file', 'search_files', 'search_content']));
+      expect(exploreMatcher).toEqual(new Set(['read_file', 'search_files', 'search_content', 'write_file']));
       expect(transcript?.matcher).toBeUndefined();
     });
   });

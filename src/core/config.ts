@@ -35,6 +35,8 @@ export interface SlopeConfig {
     handoffsDir?: string;
     allowMainCommitPatterns?: string[];
     protectedBranches?: string[];
+    mapStaleWarnAt?: number;
+    mapStaleBlockAt?: number;
   };
   orchestration?: {
     escalation?: EscalationConfig;

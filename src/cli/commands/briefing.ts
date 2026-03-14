@@ -1,6 +1,6 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { formatBriefing, parseRoadmap, getRole, hasRole, loadCustomRoles, filterScorecardsByPlayer, filterHazardsByVisibility } from '../../core/index.js';
+import { formatBriefing, parseRoadmap, getRole, hasRole, loadCustomRoles, filterScorecardsByPlayer, filterHazardsByVisibility, formatDeferredForBriefing, loadDeferred } from '../../core/index.js';
 import type { CommonIssuesFile, SessionEntry, SprintClaim, RoadmapDefinition, SlopeEvent, RoleDefinition } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { loadScorecards } from '../loader.js';
@@ -127,4 +127,15 @@ export async function briefingCommand(args: string[]): Promise<void> {
   const output = formatBriefing({ scorecards: effectiveScorecards, commonIssues: visibleIssues, lastSession, filter, includeTraining, claims, roadmap, currentSprint: sprintNumber, metaphor, role, recentEvents });
   console.log('');
   console.log(output);
+
+  // Deferred findings section (appended after main briefing)
+  const deferred = loadDeferred(cwd);
+  const deferredLines = formatDeferredForBriefing(deferred, sprintNumber);
+  if (deferredLines.length > 0) {
+    console.log('\u2500'.repeat(50));
+    for (const line of deferredLines) {
+      console.log(line);
+    }
+    console.log('');
+  }
 }
