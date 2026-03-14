@@ -1,0 +1,10 @@
+name = "slope-stats"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+
+[vars]
+ENVIRONMENT = "production"
+
+[[kv_namespaces]]
+binding = "STATS_KV"
+id = "6025f700ed3c46f280e7b1d5fd042678"

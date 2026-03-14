@@ -54,6 +54,7 @@ import { contextCommand } from './commands/context.js';
 import { prepCommand } from './commands/prep.js';
 import { enrichCommand } from './commands/enrich.js';
 import { docsCommand } from './commands/docs.js';
+import { statsCommand } from './commands/stats.js';
 import { loopCommand } from './commands/loop.js';
 import { sprintCommand } from './commands/sprint.js';
 import { doctorCommand } from './commands/doctor.js';
@@ -316,6 +317,12 @@ switch (subcommand) {
       process.exit(1);
     });
     break;
+  case 'stats':
+    statsCommand(process.argv.slice(3)).catch(err => {
+      console.error('Error:', err.message);
+      process.exit(1);
+    });
+    break;
   case 'docs':
     docsCommand(process.argv.slice(3)).catch(err => {
       console.error('Error:', err.message);
@@ -422,6 +429,7 @@ Usage:
   slope context "query" [options]                     Semantic context search
   slope prep <ticket-id> [--json] [--top=5]          Generate execution plan for a ticket
   slope enrich [backlog-path] [--output=<path>]      Batch-enrich backlog with file context
+  slope stats export [--pretty]                      Export stats JSON for slope-web
   slope docs generate|changelog|check                Documentation manifest and changelog
   slope sprint start|gate|status|reset               Manage sprint lifecycle state
   slope worktree cleanup [--path|--all] [--dry-run]  Clean up stale worktrees
