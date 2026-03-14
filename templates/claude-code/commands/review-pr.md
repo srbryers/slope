@@ -64,7 +64,7 @@ Present all findings to the user in a table:
 
 For each finding, recommend one of:
 - **Fix now** — fix in the current sprint before merge
-- **Defer to S{N}** — fix in a named future sprint (specify which)
+- **Defer** — track with `slope review defer --from=<current> --to=<target> --severity=<sev> --description="<desc>"` for a future sprint
 - **Accept** — acknowledged risk, no action needed
 
 All findings must be explicitly addressed — no unacknowledged findings.
