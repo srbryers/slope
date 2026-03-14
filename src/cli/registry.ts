@@ -519,6 +519,15 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     ],
   },
   {
+    cmd: 'stats', desc: 'Export stats JSON for slope-web live dashboard', category: 'tooling',
+    subcommands: [
+      { name: 'export', desc: 'Compute SlopeStats JSON from local scorecards + registries', flags: [
+        { flag: '--pretty', desc: 'Pretty-print JSON output' },
+        { flag: '--stdout', desc: 'Write to stdout (default behavior)' },
+      ]},
+    ],
+  },
+  {
     cmd: 'docs', desc: 'Generate documentation manifest and changelog', category: 'tooling',
     subcommands: [
       { name: 'generate', desc: 'Build manifest JSON from registries + git history', flags: [
