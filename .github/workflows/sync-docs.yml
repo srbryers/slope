@@ -49,7 +49,7 @@ jobs:
         run: node -e "const s = JSON.parse(require('fs').readFileSync('stats.json','utf8')); if (!s.sprints_completed || !s.handicap) { console.error('Invalid stats'); process.exit(1); } console.log('Stats valid:', s.sprints_completed, 'sprints,', s.cli_commands, 'commands');"
 
       - name: Publish stats to KV
-        if: env.CLOUDFLARE_API_TOKEN != ''
+        if: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
         run: npx wrangler kv key put --namespace-id=${{ secrets.SLOPE_STATS_KV_NS_ID }} "stats" --path=stats.json --remote
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
