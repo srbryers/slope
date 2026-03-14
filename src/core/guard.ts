@@ -119,6 +119,10 @@ export interface GuidanceConfig {
   allowMainCommitPatterns?: string[];
   /** Branch names treated as protected (default: ['main', 'master']) */
   protectedBranches?: string[];
+  /** Commits behind before explore guard warns (default 11) */
+  mapStaleWarnAt?: number;
+  /** Commits behind before explore guard blocks Edit/Write (default 31) */
+  mapStaleBlockAt?: number;
 }
 
 /** All guard definitions */
@@ -127,8 +131,8 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     name: 'explore',
     description: 'Suggest checking codebase index before deep exploration',
     hookEvent: 'PreToolUse',
-    toolCategories: ['read_file', 'search_files', 'search_content'],
-    matcher: 'Read|Glob|Grep',
+    toolCategories: ['read_file', 'search_files', 'search_content', 'write_file'],
+    matcher: 'Read|Glob|Grep|Edit|Write',
     level: 'full',
   },
   {

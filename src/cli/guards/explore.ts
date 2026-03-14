@@ -5,11 +5,16 @@ import type { HookInput, GuardResult } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 
 const DEFAULT_INDEX_PATHS = ['CODEBASE.md', '.slope/index.json', 'docs/architecture.md'];
+const DEFAULT_STALE_WARN_AT = 11;
+const DEFAULT_STALE_BLOCK_AT = 31;
 
 /**
- * Explore guard: fires on Read|Glob|Grep (PreToolUse).
+ * Explore guard: fires on Read|Glob|Grep|Edit|Write (PreToolUse).
  * Suggests checking codebase map before deep exploration.
- * Includes staleness awareness when CODEBASE.md has YAML frontmatter.
+ * Includes tiered staleness awareness when CODEBASE.md has YAML frontmatter:
+ *   0–10 commits stale  → no warning (within tolerance)
+ *   11–30 commits stale → warning with commit count
+ *   31+ commits stale   → block Edit/Write (don't block Read/Glob/Grep)
  */
 export async function exploreGuard(input: HookInput, cwd: string): Promise<GuardResult> {
   const config = loadConfig();
@@ -31,11 +36,27 @@ export async function exploreGuard(input: HookInput, cwd: string): Promise<Guard
   // Check if CODEBASE.md exists and assess staleness
   const mapPath = join(cwd, 'CODEBASE.md');
   if (existsSync(mapPath)) {
-    const staleness = checkMapStaleness(mapPath, cwd);
+    const staleness = checkMapStaleness(mapPath, cwd, config);
 
-    if (staleness === 'stale') {
+    if (staleness.level === 'block') {
+      // Only block Edit/Write — let Read/Glob/Grep through with a warning
+      const toolName = input.tool_name ?? '';
+      const isWriteTool = /^(Edit|Write)$/i.test(toolName);
+      if (isWriteTool) {
+        return {
+          decision: 'deny',
+          blockReason: `SLOPE: Codebase map is ${staleness.distance} commits stale. Run \`slope map\` to refresh before editing.`,
+        };
+      }
+      // Read/Glob/Grep — warn but don't block
       return {
-        context: `SLOPE: Codebase map at CODEBASE.md is stale (${getStalenessDetail(mapPath, cwd)}). Run 'slope map' to refresh, or explore if needed.`,
+        context: `SLOPE: Codebase map is ${staleness.distance} commits stale. Run \`slope map\` to refresh.`,
+      };
+    }
+
+    if (staleness.level === 'warn') {
+      return {
+        context: `SLOPE: Codebase map at CODEBASE.md is ${staleness.distance} commits stale. Run 'slope map' to refresh, or explore if needed.`,
       };
     }
 
@@ -54,38 +75,36 @@ export async function exploreGuard(input: HookInput, cwd: string): Promise<Guard
   };
 }
 
-function checkMapStaleness(mapPath: string, cwd: string): 'current' | 'stale' {
+interface StalenessResult {
+  level: 'current' | 'warn' | 'block';
+  distance: number;
+}
+
+function checkMapStaleness(
+  mapPath: string,
+  cwd: string,
+  config?: { guidance?: { mapStaleWarnAt?: number; mapStaleBlockAt?: number } },
+): StalenessResult {
+  const warnAt = config?.guidance?.mapStaleWarnAt ?? DEFAULT_STALE_WARN_AT;
+  const blockAt = config?.guidance?.mapStaleBlockAt ?? DEFAULT_STALE_BLOCK_AT;
+
   try {
     const content = readFileSync(mapPath, 'utf8');
     const metaMatch = content.match(/^---\n([\s\S]*?)\n---/m);
-    if (!metaMatch) return 'current'; // No metadata — can't check
+    if (!metaMatch) return { level: 'current', distance: 0 }; // No metadata — can't check
 
     const gitShaMatch = metaMatch[1].match(/git_sha:\s*"?([^"\n]+)"?/);
-    if (!gitShaMatch) return 'current';
+    if (!gitShaMatch) return { level: 'current', distance: 0 };
 
     const distance = parseInt(
       execSync(`git rev-list --count ${gitShaMatch[1]}..HEAD 2>/dev/null`, { cwd, encoding: 'utf8', timeout: 5000 }).trim() || '0',
       10,
     );
 
-    return distance > 50 ? 'stale' : 'current';
+    if (distance >= blockAt) return { level: 'block', distance };
+    if (distance >= warnAt) return { level: 'warn', distance };
+    return { level: 'current', distance };
   } catch {
-    return 'current'; // Can't determine — assume current
-  }
-}
-
-function getStalenessDetail(mapPath: string, cwd: string): string {
-  try {
-    const content = readFileSync(mapPath, 'utf8');
-    const metaMatch = content.match(/^---\n([\s\S]*?)\n---/m);
-    if (!metaMatch) return 'unknown';
-
-    const gitShaMatch = metaMatch[1].match(/git_sha:\s*"?([^"\n]+)"?/);
-    if (!gitShaMatch) return 'unknown';
-
-    const distance = execSync(`git rev-list --count ${gitShaMatch[1]}..HEAD 2>/dev/null`, { cwd, encoding: 'utf8', timeout: 5000 }).trim();
-    return `${distance} commits behind`;
-  } catch {
-    return 'unknown';
+    return { level: 'current', distance: 0 }; // Can't determine — assume current
   }
 }
