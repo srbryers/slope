@@ -50,7 +50,7 @@ jobs:
 
       - name: Publish stats to KV
         if: env.CLOUDFLARE_API_TOKEN != ''
-        run: npx wrangler kv:key put --namespace-id=${{ secrets.SLOPE_STATS_KV_NS_ID }} "stats" --path=stats.json
+        run: npx wrangler kv key put --namespace-id=${{ secrets.SLOPE_STATS_KV_NS_ID }} "stats" --path=stats.json --remote
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
