@@ -18,6 +18,7 @@ Run the complete pre-sprint routine: verify prior sprint hygiene, get briefing, 
 Check that the previous sprint's scorecard exists at `docs/retros/sprint-{N-1}.json`:
 - If missing, **stop and create it first** using `/post-sprint`
 - If it exists, continue
+- Note: the sprint-completion guard also enforces this — PR creation is blocked without a scorecard
 
 ### 3. Branch hygiene
 
@@ -69,7 +70,7 @@ Show the user:
 - Par and slope
 - Ticket list with planned clubs
 - Key hazards to watch for (from briefing)
-- Any deferred findings from prior sprints targeting this sprint
+- Deferred findings targeting this sprint: `slope review deferred --sprint={N}`
 
 ## Important
 

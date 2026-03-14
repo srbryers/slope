@@ -51,11 +51,9 @@ If any new recurring patterns were encountered during this sprint:
 - Check `.slope/common-issues.json` for existing patterns
 - Add new patterns or update `sprints_hit` arrays for existing ones
 
-### 6. Update roadmap status
+### 6. Roadmap status (auto-updated)
 
-If a `docs/backlog/roadmap.json` exists:
-- Update the current sprint's status to `"complete"`
-- Check if this completes a phase — if so, update the phase status too
+Roadmap sprint status is automatically updated to `"complete"` when `slope validate` succeeds (step 3). Verify with `slope roadmap show` if needed.
 
 ### 7. Prompt for PR
 
