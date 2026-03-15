@@ -1,0 +1,117 @@
+{
+  "sprint_number": 66,
+  "theme": "The Scorekeeper — Sprint Analytics Dashboard",
+  "par": 4,
+  "slope": 2,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-03-15",
+  "shots": [
+    {
+      "ticket_key": "S66-1",
+      "title": "Handicap Trend API — per-sprint time-series of handicap, fairway%, GIR%",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "O(n) incremental computeHandicapTrend(). Running sums for cumulative averages. Integrated into ReportData and SlopeStats. 4 tests."
+    },
+    {
+      "ticket_key": "S66-3",
+      "title": "Sprint Velocity Tracking — tickets/sprint trend with improving/stable/declining detection",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "computeVelocity() with 0.3 threshold for trend noise avoidance. VelocityReport type with points, avg_tickets, par_accuracy_pct, avg_differential, trend. 6 tests."
+    },
+    {
+      "ticket_key": "S66-2",
+      "title": "Guard Effectiveness Metrics — JSONL recording + pure analytics function",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "moderate",
+          "description": "[code review] GuardDecision type gap — no shared union between recordGuardExecution JSONL values and computeGuardMetrics switch. Also allow+context conflation undercounts context injections.",
+          "gotcha_id": "review:code"
+        },
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "[code review] GuardMetricLine.tool typed as required string but undefined for Stop/PreCompact events — type lie in interface",
+          "gotcha_id": "review:code"
+        }
+      ],
+      "notes": "recordGuardExecution() fire-and-forget appendFileSync to .slope/guard-metrics.jsonl. computeGuardMetrics() pure function with malformed-line resilience. GuardDecision union type added post-review. 9 tests."
+    },
+    {
+      "ticket_key": "S66-4",
+      "title": "Dashboard Widgets — SVG charts for trend, velocity, guard effectiveness",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "[code review] New render functions lack metaphor parameter — inconsistent with existing renderHandicapTrendChart, renderSprintTable etc. which all accept optional metaphor",
+          "gotcha_id": "review:code"
+        }
+      ],
+      "notes": "renderTrendTimeSeriesChart (multi-line SVG), renderVelocityChart (bars + differential overlay + summary cards), renderGuardEffectivenessChart (horizontal stacked bars). Guard section conditional. /api/guard-metrics route. 6 tests."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 3,
+    "hazard_penalties": 0.5,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "type": "feature",
+  "conditions": [],
+  "special_plays": [],
+  "training": [],
+  "nutrition": [
+    {
+      "category": "hydration",
+      "description": "Test coverage strong — 28 new tests, all passing. Full suite 2720 tests green.",
+      "status": "healthy"
+    },
+    {
+      "category": "diet",
+      "description": "Clean build, typecheck, zero regressions. Pure analytics module with no I/O.",
+      "status": "healthy"
+    },
+    {
+      "category": "recovery",
+      "description": "Review findings addressed same-session — GuardDecision type, tool coercion, 3 test gap fixes",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Smooth sprint — analytics.ts is a clean pure-compute module. The pattern of types+compute in analytics, render in report, wire in dashboard is repeatable.",
+    "advice_for_next_player": "New render functions should accept optional metaphor parameter for label consistency. The report.ts module is growing (776 lines) — consider extracting charts to charts.ts before next analytics sprint.",
+    "what_surprised_you": "Guard metrics JSONL approach was simpler than expected — appendFileSync in try/catch is robust for hot-path telemetry. The fire-and-forget pattern from transcript.ts transfers perfectly.",
+    "excited_about_next": "S66 unblocks S70 (Session Insights & Debugging). The analytics pattern is extensible — adding new metrics follows the same 5-step recipe."
+  },
+  "bunker_locations": [],
+  "yardage_book_updates": [
+    "New render functions must accept optional metaphor param — all existing chart renderers do",
+    "report.ts approaching god-module territory at 776 lines — extract chart renderers before next analytics sprint",
+    "GuardResult.decision is 'allow'|'deny'|'ask' but JSONL records synthetic 'context' and 'silent' values — use GuardDecision union"
+  ],
+  "course_management_notes": [
+    "T1→T3→T2→T4 order worked well — analytics functions built first, then dashboard wiring",
+    "Guard JSONL separate from ReportData by design — different data domains (runtime telemetry vs scorecard analytics)",
+    "Defensive sort in analytics functions is correct tradeoff — O(n log n) on small n preserves function purity"
+  ]
+}
