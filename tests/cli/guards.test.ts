@@ -356,13 +356,23 @@ describe('subagentGateGuard', () => {
     expect(result.blockReason).toContain('sonnet');
   });
 
-  it('allows haiku Explore agent without model set', async () => {
+  it('denies Explore agent without model set', async () => {
     const result = await subagentGateGuard(
       makeInput({ tool_input: { subagent_type: 'Explore' } }),
       tmpDir,
     );
-    expect(result.decision).toBeUndefined();
-    expect(result.context).toContain('SLOPE subagent tip');
+    expect(result.decision).toBe('deny');
+    expect(result.blockReason).toContain('no model specified');
+    expect(result.blockReason).toContain('haiku');
+  });
+
+  it('denies Plan agent without model set', async () => {
+    const result = await subagentGateGuard(
+      makeInput({ tool_input: { subagent_type: 'Plan' } }),
+      tmpDir,
+    );
+    expect(result.decision).toBe('deny');
+    expect(result.blockReason).toContain('no model specified');
   });
 
   it('allows correct Explore agent with orientation context', async () => {

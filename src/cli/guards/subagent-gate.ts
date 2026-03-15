@@ -58,10 +58,17 @@ export async function subagentGateGuard(input: HookInput, _cwd: string): Promise
   const guidance = config.guidance ?? {};
   const allowedModels = guidance.subagentAllowModels ?? ['haiku'];
 
-  if (model && !allowedModels.includes(model)) {
+  if (!model) {
     return {
       decision: 'deny',
-      blockReason: `SLOPE subagent-gate: ${subagentType} agent blocked — model "${model}" not in allowed list [${allowedModels.join(', ')}]. Resubmit with model: ${allowedModels[0]}.`,
+      blockReason: `SLOPE subagent-gate: ${subagentType} agent blocked — no model specified (would inherit parent model). Resubmit with model: "${allowedModels[0]}".`,
+    };
+  }
+
+  if (!allowedModels.includes(model)) {
+    return {
+      decision: 'deny',
+      blockReason: `SLOPE subagent-gate: ${subagentType} agent blocked — model "${model}" not in allowed list [${allowedModels.join(', ')}]. Resubmit with model: "${allowedModels[0]}".`,
     };
   }
 
