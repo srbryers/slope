@@ -195,16 +195,17 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
 
   server.tool(
     'context_search',
-    'Semantic code search — returns relevant snippets instead of full files. Much cheaper than spawning an explore subagent. Falls back to grep when no embedding index exists.',
+    'Semantic code search — returns relevant snippets instead of full files. Much cheaper than spawning an explore subagent. Falls back to grep when no embedding index exists. Only searches src/.',
     {
       query: z.string().describe('Natural language query or code concept to search for'),
-      top: z.number().optional().describe('Max results (default: 5)'),
-      format: z.enum(['paths', 'snippets', 'full']).optional().describe('Output format (default: snippets)'),
+      top: z.number().int().min(1).max(50).optional().describe('Max results (default: 5)'),
+      format: z.enum(['paths', 'snippets']).optional().describe('Output format (default: snippets)'),
     },
     async ({ query, top, format }) => {
       const limit = top ?? 5;
       const outputFormat = format ?? 'snippets';
       const cwd = process.cwd();
+      let embeddingFailed = false;
 
       // Semantic path: embedding index available
       if (store && hasEmbeddingSupport(store) && config?.embedding) {
@@ -221,28 +222,30 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
           ).slice(0, limit);
           const text = formatContextForAgent(deduped, outputFormat, cwd);
           return { content: [{ type: 'text' as const, text: text || 'No results found.' }] };
-        } catch (err) {
-          // Fall through to grep on embedding failure
+        } catch {
+          embeddingFailed = true;
         }
       }
 
-      // Grep fallback
+      // Grep fallback (fixed-string mode for safety — no regex interpretation)
       try {
-        const escaped = query.replace(/[\\'"]/g, '\\$&').replace(/[^a-zA-Z0-9_.\- ]/g, '.');
         const grepResult = execSync(
-          `grep -rn --include='*.ts' -l "${escaped}" src/ 2>/dev/null || true`,
+          `grep -rFn --include='*.ts' -l ${JSON.stringify(query)} src/ 2>/dev/null || true`,
           { cwd, encoding: 'utf8', timeout: 10000 },
         ).trim();
 
+        const fallbackNote = embeddingFailed
+          ? '\n\nNote: Semantic search failed, showing grep results.'
+          : '\n\nTip: Run `npx slope index` for semantic search (better results).';
+
         if (!grepResult) {
-          return { content: [{ type: 'text' as const, text: `No files matching "${query}" found.\n\nTip: Run \`npx slope index\` for semantic search (better results).` }] };
+          return { content: [{ type: 'text' as const, text: `No files matching "${query}" found.` + fallbackNote }] };
         }
 
         const files = grepResult.split('\n').filter(Boolean).slice(0, limit);
 
         if (outputFormat === 'paths') {
-          const text = files.join('\n') + '\n\nTip: Run `npx slope index` for semantic search (better results).';
-          return { content: [{ type: 'text' as const, text }] };
+          return { content: [{ type: 'text' as const, text: files.join('\n') + fallbackNote }] };
         }
 
         // Build snippet results from grep context
@@ -250,7 +253,7 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
         for (const file of files) {
           try {
             const lines = execSync(
-              `grep -n "${escaped}" "${file}" 2>/dev/null | head -5`,
+              `grep -Fn ${JSON.stringify(query)} ${JSON.stringify(file)} 2>/dev/null | head -5`,
               { cwd, encoding: 'utf8', timeout: 5000 },
             ).trim();
             if (lines) {
@@ -268,7 +271,7 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
         return {
           content: [{
             type: 'text' as const,
-            text: (text || 'No matching snippets found.') + '\n\nTip: Run `npx slope index` for semantic search (better results).',
+            text: (text || 'No matching snippets found.') + fallbackNote,
           }],
         };
       } catch (err) {

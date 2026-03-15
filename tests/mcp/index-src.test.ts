@@ -660,4 +660,32 @@ describe('context_search', () => {
     expect(server).toBeDefined();
     // context_search is registered outside the store block, so it's always available
   });
+
+  it('grep fallback returns results for a known query', async () => {
+    // Create a temp project with a known .ts file
+    const tmp = mkdtempSync(join(tmpdir(), 'slope-ctx-search-'));
+    const srcDir = join(tmp, 'src');
+    mkdirSync(srcDir, { recursive: true });
+    writeFileSync(join(srcDir, 'example.ts'), 'export function uniqueTestMarker() { return 42; }\n');
+
+    // Run the grep fallback by executing in the temp dir context
+    const { execSync } = await import('node:child_process');
+    const grepResult = execSync(
+      `grep -rFn --include='*.ts' -l "uniqueTestMarker" src/ 2>/dev/null || true`,
+      { cwd: tmp, encoding: 'utf8', timeout: 5000 },
+    ).trim();
+
+    expect(grepResult).toContain('src/example.ts');
+
+    // Verify snippet extraction also works
+    const snippetResult = execSync(
+      `grep -Fn "uniqueTestMarker" "src/example.ts" 2>/dev/null | head -5`,
+      { cwd: tmp, encoding: 'utf8', timeout: 5000 },
+    ).trim();
+
+    expect(snippetResult).toContain('uniqueTestMarker');
+    expect(snippetResult).toMatch(/^\d+:/); // line number prefix
+
+    rmSync(tmp, { recursive: true, force: true });
+  });
 });

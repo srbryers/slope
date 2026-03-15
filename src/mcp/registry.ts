@@ -630,7 +630,7 @@ export const SLOPE_REGISTRY: FunctionRegistryEntry[] = [
     name: 'context_search',
     module: 'store',
     description: 'MCP tool: Semantic code search — returns relevant snippets instead of full files. Falls back to grep when no embedding index exists.',
-    signature: 'context_search(query: string, top?: number, format?: "paths" | "snippets" | "full"): ContextResult[]',
+    signature: 'context_search(query: string, top?: number, format?: "paths" | "snippets"): { text: string }',
     example: '// Called via MCP tool: context_search({ query: "guard system" })',
   },
 
