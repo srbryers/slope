@@ -56,9 +56,12 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     cmd: 'version', desc: 'Show version or bump with automated PR workflow', category: 'lifecycle',
     subcommands: [
       { name: 'bump', desc: 'Bump version with automated PR workflow', flags: [
-        { flag: '<version>', desc: 'Version to bump to (e.g. 1.25.0)' },
+        { flag: '<version>', desc: 'Explicit version (e.g. 1.28.0)' },
+        { flag: '--patch', desc: 'Patch bump (x.y.Z+1) — bug fixes only' },
+        { flag: '--major', desc: 'Major bump (X+1.0.0) — breaking changes' },
         { flag: '--dry-run', desc: 'Preview changes without committing' },
       ]},
+      { name: 'recommend', desc: 'Analyze commits and recommend version tier' },
     ],
   },
   {

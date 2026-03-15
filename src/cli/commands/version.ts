@@ -20,10 +20,16 @@ export async function versionCommand(args: string[]): Promise<void> {
     return;
   }
 
+  if (sub === 'recommend') {
+    await versionRecommend(process.cwd());
+    return;
+  }
+
   if (sub === '--help' || sub === '-h') {
     console.log(`
-slope version                                      Show current version
-slope version bump [<version>] [--dry-run]         Bump version, create PR, merge
+slope version                                              Show current version
+slope version bump [<version>] [--patch|--major] [--dry-run]  Bump version, create PR, merge
+slope version recommend                                    Analyze commits and recommend version tier
 `);
     return;
   }
@@ -49,9 +55,22 @@ async function versionBump(args: string[]): Promise<void> {
   syncToMain(cwd);
 
   // 2. Determine version (anchored regex prevents shell injection)
+  // Priority: explicit version arg > --major > --patch > default (minor)
   const currentVersion = getCurrentVersion(cwd);
-  const versionArg = args.find(a => /^\d+\.\d+\.\d+$/.test(a));
-  const targetVersion = versionArg ?? bumpMinor(currentVersion);
+  const explicitVersion = args.find(a => /^\d+\.\d+\.\d+$/.test(a));
+  const patchFlag = args.includes('--patch');
+  const majorFlag = args.includes('--major');
+
+  let targetVersion: string;
+  if (explicitVersion) {
+    targetVersion = explicitVersion;
+  } else if (majorFlag) {
+    targetVersion = bumpMajor(currentVersion);
+  } else if (patchFlag) {
+    targetVersion = bumpPatch(currentVersion);
+  } else {
+    targetVersion = bumpMinor(currentVersion);
+  }
 
   console.log(`\nSLOPE Release: ${currentVersion} → ${targetVersion}`);
 
@@ -152,11 +171,63 @@ function getCurrentVersion(cwd: string): string {
   return pkg.version;
 }
 
+function bumpPatch(version: string): string {
+  const parts = version.split('.').map(Number);
+  parts[2]++;
+  return parts.join('.');
+}
+
 function bumpMinor(version: string): string {
   const parts = version.split('.').map(Number);
   parts[1]++;
   parts[2] = 0;
   return parts.join('.');
+}
+
+function bumpMajor(version: string): string {
+  const parts = version.split('.').map(Number);
+  parts[0]++;
+  parts[1] = 0;
+  parts[2] = 0;
+  return parts.join('.');
+}
+
+async function versionRecommend(cwd: string): Promise<void> {
+  const { parseChangelog } = await import('./docs.js');
+
+  const changelog = parseChangelog(cwd);
+
+  const unreleased = changelog.entries.find(e => e.version === 'Unreleased');
+  if (!unreleased || unreleased.changes.length === 0) {
+    console.log('No unreleased changes since last tag.');
+    return;
+  }
+
+  const counts = { feat: 0, fix: 0, docs: 0, chore: 0, other: 0, breaking: 0 };
+  for (const c of unreleased.changes) {
+    if (c.breaking) counts.breaking++;
+    const key = c.type as string;
+    if (key in counts) counts[key as keyof typeof counts]++;
+    else counts.other++;
+  }
+
+  let tier: string;
+  if (counts.breaking > 0) tier = 'major';
+  else if (counts.feat > 0) tier = 'minor';
+  else tier = 'patch';
+
+  const currentVersion = getCurrentVersion(cwd);
+  const nextVersion = tier === 'major' ? bumpMajor(currentVersion)
+    : tier === 'minor' ? bumpMinor(currentVersion)
+    : bumpPatch(currentVersion);
+
+  console.log(`\nUnreleased changes since v${currentVersion}: ${unreleased.changes.length}`);
+  console.log(`  feat: ${counts.feat}, fix: ${counts.fix}, docs: ${counts.docs}, chore: ${counts.chore}, breaking: ${counts.breaking}`);
+  console.log(`\n  Recommended: ${tier} (${currentVersion} → ${nextVersion})\n`);
+
+  if (counts.feat > 0) {
+    console.log('  Includes new features — check release-policy.md for slope-web content review guidance.\n');
+  }
 }
 
 function run(cmd: string, cwd: string): string {
