@@ -1,10 +1,10 @@
 ---
-generated_at: "2026-03-15T03:45:11.510Z"
-git_sha: "134edd90ec3f345793709dbe36cece8f459cfdbe"
-sprint: 64
-source_files: 195
-test_files: 152
-cli_commands: 45
+generated_at: "2026-03-15T19:09:13.119Z"
+git_sha: "6062d82ff3ff51e3ca11fdcf871397c27dc10562"
+sprint: 66
+source_files: 199
+test_files: 155
+cli_commands: 46
 guards: 22
 flows: 0
 ---
@@ -18,7 +18,7 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
 <!-- AUTO-GENERATED: START packages -->
 
 ### `src/cli`
-- Source files: 98 | Test files: 65
+- Source files: 99 | Test files: 65
 - Key modules:
   - `config`
   - `hooks-config`
@@ -31,9 +31,10 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
   - `template-generator` — SLOPE Template Generator
 
 ### `src/core`
-- Source files: 85 | Test files: 76
+- Source files: 88 | Test files: 79
 - Key modules:
   - `advisor` — --- Module-private constants ---
+  - `analytics` — SLOPE — Sprint Analytics
   - `briefing` — --- Input types ---
   - `builder` — --- Helpers ---
   - `ci-signals` — SLOPE — CI/Test Signal Parser
@@ -47,8 +48,7 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
   - `embedding-client` — SLOPE — HTTP Client for OpenAI-Compatible Embedding Endpoints
   - `embedding-store` — SLOPE — EmbeddingStore Interface
   - `embedding` — SLOPE — Embedding Types & Chunking Logic (pure — no HTTP calls)
-  - `enrich` — SLOPE — Backlog Enrichment
-  - ... and 38 more
+  - ... and 41 more
 
 ### `src/mcp`
 - Source files: 3 | Test files: 6
@@ -213,6 +213,9 @@ Re-exports from `src/core/index.ts`:
 - `renderAreaPerformanceChart`
 - `renderNutritionChart`
 - `renderSprintTable`
+- `renderTrendTimeSeriesChart`
+- `renderVelocityChart`
+- `renderGuardEffectivenessChart`
 **Dashboard:**
 - `DEFAULT_DASHBOARD_CONFIG`
 - `generateDashboardHtml`
@@ -284,6 +287,16 @@ Re-exports from `src/core/index.ts`:
 - `validateFlows(flows: FlowsFile, cwd: string): { errors: string[], warnings: string[] }`
 - `checkFlowStaleness(flow: FlowDefinition, currentSha: string, cwd: string): { stale: boolean, changedFiles: string[] }`
 - `loadFlows(flowsPath: string): FlowsFile | null`
+**Inspirations:**
+- `parseInspirations`
+- `validateInspirations`
+- `loadInspirations(inspirationsPath: string): InspirationsFile | null`
+- `linkInspirationToSprint(path: string, id: string, sprint: number): InspirationsFile`
+- `deriveId(projectName: string): string`
+**Imports (blast radius):**
+- `parseImports`
+- `buildImportGraph(rootDir: string): Map<string, string[]>`
+- `blastRadius(graph: Map<string, string[]>, targetFile: string): string[]`
 **Interview (Init):**
 - `validateInitInput`
 - `initFromInterview`
@@ -392,6 +405,10 @@ Re-exports from `src/core/index.ts`:
 - `listDeferred`
 - `formatDeferredForBriefing`
 - `deferredPath`
+**Analytics:**
+- `computeHandicapTrend`
+- `computeVelocity`
+- `computeGuardMetrics`
 **Built-in metaphors (auto-registers on import):**
 - `golf`
 - `tennis`
@@ -435,6 +452,7 @@ Re-exports from `src/core/index.ts`:
 - `slope distill` — Promote event patterns to common issues
 - `slope map` — Generate/update codebase map
 - `slope flows` — Manage user flow definitions
+- `slope inspirations` — Track external OSS inspiration sources
 - `slope metaphor` — Manage metaphor display themes
 - `slope plugin` — Manage custom plugins
 - `slope store` — Store diagnostics and management
@@ -508,13 +526,13 @@ Re-exports from `src/core/index.ts`:
 | Directory | Test Files | Command |
 |-----------|-----------|---------|
 | tests/cli | 65 | `pnpm test` |
-| tests/core | 76 | `pnpm test` |
+| tests/core | 79 | `pnpm test` |
 | tests/mcp | 6 | `pnpm test` |
 | tests/store | 1 | `pnpm test` |
 | tests/store-pg | 2 | `pnpm test` |
 | tests/tokens | 1 | `pnpm test` |
 
-**Total test files:** 151
+**Total test files:** 154
 **Run all:** `pnpm -r test`
 **Typecheck:** `pnpm -r typecheck`
 <!-- AUTO-GENERATED: END tests -->
@@ -525,11 +543,11 @@ Re-exports from `src/core/index.ts`:
 
 | Sprint | Theme | Tickets | Score |
 |--------|-------|---------|-------|
-| **60** | Compaction-proof review gates + worktree-merge guard | 5 | par |
-| **61** | The Terminal Caddy — OB1 Adapter | 3 | birdie |
 | **62** | The Welcome Mat v2 + Templates — Streamlined First-Run Experience & Sprint/Ticket Templates | 5 | par |
 | **63** | The Handbook + Template Integration — CLI Help & Documentation Polish | 6 | eagle |
 | **64** | Claim Hygiene, Worktree Safety & Loop Planner Context | 5 | par |
+| **65** | The Inspiration Engine | 3 | bogey |
+| **66** | The Scorekeeper — Sprint Analytics Dashboard | 4 | par |
 <!-- AUTO-GENERATED: END history -->
 
 ## Known Gotchas
