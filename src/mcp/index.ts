@@ -125,7 +125,7 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
     'Discover SLOPE API functions, filesystem helpers, constants, and type definitions. Call with no args to see everything, or filter by query/module.',
     {
       query: z.string().optional().describe('Case-insensitive search term to filter by name or description'),
-      module: z.enum(['core', 'fs', 'constants', 'types', 'store', 'map', 'flows', 'metaphor', 'init', 'testing']).optional().describe('Filter by module category'),
+      module: z.enum(['core', 'fs', 'constants', 'types', 'store', 'map', 'flows', 'inspirations', 'metaphor', 'init', 'testing']).optional().describe('Filter by module category'),
     },
     async ({ query, module }) => {
       // Map module — return codebase map content

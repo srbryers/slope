@@ -786,7 +786,7 @@ export const SLOPE_REGISTRY: FunctionRegistryEntry[] = [
     name: 'loadInspirations',
     module: 'inspirations',
     description: 'Load and parse .slope/inspirations.json. Returns null if file does not exist.',
-    signature: 'loadInspirations(path?: string): InspirationsFile | null',
+    signature: 'loadInspirations(inspirationsPath: string): InspirationsFile | null',
     example: 'const config = loadConfig(); return loadInspirations(config.inspirationsPath);',
   },
   {
@@ -1083,7 +1083,7 @@ export const MCP_TOOL_REGISTRY: readonly McpToolMeta[] = [
     desc: 'Discover the SLOPE API — functions, types, constants, flows, and codebase map',
     params: [
       { name: 'query', type: 'string', desc: 'Search term to filter results' },
-      { name: 'module', type: 'string', desc: 'Filter by module (core, fs, constants, store, flows, init, testing, types, map)' },
+      { name: 'module', type: 'string', desc: 'Filter by module (core, fs, constants, store, flows, inspirations, init, testing, types, map)' },
     ],
     requiresStore: false,
   },
