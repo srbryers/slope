@@ -4,6 +4,7 @@ import { execSync } from 'node:child_process';
 import { loadConfig, loadScorecards, detectLatestSprint, GUARD_DEFINITIONS, loadFlows, checkFlowStaleness } from '../../core/index.js';
 import type { SlopeConfig } from '../../core/index.js';
 import { CLI_COMMAND_REGISTRY } from '../registry.js';
+import { SLOPE_REGISTRY } from '../../mcp/registry.js';
 
 // ── Helpers ─────────────────────────────────────────────────────
 
@@ -148,6 +149,9 @@ function generateApiSurface(cwd: string): string {
   const content = readFileSync(indexPath, 'utf8');
   const lines: string[] = [''];
 
+  // Build name→signature lookup from SLOPE_REGISTRY
+  const sigMap = new Map(SLOPE_REGISTRY.map(e => [e.name, e.signature]));
+
   // Match all export blocks (single and multi-line) and section comments
   const exportRegex = /^(\/\/\s*.+)|^(export\s+(?:type\s+)?\{[\s\S]*?\})/gm;
   let match: RegExpExecArray | null;
@@ -172,14 +176,32 @@ function generateApiSurface(cwd: string): string {
         .split(',')
         .map(n => n.trim())
         .filter(n => n && !n.includes(' as '));
-      if (names.length > 0) {
-        const suffix = isType ? ' (types)' : '';
-        lines.push(`- ${names.map(n => `\`${n}\``).join(', ')}${suffix}`);
+      if (names.length === 0) continue;
+
+      if (isType) {
+        // Type exports stay as comma-separated name-only lists
+        lines.push(`- ${names.map(n => `\`${n}\``).join(', ')} (types)`);
+      } else {
+        // Function exports: one per line with signature from registry
+        for (const name of names) {
+          const sig = sigMap.get(name);
+          if (sig) {
+            lines.push(`- \`${sig}\``);
+          } else {
+            lines.push(`- \`${name}\``);
+          }
+        }
       }
     }
   }
 
-  return lines.join('\n');
+  // Token budget guard: warn if API surface section is too large
+  const output = lines.join('\n');
+  if (output.length > 15000) {
+    console.warn(`Warning: API surface section is ${output.length} chars (~${Math.round(output.length / 4)} tokens) — consider trimming.`);
+  }
+
+  return output;
 }
 
 function generateCliCommands(): string {

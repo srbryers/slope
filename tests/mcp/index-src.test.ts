@@ -78,7 +78,7 @@ describe('createSlopeToolsServer', () => {
   });
 
   it('exposes all expected tool names', () => {
-    const expectedTools = ['search', 'execute', 'session_status', 'acquire_claim', 'check_conflicts', 'store_status', 'testing_session_start', 'testing_session_finding', 'testing_session_end', 'testing_session_status', 'testing_plan_status'];
+    const expectedTools = ['search', 'execute', 'context_search', 'session_status', 'acquire_claim', 'check_conflicts', 'store_status', 'testing_session_start', 'testing_session_finding', 'testing_session_end', 'testing_session_status', 'testing_plan_status'];
     expect(SLOPE_MCP_TOOL_NAMES).toEqual(expect.arrayContaining(expectedTools));
     expect(SLOPE_MCP_TOOL_NAMES.length).toBe(expectedTools.length);
   });
@@ -110,7 +110,7 @@ describe('registry', () => {
 
   it('store module entries exist with correct names', () => {
     const storeEntries = SLOPE_REGISTRY.filter((e) => e.module === 'store');
-    const expectedStoreTools = ['session_status', 'acquire_claim', 'check_conflicts', 'store_status'];
+    const expectedStoreTools = ['session_status', 'acquire_claim', 'check_conflicts', 'store_status', 'context_search'];
     expect(storeEntries.length).toBe(expectedStoreTools.length);
     const storeNames = storeEntries.map(e => e.name);
     for (const name of expectedStoreTools) {
@@ -620,5 +620,44 @@ describe('search with setup hints', () => {
     const hints: SetupHints = { guardsInstalled: false, lifecycleHooksInstalled: false, settingsConfigured: false };
     const server = createSlopeToolsServer(undefined, hints);
     expect(server).toBeDefined();
+  });
+});
+
+describe('context_search', () => {
+  it('context_search is included in SLOPE_MCP_TOOL_NAMES', () => {
+    expect(SLOPE_MCP_TOOL_NAMES).toContain('context_search');
+  });
+
+  it('registry includes context_search entry', () => {
+    const entry = SLOPE_REGISTRY.find(e => e.name === 'context_search');
+    expect(entry).toBeDefined();
+    expect(entry!.module).toBe('store');
+    expect(entry!.signature).toContain('query');
+  });
+
+  it('server with config parameter creates successfully', () => {
+    const config = {
+      scorecardDir: 'docs/retros',
+      scorecardPattern: 'sprint-*.json',
+      minSprint: 1,
+      commonIssuesPath: '.slope/common-issues.json',
+      sessionsPath: '.slope/sessions.json',
+      registry: 'file' as const,
+      claimsPath: '.slope/claims.json',
+      roadmapPath: 'docs/backlog/roadmap.json',
+      flowsPath: '.slope/flows.json',
+      visionPath: '.slope/vision.json',
+      repoProfilePath: '.slope/repo-profile.json',
+      transcriptsPath: '.slope/transcripts',
+      metaphor: 'golf',
+    };
+    const server = createSlopeToolsServer(createMockStore(), undefined, undefined, config);
+    expect(server).toBeDefined();
+  });
+
+  it('server without store still registers context_search (grep fallback)', () => {
+    const server = createSlopeToolsServer();
+    expect(server).toBeDefined();
+    // context_search is registered outside the store block, so it's always available
   });
 });

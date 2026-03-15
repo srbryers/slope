@@ -27,13 +27,14 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 import { SLOPE_REGISTRY, SLOPE_TYPES } from './registry.js';
 import { runInSandbox } from './sandbox.js';
-import type { SlopeStore } from '../core/index.js';
-import { checkConflicts, loadFlows, checkFlowStaleness, checkStoreHealth, METAPHOR_SCHEMA, listMetaphors, buildInterviewContext, generateInterviewSteps, loadConfig, parseTestPlan, getAreasNeedingTest } from '../core/index.js';
+import type { SlopeStore, SlopeConfig } from '../core/index.js';
+import { checkConflicts, loadFlows, checkFlowStaleness, checkStoreHealth, METAPHOR_SCHEMA, listMetaphors, buildInterviewContext, generateInterviewSteps, loadConfig, parseTestPlan, getAreasNeedingTest, hasEmbeddingSupport, embed, deduplicateByFile, formatContextForAgent } from '../core/index.js';
+import type { ContextResult } from '../core/index.js';
 import { gaming } from '../core/metaphors/gaming.js';
 import type { ClaimScope, FlowsFile, FlowDefinition } from '../core/index.js';
 
 /** Tool names exposed by this MCP server (for tests and tool discovery). */
-export const SLOPE_MCP_TOOL_NAMES = ['search', 'execute', 'session_status', 'acquire_claim', 'check_conflicts', 'store_status', 'testing_session_start', 'testing_session_finding', 'testing_session_end', 'testing_session_status', 'testing_plan_status'] as const;
+export const SLOPE_MCP_TOOL_NAMES = ['search', 'execute', 'context_search', 'session_status', 'acquire_claim', 'check_conflicts', 'store_status', 'testing_session_start', 'testing_session_finding', 'testing_session_end', 'testing_session_status', 'testing_plan_status'] as const;
 
 /** Detection results for hook/settings activation status. */
 export interface SetupHints {
@@ -113,7 +114,7 @@ export function buildSetupHint(hints: SetupHints): string | null {
   );
 }
 
-export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHints, storeType?: string): McpServer {
+export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHints, storeType?: string, config?: SlopeConfig): McpServer {
   const server = new McpServer({
     name: 'slope-tools',
     version: '1.0.0',
@@ -188,6 +189,91 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
         return { content: [{ type: 'text' as const, text: message }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    'context_search',
+    'Semantic code search — returns relevant snippets instead of full files. Much cheaper than spawning an explore subagent. Falls back to grep when no embedding index exists.',
+    {
+      query: z.string().describe('Natural language query or code concept to search for'),
+      top: z.number().optional().describe('Max results (default: 5)'),
+      format: z.enum(['paths', 'snippets', 'full']).optional().describe('Output format (default: snippets)'),
+    },
+    async ({ query, top, format }) => {
+      const limit = top ?? 5;
+      const outputFormat = format ?? 'snippets';
+      const cwd = process.cwd();
+
+      // Semantic path: embedding index available
+      if (store && hasEmbeddingSupport(store) && config?.embedding) {
+        try {
+          const [queryVector] = await embed([query], config.embedding);
+          const raw = await store.searchEmbeddings(queryVector, limit * 2);
+          const deduped = deduplicateByFile(
+            raw.map(r => ({
+              filePath: r.filePath,
+              chunkIndex: r.chunkIndex,
+              snippet: r.chunkText,
+              score: r.score,
+            })),
+          ).slice(0, limit);
+          const text = formatContextForAgent(deduped, outputFormat, cwd);
+          return { content: [{ type: 'text' as const, text: text || 'No results found.' }] };
+        } catch (err) {
+          // Fall through to grep on embedding failure
+        }
+      }
+
+      // Grep fallback
+      try {
+        const escaped = query.replace(/[\\'"]/g, '\\$&').replace(/[^a-zA-Z0-9_.\- ]/g, '.');
+        const grepResult = execSync(
+          `grep -rn --include='*.ts' -l "${escaped}" src/ 2>/dev/null || true`,
+          { cwd, encoding: 'utf8', timeout: 10000 },
+        ).trim();
+
+        if (!grepResult) {
+          return { content: [{ type: 'text' as const, text: `No files matching "${query}" found.\n\nTip: Run \`npx slope index\` for semantic search (better results).` }] };
+        }
+
+        const files = grepResult.split('\n').filter(Boolean).slice(0, limit);
+
+        if (outputFormat === 'paths') {
+          const text = files.join('\n') + '\n\nTip: Run `npx slope index` for semantic search (better results).';
+          return { content: [{ type: 'text' as const, text }] };
+        }
+
+        // Build snippet results from grep context
+        const results: ContextResult[] = [];
+        for (const file of files) {
+          try {
+            const lines = execSync(
+              `grep -n "${escaped}" "${file}" 2>/dev/null | head -5`,
+              { cwd, encoding: 'utf8', timeout: 5000 },
+            ).trim();
+            if (lines) {
+              results.push({
+                filePath: file,
+                chunkIndex: 0,
+                snippet: lines,
+                score: 0,
+              });
+            }
+          } catch { /* skip file */ }
+        }
+
+        const text = formatContextForAgent(results, outputFormat, cwd);
+        return {
+          content: [{
+            type: 'text' as const,
+            text: (text || 'No matching snippets found.') + '\n\nTip: Run `npx slope index` for semantic search (better results).',
+          }],
+        };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        return { content: [{ type: 'text' as const, text: `Search error: ${message}` }], isError: true };
       }
     },
   );
@@ -927,18 +1013,20 @@ async function main(): Promise<void> {
   let store: SlopeStore | undefined;
   let hints: SetupHints | undefined;
   let storeType: string | undefined;
+  let slopeConfig: SlopeConfig | undefined;
   try {
     const { loadConfig } = await import('../core/index.js');
     const { createStore } = await import('../store/index.js');
     const cwd = findProjectRoot(process.cwd());
     const config = loadConfig(cwd);
+    slopeConfig = config;
     store = createStore({ storePath: config.store_path ?? '.slope/slope.db', cwd });
     storeType = config.store ?? 'sqlite';
     hints = detectSetupHints(cwd);
   } catch {
     // No config or store — server runs without store tools
   }
-  const server = createSlopeToolsServer(store, hints, storeType);
+  const server = createSlopeToolsServer(store, hints, storeType, slopeConfig);
   const transport = new StdioServerTransport();
   await server.connect(transport);
 }
