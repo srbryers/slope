@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, appendFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { GUARD_DEFINITIONS, formatPreToolUseOutput, formatPostToolUseOutput, formatStopOutput, getAllGuardDefinitions, getCustomGuard, loadPluginGuards, detectAdapter } from '../../core/index.js';
 import type { HookInput, GuardResult, GuardName, AnyGuardDefinition } from '../../core/index.js';
@@ -179,6 +179,9 @@ export async function guardCommand(args: string[]): Promise<void> {
   }
 
   const result = await handler(input, cwd);
+
+  // Record guard execution metrics (fire-and-forget)
+  recordGuardExecution(cwd, name, input, result);
 
   // Format output based on hook event type
   if (!result.context && !result.decision && !result.blockReason) {
@@ -503,6 +506,25 @@ function guardRecommendCommand(cwd: string): void {
   } else {
     console.log('\n  No guards are specifically recommended for your detected workflow.\n');
   }
+}
+
+/** Record a guard execution to the metrics JSONL file. Fire-and-forget with try/catch. */
+function recordGuardExecution(cwd: string, guardName: string, input: HookInput, result: GuardResult): void {
+  try {
+    const metricsPath = join(cwd, '.slope', 'guard-metrics.jsonl');
+    // Derive decision: explicit decision takes precedence, then infer from result fields.
+    // Note: a guard can return decision='allow' AND context='...' (allow with guidance).
+    // We record the explicit decision when present; 'context' only when there's no decision.
+    const decision = result.decision ?? (result.blockReason ? 'deny' : result.context ? 'context' : 'silent');
+    const line = JSON.stringify({
+      ts: new Date().toISOString(),
+      guard: guardName,
+      event: input.hook_event_name,
+      tool: input.tool_name ?? '',
+      decision,
+    });
+    appendFileSync(metricsPath, line + '\n');
+  } catch { /* never block guard execution */ }
 }
 
 /** Check if a guard is installed in the harness hooks config */

@@ -17,7 +17,11 @@ import {
   renderAreaPerformanceChart,
   renderNutritionChart,
   renderSprintTable,
+  renderTrendTimeSeriesChart,
+  renderVelocityChart,
+  renderGuardEffectivenessChart,
 } from './report.js';
+import type { GuardEffectivenessReport } from './analytics.js';
 import { extractPlayers } from './player.js';
 import { buildLeaderboard, renderLeaderboardHtml } from './leaderboard.js';
 
@@ -438,6 +442,7 @@ export function generateDashboardHtml(
   data: ReportData,
   metaphor?: MetaphorDefinition,
   config?: Partial<DashboardConfig>,
+  guardMetrics?: GuardEffectivenessReport,
 ): string {
   const resolvedConfig = { ...DEFAULT_DASHBOARD_CONFIG, ...config };
   const title = metaphor?.vocabulary.review ?? 'SLOPE Dashboard';
@@ -475,6 +480,12 @@ export function generateDashboardHtml(
   <h2>Performance Trend</h2>
   ${renderHandicapTrendChart(data.sprintTrend, metaphor)}
 
+  <h2>Velocity</h2>
+  ${renderVelocityChart(data.velocity)}
+
+  <h2>Handicap Time Series</h2>
+  ${renderTrendTimeSeriesChart(data.handicapTrend)}
+
   <h2>${escapeHtml(sprintLabel)} Timeline</h2>
   ${renderSprintTimeline(data.sprintTrend, metaphor)}
 
@@ -487,6 +498,8 @@ export function generateDashboardHtml(
   <h2>Approach Performance</h2>
   ${renderAreaPerformanceChart(data.areaPerformance, metaphor)}
   ${renderAreaHazardOverlay(hazards, metaphor)}
+
+  ${guardMetrics ? `<h2>Guard Effectiveness</h2>\n  ${renderGuardEffectivenessChart(guardMetrics)}` : ''}
 
   <h2>${escapeHtml(nutritionHeading)}</h2>
   ${renderNutritionChart(data.nutritionTrends, metaphor)}

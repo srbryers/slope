@@ -1,5 +1,7 @@
 import { createServer } from 'node:http';
 import { exec } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { loadConfig } from '../config.js';
 import {
   loadScorecards,
@@ -10,6 +12,7 @@ import {
   DEFAULT_DASHBOARD_CONFIG,
   buildLeaderboard,
   filterScorecardsByPlayer,
+  computeGuardMetrics,
 } from '../../core/index.js';
 import type { SlopeConfig, DashboardConfig } from '../../core/index.js';
 
@@ -34,6 +37,16 @@ export function resolveDashboardConfig(args: string[], config: SlopeConfig): Das
   if (refreshArg) defaults.refreshInterval = parseInt(refreshArg.slice('--refresh='.length), 10);
 
   return defaults;
+}
+
+function loadGuardMetricsLines(cwd: string): string[] | null {
+  const metricsPath = join(cwd, '.slope', 'guard-metrics.jsonl');
+  if (!existsSync(metricsPath)) return null;
+  try {
+    return readFileSync(metricsPath, 'utf8').split('\n');
+  } catch {
+    return null;
+  }
 }
 
 function openBrowser(url: string): void {
@@ -75,9 +88,21 @@ export async function dashboardCommand(args: string[]): Promise<void> {
         const allScorecards = loadScorecards(config, cwd);
         const scorecards = playerFilter ? filterScorecardsByPlayer(allScorecards, playerFilter) : allScorecards;
         const data = buildReportData(scorecards);
-        const html = generateDashboardHtml(data, metaphor, dashConfig);
+        const guardLines = loadGuardMetricsLines(cwd);
+        const guardReport = guardLines ? computeGuardMetrics(guardLines) : undefined;
+        const html = generateDashboardHtml(data, metaphor, dashConfig, guardReport);
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         res.end(html);
+      } else if (pathname === '/api/guard-metrics' && req.method === 'GET') {
+        const guardLines = loadGuardMetricsLines(cwd);
+        if (!guardLines) {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'No guard metrics file found' }));
+          return;
+        }
+        const guardReport = computeGuardMetrics(guardLines);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(guardReport));
       } else if (pathname === '/api/data' && req.method === 'GET') {
         const allScorecards = loadScorecards(config, cwd);
         const scorecards = playerFilter ? filterScorecardsByPlayer(allScorecards, playerFilter) : allScorecards;
@@ -158,10 +183,11 @@ Usage:
   slope dashboard --player=alice     Filter dashboard to a single player
 
 Routes:
-  /                  Dashboard HTML page
-  /api/data          Report data as JSON
-  /api/sprint/:n     Single sprint scorecard (JSON or ?html=1)
-  /api/leaderboard   Team leaderboard (JSON)
+  /                    Dashboard HTML page
+  /api/data            Report data as JSON (includes handicapTrend + velocity)
+  /api/sprint/:n       Single sprint scorecard (JSON or ?html=1)
+  /api/leaderboard     Team leaderboard (JSON)
+  /api/guard-metrics   Guard effectiveness report (JSON)
 
 Examples:
   slope dashboard

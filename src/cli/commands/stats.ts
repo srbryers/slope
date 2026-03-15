@@ -7,11 +7,13 @@ import {
   loadScorecards,
   computeHandicapCard,
   computeScoreLabel,
+  computeHandicapTrend,
+  computeVelocity,
   listMetaphors,
   GUARD_DEFINITIONS,
   loadConfig,
 } from '../../core/index.js';
-import type { GolfScorecard, RollingStats as CoreRollingStats } from '../../core/index.js';
+import type { GolfScorecard, RollingStats as CoreRollingStats, TrendPoint, VelocityReport } from '../../core/index.js';
 import { CLI_COMMAND_REGISTRY } from '../registry.js';
 
 // Ensure metaphors are registered before counting
@@ -70,6 +72,8 @@ interface SlopeStats {
   phase_status: Record<string, string>;
   latest_scorecard: LatestScorecard | null;
   handicap_milestones: HandicapMilestone[];
+  handicap_trend: TrendPoint[];
+  velocity: VelocityReport;
 }
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -187,6 +191,8 @@ export function computeSlopeStats(cwd: string = process.cwd()): SlopeStats {
     phase_status: {},
     latest_scorecard: latest ? toLatestScorecard(latest) : null,
     handicap_milestones: computeMilestones(scorecards),
+    handicap_trend: computeHandicapTrend(scorecards),
+    velocity: computeVelocity(scorecards),
   };
 }
 
