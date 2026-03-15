@@ -179,8 +179,8 @@ function generateApiSurface(cwd: string): string {
       if (names.length === 0) continue;
 
       if (isType) {
-        // Type exports stay as comma-separated name-only lists
-        lines.push(`- ${names.map(n => `\`${n}\``).join(', ')} (types)`);
+        // Skip type-only exports — discoverable via search({ module: 'types' })
+        continue;
       } else {
         // Function exports: one per line with signature from registry
         for (const name of names) {
@@ -195,8 +195,21 @@ function generateApiSurface(cwd: string): string {
     }
   }
 
+  // Remove empty section headers (headers followed by another header or end)
+  const filtered: string[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].startsWith('**') && lines[i].endsWith(':**')) {
+      // Check if next non-empty line is also a header or end of list
+      const next = lines.slice(i + 1).find(l => l.length > 0);
+      if (!next || (next.startsWith('**') && next.endsWith(':**'))) {
+        continue; // Skip empty section header
+      }
+    }
+    filtered.push(lines[i]);
+  }
+
   // Token budget guard: warn if API surface section is too large
-  const output = lines.join('\n');
+  const output = filtered.join('\n');
   if (output.length > 15000) {
     console.warn(`Warning: API surface section is ${output.length} chars (~${Math.round(output.length / 4)} tokens) — consider trimming.`);
   }
