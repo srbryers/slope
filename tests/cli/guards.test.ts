@@ -65,7 +65,7 @@ describe('exploreGuard', () => {
 
     const result = await exploreGuard(makeInput(), tmpDir);
     expect(result.context).toContain('CODEBASE.md');
-    expect(result.context).toContain("search({ module: 'map' })");
+    expect(result.context).toContain('L1');
   });
 
   it('suggests checking index when .slope/index.json exists', async () => {
@@ -83,7 +83,7 @@ describe('exploreGuard', () => {
 
     const result = await exploreGuard(makeInput(), tmpDir);
     expect(result.context).toContain('CODEBASE.md');
-    expect(result.context).toContain("search({ module: 'map' })");
+    expect(result.context).toContain('L1');
   });
 
   it('falls back to listing index files when no CODEBASE.md', async () => {

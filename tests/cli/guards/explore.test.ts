@@ -122,6 +122,7 @@ describe('explore guard — tiered staleness', () => {
     writeCodebaseMap('abc123');
     const result = await exploreGuard(makeInput('Read'), tmpDir);
     expect(result.context).toContain('k tokens');
+    expect(result.context).toContain('L1');
     expect(result.context).not.toContain('stale');
   });
 

@@ -4,7 +4,7 @@
 
 export interface FunctionRegistryEntry {
   name: string;
-  module: 'core' | 'fs' | 'constants' | 'store' | 'flows' | 'init' | 'testing';
+  module: 'core' | 'fs' | 'constants' | 'store' | 'flows' | 'inspirations' | 'init' | 'testing';
   description: string;
   signature: string;
   example: string;
@@ -779,6 +779,45 @@ export const SLOPE_REGISTRY: FunctionRegistryEntry[] = [
     description: 'Validates a VisionDocument, returning an array of error strings.',
     signature: 'validateVision(vision: unknown): string[]',
     example: 'return validateVision({ purpose: "", priorities: [] });',
+  },
+
+  // ─── Inspirations ───
+  {
+    name: 'loadInspirations',
+    module: 'inspirations',
+    description: 'Load and parse .slope/inspirations.json. Returns null if file does not exist.',
+    signature: 'loadInspirations(path?: string): InspirationsFile | null',
+    example: 'const config = loadConfig(); return loadInspirations(config.inspirationsPath);',
+  },
+  {
+    name: 'linkInspirationToSprint',
+    module: 'inspirations',
+    description: 'Link an inspiration entry to a sprint number. Idempotent — no error if already linked. Writes to disk.',
+    signature: 'linkInspirationToSprint(path: string, id: string, sprint: number): InspirationsFile',
+    example: 'return linkInspirationToSprint(".slope/inspirations.json", "gitnexus", 65);',
+  },
+  {
+    name: 'deriveId',
+    module: 'inspirations',
+    description: 'Derive a kebab-case ID from a project name for use as an inspiration ID.',
+    signature: 'deriveId(projectName: string): string',
+    example: 'return deriveId("GitNexus"); // → "gitnexus"',
+  },
+
+  // ─── Imports (Blast Radius) ───
+  {
+    name: 'buildImportGraph',
+    module: 'core',
+    description: 'Walk all .ts files and build import dependency graph. Skips node_modules, dist, .slope.',
+    signature: 'buildImportGraph(rootDir: string): Map<string, string[]>',
+    example: 'return buildImportGraph(".");',
+  },
+  {
+    name: 'blastRadius',
+    module: 'core',
+    description: 'Compute transitive dependents of a file via BFS on inverted import graph. Returns sorted file paths.',
+    signature: 'blastRadius(graph: Map<string, string[]>, targetFile: string): string[]',
+    example: 'const g = buildImportGraph("."); return blastRadius(g, "src/core/config.ts");',
   },
 
   // ─── Custom Metaphor ───

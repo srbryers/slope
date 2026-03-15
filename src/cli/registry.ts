@@ -311,6 +311,24 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     ],
   },
   {
+    cmd: 'inspirations', desc: 'Track external OSS inspiration sources', category: 'tooling',
+    subcommands: [
+      { name: 'add', desc: 'Add an inspiration source', flags: [
+        { flag: '--url=<url>', desc: 'Source URL (required)' },
+        { flag: '--project=<name>', desc: 'Project name (required)' },
+        { flag: '--idea="<text>"', desc: 'Idea extracted (repeatable, required)' },
+        { flag: '--id=<id>', desc: 'Override auto-derived ID' },
+      ]},
+      { name: 'list', desc: 'List tracked inspirations', flags: [
+        { flag: '--status=<status>', desc: 'Filter by status (backlogged, planned, implemented, rejected)' },
+      ]},
+      { name: 'link', desc: 'Link inspiration to a sprint', flags: [
+        { flag: '--id=<id>', desc: 'Inspiration ID (required)' },
+        { flag: '--sprint=<N>', desc: 'Sprint number (required)' },
+      ]},
+    ],
+  },
+  {
     cmd: 'metaphor', desc: 'Manage metaphor display themes', category: 'tooling',
     subcommands: [
       { name: 'list', desc: 'Show all available metaphors' },

@@ -464,6 +464,28 @@ export type {
   FlowStalenessResult,
 } from './flows.js';
 
+// Inspirations
+export {
+  parseInspirations,
+  validateInspirations,
+  loadInspirations,
+  linkInspirationToSprint,
+  deriveId,
+} from './inspirations.js';
+export type {
+  InspirationStatus,
+  InspirationEntry,
+  InspirationsFile,
+  InspirationValidationResult,
+} from './inspirations.js';
+
+// Imports (blast radius)
+export {
+  parseImports,
+  buildImportGraph,
+  blastRadius,
+} from './imports.js';
+
 // Interview (Init)
 export {
   validateInitInput,

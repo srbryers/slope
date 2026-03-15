@@ -13,6 +13,7 @@ export interface SlopeConfig {
   claimsPath: string;
   roadmapPath: string;
   flowsPath: string;
+  inspirationsPath: string;
   visionPath: string;
   repoProfilePath: string;
   transcriptsPath: string;
@@ -88,6 +89,7 @@ const DEFAULT_CONFIG: SlopeConfig = {
   claimsPath: '.slope/claims.json',
   roadmapPath: 'docs/backlog/roadmap.json',
   flowsPath: '.slope/flows.json',
+  inspirationsPath: '.slope/inspirations.json',
   visionPath: '.slope/vision.json',
   repoProfilePath: '.slope/repo-profile.json',
   transcriptsPath: '.slope/transcripts',
