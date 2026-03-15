@@ -139,6 +139,12 @@ The original shell script runners are deprecated but available as fallback:
 
 **Note:** Use `slope loop` CLI commands instead of shell scripts. Shell scripts are maintained for backward compatibility but are not the primary interface.
 
+## Release Process
+- Policy: `.claude/rules/release-policy.md` — version tier definitions, pre-release checklist, slope-web content rules
+- Never `npm publish` directly — use `gh release create` for trusted publishing via GitHub Actions
+- `slope version recommend` — analyze unreleased commits and get a tier recommendation
+- `slope version bump [--patch|--major]` → wait for CI → `gh release create vX.Y.Z --target main --generate-notes`
+
 ## Key Files
 - `.slope/config.json` — SLOPE configuration (includes `metaphor` field)
 - `.slope/slope.db` — SQLite store (sessions, claims, scorecards, common issues, events)
