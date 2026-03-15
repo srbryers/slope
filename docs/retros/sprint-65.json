@@ -1,0 +1,70 @@
+{
+  "sprint_number": 65,
+  "theme": "The Inspiration Engine",
+  "par": 4,
+  "slope": 2,
+  "score": 3,
+  "score_label": "birdie",
+  "date": "2026-03-15",
+  "type": "feature",
+  "inspired_by": ["gitnexus", "openviking", "mirofish"],
+  "shots": [
+    {
+      "ticket_key": "S65-1",
+      "title": "Inspiration registry — .slope/inspirations.json with CLI commands",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Core: parseInspirations, validateInspirations, loadInspirations, linkInspirationToSprint, deriveId. CLI: add/list/link subcommands. Builder passthrough with conditional spread. MCP registry entries. 20 tests."
+    },
+    {
+      "ticket_key": "S65-2",
+      "title": "Formalize context tiers (L0/L1/L1.5/L2) in docs and explore guard",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Enhanced explore guard advisory with tier vocabulary. Updated CLAUDE.md and codebase-context.md with tier table. Two test files updated for new message."
+    },
+    {
+      "ticket_key": "S65-3",
+      "title": "Import-graph blast radius — parseImports, buildImportGraph, blastRadius",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Regex-based TS import parsing with .js→.ts ESM resolution. BFS with visited set for circular imports. Skips node_modules/dist/.slope. MCP-only. 19 tests."
+    }
+  ],
+  "conditions": [],
+  "special_plays": [],
+  "stats": {
+    "fairways_hit": 3,
+    "fairways_total": 3,
+    "greens_in_regulation": 3,
+    "greens_total": 3,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": { "long": 0, "short": 0, "left": 0, "right": 0 }
+  },
+  "training": [],
+  "nutrition": [
+    { "category": "hydration", "description": "Test coverage strong — 48 new tests, all passing", "status": "healthy" },
+    { "category": "diet", "description": "Clean build, typecheck, zero regressions in 2695 tests", "status": "healthy" }
+  ],
+  "yardage_book_updates": [
+    "buildScorecard uses explicit property construction — must add conditional spread for new optional fields",
+    "Explore guard advisory text is tested in two separate test files (guards.test.ts and guards/explore.test.ts)"
+  ],
+  "bunker_locations": [],
+  "course_management_notes": [
+    "All three tickets independent — no ordering constraints. Shared files touched non-overlapping sections.",
+    "flows.ts pattern is an effective template for new file-based registries (inspirations followed it exactly)"
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Clean sprint — all three tickets landed without hazards. The flows.ts pattern made S65-1 straightforward.",
+    "advice_for_next_player": "When adding optional fields to GolfScorecard, remember buildScorecard uses explicit construction — conditional spread required.",
+    "what_surprised_you": "Import graph parsing via regex worked better than expected — handles all SLOPE barrel patterns including star re-exports.",
+    "excited_about_next": "blastRadius can now inform scope analysis for tickets — potential guard integration in future sprints."
+  }
+}
