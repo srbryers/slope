@@ -1,10 +1,10 @@
 ---
-generated_at: "2026-03-15T03:45:11.510Z"
-git_sha: "134edd90ec3f345793709dbe36cece8f459cfdbe"
-sprint: 64
-source_files: 195
-test_files: 152
-cli_commands: 45
+generated_at: "2026-03-15T15:28:52.941Z"
+git_sha: "8e7e8560b63a6b8a11b3d5d1ca30da886adb647a"
+sprint: 65
+source_files: 198
+test_files: 154
+cli_commands: 46
 guards: 22
 flows: 0
 ---
@@ -18,7 +18,7 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
 <!-- AUTO-GENERATED: START packages -->
 
 ### `src/cli`
-- Source files: 98 | Test files: 65
+- Source files: 99 | Test files: 65
 - Key modules:
   - `config`
   - `hooks-config`
@@ -31,7 +31,7 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
   - `template-generator` — SLOPE Template Generator
 
 ### `src/core`
-- Source files: 85 | Test files: 76
+- Source files: 87 | Test files: 78
 - Key modules:
   - `advisor` — --- Module-private constants ---
   - `briefing` — --- Input types ---
@@ -48,7 +48,7 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
   - `embedding-store` — SLOPE — EmbeddingStore Interface
   - `embedding` — SLOPE — Embedding Types & Chunking Logic (pure — no HTTP calls)
   - `enrich` — SLOPE — Backlog Enrichment
-  - ... and 38 more
+  - ... and 40 more
 
 ### `src/mcp`
 - Source files: 3 | Test files: 6
@@ -284,6 +284,16 @@ Re-exports from `src/core/index.ts`:
 - `validateFlows(flows: FlowsFile, cwd: string): { errors: string[], warnings: string[] }`
 - `checkFlowStaleness(flow: FlowDefinition, currentSha: string, cwd: string): { stale: boolean, changedFiles: string[] }`
 - `loadFlows(flowsPath: string): FlowsFile | null`
+**Inspirations:**
+- `parseInspirations`
+- `validateInspirations`
+- `loadInspirations(inspirationsPath: string): InspirationsFile | null`
+- `linkInspirationToSprint(path: string, id: string, sprint: number): InspirationsFile`
+- `deriveId(projectName: string): string`
+**Imports (blast radius):**
+- `parseImports`
+- `buildImportGraph(rootDir: string): Map<string, string[]>`
+- `blastRadius(graph: Map<string, string[]>, targetFile: string): string[]`
 **Interview (Init):**
 - `validateInitInput`
 - `initFromInterview`
@@ -435,6 +445,7 @@ Re-exports from `src/core/index.ts`:
 - `slope distill` — Promote event patterns to common issues
 - `slope map` — Generate/update codebase map
 - `slope flows` — Manage user flow definitions
+- `slope inspirations` — Track external OSS inspiration sources
 - `slope metaphor` — Manage metaphor display themes
 - `slope plugin` — Manage custom plugins
 - `slope store` — Store diagnostics and management
@@ -508,13 +519,13 @@ Re-exports from `src/core/index.ts`:
 | Directory | Test Files | Command |
 |-----------|-----------|---------|
 | tests/cli | 65 | `pnpm test` |
-| tests/core | 76 | `pnpm test` |
+| tests/core | 78 | `pnpm test` |
 | tests/mcp | 6 | `pnpm test` |
 | tests/store | 1 | `pnpm test` |
 | tests/store-pg | 2 | `pnpm test` |
 | tests/tokens | 1 | `pnpm test` |
 
-**Total test files:** 151
+**Total test files:** 153
 **Run all:** `pnpm -r test`
 **Typecheck:** `pnpm -r typecheck`
 <!-- AUTO-GENERATED: END tests -->
@@ -525,11 +536,11 @@ Re-exports from `src/core/index.ts`:
 
 | Sprint | Theme | Tickets | Score |
 |--------|-------|---------|-------|
-| **60** | Compaction-proof review gates + worktree-merge guard | 5 | par |
 | **61** | The Terminal Caddy — OB1 Adapter | 3 | birdie |
 | **62** | The Welcome Mat v2 + Templates — Streamlined First-Run Experience & Sprint/Ticket Templates | 5 | par |
 | **63** | The Handbook + Template Integration — CLI Help & Documentation Polish | 6 | eagle |
 | **64** | Claim Hygiene, Worktree Safety & Loop Planner Context | 5 | par |
+| **65** | The Inspiration Engine | 3 | bogey |
 <!-- AUTO-GENERATED: END history -->
 
 ## Known Gotchas
@@ -538,4 +549,12 @@ Top recurring patterns from common-issues:
 
 <!-- AUTO-GENERATED: START gotchas -->
 
+- **Review-discovered hazards inflate scores** (process, 5 sprints): Every hazard since S43 was found by post-hole review, never during coding. S49: all 3 hazards in autonomous sprint caught by manual code review. The review gate works but is a trailing indicator.
+- **API shape assumptions** (types, 3 sprints): Assuming property names or structure of internal APIs without reading the definition. #1 hazard source across S39-S44.
+- **Shell script boundary values** (shell, 2 sprints): Shell arithmetic comparisons (-lt vs -le, -gt vs -ge) are error-prone. S48: -lt 500 excluded exactly 500 lines. S45: multiple shell hazards.
+- **process.exit() inside try/finally skips cleanup** (control-flow, 2 sprints): process.exit(1) inside a try block with finally { db.close() } — exit runs before finally in Node.js. S46: original store.ts hazard. S49: autonomous agent repeated the same pattern in restore validation.
+- **Threshold/constant consistency across consumers** (calibration, 1 sprint): Changing a default value (e.g. minScore) in one consumer but not all consumers of the same pipeline. S48: context.ts threshold updated to 0.4 but enrich.ts still used 0.55.
+- **AI-generated code duplicates existing abstractions** (autonomous, 1 sprint): Autonomous agents (Aider/Sonnet) may reimplement logic that already exists elsewhere in the file. S49: validateSubcommand duplicated loadRoadmapFile's file-loading and error handling instead of extracting a shared helper.
+- **Compaction drops pending protocol gates** (process, 1 sprint): Advisory guard output (context messages) is lost on compaction. If the agent hasn't acted on the guidance before compaction, the obligation disappears. Post-compaction 'continue without asking' instructions compound the problem by discouraging the agent from re-checking.
+- **gh pr merge --delete-branch fails in worktrees** (git, 1 sprint): gh pr merge --delete-branch succeeds at merging but exits 1 because local branch cleanup tries to switch to main, which is held by the parent worktree. Agent sees error, retries, gets 'already merged'. Hit at least 4 times before S60.
 <!-- AUTO-GENERATED: END gotchas -->
