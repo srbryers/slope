@@ -719,5 +719,19 @@ export type {
   DeferredStatus,
 } from './deferred.js';
 
+// Analytics
+export {
+  computeHandicapTrend,
+  computeVelocity,
+  computeGuardMetrics,
+} from './analytics.js';
+export type {
+  TrendPoint,
+  VelocityPoint,
+  VelocityReport,
+  GuardMetrics,
+  GuardEffectivenessReport,
+} from './analytics.js';
+
 // Built-in metaphors (auto-registers on import)
 export { golf, tennis, baseball, gaming, dnd, matrix, agile } from './metaphors/index.js';

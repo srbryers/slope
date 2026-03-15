@@ -8,8 +8,10 @@ import type {
   NutritionEntry,
 } from './types.js';
 import type { MetaphorDefinition } from './metaphor.js';
+import type { TrendPoint, VelocityReport } from './analytics.js';
 import { computeHandicapCard } from './handicap.js';
 import { computeDispersion, computeAreaPerformance } from './dispersion.js';
+import { computeHandicapTrend, computeVelocity } from './analytics.js';
 import { normalizeStats } from './builder.js';
 import {
   background, text as textColor, border, status, chart, semantic,
@@ -27,6 +29,8 @@ export interface ReportData {
   areaPerformance: AreaReport;
   nutritionTrends: NutritionTrendEntry[];
   sprintTrend: SprintTrendEntry[];
+  handicapTrend: TrendPoint[];
+  velocity: VelocityReport;
 }
 
 export interface SprintTrendEntry {
@@ -95,6 +99,9 @@ export function buildReportData(scorecards: GolfScorecard[]): ReportData {
     .filter(([, v]) => v.total > 0)
     .map(([cat, v]) => ({ category: cat as NutritionCategory, ...v }));
 
+  const handicapTrend = computeHandicapTrend(sorted);
+  const velocity = computeVelocity(sorted);
+
   return {
     generatedAt: new Date().toISOString(),
     sprintCount: sorted.length,
@@ -104,6 +111,8 @@ export function buildReportData(scorecards: GolfScorecard[]): ReportData {
     areaPerformance,
     nutritionTrends,
     sprintTrend,
+    handicapTrend,
+    velocity,
   };
 }
 
