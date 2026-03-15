@@ -38,6 +38,15 @@ The SLOPE MCP server is configured in `.mcp.json` (local build).
 
 Requires `pnpm -r build` before first use.
 
+## Context Tiers
+SLOPE formalizes context loading into tiers to minimize token usage:
+- **L0** — CODEBASE.md headers (~2k tokens): package ownership, feature areas
+- **L1** — Full CODEBASE.md (~5k tokens): function signatures, CLI commands, guards
+- **L1.5** — `context_search` / `search({ module: 'map', query })` (~3k tokens): targeted code questions
+- **L2** — Full file reads via `Read` (unbounded): implementation detail, debugging
+
+Prefer the lowest tier that answers your question. See `.claude/rules/codebase-context.md` for details.
+
 ## Sprint Workflow
 This repo uses SLOPE to score its own sprints:
 - Scorecards: `docs/retros/sprint-N.json`
@@ -129,6 +138,12 @@ The original shell script runners are deprecated but available as fallback:
 - `slope-loop/parallel.sh` — parallel runner with module overlap detection (legacy)
 
 **Note:** Use `slope loop` CLI commands instead of shell scripts. Shell scripts are maintained for backward compatibility but are not the primary interface.
+
+## Release Process
+- Policy: `.claude/rules/release-policy.md` — version tier definitions, pre-release checklist, slope-web content rules
+- Never `npm publish` directly — use `gh release create` for trusted publishing via GitHub Actions
+- `slope version recommend` — analyze unreleased commits and get a tier recommendation
+- `slope version bump [--patch|--major]` → wait for CI → `gh release create vX.Y.Z --target main --generate-notes`
 
 ## Key Files
 - `.slope/config.json` — SLOPE configuration (includes `metaphor` field)

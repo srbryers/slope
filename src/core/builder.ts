@@ -172,6 +172,9 @@ export interface ScorecardInput {
 
   // Multi-agent (swarm) sprints
   agents?: AgentBreakdown[];
+
+  // Inspiration tracking
+  inspired_by?: string[];
 }
 
 /**
@@ -216,6 +219,7 @@ export function buildScorecard(input: ScorecardInput): GolfScorecard {
     yardage_book_updates: input.yardage_book_updates ?? [],
     course_management_notes: input.course_management_notes ?? [],
     ...(input.agents ? { agents: input.agents } : {}),
+    ...(input.inspired_by ? { inspired_by: input.inspired_by } : {}),
   };
 }
 

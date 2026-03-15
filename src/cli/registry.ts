@@ -56,9 +56,12 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     cmd: 'version', desc: 'Show version or bump with automated PR workflow', category: 'lifecycle',
     subcommands: [
       { name: 'bump', desc: 'Bump version with automated PR workflow', flags: [
-        { flag: '<version>', desc: 'Version to bump to (e.g. 1.25.0)' },
+        { flag: '<version>', desc: 'Explicit version (e.g. 1.28.0)' },
+        { flag: '--patch', desc: 'Patch bump (x.y.Z+1) — bug fixes only' },
+        { flag: '--major', desc: 'Major bump (X+1.0.0) — breaking changes' },
         { flag: '--dry-run', desc: 'Preview changes without committing' },
       ]},
+      { name: 'recommend', desc: 'Analyze commits and recommend version tier' },
     ],
   },
   {
@@ -308,6 +311,24 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
       { name: 'init', desc: 'Create .slope/flows.json with example template' },
       { name: 'list', desc: 'List all flows with staleness indicators' },
       { name: 'check', desc: 'Validate all flows (file existence, staleness); exit 1 if stale' },
+    ],
+  },
+  {
+    cmd: 'inspirations', desc: 'Track external OSS inspiration sources', category: 'tooling',
+    subcommands: [
+      { name: 'add', desc: 'Add an inspiration source', flags: [
+        { flag: '--url=<url>', desc: 'Source URL (required)' },
+        { flag: '--project=<name>', desc: 'Project name (required)' },
+        { flag: '--idea="<text>"', desc: 'Idea extracted (repeatable, required)' },
+        { flag: '--id=<id>', desc: 'Override auto-derived ID' },
+      ]},
+      { name: 'list', desc: 'List tracked inspirations', flags: [
+        { flag: '--status=<status>', desc: 'Filter by status (backlogged, planned, implemented, rejected)' },
+      ]},
+      { name: 'link', desc: 'Link inspiration to a sprint', flags: [
+        { flag: '--id=<id>', desc: 'Inspiration ID (required)' },
+        { flag: '--sprint=<N>', desc: 'Sprint number (required)' },
+      ]},
     ],
   },
   {

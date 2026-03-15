@@ -65,7 +65,7 @@ export async function exploreGuard(input: HookInput, cwd: string): Promise<Guard
     const approxTokens = Math.round(content.length / 4 / 1000);
 
     return {
-      context: `SLOPE: Codebase map at CODEBASE.md (~${approxTokens}k tokens). Read it or use search({ module: 'map' }) before exploring.`,
+      context: `SLOPE: Codebase map at CODEBASE.md (~${approxTokens}k tokens, L1). Try \`context_search\` (L1.5) before reading full files (L2).`,
     };
   }
 

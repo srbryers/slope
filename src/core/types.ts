@@ -148,6 +148,8 @@ export interface GolfScorecard extends HoleScore {
   nineteenth_hole?: NineteenthHole;
   /** Per-agent breakdowns for multi-agent (swarm) sprints */
   agents?: AgentBreakdown[];
+  /** External inspiration sources that influenced this sprint */
+  inspired_by?: string[];
 }
 
 // --- Handicap Types ---

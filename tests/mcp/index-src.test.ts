@@ -646,6 +646,7 @@ describe('context_search', () => {
       claimsPath: '.slope/claims.json',
       roadmapPath: 'docs/backlog/roadmap.json',
       flowsPath: '.slope/flows.json',
+      inspirationsPath: '.slope/inspirations.json',
       visionPath: '.slope/vision.json',
       repoProfilePath: '.slope/repo-profile.json',
       transcriptsPath: '.slope/transcripts',

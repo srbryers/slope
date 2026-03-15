@@ -42,6 +42,7 @@ import { pluginCommand } from './commands/plugin.js';
 import { dashboardCommand } from './commands/dashboard.js';
 import { mapCommand } from './commands/map.js';
 import { flowsCommand } from './commands/flows.js';
+import { inspirationsCommand } from './commands/inspirations.js';
 import { reviewStateCommand } from './commands/review-state.js';
 import { analyzeCommand } from './commands/analyze.js';
 import { visionCommand } from './commands/vision.js';
@@ -257,6 +258,12 @@ switch (subcommand) {
       process.exit(1);
     });
     break;
+  case 'inspirations':
+    inspirationsCommand(process.argv.slice(3)).catch(err => {
+      console.error('Error:', err.message);
+      process.exit(1);
+    });
+    break;
   case 'analyze':
     analyzeCommand(process.argv.slice(3)).catch(err => {
       console.error('Error:', err.message);
@@ -415,6 +422,7 @@ Usage:
   slope roadmap validate|review|status|show  Strategic planning tools
   slope map [--check] [--output=<path>]     Generate/update codebase map
   slope flows init|list|check               Manage user flow definitions
+  slope inspirations add|list|link          Track external OSS inspiration sources
   slope analyze [--json] [--analyzers=...]  Scan repo and generate profile
   slope vision [--json]                     Display project vision document
   slope store status [--json]                Store diagnostics (type, schema, stats)
