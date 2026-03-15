@@ -626,6 +626,13 @@ export const SLOPE_REGISTRY: FunctionRegistryEntry[] = [
     signature: 'store_status(): StoreHealthResult',
     example: '// Called via MCP tool, not directly',
   },
+  {
+    name: 'context_search',
+    module: 'store',
+    description: 'MCP tool: Semantic code search — returns relevant snippets instead of full files. Falls back to grep when no embedding index exists.',
+    signature: 'context_search(query: string, top?: number, format?: "paths" | "snippets"): { text: string }',
+    example: '// Called via MCP tool: context_search({ query: "guard system" })',
+  },
 
   // ─── Transcript ───
   {
@@ -1046,6 +1053,16 @@ export const MCP_TOOL_REGISTRY: readonly McpToolMeta[] = [
     desc: 'Run JavaScript in a sandboxed node:vm with the full SLOPE API pre-injected',
     params: [
       { name: 'code', type: 'string', desc: 'JavaScript code to execute (must return a value)', required: true },
+    ],
+    requiresStore: false,
+  },
+  {
+    name: 'context_search',
+    desc: 'Semantic code search — returns relevant snippets instead of full files. Falls back to grep without embedding index.',
+    params: [
+      { name: 'query', type: 'string', desc: 'Natural language query or code concept to search for', required: true },
+      { name: 'top', type: 'number', desc: 'Max results (default: 5)' },
+      { name: 'format', type: 'string', desc: 'Output format: paths, snippets, or full (default: snippets)' },
     ],
     requiresStore: false,
   },
