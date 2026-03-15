@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { mkdtempSync, readFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { ClaudeCodeAdapter } from '../../../src/core/adapters/claude-code.js';
@@ -160,6 +160,66 @@ describe('ClaudeCodeAdapter', () => {
 
       // Should be identical
       expect(second).toEqual(first);
+    });
+
+    it('removes stale SLOPE hook entries with outdated matchers on re-install', () => {
+      const tmpDir = mkdtempSync(join(tmpdir(), 'slope-cc-stale-'));
+      const settingsPath = join(tmpDir, '.claude', 'settings.json');
+
+      // Simulate a stale install with matcher "Task" instead of "Agent"
+      mkdirSync(join(tmpDir, '.claude', 'hooks'), { recursive: true });
+      writeFileSync(settingsPath, JSON.stringify({
+        hooks: {
+          PreToolUse: [
+            {
+              matcher: 'Task',
+              hooks: [{ type: 'command', command: '"$CLAUDE_PROJECT_DIR"/.claude/hooks/slope-guard.sh subagent-gate', timeout: 10 }],
+            },
+          ],
+        },
+      }));
+
+      // Re-install with current guard definitions
+      adapter.installGuards(tmpDir, GUARD_DEFINITIONS);
+      const result = JSON.parse(readFileSync(settingsPath, 'utf8'));
+
+      // The stale "Task" matcher entry should be gone
+      const preToolEntries = result.hooks.PreToolUse as Array<{ matcher?: string; hooks: unknown[] }>;
+      const taskEntries = preToolEntries.filter(e => e.matcher === 'Task');
+      expect(taskEntries).toHaveLength(0);
+
+      // The correct "Agent" matcher entry should exist
+      const agentEntries = preToolEntries.filter(e => e.matcher === 'Agent');
+      expect(agentEntries.length).toBeGreaterThan(0);
+      const agentHooks = agentEntries[0].hooks as Array<{ command: string }>;
+      expect(agentHooks.some(h => h.command.includes('subagent-gate'))).toBe(true);
+    });
+
+    it('preserves non-SLOPE hooks during re-install', () => {
+      const tmpDir = mkdtempSync(join(tmpdir(), 'slope-cc-preserve-'));
+      const settingsPath = join(tmpDir, '.claude', 'settings.json');
+
+      // Install SLOPE guards first
+      adapter.installGuards(tmpDir, GUARD_DEFINITIONS.slice(0, 2));
+
+      // Manually add a non-SLOPE hook
+      const settings = JSON.parse(readFileSync(settingsPath, 'utf8'));
+      settings.hooks.PreToolUse.push({
+        matcher: 'Bash',
+        hooks: [{ type: 'command', command: 'my-custom-hook.sh', timeout: 5 }],
+      });
+      writeFileSync(settingsPath, JSON.stringify(settings));
+
+      // Re-install SLOPE guards
+      adapter.installGuards(tmpDir, GUARD_DEFINITIONS.slice(0, 4));
+      const result = JSON.parse(readFileSync(settingsPath, 'utf8'));
+
+      // Non-SLOPE hook should be preserved
+      const preToolEntries = result.hooks.PreToolUse as Array<{ matcher?: string; hooks: Array<{ command: string }> }>;
+      const customEntry = preToolEntries.find(e =>
+        e.hooks.some(h => h.command === 'my-custom-hook.sh'),
+      );
+      expect(customEntry).toBeDefined();
     });
   });
 });
