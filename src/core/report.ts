@@ -8,7 +8,7 @@ import type {
   NutritionEntry,
 } from './types.js';
 import type { MetaphorDefinition } from './metaphor.js';
-import type { TrendPoint, VelocityReport } from './analytics.js';
+import type { TrendPoint, VelocityReport, GuardEffectivenessReport } from './analytics.js';
 import { computeHandicapCard } from './handicap.js';
 import { computeDispersion, computeAreaPerformance } from './dispersion.js';
 import { computeHandicapTrend, computeVelocity } from './analytics.js';
@@ -499,6 +499,275 @@ export function generateHtmlReport(data: ReportData, metaphor?: MetaphorDefiniti
   <div class="footer">SLOPE &mdash; Sprint Lifecycle &amp; Operational Performance Engine</div>
 </body>
 </html>`;
+}
+
+// --- T4: Analytics Chart Renderers ---
+
+/**
+ * Multi-line SVG time-series: handicap (primary, left axis), fairway%/GIR% (secondary).
+ */
+export function renderTrendTimeSeriesChart(points: TrendPoint[]): string {
+  if (points.length === 0) return '<p>No trend data available.</p>';
+
+  const W = 600, H = 280, PAD = { top: 30, right: 60, bottom: 40, left: 50 };
+  const plotW = W - PAD.left - PAD.right;
+  const plotH = H - PAD.top - PAD.bottom;
+
+  // Handicap axis (left)
+  const handicaps = points.map(p => p.handicap);
+  const minH = Math.min(...handicaps, -1);
+  const maxH = Math.max(...handicaps, 1);
+  const hRange = Math.max(maxH - minH, 1);
+
+  // Percentage axis (right, 0-100)
+  const scaleX = (i: number) => PAD.left + (i / Math.max(points.length - 1, 1)) * plotW;
+  const scaleHY = (v: number) => PAD.top + plotH - ((v - minH) / hRange) * plotH;
+  const scalePctY = (v: number) => PAD.top + plotH - (v / 100) * plotH;
+
+  const handicapPts = points.map((p, i) => ({ x: scaleX(i), y: scaleHY(p.handicap) }));
+  const fairwayPts = points.map((p, i) => ({ x: scaleX(i), y: scalePctY(p.fairway_pct) }));
+  const girPts = points.map((p, i) => ({ x: scaleX(i), y: scalePctY(p.gir_pct) }));
+
+  // Grid + left axis labels
+  let gridLines = '';
+  for (let v = Math.ceil(minH); v <= Math.floor(maxH); v++) {
+    const y = scaleHY(v);
+    gridLines += `<line x1="${PAD.left}" y1="${y}" x2="${W - PAD.right}" y2="${y}" stroke="${border.default}" stroke-width="0.5"/>`;
+    gridLines += svgText(PAD.left - 8, y + 4, v > 0 ? `+${v}` : `${v}`, { anchor: 'end', size: 10 });
+  }
+
+  // Right axis labels (%)
+  let rightAxis = '';
+  for (let v = 0; v <= 100; v += 25) {
+    const y = scalePctY(v);
+    rightAxis += svgText(W - PAD.right + 8, y + 4, `${v}%`, { anchor: 'start', size: 10, fill: textColor.faint });
+  }
+
+  // X-axis
+  let xLabels = '';
+  const step = Math.max(1, Math.floor(points.length / 12));
+  for (let i = 0; i < points.length; i += step) {
+    xLabels += svgText(scaleX(i), H - PAD.bottom + 16, `S${points[i].sprint}`, { size: 10 });
+  }
+  // Always show last
+  if (points.length > 1 && (points.length - 1) % step !== 0) {
+    xLabels += svgText(scaleX(points.length - 1), H - PAD.bottom + 16, `S${points[points.length - 1].sprint}`, { size: 10 });
+  }
+
+  return `
+  <div class="chart-container">
+    <h3>Handicap Time Series</h3>
+    <svg viewBox="0 0 ${W} ${H}" width="100%">
+      ${gridLines}
+      ${rightAxis}
+      ${svgLine(fairwayPts, W, H, status.green, 1.5)}
+      ${svgLine(girPts, W, H, status.blue, 1.5)}
+      ${svgLine(handicapPts, W, H, chart.atPar, 2.5)}
+      ${xLabels}
+      ${svgText(PAD.left - 8, PAD.top - 10, 'Handicap', { anchor: 'start', size: 10, fill: chart.atPar })}
+      ${svgText(W - PAD.right + 8, PAD.top - 10, '%', { anchor: 'start', size: 10, fill: textColor.faint })}
+    </svg>
+    <div class="legend">
+      <span class="legend-item"><span class="dot" style="background:${chart.atPar}"></span> Handicap</span>
+      <span class="legend-item"><span class="dot green"></span> Fairway %</span>
+      <span class="legend-item"><span class="dot" style="background:${status.blue}"></span> GIR %</span>
+    </div>
+  </div>`;
+}
+
+/**
+ * Bar chart for tickets/sprint + line overlay for differential.
+ * Summary cards row: avg tickets, par accuracy, trend arrow.
+ */
+export function renderVelocityChart(velocity: VelocityReport): string {
+  if (velocity.points.length === 0) return '<p>No velocity data available.</p>';
+
+  const points = velocity.points;
+  const W = 600, H = 250, PAD = { top: 30, right: 30, bottom: 40, left: 50 };
+  const plotW = W - PAD.left - PAD.right;
+  const plotH = H - PAD.top - PAD.bottom;
+
+  const maxTickets = Math.max(...points.map(p => p.tickets), 1);
+  const barGroupW = plotW / points.length;
+  const barW = Math.min(barGroupW * 0.6, 28);
+
+  const scaleX = (i: number) => PAD.left + i * barGroupW + (barGroupW - barW) / 2;
+  const scaleTicketY = (v: number) => PAD.top + plotH - (v / maxTickets) * plotH;
+
+  // Bars
+  let bars = '';
+  for (let i = 0; i < points.length; i++) {
+    const p = points[i];
+    const x = scaleX(i);
+    const h = (p.tickets / maxTickets) * plotH;
+    const y = PAD.top + plotH - h;
+    const color = p.at_or_under_par ? chart.underPar : chart.overPar;
+    bars += svgRect(x, y, barW, h, color);
+    bars += svgText(x + barW / 2, y - 4, `${p.tickets}`, { size: 9, fill: textColor.muted });
+  }
+
+  // Differential line overlay
+  const diffs = points.map(p => p.differential);
+  const minD = Math.min(...diffs, -1);
+  const maxD = Math.max(...diffs, 1);
+  const dRange = Math.max(maxD - minD, 1);
+  const scaleDY = (v: number) => PAD.top + plotH - ((v - minD) / dRange) * plotH;
+  const diffPts = points.map((p, i) => ({
+    x: scaleX(i) + barW / 2,
+    y: scaleDY(p.differential),
+  }));
+  const diffLine = svgLine(diffPts, W, H, status.amber, 2);
+
+  // X-axis labels
+  let xLabels = '';
+  const step = Math.max(1, Math.floor(points.length / 15));
+  for (let i = 0; i < points.length; i += step) {
+    xLabels += svgText(scaleX(i) + barW / 2, H - PAD.bottom + 16, `S${points[i].sprint}`, { size: 10 });
+  }
+
+  // Y-axis
+  let yLabels = '';
+  for (let v = 0; v <= maxTickets; v++) {
+    const y = scaleTicketY(v);
+    yLabels += `<line x1="${PAD.left}" y1="${y}" x2="${W - PAD.right}" y2="${y}" stroke="${border.default}" stroke-width="0.5"/>`;
+    yLabels += svgText(PAD.left - 8, y + 4, `${v}`, { anchor: 'end', size: 10 });
+  }
+
+  const trendArrow = velocity.trend === 'improving' ? '&#x25BC; Improving'
+    : velocity.trend === 'declining' ? '&#x25B2; Declining'
+    : '&#x25CF; Stable';
+  const trendColor = velocity.trend === 'improving' ? status.green
+    : velocity.trend === 'declining' ? status.red
+    : textColor.muted;
+
+  return `
+  <div class="chart-container">
+    <h3>Sprint Velocity</h3>
+    <div class="summary-cards" style="margin-bottom:16px">
+      <div class="card">
+        <div class="card-label">Avg Tickets</div>
+        <div class="card-value">${velocity.avg_tickets}</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Par Accuracy</div>
+        <div class="card-value">${velocity.par_accuracy_pct}%</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Avg Differential</div>
+        <div class="card-value">${velocity.avg_differential > 0 ? '+' : ''}${velocity.avg_differential}</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Trend</div>
+        <div class="card-value" style="color:${trendColor}">${trendArrow}</div>
+      </div>
+    </div>
+    <svg viewBox="0 0 ${W} ${H}" width="100%">
+      ${yLabels}
+      ${bars}
+      ${diffLine}
+      ${xLabels}
+    </svg>
+    <div class="legend">
+      <span class="legend-item"><span class="dot green"></span> At/Under Par</span>
+      <span class="legend-item"><span class="dot red"></span> Over Par</span>
+      <span class="legend-item"><span class="dot" style="background:${status.amber}"></span> Differential</span>
+    </div>
+  </div>`;
+}
+
+/**
+ * Horizontal stacked bars per guard showing decision breakdown.
+ */
+export function renderGuardEffectivenessChart(report: GuardEffectivenessReport): string {
+  const guards = report.by_guard.filter(g => g.total > 0);
+  if (guards.length === 0) return '<p>No guard execution data.</p>';
+
+  const W = 600, H = Math.max(guards.length * 36 + 80, 120);
+  const PAD = { top: 30, right: 100, bottom: 20, left: 160 };
+  const plotW = W - PAD.left - PAD.right;
+  const barH = Math.min((H - PAD.top - PAD.bottom) / guards.length - 6, 24);
+
+  const maxTotal = Math.max(...guards.map(g => g.total));
+
+  let bars = '';
+  for (let i = 0; i < guards.length; i++) {
+    const g = guards[i];
+    const y = PAD.top + i * ((H - PAD.top - PAD.bottom) / guards.length) + ((H - PAD.top - PAD.bottom) / guards.length - barH) / 2;
+
+    // Label
+    bars += svgText(PAD.left - 8, y + barH / 2 + 4, g.guard, { anchor: 'end', size: 11 });
+
+    // Stacked segments
+    const scale = (v: number) => (v / maxTotal) * plotW;
+    let x = PAD.left;
+
+    // allow (green)
+    if (g.allow > 0) {
+      const w = scale(g.allow);
+      bars += svgRect(x, y, w, barH, status.green);
+      x += w;
+    }
+    // context (blue)
+    if (g.context > 0) {
+      const w = scale(g.context);
+      bars += svgRect(x, y, w, barH, status.blue);
+      x += w;
+    }
+    // ask (amber)
+    if (g.ask > 0) {
+      const w = scale(g.ask);
+      bars += svgRect(x, y, w, barH, status.amber);
+      x += w;
+    }
+    // deny (red)
+    if (g.deny > 0) {
+      const w = scale(g.deny);
+      bars += svgRect(x, y, w, barH, status.red);
+      x += w;
+    }
+    // silent (gray)
+    if (g.silent > 0) {
+      const w = scale(g.silent);
+      bars += svgRect(x, y, w, barH, chart.parBar);
+      x += w;
+    }
+
+    // Total count + block rate
+    bars += svgText(x + 8, y + barH / 2 + 4, `${g.total} (${g.block_rate}% block)`, { anchor: 'start', size: 10, fill: textColor.muted });
+  }
+
+  // Summary
+  const summaryHtml = `
+    <div class="summary-cards" style="margin-bottom:16px">
+      <div class="card">
+        <div class="card-label">Total Executions</div>
+        <div class="card-value">${report.total_executions}</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Most Active</div>
+        <div class="card-value" style="font-size:16px">${escapeHtml(report.most_active ?? 'N/A')}</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Most Blocking</div>
+        <div class="card-value" style="font-size:16px">${escapeHtml(report.most_blocking ?? 'N/A')}</div>
+      </div>
+    </div>`;
+
+  return `
+  <div class="chart-container">
+    <h3>Guard Effectiveness</h3>
+    ${summaryHtml}
+    <svg viewBox="0 0 ${W} ${H}" width="100%">
+      ${bars}
+    </svg>
+    <div class="legend">
+      <span class="legend-item"><span class="dot green"></span> Allow</span>
+      <span class="legend-item"><span class="dot" style="background:${status.blue}"></span> Context</span>
+      <span class="legend-item"><span class="dot amber"></span> Ask</span>
+      <span class="legend-item"><span class="dot red"></span> Deny</span>
+      <span class="legend-item"><span class="dot" style="background:${chart.parBar}"></span> Silent</span>
+    </div>
+  </div>`;
 }
 
 export function escapeHtml(s: string): string {

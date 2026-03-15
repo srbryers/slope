@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { computeHandicapTrend, computeVelocity, computeGuardMetrics } from '../../src/core/analytics.js';
+import { renderTrendTimeSeriesChart, renderVelocityChart, renderGuardEffectivenessChart } from '../../src/core/report.js';
 import type { GolfScorecard } from '../../src/core/types.js';
+import type { TrendPoint, VelocityReport, GuardEffectivenessReport } from '../../src/core/analytics.js';
 
 // --- Helpers ---
 
@@ -286,5 +288,91 @@ describe('computeGuardMetrics', () => {
     ];
     const result = computeGuardMetrics(lines);
     expect(result.by_guard[0].block_rate).toBe(25); // 1/4 * 100
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════
+// T4: Dashboard render functions
+// ═══════════════════════════════════════════════════════════════
+
+describe('renderTrendTimeSeriesChart', () => {
+  it('returns fallback for empty data', () => {
+    expect(renderTrendTimeSeriesChart([])).toContain('No trend data');
+  });
+
+  it('renders SVG with data points', () => {
+    const points: TrendPoint[] = [
+      { sprint: 1, handicap: 1, fairway_pct: 75, gir_pct: 50 },
+      { sprint: 2, handicap: 0.5, fairway_pct: 80, gir_pct: 60 },
+    ];
+    const html = renderTrendTimeSeriesChart(points);
+    expect(html).toContain('<svg');
+    expect(html).toContain('Handicap Time Series');
+    expect(html).toContain('polyline');
+    expect(html).toContain('Fairway %');
+    expect(html).toContain('GIR %');
+  });
+});
+
+describe('renderVelocityChart', () => {
+  it('returns fallback for empty velocity', () => {
+    const empty: VelocityReport = {
+      points: [],
+      avg_tickets: 0,
+      par_accuracy_pct: 0,
+      avg_differential: 0,
+      trend: 'stable',
+    };
+    expect(renderVelocityChart(empty)).toContain('No velocity data');
+  });
+
+  it('renders SVG and summary cards', () => {
+    const report: VelocityReport = {
+      points: [
+        { sprint: 1, tickets: 4, par: 4, score: 4, differential: 0, at_or_under_par: true },
+        { sprint: 2, tickets: 3, par: 4, score: 5, differential: 1, at_or_under_par: false },
+      ],
+      avg_tickets: 3.5,
+      par_accuracy_pct: 50,
+      avg_differential: 0.5,
+      trend: 'stable',
+    };
+    const html = renderVelocityChart(report);
+    expect(html).toContain('<svg');
+    expect(html).toContain('Sprint Velocity');
+    expect(html).toContain('Avg Tickets');
+    expect(html).toContain('Par Accuracy');
+    expect(html).toContain('Stable');
+  });
+});
+
+describe('renderGuardEffectivenessChart', () => {
+  it('returns fallback for empty report', () => {
+    const empty: GuardEffectivenessReport = {
+      total_executions: 0,
+      by_guard: [],
+      most_active: null,
+      most_blocking: null,
+    };
+    expect(renderGuardEffectivenessChart(empty)).toContain('No guard execution data');
+  });
+
+  it('renders SVG with guard data', () => {
+    const report: GuardEffectivenessReport = {
+      total_executions: 10,
+      by_guard: [
+        { guard: 'explore', total: 6, allow: 3, deny: 1, ask: 0, context: 2, silent: 0, block_rate: 16.67 },
+        { guard: 'hazard', total: 4, allow: 4, deny: 0, ask: 0, context: 0, silent: 0, block_rate: 0 },
+      ],
+      most_active: 'explore',
+      most_blocking: null,
+    };
+    const html = renderGuardEffectivenessChart(report);
+    expect(html).toContain('<svg');
+    expect(html).toContain('Guard Effectiveness');
+    expect(html).toContain('explore');
+    expect(html).toContain('hazard');
+    expect(html).toContain('Total Executions');
+    expect(html).toContain('Most Active');
   });
 });

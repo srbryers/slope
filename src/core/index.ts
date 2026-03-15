@@ -313,6 +313,9 @@ export {
   renderAreaPerformanceChart,
   renderNutritionChart,
   renderSprintTable,
+  renderTrendTimeSeriesChart,
+  renderVelocityChart,
+  renderGuardEffectivenessChart,
 } from './report.js';
 export type {
   ReportData,
