@@ -95,6 +95,13 @@ describe('computeHandicapTrend', () => {
     expect(result[1].gir_pct).toBe(75);       // 6/8
   });
 
+  it('returns 0 for fairway_pct and gir_pct when totals are 0', () => {
+    const sc = makeScorecard({ sprint_number: 1, par: 4, score: 4 });
+    const result = computeHandicapTrend([sc]);
+    expect(result[0].fairway_pct).toBe(0);
+    expect(result[0].gir_pct).toBe(0);
+  });
+
   it('sorts by sprint_number', () => {
     const scorecards = [
       makeScorecard({ sprint_number: 3, par: 4, score: 4 }),
@@ -169,6 +176,15 @@ describe('computeVelocity', () => {
     }
     const result = computeVelocity(scorecards);
     expect(result.trend).toBe('declining');
+  });
+
+  it('returns stable trend with fewer than 5 scorecards', () => {
+    const scorecards = [
+      makeScorecard({ sprint_number: 1, par: 4, score: 5 }),
+      makeScorecard({ sprint_number: 2, par: 4, score: 3 }),
+    ];
+    const result = computeVelocity(scorecards);
+    expect(result.trend).toBe('stable');
   });
 
   it('marks at_or_under_par correctly', () => {
@@ -269,6 +285,15 @@ describe('computeGuardMetrics', () => {
     const result = computeGuardMetrics(lines);
     // Should parse 2 valid lines (explore + hazard)
     expect(result.total_executions).toBe(2);
+  });
+
+  it('skips lines where guard is non-string', () => {
+    const lines = [
+      JSON.stringify({ ts: '2025-01-01', guard: 123, event: 'PreToolUse', tool: 'X', decision: 'allow' }),
+      JSON.stringify({ ts: '2025-01-01', guard: null, event: 'PreToolUse', tool: 'X', decision: 'allow' }),
+    ];
+    const result = computeGuardMetrics(lines);
+    expect(result.total_executions).toBe(0);
   });
 
   it('treats unknown decisions as silent', () => {

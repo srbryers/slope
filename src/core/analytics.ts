@@ -139,11 +139,14 @@ export interface GuardEffectivenessReport {
   most_blocking: string | null;  // guard with highest block_rate (min 5 executions)
 }
 
+/** Possible decision values in guard metrics JSONL (superset of GuardResult.decision) */
+export type GuardDecision = 'allow' | 'deny' | 'ask' | 'context' | 'silent';
+
 interface GuardMetricLine {
   ts: string;
   guard: string;
   event: string;
-  tool: string;
+  tool?: string;
   decision: string;
 }
 

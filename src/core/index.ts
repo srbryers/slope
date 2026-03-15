@@ -734,6 +734,7 @@ export type {
   VelocityReport,
   GuardMetrics,
   GuardEffectivenessReport,
+  GuardDecision,
 } from './analytics.js';
 
 // Built-in metaphors (auto-registers on import)

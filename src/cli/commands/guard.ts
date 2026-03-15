@@ -512,12 +512,15 @@ function guardRecommendCommand(cwd: string): void {
 function recordGuardExecution(cwd: string, guardName: string, input: HookInput, result: GuardResult): void {
   try {
     const metricsPath = join(cwd, '.slope', 'guard-metrics.jsonl');
+    // Derive decision: explicit decision takes precedence, then infer from result fields.
+    // Note: a guard can return decision='allow' AND context='...' (allow with guidance).
+    // We record the explicit decision when present; 'context' only when there's no decision.
     const decision = result.decision ?? (result.blockReason ? 'deny' : result.context ? 'context' : 'silent');
     const line = JSON.stringify({
       ts: new Date().toISOString(),
       guard: guardName,
       event: input.hook_event_name,
-      tool: input.tool_name,
+      tool: input.tool_name ?? '',
       decision,
     });
     appendFileSync(metricsPath, line + '\n');
