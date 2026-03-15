@@ -128,31 +128,20 @@ export class ClaudeCodeAdapter implements HarnessAdapter {
       } catch { /* start fresh */ }
     }
 
-    // Merge hooks — preserve existing non-SLOPE hooks
+    // Merge hooks — remove stale SLOPE entries, preserve non-SLOPE hooks
     const existingHooks = (settings.hooks ?? {}) as Record<string, unknown[]>;
     for (const [event, entries] of Object.entries(hooksConfig)) {
       if (!existingHooks[event]) {
         existingHooks[event] = [];
       }
+      // Remove all existing SLOPE hook entries for this event (stale matchers, renamed guards)
+      const existing = existingHooks[event] as Array<{ matcher?: string; hooks?: Array<{ command?: string }> }>;
+      existingHooks[event] = existing.filter(e =>
+        !e.hooks?.some(h => h.command?.includes('slope-guard.sh')),
+      );
+      // Add fresh SLOPE entries
       for (const entry of entries) {
-        const entryWithMatcher = entry as { matcher?: string; hooks: Array<{ command?: string }> };
-        const existing = existingHooks[event] as Array<{ matcher?: string; hooks?: Array<{ command?: string }> }>;
-        // Find an existing entry with the same matcher that already has SLOPE hooks
-        const matchingEntry = existing.find(e =>
-          e.matcher === entryWithMatcher.matcher &&
-          e.hooks?.some(h => h.command?.includes('slope-guard.sh')),
-        );
-        if (matchingEntry?.hooks) {
-          // Merge individual hook commands that don't already exist
-          for (const hook of entryWithMatcher.hooks) {
-            const hookExists = matchingEntry.hooks.some(h => h.command === hook.command);
-            if (!hookExists) {
-              matchingEntry.hooks.push(hook);
-            }
-          }
-        } else {
-          existingHooks[event].push(entry);
-        }
+        existingHooks[event].push(entry);
       }
     }
     settings.hooks = existingHooks;
