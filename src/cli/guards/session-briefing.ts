@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import type { HookInput, GuardResult, Suggestion } from '../../core/index.js';
 import { loadConfig, parseRoadmap, formatStrategicContext } from '../../core/index.js';
 import { loadSprintState } from '../sprint-state.js';
-import { loadSessionState, updateSessionState } from '../session-state.js';
+import { loadSessionState, updateSessionState, setSessionMode } from '../session-state.js';
 
 /**
  * Session-briefing guard: fires PostToolUse on all tools.
@@ -26,14 +26,17 @@ export async function sessionBriefingGuard(input: HookInput, cwd: string): Promi
   const sprintState = loadSprintState(cwd);
   const lines: string[] = [];
 
-  // Sprint state
-  if (sprintState) {
+  // Sprint state + session mode
+  const hasActiveSprint = sprintState && (sprintState.phase === 'implementing' || sprintState.phase === 'scoring');
+  if (hasActiveSprint) {
+    setSessionMode(cwd, sessionId, 'sprint');
     const gateStatus = Object.entries(sprintState.gates)
       .map(([name, done]) => `${done ? '[x]' : '[ ]'} ${name}`)
       .join('  ');
     lines.push(`Sprint: S${sprintState.sprint}  Phase: ${sprintState.phase}  Gates: ${gateStatus}`);
   } else {
-    lines.push('No active sprint.');
+    setSessionMode(cwd, sessionId, 'adhoc');
+    lines.push('No active sprint. Session mode: adhoc (sprint-workflow guards silenced).');
   }
 
   // Roadmap context (next sprint)

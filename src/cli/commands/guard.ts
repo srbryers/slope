@@ -30,6 +30,7 @@ import { reviewStaleGuard } from '../guards/review-stale.js';
 import { formatGuardDocs } from '../guards/docs.js';
 import { recordBaseline } from '../guards/git-utils.js';
 import { execSync } from 'node:child_process';
+import { isAdhocSession } from '../session-state.js';
 
 // Side-effect imports: ensure all adapters are registered for detectAdapter()
 import '../../core/adapters/claude-code.js';
@@ -163,6 +164,12 @@ export async function guardCommand(args: string[]): Promise<void> {
   // If hook_event_name was missing from stdin, fill from the guard definition
   if (!hookEvent) {
     input.hook_event_name = def.hookEvent;
+  }
+
+  // Skip sprint-workflow guards in adhoc sessions
+  const relevance = GUARD_RELEVANCE[name];
+  if (relevance?.when === 'sprint-workflow' && input.session_id && isAdhocSession(cwd, input.session_id)) {
+    return;
   }
 
   // Find and run the handler

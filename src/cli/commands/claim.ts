@@ -91,6 +91,13 @@ export async function claimCommand(args: string[]): Promise<void> {
   console.log(`  Target: ${claim.target} (${claim.scope})`);
   if (claim.notes) console.log(`  Notes:  ${claim.notes}`);
 
+  // Flip session mode to sprint — enables sprint-workflow guards
+  const sessionId = process.env.CLAUDE_SESSION_ID || '';
+  if (sessionId) {
+    const { setSessionMode } = await import('../session-state.js');
+    setSessionMode(cwd, sessionId, 'sprint');
+  }
+
   // Adjacent conflicts are informational only
   if (adjacents.length > 0) {
     console.log(`\n  Note: ${adjacents.length} adjacent conflict(s):`);
