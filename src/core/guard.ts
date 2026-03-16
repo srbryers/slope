@@ -279,8 +279,8 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     name: 'worktree-check',
     description: 'Block concurrent sessions without worktree isolation',
     hookEvent: 'PreToolUse',
-    toolCategories: ['read_file', 'search_files', 'search_content', 'write_file', 'execute_command'],
-    matcher: 'Read|Glob|Grep|Edit|Write|Bash',
+    toolCategories: ['write_file', 'execute_command'],
+    matcher: 'Edit|Write|Bash',
     level: 'full',
   },
   {
