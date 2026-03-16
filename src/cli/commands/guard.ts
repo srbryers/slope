@@ -22,6 +22,11 @@ import { worktreeCheckGuard } from '../guards/worktree-check.js';
 import { sprintCompletionGuard } from '../guards/sprint-completion.js';
 import { worktreeMergeGuard } from '../guards/worktree-merge.js';
 import { worktreeSelfRemoveGuard } from '../guards/worktree-self-remove.js';
+import { sessionBriefingGuard } from '../guards/session-briefing.js';
+import { postPushGuard } from '../guards/post-push.js';
+import { phaseBoundaryGuard } from '../guards/phase-boundary.js';
+import { claimRequiredGuard } from '../guards/claim-required.js';
+import { reviewStaleGuard } from '../guards/review-stale.js';
 import { formatGuardDocs } from '../guards/docs.js';
 import { recordBaseline } from '../guards/git-utils.js';
 import { execSync } from 'node:child_process';
@@ -87,6 +92,11 @@ const handlers: Partial<Record<GuardName, GuardHandler>> = {
   'sprint-completion': sprintCompletionGuard,
   'worktree-merge': worktreeMergeGuard,
   'worktree-self-remove': worktreeSelfRemoveGuard,
+  'session-briefing': sessionBriefingGuard,
+  'post-push': postPushGuard,
+  'phase-boundary': phaseBoundaryGuard,
+  'claim-required': claimRequiredGuard,
+  'review-stale': reviewStaleGuard,
 };
 
 /** Register a guard handler */
