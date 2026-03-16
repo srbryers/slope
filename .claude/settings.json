@@ -13,7 +13,7 @@
         ]
       },
       {
-        "matcher": "Read|Glob|Grep|Edit|Write|Bash",
+        "matcher": "Edit|Write|Bash",
         "hooks": [
           {
             "type": "command",

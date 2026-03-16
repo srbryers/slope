@@ -96,12 +96,14 @@ function handlePreToolUse(input: HookInput, cwd: string): GuardResult {
   };
 }
 
-/** Block session end when mid-sprint with incomplete gates or missing scorecard. */
+/** Warn at session end when mid-sprint with incomplete gates or missing scorecard.
+ *  Advisory (context), not blocking — avoids trapping ad-hoc sessions that inherit
+ *  sprint state from a previous session. */
 function handleStop(cwd: string): GuardResult {
   const state = loadSprintState(cwd);
   if (!state) return {};
 
-  // Only block during implementing/scoring phases — don't block during planning/reviewing
+  // Only warn during implementing/scoring phases — don't warn during planning/reviewing
   if (state.phase !== 'implementing' && state.phase !== 'scoring') return {};
 
   const scorecardMissing = !scorecardExists(state.sprint, cwd);
@@ -141,7 +143,9 @@ function handleStop(cwd: string): GuardResult {
   }
 
   if (staleWarning) lines.push('', staleWarning);
-  return { blockReason: lines.join('\n') };
+  // Advisory context, not a hard block — ad-hoc sessions shouldn't be trapped
+  // by sprint state left from a previous session.
+  return { context: lines.join('\n') };
 }
 
 /** Check if a scorecard file exists for the given sprint. */
