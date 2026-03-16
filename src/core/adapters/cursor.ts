@@ -109,8 +109,10 @@ export class CursorAdapter implements HarnessAdapter {
   formatPostToolOutput(result: GuardResult): CursorHookOutput {
     const suggestionText = result.suggestion && !result.blockReason
       ? this.formatSuggestion(result.suggestion) : undefined;
+    // Only block for critical suggestions that require a decision (matches Claude Code behavior)
     const effectiveBlockReason = result.blockReason ?? (
-      result.suggestion?.requiresDecision ? suggestionText : undefined
+      result.suggestion?.requiresDecision && result.suggestion.priority === 'critical'
+        ? suggestionText : undefined
     );
 
     if (effectiveBlockReason) {
@@ -131,8 +133,10 @@ export class CursorAdapter implements HarnessAdapter {
   formatStopOutput(result: GuardResult): CursorHookOutput {
     const suggestionText = result.suggestion && !result.blockReason
       ? this.formatSuggestion(result.suggestion) : undefined;
+    // Only block for critical suggestions that require a decision
     const effectiveBlockReason = result.blockReason ?? (
-      result.suggestion?.requiresDecision ? suggestionText : undefined
+      result.suggestion?.requiresDecision && result.suggestion.priority === 'critical'
+        ? suggestionText : undefined
     );
     if (effectiveBlockReason) {
       return {

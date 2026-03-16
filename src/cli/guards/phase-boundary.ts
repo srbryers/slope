@@ -63,6 +63,8 @@ export async function phaseBoundaryGuard(input: HookInput, cwd: string): Promise
   if (targetPhaseIdx === 0) return {}; // First phase — no previous phase to check
 
   const targetPhaseNum = phaseNumbers[targetPhaseIdx];
+  // Use array order (not phase number arithmetic) to find the previous phase.
+  // This correctly handles non-sequential numbering: [Phase 1, Phase 3] → check Phase 1 before Phase 3.
   const prevPhaseIdx = targetPhaseIdx - 1;
   const prevPhaseNum = phaseNumbers[prevPhaseIdx];
 

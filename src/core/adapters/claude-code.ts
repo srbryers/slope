@@ -68,7 +68,9 @@ export class ClaudeCodeAdapter implements HarnessAdapter {
     );
 
     if (effectiveBlockReason) {
-      const context = [result.context, !result.blockReason && !result.suggestion?.requiresDecision ? suggestionText : undefined].filter(Boolean).join('\n\n') || undefined;
+      // Only include suggestion in context if it's not already captured in the blockReason
+      const contextSuggestion = result.blockReason || result.suggestion?.requiresDecision ? undefined : suggestionText;
+      const context = [result.context, contextSuggestion].filter(Boolean).join('\n\n') || undefined;
       return {
         decision: 'block',
         reason: effectiveBlockReason,
