@@ -1,11 +1,11 @@
 ---
-generated_at: "2026-03-15T19:10:26.666Z"
-git_sha: "28e860a312e36351ff69a77f1eb0c06f1794194b"
+generated_at: "2026-03-16T20:08:02.303Z"
+git_sha: "1a890174948daf614dd171630d157b5c78498add"
 sprint: 66
-source_files: 199
+source_files: 208
 test_files: 155
 cli_commands: 46
-guards: 22
+guards: 28
 flows: 0
 ---
 
@@ -18,14 +18,16 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
 <!-- AUTO-GENERATED: START packages -->
 
 ### `src/cli`
-- Source files: 99 | Test files: 65
+- Source files: 108 | Test files: 65
 - Key modules:
   - `config`
   - `hooks-config`
   - `interactive-init` — SLOPE — Rich Interactive Init (powered by @clack/prompts)
   - `loader`
   - `metaphor` — CLI metaphor resolution
+  - `phase-cleanup` — Load phase cleanup state. Returns empty state if missing/corrupt.
   - `registry` — CLI Command Registry — metadata for CLI commands (map generation, documentation, slope-web)
+  - `session-state` — Session ID for the briefing guard
   - `sprint-state` — Sprint lifecycle phases
   - `store` — Store info from config — no store connection required
   - `template-generator` — SLOPE Template Generator
@@ -493,12 +495,18 @@ Re-exports from `src/core/index.ts`:
 | `pr-review` | PostToolUse | Bash | Prompt for review workflow after PR creation |
 | `transcript` | PostToolUse | — | Append tool call metadata to session transcript |
 | `branch-before-commit` | PreToolUse | Bash | Block git commit on main/master — create a feature branch first |
-| `worktree-check` | PreToolUse | Read|Glob|Grep|Edit|Write|Bash | Block concurrent sessions without worktree isolation |
+| `worktree-check` | PreToolUse | Edit|Write|Bash | Block concurrent sessions without worktree isolation |
 | `sprint-completion` | PreToolUse | Bash | Block PR creation when sprint gates are incomplete |
 | `sprint-completion` | Stop | — | Block session end when sprint gates are incomplete |
 | `sprint-completion` | PostToolUse | Bash | Auto-detect test pass and mark gate complete |
 | `worktree-merge` | PreToolUse | Bash | Block gh pr merge --delete-branch in worktrees (causes false failure) |
 | `worktree-self-remove` | PreToolUse | Bash | Block git worktree remove when targeting own cwd |
+| `phase-boundary` | PreToolUse | Bash | Block starting sprint in new phase if previous phase cleanup incomplete |
+| `claim-required` | PreToolUse | Edit|Write | Warn when editing code without an active sprint claim |
+| `post-push` | PostToolUse | Bash | Suggest next workflow step after git push |
+| `session-briefing` | PostToolUse | — | Inject sprint context on first tool call of session |
+| `review-stale` | Stop | — | Warn about scored sprints with missing reviews at session end |
+| `worktree-reuse` | PreToolUse | EnterWorktree | Guide agent to reuse existing worktrees instead of recreating |
 <!-- AUTO-GENERATED: END guards -->
 
 ## MCP Tools

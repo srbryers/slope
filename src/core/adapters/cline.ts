@@ -25,6 +25,7 @@ const CLINE_TOOLS: ToolNameMap = {
   execute_command: 'execute_command',
   create_subagent: 'use_mcp_tool',
   exit_plan: 'plan_mode_response',
+  enter_worktree: '',
 };
 
 /**

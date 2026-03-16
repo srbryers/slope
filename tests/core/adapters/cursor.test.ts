@@ -262,6 +262,9 @@ describe('CursorAdapter', () => {
       for (const g of GUARD_DEFINITIONS) {
         const resolved = resolveToolMatcher(adapter, g.toolCategories);
         if (g.toolCategories) {
+          // Skip guards whose categories don't map to any tool on this adapter
+          const hasMapping = g.toolCategories.some(c => (adapter.toolNames as Record<string, string>)[c]);
+          if (!hasMapping) continue;
           expect(resolved, `${g.name}: should resolve to non-empty string`).toBeTruthy();
           // Each resolved name should be a Cursor tool name
           for (const name of resolved!.split('|')) {

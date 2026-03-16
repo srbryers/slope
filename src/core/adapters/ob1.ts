@@ -30,7 +30,8 @@ const OB1_TOOLS: ToolNameMap = {
   search_content: 'grep_search',
   execute_command: 'run_shell_command',
   create_subagent: 'worker|general|explore|plan|codebase_investigator|browser|vision-analyzer|handoff_to_agent|web',
-  exit_plan: '',  // No OB1 equivalent for exit_plan
+  exit_plan: '',
+  enter_worktree: '',
 };
 
 /**

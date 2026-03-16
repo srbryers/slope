@@ -17,7 +17,8 @@ export type ToolCategory =
   | 'search_content'
   | 'execute_command'
   | 'create_subagent'
-  | 'exit_plan';
+  | 'exit_plan'
+  | 'enter_worktree';
 
 /** All tool categories for iteration */
 export const TOOL_CATEGORIES: ToolCategory[] = [
@@ -28,6 +29,7 @@ export const TOOL_CATEGORIES: ToolCategory[] = [
   'execute_command',
   'create_subagent',
   'exit_plan',
+  'enter_worktree',
 ];
 
 /** Maps tool categories to harness-specific tool name patterns */
@@ -72,6 +74,7 @@ export const CLAUDE_CODE_TOOLS: ToolNameMap = {
   execute_command: 'Bash',
   create_subagent: 'Agent',
   exit_plan: 'ExitPlanMode',
+  enter_worktree: 'EnterWorktree',
 };
 
 // --- Adapter Priority ---

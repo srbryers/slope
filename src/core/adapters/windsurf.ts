@@ -20,6 +20,7 @@ const WINDSURF_TOOLS: ToolNameMap = {
   execute_command: 'run_command',
   create_subagent: 'create_subagent',
   exit_plan: 'exit_plan',
+  enter_worktree: '',
 };
 
 /** Windsurf hook entry in .windsurf/hooks.json */

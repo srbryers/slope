@@ -97,7 +97,7 @@ describe('adapters barrel export', () => {
     expect(ADAPTER_PRIORITY).toContain('claude-code');
     expect(ADAPTER_PRIORITY).toContain('cline');
     expect(ADAPTER_PRIORITY).toContain('generic');
-    expect(TOOL_CATEGORIES.length).toBe(7);
+    expect(TOOL_CATEGORIES.length).toBe(8);
     expect(CLAUDE_CODE_TOOLS.read_file).toBe('Read');
   });
 
