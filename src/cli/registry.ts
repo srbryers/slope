@@ -30,7 +30,7 @@ export interface CliCommandMeta {
 }
 
 /** Command files that are internal implementation modules, not user-invocable top-level commands. */
-export const CLI_INTERNAL_MODULES = ['review-state'] as const;
+export const CLI_INTERNAL_MODULES = ['phase', 'review-state'] as const;
 
 export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
   // ── Lifecycle ──────────────────────────────────────────────────

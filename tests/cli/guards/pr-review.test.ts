@@ -21,21 +21,21 @@ describe('prReviewGuard', () => {
     );
 
     const result = await prReviewGuard(input, '/tmp/test');
-    expect(result.blockReason).toBeDefined();
-    expect(result.blockReason).toContain('pr-review');
-    expect(result.blockReason).toContain('pull/42');
-    expect(result.blockReason).toContain('Code Review');
-    expect(result.blockReason).toContain('Architect Review');
-    expect(result.blockReason).toContain('Both');
-    expect(result.blockReason).toContain('Manual Review');
-    expect(result.blockReason).toContain('Skip / Merge Now');
+    expect(result.suggestion).toBeDefined();
+    expect(result.suggestion!.id).toBe('pr-review');
+    expect(result.suggestion!.context).toContain('pull/42');
+    expect(result.suggestion!.options.map(o => o.label)).toContain('Code Review');
+    expect(result.suggestion!.options.map(o => o.label)).toContain('Architect Review');
+    expect(result.suggestion!.options.map(o => o.label)).toContain('Both');
+    expect(result.suggestion!.options.map(o => o.label)).toContain('Manual Review');
+    expect(result.suggestion!.options.map(o => o.label)).toContain('Skip / Merge Now');
   });
 
   it('does not fire for non-PR commands', async () => {
     const input = makeInput('git push -u origin main', 'Everything up-to-date');
 
     const result = await prReviewGuard(input, '/tmp/test');
-    expect(result.blockReason).toBeUndefined();
+    expect(result.suggestion).toBeUndefined();
   });
 
   it('does not fire when gh pr create fails (no PR URL)', async () => {
@@ -45,7 +45,7 @@ describe('prReviewGuard', () => {
     );
 
     const result = await prReviewGuard(input, '/tmp/test');
-    expect(result.blockReason).toBeUndefined();
+    expect(result.suggestion).toBeUndefined();
   });
 
   it('extracts PR URL from multiline output', async () => {
@@ -55,7 +55,8 @@ describe('prReviewGuard', () => {
     );
 
     const result = await prReviewGuard(input, '/tmp/test');
-    expect(result.blockReason).toContain('pull/99');
+    expect(result.suggestion).toBeDefined();
+    expect(result.suggestion!.context).toContain('pull/99');
   });
 
   it('handles response in result field', async () => {
@@ -69,7 +70,7 @@ describe('prReviewGuard', () => {
     };
 
     const result = await prReviewGuard(input, '/tmp/test');
-    expect(result.blockReason).toBeDefined();
-    expect(result.blockReason).toContain('pull/7');
+    expect(result.suggestion).toBeDefined();
+    expect(result.suggestion!.context).toContain('pull/7');
   });
 });
