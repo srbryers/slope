@@ -1,4 +1,4 @@
-import type { HookInput, GuardResult } from '../../core/index.js';
+import type { HookInput, GuardResult, Suggestion } from '../../core/index.js';
 
 /**
  * PR review guard: fires PostToolUse on Bash.
@@ -18,27 +18,20 @@ export async function prReviewGuard(input: HookInput, _cwd: string): Promise<Gua
   const urlMatch = response.match(/(https:\/\/github\.com\/[^\s]+\/pull\/\d+)/);
   const prUrl = urlMatch ? urlMatch[1] : 'the PR';
 
-  return {
-    blockReason: [
-      `SLOPE pr-review: A pull request was just created (${prUrl}).`,
-      '',
-      'You MUST now ask the user how they want to handle the PR review using AskUserQuestion.',
-      'Present these options:',
-      '',
-      '1. Code Review — Detailed line-by-line code review of the diff',
-      '2. Architect Review — High-level architecture and design review',
-      '3. Both — Run code review followed by architect review',
-      '4. Manual Review — User will review manually, no automated review',
-      '5. Skip / Merge Now — No review needed, proceed to merge',
-      '',
-      'Wait for the user\'s choice before taking any further action.',
-      '',
-      'After the review is complete, capture findings:',
-      '1. For each issue found: `slope review findings add --type=<type> --ticket=<key> --severity=<sev> --description="..."`',
-      '2. After all findings recorded: `slope review amend` to apply to scorecard',
-      '3. Run `slope distill --auto` to promote recurring patterns',
-      '',
-      'Review type to finding type mapping: architect→architect, code→code',
-    ].join('\n'),
+  const suggestion: Suggestion = {
+    id: 'pr-review',
+    title: 'PR Review',
+    context: `A pull request was just created (${prUrl}). After the review, capture findings with \`slope review findings add\`, then \`slope review amend\` to apply to scorecard.`,
+    options: [
+      { id: 'code', label: 'Code Review', description: 'Detailed line-by-line code review of the diff' },
+      { id: 'architect', label: 'Architect Review', description: 'High-level architecture and design review' },
+      { id: 'both', label: 'Both', description: 'Run code review followed by architect review' },
+      { id: 'manual', label: 'Manual Review', description: 'User will review manually, no automated review' },
+      { id: 'skip', label: 'Skip / Merge Now', description: 'No review needed, proceed to merge' },
+    ],
+    requiresDecision: true,
+    priority: 'high',
   };
+
+  return { suggestion };
 }

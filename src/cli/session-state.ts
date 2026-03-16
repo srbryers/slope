@@ -10,6 +10,8 @@ interface SessionState {
   push_prompted_session_id?: string;
   /** Session ID for the claim-required guard */
   claim_warned_session_id?: string;
+  /** Session ID for handoff read in explore guard */
+  handoff_read_session_id?: string;
 }
 
 /** Load consolidated session state. Returns empty object if missing/corrupt. */
