@@ -130,7 +130,6 @@ describe('Testing Session — Next-Action Guard', () => {
   it('builds suggestions for testing-active state', () => {
     const result = buildSuggestions({ type: 'testing-active' });
     expect(result).toContain('Testing session active');
-    expect(result).toContain('testing_session_end');
     expect(result).toContain('Continue testing');
   });
 });

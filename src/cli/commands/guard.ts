@@ -22,6 +22,11 @@ import { worktreeCheckGuard } from '../guards/worktree-check.js';
 import { sprintCompletionGuard } from '../guards/sprint-completion.js';
 import { worktreeMergeGuard } from '../guards/worktree-merge.js';
 import { worktreeSelfRemoveGuard } from '../guards/worktree-self-remove.js';
+import { sessionBriefingGuard } from '../guards/session-briefing.js';
+import { postPushGuard } from '../guards/post-push.js';
+import { phaseBoundaryGuard } from '../guards/phase-boundary.js';
+import { claimRequiredGuard } from '../guards/claim-required.js';
+import { reviewStaleGuard } from '../guards/review-stale.js';
 import { formatGuardDocs } from '../guards/docs.js';
 import { recordBaseline } from '../guards/git-utils.js';
 import { execSync } from 'node:child_process';
@@ -87,6 +92,11 @@ const handlers: Partial<Record<GuardName, GuardHandler>> = {
   'sprint-completion': sprintCompletionGuard,
   'worktree-merge': worktreeMergeGuard,
   'worktree-self-remove': worktreeSelfRemoveGuard,
+  'session-briefing': sessionBriefingGuard,
+  'post-push': postPushGuard,
+  'phase-boundary': phaseBoundaryGuard,
+  'claim-required': claimRequiredGuard,
+  'review-stale': reviewStaleGuard,
 };
 
 /** Register a guard handler */
@@ -184,7 +194,7 @@ export async function guardCommand(args: string[]): Promise<void> {
   recordGuardExecution(cwd, name, input, result);
 
   // Format output based on hook event type
-  if (!result.context && !result.decision && !result.blockReason) {
+  if (!result.context && !result.decision && !result.blockReason && !result.suggestion) {
     // No guidance to inject — silent passthrough
     return;
   }
@@ -398,6 +408,11 @@ const GUARD_RELEVANCE: Record<string, { when: string; why: string }> = {
   'subagent-gate': { when: 'always', why: 'Caps subagent model/turns to control cost' },
   'compaction': { when: 'always', why: 'Extracts events before context window compression' },
   'transcript': { when: 'always', why: 'Records tool call metadata for session replay' },
+  'session-briefing': { when: 'always', why: 'Injects sprint context on session start for continuity' },
+  'post-push': { when: 'sprint-workflow', why: 'Suggests next workflow step after pushing' },
+  'phase-boundary': { when: 'sprint-workflow', why: 'Prevents starting new phase without cleanup' },
+  'claim-required': { when: 'sprint-workflow', why: 'Warns when editing without sprint claim' },
+  'review-stale': { when: 'sprint-workflow', why: 'Catches scored sprints missing reviews' },
 };
 
 /** Detect which workflow profiles apply to this repo */

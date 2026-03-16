@@ -19,7 +19,7 @@ vi.mock('../../src/cli/store.js', () => ({
   resolveStore: vi.fn().mockRejectedValue(new Error('no store')),
 }));
 
-import { nextActionGuard, detectSprintState, buildSuggestions } from '../../src/cli/guards/next-action.js';
+import { nextActionGuard, detectSprintState, buildSuggestions, buildSuggestionObject } from '../../src/cli/guards/next-action.js';
 import { resolveStore } from '../../src/cli/store.js';
 
 const mockedResolveStore = vi.mocked(resolveStore);
@@ -161,7 +161,51 @@ describe('detectSprintState', () => {
   });
 });
 
-describe('buildSuggestions', () => {
+describe('buildSuggestionObject', () => {
+  it('includes claim targets for mid-sprint', () => {
+    const suggestion = buildSuggestionObject({
+      type: 'mid-sprint',
+      sprintNumber: 26,
+      claimCount: 2,
+      targets: ['S26-1', 'S26-2'],
+    });
+    expect(suggestion.id).toBe('next-action-mid-sprint');
+    expect(suggestion.context).toContain('S26-1, S26-2');
+    expect(suggestion.options.map(o => o.label)).toContain('Continue with the next ticket');
+    expect(suggestion.requiresDecision).toBe(true);
+  });
+
+  it('includes scoring options for sprint-complete', () => {
+    const suggestion = buildSuggestionObject({ type: 'sprint-complete', sprintNumber: 26 });
+    expect(suggestion.context).toContain('Sprint 26 is complete but unscored');
+    expect(suggestion.options.map(o => o.label)).toContain('Score the sprint');
+  });
+
+  it('includes review options for needs-review', () => {
+    const suggestion = buildSuggestionObject({ type: 'needs-review', sprintNumber: 26 });
+    expect(suggestion.context).toContain('Sprint 26 has a scorecard but no review');
+    expect(suggestion.options.map(o => o.label)).toContain('Generate sprint review');
+  });
+
+  it('includes roadmap context for between-sprints', () => {
+    const suggestion = buildSuggestionObject({
+      type: 'between-sprints',
+      roadmapContext: 'Sprint 2 of 5 — S27: Observability',
+    });
+    expect(suggestion.context).toContain('No active sprint');
+    expect(suggestion.context).toContain('Sprint 2 of 5');
+    expect(suggestion.options.map(o => o.label)).toContain('Start a new sprint');
+  });
+
+  it('works without roadmap context for between-sprints', () => {
+    const suggestion = buildSuggestionObject({ type: 'between-sprints' });
+    expect(suggestion.context).toContain('No active sprint');
+    expect(suggestion.options.map(o => o.label)).toContain('Start a new sprint');
+    expect(suggestion.context).not.toContain('undefined');
+  });
+});
+
+describe('buildSuggestions (deprecated wrapper)', () => {
   it('includes claim targets for mid-sprint', () => {
     const text = buildSuggestions({
       type: 'mid-sprint',
@@ -169,8 +213,7 @@ describe('buildSuggestions', () => {
       claimCount: 2,
       targets: ['S26-1', 'S26-2'],
     });
-    expect(text).toContain('SLOPE next-action');
-    expect(text).toContain('Mid-sprint');
+    expect(text).toContain('SLOPE');
     expect(text).toContain('S26-1, S26-2');
     expect(text).toContain('Continue with the next ticket');
     expect(text).toContain('AskUserQuestion');
@@ -222,8 +265,7 @@ describe('re-prompt prevention', () => {
     writeFileSync(stateFile, JSON.stringify({ session_id: 'sess-old', prompted_at: '' }));
 
     const result = await nextActionGuard(makeInput({ session_id: 'sess-new' }), tmpDir);
-    expect(result.blockReason).toBeDefined();
-    expect(result.blockReason).toContain('SLOPE next-action');
+    expect(result.suggestion).toBeDefined();
   });
 
   it('always fires when session_id is empty (manual test)', async () => {
@@ -232,7 +274,7 @@ describe('re-prompt prevention', () => {
     writeFileSync(stateFile, JSON.stringify({ session_id: 'anything', prompted_at: '' }));
 
     const result = await nextActionGuard(makeInput({ session_id: '' }), tmpDir);
-    expect(result.blockReason).toBeDefined();
+    expect(result.suggestion).toBeDefined();
   });
 });
 
@@ -240,7 +282,7 @@ describe('atomic state file write', () => {
   it('writes valid JSON to .next-action-prompted after guard runs', async () => {
     initSlopeDir();
     const result = await nextActionGuard(makeInput({ session_id: 'sess-abc' }), tmpDir);
-    expect(result.blockReason).toBeDefined();
+    expect(result.suggestion).toBeDefined();
 
     const stateFile = join(tmpDir, '.slope', '.next-action-prompted');
     expect(existsSync(stateFile)).toBe(true);
@@ -252,7 +294,7 @@ describe('atomic state file write', () => {
   it('creates .slope dir if missing', async () => {
     // No initSlopeDir — just bare tmpDir
     const result = await nextActionGuard(makeInput({ session_id: 'sess-xyz' }), tmpDir);
-    expect(result.blockReason).toBeDefined();
+    expect(result.suggestion).toBeDefined();
 
     const stateFile = join(tmpDir, '.slope', '.next-action-prompted');
     expect(existsSync(stateFile)).toBe(true);

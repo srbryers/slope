@@ -4,7 +4,7 @@ import { existsSync, writeFileSync, readFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { HarnessAdapter, ToolNameMap } from '../harness.js';
 import { CLAUDE_CODE_TOOLS, registerAdapter, SLOPE_BIN_PREAMBLE, writeOrUpdateManagedScript } from '../harness.js';
-import type { GuardResult, AnyGuardDefinition, PreToolUseOutput, PostToolUseOutput, StopOutput } from '../guard.js';
+import type { GuardResult, AnyGuardDefinition, PreToolUseOutput, PostToolUseOutput, StopOutput, Suggestion } from '../guard.js';
 
 /** Claude Code adapter — formats guard output for Claude Code's hook protocol. */
 export class ClaudeCodeAdapter implements HarnessAdapter {
@@ -18,33 +18,74 @@ export class ClaudeCodeAdapter implements HarnessAdapter {
     return join(cwd, '.claude', 'settings.json');
   }
 
+  formatSuggestion(suggestion: Suggestion): string {
+    const lines: string[] = [`SLOPE ${suggestion.title}: ${suggestion.context}`];
+    if (suggestion.options.length > 0) {
+      lines.push('', 'Options:');
+      for (let i = 0; i < suggestion.options.length; i++) {
+        const opt = suggestion.options[i];
+        const desc = opt.description ? ` — ${opt.description}` : '';
+        lines.push(`${i + 1}. ${opt.label}${desc}`);
+      }
+    }
+    if (suggestion.requiresDecision) {
+      lines.push('', 'Present these options to the user using AskUserQuestion. Wait for their choice before proceeding.');
+    }
+    return lines.join('\n');
+  }
+
   formatPreToolOutput(result: GuardResult): PreToolUseOutput {
+    // blockReason takes precedence over suggestion (defensive)
+    const suggestionText = result.suggestion && !result.blockReason
+      ? this.formatSuggestion(result.suggestion) : undefined;
+    const context = [result.context, suggestionText].filter(Boolean).join('\n\n') || undefined;
+    const blockReason = result.blockReason ?? (
+      result.suggestion?.requiresDecision && result.suggestion.priority === 'critical'
+        ? suggestionText : undefined
+    );
+
     return {
       hookSpecificOutput: {
         hookEventName: 'PreToolUse',
         ...(result.decision && { permissionDecision: result.decision }),
-        ...(result.blockReason && { permissionDecisionReason: result.blockReason }),
-        ...(result.context && { additionalContext: result.context }),
+        ...(blockReason && { permissionDecisionReason: blockReason }),
+        ...(context && { additionalContext: context }),
+        // Critical suggestions with requiresDecision force a deny
+        ...(result.suggestion?.requiresDecision && result.suggestion.priority === 'critical' && !result.decision && {
+          permissionDecision: 'deny' as const,
+        }),
       },
     };
   }
 
   formatPostToolOutput(result: GuardResult): PostToolUseOutput {
-    if (result.blockReason) {
+    const suggestionText = result.suggestion && !result.blockReason
+      ? this.formatSuggestion(result.suggestion) : undefined;
+
+    // Suggestions with requiresDecision become blockReason (forces agent to address)
+    const effectiveBlockReason = result.blockReason ?? (
+      result.suggestion?.requiresDecision ? suggestionText : undefined
+    );
+
+    if (effectiveBlockReason) {
+      // Only include suggestion in context if it's not already captured in the blockReason
+      const contextSuggestion = result.blockReason || result.suggestion?.requiresDecision ? undefined : suggestionText;
+      const context = [result.context, contextSuggestion].filter(Boolean).join('\n\n') || undefined;
       return {
         decision: 'block',
-        reason: result.blockReason,
+        reason: effectiveBlockReason,
         hookSpecificOutput: {
           hookEventName: 'PostToolUse',
-          ...(result.context && { additionalContext: result.context }),
+          ...(context && { additionalContext: context }),
         },
       };
     }
-    if (result.context) {
+    const context = [result.context, suggestionText].filter(Boolean).join('\n\n') || undefined;
+    if (context) {
       return {
         hookSpecificOutput: {
           hookEventName: 'PostToolUse',
-          additionalContext: result.context,
+          additionalContext: context,
         },
       };
     }
@@ -52,8 +93,13 @@ export class ClaudeCodeAdapter implements HarnessAdapter {
   }
 
   formatStopOutput(result: GuardResult): StopOutput {
-    if (result.blockReason) {
-      return { decision: 'block', reason: result.blockReason };
+    const suggestionText = result.suggestion && !result.blockReason
+      ? this.formatSuggestion(result.suggestion) : undefined;
+    const effectiveBlockReason = result.blockReason ?? (
+      result.suggestion?.requiresDecision ? suggestionText : undefined
+    );
+    if (effectiveBlockReason) {
+      return { decision: 'block', reason: effectiveBlockReason };
     }
     return {};
   }

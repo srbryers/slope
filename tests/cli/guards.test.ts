@@ -356,12 +356,13 @@ describe('subagentGateGuard', () => {
     expect(result.blockReason).toContain('sonnet');
   });
 
-  it('denies Explore agent without model set', async () => {
+  it('denies Explore agent without model set (local fix #173)', async () => {
     const result = await subagentGateGuard(
       makeInput({ tool_input: { subagent_type: 'Explore' } }),
       tmpDir,
     );
     expect(result.decision).toBe('deny');
+    expect(result.blockReason).toContain('subagent-gate');
     expect(result.blockReason).toContain('no model specified');
     expect(result.blockReason).toContain('haiku');
   });

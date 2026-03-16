@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, writeFileSync, renameSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import type { HookInput, GuardResult, SlopeConfig } from '../../core/index.js';
+import type { HookInput, GuardResult, SlopeConfig, Suggestion } from '../../core/index.js';
 import { loadConfig, loadScorecards, detectLatestSprint, parseRoadmap, formatStrategicContext } from '../../core/index.js';
 import { resolveStore } from '../store.js';
 import { loadFindings } from '../commands/review-state.js';
@@ -38,8 +38,8 @@ export async function nextActionGuard(input: HookInput, cwd: string): Promise<Gu
   // Detect sprint state
   const state = await detectSprintState(cwd, input.session_id);
 
-  // Build suggestion text
-  const suggestion = buildSuggestions(state);
+  // Build structured suggestion
+  const suggestion = buildSuggestionObject(state);
 
   // Write state file atomically
   try {
@@ -53,7 +53,7 @@ export async function nextActionGuard(input: HookInput, cwd: string): Promise<Gu
     renameSync(tmpPath, stateFile);
   } catch { /* best-effort — don't fail the guard */ }
 
-  return { blockReason: suggestion };
+  return { suggestion };
 }
 
 /** Detect current sprint state via store then filesystem fallback */
@@ -191,103 +191,112 @@ function buildBetweenSprints(config: SlopeConfig, cwd: string, latestSprint: num
   return { type: 'between-sprints', roadmapContext };
 }
 
-/** Build block reason text from sprint state */
-export function buildSuggestions(state: SprintState): string {
-  const header = 'SLOPE next-action: Before ending this session, present the user with options for what to do next.';
-
+/** Build structured Suggestion from sprint state */
+export function buildSuggestionObject(state: SprintState): Suggestion {
   switch (state.type) {
     case 'mid-sprint': {
       const targetList = state.targets.join(', ');
-      return [
-        header,
-        '',
-        `Current state: Mid-sprint — ${state.claimCount} active claim(s) for sprint ${state.sprintNumber}: ${targetList}`,
-        '',
-        'Suggested options:',
-        '1. Continue with the next ticket',
-        '2. Push and take a break — resume later',
-        '3. End session — nothing more to do right now',
-        '',
-        'Present these using AskUserQuestion. If the user chooses to end the session, stop without further action.',
-      ].join('\n');
+      return {
+        id: 'next-action-mid-sprint',
+        title: 'Next Action',
+        context: `Mid-sprint — ${state.claimCount} active claim(s) for sprint ${state.sprintNumber}: ${targetList}`,
+        options: [
+          { id: 'continue', label: 'Continue with the next ticket' },
+          { id: 'push-break', label: 'Push and take a break', description: 'Resume later' },
+          { id: 'end', label: 'End session', description: 'Nothing more to do right now' },
+        ],
+        requiresDecision: true,
+        priority: 'normal',
+      };
     }
 
     case 'sprint-complete':
-      return [
-        header,
-        '',
-        `Current state: Sprint ${state.sprintNumber} is complete but unscored`,
-        '',
-        'Suggested options:',
-        '1. Score the sprint — run post-hole routine',
-        '2. Run `slope validate` on the scorecard',
-        '3. Distill learnings into common issues',
-        '4. End session — nothing more to do right now',
-        '',
-        'Present these using AskUserQuestion. If the user chooses to end the session, stop without further action.',
-      ].join('\n');
+      return {
+        id: 'next-action-complete',
+        title: 'Next Action',
+        context: `Sprint ${state.sprintNumber} is complete but unscored`,
+        options: [
+          { id: 'score', label: 'Score the sprint', description: 'Run post-hole routine' },
+          { id: 'validate', label: 'Validate scorecard', command: 'slope validate' },
+          { id: 'distill', label: 'Distill learnings', command: 'slope distill --auto' },
+          { id: 'end', label: 'End session', description: 'Nothing more to do right now' },
+        ],
+        requiresDecision: true,
+        priority: 'normal',
+      };
 
-    case 'needs-review': {
-      return [
-        header,
-        '',
-        `Current state: Sprint ${state.sprintNumber} has a scorecard but no review`,
-        '',
-        'Suggested options:',
-        '1. Generate sprint review',
-        '2. Distill learnings and update common issues',
-        '3. Run `slope review` for the full sprint review',
-        '4. End session — nothing more to do right now',
-        '',
-        'Present these using AskUserQuestion. If the user chooses to end the session, stop without further action.',
-      ].join('\n');
-    }
+    case 'needs-review':
+      return {
+        id: 'next-action-review',
+        title: 'Next Action',
+        context: `Sprint ${state.sprintNumber} has a scorecard but no review`,
+        options: [
+          { id: 'review', label: 'Generate sprint review', command: 'slope review' },
+          { id: 'distill', label: 'Distill learnings', command: 'slope distill --auto' },
+          { id: 'end', label: 'End session', description: 'Nothing more to do right now' },
+        ],
+        requiresDecision: true,
+        priority: 'normal',
+      };
 
-    case 'needs-amend': {
-      return [
-        header,
-        '',
-        `Current state: Sprint ${state.sprintNumber} has ${state.findingCount} review finding(s) not yet applied to scorecard`,
-        '',
-        'Suggested options:',
-        '1. Run `slope review amend` to apply findings as hazards and recalculate score',
-        '2. Run `slope review findings list` to see the findings first',
-        '3. End session — nothing more to do right now',
-        '',
-        'Present these using AskUserQuestion. If the user chooses to end the session, stop without further action.',
-      ].join('\n');
-    }
+    case 'needs-amend':
+      return {
+        id: 'next-action-amend',
+        title: 'Next Action',
+        context: `Sprint ${state.sprintNumber} has ${state.findingCount} review finding(s) not yet applied to scorecard`,
+        options: [
+          { id: 'amend', label: 'Apply findings to scorecard', command: 'slope review amend' },
+          { id: 'list', label: 'View findings first', command: 'slope review findings list' },
+          { id: 'end', label: 'End session', description: 'Nothing more to do right now' },
+        ],
+        requiresDecision: true,
+        priority: 'normal',
+      };
 
     case 'testing-active':
-      return [
-        header,
-        '',
-        'Current state: Testing session active',
-        '',
-        'Suggested options:',
-        '1. Continue testing',
-        '2. End testing session (testing_session_end)',
-        '3. End session — nothing more to do right now',
-        '',
-        'Present these using AskUserQuestion.',
-      ].join('\n');
+      return {
+        id: 'next-action-testing',
+        title: 'Next Action',
+        context: 'Testing session active',
+        options: [
+          { id: 'continue', label: 'Continue testing' },
+          { id: 'end-testing', label: 'End testing session' },
+          { id: 'end', label: 'End session', description: 'Nothing more to do right now' },
+        ],
+        requiresDecision: true,
+        priority: 'normal',
+      };
 
     case 'between-sprints': {
       const contextLine = state.roadmapContext
-        ? `\n${state.roadmapContext}\n`
+        ? `\n${state.roadmapContext}`
         : '';
-      return [
-        header,
-        '',
-        `Current state: No active sprint${contextLine}`,
-        'Suggested options:',
-        '1. Check next sprint candidates from the roadmap',
-        '2. Start a new sprint',
-        '3. Run `slope briefing` for a status overview',
-        '4. End session — nothing more to do right now',
-        '',
-        'Present these using AskUserQuestion. If the user chooses to end the session, stop without further action.',
-      ].join('\n');
+      return {
+        id: 'next-action-between',
+        title: 'Next Action',
+        context: `No active sprint${contextLine}`,
+        options: [
+          { id: 'roadmap', label: 'Check next sprint candidates' },
+          { id: 'start', label: 'Start a new sprint' },
+          { id: 'briefing', label: 'Run briefing', command: 'slope briefing' },
+          { id: 'end', label: 'End session', description: 'Nothing more to do right now' },
+        ],
+        requiresDecision: true,
+        priority: 'normal',
+      };
     }
   }
+}
+
+/** @deprecated Use buildSuggestionObject instead. Kept for backward compatibility. */
+export function buildSuggestions(state: SprintState): string {
+  const suggestion = buildSuggestionObject(state);
+  const lines = [`SLOPE ${suggestion.title}: ${suggestion.context}`, '', 'Suggested options:'];
+  for (let i = 0; i < suggestion.options.length; i++) {
+    const opt = suggestion.options[i];
+    const desc = opt.description ? ` — ${opt.description}` : '';
+    lines.push(`${i + 1}. ${opt.label}${desc}`);
+  }
+  lines.push('', 'Present these using AskUserQuestion. If the user chooses to end the session, stop without further action.');
+  return lines.join('\n');
 }

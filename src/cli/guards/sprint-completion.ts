@@ -167,6 +167,16 @@ function handlePostToolUse(input: HookInput, cwd: string): GuardResult {
     return handleValidateSuccess(input, cwd);
   }
 
+  // Detect slope review completion → mark review_md gate
+  if (/\bslope\s+review\b/.test(command) && !/\bslope\s+review\s+(start|round|status|reset|recommend|findings|amend|defer|deferred|resolve)\b/.test(command)) {
+    return handleReviewCompletion(input, cwd);
+  }
+
+  // Detect slope auto-card completion → suggest validate next
+  if (/\bslope\s+auto-card\b/.test(command)) {
+    return handleAutoCardCompletion(input, cwd);
+  }
+
   // Check if command looks like a test runner
   const isTestCommand = /\b(jest|vitest|bun\s+test|npx\s+jest|npx\s+vitest)\b/.test(command);
   if (!isTestCommand) return {};
@@ -229,6 +239,32 @@ function handleValidateSuccess(input: HookInput, cwd: string): GuardResult {
   } catch {
     return {};
   }
+}
+
+/** Detect `slope review` completion → mark review_md gate. */
+function handleReviewCompletion(input: HookInput, cwd: string): GuardResult {
+  const response = input.tool_response ?? {};
+  const exitCode = response.exit_code ?? response.exitCode;
+  if (exitCode !== 0 && exitCode !== '0') return {};
+
+  const state = loadSprintState(cwd);
+  if (!state) return {};
+  if (state.gates.review_md) return {}; // Already marked
+
+  updateGate(cwd, 'review_md', true);
+  return { context: 'SLOPE: Review generated — gate marked complete.' };
+}
+
+/** Detect `slope auto-card` completion → suggest validate next. */
+function handleAutoCardCompletion(input: HookInput, cwd: string): GuardResult {
+  const response = input.tool_response ?? {};
+  const exitCode = response.exit_code ?? response.exitCode;
+  if (exitCode !== 0 && exitCode !== '0') return {};
+
+  const state = loadSprintState(cwd);
+  if (!state) return {};
+
+  return { context: 'SLOPE: Scorecard generated. Run `slope validate` to verify and mark the scorecard gate complete.' };
 }
 
 /** Transition sprint to scoring phase after PR merge. */
