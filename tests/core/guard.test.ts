@@ -11,8 +11,8 @@ import type { GuardResult } from '../../src/core/guard.js';
 import '../../src/core/adapters/claude-code.js';
 
 describe('GUARD_DEFINITIONS', () => {
-  it('has 27 guard definitions', () => {
-    expect(GUARD_DEFINITIONS).toHaveLength(27);
+  it('has 28 guard definitions', () => {
+    expect(GUARD_DEFINITIONS).toHaveLength(28);
   });
 
   it('all guards have required fields', () => {

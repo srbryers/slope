@@ -22,6 +22,7 @@ import { worktreeCheckGuard } from '../guards/worktree-check.js';
 import { sprintCompletionGuard } from '../guards/sprint-completion.js';
 import { worktreeMergeGuard } from '../guards/worktree-merge.js';
 import { worktreeSelfRemoveGuard } from '../guards/worktree-self-remove.js';
+import { worktreeReuseGuard } from '../guards/worktree-reuse.js';
 import { sessionBriefingGuard } from '../guards/session-briefing.js';
 import { postPushGuard } from '../guards/post-push.js';
 import { phaseBoundaryGuard } from '../guards/phase-boundary.js';
@@ -98,6 +99,7 @@ const handlers: Partial<Record<GuardName, GuardHandler>> = {
   'phase-boundary': phaseBoundaryGuard,
   'claim-required': claimRequiredGuard,
   'review-stale': reviewStaleGuard,
+  'worktree-reuse': worktreeReuseGuard,
 };
 
 /** Register a guard handler */

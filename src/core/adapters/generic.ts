@@ -16,6 +16,7 @@ const GENERIC_TOOLS: ToolNameMap = {
   execute_command: 'execute_command',
   create_subagent: 'create_subagent',
   exit_plan: 'exit_plan',
+  enter_worktree: '',
 };
 
 /** Guard manifest entry written to guards-manifest.json */

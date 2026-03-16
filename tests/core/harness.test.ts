@@ -173,8 +173,8 @@ describe('CLAUDE_CODE_TOOLS', () => {
 });
 
 describe('TOOL_CATEGORIES', () => {
-  it('contains exactly 7 categories', () => {
-    expect(TOOL_CATEGORIES).toHaveLength(7);
+  it('contains exactly 8 categories', () => {
+    expect(TOOL_CATEGORIES).toHaveLength(8);
   });
 
   it('matches ToolNameMap keys', () => {

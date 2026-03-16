@@ -102,7 +102,8 @@ export type GuardName =
   | 'post-push'
   | 'phase-boundary'
   | 'claim-required'
-  | 'review-stale';
+  | 'review-stale'
+  | 'worktree-reuse';
 
 /** Guard registration entry */
 export interface GuardDefinition {
@@ -357,6 +358,14 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     name: 'review-stale',
     description: 'Warn about scored sprints with missing reviews at session end',
     hookEvent: 'Stop',
+    level: 'full',
+  },
+  {
+    name: 'worktree-reuse',
+    description: 'Guide agent to reuse existing worktrees instead of recreating',
+    hookEvent: 'PreToolUse',
+    toolCategories: ['enter_worktree'],
+    matcher: 'EnterWorktree',
     level: 'full',
   },
 ];

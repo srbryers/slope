@@ -16,6 +16,7 @@ const CURSOR_TOOLS: ToolNameMap = {
   execute_command: 'run_terminal_command',
   create_subagent: 'create_subagent',
   exit_plan: 'exit_plan',
+  enter_worktree: '',
 };
 
 /** Cursor hook entry in .cursor/hooks.json */
