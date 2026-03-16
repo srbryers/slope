@@ -267,6 +267,8 @@ export type {
   GuidanceConfig,
   CustomGuardDefinition,
   AnyGuardDefinition,
+  Suggestion,
+  SuggestionOption,
 } from './guard.js';
 
 // Harness Adapter Framework

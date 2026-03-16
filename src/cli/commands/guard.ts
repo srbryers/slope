@@ -184,7 +184,7 @@ export async function guardCommand(args: string[]): Promise<void> {
   recordGuardExecution(cwd, name, input, result);
 
   // Format output based on hook event type
-  if (!result.context && !result.decision && !result.blockReason) {
+  if (!result.context && !result.decision && !result.blockReason && !result.suggestion) {
     // No guidance to inject — silent passthrough
     return;
   }

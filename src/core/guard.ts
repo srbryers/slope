@@ -44,6 +44,26 @@ export interface StopOutput {
   reason?: string;
 }
 
+/** A structured option within a suggestion */
+export interface SuggestionOption {
+  id: string;
+  label: string;
+  description?: string;
+  /** Slash command or CLI command to run if selected */
+  command?: string;
+}
+
+/** A structured suggestion with options for the agent to present */
+export interface Suggestion {
+  id: string;
+  title: string;
+  context: string;
+  options: SuggestionOption[];
+  /** If true, agent must present and wait for user choice */
+  requiresDecision: boolean;
+  priority?: 'critical' | 'high' | 'normal';
+}
+
 /** A guard's response — what guidance to inject */
 export interface GuardResult {
   /** Text injected into the agent's context */
@@ -52,6 +72,8 @@ export interface GuardResult {
   decision?: 'allow' | 'deny' | 'ask';
   /** For Stop/PostToolUse: block reason */
   blockReason?: string;
+  /** Structured suggestion — adapter formats for platform */
+  suggestion?: Suggestion;
 }
 
 /** Known guard names */
@@ -75,7 +97,12 @@ export type GuardName =
   | 'worktree-check'
   | 'sprint-completion'
   | 'worktree-merge'
-  | 'worktree-self-remove';
+  | 'worktree-self-remove'
+  | 'session-briefing'
+  | 'post-push'
+  | 'phase-boundary'
+  | 'claim-required'
+  | 'review-stale';
 
 /** Guard registration entry */
 export interface GuardDefinition {
@@ -292,6 +319,44 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     hookEvent: 'PreToolUse',
     toolCategories: ['execute_command'],
     matcher: 'Bash',
+    level: 'full',
+  },
+  // --- Suggestion Engine Guards ---
+  {
+    name: 'phase-boundary',
+    description: 'Block starting sprint in new phase if previous phase cleanup incomplete',
+    hookEvent: 'PreToolUse',
+    toolCategories: ['execute_command'],
+    matcher: 'Bash',
+    level: 'full',
+  },
+  {
+    name: 'claim-required',
+    description: 'Warn when editing code without an active sprint claim',
+    hookEvent: 'PreToolUse',
+    toolCategories: ['write_file'],
+    matcher: 'Edit|Write',
+    level: 'full',
+  },
+  {
+    name: 'post-push',
+    description: 'Suggest next workflow step after git push',
+    hookEvent: 'PostToolUse',
+    toolCategories: ['execute_command'],
+    matcher: 'Bash',
+    level: 'full',
+  },
+  {
+    name: 'session-briefing',
+    description: 'Inject sprint context on first tool call of session',
+    hookEvent: 'PostToolUse',
+    // no toolCategories, no matcher → fires on all tools
+    level: 'full',
+  },
+  {
+    name: 'review-stale',
+    description: 'Warn about scored sprints with missing reviews at session end',
+    hookEvent: 'Stop',
     level: 'full',
   },
 ];

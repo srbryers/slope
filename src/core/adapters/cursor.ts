@@ -5,7 +5,7 @@ import { existsSync, writeFileSync, readFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { HarnessAdapter, ToolNameMap } from '../harness.js';
 import { registerAdapter, resolveToolMatcher, SLOPE_BIN_PREAMBLE, writeOrUpdateManagedScript } from '../harness.js';
-import type { GuardResult, AnyGuardDefinition } from '../guard.js';
+import type { GuardResult, AnyGuardDefinition, Suggestion } from '../guard.js';
 
 /** Cursor tool name mappings */
 const CURSOR_TOOLS: ToolNameMap = {
@@ -61,40 +61,83 @@ export class CursorAdapter implements HarnessAdapter {
     return join(cwd, '.cursor', 'hooks.json');
   }
 
+  formatSuggestion(suggestion: Suggestion): string {
+    const lines: string[] = [`SLOPE ${suggestion.title}: ${suggestion.context}`];
+    if (suggestion.options.length > 0) {
+      lines.push('', 'Options:');
+      for (let i = 0; i < suggestion.options.length; i++) {
+        const opt = suggestion.options[i];
+        const desc = opt.description ? ` — ${opt.description}` : '';
+        lines.push(`${i + 1}. ${opt.label}${desc}`);
+      }
+    }
+    if (suggestion.requiresDecision) {
+      lines.push('', 'Present these options to the user. Wait for their choice before proceeding.');
+    }
+    return lines.join('\n');
+  }
+
   formatPreToolOutput(result: GuardResult): CursorHookOutput {
+    const suggestionText = result.suggestion && !result.blockReason
+      ? this.formatSuggestion(result.suggestion) : undefined;
+
     if (result.decision === 'deny' || result.blockReason) {
       return {
         decision: 'block',
         ...(result.blockReason && { reason: result.blockReason }),
+        ...([result.context, suggestionText].filter(Boolean).length > 0 && {
+          context: [result.context, suggestionText].filter(Boolean).join('\n\n'),
+        }),
+      };
+    }
+    // Critical suggestions with requiresDecision force a block
+    if (result.suggestion?.requiresDecision && result.suggestion.priority === 'critical') {
+      return {
+        decision: 'block',
+        reason: suggestionText,
         ...(result.context && { context: result.context }),
       };
     }
-    // 'ask' falls through to 'allow' — Cursor has no user-confirmation prompt
     return {
       decision: 'allow',
-      ...(result.context && { context: result.context }),
+      ...([result.context, suggestionText].filter(Boolean).length > 0 && {
+        context: [result.context, suggestionText].filter(Boolean).join('\n\n'),
+      }),
     };
   }
 
   formatPostToolOutput(result: GuardResult): CursorHookOutput {
-    if (result.blockReason) {
+    const suggestionText = result.suggestion && !result.blockReason
+      ? this.formatSuggestion(result.suggestion) : undefined;
+    const effectiveBlockReason = result.blockReason ?? (
+      result.suggestion?.requiresDecision ? suggestionText : undefined
+    );
+
+    if (effectiveBlockReason) {
       return {
         decision: 'block',
-        reason: result.blockReason,
+        reason: effectiveBlockReason,
         ...(result.context && { context: result.context }),
       };
     }
     return {
       decision: 'allow',
-      ...(result.context && { context: result.context }),
+      ...([result.context, suggestionText].filter(Boolean).length > 0 && {
+        context: [result.context, suggestionText].filter(Boolean).join('\n\n'),
+      }),
     };
   }
 
   formatStopOutput(result: GuardResult): CursorHookOutput {
-    if (result.blockReason) {
+    const suggestionText = result.suggestion && !result.blockReason
+      ? this.formatSuggestion(result.suggestion) : undefined;
+    const effectiveBlockReason = result.blockReason ?? (
+      result.suggestion?.requiresDecision ? suggestionText : undefined
+    );
+    if (effectiveBlockReason) {
       return {
         decision: 'block',
-        reason: result.blockReason,
+        reason: effectiveBlockReason,
       };
     }
     return { decision: 'allow' };

@@ -9,7 +9,7 @@ import { existsSync, writeFileSync, readFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { HarnessAdapter, ToolNameMap } from '../harness.js';
 import { registerAdapter, resolveToolMatcher, SLOPE_BIN_PREAMBLE, writeOrUpdateManagedScript } from '../harness.js';
-import type { GuardResult, AnyGuardDefinition } from '../guard.js';
+import type { GuardResult, AnyGuardDefinition, Suggestion } from '../guard.js';
 
 /** Windsurf tool name mappings */
 const WINDSURF_TOOLS: ToolNameMap = {
@@ -64,34 +64,58 @@ export class WindsurfAdapter implements HarnessAdapter {
     return join(cwd, '.windsurf', 'hooks.json');
   }
 
+  formatSuggestion(suggestion: Suggestion): string {
+    const lines: string[] = [`SLOPE ${suggestion.title}: ${suggestion.context}`];
+    if (suggestion.options.length > 0) {
+      lines.push('', 'Options:');
+      for (let i = 0; i < suggestion.options.length; i++) {
+        const opt = suggestion.options[i];
+        const desc = opt.description ? ` — ${opt.description}` : '';
+        lines.push(`${i + 1}. ${opt.label}${desc}`);
+      }
+    }
+    return lines.join('\n');
+  }
+
   formatPreToolOutput(result: GuardResult): WindsurfHookOutput {
+    // Windsurf can only block — no context injection
+    const suggestionText = result.suggestion && !result.blockReason
+      ? this.formatSuggestion(result.suggestion) : undefined;
+
     if (result.decision === 'deny' || result.blockReason) {
       return {
         action: 'deny',
         ...(result.blockReason && { message: result.blockReason }),
       };
     }
-    // 'ask' and context-only fall through to 'allow' — Windsurf can't inject context or prompt
+    // Critical suggestions with requiresDecision force a deny
+    if (result.suggestion?.requiresDecision && result.suggestion.priority === 'critical') {
+      return { action: 'deny', message: suggestionText };
+    }
     return { action: 'allow' };
   }
 
   formatPostToolOutput(result: GuardResult): WindsurfHookOutput {
-    if (result.blockReason) {
-      return {
-        action: 'deny',
-        message: result.blockReason,
-      };
+    const suggestionText = result.suggestion && !result.blockReason
+      ? this.formatSuggestion(result.suggestion) : undefined;
+    const effectiveBlockReason = result.blockReason ?? (
+      result.suggestion?.requiresDecision ? suggestionText : undefined
+    );
+
+    if (effectiveBlockReason) {
+      return { action: 'deny', message: effectiveBlockReason };
     }
     return { action: 'allow' };
   }
 
   formatStopOutput(result: GuardResult): WindsurfHookOutput {
-    // Windsurf doesn't support stop hooks, but format consistently
-    if (result.blockReason) {
-      return {
-        action: 'deny',
-        message: result.blockReason,
-      };
+    const suggestionText = result.suggestion && !result.blockReason
+      ? this.formatSuggestion(result.suggestion) : undefined;
+    const effectiveBlockReason = result.blockReason ?? (
+      result.suggestion?.requiresDecision ? suggestionText : undefined
+    );
+    if (effectiveBlockReason) {
+      return { action: 'deny', message: effectiveBlockReason };
     }
     return { action: 'allow' };
   }
