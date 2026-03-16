@@ -93,6 +93,11 @@ function parseArgs(args: string[]): Record<string, string> {
   return result;
 }
 
+/** Check if a name matches a known harness adapter (claude-code, cursor, windsurf, etc.) */
+function isKnownAdapter(name: string): boolean {
+  return listAdapters().includes(name);
+}
+
 export async function hookCommand(args: string[]): Promise<void> {
   const sub = args[0];
   const hookName = args[1];
@@ -103,6 +108,9 @@ export async function hookCommand(args: string[]): Promise<void> {
     case 'add':
       if (flags.level === 'full' || flags.level === 'scoring') {
         installGuardHooks(cwd, flags.level as 'scoring' | 'full', flags.harness);
+      } else if (hookName && isKnownAdapter(hookName)) {
+        // `slope hook add claude-code` → shorthand for `--level=full --harness=claude-code`
+        installGuardHooks(cwd, 'full', hookName);
       } else {
         addHook(hookName, cwd);
       }

@@ -152,10 +152,10 @@ describe('sprint-completion guard', () => {
       expect(result.blockReason).not.toContain('Tests passing');
     });
 
-    it('blocks Stop with gate list', async () => {
+    it('advises on Stop with gate list', async () => {
       const result = await sprintCompletionGuard(makeStop(), tmpDir);
-      expect(result.blockReason).toContain('Sprint 22');
-      expect(result.blockReason).toContain('Code review');
+      expect(result.context).toContain('Sprint 22');
+      expect(result.context).toContain('Code review');
     });
 
     it('does not block non-PR Bash commands', async () => {
@@ -177,10 +177,10 @@ describe('sprint-completion guard', () => {
       expect(result).toEqual({});
     });
 
-    it('blocks during scoring phase', async () => {
+    it('advises during scoring phase', async () => {
       saveSprintState(tmpDir, createSprintState(22, 'scoring'));
       const result = await sprintCompletionGuard(makeStop(), tmpDir);
-      expect(result.blockReason).toContain('Sprint 22');
+      expect(result.context).toContain('Sprint 22');
     });
   });
 
@@ -296,7 +296,7 @@ describe('sprint-completion guard', () => {
       expect(result).toEqual({});
     });
 
-    it('blocks Stop when scorecard is missing during implementing phase', async () => {
+    it('advises on Stop when scorecard is missing during implementing phase', async () => {
       const state = createSprintState(22, 'implementing');
       state.gates.tests = true;
       state.gates.code_review = true;
@@ -307,7 +307,7 @@ describe('sprint-completion guard', () => {
       // No scorecard file
 
       const result = await sprintCompletionGuard(makeStop(), tmpDir);
-      expect(result.blockReason).toContain('scorecard not found');
+      expect(result.context).toContain('scorecard not found');
     });
 
     it('shows both scorecard and gate errors when both are missing', async () => {
