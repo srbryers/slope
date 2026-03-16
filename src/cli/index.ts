@@ -63,6 +63,7 @@ import { versionCommand } from './commands/version.js';
 import { helpCommand } from './commands/help.js';
 import { quickstartCommand } from './commands/quickstart.js';
 import { worktreeCommand } from './commands/worktree.js';
+import { phaseCommand } from './commands/phase.js';
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -344,6 +345,12 @@ switch (subcommand) {
     break;
   case 'sprint':
     sprintCommand(process.argv.slice(3)).catch(err => {
+      console.error('Error:', err.message);
+      process.exit(1);
+    });
+    break;
+  case 'phase':
+    phaseCommand(process.argv.slice(3)).catch(err => {
       console.error('Error:', err.message);
       process.exit(1);
     });

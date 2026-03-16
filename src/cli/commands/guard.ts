@@ -408,6 +408,11 @@ const GUARD_RELEVANCE: Record<string, { when: string; why: string }> = {
   'subagent-gate': { when: 'always', why: 'Caps subagent model/turns to control cost' },
   'compaction': { when: 'always', why: 'Extracts events before context window compression' },
   'transcript': { when: 'always', why: 'Records tool call metadata for session replay' },
+  'session-briefing': { when: 'always', why: 'Injects sprint context on session start for continuity' },
+  'post-push': { when: 'sprint-workflow', why: 'Suggests next workflow step after pushing' },
+  'phase-boundary': { when: 'sprint-workflow', why: 'Prevents starting new phase without cleanup' },
+  'claim-required': { when: 'sprint-workflow', why: 'Warns when editing without sprint claim' },
+  'review-stale': { when: 'sprint-workflow', why: 'Catches scored sprints missing reviews' },
 };
 
 /** Detect which workflow profiles apply to this repo */
