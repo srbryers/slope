@@ -2,7 +2,6 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Read|Glob|Grep",
         "hooks": [
           {
             "type": "command",
@@ -10,21 +9,10 @@
             "timeout": 10,
             "statusMessage": "SLOPE: Suggest checking codebase index before deep exploration"
           }
-        ]
+        ],
+        "matcher": "Read|Glob|Grep|Edit|Write"
       },
       {
-        "matcher": "Edit|Write|Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/slope-guard.sh worktree-check",
-            "timeout": 10,
-            "statusMessage": "SLOPE: Block concurrent sessions without worktree isolation"
-          }
-        ]
-      },
-      {
-        "matcher": "Edit|Write",
         "hooks": [
           {
             "type": "command",
@@ -43,11 +31,39 @@
             "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/slope-guard.sh stale-flows",
             "timeout": 10,
             "statusMessage": "SLOPE: Warn when editing files belonging to a stale flow definition"
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/slope-guard.sh claim-required",
+            "timeout": 10,
+            "statusMessage": "SLOPE: Warn when editing code without an active sprint claim"
           }
-        ]
+        ],
+        "matcher": "Edit|Write"
       },
       {
-        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/slope-guard.sh subagent-gate",
+            "timeout": 10,
+            "statusMessage": "SLOPE: Enforce model selection on Explore/Plan subagents"
+          }
+        ],
+        "matcher": "Agent"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/slope-guard.sh workflow-gate",
+            "timeout": 10,
+            "statusMessage": "SLOPE: Block ExitPlanMode until review rounds are complete"
+          }
+        ],
+        "matcher": "ExitPlanMode"
+      },
+      {
         "hooks": [
           {
             "type": "command",
@@ -78,46 +94,30 @@
             "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/slope-guard.sh worktree-self-remove",
             "timeout": 10,
             "statusMessage": "SLOPE: Block git worktree remove when targeting own cwd"
-          }
-        ]
-      },
-      {
-        "matcher": "Agent",
-        "hooks": [
+          },
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/slope-guard.sh subagent-gate",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/slope-guard.sh phase-boundary",
             "timeout": 10,
-            "statusMessage": "SLOPE: Force haiku model and cap max_turns on Explore/Plan subagents"
+            "statusMessage": "SLOPE: Block starting sprint in new phase if previous phase cleanup incomplete"
           }
-        ]
+        ],
+        "matcher": "Bash"
       },
       {
-        "matcher": "EnterWorktree",
         "hooks": [
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/slope-guard.sh worktree-reuse",
-            "timeout": 15,
-            "statusMessage": "SLOPE: Guide agent to reuse existing worktrees instead of recreating"
-          }
-        ]
-      },
-      {
-        "matcher": "ExitPlanMode",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/slope-guard.sh workflow-gate",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/slope-guard.sh worktree-check",
             "timeout": 10,
-            "statusMessage": "SLOPE: Block ExitPlanMode until review rounds are complete"
+            "statusMessage": "SLOPE: Block concurrent sessions without worktree isolation"
           }
-        ]
+        ],
+        "matcher": "Read|Glob|Grep|Edit|Write|Bash"
       }
     ],
     "PostToolUse": [
       {
-        "matcher": "Edit|Write",
         "hooks": [
           {
             "type": "command",
@@ -129,12 +129,12 @@
             "type": "command",
             "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/slope-guard.sh review-tier",
             "timeout": 10,
-            "statusMessage": "SLOPE: Suggest plan review with specialist reviewers"
+            "statusMessage": "SLOPE: Suggest plan review with specialist reviewers after plan file write"
           }
-        ]
+        ],
+        "matcher": "Edit|Write"
       },
       {
-        "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
@@ -153,8 +153,15 @@
             "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/slope-guard.sh sprint-completion",
             "timeout": 10,
             "statusMessage": "SLOPE: Auto-detect test pass and mark gate complete"
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/slope-guard.sh post-push",
+            "timeout": 10,
+            "statusMessage": "SLOPE: Suggest next workflow step after git push"
           }
-        ]
+        ],
+        "matcher": "Bash"
       },
       {
         "hooks": [
@@ -163,6 +170,12 @@
             "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/slope-guard.sh transcript",
             "timeout": 10,
             "statusMessage": "SLOPE: Append tool call metadata to session transcript"
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/slope-guard.sh session-briefing",
+            "timeout": 10,
+            "statusMessage": "SLOPE: Inject sprint context on first tool call of session"
           }
         ]
       }
@@ -199,6 +212,12 @@
             "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/slope-guard.sh sprint-completion",
             "timeout": 10,
             "statusMessage": "SLOPE: Block session end when sprint gates are incomplete"
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/slope-guard.sh review-stale",
+            "timeout": 10,
+            "statusMessage": "SLOPE: Warn about scored sprints with missing reviews at session end"
           }
         ]
       }
