@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { mkdtempSync, rmSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execSync } from 'node:child_process';
@@ -92,6 +92,82 @@ describe('stop-check guard', () => {
       expect(result.blockReason).toBeUndefined();
 
       rmSync(bareDir, { recursive: true, force: true });
+    });
+  });
+
+  describe('session cleanup on exit', () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('calls removeSession on clean exit with correct sessionId', async () => {
+      const mockStore = {
+        removeSession: vi.fn().mockResolvedValue(true),
+        close: vi.fn(),
+      };
+      const resolveStoreMock = vi.fn().mockResolvedValue(mockStore);
+
+      vi.resetModules();
+      vi.doMock('../../../src/cli/store.js', () => ({
+        resolveStore: resolveStoreMock,
+      }));
+
+      const { stopCheckGuard: guardWithMock } = await import('../../../src/cli/guards/stop-check.js');
+
+      const result = await guardWithMock(makeStop(), tmpDir);
+      expect(result.blockReason).toBeUndefined();
+      expect(resolveStoreMock).toHaveBeenCalledWith(tmpDir);
+      expect(mockStore.removeSession).toHaveBeenCalledWith('test-session');
+      expect(mockStore.close).toHaveBeenCalled();
+    });
+
+    it('removeSession failure does not block stop', async () => {
+      vi.resetModules();
+      vi.doMock('../../../src/cli/store.js', () => ({
+        resolveStore: vi.fn().mockRejectedValue(new Error('store unavailable')),
+      }));
+
+      const { stopCheckGuard: guardWithMock } = await import('../../../src/cli/guards/stop-check.js');
+
+      // Should not throw
+      const result = await guardWithMock(makeStop(), tmpDir);
+      expect(result.blockReason).toBeUndefined();
+    });
+
+    it('sentinel file cleaned on exit', async () => {
+      // Create sentinel file
+      const sentinelDir = join(tmpdir(), 'slope-guards');
+      const sentinelFile = join(sentinelDir, 'worktree-check-test-session');
+      writeFileSync(sentinelFile, new Date().toISOString());
+      expect(existsSync(sentinelFile)).toBe(true);
+
+      vi.resetModules();
+      vi.doMock('../../../src/cli/store.js', () => ({
+        resolveStore: vi.fn().mockResolvedValue({
+          removeSession: vi.fn().mockResolvedValue(true),
+          close: vi.fn(),
+        }),
+      }));
+
+      const { stopCheckGuard: guardWithMock } = await import('../../../src/cli/guards/stop-check.js');
+      await guardWithMock(makeStop(), tmpDir);
+
+      expect(existsSync(sentinelFile)).toBe(false);
+    });
+
+    it('cleanup skipped when no session_id', async () => {
+      const resolveStoreMock = vi.fn();
+
+      vi.resetModules();
+      vi.doMock('../../../src/cli/store.js', () => ({
+        resolveStore: resolveStoreMock,
+      }));
+
+      const { stopCheckGuard: guardWithMock } = await import('../../../src/cli/guards/stop-check.js');
+      const input: HookInput = { session_id: '', cwd: tmpDir, hook_event_name: 'Stop' };
+      await guardWithMock(input, tmpDir);
+
+      expect(resolveStoreMock).not.toHaveBeenCalled();
     });
   });
 });

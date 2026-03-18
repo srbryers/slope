@@ -184,4 +184,64 @@ describe('transcriptGuard', () => {
       expect(() => JSON.parse(l)).not.toThrow();
     }
   });
+
+  describe('heartbeat', () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('calls updateHeartbeat after transcript append', async () => {
+      const mockStore = {
+        updateHeartbeat: vi.fn().mockResolvedValue(undefined),
+        close: vi.fn(),
+      };
+
+      vi.resetModules();
+      vi.doMock('../../../src/cli/store.js', () => ({
+        resolveStore: vi.fn().mockResolvedValue(mockStore),
+      }));
+      vi.doMock('../../../src/cli/config.js', () => ({
+        loadConfig: () => ({ transcriptsPath: '.slope/transcripts' }),
+      }));
+
+      const { transcriptGuard: guardWithMock } = await import('../../../src/cli/guards/transcript.js');
+      await guardWithMock(makeInput(), TEST_DIR);
+
+      expect(mockStore.updateHeartbeat).toHaveBeenCalledWith('test-sess-1');
+      expect(mockStore.close).toHaveBeenCalled();
+    });
+
+    it('heartbeat failure does not block transcript', async () => {
+      vi.resetModules();
+      vi.doMock('../../../src/cli/store.js', () => ({
+        resolveStore: vi.fn().mockRejectedValue(new Error('store unavailable')),
+      }));
+      vi.doMock('../../../src/cli/config.js', () => ({
+        loadConfig: () => ({ transcriptsPath: '.slope/transcripts' }),
+      }));
+
+      const { transcriptGuard: guardWithMock } = await import('../../../src/cli/guards/transcript.js');
+      const result = await guardWithMock(makeInput(), TEST_DIR);
+
+      // Guard still returns empty (silent)
+      expect(result).toEqual({});
+    });
+
+    it('heartbeat skipped when no session_id', async () => {
+      const resolveStoreMock = vi.fn();
+
+      vi.resetModules();
+      vi.doMock('../../../src/cli/store.js', () => ({
+        resolveStore: resolveStoreMock,
+      }));
+      vi.doMock('../../../src/cli/config.js', () => ({
+        loadConfig: () => ({ transcriptsPath: '.slope/transcripts' }),
+      }));
+
+      const { transcriptGuard: guardWithMock } = await import('../../../src/cli/guards/transcript.js');
+      await guardWithMock(makeInput({ session_id: '' }), TEST_DIR);
+
+      expect(resolveStoreMock).not.toHaveBeenCalled();
+    });
+  });
 });
