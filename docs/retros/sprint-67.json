@@ -1,0 +1,64 @@
+{
+  "sprint_number": 67,
+  "theme": "The Skill Shelf — Skill System Restructuring",
+  "par": 4,
+  "slope": 2,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-03-18",
+  "shots": [
+    {
+      "ticket_key": "T1",
+      "title": "Restructure sprint-workflow and performance-analysis skills",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Moved both skills from /skills/ to .claude/skills/ with folder structure"
+    },
+    {
+      "ticket_key": "T2",
+      "title": "Enhance loop-guide with gotchas and expanded references",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added gotchas.md, model-tier-rules.md, error-recovery.md; slimmed SKILL.md"
+    },
+    {
+      "ticket_key": "T3",
+      "title": "Create SLOPE API reference skill",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "New skill with 12 MCP gotchas, tool schemas, execute cookbook, search guide"
+    },
+    {
+      "ticket_key": "T4",
+      "title": "Update references and run validation",
+      "club": "putter",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Deleted old /skills/, regenerated CODEBASE.md, build+test+typecheck clean"
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [],
+  "special_plays": [],
+  "bunker_locations": [],
+  "yardage_book_updates": [],
+  "course_management_notes": []
+}
