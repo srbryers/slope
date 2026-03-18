@@ -28,9 +28,9 @@ return computeAreaPerformance(loadScorecards());
 ### Generate Training Plan
 ```javascript
 const scorecards = loadScorecards();
-const card = computeHandicapCard(scorecards);
 return generateTrainingPlan({
-  handicapCard: card,
+  handicap: computeHandicapCard(scorecards),
+  dispersion: computeDispersion(scorecards),
   recentScorecards: scorecards.slice(-5),
 });
 ```

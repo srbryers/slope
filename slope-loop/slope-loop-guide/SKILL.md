@@ -9,7 +9,7 @@ description: >
   Do NOT use for general Slope CLI usage or manual development — those are
   covered by the main Slope skill and CLAUDE.md.
 compatibility: >
-  Requires Slope CLI (@slope-dev/slope v1.13.1+) and slope-loop/ directory.
+  Requires Slope CLI (@slope-dev/slope v1.31.0+) and slope-loop/ directory.
   Best with Slope MCP server connected. Works in Claude Code (with hooks),
   claude.ai (upload as skill), and API (via /v1/skills endpoint).
 metadata:
@@ -31,12 +31,12 @@ Auto-injected into every automated sprint via Aider's `--read` flag. Supplements
 | `gotchas.md` | Loop-specific hazards with prevention steps |
 | `references/model-tier-rules.md` | Club-to-model mapping, escalation triggers, token thresholds |
 | `references/error-recovery.md` | Troubleshooting guide for all loop error scenarios |
-| `references/sprint-history.md` | Full per-sprint learning archive (loaded on demand) |
+| `references/sprint-history.md` | Per-sprint learning archive (stub — populated by loop automation after each sprint) |
 | `scripts/synthesize.sh` | Compacts SKILL.md when it exceeds 5000 words |
 
 ## Project Quick Reference
 - SLOPE: Sprint Lifecycle & Operational Performance Engine
-- Package: @slope-dev/slope (v1.13.1+)
+- Package: @slope-dev/slope (v1.31.0+)
 - TypeScript monorepo, pnpm, vitest for tests, strict TypeScript
 - 46 CLI commands, SQLite store, MCP server, 28 guard hooks
 - Scoring: golf metaphors (handicap, par, birdie, bogey, hazards)
@@ -58,9 +58,9 @@ Auto-injected into every automated sprint via Aider's `--read` flag. Supplements
 
 | Club | Model | Escalation |
 |------|-------|-----------|
-| Putter/Wedge | Local (Qwen 32B) | — |
-| Short Iron | Local (Qwen 32B) | Escalate on failure |
-| Long Iron/Driver | API (MiniMax M2.5) | — |
+| Putter/Wedge | Local (configurable) | — |
+| Short Iron | Local (configurable) | Escalate on failure |
+| Long Iron/Driver | API (configurable) | — |
 | Multi-file (2+) | API (always) | — |
 | >24K tokens | API (always) | — |
 

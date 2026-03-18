@@ -18,17 +18,17 @@ Expanded error handling scenarios and recovery steps for the autonomous loop.
 **Symptoms:** Store health check returns warnings or errors.
 **Recovery:**
 1. Run `slope store backup` to create a safety copy
-2. Run `slope store restore` to rebuild from backup
-3. If restore fails, check `.slope/slope.db` file permissions
-4. Last resort: delete `.slope/slope.db` and re-run `slope extract` to rebuild from git history
+2. Check `.slope/slope.db` file permissions and integrity
+3. If corrupt, delete `.slope/slope.db` and re-run `slope extract` to rebuild from git history
+4. Re-run `slope store status` to verify recovery
 
 ### Ollama returns empty responses
 **Symptoms:** Local model produces no output or garbage output.
 **Recovery:**
 1. Verify model is loaded: `ollama list`
 2. Check Ollama is running: `curl http://localhost:11434/api/tags`
-3. Try a simple test: `echo "hello" | ollama run qwen2.5-coder:14b`
-4. If model is corrupted, re-pull: `ollama pull qwen2.5-coder:14b`
+3. Try a simple test with the configured local model (check `slope loop config --show` for the model name)
+4. If model is corrupted, re-pull: `ollama pull <model-name>`
 5. If Ollama is down, the loop should auto-escalate to API model
 
 ### Aider edit blocks fail to parse

@@ -6,11 +6,11 @@ Detailed model routing rules for the autonomous loop.
 
 | Club | Default Model | Rationale |
 |------|--------------|-----------|
-| Putter | Local (Qwen 32B) | Trivial changes — fast, free |
-| Wedge | Local (Qwen 32B) | Small changes — fast, free |
-| Short Iron | Local (Qwen 32B) | Standard work — try local first |
-| Long Iron | API (MiniMax M2.5) | Multi-package — needs planning capability |
-| Driver | API (MiniMax M2.5) | High risk — needs architect-level reasoning |
+| Putter | Local (configurable, default: ollama/qwen3-coder-next-fast) | Trivial changes — fast, free |
+| Wedge | Local (configurable, default: ollama/qwen3-coder-next-fast) | Small changes — fast, free |
+| Short Iron | Local (configurable, default: ollama/qwen3-coder-next-fast) | Standard work — try local first |
+| Long Iron | API (configurable, default: claude-haiku-4-5) | Multi-package — needs planning capability |
+| Driver | API (configurable, default: claude-haiku-4-5) | High risk — needs architect-level reasoning |
 
 ## Escalation Triggers
 

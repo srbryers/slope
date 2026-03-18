@@ -19,36 +19,38 @@ return computeAreaPerformance(scorecards);
 // ── Generate training plan ──
 // Returns recommended practice areas based on trends
 const scorecards = loadScorecards();
-const card = computeHandicapCard(scorecards);
 return generateTrainingPlan({
-  handicapCard: card,
+  handicap: computeHandicapCard(scorecards),
+  dispersion: computeDispersion(scorecards),
   recentScorecards: scorecards.slice(-5),
 });
 
-// ── Hazard hotspot ranking ──
-// Returns modules ranked by weighted hazard score
+// ── Club-level miss rates ──
+// Returns per-club stats from area performance
 const scorecards = loadScorecards();
 const area = computeAreaPerformance(scorecards);
-return area.modules
-  .filter((m) => m.hazardCount > 0)
-  .sort((a, b) => b.weightedScore - a.weightedScore)
-  .slice(0, 10);
+return Object.entries(area.by_club).map(([club, stats]) => ({
+  club,
+  count: stats.count,
+  in_the_hole_rate: stats.in_the_hole_rate,
+  miss_rate: stats.miss_rate,
+}));
 
 // ── Trend detection (last 5 vs last 10) ──
 const scorecards = loadScorecards();
 const card = computeHandicapCard(scorecards);
 const trend =
-  card.rolling.last5 < card.rolling.last10
+  card.last_5.handicap < card.last_10.handicap
     ? "improving"
-    : card.rolling.last5 > card.rolling.last10
+    : card.last_5.handicap > card.last_10.handicap
       ? "worsening"
       : "stable";
-return { trend, last5: card.rolling.last5, last10: card.rolling.last10 };
+return { trend, last5: card.last_5.handicap, last10: card.last_10.handicap };
 
-// ── Club success rates ──
+// ── Per-sprint-type performance ──
 const scorecards = loadScorecards();
-const card = computeHandicapCard(scorecards);
-return card.clubPerformance;
+const area = computeAreaPerformance(scorecards);
+return area.by_sprint_type;
 
 // ── Team handicap (multi-developer) ──
 const scorecards = loadScorecards();

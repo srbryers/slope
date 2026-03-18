@@ -27,7 +27,8 @@ Top recurring hazards from 60+ sprints. Read before every sprint start.
 **What:** Every hazard since S43 was found by post-hole review, never during coding. The review gate works but is a trailing indicator.
 
 **Examples:**
-- S45: par -> triple+ from 2.5 hazard penalties alone, all found in review
+- S43, S44, S45, S48, S49: All hazards found by post-hole review, never during coding
+- S45: par -> triple+ from 2.5 hazard penalties alone
 - S49: All 3 hazards in autonomous sprint caught by manual code review
 
 **Prevention:** Mid-ticket self-review after complex changes (driver/long_iron). Shift detection left — don't rely solely on post-hole review.
@@ -39,7 +40,7 @@ Top recurring hazards from 60+ sprints. Read before every sprint start.
 **Examples:**
 - S60: Post-compaction "continue without asking" instructions compounded the problem by discouraging re-checking
 
-**Prevention:** All mandatory gates must write state to disk. Use the workflow-gate pattern: write expected state on detection, block on incomplete state at action time.
+**Prevention:** All mandatory gates must write state to disk. Advisory-only guards should be converted to state-writing guards where the obligation is enforceable. Use the workflow-gate pattern: write expected state on detection, block on incomplete state at action time.
 
 ## 5. Skipping Pre-Round Routine
 

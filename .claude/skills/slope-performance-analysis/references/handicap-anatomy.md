@@ -6,15 +6,17 @@ Field-by-field interpretation of `slope card` output.
 
 ### Rolling Stats
 ```
-last_5:    0.2    ← Average score-vs-par delta over last 5 sprints
-last_10:   0.8    ← Average over last 10 sprints
-all_time:  1.2    ← Lifetime average
+last_5:    { handicap: 0.2, fairway_pct: 95, gir_pct: 100, ... }
+last_10:   { handicap: 0.8, fairway_pct: 90, gir_pct: 95, ... }
+all_time:  { handicap: 1.2, fairway_pct: 88, gir_pct: 92, ... }
 ```
 
-**Trend detection:**
-- `last_5 < last_10` → Improving (recent sprints better than history)
-- `last_5 ≈ last_10` → Stable
-- `last_5 > last_10` → Worsening (recent sprints worse)
+Each is a `RollingStats` object. The `.handicap` field is the key metric — average score-vs-par delta.
+
+**Trend detection** (compare `.handicap` sub-field):
+- `last_5.handicap < last_10.handicap` → Improving (recent sprints better than history)
+- `last_5.handicap ≈ last_10.handicap` → Stable
+- `last_5.handicap > last_10.handicap` → Worsening (recent sprints worse)
 
 A handicap of 0 means consistently hitting par — optimal performance.
 

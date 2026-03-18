@@ -7,12 +7,14 @@ return computeHandicapCard(loadScorecards());
 // ── Dispersion analysis ──
 return computeDispersion(loadScorecards());
 
-// ── Area performance with hotspot ranking ──
+// ── Area performance — per-club stats ──
 const area = computeAreaPerformance(loadScorecards());
-return area.modules
-  .filter((m) => m.hazardCount > 0)
-  .sort((a, b) => b.weightedScore - a.weightedScore)
-  .slice(0, 10);
+return Object.entries(area.by_club).map(([club, stats]) => ({
+  club,
+  count: stats.count,
+  in_the_hole_rate: stats.in_the_hole_rate,
+  miss_rate: stats.miss_rate,
+}));
 
 // ── Validate a scorecard file ──
 return validateScorecard(
@@ -50,7 +52,8 @@ return formatBriefing({
 // ── Training plan from current data ──
 const scorecards = loadScorecards();
 return generateTrainingPlan({
-  handicapCard: computeHandicapCard(scorecards),
+  handicap: computeHandicapCard(scorecards),
+  dispersion: computeDispersion(scorecards),
   recentScorecards: scorecards.slice(-5),
 });
 

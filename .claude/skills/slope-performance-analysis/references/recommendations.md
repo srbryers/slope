@@ -76,9 +76,9 @@ Use `generateTrainingPlan()` to get automated recommendations:
 ```javascript
 // Via execute()
 const scorecards = loadScorecards();
-const card = computeHandicapCard(scorecards);
 return generateTrainingPlan({
-  handicapCard: card,
+  handicap: computeHandicapCard(scorecards),
+  dispersion: computeDispersion(scorecards),
   recentScorecards: scorecards.slice(-5),
 });
 ```

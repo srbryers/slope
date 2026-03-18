@@ -21,8 +21,8 @@ return formatBriefing({
 });
 
 // ── Check branch hygiene ──
-// Returns list of branches (use to identify stale ones)
-return listFiles(".git/refs/heads").map((f) => f.replace(".git/refs/heads/", ""));
+// Returns list of local branch ref files
+return listFiles(".git/refs/heads");
 
 // ── Compute par and slope ──
 const ticketCount = 4;
@@ -61,11 +61,9 @@ const scorecards = loadScorecards();
 return extractHazardIndex(scorecards, "types");
 
 // ── Recommend reviews for current sprint ──
-// Pass the scorecard to get review type recommendations
-const card = JSON.parse(readFile("docs/retros/sprint-67.json"));
+// Pass sprint metadata to get review type recommendations
 return recommendReviews({
-  scorecard: card,
   ticketCount: 4,
-  hasSchemaChanges: false,
-  hasSecurityChanges: false,
+  slope: 2,
+  clubs: ["short_iron", "wedge", "long_iron", "putter"],
 });
