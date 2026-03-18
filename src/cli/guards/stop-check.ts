@@ -1,6 +1,8 @@
 import { execSync } from 'node:child_process';
 import type { HookInput, GuardResult } from '../../core/index.js';
 import { headIsOnMain, loadBaseline, removeBaseline } from './git-utils.js';
+import { resolveStore } from '../store.js';
+import { resetWorktreeCheckState } from './worktree-check.js';
 
 /**
  * Detect the effective git working directory for this session.
@@ -176,5 +178,20 @@ export async function stopCheckGuard(_input: HookInput, cwd: string): Promise<Gu
 
   // Clean session — remove baseline
   removeBaseline(_input.session_id, cwd);
+
+  // Clean up session from store and sentinel file
+  if (_input.session_id) {
+    try {
+      const store = await resolveStore(cwd);
+      try {
+        await store.removeSession(_input.session_id);
+      } finally {
+        try { store.close(); } catch { /* ignore */ }
+      }
+    } catch { /* store unavailable — session will expire via TTL */ }
+
+    resetWorktreeCheckState(_input.session_id);
+  }
+
   return {};
 }

@@ -3,6 +3,7 @@ import type { HookInput, GuardResult } from '../../core/index.js';
 import { appendTurn } from '../../core/transcript.js';
 import type { ToolCallSummary, TranscriptLine } from '../../core/types.js';
 import { loadConfig } from '../config.js';
+import { resolveStore } from '../store.js';
 
 /**
  * Summarize tool_input params into a short string for the transcript.
@@ -77,6 +78,18 @@ export async function transcriptGuard(input: HookInput, cwd: string): Promise<Gu
     appendTurn(transcriptsDir, input.session_id, line);
   } catch {
     // Silent — transcript write failure should never block the agent
+  }
+
+  // Heartbeat: keep session alive in store (prevents stale cleanup with shorter TTL)
+  if (input.session_id) {
+    try {
+      const store = await resolveStore(cwd);
+      try {
+        await store.updateHeartbeat(input.session_id);
+      } finally {
+        try { store.close(); } catch { /* ignore */ }
+      }
+    } catch { /* heartbeat failure is non-fatal */ }
   }
 
   return {};
