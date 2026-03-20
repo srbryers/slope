@@ -5,6 +5,10 @@ import type { Logger } from './logger.js';
 // === Config ===
 
 export interface LoopConfig {
+  /** Workflow name to use for step ordering (opt-in). When set, the loop delegates to the workflow engine. */
+  workflowName?: string;
+  /** Variables to pass to the workflow (e.g., model, sprint_id) */
+  workflowVariables?: Record<string, string>;
   modelLocal: string;
   modelApi: string;
   ollamaApiBase: string;
