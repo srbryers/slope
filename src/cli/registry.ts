@@ -306,6 +306,14 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     ],
   },
   {
+    cmd: 'workflow', desc: 'Manage workflow definitions', category: 'tooling',
+    subcommands: [
+      { name: 'validate', desc: 'Parse and validate a workflow definition' },
+      { name: 'list', desc: 'List all available workflows (project + built-in)' },
+      { name: 'show', desc: 'Pretty-print a workflow with phase/step tree' },
+    ],
+  },
+  {
     cmd: 'flows', desc: 'Manage user flow definitions', category: 'tooling',
     subcommands: [
       { name: 'init', desc: 'Create .slope/flows.json with example template' },
