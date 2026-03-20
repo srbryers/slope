@@ -24,7 +24,8 @@
     "mcp-slope-tools": "./dist/mcp/index.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "src/core/workflows"
   ],
   "scripts": {
     "prepare": "tsc",

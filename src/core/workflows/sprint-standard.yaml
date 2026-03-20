@@ -1,0 +1,77 @@
+# SLOPE Sprint Standard Workflow
+# Full lifecycle: briefing → tickets → scorecard → review
+name: sprint-standard
+version: "1"
+description: Standard sprint lifecycle with pre-hole, per-ticket, and post-hole phases
+
+variables:
+  sprint_id:
+    required: true
+    type: string
+    pattern: "^S\\d+$"
+  tickets:
+    required: true
+    type: array
+
+phases:
+  # --- Pre-Hole: Sprint setup ---
+  - id: pre_hole
+    steps:
+      - id: briefing
+        type: command
+        command: slope briefing --sprint=${sprint_id}
+        checkpoint: exit_code_0
+        blocks_next: true
+
+      - id: verify_previous
+        type: validation
+        prompt: Verify previous sprint scorecard exists
+        conditions:
+          - previous_scorecard_exists
+
+  # --- Per-Ticket: Execute each ticket ---
+  - id: per_ticket
+    repeat_for: tickets
+    timeout_per_item: 600
+    on_timeout: log_blocker_and_skip
+    steps:
+      - id: pre_shot
+        type: agent_input
+        prompt: "Select club and declare approach for ticket"
+        required_fields:
+          - club
+          - approach
+
+      - id: implement
+        type: agent_work
+        prompt: "Implement the ticket according to the declared approach"
+        rules:
+          - "Run tests after each change"
+          - "Commit after each file creation or feature completion"
+          - "Push after ticket completion"
+        blocks_next: true
+
+      - id: post_shot
+        type: agent_input
+        prompt: "Score the shot — record result, hazards, and penalties"
+        required_fields:
+          - result
+          - hazards
+
+  # --- Post-Hole: Sprint wrap-up ---
+  - id: post_hole
+    steps:
+      - id: validate_scorecard
+        type: command
+        command: slope validate
+        checkpoint: exit_code_0
+        blocks_next: true
+
+      - id: review
+        type: command
+        command: slope review
+        checkpoint: exit_code_0
+
+      - id: update_map
+        type: command
+        command: slope map
