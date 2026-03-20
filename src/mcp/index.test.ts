@@ -61,6 +61,13 @@ function createMockStore(): SlopeStore & { sessions: SlopeSession[]; claims: Spr
     async getActiveTestingSession() { return null; },
     async addTestingFinding() { return { id: `tfind-${Date.now()}` }; },
     async getTestingFindings() { return []; },
+    async startExecution(p) { return { id: `wf-${Date.now()}`, workflow_name: p.workflow_name, status: 'running' as const, variables: p.variables ?? {}, completed_steps: [], started_at: new Date().toISOString(), updated_at: new Date().toISOString(), sprint_id: p.sprint_id, session_id: p.session_id }; },
+    async getExecution() { return null; },
+    async getExecutionBySprint() { return null; },
+    async updateExecutionState() {},
+    async completeExecution() {},
+    async recordStepResult(p) { return { id: `wfs-${Date.now()}`, execution_id: p.execution_id, step_id: p.step_id, phase: p.phase, status: p.status, started_at: new Date().toISOString() }; },
+    async listExecutions() { return []; },
     close() {},
   };
 }
