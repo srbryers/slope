@@ -58,11 +58,48 @@ describe('Built-in workflows', () => {
     });
   });
 
+  describe('sprint-autonomous', () => {
+    it('loads and passes validation', () => {
+      const def = loadWorkflow('sprint-autonomous', cwd);
+      expect(def.name).toBe('sprint-autonomous');
+      const result = validateWorkflow(def);
+      expect(result.valid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it('has per_ticket phase with repeat_for and timeout', () => {
+      const def = loadWorkflow('sprint-autonomous', cwd);
+      const perTicket = def.phases.find(p => p.id === 'per_ticket')!;
+      expect(perTicket.repeat_for).toBe('tickets');
+      expect(perTicket.on_timeout).toBe('log_blocker_and_skip');
+      expect(perTicket.timeout_per_item).toBe(1800);
+    });
+  });
+
+  describe('sprint-lightweight', () => {
+    it('loads and passes validation', () => {
+      const def = loadWorkflow('sprint-lightweight', cwd);
+      expect(def.name).toBe('sprint-lightweight');
+      const result = validateWorkflow(def);
+      expect(result.valid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it('has minimal structure (per_ticket + validate)', () => {
+      const def = loadWorkflow('sprint-lightweight', cwd);
+      expect(def.phases).toHaveLength(2);
+      expect(def.phases[0].id).toBe('per_ticket');
+      expect(def.phases[1].id).toBe('validate');
+    });
+  });
+
   describe('listWorkflows', () => {
-    it('includes sprint-standard in built-ins', () => {
+    it('includes all 3 built-in workflows', () => {
       const list = listWorkflows(cwd);
       const names = list.map(w => w.name);
       expect(names).toContain('sprint-standard');
+      expect(names).toContain('sprint-autonomous');
+      expect(names).toContain('sprint-lightweight');
     });
   });
 });

@@ -1,0 +1,39 @@
+# SLOPE Sprint Lightweight Workflow
+# Minimal gates: implement → validate → done.
+# Use for quick fixes, docs-only sprints, or when full ceremony isn't needed.
+name: sprint-lightweight
+version: "1"
+description: Minimal workflow — implement, validate, done
+
+variables:
+  sprint_id:
+    required: true
+    type: string
+  tickets:
+    required: true
+    type: array
+
+phases:
+  # --- Per-Ticket: Just implement ---
+  - id: per_ticket
+    repeat_for: tickets
+    steps:
+      - id: implement
+        type: agent_work
+        prompt: "Implement the ticket"
+        rules:
+          - "Commit after completion"
+        blocks_next: true
+
+  # --- Validate: Ensure quality ---
+  - id: validate
+    steps:
+      - id: typecheck
+        type: command
+        command: pnpm typecheck
+        checkpoint: exit_code_0
+
+      - id: tests
+        type: command
+        command: pnpm test
+        checkpoint: exit_code_0
