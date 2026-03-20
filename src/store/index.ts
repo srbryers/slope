@@ -7,7 +7,7 @@ import { dirname } from 'node:path';
 import { createRequire } from 'node:module';
 import Database from 'better-sqlite3';
 import type { Database as DatabaseType } from 'better-sqlite3';
-import type { SprintClaim, GolfScorecard, SlopeEvent, EventType } from '../core/index.js';
+import type { SprintClaim, GolfScorecard, SlopeEvent, EventType, WorkflowExecution, WorkflowStepResult, CompletedStep } from '../core/index.js';
 import type { CommonIssuesFile, StoreStats } from '../core/index.js';
 import { SlopeStoreError } from '../core/index.js';
 import type { SlopeStore, SlopeSession } from '../core/index.js';
@@ -582,6 +582,136 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
     }));
   }
 
+  // --- Workflow Executions ---
+
+  async startExecution(params: { workflow_name: string; sprint_id?: string; variables?: Record<string, string>; session_id?: string }): Promise<WorkflowExecution> {
+    const id = generateId('wf');
+    const now = nowISO();
+    const execution: WorkflowExecution = {
+      id,
+      workflow_name: params.workflow_name,
+      sprint_id: params.sprint_id,
+      current_phase: undefined,
+      current_step: undefined,
+      status: 'running',
+      variables: params.variables ?? {},
+      completed_steps: [],
+      started_at: now,
+      updated_at: now,
+      session_id: params.session_id,
+    };
+
+    this.db.prepare(`
+      INSERT INTO workflow_executions (id, workflow_name, sprint_id, current_phase, current_step, status, variables, completed_steps, started_at, updated_at, session_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      execution.id,
+      execution.workflow_name,
+      execution.sprint_id ?? null,
+      execution.current_phase ?? null,
+      execution.current_step ?? null,
+      execution.status,
+      JSON.stringify(execution.variables),
+      JSON.stringify(execution.completed_steps),
+      execution.started_at,
+      execution.updated_at,
+      execution.session_id ?? null,
+    );
+
+    return execution;
+  }
+
+  async getExecution(executionId: string): Promise<WorkflowExecution | null> {
+    const row = this.db.prepare('SELECT * FROM workflow_executions WHERE id = ?').get(executionId) as Record<string, unknown> | undefined;
+    return row ? rowToExecution(row) : null;
+  }
+
+  async getExecutionBySprint(sprintId: string): Promise<WorkflowExecution | null> {
+    const row = this.db.prepare(
+      "SELECT * FROM workflow_executions WHERE sprint_id = ? AND status NOT IN ('completed', 'failed') ORDER BY started_at DESC LIMIT 1"
+    ).get(sprintId) as Record<string, unknown> | undefined;
+    return row ? rowToExecution(row) : null;
+  }
+
+  async updateExecutionState(executionId: string, phase: string, step: string): Promise<void> {
+    const result = this.db.prepare(
+      'UPDATE workflow_executions SET current_phase = ?, current_step = ?, updated_at = ? WHERE id = ?'
+    ).run(phase, step, nowISO(), executionId);
+    if (result.changes === 0) {
+      throw new SlopeStoreError('NOT_FOUND', `Workflow execution "${executionId}" not found`);
+    }
+  }
+
+  async completeExecution(executionId: string, status: 'completed' | 'failed'): Promise<void> {
+    const result = this.db.prepare(
+      'UPDATE workflow_executions SET status = ?, updated_at = ? WHERE id = ?'
+    ).run(status, nowISO(), executionId);
+    if (result.changes === 0) {
+      throw new SlopeStoreError('NOT_FOUND', `Workflow execution "${executionId}" not found`);
+    }
+  }
+
+  async recordStepResult(params: { execution_id: string; step_id: string; phase: string; status: 'completed' | 'skipped' | 'failed'; output?: Record<string, unknown>; exit_code?: number }): Promise<WorkflowStepResult> {
+    const id = generateId('wfs');
+    const now = nowISO();
+    const result: WorkflowStepResult = {
+      id,
+      execution_id: params.execution_id,
+      step_id: params.step_id,
+      phase: params.phase,
+      status: params.status,
+      output: params.output,
+      exit_code: params.exit_code,
+      started_at: now,
+      completed_at: now,
+    };
+
+    this.db.prepare(`
+      INSERT INTO workflow_step_results (id, execution_id, step_id, phase, status, output, exit_code, started_at, completed_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      result.id,
+      result.execution_id,
+      result.step_id,
+      result.phase,
+      result.status,
+      result.output ? JSON.stringify(result.output) : null,
+      result.exit_code ?? null,
+      result.started_at,
+      result.completed_at ?? null,
+    );
+
+    // Update completed_steps on the execution
+    const exec = this.db.prepare('SELECT completed_steps FROM workflow_executions WHERE id = ?')
+      .get(params.execution_id) as { completed_steps: string } | undefined;
+    if (exec) {
+      const steps: CompletedStep[] = JSON.parse(exec.completed_steps);
+      steps.push({ step_id: params.step_id, phase: params.phase, status: params.status });
+      this.db.prepare('UPDATE workflow_executions SET completed_steps = ?, updated_at = ? WHERE id = ?')
+        .run(JSON.stringify(steps), nowISO(), params.execution_id);
+    }
+
+    return result;
+  }
+
+  async listExecutions(filter?: { sprint_id?: string; status?: string }): Promise<WorkflowExecution[]> {
+    let sql = 'SELECT * FROM workflow_executions WHERE 1=1';
+    const params: unknown[] = [];
+
+    if (filter?.sprint_id) {
+      sql += ' AND sprint_id = ?';
+      params.push(filter.sprint_id);
+    }
+    if (filter?.status) {
+      sql += ' AND status = ?';
+      params.push(filter.status);
+    }
+    sql += ' ORDER BY started_at DESC';
+
+    const rows = this.db.prepare(sql).all(...params) as Array<Record<string, unknown>>;
+    return rows.map(rowToExecution);
+  }
+
   // --- Embeddings ---
 
   async saveEmbeddings(entries: EmbeddingEntry[]): Promise<void> {
@@ -776,6 +906,22 @@ function rowToEvent(row: Record<string, unknown>): SlopeEvent {
     data: row.data ? JSON.parse(row.data as string) : {},
     sprint_number: (row.sprint_number as number | null) ?? undefined,
     ticket_key: (row.ticket_key as string | null) ?? undefined,
+  };
+}
+
+function rowToExecution(row: Record<string, unknown>): WorkflowExecution {
+  return {
+    id: row.id as string,
+    workflow_name: row.workflow_name as string,
+    sprint_id: (row.sprint_id as string | null) ?? undefined,
+    current_phase: (row.current_phase as string | null) ?? undefined,
+    current_step: (row.current_step as string | null) ?? undefined,
+    status: row.status as WorkflowExecution['status'],
+    variables: row.variables ? JSON.parse(row.variables as string) : {},
+    completed_steps: row.completed_steps ? JSON.parse(row.completed_steps as string) : [],
+    started_at: row.started_at as string,
+    updated_at: row.updated_at as string,
+    session_id: (row.session_id as string | null) ?? undefined,
   };
 }
 

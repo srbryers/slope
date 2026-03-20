@@ -1,7 +1,7 @@
 // SLOPE — SlopeStore Interface
 // Pluggable persistent storage for sessions, claims, scorecards, and common issues.
 
-import type { SprintClaim, GolfScorecard, SlopeEvent } from './types.js';
+import type { SprintClaim, GolfScorecard, SlopeEvent, WorkflowExecution, WorkflowStepResult } from './types.js';
 import type { CommonIssuesFile } from './briefing.js';
 import type { SprintRegistry } from './registry.js';
 
@@ -69,6 +69,15 @@ export interface SlopeStore extends SprintRegistry {
   getActiveTestingSession(): Promise<{ id: string; branch?: string; sprint?: number; purpose?: string; worktree_path?: string; branch_name?: string; started_at: string } | null>;
   addTestingFinding(finding: { session_id: string; description: string; severity?: string; ticket?: string }): Promise<{ id: string }>;
   getTestingFindings(sessionId: string): Promise<Array<{ id: string; description: string; severity: string; ticket?: string; created_at: string }>>;
+
+  // Workflow executions
+  startExecution(params: { workflow_name: string; sprint_id?: string; variables?: Record<string, string>; session_id?: string }): Promise<WorkflowExecution>;
+  getExecution(executionId: string): Promise<WorkflowExecution | null>;
+  getExecutionBySprint(sprintId: string): Promise<WorkflowExecution | null>;
+  updateExecutionState(executionId: string, phase: string, step: string): Promise<void>;
+  completeExecution(executionId: string, status: 'completed' | 'failed'): Promise<void>;
+  recordStepResult(params: { execution_id: string; step_id: string; phase: string; status: 'completed' | 'skipped' | 'failed'; output?: Record<string, unknown>; exit_code?: number }): Promise<WorkflowStepResult>;
+  listExecutions(filter?: { sprint_id?: string; status?: string }): Promise<WorkflowExecution[]>;
 
   // Diagnostics
   getSchemaVersion(): Promise<number>;
