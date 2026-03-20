@@ -754,6 +754,10 @@ export type {
   WorkflowVariable,
 } from './workflow.js';
 
+// Workflow Validator
+export { validateWorkflow } from './workflow-validator.js';
+export type { ValidationIssue, WorkflowValidationResult } from './workflow-validator.js';
+
 // Workflow Engine
 export { WorkflowEngine } from './workflow-engine.js';
 export type {
