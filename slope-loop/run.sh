@@ -1,7 +1,12 @@
 #!/bin/bash
+# DEPRECATED: Use `slope loop run` or `slope sprint run --workflow=sprint-autonomous` instead.
+# This shell script is maintained for backward compatibility only.
+# Migration: slope loop run → slope sprint run --workflow=sprint-autonomous
+#
 # slope-loop/run.sh — Run a single sprint from the generated backlog
 # Usage: ./slope-loop/run.sh [sprint-id] [--dry-run]
 # If no sprint-id, picks the next unscored sprint
+echo "⚠ DEPRECATED: Use 'slope loop run' or 'slope sprint run --workflow=sprint-autonomous' instead." >&2
 
 set -euo pipefail
 

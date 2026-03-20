@@ -1,8 +1,12 @@
 #!/bin/bash
+# DEPRECATED: Use `slope loop continuous` or `slope sprint run --workflow=sprint-autonomous` instead.
+# This shell script is maintained for backward compatibility only.
+#
 # slope-loop/continuous.sh — Run sprints in a loop, regenerating backlog when exhausted
 #
 # @description Continuously runs SLOPE sprints in a loop, regenerating the backlog
 #              when exhausted. Includes safety limits and failure detection.
+echo "⚠ DEPRECATED: Use 'slope loop continuous' or 'slope sprint run --workflow=sprint-autonomous' instead." >&2
 # @usage ./slope-loop/continuous.sh [--max=N] [--dry-run] [--pause=SECONDS]
 # @param --max=N Maximum number of sprints to run (default: 10)
 # @param --dry-run Run without executing sprints
