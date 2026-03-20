@@ -42,6 +42,7 @@ import { pluginCommand } from './commands/plugin.js';
 import { dashboardCommand } from './commands/dashboard.js';
 import { mapCommand } from './commands/map.js';
 import { flowsCommand } from './commands/flows.js';
+import { workflowCommand } from './commands/workflow.js';
 import { inspirationsCommand } from './commands/inspirations.js';
 import { reviewStateCommand } from './commands/review-state.js';
 import { analyzeCommand } from './commands/analyze.js';
@@ -255,6 +256,12 @@ switch (subcommand) {
     break;
   case 'flows':
     flowsCommand(process.argv.slice(3)).catch(err => {
+      console.error('Error:', err.message);
+      process.exit(1);
+    });
+    break;
+  case 'workflow':
+    workflowCommand(process.argv.slice(3)).catch(err => {
       console.error('Error:', err.message);
       process.exit(1);
     });
