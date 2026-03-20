@@ -147,6 +147,40 @@ const MIGRATIONS: Array<{ version: number; sql: string }> = [
       CREATE INDEX IF NOT EXISTS idx_testing_findings_session ON testing_findings(session_id);
     `,
   },
+  {
+    version: 6,
+    sql: `
+      CREATE TABLE IF NOT EXISTS workflow_executions (
+        id TEXT PRIMARY KEY,
+        workflow_name TEXT NOT NULL,
+        sprint_id TEXT,
+        current_phase TEXT,
+        current_step TEXT,
+        status TEXT NOT NULL DEFAULT 'running',
+        variables TEXT DEFAULT '{}',
+        completed_steps TEXT DEFAULT '[]',
+        started_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        session_id TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS workflow_step_results (
+        id TEXT PRIMARY KEY,
+        execution_id TEXT NOT NULL REFERENCES workflow_executions(id) ON DELETE CASCADE,
+        step_id TEXT NOT NULL,
+        phase TEXT NOT NULL,
+        status TEXT NOT NULL,
+        output TEXT,
+        exit_code INTEGER,
+        started_at TEXT NOT NULL,
+        completed_at TEXT
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_wf_exec_sprint ON workflow_executions(sprint_id);
+      CREATE INDEX IF NOT EXISTS idx_wf_exec_session ON workflow_executions(session_id);
+      CREATE INDEX IF NOT EXISTS idx_wf_step_exec ON workflow_step_results(execution_id);
+    `,
+  },
 ];
 
 /** Latest schema version — total number of migrations available. */
