@@ -4,7 +4,7 @@
 
 export interface FunctionRegistryEntry {
   name: string;
-  module: 'core' | 'fs' | 'constants' | 'store' | 'flows' | 'inspirations' | 'init' | 'testing';
+  module: 'core' | 'fs' | 'constants' | 'store' | 'flows' | 'inspirations' | 'init' | 'testing' | 'workflow';
   description: string;
   signature: string;
   example: string;
@@ -925,6 +925,49 @@ export const SLOPE_REGISTRY: FunctionRegistryEntry[] = [
     signature: 'testing_plan_status()',
     example: 'Call via MCP: testing_plan_status()',
   },
+  // ─── Workflow Engine ───
+  {
+    name: 'parseWorkflow',
+    module: 'workflow',
+    description: 'Parse a YAML string into a WorkflowDefinition. Validates structure and step types.',
+    signature: 'parseWorkflow(yaml: string): WorkflowDefinition',
+    example: 'return parseWorkflow(readFileSync(".slope/workflows/sprint-standard.yaml", "utf8"))',
+  },
+  {
+    name: 'resolveVariables',
+    module: 'workflow',
+    description: 'Interpolate ${var} references in a workflow definition. Missing vars throw.',
+    signature: 'resolveVariables(def: WorkflowDefinition, vars: Record<string, string>): WorkflowDefinition',
+    example: 'return resolveVariables(def, { sprint_id: "S42", tickets: "T1,T2" })',
+  },
+  {
+    name: 'validateWorkflow',
+    module: 'workflow',
+    description: 'Validate a workflow definition for structural issues. Returns errors and warnings.',
+    signature: 'validateWorkflow(def: WorkflowDefinition): WorkflowValidationResult',
+    example: 'return validateWorkflow(parseWorkflow(yaml))',
+  },
+  {
+    name: 'loadWorkflow',
+    module: 'workflow',
+    description: 'Load a workflow by name from .slope/workflows/ or built-in defaults.',
+    signature: 'loadWorkflow(name: string, cwd: string): WorkflowDefinition',
+    example: 'return loadWorkflow("sprint-standard", process.cwd())',
+  },
+  {
+    name: 'listWorkflows',
+    module: 'workflow',
+    description: 'List all available workflows (project + built-in) with source info.',
+    signature: 'listWorkflows(cwd: string): WorkflowSummary[]',
+    example: 'return listWorkflows(process.cwd())',
+  },
+  {
+    name: 'WorkflowEngine',
+    module: 'workflow',
+    description: 'Execution engine: start(), next(), complete(), skip(), fail(). Controls step ordering and state transitions.',
+    signature: 'new WorkflowEngine()',
+    example: 'const engine = new WorkflowEngine(); const exec = await engine.start(def, store, { sprint_id: "S42" })',
+  },
 ];
 
 /**
@@ -1175,5 +1218,33 @@ export const MCP_TOOL_REGISTRY: readonly McpToolMeta[] = [
     desc: 'Show test plan coverage summary: tested, untested, stale, and issue counts per section',
     params: [],
     requiresStore: false,
+  },
+  {
+    name: 'workflow_next',
+    desc: 'Get the next step in a workflow execution. Returns step info or completion status.',
+    params: [
+      { name: 'execution_id', type: 'string', desc: 'Workflow execution ID (optional if session_id provided)', required: false },
+      { name: 'session_id', type: 'string', desc: 'Session ID to find active execution', required: false },
+    ],
+    requiresStore: true,
+  },
+  {
+    name: 'workflow_complete',
+    desc: 'Complete the current step and advance the workflow execution.',
+    params: [
+      { name: 'execution_id', type: 'string', desc: 'Workflow execution ID', required: true },
+      { name: 'step_id', type: 'string', desc: 'Step ID being completed', required: true },
+      { name: 'output', type: 'object', desc: 'Step output data', required: false },
+      { name: 'exit_code', type: 'number', desc: 'Exit code for command steps', required: false },
+    ],
+    requiresStore: true,
+  },
+  {
+    name: 'workflow_status',
+    desc: 'Show workflow execution status with progress (completed/total steps).',
+    params: [
+      { name: 'execution_id', type: 'string', desc: 'Specific execution ID, or omit for all active', required: false },
+    ],
+    requiresStore: true,
   },
 ];

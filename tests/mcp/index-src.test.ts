@@ -61,6 +61,13 @@ function createMockStore(): SlopeStore & { sessions: SlopeSession[]; claims: Spr
     async getActiveTestingSession() { return null; },
     async addTestingFinding() { return { id: `tfind-${Date.now()}` }; },
     async getTestingFindings() { return []; },
+    async startExecution(p) { return { id: `wf-${Date.now()}`, workflow_name: p.workflow_name, status: 'running' as const, variables: p.variables ?? {}, completed_steps: [], started_at: new Date().toISOString(), updated_at: new Date().toISOString(), sprint_id: p.sprint_id, session_id: p.session_id }; },
+    async getExecution() { return null; },
+    async getExecutionBySprint() { return null; },
+    async updateExecutionState() {},
+    async completeExecution() {},
+    async recordStepResult(p) { return { id: `wfs-${Date.now()}`, execution_id: p.execution_id, step_id: p.step_id, phase: p.phase, status: p.status, started_at: new Date().toISOString() }; },
+    async listExecutions() { return []; },
     close() {},
   };
 }
@@ -78,7 +85,7 @@ describe('createSlopeToolsServer', () => {
   });
 
   it('exposes all expected tool names', () => {
-    const expectedTools = ['search', 'execute', 'context_search', 'session_status', 'acquire_claim', 'check_conflicts', 'store_status', 'testing_session_start', 'testing_session_finding', 'testing_session_end', 'testing_session_status', 'testing_plan_status'];
+    const expectedTools = ['search', 'execute', 'context_search', 'session_status', 'acquire_claim', 'check_conflicts', 'store_status', 'testing_session_start', 'testing_session_finding', 'testing_session_end', 'testing_session_status', 'testing_plan_status', 'workflow_next', 'workflow_complete', 'workflow_status'];
     expect(SLOPE_MCP_TOOL_NAMES).toEqual(expect.arrayContaining(expectedTools));
     expect(SLOPE_MCP_TOOL_NAMES.length).toBe(expectedTools.length);
   });
