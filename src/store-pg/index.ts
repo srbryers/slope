@@ -713,7 +713,7 @@ export class PostgresSlopeStore implements SlopeStore {
     }
   }
 
-  async recordStepResult(params: { execution_id: string; step_id: string; phase: string; status: 'completed' | 'skipped' | 'failed'; output?: Record<string, unknown>; exit_code?: number }): Promise<WorkflowStepResult> {
+  async recordStepResult(params: { execution_id: string; step_id: string; phase: string; status: 'completed' | 'skipped' | 'failed'; output?: Record<string, unknown>; exit_code?: number; item?: string }): Promise<WorkflowStepResult> {
     const id = generateId('wfs');
     const now = nowISO();
     const stepResult: WorkflowStepResult = {
@@ -744,13 +744,11 @@ export class PostgresSlopeStore implements SlopeStore {
     ]);
 
     // Update completed_steps on the execution (JSONB append)
+    const entry: CompletedStep = { step_id: params.step_id, phase: params.phase, status: params.status };
+    if (params.item) entry.item = params.item;
     await this.pool.query(
       `UPDATE workflow_executions SET completed_steps = completed_steps || $1::jsonb, updated_at = $2 WHERE id = $3`,
-      [
-        JSON.stringify([{ step_id: params.step_id, phase: params.phase, status: params.status }]),
-        nowISO(),
-        params.execution_id,
-      ],
+      [JSON.stringify([entry]), nowISO(), params.execution_id],
     );
 
     return stepResult;

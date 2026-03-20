@@ -651,7 +651,7 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
     }
   }
 
-  async recordStepResult(params: { execution_id: string; step_id: string; phase: string; status: 'completed' | 'skipped' | 'failed'; output?: Record<string, unknown>; exit_code?: number }): Promise<WorkflowStepResult> {
+  async recordStepResult(params: { execution_id: string; step_id: string; phase: string; status: 'completed' | 'skipped' | 'failed'; output?: Record<string, unknown>; exit_code?: number; item?: string }): Promise<WorkflowStepResult> {
     const id = generateId('wfs');
     const now = nowISO();
     const result: WorkflowStepResult = {
@@ -686,7 +686,9 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
       .get(params.execution_id) as { completed_steps: string } | undefined;
     if (exec) {
       const steps: CompletedStep[] = JSON.parse(exec.completed_steps);
-      steps.push({ step_id: params.step_id, phase: params.phase, status: params.status });
+      const entry: CompletedStep = { step_id: params.step_id, phase: params.phase, status: params.status };
+      if (params.item) entry.item = params.item;
+      steps.push(entry);
       this.db.prepare('UPDATE workflow_executions SET completed_steps = ?, updated_at = ? WHERE id = ?')
         .run(JSON.stringify(steps), nowISO(), params.execution_id);
     }

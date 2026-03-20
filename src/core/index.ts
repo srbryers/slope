@@ -754,5 +754,14 @@ export type {
   WorkflowVariable,
 } from './workflow.js';
 
+// Workflow Engine
+export { WorkflowEngine } from './workflow-engine.js';
+export type {
+  StartOpts,
+  NextStepInfo,
+  AdvanceResult,
+  StepResult,
+} from './workflow-engine.js';
+
 // Built-in metaphors (auto-registers on import)
 export { golf, tennis, baseball, gaming, dnd, matrix, agile } from './metaphors/index.js';
