@@ -713,7 +713,7 @@ export class PostgresSlopeStore implements SlopeStore {
     }
   }
 
-  async recordStepResult(params: { execution_id: string; step_id: string; phase: string; status: 'completed' | 'skipped' | 'failed'; output?: Record<string, unknown>; exit_code?: number; item?: string }): Promise<WorkflowStepResult> {
+  async recordStepResult(params: { execution_id: string; step_id: string; phase: string; status: 'completed' | 'skipped' | 'failed'; output?: Record<string, unknown>; exit_code?: number; item?: string; started_at?: string }): Promise<WorkflowStepResult> {
     const id = generateId('wfs');
     const now = nowISO();
     const stepResult: WorkflowStepResult = {
@@ -724,32 +724,45 @@ export class PostgresSlopeStore implements SlopeStore {
       status: params.status,
       output: params.output,
       exit_code: params.exit_code,
-      started_at: now,
+      started_at: params.started_at ?? now,
       completed_at: now,
     };
 
-    await this.pool.query(`
-      INSERT INTO workflow_step_results (id, execution_id, step_id, phase, status, output, exit_code, started_at, completed_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-    `, [
-      stepResult.id,
-      stepResult.execution_id,
-      stepResult.step_id,
-      stepResult.phase,
-      stepResult.status,
-      stepResult.output ? JSON.stringify(stepResult.output) : null,
-      stepResult.exit_code ?? null,
-      stepResult.started_at,
-      stepResult.completed_at ?? null,
-    ]);
+    // Wrap INSERT + completed_steps UPDATE in a transaction to keep them atomic.
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
 
-    // Update completed_steps on the execution (JSONB append)
-    const entry: CompletedStep = { step_id: params.step_id, phase: params.phase, status: params.status };
-    if (params.item) entry.item = params.item;
-    await this.pool.query(
-      `UPDATE workflow_executions SET completed_steps = completed_steps || $1::jsonb, updated_at = $2 WHERE id = $3`,
-      [JSON.stringify([entry]), nowISO(), params.execution_id],
-    );
+      await client.query(`
+        INSERT INTO workflow_step_results (id, execution_id, step_id, phase, status, output, exit_code, started_at, completed_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      `, [
+        stepResult.id,
+        stepResult.execution_id,
+        stepResult.step_id,
+        stepResult.phase,
+        stepResult.status,
+        stepResult.output ? JSON.stringify(stepResult.output) : null,
+        stepResult.exit_code ?? null,
+        stepResult.started_at,
+        stepResult.completed_at ?? null,
+      ]);
+
+      // Update completed_steps on the execution (JSONB append)
+      const entry: CompletedStep = { step_id: params.step_id, phase: params.phase, status: params.status };
+      if (params.item) entry.item = params.item;
+      await client.query(
+        `UPDATE workflow_executions SET completed_steps = completed_steps || $1::jsonb, updated_at = $2 WHERE id = $3`,
+        [JSON.stringify([entry]), nowISO(), params.execution_id],
+      );
+
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
 
     return stepResult;
   }

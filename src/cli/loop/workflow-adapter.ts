@@ -129,6 +129,7 @@ export class WorkflowAdapter {
     if (!this.execution) return;
 
     await this.engine.fail(this.execution.id, this.store);
+    this.execution = { ...this.execution, status: 'failed' };
     this.log.info('Workflow execution failed');
   }
 
@@ -137,7 +138,15 @@ export class WorkflowAdapter {
     return this.execution?.id ?? null;
   }
 
-  /** Get the current execution status */
+  /** Get the current execution status (re-reads from store for accuracy) */
+  async getStatus(): Promise<string | null> {
+    if (!this.execution) return null;
+    const fresh = await this.store.getExecution(this.execution.id);
+    if (fresh) this.execution = fresh;
+    return fresh?.status ?? null;
+  }
+
+  /** Get the cached execution status (may be stale — prefer getStatus()) */
   get status(): string | null {
     return this.execution?.status ?? null;
   }

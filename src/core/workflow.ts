@@ -116,7 +116,8 @@ function isVariableType(val: unknown): val is 'string' | 'integer' | 'array' {
   return val === 'string' || val === 'integer' || val === 'array';
 }
 
-const VALID_STEP_TYPES = new Set(['command', 'validation', 'agent_input', 'agent_work']);
+/** Valid step types for workflow definitions. Shared with the validator. */
+export const VALID_STEP_TYPES = new Set(['command', 'validation', 'agent_input', 'agent_work']);
 
 function parsePhase(raw: unknown, index: number): WorkflowPhase {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {

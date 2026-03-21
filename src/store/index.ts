@@ -651,7 +651,7 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
     }
   }
 
-  async recordStepResult(params: { execution_id: string; step_id: string; phase: string; status: 'completed' | 'skipped' | 'failed'; output?: Record<string, unknown>; exit_code?: number; item?: string }): Promise<WorkflowStepResult> {
+  async recordStepResult(params: { execution_id: string; step_id: string; phase: string; status: 'completed' | 'skipped' | 'failed'; output?: Record<string, unknown>; exit_code?: number; item?: string; started_at?: string }): Promise<WorkflowStepResult> {
     const id = generateId('wfs');
     const now = nowISO();
     const result: WorkflowStepResult = {
@@ -662,36 +662,42 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
       status: params.status,
       output: params.output,
       exit_code: params.exit_code,
-      started_at: now,
+      started_at: params.started_at ?? now,
       completed_at: now,
     };
 
-    this.db.prepare(`
+    // Wrap INSERT + completed_steps UPDATE in a transaction to prevent
+    // the JSON array from falling out of sync with the results table.
+    const insertStmt = this.db.prepare(`
       INSERT INTO workflow_step_results (id, execution_id, step_id, phase, status, output, exit_code, started_at, completed_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      result.id,
-      result.execution_id,
-      result.step_id,
-      result.phase,
-      result.status,
-      result.output ? JSON.stringify(result.output) : null,
-      result.exit_code ?? null,
-      result.started_at,
-      result.completed_at ?? null,
-    );
+    `);
+    const selectStmt = this.db.prepare('SELECT completed_steps FROM workflow_executions WHERE id = ?');
+    const updateStmt = this.db.prepare('UPDATE workflow_executions SET completed_steps = ?, updated_at = ? WHERE id = ?');
 
-    // Update completed_steps on the execution
-    const exec = this.db.prepare('SELECT completed_steps FROM workflow_executions WHERE id = ?')
-      .get(params.execution_id) as { completed_steps: string } | undefined;
-    if (exec) {
-      const steps: CompletedStep[] = JSON.parse(exec.completed_steps);
-      const entry: CompletedStep = { step_id: params.step_id, phase: params.phase, status: params.status };
-      if (params.item) entry.item = params.item;
-      steps.push(entry);
-      this.db.prepare('UPDATE workflow_executions SET completed_steps = ?, updated_at = ? WHERE id = ?')
-        .run(JSON.stringify(steps), nowISO(), params.execution_id);
-    }
+    const txn = this.db.transaction(() => {
+      insertStmt.run(
+        result.id,
+        result.execution_id,
+        result.step_id,
+        result.phase,
+        result.status,
+        result.output ? JSON.stringify(result.output) : null,
+        result.exit_code ?? null,
+        result.started_at,
+        result.completed_at ?? null,
+      );
+
+      const exec = selectStmt.get(params.execution_id) as { completed_steps: string } | undefined;
+      if (exec) {
+        const steps: CompletedStep[] = JSON.parse(exec.completed_steps);
+        const entry: CompletedStep = { step_id: params.step_id, phase: params.phase, status: params.status };
+        if (params.item) entry.item = params.item;
+        steps.push(entry);
+        updateStmt.run(JSON.stringify(steps), nowISO(), params.execution_id);
+      }
+    });
+    txn();
 
     return result;
   }
