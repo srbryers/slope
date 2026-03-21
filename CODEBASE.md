@@ -1,6 +1,6 @@
 ---
-generated_at: "2026-03-21T16:40:29.398Z"
-git_sha: "7573369ba36b900ab5cadbdaade51445af6ed37f"
+generated_at: "2026-03-21T16:58:32.085Z"
+git_sha: "72fb5bbace2dc3df42141d4150516820aff4267a"
 sprint: 67
 source_files: 214
 test_files: 165
@@ -570,7 +570,7 @@ Re-exports from `src/core/index.ts`:
 | **64** | Claim Hygiene, Worktree Safety & Loop Planner Context | 5 | par |
 | **65** | The Inspiration Engine | 3 | bogey |
 | **66** | The Scorekeeper — Sprint Analytics Dashboard | 4 | par |
-| **67** | The Skill Shelf — Skill System Restructuring | 4 | bogey |
+| **67** | The Skill Shelf — Skill System Restructuring | 4 | triple_plus |
 <!-- AUTO-GENERATED: END history -->
 
 ## Known Gotchas
