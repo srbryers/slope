@@ -58,6 +58,8 @@ export interface AdvanceResult {
 export interface StepResult {
   output?: Record<string, unknown>;
   exit_code?: number;
+  /** When the step actually started (for accurate duration tracking) */
+  started_at?: string;
 }
 
 // --- Engine ---
@@ -148,6 +150,7 @@ export class WorkflowEngine {
       output: result.output,
       exit_code: result.exit_code,
       item: currentInfo.current_item,
+      started_at: result.started_at,
     });
 
     return this.advanceToNext(executionId, execution, def, store);

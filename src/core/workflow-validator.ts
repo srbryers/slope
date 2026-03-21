@@ -2,6 +2,7 @@
 // Validates WorkflowDefinitions for structural correctness before execution.
 
 import type { WorkflowDefinition, WorkflowStep } from './workflow.js';
+import { VALID_STEP_TYPES } from './workflow.js';
 
 /** A single validation error or warning */
 export interface ValidationIssue {
@@ -16,8 +17,6 @@ export interface WorkflowValidationResult {
   errors: ValidationIssue[];
   warnings: ValidationIssue[];
 }
-
-const VALID_STEP_TYPES = new Set(['command', 'validation', 'agent_input', 'agent_work']);
 
 /**
  * Validate a parsed WorkflowDefinition for structural issues.

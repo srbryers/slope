@@ -1,11 +1,11 @@
 ---
-generated_at: "2026-03-18T00:39:47.159Z"
-git_sha: "4b8b400cb6f8622486cbb30c7ccaddb12711f7e3"
-sprint: 66
-source_files: 208
-test_files: 155
-cli_commands: 46
-guards: 28
+generated_at: "2026-03-21T16:58:32.085Z"
+git_sha: "72fb5bbace2dc3df42141d4150516820aff4267a"
+sprint: 67
+source_files: 214
+test_files: 165
+cli_commands: 47
+guards: 29
 flows: 0
 ---
 
@@ -18,7 +18,7 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
 <!-- AUTO-GENERATED: START packages -->
 
 ### `src/cli`
-- Source files: 108 | Test files: 65
+- Source files: 110 | Test files: 68
 - Key modules:
   - `config`
   - `hooks-config`
@@ -33,7 +33,7 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
   - `template-generator` — SLOPE Template Generator
 
 ### `src/core`
-- Source files: 88 | Test files: 79
+- Source files: 92 | Test files: 85
 - Key modules:
   - `advisor` — --- Module-private constants ---
   - `analytics` — SLOPE — Sprint Analytics
@@ -50,10 +50,10 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
   - `embedding-client` — SLOPE — HTTP Client for OpenAI-Compatible Embedding Endpoints
   - `embedding-store` — SLOPE — EmbeddingStore Interface
   - `embedding` — SLOPE — Embedding Types & Chunking Logic (pure — no HTTP calls)
-  - ... and 41 more
+  - ... and 45 more
 
 ### `src/mcp`
-- Source files: 3 | Test files: 6
+- Source files: 3 | Test files: 7
 - Key modules:
   - `registry` — ─── Core Scoring Enums ───
   - `sandbox` — SLOPE sandbox — runs agent-written JS in a node:vm context
@@ -411,6 +411,16 @@ Re-exports from `src/core/index.ts`:
 - `computeHandicapTrend`
 - `computeVelocity`
 - `computeGuardMetrics`
+**Workflow:**
+- `parseWorkflow(yaml: string): WorkflowDefinition`
+- `resolveVariables(def: WorkflowDefinition, vars: Record<string, string>): WorkflowDefinition`
+**Workflow Loader:**
+- `loadWorkflow(name: string, cwd: string): WorkflowDefinition`
+- `listWorkflows(cwd: string): WorkflowSummary[]`
+**Workflow Validator:**
+- `validateWorkflow(def: WorkflowDefinition): WorkflowValidationResult`
+**Workflow Engine:**
+- `new WorkflowEngine()`
 **Built-in metaphors (auto-registers on import):**
 - `golf`
 - `tennis`
@@ -453,6 +463,7 @@ Re-exports from `src/core/index.ts`:
 - `slope extract` — Extract events into SLOPE store
 - `slope distill` — Promote event patterns to common issues
 - `slope map` — Generate/update codebase map
+- `slope workflow` — Manage workflow definitions
 - `slope flows` — Manage user flow definitions
 - `slope inspirations` — Track external OSS inspiration sources
 - `slope metaphor` — Manage metaphor display themes
@@ -490,6 +501,7 @@ Re-exports from `src/core/index.ts`:
 | `workflow-gate` | PreToolUse | ExitPlanMode | Block ExitPlanMode until review rounds are complete |
 | `review-tier` | PostToolUse | Edit|Write | Suggest plan review with specialist reviewers after plan file write |
 | `version-check` | PreToolUse | Bash | Block push to main when package versions have not been bumped |
+| `workflow-step-gate` | PreToolUse | Edit|Write | Check if current workflow step allows agent_work before editing |
 | `stale-flows` | PreToolUse | Edit|Write | Warn when editing files belonging to a stale flow definition |
 | `next-action` | Stop | — | Suggest next actions before session end |
 | `pr-review` | PostToolUse | Bash | Prompt for review workflow after PR creation |
@@ -525,6 +537,9 @@ Re-exports from `src/core/index.ts`:
 - `testing_session_end`
 - `testing_session_status`
 - `testing_plan_status`
+- `workflow_next`
+- `workflow_complete`
+- `workflow_status`
 <!-- AUTO-GENERATED: END mcp -->
 
 ## Test Inventory
@@ -533,14 +548,14 @@ Re-exports from `src/core/index.ts`:
 
 | Directory | Test Files | Command |
 |-----------|-----------|---------|
-| tests/cli | 65 | `pnpm test` |
-| tests/core | 79 | `pnpm test` |
-| tests/mcp | 6 | `pnpm test` |
+| tests/cli | 68 | `pnpm test` |
+| tests/core | 85 | `pnpm test` |
+| tests/mcp | 7 | `pnpm test` |
 | tests/store | 1 | `pnpm test` |
 | tests/store-pg | 2 | `pnpm test` |
 | tests/tokens | 1 | `pnpm test` |
 
-**Total test files:** 154
+**Total test files:** 164
 **Run all:** `pnpm -r test`
 **Typecheck:** `pnpm -r typecheck`
 <!-- AUTO-GENERATED: END tests -->
@@ -551,11 +566,11 @@ Re-exports from `src/core/index.ts`:
 
 | Sprint | Theme | Tickets | Score |
 |--------|-------|---------|-------|
-| **62** | The Welcome Mat v2 + Templates — Streamlined First-Run Experience & Sprint/Ticket Templates | 5 | par |
 | **63** | The Handbook + Template Integration — CLI Help & Documentation Polish | 6 | eagle |
 | **64** | Claim Hygiene, Worktree Safety & Loop Planner Context | 5 | par |
 | **65** | The Inspiration Engine | 3 | bogey |
 | **66** | The Scorekeeper — Sprint Analytics Dashboard | 4 | par |
+| **67** | The Skill Shelf — Skill System Restructuring | 4 | triple_plus |
 <!-- AUTO-GENERATED: END history -->
 
 ## Known Gotchas
@@ -564,12 +579,4 @@ Top recurring patterns from common-issues:
 
 <!-- AUTO-GENERATED: START gotchas -->
 
-- **Review-discovered hazards inflate scores** (process, 5 sprints): Every hazard since S43 was found by post-hole review, never during coding. S49: all 3 hazards in autonomous sprint caught by manual code review. The review gate works but is a trailing indicator.
-- **API shape assumptions** (types, 3 sprints): Assuming property names or structure of internal APIs without reading the definition. #1 hazard source across S39-S44.
-- **Shell script boundary values** (shell, 2 sprints): Shell arithmetic comparisons (-lt vs -le, -gt vs -ge) are error-prone. S48: -lt 500 excluded exactly 500 lines. S45: multiple shell hazards.
-- **process.exit() inside try/finally skips cleanup** (control-flow, 2 sprints): process.exit(1) inside a try block with finally { db.close() } — exit runs before finally in Node.js. S46: original store.ts hazard. S49: autonomous agent repeated the same pattern in restore validation.
-- **Threshold/constant consistency across consumers** (calibration, 1 sprint): Changing a default value (e.g. minScore) in one consumer but not all consumers of the same pipeline. S48: context.ts threshold updated to 0.4 but enrich.ts still used 0.55.
-- **AI-generated code duplicates existing abstractions** (autonomous, 1 sprint): Autonomous agents (Aider/Sonnet) may reimplement logic that already exists elsewhere in the file. S49: validateSubcommand duplicated loadRoadmapFile's file-loading and error handling instead of extracting a shared helper.
-- **Compaction drops pending protocol gates** (process, 1 sprint): Advisory guard output (context messages) is lost on compaction. If the agent hasn't acted on the guidance before compaction, the obligation disappears. Post-compaction 'continue without asking' instructions compound the problem by discouraging the agent from re-checking.
-- **gh pr merge --delete-branch fails in worktrees** (git, 1 sprint): gh pr merge --delete-branch succeeds at merging but exits 1 because local branch cleanup tries to switch to main, which is held by the parent worktree. Agent sees error, retries, gets 'already merged'. Hit at least 4 times before S60.
 <!-- AUTO-GENERATED: END gotchas -->

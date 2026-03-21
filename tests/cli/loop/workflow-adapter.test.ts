@@ -110,7 +110,7 @@ describe('WorkflowAdapter', () => {
     await adapter.start(TEST_SPRINT, tmpDir);
 
     await adapter.fail();
-    expect(adapter.status).toBe('running'); // status cached from start; store has 'failed'
+    expect(adapter.status).toBe('failed'); // fail() now updates local cache
     const exec = await store.getExecution(adapter.executionId!);
     expect(exec!.status).toBe('failed');
   });

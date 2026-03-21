@@ -28,7 +28,7 @@ import { z } from 'zod';
 import { SLOPE_REGISTRY, SLOPE_TYPES } from './registry.js';
 import { runInSandbox } from './sandbox.js';
 import type { SlopeStore, SlopeConfig } from '../core/index.js';
-import { checkConflicts, loadFlows, checkFlowStaleness, checkStoreHealth, METAPHOR_SCHEMA, listMetaphors, buildInterviewContext, generateInterviewSteps, loadConfig, parseTestPlan, getAreasNeedingTest, hasEmbeddingSupport, embed, deduplicateByFile, formatContextForAgent, WorkflowEngine, loadWorkflow, listWorkflows } from '../core/index.js';
+import { checkConflicts, loadFlows, checkFlowStaleness, checkStoreHealth, METAPHOR_SCHEMA, listMetaphors, buildInterviewContext, generateInterviewSteps, loadConfig, parseTestPlan, getAreasNeedingTest, hasEmbeddingSupport, embed, deduplicateByFile, formatContextForAgent, WorkflowEngine, loadWorkflow, listWorkflows, resolveVariables } from '../core/index.js';
 import type { ContextResult } from '../core/index.js';
 import { gaming } from '../core/metaphors/gaming.js';
 import type { ClaimScope, FlowsFile, FlowDefinition } from '../core/index.js';
@@ -753,6 +753,11 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
 
     // --- Workflow Tools ---
 
+    /** Resolve project root, falling back to cwd */
+    function safeProjectRoot(): string {
+      try { return findProjectRoot(process.cwd()); } catch { return process.cwd(); }
+    }
+
     const workflowEngine = new WorkflowEngine();
 
     server.tool(
@@ -785,10 +790,11 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
             return { content: [{ type: 'text' as const, text: JSON.stringify({ error: `Execution "${execId}" not found` }) }], isError: true };
           }
 
-          // Load the workflow definition
-          let projectRoot: string;
-          try { projectRoot = findProjectRoot(process.cwd()); } catch { projectRoot = process.cwd(); }
-          const def = loadWorkflow(execution.workflow_name, projectRoot);
+          // Load and resolve the workflow definition
+          const def = resolveVariables(
+            loadWorkflow(execution.workflow_name, safeProjectRoot()),
+            execution.variables,
+          );
 
           const next = await workflowEngine.next(execId, def, store);
           return {
@@ -822,9 +828,10 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
             return { content: [{ type: 'text' as const, text: JSON.stringify({ error: `Execution "${execution_id}" not found` }) }], isError: true };
           }
 
-          let projectRoot: string;
-          try { projectRoot = findProjectRoot(process.cwd()); } catch { projectRoot = process.cwd(); }
-          const def = loadWorkflow(execution.workflow_name, projectRoot);
+          const def = resolveVariables(
+            loadWorkflow(execution.workflow_name, safeProjectRoot()),
+            execution.variables,
+          );
 
           const result = await workflowEngine.complete(
             execution_id,
@@ -863,13 +870,21 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
               return { content: [{ type: 'text' as const, text: JSON.stringify({ error: `Execution "${execution_id}" not found` }) }], isError: true };
             }
 
-            // Load def to compute total steps
+            // Load def to compute total steps (accounting for repeat_for multiplier)
             let totalSteps = 0;
             try {
-              let projectRoot: string;
-              try { projectRoot = findProjectRoot(process.cwd()); } catch { projectRoot = process.cwd(); }
-              const def = loadWorkflow(execution.workflow_name, projectRoot);
-              totalSteps = def.phases.reduce((sum, p) => sum + p.steps.length, 0);
+              const def = resolveVariables(
+                loadWorkflow(execution.workflow_name, safeProjectRoot()),
+                execution.variables,
+              );
+              totalSteps = def.phases.reduce((sum, p) => {
+                const stepCount = p.steps.length;
+                if (p.repeat_for && execution.variables[p.repeat_for]) {
+                  const items = execution.variables[p.repeat_for].split(',').filter(Boolean);
+                  return sum + stepCount * items.length;
+                }
+                return sum + stepCount;
+              }, 0);
             } catch { /* def not available — ok */ }
 
             return {
