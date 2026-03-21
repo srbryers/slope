@@ -28,13 +28,13 @@ import { z } from 'zod';
 import { SLOPE_REGISTRY, SLOPE_TYPES } from './registry.js';
 import { runInSandbox } from './sandbox.js';
 import type { SlopeStore, SlopeConfig } from '../core/index.js';
-import { checkConflicts, loadFlows, checkFlowStaleness, checkStoreHealth, METAPHOR_SCHEMA, listMetaphors, buildInterviewContext, generateInterviewSteps, loadConfig, parseTestPlan, getAreasNeedingTest, hasEmbeddingSupport, embed, deduplicateByFile, formatContextForAgent } from '../core/index.js';
+import { checkConflicts, loadFlows, checkFlowStaleness, checkStoreHealth, METAPHOR_SCHEMA, listMetaphors, buildInterviewContext, generateInterviewSteps, loadConfig, parseTestPlan, getAreasNeedingTest, hasEmbeddingSupport, embed, deduplicateByFile, formatContextForAgent, WorkflowEngine, loadWorkflow, listWorkflows } from '../core/index.js';
 import type { ContextResult } from '../core/index.js';
 import { gaming } from '../core/metaphors/gaming.js';
 import type { ClaimScope, FlowsFile, FlowDefinition } from '../core/index.js';
 
 /** Tool names exposed by this MCP server (for tests and tool discovery). */
-export const SLOPE_MCP_TOOL_NAMES = ['search', 'execute', 'context_search', 'session_status', 'acquire_claim', 'check_conflicts', 'store_status', 'testing_session_start', 'testing_session_finding', 'testing_session_end', 'testing_session_status', 'testing_plan_status'] as const;
+export const SLOPE_MCP_TOOL_NAMES = ['search', 'execute', 'context_search', 'session_status', 'acquire_claim', 'check_conflicts', 'store_status', 'testing_session_start', 'testing_session_finding', 'testing_session_end', 'testing_session_status', 'testing_plan_status', 'workflow_next', 'workflow_complete', 'workflow_status'] as const;
 
 /** Detection results for hook/settings activation status. */
 export interface SetupHints {
@@ -748,6 +748,165 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
         };
 
         return { content: [{ type: 'text' as const, text: JSON.stringify(response, null, 2) }] };
+      },
+    );
+
+    // --- Workflow Tools ---
+
+    const workflowEngine = new WorkflowEngine();
+
+    server.tool(
+      'workflow_next',
+      'Get the next step in a workflow execution. Returns the current step to execute, or signals completion.',
+      {
+        execution_id: z.string().optional().describe('Workflow execution ID'),
+        session_id: z.string().optional().describe('Session ID to find active execution'),
+      },
+      async ({ execution_id, session_id }) => {
+        try {
+          let execId = execution_id;
+
+          // Fallback: find execution by session
+          if (!execId && session_id) {
+            const executions = await store.listExecutions({ status: 'running' });
+            const match = executions.find(e => e.session_id === session_id);
+            if (!match) {
+              return { content: [{ type: 'text' as const, text: JSON.stringify({ error: `No active workflow execution found for session "${session_id}"` }) }], isError: true };
+            }
+            execId = match.id;
+          }
+
+          if (!execId) {
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Either execution_id or session_id is required' }) }], isError: true };
+          }
+
+          const execution = await store.getExecution(execId);
+          if (!execution) {
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ error: `Execution "${execId}" not found` }) }], isError: true };
+          }
+
+          // Load the workflow definition
+          let projectRoot: string;
+          try { projectRoot = findProjectRoot(process.cwd()); } catch { projectRoot = process.cwd(); }
+          const def = loadWorkflow(execution.workflow_name, projectRoot);
+
+          const next = await workflowEngine.next(execId, def, store);
+          return {
+            content: [{
+              type: 'text' as const,
+              text: JSON.stringify({
+                execution_id: execId,
+                ...next,
+              }, null, 2),
+            }],
+          };
+        } catch (err) {
+          return { content: [{ type: 'text' as const, text: JSON.stringify({ error: (err as Error).message }) }], isError: true };
+        }
+      },
+    );
+
+    server.tool(
+      'workflow_complete',
+      'Complete the current step in a workflow execution and advance to the next step.',
+      {
+        execution_id: z.string().describe('Workflow execution ID'),
+        step_id: z.string().describe('Step ID being completed'),
+        output: z.record(z.unknown()).optional().describe('Step output data'),
+        exit_code: z.number().optional().describe('Exit code for command steps'),
+      },
+      async ({ execution_id, step_id, output, exit_code }) => {
+        try {
+          const execution = await store.getExecution(execution_id);
+          if (!execution) {
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ error: `Execution "${execution_id}" not found` }) }], isError: true };
+          }
+
+          let projectRoot: string;
+          try { projectRoot = findProjectRoot(process.cwd()); } catch { projectRoot = process.cwd(); }
+          const def = loadWorkflow(execution.workflow_name, projectRoot);
+
+          const result = await workflowEngine.complete(
+            execution_id,
+            step_id,
+            { output: output as Record<string, unknown> | undefined, exit_code },
+            def,
+            store,
+          );
+
+          return {
+            content: [{
+              type: 'text' as const,
+              text: JSON.stringify({
+                execution_id,
+                ...result,
+              }, null, 2),
+            }],
+          };
+        } catch (err) {
+          return { content: [{ type: 'text' as const, text: JSON.stringify({ error: (err as Error).message }) }], isError: true };
+        }
+      },
+    );
+
+    server.tool(
+      'workflow_status',
+      'Show the status of a workflow execution with progress summary.',
+      {
+        execution_id: z.string().optional().describe('Specific execution ID, or omit for all active executions'),
+      },
+      async ({ execution_id }) => {
+        try {
+          if (execution_id) {
+            const execution = await store.getExecution(execution_id);
+            if (!execution) {
+              return { content: [{ type: 'text' as const, text: JSON.stringify({ error: `Execution "${execution_id}" not found` }) }], isError: true };
+            }
+
+            // Load def to compute total steps
+            let totalSteps = 0;
+            try {
+              let projectRoot: string;
+              try { projectRoot = findProjectRoot(process.cwd()); } catch { projectRoot = process.cwd(); }
+              const def = loadWorkflow(execution.workflow_name, projectRoot);
+              totalSteps = def.phases.reduce((sum, p) => sum + p.steps.length, 0);
+            } catch { /* def not available — ok */ }
+
+            return {
+              content: [{
+                type: 'text' as const,
+                text: JSON.stringify({
+                  ...execution,
+                  progress: {
+                    completed_steps: execution.completed_steps.length,
+                    total_steps: totalSteps || undefined,
+                  },
+                }, null, 2),
+              }],
+            };
+          }
+
+          // List all active executions
+          const active = await store.listExecutions({ status: 'running' });
+          return {
+            content: [{
+              type: 'text' as const,
+              text: JSON.stringify({
+                active_executions: active.map(e => ({
+                  id: e.id,
+                  workflow_name: e.workflow_name,
+                  sprint_id: e.sprint_id,
+                  current_phase: e.current_phase,
+                  current_step: e.current_step,
+                  completed_steps: e.completed_steps.length,
+                  started_at: e.started_at,
+                })),
+              }, null, 2),
+            }],
+          };
+        } catch (err) {
+          return { content: [{ type: 'text' as const, text: JSON.stringify({ error: (err as Error).message }) }], isError: true };
+        }
       },
     );
   }

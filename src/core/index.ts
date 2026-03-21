@@ -45,6 +45,9 @@ export type {
   ReviewType,
   ReviewFinding,
   ReviewRecommendation,
+  CompletedStep,
+  WorkflowExecution,
+  WorkflowStepResult,
 } from './types.js';
 
 // Constants
@@ -738,6 +741,35 @@ export type {
   GuardEffectivenessReport,
   GuardDecision,
 } from './analytics.js';
+
+// Workflow
+export {
+  parseWorkflow,
+  resolveVariables,
+} from './workflow.js';
+export type {
+  WorkflowDefinition,
+  WorkflowPhase,
+  WorkflowStep,
+  WorkflowVariable,
+} from './workflow.js';
+
+// Workflow Loader
+export { loadWorkflow, listWorkflows } from './workflow-loader.js';
+export type { WorkflowSummary } from './workflow-loader.js';
+
+// Workflow Validator
+export { validateWorkflow } from './workflow-validator.js';
+export type { ValidationIssue, WorkflowValidationResult } from './workflow-validator.js';
+
+// Workflow Engine
+export { WorkflowEngine } from './workflow-engine.js';
+export type {
+  StartOpts,
+  NextStepInfo,
+  AdvanceResult,
+  StepResult,
+} from './workflow-engine.js';
 
 // Built-in metaphors (auto-registers on import)
 export { golf, tennis, baseball, gaming, dnd, matrix, agile } from './metaphors/index.js';

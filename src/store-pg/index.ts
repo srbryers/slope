@@ -2,7 +2,7 @@
 // Implements SlopeStore backed by PostgreSQL with JSONB and multi-tenancy.
 // Requires the `pg` package: npm install pg
 
-import type { SprintClaim, GolfScorecard, SlopeEvent, EventType } from '../core/types.js';
+import type { SprintClaim, GolfScorecard, SlopeEvent, EventType, WorkflowExecution, WorkflowStepResult, CompletedStep } from '../core/types.js';
 import type { CommonIssuesFile } from '../core/briefing.js';
 import type { StoreStats } from '../core/store.js';
 import { SlopeStoreError } from '../core/store.js';
@@ -162,6 +162,42 @@ const MIGRATIONS: Array<{ version: number; sql: string }> = [
       );
 
       CREATE INDEX IF NOT EXISTS idx_testing_findings_session ON testing_findings(session_id);
+    `,
+  },
+  {
+    version: 4,
+    sql: `
+      CREATE TABLE IF NOT EXISTS workflow_executions (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL DEFAULT 'default',
+        workflow_name TEXT NOT NULL,
+        sprint_id TEXT,
+        current_phase TEXT,
+        current_step TEXT,
+        status TEXT NOT NULL DEFAULT 'running',
+        variables JSONB DEFAULT '{}',
+        completed_steps JSONB DEFAULT '[]',
+        started_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        session_id TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS workflow_step_results (
+        id TEXT PRIMARY KEY,
+        execution_id TEXT NOT NULL REFERENCES workflow_executions(id) ON DELETE CASCADE,
+        step_id TEXT NOT NULL,
+        phase TEXT NOT NULL,
+        status TEXT NOT NULL,
+        output JSONB,
+        exit_code INTEGER,
+        started_at TEXT NOT NULL,
+        completed_at TEXT
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_wf_exec_project ON workflow_executions(project_id);
+      CREATE INDEX IF NOT EXISTS idx_wf_exec_sprint ON workflow_executions(sprint_id);
+      CREATE INDEX IF NOT EXISTS idx_wf_exec_session ON workflow_executions(session_id);
+      CREATE INDEX IF NOT EXISTS idx_wf_step_exec ON workflow_step_results(execution_id);
     `,
   },
 ];
@@ -601,6 +637,144 @@ export class PostgresSlopeStore implements SlopeStore {
     }));
   }
 
+  // --- Workflow Executions ---
+
+  async startExecution(params: { workflow_name: string; sprint_id?: string; variables?: Record<string, string>; session_id?: string }): Promise<WorkflowExecution> {
+    const id = generateId('wf');
+    const now = nowISO();
+    const execution: WorkflowExecution = {
+      id,
+      workflow_name: params.workflow_name,
+      sprint_id: params.sprint_id,
+      current_phase: undefined,
+      current_step: undefined,
+      status: 'running',
+      variables: params.variables ?? {},
+      completed_steps: [],
+      started_at: now,
+      updated_at: now,
+      session_id: params.session_id,
+    };
+
+    await this.pool.query(`
+      INSERT INTO workflow_executions (id, project_id, workflow_name, sprint_id, current_phase, current_step, status, variables, completed_steps, started_at, updated_at, session_id)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+    `, [
+      execution.id,
+      this.projectId,
+      execution.workflow_name,
+      execution.sprint_id ?? null,
+      execution.current_phase ?? null,
+      execution.current_step ?? null,
+      execution.status,
+      JSON.stringify(execution.variables),
+      JSON.stringify(execution.completed_steps),
+      execution.started_at,
+      execution.updated_at,
+      execution.session_id ?? null,
+    ]);
+
+    return execution;
+  }
+
+  async getExecution(executionId: string): Promise<WorkflowExecution | null> {
+    const { rows } = await this.pool.query(
+      'SELECT * FROM workflow_executions WHERE id = $1 AND project_id = $2',
+      [executionId, this.projectId],
+    );
+    return rows.length > 0 ? rowToExecution(rows[0]) : null;
+  }
+
+  async getExecutionBySprint(sprintId: string): Promise<WorkflowExecution | null> {
+    const { rows } = await this.pool.query(
+      "SELECT * FROM workflow_executions WHERE sprint_id = $1 AND project_id = $2 AND status NOT IN ('completed', 'failed') ORDER BY started_at DESC LIMIT 1",
+      [sprintId, this.projectId],
+    );
+    return rows.length > 0 ? rowToExecution(rows[0]) : null;
+  }
+
+  async updateExecutionState(executionId: string, phase: string, step: string): Promise<void> {
+    const result = await this.pool.query(
+      'UPDATE workflow_executions SET current_phase = $1, current_step = $2, updated_at = $3 WHERE id = $4 AND project_id = $5',
+      [phase, step, nowISO(), executionId, this.projectId],
+    );
+    if ((result.rowCount ?? 0) === 0) {
+      throw new SlopeStoreError('NOT_FOUND', `Workflow execution "${executionId}" not found`);
+    }
+  }
+
+  async completeExecution(executionId: string, status: 'completed' | 'failed'): Promise<void> {
+    const result = await this.pool.query(
+      'UPDATE workflow_executions SET status = $1, updated_at = $2 WHERE id = $3 AND project_id = $4',
+      [status, nowISO(), executionId, this.projectId],
+    );
+    if ((result.rowCount ?? 0) === 0) {
+      throw new SlopeStoreError('NOT_FOUND', `Workflow execution "${executionId}" not found`);
+    }
+  }
+
+  async recordStepResult(params: { execution_id: string; step_id: string; phase: string; status: 'completed' | 'skipped' | 'failed'; output?: Record<string, unknown>; exit_code?: number; item?: string }): Promise<WorkflowStepResult> {
+    const id = generateId('wfs');
+    const now = nowISO();
+    const stepResult: WorkflowStepResult = {
+      id,
+      execution_id: params.execution_id,
+      step_id: params.step_id,
+      phase: params.phase,
+      status: params.status,
+      output: params.output,
+      exit_code: params.exit_code,
+      started_at: now,
+      completed_at: now,
+    };
+
+    await this.pool.query(`
+      INSERT INTO workflow_step_results (id, execution_id, step_id, phase, status, output, exit_code, started_at, completed_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    `, [
+      stepResult.id,
+      stepResult.execution_id,
+      stepResult.step_id,
+      stepResult.phase,
+      stepResult.status,
+      stepResult.output ? JSON.stringify(stepResult.output) : null,
+      stepResult.exit_code ?? null,
+      stepResult.started_at,
+      stepResult.completed_at ?? null,
+    ]);
+
+    // Update completed_steps on the execution (JSONB append)
+    const entry: CompletedStep = { step_id: params.step_id, phase: params.phase, status: params.status };
+    if (params.item) entry.item = params.item;
+    await this.pool.query(
+      `UPDATE workflow_executions SET completed_steps = completed_steps || $1::jsonb, updated_at = $2 WHERE id = $3`,
+      [JSON.stringify([entry]), nowISO(), params.execution_id],
+    );
+
+    return stepResult;
+  }
+
+  async listExecutions(filter?: { sprint_id?: string; status?: string }): Promise<WorkflowExecution[]> {
+    let sql = 'SELECT * FROM workflow_executions WHERE project_id = $1';
+    const params: unknown[] = [this.projectId];
+    let idx = 2;
+
+    if (filter?.sprint_id) {
+      sql += ` AND sprint_id = $${idx}`;
+      params.push(filter.sprint_id);
+      idx++;
+    }
+    if (filter?.status) {
+      sql += ` AND status = $${idx}`;
+      params.push(filter.status);
+      idx++;
+    }
+    sql += ' ORDER BY started_at DESC';
+
+    const { rows } = await this.pool.query(sql, params);
+    return rows.map(rowToExecution);
+  }
+
   // --- Lifecycle ---
 
   close(): void {
@@ -651,6 +825,30 @@ function rowToEvent(row: Record<string, unknown>): SlopeEvent {
     data: parseJsonColumn(row.data),
     sprint_number: (row.sprint_number as number | null) ?? undefined,
     ticket_key: (row.ticket_key as string | null) ?? undefined,
+  };
+}
+
+function rowToExecution(row: Record<string, unknown>): WorkflowExecution {
+  const variables = parseJsonColumn(row.variables) as Record<string, string>;
+  const completedRaw = row.completed_steps;
+  const completed_steps: CompletedStep[] = Array.isArray(completedRaw)
+    ? completedRaw
+    : typeof completedRaw === 'string'
+      ? JSON.parse(completedRaw)
+      : [];
+
+  return {
+    id: row.id as string,
+    workflow_name: row.workflow_name as string,
+    sprint_id: (row.sprint_id as string | null) ?? undefined,
+    current_phase: (row.current_phase as string | null) ?? undefined,
+    current_step: (row.current_step as string | null) ?? undefined,
+    status: row.status as WorkflowExecution['status'],
+    variables,
+    completed_steps,
+    started_at: row.started_at as string,
+    updated_at: row.updated_at as string,
+    session_id: (row.session_id as string | null) ?? undefined,
   };
 }
 

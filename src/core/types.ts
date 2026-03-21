@@ -431,3 +431,42 @@ export interface TranscriptTurn {
 
 /** What's actually written per JSONL line (turn_number derived on read) */
 export type TranscriptLine = Omit<TranscriptTurn, 'turn_number'>;
+
+// --- Workflow Execution Types ---
+
+/** Completed step entry stored as JSON array in workflow_executions */
+export interface CompletedStep {
+  step_id: string;
+  phase: string;
+  status: 'completed' | 'skipped' | 'failed';
+  /** Optional iteration key when inside a repeat_for phase */
+  item?: string;
+}
+
+/** A workflow execution instance persisted in the store */
+export interface WorkflowExecution {
+  id: string;
+  workflow_name: string;
+  sprint_id?: string;
+  current_phase?: string;
+  current_step?: string;
+  status: 'running' | 'paused' | 'completed' | 'failed';
+  variables: Record<string, string>;
+  completed_steps: CompletedStep[];
+  started_at: string;
+  updated_at: string;
+  session_id?: string;
+}
+
+/** Result of a single workflow step execution */
+export interface WorkflowStepResult {
+  id: string;
+  execution_id: string;
+  step_id: string;
+  phase: string;
+  status: 'completed' | 'skipped' | 'failed';
+  output?: Record<string, unknown>;
+  exit_code?: number;
+  started_at: string;
+  completed_at?: string;
+}

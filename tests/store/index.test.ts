@@ -610,3 +610,118 @@ describe('Integration: full session lifecycle', () => {
     expect(sessions[0].session_id).toBe('s2');
   });
 });
+
+describe('Workflow Executions', () => {
+  it('starts and retrieves an execution', async () => {
+    const exec = await store.startExecution({
+      workflow_name: 'sprint-standard',
+      sprint_id: 'S42',
+      variables: { sprint_id: 'S42', model: 'local' },
+      session_id: 'sess-1',
+    });
+
+    expect(exec.id).toMatch(/^wf-/);
+    expect(exec.workflow_name).toBe('sprint-standard');
+    expect(exec.sprint_id).toBe('S42');
+    expect(exec.status).toBe('running');
+    expect(exec.variables).toEqual({ sprint_id: 'S42', model: 'local' });
+    expect(exec.completed_steps).toEqual([]);
+    expect(exec.started_at).toBeTruthy();
+
+    // Retrieve by ID
+    const fetched = await store.getExecution(exec.id);
+    expect(fetched).not.toBeNull();
+    expect(fetched!.workflow_name).toBe('sprint-standard');
+    expect(fetched!.variables).toEqual({ sprint_id: 'S42', model: 'local' });
+  });
+
+  it('retrieves execution by sprint', async () => {
+    await store.startExecution({ workflow_name: 'test', sprint_id: 'S99' });
+    const exec = await store.getExecutionBySprint('S99');
+    expect(exec).not.toBeNull();
+    expect(exec!.sprint_id).toBe('S99');
+  });
+
+  it('returns null for non-existent execution', async () => {
+    expect(await store.getExecution('wf-nonexistent')).toBeNull();
+    expect(await store.getExecutionBySprint('S999')).toBeNull();
+  });
+
+  it('updates execution state', async () => {
+    const exec = await store.startExecution({ workflow_name: 'test' });
+    await store.updateExecutionState(exec.id, 'pre_hole', 'briefing');
+    const updated = await store.getExecution(exec.id);
+    expect(updated!.current_phase).toBe('pre_hole');
+    expect(updated!.current_step).toBe('briefing');
+  });
+
+  it('completes an execution', async () => {
+    const exec = await store.startExecution({ workflow_name: 'test' });
+    await store.completeExecution(exec.id, 'completed');
+    const updated = await store.getExecution(exec.id);
+    expect(updated!.status).toBe('completed');
+  });
+
+  it('records step results and updates completed_steps', async () => {
+    const exec = await store.startExecution({ workflow_name: 'test' });
+
+    const result = await store.recordStepResult({
+      execution_id: exec.id,
+      step_id: 'briefing',
+      phase: 'pre_hole',
+      status: 'completed',
+      output: { summary: 'Briefing complete' },
+      exit_code: 0,
+    });
+
+    expect(result.id).toMatch(/^wfs-/);
+    expect(result.step_id).toBe('briefing');
+    expect(result.status).toBe('completed');
+    expect(result.output).toEqual({ summary: 'Briefing complete' });
+
+    // completed_steps should be updated on execution
+    const updated = await store.getExecution(exec.id);
+    expect(updated!.completed_steps).toHaveLength(1);
+    expect(updated!.completed_steps[0]).toEqual({
+      step_id: 'briefing',
+      phase: 'pre_hole',
+      status: 'completed',
+    });
+  });
+
+  it('lists executions with filters', async () => {
+    await store.startExecution({ workflow_name: 'test', sprint_id: 'S1' });
+    await store.startExecution({ workflow_name: 'test', sprint_id: 'S2' });
+    const exec3 = await store.startExecution({ workflow_name: 'test', sprint_id: 'S1' });
+    await store.completeExecution(exec3.id, 'completed');
+
+    // All executions
+    const all = await store.listExecutions();
+    expect(all).toHaveLength(3);
+
+    // Filter by sprint
+    const s1 = await store.listExecutions({ sprint_id: 'S1' });
+    expect(s1).toHaveLength(2);
+
+    // Filter by status
+    const running = await store.listExecutions({ status: 'running' });
+    expect(running).toHaveLength(2);
+
+    // Combined filter
+    const s1Running = await store.listExecutions({ sprint_id: 'S1', status: 'running' });
+    expect(s1Running).toHaveLength(1);
+  });
+
+  it('getExecutionBySprint ignores completed executions', async () => {
+    const exec = await store.startExecution({ workflow_name: 'test', sprint_id: 'S50' });
+    await store.completeExecution(exec.id, 'completed');
+    expect(await store.getExecutionBySprint('S50')).toBeNull();
+  });
+
+  it('throws NOT_FOUND on update of non-existent execution', async () => {
+    await expect(store.updateExecutionState('wf-missing', 'p', 's'))
+      .rejects.toThrow('not found');
+    await expect(store.completeExecution('wf-missing', 'failed'))
+      .rejects.toThrow('not found');
+  });
+});

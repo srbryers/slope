@@ -71,6 +71,11 @@ Usage:
   slope loop models [--analyze] [--show]    Model selection analytics
   slope loop guide [--check] [--synthesize] SKILL.md word count, hazard check
   slope loop clean [--results] [--logs] [--worktrees] [--all]  Cleanup artifacts
+
+Workflow integration:
+  Add workflowName to loop config to delegate step ordering to the workflow engine.
+  slope loop config --set workflowName=sprint-autonomous
+  Or use directly: slope sprint run <id> --workflow=sprint-autonomous
 `);
       if (sub) process.exit(1);
   }

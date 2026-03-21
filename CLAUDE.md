@@ -86,6 +86,18 @@ Multi-sprint initiatives with structured review gates. Built on top of existing 
 - Review gates: plan gate (architect + auto-selected specialist), PR gate (architect + code)
 - Specialist selection: keyword-based (`selectSpecialists()`) — backend, ml-engineer, database, frontend, ux-designer
 
+## Workflow Engine
+YAML-defined sprint lifecycles that control step ordering, validate checkpoints, and persist state for reliable resume. Eventually replaces `slope loop` as the primary execution system.
+- Core: `src/core/workflow.ts` (parser + types), `src/core/workflow-engine.ts` (engine), `src/core/workflow-validator.ts`, `src/core/workflow-loader.ts`
+- CLI: `slope workflow validate|list|show`, `slope sprint run --workflow=<name>`, `slope sprint status|resume|skip`
+- MCP: `workflow_next`, `workflow_complete`, `workflow_status`
+- Store: `workflow_executions` + `workflow_step_results` tables (SQLite v6, PG v4)
+- Built-in workflows: `src/core/workflows/` — `sprint-standard`, `sprint-autonomous`, `sprint-lightweight`
+- Variables: `${var}` interpolation, top-level string keys only, `\${escaped}` for literals
+- State machine: `running → paused/completed/failed`, `paused → running/failed`
+- Loop bridge: `src/cli/loop/workflow-adapter.ts` — opt-in via `LoopConfig.workflowName`
+- Guard: `workflow-step-gate` — checks if current step allows agent_work before Edit/Write
+
 ## Self-Development Loop
 Autonomous sprint execution via the `slope loop` CLI command. The loop orchestrates multi-sprint execution with tiered model selection, backlog regeneration, and result tracking.
 

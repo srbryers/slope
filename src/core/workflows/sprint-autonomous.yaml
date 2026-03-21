@@ -1,0 +1,59 @@
+# SLOPE Sprint Autonomous Workflow
+# Designed for `slope loop` — auto-commits, minimal agent_input gates.
+# The loop executor handles model selection, worktree management, and error recovery.
+name: sprint-autonomous
+version: "1"
+description: Autonomous sprint execution for slope loop — minimal gates, auto-commit
+
+variables:
+  sprint_id:
+    required: true
+    type: string
+  tickets:
+    required: true
+    type: array
+  model:
+    type: string
+    default: local
+
+phases:
+  # --- Pre-Hole: Automated setup ---
+  - id: pre_hole
+    steps:
+      - id: briefing
+        type: command
+        command: slope briefing --sprint=${sprint_id}
+        checkpoint: exit_code_0
+
+  # --- Per-Ticket: Execute each ticket ---
+  - id: per_ticket
+    repeat_for: tickets
+    timeout_per_item: 1800
+    on_timeout: log_blocker_and_skip
+    steps:
+      - id: implement
+        type: agent_work
+        prompt: "Implement the ticket. Run tests after changes. Commit and push on completion."
+        rules:
+          - "Run tests after each change"
+          - "Auto-commit after each file or feature"
+          - "Push after ticket completion"
+          - "If tests fail, fix before moving on"
+        blocks_next: true
+
+      - id: verify
+        type: command
+        command: pnpm typecheck
+        checkpoint: exit_code_0
+
+  # --- Post-Hole: Automated wrap-up ---
+  - id: post_hole
+    steps:
+      - id: validate_scorecard
+        type: command
+        command: slope validate
+        checkpoint: exit_code_0
+
+      - id: update_map
+        type: command
+        command: slope map

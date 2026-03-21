@@ -103,7 +103,8 @@ export type GuardName =
   | 'phase-boundary'
   | 'claim-required'
   | 'review-stale'
-  | 'worktree-reuse';
+  | 'worktree-reuse'
+  | 'workflow-step-gate';
 
 /** Guard registration entry */
 export interface GuardDefinition {
@@ -237,6 +238,14 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     hookEvent: 'PreToolUse',
     toolCategories: ['execute_command'],
     matcher: 'Bash',
+    level: 'full',
+  },
+  {
+    name: 'workflow-step-gate',
+    description: 'Check if current workflow step allows agent_work before editing',
+    hookEvent: 'PreToolUse',
+    toolCategories: ['write_file'],
+    matcher: 'Edit|Write',
     level: 'full',
   },
   {
