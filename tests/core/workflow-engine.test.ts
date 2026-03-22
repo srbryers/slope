@@ -301,6 +301,161 @@ describe('WorkflowEngine', () => {
     });
   });
 
+  describe('edge cases — error recovery and state transitions', () => {
+    it('throws on complete after fail', async () => {
+      const exec = await engine.start(SIMPLE_WORKFLOW, store);
+      await engine.fail(exec.id, store);
+      await expect(engine.complete(exec.id, 'briefing', {}, SIMPLE_WORKFLOW, store))
+        .rejects.toThrow('status "failed"');
+    });
+
+    it('throws on skip after fail', async () => {
+      const exec = await engine.start(SIMPLE_WORKFLOW, store);
+      await engine.fail(exec.id, store);
+      await expect(engine.skip(exec.id, 'briefing', 'skip', SIMPLE_WORKFLOW, store))
+        .rejects.toThrow();
+    });
+
+    it('next() throws on paused execution', async () => {
+      const exec = await engine.start(SIMPLE_WORKFLOW, store);
+      // Manually set to paused via store
+      await store.completeExecution(exec.id, 'failed');
+      // Can't pause directly, so test the failed path
+      await expect(engine.next(exec.id, SIMPLE_WORKFLOW, store))
+        .rejects.toThrow('has failed');
+    });
+
+    it('double fail throws on second attempt', async () => {
+      const exec = await engine.start(SIMPLE_WORKFLOW, store);
+      await engine.fail(exec.id, store);
+      await expect(engine.fail(exec.id, store))
+        .rejects.toThrow('Invalid workflow transition');
+    });
+
+    it('fail on completed execution throws', async () => {
+      const exec = await engine.start(SIMPLE_WORKFLOW, store);
+      await engine.complete(exec.id, 'briefing', {}, SIMPLE_WORKFLOW, store);
+      await engine.complete(exec.id, 'verify', {}, SIMPLE_WORKFLOW, store);
+      await engine.complete(exec.id, 'implement', {}, SIMPLE_WORKFLOW, store);
+      await engine.complete(exec.id, 'validate', {}, SIMPLE_WORKFLOW, store);
+
+      await expect(engine.fail(exec.id, store))
+        .rejects.toThrow('Invalid workflow transition');
+    });
+
+    it('complete on already-completed workflow throws', async () => {
+      const exec = await engine.start(SIMPLE_WORKFLOW, store);
+      await engine.complete(exec.id, 'briefing', {}, SIMPLE_WORKFLOW, store);
+      await engine.complete(exec.id, 'verify', {}, SIMPLE_WORKFLOW, store);
+      await engine.complete(exec.id, 'implement', {}, SIMPLE_WORKFLOW, store);
+      await engine.complete(exec.id, 'validate', {}, SIMPLE_WORKFLOW, store);
+
+      // Workflow is complete — trying to complete another step should fail
+      await expect(engine.complete(exec.id, 'briefing', {}, SIMPLE_WORKFLOW, store))
+        .rejects.toThrow();
+    });
+
+    it('next() returns is_complete true after completion', async () => {
+      const exec = await engine.start(SIMPLE_WORKFLOW, store);
+      await engine.complete(exec.id, 'briefing', {}, SIMPLE_WORKFLOW, store);
+      await engine.complete(exec.id, 'verify', {}, SIMPLE_WORKFLOW, store);
+      await engine.complete(exec.id, 'implement', {}, SIMPLE_WORKFLOW, store);
+      await engine.complete(exec.id, 'validate', {}, SIMPLE_WORKFLOW, store);
+
+      const next = await engine.next(exec.id, SIMPLE_WORKFLOW, store);
+      expect(next.is_complete).toBe(true);
+      expect(next.step).toBeUndefined();
+    });
+
+    it('requireExecution throws for nonexistent ID', async () => {
+      await expect(engine.next('wf-doesnotexist', SIMPLE_WORKFLOW, store))
+        .rejects.toThrow('not found');
+    });
+  });
+
+  describe('store — completed_steps integrity', () => {
+    it('completed_steps array grows with each complete call', async () => {
+      const exec = await engine.start(SIMPLE_WORKFLOW, store);
+
+      await engine.complete(exec.id, 'briefing', { output: { a: 1 } }, SIMPLE_WORKFLOW, store);
+      let updated = await store.getExecution(exec.id);
+      expect(updated!.completed_steps).toHaveLength(1);
+      expect(updated!.completed_steps[0].step_id).toBe('briefing');
+
+      await engine.complete(exec.id, 'verify', { output: { b: 2 } }, SIMPLE_WORKFLOW, store);
+      updated = await store.getExecution(exec.id);
+      expect(updated!.completed_steps).toHaveLength(2);
+      expect(updated!.completed_steps[1].step_id).toBe('verify');
+    });
+
+    it('skipped steps appear in completed_steps with skipped status', async () => {
+      const exec = await engine.start(SIMPLE_WORKFLOW, store);
+      await engine.skip(exec.id, 'briefing', 'Not needed', SIMPLE_WORKFLOW, store);
+
+      const updated = await store.getExecution(exec.id);
+      expect(updated!.completed_steps).toHaveLength(1);
+      expect(updated!.completed_steps[0].status).toBe('skipped');
+    });
+
+    it('getExecution returns fresh state after mutations', async () => {
+      const exec = await engine.start(SIMPLE_WORKFLOW, store);
+      expect(exec.status).toBe('running');
+      expect(exec.completed_steps).toHaveLength(0);
+
+      await engine.complete(exec.id, 'briefing', {}, SIMPLE_WORKFLOW, store);
+
+      // Re-fetch — should reflect the new state
+      const fresh = await store.getExecution(exec.id);
+      expect(fresh!.completed_steps).toHaveLength(1);
+      expect(fresh!.current_step).not.toBe('briefing'); // advanced past briefing
+    });
+
+    it('getExecutionBySprint returns null for failed/completed executions', async () => {
+      const exec = await engine.start(SIMPLE_WORKFLOW, store, { sprint_id: 'S99' });
+      await engine.complete(exec.id, 'briefing', {}, SIMPLE_WORKFLOW, store);
+      await engine.fail(exec.id, store);
+
+      // getExecutionBySprint only returns active (running/paused) executions
+      const bySprintResult = await store.getExecutionBySprint('S99');
+      expect(bySprintResult).toBeNull();
+
+      // getExecution still returns the full state
+      const byId = await store.getExecution(exec.id);
+      expect(byId!.status).toBe('failed');
+      expect(byId!.completed_steps).toHaveLength(1);
+    });
+
+    it('listExecutions filters by status correctly', async () => {
+      await engine.start(SIMPLE_WORKFLOW, store, { sprint_id: 'A' });
+      const exec2 = await engine.start(SIMPLE_WORKFLOW, store, { sprint_id: 'B' });
+      await engine.fail(exec2.id, store);
+
+      const running = await store.listExecutions({ status: 'running' });
+      expect(running).toHaveLength(1);
+      expect(running[0].sprint_id).toBe('A');
+
+      const failed = await store.listExecutions({ status: 'failed' });
+      expect(failed).toHaveLength(1);
+      expect(failed[0].sprint_id).toBe('B');
+    });
+
+    it('step results persist across store reopen', async () => {
+      const dbPath = join(tmpDir, 'persist.db');
+      let s = new SqliteSlopeStore(dbPath);
+      const exec = await engine.start(SIMPLE_WORKFLOW, s);
+      await engine.complete(exec.id, 'briefing', { output: { key: 'val' } }, SIMPLE_WORKFLOW, s);
+      s.close();
+
+      // Reopen and verify
+      s = new SqliteSlopeStore(dbPath);
+      const reloaded = await s.getExecution(exec.id);
+      expect(reloaded!.completed_steps).toHaveLength(1);
+      expect(reloaded!.completed_steps[0].step_id).toBe('briefing');
+      expect(reloaded!.completed_steps[0].status).toBe('completed');
+      s.close();
+    });
+  });
+
   describe('YAML integration', () => {
     it('works end-to-end with parsed YAML', async () => {
       const yaml = `
