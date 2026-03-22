@@ -3,6 +3,8 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { sprintCommand } from '../../src/cli/commands/sprint.js';
+import { createStore } from '../../src/store/index.js';
+import { WorkflowEngine, loadWorkflow, resolveVariables } from '../../src/core/index.js';
 
 let tmpDir: string;
 let originalCwd: string;
@@ -11,9 +13,8 @@ beforeEach(() => {
   tmpDir = mkdtempSync(join(tmpdir(), 'slope-sprint-wf-'));
   originalCwd = process.cwd();
   process.chdir(tmpDir);
-  // Create minimal .slope/config.json
   mkdirSync(join(tmpDir, '.slope'), { recursive: true });
-  writeFileSync(join(tmpDir, '.slope', 'config.json'), JSON.stringify({ currentSprint: 1 }));
+  writeFileSync(join(tmpDir, '.slope', 'config.json'), JSON.stringify({ currentSprint: 68 }));
 });
 
 afterEach(() => {
@@ -21,70 +22,220 @@ afterEach(() => {
   rmSync(tmpDir, { recursive: true, force: true });
 });
 
-describe('slope sprint run --workflow', () => {
-  it('starts a workflow execution and prints first step', async () => {
-    const logs: string[] = [];
-    const spy = vi.spyOn(console, 'log').mockImplementation((...args) => { logs.push(args.join(' ')); });
-
-    await sprintCommand(['run', 'S99', '--workflow=sprint-standard', '--var=tickets=T1,T2']);
-
+/** Capture console.log output during an async call */
+async function captureLog(fn: () => Promise<void>): Promise<string> {
+  const logs: string[] = [];
+  const spy = vi.spyOn(console, 'log').mockImplementation((...args) => { logs.push(args.join(' ')); });
+  try {
+    await fn();
+  } finally {
     spy.mockRestore();
-    const output = logs.join('\n');
-    expect(output).toContain('sprint-standard');
+  }
+  return logs.join('\n');
+}
+
+/** Start a workflow execution and return the execution ID */
+async function startWorkflow(sprintId: string, workflowName = 'sprint-lightweight'): Promise<string> {
+  const store = createStore({ storePath: '.slope/slope.db', cwd: tmpDir });
+  try {
+    const def = loadWorkflow(workflowName, tmpDir);
+    const vars: Record<string, string> = { sprint_id: sprintId, tickets: 'T1,T2' };
+    const resolved = resolveVariables(def, vars);
+    const engine = new WorkflowEngine();
+    const exec = await engine.start(resolved, store, { sprint_id: sprintId, variables: vars });
+    return exec.id;
+  } finally {
+    store.close();
+  }
+}
+
+describe('slope sprint run', () => {
+  it('starts a workflow execution', async () => {
+    const output = await captureLog(() =>
+      sprintCommand(['run', 'S68', '--workflow=sprint-lightweight', '--var=tickets=T1,T2'])
+    );
+    expect(output).toContain('sprint-lightweight');
     expect(output).toContain('started');
-    expect(output).toContain('pre_hole');
-    expect(output).toContain('briefing');
+    expect(output).toContain('running');
+    expect(output).toContain('First step');
+  });
+
+  it('errors without --workflow flag', async () => {
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => { throw new Error('exit'); });
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      await sprintCommand(['run', 'S68']);
+    } catch {
+      // expected
+    }
+    const calls = errSpy.mock.calls;
+    errSpy.mockRestore();
+    exitSpy.mockRestore();
+    expect(calls.some(c => c.join(' ').includes('--workflow'))).toBe(true);
+  });
+
+  it('passes --var arguments to workflow', async () => {
+    const output = await captureLog(() =>
+      sprintCommand(['run', 'S68', '--workflow=sprint-lightweight', '--var=sprint_id=S68', '--var=tickets=T1'])
+    );
+    expect(output).toContain('sprint-lightweight');
+    expect(output).toContain('started');
   });
 });
 
-describe('slope sprint status (workflow)', () => {
-  it('shows active workflow executions', async () => {
-    // Start a workflow first
-    vi.spyOn(console, 'log').mockImplementation(() => {});
-    await sprintCommand(['run', 'S88', '--workflow=sprint-standard', '--var=tickets=T1']);
-    vi.restoreAllMocks();
-
-    const logs: string[] = [];
-    const spy = vi.spyOn(console, 'log').mockImplementation((...args) => { logs.push(args.join(' ')); });
-
-    await sprintCommand(['status', 'S88']);
-
-    spy.mockRestore();
-    const output = logs.join('\n');
-    expect(output).toContain('sprint-standard');
+describe('slope sprint status (workflow mode)', () => {
+  it('shows workflow execution status by sprint ID', async () => {
+    await startWorkflow('70');
+    const output = await captureLog(() =>
+      sprintCommand(['status', '70'])
+    );
+    expect(output).toContain('Execution:');
+    expect(output).toContain('sprint-lightweight');
     expect(output).toContain('running');
+    expect(output).toContain('Sprint:    70');
+  });
+
+  it('lists all active executions when no sprint ID given', async () => {
+    await startWorkflow('71');
+    const output = await captureLog(() =>
+      sprintCommand(['status'])
+    );
+    expect(output).toContain('active workflow execution');
+    expect(output).toContain('sprint-lightweight');
+  });
+
+  it('reports no execution for unknown sprint', async () => {
+    const store = createStore({ storePath: '.slope/slope.db', cwd: tmpDir });
+    store.close();
+
+    const output = await captureLog(() =>
+      sprintCommand(['status', '999'])
+    );
+    expect(output).toContain('No active workflow execution');
+  });
+
+  it('falls back to legacy status when no workflow executions exist', async () => {
+    const store = createStore({ storePath: '.slope/slope.db', cwd: tmpDir });
+    store.close();
+
+    const output = await captureLog(() =>
+      sprintCommand(['status'])
+    );
+    expect(output).toContain('No active sprint');
   });
 });
 
 describe('slope sprint resume', () => {
-  it('shows next step for existing execution', async () => {
-    vi.spyOn(console, 'log').mockImplementation(() => {});
-    await sprintCommand(['run', 'S77', '--workflow=sprint-standard', '--var=tickets=T1']);
-    vi.restoreAllMocks();
+  it('resumes an existing workflow execution', async () => {
+    await startWorkflow('72');
+    const output = await captureLog(() =>
+      sprintCommand(['resume', '72'])
+    );
+    expect(output).toContain('Resuming workflow for sprint 72');
+    expect(output).toContain('Next step');
+  });
 
-    const logs: string[] = [];
-    const spy = vi.spyOn(console, 'log').mockImplementation((...args) => { logs.push(args.join(' ')); });
+  it('errors without sprint ID', async () => {
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => { throw new Error('exit'); });
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      await sprintCommand(['resume']);
+    } catch {
+      // expected
+    }
+    const calls = errSpy.mock.calls;
+    errSpy.mockRestore();
+    exitSpy.mockRestore();
+    expect(calls.some(c => c.join(' ').includes('Usage'))).toBe(true);
+  });
 
-    await sprintCommand(['resume', 'S77']);
+  it('errors for non-existent sprint execution', async () => {
+    const store = createStore({ storePath: '.slope/slope.db', cwd: tmpDir });
+    store.close();
 
-    spy.mockRestore();
-    const output = logs.join('\n');
-    expect(output).toContain('Resuming');
-    expect(output).toContain('briefing');
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => { throw new Error('exit'); });
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      await sprintCommand(['resume', '999']);
+    } catch {
+      // expected
+    }
+    const calls = errSpy.mock.calls;
+    errSpy.mockRestore();
+    exitSpy.mockRestore();
+    expect(calls.some(c => c.join(' ').includes('No active workflow'))).toBe(true);
   });
 });
 
-describe('slope sprint help', () => {
-  it('shows help with workflow commands', async () => {
-    const logs: string[] = [];
-    const spy = vi.spyOn(console, 'log').mockImplementation((...args) => { logs.push(args.join(' ')); });
+describe('slope sprint skip', () => {
+  it('skips the current step with a reason', async () => {
+    await startWorkflow('73');
 
-    await sprintCommand([]);
+    const store = createStore({ storePath: '.slope/slope.db', cwd: tmpDir });
+    let stepId: string;
+    try {
+      const def = loadWorkflow('sprint-lightweight', tmpDir);
+      const resolved = resolveVariables(def, { sprint_id: '73', tickets: 'T1,T2' });
+      const engine = new WorkflowEngine();
+      const exec = await store.getExecutionBySprint('73');
+      const next = await engine.next(exec!.id, resolved, store);
+      stepId = next.step!.id;
+    } finally {
+      store.close();
+    }
 
-    spy.mockRestore();
-    const output = logs.join('\n');
+    const output = await captureLog(() =>
+      sprintCommand(['skip', '73', `--step=${stepId}`, '--reason=Not needed'])
+    );
+    expect(output).toContain(`${stepId}`);
+    expect(output).toContain('skipped');
+  });
+
+  it('errors without required arguments', async () => {
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => { throw new Error('exit'); });
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      await sprintCommand(['skip']);
+    } catch {
+      // expected
+    }
+    const calls = errSpy.mock.calls;
+    errSpy.mockRestore();
+    exitSpy.mockRestore();
+    expect(calls.some(c => c.join(' ').includes('Usage'))).toBe(true);
+  });
+
+  it('uses default reason when --reason not provided', async () => {
+    await startWorkflow('74');
+
+    const store = createStore({ storePath: '.slope/slope.db', cwd: tmpDir });
+    let stepId: string;
+    try {
+      const def = loadWorkflow('sprint-lightweight', tmpDir);
+      const resolved = resolveVariables(def, { sprint_id: '74', tickets: 'T1,T2' });
+      const engine = new WorkflowEngine();
+      const exec = await store.getExecutionBySprint('74');
+      const next = await engine.next(exec!.id, resolved, store);
+      stepId = next.step!.id;
+    } finally {
+      store.close();
+    }
+
+    const output = await captureLog(() =>
+      sprintCommand(['skip', '74', `--step=${stepId}`])
+    );
+    expect(output).toContain('skipped');
+  });
+});
+
+describe('slope sprint (help)', () => {
+  it('shows help with workflow commands listed', async () => {
+    const output = await captureLog(() =>
+      sprintCommand([])
+    );
+    expect(output).toContain('slope sprint run');
+    expect(output).toContain('slope sprint resume');
+    expect(output).toContain('slope sprint skip');
     expect(output).toContain('--workflow');
-    expect(output).toContain('resume');
-    expect(output).toContain('skip');
   });
 });
