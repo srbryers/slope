@@ -6,6 +6,10 @@ import { sprintCommand } from '../../src/cli/commands/sprint.js';
 import { createStore } from '../../src/store/index.js';
 import { WorkflowEngine, loadWorkflow, resolveVariables } from '../../src/core/index.js';
 
+class ProcessExitError extends Error {
+  constructor(public code: number | undefined) { super(`process.exit(${code})`); }
+}
+
 let tmpDir: string;
 let originalCwd: string;
 
@@ -61,12 +65,13 @@ describe('slope sprint run', () => {
   });
 
   it('errors without --workflow flag', async () => {
-    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => { throw new Error('exit'); });
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((code) => { throw new ProcessExitError(code as number); });
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     try {
       await sprintCommand(['run', 'S68']);
-    } catch {
-      // expected
+    } catch (e) {
+      expect(e).toBeInstanceOf(ProcessExitError);
+      expect((e as ProcessExitError).code).toBe(1);
     }
     const calls = errSpy.mock.calls;
     errSpy.mockRestore();
@@ -136,12 +141,13 @@ describe('slope sprint resume', () => {
   });
 
   it('errors without sprint ID', async () => {
-    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => { throw new Error('exit'); });
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((code) => { throw new ProcessExitError(code as number); });
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     try {
       await sprintCommand(['resume']);
-    } catch {
-      // expected
+    } catch (e) {
+      expect(e).toBeInstanceOf(ProcessExitError);
+      expect((e as ProcessExitError).code).toBe(1);
     }
     const calls = errSpy.mock.calls;
     errSpy.mockRestore();
@@ -153,12 +159,13 @@ describe('slope sprint resume', () => {
     const store = createStore({ storePath: '.slope/slope.db', cwd: tmpDir });
     store.close();
 
-    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => { throw new Error('exit'); });
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((code) => { throw new ProcessExitError(code as number); });
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     try {
       await sprintCommand(['resume', '999']);
-    } catch {
-      // expected
+    } catch (e) {
+      expect(e).toBeInstanceOf(ProcessExitError);
+      expect((e as ProcessExitError).code).toBe(1);
     }
     const calls = errSpy.mock.calls;
     errSpy.mockRestore();
@@ -192,12 +199,13 @@ describe('slope sprint skip', () => {
   });
 
   it('errors without required arguments', async () => {
-    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => { throw new Error('exit'); });
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((code) => { throw new ProcessExitError(code as number); });
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     try {
       await sprintCommand(['skip']);
-    } catch {
-      // expected
+    } catch (e) {
+      expect(e).toBeInstanceOf(ProcessExitError);
+      expect((e as ProcessExitError).code).toBe(1);
     }
     const calls = errSpy.mock.calls;
     errSpy.mockRestore();

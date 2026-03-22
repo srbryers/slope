@@ -313,14 +313,12 @@ describe('WorkflowEngine', () => {
       const exec = await engine.start(SIMPLE_WORKFLOW, store);
       await engine.fail(exec.id, store);
       await expect(engine.skip(exec.id, 'briefing', 'skip', SIMPLE_WORKFLOW, store))
-        .rejects.toThrow();
+        .rejects.toThrow('status "failed"');
     });
 
-    it('next() throws on paused execution', async () => {
+    it('next() throws on failed execution (via direct store mutation)', async () => {
       const exec = await engine.start(SIMPLE_WORKFLOW, store);
-      // Manually set to paused via store
       await store.completeExecution(exec.id, 'failed');
-      // Can't pause directly, so test the failed path
       await expect(engine.next(exec.id, SIMPLE_WORKFLOW, store))
         .rejects.toThrow('has failed');
     });
