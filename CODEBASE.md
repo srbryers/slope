@@ -1,9 +1,9 @@
 ---
-generated_at: "2026-03-21T16:58:32.085Z"
-git_sha: "72fb5bbace2dc3df42141d4150516820aff4267a"
+generated_at: "2026-03-22T18:01:36.752Z"
+git_sha: "e17305499ea516fdbc3c5b56481f8c9160aa40cb"
 sprint: 67
 source_files: 214
-test_files: 165
+test_files: 166
 cli_commands: 47
 guards: 29
 flows: 0
@@ -18,7 +18,7 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
 <!-- AUTO-GENERATED: START packages -->
 
 ### `src/cli`
-- Source files: 110 | Test files: 68
+- Source files: 110 | Test files: 69
 - Key modules:
   - `config`
   - `hooks-config`
@@ -548,14 +548,14 @@ Re-exports from `src/core/index.ts`:
 
 | Directory | Test Files | Command |
 |-----------|-----------|---------|
-| tests/cli | 68 | `pnpm test` |
+| tests/cli | 69 | `pnpm test` |
 | tests/core | 85 | `pnpm test` |
 | tests/mcp | 7 | `pnpm test` |
 | tests/store | 1 | `pnpm test` |
 | tests/store-pg | 2 | `pnpm test` |
 | tests/tokens | 1 | `pnpm test` |
 
-**Total test files:** 164
+**Total test files:** 165
 **Run all:** `pnpm -r test`
 **Typecheck:** `pnpm -r typecheck`
 <!-- AUTO-GENERATED: END tests -->
@@ -579,4 +579,5 @@ Top recurring patterns from common-issues:
 
 <!-- AUTO-GENERATED: START gotchas -->
 
+- **Example pattern** (general, 1 sprint): This is an example recurring pattern. Replace with your own.
 <!-- AUTO-GENERATED: END gotchas -->
