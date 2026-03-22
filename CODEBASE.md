@@ -1,7 +1,7 @@
 ---
-generated_at: "2026-03-22T18:01:36.752Z"
-git_sha: "e17305499ea516fdbc3c5b56481f8c9160aa40cb"
-sprint: 67
+generated_at: "2026-03-22T18:01:48.556Z"
+git_sha: "2e75d7f397395860a0eac12cb5a2f7685f59d3ed"
+sprint: 68
 source_files: 214
 test_files: 166
 cli_commands: 47
@@ -566,11 +566,11 @@ Re-exports from `src/core/index.ts`:
 
 | Sprint | Theme | Tickets | Score |
 |--------|-------|---------|-------|
-| **63** | The Handbook + Template Integration — CLI Help & Documentation Polish | 6 | eagle |
 | **64** | Claim Hygiene, Worktree Safety & Loop Planner Context | 5 | par |
 | **65** | The Inspiration Engine | 3 | bogey |
 | **66** | The Scorekeeper — Sprint Analytics Dashboard | 4 | par |
 | **67** | The Skill Shelf — Skill System Restructuring | 4 | triple_plus |
+| **68** | The Fence — Workflow Engine Test Coverage | 4 | par |
 <!-- AUTO-GENERATED: END history -->
 
 ## Known Gotchas
