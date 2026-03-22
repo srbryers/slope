@@ -1,8 +1,8 @@
 ---
-generated_at: "2026-03-22T18:01:56.292Z"
-git_sha: "6c81faca2f4d538c92d86c3954848d37588fd4fd"
+generated_at: "2026-03-22T18:46:49.769Z"
+git_sha: "3c99310cfafd9d26e61778d94078ec6c2085f99d"
 sprint: 68
-source_files: 214
+source_files: 215
 test_files: 166
 cli_commands: 47
 guards: 29
@@ -18,7 +18,7 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
 <!-- AUTO-GENERATED: START packages -->
 
 ### `src/cli`
-- Source files: 110 | Test files: 69
+- Source files: 111 | Test files: 69
 - Key modules:
   - `config`
   - `hooks-config`
@@ -145,6 +145,7 @@ Re-exports from `src/core/index.ts`:
 - `loadScorecards(): GolfScorecard[]`
 - `detectLatestSprint`
 - `resolveCurrentSprint`
+- `normalizeScorecard`
 **Metaphor:**
 - `registerMetaphor`
 - `getMetaphor`
