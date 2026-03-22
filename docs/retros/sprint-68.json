@@ -1,0 +1,104 @@
+{
+  "sprint_number": 68,
+  "theme": "The Fence — Workflow Engine Test Coverage",
+  "par": 4,
+  "slope": 2,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-03-22",
+  "shots": [
+    {
+      "ticket_key": "T1",
+      "title": "Workflow gate guard dedicated tests",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "15 tests for malformed JSON, invalid shapes, sprint-state transitions, skip tier, boundary conditions. Plan described workflow-step-gate but tests cover workflow-gate (review gate)."
+    },
+    {
+      "ticket_key": "T2",
+      "title": "Sprint CLI integration tests — run/status/resume/skip",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "sprint-standard requires tickets variable and sprint_id pattern ^S\\d+$ — switched to sprint-lightweight for CLI tests"
+        },
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "loadWorkflow requires cwd as second arg — undefined caused TypeError in test helper"
+        },
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "[code review] process.exit mock throws in bare catch{} — any unexpected failure passes the test. Fixed with ProcessExitError sentinel.",
+          "gotcha_id": "review:code"
+        }
+      ],
+      "notes": "14 tests covering run, status, resume, skip, error paths, legacy fallback, and help output"
+    },
+    {
+      "ticket_key": "T3",
+      "title": "Built-in workflow E2E — autonomous + lightweight",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "3 new E2E tests driving all phases for both workflows plus variable defaults"
+    },
+    {
+      "ticket_key": "T4",
+      "title": "Engine edge cases + store failure conditions",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "complete() on failed execution throws 'status failed' not 'not found' — error message assumption"
+        },
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "getExecutionBySprint filters out failed/completed — returns null, not stale state. By design for active-only queries."
+        },
+        {
+          "type": "bunker",
+          "severity": "moderate",
+          "description": "[architect review] No regression test for S67 race condition (concurrent complete() calls) despite being a planned target. Transaction fix exists but lacks proof.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "[code review] Test 'next() throws on paused execution' was mislabeled — tested failed path. Bare .rejects.toThrow() without message match. Fixed.",
+          "gotcha_id": "review:code"
+        }
+      ],
+      "notes": "17 new tests for error recovery, state machine transitions, store integrity, persistence across reopen"
+    }
+  ],
+  "hole_stats": {
+    "fairways_hit": 4,
+    "total_fairways": 4,
+    "greens_in_regulation": 4,
+    "total_greens": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazard_penalties": 0
+  },
+  "bunker_locations": [],
+  "meta": {
+    "tests_before": 103,
+    "tests_after": 149,
+    "test_files_before": 9,
+    "test_files_after": 11,
+    "findings": [
+      "workflow-step-gate guard is registered in GUARD_DEFINITIONS but has no implementation function",
+      "getExecutionBySprint intentionally filters out completed/failed — active executions only",
+      "S67 race condition in recordStepResult was already fixed with SQLite transaction"
+    ]
+  }
+}

@@ -162,6 +162,106 @@ phases:
   });
 });
 
+describe('Full workflow execution E2E — sprint-lightweight', () => {
+  it('runs sprint-lightweight through all phases', async () => {
+    const cwd = '/tmp/slope-integ-nonexistent';
+    const def = loadWorkflow('sprint-lightweight', cwd);
+    const resolved = resolveVariables(def, { sprint_id: 'S50', tickets: 'T1,T2' });
+
+    const exec = await engine.start(resolved, store, { sprint_id: 'S50', variables: { sprint_id: 'S50', tickets: 'T1,T2' } });
+    expect(exec.status).toBe('running');
+
+    // Phase 1: per_ticket — T1
+    let next = await engine.next(exec.id, resolved, store);
+    expect(next.phase).toBe('per_ticket');
+    expect(next.current_item).toBe('T1');
+    expect(next.step!.id).toBe('implement');
+    await engine.complete(exec.id, 'implement', {}, resolved, store);
+
+    // Phase 1: per_ticket — T2
+    next = await engine.next(exec.id, resolved, store);
+    expect(next.current_item).toBe('T2');
+    expect(next.step!.id).toBe('implement');
+    await engine.complete(exec.id, 'implement', {}, resolved, store);
+
+    // Phase 2: validate
+    next = await engine.next(exec.id, resolved, store);
+    expect(next.phase).toBe('validate');
+    expect(next.step!.id).toBe('typecheck');
+    await engine.complete(exec.id, 'typecheck', { exit_code: 0 }, resolved, store);
+
+    const result = await engine.complete(exec.id, 'tests', { exit_code: 0 }, resolved, store);
+    expect(result.is_complete).toBe(true);
+
+    // Verify final state
+    const final = await store.getExecution(exec.id);
+    expect(final!.status).toBe('completed');
+    expect(final!.completed_steps.length).toBe(4); // 2 implement + typecheck + tests
+  });
+});
+
+describe('Full workflow execution E2E — sprint-autonomous', () => {
+  it('runs sprint-autonomous through all phases', async () => {
+    const cwd = '/tmp/slope-integ-nonexistent';
+    const def = loadWorkflow('sprint-autonomous', cwd);
+    const resolved = resolveVariables(def, { sprint_id: 'S51', tickets: 'T1,T2' });
+
+    const exec = await engine.start(resolved, store, { sprint_id: 'S51', variables: { sprint_id: 'S51', tickets: 'T1,T2' } });
+    expect(exec.status).toBe('running');
+
+    // Phase 1: pre_hole — briefing
+    let next = await engine.next(exec.id, resolved, store);
+    expect(next.phase).toBe('pre_hole');
+    expect(next.step!.id).toBe('briefing');
+    expect(next.step!.command).toContain('slope briefing');
+    await engine.complete(exec.id, 'briefing', { exit_code: 0 }, resolved, store);
+
+    // Phase 2: per_ticket — T1
+    next = await engine.next(exec.id, resolved, store);
+    expect(next.phase).toBe('per_ticket');
+    expect(next.current_item).toBe('T1');
+    expect(next.step!.id).toBe('implement');
+    await engine.complete(exec.id, 'implement', {}, resolved, store);
+
+    next = await engine.next(exec.id, resolved, store);
+    expect(next.step!.id).toBe('verify');
+    await engine.complete(exec.id, 'verify', { exit_code: 0 }, resolved, store);
+
+    // Phase 2: per_ticket — T2
+    next = await engine.next(exec.id, resolved, store);
+    expect(next.current_item).toBe('T2');
+    expect(next.step!.id).toBe('implement');
+    await engine.complete(exec.id, 'implement', {}, resolved, store);
+
+    next = await engine.next(exec.id, resolved, store);
+    expect(next.step!.id).toBe('verify');
+    await engine.complete(exec.id, 'verify', { exit_code: 0 }, resolved, store);
+
+    // Phase 3: post_hole
+    next = await engine.next(exec.id, resolved, store);
+    expect(next.phase).toBe('post_hole');
+    expect(next.step!.id).toBe('validate_scorecard');
+    await engine.complete(exec.id, 'validate_scorecard', { exit_code: 0 }, resolved, store);
+
+    const result = await engine.complete(exec.id, 'update_map', { exit_code: 0 }, resolved, store);
+    expect(result.is_complete).toBe(true);
+
+    // Verify final state
+    const final = await store.getExecution(exec.id);
+    expect(final!.status).toBe('completed');
+    expect(final!.completed_steps.length).toBe(7); // 1 + 2*2 + 2
+  });
+
+  it('uses default model variable when not provided', async () => {
+    const cwd = '/tmp/slope-integ-nonexistent';
+    const def = loadWorkflow('sprint-autonomous', cwd);
+    // Only provide required vars — model should default to 'local'
+    const resolved = resolveVariables(def, { sprint_id: 'S52', tickets: 'T1' });
+    const exec = await engine.start(resolved, store, { sprint_id: 'S52', variables: { sprint_id: 'S52', tickets: 'T1' } });
+    expect(exec.status).toBe('running');
+  });
+});
+
 describe('Per-ticket partial failures', () => {
   it('skips failed ticket and continues to next', async () => {
     const yaml = `
