@@ -13,7 +13,7 @@
       "club": "wedge",
       "result": "in_the_hole",
       "hazards": [],
-      "notes": "15 tests for malformed JSON, invalid shapes, sprint-state transitions, skip tier, boundary conditions"
+      "notes": "15 tests for malformed JSON, invalid shapes, sprint-state transitions, skip tier, boundary conditions. Plan described workflow-step-gate but tests cover workflow-gate (review gate)."
     },
     {
       "ticket_key": "T2",
@@ -30,6 +30,12 @@
           "type": "rough",
           "severity": "minor",
           "description": "loadWorkflow requires cwd as second arg — undefined caused TypeError in test helper"
+        },
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "[code review] process.exit mock throws in bare catch{} — any unexpected failure passes the test. Fixed with ProcessExitError sentinel.",
+          "gotcha_id": "review:code"
         }
       ],
       "notes": "14 tests covering run, status, resume, skip, error paths, legacy fallback, and help output"
@@ -57,6 +63,18 @@
           "type": "rough",
           "severity": "minor",
           "description": "getExecutionBySprint filters out failed/completed — returns null, not stale state. By design for active-only queries."
+        },
+        {
+          "type": "bunker",
+          "severity": "moderate",
+          "description": "[architect review] No regression test for S67 race condition (concurrent complete() calls) despite being a planned target. Transaction fix exists but lacks proof.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "[code review] Test 'next() throws on paused execution' was mislabeled — tested failed path. Bare .rejects.toThrow() without message match. Fixed.",
+          "gotcha_id": "review:code"
         }
       ],
       "notes": "17 new tests for error recovery, state machine transitions, store integrity, persistence across reopen"
