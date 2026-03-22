@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdirSync } from '
 import { join } from 'node:path';
 import type { ReviewFinding, ReviewType, HazardSeverity } from '../../core/types.js';
 import { recommendReviews, amendScorecardWithFindings } from '../../core/review.js';
-import { loadConfig, detectLatestSprint } from '../../core/index.js';
+import { loadConfig, detectLatestSprint, normalizeScorecard } from '../../core/index.js';
 import { createDeferred, listDeferred, resolveDeferred } from '../../core/deferred.js';
 import type { DeferredSeverity } from '../../core/deferred.js';
 import { HAZARD_SEVERITY_PENALTIES } from '../../core/constants.js';
@@ -386,7 +386,7 @@ function amendCommand(args: string[], cwd: string): void {
 
   let scorecard: GolfScorecard;
   try {
-    scorecard = JSON.parse(readFileSync(scorecardPath, 'utf8')) as GolfScorecard;
+    scorecard = normalizeScorecard(JSON.parse(readFileSync(scorecardPath, 'utf8')));
   } catch {
     console.error(`Error: Could not parse scorecard at ${scorecardPath}`);
     process.exit(1);

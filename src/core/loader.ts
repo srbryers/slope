@@ -2,6 +2,7 @@ import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { GolfScorecard } from './types.js';
 import type { SlopeConfig } from './config.js';
+import { normalizeStats } from './builder.js';
 
 /**
  * Load SLOPE scorecards from the configured directory.
@@ -37,10 +38,7 @@ export function loadScorecards(config: SlopeConfig, cwd: string = process.cwd())
 
     try {
       const raw = JSON.parse(readFileSync(join(dir, file), 'utf8'));
-      const card: GolfScorecard = {
-        ...raw,
-        sprint_number: raw.sprint_number ?? raw.sprint,
-      };
+      const card = normalizeScorecard(raw);
       scorecards.push(card);
     } catch {
       console.error(`  Warning: Could not parse ${file}, skipping`);
@@ -67,6 +65,27 @@ export function resolveCurrentSprint(config: SlopeConfig, cwd: string = process.
   if (config.currentSprint) return config.currentSprint;
   const latest = detectLatestSprint(config, cwd);
   return latest + 1;
+}
+
+/**
+ * Normalize a raw scorecard object to ensure consistent field names.
+ * Handles legacy `hole_stats` → `stats` and `sprint` → `sprint_number`.
+ */
+export function normalizeScorecard(raw: Record<string, unknown>): GolfScorecard {
+  const card = { ...raw } as Record<string, unknown>;
+
+  // Normalize sprint_number
+  card.sprint_number = card.sprint_number ?? card.sprint;
+
+  // Normalize hole_stats → stats using the existing normalizeStats coercion
+  if (card.hole_stats && !card.stats) {
+    card.stats = normalizeStats(card.hole_stats, (card.shots as unknown[])?.length ?? 0);
+    delete card.hole_stats;
+  } else if (card.stats) {
+    card.stats = normalizeStats(card.stats, (card.shots as unknown[])?.length ?? 0);
+  }
+
+  return card as unknown as GolfScorecard;
 }
 
 function escapeRegex(s: string): string {
