@@ -689,10 +689,12 @@ describe('Workflow Executions', () => {
     });
   });
 
-  it('handles concurrent recordStepResult calls without data loss (S67 regression)', async () => {
+  it('handles multiple rapid recordStepResult calls without data loss (S67 regression)', async () => {
     const exec = await store.startExecution({ workflow_name: 'test' });
 
-    // Simulate concurrent step completions
+    // better-sqlite3 is synchronous so Promise.all runs these sequentially
+    // in microtask order — validates transaction wrapper prevents lost writes,
+    // not true process-level concurrency.
     await Promise.all([
       store.recordStepResult({ execution_id: exec.id, step_id: 'step-a', phase: 'pre_hole', status: 'completed' }),
       store.recordStepResult({ execution_id: exec.id, step_id: 'step-b', phase: 'pre_hole', status: 'completed' }),

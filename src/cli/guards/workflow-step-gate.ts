@@ -15,6 +15,9 @@ export async function workflowStepGateGuard(input: HookInput, cwd: string): Prom
   const storePath = join(cwd, config.store_path ?? '.slope/slope.db');
   if (!existsSync(storePath)) return {};
 
+  // Note: opens SQLite on every invocation — heavier than file-based guards.
+  // Acceptable for v1 since workflow executions live only in the store.
+  // Future: consider a lightweight sidecar file written by the workflow engine.
   let store: SqliteSlopeStore | null = null;
   try {
     store = new SqliteSlopeStore(storePath);

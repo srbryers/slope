@@ -78,11 +78,13 @@ export function normalizeScorecard(raw: Record<string, unknown>): GolfScorecard 
   card.sprint_number = card.sprint_number ?? card.sprint;
 
   // Normalize hole_stats → stats using the existing normalizeStats coercion
+  const shotCount = (card.shots as unknown[])?.length ?? 0;
   if (card.hole_stats && !card.stats) {
-    card.stats = normalizeStats(card.hole_stats, (card.shots as unknown[])?.length ?? 0);
+    card.stats = normalizeStats(card.hole_stats, shotCount);
     delete card.hole_stats;
-  } else if (card.stats) {
-    card.stats = normalizeStats(card.stats, (card.shots as unknown[])?.length ?? 0);
+  } else {
+    // Always normalize — handles both existing stats and missing stats (zeroed defaults)
+    card.stats = normalizeStats(card.stats, shotCount);
   }
 
   return card as unknown as GolfScorecard;

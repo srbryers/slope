@@ -424,6 +424,7 @@ const GUARD_RELEVANCE: Record<string, { when: string; why: string }> = {
   'phase-boundary': { when: 'sprint-workflow', why: 'Prevents starting new phase without cleanup' },
   'claim-required': { when: 'sprint-workflow', why: 'Warns when editing without sprint claim' },
   'review-stale': { when: 'sprint-workflow', why: 'Catches scored sprints missing reviews' },
+  'workflow-step-gate': { when: 'sprint-workflow', why: 'Blocks file edits outside agent_work workflow steps' },
 };
 
 /** Detect which workflow profiles apply to this repo */
