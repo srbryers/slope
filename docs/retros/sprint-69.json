@@ -3,8 +3,8 @@
   "theme": "The Patch Kit — S68 Carryover Fixes",
   "par": 3,
   "slope": 2,
-  "score": 2,
-  "score_label": "birdie",
+  "score": 5,
+  "score_label": "double_bogey",
   "date": "2026-03-23",
   "shots": [
     {
@@ -12,7 +12,14 @@
       "title": "Fix review amend crash — hole_stats → stats normalization",
       "club": "wedge",
       "result": "in_the_hole",
-      "hazards": [],
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "minor",
+          "description": "[architect review] Missing stats field not normalized — fixed with unconditional normalizeStats fallback.",
+          "gotcha_id": "review:architect"
+        }
+      ],
       "notes": "Added normalizeScorecard() to loader.ts, reusing existing normalizeStats() from builder.ts. Applied in loadScorecards() and amendCommand()."
     },
     {
@@ -20,7 +27,20 @@
       "title": "Implement workflow-step-gate guard",
       "club": "short_iron",
       "result": "green",
-      "hazards": [],
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "moderate",
+          "description": "[architect review] SQLite store opened/closed on every Edit/Write — heavier than existing file-based guard patterns. Comment added; consider sidecar file in future.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "bunker",
+          "severity": "minor",
+          "description": "[architect review] workflow-step-gate missing from GUARD_RELEVANCE map — added.",
+          "gotcha_id": "review:architect"
+        }
+      ],
       "notes": "New guard opens store, finds running execution, loads workflow definition to resolve step type. Blocks Edit/Write if current step is not agent_work."
     },
     {
@@ -28,7 +48,14 @@
       "title": "Add concurrent recordStepResult regression test (S67)",
       "club": "putter",
       "result": "in_the_hole",
-      "hazards": [],
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "moderate",
+          "description": "[architect review] Promise.all with synchronous better-sqlite3 tests sequential integrity, not true process-level concurrency. Test renamed to clarify.",
+          "gotcha_id": "review:architect"
+        }
+      ],
       "notes": "Promise.all with 3 concurrent calls, asserts no lost writes or duplicates. SQLite serializes internally but test prevents regression if transaction wrapper removed."
     },
     {
@@ -40,8 +67,6 @@
       "notes": "review-tier guard now also matches docs/backlog/*-plan.md, closing the enforcement gap where plans written outside .claude/plans/ bypassed review gating."
     }
   ],
-  "conditions": [],
-  "special_plays": [],
   "stats": {
     "fairways_hit": 4,
     "fairways_total": 4,
@@ -49,16 +74,23 @@
     "greens_total": 4,
     "putts": 0,
     "penalties": 0,
-    "hazards_hit": 0,
-    "hazard_penalties": 0,
-    "miss_directions": { "long": 0, "short": 0, "left": 0, "right": 0 }
+    "hazards_hit": 4,
+    "hazard_penalties": 1,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
   },
+  "conditions": [],
+  "special_plays": [],
+  "bunker_locations": [],
   "yardage_book_updates": [
     "normalizeScorecard() exists in loader.ts — use it instead of raw JSON.parse for scorecards",
     "Guards can open SqliteSlopeStore directly for read-only queries",
     "review-tier guard now fires on docs/backlog/*-plan.md too"
   ],
-  "bunker_locations": [],
   "course_management_notes": [
     "All 4 tickets independent — no ordering constraints",
     "Reused existing normalizeStats() rather than reimplementing shape coercion",
