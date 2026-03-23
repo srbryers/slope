@@ -28,7 +28,9 @@ export async function reviewTierGuard(input: HookInput, cwd: string): Promise<Gu
 
   // Check if the written file is a plan file
   const normalizedPath = filePath.replace(/\\/g, '/');
-  if (!normalizedPath.includes('.claude/plans/') || !normalizedPath.endsWith('.md')) {
+  const isClaudePlan = normalizedPath.includes('.claude/plans/') && normalizedPath.endsWith('.md');
+  const isBacklogPlan = normalizedPath.includes('docs/backlog/') && normalizedPath.endsWith('-plan.md');
+  if (!isClaudePlan && !isBacklogPlan) {
     return {};
   }
 

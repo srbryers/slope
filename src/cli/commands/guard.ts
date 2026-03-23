@@ -28,6 +28,7 @@ import { postPushGuard } from '../guards/post-push.js';
 import { phaseBoundaryGuard } from '../guards/phase-boundary.js';
 import { claimRequiredGuard } from '../guards/claim-required.js';
 import { reviewStaleGuard } from '../guards/review-stale.js';
+import { workflowStepGateGuard } from '../guards/workflow-step-gate.js';
 import { formatGuardDocs } from '../guards/docs.js';
 import { recordBaseline } from '../guards/git-utils.js';
 import { execSync } from 'node:child_process';
@@ -100,6 +101,7 @@ const handlers: Partial<Record<GuardName, GuardHandler>> = {
   'claim-required': claimRequiredGuard,
   'review-stale': reviewStaleGuard,
   'worktree-reuse': worktreeReuseGuard,
+  'workflow-step-gate': workflowStepGateGuard,
 };
 
 /** Register a guard handler */
@@ -422,6 +424,7 @@ const GUARD_RELEVANCE: Record<string, { when: string; why: string }> = {
   'phase-boundary': { when: 'sprint-workflow', why: 'Prevents starting new phase without cleanup' },
   'claim-required': { when: 'sprint-workflow', why: 'Warns when editing without sprint claim' },
   'review-stale': { when: 'sprint-workflow', why: 'Catches scored sprints missing reviews' },
+  'workflow-step-gate': { when: 'sprint-workflow', why: 'Blocks file edits outside agent_work workflow steps' },
 };
 
 /** Detect which workflow profiles apply to this repo */

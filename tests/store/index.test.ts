@@ -689,6 +689,27 @@ describe('Workflow Executions', () => {
     });
   });
 
+  it('handles multiple rapid recordStepResult calls without data loss (S67 regression)', async () => {
+    const exec = await store.startExecution({ workflow_name: 'test' });
+
+    // better-sqlite3 is synchronous so Promise.all runs these sequentially
+    // in microtask order — validates transaction wrapper prevents lost writes,
+    // not true process-level concurrency.
+    await Promise.all([
+      store.recordStepResult({ execution_id: exec.id, step_id: 'step-a', phase: 'pre_hole', status: 'completed' }),
+      store.recordStepResult({ execution_id: exec.id, step_id: 'step-b', phase: 'pre_hole', status: 'completed' }),
+      store.recordStepResult({ execution_id: exec.id, step_id: 'step-c', phase: 'per_ticket', status: 'completed' }),
+    ]);
+
+    const updated = await store.getExecution(exec.id);
+    const stepIds = updated!.completed_steps.map(s => s.step_id).sort();
+
+    // All 3 steps must be recorded — no lost writes
+    expect(stepIds).toEqual(['step-a', 'step-b', 'step-c']);
+    // No duplicates
+    expect(new Set(stepIds).size).toBe(3);
+  });
+
   it('lists executions with filters', async () => {
     await store.startExecution({ workflow_name: 'test', sprint_id: 'S1' });
     await store.startExecution({ workflow_name: 'test', sprint_id: 'S2' });

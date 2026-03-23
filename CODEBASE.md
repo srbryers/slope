@@ -1,8 +1,8 @@
 ---
-generated_at: "2026-03-22T18:01:56.292Z"
-git_sha: "6c81faca2f4d538c92d86c3954848d37588fd4fd"
-sprint: 68
-source_files: 214
+generated_at: "2026-03-23T12:43:28.912Z"
+git_sha: "783796fdb20a5984825855e7f2dbbfb303bcdec0"
+sprint: 69
+source_files: 215
 test_files: 166
 cli_commands: 47
 guards: 29
@@ -18,7 +18,7 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
 <!-- AUTO-GENERATED: START packages -->
 
 ### `src/cli`
-- Source files: 110 | Test files: 69
+- Source files: 111 | Test files: 69
 - Key modules:
   - `config`
   - `hooks-config`
@@ -145,6 +145,7 @@ Re-exports from `src/core/index.ts`:
 - `loadScorecards(): GolfScorecard[]`
 - `detectLatestSprint`
 - `resolveCurrentSprint`
+- `normalizeScorecard`
 **Metaphor:**
 - `registerMetaphor`
 - `getMetaphor`
@@ -566,11 +567,11 @@ Re-exports from `src/core/index.ts`:
 
 | Sprint | Theme | Tickets | Score |
 |--------|-------|---------|-------|
-| **64** | Claim Hygiene, Worktree Safety & Loop Planner Context | 5 | par |
 | **65** | The Inspiration Engine | 3 | bogey |
 | **66** | The Scorekeeper — Sprint Analytics Dashboard | 4 | par |
 | **67** | The Skill Shelf — Skill System Restructuring | 4 | triple_plus |
 | **68** | The Fence — Workflow Engine Test Coverage | 4 | par |
+| **69** | The Patch Kit — S68 Carryover Fixes | 4 | double_bogey |
 <!-- AUTO-GENERATED: END history -->
 
 ## Known Gotchas
