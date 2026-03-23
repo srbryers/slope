@@ -1,0 +1,67 @@
+{
+  "sprint_number": 69,
+  "theme": "The Patch Kit — S68 Carryover Fixes",
+  "par": 3,
+  "slope": 2,
+  "score": 2,
+  "score_label": "birdie",
+  "date": "2026-03-23",
+  "shots": [
+    {
+      "ticket_key": "T1",
+      "title": "Fix review amend crash — hole_stats → stats normalization",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added normalizeScorecard() to loader.ts, reusing existing normalizeStats() from builder.ts. Applied in loadScorecards() and amendCommand()."
+    },
+    {
+      "ticket_key": "T2",
+      "title": "Implement workflow-step-gate guard",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "New guard opens store, finds running execution, loads workflow definition to resolve step type. Blocks Edit/Write if current step is not agent_work."
+    },
+    {
+      "ticket_key": "T3",
+      "title": "Add concurrent recordStepResult regression test (S67)",
+      "club": "putter",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Promise.all with 3 concurrent calls, asserts no lost writes or duplicates. SQLite serializes internally but test prevents regression if transaction wrapper removed."
+    },
+    {
+      "ticket_key": "T4",
+      "title": "Broaden review-tier guard path matching",
+      "club": "putter",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "review-tier guard now also matches docs/backlog/*-plan.md, closing the enforcement gap where plans written outside .claude/plans/ bypassed review gating."
+    }
+  ],
+  "conditions": [],
+  "special_plays": [],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": { "long": 0, "short": 0, "left": 0, "right": 0 }
+  },
+  "yardage_book_updates": [
+    "normalizeScorecard() exists in loader.ts — use it instead of raw JSON.parse for scorecards",
+    "Guards can open SqliteSlopeStore directly for read-only queries",
+    "review-tier guard now fires on docs/backlog/*-plan.md too"
+  ],
+  "bunker_locations": [],
+  "course_management_notes": [
+    "All 4 tickets independent — no ordering constraints",
+    "Reused existing normalizeStats() rather than reimplementing shape coercion",
+    "S68 scorecard itself had the hole_stats bug — good proof the fix was needed"
+  ]
+}
