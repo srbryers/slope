@@ -1,7 +1,7 @@
 ---
-generated_at: "2026-03-22T18:46:49.769Z"
-git_sha: "3c99310cfafd9d26e61778d94078ec6c2085f99d"
-sprint: 68
+generated_at: "2026-03-23T12:43:28.912Z"
+git_sha: "783796fdb20a5984825855e7f2dbbfb303bcdec0"
+sprint: 69
 source_files: 215
 test_files: 166
 cli_commands: 47
@@ -567,11 +567,11 @@ Re-exports from `src/core/index.ts`:
 
 | Sprint | Theme | Tickets | Score |
 |--------|-------|---------|-------|
-| **64** | Claim Hygiene, Worktree Safety & Loop Planner Context | 5 | par |
 | **65** | The Inspiration Engine | 3 | bogey |
 | **66** | The Scorekeeper — Sprint Analytics Dashboard | 4 | par |
 | **67** | The Skill Shelf — Skill System Restructuring | 4 | triple_plus |
 | **68** | The Fence — Workflow Engine Test Coverage | 4 | par |
+| **69** | The Patch Kit — S68 Carryover Fixes | 4 | double_bogey |
 <!-- AUTO-GENERATED: END history -->
 
 ## Known Gotchas
