@@ -1,6 +1,6 @@
 {
   "name": "SLOPE Development Roadmap",
-  "description": "Forward-looking roadmap from S61+. Phases 1-9 (S1-S47) are complete. S48-S60 were hardening, guard enforcement, and process sprints. This roadmap covers adoption, observability, guard maturity, multi-project, and loop evolution. S61-S64 reflect what actually shipped (themes diverged from original plan).",
+  "description": "Forward-looking roadmap from S61+. Phases 1-9 (S1-S47) are complete. S48-S60 were hardening, guard enforcement, and process sprints. This roadmap covers adoption, observability, guard maturity, multi-project, and loop evolution. S61-S64 reflect what actually shipped (themes diverged from original plan). Note: the actual S69 diverged from the planned Referee sprint — a carryover patch kit ran instead. The Referee work was rescheduled as S76.",
   "phases": [
     {
       "name": "Phase 10 — Adoption & Onboarding",
@@ -9,11 +9,13 @@
     },
     {
       "name": "Phase 11 — Repair & Observability",
-      "sprints": [65, 66, 67]
+      "sprints": [65, 66, 67],
+      "status": "complete"
     },
     {
       "name": "Phase 12 — Guard Maturity",
-      "sprints": [68, 69]
+      "sprints": [68, 69, 76],
+      "note": "S69 diverged — patch kit ran instead of The Referee. The Referee rescheduled as S76."
     },
     {
       "name": "Phase 13 — Multi-Project & Teams",
@@ -22,6 +24,10 @@
     {
       "name": "Phase 14 — Loop Evolution",
       "sprints": [73, 74, 75]
+    },
+    {
+      "name": "Phase 15 — Assessment & Wrap-up",
+      "sprints": [77]
     }
   ],
   "sprints": [
@@ -193,6 +199,9 @@
       "par": 4,
       "slope": 1,
       "type": "feature + dx",
+      "status": "complete",
+      "score": 5,
+      "score_label": "bogey",
       "tickets": [
         {
           "key": "S65-1",
@@ -226,6 +235,9 @@
       "par": 4,
       "slope": 2,
       "type": "feature",
+      "status": "complete",
+      "score": 4,
+      "score_label": "par",
       "tickets": [
         {
           "key": "S66-1",
@@ -260,6 +272,9 @@
       "par": 3,
       "slope": 2,
       "type": "feature",
+      "status": "complete",
+      "score": 7,
+      "score_label": "triple_plus",
       "tickets": [
         {
           "key": "S67-1",
@@ -287,6 +302,9 @@
       "par": 4,
       "slope": 2,
       "type": "infrastructure",
+      "status": "complete",
+      "score": 4,
+      "score_label": "par",
       "tickets": [
         {
           "key": "S68-1",
@@ -316,37 +334,40 @@
     },
     {
       "id": 69,
-      "theme": "The Referee — Advisory-to-Mechanical Guard Conversion",
-      "par": 4,
+      "theme": "The Patch Kit — S68 Carryover Fixes",
+      "par": 3,
       "slope": 2,
-      "type": "hardening",
+      "type": "bug fix + hardening",
+      "status": "complete",
+      "score": 5,
+      "score_label": "double_bogey",
+      "note": "Diverged from planned Referee sprint. Carried forward S68 review findings and unimplemented guard stub. The Referee work rescheduled as S76.",
       "tickets": [
         {
           "key": "S69-1",
-          "title": "Audit all advisory guards — identify which return context-only with no disk state",
+          "title": "Fix review amend crash — hole_stats → stats normalization",
           "club": "wedge",
           "complexity": "small"
         },
         {
           "key": "S69-2",
-          "title": "Convert hazard guard to write disk state for compaction survival",
+          "title": "Implement workflow-step-gate guard",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
           "key": "S69-3",
-          "title": "Convert scope-drift guard to write disk state for compaction survival",
-          "club": "short_iron",
-          "complexity": "standard"
+          "title": "Add concurrent recordStepResult regression test (S67)",
+          "club": "putter",
+          "complexity": "trivial"
         },
         {
           "key": "S69-4",
-          "title": "Guard enforcement report — slope doctor check for advisory vs mechanical guards",
-          "club": "wedge",
-          "complexity": "small"
+          "title": "Broaden review-tier guard path matching",
+          "club": "putter",
+          "complexity": "trivial"
         }
-      ],
-      "depends_on": [68]
+      ]
     },
     {
       "id": 70,
@@ -544,6 +565,76 @@
         }
       ],
       "depends_on": [73, 74]
+    },
+    {
+      "id": 76,
+      "theme": "The Referee — Advisory-to-Mechanical Guard Conversion",
+      "par": 4,
+      "slope": 2,
+      "type": "hardening",
+      "note": "Originally planned as S69. Skipped when S69 ran as a patch sprint instead. Rescheduled here; depends only on S68 which is complete.",
+      "tickets": [
+        {
+          "key": "S76-1",
+          "title": "Audit all advisory guards — identify which return context-only with no disk state",
+          "club": "wedge",
+          "complexity": "small"
+        },
+        {
+          "key": "S76-2",
+          "title": "Convert hazard guard to write disk state for compaction survival",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S76-3",
+          "title": "Convert scope-drift guard to write disk state for compaction survival",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S76-4",
+          "title": "Guard enforcement report — slope doctor check for advisory vs mechanical guards",
+          "club": "wedge",
+          "complexity": "small"
+        }
+      ],
+      "depends_on": [68]
+    },
+    {
+      "id": 77,
+      "theme": "The 19th Hole — Workflow Engine Assessment & Phase Wrap-up",
+      "par": 4,
+      "slope": 2,
+      "type": "assessment + hardening",
+      "note": "Capstone sprint. Assess the workflow engine's test coverage and integration health, review what shipped across the roadmap, and identify gaps before declaring the roadmap complete.",
+      "tickets": [
+        {
+          "key": "S77-1",
+          "title": "Workflow engine test coverage audit — identify gaps vs S67/S68 test suite",
+          "club": "wedge",
+          "complexity": "small"
+        },
+        {
+          "key": "S77-2",
+          "title": "Workflow engine E2E smoke test — full sprint lifecycle via CLI against real store",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S77-3",
+          "title": "Phase retrospective — assess shipped state vs original vision, document gaps for next roadmap",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S77-4",
+          "title": "CODEBASE.md and docs alignment check — ensure map reflects all shipped features",
+          "club": "wedge",
+          "complexity": "small"
+        }
+      ],
+      "depends_on": [75, 76]
     }
   ]
 }
