@@ -1,0 +1,148 @@
+{
+  "generated_at": "2026-03-24T19:50:00.000Z",
+  "sprints": [
+    {
+      "id": "S73",
+      "title": "The Autopilot v2 — Smart Model Routing",
+      "strategy": "roadmap",
+      "par": 4,
+      "slope": 2,
+      "type": "feature",
+      "tickets": [
+        {
+          "key": "S73-1",
+          "title": "Model success rate tracking — per-club, per-ticket-type breakdown",
+          "club": "short_iron",
+          "description": "Extend analyze-scorecards.ts to compute success rates per-club-per-strategy and per-club-per-ticket-type from sprint result files. Add min_samples threshold (>= 3) before emitting a recommendation. Update ModelConfig interface if structure changes.",
+          "acceptance_criteria": [
+            "analyze-scorecards.ts outputs per-club-per-strategy success rates in model-config.json",
+            "analyze-scorecards.ts outputs per-club-per-ticket-type success rates in model-config.json",
+            "Recommendations only emitted when sample count >= 3 for a dimension",
+            "Existing ModelConfig consumers (selectModel, loadModelConfig) still work without changes"
+          ],
+          "modules": ["slope-loop", "src/cli/loop"],
+          "max_files": 2,
+          "files": { "primary": ["slope-loop/analyze-scorecards.ts", "src/cli/loop/types.ts"] }
+        },
+        {
+          "key": "S73-2",
+          "title": "Adaptive model selection — apply cross-dimensional recommendations",
+          "club": "long_iron",
+          "description": "Extend selectModel() to accept ticketType and check cross-dimensional recommendations in priority order: club+type > club+strategy > club-only > defaults. Only apply data-driven override if sample count meets min_samples threshold. New params must be optional for backward compatibility.",
+          "acceptance_criteria": [
+            "selectModel() accepts optional ticketType parameter",
+            "Cross-dimensional lookup priority: club+type > club+strategy > club-only > defaults",
+            "Recommendations with insufficient samples fall through to next tier",
+            "Existing callers without ticketType param still work unchanged",
+            "Tests cover all fallback tiers"
+          ],
+          "modules": ["src/cli/loop"],
+          "max_files": 2,
+          "files": { "primary": ["src/cli/loop/model-selector.ts", "src/cli/loop/types.ts"] }
+        },
+        {
+          "key": "S73-3",
+          "title": "Model cost-performance tradeoff — factor cost into routing decisions",
+          "club": "short_iron",
+          "description": "Add cost_adjusted_score = success_rate / (cost_per_success + epsilon) metric to analysis output. In selectModel(), if both local and API have sufficient samples, prefer the one with better cost-adjusted score. Emit cost_adjusted_scores in model-config.json. Update slope-loop/model-selector.ts shell companion to reflect same logic.",
+          "acceptance_criteria": [
+            "model-config.json includes cost_adjusted_scores per model per club",
+            "selectModel() uses cost-adjusted score when both models have sufficient data",
+            "slope-loop/model-selector.ts reflects the same cost-adjusted logic",
+            "Tests verify cost-adjusted routing preference"
+          ],
+          "modules": ["slope-loop", "src/cli/loop"],
+          "max_files": 3,
+          "files": { "primary": ["slope-loop/analyze-scorecards.ts", "src/cli/loop/model-selector.ts", "slope-loop/model-selector.ts"] }
+        },
+        {
+          "key": "S73-4",
+          "title": "slope loop config recommend — surface optimal config from data",
+          "club": "wedge",
+          "description": "Add 'recommend' subcommand to slope loop config. Reads model-config.json, formats recommendations as a table (club > model > reason > samples > rate). Warns if model-config.json missing or stale (> 7 days). Add --json flag for machine-readable output.",
+          "acceptance_criteria": [
+            "slope loop config recommend prints formatted recommendation table",
+            "Warns when model-config.json is missing or older than 7 days",
+            "--json flag outputs machine-readable JSON",
+            "Slots into existing loop config subcommand routing without disrupting --show/--set"
+          ],
+          "modules": ["src/cli/commands/loop.ts"],
+          "max_files": 2,
+          "files": { "primary": ["src/cli/commands/loop.ts"] }
+        }
+      ]
+    },
+    {
+      "id": "S76",
+      "title": "The Referee — Advisory-to-Mechanical Guard Conversion",
+      "strategy": "hardening",
+      "par": 4,
+      "slope": 2,
+      "type": "chore",
+      "tickets": [
+        {
+          "key": "S76-1",
+          "title": "Audit all advisory guards — classify mechanical vs advisory",
+          "club": "wedge",
+          "description": "Read every guard in src/cli/guards/ and classify by return shape: mechanical (blockReason or disk write), advisory (additionalContext only), mixed. Add optional guardType field to GuardDefinition in guard.ts. Populate for all entries in GUARD_DEFINITIONS.",
+          "acceptance_criteria": [
+            "Every guard in GUARD_DEFINITIONS has a guardType classification",
+            "guardType field is optional on GuardDefinition interface (backward compatible)",
+            "Classification matches actual guard behavior (verified by reading each guard file)",
+            "TypeScript compiles clean with the new field"
+          ],
+          "modules": ["src/core/guard.ts", "src/cli/guards"],
+          "max_files": 2,
+          "files": { "primary": ["src/core/guard.ts"] }
+        },
+        {
+          "key": "S76-2",
+          "title": "Convert hazard guard to write disk state for compaction survival",
+          "club": "short_iron",
+          "description": "After computing warnings, write to .slope/guard-state/hazard.json. On next invocation, read state file first — if warning for file+sprint exists on disk, include it regardless of context. Clear stale entries on sprint change. Create .slope/guard-state/ with mkdirSync recursive. Wrap disk writes in try/catch (fail open).",
+          "acceptance_criteria": [
+            "hazard.ts writes warnings to .slope/guard-state/hazard.json after computing them",
+            "Previously-written warnings are restored from disk on subsequent invocations",
+            "Stale entries cleared when sprint number changes",
+            ".slope/guard-state/ created automatically if missing",
+            "Disk write failures don't crash the guard (fail open)",
+            "Tests cover: write+restore round-trip, sprint change clears state, missing directory creation"
+          ],
+          "modules": ["src/cli/guards"],
+          "max_files": 2,
+          "files": { "primary": ["src/cli/guards/hazard.ts"] }
+        },
+        {
+          "key": "S76-3",
+          "title": "Convert scope-drift guard to write disk state for compaction survival",
+          "club": "short_iron",
+          "description": "After successful store query finding drift violation, write to .slope/guard-state/scope-drift.json. If store unavailable on subsequent call, read from state file as fallback. If state file indicates drift for current file+sprint, return blockReason from disk. Clear on sprint change or when store returns in-scope.",
+          "acceptance_criteria": [
+            "scope-drift.ts writes drift violations to .slope/guard-state/scope-drift.json",
+            "Store-unavailable path falls back to disk state instead of silent pass",
+            "Stale entries cleared on sprint change or when store says file is in-scope",
+            "Tests cover: store-down fallback from disk, sprint change clears, in-scope clears state"
+          ],
+          "modules": ["src/cli/guards"],
+          "max_files": 2,
+          "files": { "primary": ["src/cli/guards/scope-drift.ts"] }
+        },
+        {
+          "key": "S76-4",
+          "title": "Guard enforcement report — slope guard audit or doctor check",
+          "club": "wedge",
+          "description": "Add slope guard audit (or slope doctor check) that reads GUARD_DEFINITIONS, groups by guardType, prints table: name | type | event | description. Highlight advisory guards with compaction-loss warning.",
+          "acceptance_criteria": [
+            "Command outputs table of all guards grouped by mechanical/advisory/mixed",
+            "Advisory guards shown with compaction-loss warning",
+            "Table includes guard name, type, event, and description",
+            "Tests verify output format and grouping"
+          ],
+          "modules": ["src/cli/commands/guard.ts", "src/core/guard.ts"],
+          "max_files": 2,
+          "files": { "primary": ["src/cli/commands/guard.ts", "src/core/guard.ts"] }
+        }
+      ]
+    }
+  ]
+}
