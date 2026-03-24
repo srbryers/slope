@@ -121,7 +121,7 @@ export async function runSprint(flags: Record<string, string>, cwd: string): Pro
           log.warn('Shutdown requested — stopping ticket processing');
           break;
         }
-        const result = await processTicket(ticket, config, worktreeCwd, log, sprint.strategy, flags.executor);
+        const result = await processTicket(ticket, config, worktreeCwd, log, sprint.strategy, flags.executor, sprint.type);
         ticketResults.push(result);
 
         // Log model usage (JSONL)
@@ -251,6 +251,7 @@ async function processTicket(
   log: Logger,
   strategy?: BacklogSprint['strategy'],
   executorOverride?: string,
+  sprintType?: BacklogSprint['type'],
 ): Promise<TicketResult> {
   const tLog = log.child(`ticket:${ticket.key}`);
   tLog.info(`-- ${ticket.key}: ${ticket.title} --`);
@@ -390,6 +391,8 @@ async function processTicket(
     escalated,
     tests_passing: testsPassing,
     noop,
+    strategy,
+    sprint_type: sprintType,
     tokens_in: tokens_in || undefined,
     tokens_out: tokens_out || undefined,
     cost_usd: cost_usd || undefined,
