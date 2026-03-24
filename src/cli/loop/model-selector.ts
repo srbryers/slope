@@ -7,7 +7,10 @@ import type { Club, LoopConfig, ModelConfig, BacklogSprint } from './types.js';
  *  1. Token-based: est_tokens > 24000 → API
  *  2. File-based: max_files >= 2 → API
  *  3. Strategy-based: documentation → API (local models can't reliably edit prose)
- *  4. Data-driven: check model-config.json recommendations per club
+ *  4. Data-driven: check model-config.json recommendations
+ *     4a. club+sprintType → most specific
+ *     4b. club+strategy → medium specificity
+ *     4c. club-only → least specific
  *  5. Club defaults: putter/wedge/short_iron → local, long_iron/driver → API
  */
 export function selectModel(
@@ -17,6 +20,7 @@ export function selectModel(
   config: LoopConfig,
   cwd: string,
   strategy?: BacklogSprint['strategy'],
+  sprintType?: BacklogSprint['type'],
 ): string {
   // 1. Token-based escalation: won't fit in Qwen 32K context
   if (estTokens > 24000) return config.modelApi;
@@ -31,6 +35,19 @@ export function selectModel(
   // 4. Data-driven overrides from model-config.json
   const modelConfig = loadModelConfig(cwd);
   if (modelConfig) {
+    // 4a. Most specific: club + sprint type
+    if (sprintType && modelConfig.recommendations_by_type) {
+      const rec = modelConfig.recommendations_by_type[`${club}:${sprintType}`];
+      if (rec) return rec.model === 'api' ? config.modelApi : config.modelLocal;
+    }
+
+    // 4b. Medium: club + strategy
+    if (strategy && modelConfig.recommendations_by_strategy) {
+      const rec = modelConfig.recommendations_by_strategy[`${club}:${strategy}`];
+      if (rec) return rec.model === 'api' ? config.modelApi : config.modelLocal;
+    }
+
+    // 4c. Least specific: club-only
     const rec = modelConfig.recommendations[club];
     if (rec?.model === 'api') return config.modelApi;
     if (rec?.model === 'local') return config.modelLocal;

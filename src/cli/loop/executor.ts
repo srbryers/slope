@@ -257,7 +257,7 @@ async function processTicket(
   tLog.info(`-- ${ticket.key}: ${ticket.title} --`);
   tLog.info(`Club: ${ticket.club} (max_files: ${ticket.max_files}, est_tokens: ${ticket.estimated_tokens ?? 0})`);
 
-  const primaryModel = selectModel(ticket.club, ticket.max_files, ticket.estimated_tokens ?? 0, config, cwd, strategy);
+  const primaryModel = selectModel(ticket.club, ticket.max_files, ticket.estimated_tokens ?? 0, config, cwd, strategy, sprintType);
   const timeout = selectTimeout(primaryModel, config);
   tLog.info(`Model: ${primaryModel} (timeout: ${timeout}s)`);
 

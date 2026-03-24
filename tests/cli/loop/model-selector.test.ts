@@ -149,6 +149,89 @@ describe('selectModel', () => {
     const model = selectModel('short_iron', 1, 0, config, tmpDir);
     expect(model).toBe(config.modelLocal);
   });
+
+  // Cross-dimensional recommendations (T2)
+  it('uses club+sprintType recommendation over club-only', () => {
+    writeFileSync(join(tmpDir, 'slope-loop/model-config.json'), JSON.stringify({
+      generated_at: '2026-01-01T00:00:00Z',
+      ticket_count: 20,
+      escalation_save_rate: 50,
+      success_rates: {},
+      cost_per_success: {},
+      recommendations: {
+        wedge: { model: 'local', reason: 'club-level says local' },
+      },
+      recommendations_by_type: {
+        'wedge:chore': { model: 'api', reason: '40% success on chore', samples: 5 },
+      },
+      notes: [],
+    }));
+    // sprintType 'chore' overrides club-only 'local' → API
+    const model = selectModel('wedge', 1, 0, config, tmpDir, undefined, 'chore');
+    expect(model).toBe(config.modelApi);
+  });
+
+  it('uses club+strategy recommendation when no sprintType match', () => {
+    writeFileSync(join(tmpDir, 'slope-loop/model-config.json'), JSON.stringify({
+      generated_at: '2026-01-01T00:00:00Z',
+      ticket_count: 20,
+      escalation_save_rate: 50,
+      success_rates: {},
+      cost_per_success: {},
+      recommendations: {
+        wedge: { model: 'local', reason: 'club-level says local' },
+      },
+      recommendations_by_strategy: {
+        'wedge:hardening': { model: 'api', reason: '45% on hardening', samples: 4 },
+      },
+      notes: [],
+    }));
+    // No sprintType match, but strategy 'hardening' matches → API
+    const model = selectModel('wedge', 1, 0, config, tmpDir, 'hardening');
+    expect(model).toBe(config.modelApi);
+  });
+
+  it('falls back to club-only when no cross-dimensional match', () => {
+    writeFileSync(join(tmpDir, 'slope-loop/model-config.json'), JSON.stringify({
+      generated_at: '2026-01-01T00:00:00Z',
+      ticket_count: 20,
+      escalation_save_rate: 50,
+      success_rates: {},
+      cost_per_success: {},
+      recommendations: {
+        wedge: { model: 'api', reason: 'club-level says api' },
+      },
+      recommendations_by_type: {
+        'short_iron:feature': { model: 'local', reason: 'different club', samples: 5 },
+      },
+      notes: [],
+    }));
+    // No type or strategy match for wedge:chore, falls to club-only → API
+    const model = selectModel('wedge', 1, 0, config, tmpDir, 'testing', 'chore');
+    expect(model).toBe(config.modelApi);
+  });
+
+  it('falls to club defaults when all cross-dimensional cells empty (cold start)', () => {
+    writeFileSync(join(tmpDir, 'slope-loop/model-config.json'), JSON.stringify({
+      generated_at: '2026-01-01T00:00:00Z',
+      ticket_count: 20,
+      escalation_save_rate: 50,
+      success_rates: {},
+      cost_per_success: {},
+      recommendations: {},
+      recommendations_by_type: {},
+      recommendations_by_strategy: {},
+      notes: [],
+    }));
+    // No data at all — fall through to club defaults
+    expect(selectModel('wedge', 1, 0, config, tmpDir, 'hardening', 'feature')).toBe(config.modelLocal);
+    expect(selectModel('long_iron', 1, 0, config, tmpDir, 'hardening', 'feature')).toBe(config.modelApi);
+  });
+
+  it('sprintType is optional (backward compat)', () => {
+    const model = selectModel('wedge', 1, 0, config, tmpDir, 'hardening');
+    expect(model).toBe(config.modelLocal);
+  });
 });
 
 describe('selectTimeout', () => {
