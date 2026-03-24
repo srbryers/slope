@@ -48,6 +48,14 @@ export function selectModel(
     }
 
     // 4c. Least specific: club-only
+    //     If both local and API have data, prefer the one with better cost-adjusted score
+    if (modelConfig.cost_adjusted_scores) {
+      const localScore = findCostScore(modelConfig.cost_adjusted_scores, club, 'ollama');
+      const apiScore = findCostScore(modelConfig.cost_adjusted_scores, club, config.modelApi);
+      if (localScore !== undefined && apiScore !== undefined) {
+        return localScore >= apiScore ? config.modelLocal : config.modelApi;
+      }
+    }
     const rec = modelConfig.recommendations[club];
     if (rec?.model === 'api') return config.modelApi;
     if (rec?.model === 'local') return config.modelLocal;
@@ -75,6 +83,16 @@ export function selectTimeout(model: string, config: LoopConfig): number {
 /** Check if a model string refers to a local (ollama) model */
 export function isLocalModel(model: string): boolean {
   return model.includes('ollama');
+}
+
+/** Find cost-adjusted score for a club+model combo (keys are "club:model_string") */
+function findCostScore(scores: Record<string, number>, club: string, modelSubstring: string): number | undefined {
+  for (const [key, score] of Object.entries(scores)) {
+    if (key.startsWith(`${club}:`) && key.includes(modelSubstring)) {
+      return score;
+    }
+  }
+  return undefined;
 }
 
 /** Load model-config.json if it exists */

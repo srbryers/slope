@@ -232,6 +232,67 @@ describe('selectModel', () => {
     const model = selectModel('wedge', 1, 0, config, tmpDir, 'hardening');
     expect(model).toBe(config.modelLocal);
   });
+
+  // Cost-adjusted routing (T3)
+  it('prefers model with better cost-adjusted score', () => {
+    writeFileSync(join(tmpDir, 'slope-loop/model-config.json'), JSON.stringify({
+      generated_at: '2026-01-01T00:00:00Z',
+      ticket_count: 20,
+      escalation_save_rate: 50,
+      success_rates: {},
+      cost_per_success: {},
+      cost_adjusted_scores: {
+        // Local has better cost-adjusted score (free + decent rate)
+        'short_iron:ollama/qwen2.5-coder:32b': 10.0,
+        [`short_iron:${config.modelApi}`]: 2.5,
+      },
+      recommendations: {},
+      notes: [],
+    }));
+    // Cost-adjusted: local wins (10.0 > 2.5)
+    const model = selectModel('short_iron', 1, 0, config, tmpDir);
+    expect(model).toBe(config.modelLocal);
+  });
+
+  it('routes to API when API has better cost-adjusted score', () => {
+    writeFileSync(join(tmpDir, 'slope-loop/model-config.json'), JSON.stringify({
+      generated_at: '2026-01-01T00:00:00Z',
+      ticket_count: 20,
+      escalation_save_rate: 50,
+      success_rates: {},
+      cost_per_success: {},
+      cost_adjusted_scores: {
+        // API has better cost-adjusted score (much higher success rate offsets cost)
+        'short_iron:ollama/qwen2.5-coder:32b': 1.0,
+        [`short_iron:${config.modelApi}`]: 5.0,
+      },
+      recommendations: {},
+      notes: [],
+    }));
+    const model = selectModel('short_iron', 1, 0, config, tmpDir);
+    expect(model).toBe(config.modelApi);
+  });
+
+  it('falls through to recommendations when only one model has cost data', () => {
+    writeFileSync(join(tmpDir, 'slope-loop/model-config.json'), JSON.stringify({
+      generated_at: '2026-01-01T00:00:00Z',
+      ticket_count: 20,
+      escalation_save_rate: 50,
+      success_rates: {},
+      cost_per_success: {},
+      cost_adjusted_scores: {
+        'short_iron:ollama/qwen2.5-coder:32b': 10.0,
+        // No API entry for short_iron
+      },
+      recommendations: {
+        short_iron: { model: 'api', reason: 'rec says api' },
+      },
+      notes: [],
+    }));
+    // Only one model has cost data → skip cost-adjusted, fall to recommendations → API
+    const model = selectModel('short_iron', 1, 0, config, tmpDir);
+    expect(model).toBe(config.modelApi);
+  });
 });
 
 describe('selectTimeout', () => {
