@@ -118,6 +118,8 @@ export interface GuardDefinition {
   matcher?: string;
   /** Which --level installs this guard */
   level: 'scoring' | 'full';
+  /** Guard enforcement type: mechanical (blocks), advisory (warns), or mixed */
+  guardType?: 'mechanical' | 'advisory' | 'mixed';
 }
 
 /** Guidance configuration fields for .slope/config.json */
@@ -163,6 +165,7 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     toolCategories: ['read_file', 'search_files', 'search_content', 'write_file'],
     matcher: 'Read|Glob|Grep|Edit|Write',
     level: 'full',
+    guardType: 'advisory',
   },
   {
     name: 'hazard',
@@ -171,6 +174,7 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     toolCategories: ['write_file'],
     matcher: 'Edit|Write',
     level: 'full',
+    guardType: 'advisory',
   },
   {
     name: 'commit-nudge',
@@ -179,6 +183,7 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     toolCategories: ['write_file'],
     matcher: 'Edit|Write',
     level: 'full',
+    guardType: 'advisory',
   },
   {
     name: 'scope-drift',
@@ -187,18 +192,21 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     toolCategories: ['write_file'],
     matcher: 'Edit|Write',
     level: 'full',
+    guardType: 'advisory',
   },
   {
     name: 'compaction',
     description: 'Extract events before context compaction',
     hookEvent: 'PreCompact',
     level: 'full',
+    guardType: 'mechanical',
   },
   {
     name: 'stop-check',
     description: 'Check for uncommitted/unpushed work before session end',
     hookEvent: 'Stop',
     level: 'full',
+    guardType: 'mechanical',
   },
   {
     name: 'subagent-gate',
@@ -207,6 +215,7 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     toolCategories: ['create_subagent'],
     matcher: 'Agent',
     level: 'full',
+    guardType: 'mechanical',
   },
   {
     name: 'push-nudge',
@@ -215,6 +224,7 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     toolCategories: ['execute_command'],
     matcher: 'Bash',
     level: 'full',
+    guardType: 'advisory',
   },
   {
     name: 'workflow-gate',
@@ -223,6 +233,7 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     toolCategories: ['exit_plan'],
     matcher: 'ExitPlanMode',
     level: 'full',
+    guardType: 'mechanical',
   },
   {
     name: 'review-tier',
@@ -231,6 +242,7 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     toolCategories: ['write_file'],
     matcher: 'Edit|Write',
     level: 'full',
+    guardType: 'advisory',
   },
   {
     name: 'version-check',
@@ -239,6 +251,7 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     toolCategories: ['execute_command'],
     matcher: 'Bash',
     level: 'full',
+    guardType: 'mechanical',
   },
   {
     name: 'workflow-step-gate',
@@ -247,6 +260,7 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     toolCategories: ['write_file'],
     matcher: 'Edit|Write',
     level: 'full',
+    guardType: 'mechanical',
   },
   {
     name: 'stale-flows',
@@ -255,12 +269,14 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     toolCategories: ['write_file'],
     matcher: 'Edit|Write',
     level: 'full',
+    guardType: 'advisory',
   },
   {
     name: 'next-action',
     description: 'Suggest next actions before session end',
     hookEvent: 'Stop',
     level: 'full',
+    guardType: 'advisory',
   },
   {
     name: 'pr-review',
@@ -269,6 +285,7 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     toolCategories: ['execute_command'],
     matcher: 'Bash',
     level: 'full',
+    guardType: 'advisory',
   },
   {
     name: 'transcript',
@@ -276,6 +293,7 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     hookEvent: 'PostToolUse',
     // no toolCategories, no matcher → fires on all tools
     level: 'full',
+    guardType: 'mechanical',
   },
   {
     name: 'branch-before-commit',
@@ -284,6 +302,7 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     toolCategories: ['execute_command'],
     matcher: 'Bash',
     level: 'full',
+    guardType: 'mechanical',
   },
   {
     name: 'worktree-check',
@@ -292,6 +311,7 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     toolCategories: ['write_file', 'execute_command'],
     matcher: 'Edit|Write|Bash',
     level: 'full',
+    guardType: 'mechanical',
   },
   {
     name: 'sprint-completion',
@@ -300,12 +320,14 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     toolCategories: ['execute_command'],
     matcher: 'Bash',
     level: 'full',
+    guardType: 'mechanical',
   },
   {
     name: 'sprint-completion',
     description: 'Block session end when sprint gates are incomplete',
     hookEvent: 'Stop',
     level: 'full',
+    guardType: 'mechanical',
   },
   {
     name: 'sprint-completion',
@@ -314,6 +336,7 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     toolCategories: ['execute_command'],
     matcher: 'Bash',
     level: 'full',
+    guardType: 'mechanical',
   },
   {
     name: 'worktree-merge',
@@ -322,6 +345,7 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     toolCategories: ['execute_command'],
     matcher: 'Bash',
     level: 'full',
+    guardType: 'mechanical',
   },
   {
     name: 'worktree-self-remove',
@@ -330,6 +354,7 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     toolCategories: ['execute_command'],
     matcher: 'Bash',
     level: 'full',
+    guardType: 'mechanical',
   },
   // --- Suggestion Engine Guards ---
   {
@@ -339,6 +364,7 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     toolCategories: ['execute_command'],
     matcher: 'Bash',
     level: 'full',
+    guardType: 'mechanical',
   },
   {
     name: 'claim-required',
@@ -347,6 +373,7 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     toolCategories: ['write_file'],
     matcher: 'Edit|Write',
     level: 'full',
+    guardType: 'advisory',
   },
   {
     name: 'post-push',
@@ -355,6 +382,7 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     toolCategories: ['execute_command'],
     matcher: 'Bash',
     level: 'full',
+    guardType: 'advisory',
   },
   {
     name: 'session-briefing',
@@ -362,12 +390,14 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     hookEvent: 'PostToolUse',
     // no toolCategories, no matcher → fires on all tools
     level: 'full',
+    guardType: 'mechanical',
   },
   {
     name: 'review-stale',
     description: 'Warn about scored sprints with missing reviews at session end',
     hookEvent: 'Stop',
     level: 'full',
+    guardType: 'advisory',
   },
   {
     name: 'worktree-reuse',
@@ -376,6 +406,7 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     toolCategories: ['enter_worktree'],
     matcher: 'EnterWorktree',
     level: 'full',
+    guardType: 'advisory',
   },
 ];
 
@@ -391,6 +422,8 @@ export interface CustomGuardDefinition {
   toolCategories?: ToolCategory[];
   level: 'scoring' | 'full';
   command: string;
+  /** Guard enforcement type: mechanical (blocks), advisory (warns), or mixed */
+  guardType?: 'mechanical' | 'advisory' | 'mixed';
 }
 
 /** Union type for functions that accept both built-in and custom guards */
