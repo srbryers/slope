@@ -423,7 +423,12 @@ function recommendSubcommand(flags: Record<string, string>, cwd: string): void {
   console.log('  Club          Model   Reason                              Samples');
   console.log('  ────────────  ──────  ──────────────────────────────────  ───────');
   for (const [club, rec] of Object.entries(mc.recommendations)) {
-    const stats = mc.success_rates[`${club}:${rec.model === 'api' ? Object.keys(mc.success_rates).find(k => k.startsWith(`${club}:`) && !k.includes('ollama'))?.split(':')[1] ?? 'api' : Object.keys(mc.success_rates).find(k => k.startsWith(`${club}:`) && k.includes('ollama'))?.split(':')[1] ?? 'local'}`];
+    // Find matching success_rates key — keys are "club:full_model_name" (model names may contain colons)
+    const isLocal = rec.model === 'local';
+    const matchKey = Object.keys(mc.success_rates).find(k =>
+      k.startsWith(`${club}:`) && (isLocal ? k.includes('ollama') : !k.includes('ollama')),
+    );
+    const stats = matchKey ? mc.success_rates[matchKey] : undefined;
     const samples = stats?.total ?? '?';
     console.log(`  ${club.padEnd(14)}${rec.model.padEnd(8)}${rec.reason.padEnd(36)}${samples}`);
   }
