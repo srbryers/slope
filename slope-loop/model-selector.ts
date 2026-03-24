@@ -146,6 +146,15 @@ function run(): void {
     costPerSuccess[key] = (costPerTicket * val.total) / successCount;
   }
 
+  // Cost-adjusted score: success_rate / (cost_per_success + epsilon)
+  const EPSILON = 0.01;
+  const costAdjustedScores: Record<string, number> = {};
+  for (const [key, val] of Object.entries(stats)) {
+    const rate = (val.passing / val.total); // success rate 0-1
+    const cost = costPerSuccess[key] || EPSILON;
+    costAdjustedScores[key] = rate / (cost + EPSILON);
+  }
+
   // Helper to compute rate with min_samples check
   function computeRate(s: { total: number; passing: number } | undefined): { total: number; passing: number; rate: number } | null {
     if (!s || s.total < DEFAULT_MIN_SAMPLES) return null;
@@ -220,11 +229,13 @@ function run(): void {
     success_rates_by_strategy: successRatesByStrategy,
     success_rates_by_type: successRatesByType,
     cost_per_success: costPerSuccess,
+    cost_adjusted_scores: costAdjustedScores,
     recommendations,
     notes: [
       'Recommendations based on observed success rates per club x model combination',
       `Escalation save rate: ${Math.round(escalationSaveRate * 100)}% (${escalations.filter(r => r.tests_passing).length}/${escalations.length})`,
       `min_samples threshold: ${DEFAULT_MIN_SAMPLES} (recommendations only emitted when sample count >= min_samples)`,
+      'cost_adjusted_score = success_rate / (cost_per_success + epsilon) — higher is better',
       'Run again after 10+ more sprints for updated recommendations',
     ],
   };

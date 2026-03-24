@@ -238,6 +238,7 @@ export interface ModelConfig {
   success_rates_by_strategy: Record<string, Record<string, { total: number; passing: number; rate: number }>>;
   success_rates_by_type: Record<string, Record<string, { total: number; passing: number; rate: number }>>;
   cost_per_success: Record<string, number>;
+  cost_adjusted_scores: Record<string, number>;
   recommendations: Record<string, { model: 'api' | 'local'; reason: string }>;
   notes: string[];
 }
