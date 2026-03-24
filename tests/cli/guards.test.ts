@@ -190,6 +190,102 @@ describe('hazardGuard', () => {
     expect(result.decision).toBeUndefined();
     expect(result.blockReason).toBeUndefined();
   });
+
+  it('writes warnings to disk state for compaction survival', async () => {
+    mkdirSync(join(tmpDir, '.slope'), { recursive: true });
+    writeFileSync(join(tmpDir, '.slope/common-issues.json'), JSON.stringify({
+      recurring_patterns: [
+        {
+          id: 1,
+          title: 'Core issue',
+          category: 'testing',
+          sprints_hit: [8],
+          gotcha_refs: [],
+          description: 'Affects core package testing',
+          prevention: 'Run tests after editing core',
+        },
+      ],
+    }));
+    (mockConfig as Record<string, unknown>).currentSprint = 10;
+
+    await hazardGuard(
+      makeInput({ tool_input: { file_path: join(tmpDir, 'packages/core/src/foo.ts') } }),
+      tmpDir,
+    );
+
+    const statePath = join(tmpDir, '.slope/guard-state/hazard.json');
+    expect(existsSync(statePath)).toBe(true);
+    const state = JSON.parse(readFileSync(statePath, 'utf8'));
+    expect(state.entries).toHaveLength(1);
+    expect(state.entries[0].area).toBe('packages/core/src');
+    expect(state.entries[0].sprint).toBe(10);
+    expect(state.entries[0].warnings[0]).toContain('Core issue');
+  });
+
+  it('restores warnings from disk when common issues file is removed', async () => {
+    mkdirSync(join(tmpDir, '.slope/guard-state'), { recursive: true });
+    (mockConfig as Record<string, unknown>).currentSprint = 10;
+
+    // Seed disk state directly
+    writeFileSync(join(tmpDir, '.slope/guard-state/hazard.json'), JSON.stringify({
+      entries: [{
+        area: 'packages/core/src',
+        warnings: ['[testing] Cached warning (last: S8) — Run tests after editing core'],
+        sprint: 10,
+        timestamp: Date.now(),
+      }],
+    }));
+
+    // No common-issues.json → fresh warnings empty, but disk state should fill in
+    const result = await hazardGuard(
+      makeInput({ tool_input: { file_path: join(tmpDir, 'packages/core/src/foo.ts') } }),
+      tmpDir,
+    );
+    expect(result.context).toContain('Cached warning');
+  });
+
+  it('clears disk state when sprint changes', async () => {
+    mkdirSync(join(tmpDir, '.slope/guard-state'), { recursive: true });
+    (mockConfig as Record<string, unknown>).currentSprint = 11;
+
+    // Seed disk state from sprint 10
+    writeFileSync(join(tmpDir, '.slope/guard-state/hazard.json'), JSON.stringify({
+      entries: [{
+        area: 'packages/core/src',
+        warnings: ['[testing] Old sprint warning'],
+        sprint: 10,
+        timestamp: Date.now(),
+      }],
+    }));
+
+    // Sprint changed → old state should be pruned, no common-issues → empty
+    const result = await hazardGuard(
+      makeInput({ tool_input: { file_path: join(tmpDir, 'packages/core/src/foo.ts') } }),
+      tmpDir,
+    );
+    expect(result).toEqual({});
+  });
+
+  it('prunes entries older than 7 days', async () => {
+    mkdirSync(join(tmpDir, '.slope/guard-state'), { recursive: true });
+    (mockConfig as Record<string, unknown>).currentSprint = 10;
+
+    // Seed with ancient timestamp
+    writeFileSync(join(tmpDir, '.slope/guard-state/hazard.json'), JSON.stringify({
+      entries: [{
+        area: 'packages/core/src',
+        warnings: ['[testing] Ancient warning'],
+        sprint: 10,
+        timestamp: Date.now() - (8 * 24 * 60 * 60 * 1000), // 8 days ago
+      }],
+    }));
+
+    const result = await hazardGuard(
+      makeInput({ tool_input: { file_path: join(tmpDir, 'packages/core/src/foo.ts') } }),
+      tmpDir,
+    );
+    expect(result).toEqual({});
+  });
 });
 
 describe('commitNudgeGuard', () => {
