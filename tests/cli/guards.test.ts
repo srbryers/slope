@@ -338,6 +338,75 @@ describe('scopeDriftGuard', () => {
     expect(result.decision).toBeUndefined();
     expect(result.blockReason).toBeUndefined();
   });
+
+  it('falls back to disk state when store is unavailable', async () => {
+    mkdirSync(join(tmpDir, '.slope/guard-state'), { recursive: true });
+    (mockConfig as Record<string, unknown>).currentSprint = 10;
+
+    // Seed disk state with a drift violation
+    writeFileSync(join(tmpDir, '.slope/guard-state/scope-drift.json'), JSON.stringify({
+      entries: [{
+        file: 'packages/other/src/bar.ts',
+        claimedAreas: 'src/core',
+        sprint: 10,
+        timestamp: Date.now(),
+      }],
+    }));
+
+    // Mock resolveStore to throw (simulates store unavailable)
+    const storeModule = await import('../../src/cli/store.js');
+    const spy = vi.spyOn(storeModule, 'resolveStore').mockRejectedValueOnce(new Error('store unavailable'));
+
+    const result = await scopeDriftGuard(
+      makeInput({ tool_input: { file_path: join(tmpDir, 'packages/other/src/bar.ts') } }),
+      tmpDir,
+    );
+    expect(result.context).toContain('scope drift');
+    expect(result.context).toContain('src/core');
+    spy.mockRestore();
+  });
+
+  it('fails open when disk state is older than 24 hours', async () => {
+    mkdirSync(join(tmpDir, '.slope/guard-state'), { recursive: true });
+    (mockConfig as Record<string, unknown>).currentSprint = 10;
+
+    // Seed disk state with old timestamp (25 hours ago)
+    writeFileSync(join(tmpDir, '.slope/guard-state/scope-drift.json'), JSON.stringify({
+      entries: [{
+        file: 'packages/other/src/bar.ts',
+        claimedAreas: 'src/core',
+        sprint: 10,
+        timestamp: Date.now() - (25 * 60 * 60 * 1000),
+      }],
+    }));
+
+    const result = await scopeDriftGuard(
+      makeInput({ tool_input: { file_path: join(tmpDir, 'packages/other/src/bar.ts') } }),
+      tmpDir,
+    );
+    expect(result).toEqual({});
+  });
+
+  it('clears disk state on sprint change', async () => {
+    mkdirSync(join(tmpDir, '.slope/guard-state'), { recursive: true });
+    (mockConfig as Record<string, unknown>).currentSprint = 11;
+
+    // Seed disk state from sprint 10
+    writeFileSync(join(tmpDir, '.slope/guard-state/scope-drift.json'), JSON.stringify({
+      entries: [{
+        file: 'packages/other/src/bar.ts',
+        claimedAreas: 'src/core',
+        sprint: 10,
+        timestamp: Date.now(),
+      }],
+    }));
+
+    const result = await scopeDriftGuard(
+      makeInput({ tool_input: { file_path: join(tmpDir, 'packages/other/src/bar.ts') } }),
+      tmpDir,
+    );
+    expect(result).toEqual({});
+  });
 });
 
 describe('compactionGuard', () => {
