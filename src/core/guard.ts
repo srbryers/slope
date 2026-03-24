@@ -165,7 +165,7 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     toolCategories: ['read_file', 'search_files', 'search_content', 'write_file'],
     matcher: 'Read|Glob|Grep|Edit|Write',
     level: 'full',
-    guardType: 'advisory',
+    guardType: 'mixed',
   },
   {
     name: 'hazard',
@@ -242,7 +242,7 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     toolCategories: ['write_file'],
     matcher: 'Edit|Write',
     level: 'full',
-    guardType: 'advisory',
+    guardType: 'mechanical',
   },
   {
     name: 'version-check',
@@ -276,7 +276,7 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     description: 'Suggest next actions before session end',
     hookEvent: 'Stop',
     level: 'full',
-    guardType: 'advisory',
+    guardType: 'mechanical',
   },
   {
     name: 'pr-review',
@@ -390,7 +390,7 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     hookEvent: 'PostToolUse',
     // no toolCategories, no matcher → fires on all tools
     level: 'full',
-    guardType: 'mechanical',
+    guardType: 'advisory',
   },
   {
     name: 'review-stale',
