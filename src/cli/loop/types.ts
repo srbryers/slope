@@ -91,6 +91,8 @@ export interface BacklogSprint {
   slope: number;
   type: 'feature' | 'bugfix' | 'chore';
   tickets: BacklogTicket[];
+  /** Sprint IDs that must complete before this sprint can run */
+  depends_on?: string[];
 }
 
 export interface BacklogTicket {

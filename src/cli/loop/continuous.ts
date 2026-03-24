@@ -2,7 +2,7 @@ import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { execSync } from 'node:child_process';
 import { resolveLoopConfig } from './config.js';
-import { loadBacklog, getRemainingSprintIds } from './backlog.js';
+import { loadBacklog, getRemainingSprintIds, getReadySprints } from './backlog.js';
 import { runSprint, isShuttingDown } from './executor.js';
 import { initStagingBranch, createUmbrellaPr, cleanupStagingBranch } from './staging.js';
 import { checkGhCli } from './pr-lifecycle.js';
@@ -55,7 +55,7 @@ export async function runContinuous(flags: Record<string, string>, cwd: string):
       break;
     }
 
-    // Check remaining sprints
+    // Check remaining sprints (dependency-aware)
     let backlog = loadBacklogSafe(cwd, config, log);
     let remaining = backlog ? getRemainingSprintIds(backlog, cwd, config) : [];
 
@@ -73,7 +73,14 @@ export async function runContinuous(flags: Record<string, string>, cwd: string):
       }
     }
 
-    const nextSprint = remaining[0];
+    // Use dependency-aware selection: only pick sprints whose deps are satisfied
+    const ready = backlog ? getReadySprints(backlog, cwd, config) : [];
+    if (ready.length === 0 && remaining.length > 0) {
+      log.warn(`${remaining.length} sprint(s) remain but all blocked by unmet dependencies. Stopping.`);
+      break;
+    }
+
+    const nextSprint = ready.length > 0 ? ready[0].id : remaining[0];
     log.info(`── Sprint ${completed + 1}/${maxSprints}: ${nextSprint} ──`);
 
     try {
