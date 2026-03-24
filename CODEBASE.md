@@ -1,6 +1,6 @@
 ---
-generated_at: "2026-03-23T12:43:28.912Z"
-git_sha: "783796fdb20a5984825855e7f2dbbfb303bcdec0"
+generated_at: "2026-03-24T18:34:58.030Z"
+git_sha: "1daa7e6aaa7b0578b3e3002daee3f0a657a1aa6b"
 sprint: 69
 source_files: 215
 test_files: 166
@@ -580,5 +580,12 @@ Top recurring patterns from common-issues:
 
 <!-- AUTO-GENERATED: START gotchas -->
 
-- **Example pattern** (general, 1 sprint): This is an example recurring pattern. Replace with your own.
+- **Review-discovered hazards inflate scores** (process, 5 sprints): Every hazard since S43 was found by post-hole review, never during coding. S49: all 3 hazards in autonomous sprint caught by manual code review. The review gate works but is a trailing indicator.
+- **API shape assumptions** (types, 3 sprints): Assuming property names or structure of internal APIs without reading the definition. #1 hazard source across S39-S44.
+- **Shell script boundary values** (shell, 2 sprints): Shell arithmetic comparisons (-lt vs -le, -gt vs -ge) are error-prone. S48: -lt 500 excluded exactly 500 lines. S45: multiple shell hazards.
+- **process.exit() inside try/finally skips cleanup** (control-flow, 2 sprints): process.exit(1) inside a try block with finally { db.close() } — exit runs before finally in Node.js. S46: original store.ts hazard. S49: autonomous agent repeated the same pattern in restore validation.
+- **Threshold/constant consistency across consumers** (calibration, 1 sprint): Changing a default value (e.g. minScore) in one consumer but not all consumers of the same pipeline. S48: context.ts threshold updated to 0.4 but enrich.ts still used 0.55.
+- **AI-generated code duplicates existing abstractions** (autonomous, 1 sprint): Autonomous agents (Aider/Sonnet) may reimplement logic that already exists elsewhere in the file. S49: validateSubcommand duplicated loadRoadmapFile's file-loading and error handling instead of extracting a shared helper.
+- **Compaction drops pending protocol gates** (process, 1 sprint): Advisory guard output (context messages) is lost on compaction. If the agent hasn't acted on the guidance before compaction, the obligation disappears. Post-compaction 'continue without asking' instructions compound the problem by discouraging the agent from re-checking.
+- **gh pr merge --delete-branch fails in worktrees** (git, 1 sprint): gh pr merge --delete-branch succeeds at merging but exits 1 because local branch cleanup tries to switch to main, which is held by the parent worktree. Agent sees error, retries, gets 'already merged'. Hit at least 4 times before S60.
 <!-- AUTO-GENERATED: END gotchas -->
