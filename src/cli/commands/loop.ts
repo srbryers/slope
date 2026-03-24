@@ -62,6 +62,7 @@ slope loop — Autonomous sprint execution loop
 Usage:
   slope loop status [--sprint=ID]           Show loop progress, next sprint, config
   slope loop config [--show] [--set k=v]    Loop configuration management
+  slope loop config recommend [--json]      Show model recommendations from data
   slope loop run [--sprint=ID] [--dry-run] [--executor=aider|slope]  Single sprint execution
   slope loop continuous [--max=N] [--pause=S] [--staging] [--dry-run]  Multi-sprint loop
   slope loop parallel [--dry-run]           Dual-sprint parallel execution
@@ -141,6 +142,13 @@ function printSprintSummary(sprint: BacklogSprint, config: LoopConfig, cwd: stri
 
 function configSubcommand(flags: Record<string, string>, cwd: string): void {
   const set = flags.set;
+  const recommend = flags.recommend === 'true';
+
+  // Handle recommend subcommand
+  if (recommend) {
+    recommendSubcommand(flags, cwd);
+    return;
+  }
 
   if (set) {
     const eqIdx = set.indexOf('=');
@@ -191,6 +199,114 @@ function configSubcommand(flags: Record<string, string>, cwd: string): void {
 }
 
 // ── run ─────────────────────────────────────────────
+
+// ── recommend ────────────────────────────────────────
+
+interface ModelRecommendation {
+  club: string;
+  model: string;
+  reason: string;
+  samples: number;
+  rate: number;
+}
+
+function recommendSubcommand(flags: Record<string, string>, cwd: string): void {
+  const json = flags.json === 'true';
+  const configPath = join(cwd, 'slope-loop/model-config.json');
+
+  // Check if model-config.json exists
+  if (!existsSync(configPath)) {
+    const warnMsg = 'Warning: No model-config.json found. Run: slope loop models --analyze';
+    if (json) {
+      console.log(JSON.stringify({ error: warnMsg, missing: true }, null, 2));
+    } else {
+      console.warn(`\x1b[33m${warnMsg}\x1b[0m`);
+    }
+    return;
+  }
+
+  // Check if file is stale (> 7 days old)
+  const stats = require('fs').statSync(configPath);
+  const ageMs = Date.now() - stats.mtimeMs;
+  const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+  const isStale = ageMs > sevenDaysMs;
+
+  let mc: Record<string, unknown>;
+  try {
+    mc = JSON.parse(readFileSync(configPath, 'utf8'));
+  } catch {
+    const errMsg = 'Error: Failed to parse model-config.json';
+    if (json) {
+      console.log(JSON.stringify({ error: errMsg, parse_error: true }, null, 2));
+    } else {
+      console.error(errMsg);
+    }
+    process.exit(1);
+  }
+
+  // Build recommendations from data
+  const recommendations: ModelRecommendation[] = [];
+  const recs = mc.recommendations as Record<string, { model: string; reason: string }> | undefined;
+  const rates = mc.success_rates as Record<string, { total: number; passing: number; rate: number }> | undefined;
+
+  if (recs) {
+    for (const [club, data] of Object.entries(recs)) {
+      const rateData = rates?.[club];
+      recommendations.push({
+        club,
+        model: data.model,
+        reason: data.reason,
+        samples: rateData?.total ?? 0,
+        rate: rateData?.rate ?? 0,
+      });
+    }
+  }
+
+  // Sort by club name for consistent output
+  recommendations.sort((a, b) => a.club.localeCompare(b.club));
+
+  // Output
+  if (json) {
+    const output = {
+      generated_at: mc.generated_at,
+      ticket_count: mc.ticket_count,
+      escalation_save_rate: mc.escalation_save_rate,
+      stale: isStale,
+      stale_warning: isStale ? `model-config.json is ${Math.floor(ageMs / (24 * 60 * 60 * 1000))} days old (>7 days)` : null,
+      recommendations,
+    };
+    console.log(JSON.stringify(output, null, 2));
+    return;
+  }
+
+  // Table output
+  if (isStale) {
+    const daysOld = Math.floor(ageMs / (24 * 60 * 60 * 1000));
+    console.warn(`\x1b[33mWarning: model-config.json is ${daysOld} days old (>7 days). Data may be stale.\x1b[0m`);
+  }
+
+  console.log('\n=== Model Recommendations ===\n');
+  console.log(`Generated: ${mc.generated_at}`);
+  console.log(`Tickets analyzed: ${mc.ticket_count}`);
+  console.log(`Escalation save rate: ${((mc.escalation_save_rate as number) * 100).toFixed(1)}%`);
+
+  // Table header
+  console.log('\n' + 'Club'.padEnd(12) + 'Model'.padEnd(20) + 'Reason'.padEnd(25) + 'Samples'.padEnd(10) + 'Rate');
+  console.log('─'.repeat(12) + ' ' + '─'.repeat(20) + ' ' + '─'.repeat(25) + ' ' + '─'.repeat(10) + ' ' + '─────');
+
+  for (const r of recommendations) {
+    const ratePct = (r.rate * 100).toFixed(1) + '%';
+    console.log(
+      r.club.padEnd(12) + ' ' +
+      r.model.padEnd(20) + ' ' +
+      r.reason.substring(0, 25).padEnd(25) + ' ' +
+      String(r.samples).padEnd(10) + ' ' +
+      ratePct
+    );
+  }
+
+  console.log('');
+}
 
 async function runSubcommand(flags: Record<string, string>, cwd: string): Promise<void> {
   const { runSprint } = await import('../loop/executor.js');
