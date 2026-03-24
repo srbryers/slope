@@ -40,12 +40,12 @@ function saveDriftState(cwd: string, state: DriftState): void {
   } catch { /* fail open */ }
 }
 
-/** Prune entries from old sprints, older than 7 days */
+/** Prune entries from old sprints AND older than 7 days */
 function pruneState(state: DriftState, currentSprint: number): DriftState {
   const cutoff = Date.now() - MAX_AGE_MS;
   return {
     entries: state.entries.filter(
-      e => e.sprint === currentSprint && e.timestamp > cutoff,
+      e => e.sprint === currentSprint || e.timestamp > cutoff,
     ),
   };
 }

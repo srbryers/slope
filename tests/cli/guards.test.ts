@@ -244,21 +244,20 @@ describe('hazardGuard', () => {
     expect(result.context).toContain('Cached warning');
   });
 
-  it('clears disk state when sprint changes', async () => {
+  it('clears disk state when sprint changes AND entry is old', async () => {
     mkdirSync(join(tmpDir, '.slope/guard-state'), { recursive: true });
     (mockConfig as Record<string, unknown>).currentSprint = 11;
 
-    // Seed disk state from sprint 10
+    // Seed disk state from sprint 10, old timestamp (>7 days) — fails both conditions
     writeFileSync(join(tmpDir, '.slope/guard-state/hazard.json'), JSON.stringify({
       entries: [{
         area: 'packages/core/src',
         warnings: ['[testing] Old sprint warning'],
         sprint: 10,
-        timestamp: Date.now(),
+        timestamp: Date.now() - (8 * 24 * 60 * 60 * 1000),
       }],
     }));
 
-    // Sprint changed → old state should be pruned, no common-issues → empty
     const result = await hazardGuard(
       makeInput({ tool_input: { file_path: join(tmpDir, 'packages/core/src/foo.ts') } }),
       tmpDir,
@@ -266,17 +265,38 @@ describe('hazardGuard', () => {
     expect(result).toEqual({});
   });
 
-  it('prunes entries older than 7 days', async () => {
+  it('keeps entries from old sprint if still fresh (<7 days)', async () => {
     mkdirSync(join(tmpDir, '.slope/guard-state'), { recursive: true });
-    (mockConfig as Record<string, unknown>).currentSprint = 10;
+    (mockConfig as Record<string, unknown>).currentSprint = 11;
 
-    // Seed with ancient timestamp
+    // Sprint 10 but fresh timestamp — kept because timestamp still within 7 days
+    writeFileSync(join(tmpDir, '.slope/guard-state/hazard.json'), JSON.stringify({
+      entries: [{
+        area: 'packages/core/src',
+        warnings: ['[testing] Recent old-sprint warning'],
+        sprint: 10,
+        timestamp: Date.now(),
+      }],
+    }));
+
+    const result = await hazardGuard(
+      makeInput({ tool_input: { file_path: join(tmpDir, 'packages/core/src/foo.ts') } }),
+      tmpDir,
+    );
+    expect(result.context).toContain('Recent old-sprint warning');
+  });
+
+  it('prunes entries older than 7 days from old sprints', async () => {
+    mkdirSync(join(tmpDir, '.slope/guard-state'), { recursive: true });
+    (mockConfig as Record<string, unknown>).currentSprint = 11;
+
+    // Old sprint AND ancient timestamp — pruned
     writeFileSync(join(tmpDir, '.slope/guard-state/hazard.json'), JSON.stringify({
       entries: [{
         area: 'packages/core/src',
         warnings: ['[testing] Ancient warning'],
         sprint: 10,
-        timestamp: Date.now() - (8 * 24 * 60 * 60 * 1000), // 8 days ago
+        timestamp: Date.now() - (8 * 24 * 60 * 60 * 1000),
       }],
     }));
 

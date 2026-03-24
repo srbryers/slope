@@ -39,12 +39,12 @@ function saveHazardState(cwd: string, state: HazardState): void {
   } catch { /* fail open — disk write failure should not break the guard */ }
 }
 
-/** Prune entries from old sprints or older than 7 days */
+/** Prune entries from old sprints AND older than 7 days */
 function pruneState(state: HazardState, currentSprint: number): HazardState {
   const cutoff = Date.now() - MAX_AGE_MS;
   return {
     entries: state.entries.filter(
-      e => e.sprint === currentSprint && e.timestamp > cutoff,
+      e => e.sprint === currentSprint || e.timestamp > cutoff,
     ),
   };
 }
@@ -95,6 +95,12 @@ export async function hazardGuard(input: HookInput, cwd: string): Promise<GuardR
   // Merge fresh warnings with any disk-cached warnings for this area
   const cached = state.entries.find(e => e.area === area);
   const allWarnings = freshWarnings.length > 0 ? freshWarnings : (cached?.warnings ?? []);
+
+  if (freshWarnings.length === 0 && cached) {
+    // No fresh warnings for this area anymore — clear stale cached entry
+    state.entries = state.entries.filter(e => e.area !== area);
+    saveHazardState(cwd, state);
+  }
 
   // Persist fresh warnings to disk (update or add entry)
   if (freshWarnings.length > 0) {
