@@ -7,7 +7,10 @@ import type { Club, LoopConfig, ModelConfig, BacklogSprint } from './types.js';
  *  1. Token-based: est_tokens > 24000 → API
  *  2. File-based: max_files >= 2 → API
  *  3. Strategy-based: documentation → API (local models can't reliably edit prose)
- *  4. Data-driven: check model-config.json recommendations per club
+ *  4. Data-driven: check model-config.json recommendations
+ *     4a. club+sprintType → most specific
+ *     4b. club+strategy → medium specificity
+ *     4c. club-only → least specific
  *  5. Club defaults: putter/wedge/short_iron → local, long_iron/driver → API
  */
 export function selectModel(
@@ -17,6 +20,7 @@ export function selectModel(
   config: LoopConfig,
   cwd: string,
   strategy?: BacklogSprint['strategy'],
+  sprintType?: BacklogSprint['type'],
 ): string {
   // 1. Token-based escalation: won't fit in Qwen 32K context
   if (estTokens > 24000) return config.modelApi;
@@ -31,6 +35,27 @@ export function selectModel(
   // 4. Data-driven overrides from model-config.json
   const modelConfig = loadModelConfig(cwd);
   if (modelConfig) {
+    // 4a. Most specific: club + sprint type
+    if (sprintType && modelConfig.recommendations_by_type) {
+      const rec = modelConfig.recommendations_by_type[`${club}:${sprintType}`];
+      if (rec) return rec.model === 'api' ? config.modelApi : config.modelLocal;
+    }
+
+    // 4b. Medium: club + strategy
+    if (strategy && modelConfig.recommendations_by_strategy) {
+      const rec = modelConfig.recommendations_by_strategy[`${club}:${strategy}`];
+      if (rec) return rec.model === 'api' ? config.modelApi : config.modelLocal;
+    }
+
+    // 4c. Least specific: club-only
+    //     If both local and API have data, prefer the one with better cost-adjusted score
+    if (modelConfig.cost_adjusted_scores) {
+      const localScore = findCostScore(modelConfig.cost_adjusted_scores, club, 'ollama');
+      const apiScore = findCostScore(modelConfig.cost_adjusted_scores, club, config.modelApi);
+      if (localScore !== undefined && apiScore !== undefined) {
+        return localScore >= apiScore ? config.modelLocal : config.modelApi;
+      }
+    }
     const rec = modelConfig.recommendations[club];
     if (rec?.model === 'api') return config.modelApi;
     if (rec?.model === 'local') return config.modelLocal;
@@ -58,6 +83,16 @@ export function selectTimeout(model: string, config: LoopConfig): number {
 /** Check if a model string refers to a local (ollama) model */
 export function isLocalModel(model: string): boolean {
   return model.includes('ollama');
+}
+
+/** Find cost-adjusted score for a club+model combo (keys are "club:model_string") */
+function findCostScore(scores: Record<string, number>, club: string, modelSubstring: string): number | undefined {
+  for (const [key, score] of Object.entries(scores)) {
+    if (key.startsWith(`${club}:`) && key.includes(modelSubstring)) {
+      return score;
+    }
+  }
+  return undefined;
 }
 
 /** Load model-config.json if it exists */

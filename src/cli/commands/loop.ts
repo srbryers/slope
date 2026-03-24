@@ -5,7 +5,7 @@ import { loadLoopConfig, resolveLoopConfig } from '../loop/config.js';
 import { loadBacklog, getRemainingSprintIds } from '../loop/backlog.js';
 import { selectModel } from '../loop/model-selector.js';
 import { createLogger } from '../loop/logger.js';
-import type { LoopConfig, ConfigSource, BacklogSprint, SprintResult } from '../loop/types.js';
+import type { LoopConfig, ConfigSource, BacklogSprint, SprintResult, ModelConfig } from '../loop/types.js';
 
 function parseArgs(args: string[]): Record<string, string> {
   const result: Record<string, string> = {};
@@ -26,7 +26,7 @@ export async function loopCommand(args: string[]): Promise<void> {
       statusSubcommand(flags, cwd);
       break;
     case 'config':
-      configSubcommand(flags, cwd);
+      configSubcommand(args.slice(1), flags, cwd);
       break;
     case 'run':
       await runSubcommand(flags, cwd);
@@ -139,7 +139,13 @@ function printSprintSummary(sprint: BacklogSprint, config: LoopConfig, cwd: stri
 
 // ── config ──────────────────────────────────────────
 
-function configSubcommand(flags: Record<string, string>, cwd: string): void {
+function configSubcommand(args: string[], flags: Record<string, string>, cwd: string): void {
+  // Check for positional subcommand: slope loop config recommend
+  if (args[0] === 'recommend') {
+    recommendSubcommand(flags, cwd);
+    return;
+  }
+
   const set = flags.set;
 
   if (set) {
@@ -369,6 +375,89 @@ function guideSubcommand(flags: Record<string, string>, cwd: string): void {
     console.log(`  Warning: SKILL.md exceeds ${limit} words — needs synthesis`);
     process.exit(1);
   }
+  console.log('');
+}
+
+// ── recommend ────────────────────────────────────────
+
+function recommendSubcommand(flags: Record<string, string>, cwd: string): void {
+  const configPath = join(cwd, 'slope-loop/model-config.json');
+  if (!existsSync(configPath)) {
+    console.log('No model-config.json found. Run: slope loop analyze');
+    return;
+  }
+
+  let mc: ModelConfig;
+  try {
+    mc = JSON.parse(readFileSync(configPath, 'utf8'));
+  } catch {
+    console.error('Error reading model-config.json');
+    process.exit(1);
+  }
+
+  // Staleness check (> 7 days)
+  const generatedAt = new Date(mc.generated_at).getTime();
+  const ageMs = Date.now() - generatedAt;
+  const ageDays = Math.round(ageMs / (24 * 60 * 60 * 1000));
+  if (ageDays > 7) {
+    console.log(`\x1b[33m⚠ model-config.json is ${ageDays} days old. Run \`slope loop analyze\` to refresh.\x1b[0m\n`);
+  }
+
+  if (flags.json === 'true') {
+    console.log(JSON.stringify({
+      generated_at: mc.generated_at,
+      age_days: ageDays,
+      recommendations: mc.recommendations,
+      recommendations_by_type: mc.recommendations_by_type,
+      recommendations_by_strategy: mc.recommendations_by_strategy,
+      cost_adjusted_scores: mc.cost_adjusted_scores,
+      min_samples: mc.min_samples,
+    }, null, 2));
+    return;
+  }
+
+  console.log(`\n=== Model Recommendations === (${mc.ticket_count} tickets, ${ageDays}d old)\n`);
+
+  // Per-club table
+  console.log('Per-club:');
+  console.log('  Club          Model   Reason                              Samples');
+  console.log('  ────────────  ──────  ──────────────────────────────────  ───────');
+  for (const [club, rec] of Object.entries(mc.recommendations)) {
+    // Find matching success_rates key — keys are "club:full_model_name" (model names may contain colons)
+    const isLocal = rec.model === 'local';
+    const matchKey = Object.keys(mc.success_rates).find(k =>
+      k.startsWith(`${club}:`) && (isLocal ? k.includes('ollama') : !k.includes('ollama')),
+    );
+    const stats = matchKey ? mc.success_rates[matchKey] : undefined;
+    const samples = stats?.total ?? '?';
+    console.log(`  ${club.padEnd(14)}${rec.model.padEnd(8)}${rec.reason.padEnd(36)}${samples}`);
+  }
+
+  // Cross-dimensional: by type
+  if (mc.recommendations_by_type && Object.keys(mc.recommendations_by_type).length > 0) {
+    console.log('\nPer-club+type:');
+    for (const [key, rec] of Object.entries(mc.recommendations_by_type)) {
+      console.log(`  ${key.padEnd(22)}→ ${rec.model.padEnd(8)}${rec.reason} (n=${rec.samples})`);
+    }
+  }
+
+  // Cross-dimensional: by strategy
+  if (mc.recommendations_by_strategy && Object.keys(mc.recommendations_by_strategy).length > 0) {
+    console.log('\nPer-club+strategy:');
+    for (const [key, rec] of Object.entries(mc.recommendations_by_strategy)) {
+      console.log(`  ${key.padEnd(22)}→ ${rec.model.padEnd(8)}${rec.reason} (n=${rec.samples})`);
+    }
+  }
+
+  // Cost-adjusted scores
+  if (mc.cost_adjusted_scores && Object.keys(mc.cost_adjusted_scores).length > 0) {
+    console.log('\nCost-adjusted scores (higher = better value):');
+    const sorted = Object.entries(mc.cost_adjusted_scores).sort((a, b) => b[1] - a[1]);
+    for (const [key, score] of sorted) {
+      console.log(`  ${key.padEnd(40)}${score}`);
+    }
+  }
+
   console.log('');
 }
 

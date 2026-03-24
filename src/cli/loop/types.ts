@@ -119,6 +119,9 @@ export interface TicketResult {
   escalated: boolean;
   tests_passing: boolean;
   noop: boolean;
+  // Sprint-level context for cross-dimensional model analysis
+  strategy?: BacklogSprint['strategy'];
+  sprint_type?: BacklogSprint['type'];
   // Added by SlopeExecutor (optional for AiderExecutor backward compat)
   tokens_in?: number;
   tokens_out?: number;
@@ -234,8 +237,19 @@ export interface ModelConfig {
   ticket_count: number;
   escalation_save_rate: number;
   success_rates: Record<string, { total: number; passing: number; rate: number }>;
+  /** Cross-dimensional rates: "club:strategy" → stats */
+  success_rates_by_strategy?: Record<string, { total: number; passing: number; rate: number }>;
+  /** Cross-dimensional rates: "club:sprint_type" → stats */
+  success_rates_by_type?: Record<string, { total: number; passing: number; rate: number }>;
   cost_per_success: Record<string, number>;
-  recommendations: Record<string, { model: 'api' | 'local'; reason: string }>;
+  /** Cost-adjusted scores: higher is better (success_rate / cost) */
+  cost_adjusted_scores?: Record<string, number>;
+  recommendations: Record<string, { model: string; reason: string }>;
+  /** Cross-dimensional recommendations: "club:sprint_type" or "club:strategy" → model */
+  recommendations_by_type?: Record<string, { model: string; reason: string; samples: number }>;
+  recommendations_by_strategy?: Record<string, { model: string; reason: string; samples: number }>;
+  /** Minimum sample count used for cross-dimensional recommendations */
+  min_samples?: number;
   notes: string[];
 }
 
