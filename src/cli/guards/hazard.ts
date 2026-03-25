@@ -3,6 +3,7 @@ import { join, dirname } from 'node:path';
 import type { HookInput, GuardResult } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import type { CommonIssuesFile } from '../../core/index.js';
+import { dedupGuardContext } from '../session-state.js';
 
 // ── Disk state for compaction survival ──────────────
 
@@ -118,7 +119,11 @@ export async function hazardGuard(input: HookInput, cwd: string): Promise<GuardR
   if (allWarnings.length === 0) return {};
 
   const header = `SLOPE hazard warning for ${area}:`;
-  return {
-    context: [header, ...allWarnings.map(w => `  ${w}`)].join('\n'),
-  };
+  const fullContext = [header, ...allWarnings.map(w => `  ${w}`)].join('\n');
+
+  // Session dedup: if this exact context was already injected, return compressed reference
+  const dedup = dedupGuardContext(cwd, input.session_id, 'hazard', fullContext);
+  if (dedup) return { context: dedup };
+
+  return { context: fullContext };
 }

@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
+import { createHash } from 'node:crypto';
 
 const SESSION_STATE_FILE = '.slope/.session-state.json';
 
@@ -64,4 +65,67 @@ export function isAdhocSession(cwd: string, sessionId: string): boolean {
   if (!sessionId) return false;
   const state = loadSessionState(cwd);
   return state.session_mode === 'adhoc' && state.session_mode_id === sessionId;
+}
+
+// ── Context dedup ───────────────────────────────────
+
+/** File for context dedup hashes (separate from session-state for performance) */
+const CONTEXT_DEDUP_FILE = '.slope/.context-dedup.json';
+
+interface ContextDedupState {
+  session_id: string;
+  /** Map of content hash → { guard, turn_count, first_injected } */
+  seen: Record<string, { guard: string; count: number }>;
+}
+
+function loadDedupState(cwd: string): ContextDedupState | null {
+  const path = join(cwd, CONTEXT_DEDUP_FILE);
+  if (!existsSync(path)) return null;
+  try { return JSON.parse(readFileSync(path, 'utf8')); } catch { return null; }
+}
+
+function saveDedupState(cwd: string, state: ContextDedupState): void {
+  const dir = join(cwd, '.slope');
+  mkdirSync(dir, { recursive: true });
+  const path = join(cwd, CONTEXT_DEDUP_FILE);
+  writeFileSync(path, JSON.stringify(state) + '\n');
+}
+
+function hashContent(content: string): string {
+  return createHash('sha256').update(content).digest('hex').slice(0, 12);
+}
+
+/**
+ * Check if context has already been injected this session.
+ * Returns null if new (caller should inject full context).
+ * Returns a compressed reference string if duplicate.
+ */
+export function dedupGuardContext(
+  cwd: string,
+  sessionId: string,
+  guardName: string,
+  context: string,
+): string | null {
+  if (!sessionId || !context) return null;
+
+  const hash = hashContent(context);
+  let state = loadDedupState(cwd);
+
+  // Reset if session changed
+  if (!state || state.session_id !== sessionId) {
+    state = { session_id: sessionId, seen: {} };
+  }
+
+  const existing = state.seen[hash];
+  if (existing) {
+    // Already injected — return compressed reference
+    existing.count++;
+    saveDedupState(cwd, state);
+    return `SLOPE ${guardName}: (same as prior warning, shown ${existing.count}x)`;
+  }
+
+  // New content — record and return null (caller injects full)
+  state.seen[hash] = { guard: guardName, count: 1 };
+  saveDedupState(cwd, state);
+  return null;
 }
