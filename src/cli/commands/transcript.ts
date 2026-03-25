@@ -45,9 +45,56 @@ function listCommand(): void {
 }
 
 /**
- * slope transcript show <session-id> — render turn-by-turn summary
+ * slope transcript show <session-id> [--tool=X] [--errors] — render turn-by-turn summary
  */
-function showCommand(sessionId: string): void {
+function showCommand(sessionId: string, flags: Record<string, string>): void {
+  const dir = resolveTranscriptsDir();
+  let turns = readTranscript(dir, sessionId);
+
+  if (turns.length === 0) {
+    console.error(`No transcript found for session: ${sessionId}`);
+    process.exit(1);
+  }
+
+  // Filter by tool name
+  const toolFilter = flags.tool;
+  if (toolFilter) {
+    turns = turns.filter(t => t.tool_calls?.some(tc => tc.tool.toLowerCase() === toolFilter.toLowerCase()));
+  }
+
+  // Filter to errors only
+  if (flags.errors === 'true') {
+    turns = turns.filter(t => t.outcome === 'failure' || t.tool_calls?.some(tc => !tc.success));
+  }
+
+  const red = '\x1b[31m';
+  const reset = '\x1b[0m';
+
+  console.log(`\nSession: ${sessionId} (${turns.length} turns${toolFilter ? `, tool=${toolFilter}` : ''}${flags.errors === 'true' ? ', errors only' : ''})\n`);
+  console.log(`  ${'#'.padStart(3)}  ${'Tool'.padEnd(15)} ${'Outcome'.padEnd(9)} ${'Time'.padEnd(12)} ${'ms'.padEnd(6)} Note`);
+
+  for (const turn of turns) {
+    const tool = turn.tool_calls?.[0]?.tool ?? turn.role;
+    const outcome = turn.outcome ?? '—';
+    const ts = turn.timestamp.split('T')[1]?.slice(0, 8) ?? turn.timestamp;
+    const durationMs = turn.tool_calls?.[0]?.duration_ms;
+    const duration = durationMs !== undefined ? String(durationMs) : '—';
+    const note = turn.outcome === 'failure' && turn.outcome_note ? `"${turn.outcome_note}"` : '';
+    const failNote = !note && turn.tool_calls?.[0]?.success === false && turn.tool_calls[0].params_summary
+      ? turn.tool_calls[0].params_summary
+      : note;
+    const isError = outcome === 'failure' || turn.tool_calls?.[0]?.success === false;
+    const prefix = isError ? red : '';
+    const suffix = isError ? reset : '';
+    console.log(`  ${prefix}${String(turn.turn_number).padStart(3)}  ${tool.padEnd(15)} ${outcome.padEnd(9)} ${ts.padEnd(12)} ${duration.padEnd(6)} ${failNote}${suffix}`);
+  }
+  console.log('');
+}
+
+/**
+ * slope transcript summary <session-id> [--json] — auto-generate session narrative
+ */
+function summaryCommand(sessionId: string, json: boolean): void {
   const dir = resolveTranscriptsDir();
   const turns = readTranscript(dir, sessionId);
 
@@ -56,18 +103,62 @@ function showCommand(sessionId: string): void {
     process.exit(1);
   }
 
-  console.log(`\nSession: ${sessionId} (${turns.length} turns)\n`);
-  console.log(`  ${'#'.padStart(3)}  ${'Tool'.padEnd(15)} ${'Outcome'.padEnd(9)} ${'Timestamp'.padEnd(12)} Note`);
+  const stats = computeStats(turns);
 
+  // Compute most-used tool
+  const sortedTools = Object.entries(stats.toolCounts).sort((a, b) => b[1] - a[1]);
+  const topTool = sortedTools[0]?.[0] ?? 'unknown';
+  const topToolPct = sortedTools[0] ? Math.round((sortedTools[0][1] / stats.turnCount) * 100) : 0;
+
+  // Compute most-active area from params
+  const areaCounts: Record<string, number> = {};
   for (const turn of turns) {
-    const tool = turn.tool_calls?.[0]?.tool ?? turn.role;
-    const outcome = turn.outcome ?? '—';
-    const ts = turn.timestamp.split('T')[1]?.slice(0, 8) ?? turn.timestamp;
-    const note = turn.outcome === 'failure' && turn.outcome_note ? `"${turn.outcome_note}"` : '';
-    const failNote = !note && turn.tool_calls?.[0]?.success === false && turn.tool_calls[0].params_summary
-      ? turn.tool_calls[0].params_summary
-      : note;
-    console.log(`  ${String(turn.turn_number).padStart(3)}  ${tool.padEnd(15)} ${outcome.padEnd(9)} ${ts.padEnd(12)} ${failNote}`);
+    for (const tc of turn.tool_calls ?? []) {
+      const pathMatch = tc.params_summary?.match(/(?:src|packages|tests)\/[\w/-]+/);
+      if (pathMatch) {
+        const area = pathMatch[0].split('/').slice(0, 3).join('/');
+        areaCounts[area] = (areaCounts[area] ?? 0) + 1;
+      }
+    }
+  }
+  const topArea = Object.entries(areaCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'unknown';
+
+  const summary = {
+    session_id: sessionId,
+    turns: stats.turnCount,
+    duration_min: stats.durationMin,
+    tools_used: Object.keys(stats.toolCounts).length,
+    top_tool: topTool,
+    top_tool_pct: topToolPct,
+    errors: stats.failureCount,
+    retries: stats.retryCount,
+    most_active_area: topArea,
+    tool_breakdown: sortedTools.map(([tool, count]) => ({
+      tool,
+      count,
+      pct: Math.round((count / stats.turnCount) * 100),
+    })),
+  };
+
+  if (json) {
+    console.log(JSON.stringify(summary, null, 2));
+    return;
+  }
+
+  const narrative = [
+    `Session ${sessionId} ran ${stats.turnCount} turns over ${stats.durationMin}m.`,
+    `Used ${Object.keys(stats.toolCounts).length} tools — ${topTool} (${topToolPct}%)${sortedTools.length > 1 ? `, ${sortedTools[1][0]} (${Math.round((sortedTools[1][1] / stats.turnCount) * 100)}%)` : ''}.`,
+    stats.failureCount > 0 ? `${stats.failureCount} error${stats.failureCount > 1 ? 's' : ''}.` : 'No errors.',
+    `Most active area: ${topArea}.`,
+  ].join(' ');
+
+  console.log(`\n=== Session Summary ===\n`);
+  console.log(`  ${narrative}\n`);
+
+  console.log('  Tool breakdown:');
+  for (const [tool, count] of sortedTools) {
+    const pct = Math.round((count / stats.turnCount) * 100);
+    console.log(`    ${tool.padEnd(15)} ${String(count).padStart(4)} (${pct}%)`);
   }
   console.log('');
 }
@@ -197,8 +288,18 @@ function statsCommand(sessionId?: string): void {
   console.log('');
 }
 
+function parseFlags(args: string[]): Record<string, string> {
+  const flags: Record<string, string> = {};
+  for (const arg of args) {
+    const match = arg.match(/^--(\w[\w-]*)(?:=(.+))?$/);
+    if (match) flags[match[1]] = match[2] ?? 'true';
+  }
+  return flags;
+}
+
 export async function transcriptCommand(args: string[]): Promise<void> {
   const sub = args[0];
+  const flags = parseFlags(args.slice(1));
 
   switch (sub) {
     case 'list':
@@ -206,11 +307,20 @@ export async function transcriptCommand(args: string[]): Promise<void> {
       break;
     case 'show': {
       const sessionId = args[1];
-      if (!sessionId) {
-        console.error('Usage: slope transcript show <session-id>');
+      if (!sessionId || sessionId.startsWith('--')) {
+        console.error('Usage: slope transcript show <session-id> [--tool=X] [--errors]');
         process.exit(1);
       }
-      showCommand(sessionId);
+      showCommand(sessionId, parseFlags(args.slice(2)));
+      break;
+    }
+    case 'summary': {
+      const sessionId = args[1];
+      if (!sessionId || sessionId.startsWith('--')) {
+        console.error('Usage: slope transcript summary <session-id> [--json]');
+        process.exit(1);
+      }
+      summaryCommand(sessionId, parseFlags(args.slice(2)).json === 'true');
       break;
     }
     case 'stats':
@@ -221,9 +331,10 @@ export async function transcriptCommand(args: string[]): Promise<void> {
 slope transcript — View session transcript data
 
 Usage:
-  slope transcript list                   List available transcripts
-  slope transcript show <session-id>      Show turn-by-turn summary
-  slope transcript stats [session-id]     Aggregate metrics (all if no id)
+  slope transcript list                          List available transcripts
+  slope transcript show <id> [--tool=X] [--errors]  Turn-by-turn summary with filters
+  slope transcript summary <id> [--json]         Auto-generated session narrative
+  slope transcript stats [id]                    Aggregate metrics (all if no id)
 `);
       if (sub) process.exit(1);
   }

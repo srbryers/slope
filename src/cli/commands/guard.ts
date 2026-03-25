@@ -392,6 +392,35 @@ export async function guardManageCommand(args: string[]): Promise<void> {
       console.log(`  "guidance": { "disabled": [${sub === 'disable' ? `"${name}"` : '...remove...'} ] }\n`);
       break;
     }
+    case 'audit': {
+      console.log('\n=== Guard Enforcement Audit ===\n');
+      const seen = new Set<string>();
+      const groups: Record<string, Array<{ name: string; event: string; description: string }>> = {
+        mechanical: [],
+        advisory: [],
+        mixed: [],
+        unclassified: [],
+      };
+
+      for (const d of GUARD_DEFINITIONS) {
+        if (seen.has(d.name)) continue;
+        seen.add(d.name);
+        const gType = d.guardType ?? 'unclassified';
+        const events = GUARD_DEFINITIONS.filter(g => g.name === d.name).map(g => g.hookEvent);
+        groups[gType].push({ name: d.name, event: events.join(','), description: d.description });
+      }
+
+      for (const [type, guards] of Object.entries(groups)) {
+        if (guards.length === 0) continue;
+        const warning = type === 'advisory' ? ' \x1b[33m⚠ lose state on compaction\x1b[0m' : '';
+        console.log(`  ${type.toUpperCase()} (${guards.length})${warning}`);
+        for (const g of guards) {
+          console.log(`    ${g.name.padEnd(22)} [${g.event.padEnd(30)}] ${g.description}`);
+        }
+        console.log('');
+      }
+      break;
+    }
     default:
       printUsage();
   }
