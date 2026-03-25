@@ -10,6 +10,7 @@ import {
   validateTickets,
   needsEnrichment,
   getRemainingSprintIds,
+  getReadySprints,
 } from '../../../src/cli/loop/backlog.js';
 import { DEFAULT_LOOP_CONFIG } from '../../../src/cli/loop/types.js';
 import type { LoopConfig, BacklogFile } from '../../../src/cli/loop/types.js';
@@ -210,5 +211,69 @@ describe('getRemainingSprintIds', () => {
     writeFileSync(join(tmpDir, 'slope-loop/results/S-LOCAL-002.json'), '{}');
     const remaining = getRemainingSprintIds(SAMPLE_BACKLOG, tmpDir, config);
     expect(remaining).toEqual([]);
+  });
+});
+
+describe('getReadySprints', () => {
+  const DEP_BACKLOG: BacklogFile = {
+    generated_at: '2026-01-01T00:00:00Z',
+    sprints: [
+      {
+        id: 'S1', title: 'Sprint 1', strategy: 'hardening', par: 4, slope: 2, type: 'feature',
+        tickets: [{ key: 'S1-1', title: 'T1', club: 'wedge', description: '', acceptance_criteria: [], modules: ['src'], max_files: 1 }],
+      },
+      {
+        id: 'S2', title: 'Sprint 2', strategy: 'hardening', par: 4, slope: 2, type: 'feature',
+        tickets: [{ key: 'S2-1', title: 'T1', club: 'wedge', description: '', acceptance_criteria: [], modules: ['src'], max_files: 1 }],
+        depends_on: ['S1'],
+      },
+      {
+        id: 'S3', title: 'Sprint 3', strategy: 'hardening', par: 4, slope: 2, type: 'feature',
+        tickets: [{ key: 'S3-1', title: 'T1', club: 'wedge', description: '', acceptance_criteria: [], modules: ['src'], max_files: 1 }],
+      },
+    ],
+  };
+
+  it('returns sprints with no dependencies', () => {
+    const ready = getReadySprints(DEP_BACKLOG, tmpDir, config);
+    // S1 (no deps) and S3 (no deps) are ready; S2 blocked by S1
+    expect(ready.map(s => s.id)).toEqual(['S1', 'S3']);
+  });
+
+  it('unblocks sprint when dependency is completed', () => {
+    writeFileSync(join(tmpDir, 'slope-loop/results/S1.json'), '{}');
+    const ready = getReadySprints(DEP_BACKLOG, tmpDir, config);
+    // S1 done, S2 unblocked, S3 still ready
+    expect(ready.map(s => s.id)).toEqual(['S2', 'S3']);
+  });
+
+  it('excludes completed sprints', () => {
+    writeFileSync(join(tmpDir, 'slope-loop/results/S1.json'), '{}');
+    writeFileSync(join(tmpDir, 'slope-loop/results/S3.json'), '{}');
+    const ready = getReadySprints(DEP_BACKLOG, tmpDir, config);
+    expect(ready.map(s => s.id)).toEqual(['S2']);
+  });
+
+  it('excludes locked sprints', () => {
+    mkdirSync(join(tmpDir, 'slope-loop/results/S1.lock'));
+    const ready = getReadySprints(DEP_BACKLOG, tmpDir, config);
+    // S1 locked, S3 ready, S2 blocked (S1 not completed)
+    expect(ready.map(s => s.id)).toEqual(['S3']);
+  });
+
+  it('returns empty when all blocked by deps', () => {
+    const blockedBacklog: BacklogFile = {
+      generated_at: '2026-01-01T00:00:00Z',
+      sprints: [
+        {
+          id: 'S2', title: 'Sprint 2', strategy: 'hardening', par: 4, slope: 2, type: 'feature',
+          tickets: [{ key: 'S2-1', title: 'T1', club: 'wedge', description: '', acceptance_criteria: [], modules: ['src'], max_files: 1 }],
+          depends_on: ['S1'],
+        },
+      ],
+    };
+    // S1 not in backlog and not completed → S2 blocked forever
+    const ready = getReadySprints(blockedBacklog, tmpDir, config);
+    expect(ready).toEqual([]);
   });
 });

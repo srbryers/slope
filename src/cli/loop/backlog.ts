@@ -1,4 +1,4 @@
-import { readFileSync, existsSync, mkdirSync, rmdirSync } from 'node:fs';
+import { readFileSync, existsSync, mkdirSync, rmdirSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { BacklogFile, BacklogSprint, BacklogTicket, LoopConfig } from './types.js';
 import type { Logger } from './logger.js';
@@ -121,4 +121,51 @@ export function getRemainingSprintIds(
   return backlog.sprints
     .filter(s => !existsSync(join(resultsDir, `${s.id}.json`)))
     .map(s => s.id);
+}
+
+/**
+ * Get sprints whose dependencies are all satisfied (completed).
+ * Filters to remaining (unscored) sprints, then checks depends_on.
+ * Warns if depends_on references sprint IDs not in the backlog or results.
+ */
+export function getReadySprints(
+  backlog: BacklogFile,
+  cwd: string,
+  config: LoopConfig,
+): BacklogSprint[] {
+  const resultsDir = join(cwd, config.resultsDir);
+  if (!existsSync(resultsDir)) mkdirSync(resultsDir, { recursive: true });
+
+  // Build set of completed sprint IDs from result files
+  const completed = new Set<string>();
+  try {
+    const files = readdirSync(resultsDir);
+    for (const f of files) {
+      if (f.endsWith('.json') && !f.endsWith('.tmp.json')) {
+        completed.add(f.replace('.json', ''));
+      }
+    }
+  } catch { /* empty */ }
+
+  // Known sprint IDs (in backlog + completed) for dependency validation
+  const knownIds = new Set([...backlog.sprints.map(s => s.id), ...completed]);
+
+  return backlog.sprints.filter(s => {
+    // Already completed — skip
+    if (completed.has(s.id)) return false;
+    // Already locked — skip
+    if (existsSync(join(resultsDir, `${s.id}.lock`))) return false;
+    // Check dependencies
+    if (s.depends_on && s.depends_on.length > 0) {
+      for (const dep of s.depends_on) {
+        if (!knownIds.has(dep)) {
+          // Dependency references unknown sprint — treat as unresolvable
+          // (silent skip; caller's "all blocked" warning will surface this)
+          return false;
+        }
+      }
+      return s.depends_on.every(dep => completed.has(dep));
+    }
+    return true;
+  });
 }

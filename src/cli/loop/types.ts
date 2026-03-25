@@ -26,6 +26,10 @@ export interface LoopConfig {
   agentGuide: string;
   sprintHistory: string;
   forcePlannerExecutor: boolean; // If true, always use planner before executor
+  /** Max sprint-level retries on full failure (default 0 — no retry) */
+  maxRetries: number;
+  /** Retry strategy: 'model' escalates all tickets to API, 'replan' regenerates plans */
+  retryStrategy: 'none' | 'model' | 'replan';
 }
 
 export const DEFAULT_LOOP_CONFIG: LoopConfig = {
@@ -46,6 +50,8 @@ export const DEFAULT_LOOP_CONFIG: LoopConfig = {
   agentGuide: 'slope-loop/slope-loop-guide/SKILL.md',
   sprintHistory: 'slope-loop/slope-loop-guide/references/sprint-history.md',
   forcePlannerExecutor: false,
+  maxRetries: 0,
+  retryStrategy: 'none',
 };
 
 // Mapping from LoopConfig keys to environment variable names
@@ -91,6 +97,8 @@ export interface BacklogSprint {
   slope: number;
   type: 'feature' | 'bugfix' | 'chore';
   tickets: BacklogTicket[];
+  /** Sprint IDs that must complete before this sprint can run */
+  depends_on?: string[];
 }
 
 export interface BacklogTicket {
@@ -190,6 +198,8 @@ export interface SprintResult {
   merge_status?: 'merged' | 'blocked' | 'skipped';
   merge_block_reason?: string;
   handicap_delta?: number;
+  /** Number of sprint-level retries attempted */
+  retries?: number;
 }
 
 // === Execution Plan ===
