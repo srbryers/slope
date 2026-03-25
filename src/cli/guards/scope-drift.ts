@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import type { HookInput, GuardResult } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { resolveStore } from '../store.js';
+import { dedupGuardContext } from '../session-state.js';
 
 // ── Disk state for compaction survival ──────────────
 
@@ -109,16 +110,16 @@ export async function scopeDriftGuard(input: HookInput, cwd: string): Promise<Gu
     state.entries.push(entry);
     saveDriftState(cwd, state);
 
-    return {
-      context: `SLOPE scope drift: ${relativePath} is outside claimed areas (${claimedAreas}). Intentional?`,
-    };
+    const driftMsg = `SLOPE scope drift: ${relativePath} is outside claimed areas (${claimedAreas}). Intentional?`;
+    const dedup = dedupGuardContext(cwd, input.session_id, 'scope-drift', driftMsg);
+    return { context: dedup ?? driftMsg };
   } catch {
     // Store not available — fall back to disk state (advisory, not blocking)
     const cached = state.entries.find(e => e.file === relativePath);
     if (cached && (Date.now() - cached.timestamp) < STALE_MS) {
-      return {
-        context: `SLOPE scope drift: ${relativePath} is outside claimed areas (${cached.claimedAreas}). Intentional?`,
-      };
+      const cachedMsg = `SLOPE scope drift: ${relativePath} is outside claimed areas (${cached.claimedAreas}). Intentional?`;
+      const dedup = dedupGuardContext(cwd, input.session_id, 'scope-drift', cachedMsg);
+      return { context: dedup ?? cachedMsg };
     }
     return {}; // No cached state or too stale — fail open
   }

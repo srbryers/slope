@@ -126,8 +126,9 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
     {
       query: z.string().optional().describe('Case-insensitive search term to filter by name or description'),
       module: z.enum(['core', 'fs', 'constants', 'types', 'store', 'map', 'flows', 'inspirations', 'metaphor', 'init', 'testing']).optional().describe('Filter by module category'),
+      compact: z.boolean().optional().describe('Return name+module+description only (saves ~80% tokens). Default: true when no query/module filter.'),
     },
-    async ({ query, module }) => {
+    async ({ query, module, compact }) => {
       // Map module — return codebase map content
       if (module === 'map') {
         return { content: [{ type: 'text' as const, text: handleMapQuery(query) }] };
@@ -157,8 +158,19 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
           (e) => e.name.toLowerCase().includes(q) || e.description.toLowerCase().includes(q),
         );
       }
+
+      // Compact mode: name + module + description only (default for unfiltered discovery)
+      const useCompact = compact ?? (!query && !module);
+      let outputText: string;
+      if (useCompact) {
+        const compactResults = results.map(e => `${e.module}/${e.name}: ${e.description}`);
+        outputText = `SLOPE API (${results.length} functions):\n${compactResults.join('\n')}\n\nUse search({ query: "name" }) or search({ module: "core", compact: false }) for full signatures and examples.`;
+      } else {
+        outputText = JSON.stringify(results, null, 2);
+      }
+
       const content: Array<{ type: 'text'; text: string }> = [
-        { type: 'text' as const, text: JSON.stringify(results, null, 2) },
+        { type: 'text' as const, text: outputText },
       ];
       // Append setup hint only on unfiltered discovery calls (no query, no module)
       if (!query && !module && setupHints) {

@@ -3,6 +3,7 @@ import { join, dirname } from 'node:path';
 import type { HookInput, GuardResult } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import type { CommonIssuesFile } from '../../core/index.js';
+import { dedupGuardContext } from '../session-state.js';
 
 // ── Disk state for compaction survival ──────────────
 
@@ -72,8 +73,9 @@ export async function hazardGuard(input: HookInput, cwd: string): Promise<GuardR
   let state = loadHazardState(cwd);
   state = pruneState(state, currentSprint);
 
-  // Compute fresh warnings from common issues
-  const freshWarnings: string[] = [];
+  // Compute fresh warnings from common issues (ranked by recency)
+  const MAX_HAZARDS = 3;
+  const freshWarnings: Array<{ lastSprint: number; text: string }> = [];
 
   try {
     const issuesPath = join(cwd, config.commonIssuesPath);
@@ -86,27 +88,30 @@ export async function hazardGuard(input: HookInput, cwd: string): Promise<GuardR
         const text = `${pattern.title} ${pattern.description} ${pattern.prevention}`.toLowerCase();
         if (text.includes(areaLower) || areaLower.split('/').some(seg => text.includes(seg))) {
           const lastSprint = Math.max(...pattern.sprints_hit);
-          freshWarnings.push(`[${pattern.category}] ${pattern.title} (last: S${lastSprint}) — ${pattern.prevention.slice(0, 100)}`);
+          freshWarnings.push({ lastSprint, text: `[${pattern.category}] ${pattern.title} (S${lastSprint}) — ${pattern.prevention.slice(0, 80)}` });
         }
       }
     }
   } catch { /* skip — common issues are optional */ }
 
+  // Sort by recency (most recent first) and cap at top N
+  freshWarnings.sort((a, b) => b.lastSprint - a.lastSprint);
+  const freshTexts = freshWarnings.map(w => w.text);
+
   // Merge fresh warnings with any disk-cached warnings for this area
   const cached = state.entries.find(e => e.area === area);
-  const allWarnings = freshWarnings.length > 0 ? freshWarnings : (cached?.warnings ?? []);
+  const allWarnings = freshTexts.length > 0 ? freshTexts : (cached?.warnings ?? []);
 
-  if (freshWarnings.length === 0 && cached) {
-    // No fresh warnings for this area anymore — clear stale cached entry
+  if (freshTexts.length === 0 && cached) {
     state.entries = state.entries.filter(e => e.area !== area);
     saveHazardState(cwd, state);
   }
 
   // Persist fresh warnings to disk (update or add entry)
-  if (freshWarnings.length > 0) {
+  if (freshTexts.length > 0) {
     const entry: HazardStateEntry = {
       area,
-      warnings: freshWarnings,
+      warnings: freshTexts,
       sprint: currentSprint,
       timestamp: Date.now(),
     };
@@ -117,8 +122,17 @@ export async function hazardGuard(input: HookInput, cwd: string): Promise<GuardR
 
   if (allWarnings.length === 0) return {};
 
-  const header = `SLOPE hazard warning for ${area}:`;
-  return {
-    context: [header, ...allWarnings.map(w => `  ${w}`)].join('\n'),
-  };
+  // Cap output at top N, show overflow count
+  const shown = allWarnings.slice(0, MAX_HAZARDS);
+  const overflow = allWarnings.length - shown.length;
+  const header = `SLOPE hazards (${area}, ${allWarnings.length} total${overflow > 0 ? `, showing top ${MAX_HAZARDS}` : ''}):`;
+  const lines = [header, ...shown.map(w => `• ${w}`)];
+  if (overflow > 0) lines.push(`  (+${overflow} more — run \`slope briefing --area=${area}\` for all)`);
+  const fullContext = lines.join('\n');
+
+  // Session dedup: if this exact context was already injected, return compressed reference
+  const dedup = dedupGuardContext(cwd, input.session_id, 'hazard', fullContext);
+  if (dedup) return { context: dedup };
+
+  return { context: fullContext };
 }
