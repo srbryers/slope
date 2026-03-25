@@ -135,7 +135,7 @@ export async function briefingCommand(args: string[]): Promise<void> {
     const hazardCount = visibleIssues.recurring_patterns.length;
     const topHazards = visibleIssues.recurring_patterns
       .sort((a, b) => Math.max(...b.sprints_hit) - Math.max(...a.sprints_hit))
-      .slice(0, 2)
+      .slice(0, 3)
       .map(p => p.title)
       .join('; ');
     const claimList = claims.length > 0 ? claims.map(c => c.target).join(', ') : 'none';

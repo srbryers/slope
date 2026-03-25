@@ -74,8 +74,8 @@ const CONTEXT_DEDUP_FILE = '.slope/.context-dedup.json';
 
 interface ContextDedupState {
   session_id: string;
-  /** Map of content hash → { guard, turn_count, first_injected } */
-  seen: Record<string, { guard: string; count: number }>;
+  /** Map of content hash → { guard, count, timestamp } */
+  seen: Record<string, { guard: string; count: number; ts: number }>;
 }
 
 function loadDedupState(cwd: string): ContextDedupState | null {
@@ -87,8 +87,10 @@ function loadDedupState(cwd: string): ContextDedupState | null {
 function saveDedupState(cwd: string, state: ContextDedupState): void {
   const dir = join(cwd, '.slope');
   mkdirSync(dir, { recursive: true });
-  const path = join(cwd, CONTEXT_DEDUP_FILE);
-  writeFileSync(path, JSON.stringify(state) + '\n');
+  const filePath = join(cwd, CONTEXT_DEDUP_FILE);
+  const tmpPath = filePath + '.tmp';
+  writeFileSync(tmpPath, JSON.stringify(state) + '\n');
+  renameSync(tmpPath, filePath);
 }
 
 function hashContent(content: string): string {
@@ -116,16 +118,26 @@ export function dedupGuardContext(
     state = { session_id: sessionId, seen: {} };
   }
 
+  // Prune entries older than 24 hours (prevents unbounded growth across long sessions)
+  const DEDUP_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+  const now = Date.now();
+  for (const [h, entry] of Object.entries(state.seen)) {
+    if (entry.ts && (now - entry.ts) > DEDUP_MAX_AGE_MS) {
+      delete state.seen[h];
+    }
+  }
+
   const existing = state.seen[hash];
   if (existing) {
     // Already injected — return compressed reference
     existing.count++;
+    existing.ts = now;
     saveDedupState(cwd, state);
     return `SLOPE ${guardName}: (same as prior warning, shown ${existing.count}x)`;
   }
 
   // New content — record and return null (caller injects full)
-  state.seen[hash] = { guard: guardName, count: 1 };
+  state.seen[hash] = { guard: guardName, count: 1, ts: now };
   saveDedupState(cwd, state);
   return null;
 }
