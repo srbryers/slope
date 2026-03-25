@@ -111,6 +111,8 @@ export interface BacklogTicket {
   max_files: number;
   estimated_tokens?: number;
   files?: { primary: string[] };
+  /** Execution likelihood score 0-1 (higher = more likely to succeed). Computed by analyze-scorecards. */
+  quality_score?: number;
 }
 
 export type Club = 'putter' | 'wedge' | 'short_iron' | 'long_iron' | 'driver';

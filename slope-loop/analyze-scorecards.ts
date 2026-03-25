@@ -484,7 +484,7 @@ function generateBacklog(analysis: Analysis, sprintCount: number): void {
   for (const c of analysis.clubs) {
     clubSuccessMap[c.club] = c.success_rate;
   }
-  const safeClub = (clubSuccessMap.short_iron ?? 100) < 60 ? 'wedge' : 'short_iron';
+  const safeClub: 'wedge' | 'short_iron' = (clubSuccessMap.short_iron ?? 100) < 60 ? 'wedge' : 'short_iron';
 
   // --- Strategy 1: Harden hotspot modules ---
   // Only include hotspots that have identifiable source files
@@ -678,12 +678,151 @@ function generateBacklog(analysis: Analysis, sprintCount: number): void {
     }
   }
 
+  // --- Strategy 7 & 8: Supplementary (always run, not fallback) ---
+  // These add issue-driven and guard-friction tickets alongside scorecard strategies.
+  // Unlike Strategy 6 (roadmap fallback), they don't require scorecard exhaustion.
+
+  // --- Strategy 7: Issue-driven (from common-issues.json) ---
+  const repoRoot = join(__dirname, '..');
+  const commonIssuesPath = join(repoRoot, '.slope/common-issues.json');
+  if (existsSync(commonIssuesPath)) {
+    try {
+      const issues = JSON.parse(readFileSync(commonIssuesPath, 'utf8'));
+      const persistent = (issues.recurring_patterns ?? []).filter(
+        (p: { sprints_hit?: number[] }) => (p.sprints_hit?.length ?? 0) >= 3,
+      );
+
+      if (persistent.length > 0) {
+        const issueTickets = persistent.slice(0, 4).map((p: { title: string; category: string; description: string; prevention: string }, i: number) => {
+          // Infer module from description/prevention text
+          const text = `${p.description} ${p.prevention}`;
+          const moduleMatch = text.match(/(?:src\/[\w/.-]+\.ts|packages\/[\w/.-]+)/);
+          const module = moduleMatch ? moduleMatch[0] : 'src';
+
+          return {
+            key: `S-LOCAL-${String(counter).padStart(3, '0')}-${i + 1}`,
+            title: `Fix recurring: ${p.title}`,
+            club: safeClub,
+            description: `Address recurring pattern [${p.category}]: ${p.description}\n\nPrevention: ${p.prevention}`,
+            acceptance_criteria: [
+              'pnpm test passes',
+              'pnpm typecheck passes',
+              `Recurring pattern "${p.title}" addressed`,
+            ],
+            modules: [module],
+            max_files: 2,
+          };
+        });
+
+        sprints.push({
+          id: `S-LOCAL-${String(counter).padStart(3, '0')}`,
+          title: 'Fix recurring issues from common-issues.json',
+          strategy: 'hardening' as const,
+          par: Math.min(issueTickets.length + 1, 5),
+          slope: 2,
+          type: 'bugfix' as const,
+          tickets: issueTickets,
+        });
+        counter++;
+      }
+    } catch { /* common-issues is optional */ }
+  }
+
+  // --- Strategy 8: Guard friction reduction ---
+  const guardLogDir = join(repoRoot, '.slope/transcripts');
+  if (existsSync(guardLogDir)) {
+    try {
+      // Look for guard JSONL logs to find high-friction guards
+      const guardFiles = readdirSync(guardLogDir).filter((f: string) => f.endsWith('.jsonl'));
+      const guardCounts: Record<string, { block: number; total: number }> = {};
+
+      for (const file of guardFiles.slice(-10)) { // last 10 sessions
+        const content = readFileSync(join(guardLogDir, file), 'utf8').trim();
+        if (!content) continue;
+        for (const line of content.split('\n')) {
+          try {
+            const entry = JSON.parse(line);
+            const guard = entry.guard ?? entry.tool;
+            const decision = entry.decision ?? entry.result;
+            if (!guard) continue;
+            if (!guardCounts[guard]) guardCounts[guard] = { block: 0, total: 0 };
+            guardCounts[guard].total++;
+            if (decision === 'deny' || decision === 'block') guardCounts[guard].block++;
+          } catch { /* skip malformed */ }
+        }
+      }
+
+      // Find guards with >50% block rate and 5+ executions
+      const highFriction = Object.entries(guardCounts)
+        .filter(([, v]) => v.total >= 5 && (v.block / v.total) > 0.5)
+        .map(([name, v]) => ({ name, blockRate: Math.round((v.block / v.total) * 100), total: v.total }));
+
+      if (highFriction.length > 0) {
+        const frictionTickets = highFriction.slice(0, 3).map((g, i) => ({
+          key: `S-LOCAL-${String(counter).padStart(3, '0')}-${i + 1}`,
+          title: `Reduce friction: ${g.name} guard (${g.blockRate}% block rate)`,
+          club: safeClub,
+          description: `Guard "${g.name}" has a ${g.blockRate}% block rate across ${g.total} executions. Investigate root cause and reduce false positives or address the underlying issue it catches.`,
+          acceptance_criteria: [
+            'pnpm test passes',
+            'pnpm typecheck passes',
+            `${g.name} guard block rate reduced or root cause addressed`,
+          ],
+          modules: [`src/cli/guards/${g.name}.ts`],
+          max_files: 2,
+        }));
+
+        sprints.push({
+          id: `S-LOCAL-${String(counter).padStart(3, '0')}`,
+          title: 'Reduce guard friction — high block-rate guards',
+          strategy: 'hardening' as const,
+          par: Math.min(frictionTickets.length + 1, 4),
+          slope: 2,
+          type: 'chore' as const,
+          tickets: frictionTickets,
+        });
+        counter++;
+      }
+    } catch { /* guard metrics are optional */ }
+  }
+
+  // --- Quality scoring: rate tickets by execution likelihood ---
+  const hotspotAreas = new Set(analysis.hotspots.map((h: { area: string }) => h.area));
+  for (const sprint of sprints) {
+    for (const ticket of sprint.tickets) {
+      let score = 0.5; // baseline
+
+      // Factor 1: Club success rate (0-0.3)
+      const clubRate = clubSuccessMap[ticket.club] ?? 50;
+      score += (clubRate / 100) * 0.3;
+
+      // Factor 2: File count (fewer = better, 0-0.2)
+      if (ticket.max_files <= 1) score += 0.2;
+      else if (ticket.max_files === 2) score += 0.1;
+
+      // Factor 3: Module in hazard hotspot (penalty -0.1)
+      const inHotspot = ticket.modules.some((m: string) =>
+        [...hotspotAreas].some((area: string) => m.includes(area) || area.includes(m)),
+      );
+      if (inHotspot) score -= 0.1;
+
+      ticket.quality_score = Math.round(Math.min(1, Math.max(0, score)) * 100) / 100;
+    }
+  }
+
+  // Sort sprints by average quality score (highest first)
+  sprints.sort((a: { tickets: { quality_score?: number }[] }, b: { tickets: { quality_score?: number }[] }) => {
+    const avgA = a.tickets.reduce((s, t) => s + (t.quality_score ?? 0.5), 0) / a.tickets.length;
+    const avgB = b.tickets.reduce((s, t) => s + (t.quality_score ?? 0.5), 0) / b.tickets.length;
+    return avgB - avgA;
+  });
+
   writeFileSync(
     join(__dirname, 'backlog.json'),
     JSON.stringify({ generated_at: new Date().toISOString(), sprints }, null, 2) + '\n',
   );
 
-  console.log(`\nGenerated backlog: ${sprints.length} sprints, ${sprints.reduce((s, sp) => s + sp.tickets.length, 0)} tickets`);
+  console.log(`\nGenerated backlog: ${sprints.length} sprints, ${sprints.reduce((s: number, sp: { tickets: unknown[] }) => s + sp.tickets.length, 0)} tickets`);
   console.log(`Safe club: ${safeClub} (short_iron success rate: ${clubSuccessMap.short_iron ?? 'N/A'}%)`);
   console.log(`Full backlog: slope-loop/backlog.json`);
 }

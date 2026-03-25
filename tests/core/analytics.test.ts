@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeHandicapTrend, computeVelocity, computeGuardMetrics } from '../../src/core/analytics.js';
+import { computeHandicapTrend, computeVelocity, computeGuardMetrics, computeConvergence } from '../../src/core/analytics.js';
 import { renderTrendTimeSeriesChart, renderVelocityChart, renderGuardEffectivenessChart } from '../../src/core/report.js';
 import type { GolfScorecard } from '../../src/core/types.js';
 import type { TrendPoint, VelocityReport, GuardEffectivenessReport } from '../../src/core/analytics.js';
@@ -399,5 +399,59 @@ describe('renderGuardEffectivenessChart', () => {
     expect(html).toContain('hazard');
     expect(html).toContain('Total Executions');
     expect(html).toContain('Most Active');
+  });
+});
+
+// --- Convergence Detection ---
+
+describe('computeConvergence', () => {
+  it('returns insufficient_data with fewer than 10 scorecards', () => {
+    const cards = Array.from({ length: 5 }, (_, i) =>
+      makeScorecard({ sprint_number: i + 1, par: 4, score: 4 }),
+    );
+    const result = computeConvergence(cards);
+    expect(result.prediction).toBe('insufficient_data');
+  });
+
+  it('detects improving trend (scores decreasing over time)', () => {
+    // Scores go from 6 → 3 over 12 sprints (steady improvement)
+    const cards = Array.from({ length: 12 }, (_, i) =>
+      makeScorecard({ sprint_number: i + 1, par: 4, score: Math.max(3, 6 - Math.floor(i / 3)) }),
+    );
+    const result = computeConvergence(cards);
+    expect(result.prediction).toBe('improving');
+    expect(result.improvement_rate).toBeLessThan(0);
+  });
+
+  it('detects plateau (stable scores)', () => {
+    // All sprints score exactly par
+    const cards = Array.from({ length: 12 }, (_, i) =>
+      makeScorecard({ sprint_number: i + 1, par: 4, score: 4 }),
+    );
+    const result = computeConvergence(cards);
+    expect(result.plateau).toBe(true);
+    expect(result.prediction).toBe('plateau');
+    expect(result.improvement_rate).toBe(0);
+  });
+
+  it('detects reversion (last 5 worse than last 10)', () => {
+    // First 7 sprints: par, last 5: bogey+
+    const cards = [
+      ...Array.from({ length: 7 }, (_, i) => makeScorecard({ sprint_number: i + 1, par: 4, score: 4 })),
+      ...Array.from({ length: 5 }, (_, i) => makeScorecard({ sprint_number: i + 8, par: 4, score: 6 })),
+    ];
+    const result = computeConvergence(cards);
+    expect(result.reversion).toBe(true);
+    expect(result.prediction).toBe('reverting');
+  });
+
+  it('counts sprints since last improvement', () => {
+    // Improving for 8, then flat for 4
+    const cards = [
+      ...Array.from({ length: 8 }, (_, i) => makeScorecard({ sprint_number: i + 1, par: 4, score: 6 - Math.floor(i / 2) })),
+      ...Array.from({ length: 4 }, (_, i) => makeScorecard({ sprint_number: i + 9, par: 4, score: 4 })),
+    ];
+    const result = computeConvergence(cards);
+    expect(result.sprints_since_improvement).toBeGreaterThanOrEqual(3);
   });
 });
