@@ -460,8 +460,8 @@ function recommendSubcommand(flags: Record<string, string>, cwd: string): void {
 
   // Per-club table
   console.log('Per-club:');
-  console.log('  Club          Model   Reason                              Samples');
-  console.log('  ────────────  ──────  ──────────────────────────────────  ───────');
+  console.log('  Club            Model    Samples  Reason');
+  console.log('  ──────────────  ───────  ───────  ──────');
   for (const [club, rec] of Object.entries(mc.recommendations)) {
     // Find matching success_rates key — keys are "club:full_model_name" (model names may contain colons)
     const isLocal = rec.model === 'local';
@@ -469,8 +469,8 @@ function recommendSubcommand(flags: Record<string, string>, cwd: string): void {
       k.startsWith(`${club}:`) && (isLocal ? k.includes('ollama') : !k.includes('ollama')),
     );
     const stats = matchKey ? mc.success_rates[matchKey] : undefined;
-    const samples = stats?.total ?? '?';
-    console.log(`  ${club.padEnd(14)}${rec.model.padEnd(8)}${rec.reason.padEnd(36)}${samples}`);
+    const samples = String(stats?.total ?? '?');
+    console.log(`  ${club.padEnd(16)}${rec.model.padEnd(9)}${samples.padStart(7)}  ${rec.reason}`);
   }
 
   // Cross-dimensional: by type
@@ -493,8 +493,9 @@ function recommendSubcommand(flags: Record<string, string>, cwd: string): void {
   if (mc.cost_adjusted_scores && Object.keys(mc.cost_adjusted_scores).length > 0) {
     console.log('\nCost-adjusted scores (higher = better value):');
     const sorted = Object.entries(mc.cost_adjusted_scores).sort((a, b) => b[1] - a[1]);
+    const maxKeyLen = Math.max(...sorted.map(([k]) => k.length), 20);
     for (const [key, score] of sorted) {
-      console.log(`  ${key.padEnd(40)}${score}`);
+      console.log(`  ${key.padEnd(maxKeyLen + 2)}${String(score).padStart(8)}`);
     }
   }
 
