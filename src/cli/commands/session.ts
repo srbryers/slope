@@ -1,4 +1,6 @@
 import { randomUUID } from 'node:crypto';
+import { existsSync, writeFileSync, readFileSync, readdirSync, mkdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { checkConflicts } from '../../core/index.js';
 import { STALE_SESSION_THRESHOLD_MS } from '../../core/constants.js';
 import { resolveStore } from '../store.js';
@@ -29,6 +31,18 @@ export async function sessionCommand(args: string[]): Promise<void> {
       break;
     case 'list':
       await listSessions(flags, cwd);
+      break;
+    case 'dashboard':
+      await dashboardCommand(flags, cwd);
+      break;
+    case 'handoff':
+      await handoffCommand(flags, cwd);
+      break;
+    case 'assign':
+      await assignCommand(flags, cwd);
+      break;
+    case 'plan':
+      await planCommand(flags, cwd);
       break;
     default:
       console.log(`
@@ -235,6 +249,233 @@ async function listSessions(flags: Record<string, string>, cwd: string): Promise
           console.log(`    ${s.session_id}${roleTag} — last heartbeat ${age}m ago`);
         }
       }
+    }
+    console.log('');
+  } finally {
+    store.close();
+  }
+}
+
+// ── T4: Dashboard ────────────────────────────────────
+
+async function dashboardCommand(flags: Record<string, string>, cwd: string): Promise<void> {
+  const store = await resolveStore(cwd);
+  try {
+    await store.cleanStaleSessions(STALE_SESSION_THRESHOLD_MS);
+    const sessions = await store.getActiveSessions();
+    const now = Date.now();
+
+    if (sessions.length === 0) {
+      console.log('\nNo active sessions.\n');
+      return;
+    }
+
+    // Collect claims across sessions
+    const allClaims: Array<{ target: string; scope: string; session_id?: string; player: string; sprint_number: number }> = [];
+    const sprintNumbers = new Set<number>();
+    for (const s of sessions) {
+      const meta = s.metadata as Record<string, unknown> | undefined;
+      if (meta?.sprint) sprintNumbers.add(Number(meta.sprint));
+    }
+    for (const sn of sprintNumbers) {
+      const claims = await store.list(sn);
+      allClaims.push(...claims);
+    }
+
+    if (flags.json) {
+      console.log(JSON.stringify({ sessions, claims: allClaims }, null, 2));
+      return;
+    }
+
+    const red = '\x1b[31m';
+    const yellow = '\x1b[33m';
+    const green = '\x1b[32m';
+    const gray = '\x1b[90m';
+    const reset = '\x1b[0m';
+
+    console.log(`\n=== Agent Session Dashboard === (${sessions.length} active)\n`);
+
+    const swarms = new Map<string, typeof sessions>();
+    const unswarm: typeof sessions = [];
+    for (const s of sessions) {
+      if (s.swarm_id) {
+        const group = swarms.get(s.swarm_id) ?? [];
+        group.push(s);
+        swarms.set(s.swarm_id, group);
+      } else {
+        unswarm.push(s);
+      }
+    }
+
+    const printSession = (s: typeof sessions[0]): void => {
+      const hbAge = Math.round((now - new Date(s.last_heartbeat_at).getTime()) / 60000);
+      const isStale = (now - new Date(s.last_heartbeat_at).getTime()) > STALE_SESSION_THRESHOLD_MS;
+      const roleTag = s.agent_role ? ` [${s.agent_role}]` : '';
+      const branchTag = s.branch ? ` on ${s.branch}` : '';
+      const staleTag = isStale ? ` ${yellow}stale (${hbAge}m)${reset}` : ` ${gray}(${hbAge}m ago)${reset}`;
+      const color = isStale ? yellow : green;
+      console.log(`  ${color}*${reset} ${s.session_id.slice(0, 12)}  ${s.role}${roleTag}${branchTag}${staleTag}`);
+      const myClaims = allClaims.filter(c => c.session_id === s.session_id);
+      for (const c of myClaims) console.log(`    - ${c.scope}: ${c.target}`);
+    };
+
+    for (const s of unswarm) printSession(s);
+    for (const [swarmId, members] of swarms) {
+      console.log(`\n  Swarm: ${swarmId} (${members.length} agents)`);
+      for (const s of members) printSession(s);
+      const swarmClaims = allClaims.filter(c => members.some(m => m.session_id === c.session_id)) as import('../../core/index.js').SprintClaim[];
+      if (swarmClaims.length > 1) {
+        const conflicts = checkConflicts(swarmClaims);
+        if (conflicts.length > 0) {
+          console.log(`  ${red}${conflicts.length} conflict(s):${reset}`);
+          for (const c of conflicts) console.log(`    ${red}${c.severity}: ${c.reason}${reset}`);
+        }
+      }
+    }
+    console.log('');
+  } finally {
+    store.close();
+  }
+}
+
+// ── T2: Handoff ──────────────────────────────────────
+
+async function handoffCommand(flags: Record<string, string>, cwd: string): Promise<void> {
+  const handoffsDir = join(cwd, '.slope/handoffs');
+
+  if (flags.list) {
+    if (!existsSync(handoffsDir)) { console.log('\nNo handoffs directory.\n'); return; }
+    const files = readdirSync(handoffsDir).filter(f => f.startsWith('transfer-') && f.endsWith('.json'));
+    if (files.length === 0) { console.log('\nNo pending handoffs.\n'); return; }
+    console.log(`\n=== Pending Handoffs (${files.length}) ===\n`);
+    for (const f of files) {
+      try {
+        const data = JSON.parse(readFileSync(join(handoffsDir, f), 'utf8'));
+        console.log(`  ${data.from?.slice(0, 12)} -> ${data.to?.slice(0, 12)}  ${data.message ?? '(no message)'}  ${data.timestamp}`);
+      } catch { console.log(`  ${f} (unreadable)`); }
+    }
+    console.log('');
+    return;
+  }
+
+  const to = flags.to;
+  const from = flags.from;
+  if (!to || !from) {
+    console.error('Usage: slope session handoff --from=<id> --to=<id> [--message="..."]');
+    console.error('       slope session handoff --list');
+    process.exit(1);
+  }
+
+  const store = await resolveStore(cwd);
+  try {
+    const sessions = await store.getActiveSessions();
+    const fromSession = sessions.find(s => s.session_id.startsWith(from));
+    if (!fromSession) { console.error(`Source session not found: ${from}`); process.exit(1); }
+
+    const meta = fromSession.metadata as Record<string, unknown> | undefined;
+    const sprintNumber = meta?.sprint ? Number(meta.sprint) : undefined;
+    const claims = sprintNumber ? await store.list(sprintNumber) : [];
+    const fromClaims = claims.filter(c => c.session_id === fromSession.session_id);
+
+    mkdirSync(handoffsDir, { recursive: true });
+    const handoff = { from: fromSession.session_id, to, claims: fromClaims.map(c => ({ target: c.target, scope: c.scope })), message: flags.message ?? '', timestamp: new Date().toISOString() };
+    const filename = `transfer-${fromSession.session_id.slice(0, 8)}-${to.slice(0, 8)}.json`;
+    writeFileSync(join(handoffsDir, filename), JSON.stringify(handoff, null, 2) + '\n');
+
+    console.log(`\nHandoff created: ${filename}`);
+    console.log(`  From: ${fromSession.session_id}`);
+    console.log(`  To: ${to}`);
+    console.log(`  Claims: ${fromClaims.length}`);
+    console.log('');
+  } finally {
+    store.close();
+  }
+}
+
+// ── T3: Assign + Plan ────────────────────────────────
+
+async function assignCommand(flags: Record<string, string>, cwd: string): Promise<void> {
+  const ticket = flags.ticket;
+  const agent = flags.agent;
+  if (!ticket || !agent) {
+    console.error('Usage: slope session assign --ticket=S72-1 --agent=<session-id> [--sprint=N]');
+    process.exit(1);
+  }
+
+  const store = await resolveStore(cwd);
+  try {
+    const sessions = await store.getActiveSessions();
+    const target = sessions.find(s => s.session_id.startsWith(agent));
+    if (!target) { console.error(`Agent session not found: ${agent}`); process.exit(1); }
+
+    const meta = target.metadata as Record<string, unknown> | undefined;
+    const sprintNumber = flags.sprint ? Number(flags.sprint) : (meta?.sprint ? Number(meta.sprint) : undefined);
+    if (!sprintNumber) { console.error('Sprint number required (--sprint=N).'); process.exit(1); }
+
+    // Pre-flight conflict check
+    const existingClaims = await store.list(sprintNumber);
+    const newClaim = { sprint_number: sprintNumber, player: target.agent_role ?? target.role ?? 'agent', target: ticket, scope: 'ticket' as const, session_id: target.session_id, id: '', claimed_at: '' };
+    const conflicts = checkConflicts([...existingClaims, newClaim]);
+    if (conflicts.length > 0) {
+      console.log(`\n\x1b[33m⚠ Conflicts detected:\x1b[0m`);
+      for (const c of conflicts) console.log(`  ${c.severity}: ${c.reason}`);
+      console.log('  Use slope session assign --force to override.\n');
+      if (!flags.force) { store.close(); process.exit(1); }
+    }
+
+    await store.claim({
+      sprint_number: sprintNumber,
+      player: target.agent_role ?? target.role ?? 'agent',
+      target: ticket,
+      scope: 'ticket',
+      session_id: target.session_id,
+    });
+
+    console.log(`\nAssigned ${ticket} to ${target.session_id.slice(0, 12)} (sprint S${sprintNumber})\n`);
+  } finally {
+    store.close();
+  }
+}
+
+async function planCommand(flags: Record<string, string>, cwd: string): Promise<void> {
+  const store = await resolveStore(cwd);
+  try {
+    const sessions = await store.getActiveSessions();
+    if (sessions.length === 0) { console.log('\nNo active sessions.\n'); return; }
+
+    const firstMeta = sessions.find(s => (s.metadata as Record<string, unknown>)?.sprint)?.metadata as Record<string, unknown> | undefined;
+    const sprintNumber = flags.sprint ? Number(flags.sprint) : (firstMeta?.sprint ? Number(firstMeta.sprint) : undefined);
+    if (!sprintNumber) { console.log('\nNo sprint context. Use --sprint=N.\n'); return; }
+
+    const claims = await store.list(sprintNumber);
+
+    if (flags.json) {
+      console.log(JSON.stringify({ sprint: sprintNumber, assignments: claims, sessions }, null, 2));
+      return;
+    }
+
+    console.log(`\n=== Sprint S${sprintNumber} — Ticket Assignments ===\n`);
+    const byAgent = new Map<string, typeof claims>();
+    const unassigned: typeof claims = [];
+    for (const c of claims) {
+      if (c.session_id) {
+        const group = byAgent.get(c.session_id) ?? [];
+        group.push(c);
+        byAgent.set(c.session_id, group);
+      } else {
+        unassigned.push(c);
+      }
+    }
+
+    for (const [sid, agentClaims] of byAgent) {
+      const session = sessions.find(s => s.session_id === sid);
+      const role = session?.agent_role ?? session?.role ?? 'agent';
+      console.log(`  ${sid.slice(0, 12)} (${role}):`);
+      for (const c of agentClaims) console.log(`    ${c.scope}: ${c.target}`);
+    }
+    if (unassigned.length > 0) {
+      console.log(`\n  Unassigned:`);
+      for (const c of unassigned) console.log(`    ${c.scope}: ${c.target}`);
     }
     console.log('');
   } finally {
