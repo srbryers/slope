@@ -227,3 +227,81 @@ export function computeGuardMetrics(lines: string[]): GuardEffectivenessReport {
     most_blocking: mostBlocking,
   };
 }
+
+// --- Convergence Detection ---
+
+export interface ConvergenceCard {
+  /** Average handicap change per sprint over last 10 (negative = improving) */
+  improvement_rate: number;
+  /** True if |improvement_rate| < 0.1 for the last 10 sprints */
+  plateau: boolean;
+  /** True if last_5 handicap > last_10 handicap after prior improvement */
+  reversion: boolean;
+  /** Consecutive sprints without handicap improvement */
+  sprints_since_improvement: number;
+  /** Overall prediction */
+  prediction: 'improving' | 'plateau' | 'reverting' | 'insufficient_data';
+}
+
+const CONVERGENCE_MIN_SPRINTS = 10;
+const PLATEAU_THRESHOLD = 0.1;
+
+/**
+ * Detect convergence patterns: plateau, reversion, improvement rate.
+ * Requires at least 10 scorecards for meaningful analysis.
+ */
+export function computeConvergence(scorecards: GolfScorecard[]): ConvergenceCard {
+  if (scorecards.length < CONVERGENCE_MIN_SPRINTS) {
+    return {
+      improvement_rate: 0,
+      plateau: false,
+      reversion: false,
+      sprints_since_improvement: 0,
+      prediction: 'insufficient_data',
+    };
+  }
+
+  const sorted = [...scorecards].sort((a, b) => a.sprint_number - b.sprint_number);
+
+  // Compute per-sprint differentials (score - par)
+  const diffs = sorted.map(s => s.score - s.par);
+
+  // Improvement rate: slope of differentials over last 10 sprints
+  const last10 = diffs.slice(-10);
+  let sumChange = 0;
+  for (let i = 1; i < last10.length; i++) {
+    sumChange += last10[i] - last10[i - 1];
+  }
+  const improvementRate = Math.round((sumChange / (last10.length - 1)) * 100) / 100;
+
+  // Plateau: improvement rate near zero
+  const plateau = Math.abs(improvementRate) < PLATEAU_THRESHOLD;
+
+  // Reversion: last 5 avg worse than last 10 avg
+  const last5Diffs = diffs.slice(-5);
+  const last10Diffs = diffs.slice(-10);
+  const last5Avg = last5Diffs.reduce((a, b) => a + b, 0) / last5Diffs.length;
+  const last10Avg = last10Diffs.reduce((a, b) => a + b, 0) / last10Diffs.length;
+  const reversion = last5Avg > last10Avg + PLATEAU_THRESHOLD;
+
+  // Sprints since improvement: count backward from latest
+  let sprintsSinceImprovement = 0;
+  for (let i = diffs.length - 1; i > 0; i--) {
+    if (diffs[i] < diffs[i - 1]) break; // found improvement
+    sprintsSinceImprovement++;
+  }
+
+  // Prediction
+  let prediction: ConvergenceCard['prediction'];
+  if (reversion) prediction = 'reverting';
+  else if (plateau) prediction = 'plateau';
+  else prediction = 'improving';
+
+  return {
+    improvement_rate: improvementRate,
+    plateau,
+    reversion,
+    sprints_since_improvement: sprintsSinceImprovement,
+    prediction,
+  };
+}

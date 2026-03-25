@@ -6,6 +6,8 @@ import { loadBacklog, getRemainingSprintIds } from '../loop/backlog.js';
 import { selectModel } from '../loop/model-selector.js';
 import { createLogger } from '../loop/logger.js';
 import type { LoopConfig, ConfigSource, BacklogSprint, SprintResult, ModelConfig } from '../loop/types.js';
+import { loadScorecards, computeConvergence } from '../../core/index.js';
+import { loadConfig } from '../config.js';
 
 function parseArgs(args: string[]): Record<string, string> {
   const result: Record<string, string> = {};
@@ -54,6 +56,9 @@ export async function loopCommand(args: string[]): Promise<void> {
       break;
     case 'ab':
       await abSubcommand(flags, cwd);
+      break;
+    case 'convergence':
+      convergenceSubcommand(flags, cwd);
       break;
     default:
       console.log(`
@@ -717,4 +722,41 @@ function fmtNum(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
   return String(n);
+}
+
+// ── convergence ──────────────────────────────────────
+
+function convergenceSubcommand(flags: Record<string, string>, cwd: string): void {
+  const config = loadConfig();
+  const scorecards = loadScorecards(config, cwd);
+
+  if (scorecards.length === 0) {
+    console.log('No scorecards found.');
+    return;
+  }
+
+  const card = computeConvergence(scorecards);
+
+  if (flags.json === 'true') {
+    console.log(JSON.stringify(card, null, 2));
+    return;
+  }
+
+  const predColor: Record<string, string> = {
+    improving: '\x1b[32m',    // green
+    plateau: '\x1b[33m',      // yellow
+    reverting: '\x1b[31m',    // red
+    insufficient_data: '\x1b[90m', // gray
+  };
+  const reset = '\x1b[0m';
+  const color = predColor[card.prediction] ?? reset;
+
+  console.log('\n=== Convergence Card ===\n');
+  console.log(`  Prediction:      ${color}${card.prediction}${reset}`);
+  console.log(`  Improvement rate: ${card.improvement_rate} per sprint (negative = improving)`);
+  console.log(`  Plateau:          ${card.plateau ? 'yes' : 'no'}`);
+  console.log(`  Reversion:        ${card.reversion ? 'yes' : 'no'}`);
+  console.log(`  Sprints since improvement: ${card.sprints_since_improvement}`);
+  console.log(`  Scorecards analyzed: ${scorecards.length}`);
+  console.log('');
 }

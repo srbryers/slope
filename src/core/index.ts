@@ -732,6 +732,7 @@ export {
   computeHandicapTrend,
   computeVelocity,
   computeGuardMetrics,
+  computeConvergence,
 } from './analytics.js';
 export type {
   TrendPoint,
@@ -740,6 +741,7 @@ export type {
   GuardMetrics,
   GuardEffectivenessReport,
   GuardDecision,
+  ConvergenceCard,
 } from './analytics.js';
 
 // Workflow
