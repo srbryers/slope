@@ -580,4 +580,16 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
       ]},
     ],
   },
+  {
+    cmd: 'org', desc: 'Multi-repo aggregation and org-level metrics', category: 'analysis',
+    subcommands: [
+      { name: 'init', desc: 'Create .slope/org.json template' },
+      { name: 'status', desc: 'Show all repos with handicaps and sprint counts', flags: [
+        { flag: '--json', desc: 'Output as JSON' },
+      ]},
+      { name: 'issues', desc: 'Show recurring patterns shared across repos', flags: [
+        { flag: '--json', desc: 'Output as JSON' },
+      ]},
+    ],
+  },
 ];
