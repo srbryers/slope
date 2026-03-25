@@ -5,7 +5,7 @@
  */
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, isAbsolute } from 'node:path';
 import { loadScorecards } from './loader.js';
 import { loadConfig } from './config.js';
 import { computeHandicapCard } from './handicap.js';
@@ -65,14 +65,20 @@ export function createOrgConfig(cwd: string, repos: OrgRepo[]): void {
 
 // ── Scorecard Collection ────────────────────────────
 
-export function loadOrgScorecards(orgConfig: OrgConfig): OrgScorecard[] {
+/** Resolve repo path — absolute paths used as-is, relative resolved from baseCwd */
+function resolveRepoPath(repo: OrgRepo, baseCwd: string): string {
+  return isAbsolute(repo.path) ? repo.path : join(baseCwd, repo.path);
+}
+
+export function loadOrgScorecards(orgConfig: OrgConfig, baseCwd: string = process.cwd()): OrgScorecard[] {
   const all: OrgScorecard[] = [];
 
   for (const repo of orgConfig.repos) {
-    if (!existsSync(repo.path)) continue;
+    const repoPath = resolveRepoPath(repo, baseCwd);
+    if (!existsSync(repoPath)) continue;
     try {
-      const config = loadConfig(repo.path);
-      const cards = loadScorecards(config, repo.path);
+      const config = loadConfig(repoPath);
+      const cards = loadScorecards(config, repoPath);
       for (const card of cards) {
         all.push({ ...card, _repo: repo.name });
       }
@@ -84,15 +90,16 @@ export function loadOrgScorecards(orgConfig: OrgConfig): OrgScorecard[] {
 
 // ── Org Handicap ────────────────────────────────────
 
-export function computeOrgHandicap(orgConfig: OrgConfig): OrgHandicap {
+export function computeOrgHandicap(orgConfig: OrgConfig, baseCwd: string = process.cwd()): OrgHandicap {
   const allCards: OrgScorecard[] = [];
   const perRepo: RepoHandicap[] = [];
 
   for (const repo of orgConfig.repos) {
-    if (!existsSync(repo.path)) continue;
+    const repoPath = resolveRepoPath(repo, baseCwd);
+    if (!existsSync(repoPath)) continue;
     try {
-      const config = loadConfig(repo.path);
-      const cards = loadScorecards(config, repo.path);
+      const config = loadConfig(repoPath);
+      const cards = loadScorecards(config, repoPath);
       const tagged = cards.map(c => ({ ...c, _repo: repo.name }));
       allCards.push(...tagged);
 
@@ -100,7 +107,7 @@ export function computeOrgHandicap(orgConfig: OrgConfig): OrgHandicap {
         const sorted = [...cards].sort((a, b) => a.sprint_number - b.sprint_number);
         perRepo.push({
           repo: repo.name,
-          path: repo.path,
+          path: repoPath,
           handicap: computeHandicapCard(cards),
           sprint_count: cards.length,
           latest_sprint: sorted[sorted.length - 1].sprint_number,
@@ -118,19 +125,20 @@ export function computeOrgHandicap(orgConfig: OrgConfig): OrgHandicap {
 
 // ── Cross-Repo Common Issues ────────────────────────
 
-export function mergeCommonIssues(orgConfig: OrgConfig): OrgIssue[] {
+export function mergeCommonIssues(orgConfig: OrgConfig, baseCwd: string = process.cwd()): OrgIssue[] {
   // Collect all patterns with repo source
   const patternMap = new Map<string, { pattern: RecurringPattern; repos: Set<string> }>();
 
   for (const repo of orgConfig.repos) {
-    const issuesPath = join(repo.path, '.slope/common-issues.json');
+    const repoPath = resolveRepoPath(repo, baseCwd);
+    const issuesPath = join(repoPath, '.slope/common-issues.json');
     if (!existsSync(issuesPath)) continue;
 
     try {
       const issues: CommonIssuesFile = JSON.parse(readFileSync(issuesPath, 'utf8'));
       for (const pattern of issues.recurring_patterns ?? []) {
         // Key by normalized title + category
-        const key = `${pattern.category}:${pattern.title.toLowerCase().trim()}`;
+        const key = `${(pattern.category ?? '').toLowerCase().trim()}:${pattern.title.toLowerCase().trim()}`;
         const existing = patternMap.get(key);
         if (existing) {
           existing.repos.add(repo.name);
