@@ -51,7 +51,7 @@ export const DEFAULT_LOOP_CONFIG: LoopConfig = {
   sprintHistory: 'slope-loop/slope-loop-guide/references/sprint-history.md',
   forcePlannerExecutor: false,
   maxRetries: 0,
-  retryStrategy: 'model',
+  retryStrategy: 'none',
 };
 
 // Mapping from LoopConfig keys to environment variable names

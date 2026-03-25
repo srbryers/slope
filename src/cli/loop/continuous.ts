@@ -122,7 +122,7 @@ export async function runContinuous(flags: Record<string, string>, cwd: string):
         collectedResults.push(result);
         failures = result.tickets_passing > 0 ? 0 : failures + 1;
       } else {
-        log.warn(`Sprint ${nextSprint} returned no result`);
+        log.warn(`Sprint ${nextSprint} returned no result${retries > 0 ? ` (after ${retries} retries)` : ''}`);
         failures++;
       }
     } catch (err) {
