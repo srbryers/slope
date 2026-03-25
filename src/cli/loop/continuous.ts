@@ -1,8 +1,8 @@
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { execSync } from 'node:child_process';
 import { resolveLoopConfig } from './config.js';
-import { loadBacklog, getRemainingSprintIds, getReadySprints } from './backlog.js';
+import { loadBacklog, getRemainingSprintIds, getReadySprints, releaseLock } from './backlog.js';
 import { runSprint, isShuttingDown } from './executor.js';
 import { initStagingBranch, createUmbrellaPr, cleanupStagingBranch } from './staging.js';
 import { checkGhCli } from './pr-lifecycle.js';
@@ -88,11 +88,39 @@ export async function runContinuous(flags: Record<string, string>, cwd: string):
       if (dryRun) runFlags['dry-run'] = 'true';
       if (stagingBranch) runFlags.stagingBranch = stagingBranch;
 
-      const result = await runSprint(runFlags, cwd);
+      let result = await runSprint(runFlags, cwd);
+      let retries = 0;
+
+      // Retry on full failure if configured
+      while (
+        result &&
+        result.tickets_passing === 0 &&
+        retries < config.maxRetries &&
+        config.retryStrategy !== 'none' &&
+        !dryRun &&
+        !isShuttingDown()
+      ) {
+        retries++;
+        log.info(`Sprint ${nextSprint} had 0 passing tickets — retrying (${retries}/${config.maxRetries}, strategy: ${config.retryStrategy})`);
+
+        // Remove result file and lock so sprint can re-run
+        clearSprintResult(cwd, config, nextSprint);
+        releaseLock(cwd, config, nextSprint);
+
+        // Force API model on retry if strategy is 'model'
+        const retryFlags = { ...runFlags };
+        if (config.retryStrategy === 'model') {
+          retryFlags.forceApi = 'true';
+        }
+
+        result = await runSprint(retryFlags, cwd);
+      }
+
       if (result) {
-        log.info(`Sprint ${nextSprint} completed successfully`);
+        if (retries > 0) result.retries = retries;
+        log.info(`Sprint ${nextSprint} completed (${result.tickets_passing}/${result.tickets_total} passing${retries > 0 ? `, ${retries} retries` : ''})`);
         collectedResults.push(result);
-        failures = 0;
+        failures = result.tickets_passing > 0 ? 0 : failures + 1;
       } else {
         log.warn(`Sprint ${nextSprint} returned no result`);
         failures++;
@@ -156,6 +184,12 @@ function regenerateBacklog(cwd: string, log: Logger): boolean {
     log.error('Backlog regeneration failed');
     return false;
   }
+}
+
+/** Remove a sprint's result file so it can be re-run */
+function clearSprintResult(cwd: string, config: LoopConfig, sprintId: string): void {
+  const resultPath = join(cwd, config.resultsDir, `${sprintId}.json`);
+  try { unlinkSync(resultPath); } catch { /* may not exist */ }
 }
 
 function sleep(ms: number): Promise<void> {

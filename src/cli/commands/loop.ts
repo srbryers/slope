@@ -247,8 +247,21 @@ function resultsSubcommand(flags: Record<string, string>, cwd: string): void {
     }
   }).filter(Boolean);
 
+  // Filter by --since date
+  const sinceFilter = flags.since;
+  let filtered = results as Record<string, unknown>[];
+  if (sinceFilter) {
+    const sinceMs = new Date(sinceFilter).getTime();
+    if (!isNaN(sinceMs)) {
+      filtered = filtered.filter(r => {
+        const completedAt = new Date(r.completed_at as string).getTime();
+        return !isNaN(completedAt) && completedAt >= sinceMs;
+      });
+    }
+  }
+
   if (sprintFilter) {
-    const result = results.find((r: Record<string, unknown>) => r.sprint_id === sprintFilter);
+    const result = filtered.find(r => r.sprint_id === sprintFilter);
     if (!result) {
       console.log(`No result found for sprint ${sprintFilter}`);
       return;
@@ -262,26 +275,48 @@ function resultsSubcommand(flags: Record<string, string>, cwd: string): void {
   }
 
   if (json) {
-    console.log(JSON.stringify(results, null, 2));
+    console.log(JSON.stringify(filtered, null, 2));
     return;
   }
 
-  // Summary view
-  console.log('\n=== Sprint Results ===\n');
+  // Summary view (also serves as --batch report)
+  const isBatch = flags.batch === 'true';
+  const label = isBatch ? 'Batch Execution Report' : 'Sprint Results';
+  console.log(`\n=== ${label} ===\n`);
+
   let totalPassing = 0;
   let totalTickets = 0;
   let totalNoop = 0;
+  let earliestAt = '';
+  let latestAt = '';
 
-  for (const r of results) {
+  for (const r of filtered) {
     const status = r.merge_status === 'merged' ? 'merged' :
                    r.merge_status === 'blocked' ? 'BLOCKED' : '-';
-    console.log(`  ${r.sprint_id}: ${r.title} — ${r.tickets_passing}/${r.tickets_total} passing, ${r.tickets_noop} noop [${status}]`);
-    totalPassing += r.tickets_passing ?? 0;
-    totalTickets += r.tickets_total ?? 0;
-    totalNoop += r.tickets_noop ?? 0;
+    const retries = (r.retries as number) ? ` (${r.retries} retries)` : '';
+    console.log(`  ${r.sprint_id}: ${r.title} — ${r.tickets_passing}/${r.tickets_total} passing, ${r.tickets_noop} noop [${status}]${retries}`);
+    totalPassing += (r.tickets_passing as number) ?? 0;
+    totalTickets += (r.tickets_total as number) ?? 0;
+    totalNoop += (r.tickets_noop as number) ?? 0;
+
+    const at = r.completed_at as string;
+    if (at && (!earliestAt || at < earliestAt)) earliestAt = at;
+    if (at && (!latestAt || at > latestAt)) latestAt = at;
   }
 
-  console.log(`\nTotal: ${results.length} sprints, ${totalPassing}/${totalTickets} tickets passing, ${totalNoop} noop`);
+  const passing = filtered.filter(r => ((r.tickets_passing as number) ?? 0) > 0).length;
+  const failing = filtered.length - passing;
+
+  console.log(`\nSprints: ${filtered.length} total, ${passing} passing, ${failing} failing`);
+  console.log(`Tickets: ${totalPassing}/${totalTickets} passing, ${totalNoop} noop`);
+
+  if (earliestAt && latestAt && filtered.length > 1) {
+    const durationMs = new Date(latestAt).getTime() - new Date(earliestAt).getTime();
+    const durationMin = Math.round(durationMs / 60000);
+    console.log(`Duration: ${durationMin}m (${earliestAt.slice(0, 16)} → ${latestAt.slice(0, 16)})`);
+  }
+
+  if (sinceFilter) console.log(`Filtered: --since=${sinceFilter}`);
   console.log('');
 }
 
