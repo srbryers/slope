@@ -678,12 +678,43 @@ function generateBacklog(analysis: Analysis, sprintCount: number): void {
     }
   }
 
+  // --- Quality scoring: rate tickets by execution likelihood ---
+  const hotspotAreas = new Set(analysis.hotspots.map((h: { area: string }) => h.area));
+  for (const sprint of sprints) {
+    for (const ticket of sprint.tickets) {
+      let score = 0.5; // baseline
+
+      // Factor 1: Club success rate (0-0.3)
+      const clubRate = clubSuccessMap[ticket.club] ?? 50;
+      score += (clubRate / 100) * 0.3;
+
+      // Factor 2: File count (fewer = better, 0-0.2)
+      if (ticket.max_files <= 1) score += 0.2;
+      else if (ticket.max_files === 2) score += 0.1;
+
+      // Factor 3: Module in hazard hotspot (penalty -0.1)
+      const inHotspot = ticket.modules.some((m: string) =>
+        [...hotspotAreas].some((area: string) => m.includes(area) || area.includes(m)),
+      );
+      if (inHotspot) score -= 0.1;
+
+      ticket.quality_score = Math.round(Math.min(1, Math.max(0, score)) * 100) / 100;
+    }
+  }
+
+  // Sort sprints by average quality score (highest first)
+  sprints.sort((a: { tickets: { quality_score?: number }[] }, b: { tickets: { quality_score?: number }[] }) => {
+    const avgA = a.tickets.reduce((s, t) => s + (t.quality_score ?? 0.5), 0) / a.tickets.length;
+    const avgB = b.tickets.reduce((s, t) => s + (t.quality_score ?? 0.5), 0) / b.tickets.length;
+    return avgB - avgA;
+  });
+
   writeFileSync(
     join(__dirname, 'backlog.json'),
     JSON.stringify({ generated_at: new Date().toISOString(), sprints }, null, 2) + '\n',
   );
 
-  console.log(`\nGenerated backlog: ${sprints.length} sprints, ${sprints.reduce((s, sp) => s + sp.tickets.length, 0)} tickets`);
+  console.log(`\nGenerated backlog: ${sprints.length} sprints, ${sprints.reduce((s: number, sp: { tickets: unknown[] }) => s + sp.tickets.length, 0)} tickets`);
   console.log(`Safe club: ${safeClub} (short_iron success rate: ${clubSuccessMap.short_iron ?? 'N/A'}%)`);
   console.log(`Full backlog: slope-loop/backlog.json`);
 }
