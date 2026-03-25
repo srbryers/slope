@@ -140,7 +140,7 @@ describe('hazardGuard', () => {
       makeInput({ tool_input: { file_path: join(tmpDir, 'packages/core/src/store.ts') } }),
       tmpDir,
     );
-    expect(result.context).toContain('hazard warning');
+    expect(result.context).toContain('SLOPE hazards');
     expect(result.context).toContain('Migration conflict in core');
   });
 
