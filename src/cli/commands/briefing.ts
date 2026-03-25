@@ -1,6 +1,6 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { formatBriefing, parseRoadmap, getRole, hasRole, loadCustomRoles, filterScorecardsByPlayer, filterHazardsByVisibility, formatDeferredForBriefing, loadDeferred } from '../../core/index.js';
+import { formatBriefing, parseRoadmap, getRole, hasRole, loadCustomRoles, filterScorecardsByPlayer, filterHazardsByVisibility, formatDeferredForBriefing, loadDeferred, computeHandicapCard, formatStrategicContext } from '../../core/index.js';
 import type { CommonIssuesFile, SessionEntry, SprintClaim, RoadmapDefinition, SlopeEvent, RoleDefinition } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { loadScorecards } from '../loader.js';
@@ -38,6 +38,7 @@ export async function briefingCommand(args: string[]): Promise<void> {
   let roleFlag: string | undefined;
   let playerFlag: string | undefined;
   let personalFlag = false;
+  let compactFlag = false;
   for (const arg of args) {
     if (arg.startsWith('--categories=')) {
       categories.push(...arg.slice('--categories='.length).split(',').map(s => s.trim()).filter(Boolean));
@@ -53,6 +54,8 @@ export async function briefingCommand(args: string[]): Promise<void> {
       personalFlag = true;
     } else if (arg === '--no-training') {
       includeTraining = false;
+    } else if (arg === '--compact') {
+      compactFlag = true;
     }
   }
 
@@ -122,6 +125,30 @@ export async function briefingCommand(args: string[]): Promise<void> {
     player: playerFlag,
     teamWide: !personalFlag,
   });
+
+  // Compact mode: L0 briefing (~200 tokens)
+  if (compactFlag) {
+    const card = computeHandicapCard(effectiveScorecards);
+    const hcp = card.all_time.handicap.toFixed(1);
+    const fwy = card.all_time.fairway_pct.toFixed(0);
+    const gir = card.all_time.gir_pct.toFixed(0);
+    const hazardCount = visibleIssues.recurring_patterns.length;
+    const topHazards = visibleIssues.recurring_patterns
+      .sort((a, b) => Math.max(...b.sprints_hit) - Math.max(...a.sprints_hit))
+      .slice(0, 2)
+      .map(p => p.title)
+      .join('; ');
+    const claimList = claims.length > 0 ? claims.map(c => c.target).join(', ') : 'none';
+    const ctx = roadmap ? formatStrategicContext(roadmap, sprintNumber) : '';
+    const ctxLine = ctx ? `\n${ctx.split('\n')[0]}` : '';
+
+    console.log(`\nSLOPE BRIEFING (compact) — S${sprintNumber}`);
+    console.log(`Handicap: ${hcp} | Fairways: ${fwy}% | GIR: ${gir}% | Scorecards: ${effectiveScorecards.length}`);
+    console.log(`Hazards: ${hazardCount}${topHazards ? ` — top: ${topHazards}` : ''}`);
+    console.log(`Claims: ${claimList}${ctxLine}`);
+    console.log(`\nRun \`slope briefing\` (without --compact) for full details.\n`);
+    return;
+  }
 
   const metaphor = resolveMetaphor(args, config.metaphor);
   const output = formatBriefing({ scorecards: effectiveScorecards, commonIssues: visibleIssues, lastSession, filter, includeTraining, claims, roadmap, currentSprint: sprintNumber, metaphor, role, recentEvents });
