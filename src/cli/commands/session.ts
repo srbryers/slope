@@ -412,6 +412,17 @@ async function assignCommand(flags: Record<string, string>, cwd: string): Promis
     const sprintNumber = flags.sprint ? Number(flags.sprint) : (meta?.sprint ? Number(meta.sprint) : undefined);
     if (!sprintNumber) { console.error('Sprint number required (--sprint=N).'); process.exit(1); }
 
+    // Pre-flight conflict check
+    const existingClaims = await store.list(sprintNumber);
+    const newClaim = { sprint_number: sprintNumber, player: target.agent_role ?? target.role ?? 'agent', target: ticket, scope: 'ticket' as const, session_id: target.session_id, id: '', claimed_at: '' };
+    const conflicts = checkConflicts([...existingClaims, newClaim]);
+    if (conflicts.length > 0) {
+      console.log(`\n\x1b[33m⚠ Conflicts detected:\x1b[0m`);
+      for (const c of conflicts) console.log(`  ${c.severity}: ${c.reason}`);
+      console.log('  Use slope session assign --force to override.\n');
+      if (!flags.force) { store.close(); process.exit(1); }
+    }
+
     await store.claim({
       sprint_number: sprintNumber,
       player: target.agent_role ?? target.role ?? 'agent',
