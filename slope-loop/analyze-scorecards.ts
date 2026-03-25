@@ -678,6 +678,10 @@ function generateBacklog(analysis: Analysis, sprintCount: number): void {
     }
   }
 
+  // --- Strategy 7 & 8: Supplementary (always run, not fallback) ---
+  // These add issue-driven and guard-friction tickets alongside scorecard strategies.
+  // Unlike Strategy 6 (roadmap fallback), they don't require scorecard exhaustion.
+
   // --- Strategy 7: Issue-driven (from common-issues.json) ---
   const repoRoot = join(__dirname, '..');
   const commonIssuesPath = join(repoRoot, '.slope/common-issues.json');

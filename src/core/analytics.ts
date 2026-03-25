@@ -243,7 +243,9 @@ export interface ConvergenceCard {
   prediction: 'improving' | 'plateau' | 'reverting' | 'insufficient_data';
 }
 
+/** Minimum history for statistical significance (~2-3 months at typical velocity) */
 const CONVERGENCE_MIN_SPRINTS = 10;
+/** Near-zero improvement threshold (noise floor in sprint scoring) */
 const PLATEAU_THRESHOLD = 0.1;
 
 /**
