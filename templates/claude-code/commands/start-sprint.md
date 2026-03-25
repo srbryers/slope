@@ -43,7 +43,18 @@ slope briefing --categories=<area> --keywords=<topic>
 
 Run `slope sprint start --number={N}` to create the sprint state file with gate tracking.
 
-### 6. Set par and slope
+### 6. Write sprint plan in plan mode
+
+**Enter plan mode** before writing the sprint plan. This is required for the review guards to work:
+- Use `EnterPlanMode` to enter plan mode
+- Write the sprint plan as a plan file (e.g., `docs/backlog/sprint-{N}-plan.md`)
+- The `review-tier` guard fires on plan file writes and determines the review tier
+- Complete the required review rounds before exiting plan mode
+- The `workflow-gate` guard blocks `ExitPlanMode` until reviews are done
+
+**Do NOT describe the plan in prose and skip plan mode** — this bypasses the review loop entirely.
+
+### 7. Set par and slope
 
 Based on the sprint plan:
 - **Par**: 1-2 tickets = 3, 3-4 tickets = 4, 5+ tickets = 5
@@ -54,7 +65,7 @@ Based on the sprint plan:
   - External API integration (+1)
   - Learning curve / unfamiliar territory (+1)
 
-### 7. Prior art research
+### 8. Prior art research
 
 Before implementation begins, search for existing solutions:
 - How have other projects solved this problem?
@@ -63,7 +74,7 @@ Before implementation begins, search for existing solutions:
 
 Save findings to `docs/` for reference during implementation.
 
-### 8. Present sprint summary
+### 9. Present sprint summary
 
 Show the user:
 - Sprint number and theme

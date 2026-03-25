@@ -28,12 +28,17 @@ export async function sessionBriefingGuard(input: HookInput, cwd: string): Promi
 
   // Sprint state + session mode
   const hasActiveSprint = sprintState && (sprintState.phase === 'implementing' || sprintState.phase === 'scoring');
+  const isPlanning = sprintState && sprintState.phase === 'planning';
   if (hasActiveSprint) {
     setSessionMode(cwd, sessionId, 'sprint');
     const gateStatus = Object.entries(sprintState.gates)
       .map(([name, done]) => `${done ? '[x]' : '[ ]'} ${name}`)
       .join('  ');
     lines.push(`Sprint: S${sprintState.sprint}  Phase: ${sprintState.phase}  Gates: ${gateStatus}`);
+  } else if (isPlanning) {
+    setSessionMode(cwd, sessionId, 'sprint');
+    lines.push(`Sprint: S${sprintState!.sprint}  Phase: planning`);
+    lines.push('Reminder: Use EnterPlanMode and write the sprint plan as a file. The review-tier and workflow-gate guards only fire in plan mode — describing the plan in prose skips the review loop.');
   } else {
     setSessionMode(cwd, sessionId, 'adhoc');
     lines.push('No active sprint. Session mode: adhoc (sprint-workflow guards silenced).');
