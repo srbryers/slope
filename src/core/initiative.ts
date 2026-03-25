@@ -375,12 +375,17 @@ export function createInitiative(
     pr: { ...defaultGates.pr, ...gatesOverride?.pr },
   };
 
-  const sprints: InitiativeSprintStatus[] = roadmap.sprints.map(s => ({
-    sprint_number: s.id,
-    phase: 'pending' as const,
-    plan_reviews: [],
-    pr_reviews: [],
-  }));
+  // Sync completion state: a sprint is complete if its scorecard exists
+  const scorecardDir = join(cwd, 'docs/retros');
+  const sprints: InitiativeSprintStatus[] = roadmap.sprints.map(s => {
+    const hasScorecard = existsSync(join(scorecardDir, `sprint-${s.id}.json`));
+    return {
+      sprint_number: s.id,
+      phase: hasScorecard ? 'complete' as const : 'pending' as const,
+      plan_reviews: [],
+      pr_reviews: [],
+    };
+  });
 
   const initiative: InitiativeDefinition = {
     name,
