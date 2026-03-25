@@ -248,12 +248,18 @@ function installClaudeCodeTemplates(cwd: string, metaphor: MetaphorDefinition): 
   const commandsDir = join(cwd, '.claude', 'commands');
   mkdirSync(commandsDir, { recursive: true });
   const commandFiles = ['post-sprint.md', 'review-pr.md', 'start-sprint.md'];
+  let commandsInstalled = 0;
   for (const file of commandFiles) {
     const src = join(templatesRoot, 'commands', file);
     const dest = join(commandsDir, file);
-    if (existsSync(src) && !existsSync(dest)) {
+    if (!existsSync(src)) {
+      console.warn(`  Warning: template not found: ${file} (templates may not be bundled)`);
+      continue;
+    }
+    if (!existsSync(dest)) {
       cpSync(src, dest);
       console.log(`  Created ${dest}`);
+      commandsInstalled++;
     }
   }
 

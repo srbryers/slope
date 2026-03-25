@@ -25,7 +25,8 @@
   },
   "files": [
     "dist",
-    "src/core/workflows"
+    "src/core/workflows",
+    "templates"
   ],
   "scripts": {
     "prepare": "tsc",
