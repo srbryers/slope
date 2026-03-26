@@ -35,10 +35,25 @@ export async function sessionBriefingGuard(input: HookInput, cwd: string): Promi
       .map(([name, done]) => `${done ? '[x]' : '[ ]'} ${name}`)
       .join('  ');
     lines.push(`Sprint: S${sprintState.sprint}  Phase: ${sprintState.phase}  Gates: ${gateStatus}`);
+
+    // Nudge if no workflow execution is active
+    try {
+      const { SqliteSlopeStore } = await import('../../store/index.js');
+      const storePath = join(cwd, '.slope/slope.db');
+      if (existsSync(storePath)) {
+        const store = new SqliteSlopeStore(storePath);
+        const executions = await store.listExecutions({ status: 'running' });
+        store.close();
+        if (executions.length === 0) {
+          lines.push('No workflow execution active. Consider: slope sprint run --workflow=sprint-standard --var sprint_id=S' + sprintState.sprint);
+        }
+      }
+    } catch { /* store unavailable */ }
   } else if (isPlanning) {
     setSessionMode(cwd, sessionId, 'sprint');
     lines.push(`Sprint: S${sprintState!.sprint}  Phase: planning`);
-    lines.push('Reminder: Use EnterPlanMode and write the sprint plan as a file. The review-tier and workflow-gate guards only fire in plan mode — describing the plan in prose skips the review loop.');
+    lines.push('Start with: slope sprint run --workflow=sprint-standard --var sprint_id=S' + sprintState!.sprint);
+    lines.push('Then enter plan mode to write the sprint plan — review guards require plan mode to fire.');
   } else {
     setSessionMode(cwd, sessionId, 'adhoc');
     lines.push('No active sprint. Session mode: adhoc (sprint-workflow guards silenced).');

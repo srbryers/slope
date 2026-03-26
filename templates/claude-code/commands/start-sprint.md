@@ -39,9 +39,17 @@ If you know the sprint's work area, add filters:
 slope briefing --categories=<area> --keywords=<topic>
 ```
 
-### 5. Initialize sprint state
+### 5. Start sprint with workflow engine
 
-Run `slope sprint start --number={N}` to create the sprint state file with gate tracking.
+Run `slope sprint run --workflow=sprint-standard --var sprint_id=S{N}` to start a workflow-controlled sprint.
+
+This activates the workflow engine which:
+- Controls step ordering (plan → review → implement → validate → score)
+- The `workflow-step-gate` guard blocks file edits outside of `agent_work` steps
+- State persists in the store — resume with `slope sprint resume` if interrupted
+- Skip steps with `slope sprint skip` if not applicable
+
+If no workflow is needed (simple fix or chore), use `slope sprint run --workflow=sprint-lightweight`.
 
 ### 6. Write sprint plan in plan mode
 
