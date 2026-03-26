@@ -121,7 +121,7 @@ export async function runSprint(flags: Record<string, string>, cwd: string): Pro
           log.warn('Shutdown requested — stopping ticket processing');
           break;
         }
-        const result = await processTicket(ticket, config, worktreeCwd, log, sprint.strategy, flags.executor, sprint.type);
+        const result = await processTicket(ticket, config, worktreeCwd, log, sprint.strategy, flags.executor, sprint.type, flags.forceApi === 'true');
         ticketResults.push(result);
 
         // Log model usage (JSONL)
@@ -252,12 +252,13 @@ async function processTicket(
   strategy?: BacklogSprint['strategy'],
   executorOverride?: string,
   sprintType?: BacklogSprint['type'],
+  forceApi?: boolean,
 ): Promise<TicketResult> {
   const tLog = log.child(`ticket:${ticket.key}`);
   tLog.info(`-- ${ticket.key}: ${ticket.title} --`);
   tLog.info(`Club: ${ticket.club} (max_files: ${ticket.max_files}, est_tokens: ${ticket.estimated_tokens ?? 0})`);
 
-  const primaryModel = selectModel(ticket.club, ticket.max_files, ticket.estimated_tokens ?? 0, config, cwd, strategy, sprintType);
+  const primaryModel = selectModel(ticket.club, ticket.max_files, ticket.estimated_tokens ?? 0, config, cwd, strategy, sprintType, forceApi);
   const timeout = selectTimeout(primaryModel, config);
   tLog.info(`Model: ${primaryModel} (timeout: ${timeout}s)`);
 

@@ -293,6 +293,28 @@ describe('selectModel', () => {
     const model = selectModel('short_iron', 1, 0, config, tmpDir);
     expect(model).toBe(config.modelApi);
   });
+
+  // forceApi override (S78-T1)
+  it('returns API model when forceApi is true regardless of club', () => {
+    expect(selectModel('putter', 1, 0, config, tmpDir, undefined, undefined, true)).toBe(config.modelApi);
+    expect(selectModel('wedge', 1, 0, config, tmpDir, undefined, undefined, true)).toBe(config.modelApi);
+  });
+
+  it('forceApi overrides even model-config.json local recommendation', () => {
+    writeFileSync(join(tmpDir, 'slope-loop/model-config.json'), JSON.stringify({
+      generated_at: '2026-01-01T00:00:00Z',
+      ticket_count: 20,
+      escalation_save_rate: 50,
+      success_rates: {},
+      cost_per_success: {},
+      recommendations: {
+        putter: { model: 'local', reason: 'high local success rate' },
+      },
+      notes: [],
+    }));
+    const model = selectModel('putter', 1, 0, config, tmpDir, undefined, undefined, true);
+    expect(model).toBe(config.modelApi);
+  });
 });
 
 describe('selectTimeout', () => {
