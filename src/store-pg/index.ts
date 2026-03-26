@@ -703,7 +703,7 @@ export class PostgresSlopeStore implements SlopeStore {
     }
   }
 
-  async completeExecution(executionId: string, status: 'completed' | 'failed'): Promise<void> {
+  async completeExecution(executionId: string, status: 'completed' | 'failed' | 'paused' | 'running'): Promise<void> {
     const result = await this.pool.query(
       'UPDATE workflow_executions SET status = $1, updated_at = $2 WHERE id = $3 AND project_id = $4',
       [status, nowISO(), executionId, this.projectId],

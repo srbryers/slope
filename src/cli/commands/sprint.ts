@@ -285,6 +285,31 @@ async function skipCommand(args: string[], cwd: string): Promise<void> {
   }
 }
 
+async function pauseCommand(args: string[], cwd: string): Promise<void> {
+  const sprintArg = args.find(a => !a.startsWith('--'));
+
+  if (!sprintArg) {
+    console.error('Usage: slope sprint pause <sprint_id>');
+    process.exit(1);
+  }
+
+  const store = getStore(cwd);
+  try {
+    const exec = await store.getExecutionBySprint(sprintArg);
+    if (!exec) {
+      console.error(`No active workflow execution for sprint ${sprintArg}.`);
+      process.exit(1);
+    }
+
+    const engine = new WorkflowEngine();
+    await engine.pause(exec.id, store);
+    console.log(`Sprint ${sprintArg} paused at ${exec.current_phase}/${exec.current_step}.`);
+    console.log('Resume with: slope sprint resume ' + sprintArg);
+  } finally {
+    store.close();
+  }
+}
+
 export async function sprintCommand(args: string[]): Promise<void> {
   const cwd = process.cwd();
   const sub = args[0];
@@ -310,6 +335,9 @@ export async function sprintCommand(args: string[]): Promise<void> {
       break;
     case 'skip':
       await skipCommand(args.slice(1), cwd);
+      break;
+    case 'pause':
+      await pauseCommand(args.slice(1), cwd);
       break;
     default:
       console.log(`
