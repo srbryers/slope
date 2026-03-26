@@ -77,6 +77,8 @@ export interface SlopeConfig {
     runtime?: string;
   };
   slopeVersion?: string;
+  /** Default workflow for sprint execution (e.g., 'sprint-standard', 'sprint-lightweight') */
+  defaultWorkflow?: string;
 }
 
 const DEFAULT_CONFIG: SlopeConfig = {
@@ -94,6 +96,7 @@ const DEFAULT_CONFIG: SlopeConfig = {
   repoProfilePath: '.slope/repo-profile.json',
   transcriptsPath: '.slope/transcripts',
   metaphor: 'golf',
+  defaultWorkflow: 'sprint-standard',
 };
 
 const CONFIG_DIR = '.slope';
