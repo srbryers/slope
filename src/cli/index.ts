@@ -117,7 +117,7 @@ switch (subcommand) {
   case 'review': {
     const reviewArgs = process.argv.slice(3);
     const reviewSub = reviewArgs[0];
-    if (['start', 'round', 'status', 'reset', 'recommend', 'findings', 'amend', 'defer', 'deferred', 'resolve'].includes(reviewSub)) {
+    if (['start', 'round', 'status', 'reset', 'recommend', 'findings', 'amend', 'defer', 'deferred', 'resolve', 'run'].includes(reviewSub)) {
       reviewStateCommand(reviewArgs).catch(err => {
         console.error('Error:', err.message);
         process.exit(1);

@@ -30,7 +30,7 @@ export interface CliCommandMeta {
 }
 
 /** Command files that are internal implementation modules, not user-invocable top-level commands. */
-export const CLI_INTERNAL_MODULES = ['phase', 'review-state'] as const;
+export const CLI_INTERNAL_MODULES = ['phase', 'review-state', 'review-run'] as const;
 
 export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
   // ── Lifecycle ──────────────────────────────────────────────────
@@ -150,6 +150,12 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
         { flag: 'clear', desc: 'Clear all findings' },
       ]},
       { name: 'amend', desc: 'Inject review findings as hazards into scorecard' },
+      { name: 'run', desc: 'Generate subagent review prompts from PR diff', flags: [
+        { flag: '--pr=<N>', desc: 'PR number (default: current branch)' },
+        { flag: '--type=<type>', desc: 'Review type: architect, code, or both (default: both)' },
+        { flag: '--sprint=<N>', desc: 'Sprint number for findings' },
+        { flag: '--json', desc: 'Output as JSON for programmatic use' },
+      ]},
     ],
     flags: [
       { flag: '--metaphor=<id>', desc: 'Display theme override' },

@@ -477,8 +477,13 @@ export async function reviewStateCommand(args: string[]): Promise<void> {
     case 'resolve':
       resolveCommand(args.slice(1), cwd);
       break;
+    case 'run': {
+      const { reviewRunCommand } = await import('./review-run.js');
+      await reviewRunCommand(args.slice(1));
+      break;
+    }
     default:
-      console.error(`Unknown review subcommand: ${sub}. Use start, round, status, reset, recommend, findings, amend, defer, deferred, resolve.`);
+      console.error(`Unknown review subcommand: ${sub}. Use start, round, status, reset, recommend, findings, amend, defer, deferred, resolve, run.`);
       process.exit(1);
   }
 }
