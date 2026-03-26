@@ -20,15 +20,20 @@ export async function postPushGuard(input: HookInput, cwd: string): Promise<Guar
   const exitCode = response.exit_code ?? response.exitCode;
   if (exitCode !== 0 && exitCode !== '0' && exitCode !== undefined) return {};
 
-  // Session dedup: fire once per session
+  // Dedup: fire once per push (track push count, not session boolean)
   const sessionId = input.session_id;
   if (!sessionId) return {};
 
   const sessionState = loadSessionState(cwd);
-  if (sessionState.push_prompted_session_id === sessionId) return {};
+  const pushCount = parseInt(sessionState.push_count ?? '0', 10) || 0;
+  const lastPushCmd = sessionState.last_push_command as string | undefined;
 
-  // Mark as prompted
-  updateSessionState(cwd, 'push_prompted_session_id', sessionId);
+  // Skip if this is the same push command repeated (e.g., retry)
+  if (lastPushCmd === command) return {};
+
+  // Track the push
+  updateSessionState(cwd, 'push_count', String(pushCount + 1));
+  updateSessionState(cwd, 'last_push_command', command);
 
   // Determine workflow context
   const sprintState = loadSprintState(cwd);
