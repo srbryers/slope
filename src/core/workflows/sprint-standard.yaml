@@ -1,8 +1,8 @@
 # SLOPE Sprint Standard Workflow
-# Full lifecycle: briefing → tickets → scorecard → review
+# Full lifecycle: briefing → plan review → tickets → scorecard → review
 name: sprint-standard
 version: "1"
-description: Standard sprint lifecycle with pre-hole, per-ticket, and post-hole phases
+description: Standard sprint lifecycle with pre-hole, plan review, per-ticket, and post-hole phases
 
 variables:
   sprint_id:
@@ -28,6 +28,28 @@ phases:
         prompt: Verify previous sprint scorecard exists
         conditions:
           - previous_scorecard_exists
+
+  # --- Plan Review: Write and review the sprint plan ---
+  - id: plan_review
+    steps:
+      - id: write_plan
+        type: agent_work
+        prompt: "Write the sprint plan as a file in docs/backlog/. Use EnterPlanMode before writing. Include ticket list, clubs, approach, and hazard watch for each ticket."
+        rules:
+          - "Enter plan mode before writing the plan file"
+          - "Plan file triggers review-tier guard which determines review tier"
+        blocks_next: true
+
+      - id: review_plan
+        type: agent_input
+        prompt: "Review the plan. The review-tier guard determines the tier (skip/light/standard/deep). Complete required review rounds before proceeding."
+        required_fields:
+          - review_tier
+          - review_complete
+
+      - id: revise_plan
+        type: agent_work
+        prompt: "Address review findings if any. Skip if no findings or review tier was skip."
 
   # --- Per-Ticket: Execute each ticket ---
   - id: per_ticket

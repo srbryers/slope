@@ -1,6 +1,10 @@
 # SLOPE Sprint Lightweight Workflow
 # Minimal gates: implement → validate → done.
 # Use for quick fixes, docs-only sprints, or when full ceremony isn't needed.
+#
+# NOTE: This workflow INTENTIONALLY skips plan review.
+# Use sprint-standard if plan review is needed.
+# Choosing lightweight is an explicit decision to trade ceremony for speed.
 name: sprint-lightweight
 version: "1"
 description: Minimal workflow — implement, validate, done

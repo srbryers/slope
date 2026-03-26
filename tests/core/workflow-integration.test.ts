@@ -39,7 +39,15 @@ describe('Full workflow execution E2E', () => {
     expect(next.step!.id).toBe('verify_previous');
     await engine.complete(exec.id, 'verify_previous', {}, resolved, store);
 
-    // Phase 2: per_ticket — T1
+    // Phase 2: plan_review
+    next = await engine.next(exec.id, resolved, store);
+    expect(next.phase).toBe('plan_review');
+    expect(next.step!.id).toBe('write_plan');
+    await engine.complete(exec.id, 'write_plan', {}, resolved, store);
+    await engine.complete(exec.id, 'review_plan', { output: { review_tier: 'skip', review_complete: true } }, resolved, store);
+    await engine.complete(exec.id, 'revise_plan', {}, resolved, store);
+
+    // Phase 3: per_ticket — T1
     next = await engine.next(exec.id, resolved, store);
     expect(next.phase).toBe('per_ticket');
     expect(next.current_item).toBe('T1');
@@ -69,7 +77,7 @@ describe('Full workflow execution E2E', () => {
     // Verify final state
     const final = await store.getExecution(exec.id);
     expect(final!.status).toBe('completed');
-    expect(final!.completed_steps.length).toBe(11); // 2 + 3*2 + 3
+    expect(final!.completed_steps.length).toBe(14); // 2 + 3 (plan_review) + 3*2 + 3
   });
 });
 
@@ -216,7 +224,13 @@ describe('Full workflow execution E2E — sprint-autonomous', () => {
     expect(next.step!.command).toContain('slope briefing');
     await engine.complete(exec.id, 'briefing', { exit_code: 0 }, resolved, store);
 
-    // Phase 2: per_ticket — T1
+    // Phase 2: plan — generate execution plan
+    next = await engine.next(exec.id, resolved, store);
+    expect(next.phase).toBe('plan');
+    expect(next.step!.id).toBe('generate_plan');
+    await engine.complete(exec.id, 'generate_plan', {}, resolved, store);
+
+    // Phase 3: per_ticket — T1
     next = await engine.next(exec.id, resolved, store);
     expect(next.phase).toBe('per_ticket');
     expect(next.current_item).toBe('T1');
@@ -227,7 +241,7 @@ describe('Full workflow execution E2E — sprint-autonomous', () => {
     expect(next.step!.id).toBe('verify');
     await engine.complete(exec.id, 'verify', { exit_code: 0 }, resolved, store);
 
-    // Phase 2: per_ticket — T2
+    // Phase 3: per_ticket — T2
     next = await engine.next(exec.id, resolved, store);
     expect(next.current_item).toBe('T2');
     expect(next.step!.id).toBe('implement');
@@ -249,7 +263,7 @@ describe('Full workflow execution E2E — sprint-autonomous', () => {
     // Verify final state
     const final = await store.getExecution(exec.id);
     expect(final!.status).toBe('completed');
-    expect(final!.completed_steps.length).toBe(7); // 1 + 2*2 + 2
+    expect(final!.completed_steps.length).toBe(8); // 1 + 1 (plan) + 2*2 + 2
   });
 
   it('uses default model variable when not provided', async () => {
