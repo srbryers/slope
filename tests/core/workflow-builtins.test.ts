@@ -15,12 +15,13 @@ describe('Built-in workflows', () => {
     it('has required structure', () => {
       const def = loadWorkflow('sprint-standard', cwd);
 
-      // Should have 3 phases
-      expect(def.phases).toHaveLength(3);
+      // Should have 4 phases (pre_hole, plan_review, per_ticket, post_hole)
+      expect(def.phases).toHaveLength(4);
 
       // Phase IDs
       const phaseIds = def.phases.map(p => p.id);
       expect(phaseIds).toContain('pre_hole');
+      expect(phaseIds).toContain('plan_review');
       expect(phaseIds).toContain('per_ticket');
       expect(phaseIds).toContain('post_hole');
 
@@ -67,8 +68,12 @@ describe('Built-in workflows', () => {
       expect(result.errors).toHaveLength(0);
     });
 
-    it('has per_ticket phase with repeat_for and timeout', () => {
+    it('has plan and per_ticket phases', () => {
       const def = loadWorkflow('sprint-autonomous', cwd);
+      const phaseIds = def.phases.map(p => p.id);
+      expect(phaseIds).toContain('plan');
+      expect(phaseIds).toContain('per_ticket');
+
       const perTicket = def.phases.find(p => p.id === 'per_ticket')!;
       expect(perTicket.repeat_for).toBe('tickets');
       expect(perTicket.on_timeout).toBe('log_blocker_and_skip');

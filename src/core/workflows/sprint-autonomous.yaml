@@ -25,6 +25,17 @@ phases:
         command: slope briefing --sprint=${sprint_id}
         checkpoint: exit_code_0
 
+  # --- Plan: Generate execution plan (no review gate for autonomous) ---
+  - id: plan
+    steps:
+      - id: generate_plan
+        type: agent_work
+        prompt: "Generate an execution plan for each ticket. Identify files, approach, and risks. No review gate — autonomous agents proceed directly."
+        rules:
+          - "Plan is for agent self-orientation, not human review"
+          - "Identify primary files and test files for each ticket"
+        blocks_next: true
+
   # --- Per-Ticket: Execute each ticket ---
   - id: per_ticket
     repeat_for: tickets
