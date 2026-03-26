@@ -639,7 +639,7 @@ export class PostgresSlopeStore implements SlopeStore {
 
   // --- Workflow Executions ---
 
-  async startExecution(params: { workflow_name: string; sprint_id?: string; variables?: Record<string, string>; session_id?: string }): Promise<WorkflowExecution> {
+  async startExecution(params: { workflow_name: string; sprint_id?: string; variables?: Record<string, string>; session_id?: string; definition_json?: string; definition_hash?: string }): Promise<WorkflowExecution> {
     const id = generateId('wf');
     const now = nowISO();
     const execution: WorkflowExecution = {
@@ -654,11 +654,13 @@ export class PostgresSlopeStore implements SlopeStore {
       started_at: now,
       updated_at: now,
       session_id: params.session_id,
+      definition_json: params.definition_json,
+      definition_hash: params.definition_hash,
     };
 
     await this.pool.query(`
-      INSERT INTO workflow_executions (id, project_id, workflow_name, sprint_id, current_phase, current_step, status, variables, completed_steps, started_at, updated_at, session_id)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      INSERT INTO workflow_executions (id, project_id, workflow_name, sprint_id, current_phase, current_step, status, variables, completed_steps, started_at, updated_at, session_id, definition_json, definition_hash)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
     `, [
       execution.id,
       this.projectId,
@@ -672,6 +674,8 @@ export class PostgresSlopeStore implements SlopeStore {
       execution.started_at,
       execution.updated_at,
       execution.session_id ?? null,
+      execution.definition_json ?? null,
+      execution.definition_hash ?? null,
     ]);
 
     return execution;
