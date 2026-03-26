@@ -456,6 +456,10 @@ export interface WorkflowExecution {
   started_at: string;
   updated_at: string;
   session_id?: string;
+  /** Snapshot of the workflow definition at execution start (prevents definition drift) */
+  definition_json?: string;
+  /** Hash of the definition at start — used to detect if YAML changed since execution began */
+  definition_hash?: string;
 }
 
 /** Result of a single workflow step execution */

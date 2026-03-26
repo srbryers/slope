@@ -23,7 +23,7 @@ describe('checkStoreHealth', () => {
     const result = await checkStoreHealth(store, 'sqlite');
     expect(result.healthy).toBe(true);
     expect(result.type).toBe('sqlite');
-    expect(result.schemaVersion).toBe(6);
+    expect(result.schemaVersion).toBe(7);
     expect(result.stats.sessions).toBe(0);
     expect(result.stats.claims).toBe(0);
     expect(result.stats.scorecards).toBe(0);

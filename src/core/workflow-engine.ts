@@ -83,11 +83,18 @@ export class WorkflowEngine {
       throw new Error(`Phase "${firstPhase.id}" has no steps`);
     }
 
+    // Snapshot the definition at start to prevent definition drift
+    const definitionJson = JSON.stringify(def);
+    const { createHash } = await import('node:crypto');
+    const definitionHash = createHash('sha256').update(definitionJson).digest('hex').slice(0, 16);
+
     const execution = await store.startExecution({
       workflow_name: def.name,
       sprint_id: opts.sprint_id,
       variables: opts.variables,
       session_id: opts.session_id,
+      definition_json: definitionJson,
+      definition_hash: definitionHash,
     });
 
     // Position at first step

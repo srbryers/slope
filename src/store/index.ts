@@ -181,6 +181,13 @@ const MIGRATIONS: Array<{ version: number; sql: string }> = [
       CREATE INDEX IF NOT EXISTS idx_wf_step_exec ON workflow_step_results(execution_id);
     `,
   },
+  {
+    version: 7,
+    sql: `
+      ALTER TABLE workflow_executions ADD COLUMN definition_json TEXT;
+      ALTER TABLE workflow_executions ADD COLUMN definition_hash TEXT;
+    `,
+  },
 ];
 
 /** Latest schema version — total number of migrations available. */
@@ -584,7 +591,7 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
 
   // --- Workflow Executions ---
 
-  async startExecution(params: { workflow_name: string; sprint_id?: string; variables?: Record<string, string>; session_id?: string }): Promise<WorkflowExecution> {
+  async startExecution(params: { workflow_name: string; sprint_id?: string; variables?: Record<string, string>; session_id?: string; definition_json?: string; definition_hash?: string }): Promise<WorkflowExecution> {
     const id = generateId('wf');
     const now = nowISO();
     const execution: WorkflowExecution = {
@@ -599,11 +606,13 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
       started_at: now,
       updated_at: now,
       session_id: params.session_id,
+      definition_json: params.definition_json,
+      definition_hash: params.definition_hash,
     };
 
     this.db.prepare(`
-      INSERT INTO workflow_executions (id, workflow_name, sprint_id, current_phase, current_step, status, variables, completed_steps, started_at, updated_at, session_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO workflow_executions (id, workflow_name, sprint_id, current_phase, current_step, status, variables, completed_steps, started_at, updated_at, session_id, definition_json, definition_hash)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       execution.id,
       execution.workflow_name,
@@ -616,6 +625,8 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
       execution.started_at,
       execution.updated_at,
       execution.session_id ?? null,
+      execution.definition_json ?? null,
+      execution.definition_hash ?? null,
     );
 
     return execution;
@@ -930,6 +941,8 @@ function rowToExecution(row: Record<string, unknown>): WorkflowExecution {
     started_at: row.started_at as string,
     updated_at: row.updated_at as string,
     session_id: (row.session_id as string | null) ?? undefined,
+    definition_json: (row.definition_json as string | null) ?? undefined,
+    definition_hash: (row.definition_hash as string | null) ?? undefined,
   };
 }
 

@@ -10,6 +10,26 @@ import {
   type SprintPhase,
 } from '../sprint-state.js';
 import { WorkflowEngine, loadWorkflow, resolveVariables, validateWorkflow, loadConfig } from '../../core/index.js';
+import type { WorkflowDefinition, WorkflowExecution } from '../../core/index.js';
+import { createHash } from 'node:crypto';
+
+/** Get workflow definition from execution snapshot (preferred) or disk (fallback for old executions) */
+function getDefinition(exec: WorkflowExecution, cwd: string): { def: WorkflowDefinition; drifted: boolean } {
+  // Prefer snapshot from execution
+  if (exec.definition_json) {
+    const def = JSON.parse(exec.definition_json) as WorkflowDefinition;
+    // Check if current YAML has drifted
+    let drifted = false;
+    try {
+      const current = loadWorkflow(exec.workflow_name, cwd);
+      const currentHash = createHash('sha256').update(JSON.stringify(current)).digest('hex').slice(0, 16);
+      drifted = exec.definition_hash !== currentHash;
+    } catch { /* workflow file might be gone — that's fine, we have the snapshot */ }
+    return { def, drifted };
+  }
+  // Fallback for old executions without snapshot
+  return { def: loadWorkflow(exec.workflow_name, cwd), drifted: false };
+}
 import { createStore } from '../../store/index.js';
 
 const VALID_GATES: GateName[] = ['tests', 'code_review', 'architect_review', 'scorecard', 'review_md'];
@@ -225,7 +245,8 @@ async function resumeCommand(args: string[], cwd: string): Promise<void> {
       process.exit(1);
     }
 
-    const def = loadWorkflow(exec.workflow_name, cwd);
+    const { def, drifted } = getDefinition(exec, cwd);
+    if (drifted) console.log(`\x1b[33m⚠ Workflow definition has changed since this execution started. Using snapshot from start.\x1b[0m`);
     const resolved = resolveVariables(def, exec.variables);
     const engine = new WorkflowEngine();
 
@@ -275,7 +296,8 @@ async function skipCommand(args: string[], cwd: string): Promise<void> {
       process.exit(1);
     }
 
-    const def = loadWorkflow(exec.workflow_name, cwd);
+    const { def, drifted } = getDefinition(exec, cwd);
+    if (drifted) console.log(`\x1b[33m⚠ Workflow definition has changed since this execution started. Using snapshot from start.\x1b[0m`);
     const resolved = resolveVariables(def, exec.variables);
     const engine = new WorkflowEngine();
     const result = await engine.skip(exec.id, stepId, reason, resolved, store);
