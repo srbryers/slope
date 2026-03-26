@@ -224,7 +224,7 @@ switch (subcommand) {
   case 'guard': {
     const guardArgs = process.argv.slice(3);
     const guardSub = guardArgs[0];
-    if (guardSub === 'list' || guardSub === 'status' || guardSub === 'enable' || guardSub === 'disable' || guardSub === 'docs' || guardSub === 'audit' || guardSub === 'recommend') {
+    if (guardSub === 'list' || guardSub === 'status' || guardSub === 'enable' || guardSub === 'disable' || guardSub === 'docs' || guardSub === 'audit' || guardSub === 'recommend' || guardSub === 'metrics') {
       guardManageCommand(guardArgs).catch(err => {
         console.error('Error:', err.message);
         process.exit(1);

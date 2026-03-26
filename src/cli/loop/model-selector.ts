@@ -21,7 +21,11 @@ export function selectModel(
   cwd: string,
   strategy?: BacklogSprint['strategy'],
   sprintType?: BacklogSprint['type'],
+  forceApi?: boolean,
 ): string {
+  // 0. Force API override (used by retry strategy 'model')
+  if (forceApi) return config.modelApi;
+
   // 1. Token-based escalation: won't fit in Qwen 32K context
   if (estTokens > 24000) return config.modelApi;
 

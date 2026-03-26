@@ -642,7 +642,7 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
     }
   }
 
-  async completeExecution(executionId: string, status: 'completed' | 'failed'): Promise<void> {
+  async completeExecution(executionId: string, status: 'completed' | 'failed' | 'paused' | 'running'): Promise<void> {
     const result = this.db.prepare(
       'UPDATE workflow_executions SET status = ?, updated_at = ? WHERE id = ?'
     ).run(status, nowISO(), executionId);

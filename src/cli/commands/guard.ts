@@ -392,6 +392,29 @@ export async function guardManageCommand(args: string[]): Promise<void> {
       console.log(`  "guidance": { "disabled": [${sub === 'disable' ? `"${name}"` : '...remove...'} ] }\n`);
       break;
     }
+    case 'metrics': {
+      const metricsPath = join(cwd, '.slope', 'guard-metrics.jsonl');
+      if (!existsSync(metricsPath)) {
+        console.log('\nNo guard metrics found. Metrics are recorded automatically after guards fire.\n');
+        break;
+      }
+      const { computeGuardMetrics } = await import('../../core/index.js');
+      const raw = readFileSync(metricsPath, 'utf8').trim();
+      const lines = raw.split('\n').filter(Boolean);
+      const report = computeGuardMetrics(lines);
+
+      console.log(`\n=== Guard Metrics === (${report.total_executions} executions)\n`);
+      if (report.most_active) console.log(`  Most active: ${report.most_active}`);
+      if (report.most_blocking) console.log(`  Most blocking: ${report.most_blocking}`);
+      console.log('');
+      console.log('  Guard                 Total  Allow  Deny   Context  Silent  Block%');
+      console.log('  ────────────────────  ─────  ─────  ─────  ───────  ──────  ──────');
+      for (const m of report.by_guard) {
+        console.log(`  ${m.guard.padEnd(22)} ${String(m.total).padStart(5)}  ${String(m.allow).padStart(5)}  ${String(m.deny).padStart(5)}  ${String(m.context).padStart(7)}  ${String(m.silent).padStart(6)}  ${String(m.block_rate.toFixed(0)).padStart(5)}%`);
+      }
+      console.log('');
+      break;
+    }
     case 'audit': {
       console.log('\n=== Guard Enforcement Audit ===\n');
       const seen = new Set<string>();

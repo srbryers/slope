@@ -185,9 +185,7 @@ export class WorkflowEngine {
   }
 
   /**
-   * Transition execution status (e.g., fail).
-   * Validates the transition against the state machine.
-   * Note: pause/resume will be added in S4 when the loop bridge needs signal handling.
+   * Transition execution to failed status.
    */
   async fail(
     executionId: string,
@@ -203,6 +201,44 @@ export class WorkflowEngine {
     }
 
     await store.completeExecution(executionId, 'failed');
+  }
+
+  /**
+   * Pause a running execution. Preserves current phase/step for later resume.
+   */
+  async pause(
+    executionId: string,
+    store: SlopeStore,
+  ): Promise<void> {
+    const execution = await this.requireExecution(executionId, store);
+
+    if (!isValidTransition(execution.status, 'paused')) {
+      throw new Error(
+        `Invalid workflow transition: "${execution.status}" → "paused". ` +
+        `Valid transitions from "${execution.status}": ${VALID_TRANSITIONS[execution.status]?.join(', ') || 'none'}`,
+      );
+    }
+
+    await store.completeExecution(executionId, 'paused');
+  }
+
+  /**
+   * Resume a paused execution. Continues from the same phase/step.
+   */
+  async resume(
+    executionId: string,
+    store: SlopeStore,
+  ): Promise<void> {
+    const execution = await this.requireExecution(executionId, store);
+
+    if (!isValidTransition(execution.status, 'running')) {
+      throw new Error(
+        `Invalid workflow transition: "${execution.status}" → "running". ` +
+        `Valid transitions from "${execution.status}": ${VALID_TRANSITIONS[execution.status]?.join(', ') || 'none'}`,
+      );
+    }
+
+    await store.completeExecution(executionId, 'running');
   }
 
   // --- Private helpers ---

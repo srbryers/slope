@@ -1,11 +1,11 @@
 ---
-generated_at: "2026-03-25T11:48:33.435Z"
-git_sha: "4851d42d7c20df80db42f0d2b2ad5e18aff79b26"
+generated_at: "2026-03-26T14:04:20.540Z"
+git_sha: "5245d843b53974612745595be4fb4018db6c4bd1"
 sprint: 69
-source_files: 215
+source_files: 218
 test_files: 167
-cli_commands: 46
-guards: 28
+cli_commands: 48
+guards: 29
 flows: 0
 ---
 
@@ -18,7 +18,7 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
 <!-- AUTO-GENERATED: START packages -->
 
 ### `src/cli`
-- Source files: 111 | Test files: 70
+- Source files: 113 | Test files: 70
 - Key modules:
   - `config`
   - `hooks-config`
@@ -27,20 +27,20 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
   - `metaphor` — CLI metaphor resolution
   - `phase-cleanup` — Load phase cleanup state. Returns empty state if missing/corrupt.
   - `registry` — CLI Command Registry — metadata for CLI commands (map generation, documentation, slope-web)
-  - `session-state` — Session ID for the briefing guard
+  - `session-state` — ── Context dedup ───────────────────────────────────
   - `sprint-state` — Sprint lifecycle phases
   - `store` — Store info from config — no store connection required
   - `template-generator` — SLOPE Template Generator
 
 ### `src/core`
-- Source files: 92 | Test files: 85
+- Source files: 93 | Test files: 85
 - Key modules:
   - `advisor` — --- Module-private constants ---
   - `analytics` — SLOPE — Sprint Analytics
   - `briefing` — --- Input types ---
   - `builder` — --- Helpers ---
   - `ci-signals` — SLOPE — CI/Test Signal Parser
-  - `config` — Write a complete SlopeConfig to .slope/config.json. Expects a full config object (use loadConfig() to read-modify-write).
+  - `config` — Default workflow for sprint execution (e.g., 'sprint-standard', 'sprint-lightweight')
   - `constants` — Maps ticket count ranges to par values
   - `context` — SLOPE — Semantic Context Retrieval
   - `dashboard` — --- Dashboard Config ---
@@ -50,7 +50,7 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
   - `embedding-client` — SLOPE — HTTP Client for OpenAI-Compatible Embedding Endpoints
   - `embedding-store` — SLOPE — EmbeddingStore Interface
   - `embedding` — SLOPE — Embedding Types & Chunking Logic (pure — no HTTP calls)
-  - ... and 45 more
+  - ... and 46 more
 
 ### `src/mcp`
 - Source files: 3 | Test files: 7
@@ -414,15 +414,15 @@ Re-exports from `src/core/index.ts`:
 - `computeGuardMetrics`
 - `computeConvergence`
 **Workflow:**
-- `parseWorkflow`
-- `resolveVariables`
+- `parseWorkflow(yaml: string): WorkflowDefinition`
+- `resolveVariables(def: WorkflowDefinition, vars: Record<string, string>): WorkflowDefinition`
 **Workflow Loader:**
-- `loadWorkflow`
-- `listWorkflows`
+- `loadWorkflow(name: string, cwd: string): WorkflowDefinition`
+- `listWorkflows(cwd: string): WorkflowSummary[]`
 **Workflow Validator:**
-- `validateWorkflow`
+- `validateWorkflow(def: WorkflowDefinition): WorkflowValidationResult`
 **Workflow Engine:**
-- `WorkflowEngine`
+- `new WorkflowEngine()`
 **Built-in metaphors (auto-registers on import):**
 - `golf`
 - `tennis`
@@ -465,6 +465,7 @@ Re-exports from `src/core/index.ts`:
 - `slope extract` — Extract events into SLOPE store
 - `slope distill` — Promote event patterns to common issues
 - `slope map` — Generate/update codebase map
+- `slope workflow` — Manage workflow definitions
 - `slope flows` — Manage user flow definitions
 - `slope inspirations` — Track external OSS inspiration sources
 - `slope metaphor` — Manage metaphor display themes
@@ -483,6 +484,7 @@ Re-exports from `src/core/index.ts`:
 - `slope enrich` — Batch-enrich backlog with file context
 - `slope stats` — Export stats JSON for slope-web live dashboard
 - `slope docs` — Generate documentation manifest and changelog
+- `slope org` — Multi-repo aggregation and org-level metrics
 <!-- AUTO-GENERATED: END cli -->
 
 ## Guard Definitions
@@ -502,6 +504,7 @@ Re-exports from `src/core/index.ts`:
 | `workflow-gate` | PreToolUse | ExitPlanMode | Block ExitPlanMode until review rounds are complete |
 | `review-tier` | PostToolUse | Edit|Write | Suggest plan review with specialist reviewers after plan file write |
 | `version-check` | PreToolUse | Bash | Block push to main when package versions have not been bumped |
+| `workflow-step-gate` | PreToolUse | Edit|Write | Check if current workflow step allows agent_work before editing |
 | `stale-flows` | PreToolUse | Edit|Write | Warn when editing files belonging to a stale flow definition |
 | `next-action` | Stop | — | Suggest next actions before session end |
 | `pr-review` | PostToolUse | Bash | Prompt for review workflow after PR creation |

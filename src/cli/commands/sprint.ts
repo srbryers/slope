@@ -228,6 +228,12 @@ async function resumeCommand(args: string[], cwd: string): Promise<void> {
     const def = loadWorkflow(exec.workflow_name, cwd);
     const resolved = resolveVariables(def, exec.variables);
     const engine = new WorkflowEngine();
+
+    // Transition paused → running before querying next step
+    if (exec.status === 'paused') {
+      await engine.resume(exec.id, store);
+    }
+
     const next = await engine.next(exec.id, resolved, store);
 
     if (next.is_complete) {
@@ -285,6 +291,31 @@ async function skipCommand(args: string[], cwd: string): Promise<void> {
   }
 }
 
+async function pauseCommand(args: string[], cwd: string): Promise<void> {
+  const sprintArg = args.find(a => !a.startsWith('--'));
+
+  if (!sprintArg) {
+    console.error('Usage: slope sprint pause <sprint_id>');
+    process.exit(1);
+  }
+
+  const store = getStore(cwd);
+  try {
+    const exec = await store.getExecutionBySprint(sprintArg);
+    if (!exec) {
+      console.error(`No active workflow execution for sprint ${sprintArg}.`);
+      process.exit(1);
+    }
+
+    const engine = new WorkflowEngine();
+    await engine.pause(exec.id, store);
+    console.log(`Sprint ${sprintArg} paused at ${exec.current_phase}/${exec.current_step}.`);
+    console.log('Resume with: slope sprint resume ' + sprintArg);
+  } finally {
+    store.close();
+  }
+}
+
 export async function sprintCommand(args: string[]): Promise<void> {
   const cwd = process.cwd();
   const sub = args[0];
@@ -311,6 +342,9 @@ export async function sprintCommand(args: string[]): Promise<void> {
     case 'skip':
       await skipCommand(args.slice(1), cwd);
       break;
+    case 'pause':
+      await pauseCommand(args.slice(1), cwd);
+      break;
     default:
       console.log(`
 slope sprint — Sprint lifecycle management
@@ -324,7 +358,8 @@ Legacy commands:
 Workflow commands:
   slope sprint run <id> --workflow=<name> [--var k=v ...]   Start workflow execution
   slope sprint status [sprint_id]    Show workflow execution progress
-  slope sprint resume <sprint_id>    Resume a workflow execution
+  slope sprint resume <sprint_id>    Resume a paused workflow execution
+  slope sprint pause <sprint_id>     Pause a running workflow execution
   slope sprint skip <id> --step=<s> --reason="..."          Skip a blocking step
 `);
       if (sub) process.exit(1);
