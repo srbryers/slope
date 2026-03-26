@@ -858,6 +858,22 @@ export async function initCommand(args: string[]): Promise<void> {
 
   const configPath = createConfig(cwd);
 
+  // Scaffold .slope/workflows/ with built-in workflow stubs
+  const workflowsDir = join(cwd, '.slope', 'workflows');
+  mkdirSync(workflowsDir, { recursive: true });
+  const builtinDir = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'core', 'workflows');
+  if (existsSync(builtinDir)) {
+    const yamlFiles = ['sprint-standard.yaml', 'sprint-autonomous.yaml', 'sprint-lightweight.yaml'];
+    for (const file of yamlFiles) {
+      const src = join(builtinDir, file);
+      const dest = join(workflowsDir, file);
+      if (existsSync(src) && !existsSync(dest)) {
+        cpSync(src, dest);
+        console.log(`  Created ${dest}`);
+      }
+    }
+  }
+
   // Apply metaphor and team config
   const configData = JSON.parse(readFileSync(configPath, 'utf8'));
   configData.metaphor = metaphor.id;

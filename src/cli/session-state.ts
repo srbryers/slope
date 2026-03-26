@@ -9,8 +9,12 @@ export type SessionMode = 'sprint' | 'adhoc';
 interface SessionState {
   /** Session ID for the briefing guard */
   briefing_session_id?: string;
-  /** Session ID for the post-push guard */
+  /** Session ID for the post-push guard (legacy — kept for backward compat) */
   push_prompted_session_id?: string;
+  /** Number of pushes in current session (stored as string) */
+  push_count?: string;
+  /** Last push command string (dedup repeated retries) */
+  last_push_command?: string;
   /** Session ID for the claim-required guard */
   claim_warned_session_id?: string;
   /** Session ID for handoff read in explore guard */
