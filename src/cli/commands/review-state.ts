@@ -203,11 +203,17 @@ function recommendCommand(cwd: string): void {
     // Check for new infrastructure keywords
     hasNewInfra = /\b(new module|new package|new service|new infrastructure)\b/i.test(plan.content);
   } else {
-    // Fallback: try to detect from config
+    // Fallback: read current sprint's scorecard for ticket count and slope
     try {
       const config = loadConfig(cwd);
-      sprintNumber = detectLatestSprint(config, cwd) + 1;
-    } catch { /* no config */ }
+      sprintNumber = config.currentSprint ?? detectLatestSprint(config, cwd);
+      const scorecardPath = join(cwd, config.scorecardDir, `sprint-${sprintNumber}.json`);
+      if (existsSync(scorecardPath)) {
+        const card = normalizeScorecard(JSON.parse(readFileSync(scorecardPath, 'utf8')));
+        ticketCount = card.shots?.length ?? 0;
+        slope = card.slope ?? 0;
+      }
+    } catch { /* no config or scorecard */ }
   }
 
   const recs = recommendReviews({
