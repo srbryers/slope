@@ -228,6 +228,12 @@ async function resumeCommand(args: string[], cwd: string): Promise<void> {
     const def = loadWorkflow(exec.workflow_name, cwd);
     const resolved = resolveVariables(def, exec.variables);
     const engine = new WorkflowEngine();
+
+    // Transition paused → running before querying next step
+    if (exec.status === 'paused') {
+      await engine.resume(exec.id, store);
+    }
+
     const next = await engine.next(exec.id, resolved, store);
 
     if (next.is_complete) {
@@ -352,7 +358,8 @@ Legacy commands:
 Workflow commands:
   slope sprint run <id> --workflow=<name> [--var k=v ...]   Start workflow execution
   slope sprint status [sprint_id]    Show workflow execution progress
-  slope sprint resume <sprint_id>    Resume a workflow execution
+  slope sprint resume <sprint_id>    Resume a paused workflow execution
+  slope sprint pause <sprint_id>     Pause a running workflow execution
   slope sprint skip <id> --step=<s> --reason="..."          Skip a blocking step
 `);
       if (sub) process.exit(1);
