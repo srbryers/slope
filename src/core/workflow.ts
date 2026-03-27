@@ -25,6 +25,11 @@ export interface WorkflowStep {
   required_fields?: string[];
   /** Validation conditions (for type=validation) */
   conditions?: string[];
+  /** File glob patterns that must exist before step can be completed */
+  completion_conditions?: {
+    /** Files that must exist (glob patterns resolved from cwd) */
+    files_exist?: string[];
+  };
 }
 
 /** A phase containing ordered steps */
@@ -179,6 +184,13 @@ function parseStep(raw: unknown, phaseId: string, index: number): WorkflowStep {
       : undefined,
     conditions: Array.isArray(s.conditions)
       ? (s.conditions as unknown[]).map(c => String(c))
+      : undefined,
+    completion_conditions: s.completion_conditions && typeof s.completion_conditions === 'object'
+      ? {
+          files_exist: Array.isArray((s.completion_conditions as Record<string, unknown>).files_exist)
+            ? ((s.completion_conditions as Record<string, unknown>).files_exist as unknown[]).map(f => String(f))
+            : undefined,
+        }
       : undefined,
   };
 }
