@@ -30,7 +30,52 @@ function getDefinition(exec: WorkflowExecution, cwd: string): { def: WorkflowDef
   // Fallback for old executions without snapshot
   return { def: loadWorkflow(exec.workflow_name, cwd), drifted: false };
 }
+import { existsSync, readdirSync } from 'node:fs';
+import { join, dirname, basename } from 'node:path';
 import { createStore } from '../../store/index.js';
+
+/**
+ * Check completion_conditions for a step before allowing completion/skip.
+ * Returns null if all conditions met, or an error message string.
+ */
+function checkCompletionConditions(
+  stepId: string,
+  def: WorkflowDefinition,
+  currentPhase: string | undefined,
+  cwd: string,
+): string | null {
+  const phase = def.phases.find(p => p.id === currentPhase);
+  const step = phase?.steps.find(s => s.id === stepId);
+  if (!step?.completion_conditions) return null;
+
+  const { files_exist } = step.completion_conditions;
+  if (!files_exist || files_exist.length === 0) return null;
+
+  const missing: string[] = [];
+  for (const pattern of files_exist) {
+    if (pattern.includes('*')) {
+      // Simple glob: match files in the directory using the pattern
+      const dir = join(cwd, dirname(pattern));
+      const base = basename(pattern);
+      const re = new RegExp('^' + base.replace(/\*/g, '.*') + '$');
+      try {
+        const files = readdirSync(dir);
+        if (!files.some(f => re.test(f))) missing.push(pattern);
+      } catch {
+        missing.push(pattern); // directory doesn't exist
+      }
+    } else {
+      if (!existsSync(join(cwd, pattern))) missing.push(pattern);
+    }
+  }
+
+  if (missing.length > 0) {
+    return `Step "${stepId}" has unmet completion conditions:\n` +
+      missing.map(m => `  - Missing: ${m}`).join('\n') +
+      '\n\nComplete these conditions before advancing, or use --force to override.';
+  }
+  return null;
+}
 
 const VALID_GATES: GateName[] = ['tests', 'code_review', 'architect_review', 'scorecard', 'review_md'];
 
@@ -296,8 +341,19 @@ async function skipCommand(args: string[], cwd: string): Promise<void> {
       process.exit(1);
     }
 
+    const forceFlag = args.some(a => a === '--force');
     const { def, drifted } = getDefinition(exec, cwd);
     if (drifted) console.log(`\x1b[33m⚠ Workflow definition has changed since this execution started. Using snapshot from start.\x1b[0m`);
+
+    // Check completion conditions before allowing skip
+    if (!forceFlag) {
+      const conditionError = checkCompletionConditions(stepId, def, exec.current_phase, cwd);
+      if (conditionError) {
+        console.error(conditionError);
+        process.exit(1);
+      }
+    }
+
     const resolved = resolveVariables(def, exec.variables);
     const engine = new WorkflowEngine();
     const result = await engine.skip(exec.id, stepId, reason, resolved, store);

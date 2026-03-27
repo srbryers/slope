@@ -39,6 +39,10 @@ phases:
           - "Enter plan mode before writing the plan file"
           - "Plan file triggers review-tier guard which determines review tier"
         blocks_next: true
+        completion_conditions:
+          files_exist:
+            - "docs/backlog/sprint-*-plan.md"
+            - ".slope/review-state.json"
 
       - id: review_plan
         type: agent_input
