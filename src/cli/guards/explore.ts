@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { execSync } from 'node:child_process';
 import type { HookInput, GuardResult } from '../../core/index.js';
 import { loadConfig } from '../config.js';
-import { loadSessionState, updateSessionState } from '../session-state.js';
+import { loadSessionState, updateSessionState, dedupGuardContext } from '../session-state.js';
 
 const DEFAULT_INDEX_PATHS = ['CODEBASE.md', '.slope/index.json', 'docs/architecture.md'];
 const DEFAULT_STALE_WARN_AT = 11;
@@ -54,30 +54,30 @@ export async function exploreGuard(input: HookInput, cwd: string): Promise<Guard
         };
       }
       // Read/Glob/Grep — warn but don't block
-      return {
-        context: prependHandoff(handoffContext, `SLOPE: Codebase map is ${staleness.distance} commits stale. Run \`slope map\` to refresh.`),
-      };
+      const staleCtx = prependHandoff(handoffContext, `SLOPE: Codebase map is ${staleness.distance} commits stale. Run \`slope map\` to refresh.`);
+      const staleDedup = dedupGuardContext(cwd, input.session_id, 'explore', staleCtx);
+      return { context: staleDedup ?? staleCtx };
     }
 
     if (staleness.level === 'warn') {
-      return {
-        context: prependHandoff(handoffContext, `SLOPE: Codebase map at CODEBASE.md is ${staleness.distance} commits stale. Run 'slope map' to refresh, or explore if needed.`),
-      };
+      const warnCtx = prependHandoff(handoffContext, `SLOPE: Codebase map at CODEBASE.md is ${staleness.distance} commits stale. Run 'slope map' to refresh, or explore if needed.`);
+      const warnDedup = dedupGuardContext(cwd, input.session_id, 'explore', warnCtx);
+      return { context: warnDedup ?? warnCtx };
     }
 
     // Current map — estimate token size
     const content = readFileSync(mapPath, 'utf8');
     const approxTokens = Math.round(content.length / 4 / 1000);
 
-    return {
-      context: prependHandoff(handoffContext, `SLOPE: Codebase map at CODEBASE.md (~${approxTokens}k tokens, L1). Try \`context_search\` (L1.5) before reading full files (L2).`),
-    };
+    const mapCtx = prependHandoff(handoffContext, `SLOPE: Codebase map at CODEBASE.md (~${approxTokens}k tokens, L1). Try \`context_search\` (L1.5) before reading full files (L2).`);
+    const mapDedup = dedupGuardContext(cwd, input.session_id, 'explore', mapCtx);
+    return { context: mapDedup ?? mapCtx };
   }
 
   // Fallback: other index files found but no CODEBASE.md
-  return {
-    context: prependHandoff(handoffContext, `SLOPE: Codebase index available at: ${found.join(', ')} — check before deep exploration.`),
-  };
+  const fallbackCtx = prependHandoff(handoffContext, `SLOPE: Codebase index available at: ${found.join(', ')} — check before deep exploration.`);
+  const fallbackDedup = dedupGuardContext(cwd, input.session_id, 'explore', fallbackCtx);
+  return { context: fallbackDedup ?? fallbackCtx };
 }
 
 /** Prepend handoff context if available. */

@@ -2,6 +2,7 @@ import { execSync } from 'node:child_process';
 import type { HookInput, GuardResult } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { headIsOnMain } from './git-utils.js';
+import { dedupGuardContext } from '../session-state.js';
 
 /**
  * Commit nudge guard: fires PostToolUse on Edit|Write.
@@ -60,7 +61,7 @@ export async function commitNudgeGuard(input: HookInput, cwd: string): Promise<G
 
   if (nudges.length === 0) return {};
 
-  return {
-    context: `SLOPE commit discipline:\n${nudges.map(n => `  ${n}`).join('\n')}`,
-  };
+  const ctx = `SLOPE commit discipline:\n${nudges.map(n => `  ${n}`).join('\n')}`;
+  const dedup = dedupGuardContext(cwd, input.session_id, 'commit-nudge', ctx);
+  return { context: dedup ?? ctx };
 }
