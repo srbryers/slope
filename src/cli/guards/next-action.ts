@@ -205,7 +205,7 @@ export function buildSuggestionObject(state: SprintState): Suggestion {
           { id: 'push-break', label: 'Push and take a break', description: 'Resume later' },
           { id: 'end', label: 'End session', description: 'Nothing more to do right now' },
         ],
-        requiresDecision: true,
+        requiresDecision: false,
         priority: 'normal',
       };
     }
@@ -221,7 +221,7 @@ export function buildSuggestionObject(state: SprintState): Suggestion {
           { id: 'distill', label: 'Distill learnings', command: 'slope distill --auto' },
           { id: 'end', label: 'End session', description: 'Nothing more to do right now' },
         ],
-        requiresDecision: true,
+        requiresDecision: false,
         priority: 'normal',
       };
 
@@ -235,7 +235,7 @@ export function buildSuggestionObject(state: SprintState): Suggestion {
           { id: 'distill', label: 'Distill learnings', command: 'slope distill --auto' },
           { id: 'end', label: 'End session', description: 'Nothing more to do right now' },
         ],
-        requiresDecision: true,
+        requiresDecision: false,
         priority: 'normal',
       };
 
@@ -249,7 +249,7 @@ export function buildSuggestionObject(state: SprintState): Suggestion {
           { id: 'list', label: 'View findings first', command: 'slope review findings list' },
           { id: 'end', label: 'End session', description: 'Nothing more to do right now' },
         ],
-        requiresDecision: true,
+        requiresDecision: false,
         priority: 'normal',
       };
 
@@ -263,7 +263,7 @@ export function buildSuggestionObject(state: SprintState): Suggestion {
           { id: 'end-testing', label: 'End testing session' },
           { id: 'end', label: 'End session', description: 'Nothing more to do right now' },
         ],
-        requiresDecision: true,
+        requiresDecision: false,
         priority: 'normal',
       };
 
@@ -281,7 +281,7 @@ export function buildSuggestionObject(state: SprintState): Suggestion {
           { id: 'briefing', label: 'Run briefing', command: 'slope briefing' },
           { id: 'end', label: 'End session', description: 'Nothing more to do right now' },
         ],
-        requiresDecision: true,
+        requiresDecision: false,
         priority: 'normal',
       };
     }
