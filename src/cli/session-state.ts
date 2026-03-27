@@ -76,10 +76,15 @@ export function isAdhocSession(cwd: string, sessionId: string): boolean {
 /** File for context dedup hashes (separate from session-state for performance) */
 const CONTEXT_DEDUP_FILE = '.slope/.context-dedup.json';
 
+/** Default token budget: ~4k tokens worth of context chars (chars ≈ tokens × 4) */
+const DEFAULT_CONTEXT_BUDGET_CHARS = 16000;
+
 interface ContextDedupState {
   session_id: string;
   /** Map of content hash → { guard, count, timestamp } */
   seen: Record<string, { guard: string; count: number; ts: number }>;
+  /** Cumulative chars of context injected this session */
+  total_chars: number;
 }
 
 function loadDedupState(cwd: string): ContextDedupState | null {
@@ -119,7 +124,7 @@ export function dedupGuardContext(
 
   // Reset if session changed
   if (!state || state.session_id !== sessionId) {
-    state = { session_id: sessionId, seen: {} };
+    state = { session_id: sessionId, seen: {}, total_chars: 0 };
   }
 
   // Prune entries older than 24 hours (prevents unbounded growth across long sessions)
@@ -140,7 +145,15 @@ export function dedupGuardContext(
     return `SLOPE ${guardName}: (same as prior warning, shown ${existing.count}x)`;
   }
 
-  // New content — record and return null (caller injects full)
+  // Check token budget — if exceeded, return short message instead of full context
+  const budget = DEFAULT_CONTEXT_BUDGET_CHARS;
+  if ((state.total_chars ?? 0) + context.length > budget) {
+    saveDedupState(cwd, state);
+    return `SLOPE ${guardName}: context budget exhausted (${Math.round((state.total_chars ?? 0) / 4)}+ tokens injected). Run \`slope briefing --compact\` for status.`;
+  }
+
+  // New content — track chars and record
+  state.total_chars = (state.total_chars ?? 0) + context.length;
   state.seen[hash] = { guard: guardName, count: 1, ts: now };
   saveDedupState(cwd, state);
   return null;
