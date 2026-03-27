@@ -172,7 +172,7 @@ describe('buildSuggestionObject', () => {
     expect(suggestion.id).toBe('next-action-mid-sprint');
     expect(suggestion.context).toContain('S26-1, S26-2');
     expect(suggestion.options.map(o => o.label)).toContain('Continue with the next ticket');
-    expect(suggestion.requiresDecision).toBe(true);
+    expect(suggestion.requiresDecision).toBe(false);
   });
 
   it('includes scoring options for sprint-complete', () => {
