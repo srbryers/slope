@@ -72,3 +72,51 @@ export function removeBaseline(sessionId: string, cwd: string): void {
     if (existsSync(path)) unlinkSync(path);
   } catch { /* best-effort cleanup */ }
 }
+
+// --- Worktree detection ---
+
+export interface ActiveWorktree {
+  path: string;
+  branch: string;
+  /** Unpushed commit count (0 if clean) */
+  unpushed: number;
+}
+
+/**
+ * Detect active agent worktrees with unpushed work.
+ * Parses `git worktree list --porcelain` for non-bare worktrees.
+ */
+export function getActiveWorktrees(cwd: string): ActiveWorktree[] {
+  try {
+    const raw = execSync('git worktree list --porcelain', { cwd, encoding: 'utf8', timeout: 5000 });
+    const worktrees: ActiveWorktree[] = [];
+    let currentPath = '';
+    let currentBranch = '';
+
+    for (const line of raw.split('\n')) {
+      if (line.startsWith('worktree ')) {
+        currentPath = line.slice('worktree '.length).trim();
+      } else if (line.startsWith('branch ')) {
+        currentBranch = line.slice('branch '.length).replace('refs/heads/', '').trim();
+      } else if (line === '' && currentPath && currentBranch) {
+        // Skip the main worktree (same as cwd)
+        if (currentPath !== cwd) {
+          // Check for unpushed commits
+          let unpushed = 0;
+          try {
+            const log = execSync(`git -C "${currentPath}" log --oneline @{u}..HEAD 2>/dev/null`, { encoding: 'utf8', timeout: 3000 }).trim();
+            unpushed = log ? log.split('\n').length : 0;
+          } catch { /* no upstream or other error — count as 0 */ }
+
+          worktrees.push({ path: currentPath, branch: currentBranch, unpushed });
+        }
+        currentPath = '';
+        currentBranch = '';
+      }
+    }
+
+    return worktrees;
+  } catch {
+    return [];
+  }
+}

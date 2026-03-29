@@ -17,8 +17,8 @@ function extractPhaseNumber(name: string, index: number): number {
 export async function phaseBoundaryGuard(input: HookInput, cwd: string): Promise<GuardResult> {
   const command = (input.tool_input?.command as string) ?? '';
 
-  // Only match sprint-start or claim commands
-  if (!/\bslope\s+(sprint\s+start|claim)\b/.test(command)) return {};
+  // Match sprint-start, sprint-run, or claim commands
+  if (!/\bslope\s+(sprint\s+(start|run)|claim)\b/.test(command)) return {};
 
   // Parse target sprint number from command args
   const sprintMatch = command.match(/--sprint[=\s]+(\d+)/i) ??

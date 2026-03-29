@@ -5,6 +5,7 @@ import { loadConfig, loadScorecards, detectLatestSprint, parseRoadmap, formatStr
 import { resolveStore } from '../store.js';
 import { loadFindings } from '../commands/review-state.js';
 import { loadSprintState } from '../sprint-state.js';
+import { getActiveWorktrees } from './git-utils.js';
 
 /** Sprint state types for next-action detection */
 type SprintState =
@@ -13,7 +14,8 @@ type SprintState =
   | { type: 'needs-review'; sprintNumber: number }
   | { type: 'needs-amend'; sprintNumber: number; findingCount: number }
   | { type: 'testing-active' }
-  | { type: 'between-sprints'; roadmapContext?: string };
+  | { type: 'between-sprints'; roadmapContext?: string }
+  | { type: 'worktrees-active'; worktreeCount: number; branches: string[] };
 
 /**
  * Next-action guard: fires on Stop.
@@ -188,6 +190,16 @@ function buildBetweenSprints(config: SlopeConfig, cwd: string, latestSprint: num
     }
   } catch { /* roadmap parsing failed — proceed without context */ }
 
+  // Check for active agent worktrees before declaring "between sprints"
+  const worktrees = getActiveWorktrees(cwd);
+  if (worktrees.length > 0) {
+    return {
+      type: 'worktrees-active',
+      worktreeCount: worktrees.length,
+      branches: worktrees.map(w => w.branch),
+    };
+  }
+
   return { type: 'between-sprints', roadmapContext };
 }
 
@@ -262,6 +274,20 @@ export function buildSuggestionObject(state: SprintState): Suggestion {
           { id: 'continue', label: 'Continue testing' },
           { id: 'end-testing', label: 'End testing session' },
           { id: 'end', label: 'End session', description: 'Nothing more to do right now' },
+        ],
+        requiresDecision: false,
+        priority: 'normal',
+      };
+
+    case 'worktrees-active':
+      return {
+        id: 'next-action-worktrees',
+        title: 'Next Action',
+        context: `${state.worktreeCount} agent worktree(s) active: ${state.branches.join(', ')}. Sprint work in progress.`,
+        options: [
+          { id: 'dashboard', label: 'View agent dashboard', command: 'slope session dashboard' },
+          { id: 'wait', label: 'Wait for agents to finish' },
+          { id: 'end', label: 'End session', description: 'Agents will continue in worktrees' },
         ],
         requiresDecision: false,
         priority: 'normal',
