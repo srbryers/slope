@@ -415,6 +415,74 @@ export async function guardManageCommand(args: string[]): Promise<void> {
       console.log('');
       break;
     }
+    case 'check': {
+      // Standalone guard checks for worktree agents (#249)
+      // Runs key validations without session hooks
+      const checks: Array<{ name: string; passed: boolean; message: string }> = [];
+
+      // 1. Typecheck
+      try {
+        const { execSync } = await import('node:child_process');
+        execSync('pnpm typecheck 2>&1', { cwd, encoding: 'utf8', timeout: 60000 });
+        checks.push({ name: 'typecheck', passed: true, message: 'passed' });
+      } catch (err) {
+        checks.push({ name: 'typecheck', passed: false, message: 'failed' });
+      }
+
+      // 2. Tests
+      try {
+        const { execSync } = await import('node:child_process');
+        execSync('pnpm test 2>&1', { cwd, encoding: 'utf8', timeout: 120000 });
+        checks.push({ name: 'tests', passed: true, message: 'passed' });
+      } catch {
+        checks.push({ name: 'tests', passed: false, message: 'failed' });
+      }
+
+      // 3. Uncommitted changes
+      try {
+        const { execSync } = await import('node:child_process');
+        const status = execSync('git status --porcelain', { cwd, encoding: 'utf8', timeout: 5000 }).trim();
+        if (status) {
+          checks.push({ name: 'uncommitted', passed: false, message: `${status.split('\n').length} file(s) uncommitted` });
+        } else {
+          checks.push({ name: 'uncommitted', passed: true, message: 'clean' });
+        }
+      } catch {
+        checks.push({ name: 'uncommitted', passed: false, message: 'git status failed' });
+      }
+
+      // 4. Unpushed commits
+      try {
+        const { execSync } = await import('node:child_process');
+        const log = execSync('git log --oneline @{u}..HEAD 2>/dev/null', { cwd, encoding: 'utf8', timeout: 5000 }).trim();
+        if (log) {
+          checks.push({ name: 'unpushed', passed: false, message: `${log.split('\n').length} commit(s) unpushed` });
+        } else {
+          checks.push({ name: 'unpushed', passed: true, message: 'clean' });
+        }
+      } catch {
+        checks.push({ name: 'unpushed', passed: true, message: 'no upstream (ok)' });
+      }
+
+      const allPassed = checks.every(c => c.passed);
+      const red = '\x1b[31m';
+      const green = '\x1b[32m';
+      const reset = '\x1b[0m';
+
+      if (name === '--json') {
+        console.log(JSON.stringify({ passed: allPassed, checks }, null, 2));
+      } else {
+        console.log(`\n=== Guard Check === ${allPassed ? `${green}PASS${reset}` : `${red}FAIL${reset}`}\n`);
+        for (const c of checks) {
+          const icon = c.passed ? `${green}✓${reset}` : `${red}✗${reset}`;
+          console.log(`  ${icon} ${c.name.padEnd(14)} ${c.message}`);
+        }
+        console.log('');
+      }
+
+      if (!allPassed) process.exit(1);
+      break;
+    }
     case 'audit': {
       console.log('\n=== Guard Enforcement Audit ===\n');
       const seen = new Set<string>();
