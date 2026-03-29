@@ -1,8 +1,10 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { HookInput, GuardResult, Suggestion } from '../../core/index.js';
+import { loadConfig, parseRoadmap } from '../../core/index.js';
 import { loadSprintState } from '../sprint-state.js';
 import { loadSessionState, updateSessionState } from '../session-state.js';
+import { isPhaseComplete } from '../phase-cleanup.js';
 
 /**
  * Post-push guard: fires PostToolUse on Bash.
@@ -91,6 +93,36 @@ export async function postPushGuard(input: HookInput, cwd: string): Promise<Guar
       { id: 'briefing', label: 'Run briefing', command: 'slope briefing' },
       { id: 'start-sprint', label: 'Start new sprint' },
     ];
+  }
+
+  // Auto-detect phase completion (#250)
+  if (sprintState) {
+    try {
+      const config = loadConfig(cwd);
+      const roadmapPath = join(cwd, config.roadmapPath);
+      if (existsSync(roadmapPath)) {
+        const raw = JSON.parse(readFileSync(roadmapPath, 'utf8'));
+        const { roadmap } = parseRoadmap(raw);
+        if (roadmap?.phases) {
+          for (let i = 0; i < roadmap.phases.length; i++) {
+            const phase = roadmap.phases[i];
+            if (Array.isArray(phase.sprints) && phase.sprints.includes(sprintState.sprint)) {
+              // Current sprint is in this phase — check if all sprints in phase have scorecards
+              const allDone = phase.sprints.every((sn: number) =>
+                existsSync(join(cwd, config.scorecardDir, `sprint-${sn}.json`)),
+              );
+              const phaseMatch = phase.name.match(/Phase\s+(\d+)/i);
+              const phaseNum = phaseMatch ? parseInt(phaseMatch[1], 10) : i + 1;
+              if (allDone && !isPhaseComplete(cwd, phaseNum)) {
+                contextText += `\n\nPhase ${phaseNum} (${phase.name}) is now complete — run phase boundary cleanup before starting the next phase.`;
+                options.push({ id: 'phase-cleanup', label: `Phase ${phaseNum} cleanup`, command: `slope phase complete ${phaseNum}` });
+              }
+              break;
+            }
+          }
+        }
+      }
+    } catch { /* roadmap unavailable — skip phase check */ }
   }
 
   const suggestion: Suggestion = {
