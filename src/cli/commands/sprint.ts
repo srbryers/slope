@@ -394,6 +394,144 @@ async function pauseCommand(args: string[], cwd: string): Promise<void> {
   }
 }
 
+async function contextCommand(args: string[], cwd: string): Promise<void> {
+  const sprintArg = args.find(a => !a.startsWith('--'));
+  if (!sprintArg) {
+    console.error('Usage: slope sprint context <sprint_id>');
+    process.exit(1);
+  }
+
+  const store = getStore(cwd);
+  try {
+    const exec = await store.getExecutionBySprint(sprintArg);
+    if (!exec) {
+      console.error(`No active workflow execution for sprint ${sprintArg}.`);
+      process.exit(1);
+    }
+
+    const { def } = getDefinition(exec, cwd);
+    const resolved = resolveVariables(def, exec.variables);
+    const engine = new WorkflowEngine();
+    const next = await engine.next(exec.id, resolved, store);
+
+    const completedCount = exec.completed_steps.length;
+    const totalSteps = def.phases.reduce((sum, p) => sum + p.steps.length, 0);
+
+    const lines: string[] = [
+      `Sprint ${sprintArg} — Workflow: ${exec.workflow_name}`,
+      `Status: ${exec.status} | Progress: ${completedCount}/${totalSteps} steps`,
+      '',
+    ];
+
+    if (next.is_complete) {
+      lines.push('All steps complete. Run post-hole routine.');
+    } else {
+      lines.push(`Current: ${next.phase}/${next.step?.id} (${next.step?.type})`);
+      if (next.step?.prompt) lines.push(`Prompt: ${next.step.prompt}`);
+      if (next.step?.rules) lines.push(`Rules: ${next.step.rules.join('; ')}`);
+      if (next.current_item) lines.push(`Item: ${next.current_item} (${(next.item_index ?? 0) + 1}/${next.total_items})`);
+
+      // Show remaining steps
+      lines.push('', 'Remaining steps:');
+      const completedIds = new Set(exec.completed_steps.map(s => `${s.phase}/${s.step_id}`));
+      for (const phase of def.phases) {
+        for (const step of phase.steps) {
+          if (!completedIds.has(`${phase.id}/${step.id}`)) {
+            lines.push(`  ${phase.id}/${step.id} (${step.type})`);
+          }
+        }
+      }
+    }
+
+    if (args.includes('--json')) {
+      console.log(JSON.stringify({ sprint: sprintArg, workflow: exec.workflow_name, status: exec.status, progress: `${completedCount}/${totalSteps}`, current: next.is_complete ? null : { phase: next.phase, step: next.step?.id, type: next.step?.type }, remaining: def.phases.flatMap(p => p.steps.filter(s => !exec.completed_steps.some(cs => cs.phase === p.id && cs.step_id === s.id)).map(s => ({ phase: p.id, step: s.id, type: s.type }))) }, null, 2));
+    } else {
+      console.log(lines.join('\n'));
+    }
+  } finally {
+    store.close();
+  }
+}
+
+async function validateSprintCommand(args: string[], cwd: string): Promise<void> {
+  const sprintArg = args.find(a => !a.startsWith('--'));
+  if (!sprintArg) {
+    console.error('Usage: slope sprint validate <sprint_id>');
+    process.exit(1);
+  }
+
+  const store = getStore(cwd);
+  try {
+    // Check workflow execution
+    const exec = await store.getExecutionBySprint(sprintArg);
+    const checks: Array<{ name: string; passed: boolean; message: string }> = [];
+
+    if (exec) {
+      const { def } = getDefinition(exec, cwd);
+      const totalSteps = def.phases.reduce((sum, p) => sum + p.steps.length, 0);
+      const completed = exec.completed_steps.length;
+      checks.push({
+        name: 'workflow',
+        passed: exec.status === 'completed',
+        message: exec.status === 'completed' ? `complete (${completed}/${totalSteps} steps)` : `${exec.status} (${completed}/${totalSteps} steps)`,
+      });
+    } else {
+      checks.push({ name: 'workflow', passed: false, message: 'no execution found' });
+    }
+
+    // Check scorecard exists
+    const scorecardNum = sprintArg.replace(/^S/, '');
+    const scorecardPath = join(cwd, 'docs', 'retros', `sprint-${scorecardNum}.json`);
+    checks.push({
+      name: 'scorecard',
+      passed: existsSync(scorecardPath),
+      message: existsSync(scorecardPath) ? 'exists' : 'missing',
+    });
+
+    // Check plan exists
+    const planGlob = join(cwd, 'docs', 'backlog');
+    let planExists = false;
+    try {
+      const files = readdirSync(planGlob);
+      planExists = files.some(f => f.includes(`sprint-${scorecardNum}`) && f.endsWith('-plan.md'));
+    } catch { /* dir missing */ }
+    checks.push({
+      name: 'plan',
+      passed: planExists,
+      message: planExists ? 'exists' : 'missing',
+    });
+
+    // Check tests pass
+    try {
+      const { execSync } = await import('node:child_process');
+      execSync('pnpm test 2>&1', { cwd, encoding: 'utf8', timeout: 120000 });
+      checks.push({ name: 'tests', passed: true, message: 'passing' });
+    } catch {
+      checks.push({ name: 'tests', passed: false, message: 'failing' });
+    }
+
+    const allPassed = checks.every(c => c.passed);
+    const red = '\x1b[31m';
+    const green = '\x1b[32m';
+    const reset = '\x1b[0m';
+
+    if (args.includes('--json')) {
+      console.log(JSON.stringify({ sprint: sprintArg, passed: allPassed, checks }, null, 2));
+    } else {
+      console.log(`\n=== Sprint Validate: ${sprintArg} === ${allPassed ? `${green}PASS${reset}` : `${red}FAIL${reset}`}\n`);
+      for (const c of checks) {
+        const icon = c.passed ? `${green}✓${reset}` : `${red}✗${reset}`;
+        console.log(`  ${icon} ${c.name.padEnd(12)} ${c.message}`);
+      }
+      console.log('');
+    }
+
+    if (!allPassed) process.exit(1);
+  } finally {
+    store.close();
+  }
+}
+
 export async function sprintCommand(args: string[]): Promise<void> {
   const cwd = process.cwd();
   const sub = args[0];
@@ -422,6 +560,12 @@ export async function sprintCommand(args: string[]): Promise<void> {
       break;
     case 'pause':
       await pauseCommand(args.slice(1), cwd);
+      break;
+    case 'context':
+      await contextCommand(args.slice(1), cwd);
+      break;
+    case 'validate':
+      await validateSprintCommand(args.slice(1), cwd);
       break;
     default:
       console.log(`
