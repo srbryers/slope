@@ -116,9 +116,8 @@ export async function stopCheckGuard(_input: HookInput, cwd: string): Promise<Gu
       if (sessionModified.length > 0) {
         warningIssues.push(`${sessionModified.length} uncommitted change${sessionModified.length === 1 ? '' : 's'}`);
       }
-      if (sessionUntracked.length > 0) {
-        warningIssues.push(`${sessionUntracked.length} untracked file${sessionUntracked.length === 1 ? '' : 's'}`);
-      }
+      // Untracked files are informational only — don't block session end
+      // (agents frequently create temp files, .slope state files, etc.)
       if (preExistingCount > 0) {
         warningIssues.push(`${preExistingCount} pre-existing dirty file${preExistingCount === 1 ? '' : 's'} (not from this session)`);
       }
@@ -126,15 +125,19 @@ export async function stopCheckGuard(_input: HookInput, cwd: string): Promise<Gu
   } catch { /* not a git repo */ }
 
   // Check for unpushed commits
-  // Skip if HEAD is already on origin/main (e.g., after squash merge + reset)
-  // The tracking branch (@{u}) may be stale after squash merges, causing false positives
+  // Use origin/<branch> explicitly + --first-parent to avoid counting merge ancestors
+  // in worktrees (#255: git log @{u}..HEAD traverses merged branch history)
   if (!headIsOnMain(gitDir)) {
     try {
-      const unpushed = execSync('git log @{u}..HEAD --oneline 2>/dev/null', { cwd: gitDir, encoding: 'utf8' }).trim();
-      if (unpushed) {
-        const lines = unpushed.split('\n').filter(Boolean);
-        if (lines.length > 0) {
-          blockingIssues.push(`${lines.length} unpushed commit${lines.length === 1 ? '' : 's'}`);
+      const branch = execSync('git rev-parse --abbrev-ref HEAD 2>/dev/null', { cwd: gitDir, encoding: 'utf8' }).trim();
+      const remoteRef = `origin/${branch}`;
+      // Verify remote ref exists before comparing
+      const hasRemote = (() => { try { execSync(`git rev-parse --verify ${remoteRef} 2>/dev/null`, { cwd: gitDir, encoding: 'utf8' }); return true; } catch { return false; } })();
+      if (hasRemote) {
+        const unpushed = execSync(`git rev-list ${remoteRef}..HEAD --first-parent --count 2>/dev/null`, { cwd: gitDir, encoding: 'utf8' }).trim();
+        const count = parseInt(unpushed, 10) || 0;
+        if (count > 0) {
+          blockingIssues.push(`${count} unpushed commit${count === 1 ? '' : 's'}`);
         }
       }
     } catch { /* no upstream */ }
@@ -172,7 +175,7 @@ export async function stopCheckGuard(_input: HookInput, cwd: string): Promise<Gu
   if (warningIssues.length > 0) {
     removeBaseline(_input.session_id, cwd);
     return {
-      context: `SLOPE: ${warningIssues.join(' and ')} detected. Consider committing or cleaning up untracked files.`,
+      context: `SLOPE: ${warningIssues.join(' and ')} detected. Consider committing before stopping.`,
     };
   }
 
