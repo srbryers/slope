@@ -51,12 +51,12 @@ describe('stop-check guard', () => {
     expect(result.context).toContain('uncommitted');
   });
 
-  it('warns on untracked files only', async () => {
+  it('ignores untracked files (no warning)', async () => {
     writeFileSync(join(tmpDir, 'new-file.txt'), 'new');
 
     const result = await stopCheckGuard(makeStop(), tmpDir);
     expect(result.blockReason).toBeUndefined();
-    expect(result.context).toContain('untracked');
+    expect(result.context).toBeUndefined();
   });
 
   describe('post-squash-merge scenario', () => {
