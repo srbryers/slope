@@ -26,7 +26,8 @@
   "files": [
     "dist",
     "src/core/workflows",
-    "templates"
+    "templates",
+    "README.md"
   ],
   "scripts": {
     "prepare": "tsc",
