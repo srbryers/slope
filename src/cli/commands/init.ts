@@ -1021,6 +1021,33 @@ export async function initCommand(args: string[]): Promise<void> {
     installForProvider(cwd, p, metaphor);
   }
 
+  // Cross-agent skills directory (.agents/skills/) — works with Pi, Claude Code, and other
+  // agents that follow the Agent Skills spec (https://agentskills.io/specification)
+  const agentsSkillsDir = join(cwd, '.agents', 'skills');
+  if (!existsSync(agentsSkillsDir)) {
+    mkdirSync(agentsSkillsDir, { recursive: true });
+    // Copy SLOPE skills from .claude/skills/ if they exist
+    const claudeSkillsDir = join(cwd, '.claude', 'skills');
+    if (existsSync(claudeSkillsDir)) {
+      try {
+        cpSync(claudeSkillsDir, agentsSkillsDir, { recursive: true });
+        console.log('  Created .agents/skills/ (cross-agent skills directory)');
+      } catch { /* best-effort */ }
+    }
+  }
+
+  // Generate AGENTS.md (cross-agent project context — equivalent to CLAUDE.md)
+  const agentsMdPath = join(cwd, 'AGENTS.md');
+  if (!existsSync(agentsMdPath)) {
+    const claudeMdPath = join(cwd, 'CLAUDE.md');
+    if (existsSync(claudeMdPath)) {
+      try {
+        cpSync(claudeMdPath, agentsMdPath);
+        console.log(`  Created AGENTS.md (cross-agent project context)`);
+      } catch { /* best-effort */ }
+    }
+  }
+
   // Save structured vision if provided via flags
   const visionPurpose = args.find(a => a.startsWith('--vision-purpose='))?.slice('--vision-purpose='.length);
   const visionPriorities = args.find(a => a.startsWith('--vision-priorities='))?.slice('--vision-priorities='.length);
