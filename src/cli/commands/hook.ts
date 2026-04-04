@@ -106,8 +106,8 @@ export async function hookCommand(args: string[]): Promise<void> {
 
   switch (sub) {
     case 'add':
-      if (flags.level === 'full' || flags.level === 'scoring') {
-        installGuardHooks(cwd, flags.level as 'scoring' | 'full', flags.harness);
+      if (flags.level === 'full' || flags.level === 'scoring' || flags.level === 'essential') {
+        installGuardHooks(cwd, flags.level as 'scoring' | 'essential' | 'full', flags.harness);
       } else if (hookName && isKnownAdapter(hookName)) {
         // `slope hook add claude-code` → shorthand for `--level=full --harness=claude-code`
         installGuardHooks(cwd, 'full', hookName);
@@ -257,15 +257,20 @@ function showHook(name: string, cwd: string): void {
   process.exit(1);
 }
 
-function installGuardHooks(cwd: string, level: 'scoring' | 'full', harnessId?: string): void {
+function installGuardHooks(cwd: string, level: 'scoring' | 'essential' | 'full', harnessId?: string): void {
   // Load custom guard plugins
   const config = loadConfig(cwd);
   loadPluginGuards(cwd, config.plugins);
 
-  // Filter guards by level (includes custom guards)
-  const guards = getAllGuardDefinitions().filter(g =>
-    level === 'full' || g.level === 'scoring',
-  );
+  // Filter guards by level:
+  // - scoring: only guards with level='scoring'
+  // - essential: scoring + essential (mechanical guards)
+  // - full: all guards
+  const guards = getAllGuardDefinitions().filter(g => {
+    if (level === 'full') return true;
+    if (level === 'essential') return g.level === 'scoring' || g.level === 'essential';
+    return g.level === 'scoring';
+  });
 
   if (guards.length === 0) {
     console.log('\n  No guards to install for this level.\n');
