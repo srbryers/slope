@@ -36,7 +36,8 @@ export async function claimRequiredGuard(input: HookInput, cwd: string): Promise
       }
     } catch { /* claims unavailable */ }
   } else if (!sprintState) {
-    // No sprint state at all — warn
+    // No sprint state — adhoc work, no warning needed (#263)
+    return {};
   } else {
     // Sprint exists but not in implementing phase — passthrough
     return {};

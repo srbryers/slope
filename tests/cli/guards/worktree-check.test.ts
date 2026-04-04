@@ -147,7 +147,7 @@ describe('worktreeCheckGuard', () => {
     expect(mockResolveStore).not.toHaveBeenCalled();
   });
 
-  it('falls back to soft ask on store resolve error', async () => {
+  it('silently passes on store resolve error (#263)', async () => {
     mockExecSync
       .mockReturnValueOnce('.git' as never)
       .mockReturnValueOnce('feat/foo' as never);
@@ -155,11 +155,10 @@ describe('worktreeCheckGuard', () => {
     mockResolveStore.mockRejectedValueOnce(new Error('no store'));
 
     const result = await worktreeCheckGuard(makeInput(), '/tmp/test');
-    expect(result.decision).toBe('ask');
-    expect(result.context).toContain('store unavailable');
+    expect(result).toEqual({});
   });
 
-  it('falls back to soft ask on store query error', async () => {
+  it('silently passes on store query error (#263)', async () => {
     mockExecSync
       .mockReturnValueOnce('.git' as never)
       .mockReturnValueOnce('feat/foo' as never);
@@ -167,8 +166,7 @@ describe('worktreeCheckGuard', () => {
     (mockStore.cleanStaleSessions as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('db locked'));
 
     const result = await worktreeCheckGuard(makeInput(), '/tmp/test');
-    expect(result.decision).toBe('ask');
-    expect(result.context).toContain('db locked');
+    expect(result).toEqual({});
   });
 
   it('fires on feature branch (no longer gated to main/master)', async () => {
@@ -424,15 +422,14 @@ describe('worktreeCheckGuard', () => {
     expect(result).toEqual({});
   });
 
-  it('falls back to soft ask when registerSession throws non-SlopeStoreError', async () => {
+  it('silently passes when registerSession throws non-SlopeStoreError (#263)', async () => {
     mockGitMainRepo();
     (mockStore.registerSession as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
       new Error('database disk image is malformed'),
     );
 
     const result = await worktreeCheckGuard(makeInput(), '/tmp/test');
-    expect(result.decision).toBe('ask');
-    expect(result.context).toContain('database disk image is malformed');
+    expect(result).toEqual({});
   });
 
   it('uses branch unknown fallback when git branch fails', async () => {

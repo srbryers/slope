@@ -1,4 +1,6 @@
 import { execSync } from 'node:child_process';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type { HookInput, GuardResult } from '../../core/index.js';
 import { headIsOnMain, loadBaseline, removeBaseline } from './git-utils.js';
 import { resolveStore } from '../store.js';
@@ -53,6 +55,9 @@ function hasOtherWorktrees(cwd: string): boolean {
  * downgrades uncommitted-change blocks to warnings (dirty state may belong
  * to another session). Unpushed commits always block — they're branch-specific.
  */
+/** Max times stop-check blocks for same reason before downgrading to warning */
+const MAX_REPEATED_BLOCKS = 2;
+
 export async function stopCheckGuard(_input: HookInput, cwd: string): Promise<GuardResult> {
   // Resolve the actual git root — may differ from cwd if inside a worktree
   const gitDir = resolveGitDir(cwd);
@@ -146,13 +151,35 @@ export async function stopCheckGuard(_input: HookInput, cwd: string): Promise<Gu
   // Blocking issues take priority — but downgrade to warning if changes belong to another context
   if (blockingIssues.length > 0) {
     const allIssues = [...blockingIssues, ...warningIssues];
+
+    // Track repeated blocks — after MAX_REPEATED_BLOCKS identical blocks, downgrade to warning (#264)
+    const blockKey = allIssues.sort().join('|');
+    const stopStateFile = join(gitDir, '.slope', '.stop-check-state.json');
+    let repeatCount = 0;
+    try {
+      if (existsSync(stopStateFile)) {
+        const prev = JSON.parse(readFileSync(stopStateFile, 'utf8'));
+        if (prev.session_id === _input.session_id && prev.block_key === blockKey) {
+          repeatCount = (prev.count ?? 0) + 1;
+        }
+      }
+    } catch { /* corrupted */ }
+    try {
+      writeFileSync(stopStateFile, JSON.stringify({ session_id: _input.session_id, block_key: blockKey, count: repeatCount }));
+    } catch { /* best-effort */ }
+
+    if (repeatCount >= MAX_REPEATED_BLOCKS) {
+      return {
+        context: `SLOPE: ${allIssues.join(' and ')} still present (reported ${repeatCount + 1}x). Allowing session end — resolve manually.`,
+      };
+    }
+
     if (loopRunning) {
       return {
         context: `SLOPE: ${allIssues.join(' and ')} detected, but autonomous loop is running — changes belong to the loop.`,
       };
     }
     if (otherWorktreesExist) {
-      // Unpushed commits are branch-specific — always block. Only downgrade uncommitted changes.
       const unpushedBlocks = blockingIssues.filter(i => i.includes('unpushed'));
       const uncommittedBlocks = blockingIssues.filter(i => !i.includes('unpushed'));
       if (unpushedBlocks.length > 0) {
@@ -161,7 +188,6 @@ export async function stopCheckGuard(_input: HookInput, cwd: string): Promise<Gu
             (uncommittedBlocks.length > 0 ? ` (${uncommittedBlocks.join(' and ')} may belong to another session)` : ''),
         };
       }
-      // All blocking issues are uncommitted changes — downgrade to warning
       return {
         context: `SLOPE: ${allIssues.join(' and ')} detected, but other worktrees exist — changes may belong to another session.`,
       };

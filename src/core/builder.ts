@@ -195,7 +195,10 @@ export function buildScorecard(input: ScorecardInput): GolfScorecard {
     penalties,
   });
 
-  const score = Math.round(input.shots.length + penalties + stats.hazard_penalties);
+  // Score = base strokes (1 per ticket) + miss penalties + hazard penalties + manual penalties
+  // Misses add a stroke: each missed_* result adds 1 to the score
+  const missCount = Object.values(stats.miss_directions).reduce((a, b) => a + b, 0);
+  const score = Math.round(input.shots.length + missCount + penalties + stats.hazard_penalties);
   const score_label: ScoreLabel = computeScoreLabel(score, input.par);
 
   return {
