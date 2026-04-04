@@ -116,8 +116,8 @@ export interface GuardDefinition {
   toolCategories?: ToolCategory[];
   /** Regex matcher for tool name (PreToolUse/PostToolUse only) — computed from toolCategories via adapter */
   matcher?: string;
-  /** Which --level installs this guard */
-  level: 'scoring' | 'full';
+  /** Which --level installs this guard: scoring (minimal), essential (mechanical guards only), full (all) */
+  level: 'scoring' | 'essential' | 'full';
   /** Guard enforcement type: mechanical (blocks), advisory (warns), or mixed */
   guardType?: 'mechanical' | 'advisory' | 'mixed';
 }
@@ -198,14 +198,14 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     name: 'compaction',
     description: 'Extract events before context compaction',
     hookEvent: 'PreCompact',
-    level: 'full',
+    level: 'essential',
     guardType: 'mechanical',
   },
   {
     name: 'stop-check',
     description: 'Check for uncommitted/unpushed work before session end',
     hookEvent: 'Stop',
-    level: 'full',
+    level: 'essential',
     guardType: 'mechanical',
   },
   {
@@ -214,7 +214,7 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     hookEvent: 'PreToolUse',
     toolCategories: ['create_subagent'],
     matcher: 'Agent',
-    level: 'full',
+    level: 'essential',
     guardType: 'mechanical',
   },
   {
@@ -232,7 +232,7 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     hookEvent: 'PreToolUse',
     toolCategories: ['exit_plan'],
     matcher: 'ExitPlanMode',
-    level: 'full',
+    level: 'essential',
     guardType: 'mechanical',
   },
   {
@@ -259,7 +259,7 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     hookEvent: 'PreToolUse',
     toolCategories: ['write_file'],
     matcher: 'Edit|Write',
-    level: 'full',
+    level: 'essential',
     guardType: 'mechanical',
   },
   {
@@ -284,7 +284,7 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     hookEvent: 'PostToolUse',
     toolCategories: ['execute_command'],
     matcher: 'Bash',
-    level: 'full',
+    level: 'essential',
     guardType: 'advisory',
   },
   {
@@ -292,7 +292,7 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     description: 'Append tool call metadata to session transcript',
     hookEvent: 'PostToolUse',
     // no toolCategories, no matcher → fires on all tools
-    level: 'full',
+    level: 'essential',
     guardType: 'mechanical',
   },
   {
@@ -301,7 +301,7 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     hookEvent: 'PreToolUse',
     toolCategories: ['execute_command'],
     matcher: 'Bash',
-    level: 'full',
+    level: 'essential',
     guardType: 'mechanical',
   },
   {
@@ -310,7 +310,7 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     hookEvent: 'PreToolUse',
     toolCategories: ['write_file', 'execute_command'],
     matcher: 'Edit|Write|Bash',
-    level: 'full',
+    level: 'essential',
     guardType: 'mechanical',
   },
   {
@@ -319,14 +319,14 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     hookEvent: 'PreToolUse',
     toolCategories: ['execute_command'],
     matcher: 'Bash',
-    level: 'full',
+    level: 'essential',
     guardType: 'mechanical',
   },
   {
     name: 'sprint-completion',
     description: 'Block session end when sprint gates are incomplete',
     hookEvent: 'Stop',
-    level: 'full',
+    level: 'essential',
     guardType: 'mechanical',
   },
   {
@@ -335,7 +335,7 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     hookEvent: 'PostToolUse',
     toolCategories: ['execute_command'],
     matcher: 'Bash',
-    level: 'full',
+    level: 'essential',
     guardType: 'mechanical',
   },
   {
@@ -344,7 +344,7 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     hookEvent: 'PreToolUse',
     toolCategories: ['execute_command'],
     matcher: 'Bash',
-    level: 'full',
+    level: 'essential',
     guardType: 'mechanical',
   },
   {
@@ -353,7 +353,7 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     hookEvent: 'PreToolUse',
     toolCategories: ['execute_command'],
     matcher: 'Bash',
-    level: 'full',
+    level: 'essential',
     guardType: 'mechanical',
   },
   // --- Suggestion Engine Guards ---

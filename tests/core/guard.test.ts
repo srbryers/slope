@@ -20,7 +20,7 @@ describe('GUARD_DEFINITIONS', () => {
       expect(d.name).toBeTruthy();
       expect(d.description).toBeTruthy();
       expect(['PreToolUse', 'PostToolUse', 'Stop', 'PreCompact']).toContain(d.hookEvent);
-      expect(['scoring', 'full']).toContain(d.level);
+      expect(['scoring', 'essential', 'full']).toContain(d.level);
     }
   });
 
@@ -29,9 +29,13 @@ describe('GUARD_DEFINITIONS', () => {
     expect(new Set(keys).size).toBe(keys.length);
   });
 
-  it('all current guards are level=full', () => {
-    // No scoring-level guards yet — all are full
-    expect(GUARD_DEFINITIONS.every(d => d.level === 'full')).toBe(true);
+  it('guards are split between essential and full levels', () => {
+    const essential = GUARD_DEFINITIONS.filter(d => d.level === 'essential');
+    const full = GUARD_DEFINITIONS.filter(d => d.level === 'full');
+    expect(essential.length).toBeGreaterThan(0);
+    expect(full.length).toBeGreaterThan(0);
+    // Essential guards should all be mechanical
+    expect(essential.every(d => d.guardType === 'mechanical' || d.guardType === 'advisory')).toBe(true);
   });
 
   it('PreToolUse guards have matchers', () => {
