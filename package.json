@@ -1,6 +1,6 @@
 {
   "name": "@slope-dev/slope",
-  "version": "1.48.1",
+  "version": "1.49.0",
   "description": "Quantified sprint metrics for AI-assisted development. Scorecards, handicap tracking, and real-time agent guidance for Claude Code, Cursor, Windsurf, Cline, and OpenCode.",
   "type": "module",
   "main": "./dist/index.js",
