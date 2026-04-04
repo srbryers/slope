@@ -1,0 +1,14 @@
+{
+  "name": "@slope-dev/opencode-plugin",
+  "version": "1.0.0",
+  "description": "SLOPE integration for OpenCode — guards, tools, and workflow enforcement",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "keywords": ["slope", "opencode", "coding-agent", "sprint", "guards"],
+  "license": "MIT"
+}

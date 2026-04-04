@@ -32,6 +32,7 @@ import '../../core/adapters/cursor.js';
 import '../../core/adapters/windsurf.js';
 import '../../core/adapters/cline.js';
 import '../../core/adapters/ob1.js';
+import '../../core/adapters/codex.js';
 import '../../core/adapters/generic.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -645,6 +646,16 @@ function installForProvider(cwd: string, provider: InitProvider, metaphor: Metap
       installOpenCodeTemplates(cwd, metaphor);
       installOpenCodeMcpConfig(cwd);
       installOpenCodePlugin(cwd);
+      break;
+    case 'codex':
+      // Codex uses AGENTS.md (already generated) + .codex/hooks.json for guards
+      installDefaultHooks(cwd, 'codex');
+      console.log('\n  Codex CLI: Guards installed to .codex/hooks.json');
+      console.log('  Codex CLI: AGENTS.md provides project context');
+      console.log('  Codex CLI: MCP server configured — add to .codex/config.toml:');
+      console.log('    [mcp.slope]');
+      console.log('    command = "slope"');
+      console.log('    args = ["mcp"]');
       break;
     case 'ob1':
       installOB1Templates(cwd, metaphor);

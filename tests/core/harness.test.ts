@@ -20,6 +20,7 @@ import { CursorAdapter } from '../../src/core/adapters/cursor.js';
 import { WindsurfAdapter } from '../../src/core/adapters/windsurf.js';
 import { ClineAdapter } from '../../src/core/adapters/cline.js';
 import { OB1Adapter } from '../../src/core/adapters/ob1.js';
+import { CodexAdapter } from '../../src/core/adapters/codex.js';
 import { GenericAdapter } from '../../src/core/adapters/generic.js';
 
 function makeAdapter(id: string, detectResult = false): HarnessAdapter {
@@ -275,6 +276,7 @@ describe('adapter interface contract — new members', () => {
     registerAdapter(new WindsurfAdapter());
     registerAdapter(new ClineAdapter());
     registerAdapter(new OB1Adapter());
+    registerAdapter(new CodexAdapter());
     registerAdapter(new GenericAdapter());
   });
 
@@ -310,6 +312,7 @@ describe('adapter registration completeness', () => {
     registerAdapter(new WindsurfAdapter());
     registerAdapter(new ClineAdapter());
     registerAdapter(new OB1Adapter());
+    registerAdapter(new CodexAdapter());
     registerAdapter(new GenericAdapter());
 
     for (const id of ADAPTER_PRIORITY) {
