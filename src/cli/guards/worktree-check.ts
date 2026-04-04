@@ -67,11 +67,8 @@ export async function worktreeCheckGuard(input: HookInput, cwd: string): Promise
   try {
     store = await resolveStore(cwd);
   } catch {
-    // Store unavailable — fall back to soft warning
-    return {
-      decision: 'ask',
-      context: `Could not check for concurrent sessions (store unavailable). Consider using a worktree for isolation: use \`EnterWorktree\` to create an isolated working copy.`,
-    };
+    // Store unavailable — silently pass (no-op). Don't warn on every tool call (#263)
+    return {};
   }
 
   try {
@@ -124,11 +121,9 @@ export async function worktreeCheckGuard(input: HookInput, cwd: string): Promise
     // No conflict — write sentinel so we don't re-check this session
     writeFileSync(sentinel, new Date().toISOString());
     return {};
-  } catch (err) {
-    return {
-      decision: 'ask',
-      context: `Could not check for concurrent sessions (${err instanceof Error ? err.message : 'unknown error'}). Consider using a worktree for isolation: use \`EnterWorktree\` to create an isolated working copy.`,
-    };
+  } catch {
+    // Silently pass on error — don't warn on every tool call (#263)
+    return {};
   } finally {
     try { store.close(); } catch { /* ignore */ }
   }
