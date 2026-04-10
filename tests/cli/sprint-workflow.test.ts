@@ -61,7 +61,7 @@ describe('slope sprint run', () => {
     expect(output).toContain('sprint-lightweight');
     expect(output).toContain('started');
     expect(output).toContain('running');
-    expect(output).toContain('First step');
+    expect(output).toContain('Next step');
   });
 
   it('errors without --workflow flag', async () => {

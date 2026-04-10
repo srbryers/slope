@@ -17,7 +17,14 @@
     "./store-pg": {
       "types": "./dist/store-pg/index.d.ts",
       "import": "./dist/store-pg/index.js"
+    },
+    "./mcp": {
+      "types": "./dist/mcp/index.d.ts",
+      "import": "./dist/mcp/index.js"
     }
+  },
+  "pi": {
+    "extensions": ["./packages/pi-extension/src/index.ts"]
   },
   "bin": {
     "slope": "./dist/cli/index.js",
