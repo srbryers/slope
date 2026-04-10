@@ -166,6 +166,48 @@ function resetCommand(cwd: string): void {
 
 // --- Workflow-driven commands ---
 
+/**
+ * Auto-execute command steps and advance the workflow.
+ * Keeps running command steps until hitting a non-command step or completion.
+ */
+async function autoRunCommandSteps(
+  execId: string,
+  def: WorkflowDefinition,
+  store: ReturnType<typeof createStore>,
+  cwd: string,
+): Promise<{ phase?: string; step?: { id: string; type: string; prompt?: string; command?: string }; is_complete: boolean }> {
+  const { execSync } = await import('node:child_process');
+  const engine = new WorkflowEngine();
+  const resolved = resolveVariables(def, (await store.getExecution(execId))!.variables);
+
+  let next = await engine.next(execId, resolved, store);
+
+  while (!next.is_complete && next.step?.type === 'command' && next.step.command) {
+    const cmd = next.step.command;
+    const stepId = next.step.id;
+    console.log(`  Running: ${cmd}`);
+
+    let exitCode = 0;
+    try {
+      execSync(cmd, { cwd, stdio: 'inherit', timeout: 60000 });
+    } catch (err) {
+      exitCode = (err as { status?: number }).status ?? 1;
+      console.log(`  Command exited with code ${exitCode}`);
+    }
+
+    // Complete the step with the exit code
+    const result = await engine.complete(execId, stepId, { exit_code: exitCode }, resolved, store);
+    if (result.is_complete) {
+      return { is_complete: true };
+    }
+
+    // Get next step
+    next = await engine.next(execId, resolved, store);
+  }
+
+  return next;
+}
+
 function getStore(cwd: string) {
   const config = loadConfig(cwd);
   return createStore({ storePath: config.store_path ?? '.slope/slope.db', cwd });
@@ -218,16 +260,22 @@ async function runWorkflowCommand(args: string[], cwd: string): Promise<void> {
       variables: vars,
     });
 
-    const next = await engine.next(exec.id, resolved, store);
-
     console.log(`\nWorkflow "${def.name}" started (execution: ${exec.id})`);
     if (sprintId) console.log(`Sprint: ${sprintId}`);
-    console.log(`Status: ${exec.status}`);
-    console.log(`\nFirst step:`);
-    console.log(`  Phase: ${next.phase}`);
-    console.log(`  Step:  ${next.step?.id} (${next.step?.type})`);
-    if (next.step?.prompt) console.log(`  Prompt: ${next.step.prompt}`);
-    if (next.step?.command) console.log(`  Command: ${next.step.command}`);
+    console.log(`Status: ${exec.status}\n`);
+
+    // Auto-execute any initial command steps
+    const next = await autoRunCommandSteps(exec.id, resolved, store, cwd);
+
+    if (next.is_complete) {
+      console.log('Workflow complete.');
+    } else {
+      console.log(`\nNext step:`);
+      console.log(`  Phase: ${next.phase}`);
+      console.log(`  Step:  ${next.step?.id} (${next.step?.type})`);
+      if (next.step?.prompt) console.log(`  Prompt: ${next.step.prompt}`);
+      if (next.step?.command) console.log(`  Command: ${next.step.command}`);
+    }
     console.log('');
   } finally {
     store.close();
@@ -300,10 +348,11 @@ async function resumeCommand(args: string[], cwd: string): Promise<void> {
       await engine.resume(exec.id, store);
     }
 
-    const next = await engine.next(exec.id, resolved, store);
+    // Auto-execute any pending command steps
+    const next = await autoRunCommandSteps(exec.id, def, store, cwd);
 
     if (next.is_complete) {
-      console.log(`Workflow for sprint ${sprintArg} is already complete.`);
+      console.log(`Workflow for sprint ${sprintArg} is complete.`);
       return;
     }
 
@@ -311,7 +360,6 @@ async function resumeCommand(args: string[], cwd: string): Promise<void> {
     console.log(`\nNext step:`);
     console.log(`  Phase: ${next.phase}`);
     console.log(`  Step:  ${next.step?.id} (${next.step?.type})`);
-    if (next.current_item) console.log(`  Item:  ${next.current_item} (${(next.item_index ?? 0) + 1}/${next.total_items})`);
     if (next.step?.prompt) console.log(`  Prompt: ${next.step.prompt}`);
     if (next.step?.command) console.log(`  Command: ${next.step.command}`);
     console.log('');

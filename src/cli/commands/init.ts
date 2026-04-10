@@ -208,7 +208,8 @@ function ensureGitignore(cwd: string): void {
 }
 
 function getTemplatesRoot(): string {
-  return join(__dirname, '..', '..', '..', '..', 'templates');
+  // __dirname = dist/cli/commands/ → 3 levels up = project root
+  return join(__dirname, '..', '..', '..', 'templates');
 }
 
 function installClaudeCodeTemplates(cwd: string, metaphor: MetaphorDefinition): void {
