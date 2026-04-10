@@ -33,6 +33,7 @@ import '../../core/adapters/windsurf.js';
 import '../../core/adapters/cline.js';
 import '../../core/adapters/ob1.js';
 import '../../core/adapters/codex.js';
+import '../../core/adapters/pi.js';
 import '../../core/adapters/generic.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -657,6 +658,13 @@ function installForProvider(cwd: string, provider: InitProvider, metaphor: Metap
       console.log('    [mcp.slope]');
       console.log('    command = "slope"');
       console.log('    args = ["mcp"]');
+      break;
+    case 'pi':
+      // Pi adapter registered via side-effect import — use installDefaultHooks
+      installDefaultHooks(cwd, 'pi');
+      console.log('\n  Pi: Extension installed to .pi/extensions/slope/');
+      console.log('  Pi: Skills copied to .pi/skills/');
+      console.log('  Pi: Run /reload in pi to activate');
       break;
     case 'ob1':
       installOB1Templates(cwd, metaphor);
