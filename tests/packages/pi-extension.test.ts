@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -55,7 +55,8 @@ describe('Pi Extension', () => {
       const toolNames = mockPi.registerTool.mock.calls.map((c: unknown[]) => (c[0] as { name: string }).name);
       expect(toolNames).not.toContain('slope_briefing');
       expect(toolNames).not.toContain('slope_card');
-      expect(mockPi.registerCommand).not.toHaveBeenCalled();
+      // Settings command is always available
+      expect(mockPi.registerCommand).toHaveBeenCalled();
     });
   });
 
@@ -187,6 +188,75 @@ describe('Pi Extension', () => {
 
       const result = await cardTool.execute('id', {}, null, null, makeCtx(tmpDir));
       expect(result.content[0].text).toContain('Error');
+    });
+
+    it('registers slope_interview tool', () => {
+      slopeExtension(mockPi as never, tmpDir);
+      const interviewTool = mockPi.registerTool.mock.calls.find(
+        (c: unknown[]) => (c[0] as { name: string }).name === 'slope_interview',
+      );
+      expect(interviewTool).toBeDefined();
+    });
+
+    it('slope_interview tool completes interview and initializes project', async () => {
+      slopeExtension(mockPi as never, tmpDir);
+      const interviewTool = mockPi.registerTool.mock.calls.find(
+        (c: unknown[]) => (c[0] as { name: string }).name === 'slope_interview',
+      )?.[0] as {
+        execute: (
+          _id: string,
+          _params: Record<string, unknown>,
+          _sig: null,
+          _upd: null,
+          ctx: {
+            cwd: string;
+            ui: {
+              input: (title: string, _placeholder?: string) => Promise<string | undefined>;
+              select: (title: string, _options: string[]) => Promise<string | undefined>;
+              confirm: (title: string, _message: string) => Promise<boolean>;
+            };
+          },
+        ) => Promise<{ content: Array<{ text: string }> }>;
+      };
+
+      const ctx = {
+        cwd: tmpDir,
+        ui: {
+          input: vi.fn()
+            .mockResolvedValueOnce('TestProject')
+            .mockResolvedValueOnce('')
+            .mockResolvedValueOnce('1')
+            .mockResolvedValueOnce('')
+            .mockResolvedValueOnce(''),
+          select: vi.fn().mockResolvedValueOnce('golf'),
+          confirm: vi.fn().mockResolvedValueOnce(false),
+        },
+      };
+
+      const result = await interviewTool.execute('id', {}, null, null, ctx);
+      expect(result.content[0].text).toContain('Project initialized');
+      expect(result.content[0].text).toContain('Files created');
+
+      // Verify sprint state was created
+      const sprintState = JSON.parse(
+        readFileSync(join(tmpDir, '.slope', 'sprint-state.json'), 'utf8'),
+      );
+      expect(sprintState.phase).toBe('planning');
+    });
+
+    it('before_agent_start shows planning message when phase is planning', async () => {
+      writeFileSync(
+        join(tmpDir, '.slope', 'sprint-state.json'),
+        JSON.stringify({ sprint: 1, phase: 'planning', gates: {}, started_at: '', updated_at: '' }),
+      );
+      slopeExtension(mockPi as never, tmpDir);
+      const handler = mockPi.on.mock.calls.find(
+        (c: unknown[]) => c[0] === 'before_agent_start',
+      )?.[1] as (_event: unknown, ctx: unknown) => Promise<{ message: { content: string } } | undefined>;
+
+      const result = await handler({}, makeCtx(tmpDir));
+      expect(result?.message.content).toContain('Planning Phase');
+      expect(result?.message.content).toContain('sprint start');
     });
   });
 });

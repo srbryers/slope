@@ -5,6 +5,7 @@ import * as p from '@clack/prompts';
 import { buildInterviewContext } from '../core/interview-engine.js';
 import { generateInterviewSteps } from '../core/interview-steps.js';
 import { initFromAnswers } from '../core/interview.js';
+import { InterviewStateMachine } from '../core/interview-state-machine.js';
 import { formatPreviewText } from '../core/metaphor-preview.js';
 import type { InterviewStep, StepOption } from '../core/interview-steps.js';
 import type { MetaphorPreview } from '../core/metaphor-preview.js';
@@ -107,18 +108,23 @@ export async function runInteractiveCli(cwd: string): Promise<void> {
   const ctx = buildInterviewContext(cwd);
   s.stop('Project detected');
 
-  // 2. Walk through interview steps
+  // 2. Walk through interview steps via state machine
   const steps = generateInterviewSteps(ctx);
-  const answers: Record<string, unknown> = {};
+  const sm = new InterviewStateMachine(steps);
 
-  for (const step of steps) {
-    if (step.condition && !step.condition(answers)) continue;
-    const value = await renderStep(step, answers);
+  let step: InterviewStep | null;
+  while ((step = sm.nextQuestion()) !== null) {
+    const value = await renderStep(step, sm.getResultUnknown());
     if (p.isCancel(value)) {
       p.cancel('Init cancelled.');
       process.exit(0);
     }
-    answers[step.id] = value;
+
+    const submitResult = sm.submitAnswer(step.id, value);
+    if (!submitResult.success) {
+      p.log.error(`Validation error: ${submitResult.error}`);
+      process.exit(1);
+    }
 
     // Show metaphor preview after selection
     if (step.id === 'metaphor' && value !== 'custom') {
@@ -129,6 +135,8 @@ export async function runInteractiveCli(cwd: string): Promise<void> {
       }
     }
   }
+
+  const answers = sm.getResultUnknown();
 
   // 3. Summary + confirm
   p.note(buildSummary(answers, ctx), 'Init Summary');

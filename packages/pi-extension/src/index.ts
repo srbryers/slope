@@ -10,6 +10,18 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ExtensionAPI } from '@mariozechner/pi-coding-agent';
 import { Type } from '@sinclair/typebox';
+import {
+  InterviewStateMachine,
+  buildInterviewContext,
+  generateInterviewSteps,
+  initFromAnswers,
+  loadPiSettings,
+  savePiSettings,
+  isSkillEnabled,
+  setSkillEnabled,
+  listSkills,
+} from '@slope-dev/slope';
+import type { InterviewStep, StepOption, PiSettings } from '@slope-dev/slope';
 
 // ── Helpers ─────────────────────────────────────────
 
@@ -77,8 +89,12 @@ function getProjectState(cwd: string): 'fresh' | 'complete' | 'active' {
 
 export default function slopeExtension(pi: ExtensionAPI, _cwdOverride?: string): void {
   const cwd = _cwdOverride ?? process.cwd();
+
+  // Load Pi settings (always, even without a SLOPE project)
+  const settings = loadPiSettings(cwd);
+
   if (!hasSlopeProject(cwd)) {
-    // Not a SLOPE project — register only the init tool
+    // Not a SLOPE project — register only the init tool and settings command
     pi.registerTool({
       name: 'slope_init',
       label: 'Slope Init',
@@ -89,11 +105,125 @@ export default function slopeExtension(pi: ExtensionAPI, _cwdOverride?: string):
         return { content: [{ type: 'text' as const, text: result }], details: {} };
       },
     });
+
+    // Settings command is always available
+    registerSettingsCommand(pi, settings, cwd);
     return;
   }
 
   // ── SLOPE Tools ───────────────────────────────────
 
+  if (isSkillEnabled(settings, 'interview')) {
+  pi.registerTool({
+    name: 'slope_interview',
+    label: 'Slope Interview',
+    description: 'Run the project interview directly in Pi. Uses native dialogs (input, select, confirm). No shell-out. Creates .slope/config.json and starter files on completion.',
+    parameters: Type.Object({
+      resume: Type.Optional(Type.Boolean({ description: 'Resume a previously started interview' })),
+    }),
+    async execute(_id, _params, _signal, _update, ctx) {
+      const steps = generateInterviewSteps(buildInterviewContext(ctx.cwd));
+      const sm = new InterviewStateMachine(steps);
+
+      let step: InterviewStep | null;
+      while ((step = sm.nextQuestion()) !== null) {
+        let value: unknown;
+        switch (step.type) {
+          case 'text': {
+            const placeholder = step.description ?? '';
+            const def = typeof step.default === 'string' ? step.default : undefined;
+            const reply = await ctx.ui.input(step.question, placeholder + (def ? ` (default: ${def})` : ''));
+            value = reply ?? def ?? '';
+            break;
+          }
+          case 'select': {
+            const options = (step.options ?? []).map((o: StepOption) =>
+              o.hint ? `${o.label} ${o.hint}` : o.label
+            );
+            const reply = await ctx.ui.select(step.question, options);
+            if (reply === undefined) {
+              return {
+                content: [{ type: 'text' as const, text: 'Interview cancelled.' }],
+                details: {},
+              };
+            }
+            // Map display label back to value
+            const chosen = step.options?.find((o: StepOption) =>
+              (o.hint ? `${o.label} ${o.hint}` : o.label) === reply
+            );
+            value = chosen?.value ?? reply;
+            break;
+          }
+          case 'multiselect': {
+            // Pi has no multiselect — ask for comma-separated values
+            const optionsText = (step.options ?? [])
+              .map((o: StepOption) => `${o.label}${o.hint ? ` ${o.hint}` : ''}`)
+              .join(', ');
+            const reply = await ctx.ui.input(
+              `${step.question} (comma-separated)`,
+              optionsText,
+            );
+            if (reply === undefined) {
+              return {
+                content: [{ type: 'text' as const, text: 'Interview cancelled.' }],
+                details: {},
+              };
+            }
+            value = reply.split(',').map((s: string) => s.trim()).filter(Boolean);
+            break;
+          }
+          case 'confirm': {
+            value = await ctx.ui.confirm(step.question, step.description ?? '');
+            break;
+          }
+          default: {
+            const reply = await ctx.ui.input(step.question);
+            value = reply ?? '';
+          }
+        }
+
+        const submitResult = sm.submitAnswer(step.id, value);
+        if (!submitResult.success) {
+          return {
+            content: [{ type: 'text' as const, text: `Validation error: ${submitResult.error}` }],
+            details: {},
+          };
+        }
+      }
+
+      const answers = sm.getResultUnknown();
+      const platformsVal = answers.platforms;
+      const result = await initFromAnswers(
+        ctx.cwd,
+        answers,
+        Array.isArray(platformsVal) ? platformsVal as string[] : undefined,
+      );
+
+      if (!result.success) {
+        return {
+          content: [{ type: 'text' as const, text: `Interview failed:\n${result.errors.map((e: { field: string; message: string }) => `  ${e.field}: ${e.message}`).join('\n')}` }],
+          details: {},
+        };
+      }
+
+      // Clear onboarding flag so future sessions show planning briefing
+      saveOnboardingState(ctx.cwd, { shownAt: new Date().toISOString() });
+
+      return {
+        content: [{
+          type: 'text' as const,
+          text:
+            'Project initialized from interview.\n\n' +
+            `Files created:\n${result.filesCreated.map((f: string) => `  ${f}`).join('\n')}\n\n` +
+            'Next: run `slope sprint start` to begin your first sprint.',
+        }],
+        details: {},
+      };
+    },
+  });
+  } // end interview skill
+
+  if (isSkillEnabled(settings, 'briefing')) {
   pi.registerTool({
     name: 'slope_briefing',
     label: 'Slope Briefing',
@@ -106,7 +236,9 @@ export default function slopeExtension(pi: ExtensionAPI, _cwdOverride?: string):
       return { content: [{ type: 'text' as const, text: result }], details: {} };
     },
   });
+  } // end briefing skill
 
+  if (isSkillEnabled(settings, 'scorecard')) {
   pi.registerTool({
     name: 'slope_card',
     label: 'Slope Card',
@@ -117,7 +249,9 @@ export default function slopeExtension(pi: ExtensionAPI, _cwdOverride?: string):
       return { content: [{ type: 'text' as const, text: result }], details: {} };
     },
   });
+  } // end scorecard skill
 
+  if (isSkillEnabled(settings, 'guards')) {
   pi.registerTool({
     name: 'slope_guard_check',
     label: 'Slope Guard Check',
@@ -130,7 +264,9 @@ export default function slopeExtension(pi: ExtensionAPI, _cwdOverride?: string):
       return { content: [{ type: 'text' as const, text: result }], details: {} };
     },
   });
+  } // end guards skill
 
+  if (isSkillEnabled(settings, 'planning')) {
   pi.registerTool({
     name: 'slope_sprint_context',
     label: 'Slope Sprint Context',
@@ -156,7 +292,9 @@ export default function slopeExtension(pi: ExtensionAPI, _cwdOverride?: string):
       return { content: [{ type: 'text' as const, text: result }], details: {} };
     },
   });
+  } // end planning skill
 
+  if (isSkillEnabled(settings, 'review')) {
   pi.registerTool({
     name: 'slope_review_run',
     label: 'Slope Review Run',
@@ -177,7 +315,9 @@ export default function slopeExtension(pi: ExtensionAPI, _cwdOverride?: string):
       return { content: [{ type: 'text' as const, text: result }], details: {} };
     },
   });
+  } // end review skill
 
+  if (isSkillEnabled(settings, 'guards')) {
   pi.registerTool({
     name: 'slope_guard_metrics',
     label: 'Slope Guard Metrics',
@@ -188,7 +328,9 @@ export default function slopeExtension(pi: ExtensionAPI, _cwdOverride?: string):
       return { content: [{ type: 'text' as const, text: result }], details: {} };
     },
   });
+  } // end guards skill (metrics)
 
+  if (isSkillEnabled(settings, 'scorecard')) {
   pi.registerTool({
     name: 'slope_convergence',
     label: 'Slope Convergence',
@@ -201,9 +343,11 @@ export default function slopeExtension(pi: ExtensionAPI, _cwdOverride?: string):
       return { content: [{ type: 'text' as const, text: result }], details: {} };
     },
   });
+  } // end scorecard skill (convergence)
 
   // ── Guard Enforcement via Events ──────────────────
 
+  if (isSkillEnabled(settings, 'guards')) {
   // Guard: hazard warning on write/edit; commit discipline nudge on bash
   pi.on('tool_call', async (event, ctx) => {
     const { toolName, input } = event;
@@ -255,7 +399,9 @@ export default function slopeExtension(pi: ExtensionAPI, _cwdOverride?: string):
       } catch { /* not in git repo */ }
     }
   });
+  } // end guards event handlers
 
+  if (isSkillEnabled(settings, 'planning')) {
   // Guard: post-push sprint nudge
   pi.on('tool_result', async (event, ctx) => {
     const inp = event.input as Record<string, unknown>;
@@ -275,6 +421,7 @@ export default function slopeExtension(pi: ExtensionAPI, _cwdOverride?: string):
       } catch { /* ignore */ }
     }
   });
+  } // end planning event handlers
 
   // ── Slash Commands ────────────────────────────────
 
@@ -294,15 +441,19 @@ export default function slopeExtension(pi: ExtensionAPI, _cwdOverride?: string):
     },
   });
 
+  // Settings command
+  registerSettingsCommand(pi, settings, cwd);
+
   // ── Session Start: Inject Briefing on First Turn ──
 
   let briefingInjected = false;
 
   pi.on('session_start', async (_event, ctx) => {
     briefingInjected = false;
-    ctx.ui.notify('SLOPE loaded — use /slope, /sprint, or ask for slope_* tools', 'info');
+    ctx.ui.notify('SLOPE loaded — use /slope, /sprint, /slope-settings, or ask for slope_* tools', 'info');
   });
 
+  if (isSkillEnabled(settings, 'briefing')) {
   pi.on('before_agent_start', async (_event, ctx) => {
     if (briefingInjected) return;
     briefingInjected = true;
@@ -349,7 +500,32 @@ export default function slopeExtension(pi: ExtensionAPI, _cwdOverride?: string):
       };
     }
 
-    // Active sprint — normal compact briefing
+    // Active sprint — check if in planning phase
+    const sprintStatePath = join(ctx.cwd, '.slope', 'sprint-state.json');
+    let phase: string | undefined;
+    try {
+      const raw = JSON.parse(readFileSync(sprintStatePath, 'utf8'));
+      phase = raw.phase;
+    } catch { /* ignore */ }
+
+    if (phase === 'planning') {
+      return {
+        message: {
+          customType: 'slope-planning',
+          content:
+            '📋 SLOPE Planning Phase\n\n' +
+            'The project is initialized and ready for sprint planning.\n\n' +
+            'Suggested next steps:\n' +
+            '1. Review docs/backlog/roadmap.json and refine the starter sprint\n' +
+            '2. Run `slope sprint start --number=1` to activate Sprint 1\n' +
+            '3. Use `slope sprint run S1 --workflow=sprint-standard` to begin execution\n\n' +
+            'Session mode: planning (workflow guards are relaxed).',
+          display: true,
+        },
+      };
+    }
+
+    // Normal active sprint — compact briefing
     const briefing = slopeCmd('briefing --compact', ctx.cwd);
     if (briefing.startsWith('Error:')) {
       return {
@@ -368,5 +544,55 @@ export default function slopeExtension(pi: ExtensionAPI, _cwdOverride?: string):
         display: true,
       },
     };
+  });
+  } // end briefing event handlers
+}
+
+// ── Settings Command ──────────────────────────────
+
+function registerSettingsCommand(pi: ExtensionAPI, settings: PiSettings, cwd: string): void {
+  pi.registerCommand('slope-settings', {
+    description: 'Show and manage SLOPE Pi feature settings',
+    handler: async (_args, ctx) => {
+      const skills = listSkills(settings);
+
+      // Build interactive select options showing current state
+      const options = skills.map((s) => {
+        const status = s.enabled ? '✓ ON ' : '✗ OFF';
+        return `${s.name.padEnd(12)} ${status}  ${s.description}`;
+      });
+
+      const choice = await ctx.ui.select('SLOPE Features — select one to toggle', options);
+      if (choice === undefined) {
+        ctx.ui.notify('Settings unchanged.', 'info');
+        return;
+      }
+
+      // Extract skill name from selection
+      const skillName = skills[options.indexOf(choice)]?.name;
+      if (!skillName || !settings.skills[skillName]) {
+        ctx.ui.notify('Invalid selection.', 'error');
+        return;
+      }
+
+      const wasEnabled = settings.skills[skillName].enabled;
+      const confirm = await ctx.ui.confirm(
+        `Toggle "${skillName}" ${wasEnabled ? 'OFF' : 'ON'}?`,
+        `Currently: ${wasEnabled ? 'enabled' : 'disabled'}. Changes take effect after session restart.`,
+      );
+
+      if (!confirm) {
+        ctx.ui.notify('Settings unchanged.', 'info');
+        return;
+      }
+
+      setSkillEnabled(settings, skillName, !wasEnabled);
+      savePiSettings(cwd, settings);
+      ctx.ui.notify(
+        `SLOPE: "${skillName}" is now ${!wasEnabled ? 'ENABLED' : 'DISABLED'}. ` +
+        'Restart the session for changes to take full effect.',
+        'info',
+      );
+    },
   });
 }

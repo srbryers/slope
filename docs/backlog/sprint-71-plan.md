@@ -76,6 +76,15 @@ The current `slope init --interactive` is CLI-only, built on `@clack/prompts`. W
 - [ ] After interview, `slope briefing --compact` shows real sprint data
 - [ ] All new code has test coverage
 
+## Hazard Watch
+
+| Ticket | Hazard | Why |
+|--------|--------|-----|
+| T1 | bunker | `interactive-init.ts` refactor must preserve exact UX — any behavior change breaks human users |
+| T1 | rough | `@clack/prompts` types (string/number/boolean) may not align with state machine `AnswerValue` union |
+| T3 | rough | Pi extension has separate `tsconfig.json` — importing core types may require path mapping or build adjustments |
+| T5 | water | JSON mode CLI tests spawn subprocesses — timing/stdout buffering flakiness in CI |
+
 ## Related
 
 - S70 onboarding message (already shipped) — the message that triggers this flow

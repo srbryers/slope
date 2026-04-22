@@ -42,6 +42,13 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     ],
   },
   {
+    cmd: 'interview', desc: 'Run project interview (human or agent JSON mode)', category: 'lifecycle',
+    flags: [
+      { flag: '--agent', desc: 'JSON I/O mode for agent harnesses' },
+      { flag: '--force', desc: 'Re-interview even if project already initialized' },
+    ],
+  },
+  {
     cmd: 'help', desc: 'Show detailed per-command usage', category: 'lifecycle',
     flags: [{ flag: '<command>', desc: 'Command name to show details for' }],
   },

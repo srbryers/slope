@@ -1,6 +1,6 @@
 {
   "name": "@slope-dev/pi-extension",
-  "version": "1.0.0",
+  "version": "1.52.0",
   "description": "SLOPE integration for pi.dev coding agent — guards, tools, and workflow enforcement",
   "type": "module",
   "main": "./dist/index.js",

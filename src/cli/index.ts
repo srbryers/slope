@@ -58,6 +58,7 @@ import { enrichCommand } from './commands/enrich.js';
 import { docsCommand } from './commands/docs.js';
 import { statsCommand } from './commands/stats.js';
 import { loopCommand } from './commands/loop.js';
+import { interviewCommand } from './commands/interview.js';
 import { sprintCommand } from './commands/sprint.js';
 import { doctorCommand } from './commands/doctor.js';
 import { versionCommand } from './commands/version.js';
@@ -104,6 +105,12 @@ if (subcommand === '--version') {
 switch (subcommand) {
   case 'init':
     initCommand(process.argv.slice(3)).catch(err => {
+      console.error('Error:', err.message);
+      process.exit(1);
+    });
+    break;
+  case 'interview':
+    interviewCommand(process.argv.slice(3)).catch(err => {
       console.error('Error:', err.message);
       process.exit(1);
     });
