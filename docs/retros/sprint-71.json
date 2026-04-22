@@ -1,0 +1,90 @@
+{
+  "sprint_number": 71,
+  "theme": "The Intake Desk — Agent-Native Project Interview",
+  "par": 5,
+  "slope": 2,
+  "score": 5,
+  "score_label": "par",
+  "date": "2026-04-22",
+  "shots": [
+    {
+      "ticket_key": "S71-1",
+      "title": "Interview state machine refactor",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [
+        "rough: initial design had submitAnswer calling nextQuestion() internally, causing double-advance in while loops — caught and fixed before commit"
+      ]
+    },
+    {
+      "ticket_key": "S71-2",
+      "title": "slope interview CLI command",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": []
+    },
+    {
+      "ticket_key": "S71-3",
+      "title": "Pi extension slope_interview tool",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        "rough: Pi has no native multiselect — adapted platforms step to comma-separated input",
+        "rough: cross-package imports required tsconfig path mapping in pi-extension"
+      ]
+    },
+    {
+      "ticket_key": "S71-4",
+      "title": "Auto-transition fresh to planning phase",
+      "club": "wedge",
+      "result": "green",
+      "hazards": []
+    },
+    {
+      "ticket_key": "S71-5",
+      "title": "Test coverage",
+      "club": "wedge",
+      "result": "green",
+      "hazards": []
+    }
+  ],
+  "conditions": [
+    "Feature branch: feat/s71-intake-desk",
+    "All 3007 tests pass",
+    "Guard check clean after push"
+  ],
+  "special_plays": [],
+  "stats": {
+    "fairways_hit": 5,
+    "fairways_total": 5,
+    "greens_in_regulation": 5,
+    "greens_total": 5,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 3,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "yardage_book_updates": [
+    "InterviewStateMachine class in src/core/interview-state-machine.ts",
+    "slope interview command in src/cli/commands/interview.ts",
+    "slope_interview Pi tool in packages/pi-extension/src/index.ts",
+    "Auto-create sprint-state.json with phase=planning after interview"
+  ],
+  "bunker_locations": [
+    "State machine design: separate nextQuestion() from submitAnswer() to avoid double-advance",
+    "Pi multiselect gap: use text input with comma-separated values",
+    "Cross-package imports: use tsconfig paths mapping for monorepo packages"
+  ],
+  "course_management_notes": [
+    "S71-1 (long_iron) was the foundation ticket — state machine design determined the shape of S71-2 and S71-3",
+    "No breaking changes: interactive-init.ts refactored to use state machine but preserves exact UX",
+    "CLI --agent JSON mode enables any harness to drive the interview via subprocess",
+    "Pi tool uses native ctx.ui dialogs for seamless agent experience"
+  ]
+}
