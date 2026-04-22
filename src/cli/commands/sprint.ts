@@ -216,7 +216,15 @@ function getStore(cwd: string) {
 async function runWorkflowCommand(args: string[], cwd: string): Promise<void> {
   const sprintArg = args.find(a => a.startsWith('--sprint=') || !a.startsWith('--'));
   const workflowArg = args.find(a => a.startsWith('--workflow='));
-  const varArgs = args.filter(a => a.startsWith('--var='));
+  const varArgs: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--var' && i + 1 < args.length) {
+      varArgs.push(`--var=${args[i + 1]}`);
+      i++;
+    } else if (args[i].startsWith('--var=')) {
+      varArgs.push(args[i]);
+    }
+  }
 
   if (!workflowArg) {
     console.error('Usage: slope sprint run <sprint_id> --workflow=<name> [--var key=value ...]');
@@ -236,6 +244,7 @@ async function runWorkflowCommand(args: string[], cwd: string): Promise<void> {
       vars[kv.slice(0, eq)] = kv.slice(eq + 1);
     }
   }
+
 
   // Load and validate workflow
   const def = loadWorkflow(workflowName, cwd);
