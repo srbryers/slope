@@ -6,7 +6,7 @@
  */
 
 import { execSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ExtensionAPI } from '@mariozechner/pi-coding-agent';
 import { Type } from '@sinclair/typebox';
@@ -24,6 +24,53 @@ function slopeCmd(args: string, cwd: string): string {
 
 function hasSlopeProject(cwd: string): boolean {
   return existsSync(join(cwd, '.slope', 'config.json'));
+}
+
+// ── Onboarding State ────────────────────────────────
+
+const ONBOARDING_STATE_FILE = '.slope/.pi-onboarding.json';
+
+interface OnboardingState {
+  shownAt?: string;
+}
+
+function loadOnboardingState(cwd: string): OnboardingState {
+  const path = join(cwd, ONBOARDING_STATE_FILE);
+  if (!existsSync(path)) return {};
+  try {
+    return JSON.parse(readFileSync(path, 'utf8')) as OnboardingState;
+  } catch {
+    return {};
+  }
+}
+
+function saveOnboardingState(cwd: string, state: OnboardingState): void {
+  const dir = join(cwd, '.slope');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(cwd, ONBOARDING_STATE_FILE), JSON.stringify(state, null, 2) + '\n');
+}
+
+/** Determine the SLOPE project state for this workspace */
+function getProjectState(cwd: string): 'fresh' | 'complete' | 'active' {
+  const sprintStatePath = join(cwd, '.slope', 'sprint-state.json');
+  if (!existsSync(sprintStatePath)) {
+    return 'fresh';
+  }
+  try {
+    const state = JSON.parse(readFileSync(sprintStatePath, 'utf8')) as {
+      phase?: string;
+    };
+    if (
+      state.phase === 'planning' ||
+      state.phase === 'implementing' ||
+      state.phase === 'scoring'
+    ) {
+      return 'active';
+    }
+    return 'complete';
+  } catch {
+    return 'fresh';
+  }
 }
 
 // ── Extension Entry Point ───────────────────────────
@@ -259,7 +306,61 @@ export default function slopeExtension(pi: ExtensionAPI, _cwdOverride?: string):
   pi.on('before_agent_start', async (_event, ctx) => {
     if (briefingInjected) return;
     briefingInjected = true;
+
+    const projectState = getProjectState(ctx.cwd);
+
+    // Fresh project: onboarding instead of briefing
+    if (projectState === 'fresh') {
+      const onboarding = loadOnboardingState(ctx.cwd);
+      if (!onboarding.shownAt) {
+        onboarding.shownAt = new Date().toISOString();
+        saveOnboardingState(ctx.cwd, onboarding);
+
+        return {
+          message: {
+            customType: 'slope-onboarding',
+            content:
+              '🎯 SLOPE Onboarding\n\n' +
+              'This project has SLOPE initialized, but no sprint is active yet. Please help get things set up:\n\n' +
+              '1. **Understand the project**: Read README.md, package.json, and explore key source files to understand what\'s been built.\n' +
+              '2. **Index the codebase**: Run `slope map` to generate CODEBASE.md for architectural context.\n' +
+              '3. **Interview the user**: Ask 2–3 quick questions about the project goals, team size, and current priorities.\n' +
+              '4. **Start Sprint 1**: Once you have context, suggest creating a sprint plan with `slope sprint start` or by editing docs/backlog/roadmap.json.\n\n' +
+              'Session mode: adhoc (sprint-workflow guards are silenced until a sprint begins).\n' +
+              'Use /slope or the slope_* tools anytime for SLOPE commands.',
+            display: true,
+          },
+        };
+      }
+      // Onboarding already shown this project — stay silent in adhoc mode
+      return {};
+    }
+
+    // Sprint complete but no active one
+    if (projectState === 'complete') {
+      return {
+        message: {
+          customType: 'slope-briefing',
+          content:
+            'SLOPE: No active sprint (previous sprint complete). ' +
+            'Start the next sprint with `slope sprint start`, or continue in adhoc mode.',
+          display: true,
+        },
+      };
+    }
+
+    // Active sprint — normal compact briefing
     const briefing = slopeCmd('briefing --compact', ctx.cwd);
+    if (briefing.startsWith('Error:')) {
+      return {
+        message: {
+          customType: 'slope-briefing',
+          content: `SLOPE: Could not load briefing (${briefing}). Run \`slope briefing\` manually.`,
+          display: true,
+        },
+      };
+    }
+
     return {
       message: {
         customType: 'slope-briefing',

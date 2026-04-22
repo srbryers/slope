@@ -135,7 +135,26 @@ describe('Pi Extension', () => {
       );
     });
 
-    it('before_agent_start injects briefing message on first turn', async () => {
+    it('before_agent_start injects onboarding message for fresh project', async () => {
+      slopeExtension(mockPi as never, tmpDir);
+      const handler = mockPi.on.mock.calls.find(
+        (c: unknown[]) => c[0] === 'before_agent_start',
+      )?.[1] as (_event: unknown, ctx: unknown) => Promise<{ message: { content: string } } | undefined>;
+
+      const result = await handler({}, makeCtx(tmpDir));
+      expect(result?.message.content).toContain('🎯 SLOPE Onboarding');
+      expect(result?.message.content).toContain('slope map');
+
+      // Second call should return nothing (dedup)
+      const result2 = await handler({}, makeCtx(tmpDir));
+      expect(result2).toBeUndefined();
+    });
+
+    it('before_agent_start injects briefing message when sprint is active', async () => {
+      writeFileSync(
+        join(tmpDir, '.slope', 'sprint-state.json'),
+        JSON.stringify({ sprint: 1, phase: 'implementing', gates: {}, started_at: '', updated_at: '' }),
+      );
       slopeExtension(mockPi as never, tmpDir);
       const handler = mockPi.on.mock.calls.find(
         (c: unknown[]) => c[0] === 'before_agent_start',
@@ -143,10 +162,20 @@ describe('Pi Extension', () => {
 
       const result = await handler({}, makeCtx(tmpDir));
       expect(result?.message.content).toContain('SLOPE Session Briefing');
+    });
 
-      // Second call should return nothing (dedup)
-      const result2 = await handler({}, makeCtx(tmpDir));
-      expect(result2).toBeUndefined();
+    it('before_agent_start shows completion notice when sprint is complete', async () => {
+      writeFileSync(
+        join(tmpDir, '.slope', 'sprint-state.json'),
+        JSON.stringify({ sprint: 1, phase: 'complete', gates: {}, started_at: '', updated_at: '' }),
+      );
+      slopeExtension(mockPi as never, tmpDir);
+      const handler = mockPi.on.mock.calls.find(
+        (c: unknown[]) => c[0] === 'before_agent_start',
+      )?.[1] as (_event: unknown, ctx: unknown) => Promise<{ message: { content: string } } | undefined>;
+
+      const result = await handler({}, makeCtx(tmpDir));
+      expect(result?.message.content).toContain('No active sprint (previous sprint complete)');
     });
 
     it('tool handles errors gracefully', async () => {
