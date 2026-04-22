@@ -12,6 +12,7 @@ dist/
 .slope-loop-worktree-*/
 slope-loop/backlog.json
 slope-loop/analysis.json
+CODEBASE.md
 docs/demo/
 docs/issues/
 
