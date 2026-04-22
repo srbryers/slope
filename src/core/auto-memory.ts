@@ -3,7 +3,7 @@
  * Creates memories automatically with lower weight (5) and proper deduplication.
  */
 
-import { addMemory, searchMemories } from './memory.js';
+import { addMemory, searchMemories, updateMemory } from './memory.js';
 import type { MemoryCategory } from './memory.js';
 
 // ── Deduplication ───────────────────────────────────
@@ -116,7 +116,13 @@ export function recordGuardFire(
     existing.lastFired = new Date().toISOString();
     if (existing.count >= 3) {
       const text = `Guard "${guardName}" fired ${existing.count} times on pattern: ${pattern}. Consider addressing root cause.`;
-      if (!isDuplicate(cwd, text)) {
+      // Check for existing memory for this guard+pattern, not exact text
+      const all = searchMemories(cwd, { source: 'auto-guard', limit: 20 });
+      const prev = all.find(m => m.text.includes(`Guard "${guardName}"`) && m.text.includes(pattern));
+      if (prev) {
+        // Update existing memory instead of creating duplicate
+        updateMemory(cwd, prev.id, { text });
+      } else {
         addMemory(cwd, text, {
           category: 'hazard',
           weight: 5,
