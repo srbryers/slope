@@ -814,5 +814,12 @@ export type {
   MemorySearchOptions,
 } from './memory.js';
 
+// Auto-Memory
+export {
+  captureGuardOverride,
+  extractWorkflowPatterns,
+  recordGuardFire,
+} from './auto-memory.js';
+
 // Built-in metaphors (auto-registers on import)
 export { golf, tennis, baseball, gaming, dnd, matrix, agile } from './metaphors/index.js';
