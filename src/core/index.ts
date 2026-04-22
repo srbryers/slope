@@ -536,6 +536,16 @@ export type {
   InterviewContext,
 } from './interview-engine.js';
 
+// Interview State Machine
+export {
+  InterviewStateMachine,
+} from './interview-state-machine.js';
+export type {
+  AnswerValue,
+  InterviewState,
+  SubmitResult,
+} from './interview-state-machine.js';
+
 // Project Registry (Multi-Project)
 export { FileProjectRegistry } from './project-registry.js';
 export type { ProjectRegistry } from './project-registry.js';
