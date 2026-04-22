@@ -12,6 +12,7 @@
   "keywords": ["slope", "pi", "pi-agent", "coding-agent", "sprint", "guards"],
   "license": "MIT",
   "peerDependencies": {
-    "@mariozechner/pi-coding-agent": ">=0.1.0"
+    "@mariozechner/pi-coding-agent": ">=0.1.0",
+    "@sinclair/typebox": "*"
   }
 }

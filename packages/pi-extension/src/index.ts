@@ -1,29 +1,15 @@
 /**
- * SLOPE Extension for pi.dev coding agent
+ * SLOPE Extension for pi coding agent
  *
  * Registers SLOPE tools and enforces guards via Pi's event system.
- * Install: copy to .pi/extensions/slope/ or npm install @slope-dev/pi-extension
+ * Install: pi install . (project-local) or pi install npm:@slope-dev/slope
  */
 
 import { execSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-
-// Pi extension interface (minimal types — avoids hard dependency on Pi)
-interface PiContext {
-  registerTool(definition: ToolDefinition): void;
-  registerCommand(name: string, description: string, handler: (args: string) => Promise<void>): void;
-  on(event: string, handler: (...args: unknown[]) => void | Promise<void>): void;
-  sendMessage(role: string, content: string): void;
-  cwd: string;
-}
-
-interface ToolDefinition {
-  name: string;
-  description: string;
-  parameters: Record<string, unknown>;
-  execute: (params: Record<string, unknown>, signal?: AbortSignal) => Promise<string>;
-}
+import type { ExtensionAPI } from '@mariozechner/pi-coding-agent';
+import { Type } from '@sinclair/typebox';
 
 // ── Helpers ─────────────────────────────────────────
 
@@ -42,16 +28,19 @@ function hasSlopeProject(cwd: string): boolean {
 
 // ── Extension Entry Point ───────────────────────────
 
-export default function slopeExtension(pi: PiContext): void {
-  const cwd = pi.cwd;
-
+export default function slopeExtension(pi: ExtensionAPI, _cwdOverride?: string): void {
+  const cwd = _cwdOverride ?? process.cwd();
   if (!hasSlopeProject(cwd)) {
     // Not a SLOPE project — register only the init tool
     pi.registerTool({
       name: 'slope_init',
+      label: 'Slope Init',
       description: 'Initialize SLOPE in this project for sprint tracking and guard enforcement',
-      parameters: {},
-      execute: async () => slopeCmd('init', cwd),
+      parameters: Type.Object({}),
+      async execute(_id, _params, _signal, _update, ctx) {
+        const result = slopeCmd('init', ctx.cwd);
+        return { content: [{ type: 'text' as const, text: result }], details: {} };
+      },
     });
     return;
   }
@@ -60,190 +49,223 @@ export default function slopeExtension(pi: PiContext): void {
 
   pi.registerTool({
     name: 'slope_briefing',
-    description: 'Get sprint briefing — handicap, hazards, claims, roadmap context. Use --compact for ~200 token summary.',
-    parameters: {
-      type: 'object',
-      properties: {
-        compact: { type: 'boolean', description: 'Compact mode (~200 tokens instead of full briefing)' },
-      },
+    label: 'Slope Briefing',
+    description: 'Get sprint briefing — handicap, hazards, claims, roadmap context. Use compact for ~200 token summary.',
+    parameters: Type.Object({
+      compact: Type.Optional(Type.Boolean({ description: 'Compact mode (~200 tokens instead of full briefing)' })),
+    }),
+    async execute(_id, params, _signal, _update, ctx) {
+      const result = slopeCmd(`briefing${params.compact ? ' --compact' : ''}`, ctx.cwd);
+      return { content: [{ type: 'text' as const, text: result }], details: {} };
     },
-    execute: async (params) => slopeCmd(`briefing${params.compact ? ' --compact' : ''}`, cwd),
   });
 
   pi.registerTool({
     name: 'slope_card',
+    label: 'Slope Card',
     description: 'Display handicap card — rolling performance stats across sprints',
-    parameters: {},
-    execute: async () => slopeCmd('card', cwd),
+    parameters: Type.Object({}),
+    async execute(_id, _params, _signal, _update, ctx) {
+      const result = slopeCmd('card', ctx.cwd);
+      return { content: [{ type: 'text' as const, text: result }], details: {} };
+    },
   });
 
   pi.registerTool({
     name: 'slope_guard_check',
+    label: 'Slope Guard Check',
     description: 'Run standalone guard validation: typecheck, tests, uncommitted changes, unpushed commits. Call before committing.',
-    parameters: {
-      type: 'object',
-      properties: {
-        json: { type: 'boolean', description: 'Machine-readable JSON output' },
-      },
+    parameters: Type.Object({
+      json: Type.Optional(Type.Boolean({ description: 'Machine-readable JSON output' })),
+    }),
+    async execute(_id, params, _signal, _update, ctx) {
+      const result = slopeCmd(`guard check${params.json ? ' --json' : ''}`, ctx.cwd);
+      return { content: [{ type: 'text' as const, text: result }], details: {} };
     },
-    execute: async (params) => slopeCmd(`guard check${params.json ? ' --json' : ''}`, cwd),
   });
 
   pi.registerTool({
     name: 'slope_sprint_context',
+    label: 'Slope Sprint Context',
     description: 'Get remaining workflow steps for the current sprint — include in subagent prompts for workflow awareness.',
-    parameters: {
-      type: 'object',
-      properties: {
-        sprint_id: { type: 'string', description: 'Sprint ID (e.g., S80)' },
-      },
-      required: ['sprint_id'],
+    parameters: Type.Object({
+      sprint_id: Type.String({ description: 'Sprint ID (e.g., S80)' }),
+    }),
+    async execute(_id, params, _signal, _update, ctx) {
+      const result = slopeCmd(`sprint context ${params.sprint_id}`, ctx.cwd);
+      return { content: [{ type: 'text' as const, text: result }], details: {} };
     },
-    execute: async (params) => slopeCmd(`sprint context ${params.sprint_id}`, cwd),
   });
 
   pi.registerTool({
     name: 'slope_sprint_validate',
+    label: 'Slope Sprint Validate',
     description: 'Post-hoc validation: check workflow complete, scorecard exists, plan exists, tests pass.',
-    parameters: {
-      type: 'object',
-      properties: {
-        sprint_id: { type: 'string', description: 'Sprint ID (e.g., S80)' },
-      },
-      required: ['sprint_id'],
+    parameters: Type.Object({
+      sprint_id: Type.String({ description: 'Sprint ID (e.g., S80)' }),
+    }),
+    async execute(_id, params, _signal, _update, ctx) {
+      const result = slopeCmd(`sprint validate ${params.sprint_id}`, ctx.cwd);
+      return { content: [{ type: 'text' as const, text: result }], details: {} };
     },
-    execute: async (params) => slopeCmd(`sprint validate ${params.sprint_id}`, cwd),
   });
 
   pi.registerTool({
     name: 'slope_review_run',
+    label: 'Slope Review Run',
     description: 'Generate isolated review prompts from a PR diff for subagent-based code/architect reviews.',
-    parameters: {
-      type: 'object',
-      properties: {
-        pr: { type: 'number', description: 'PR number (default: current branch)' },
-        type: { type: 'string', enum: ['architect', 'code', 'both'], description: 'Review type' },
-      },
-    },
-    execute: async (params) => {
-      const args = [params.pr ? `--pr=${params.pr}` : '', params.type ? `--type=${params.type}` : ''].filter(Boolean).join(' ');
-      return slopeCmd(`review run ${args}`, cwd);
+    parameters: Type.Object({
+      pr: Type.Optional(Type.Number({ description: 'PR number (default: current branch)' })),
+      type: Type.Optional(Type.Union(
+        [Type.Literal('architect'), Type.Literal('code'), Type.Literal('both')],
+        { description: 'Review type' },
+      )),
+    }),
+    async execute(_id, params, _signal, _update, ctx) {
+      const args = [
+        params.pr ? `--pr=${params.pr}` : '',
+        params.type ? `--type=${params.type}` : '',
+      ].filter(Boolean).join(' ');
+      const result = slopeCmd(`review run ${args}`, ctx.cwd);
+      return { content: [{ type: 'text' as const, text: result }], details: {} };
     },
   });
 
   pi.registerTool({
     name: 'slope_guard_metrics',
+    label: 'Slope Guard Metrics',
     description: 'Display guard execution metrics — per-guard totals, allow/deny rates, most active/blocking.',
-    parameters: {},
-    execute: async () => slopeCmd('guard metrics', cwd),
+    parameters: Type.Object({}),
+    async execute(_id, _params, _signal, _update, ctx) {
+      const result = slopeCmd('guard metrics', ctx.cwd);
+      return { content: [{ type: 'text' as const, text: result }], details: {} };
+    },
   });
 
   pi.registerTool({
     name: 'slope_convergence',
+    label: 'Slope Convergence',
     description: 'Detect convergence patterns: improvement rate, plateau, reversion. Requires 10+ scorecards.',
-    parameters: {
-      type: 'object',
-      properties: {
-        json: { type: 'boolean', description: 'JSON output' },
-      },
+    parameters: Type.Object({
+      json: Type.Optional(Type.Boolean({ description: 'JSON output' })),
+    }),
+    async execute(_id, params, _signal, _update, ctx) {
+      const result = slopeCmd(`loop convergence${params.json ? ' --json' : ''}`, ctx.cwd);
+      return { content: [{ type: 'text' as const, text: result }], details: {} };
     },
-    execute: async (params) => slopeCmd(`loop convergence${params.json ? ' --json' : ''}`, cwd),
   });
 
   // ── Guard Enforcement via Events ──────────────────
 
-  // Track injected context for dedup (mirrors session-state.ts logic)
-  const seenHashes = new Map<string, number>();
+  // Guard: hazard warning on write/edit; commit discipline nudge on bash
+  pi.on('tool_call', async (event, ctx) => {
+    const { toolName, input } = event;
+    const inp = input as Record<string, unknown>;
 
-  function hashString(s: string): string {
-    let hash = 0;
-    for (let i = 0; i < s.length; i++) {
-      hash = ((hash << 5) - hash + s.charCodeAt(i)) | 0;
-    }
-    return String(hash);
-  }
-
-  function dedupContext(guard: string, context: string): string | null {
-    const h = hashString(context);
-    const count = seenHashes.get(h);
-    if (count) {
-      seenHashes.set(h, count + 1);
-      return `SLOPE ${guard}: (same as prior warning, shown ${count + 1}x)`;
-    }
-    seenHashes.set(h, 1);
-    return null;
-  }
-
-  // Enforce hazard warnings on file writes
-  pi.on('tool_call', async (toolName: unknown, params: unknown) => {
-    const name = String(toolName);
-    const p = params as Record<string, unknown>;
-
-    // Guard: hazard warning on write/edit
-    if ((name === 'write' || name === 'edit') && p.file_path) {
+    // Hazard warning on file writes/edits
+    if ((toolName === 'write' || toolName === 'edit') && typeof inp.path === 'string') {
       try {
-        const result = slopeCmd(`guard hazard <<< '${JSON.stringify({
+        const payload = JSON.stringify({
           session_id: 'pi-session',
-          cwd,
+          cwd: ctx.cwd,
           hook_event_name: 'PreToolUse',
-          tool_name: name === 'write' ? 'Write' : 'Edit',
-          tool_input: { file_path: p.file_path },
-        })}'`, cwd);
+          tool_name: toolName === 'write' ? 'Write' : 'Edit',
+          tool_input: { file_path: inp.path },
+        });
+        const result = execSync(`echo ${JSON.stringify(payload)} | slope guard hazard`, {
+          cwd: ctx.cwd,
+          encoding: 'utf8',
+          timeout: 5000,
+        }).trim();
 
-        if (result && result.includes('additionalContext')) {
+        if (result.includes('additionalContext')) {
           const match = result.match(/"additionalContext":"([^"]+)"/);
           if (match) {
             const context = match[1].replace(/\\n/g, '\n');
-            const dedup = dedupContext('hazard', context);
-            pi.sendMessage('system', dedup ?? context);
+            pi.sendMessage(
+              { customType: 'slope-hazard', content: context, display: true },
+              { deliverAs: 'steer' },
+            );
           }
         }
       } catch { /* guard failure should never block */ }
     }
 
-    // Guard: commit discipline nudge on bash
-    if (name === 'bash' && typeof p.command === 'string') {
-      // Nudge on git commit to check branch
-      if (/git\s+commit/.test(p.command)) {
-        try {
-          const branch = execSync('git rev-parse --abbrev-ref HEAD', { cwd, encoding: 'utf8' }).trim();
-          if (branch === 'main' || branch === 'master') {
-            pi.sendMessage('system', 'SLOPE: Committing on main/master. Create a feature branch first: git checkout -b feat/<description>');
-          }
-        } catch { /* not in git repo */ }
-      }
+    // Commit discipline: warn on direct main/master commits
+    if (toolName === 'bash' && typeof inp.command === 'string' && /git\s+commit/.test(inp.command)) {
+      try {
+        const branch = execSync('git rev-parse --abbrev-ref HEAD', { cwd: ctx.cwd, encoding: 'utf8' }).trim();
+        if (branch === 'main' || branch === 'master') {
+          pi.sendMessage(
+            {
+              customType: 'slope-guard',
+              content: 'SLOPE: Committing directly on main/master. Create a feature branch first: git checkout -b feat/<description>',
+              display: true,
+            },
+            { deliverAs: 'steer' },
+          );
+        }
+      } catch { /* not in git repo */ }
     }
   });
 
-  // Guard: post-push suggestions
-  pi.on('tool_result', async (toolName: unknown, params: unknown, result: unknown) => {
-    const name = String(toolName);
-    const p = params as Record<string, unknown>;
-
-    if (name === 'bash' && typeof p.command === 'string' && /git\s+push/.test(p.command)) {
-      const status = slopeCmd('sprint status 2>/dev/null || echo "no sprint"', cwd);
-      if (status && !status.includes('no sprint') && !status.includes('Error')) {
-        pi.sendMessage('system', `SLOPE post-push: Sprint active. Run \`slope guard check\` to verify, or \`slope sprint context\` for next steps.`);
-      }
+  // Guard: post-push sprint nudge
+  pi.on('tool_result', async (event, ctx) => {
+    const inp = event.input as Record<string, unknown>;
+    if (event.toolName === 'bash' && typeof inp.command === 'string' && /git\s+push/.test(inp.command)) {
+      try {
+        const status = slopeCmd('sprint status', ctx.cwd);
+        if (status && !status.includes('Error')) {
+          pi.sendMessage(
+            {
+              customType: 'slope-post-push',
+              content: 'SLOPE post-push: Sprint active. Run `slope guard check` to verify, or `slope sprint context` for next steps.',
+              display: true,
+            },
+            { deliverAs: 'steer' },
+          );
+        }
+      } catch { /* ignore */ }
     }
   });
 
   // ── Slash Commands ────────────────────────────────
 
-  pi.registerCommand('slope', 'Run any SLOPE CLI command', async (args: string) => {
-    const output = slopeCmd(args || 'briefing --compact', cwd);
-    pi.sendMessage('system', output);
+  pi.registerCommand('slope', {
+    description: 'Run any SLOPE CLI command (default: briefing --compact)',
+    handler: async (args, ctx) => {
+      const output = slopeCmd(args || 'briefing --compact', ctx.cwd);
+      ctx.ui.notify(output, 'info');
+    },
   });
 
-  pi.registerCommand('sprint', 'Quick sprint status', async () => {
-    const output = slopeCmd('sprint status', cwd);
-    pi.sendMessage('system', output);
+  pi.registerCommand('sprint', {
+    description: 'Quick sprint status',
+    handler: async (_args, ctx) => {
+      const output = slopeCmd('sprint status', ctx.cwd);
+      ctx.ui.notify(output, 'info');
+    },
   });
 
-  // ── Session Start: Inject Briefing ────────────────
+  // ── Session Start: Inject Briefing on First Turn ──
 
-  pi.on('session_start', async () => {
-    const briefing = slopeCmd('briefing --compact', cwd);
-    pi.sendMessage('system', `SLOPE Session Briefing:\n${briefing}`);
+  let briefingInjected = false;
+
+  pi.on('session_start', async (_event, ctx) => {
+    briefingInjected = false;
+    ctx.ui.notify('SLOPE loaded — use /slope, /sprint, or ask for slope_* tools', 'info');
+  });
+
+  pi.on('before_agent_start', async (_event, ctx) => {
+    if (briefingInjected) return;
+    briefingInjected = true;
+    const briefing = slopeCmd('briefing --compact', ctx.cwd);
+    return {
+      message: {
+        customType: 'slope-briefing',
+        content: `SLOPE Session Briefing:\n${briefing}`,
+        display: true,
+      },
+    };
   });
 }
