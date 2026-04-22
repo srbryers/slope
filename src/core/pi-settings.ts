@@ -45,6 +45,10 @@ const DEFAULT_SETTINGS: PiSettings = {
       enabled: false,
       description: 'Live performance dashboard (requires manual `slope dashboard` start)',
     },
+    memory: {
+      enabled: true,
+      description: 'Cross-session memory: inject relevant memories into briefing, /slope-memory command',
+    },
   },
 };
 
