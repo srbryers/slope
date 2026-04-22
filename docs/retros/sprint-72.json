@@ -1,0 +1,69 @@
+{
+  "sprint_number": 72,
+  "theme": "The Foursome v2 — Multi-Agent Session Coordination",
+  "par": 4,
+  "slope": 3,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-04-22",
+  "shots": [
+    {
+      "ticket_key": "S72-1",
+      "title": "Session conflict detection — real-time claim overlap alerts during editing",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": []
+    },
+    {
+      "ticket_key": "S72-2",
+      "title": "Agent handoff protocol — structured session transfer",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": []
+    },
+    {
+      "ticket_key": "S72-3",
+      "title": "Parallel sprint orchestration — coordinate agents on independent tickets",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": []
+    },
+    {
+      "ticket_key": "S72-4",
+      "title": "Agent session dashboard — live view of all active sessions",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": []
+    }
+  ],
+  "conditions": [
+    "Feature branch: feat/S72-foursome-v2-multi-agent",
+    "All 3007 tests pass",
+    "Code merged via branch merge into feat/s73-memory-palace"
+  ],
+  "special_plays": [],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "yardage_book_updates": [
+    "detectCrossSessionOverlap() in src/cli/guards/claim-required.ts — advisory cross-session overlap warnings",
+    "slope session handoff --from=<id> --to=<id> in src/cli/commands/session.ts",
+    "slope session assign --ticket=X --agent=<id> in src/cli/commands/session.ts",
+    "slope session plan in src/cli/commands/session.ts — ticket-to-agent assignment matrix",
+    "slope session dashboard in src/cli/commands/session.ts — live session view with conflicts and swarm grouping"
+  ],
+  "common_issues_added": []
+}
