@@ -554,34 +554,42 @@ function registerSettingsCommand(pi: ExtensionAPI, settings: PiSettings, cwd: st
   pi.registerCommand('slope-settings', {
     description: 'Show and manage SLOPE Pi feature settings',
     handler: async (_args, ctx) => {
-      const lines: string[] = [];
-      lines.push('SLOPE Pi Settings');
-      lines.push('');
-      lines.push('Feature          Enabled  Description');
-      lines.push('─────────────────────────────────────────────────────────────────');
-      for (const { name, enabled, description } of listSkills(settings)) {
-        const status = enabled ? '✓ yes' : '✗ no ';
-        lines.push(`${name.padEnd(16)} ${status}     ${description}`);
-      }
-      lines.push('');
-      lines.push('Use `/slope-settings toggle <feature>` to enable/disable.');
-      ctx.ui.notify(lines.join('\n'), 'info');
-    },
-  });
+      const skills = listSkills(settings);
 
-  pi.registerCommand('slope-settings-toggle', {
-    description: 'Toggle a SLOPE Pi feature on/off',
-    handler: async (args, ctx) => {
-      const feature = args?.trim();
-      if (!feature || !settings.skills[feature]) {
-        ctx.ui.notify(`Unknown feature: "${feature}". Use /slope-settings to see available features.`, 'error');
+      // Build interactive select options showing current state
+      const options = skills.map((s) => {
+        const status = s.enabled ? '✓ ON ' : '✗ OFF';
+        return `${s.name.padEnd(12)} ${status}  ${s.description}`;
+      });
+
+      const choice = await ctx.ui.select('SLOPE Features — select one to toggle', options);
+      if (choice === undefined) {
+        ctx.ui.notify('Settings unchanged.', 'info');
         return;
       }
-      const wasEnabled = settings.skills[feature].enabled;
-      setSkillEnabled(settings, feature, !wasEnabled);
+
+      // Extract skill name from selection
+      const skillName = skills[options.indexOf(choice)]?.name;
+      if (!skillName || !settings.skills[skillName]) {
+        ctx.ui.notify('Invalid selection.', 'error');
+        return;
+      }
+
+      const wasEnabled = settings.skills[skillName].enabled;
+      const confirm = await ctx.ui.confirm(
+        `Toggle "${skillName}" ${wasEnabled ? 'OFF' : 'ON'}?`,
+        `Currently: ${wasEnabled ? 'enabled' : 'disabled'}. Changes take effect after session restart.`,
+      );
+
+      if (!confirm) {
+        ctx.ui.notify('Settings unchanged.', 'info');
+        return;
+      }
+
+      setSkillEnabled(settings, skillName, !wasEnabled);
       savePiSettings(cwd, settings);
       ctx.ui.notify(
-        `SLOPE: Feature "${feature}" is now ${!wasEnabled ? 'ENABLED' : 'DISABLED'}. ` +
+        `SLOPE: "${skillName}" is now ${!wasEnabled ? 'ENABLED' : 'DISABLED'}. ` +
         'Restart the session for changes to take full effect.',
         'info',
       );
