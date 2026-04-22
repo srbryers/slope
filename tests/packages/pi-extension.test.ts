@@ -55,7 +55,8 @@ describe('Pi Extension', () => {
       const toolNames = mockPi.registerTool.mock.calls.map((c: unknown[]) => (c[0] as { name: string }).name);
       expect(toolNames).not.toContain('slope_briefing');
       expect(toolNames).not.toContain('slope_card');
-      expect(mockPi.registerCommand).not.toHaveBeenCalled();
+      // Settings command is always available
+      expect(mockPi.registerCommand).toHaveBeenCalled();
     });
   });
 

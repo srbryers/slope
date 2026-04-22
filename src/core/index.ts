@@ -546,6 +546,19 @@ export type {
   SubmitResult,
 } from './interview-state-machine.js';
 
+// Pi Settings
+export {
+  loadPiSettings,
+  savePiSettings,
+  isSkillEnabled,
+  setSkillEnabled,
+  listSkills,
+} from './pi-settings.js';
+export type {
+  PiSettings,
+  PiSkillSetting,
+} from './pi-settings.js';
+
 // Project Registry (Multi-Project)
 export { FileProjectRegistry } from './project-registry.js';
 export type { ProjectRegistry } from './project-registry.js';

@@ -15,8 +15,13 @@ import {
   buildInterviewContext,
   generateInterviewSteps,
   initFromAnswers,
+  loadPiSettings,
+  savePiSettings,
+  isSkillEnabled,
+  setSkillEnabled,
+  listSkills,
 } from '@slope-dev/slope';
-import type { InterviewStep, StepOption } from '@slope-dev/slope';
+import type { InterviewStep, StepOption, PiSettings } from '@slope-dev/slope';
 
 // ── Helpers ─────────────────────────────────────────
 
@@ -84,8 +89,12 @@ function getProjectState(cwd: string): 'fresh' | 'complete' | 'active' {
 
 export default function slopeExtension(pi: ExtensionAPI, _cwdOverride?: string): void {
   const cwd = _cwdOverride ?? process.cwd();
+
+  // Load Pi settings (always, even without a SLOPE project)
+  const settings = loadPiSettings(cwd);
+
   if (!hasSlopeProject(cwd)) {
-    // Not a SLOPE project — register only the init tool
+    // Not a SLOPE project — register only the init tool and settings command
     pi.registerTool({
       name: 'slope_init',
       label: 'Slope Init',
@@ -96,11 +105,15 @@ export default function slopeExtension(pi: ExtensionAPI, _cwdOverride?: string):
         return { content: [{ type: 'text' as const, text: result }], details: {} };
       },
     });
+
+    // Settings command is always available
+    registerSettingsCommand(pi, settings, cwd);
     return;
   }
 
   // ── SLOPE Tools ───────────────────────────────────
 
+  if (isSkillEnabled(settings, 'interview')) {
   pi.registerTool({
     name: 'slope_interview',
     label: 'Slope Interview',
@@ -208,7 +221,9 @@ export default function slopeExtension(pi: ExtensionAPI, _cwdOverride?: string):
       };
     },
   });
+  } // end interview skill
 
+  if (isSkillEnabled(settings, 'briefing')) {
   pi.registerTool({
     name: 'slope_briefing',
     label: 'Slope Briefing',
@@ -221,7 +236,9 @@ export default function slopeExtension(pi: ExtensionAPI, _cwdOverride?: string):
       return { content: [{ type: 'text' as const, text: result }], details: {} };
     },
   });
+  } // end briefing skill
 
+  if (isSkillEnabled(settings, 'scorecard')) {
   pi.registerTool({
     name: 'slope_card',
     label: 'Slope Card',
@@ -232,7 +249,9 @@ export default function slopeExtension(pi: ExtensionAPI, _cwdOverride?: string):
       return { content: [{ type: 'text' as const, text: result }], details: {} };
     },
   });
+  } // end scorecard skill
 
+  if (isSkillEnabled(settings, 'guards')) {
   pi.registerTool({
     name: 'slope_guard_check',
     label: 'Slope Guard Check',
@@ -245,7 +264,9 @@ export default function slopeExtension(pi: ExtensionAPI, _cwdOverride?: string):
       return { content: [{ type: 'text' as const, text: result }], details: {} };
     },
   });
+  } // end guards skill
 
+  if (isSkillEnabled(settings, 'planning')) {
   pi.registerTool({
     name: 'slope_sprint_context',
     label: 'Slope Sprint Context',
@@ -271,7 +292,9 @@ export default function slopeExtension(pi: ExtensionAPI, _cwdOverride?: string):
       return { content: [{ type: 'text' as const, text: result }], details: {} };
     },
   });
+  } // end planning skill
 
+  if (isSkillEnabled(settings, 'review')) {
   pi.registerTool({
     name: 'slope_review_run',
     label: 'Slope Review Run',
@@ -292,7 +315,9 @@ export default function slopeExtension(pi: ExtensionAPI, _cwdOverride?: string):
       return { content: [{ type: 'text' as const, text: result }], details: {} };
     },
   });
+  } // end review skill
 
+  if (isSkillEnabled(settings, 'guards')) {
   pi.registerTool({
     name: 'slope_guard_metrics',
     label: 'Slope Guard Metrics',
@@ -303,7 +328,9 @@ export default function slopeExtension(pi: ExtensionAPI, _cwdOverride?: string):
       return { content: [{ type: 'text' as const, text: result }], details: {} };
     },
   });
+  } // end guards skill (metrics)
 
+  if (isSkillEnabled(settings, 'scorecard')) {
   pi.registerTool({
     name: 'slope_convergence',
     label: 'Slope Convergence',
@@ -316,9 +343,11 @@ export default function slopeExtension(pi: ExtensionAPI, _cwdOverride?: string):
       return { content: [{ type: 'text' as const, text: result }], details: {} };
     },
   });
+  } // end scorecard skill (convergence)
 
   // ── Guard Enforcement via Events ──────────────────
 
+  if (isSkillEnabled(settings, 'guards')) {
   // Guard: hazard warning on write/edit; commit discipline nudge on bash
   pi.on('tool_call', async (event, ctx) => {
     const { toolName, input } = event;
@@ -370,7 +399,9 @@ export default function slopeExtension(pi: ExtensionAPI, _cwdOverride?: string):
       } catch { /* not in git repo */ }
     }
   });
+  } // end guards event handlers
 
+  if (isSkillEnabled(settings, 'planning')) {
   // Guard: post-push sprint nudge
   pi.on('tool_result', async (event, ctx) => {
     const inp = event.input as Record<string, unknown>;
@@ -390,6 +421,7 @@ export default function slopeExtension(pi: ExtensionAPI, _cwdOverride?: string):
       } catch { /* ignore */ }
     }
   });
+  } // end planning event handlers
 
   // ── Slash Commands ────────────────────────────────
 
@@ -409,15 +441,19 @@ export default function slopeExtension(pi: ExtensionAPI, _cwdOverride?: string):
     },
   });
 
+  // Settings command
+  registerSettingsCommand(pi, settings, cwd);
+
   // ── Session Start: Inject Briefing on First Turn ──
 
   let briefingInjected = false;
 
   pi.on('session_start', async (_event, ctx) => {
     briefingInjected = false;
-    ctx.ui.notify('SLOPE loaded — use /slope, /sprint, or ask for slope_* tools', 'info');
+    ctx.ui.notify('SLOPE loaded — use /slope, /sprint, /slope-settings, or ask for slope_* tools', 'info');
   });
 
+  if (isSkillEnabled(settings, 'briefing')) {
   pi.on('before_agent_start', async (_event, ctx) => {
     if (briefingInjected) return;
     briefingInjected = true;
@@ -508,5 +544,47 @@ export default function slopeExtension(pi: ExtensionAPI, _cwdOverride?: string):
         display: true,
       },
     };
+  });
+  } // end briefing event handlers
+}
+
+// ── Settings Command ──────────────────────────────
+
+function registerSettingsCommand(pi: ExtensionAPI, settings: PiSettings, cwd: string): void {
+  pi.registerCommand('slope-settings', {
+    description: 'Show and manage SLOPE Pi feature settings',
+    handler: async (_args, ctx) => {
+      const lines: string[] = [];
+      lines.push('SLOPE Pi Settings');
+      lines.push('');
+      lines.push('Feature          Enabled  Description');
+      lines.push('─────────────────────────────────────────────────────────────────');
+      for (const { name, enabled, description } of listSkills(settings)) {
+        const status = enabled ? '✓ yes' : '✗ no ';
+        lines.push(`${name.padEnd(16)} ${status}     ${description}`);
+      }
+      lines.push('');
+      lines.push('Use `/slope-settings toggle <feature>` to enable/disable.');
+      ctx.ui.notify(lines.join('\n'), 'info');
+    },
+  });
+
+  pi.registerCommand('slope-settings-toggle', {
+    description: 'Toggle a SLOPE Pi feature on/off',
+    handler: async (args, ctx) => {
+      const feature = args?.trim();
+      if (!feature || !settings.skills[feature]) {
+        ctx.ui.notify(`Unknown feature: "${feature}". Use /slope-settings to see available features.`, 'error');
+        return;
+      }
+      const wasEnabled = settings.skills[feature].enabled;
+      setSkillEnabled(settings, feature, !wasEnabled);
+      savePiSettings(cwd, settings);
+      ctx.ui.notify(
+        `SLOPE: Feature "${feature}" is now ${!wasEnabled ? 'ENABLED' : 'DISABLED'}. ` +
+        'Restart the session for changes to take full effect.',
+        'info',
+      );
+    },
   });
 }
