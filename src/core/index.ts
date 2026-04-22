@@ -796,5 +796,23 @@ export type {
   StepResult,
 } from './workflow-engine.js';
 
+// Memory
+export {
+  loadMemories,
+  saveMemories,
+  addMemory,
+  removeMemory,
+  updateMemory,
+  searchMemories,
+  getMemoryById,
+} from './memory.js';
+export type {
+  Memory,
+  MemoryCategory,
+  MemorySource,
+  MemoriesFile,
+  MemorySearchOptions,
+} from './memory.js';
+
 // Built-in metaphors (auto-registers on import)
 export { golf, tennis, baseball, gaming, dnd, matrix, agile } from './metaphors/index.js';
