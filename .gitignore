@@ -18,3 +18,4 @@ docs/issues/
 
 # SLOPE session hooks
 .claude/hooks/slope-session-*.sh
+.agents/

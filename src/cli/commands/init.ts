@@ -575,43 +575,63 @@ function installOpenCodeMcpConfig(cwd: string): void {
 }
 
 function installPiTemplates(cwd: string): void {
-  // Copy compiled extension to .pi/extensions/slope/
-  const extDir = join(cwd, '.pi', 'extensions', 'slope');
-  mkdirSync(extDir, { recursive: true });
+  // Skip extension copy if this IS the slope package itself (would conflict
+  // with pi.extensions resolution from package.json)
+  const isSlopePackage = (() => {
+    try {
+      const pkgJson = JSON.parse(readFileSync(join(cwd, 'package.json'), 'utf8'));
+      return pkgJson.name === '@slope-dev/slope';
+    } catch { return false; }
+  })();
 
-  const pkgRoot = getTemplatesRoot(); // <pkg_root>/templates
-  const srcDir = join(pkgRoot, '..', 'packages', 'pi-extension', 'dist');
-  const extFiles = ['index.js', 'index.d.ts'];
-  let extInstalled = 0;
-  for (const file of extFiles) {
-    const src = join(srcDir, file);
-    const dest = join(extDir, file);
-    if (existsSync(src)) {
-      cpSync(src, dest, { force: true });
-      console.log(`  Created/updated ${dest}`);
-      extInstalled++;
-    } else {
-      console.warn(`  Warning: extension source not found: ${src} (package may not be bundled correctly)`);
+  if (!isSlopePackage) {
+    // Copy compiled extension to .pi/extensions/slope/
+    const extDir = join(cwd, '.pi', 'extensions', 'slope');
+    mkdirSync(extDir, { recursive: true });
+
+    const pkgRoot = getTemplatesRoot(); // <pkg_root>/templates
+    const srcDir = join(pkgRoot, '..', 'packages', 'pi-extension', 'dist');
+    const extFiles = ['index.js', 'index.d.ts'];
+    let extInstalled = 0;
+    for (const file of extFiles) {
+      const src = join(srcDir, file);
+      const dest = join(extDir, file);
+      if (existsSync(src)) {
+        cpSync(src, dest, { force: true });
+        console.log(`  Created/updated ${dest}`);
+        extInstalled++;
+      } else {
+        console.warn(`  Warning: extension source not found: ${src} (package may not be bundled correctly)`);
+      }
     }
-  }
-  if (extInstalled === 0) {
-    console.warn('  Warning: no extension files copied. Pi will rely on global pi.extensions resolution.');
+    if (extInstalled === 0) {
+      console.warn('  Warning: no extension files copied. Pi will rely on global pi.extensions resolution.');
+    }
+  } else {
+    console.log('  Skipped extension copy (slope package loads via pi.extensions)');
   }
 
-  // Copy skill templates to .pi/skills/
+  // Copy skill templates to .pi/skills/<name>/SKILL.md
+  // Pi expects SKILL.md inside a named directory per the Agent Skills spec
   const skillsDir = join(cwd, '.pi', 'skills');
   mkdirSync(skillsDir, { recursive: true });
 
   const templatesRoot = join(getTemplatesRoot(), 'pi', 'skills');
-  const skillFiles = ['start-sprint.md', 'post-sprint.md', 'review-pr.md'];
+  const skillFiles: Record<string, string> = {
+    'start-sprint': 'start-sprint.md',
+    'post-sprint': 'post-sprint.md',
+    'review-pr': 'review-pr.md',
+  };
   let skillsInstalled = 0;
-  for (const file of skillFiles) {
+  for (const [skillName, file] of Object.entries(skillFiles)) {
     const src = join(templatesRoot, file);
-    const dest = join(skillsDir, file);
+    const skillDir = join(skillsDir, skillName);
+    const dest = join(skillDir, 'SKILL.md');
     if (!existsSync(src)) {
       console.warn(`  Warning: skill template not found: ${file} (templates may not be bundled)`);
       continue;
     }
+    mkdirSync(skillDir, { recursive: true });
     cpSync(src, dest, { force: true });
     console.log(`  Created/updated ${dest}`);
     skillsInstalled++;
