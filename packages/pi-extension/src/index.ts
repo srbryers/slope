@@ -10,6 +10,13 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ExtensionAPI } from '@mariozechner/pi-coding-agent';
 import { Type } from '@sinclair/typebox';
+import {
+  InterviewStateMachine,
+  buildInterviewContext,
+  generateInterviewSteps,
+  initFromAnswers,
+} from '@slope-dev/slope';
+import type { InterviewStep, StepOption } from '@slope-dev/slope';
 
 // ── Helpers ─────────────────────────────────────────
 
@@ -93,6 +100,111 @@ export default function slopeExtension(pi: ExtensionAPI, _cwdOverride?: string):
   }
 
   // ── SLOPE Tools ───────────────────────────────────
+
+  pi.registerTool({
+    name: 'slope_interview',
+    label: 'Slope Interview',
+    description: 'Run the project interview directly in Pi. Uses native dialogs (input, select, confirm). No shell-out. Creates .slope/config.json and starter files on completion.',
+    parameters: Type.Object({
+      resume: Type.Optional(Type.Boolean({ description: 'Resume a previously started interview' })),
+    }),
+    async execute(_id, _params, _signal, _update, ctx) {
+      const steps = generateInterviewSteps(buildInterviewContext(ctx.cwd));
+      const sm = new InterviewStateMachine(steps);
+
+      let step: InterviewStep | null;
+      while ((step = sm.nextQuestion()) !== null) {
+        let value: unknown;
+        switch (step.type) {
+          case 'text': {
+            const placeholder = step.description ?? '';
+            const def = typeof step.default === 'string' ? step.default : undefined;
+            const reply = await ctx.ui.input(step.question, placeholder + (def ? ` (default: ${def})` : ''));
+            value = reply ?? def ?? '';
+            break;
+          }
+          case 'select': {
+            const options = (step.options ?? []).map((o: StepOption) =>
+              o.hint ? `${o.label} ${o.hint}` : o.label
+            );
+            const reply = await ctx.ui.select(step.question, options);
+            if (reply === undefined) {
+              return {
+                content: [{ type: 'text' as const, text: 'Interview cancelled.' }],
+                details: {},
+              };
+            }
+            // Map display label back to value
+            const chosen = step.options?.find((o: StepOption) =>
+              (o.hint ? `${o.label} ${o.hint}` : o.label) === reply
+            );
+            value = chosen?.value ?? reply;
+            break;
+          }
+          case 'multiselect': {
+            // Pi has no multiselect — ask for comma-separated values
+            const optionsText = (step.options ?? [])
+              .map((o: StepOption) => `${o.label}${o.hint ? ` ${o.hint}` : ''}`)
+              .join(', ');
+            const reply = await ctx.ui.input(
+              `${step.question} (comma-separated)`,
+              optionsText,
+            );
+            if (reply === undefined) {
+              return {
+                content: [{ type: 'text' as const, text: 'Interview cancelled.' }],
+                details: {},
+              };
+            }
+            value = reply.split(',').map((s: string) => s.trim()).filter(Boolean);
+            break;
+          }
+          case 'confirm': {
+            value = await ctx.ui.confirm(step.question, step.description ?? '');
+            break;
+          }
+          default: {
+            const reply = await ctx.ui.input(step.question);
+            value = reply ?? '';
+          }
+        }
+
+        const submitResult = sm.submitAnswer(step.id, value);
+        if (!submitResult.success) {
+          return {
+            content: [{ type: 'text' as const, text: `Validation error: ${submitResult.error}` }],
+            details: {},
+          };
+        }
+      }
+
+      const answers = sm.getResultUnknown();
+      const platformsVal = answers.platforms;
+      const result = await initFromAnswers(
+        ctx.cwd,
+        answers,
+        Array.isArray(platformsVal) ? platformsVal as string[] : undefined,
+      );
+
+      if (!result.success) {
+        return {
+          content: [{ type: 'text' as const, text: `Interview failed:\n${result.errors.map((e: { field: string; message: string }) => `  ${e.field}: ${e.message}`).join('\n')}` }],
+          details: {},
+        };
+      }
+
+      return {
+        content: [{
+          type: 'text' as const,
+          text:
+            'Project initialized from interview.\n\n' +
+            `Files created:\n${result.filesCreated.map((f: string) => `  ${f}`).join('\n')}\n\n` +
+            'Next: run `slope sprint start` to begin your first sprint.',
+        }],
+        details: {},
+      };
+    },
+  });
 
   pi.registerTool({
     name: 'slope_briefing',

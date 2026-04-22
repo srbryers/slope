@@ -188,5 +188,13 @@ describe('Pi Extension', () => {
       const result = await cardTool.execute('id', {}, null, null, makeCtx(tmpDir));
       expect(result.content[0].text).toContain('Error');
     });
+
+    it('registers slope_interview tool', () => {
+      slopeExtension(mockPi as never, tmpDir);
+      const interviewTool = mockPi.registerTool.mock.calls.find(
+        (c: unknown[]) => (c[0] as { name: string }).name === 'slope_interview',
+      );
+      expect(interviewTool).toBeDefined();
+    });
   });
 });

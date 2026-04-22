@@ -8,7 +8,12 @@
     "rootDir": "src",
     "strict": true,
     "esModuleInterop": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "@slope-dev/slope": ["../../dist/index.d.ts"],
+      "@slope-dev/slope/*": ["../../dist/*.d.ts"]
+    }
   },
   "include": ["src"]
 }
