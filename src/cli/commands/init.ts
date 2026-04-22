@@ -574,6 +574,53 @@ function installOpenCodeMcpConfig(cwd: string): void {
   writeFileSync(mcpPath, JSON.stringify(config, null, 2) + '\n');
 }
 
+function installPiTemplates(cwd: string): void {
+  // Copy compiled extension to .pi/extensions/slope/
+  const extDir = join(cwd, '.pi', 'extensions', 'slope');
+  mkdirSync(extDir, { recursive: true });
+
+  const pkgRoot = getTemplatesRoot(); // <pkg_root>/templates
+  const srcDir = join(pkgRoot, '..', 'packages', 'pi-extension', 'dist');
+  const extFiles = ['index.js', 'index.d.ts'];
+  let extInstalled = 0;
+  for (const file of extFiles) {
+    const src = join(srcDir, file);
+    const dest = join(extDir, file);
+    if (existsSync(src)) {
+      cpSync(src, dest, { force: true });
+      console.log(`  Created/updated ${dest}`);
+      extInstalled++;
+    } else {
+      console.warn(`  Warning: extension source not found: ${src} (package may not be bundled correctly)`);
+    }
+  }
+  if (extInstalled === 0) {
+    console.warn('  Warning: no extension files copied. Pi will rely on global pi.extensions resolution.');
+  }
+
+  // Copy skill templates to .pi/skills/
+  const skillsDir = join(cwd, '.pi', 'skills');
+  mkdirSync(skillsDir, { recursive: true });
+
+  const templatesRoot = join(getTemplatesRoot(), 'pi', 'skills');
+  const skillFiles = ['start-sprint.md', 'post-sprint.md', 'review-pr.md'];
+  let skillsInstalled = 0;
+  for (const file of skillFiles) {
+    const src = join(templatesRoot, file);
+    const dest = join(skillsDir, file);
+    if (!existsSync(src)) {
+      console.warn(`  Warning: skill template not found: ${file} (templates may not be bundled)`);
+      continue;
+    }
+    cpSync(src, dest, { force: true });
+    console.log(`  Created/updated ${dest}`);
+    skillsInstalled++;
+  }
+  if (skillsInstalled === 0) {
+    console.warn('  Warning: no skill templates copied.');
+  }
+}
+
 function installDefaultHooks(cwd: string, provider: InitProvider): void {
   // Import hook templates inline to avoid circular deps
   const SESSION_HOOKS: Record<string, string[]> = {
@@ -664,8 +711,7 @@ function installForProvider(cwd: string, provider: InitProvider, metaphor: Metap
       console.log('    args = ["mcp"]');
       break;
     case 'pi':
-      // Pi adapter registered via side-effect import — use installDefaultHooks
-      installDefaultHooks(cwd, 'pi');
+      installPiTemplates(cwd);
       console.log('\n  Pi: Extension installed to .pi/extensions/slope/');
       console.log('  Pi: Skills copied to .pi/skills/');
       console.log('  Pi: Run /reload in pi to activate');
