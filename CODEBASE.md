@@ -1,9 +1,9 @@
 ---
-generated_at: "2026-04-04T16:54:14.775Z"
-git_sha: "df956de702d2bb84493f4273acb852aca9138251"
+generated_at: "2026-04-22T17:23:59.949Z"
+git_sha: "7de08589abb923b502c64f5310b5684134b331d0"
 sprint: 69
-source_files: 219
-test_files: 170
+source_files: 220
+test_files: 171
 cli_commands: 48
 guards: 29
 flows: 0
@@ -33,7 +33,7 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
   - `template-generator` — SLOPE Template Generator
 
 ### `src/core`
-- Source files: 94 | Test files: 86
+- Source files: 95 | Test files: 87
 - Key modules:
   - `advisor` — --- Module-private constants ---
   - `analytics` — SLOPE — Sprint Analytics
@@ -552,14 +552,14 @@ Re-exports from `src/core/index.ts`:
 | Directory | Test Files | Command |
 |-----------|-----------|---------|
 | tests/cli | 70 | `pnpm test` |
-| tests/core | 86 | `pnpm test` |
+| tests/core | 87 | `pnpm test` |
 | tests/mcp | 7 | `pnpm test` |
 | tests/packages | 2 | `pnpm test` |
 | tests/store | 1 | `pnpm test` |
 | tests/store-pg | 2 | `pnpm test` |
 | tests/tokens | 1 | `pnpm test` |
 
-**Total test files:** 169
+**Total test files:** 170
 **Run all:** `pnpm -r test`
 **Typecheck:** `pnpm -r typecheck`
 <!-- AUTO-GENERATED: END tests -->
