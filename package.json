@@ -25,7 +25,7 @@
   },
   "pi": {
     "extensions": [
-      "./packages/pi-extension/src/index.ts"
+      "./packages/pi-extension/dist/index.js"
     ]
   },
   "bin": {
@@ -34,13 +34,14 @@
   },
   "files": [
     "dist",
+    "packages/pi-extension/dist",
     "src/core/workflows",
     "templates",
     "README.md"
   ],
   "scripts": {
     "prepare": "tsc",
-    "build": "tsc",
+    "build": "tsc && cd packages/pi-extension && tsc",
     "test": "vitest run",
     "test:pg": "SLOPE_TEST_PG_URL=postgresql://postgres:slope@localhost:5432/slope_test vitest run tests/store-pg/",
     "typecheck": "tsc --noEmit",
@@ -85,6 +86,8 @@
     "zod": "^3.24.0"
   },
   "devDependencies": {
+    "@mariozechner/pi-coding-agent": "0.68.1",
+    "@sinclair/typebox": "0.34.49",
     "@anthropic-ai/sdk": "^0.78.0",
     "@types/better-sqlite3": "^7.6.0",
     "@types/node": "^25.3.0",
