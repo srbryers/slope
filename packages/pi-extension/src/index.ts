@@ -28,9 +28,8 @@ function hasSlopeProject(cwd: string): boolean {
 
 // ── Extension Entry Point ───────────────────────────
 
-export default function slopeExtension(pi: ExtensionAPI): void {
-  const cwd = process.cwd();
-
+export default function slopeExtension(pi: ExtensionAPI, _cwdOverride?: string): void {
+  const cwd = _cwdOverride ?? process.cwd();
   if (!hasSlopeProject(cwd)) {
     // Not a SLOPE project — register only the init tool
     pi.registerTool({
@@ -257,10 +256,10 @@ export default function slopeExtension(pi: ExtensionAPI): void {
     ctx.ui.notify('SLOPE loaded — use /slope, /sprint, or ask for slope_* tools', 'info');
   });
 
-  pi.on('before_agent_start', async (_event, _ctx) => {
+  pi.on('before_agent_start', async (_event, ctx) => {
     if (briefingInjected) return;
     briefingInjected = true;
-    const briefing = slopeCmd('briefing --compact', cwd);
+    const briefing = slopeCmd('briefing --compact', ctx.cwd);
     return {
       message: {
         customType: 'slope-briefing',
