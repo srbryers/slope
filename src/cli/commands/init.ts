@@ -136,6 +136,7 @@ export function detectProvidersFromArgs(args: string[]): InitProvider[] {
   if (args.includes('--opencode')) providers.push('opencode');
   if (args.includes('--generic')) providers.push('generic');
   if (args.includes('--ob1')) providers.push('ob1');
+  if (args.includes('--pi')) providers.push('pi');
   // Unified --harness=<id> flag
   const harnessArg = args.find(a => a.startsWith('--harness='));
   if (harnessArg) {
@@ -579,6 +580,9 @@ function installDefaultHooks(cwd: string, provider: InitProvider): void {
     'session-start': ['slope session start --ide="$SLOPE_IDE" --role=primary', 'slope briefing --compact'],
     'session-end': ['slope session end --session-id="$SLOPE_SESSION_ID"'],
   };
+
+  // Pi uses extensions, not hooks
+  if (provider === 'pi') return;
 
   const hooksDir = provider === 'claude-code'
     ? join(cwd, '.claude', 'hooks')
