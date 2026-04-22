@@ -196,5 +196,20 @@ describe('Pi Extension', () => {
       );
       expect(interviewTool).toBeDefined();
     });
+
+    it('before_agent_start shows planning message when phase is planning', async () => {
+      writeFileSync(
+        join(tmpDir, '.slope', 'sprint-state.json'),
+        JSON.stringify({ sprint: 1, phase: 'planning', gates: {}, started_at: '', updated_at: '' }),
+      );
+      slopeExtension(mockPi as never, tmpDir);
+      const handler = mockPi.on.mock.calls.find(
+        (c: unknown[]) => c[0] === 'before_agent_start',
+      )?.[1] as (_event: unknown, ctx: unknown) => Promise<{ message: { content: string } } | undefined>;
+
+      const result = await handler({}, makeCtx(tmpDir));
+      expect(result?.message.content).toContain('Planning Phase');
+      expect(result?.message.content).toContain('sprint start');
+    });
   });
 });

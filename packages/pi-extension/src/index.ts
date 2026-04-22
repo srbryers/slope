@@ -193,6 +193,9 @@ export default function slopeExtension(pi: ExtensionAPI, _cwdOverride?: string):
         };
       }
 
+      // Clear onboarding flag so future sessions show planning briefing
+      saveOnboardingState(ctx.cwd, { shownAt: new Date().toISOString() });
+
       return {
         content: [{
           type: 'text' as const,
@@ -461,7 +464,32 @@ export default function slopeExtension(pi: ExtensionAPI, _cwdOverride?: string):
       };
     }
 
-    // Active sprint — normal compact briefing
+    // Active sprint — check if in planning phase
+    const sprintStatePath = join(ctx.cwd, '.slope', 'sprint-state.json');
+    let phase: string | undefined;
+    try {
+      const raw = JSON.parse(readFileSync(sprintStatePath, 'utf8'));
+      phase = raw.phase;
+    } catch { /* ignore */ }
+
+    if (phase === 'planning') {
+      return {
+        message: {
+          customType: 'slope-planning',
+          content:
+            '📋 SLOPE Planning Phase\n\n' +
+            'The project is initialized and ready for sprint planning.\n\n' +
+            'Suggested next steps:\n' +
+            '1. Review docs/backlog/roadmap.json and refine the starter sprint\n' +
+            '2. Run `slope sprint start --number=1` to activate Sprint 1\n' +
+            '3. Use `slope sprint run S1 --workflow=sprint-standard` to begin execution\n\n' +
+            'Session mode: planning (workflow guards are relaxed).',
+          display: true,
+        },
+      };
+    }
+
+    // Normal active sprint — compact briefing
     const briefing = slopeCmd('briefing --compact', ctx.cwd);
     if (briefing.startsWith('Error:')) {
       return {

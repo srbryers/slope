@@ -242,6 +242,23 @@ export async function initFromInterview(cwd: string, input: InitInput): Promise<
     filesCreated.push(roadmapPath);
   }
 
+  // Create sprint state (planning phase) so the project is "active" not "fresh"
+  const sprintStatePath = join(cwd, '.slope', 'sprint-state.json');
+  if (!existsSync(sprintStatePath)) {
+    const now = new Date().toISOString();
+    writeFileSync(
+      sprintStatePath,
+      JSON.stringify({
+        sprint: input.currentSprint ?? 1,
+        phase: 'planning',
+        gates: {},
+        started_at: now,
+        updated_at: now,
+      }, null, 2) + '\n',
+    );
+    filesCreated.push(sprintStatePath);
+  }
+
   // Build the final config object to return
   const config: SlopeConfig = {
     ...configData,
