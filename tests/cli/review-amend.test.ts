@@ -111,6 +111,31 @@ describe('review amend', () => {
     expect(logged).toContain('No review findings to amend');
   });
 
+  it('GH #292: errors clearly when scorecard has no shots array (sub-sprint parent stub)', async () => {
+    // Repro: parent scorecard sprint-180.json with no `shots` field.
+    // Was crashing as "Cannot read properties of undefined (reading 'map')".
+    // Should now exit cleanly with actionable error.
+    mkdirSync(join(tmpDir, '.slope'), { recursive: true });
+    writeFileSync(join(tmpDir, '.slope/config.json'), JSON.stringify({ scorecardDir: 'docs/retros' }));
+    mkdirSync(join(tmpDir, 'docs/retros'), { recursive: true });
+    writeFileSync(
+      join(tmpDir, 'docs/retros/sprint-180.json'),
+      JSON.stringify({ sprint_number: 180, theme: 'Parent', par: 5, slope: 2, date: '2026-04-30' }),
+    );
+    writeFileSync(join(tmpDir, '.slope/review-findings.json'), JSON.stringify({
+      sprint_number: 180,
+      findings: [{ review_type: 'architect', ticket_key: 'S180-1', severity: 'minor', description: 'test', resolved: true }],
+    }));
+
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    await expect(runCommand(['amend', '--sprint=180'])).rejects.toThrow('process.exit(1)');
+    const errored = errSpy.mock.calls.map(c => c[0]).join('\n');
+    errSpy.mockRestore();
+
+    expect(errored).toContain('no `shots` array');
+    expect(errored).toContain('sub-sprint');
+  });
+
   it('errors when scorecard not found', async () => {
     mkdirSync(join(tmpDir, '.slope'), { recursive: true });
     writeFileSync(join(tmpDir, '.slope/config.json'), JSON.stringify({ scorecardDir: 'docs/retros' }));
