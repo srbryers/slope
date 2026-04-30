@@ -117,15 +117,16 @@ describe('auto-memory', () => {
       expect(mems).toHaveLength(2);
     });
 
-    it('deduplicates repeated fire memories', () => {
+    it('deduplicates repeated fire memories and updates the count', () => {
       recordGuardFire(cwd, 'stop-check', 'uncommitted changes');
       recordGuardFire(cwd, 'stop-check', 'uncommitted changes');
       recordGuardFire(cwd, 'stop-check', 'uncommitted changes');
-      // Fire again — should not create duplicate memory
+      // Fire again — should update existing memory, not create duplicate
       recordGuardFire(cwd, 'stop-check', 'uncommitted changes');
 
       const mems = searchMemories(cwd, { source: 'auto-guard' });
       expect(mems).toHaveLength(1);
+      expect(mems[0].text).toContain('4 times');
     });
   });
 });

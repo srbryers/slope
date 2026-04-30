@@ -3,17 +3,19 @@
  * Creates memories automatically with lower weight (5) and proper deduplication.
  */
 
+import { existsSync, readFileSync, writeFileSync, renameSync, mkdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { addMemory, searchMemories, updateMemory } from './memory.js';
-import type { MemoryCategory } from './memory.js';
+import type { MemoryCategory, MemorySource } from './memory.js';
 
 // ── Deduplication ───────────────────────────────────
 
 const DEDUP_WINDOW_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
-function isDuplicate(cwd: string, text: string): boolean {
+function isDuplicate(cwd: string, text: string, source: MemorySource): boolean {
   const recent = searchMemories(cwd, {
     query: text.slice(0, 50),
-    source: 'auto-guard',
+    source,
     limit: 5,
   });
   const now = Date.now();
@@ -34,12 +36,13 @@ export function captureGuardOverride(
   context: string,
 ): void {
   const text = `Guard override: ${guardName} — ${context}`;
-  if (isDuplicate(cwd, text)) return;
+  if (isDuplicate(cwd, text, 'auto-guard')) return;
 
   addMemory(cwd, text, {
     category: 'hazard' as MemoryCategory,
     weight: 5,
     source: 'auto-guard',
+    allowSecrets: true,
   });
 }
 
@@ -81,11 +84,12 @@ export function extractWorkflowPatterns(
   }
 
   for (const p of patterns) {
-    if (!isDuplicate(cwd, p.text)) {
+    if (!isDuplicate(cwd, p.text, 'auto-workflow')) {
       addMemory(cwd, p.text, {
         category: p.category,
         weight: 5,
         source: 'auto-workflow',
+        allowSecrets: true,
       });
     }
   }
@@ -100,15 +104,45 @@ interface GuardFireRecord {
   lastFired: string;
 }
 
-const GUARD_FIRE_LOG: Map<string, GuardFireRecord[]> = new Map();
+const GUARD_FIRE_LOG_FILE = 'guard-fire-log.json';
+const FIRE_LOG_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+function fireLogPath(cwd: string): string {
+  return join(cwd, '.slope', GUARD_FIRE_LOG_FILE);
+}
+
+function loadFireLog(cwd: string): GuardFireRecord[] {
+  const path = fireLogPath(cwd);
+  if (!existsSync(path)) return [];
+  try {
+    const raw = JSON.parse(readFileSync(path, 'utf8'));
+    if (!Array.isArray(raw)) return [];
+    const cutoff = Date.now() - FIRE_LOG_TTL_MS;
+    return raw.filter((r): r is GuardFireRecord =>
+      r && typeof r.guard === 'string' && typeof r.pattern === 'string' &&
+      typeof r.count === 'number' && typeof r.lastFired === 'string' &&
+      new Date(r.lastFired).getTime() > cutoff,
+    );
+  } catch (err) {
+    console.error(`SLOPE auto-memory: failed to parse ${path} (${(err as Error).message}). Treating as empty.`);
+    return [];
+  }
+}
+
+function saveFireLog(cwd: string, records: GuardFireRecord[]): void {
+  const path = fireLogPath(cwd);
+  mkdirSync(join(cwd, '.slope'), { recursive: true });
+  const tmp = `${path}.tmp.${process.pid}`;
+  writeFileSync(tmp, JSON.stringify(records, null, 2) + '\n');
+  renameSync(tmp, path);
+}
 
 export function recordGuardFire(
   cwd: string,
   guardName: string,
   pattern: string,
 ): void {
-  const key = cwd;
-  const records = GUARD_FIRE_LOG.get(key) ?? [];
+  const records = loadFireLog(cwd);
   const existing = records.find(r => r.guard === guardName && r.pattern === pattern);
 
   if (existing) {
@@ -127,6 +161,7 @@ export function recordGuardFire(
           category: 'hazard',
           weight: 5,
           source: 'auto-guard',
+          allowSecrets: true,
         });
       }
     }
@@ -134,5 +169,13 @@ export function recordGuardFire(
     records.push({ guard: guardName, pattern, count: 1, lastFired: new Date().toISOString() });
   }
 
-  GUARD_FIRE_LOG.set(key, records);
+  saveFireLog(cwd, records);
+}
+
+/** Test-only: clear the on-disk fire log for a cwd. */
+export function _resetFireLogForTests(cwd: string): void {
+  const path = fireLogPath(cwd);
+  if (existsSync(path)) {
+    writeFileSync(path, '[]\n');
+  }
 }
