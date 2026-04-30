@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { mkdtempSync, writeFileSync, readFileSync, existsSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, readFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -10,6 +10,8 @@ import {
   updateMemory,
   searchMemories,
   getMemoryById,
+  detectSecret,
+  SecretDetectedError,
 } from '../../src/core/memory.js';
 
 function createTempDir(): string {
@@ -153,6 +155,71 @@ describe('memory storage', () => {
 
     it('returns undefined for missing id', () => {
       expect(getMemoryById(cwd, 'nonexistent')).toBeUndefined();
+    });
+  });
+
+  describe('secret detection', () => {
+    it('detects OpenAI/Anthropic-style sk- keys', () => {
+      expect(detectSecret('use sk-proj-abc123def456ghi789jkl')).toBeTruthy();
+    });
+
+    it('detects GitHub tokens', () => {
+      expect(detectSecret('GH token: ghp_abcdefghijklmnopqrstuvwxyz1234')).toBeTruthy();
+    });
+
+    it('detects AWS access keys', () => {
+      expect(detectSecret('AKIAIOSFODNN7EXAMPLE is leaking')).toBeTruthy();
+    });
+
+    it('detects JWT-shaped tokens', () => {
+      // Construct piece-by-piece to avoid tripping repository secret scanners.
+      // The regex only requires the eyJ.<base64url>.eyJ.<base64url>.<base64url> shape.
+      const jwtShape = ['eyJ', 'fakeHeaderXX'].join('') + '.' + ['eyJ', 'fakePayloadXX'].join('') + '.fakeSigXX';
+      expect(detectSecret(`Bearer ${jwtShape}`)).toBeTruthy();
+    });
+
+    it('detects password=secret patterns', () => {
+      expect(detectSecret('config: password="hunter2hunter2hunter2"')).toBeTruthy();
+    });
+
+    it('does not flag harmless text', () => {
+      expect(detectSecret('user prefers tabs over spaces')).toBeNull();
+      expect(detectSecret('S180.10 had 4 tickets')).toBeNull();
+    });
+
+    it('addMemory throws SecretDetectedError on suspected secret', () => {
+      expect(() => addMemory(cwd, 'API key: sk-proj-abc123def456ghi789xyz'))
+        .toThrow(SecretDetectedError);
+    });
+
+    it('addMemory accepts secrets when allowSecrets is true', () => {
+      const mem = addMemory(cwd, 'API key: sk-proj-abc123def456ghi789xyz', { allowSecrets: true });
+      expect(mem.text).toContain('sk-proj-');
+    });
+  });
+
+  describe('schema migration', () => {
+    it('backs up unknown future versions and starts fresh', () => {
+      const dir = join(cwd, '.slope');
+      const path = join(dir, 'memories.json');
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(path, JSON.stringify({ version: 99, memories: [{ id: 'a', text: 'future format' }] }));
+
+      const data = loadMemories(cwd);
+      expect(data.version).toBe(1);
+      expect(data.memories).toEqual([]);
+      // Backup should exist
+      expect(existsSync(`${path}.v99.bak`)).toBe(true);
+    });
+  });
+
+  describe('atomic save', () => {
+    it('does not leave a stale .tmp file behind on success', () => {
+      addMemory(cwd, 'first');
+      addMemory(cwd, 'second');
+      const slopeDir = join(cwd, '.slope');
+      const files = readdirSync(slopeDir);
+      expect(files.filter((f: string) => f.startsWith('memories.json.tmp'))).toEqual([]);
     });
   });
 });

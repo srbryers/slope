@@ -3,7 +3,8 @@
  * Persistent learned patterns, preferences, and project quirks in .slope/memories.json
  */
 
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, renameSync, copyFileSync, mkdirSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 
 // ── Types ───────────────────────────────────────────
@@ -19,6 +20,31 @@ export interface Memory {
   source: MemorySource;
   createdAt: string;
   updatedAt: string;
+  /** Optional session that produced this memory (auto-* sources). */
+  sourceSessionId?: string;
+}
+
+/**
+ * Detect probable secrets in a memory's text. Used as a guardrail before
+ * writing memories that auto-inject into briefings (S73-3).
+ *
+ * Detects: sk-* (OpenAI/Anthropic), ghp_* / gho_* (GitHub), AWS access keys
+ * (AKIA prefix + 16 chars), JWT-shaped 3-part dot-separated base64, and
+ * generic hex/base64 strings ≥ 32 chars after `password=`/`token=` etc.
+ */
+const SECRET_PATTERNS: RegExp[] = [
+  /\bsk-[A-Za-z0-9_-]{20,}\b/,
+  /\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{20,}\b/,
+  /\bAKIA[0-9A-Z]{16}\b/,
+  /\beyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/,
+  /\b(?:password|secret|token|api[-_]?key|access[-_]?key)\s*[:=]\s*['"]?[A-Za-z0-9+/=_-]{16,}['"]?/i,
+];
+
+export function detectSecret(text: string): string | null {
+  for (const re of SECRET_PATTERNS) {
+    if (re.test(text)) return re.source;
+  }
+  return null;
 }
 
 export interface MemoriesFile {
@@ -46,7 +72,7 @@ function getPath(cwd: string): string {
 }
 
 function generateId(): string {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return randomUUID();
 }
 
 function now(): string {
@@ -83,8 +109,12 @@ function validateMemory(m: unknown): Memory {
     source,
     createdAt: typeof mem.createdAt === 'string' ? mem.createdAt : now(),
     updatedAt: typeof mem.updatedAt === 'string' ? mem.updatedAt : now(),
+    ...(typeof mem.sourceSessionId === 'string' ? { sourceSessionId: mem.sourceSessionId } : {}),
   };
 }
+
+/** Public for callers that want to validate before pushing (e.g. import). */
+export { validateMemory };
 
 function migrateV0toV1(raw: unknown): MemoriesFile {
   // v0: plain array of memories without version wrapper
@@ -117,21 +147,44 @@ export function loadMemories(cwd: string): MemoriesFile {
           : [];
         return { version: CURRENT_VERSION, memories };
       }
-      // Future migrations go here
+      // Unknown future version — back up before returning empty so we don't silently nuke user data
+      const backupPath = `${path}.v${version}.bak`;
+      try {
+        copyFileSync(path, backupPath);
+        console.error(`SLOPE memory: unknown memories.json version=${version}; backed up to ${backupPath} and starting fresh.`);
+      } catch (err) {
+        console.error(`SLOPE memory: unknown memories.json version=${version}; backup failed (${(err as Error).message}). Starting fresh — original file untouched until next write.`);
+      }
       return { version: CURRENT_VERSION, memories: [] };
     }
 
     // No version field — try v0 migration
     return migrateV0toV1(raw);
-  } catch {
+  } catch (err) {
+    console.error(`SLOPE memory: failed to parse ${path} (${(err as Error).message}). Treating as empty.`);
     return { version: CURRENT_VERSION, memories: [] };
   }
 }
 
+/**
+ * Atomic write: write to temp file then rename. Reduces (but doesn't eliminate)
+ * the multi-agent last-write-wins window — concurrent writers each load,
+ * mutate, and write, so the loser's changes can still be lost. A future
+ * follow-up should layer this on the store interface with proper locking.
+ */
 export function saveMemories(cwd: string, data: MemoriesFile): void {
   const path = getPath(cwd);
   mkdirSync(join(cwd, '.slope'), { recursive: true });
-  writeFileSync(path, JSON.stringify(data, null, 2) + '\n');
+  const tmp = `${path}.tmp.${process.pid}`;
+  writeFileSync(tmp, JSON.stringify(data, null, 2) + '\n');
+  renameSync(tmp, path);
+}
+
+export class SecretDetectedError extends Error {
+  constructor(public pattern: string) {
+    super(`Memory text matches secret pattern (${pattern}); refusing to persist. Pass allowSecrets:true to override.`);
+    this.name = 'SecretDetectedError';
+  }
 }
 
 export function addMemory(
@@ -141,8 +194,16 @@ export function addMemory(
     category?: MemoryCategory;
     weight?: number;
     source?: MemorySource;
+    sourceSessionId?: string;
+    /** Set true to bypass secret detection. Default false. */
+    allowSecrets?: boolean;
   } = {},
 ): Memory {
+  if (!options.allowSecrets) {
+    const matched = detectSecret(text);
+    if (matched) throw new SecretDetectedError(matched);
+  }
+
   const data = loadMemories(cwd);
   const memory: Memory = {
     id: generateId(),
@@ -152,6 +213,7 @@ export function addMemory(
     source: options.source ?? 'manual',
     createdAt: now(),
     updatedAt: now(),
+    ...(options.sourceSessionId ? { sourceSessionId: options.sourceSessionId } : {}),
   };
   data.memories.push(memory);
   saveMemories(cwd, data);
