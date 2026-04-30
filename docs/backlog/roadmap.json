@@ -26,9 +26,10 @@
       "sprints": [
         68,
         69,
-        77
+        78,
+        80
       ],
-      "note": "S69 diverged — patch kit ran instead of The Referee. The Referee rescheduled as S77."
+      "note": "S69 diverged — patch kit ran instead of The Referee. The Referee was rescheduled and now sits at S78 (renumbered after S73 Caddy's Notes was inserted). S80 added 2026-04-30 to address GH issues #290/#291 (sprint hygiene — read-side surfacing + post-hole command)."
     },
     {
       "name": "Phase 13 — Multi-Project & Teams",
@@ -716,11 +717,59 @@
           "title": "Guard enforcement report — slope doctor check for advisory vs mechanical guards",
           "club": "wedge",
           "complexity": "small"
+        },
+        {
+          "key": "S78-5",
+          "title": "Post-hole enforcement guard — stop hook fails session-end on roadmap/scorecard drift (GH #291)",
+          "club": "long_iron",
+          "complexity": "moderate"
+        },
+        {
+          "key": "S78-6",
+          "title": "Extend slope validate to detect scorecard↔roadmap drift (GH #291)",
+          "club": "short_iron",
+          "complexity": "standard"
         }
       ],
       "depends_on": [
         68
-      ]
+      ],
+      "note_addendum": "S78-5 and S78-6 added 2026-04-30 to address GH #291 — converts the advisory \"update roadmap\" rule in the Post-Hole Routine into a mechanical guard + validator. Fits S78's advisory-to-mechanical thesis."
+    },
+    {
+      "id": 80,
+      "theme": "The Course Marshal — Sprint Hygiene Surfacing",
+      "par": 4,
+      "slope": 1,
+      "type": "feature + dx",
+      "note": "Created 2026-04-30 to address GH #290 (briefing should surface next planned sprint) and GH #291 item 3 (slope post-hole command). Read-side counterpart to S78-5/S78-6's write-side enforcement.",
+      "tickets": [
+        {
+          "key": "S80-1",
+          "title": "slope briefing surfaces next planned sprint (dependency-resolved) — GH #290",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S80-2",
+          "title": "Fix slope status next-sprint heuristic — read next-planned from roadmap, not max(complete_id)+1 — GH #290",
+          "club": "wedge",
+          "complexity": "small"
+        },
+        {
+          "key": "S80-3",
+          "title": "slope post-hole command — flip latest scorecard to complete, scaffold next sprint, single commit — GH #291",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S80-4",
+          "title": "Test coverage — briefing next-sprint selection, status heuristic, post-hole command roundtrip",
+          "club": "wedge",
+          "complexity": "small"
+        }
+      ],
+      "depends_on": []
     },
     {
       "id": 79,
@@ -757,7 +806,8 @@
       ],
       "depends_on": [
         77,
-        78
+        78,
+        80
       ]
     }
   ]
