@@ -11,6 +11,7 @@
  *   slope memory export <file>
  */
 
+import { readFileSync, writeFileSync } from 'node:fs';
 import {
   loadMemories,
   saveMemories,
@@ -18,7 +19,9 @@ import {
   removeMemory,
   updateMemory,
   searchMemories,
-  getMemoryById,
+  validateMemory,
+  detectSecret,
+  SecretDetectedError,
 } from '../../core/memory.js';
 import type { MemoryCategory } from '../../core/memory.js';
 
@@ -81,16 +84,32 @@ Usage:
 }
 
 function addSubcommand(args: string[], flags: Record<string, string>, cwd: string): void {
-  const text = args.find(a => !a.startsWith('--'));
-  if (!text) {
-    console.error('Usage: slope memory add <text> [--category=X] [--weight=N]');
+  const positionals = args.filter(a => !a.startsWith('--'));
+  if (positionals.length === 0) {
+    console.error('Usage: slope memory add <text> [--category=X] [--weight=N] [--allow-secrets]');
     process.exit(1);
   }
+  if (positionals.length > 1) {
+    console.error(`Error: 'add' takes a single text argument; got ${positionals.length}. Quote the text if it contains spaces.`);
+    process.exit(1);
+  }
+  const text = positionals[0];
 
   const category = isValidCategory(flags.category ?? '') ? flags.category as MemoryCategory : 'other';
   const weight = flags.weight ? parseInt(flags.weight, 10) : 8;
+  const allowSecrets = flags['allow-secrets'] === 'true';
 
-  const mem = addMemory(cwd, text, { category, weight, source: 'manual' });
+  let mem;
+  try {
+    mem = addMemory(cwd, text, { category, weight, source: 'manual', allowSecrets });
+  } catch (err) {
+    if (err instanceof SecretDetectedError) {
+      console.error(`Error: ${err.message}`);
+      console.error('Pass --allow-secrets if this is intentional.');
+      process.exit(1);
+    }
+    throw err;
+  }
   console.log(`\nMemory added: ${mem.id.slice(0, 16)}…`);
   console.log(`  ${mem.text.slice(0, 80)}`);
   console.log(`  [${mem.category}] weight:${mem.weight}\n`);
@@ -173,36 +192,52 @@ function searchSubcommand(args: string[], flags: Record<string, string>, cwd: st
 
 function importSubcommand(args: string[], cwd: string): void {
   const file = args.find(a => !a.startsWith('--'));
+  const allowSecrets = args.includes('--allow-secrets');
   if (!file) {
-    console.error('Usage: slope memory import <file.json>');
+    console.error('Usage: slope memory import <file.json> [--allow-secrets]');
     process.exit(1);
   }
 
-  const { readFileSync } = require('node:fs');
   try {
     const imported = JSON.parse(readFileSync(file, 'utf8'));
     const data = loadMemories(cwd);
+    const existingIds = new Set(data.memories.map(m => m.id));
+    const items: unknown[] = Array.isArray(imported)
+      ? imported
+      : imported && Array.isArray(imported.memories)
+        ? imported.memories
+        : [];
 
-    if (Array.isArray(imported)) {
-      for (const item of imported) {
-        if (typeof item.text === 'string') {
-          data.memories.push({
-            id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-            text: item.text,
-            category: isValidCategory(item.category ?? '') ? item.category : 'other',
-            weight: typeof item.weight === 'number' ? Math.max(1, Math.min(10, item.weight)) : 5,
-            source: 'manual',
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          });
-        }
+    let added = 0;
+    let skipped = 0;
+    let secretsBlocked = 0;
+    for (const item of items) {
+      let validated;
+      try {
+        validated = validateMemory(item);
+      } catch (err) {
+        skipped++;
+        console.error(`  skip: ${(err as Error).message}`);
+        continue;
       }
-    } else if (imported.memories && Array.isArray(imported.memories)) {
-      data.memories.push(...imported.memories);
+      if (!allowSecrets && detectSecret(validated.text)) {
+        secretsBlocked++;
+        continue;
+      }
+      // Regenerate id on collision so import is non-destructive
+      while (existingIds.has(validated.id)) {
+        validated = { ...validated, id: `${validated.id}-${Math.random().toString(36).slice(2, 6)}` };
+      }
+      existingIds.add(validated.id);
+      data.memories.push(validated);
+      added++;
     }
 
     saveMemories(cwd, data);
-    console.log(`\nImported ${imported.length ?? imported.memories?.length ?? 0} memories.\n`);
+    console.log(`\nImported ${added} memories${skipped ? `, skipped ${skipped}` : ''}${secretsBlocked ? `, blocked ${secretsBlocked} suspected-secret` : ''}.\n`);
+    if (secretsBlocked > 0 && !allowSecrets) {
+      console.error('Re-run with --allow-secrets to include the blocked entries.');
+    }
   } catch (err) {
     console.error(`Import failed: ${(err as Error).message}`);
     process.exit(1);
@@ -216,7 +251,6 @@ function exportSubcommand(args: string[], cwd: string): void {
     process.exit(1);
   }
 
-  const { writeFileSync } = require('node:fs');
   const data = loadMemories(cwd);
   writeFileSync(file, JSON.stringify(data, null, 2) + '\n');
   console.log(`\nExported ${data.memories.length} memories to ${file}\n`);
