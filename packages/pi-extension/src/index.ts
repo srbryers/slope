@@ -501,12 +501,17 @@ export default function slopeExtension(pi: ExtensionAPI, _cwdOverride?: string):
   pi.registerCommand('slope-memory', {
     description: 'List or add cross-session memories',
     handler: async (args, ctx) => {
-      const sub = args?.split(' ')[0];
+      const tokens = (args ?? '').trim().split(/\s+/).filter(Boolean);
+      const sub = tokens[0];
       if (sub === 'add') {
-        const text = args?.slice(4).trim();
+        const text = tokens.slice(1).join(' ').trim();
         if (!text) { ctx.ui.notify('Usage: /slope-memory add <text>', 'info'); return; }
-        const mem = addMemory(ctx.cwd, text, { source: 'manual' });
-        ctx.ui.notify(`Memory added: ${mem.id.slice(0, 12)}…`, 'info');
+        try {
+          const mem = addMemory(ctx.cwd, text, { source: 'manual' });
+          ctx.ui.notify(`Memory added: ${mem.id.slice(0, 12)}…`, 'info');
+        } catch (err) {
+          ctx.ui.notify(`Memory not added: ${(err as Error).message}`, 'warning');
+        }
       } else {
         const results = searchMemories(ctx.cwd, { limit: 10 });
         if (results.length === 0) { ctx.ui.notify('No memories stored.', 'info'); return; }
