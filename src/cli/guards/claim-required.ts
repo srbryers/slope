@@ -52,6 +52,25 @@ export async function claimRequiredGuard(input: HookInput, cwd: string): Promise
 }
 
 /**
+ * Pure overlap predicate for a single claim. Anchors area-scope prefix matches
+ * with a path separator so a claim on "src/core" does NOT match edits in
+ * "src/core-helpers". Exported for unit testing.
+ */
+export function claimOverlapsPath(
+  scope: string,
+  target: string,
+  relativePath: string,
+  fileArea: string,
+): boolean {
+  if (scope !== 'area') return relativePath === target;
+  const areaPrefix = target.endsWith('/') ? target : `${target}/`;
+  return (
+    relativePath === target || relativePath.startsWith(areaPrefix) ||
+    fileArea === target || fileArea.startsWith(areaPrefix)
+  );
+}
+
+/**
  * Detect if the current file edit overlaps with another agent's claimed area.
  * Returns a warning string if overlap found, null otherwise.
  */
@@ -80,9 +99,7 @@ async function detectCrossSessionOverlap(
     );
 
     for (const claim of otherClaims) {
-      const overlaps = claim.scope === 'area'
-        ? (relativePath.startsWith(claim.target) || fileArea.startsWith(claim.target))
-        : relativePath === claim.target;
+      const overlaps = claimOverlapsPath(claim.scope, claim.target, relativePath, fileArea);
 
       if (overlaps) {
         const agent = sessions.find(s => s.session_id === claim.session_id);

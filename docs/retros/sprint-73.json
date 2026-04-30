@@ -1,0 +1,82 @@
+{
+  "sprint_number": 73,
+  "theme": "The Caddy's Notes — Cross-Session Memory System",
+  "par": 5,
+  "slope": 2,
+  "score": 5,
+  "score_label": "par",
+  "date": "2026-04-22",
+  "shots": [
+    {
+      "ticket_key": "S73-1",
+      "title": "Memory Storage Core — .slope/memories.json schema, CRUD, search API",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": []
+    },
+    {
+      "ticket_key": "S73-2",
+      "title": "Memory CLI — slope memory add/list/remove/edit/search/import/export",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": []
+    },
+    {
+      "ticket_key": "S73-3",
+      "title": "Pi Extension Memory Integration — slope_memory tool, /slope-memory slash command, briefing injection",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        "rough: Pi multiselect gap not applicable — used simple tool params instead"
+      ]
+    },
+    {
+      "ticket_key": "S73-4",
+      "title": "Auto-Memory — guard overrides, workflow patterns, repeated fire detection with deduplication",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": []
+    },
+    {
+      "ticket_key": "S73-5",
+      "title": "Test Coverage — unit, CLI, auto-memory tests (42 new tests)",
+      "club": "wedge",
+      "result": "green",
+      "hazards": []
+    }
+  ],
+  "conditions": [
+    "Feature branch: feat/s73-memory-palace",
+    "All 3049 tests pass (42 new)",
+    "Typecheck clean",
+    "Guard check clean"
+  ],
+  "special_plays": [],
+  "stats": {
+    "fairways_hit": 5,
+    "fairways_total": 5,
+    "greens_in_regulation": 5,
+    "greens_total": 5,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 1,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "yardage_book_updates": [
+    "src/core/memory.ts — Memory storage core with CRUD + search",
+    "src/cli/commands/memory.ts — slope memory CLI command",
+    "src/core/auto-memory.ts — Auto-capture from guards and workflows",
+    "packages/pi-extension/src/index.ts — slope_memory tool, /slope-memory command, briefing injection",
+    "src/core/pi-settings.ts — memory skill toggle",
+    "tests/core/memory.test.ts — 18 unit tests for memory storage",
+    "tests/cli/commands/memory.test.ts — 15 CLI tests for memory commands",
+    "tests/core/auto-memory.test.ts — 9 tests for auto-memory deduplication"
+  ],
+  "common_issues_added": []
+}

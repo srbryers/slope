@@ -20,6 +20,9 @@ import {
   isSkillEnabled,
   setSkillEnabled,
   listSkills,
+  searchMemories,
+  addMemory,
+  removeMemory,
 } from '@slope-dev/slope';
 import type { InterviewStep, StepOption, PiSettings } from '@slope-dev/slope';
 
@@ -317,6 +320,59 @@ export default function slopeExtension(pi: ExtensionAPI, _cwdOverride?: string):
   });
   } // end review skill
 
+  if (isSkillEnabled(settings, 'memory')) {
+  pi.registerTool({
+    name: 'slope_memory',
+    label: 'Slope Memory',
+    description: 'List, add, search, or remove cross-session memories stored in .slope/memories.json',
+    parameters: Type.Object({
+      action: Type.Union(
+        [Type.Literal('list'), Type.Literal('add'), Type.Literal('search'), Type.Literal('remove')],
+        { description: 'Memory action' },
+      ),
+      text: Type.Optional(Type.String({ description: 'Memory text (for add)' })),
+      query: Type.Optional(Type.String({ description: 'Search query (for search)' })),
+      id: Type.Optional(Type.String({ description: 'Memory ID (for remove)' })),
+      category: Type.Optional(Type.String({ description: 'Category filter' })),
+      limit: Type.Optional(Type.Number({ description: 'Max results' })),
+    }),
+    async execute(_id, params, _signal, _update, ctx) {
+      switch (params.action) {
+        case 'list': {
+          const results = searchMemories(ctx.cwd, {
+            category: params.category as import('@slope-dev/slope').MemoryCategory | undefined,
+            limit: params.limit ?? 10,
+          });
+          const lines = results.map(m => `[${m.category}] w:${m.weight} ${m.text.slice(0, 80)}`);
+          return { content: [{ type: 'text' as const, text: lines.join('\n') || 'No memories.' }], details: {} };
+        }
+        case 'add': {
+          if (!params.text) return { content: [{ type: 'text' as const, text: 'Error: text required for add' }], details: {} };
+          const mem = addMemory(ctx.cwd, params.text, {
+            category: params.category as import('@slope-dev/slope').MemoryCategory | undefined,
+            source: 'manual',
+          });
+          return { content: [{ type: 'text' as const, text: `Added: ${mem.id.slice(0, 12)}… [${mem.category}]` }], details: {} };
+        }
+        case 'search': {
+          const results = searchMemories(ctx.cwd, {
+            query: params.query,
+            category: params.category as import('@slope-dev/slope').MemoryCategory | undefined,
+            limit: params.limit ?? 10,
+          });
+          const lines = results.map(m => `[${m.category}] w:${m.weight} ${m.text.slice(0, 80)}`);
+          return { content: [{ type: 'text' as const, text: lines.join('\n') || 'No memories found.' }], details: {} };
+        }
+        case 'remove': {
+          if (!params.id) return { content: [{ type: 'text' as const, text: 'Error: id required for remove' }], details: {} };
+          const ok = removeMemory(ctx.cwd, params.id);
+          return { content: [{ type: 'text' as const, text: ok ? 'Removed.' : 'Memory not found.' }], details: {} };
+        }
+      }
+    },
+  });
+  } // end memory skill
+
   if (isSkillEnabled(settings, 'guards')) {
   pi.registerTool({
     name: 'slope_guard_metrics',
@@ -441,6 +497,31 @@ export default function slopeExtension(pi: ExtensionAPI, _cwdOverride?: string):
     },
   });
 
+  if (isSkillEnabled(settings, 'memory')) {
+  pi.registerCommand('slope-memory', {
+    description: 'List or add cross-session memories',
+    handler: async (args, ctx) => {
+      const tokens = (args ?? '').trim().split(/\s+/).filter(Boolean);
+      const sub = tokens[0];
+      if (sub === 'add') {
+        const text = tokens.slice(1).join(' ').trim();
+        if (!text) { ctx.ui.notify('Usage: /slope-memory add <text>', 'info'); return; }
+        try {
+          const mem = addMemory(ctx.cwd, text, { source: 'manual' });
+          ctx.ui.notify(`Memory added: ${mem.id.slice(0, 12)}…`, 'info');
+        } catch (err) {
+          ctx.ui.notify(`Memory not added: ${(err as Error).message}`, 'warning');
+        }
+      } else {
+        const results = searchMemories(ctx.cwd, { limit: 10 });
+        if (results.length === 0) { ctx.ui.notify('No memories stored.', 'info'); return; }
+        const lines = results.map(m => `[${m.category}] w:${m.weight} ${m.text.slice(0, 60)}`);
+        ctx.ui.notify(`Memories:\n${lines.join('\n')}`, 'info');
+      }
+    },
+  });
+  } // end memory slash command
+
   // Settings command
   registerSettingsCommand(pi, settings, cwd);
 
@@ -537,10 +618,21 @@ export default function slopeExtension(pi: ExtensionAPI, _cwdOverride?: string):
       };
     }
 
+    // Inject top memories if memory skill is enabled
+    let memoryContext = '';
+    if (isSkillEnabled(settings, 'memory')) {
+      try {
+        const memories = searchMemories(ctx.cwd, { limit: 5, minWeight: 5 });
+        if (memories.length > 0) {
+          memoryContext = '\n\n📌 Relevant Memories:\n' + memories.map(m => `  • [${m.category}] ${m.text.slice(0, 100)}`).join('\n');
+        }
+      } catch { /* ignore memory errors */ }
+    }
+
     return {
       message: {
         customType: 'slope-briefing',
-        content: `SLOPE Session Briefing:\n${briefing}`,
+        content: `SLOPE Session Briefing:\n${briefing}${memoryContext}`,
         display: true,
       },
     };

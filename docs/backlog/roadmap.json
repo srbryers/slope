@@ -34,12 +34,17 @@
       "name": "Phase 13 — Multi-Project & Teams",
       "sprints": [
         70,
-        72,
+        72
+      ]
+    },
+    {
+      "name": "Phase 14 — Agent Memory & Context",
+      "sprints": [
         73
       ]
     },
     {
-      "name": "Phase 14 — Loop Evolution",
+      "name": "Phase 15 — Loop Evolution",
       "sprints": [
         74,
         75,
@@ -47,9 +52,9 @@
       ]
     },
     {
-      "name": "Phase 15 — Assessment & Wrap-up",
+      "name": "Phase 16 — Assessment & Wrap-up",
       "sprints": [
-        78
+        79
       ]
     }
   ],
@@ -504,31 +509,70 @@
     },
     {
       "id": 73,
+      "theme": "The Caddy's Notes — Cross-Session Memory System",
+      "par": 5,
+      "slope": 2,
+      "type": "feature",
+      "tickets": [
+        {
+          "key": "S73-1",
+          "title": "Memory storage core — .slope/memories.json schema, CRUD, search API",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S73-2",
+          "title": "Memory CLI — slope memory add/list/remove/edit/search/import/export",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S73-3",
+          "title": "Pi extension memory integration — session-start load, briefing injection, /slope-memory command",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S73-4",
+          "title": "Auto-memory from guard corrections and workflow outcomes",
+          "club": "long_iron",
+          "complexity": "moderate"
+        },
+        {
+          "key": "S73-5",
+          "title": "Test coverage — unit, CLI, Pi extension, auto-memory tests",
+          "club": "wedge",
+          "complexity": "small"
+        }
+      ]
+    },
+    {
+      "id": 74,
       "theme": "The Foursome v2 — Multi-Agent Session Coordination",
       "par": 4,
       "slope": 3,
       "type": "feature",
       "tickets": [
         {
-          "key": "S73-1",
+          "key": "S74-1",
           "title": "Session conflict detection across worktrees — real-time claim overlap alerts",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
-          "key": "S73-2",
+          "key": "S74-2",
           "title": "Agent handoff protocol — structured session transfer between agents",
           "club": "long_iron",
           "complexity": "moderate"
         },
         {
-          "key": "S73-3",
+          "key": "S74-3",
           "title": "Parallel sprint orchestration — coordinate multiple agents on independent tickets",
           "club": "long_iron",
           "complexity": "moderate"
         },
         {
-          "key": "S73-4",
+          "key": "S74-4",
           "title": "Agent session dashboard — live view of all active agent sessions",
           "club": "short_iron",
           "complexity": "standard"
@@ -539,32 +583,32 @@
       ]
     },
     {
-      "id": 74,
+      "id": 75,
       "theme": "The Autopilot v2 — Smart Model Routing",
       "par": 4,
       "slope": 2,
       "type": "feature",
       "tickets": [
         {
-          "key": "S74-1",
+          "key": "S75-1",
           "title": "Model success rate tracking — per-club, per-ticket-type success data",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
-          "key": "S74-2",
+          "key": "S75-2",
           "title": "Adaptive model selection — use historical data to pick optimal model per ticket",
           "club": "long_iron",
           "complexity": "moderate"
         },
         {
-          "key": "S74-3",
+          "key": "S75-3",
           "title": "Model cost-performance tradeoff — factor cost into routing decisions",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
-          "key": "S74-4",
+          "key": "S75-4",
           "title": "slope loop config recommend — suggest optimal model config from data",
           "club": "wedge",
           "complexity": "small"
@@ -575,74 +619,74 @@
       ]
     },
     {
-      "id": 75,
+      "id": 76,
       "theme": "The Assembly Line — Batch Sprint Execution",
       "par": 4,
       "slope": 3,
       "type": "feature",
       "tickets": [
         {
-          "key": "S75-1",
+          "key": "S76-1",
           "title": "Dependency-aware sprint scheduling — respect depends_on in continuous mode",
           "club": "long_iron",
           "complexity": "moderate"
         },
         {
-          "key": "S75-2",
+          "key": "S76-2",
           "title": "Parallel worktree management — auto-create/cleanup worktrees for parallel sprints",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
-          "key": "S75-3",
+          "key": "S76-3",
           "title": "Sprint failure recovery — auto-retry with different strategy on failure",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
-          "key": "S75-4",
+          "key": "S76-4",
           "title": "Batch execution report — summary of all sprints run in a batch",
           "club": "wedge",
           "complexity": "small"
         }
       ],
       "depends_on": [
-        74
+        75
       ]
     },
     {
-      "id": 76,
+      "id": 77,
       "theme": "The Convergence — Loop Self-Improvement",
       "par": 3,
       "slope": 3,
       "type": "architecture",
       "tickets": [
         {
-          "key": "S76-1",
+          "key": "S77-1",
           "title": "Backlog quality scoring — rate backlog tickets by likelihood of clean execution",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
-          "key": "S76-2",
+          "key": "S77-2",
           "title": "Auto-generate backlog from common-issues and guard data",
           "club": "long_iron",
           "complexity": "moderate"
         },
         {
-          "key": "S76-3",
+          "key": "S77-3",
           "title": "Convergence metrics — track handicap improvement rate, predict plateau",
           "club": "short_iron",
           "complexity": "standard"
         }
       ],
       "depends_on": [
-        74,
-        75
+        75,
+        76
       ]
     },
     {
-      "id": 77,
+      "id": 78,
       "theme": "The Referee — Advisory-to-Mechanical Guard Conversion",
       "par": 4,
       "slope": 2,
@@ -650,25 +694,25 @@
       "note": "Originally planned as S69. Skipped when S69 ran as a patch sprint instead. Rescheduled here; depends only on S68 which is complete.",
       "tickets": [
         {
-          "key": "S77-1",
+          "key": "S78-1",
           "title": "Audit all advisory guards — identify which return context-only with no disk state",
           "club": "wedge",
           "complexity": "small"
         },
         {
-          "key": "S77-2",
+          "key": "S78-2",
           "title": "Convert hazard guard to write disk state for compaction survival",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
-          "key": "S77-3",
+          "key": "S78-3",
           "title": "Convert scope-drift guard to write disk state for compaction survival",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
-          "key": "S77-4",
+          "key": "S78-4",
           "title": "Guard enforcement report — slope doctor check for advisory vs mechanical guards",
           "club": "wedge",
           "complexity": "small"
@@ -679,7 +723,7 @@
       ]
     },
     {
-      "id": 78,
+      "id": 79,
       "theme": "The 19th Hole — Workflow Engine Assessment & Phase Wrap-up",
       "par": 4,
       "slope": 2,
@@ -687,33 +731,33 @@
       "note": "Capstone sprint. Assess the workflow engine's test coverage and integration health, review what shipped across the roadmap, and identify gaps before declaring the roadmap complete.",
       "tickets": [
         {
-          "key": "S78-1",
+          "key": "S79-1",
           "title": "Workflow engine test coverage audit — identify gaps vs S67/S68 test suite",
           "club": "wedge",
           "complexity": "small"
         },
         {
-          "key": "S78-2",
+          "key": "S79-2",
           "title": "Workflow engine E2E smoke test — full sprint lifecycle via CLI against real store",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
-          "key": "S78-3",
+          "key": "S79-3",
           "title": "Phase retrospective — assess shipped state vs original vision, document gaps for next roadmap",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
-          "key": "S78-4",
+          "key": "S79-4",
           "title": "CODEBASE.md and docs alignment check — ensure map reflects all shipped features",
           "club": "wedge",
           "complexity": "small"
         }
       ],
       "depends_on": [
-        76,
-        77
+        77,
+        78
       ]
     }
   ]

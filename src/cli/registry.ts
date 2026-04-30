@@ -605,4 +605,25 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
       ]},
     ],
   },
+  {
+    cmd: 'memory', desc: 'Cross-session memory management', category: 'analysis',
+    subcommands: [
+      { name: 'add', desc: 'Add a memory', flags: [
+        { flag: '--category=<cat>', desc: 'Category: workflow, style, project, hazard, other' },
+        { flag: '--weight=<N>', desc: 'Relevance weight 1-10 (default: 8)' },
+      ]},
+      { name: 'list', desc: 'List memories', flags: [
+        { flag: '--category=<cat>', desc: 'Filter by category' },
+        { flag: '--limit=<N>', desc: 'Max results' },
+      ]},
+      { name: 'remove', desc: 'Remove a memory by ID' },
+      { name: 'edit', desc: 'Edit a memory by ID' },
+      { name: 'search', desc: 'Search memories', flags: [
+        { flag: '--category=<cat>', desc: 'Filter by category' },
+        { flag: '--limit=<N>', desc: 'Max results (default: 10)' },
+      ]},
+      { name: 'import', desc: 'Import memories from JSON file' },
+      { name: 'export', desc: 'Export memories to JSON file' },
+    ],
+  },
 ];

@@ -1,46 +1,80 @@
-# Sprint 72 Plan — The Clubhouse Network (Multi-Repo Aggregation)
+# Sprint 72 Plan — The Foursome v2 (Multi-Agent Session Coordination)
 
 **Par:** 4 (4 tickets)
 **Slope:** 3
-**Theme:** Cross-repo scorecard collection, org-level handicap, slope org CLI
+**Theme:** Enhanced coordination for concurrent agent sessions
 
 ## Context
 
-Scorecard loading and handicap computation are source-agnostic — `loadScorecards(config, cwd)` accepts any cwd, and `computeHandicapCard(scorecards)` works on any array. No org config or multi-repo loader exists. Sprint numbers are repo-local (S50 in repo-A != S50 in repo-B).
+Multi-agent infrastructure already exists:
+- Sessions with `swarm_id` + `agent_role` grouping
+- Claims system with overlap/adjacent conflict detection (`checkConflicts`)
+- Worktree isolation guard blocks unprotected concurrent access
+- Compaction handoffs persist session state to disk
+- MCP tools: `acquire_claim`, `check_conflicts`, `session_status`
 
-**Design decision:** Use a simple `repos` array in a new `.slope/org.json` config. Each entry is a path to a repo root. Scorecards are tagged with repo name on load. Sprint IDs namespaced as `repo:S50` for display.
+S72 enhances this with: real-time alerts during editing, structured handoff protocol, parallel ticket orchestration, and a live dashboard.
 
 ## Tickets
 
-### T1: Cross-repo scorecard collection
+### T1: Session conflict detection — real-time claim overlap alerts during editing
+**Club:** short_iron
+**Files:** `src/cli/guards/claim-required.ts`, `src/core/registry.ts`
+
+Existing: `checkConflicts()` runs on claim acquisition. Missing: no real-time alerts when agents edit files in overlapping areas during a session.
+
+**Approach:**
+- Extend `claim-required` guard (fires on Edit/Write) to check for cross-session overlaps
+- If current file is in an area claimed by another active session, inject warning context
+- Use `store.getActiveSessions()` + `store.list(sprintNumber)` to find other agents' claims
+- Warning is advisory (context only), not blocking — agents can intentionally overlap
+- Skip check for same-session claims (no self-conflict)
+
+### T2: Agent handoff protocol — structured session transfer
 **Club:** long_iron
-**Files:** `src/core/org.ts` (new), `src/core/index.ts`
+**Files:** `src/cli/commands/session.ts`, `src/core/handoff.ts` (new)
 
-- Define `OrgConfig` interface: `{ repos: Array<{ name: string; path: string }> }`
-- `loadOrgConfig(cwd)` reads `.slope/org.json`
-- `loadOrgScorecards(orgConfig)` iterates repos, calls `loadScorecards` per repo, tags each scorecard with `_repo` metadata
-- Returns `OrgScorecard[]` (extends GolfScorecard with `_repo: string`)
+Existing: compaction guard writes handoff files on PreCompact. Missing: explicit handoff between agents (not just compaction recovery).
 
-### T2: Org-level handicap card
+**Approach:**
+- Add `slope session handoff --to=<session-id> [--message="context"]`
+- Creates a handoff record: `{ from, to, claims, git_state, message, timestamp }`
+- Transfers claims from source to target session (re-acquire under new session_id)
+- Write handoff to `.slope/handoffs/transfer-{from}-{to}.json`
+- Receiving agent's next guard invocation injects handoff context
+- Add `slope session handoff --list` to show pending handoffs
+
+### T3: Parallel sprint orchestration — coordinate agents on independent tickets
+**Club:** long_iron
+**Files:** `src/cli/commands/session.ts`
+
+Existing: `slope loop parallel` runs sprints in worktrees. Missing: within a single sprint, assigning individual tickets to different agents.
+
+**Approach:**
+- Add `slope session assign --ticket=S72-1 --agent=<session-id>`
+- Creates a ticket-level claim linked to the agent's session
+- Uses existing claims system (`store.acquire`) with `session_id` metadata
+- `slope session plan` shows ticket-to-agent assignment matrix for current sprint
+- Validates no overlap before assigning (uses `checkConflicts`)
+
+### T4: Agent session dashboard — live view of all active sessions
 **Club:** short_iron
-**Files:** `src/core/org.ts`, `src/core/handicap.ts`
+**Files:** `src/cli/commands/session.ts`
 
-- `computeOrgHandicap(orgScorecards)` — aggregate handicap across all repos
-- Per-repo breakdown: `{ repo: string, handicap: HandicapCard, sprint_count: number }`
-- Overall org card: combined handicap from all scorecards
+Existing: `slope session list` shows sessions. Missing: rich dashboard with claims, conflicts, and activity.
 
-### T3: `slope org status` — show all repos
-**Club:** short_iron
-**Files:** `src/cli/commands/org.ts` (new), `src/cli/index.ts`
+**Approach:**
+- Add `slope session dashboard [--json]`
+- Shows: active sessions (role, IDE, branch, heartbeat age)
+- Per-session: claimed tickets/areas, last tool call (from transcript if available)
+- Conflicts: highlighted in red
+- Stale agents: flagged with warning (heartbeat > 5min)
+- Swarm grouping when swarm_id present
 
-- `slope org status` — table of repos with name, handicap, latest sprint, active sessions
-- `slope org status --json` for machine-readable
-- `slope org init` — create `.slope/org.json` template with repo paths
+## Review Tier
 
-### T4: Cross-repo common-issues — promote shared patterns
-**Club:** wedge
-**Files:** `src/core/org.ts`
+**Light** (1 round) — builds on established patterns, no new store schema.
 
-- `mergeCommonIssues(orgConfig)` — load common-issues.json from each repo
-- Find patterns with matching title+category across 2+ repos → mark as "org-wide"
-- `slope org issues` — show org-wide recurring patterns
+## Dependencies
+
+- All tickets are independent (can be worked in any order)

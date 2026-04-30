@@ -66,6 +66,7 @@ import { helpCommand } from './commands/help.js';
 import { quickstartCommand } from './commands/quickstart.js';
 import { worktreeCommand } from './commands/worktree.js';
 import { orgCommand } from './commands/org.js';
+import { memoryCommand } from './commands/memory.js';
 import { phaseCommand } from './commands/phase.js';
 
 import { readFileSync } from 'node:fs';
@@ -402,6 +403,12 @@ switch (subcommand) {
     break;
   case 'org':
     orgCommand(process.argv.slice(3)).catch(err => {
+      console.error('Error:', err.message);
+      process.exit(1);
+    });
+    break;
+  case 'memory':
+    memoryCommand(process.argv.slice(3)).catch(err => {
       console.error('Error:', err.message);
       process.exit(1);
     });
