@@ -38,18 +38,36 @@ describe('loadFindings', () => {
   it('loads valid findings', () => {
     mkdirSync(join(tmpDir, '.slope'), { recursive: true });
     const data: FindingsFile = {
+      sprints: {
+        33: [{
+          review_type: 'architect',
+          ticket_key: 'S33-1',
+          severity: 'moderate',
+          description: 'Test finding',
+          resolved: true,
+        }],
+      },
+    };
+    writeFileSync(join(tmpDir, '.slope/review-findings.json'), JSON.stringify(data));
+    const loaded = loadFindings(tmpDir);
+    expect(loaded).toEqual(data);
+  });
+
+  it('migrates legacy single-sprint format', () => {
+    mkdirSync(join(tmpDir, '.slope'), { recursive: true });
+    const legacy = {
       sprint_number: 33,
       findings: [{
         review_type: 'architect',
         ticket_key: 'S33-1',
         severity: 'moderate',
-        description: 'Test finding',
+        description: 'Legacy finding',
         resolved: true,
       }],
     };
-    writeFileSync(join(tmpDir, '.slope/review-findings.json'), JSON.stringify(data));
+    writeFileSync(join(tmpDir, '.slope/review-findings.json'), JSON.stringify(legacy));
     const loaded = loadFindings(tmpDir);
-    expect(loaded).toEqual(data);
+    expect(loaded).toEqual({ sprints: { 33: legacy.findings } });
   });
 
   it('returns null for malformed JSON', () => {
@@ -119,26 +137,26 @@ describe('review findings add', () => {
 
     const data = loadFindings(tmpDir);
     expect(data).not.toBeNull();
-    expect(data!.sprint_number).toBe(33);
-    expect(data!.findings).toHaveLength(1);
-    expect(data!.findings[0].review_type).toBe('architect');
-    expect(data!.findings[0].ticket_key).toBe('S33-1');
-    expect(data!.findings[0].severity).toBe('moderate');
-    expect(data!.findings[0].description).toBe('Malformed JSONL crash');
-    expect(data!.findings[0].resolved).toBe(false);
+    expect(data!.sprints[33]).toHaveLength(1);
+    expect(data!.sprints[33][0].review_type).toBe('architect');
+    expect(data!.sprints[33][0].ticket_key).toBe('S33-1');
+    expect(data!.sprints[33][0].severity).toBe('moderate');
+    expect(data!.sprints[33][0].description).toBe('Malformed JSONL crash');
+    expect(data!.sprints[33][0].resolved).toBe(false);
   });
 
   it('appends to existing findings', async () => {
     mkdirSync(join(tmpDir, '.slope'), { recursive: true });
     const existing: FindingsFile = {
-      sprint_number: 33,
-      findings: [{
-        review_type: 'architect',
-        ticket_key: 'S33-1',
-        severity: 'moderate',
-        description: 'First finding',
-        resolved: true,
-      }],
+      sprints: {
+        33: [{
+          review_type: 'architect',
+          ticket_key: 'S33-1',
+          severity: 'moderate',
+          description: 'First finding',
+          resolved: true,
+        }],
+      },
     };
     writeFileSync(join(tmpDir, '.slope/review-findings.json'), JSON.stringify(existing));
 
@@ -152,8 +170,8 @@ describe('review findings add', () => {
     ]);
 
     const data = loadFindings(tmpDir);
-    expect(data!.findings).toHaveLength(2);
-    expect(data!.findings[1].review_type).toBe('code');
+    expect(data!.sprints[33]).toHaveLength(2);
+    expect(data!.sprints[33][1].review_type).toBe('code');
   });
 
   it('defaults severity to moderate', async () => {
@@ -168,7 +186,7 @@ describe('review findings add', () => {
     ]);
 
     const data = loadFindings(tmpDir);
-    expect(data!.findings[0].severity).toBe('moderate');
+    expect(data!.sprints[33][0].severity).toBe('moderate');
   });
 
   it('sets resolved when --resolved flag is present', async () => {
@@ -184,35 +202,37 @@ describe('review findings add', () => {
     ]);
 
     const data = loadFindings(tmpDir);
-    expect(data!.findings[0].resolved).toBe(true);
+    expect(data!.sprints[33][0].resolved).toBe(true);
   });
 
-  it('errors when adding findings for different sprint than existing', async () => {
+  it('allows adding findings for a different sprint (multi-sprint)', async () => {
     mkdirSync(join(tmpDir, '.slope'), { recursive: true });
     const existing: FindingsFile = {
-      sprint_number: 33,
-      findings: [{
-        review_type: 'architect',
-        ticket_key: 'S33-1',
-        severity: 'moderate',
-        description: 'Existing finding',
-        resolved: true,
-      }],
+      sprints: {
+        33: [{
+          review_type: 'architect',
+          ticket_key: 'S33-1',
+          severity: 'moderate',
+          description: 'Existing finding',
+          resolved: true,
+        }],
+      },
     };
     writeFileSync(join(tmpDir, '.slope/review-findings.json'), JSON.stringify(existing));
 
-    await expect(runCommand([
+    await runCommand([
       'findings', 'add',
       '--type=code',
       '--ticket=S34-1',
       '--description=New finding',
       '--sprint=34',
-    ])).rejects.toThrow('process.exit(1)');
+    ]);
 
-    // Verify original data is preserved
+    // Verify both sprints are preserved
     const data = loadFindings(tmpDir);
-    expect(data!.sprint_number).toBe(33);
-    expect(data!.findings).toHaveLength(1);
+    expect(data!.sprints[33]).toHaveLength(1);
+    expect(data!.sprints[34]).toHaveLength(1);
+    expect(data!.sprints[34][0].ticket_key).toBe('S34-1');
   });
 
   it('errors with missing required args', async () => {
@@ -255,11 +275,12 @@ describe('review findings list', () => {
   it('lists findings for current sprint', async () => {
     mkdirSync(join(tmpDir, '.slope'), { recursive: true });
     const data: FindingsFile = {
-      sprint_number: 33,
-      findings: [
-        { review_type: 'architect', ticket_key: 'S33-1', severity: 'moderate', description: 'Malformed JSONL crash', resolved: true },
-        { review_type: 'ml-engineer', ticket_key: 'S33-3', severity: 'moderate', description: 'Stats underutilizes schema', resolved: true },
-      ],
+      sprints: {
+        33: [
+          { review_type: 'architect', ticket_key: 'S33-1', severity: 'moderate', description: 'Malformed JSONL crash', resolved: true },
+          { review_type: 'ml-engineer', ticket_key: 'S33-3', severity: 'moderate', description: 'Stats underutilizes schema', resolved: true },
+        ],
+      },
     };
     writeFileSync(join(tmpDir, '.slope/review-findings.json'), JSON.stringify(data));
 
@@ -269,7 +290,7 @@ describe('review findings list', () => {
     spy.mockRestore();
 
     expect(logged).toContain('Sprint 33');
-    expect(logged).toContain('2 total');
+    expect(logged).toContain('2');
     expect(logged).toContain('S33-1');
     expect(logged).toContain('architect');
     expect(logged).toContain('Malformed JSONL crash');
@@ -280,10 +301,11 @@ describe('review findings list', () => {
   it('filters by sprint number', async () => {
     mkdirSync(join(tmpDir, '.slope'), { recursive: true });
     const data: FindingsFile = {
-      sprint_number: 33,
-      findings: [
-        { review_type: 'architect', ticket_key: 'S33-1', severity: 'moderate', description: 'test', resolved: true },
-      ],
+      sprints: {
+        33: [
+          { review_type: 'architect', ticket_key: 'S33-1', severity: 'moderate', description: 'test', resolved: true },
+        ],
+      },
     };
     writeFileSync(join(tmpDir, '.slope/review-findings.json'), JSON.stringify(data));
 

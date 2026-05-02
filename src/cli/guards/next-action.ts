@@ -147,7 +147,8 @@ export async function detectSprintState(cwd: string, sessionId?: string): Promis
 
     // Check if findings exist but scorecard hasn't been amended
     const findingsData = loadFindings(cwd);
-    if (findingsData && findingsData.findings.length > 0) {
+    const sprintFindings = findingsData?.sprints[latestScoredSprint] ?? [];
+    if (sprintFindings.length > 0) {
       try {
         // Check if scorecard already has review hazards
         const scorecardPath = join(retrosDir, `sprint-${latestScoredSprint}.json`);
@@ -160,7 +161,7 @@ export async function detectSprintState(cwd: string, sessionId?: string): Promis
             return {
               type: 'needs-amend',
               sprintNumber: latestScoredSprint,
-              findingCount: findingsData.findings.length,
+              findingCount: sprintFindings.length,
             };
           }
         }

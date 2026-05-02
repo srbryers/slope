@@ -159,15 +159,20 @@ function resetCommand(cwd: string): void {
 const FINDINGS_FILE = '.slope/review-findings.json';
 
 export interface FindingsFile {
-  sprint_number: number;
-  findings: ReviewFinding[];
+  sprints: Record<number, ReviewFinding[]>;
 }
 
 export function loadFindings(cwd: string): FindingsFile | null {
   const filePath = join(cwd, FINDINGS_FILE);
   if (!existsSync(filePath)) return null;
   try {
-    return JSON.parse(readFileSync(filePath, 'utf8')) as FindingsFile;
+    const raw = JSON.parse(readFileSync(filePath, 'utf8')) as { sprint_number?: number; findings?: ReviewFinding[]; sprints?: Record<number, ReviewFinding[]> };
+    // Migrate legacy single-sprint format
+    if (raw.sprints) return { sprints: raw.sprints };
+    if (raw.sprint_number != null && raw.findings) {
+      return { sprints: { [raw.sprint_number]: raw.findings } };
+    }
+    return null;
   } catch {
     return null;
   }
@@ -289,15 +294,15 @@ function findingsAddCommand(args: string[], cwd: string): void {
   };
 
   const existing = loadFindings(cwd);
-  if (existing && existing.sprint_number === sprintNumber) {
-    existing.findings.push(finding);
+  if (existing && existing.sprints[sprintNumber]) {
+    existing.sprints[sprintNumber].push(finding);
     saveFindings(cwd, existing);
-  } else if (existing && existing.sprint_number !== sprintNumber) {
-    console.error(`Error: Findings file contains Sprint ${existing.sprint_number} data, but --sprint=${sprintNumber} was specified.`);
-    console.error('Run `slope review findings clear` first, or use the correct --sprint value.');
-    process.exit(1);
+  } else if (existing) {
+    // Multi-sprint: allow adding to any sprint
+    existing.sprints[sprintNumber] = [finding];
+    saveFindings(cwd, existing);
   } else {
-    saveFindings(cwd, { sprint_number: sprintNumber, findings: [finding] });
+    saveFindings(cwd, { sprints: { [sprintNumber]: [finding] } });
   }
 
   console.log(`Finding added: [${reviewType}] ${ticketKey} — ${description} (${severity})`);
@@ -307,26 +312,41 @@ function findingsListCommand(args: string[], cwd: string): void {
   const sprintArg = args.find(a => a.startsWith('--sprint='));
   const data = loadFindings(cwd);
 
-  if (!data || data.findings.length === 0) {
+  if (!data || Object.keys(data.sprints).length === 0) {
     console.log('No review findings recorded.');
     return;
   }
 
   if (sprintArg) {
     const requestedSprint = parseInt(sprintArg.slice('--sprint='.length), 10);
-    if (data.sprint_number !== requestedSprint) {
+    const sprintFindings = data.sprints[requestedSprint];
+    if (!sprintFindings || sprintFindings.length === 0) {
       console.log(`No findings for Sprint ${requestedSprint}.`);
       return;
     }
-  }
-
-  console.log(`Sprint ${data.sprint_number} findings (${data.findings.length} total):\n`);
-  console.log('  Ticket  Type           Severity   Description');
-  for (const f of data.findings) {
-    const ticket = f.ticket_key.padEnd(7);
-    const type = f.review_type.padEnd(14);
-    const severity = f.severity.padEnd(10);
-    console.log(`  ${ticket} ${type} ${severity} ${f.description}`);
+    console.log(`Sprint ${requestedSprint} findings (${sprintFindings.length} total):\n`);
+    console.log('  Ticket  Type           Severity   Description');
+    for (const f of sprintFindings) {
+      const ticket = f.ticket_key.padEnd(7);
+      const type = f.review_type.padEnd(14);
+      const severity = f.severity.padEnd(10);
+      console.log(`  ${ticket} ${type} ${severity} ${f.description}`);
+    }
+  } else {
+    // Show all findings grouped by sprint
+    const sprintKeys = Object.keys(data.sprints).map(Number).sort((a, b) => a - b);
+    for (const sprint of sprintKeys) {
+      const sprintFindings = data.sprints[sprint];
+      console.log(`Sprint ${sprint} findings (${sprintFindings.length}):\n`);
+      console.log('  Ticket  Type           Severity   Description');
+      for (const f of sprintFindings) {
+        const ticket = f.ticket_key.padEnd(7);
+        const type = f.review_type.padEnd(14);
+        const severity = f.severity.padEnd(10);
+        console.log(`  ${ticket} ${type} ${severity} ${f.description}`);
+      }
+      console.log('');
+    }
   }
 }
 
@@ -341,6 +361,19 @@ function findingsClearCommand(args: string[], cwd: string): void {
 }
 
 function findingsCommand(args: string[], cwd: string): void {
+  // Handle --help on any subcommand
+  if (args.includes('--help') || args.includes('-h')) {
+    console.log(`Usage: slope review findings <subcommand> [options]
+
+Subcommands:
+  add    Add a review finding
+  list   List recorded findings
+  clear  Clear all findings
+
+Use 'slope review findings add --help' for add options.`);
+    return;
+  }
+
   const sub = args[0];
   switch (sub) {
     case 'add':
@@ -400,17 +433,18 @@ function amendCommand(args: string[], cwd: string): void {
 
   // Load findings
   const findingsData = loadFindings(cwd);
-  if (!findingsData || findingsData.findings.length === 0) {
+  const sprintFindings = findingsData?.sprints[sprintNumber] ?? [];
+  if (sprintFindings.length === 0) {
     console.log('No review findings to amend. Use `slope review findings add` first.');
     return;
   }
 
-  console.log(`Amending Sprint ${sprintNumber} scorecard with ${findingsData.findings.length} review finding${findingsData.findings.length !== 1 ? 's' : ''}...\n`);
+  console.log(`Amending Sprint ${sprintNumber} scorecard with ${sprintFindings.length} review finding${sprintFindings.length !== 1 ? 's' : ''}...\n`);
 
   // Amend
   let result;
   try {
-    result = amendScorecardWithFindings(scorecard, findingsData.findings);
+    result = amendScorecardWithFindings(scorecard, sprintFindings);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error(`Error: ${msg}`);
@@ -439,11 +473,18 @@ function amendCommand(args: string[], cwd: string): void {
   writeFileSync(scorecardPath, JSON.stringify(result.scorecard, null, 2) + '\n');
   console.log(`Scorecard updated: ${config.scorecardDir}/sprint-${sprintNumber}.json`);
 
-  // Clear findings file after successful amend to prevent guard false-negatives
-  const findingsFilePath = join(cwd, FINDINGS_FILE);
-  if (existsSync(findingsFilePath)) {
-    unlinkSync(findingsFilePath);
-    console.log('Findings file cleared.');
+  // Clear this sprint's findings after successful amend to prevent guard false-negatives
+  if (findingsData) {
+    delete findingsData.sprints[sprintNumber];
+    if (Object.keys(findingsData.sprints).length === 0) {
+      // All sprints cleared — delete the file
+      const findingsFilePath = join(cwd, FINDINGS_FILE);
+      if (existsSync(findingsFilePath)) unlinkSync(findingsFilePath);
+      console.log('Findings file cleared.');
+    } else {
+      saveFindings(cwd, findingsData);
+      console.log(`Findings for Sprint ${sprintNumber} cleared.`);
+    }
   }
 }
 
