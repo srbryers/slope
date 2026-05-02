@@ -1,6 +1,6 @@
 {
   "name": "SLOPE Development Roadmap",
-  "description": "Forward-looking roadmap from S61+. Phases 1-9 (S1-S47) are complete. S48-S60 were hardening, guard enforcement, and process sprints. This roadmap covers adoption, observability, guard maturity, multi-project, and loop evolution. S61-S64 reflect what actually shipped (themes diverged from original plan). Note: the actual S69 diverged from the planned Referee sprint — a carryover patch kit ran instead. The Referee work was rescheduled as S76.",
+  "description": "Forward-looking roadmap from S61+. Phases 1-9 (S1-S47) are complete. S48-S60 were hardening, guard enforcement, and process sprints. This roadmap covers adoption, observability, guard maturity, multi-project, and loop evolution. S61-S64 reflect what actually shipped (themes diverged from original plan). Note: the actual S69 diverged from the planned Referee sprint — a carryover patch kit ran instead. The Referee work was rescheduled as S78. S75.5 (The Bug Clearing) added 2026-05-02 to clear accumulated CLI bugs from external repos.",
   "phases": [
     {
       "name": "Phase 10 — Adoption & Onboarding",
@@ -49,6 +49,7 @@
       "sprints": [
         74,
         75,
+        75.5,
         76
       ]
     },
@@ -618,6 +619,41 @@
       "depends_on": [
         67
       ]
+    },
+    {
+      "id": 75.5,
+      "theme": "The Bug Clearing — CLI Bug Fixes",
+      "par": 3,
+      "slope": 1,
+      "type": "bug fix",
+      "note": "Created 2026-05-02 to clear 4 accumulated CLI bugs from external repos. GH #297, #298, #299, #300.",
+      "tickets": [
+        {
+          "key": "S75.5-1",
+          "title": "Fix slope version to read from installed package (GH #300)",
+          "club": "wedge",
+          "complexity": "small"
+        },
+        {
+          "key": "S75.5-2",
+          "title": "Fix review findings stale state — namespace by sprint (GH #297)",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S75.5-3",
+          "title": "Fix review tickets display — schema field mismatch (GH #298)",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S75.5-4",
+          "title": "Fix review findings --help crash (GH #299)",
+          "club": "wedge",
+          "complexity": "small"
+        }
+      ],
+      "depends_on": []
     },
     {
       "id": 76,
