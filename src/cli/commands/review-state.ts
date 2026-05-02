@@ -408,7 +408,14 @@ function amendCommand(args: string[], cwd: string): void {
   console.log(`Amending Sprint ${sprintNumber} scorecard with ${findingsData.findings.length} review finding${findingsData.findings.length !== 1 ? 's' : ''}...\n`);
 
   // Amend
-  const result = amendScorecardWithFindings(scorecard, findingsData.findings);
+  let result;
+  try {
+    result = amendScorecardWithFindings(scorecard, findingsData.findings);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`Error: ${msg}`);
+    process.exit(1);
+  }
 
   if (result.amendments.length === 0) {
     console.log('No new amendments applied (findings already present or no matching tickets).');

@@ -136,6 +136,14 @@ export function amendScorecardWithFindings(
   scorecard: GolfScorecard,
   findings: ReviewFinding[],
 ): AmendResult {
+  if (!Array.isArray(scorecard.shots)) {
+    throw new Error(
+      `Scorecard for sprint ${scorecard.sprint_number} has no \`shots\` array — ` +
+        `likely a sub-sprint parent stub or malformed file. ` +
+        `Pass --sprint=<id> for the sub-sprint scorecard, or check the on-disk file.`,
+    );
+  }
+
   const scoreBefore = scorecard.score;
   const labelBefore = scorecard.score_label;
   const amendments: AmendResult['amendments'] = [];
