@@ -57,6 +57,7 @@ export async function branchBeforeCommitGuard(input: HookInput, cwd: string): Pr
 
   return {
     decision: 'deny',
-    blockReason: `Committing directly on ${branch} is blocked. Create a feature branch first:\n  git checkout -b feat/<ticket-or-description>\nThen commit on the new branch.`,
+    blockReason: `BLOCKED: Committing directly on ${branch}. You MUST create a feature branch first:\n  git checkout -b feat/<ticket-or-description>\nThen commit on the new branch. Do NOT retry this commit on ${branch}.`,
+    context: `⛔ STOP — Do not commit to ${branch}. Run: git checkout -b feat/<description> first.`,
   };
 }

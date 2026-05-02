@@ -525,6 +525,12 @@ export default function slopeExtension(pi: ExtensionAPI, _cwdOverride?: string):
   // Settings command
   registerSettingsCommand(pi, settings, cwd);
 
+  // ── Model Router ────────────────────────────────
+
+  if (isSkillEnabled(settings, 'model-router')) {
+    registerModelRouter(pi, cwd);
+  }
+
   // ── Session Start: Inject Briefing on First Turn ──
 
   let briefingInjected = false;
@@ -641,6 +647,179 @@ export default function slopeExtension(pi: ExtensionAPI, _cwdOverride?: string):
 }
 
 // ── Settings Command ──────────────────────────────
+
+// ── Model Router ──────────────────────────────────────────
+
+const COMPLEX_KEYWORDS = [
+  'architect', 'design', 'refactor', 'debug', 'investigate',
+  'why does', 'how should', 'what\'s the best', 'review this',
+  'performance', 'security', 'migration', 'breaking change',
+  'multi-file', 'cross-cutting', 'redesign', 'strategy',
+  'explain why', 'trade-off', 'compare approaches',
+];
+
+const SIMPLE_KEYWORDS = [
+  'fix typo', 'rename', 'add import', 'run test', 'format',
+  'lint', 'commit', 'push', 'status', 'list files', 'show',
+  'create file', 'delete file', 'move file',
+];
+
+type ModelTier = 'local' | 'cloud';
+
+interface RouterState {
+  currentTier: ModelTier;
+  turnsSinceSwitch: number;
+  lastSwitchReason: string;
+}
+
+function scoreComplexity(prompt: string): number {
+  const lower = prompt.toLowerCase();
+  let score = 0;
+  for (const kw of COMPLEX_KEYWORDS) {
+    if (lower.includes(kw)) score += 2;
+  }
+  for (const kw of SIMPLE_KEYWORDS) {
+    if (lower.includes(kw)) score -= 1;
+  }
+  if (prompt.length > 500) score += 1;
+  if (prompt.length > 1000) score += 1;
+  if (prompt.length < 50) score -= 1;
+  const questions = (prompt.match(/\?/g) ?? []).length;
+  if (questions >= 2) score += 1;
+  const fileRefs = (prompt.match(/\.[a-z]{1,4}\b/g) ?? []).length;
+  if (fileRefs >= 3) score += 1;
+  return Math.max(0, Math.min(5, score));
+}
+
+function getTopSignal(prompt: string): string {
+  const lower = prompt.toLowerCase();
+  for (const kw of COMPLEX_KEYWORDS) {
+    if (lower.includes(kw)) return kw;
+  }
+  return 'general';
+}
+
+function registerModelRouter(pi: ExtensionAPI, _cwd: string): void {
+  let state: RouterState = {
+    currentTier: 'local',
+    turnsSinceSwitch: 0,
+    lastSwitchReason: 'startup',
+  };
+
+  // Restore state from session
+  pi.on('session_start', async (_event, ctx) => {
+    for (const entry of ctx.sessionManager.getEntries()) {
+      if (entry.type === 'custom' && entry.customType === 'slope-model-router') {
+        state = entry.data as RouterState;
+      }
+    }
+    const icon = state.currentTier === 'cloud' ? '\u2601' : '\ud83d\udcbb';
+    ctx.ui.setStatus('model-router', `${icon} ${state.currentTier}`);
+  });
+
+  // Analyze complexity before each agent turn
+  pi.on('before_agent_start', async (event, ctx) => {
+    const prompt = event.prompt?.toLowerCase() ?? '';
+
+    // Explicit user commands
+    const FORCE_LOCAL = ['use local', '/route local', 'switch local'];
+    const FORCE_CLOUD = ['use cloud', '/route cloud', 'switch cloud', 'use sonnet', 'use opus'];
+
+    if (FORCE_LOCAL.some(k => prompt.includes(k))) {
+      await doSwitch('local', 'user request', ctx, pi, state);
+      return;
+    }
+    if (FORCE_CLOUD.some(k => prompt.includes(k))) {
+      await doSwitch('cloud', 'user request', ctx, pi, state);
+      return;
+    }
+
+    // Score complexity
+    const score = scoreComplexity(event.prompt ?? '');
+
+    // Hysteresis: don't switch too frequently (min 3 turns between switches)
+    if (state.turnsSinceSwitch < 3) {
+      state.turnsSinceSwitch++;
+      return;
+    }
+
+    if (score >= 3 && state.currentTier === 'local') {
+      await doSwitch('cloud', `complexity ${score} (${getTopSignal(event.prompt ?? '')})`, ctx, pi, state);
+    } else if (score <= 1 && state.currentTier === 'cloud') {
+      await doSwitch('local', `simple task (score ${score})`, ctx, pi, state);
+    } else {
+      state.turnsSinceSwitch++;
+    }
+  });
+
+  // Track turns
+  pi.on('turn_end', async () => {
+    state.turnsSinceSwitch++;
+  });
+
+  // Manual command
+  pi.registerCommand('route', {
+    description: 'Switch model routing: /route local | /route cloud | /route status',
+    handler: async (args, ctx) => {
+      const arg = (args ?? '').trim().toLowerCase();
+      if (arg === 'status') {
+        ctx.ui.notify(
+          `Model router: ${state.currentTier} (${state.turnsSinceSwitch} turns since switch, reason: ${state.lastSwitchReason})`,
+          'info',
+        );
+        return;
+      }
+      if (arg === 'local' || arg === 'cloud') {
+        await doSwitch(arg, 'manual /route command', ctx, pi, state);
+        return;
+      }
+      ctx.ui.notify('Usage: /route local | /route cloud | /route status', 'info');
+    },
+  });
+}
+
+async function doSwitch(
+  tier: ModelTier,
+  reason: string,
+  ctx: any,
+  pi: ExtensionAPI,
+  state: RouterState,
+): Promise<void> {
+  const registry = ctx.modelRegistry;
+  let model;
+
+  if (tier === 'cloud') {
+    model = registry.find('openrouter', 'anthropic/claude-sonnet-4-5')
+      ?? registry.find('openrouter', 'google/gemini-2.5-pro-preview')
+      ?? registry.find('anthropic', 'claude-sonnet-4-20250514');
+  } else {
+    // Try local models in preference order
+    model = registry.find('mlx-local', 'Qwen3.6-27B')
+      ?? registry.find('mlx-local', 'Qwen3-Coder-Next')
+      ?? registry.find('ollama', 'qwen3-coder:30b');
+  }
+
+  if (!model) {
+    ctx.ui.notify(`No ${tier} model available — check models.json`, 'warning');
+    return;
+  }
+
+  const success = await pi.setModel(model);
+  if (success) {
+    state.currentTier = tier;
+    state.turnsSinceSwitch = 0;
+    state.lastSwitchReason = reason;
+
+    const icon = tier === 'cloud' ? '\u2601' : '\ud83d\udcbb';
+    ctx.ui.setStatus('model-router', `${icon} ${tier}`);
+    ctx.ui.notify(`Model router: switched to ${tier} (${model.name ?? model.id}) — ${reason}`, 'info');
+
+    // Persist state
+    pi.appendEntry('slope-model-router', state);
+  }
+}
+
+// ── Settings Command ──────────────────────────────────
 
 function registerSettingsCommand(pi: ExtensionAPI, settings: PiSettings, cwd: string): void {
   pi.registerCommand('slope-settings', {
