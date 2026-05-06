@@ -324,3 +324,150 @@ describe('scoreComplexity tier selection', () => {
     expect(r.tier).not.toBe('local-planner');
   });
 });
+
+describe('plan-gate tool_call handler', () => {
+  let tmpDir: string;
+
+  function makePi() {
+    return {
+      registerTool: vi.fn(),
+      registerCommand: vi.fn(),
+      on: vi.fn(),
+      sendMessage: vi.fn(),
+      appendEntry: vi.fn(),
+    };
+  }
+
+  function makeSprintState(phase: string, dir: string) {
+    mkdirSync(join(dir, '.slope'), { recursive: true });
+    writeFileSync(
+      join(dir, '.slope', 'sprint-state.json'),
+      JSON.stringify({ phase }),
+    );
+  }
+
+  function makeSlopeConfig(dir: string) {
+    mkdirSync(join(dir, '.slope'), { recursive: true });
+    writeFileSync(join(dir, '.slope', 'config.json'), JSON.stringify({ version: '1' }));
+  }
+
+  /** Build a mock ctx whose sessionManager returns supplied assistant entries. */
+  function makeCtxWithEntries(
+    dir: string,
+    entries: Array<{ role: string; content: string }>,
+    confirmResult = true,
+  ) {
+    return {
+      cwd: dir,
+      sessionManager: { getEntries: () => entries },
+      ui: { notify: vi.fn(), confirm: vi.fn().mockResolvedValue(confirmResult) },
+    };
+  }
+
+  /** Get the plan-gate tool_call handler from registered mock.on calls. */
+  function getPlanGateHandler(mockPi: ReturnType<typeof makePi>) {
+    // There may be multiple tool_call handlers; find the plan-gate one by trying each.
+    // The plan-gate handler is registered after the guards handler.
+    const calls = mockPi.on.mock.calls.filter((c: unknown[]) => c[0] === 'tool_call');
+    // Return the last one registered under the plan-gate skill (enabled by default).
+    return calls[calls.length - 1]?.[1] as
+      | ((event: unknown, ctx: unknown) => Promise<{ block: boolean; reason?: string } | undefined>)
+      | undefined;
+  }
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'slope-pg-test-'));
+    makeSlopeConfig(tmpDir);
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('blocks write with no plan and no sprint phase (non-interactive)', async () => {
+    const mockPi = makePi();
+    slopeExtension(mockPi as never, tmpDir);
+    const handler = getPlanGateHandler(mockPi);
+    const ctx = { cwd: tmpDir, sessionManager: { getEntries: () => [] }, ui: { notify: vi.fn() } };
+    const result = await handler?.({ toolName: 'write', input: { path: 'foo.ts' } }, ctx);
+    expect(result).toEqual({ block: true, reason: expect.stringContaining('plan-gate') });
+  });
+
+  it('blocks edit with no plan and no sprint phase (non-interactive)', async () => {
+    const mockPi = makePi();
+    slopeExtension(mockPi as never, tmpDir);
+    const handler = getPlanGateHandler(mockPi);
+    const ctx = { cwd: tmpDir, sessionManager: { getEntries: () => [] }, ui: { notify: vi.fn() } };
+    const result = await handler?.({ toolName: 'edit', input: { path: 'foo.ts' } }, ctx);
+    expect(result).toEqual({ block: true, reason: expect.stringContaining('plan-gate') });
+  });
+
+  it('blocks bash rm -rf with no plan and no sprint (non-interactive)', async () => {
+    const mockPi = makePi();
+    slopeExtension(mockPi as never, tmpDir);
+    const handler = getPlanGateHandler(mockPi);
+    const ctx = { cwd: tmpDir, sessionManager: { getEntries: () => [] }, ui: { notify: vi.fn() } };
+    const result = await handler?.({ toolName: 'bash', input: { command: 'rm -rf dist' } }, ctx);
+    expect(result).toEqual({ block: true, reason: expect.stringContaining('plan-gate') });
+  });
+
+  it('does NOT block bash git status (exempt read-only command)', async () => {
+    const mockPi = makePi();
+    slopeExtension(mockPi as never, tmpDir);
+    const handler = getPlanGateHandler(mockPi);
+    const ctx = { cwd: tmpDir, sessionManager: { getEntries: () => [] }, ui: { notify: vi.fn() } };
+    const result = await handler?.({ toolName: 'bash', input: { command: 'git status' } }, ctx);
+    expect(result).toBeUndefined();
+  });
+
+  it('does NOT block when sprint phase is implementing', async () => {
+    makeSprintState('implementing', tmpDir);
+    const mockPi = makePi();
+    slopeExtension(mockPi as never, tmpDir);
+    const handler = getPlanGateHandler(mockPi);
+    const ctx = makeCtxWithEntries(tmpDir, []);
+    const result = await handler?.({ toolName: 'write', input: { path: 'foo.ts' } }, ctx);
+    expect(result).toBeUndefined();
+  });
+
+  it('does NOT block when assistant message contains ## Plan heading', async () => {
+    const mockPi = makePi();
+    slopeExtension(mockPi as never, tmpDir);
+    const handler = getPlanGateHandler(mockPi);
+    const ctx = makeCtxWithEntries(tmpDir, [
+      { role: 'assistant', content: '## Plan\n1. Do X\n2. Do Y\n3. Do Z' },
+    ]);
+    const result = await handler?.({ toolName: 'edit', input: { path: 'foo.ts' } }, ctx);
+    expect(result).toBeUndefined();
+  });
+
+  it('does NOT block when assistant message contains numbered list', async () => {
+    const mockPi = makePi();
+    slopeExtension(mockPi as never, tmpDir);
+    const handler = getPlanGateHandler(mockPi);
+    const ctx = makeCtxWithEntries(tmpDir, [
+      { role: 'assistant', content: 'Here is my approach:\n1. First step\n2. Second step\n3. Third step\n4. Done' },
+    ]);
+    const result = await handler?.({ toolName: 'write', input: { path: 'bar.ts' } }, ctx);
+    expect(result).toBeUndefined();
+  });
+
+  it('interactive: allows when user confirms', async () => {
+    const mockPi = makePi();
+    slopeExtension(mockPi as never, tmpDir);
+    const handler = getPlanGateHandler(mockPi);
+    const ctx = makeCtxWithEntries(tmpDir, [], true);
+    const result = await handler?.({ toolName: 'write', input: { path: 'foo.ts' } }, ctx);
+    expect(result).toBeUndefined();
+    expect(ctx.ui.confirm).toHaveBeenCalled();
+  });
+
+  it('interactive: blocks when user declines', async () => {
+    const mockPi = makePi();
+    slopeExtension(mockPi as never, tmpDir);
+    const handler = getPlanGateHandler(mockPi);
+    const ctx = makeCtxWithEntries(tmpDir, [], false);
+    const result = await handler?.({ toolName: 'write', input: { path: 'foo.ts' } }, ctx);
+    expect(result).toEqual({ block: true, reason: expect.stringContaining('plan-gate') });
+  });
+});

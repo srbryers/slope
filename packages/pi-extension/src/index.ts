@@ -41,6 +41,53 @@ function hasSlopeProject(cwd: string): boolean {
   return existsSync(join(cwd, '.slope', 'config.json'));
 }
 
+// ── Plan-Gate Helpers ────────────────────────────────
+
+/** Returns the active sprint phase, or null if no sprint state exists. */
+function readSprintPhase(cwd: string): string | null {
+  const sprintStatePath = join(cwd, '.slope', 'sprint-state.json');
+  if (!existsSync(sprintStatePath)) return null;
+  try {
+    const state = JSON.parse(readFileSync(sprintStatePath, 'utf8')) as { phase?: string };
+    return state.phase ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function inSprintPhase(cwd: string): boolean {
+  const phase = readSprintPhase(cwd);
+  return phase === 'planning' || phase === 'implementing' || phase === 'scoring';
+}
+
+function hasRecentPlan(ctx: { sessionManager: { getEntries: () => Array<{ role?: string; content?: string }> } }): boolean {
+  const entries = ctx.sessionManager.getEntries();
+  // Scan last 5 assistant messages for a structured plan.
+  const assistantMessages = entries
+    .filter(e => e.role === 'assistant' && typeof e.content === 'string')
+    .slice(-5);
+  const PLAN_HEADING = /^##+\s*(plan|approach|steps?)\b/im;
+  const NUMBERED_LIST = /^\s*1\.\s.+\n\s*2\.\s.+\n\s*3\.\s/m;
+  const PLAN_MARKER = /\[plan\]|<plan>/i;
+  return assistantMessages.some(m =>
+    PLAN_HEADING.test(m.content ?? '') ||
+    NUMBERED_LIST.test(m.content ?? '') ||
+    PLAN_MARKER.test(m.content ?? '')
+  );
+}
+
+// Read-only bash commands that are always exempt from the plan-gate.
+const BASH_EXEMPT_PREFIXES = [
+  'git status', 'git log', 'git diff', 'git show', 'git branch',
+  'ls', 'pwd', 'cat ', 'grep', 'find ', 'which ', 'echo ',
+  'head ', 'tail ', 'wc ', 'stat ', 'file ', 'type ',
+];
+
+function isBashExempt(command: string): boolean {
+  const trimmed = command.trim();
+  return BASH_EXEMPT_PREFIXES.some(prefix => trimmed.startsWith(prefix));
+}
+
 // ── Onboarding State ────────────────────────────────
 
 const ONBOARDING_STATE_FILE = '.slope/.pi-onboarding.json';
@@ -456,6 +503,39 @@ export default function slopeExtension(pi: ExtensionAPI, _cwdOverride?: string):
     }
   });
   } // end guards event handlers
+
+  if (isSkillEnabled(settings, 'plan-gate')) {
+  pi.on('tool_call', async (event, ctx) => {
+    const { toolName, input } = event;
+    const inp = input as Record<string, unknown>;
+
+    // Only gate destructive tools.
+    if (toolName !== 'write' && toolName !== 'edit' && toolName !== 'bash') return;
+
+    // Bash: exempt read-only commands.
+    if (toolName === 'bash' && typeof inp.command === 'string' && isBashExempt(inp.command)) return;
+
+    // Not a gate situation when a sprint is active.
+    if (inSprintPhase(ctx.cwd)) return;
+
+    // Not a gate situation when the assistant recently produced a plan.
+    if (hasRecentPlan(ctx as any)) return;
+
+    const reason = 'plan-gate: Run /sprint start or write a plan before this action.';
+
+    // Interactive: ask the user; non-interactive: hard block.
+    const ui = (ctx as any).ui;
+    if (typeof ui?.confirm === 'function') {
+      const ok = await ui.confirm(
+        'No plan detected',
+        'Run /sprint start or write a plan first. Proceed anyway?',
+      );
+      if (!ok) return { block: true, reason };
+    } else {
+      return { block: true, reason };
+    }
+  });
+  } // end plan-gate event handlers
 
   if (isSkillEnabled(settings, 'planning')) {
   // Guard: post-push sprint nudge
