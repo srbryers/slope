@@ -41,6 +41,28 @@ function hasSlopeProject(cwd: string): boolean {
   return existsSync(join(cwd, '.slope', 'config.json'));
 }
 
+// ── Vague-Prompt Detector ────────────────────────────
+
+// Matches vague action verbs at the start of a prompt.
+const VAGUE_PROMPT_RE = /^(optimize|improve|make\s+\S+\s+better|make\s+better|fix|refactor|clean\s+up|tidy)\b/i;
+
+export function isVaguePrompt(prompt: string): boolean {
+  const trimmed = prompt.trim();
+  return (
+    trimmed.length < 200 &&
+    VAGUE_PROMPT_RE.test(trimmed) &&
+    !HAS_PATH_RE.test(trimmed) &&
+    !HAS_SYMBOL_RE.test(trimmed)
+  );
+}
+
+/**
+ * Module-level ref populated by registerModelRouter so the vague-prompt
+ * detector (registered first) can call doSwitch without accessing the closure.
+ * Set synchronously during extension init, before any events fire.
+ */
+let _routerRef: { state: RouterState; pi: ExtensionAPI } | null = null;
+
 // ── Plan-Gate Helpers ────────────────────────────────
 
 /** Returns the active sprint phase, or null if no sprint state exists. */
@@ -535,6 +557,27 @@ export default function slopeExtension(pi: ExtensionAPI, _cwdOverride?: string):
       return { block: true, reason };
     }
   });
+  // Vague-prompt detector — registered BEFORE model-router's before_agent_start so
+  // the forced local-planner tier sticks when the router handler fires next.
+  pi.on('before_agent_start', async (event, ctx) => {
+    if (!isVaguePrompt(event.prompt ?? '')) return;
+
+    // Inject planning preamble into the chained system prompt.
+    const preamble =
+      '\n\nBefore any tool calls, produce a written plan addressing what to change, ' +
+      'where, and the order of work. Format: a numbered list of steps under a ' +
+      '"## Plan" heading. Do not call write/edit/bash before the plan is written.';
+
+    // Force-route to local-planner when the model-router skill is active.
+    if (_routerRef) {
+      _routerRef.state.turnsSinceSwitch = 3; // satisfy hysteresis so doSwitch fires
+      await doSwitch('local-planner', 'vague-prompt-detector', ctx, _routerRef.pi, _routerRef.state);
+    }
+
+    return {
+      systemPrompt: event.systemPrompt + preamble,
+    };
+  });
   } // end plan-gate event handlers
 
   if (isSkillEnabled(settings, 'planning')) {
@@ -858,6 +901,8 @@ function registerModelRouter(pi: ExtensionAPI, _cwd: string): void {
     turnsSinceSwitch: 0,
     lastSwitchReason: 'startup',
   };
+  // Expose state + pi so the vague-prompt detector (registered earlier) can call doSwitch.
+  _routerRef = { state, pi };
 
   // Restore state from session
   pi.on('session_start', async (_event, ctx) => {

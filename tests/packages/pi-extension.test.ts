@@ -10,7 +10,7 @@ vi.mock('node:child_process', () => ({
 }));
 
 // Import after mocks are set up
-const { default: slopeExtension, scoreComplexity } = await import('../../packages/pi-extension/src/index.js');
+const { default: slopeExtension, scoreComplexity, isVaguePrompt } = await import('../../packages/pi-extension/src/index.js');
 
 // Minimal mock context passed to tool execute() and event handlers
 function makeCtx(cwd: string) {
@@ -138,9 +138,9 @@ describe('Pi Extension', () => {
 
     it('before_agent_start injects onboarding message for fresh project', async () => {
       slopeExtension(mockPi as never, tmpDir);
-      const handler = mockPi.on.mock.calls.find(
-        (c: unknown[]) => c[0] === 'before_agent_start',
-      )?.[1] as (_event: unknown, ctx: unknown) => Promise<{ message: { content: string } } | undefined>;
+      // Briefing handler is the last registered before_agent_start (T3's vague-prompt handler registers first).
+      const beforeAgentStartCalls = mockPi.on.mock.calls.filter((c: unknown[]) => c[0] === 'before_agent_start');
+      const handler = beforeAgentStartCalls[beforeAgentStartCalls.length - 1]?.[1] as (_event: unknown, ctx: unknown) => Promise<{ message: { content: string } } | undefined>;
 
       const result = await handler({}, makeCtx(tmpDir));
       expect(result?.message.content).toContain('🎯 SLOPE Onboarding');
@@ -157,9 +157,9 @@ describe('Pi Extension', () => {
         JSON.stringify({ sprint: 1, phase: 'implementing', gates: {}, started_at: '', updated_at: '' }),
       );
       slopeExtension(mockPi as never, tmpDir);
-      const handler = mockPi.on.mock.calls.find(
-        (c: unknown[]) => c[0] === 'before_agent_start',
-      )?.[1] as (_event: unknown, ctx: unknown) => Promise<{ message: { content: string } } | undefined>;
+      // Briefing handler is the last registered before_agent_start (T3's vague-prompt handler registers first).
+      const beforeAgentStartCalls = mockPi.on.mock.calls.filter((c: unknown[]) => c[0] === 'before_agent_start');
+      const handler = beforeAgentStartCalls[beforeAgentStartCalls.length - 1]?.[1] as (_event: unknown, ctx: unknown) => Promise<{ message: { content: string } } | undefined>;
 
       const result = await handler({}, makeCtx(tmpDir));
       expect(result?.message.content).toContain('SLOPE Session Briefing');
@@ -171,9 +171,9 @@ describe('Pi Extension', () => {
         JSON.stringify({ sprint: 1, phase: 'complete', gates: {}, started_at: '', updated_at: '' }),
       );
       slopeExtension(mockPi as never, tmpDir);
-      const handler = mockPi.on.mock.calls.find(
-        (c: unknown[]) => c[0] === 'before_agent_start',
-      )?.[1] as (_event: unknown, ctx: unknown) => Promise<{ message: { content: string } } | undefined>;
+      // Briefing handler is the last registered before_agent_start (T3's vague-prompt handler registers first).
+      const beforeAgentStartCalls = mockPi.on.mock.calls.filter((c: unknown[]) => c[0] === 'before_agent_start');
+      const handler = beforeAgentStartCalls[beforeAgentStartCalls.length - 1]?.[1] as (_event: unknown, ctx: unknown) => Promise<{ message: { content: string } } | undefined>;
 
       const result = await handler({}, makeCtx(tmpDir));
       expect(result?.message.content).toContain('No active sprint (previous sprint complete)');
@@ -250,9 +250,9 @@ describe('Pi Extension', () => {
         JSON.stringify({ sprint: 1, phase: 'planning', gates: {}, started_at: '', updated_at: '' }),
       );
       slopeExtension(mockPi as never, tmpDir);
-      const handler = mockPi.on.mock.calls.find(
-        (c: unknown[]) => c[0] === 'before_agent_start',
-      )?.[1] as (_event: unknown, ctx: unknown) => Promise<{ message: { content: string } } | undefined>;
+      // Briefing handler is the last registered before_agent_start (T3's vague-prompt handler registers first).
+      const beforeAgentStartCalls = mockPi.on.mock.calls.filter((c: unknown[]) => c[0] === 'before_agent_start');
+      const handler = beforeAgentStartCalls[beforeAgentStartCalls.length - 1]?.[1] as (_event: unknown, ctx: unknown) => Promise<{ message: { content: string } } | undefined>;
 
       const result = await handler({}, makeCtx(tmpDir));
       expect(result?.message.content).toContain('Planning Phase');
@@ -469,5 +469,57 @@ describe('plan-gate tool_call handler', () => {
     const ctx = makeCtxWithEntries(tmpDir, [], false);
     const result = await handler?.({ toolName: 'write', input: { path: 'foo.ts' } }, ctx);
     expect(result).toEqual({ block: true, reason: expect.stringContaining('plan-gate') });
+  });
+});
+
+describe('isVaguePrompt regex', () => {
+  it('matches "optimize this"', () => {
+    expect(isVaguePrompt('optimize this')).toBe(true);
+  });
+
+  it('matches "improve" (bare verb)', () => {
+    expect(isVaguePrompt('improve')).toBe(true);
+  });
+
+  it('matches "clean up" (two-word verb)', () => {
+    expect(isVaguePrompt('clean up')).toBe(true);
+  });
+
+  it('matches "fix the bug" (lowercase, no specifier)', () => {
+    // Note: 'Fix' (capital F) is rejected by HAS_SYMBOL_RE as PascalCase — intentional false-negative.
+    expect(isVaguePrompt('fix the bug')).toBe(true);
+  });
+
+  it('does NOT match "Fix the bug" — capital F looks like PascalCase to the symbol regex', () => {
+    expect(isVaguePrompt('Fix the bug')).toBe(false);
+  });
+
+  it('matches "make it better"', () => {
+    expect(isVaguePrompt('make it better')).toBe(true);
+  });
+
+  it('does NOT match when path is present', () => {
+    expect(isVaguePrompt('optimize the bundle size in webpack.config.js')).toBe(false);
+  });
+
+  it('does NOT match when symbol is present — function call', () => {
+    expect(isVaguePrompt('refactor handleSubmit()')).toBe(false);
+  });
+
+  it('does NOT match when symbol is present — PascalCase', () => {
+    expect(isVaguePrompt('improve UserProfile component')).toBe(false);
+  });
+
+  it('does NOT match prompts >= 200 chars', () => {
+    const long = 'optimize ' + 'x'.repeat(200);
+    expect(isVaguePrompt(long)).toBe(false);
+  });
+
+  it('does NOT match unrelated verbs', () => {
+    expect(isVaguePrompt('write a poem about cats')).toBe(false);
+  });
+
+  it('does NOT match "add console.log to foo()"', () => {
+    expect(isVaguePrompt('add console.log to foo()')).toBe(false);
   });
 });
