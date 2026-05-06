@@ -10,7 +10,7 @@ vi.mock('node:child_process', () => ({
 }));
 
 // Import after mocks are set up
-const { default: slopeExtension } = await import('../../packages/pi-extension/src/index.js');
+const { default: slopeExtension, scoreComplexity } = await import('../../packages/pi-extension/src/index.js');
 
 // Minimal mock context passed to tool execute() and event handlers
 function makeCtx(cwd: string) {
@@ -258,5 +258,69 @@ describe('Pi Extension', () => {
       expect(result?.message.content).toContain('Planning Phase');
       expect(result?.message.content).toContain('sprint start');
     });
+  });
+});
+
+describe('scoreComplexity tier selection', () => {
+  it('routes "optimize this" to local-planner (vague + ambiguous + short-no-code)', () => {
+    const r = scoreComplexity('optimize this');
+    expect(r.tier).toBe('local-planner');
+    expect(r.signal).toContain('vague-verb');
+    expect(r.signal).toContain('ambiguous-noun');
+  });
+
+  it('routes "refactor everything" to local-planner', () => {
+    const r = scoreComplexity('refactor everything');
+    expect(r.tier).toBe('local-planner');
+  });
+
+  it('routes "make it better" to local-planner via short-no-code', () => {
+    const r = scoreComplexity('make it better');
+    expect(r.tier).toBe('local-planner');
+    expect(r.signal).toContain('vague-verb');
+    expect(r.signal).toContain('short-no-code');
+  });
+
+  it('routes "fix typo in foo.ts:42" to local-coder (path beats vague verb)', () => {
+    const r = scoreComplexity('fix typo in foo.ts:42');
+    expect(r.tier).toBe('local-coder');
+  });
+
+  it('routes "add console.log to handleClick()" to local-coder via symbol', () => {
+    const r = scoreComplexity('add console.log to handleClick()');
+    expect(r.tier).toBe('local-coder');
+    expect(r.signal).toBe('code-identifier');
+  });
+
+  it('routes "review this performance issue" to cloud (high score)', () => {
+    const r = scoreComplexity('review this performance issue');
+    expect(r.tier).toBe('cloud');
+    expect(r.score).toBeGreaterThanOrEqual(3);
+  });
+
+  it('routes "explain why redux is faster than zustand" to local-general (no path/symbol, low score)', () => {
+    const r = scoreComplexity('explain why redux is faster than zustand');
+    // 'explain why' is +2 → score 2 → not cloud. No path/symbol → general.
+    expect(r.tier).toBe('local-general');
+  });
+
+  it('clamps score to [0, 5]', () => {
+    const heavy = 'architect a multi-file refactor strategy with breaking changes for performance and security';
+    const r = scoreComplexity(heavy);
+    expect(r.score).toBeLessThanOrEqual(5);
+    expect(r.tier).toBe('cloud');
+  });
+
+  it('treats "fix" without targets as 1 planner signal (not enough — falls to coder via keyword)', () => {
+    // 'fix' alone fires vague-verb + short-no-code = 2 signals → planner.
+    // 'fix the bug' adds no ambiguous noun ('the bug' is not in our list).
+    const r = scoreComplexity('fix the bug');
+    expect(r.tier).toBe('local-planner');
+  });
+
+  it('does not flag a long descriptive prompt as planner', () => {
+    const long = 'optimize the bundle size in webpack.config.js by replacing the legacy uglifyjs plugin with terser and enabling tree-shaking for the lodash imports we use in src/utils';
+    const r = scoreComplexity(long);
+    expect(r.tier).not.toBe('local-planner');
   });
 });

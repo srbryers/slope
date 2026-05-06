@@ -664,44 +664,117 @@ const SIMPLE_KEYWORDS = [
   'create file', 'delete file', 'move file',
 ];
 
-type ModelTier = 'local' | 'cloud';
+// Vague verbs at start of prompt — signal that the user hasn't decided what to do.
+const PLANNER_VAGUE_RE = /^(optimize|improve|make\s+\S+\s+better|make\s+better|fix|refactor|clean\s+up|tidy|architect)\b/i;
 
-interface RouterState {
+// Standalone ambiguous noun tokens. 'it' is intentionally excluded — too common.
+const AMBIGUOUS_NOUN_TOKENS = [
+  'the code', 'this', 'everything', 'all of it', 'the whole thing', 'the codebase',
+];
+
+const HAS_PATH_RE = /\.(tsx?|jsx?|py|rs|go|md|json|ya?ml|sh|sql|css|html|toml)\b/i;
+// Function-call shape `foo()` OR PascalCase identifier `MyClass`.
+const HAS_SYMBOL_RE = /\b[a-z][A-Za-z0-9_]*\(\)|\b[A-Z][a-z][A-Za-z0-9]+\b/;
+
+function hasCodeIdentifier(prompt: string): boolean {
+  return HAS_PATH_RE.test(prompt) || HAS_SYMBOL_RE.test(prompt);
+}
+
+function getPlannerSignals(prompt: string): string[] {
+  const trimmed = prompt.trim();
+  const lower = trimmed.toLowerCase();
+  const signals: string[] = [];
+  if (PLANNER_VAGUE_RE.test(trimmed)) signals.push('vague-verb');
+  for (const t of AMBIGUOUS_NOUN_TOKENS) {
+    if (lower.includes(t)) { signals.push('ambiguous-noun'); break; }
+  }
+  if (trimmed.length < 200 && !hasCodeIdentifier(trimmed)) signals.push('short-no-code');
+  return signals;
+}
+
+export type ModelTier = 'local-coder' | 'local-general' | 'local-planner' | 'cloud';
+
+export interface RouterState {
   currentTier: ModelTier;
   turnsSinceSwitch: number;
   lastSwitchReason: string;
+  /** Set by doSwitch when entering local-planner; consumed by the vague-prompt detector (T3). */
+  plannerPreambleStaged?: boolean;
 }
 
-function scoreComplexity(prompt: string): number {
-  const lower = prompt.toLowerCase();
+export interface ComplexityResult {
+  /** Recommended tier for this prompt. */
+  tier: ModelTier;
+  /** Cloud-escalation score on the existing 0–5 scale. */
+  score: number;
+  /** Human-readable top reason for the tier choice. */
+  signal: string;
+}
+
+export function scoreComplexity(prompt: string): ComplexityResult {
+  const trimmed = prompt.trim();
+  const lower = trimmed.toLowerCase();
+
+  // 0–5 score (cloud-escalation signal). Same weights as the prior implementation.
   let score = 0;
+  let topComplexKw: string | null = null;
   for (const kw of COMPLEX_KEYWORDS) {
-    if (lower.includes(kw)) score += 2;
+    if (lower.includes(kw)) {
+      score += 2;
+      if (!topComplexKw) topComplexKw = kw;
+    }
   }
   for (const kw of SIMPLE_KEYWORDS) {
     if (lower.includes(kw)) score -= 1;
   }
-  if (prompt.length > 500) score += 1;
-  if (prompt.length > 1000) score += 1;
-  if (prompt.length < 50) score -= 1;
-  const questions = (prompt.match(/\?/g) ?? []).length;
+  if (trimmed.length > 500) score += 1;
+  if (trimmed.length > 1000) score += 1;
+  if (trimmed.length < 50) score -= 1;
+  const questions = (trimmed.match(/\?/g) ?? []).length;
   if (questions >= 2) score += 1;
-  const fileRefs = (prompt.match(/\.[a-z]{1,4}\b/g) ?? []).length;
+  const fileRefs = (trimmed.match(/\.[a-z]{1,4}\b/g) ?? []).length;
   if (fileRefs >= 3) score += 1;
-  return Math.max(0, Math.min(5, score));
+  score = Math.max(0, Math.min(5, score));
+
+  // Tier selection. Order matters: cloud > planner > coder > general.
+  if (score >= 3) {
+    return { tier: 'cloud', score, signal: topComplexKw ?? 'high-complexity' };
+  }
+  const planner = getPlannerSignals(trimmed);
+  if (planner.length >= 2) {
+    return { tier: 'local-planner', score, signal: planner.join('+') };
+  }
+  if (hasCodeIdentifier(trimmed)) {
+    return { tier: 'local-coder', score, signal: 'code-identifier' };
+  }
+  // Coder-flavoured keywords still hint at coder when no identifier is present.
+  const CODER_HINT_KWS = ['fix typo', 'rename', 'add import', 'run test', 'format', 'lint',
+    'commit', 'push', 'create file', 'delete file', 'move file', 'debug', 'refactor'];
+  for (const kw of CODER_HINT_KWS) {
+    if (lower.includes(kw)) return { tier: 'local-coder', score, signal: kw };
+  }
+  return { tier: 'local-general', score, signal: 'general-reasoning' };
 }
 
-function getTopSignal(prompt: string): string {
-  const lower = prompt.toLowerCase();
-  for (const kw of COMPLEX_KEYWORDS) {
-    if (lower.includes(kw)) return kw;
+const TIER_ICONS: Record<ModelTier, string> = {
+  'local-coder': '\u{1F6E0}',
+  'local-general': '\u{1F9E0}',
+  'local-planner': '\u{1F4CB}',
+  'cloud': '☁',
+};
+
+/** Backwards-compat: persisted RouterState may carry the old 'local' tier name. */
+function normalizeTier(tier: string): ModelTier {
+  if (tier === 'local') return 'local-coder';
+  if (tier === 'local-coder' || tier === 'local-general' || tier === 'local-planner' || tier === 'cloud') {
+    return tier;
   }
-  return 'general';
+  return 'local-coder';
 }
 
 function registerModelRouter(pi: ExtensionAPI, _cwd: string): void {
-  let state: RouterState = {
-    currentTier: 'local',
+  const state: RouterState = {
+    currentTier: 'local-coder',
     turnsSinceSwitch: 0,
     lastSwitchReason: 'startup',
   };
@@ -710,23 +783,37 @@ function registerModelRouter(pi: ExtensionAPI, _cwd: string): void {
   pi.on('session_start', async (_event, ctx) => {
     for (const entry of ctx.sessionManager.getEntries()) {
       if (entry.type === 'custom' && entry.customType === 'slope-model-router') {
-        state = entry.data as RouterState;
+        const persisted = entry.data as Partial<RouterState> & { currentTier?: string };
+        state.currentTier = normalizeTier(persisted.currentTier ?? 'local-coder');
+        state.turnsSinceSwitch = persisted.turnsSinceSwitch ?? 0;
+        state.lastSwitchReason = persisted.lastSwitchReason ?? 'restored';
+        state.plannerPreambleStaged = persisted.plannerPreambleStaged;
       }
     }
-    const icon = state.currentTier === 'cloud' ? '\u2601' : '\ud83d\udcbb';
-    ctx.ui.setStatus('model-router', `${icon} ${state.currentTier}`);
+    ctx.ui.setStatus('model-router', `${TIER_ICONS[state.currentTier]} ${state.currentTier}`);
   });
 
   // Analyze complexity before each agent turn
   pi.on('before_agent_start', async (event, ctx) => {
-    const prompt = event.prompt?.toLowerCase() ?? '';
+    const prompt = (event.prompt ?? '').toLowerCase();
 
-    // Explicit user commands
+    // Explicit user commands \u2014 match longest variants first.
+    if (/(use|switch|\/route)\s+local-planner\b/.test(prompt)) {
+      await doSwitch('local-planner', 'user request', ctx, pi, state);
+      return;
+    }
+    if (/(use|switch|\/route)\s+local-general\b/.test(prompt)) {
+      await doSwitch('local-general', 'user request', ctx, pi, state);
+      return;
+    }
+    if (/(use|switch|\/route)\s+local-coder\b/.test(prompt)) {
+      await doSwitch('local-coder', 'user request', ctx, pi, state);
+      return;
+    }
     const FORCE_LOCAL = ['use local', '/route local', 'switch local'];
     const FORCE_CLOUD = ['use cloud', '/route cloud', 'switch cloud', 'use sonnet', 'use opus'];
-
     if (FORCE_LOCAL.some(k => prompt.includes(k))) {
-      await doSwitch('local', 'user request', ctx, pi, state);
+      await doSwitch('local-coder', 'user request (legacy "local")', ctx, pi, state);
       return;
     }
     if (FORCE_CLOUD.some(k => prompt.includes(k))) {
@@ -734,19 +821,16 @@ function registerModelRouter(pi: ExtensionAPI, _cwd: string): void {
       return;
     }
 
-    // Score complexity
-    const score = scoreComplexity(event.prompt ?? '');
+    const result = scoreComplexity(event.prompt ?? '');
 
-    // Hysteresis: don't switch too frequently (min 3 turns between switches)
+    // Hysteresis: don't switch too frequently (min 3 turns between switches).
     if (state.turnsSinceSwitch < 3) {
       state.turnsSinceSwitch++;
       return;
     }
 
-    if (score >= 3 && state.currentTier === 'local') {
-      await doSwitch('cloud', `complexity ${score} (${getTopSignal(event.prompt ?? '')})`, ctx, pi, state);
-    } else if (score <= 1 && state.currentTier === 'cloud') {
-      await doSwitch('local', `simple task (score ${score})`, ctx, pi, state);
+    if (result.tier !== state.currentTier) {
+      await doSwitch(result.tier, `auto: ${result.signal} (score ${result.score})`, ctx, pi, state);
     } else {
       state.turnsSinceSwitch++;
     }
@@ -759,26 +843,31 @@ function registerModelRouter(pi: ExtensionAPI, _cwd: string): void {
 
   // Manual command
   pi.registerCommand('route', {
-    description: 'Switch model routing: /route local | /route cloud | /route status',
+    description: 'Switch model routing: /route local-coder | local-general | local-planner | cloud | status',
     handler: async (args, ctx) => {
       const arg = (args ?? '').trim().toLowerCase();
-      if (arg === 'status') {
+      if (arg === 'status' || arg === '') {
         ctx.ui.notify(
           `Model router: ${state.currentTier} (${state.turnsSinceSwitch} turns since switch, reason: ${state.lastSwitchReason})`,
           'info',
         );
         return;
       }
-      if (arg === 'local' || arg === 'cloud') {
+      // Back-compat: bare 'local' = local-coder.
+      if (arg === 'local') {
+        await doSwitch('local-coder', 'manual /route (legacy "local")', ctx, pi, state);
+        return;
+      }
+      if (arg === 'local-coder' || arg === 'local-general' || arg === 'local-planner' || arg === 'cloud') {
         await doSwitch(arg, 'manual /route command', ctx, pi, state);
         return;
       }
-      ctx.ui.notify('Usage: /route local | /route cloud | /route status', 'info');
+      ctx.ui.notify('Usage: /route local-coder | local-general | local-planner | cloud | status', 'info');
     },
   });
 }
 
-async function doSwitch(
+export async function doSwitch(
   tier: ModelTier,
   reason: string,
   ctx: any,
@@ -792,11 +881,15 @@ async function doSwitch(
     model = registry.find('openrouter', 'anthropic/claude-sonnet-4-5')
       ?? registry.find('openrouter', 'google/gemini-2.5-pro-preview')
       ?? registry.find('anthropic', 'claude-sonnet-4-20250514');
-  } else {
-    // Try local models in preference order
-    model = registry.find('mlx-local', 'Qwen3.6-27B')
-      ?? registry.find('mlx-local', 'Qwen3-Coder-Next')
+  } else if (tier === 'local-coder') {
+    model = registry.find('mlx-local', 'Qwen3-Coder-Next')
+      ?? registry.find('mlx-local', 'Qwen3-Coder')
       ?? registry.find('ollama', 'qwen3-coder:30b');
+  } else {
+    // local-general and local-planner share the dense reasoning model.
+    model = registry.find('mlx-local', 'Qwen3.6-27B')
+      ?? registry.find('mlx-local', 'Qwen3-27B')
+      ?? registry.find('ollama', 'qwen3:27b');
   }
 
   if (!model) {
@@ -809,9 +902,9 @@ async function doSwitch(
     state.currentTier = tier;
     state.turnsSinceSwitch = 0;
     state.lastSwitchReason = reason;
+    state.plannerPreambleStaged = tier === 'local-planner';
 
-    const icon = tier === 'cloud' ? '\u2601' : '\ud83d\udcbb';
-    ctx.ui.setStatus('model-router', `${icon} ${tier}`);
+    ctx.ui.setStatus('model-router', `${TIER_ICONS[tier]} ${tier}`);
     ctx.ui.notify(`Model router: switched to ${tier} (${model.name ?? model.id}) — ${reason}`, 'info');
 
     // Persist state
