@@ -188,6 +188,24 @@ const MIGRATIONS: Array<{ version: number; sql: string }> = [
       ALTER TABLE workflow_executions ADD COLUMN definition_hash TEXT;
     `,
   },
+  {
+    version: 8,
+    sql: `
+      CREATE TABLE IF NOT EXISTS memories (
+        id TEXT PRIMARY KEY,
+        text TEXT NOT NULL,
+        category TEXT NOT NULL,
+        weight INTEGER NOT NULL,
+        source TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        source_session_id TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_memories_category ON memories(category);
+      CREATE INDEX IF NOT EXISTS idx_memories_source ON memories(source);
+      CREATE INDEX IF NOT EXISTS idx_memories_weight ON memories(weight);
+    `,
+  },
 ];
 
 /** Latest schema version — total number of migrations available. */

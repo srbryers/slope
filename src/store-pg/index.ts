@@ -200,6 +200,29 @@ const MIGRATIONS: Array<{ version: number; sql: string }> = [
       CREATE INDEX IF NOT EXISTS idx_wf_step_exec ON workflow_step_results(execution_id);
     `,
   },
+  {
+    // v5: memories table parallel to sqlite migration v8 (GH #294 / S90).
+    // Postgres MemoryBackend implementation is a follow-up — schema is in
+    // place so the table is ready when an async backend ships.
+    version: 5,
+    sql: `
+      CREATE TABLE IF NOT EXISTS memories (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL DEFAULT 'default',
+        text TEXT NOT NULL,
+        category TEXT NOT NULL,
+        weight INTEGER NOT NULL,
+        source TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        source_session_id TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_memories_project ON memories(project_id);
+      CREATE INDEX IF NOT EXISTS idx_memories_category ON memories(category);
+      CREATE INDEX IF NOT EXISTS idx_memories_source ON memories(source);
+      CREATE INDEX IF NOT EXISTS idx_memories_weight ON memories(weight);
+    `,
+  },
 ];
 
 export interface PostgresStoreOptions {
