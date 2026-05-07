@@ -79,6 +79,117 @@ function checkCompletionConditions(
 
 const VALID_GATES: GateName[] = ['tests', 'code_review', 'architect_review', 'scorecard', 'review_md'];
 
+/**
+ * `slope sprint begin --sprint=N --ticket=T` — bundled start-of-work flow.
+ *
+ * Idempotent steps (GH #311):
+ *   1. Start sprint state if not already started
+ *   2. Claim the ticket (skip if already claimed by this user)
+ *   3. Run briefing
+ *   4. Run prep --lite for the ticket
+ *   5. Print pending gates
+ *   6. Print recommended next implementation step
+ */
+async function beginCommand(args: string[], cwd: string): Promise<void> {
+  const sprintArg = args.find(a => a.startsWith('--sprint='));
+  const ticketArg = args.find(a => a.startsWith('--ticket='));
+  if (!sprintArg || !ticketArg) {
+    console.error('\nUsage: slope sprint begin --sprint=N --ticket=KEY');
+    console.error('Bundles: sprint start + claim + briefing + prep --lite\n');
+    process.exit(1);
+  }
+
+  const sprint = parseInt(sprintArg.split('=')[1], 10);
+  const ticket = ticketArg.split('=')[1];
+  if (!sprint || isNaN(sprint) || !ticket) {
+    console.error('Error: --sprint must be a positive integer; --ticket must be a non-empty key');
+    process.exit(1);
+  }
+
+  // Step 1: sprint state
+  let state = loadSprintState(cwd);
+  if (state && state.sprint === sprint) {
+    console.log(`Sprint ${sprint}: already started (phase: ${state.phase}).`);
+  } else if (state && state.sprint !== sprint) {
+    console.error(`Refusing to begin S${sprint} — sprint-state.json is for S${state.sprint}.`);
+    console.error('Run `slope sprint reset` first if the previous sprint is done.');
+    process.exit(1);
+  } else {
+    state = createSprintState(sprint, 'planning');
+    saveSprintState(cwd, state);
+    console.log(`Sprint ${sprint}: started (phase: planning).`);
+  }
+
+  // Step 2: claim
+  const { resolveStore } = await import('../store.js');
+  const { checkConflicts } = await import('../../core/index.js');
+  const player = process.env.USER || 'unknown';
+  const store = await resolveStore(cwd);
+  try {
+    const existing = await store.list(sprint);
+    const ownClaim = existing.find(c => c.target === ticket && c.player === player);
+    if (ownClaim) {
+      console.log(`Ticket ${ticket}: already claimed by ${player}.`);
+    } else {
+      // Detect overlap conflicts via core check
+      const tempClaim = {
+        id: '__pending__',
+        sprint_number: sprint,
+        player,
+        target: ticket,
+        scope: 'ticket' as const,
+        claimed_at: new Date().toISOString(),
+      };
+      const overlaps = checkConflicts([...existing, tempClaim]).filter(c => c.severity === 'overlap');
+      if (overlaps.length > 0) {
+        console.error(`\nClaim blocked — overlap conflict(s) detected:`);
+        for (const c of overlaps) console.error(`  [!!] ${c.reason}`);
+        console.error(`\nResolve conflicts or run \`slope claim --target=${ticket} --sprint=${sprint} --force\` to override.`);
+        process.exit(1);
+      }
+      const claim = await store.claim({ sprint_number: sprint, player, target: ticket, scope: 'ticket' });
+      console.log(`Ticket ${ticket}: claimed (id ${claim.id.slice(0, 8)}, player ${player}).`);
+    }
+  } finally {
+    store.close();
+  }
+
+  // Step 3: briefing
+  console.log('\n' + '─'.repeat(50));
+  const { briefingCommand } = await import('./briefing.js');
+  await briefingCommand([`--sprint=${sprint}`]);
+
+  // Step 4: prep --lite
+  console.log('\n' + '─'.repeat(50));
+  console.log(`PREP: ${ticket} (--lite)`);
+  console.log('─'.repeat(50));
+  try {
+    const { prepCommand } = await import('./prep.js');
+    await prepCommand([ticket, '--lite']);
+  } catch (err) {
+    console.error(`  Could not run prep: ${(err as Error).message}`);
+  }
+
+  // Step 5 & 6: pending gates and next step (via agent status)
+  console.log('\n' + '─'.repeat(50));
+  console.log('NEXT');
+  console.log('─'.repeat(50));
+  const { collectAgentStatus } = await import('./agent.js');
+  const status = await collectAgentStatus(cwd);
+  if (status.requiredGates.length > 0) {
+    console.log(`  Pending gates: ${status.requiredGates.join(', ')}`);
+  }
+  if (status.recommendedCommands.length > 0) {
+    console.log('  Recommended commands:');
+    for (const c of status.recommendedCommands.slice(0, 3)) {
+      console.log(`    $ ${c}`);
+    }
+  } else {
+    console.log('  Sprint state is balanced. Start implementing.');
+  }
+  console.log('');
+}
+
 function startCommand(args: string[], cwd: string): void {
   const numberArg = args.find(a => a.startsWith('--number='));
   if (!numberArg) {
@@ -597,6 +708,9 @@ export async function sprintCommand(args: string[]): Promise<void> {
     case 'start':
       startCommand(args.slice(1), cwd);
       break;
+    case 'begin':
+      await beginCommand(args.slice(1), cwd);
+      break;
     case 'gate':
       gateCommand(args.slice(1), cwd);
       break;
@@ -630,6 +744,7 @@ slope sprint — Sprint lifecycle management
 
 Legacy commands:
   slope sprint start --number=N      Start sprint state tracking
+  slope sprint begin --sprint=N --ticket=T  Bundled start + claim + briefing + prep (#311)
   slope sprint gate <name>           Mark a gate as complete
   slope sprint status                Show sprint state and gates
   slope sprint reset                 Clear sprint state
