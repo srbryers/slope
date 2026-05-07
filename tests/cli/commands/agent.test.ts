@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { collectAgentStatus } from '../../../src/cli/commands/agent.js';
+import { collectAgentStatus, renderAgentMarkdown } from '../../../src/cli/commands/agent.js';
+import type { AgentStatus } from '../../../src/cli/commands/agent.js';
 
 function makeTmpRepo(): string {
   const dir = mkdtempSync(join(tmpdir(), 'slope-agent-'));
@@ -139,6 +140,71 @@ describe('agent status (GH #310)', () => {
     expect(status.requiredGates).toEqual(['scorecard', 'review_md']);
     expect(status.recommendedCommands).toContain('slope auto-card --sprint=8');
     expect(status.recommendedCommands).toContain('slope review');
+  });
+
+  it('renders agent markdown with sprint, claim, and recommended commands (#315)', () => {
+    const status: AgentStatus = {
+      vision: 'present',
+      roadmap: 'valid',
+      currentSprint: 8,
+      phase: 'planning',
+      activeClaims: ['S8-1'],
+      nextTicket: 'S8-2',
+      blockedBy: [],
+      requiredGates: ['tests', 'code_review'],
+      recommendedCommands: ['slope prep S8-2 --lite', 'slope briefing'],
+    };
+    const md = renderAgentMarkdown(status, { sprintTheme: 'The Compass' });
+
+    expect(md).toContain('# Agent Next');
+    expect(md).toContain('Current sprint: S8 The Compass');
+    expect(md).toContain('Current phase: planning');
+    expect(md).toContain('Current claim: S8-1 active');
+    expect(md).toContain('Next ticket: S8-2');
+    expect(md).toContain('Next command: slope prep S8-2 --lite');
+    expect(md).toContain('## Pending gates');
+    expect(md).toContain('- tests');
+    expect(md).toContain('## Recommended commands');
+    expect(md).toContain('`slope briefing`');
+    expect(md).toContain('## Status snapshot');
+    expect(md).toContain('"currentSprint": 8');
+  });
+
+  it('renders blocked section when blockedBy is non-empty', () => {
+    const status: AgentStatus = {
+      vision: 'present',
+      roadmap: 'valid',
+      currentSprint: 9,
+      phase: 'planning',
+      activeClaims: [],
+      nextTicket: null,
+      blockedBy: [7, 8],
+      requiredGates: [],
+      recommendedCommands: ['slope roadmap status'],
+    };
+    const md = renderAgentMarkdown(status);
+    expect(md).toContain('## Blocked');
+    expect(md).toContain('S7, S8');
+  });
+
+  it('renders gracefully with all-empty status', () => {
+    const status: AgentStatus = {
+      vision: 'missing',
+      roadmap: 'missing',
+      currentSprint: null,
+      phase: 'unknown',
+      activeClaims: [],
+      nextTicket: null,
+      blockedBy: [],
+      requiredGates: [],
+      recommendedCommands: [],
+    };
+    const md = renderAgentMarkdown(status);
+    expect(md).toContain('Current sprint: —');
+    expect(md).toContain('Current claim: none');
+    expect(md).toContain('Next command: —');
+    expect(md).not.toContain('## Pending gates');
+    expect(md).not.toContain('## Blocked');
   });
 
   it('returns null nextTicket when sprint is unknown to roadmap', async () => {
