@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { execSync } from 'node:child_process';
 import { detectPlatforms, type InitProvider } from './init.js';
 import { GUARD_DEFINITIONS } from '../../core/guard.js';
 import { hasMetaphor } from '../../core/metaphor.js';
@@ -60,6 +61,9 @@ export function runDoctorChecks(cwd: string): DoctorCheck[] {
 
   // 12. Check MCP config for detected platforms
   checks.push(...checkMcpConfig(cwd));
+
+  // 13. Branch hygiene — stale merged + remote-tracking refs (#322)
+  checks.push(...checkBranchHygiene(cwd));
 
   return checks;
 }
@@ -618,6 +622,97 @@ function formatResults(checks: DoctorCheck[]): void {
   if (fixable.length > 0) {
     console.log(`  ${fixable.length} issue${fixable.length > 1 ? 's' : ''} auto-fixable — run \`slope doctor --fix\``);
   }
+}
+
+// ── Branch hygiene (GH #322) ───────────────────────────
+
+function git(cmd: string, cwd: string): string {
+  try {
+    return execSync(`git ${cmd}`, { cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 10000 }).trim();
+  } catch {
+    return '';
+  }
+}
+
+/** Detect a reasonable "main" branch — main first, fall back to master. */
+function detectMainBranch(cwd: string): string | null {
+  // Try to read remote HEAD pointer (e.g., refs/remotes/origin/HEAD -> origin/main)
+  const remoteHead = git('symbolic-ref --short refs/remotes/origin/HEAD', cwd);
+  if (remoteHead) {
+    const parts = remoteHead.split('/');
+    return parts[parts.length - 1] || null;
+  }
+  // Fallback: pick whichever exists locally
+  for (const candidate of ['main', 'master']) {
+    if (git(`rev-parse --verify ${candidate}`, cwd)) return candidate;
+  }
+  return null;
+}
+
+/** Branch hygiene checks — emits one or more DoctorCheck entries. */
+export function checkBranchHygiene(cwd: string): DoctorCheck[] {
+  const isGit = git('rev-parse --is-inside-work-tree', cwd);
+  if (isGit !== 'true') return [];
+
+  const main = detectMainBranch(cwd);
+  if (!main) return [];
+
+  const checks: DoctorCheck[] = [];
+
+  // 1. Branches already merged into main (excluding the current branch and main itself)
+  const mergedRaw = git(`branch --merged ${main}`, cwd);
+  const merged = mergedRaw
+    .split('\n')
+    .map(l => l.replace(/^[*+]\s*/, '').trim())
+    .filter(b => b && b !== main && !b.startsWith('('));
+
+  if (merged.length >= 5) {
+    checks.push({
+      name: 'branch-hygiene-merged',
+      status: 'warn',
+      message: `${merged.length} merged-to-${main} branch(es) still local — clean up with \`git branch -d ${merged.slice(0, 3).join(' ')}${merged.length > 3 ? ' ...' : ''}\``,
+    });
+  } else if (merged.length > 0) {
+    checks.push({
+      name: 'branch-hygiene-merged',
+      status: 'ok',
+      message: `${merged.length} merged-to-${main} branch(es) (under threshold)`,
+    });
+  } else {
+    checks.push({
+      name: 'branch-hygiene-merged',
+      status: 'ok',
+      message: `No merged-to-${main} cleanup needed`,
+    });
+  }
+
+  // 2. Stale remote-tracking refs — branches that no longer exist on origin
+  const pruneRaw = git('remote prune origin --dry-run', cwd);
+  const stalePrune = pruneRaw
+    .split('\n')
+    .filter(l => l.includes('would prune') || l.includes('[would prune]'));
+
+  if (stalePrune.length >= 5) {
+    checks.push({
+      name: 'branch-hygiene-stale-remotes',
+      status: 'warn',
+      message: `${stalePrune.length} stale remote-tracking ref(s) — clean up with \`git remote prune origin\``,
+    });
+  } else if (stalePrune.length > 0) {
+    checks.push({
+      name: 'branch-hygiene-stale-remotes',
+      status: 'ok',
+      message: `${stalePrune.length} stale remote-tracking ref(s) (under threshold)`,
+    });
+  } else {
+    checks.push({
+      name: 'branch-hygiene-stale-remotes',
+      status: 'ok',
+      message: 'No stale remote-tracking refs',
+    });
+  }
+
+  return checks;
 }
 
 export async function doctorCommand(args: string[]): Promise<void> {
