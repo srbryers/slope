@@ -82,6 +82,7 @@ SLOPE CLI — Sprint Lifecycle & Operational Performance Engine
 Usage:
   slope init [--claude-code|--cursor|--opencode|--generic|--all]  Initialize .slope/ directory
   slope init --team                         Enable multi-developer team mode
+  slope init --with-example                 Also seed docs/retros/sprint-1.json with an example
   slope card                                Show handicap card
   slope card --player=<name>                Show handicap for a specific player
   slope card --team                         Show per-player comparison table
@@ -420,6 +421,7 @@ SLOPE CLI — Sprint Lifecycle & Operational Performance Engine
 Usage:
   slope init [--claude-code|--cursor|--opencode|--generic|--all]  Initialize .slope/ directory
   slope init --team                         Enable multi-developer team mode
+  slope init --with-example                 Also seed docs/retros/sprint-1.json with an example
   slope card                                Show handicap card
   slope card --player=<name>                Show handicap for a specific player
   slope card --team                         Show per-player comparison table

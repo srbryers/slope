@@ -1057,10 +1057,16 @@ export async function initCommand(args: string[]): Promise<void> {
     console.log(`  Created ${scorecardDir}/`);
   }
 
-  const examplePath = join(scorecardDir, 'sprint-1.json');
-  if (!existsSync(examplePath)) {
-    writeFileSync(examplePath, JSON.stringify(EXAMPLE_SCORECARD, null, 2) + '\n');
-    console.log(`  Created ${examplePath}`);
+  // Example scorecard is now opt-in — by default `slope init` should leave
+  // docs/retros/ empty so the project's first real sprint becomes sprint 1.
+  // The previous behavior shipped a "completed" example that polluted the
+  // handicap card and confused first-time users (GH #306).
+  if (args.includes('--with-example')) {
+    const examplePath = join(scorecardDir, 'sprint-1.json');
+    if (!existsSync(examplePath)) {
+      writeFileSync(examplePath, JSON.stringify(EXAMPLE_SCORECARD, null, 2) + '\n');
+      console.log(`  Created ${examplePath} (example — pass --with-example to keep)`);
+    }
   }
 
   const commonIssuesPath = join(cwd, '.slope', 'common-issues.json');
