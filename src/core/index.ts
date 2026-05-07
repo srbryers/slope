@@ -169,6 +169,7 @@ export {
   castRoadmapStructure,
   formatRoadmapSummary,
   formatStrategicContext,
+  findNextPlannedSprint,
 } from './roadmap.js';
 export { extractSprintReferences, findShippedSprintsOnMain } from './analyzers/git.js';
 export type {

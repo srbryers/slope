@@ -571,5 +571,48 @@ export function formatStrategicContext(
     lines.push(`Feeds into: ${dependents.join(', ')}`);
   }
 
+  // Next planned sprint (dependency-resolved) — see GH #290
+  const next = findNextPlannedSprint(roadmap, currentSprint);
+  if (next) {
+    const blockers = (next.depends_on ?? [])
+      .filter(d => {
+        const dep = roadmap.sprints.find(s => s.id === d);
+        return !dep || (dep as RoadmapSprint & { status?: string }).status !== 'complete';
+      });
+    const status = blockers.length === 0
+      ? 'ready'
+      : `blocked by ${blockers.map(b => `S${b}`).join(', ')}`;
+    lines.push(`Next: S${next.id}: ${next.theme} (${status})`);
+  }
+
   return lines.join('\n');
+}
+
+/** Find the next planned sprint after currentSprint.
+ *  Prefers a sprint with all dependencies satisfied (status:complete);
+ *  falls back to the lowest-id non-complete sprint when nothing is unblocked.
+ *  Returns null if no candidate found.
+ */
+export function findNextPlannedSprint(
+  roadmap: RoadmapDefinition,
+  currentSprint: number,
+): RoadmapSprint | null {
+  const candidates = roadmap.sprints
+    .filter(s => {
+      const status = (s as RoadmapSprint & { status?: string }).status;
+      return status !== 'complete' && s.id > currentSprint;
+    })
+    .sort((a, b) => a.id - b.id);
+
+  if (candidates.length === 0) return null;
+
+  const completedIds = new Set(
+    roadmap.sprints
+      .filter(s => (s as RoadmapSprint & { status?: string }).status === 'complete')
+      .map(s => s.id),
+  );
+
+  // Prefer the lowest-id candidate whose dependencies are all complete
+  const ready = candidates.find(s => (s.depends_on ?? []).every(d => completedIds.has(d)));
+  return ready ?? candidates[0];
 }

@@ -6,6 +6,7 @@ import {
   parseRoadmap,
   formatRoadmapSummary,
   formatStrategicContext,
+  findNextPlannedSprint,
 } from '../../src/core/roadmap.js';
 import type { RoadmapDefinition, RoadmapSprint, RoadmapTicket } from '../../src/core/roadmap.js';
 
@@ -510,5 +511,115 @@ describe('formatStrategicContext', () => {
   it('returns null for unknown sprint', () => {
     const context = formatStrategicContext(makeRoadmap(), 99);
     expect(context).toBeNull();
+  });
+});
+
+// --- findNextPlannedSprint (GH #290) ---
+
+describe('findNextPlannedSprint', () => {
+  it('returns the lowest-id non-complete sprint after current', () => {
+    const roadmap = makeRoadmap({
+      sprints: [
+        { ...makeSprint(7), status: 'complete' } as any,
+        { ...makeSprint(8, { depends_on: [7] }), status: 'complete' } as any,
+        { ...makeSprint(9, { depends_on: [8] }), status: 'planned' } as any,
+      ],
+    });
+    const next = findNextPlannedSprint(roadmap, 8);
+    expect(next?.id).toBe(9);
+  });
+
+  it('skips complete sprints', () => {
+    const roadmap = makeRoadmap({
+      sprints: [
+        makeSprint(7),
+        { ...makeSprint(8, { depends_on: [7] }), status: 'complete' } as any,
+        makeSprint(9, { depends_on: [8] }),
+      ],
+    });
+    const next = findNextPlannedSprint(roadmap, 7);
+    expect(next?.id).toBe(9);
+  });
+
+  it('returns null when no later sprints exist', () => {
+    const roadmap = makeRoadmap({
+      sprints: [
+        { ...makeSprint(7), status: 'complete' } as any,
+        { ...makeSprint(8, { depends_on: [7] }), status: 'complete' } as any,
+        { ...makeSprint(9, { depends_on: [8] }), status: 'complete' } as any,
+      ],
+    });
+    expect(findNextPlannedSprint(roadmap, 9)).toBeNull();
+  });
+
+  it('prefers a candidate whose dependencies are all satisfied', () => {
+    const roadmap = makeRoadmap({
+      sprints: [
+        { ...makeSprint(7), status: 'complete' } as any,
+        // S8 still planned; S9 depends on 7 (which IS complete) but has higher id
+        makeSprint(8),
+        makeSprint(9, { depends_on: [7] }),
+      ],
+    });
+    // S8 has no deps so it's also "ready" — by id order, S8 wins (lowest ready)
+    const next = findNextPlannedSprint(roadmap, 7);
+    expect(next?.id).toBe(8);
+  });
+
+  it('falls back to lowest-id candidate when nothing is fully unblocked', () => {
+    const roadmap = makeRoadmap({
+      sprints: [
+        makeSprint(7),
+        // S8 depends on S7 (planned, not complete) — blocked
+        makeSprint(8, { depends_on: [7] }),
+        // S9 depends on S8 — also blocked
+        makeSprint(9, { depends_on: [8] }),
+      ],
+    });
+    const next = findNextPlannedSprint(roadmap, 6);
+    expect(next?.id).toBe(7);
+  });
+});
+
+// --- formatStrategicContext: next sprint surfacing (GH #290) ---
+
+describe('formatStrategicContext next-sprint output', () => {
+  it('includes next sprint with ready status when deps complete', () => {
+    const roadmap = makeRoadmap({
+      sprints: [
+        { ...makeSprint(7), status: 'complete' } as any,
+        makeSprint(8, { depends_on: [7] }),
+        makeSprint(9, { depends_on: [8] }),
+      ],
+    });
+    const context = formatStrategicContext(roadmap, 7);
+    expect(context).toContain('Next: S8');
+    expect(context).toContain('(ready)');
+  });
+
+  it('shows blocked status when next sprint has incomplete deps', () => {
+    const roadmap = makeRoadmap({
+      sprints: [
+        makeSprint(7),
+        makeSprint(8, { depends_on: [7] }),
+        makeSprint(9, { depends_on: [7, 8] }),
+      ],
+    });
+    const context = formatStrategicContext(roadmap, 7);
+    // S8 is the next; depends on S7 which is not complete
+    expect(context).toContain('Next: S8');
+    expect(context).toContain('blocked by S7');
+  });
+
+  it('omits Next line when no later sprints exist', () => {
+    const roadmap = makeRoadmap({
+      sprints: [
+        makeSprint(7),
+        makeSprint(8, { depends_on: [7] }),
+        makeSprint(9, { depends_on: [8] }),
+      ],
+    });
+    const context = formatStrategicContext(roadmap, 9);
+    expect(context).not.toContain('Next:');
   });
 });

@@ -1,6 +1,6 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { formatBriefing, parseRoadmap, getRole, hasRole, loadCustomRoles, filterScorecardsByPlayer, filterHazardsByVisibility, formatDeferredForBriefing, loadDeferred, computeHandicapCard, formatStrategicContext } from '../../core/index.js';
+import { formatBriefing, parseRoadmap, castRoadmapStructure, getRole, hasRole, loadCustomRoles, filterScorecardsByPlayer, filterHazardsByVisibility, formatDeferredForBriefing, loadDeferred, computeHandicapCard, formatStrategicContext } from '../../core/index.js';
 import type { CommonIssuesFile, SessionEntry, SprintClaim, RoadmapDefinition, SlopeEvent, RoleDefinition } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { loadScorecards } from '../loader.js';
@@ -107,7 +107,10 @@ export async function briefingCommand(args: string[]): Promise<void> {
     if (existsSync(resolvedRoadmapPath)) {
       const raw = JSON.parse(readFileSync(resolvedRoadmapPath, 'utf8'));
       const parsed = parseRoadmap(raw);
-      if (parsed.roadmap) roadmap = parsed.roadmap;
+      // Fall back to permissive structural cast when parseRoadmap rejects due
+      // to validation errors (numbering gaps, ticket-count budget, etc.) —
+      // briefing should still surface strategic context when shape is right.
+      roadmap = parsed.roadmap ?? castRoadmapStructure(raw) ?? undefined;
     }
   } catch { /* skip — roadmap is optional */ }
 
