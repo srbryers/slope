@@ -647,4 +647,22 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
       ]},
     ],
   },
+  {
+    cmd: 'gate', desc: 'Initiative review gate aliases (agent-friendly)', category: 'tooling',
+    subcommands: [
+      { name: 'status', desc: 'Pending plan/pr gates per sprint', flags: [
+        { flag: '--json', desc: 'Emit pending list as JSON' },
+      ]},
+      { name: 'checklist', desc: 'Print review checklist', flags: [
+        { flag: '<gate>', desc: 'plan | pr' },
+        { flag: '<reviewer>', desc: 'reviewer type (architect, code, security, etc.)' },
+      ]},
+      { name: 'complete', desc: 'Record a completed review', flags: [
+        { flag: '<gate>', desc: 'plan | pr' },
+        { flag: '<reviewer>', desc: 'reviewer type' },
+        { flag: '--sprint=N', desc: 'Sprint number (required)' },
+        { flag: '--findings=N', desc: 'Number of findings (default: 0)' },
+      ]},
+    ],
+  },
 ];
