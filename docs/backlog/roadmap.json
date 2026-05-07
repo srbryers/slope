@@ -66,12 +66,39 @@
       "note": "S77/S79 plan-and-review work; S81-S84 expanded Phase 16 into harness universality (Codex/OpenCode/Pi adapters + testing polish)."
     },
     {
-      "name": "Phase 17 \u2014 TBD",
+      "name": "Phase 17 \u2014 TBD (S85 placeholder)",
       "sprints": [
         85
       ],
       "status": "planned",
-      "note": "S85 placeholder \u2014 theme TBD"
+      "note": "S85 theme TBD \u2014 current sprint per slope status."
+    },
+    {
+      "name": "Phase 18 \u2014 Drift Detection & Bug Clearing",
+      "sprints": [
+        86,
+        87
+      ],
+      "status": "planned",
+      "note": "Builds the drift-detection scaffolding (S86) the project lacked during S70-S84, and clears accumulated CLI bugs from external users (S87, supersedes S75.5)."
+    },
+    {
+      "name": "Phase 19 \u2014 Agent Developer Experience",
+      "sprints": [
+        88,
+        89
+      ],
+      "status": "planned",
+      "note": "Machine-readable state + bundled workflow commands. Foundation for agent-driven SLOPE usage filed as #309-316."
+    },
+    {
+      "name": "Phase 20 \u2014 Architecture & Automation",
+      "sprints": [
+        90,
+        91
+      ],
+      "status": "planned",
+      "note": "Memory\u2194store reunification (architectural debt from PR #293) + automation hooks for PR/issue/branch hygiene."
     }
   ],
   "sprints": [
@@ -646,7 +673,7 @@
       "par": 3,
       "slope": 1,
       "type": "bug fix",
-      "note": "Created 2026-05-02 to clear 4 accumulated CLI bugs from external repos. GH #297, #298, #299, #300.",
+      "note": "Superseded by S87 (The Bug Clearing v2). #297/#299 already shipped via 14d01862; remaining bugs refreshed in S87.",
       "tickets": [
         {
           "key": "S75.5-1",
@@ -674,7 +701,7 @@
         }
       ],
       "depends_on": [],
-      "status": "planned"
+      "status": "superseded"
     },
     {
       "id": 76,
@@ -920,6 +947,275 @@
       "type": "tbd",
       "status": "planned",
       "tickets": []
+    },
+    {
+      "id": 86,
+      "theme": "The Marshal \u2014 Drift Detection",
+      "par": 5,
+      "slope": 2,
+      "type": "feature + guard",
+      "status": "planned",
+      "depends_on": [
+        85
+      ],
+      "note": "Drift catches up. Builds the audit infrastructure that would have caught the S70-S84 status drift fixed in PR #317.",
+      "tickets": [
+        {
+          "key": "S86-1",
+          "title": "slope roadmap validate \u2014 detect status drift against git log (#319)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 319
+        },
+        {
+          "key": "S86-2",
+          "title": "Guard: block edits to sprints with status:complete (#320)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 320
+        },
+        {
+          "key": "S86-3",
+          "title": "Post-hole enforcement hook \u2014 fail session-end on roadmap/scorecard drift (#291)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 291,
+          "depends_on": [
+            "S86-1"
+          ]
+        },
+        {
+          "key": "S86-4",
+          "title": "Backfill missing scorecards for S70, S74-S83 (#318)",
+          "club": "long_iron",
+          "complexity": "multi_package",
+          "github_issue": 318
+        },
+        {
+          "key": "S86-5",
+          "title": "Briefing surfaces next sprint + fix title/theme schema drift (#290, #324)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": [
+            290,
+            324
+          ]
+        }
+      ]
+    },
+    {
+      "id": 87,
+      "theme": "The Bug Clearing v2 \u2014 CLI fixes for external repos",
+      "par": 4,
+      "slope": 1,
+      "type": "bug fix",
+      "status": "planned",
+      "depends_on": [],
+      "note": "Supersedes S75.5. Highest-impact CLI bugs from external SLOPE users.",
+      "tickets": [
+        {
+          "key": "S87-1",
+          "title": "slope version returns 'vunknown' \u2014 read from installed package, not cwd (#300)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 300
+        },
+        {
+          "key": "S87-2",
+          "title": "slope review formatted output shows 'Tickets Delivered: 0' despite tickets array (#298)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 298
+        },
+        {
+          "key": "S87-3",
+          "title": "roadmap generate --dry-run should not write roadmap.json (#304)",
+          "club": "putter",
+          "complexity": "trivial",
+          "github_issue": 304
+        },
+        {
+          "key": "S87-4",
+          "title": "init should not create a completed example retrospective by default (#306)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 306
+        }
+      ]
+    },
+    {
+      "id": 88,
+      "theme": "The Compass \u2014 Agent State & Status",
+      "par": 4,
+      "slope": 1,
+      "type": "feature + dx",
+      "status": "planned",
+      "depends_on": [],
+      "note": "Foundation primitives for the agent-DX batch (#309-316). #310 is the keystone \u2014 once status is machine-readable, downstream commands compose.",
+      "tickets": [
+        {
+          "key": "S88-1",
+          "title": "slope agent status \u2014 machine-readable next-step output (#310)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 310
+        },
+        {
+          "key": "S88-2",
+          "title": "Generate AGENT_NEXT.md with current recommended action (#315)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 315,
+          "depends_on": [
+            "S88-1"
+          ]
+        },
+        {
+          "key": "S88-3",
+          "title": "slope sprint begin \u2014 bundle start, claim, briefing, and prep (#311)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 311
+        },
+        {
+          "key": "S88-4",
+          "title": "slope ticket done \u2014 close claim and update sprint state (#316)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 316
+        }
+      ]
+    },
+    {
+      "id": 89,
+      "theme": "The Toolkit \u2014 Agent Workflow Commands",
+      "par": 4,
+      "slope": 1,
+      "type": "feature + dx",
+      "status": "planned",
+      "depends_on": [
+        88
+      ],
+      "note": "Builds on S88 status primitive. Adds Codex profile and the bundled commands agents reach for most.",
+      "tickets": [
+        {
+          "key": "S89-1",
+          "title": "slope sprint plan \u2014 generate implementation plan file (#312)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 312
+        },
+        {
+          "key": "S89-2",
+          "title": "Simpler gate commands for agent workflows (#313)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 313
+        },
+        {
+          "key": "S89-3",
+          "title": "slope commit-ready \u2014 pre-commit agent checks (#314)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 314
+        },
+        {
+          "key": "S89-4",
+          "title": "First-class Codex initialization/profile (#309)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 309
+        }
+      ]
+    },
+    {
+      "id": 90,
+      "theme": "The Vault \u2014 Memory \u2194 Store Reunification",
+      "par": 4,
+      "slope": 2,
+      "type": "refactor + architecture",
+      "status": "planned",
+      "depends_on": [],
+      "note": "Address PR #293 architect finding A1: memory system bypasses store abstraction. Requires extending store interface and migrating memory module across both store backends.",
+      "tickets": [
+        {
+          "key": "S90-1",
+          "title": "Extend store interface with memory operations (#294)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 294
+        },
+        {
+          "key": "S90-2",
+          "title": "Implement memory ops in store-sqlite + store-pg",
+          "club": "long_iron",
+          "complexity": "multi_package",
+          "github_issue": 294,
+          "depends_on": [
+            "S90-1"
+          ]
+        },
+        {
+          "key": "S90-3",
+          "title": "Migrate memory module to use store interface",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 294,
+          "depends_on": [
+            "S90-2"
+          ]
+        },
+        {
+          "key": "S90-4",
+          "title": "Migration script + tests + cleanup of legacy memory paths",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 294,
+          "depends_on": [
+            "S90-3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 91,
+      "theme": "The Pit Crew \u2014 Automation Hooks",
+      "par": 4,
+      "slope": 1,
+      "type": "feature + automation",
+      "status": "planned",
+      "depends_on": [],
+      "note": "Hook-based automation: PR review prompts, issue auto-close, branch hygiene. Pairs nicely with S86 drift detection but doesn't depend on it.",
+      "tickets": [
+        {
+          "key": "S91-1",
+          "title": "PostPRCreate hook \u2014 auto-trigger review-loop recommendation (#302)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 302
+        },
+        {
+          "key": "S91-2",
+          "title": "Auto-close GH issues from fix commits \u2014 convention or hook (#321)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 321
+        },
+        {
+          "key": "S91-3",
+          "title": "Branch hygiene automation in slope doctor (#322)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 322
+        },
+        {
+          "key": "S91-4",
+          "title": "vision create \u2014 tracked Markdown output (#305)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 305
+        }
+      ]
     }
   ]
 }
