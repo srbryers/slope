@@ -522,3 +522,51 @@ describe('formatAdvisorReport — metaphor-aware', () => {
     expect(output).toContain('**Club:** driver');
   });
 });
+
+// --- Legacy `tickets` field alias (GH #298) ---
+
+describe('formatSprintReview legacy tickets field', () => {
+  it('reads from card.tickets when card.shots is absent', () => {
+    // External-repo scorecards in the wild use `tickets` instead of `shots`
+    const card = {
+      ...makeCard({ shots: [] as ShotRecord[] }),
+      tickets: [
+        { id: 'S197-1', title: 'rock-coral A/B scene', approach: 'short_iron', result: 'in_the_hole' },
+        { id: 'S197-2', title: 'Generalize biome scene', approach: 'short_iron', result: 'green' },
+      ],
+    } as unknown as GolfScorecard;
+
+    const output = formatSprintReview(card, makeProjectStats());
+    expect(output).toContain('Tickets Delivered: 2');
+    expect(output).toContain('| S197-1 | short_iron | in_the_hole |');
+    expect(output).toContain('| S197-2 | short_iron | green |');
+  });
+
+  it('prefers canonical shots over tickets when both present', () => {
+    const card = {
+      ...makeCard({ shots: [makeShot({ ticket_key: 'CANON' })] }),
+      tickets: [{ id: 'LEGACY', title: 'should not appear', approach: 'driver', result: 'green' }],
+    } as unknown as GolfScorecard;
+
+    const output = formatSprintReview(card, makeProjectStats());
+    expect(output).toContain('CANON');
+    expect(output).not.toContain('LEGACY');
+  });
+
+  it('falls back to defaults for missing fields', () => {
+    const card = {
+      ...makeCard({ shots: [] as ShotRecord[] }),
+      tickets: [{ title: 'minimal' }], // no id, approach, or result
+    } as unknown as GolfScorecard;
+
+    const output = formatSprintReview(card, makeProjectStats());
+    expect(output).toContain('Tickets Delivered: 1');
+    expect(output).toContain('| T1 | short_iron | green |');
+  });
+
+  it('returns empty shots when neither shots nor tickets are populated', () => {
+    const card = makeCard({ shots: [] as ShotRecord[] });
+    const output = formatSprintReview(card, makeProjectStats());
+    expect(output).toContain('Tickets Delivered: 0');
+  });
+});

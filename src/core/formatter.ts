@@ -2,6 +2,7 @@ import type {
   GolfScorecard,
   MissDirection,
   ShotResult,
+  ShotRecord,
   ClubSelection,
   ScoreLabel,
   ClubRecommendation,
@@ -76,6 +77,40 @@ function safeBunkerLabel(b: unknown): string {
   return String(b);
 }
 
+/** Resolve shot records from a scorecard, accepting either the canonical
+ *  `shots` field or a legacy `tickets` field. External-repo scorecards in
+ *  the wild use `tickets` with `id`/`approach` keys; this remaps them to
+ *  ShotRecord shape so the formatter doesn't render an empty table.
+ *  See GH #298. */
+function normalizeShotsFromCard(card: GolfScorecard & { tickets?: unknown[] }): ShotRecord[] {
+  const canonical = card.shots;
+  if (Array.isArray(canonical) && canonical.length > 0) return canonical;
+
+  const legacy = card.tickets;
+  if (!Array.isArray(legacy) || legacy.length === 0) return canonical ?? [];
+
+  return legacy.map((t, i) => {
+    const obj = (t ?? {}) as Record<string, unknown>;
+    const ticketKey =
+      (typeof obj.ticket_key === 'string' && obj.ticket_key) ||
+      (typeof obj.id === 'string' && obj.id) ||
+      (typeof obj.key === 'string' && obj.key) ||
+      `T${i + 1}`;
+    const club =
+      (typeof obj.club === 'string' && obj.club) ||
+      (typeof obj.approach === 'string' && obj.approach) ||
+      'short_iron';
+    return {
+      ticket_key: ticketKey as string,
+      title: (typeof obj.title === 'string' && obj.title) || `Ticket ${ticketKey}`,
+      club: club as ShotRecord['club'],
+      result: (typeof obj.result === 'string' && obj.result) as ShotRecord['result'] || 'green',
+      hazards: Array.isArray(obj.hazards) ? (obj.hazards as ShotRecord['hazards']) : [],
+      ...(typeof obj.notes === 'string' ? { notes: obj.notes } : {}),
+    };
+  });
+}
+
 // --- Formatter ---
 
 /**
@@ -96,8 +131,11 @@ export function formatSprintReview(
   }
   const m = metaphor;
   const sprintNum = card.sprint_number ?? (card as any).sprint;
-  const stats = normalizeStats(card.stats, card.shots?.length ?? 0);
-  const shots = card.shots ?? [];
+  // Accept legacy/alternate `tickets` field as an alias for `shots` so
+  // scorecards from external repos that use the older naming still render
+  // correctly (GH #298). Field-name remapping handles common variants.
+  const shots = normalizeShotsFromCard(card);
+  const stats = normalizeStats(card.stats, shots.length);
   const conditions = card.conditions ?? [];
   const bunkerLocations = card.bunker_locations ?? [];
   const courseNotes = card.course_management_notes ?? [];
