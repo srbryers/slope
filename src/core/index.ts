@@ -627,7 +627,7 @@ export type { GeneratedConfig } from './generators/config.js';
 export type { GeneratedSprint } from './generators/first-sprint.js';
 
 // Vision
-export { loadVision, saveVision, validateVision, createVision, updateVision } from './vision.js';
+export { loadVision, saveVision, validateVision, createVision, updateVision, renderVisionMarkdown, writeVisionMarkdown } from './vision.js';
 export type { VisionDocument } from './analyzers/types.js';
 
 // Transcript

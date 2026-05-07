@@ -1,5 +1,5 @@
 // SLOPE — slope vision: display, create, and update project vision document
-import { loadVision, createVision, updateVision } from '../../core/vision.js';
+import { loadVision, createVision, updateVision, writeVisionMarkdown } from '../../core/vision.js';
 
 function parseArgs(args: string[]): Record<string, string> {
   const result: Record<string, string> = {};
@@ -43,6 +43,13 @@ function createSubcommand(flags: Record<string, string>): void {
     if (vision.techDirection) console.log(`  Tech:       ${vision.techDirection}`);
     if (vision.nonGoals?.length) console.log(`  Non-goals:  ${vision.nonGoals.join(', ')}`);
     console.log('');
+
+    // Optional tracked Markdown mirror — see GH #305
+    if (flags['write-md']) {
+      const mdPath = flags['write-md'] === 'true' ? 'docs/vision.md' : flags['write-md'];
+      const written = writeVisionMarkdown(vision, mdPath);
+      console.log(`  Markdown:   ${written}\n`);
+    }
   } catch (err) {
     console.error(`\nError: ${(err as Error).message}\n`);
     process.exit(1);
@@ -73,6 +80,12 @@ function updateSubcommand(flags: Record<string, string>): void {
     if (vision.nonGoals?.length) console.log(`  Non-goals:  ${vision.nonGoals.join(', ')}`);
     console.log(`  Updated:    ${vision.updatedAt}`);
     console.log('');
+
+    if (flags['write-md']) {
+      const mdPath = flags['write-md'] === 'true' ? 'docs/vision.md' : flags['write-md'];
+      const written = writeVisionMarkdown(vision, mdPath);
+      console.log(`  Markdown:   ${written}\n`);
+    }
   } catch (err) {
     console.error(`\nError: ${(err as Error).message}\n`);
     process.exit(1);
@@ -99,9 +112,11 @@ Create options:
   --audience="..."            Target audience
   --tech-direction="..."      Technical direction
   --non-goals="a,b"           Comma-separated non-goals
+  --write-md[=<path>]         Also write tracked Markdown (default: docs/vision.md)
 
 Update options:
   Same flags as create — only provided fields are updated.
+  --write-md[=<path>]         Re-render tracked Markdown after update.
 `);
     return;
   }
