@@ -43,14 +43,14 @@ function hasSlopeProject(cwd: string): boolean {
 
 // ── Vague-Prompt Detector ────────────────────────────
 
-// Matches vague action verbs at the start of a prompt.
-const VAGUE_PROMPT_RE = /^(optimize|improve|make\s+\S+\s+better|make\s+better|fix|refactor|clean\s+up|tidy)\b/i;
+// Matches vague action verbs at the start of a prompt. Shared by isVaguePrompt() and getPlannerSignals().
+const VAGUE_VERB_RE = /^(optimize|improve|make\s+\S+\s+better|make\s+better|fix|refactor|clean\s+up|tidy|architect)\b/i;
 
 export function isVaguePrompt(prompt: string): boolean {
   const trimmed = prompt.trim();
   return (
     trimmed.length < 200 &&
-    VAGUE_PROMPT_RE.test(trimmed) &&
+    VAGUE_VERB_RE.test(trimmed) &&
     !HAS_PATH_RE.test(trimmed) &&
     !HAS_SYMBOL_RE.test(trimmed)
   );
@@ -136,25 +136,10 @@ function saveOnboardingState(cwd: string, state: OnboardingState): void {
 
 /** Determine the SLOPE project state for this workspace */
 function getProjectState(cwd: string): 'fresh' | 'complete' | 'active' {
-  const sprintStatePath = join(cwd, '.slope', 'sprint-state.json');
-  if (!existsSync(sprintStatePath)) {
-    return 'fresh';
-  }
-  try {
-    const state = JSON.parse(readFileSync(sprintStatePath, 'utf8')) as {
-      phase?: string;
-    };
-    if (
-      state.phase === 'planning' ||
-      state.phase === 'implementing' ||
-      state.phase === 'scoring'
-    ) {
-      return 'active';
-    }
-    return 'complete';
-  } catch {
-    return 'fresh';
-  }
+  const phase = readSprintPhase(cwd);
+  if (phase === null) return 'fresh';
+  if (phase === 'planning' || phase === 'implementing' || phase === 'scoring') return 'active';
+  return 'complete';
 }
 
 // ── Extension Entry Point ───────────────────────────
@@ -787,9 +772,6 @@ const SIMPLE_KEYWORDS = [
   'create file', 'delete file', 'move file',
 ];
 
-// Vague verbs at start of prompt — signal that the user hasn't decided what to do.
-const PLANNER_VAGUE_RE = /^(optimize|improve|make\s+\S+\s+better|make\s+better|fix|refactor|clean\s+up|tidy|architect)\b/i;
-
 // Standalone ambiguous noun tokens. 'it' is intentionally excluded — too common.
 const AMBIGUOUS_NOUN_TOKENS = [
   'the code', 'this', 'everything', 'all of it', 'the whole thing', 'the codebase',
@@ -807,7 +789,7 @@ function getPlannerSignals(prompt: string): string[] {
   const trimmed = prompt.trim();
   const lower = trimmed.toLowerCase();
   const signals: string[] = [];
-  if (PLANNER_VAGUE_RE.test(trimmed)) signals.push('vague-verb');
+  if (VAGUE_VERB_RE.test(trimmed)) signals.push('vague-verb');
   for (const t of AMBIGUOUS_NOUN_TOKENS) {
     if (lower.includes(t)) { signals.push('ambiguous-noun'); break; }
   }

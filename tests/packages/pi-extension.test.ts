@@ -378,6 +378,11 @@ describe('plan-gate tool_call handler', () => {
   beforeEach(() => {
     tmpDir = mkdtempSync(join(tmpdir(), 'slope-pg-test-'));
     makeSlopeConfig(tmpDir);
+    // plan-gate defaults to false (opt-in); enable it explicitly for these tests.
+    writeFileSync(
+      join(tmpDir, '.slope', 'pi-settings.json'),
+      JSON.stringify({ version: '1', skills: { 'plan-gate': { enabled: true, description: '' } } }),
+    );
   });
 
   afterEach(() => {
