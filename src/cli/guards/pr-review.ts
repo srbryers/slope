@@ -1,27 +1,37 @@
+import { execSync } from 'node:child_process';
 import type { HookInput, GuardResult, Suggestion } from '../../core/index.js';
+import { recommendReviews } from '../../core/review.js';
+import type { ReviewRecommendation } from '../../core/index.js';
 
 /**
  * PR review guard: fires PostToolUse on Bash.
+ *
  * Detects `gh pr create` output and prompts for review workflow choice.
+ * As of S91-4 (#302) the suggestion includes recommended review types
+ * computed from the PR's diff (file patterns) and current sprint metadata.
  */
-export async function prReviewGuard(input: HookInput, _cwd: string): Promise<GuardResult> {
+export async function prReviewGuard(input: HookInput, cwd: string): Promise<GuardResult> {
   const command = (input.tool_input?.command as string) ?? '';
   const response = (input.tool_response?.stdout as string) ?? (input.tool_response?.result as string) ?? '';
 
-  // Only fire after gh pr create commands
   if (!command.includes('gh pr create')) return {};
-
-  // Verify a PR URL was returned (successful creation)
   if (!response.includes('github.com/') || !response.includes('/pull/')) return {};
 
-  // Extract PR URL from response
   const urlMatch = response.match(/(https:\/\/github\.com\/[^\s]+\/pull\/\d+)/);
   const prUrl = urlMatch ? urlMatch[1] : 'the PR';
+
+  const recs = computeRecommendations(cwd);
+  const recLine = formatRecommendations(recs);
 
   const suggestion: Suggestion = {
     id: 'pr-review',
     title: 'PR Review',
-    context: `A pull request was just created (${prUrl}). After the review, capture findings with \`slope review findings add\`, then \`slope review amend\` to apply to scorecard.`,
+    context: [
+      `A pull request was just created (${prUrl}).`,
+      ...(recLine ? [`Recommended reviews based on diff: ${recLine}`] : []),
+      `After the review, capture findings with \`slope review findings add\`, then \`slope review amend\` to apply to scorecard.`,
+      'Tip: also run `slope pr finalize` to add Closes #N for any issues referenced in commits.',
+    ].join(' '),
     options: [
       { id: 'code', label: 'Code Review', description: 'Detailed line-by-line code review of the diff' },
       { id: 'architect', label: 'Architect Review', description: 'High-level architecture and design review' },
@@ -35,3 +45,65 @@ export async function prReviewGuard(input: HookInput, _cwd: string): Promise<Gua
 
   return { suggestion };
 }
+
+/** Inspect the current branch's diff and call recommendReviews(). Best-effort
+ *  — returns [] if git is unavailable or the diff can't be read. */
+function computeRecommendations(cwd: string): ReviewRecommendation[] {
+  try {
+    const base = inferBaseRef(cwd) ?? 'origin/main';
+    const filesRaw = execSync(`git diff ${base}...HEAD --name-only`, { cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+    const filePatterns = filesRaw ? filesRaw.split('\n').filter(Boolean) : [];
+    const ticketCount = inferTicketCount(cwd, base);
+    return recommendReviews({
+      ticketCount,
+      slope: 1,
+      filePatterns,
+      hasNewInfra: filePatterns.some(p => /(\.sql|migration|schema|infra|terraform|k8s|deploy)/i.test(p)),
+    });
+  } catch {
+    return [];
+  }
+}
+
+function inferBaseRef(cwd: string): string | null {
+  try {
+    const remoteHead = execSync('git symbolic-ref --short refs/remotes/origin/HEAD', { cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+    if (remoteHead) return remoteHead; // e.g. "origin/main"
+  } catch { /* fall through */ }
+  for (const r of ['origin/main', 'origin/master', 'main', 'master']) {
+    try {
+      execSync(`git rev-parse --verify ${r}`, { cwd, stdio: ['pipe', 'pipe', 'pipe'] });
+      return r;
+    } catch { /* try next */ }
+  }
+  return null;
+}
+
+function inferTicketCount(cwd: string, base: string): number {
+  try {
+    const subjects = execSync(`git log ${base}..HEAD --format=%s`, { cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+    if (!subjects) return 1;
+    // Count distinct ticket keys (S{N}-{M}) referenced across commit subjects;
+    // fall back to commit count if no ticket keys found.
+    const keys = new Set<string>();
+    const re = /\bS(\d+)-(\d+)\b/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(subjects)) !== null) {
+      keys.add(`${m[1]}-${m[2]}`);
+    }
+    if (keys.size > 0) return keys.size;
+    return Math.max(1, subjects.split('\n').length);
+  } catch {
+    return 1;
+  }
+}
+
+function formatRecommendations(recs: ReviewRecommendation[]): string {
+  if (recs.length === 0) return '';
+  return recs
+    .map(r => r.priority === 'required' ? `${r.review_type} (required)` : r.review_type)
+    .join(', ');
+}
+
+// Exported for tests
+export const _internals = { computeRecommendations, formatRecommendations, inferTicketCount };
