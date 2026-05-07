@@ -2,6 +2,7 @@ node_modules/
 dist/
 .pi/
 *.tsbuildinfo
+.DS_Store
 .slope/
 .env
 .aider*
