@@ -105,7 +105,8 @@ export type GuardName =
   | 'review-stale'
   | 'worktree-reuse'
   | 'workflow-step-gate'
-  | 'roadmap-edit-shipped';
+  | 'roadmap-edit-shipped'
+  | 'post-hole-enforcement';
 
 /** Guard registration entry */
 export interface GuardDefinition {
@@ -417,6 +418,13 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     matcher: 'Edit|Write',
     level: 'full',
     guardType: 'mechanical',
+  },
+  {
+    name: 'post-hole-enforcement',
+    description: 'Surface shipped sprints missing scorecards or roadmap status:complete at session end',
+    hookEvent: 'Stop',
+    level: 'full',
+    guardType: 'advisory',
   },
 ];
 

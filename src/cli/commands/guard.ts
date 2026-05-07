@@ -30,6 +30,7 @@ import { claimRequiredGuard } from '../guards/claim-required.js';
 import { reviewStaleGuard } from '../guards/review-stale.js';
 import { workflowStepGateGuard } from '../guards/workflow-step-gate.js';
 import { roadmapEditShippedGuard } from '../guards/roadmap-edit-shipped.js';
+import { postHoleEnforcementGuard } from '../guards/post-hole-enforcement.js';
 import { formatGuardDocs } from '../guards/docs.js';
 import { recordBaseline } from '../guards/git-utils.js';
 import { execSync } from 'node:child_process';
@@ -104,6 +105,7 @@ const handlers: Partial<Record<GuardName, GuardHandler>> = {
   'worktree-reuse': worktreeReuseGuard,
   'workflow-step-gate': workflowStepGateGuard,
   'roadmap-edit-shipped': roadmapEditShippedGuard,
+  'post-hole-enforcement': postHoleEnforcementGuard,
 };
 
 /** Register a guard handler */
