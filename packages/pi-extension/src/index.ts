@@ -41,6 +41,75 @@ function hasSlopeProject(cwd: string): boolean {
   return existsSync(join(cwd, '.slope', 'config.json'));
 }
 
+// ── Vague-Prompt Detector ────────────────────────────
+
+// Matches vague action verbs at the start of a prompt. Shared by isVaguePrompt() and getPlannerSignals().
+const VAGUE_VERB_RE = /^(optimize|improve|make\s+\S+\s+better|make\s+better|fix|refactor|clean\s+up|tidy|architect)\b/i;
+
+export function isVaguePrompt(prompt: string): boolean {
+  const trimmed = prompt.trim();
+  return (
+    trimmed.length < 200 &&
+    VAGUE_VERB_RE.test(trimmed) &&
+    !HAS_PATH_RE.test(trimmed) &&
+    !HAS_SYMBOL_RE.test(trimmed)
+  );
+}
+
+/**
+ * Module-level ref populated by registerModelRouter so the vague-prompt
+ * detector (registered first) can call doSwitch without accessing the closure.
+ * Set synchronously during extension init, before any events fire.
+ */
+let _routerRef: { state: RouterState; pi: ExtensionAPI } | null = null;
+
+// ── Plan-Gate Helpers ────────────────────────────────
+
+/** Returns the active sprint phase, or null if no sprint state exists. */
+function readSprintPhase(cwd: string): string | null {
+  const sprintStatePath = join(cwd, '.slope', 'sprint-state.json');
+  if (!existsSync(sprintStatePath)) return null;
+  try {
+    const state = JSON.parse(readFileSync(sprintStatePath, 'utf8')) as { phase?: string };
+    return state.phase ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function inSprintPhase(cwd: string): boolean {
+  const phase = readSprintPhase(cwd);
+  return phase === 'planning' || phase === 'implementing' || phase === 'scoring';
+}
+
+function hasRecentPlan(ctx: { sessionManager: { getEntries: () => Array<{ role?: string; content?: string }> } }): boolean {
+  const entries = ctx.sessionManager.getEntries();
+  // Scan last 5 assistant messages for a structured plan.
+  const assistantMessages = entries
+    .filter(e => e.role === 'assistant' && typeof e.content === 'string')
+    .slice(-5);
+  const PLAN_HEADING = /^##+\s*(plan|approach|steps?)\b/im;
+  const NUMBERED_LIST = /^\s*1\.\s.+\n\s*2\.\s.+\n\s*3\.\s/m;
+  const PLAN_MARKER = /\[plan\]|<plan>/i;
+  return assistantMessages.some(m =>
+    PLAN_HEADING.test(m.content ?? '') ||
+    NUMBERED_LIST.test(m.content ?? '') ||
+    PLAN_MARKER.test(m.content ?? '')
+  );
+}
+
+// Read-only bash commands that are always exempt from the plan-gate.
+const BASH_EXEMPT_PREFIXES = [
+  'git status', 'git log', 'git diff', 'git show', 'git branch',
+  'ls', 'pwd', 'cat ', 'grep', 'find ', 'which ', 'echo ',
+  'head ', 'tail ', 'wc ', 'stat ', 'file ', 'type ',
+];
+
+function isBashExempt(command: string): boolean {
+  const trimmed = command.trim();
+  return BASH_EXEMPT_PREFIXES.some(prefix => trimmed.startsWith(prefix));
+}
+
 // ── Onboarding State ────────────────────────────────
 
 const ONBOARDING_STATE_FILE = '.slope/.pi-onboarding.json';
@@ -67,25 +136,10 @@ function saveOnboardingState(cwd: string, state: OnboardingState): void {
 
 /** Determine the SLOPE project state for this workspace */
 function getProjectState(cwd: string): 'fresh' | 'complete' | 'active' {
-  const sprintStatePath = join(cwd, '.slope', 'sprint-state.json');
-  if (!existsSync(sprintStatePath)) {
-    return 'fresh';
-  }
-  try {
-    const state = JSON.parse(readFileSync(sprintStatePath, 'utf8')) as {
-      phase?: string;
-    };
-    if (
-      state.phase === 'planning' ||
-      state.phase === 'implementing' ||
-      state.phase === 'scoring'
-    ) {
-      return 'active';
-    }
-    return 'complete';
-  } catch {
-    return 'fresh';
-  }
+  const phase = readSprintPhase(cwd);
+  if (phase === null) return 'fresh';
+  if (phase === 'planning' || phase === 'implementing' || phase === 'scoring') return 'active';
+  return 'complete';
 }
 
 // ── Extension Entry Point ───────────────────────────
@@ -457,6 +511,60 @@ export default function slopeExtension(pi: ExtensionAPI, _cwdOverride?: string):
   });
   } // end guards event handlers
 
+  if (isSkillEnabled(settings, 'plan-gate')) {
+  pi.on('tool_call', async (event, ctx) => {
+    const { toolName, input } = event;
+    const inp = input as Record<string, unknown>;
+
+    // Only gate destructive tools.
+    if (toolName !== 'write' && toolName !== 'edit' && toolName !== 'bash') return;
+
+    // Bash: exempt read-only commands.
+    if (toolName === 'bash' && typeof inp.command === 'string' && isBashExempt(inp.command)) return;
+
+    // Not a gate situation when a sprint is active.
+    if (inSprintPhase(ctx.cwd)) return;
+
+    // Not a gate situation when the assistant recently produced a plan.
+    if (hasRecentPlan(ctx as any)) return;
+
+    const reason = 'plan-gate: Run /sprint start or write a plan before this action.';
+
+    // Interactive: ask the user; non-interactive: hard block.
+    const ui = (ctx as any).ui;
+    if (typeof ui?.confirm === 'function') {
+      const ok = await ui.confirm(
+        'No plan detected',
+        'Run /sprint start or write a plan first. Proceed anyway?',
+      );
+      if (!ok) return { block: true, reason };
+    } else {
+      return { block: true, reason };
+    }
+  });
+  // Vague-prompt detector — registered BEFORE model-router's before_agent_start so
+  // the forced local-planner tier sticks when the router handler fires next.
+  pi.on('before_agent_start', async (event, ctx) => {
+    if (!isVaguePrompt(event.prompt ?? '')) return;
+
+    // Inject planning preamble into the chained system prompt.
+    const preamble =
+      '\n\nBefore any tool calls, produce a written plan addressing what to change, ' +
+      'where, and the order of work. Format: a numbered list of steps under a ' +
+      '"## Plan" heading. Do not call write/edit/bash before the plan is written.';
+
+    // Force-route to local-planner when the model-router skill is active.
+    if (_routerRef) {
+      _routerRef.state.turnsSinceSwitch = 3; // satisfy hysteresis so doSwitch fires
+      await doSwitch('local-planner', 'vague-prompt-detector', ctx, _routerRef.pi, _routerRef.state);
+    }
+
+    return {
+      systemPrompt: event.systemPrompt + preamble,
+    };
+  });
+  } // end plan-gate event handlers
+
   if (isSkillEnabled(settings, 'planning')) {
   // Guard: post-push sprint nudge
   pi.on('tool_result', async (event, ctx) => {
@@ -524,6 +632,12 @@ export default function slopeExtension(pi: ExtensionAPI, _cwdOverride?: string):
 
   // Settings command
   registerSettingsCommand(pi, settings, cwd);
+
+  // ── Model Router ────────────────────────────────
+
+  if (isSkillEnabled(settings, 'model-router')) {
+    registerModelRouter(pi, cwd);
+  }
 
   // ── Session Start: Inject Briefing on First Turn ──
 
@@ -641,6 +755,271 @@ export default function slopeExtension(pi: ExtensionAPI, _cwdOverride?: string):
 }
 
 // ── Settings Command ──────────────────────────────
+
+// ── Model Router ──────────────────────────────────────────
+
+const COMPLEX_KEYWORDS = [
+  'architect', 'design', 'refactor', 'debug', 'investigate',
+  'why does', 'how should', 'what\'s the best', 'review this',
+  'performance', 'security', 'migration', 'breaking change',
+  'multi-file', 'cross-cutting', 'redesign', 'strategy',
+  'explain why', 'trade-off', 'compare approaches',
+];
+
+const SIMPLE_KEYWORDS = [
+  'fix typo', 'rename', 'add import', 'run test', 'format',
+  'lint', 'commit', 'push', 'status', 'list files', 'show',
+  'create file', 'delete file', 'move file',
+];
+
+// Standalone ambiguous noun tokens. 'it' is intentionally excluded — too common.
+const AMBIGUOUS_NOUN_TOKENS = [
+  'the code', 'this', 'everything', 'all of it', 'the whole thing', 'the codebase',
+];
+
+const HAS_PATH_RE = /\.(tsx?|jsx?|py|rs|go|md|json|ya?ml|sh|sql|css|html|toml)\b/i;
+// Function-call shape `foo()` OR PascalCase identifier `MyClass`.
+const HAS_SYMBOL_RE = /\b[a-z][A-Za-z0-9_]*\(\)|\b[A-Z][a-z][A-Za-z0-9]+\b/;
+
+function hasCodeIdentifier(prompt: string): boolean {
+  return HAS_PATH_RE.test(prompt) || HAS_SYMBOL_RE.test(prompt);
+}
+
+function getPlannerSignals(prompt: string): string[] {
+  const trimmed = prompt.trim();
+  const lower = trimmed.toLowerCase();
+  const signals: string[] = [];
+  if (VAGUE_VERB_RE.test(trimmed)) signals.push('vague-verb');
+  for (const t of AMBIGUOUS_NOUN_TOKENS) {
+    if (lower.includes(t)) { signals.push('ambiguous-noun'); break; }
+  }
+  if (trimmed.length < 200 && !hasCodeIdentifier(trimmed)) signals.push('short-no-code');
+  return signals;
+}
+
+export type ModelTier = 'local-coder' | 'local-general' | 'local-planner' | 'cloud';
+
+export interface RouterState {
+  currentTier: ModelTier;
+  turnsSinceSwitch: number;
+  lastSwitchReason: string;
+  /** Set by doSwitch when entering local-planner; consumed by the vague-prompt detector (T3). */
+  plannerPreambleStaged?: boolean;
+}
+
+export interface ComplexityResult {
+  /** Recommended tier for this prompt. */
+  tier: ModelTier;
+  /** Cloud-escalation score on the existing 0–5 scale. */
+  score: number;
+  /** Human-readable top reason for the tier choice. */
+  signal: string;
+}
+
+export function scoreComplexity(prompt: string): ComplexityResult {
+  const trimmed = prompt.trim();
+  const lower = trimmed.toLowerCase();
+
+  // 0–5 score (cloud-escalation signal). Same weights as the prior implementation.
+  let score = 0;
+  let topComplexKw: string | null = null;
+  for (const kw of COMPLEX_KEYWORDS) {
+    if (lower.includes(kw)) {
+      score += 2;
+      if (!topComplexKw) topComplexKw = kw;
+    }
+  }
+  for (const kw of SIMPLE_KEYWORDS) {
+    if (lower.includes(kw)) score -= 1;
+  }
+  if (trimmed.length > 500) score += 1;
+  if (trimmed.length > 1000) score += 1;
+  if (trimmed.length < 50) score -= 1;
+  const questions = (trimmed.match(/\?/g) ?? []).length;
+  if (questions >= 2) score += 1;
+  const fileRefs = (trimmed.match(/\.[a-z]{1,4}\b/g) ?? []).length;
+  if (fileRefs >= 3) score += 1;
+  score = Math.max(0, Math.min(5, score));
+
+  // Tier selection. Order matters: cloud > planner > coder > general.
+  if (score >= 3) {
+    return { tier: 'cloud', score, signal: topComplexKw ?? 'high-complexity' };
+  }
+  const planner = getPlannerSignals(trimmed);
+  if (planner.length >= 2) {
+    return { tier: 'local-planner', score, signal: planner.join('+') };
+  }
+  if (hasCodeIdentifier(trimmed)) {
+    return { tier: 'local-coder', score, signal: 'code-identifier' };
+  }
+  // Coder-flavoured keywords still hint at coder when no identifier is present.
+  const CODER_HINT_KWS = ['fix typo', 'rename', 'add import', 'run test', 'format', 'lint',
+    'commit', 'push', 'create file', 'delete file', 'move file', 'debug', 'refactor'];
+  for (const kw of CODER_HINT_KWS) {
+    if (lower.includes(kw)) return { tier: 'local-coder', score, signal: kw };
+  }
+  return { tier: 'local-general', score, signal: 'general-reasoning' };
+}
+
+const TIER_ICONS: Record<ModelTier, string> = {
+  'local-coder': '\u{1F6E0}',
+  'local-general': '\u{1F9E0}',
+  'local-planner': '\u{1F4CB}',
+  'cloud': '☁',
+};
+
+/** Backwards-compat: persisted RouterState may carry the old 'local' tier name. */
+function normalizeTier(tier: string): ModelTier {
+  if (tier === 'local') return 'local-coder';
+  if (tier === 'local-coder' || tier === 'local-general' || tier === 'local-planner' || tier === 'cloud') {
+    return tier;
+  }
+  return 'local-coder';
+}
+
+function registerModelRouter(pi: ExtensionAPI, _cwd: string): void {
+  const state: RouterState = {
+    currentTier: 'local-coder',
+    turnsSinceSwitch: 0,
+    lastSwitchReason: 'startup',
+  };
+  // Expose state + pi so the vague-prompt detector (registered earlier) can call doSwitch.
+  _routerRef = { state, pi };
+
+  // Restore state from session
+  pi.on('session_start', async (_event, ctx) => {
+    for (const entry of ctx.sessionManager.getEntries()) {
+      if (entry.type === 'custom' && entry.customType === 'slope-model-router') {
+        const persisted = entry.data as Partial<RouterState> & { currentTier?: string };
+        state.currentTier = normalizeTier(persisted.currentTier ?? 'local-coder');
+        state.turnsSinceSwitch = persisted.turnsSinceSwitch ?? 0;
+        state.lastSwitchReason = persisted.lastSwitchReason ?? 'restored';
+        state.plannerPreambleStaged = persisted.plannerPreambleStaged;
+      }
+    }
+    ctx.ui.setStatus('model-router', `${TIER_ICONS[state.currentTier]} ${state.currentTier}`);
+  });
+
+  // Analyze complexity before each agent turn
+  pi.on('before_agent_start', async (event, ctx) => {
+    const prompt = (event.prompt ?? '').toLowerCase();
+
+    // Explicit user commands \u2014 match longest variants first.
+    if (/(use|switch|\/route)\s+local-planner\b/.test(prompt)) {
+      await doSwitch('local-planner', 'user request', ctx, pi, state);
+      return;
+    }
+    if (/(use|switch|\/route)\s+local-general\b/.test(prompt)) {
+      await doSwitch('local-general', 'user request', ctx, pi, state);
+      return;
+    }
+    if (/(use|switch|\/route)\s+local-coder\b/.test(prompt)) {
+      await doSwitch('local-coder', 'user request', ctx, pi, state);
+      return;
+    }
+    const FORCE_LOCAL = ['use local', '/route local', 'switch local'];
+    const FORCE_CLOUD = ['use cloud', '/route cloud', 'switch cloud', 'use sonnet', 'use opus'];
+    if (FORCE_LOCAL.some(k => prompt.includes(k))) {
+      await doSwitch('local-coder', 'user request (legacy "local")', ctx, pi, state);
+      return;
+    }
+    if (FORCE_CLOUD.some(k => prompt.includes(k))) {
+      await doSwitch('cloud', 'user request', ctx, pi, state);
+      return;
+    }
+
+    const result = scoreComplexity(event.prompt ?? '');
+
+    // Hysteresis: don't switch too frequently (min 3 turns between switches).
+    if (state.turnsSinceSwitch < 3) {
+      state.turnsSinceSwitch++;
+      return;
+    }
+
+    if (result.tier !== state.currentTier) {
+      await doSwitch(result.tier, `auto: ${result.signal} (score ${result.score})`, ctx, pi, state);
+    } else {
+      state.turnsSinceSwitch++;
+    }
+  });
+
+  // Track turns
+  pi.on('turn_end', async () => {
+    state.turnsSinceSwitch++;
+  });
+
+  // Manual command
+  pi.registerCommand('route', {
+    description: 'Switch model routing: /route local-coder | local-general | local-planner | cloud | status',
+    handler: async (args, ctx) => {
+      const arg = (args ?? '').trim().toLowerCase();
+      if (arg === 'status' || arg === '') {
+        ctx.ui.notify(
+          `Model router: ${state.currentTier} (${state.turnsSinceSwitch} turns since switch, reason: ${state.lastSwitchReason})`,
+          'info',
+        );
+        return;
+      }
+      // Back-compat: bare 'local' = local-coder.
+      if (arg === 'local') {
+        await doSwitch('local-coder', 'manual /route (legacy "local")', ctx, pi, state);
+        return;
+      }
+      if (arg === 'local-coder' || arg === 'local-general' || arg === 'local-planner' || arg === 'cloud') {
+        await doSwitch(arg, 'manual /route command', ctx, pi, state);
+        return;
+      }
+      ctx.ui.notify('Usage: /route local-coder | local-general | local-planner | cloud | status', 'info');
+    },
+  });
+}
+
+export async function doSwitch(
+  tier: ModelTier,
+  reason: string,
+  ctx: any,
+  pi: ExtensionAPI,
+  state: RouterState,
+): Promise<void> {
+  const registry = ctx.modelRegistry;
+  let model;
+
+  if (tier === 'cloud') {
+    model = registry.find('openrouter', 'anthropic/claude-sonnet-4-5')
+      ?? registry.find('openrouter', 'google/gemini-2.5-pro-preview')
+      ?? registry.find('anthropic', 'claude-sonnet-4-20250514');
+  } else if (tier === 'local-coder') {
+    model = registry.find('mlx-local', 'Qwen3-Coder-Next')
+      ?? registry.find('mlx-local', 'Qwen3-Coder')
+      ?? registry.find('ollama', 'qwen3-coder:30b');
+  } else {
+    // local-general and local-planner share the dense reasoning model.
+    model = registry.find('mlx-local', 'Qwen3.6-27B')
+      ?? registry.find('mlx-local', 'Qwen3-27B')
+      ?? registry.find('ollama', 'qwen3:27b');
+  }
+
+  if (!model) {
+    ctx.ui.notify(`No ${tier} model available — check models.json`, 'warning');
+    return;
+  }
+
+  const success = await pi.setModel(model);
+  if (success) {
+    state.currentTier = tier;
+    state.turnsSinceSwitch = 0;
+    state.lastSwitchReason = reason;
+    state.plannerPreambleStaged = tier === 'local-planner';
+
+    ctx.ui.setStatus('model-router', `${TIER_ICONS[tier]} ${tier}`);
+    ctx.ui.notify(`Model router: switched to ${tier} (${model.name ?? model.id}) — ${reason}`, 'info');
+
+    // Persist state
+    pi.appendEntry('slope-model-router', state);
+  }
+}
+
+// ── Settings Command ──────────────────────────────────
 
 function registerSettingsCommand(pi: ExtensionAPI, settings: PiSettings, cwd: string): void {
   pi.registerCommand('slope-settings', {

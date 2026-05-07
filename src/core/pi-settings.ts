@@ -49,6 +49,14 @@ const DEFAULT_SETTINGS: PiSettings = {
       enabled: true,
       description: 'Cross-session memory: inject relevant memories into briefing, /slope-memory command',
     },
+    'model-router': {
+      enabled: false,
+      description: 'Auto-switch between local/cloud models based on task complexity. Requires both local + cloud providers configured.',
+    },
+    'plan-gate': {
+      enabled: false,
+      description: 'Require a written plan or active sprint phase before destructive tool calls (write/edit/bash). Pairs with model-router local-planner tier.',
+    },
   },
 };
 

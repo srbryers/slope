@@ -10,7 +10,7 @@ vi.mock('node:child_process', () => ({
 }));
 
 // Import after mocks are set up
-const { default: slopeExtension } = await import('../../packages/pi-extension/src/index.js');
+const { default: slopeExtension, scoreComplexity, isVaguePrompt } = await import('../../packages/pi-extension/src/index.js');
 
 // Minimal mock context passed to tool execute() and event handlers
 function makeCtx(cwd: string) {
@@ -138,9 +138,9 @@ describe('Pi Extension', () => {
 
     it('before_agent_start injects onboarding message for fresh project', async () => {
       slopeExtension(mockPi as never, tmpDir);
-      const handler = mockPi.on.mock.calls.find(
-        (c: unknown[]) => c[0] === 'before_agent_start',
-      )?.[1] as (_event: unknown, ctx: unknown) => Promise<{ message: { content: string } } | undefined>;
+      // Briefing handler is the last registered before_agent_start (T3's vague-prompt handler registers first).
+      const beforeAgentStartCalls = mockPi.on.mock.calls.filter((c: unknown[]) => c[0] === 'before_agent_start');
+      const handler = beforeAgentStartCalls[beforeAgentStartCalls.length - 1]?.[1] as (_event: unknown, ctx: unknown) => Promise<{ message: { content: string } } | undefined>;
 
       const result = await handler({}, makeCtx(tmpDir));
       expect(result?.message.content).toContain('🎯 SLOPE Onboarding');
@@ -157,9 +157,9 @@ describe('Pi Extension', () => {
         JSON.stringify({ sprint: 1, phase: 'implementing', gates: {}, started_at: '', updated_at: '' }),
       );
       slopeExtension(mockPi as never, tmpDir);
-      const handler = mockPi.on.mock.calls.find(
-        (c: unknown[]) => c[0] === 'before_agent_start',
-      )?.[1] as (_event: unknown, ctx: unknown) => Promise<{ message: { content: string } } | undefined>;
+      // Briefing handler is the last registered before_agent_start (T3's vague-prompt handler registers first).
+      const beforeAgentStartCalls = mockPi.on.mock.calls.filter((c: unknown[]) => c[0] === 'before_agent_start');
+      const handler = beforeAgentStartCalls[beforeAgentStartCalls.length - 1]?.[1] as (_event: unknown, ctx: unknown) => Promise<{ message: { content: string } } | undefined>;
 
       const result = await handler({}, makeCtx(tmpDir));
       expect(result?.message.content).toContain('SLOPE Session Briefing');
@@ -171,9 +171,9 @@ describe('Pi Extension', () => {
         JSON.stringify({ sprint: 1, phase: 'complete', gates: {}, started_at: '', updated_at: '' }),
       );
       slopeExtension(mockPi as never, tmpDir);
-      const handler = mockPi.on.mock.calls.find(
-        (c: unknown[]) => c[0] === 'before_agent_start',
-      )?.[1] as (_event: unknown, ctx: unknown) => Promise<{ message: { content: string } } | undefined>;
+      // Briefing handler is the last registered before_agent_start (T3's vague-prompt handler registers first).
+      const beforeAgentStartCalls = mockPi.on.mock.calls.filter((c: unknown[]) => c[0] === 'before_agent_start');
+      const handler = beforeAgentStartCalls[beforeAgentStartCalls.length - 1]?.[1] as (_event: unknown, ctx: unknown) => Promise<{ message: { content: string } } | undefined>;
 
       const result = await handler({}, makeCtx(tmpDir));
       expect(result?.message.content).toContain('No active sprint (previous sprint complete)');
@@ -250,13 +250,281 @@ describe('Pi Extension', () => {
         JSON.stringify({ sprint: 1, phase: 'planning', gates: {}, started_at: '', updated_at: '' }),
       );
       slopeExtension(mockPi as never, tmpDir);
-      const handler = mockPi.on.mock.calls.find(
-        (c: unknown[]) => c[0] === 'before_agent_start',
-      )?.[1] as (_event: unknown, ctx: unknown) => Promise<{ message: { content: string } } | undefined>;
+      // Briefing handler is the last registered before_agent_start (T3's vague-prompt handler registers first).
+      const beforeAgentStartCalls = mockPi.on.mock.calls.filter((c: unknown[]) => c[0] === 'before_agent_start');
+      const handler = beforeAgentStartCalls[beforeAgentStartCalls.length - 1]?.[1] as (_event: unknown, ctx: unknown) => Promise<{ message: { content: string } } | undefined>;
 
       const result = await handler({}, makeCtx(tmpDir));
       expect(result?.message.content).toContain('Planning Phase');
       expect(result?.message.content).toContain('sprint start');
     });
+  });
+});
+
+describe('scoreComplexity tier selection', () => {
+  it('routes "optimize this" to local-planner (vague + ambiguous + short-no-code)', () => {
+    const r = scoreComplexity('optimize this');
+    expect(r.tier).toBe('local-planner');
+    expect(r.signal).toContain('vague-verb');
+    expect(r.signal).toContain('ambiguous-noun');
+  });
+
+  it('routes "refactor everything" to local-planner', () => {
+    const r = scoreComplexity('refactor everything');
+    expect(r.tier).toBe('local-planner');
+  });
+
+  it('routes "make it better" to local-planner via short-no-code', () => {
+    const r = scoreComplexity('make it better');
+    expect(r.tier).toBe('local-planner');
+    expect(r.signal).toContain('vague-verb');
+    expect(r.signal).toContain('short-no-code');
+  });
+
+  it('routes "fix typo in foo.ts:42" to local-coder (path beats vague verb)', () => {
+    const r = scoreComplexity('fix typo in foo.ts:42');
+    expect(r.tier).toBe('local-coder');
+  });
+
+  it('routes "add console.log to handleClick()" to local-coder via symbol', () => {
+    const r = scoreComplexity('add console.log to handleClick()');
+    expect(r.tier).toBe('local-coder');
+    expect(r.signal).toBe('code-identifier');
+  });
+
+  it('routes "review this performance issue" to cloud (high score)', () => {
+    const r = scoreComplexity('review this performance issue');
+    expect(r.tier).toBe('cloud');
+    expect(r.score).toBeGreaterThanOrEqual(3);
+  });
+
+  it('routes "explain why redux is faster than zustand" to local-general (no path/symbol, low score)', () => {
+    const r = scoreComplexity('explain why redux is faster than zustand');
+    // 'explain why' is +2 → score 2 → not cloud. No path/symbol → general.
+    expect(r.tier).toBe('local-general');
+  });
+
+  it('clamps score to [0, 5]', () => {
+    const heavy = 'architect a multi-file refactor strategy with breaking changes for performance and security';
+    const r = scoreComplexity(heavy);
+    expect(r.score).toBeLessThanOrEqual(5);
+    expect(r.tier).toBe('cloud');
+  });
+
+  it('treats "fix" without targets as 1 planner signal (not enough — falls to coder via keyword)', () => {
+    // 'fix' alone fires vague-verb + short-no-code = 2 signals → planner.
+    // 'fix the bug' adds no ambiguous noun ('the bug' is not in our list).
+    const r = scoreComplexity('fix the bug');
+    expect(r.tier).toBe('local-planner');
+  });
+
+  it('does not flag a long descriptive prompt as planner', () => {
+    const long = 'optimize the bundle size in webpack.config.js by replacing the legacy uglifyjs plugin with terser and enabling tree-shaking for the lodash imports we use in src/utils';
+    const r = scoreComplexity(long);
+    expect(r.tier).not.toBe('local-planner');
+  });
+});
+
+describe('plan-gate tool_call handler', () => {
+  let tmpDir: string;
+
+  function makePi() {
+    return {
+      registerTool: vi.fn(),
+      registerCommand: vi.fn(),
+      on: vi.fn(),
+      sendMessage: vi.fn(),
+      appendEntry: vi.fn(),
+    };
+  }
+
+  function makeSprintState(phase: string, dir: string) {
+    mkdirSync(join(dir, '.slope'), { recursive: true });
+    writeFileSync(
+      join(dir, '.slope', 'sprint-state.json'),
+      JSON.stringify({ phase }),
+    );
+  }
+
+  function makeSlopeConfig(dir: string) {
+    mkdirSync(join(dir, '.slope'), { recursive: true });
+    writeFileSync(join(dir, '.slope', 'config.json'), JSON.stringify({ version: '1' }));
+  }
+
+  /** Build a mock ctx whose sessionManager returns supplied assistant entries. */
+  function makeCtxWithEntries(
+    dir: string,
+    entries: Array<{ role: string; content: string }>,
+    confirmResult = true,
+  ) {
+    return {
+      cwd: dir,
+      sessionManager: { getEntries: () => entries },
+      ui: { notify: vi.fn(), confirm: vi.fn().mockResolvedValue(confirmResult) },
+    };
+  }
+
+  /** Get the plan-gate tool_call handler from registered mock.on calls. */
+  function getPlanGateHandler(mockPi: ReturnType<typeof makePi>) {
+    // There may be multiple tool_call handlers; find the plan-gate one by trying each.
+    // The plan-gate handler is registered after the guards handler.
+    const calls = mockPi.on.mock.calls.filter((c: unknown[]) => c[0] === 'tool_call');
+    // Return the last one registered under the plan-gate skill (enabled by default).
+    return calls[calls.length - 1]?.[1] as
+      | ((event: unknown, ctx: unknown) => Promise<{ block: boolean; reason?: string } | undefined>)
+      | undefined;
+  }
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'slope-pg-test-'));
+    makeSlopeConfig(tmpDir);
+    // plan-gate defaults to false (opt-in); enable it explicitly for these tests.
+    writeFileSync(
+      join(tmpDir, '.slope', 'pi-settings.json'),
+      JSON.stringify({ version: '1', skills: { 'plan-gate': { enabled: true, description: '' } } }),
+    );
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('blocks write with no plan and no sprint phase (non-interactive)', async () => {
+    const mockPi = makePi();
+    slopeExtension(mockPi as never, tmpDir);
+    const handler = getPlanGateHandler(mockPi);
+    const ctx = { cwd: tmpDir, sessionManager: { getEntries: () => [] }, ui: { notify: vi.fn() } };
+    const result = await handler?.({ toolName: 'write', input: { path: 'foo.ts' } }, ctx);
+    expect(result).toEqual({ block: true, reason: expect.stringContaining('plan-gate') });
+  });
+
+  it('blocks edit with no plan and no sprint phase (non-interactive)', async () => {
+    const mockPi = makePi();
+    slopeExtension(mockPi as never, tmpDir);
+    const handler = getPlanGateHandler(mockPi);
+    const ctx = { cwd: tmpDir, sessionManager: { getEntries: () => [] }, ui: { notify: vi.fn() } };
+    const result = await handler?.({ toolName: 'edit', input: { path: 'foo.ts' } }, ctx);
+    expect(result).toEqual({ block: true, reason: expect.stringContaining('plan-gate') });
+  });
+
+  it('blocks bash rm -rf with no plan and no sprint (non-interactive)', async () => {
+    const mockPi = makePi();
+    slopeExtension(mockPi as never, tmpDir);
+    const handler = getPlanGateHandler(mockPi);
+    const ctx = { cwd: tmpDir, sessionManager: { getEntries: () => [] }, ui: { notify: vi.fn() } };
+    const result = await handler?.({ toolName: 'bash', input: { command: 'rm -rf dist' } }, ctx);
+    expect(result).toEqual({ block: true, reason: expect.stringContaining('plan-gate') });
+  });
+
+  it('does NOT block bash git status (exempt read-only command)', async () => {
+    const mockPi = makePi();
+    slopeExtension(mockPi as never, tmpDir);
+    const handler = getPlanGateHandler(mockPi);
+    const ctx = { cwd: tmpDir, sessionManager: { getEntries: () => [] }, ui: { notify: vi.fn() } };
+    const result = await handler?.({ toolName: 'bash', input: { command: 'git status' } }, ctx);
+    expect(result).toBeUndefined();
+  });
+
+  it('does NOT block when sprint phase is implementing', async () => {
+    makeSprintState('implementing', tmpDir);
+    const mockPi = makePi();
+    slopeExtension(mockPi as never, tmpDir);
+    const handler = getPlanGateHandler(mockPi);
+    const ctx = makeCtxWithEntries(tmpDir, []);
+    const result = await handler?.({ toolName: 'write', input: { path: 'foo.ts' } }, ctx);
+    expect(result).toBeUndefined();
+  });
+
+  it('does NOT block when assistant message contains ## Plan heading', async () => {
+    const mockPi = makePi();
+    slopeExtension(mockPi as never, tmpDir);
+    const handler = getPlanGateHandler(mockPi);
+    const ctx = makeCtxWithEntries(tmpDir, [
+      { role: 'assistant', content: '## Plan\n1. Do X\n2. Do Y\n3. Do Z' },
+    ]);
+    const result = await handler?.({ toolName: 'edit', input: { path: 'foo.ts' } }, ctx);
+    expect(result).toBeUndefined();
+  });
+
+  it('does NOT block when assistant message contains numbered list', async () => {
+    const mockPi = makePi();
+    slopeExtension(mockPi as never, tmpDir);
+    const handler = getPlanGateHandler(mockPi);
+    const ctx = makeCtxWithEntries(tmpDir, [
+      { role: 'assistant', content: 'Here is my approach:\n1. First step\n2. Second step\n3. Third step\n4. Done' },
+    ]);
+    const result = await handler?.({ toolName: 'write', input: { path: 'bar.ts' } }, ctx);
+    expect(result).toBeUndefined();
+  });
+
+  it('interactive: allows when user confirms', async () => {
+    const mockPi = makePi();
+    slopeExtension(mockPi as never, tmpDir);
+    const handler = getPlanGateHandler(mockPi);
+    const ctx = makeCtxWithEntries(tmpDir, [], true);
+    const result = await handler?.({ toolName: 'write', input: { path: 'foo.ts' } }, ctx);
+    expect(result).toBeUndefined();
+    expect(ctx.ui.confirm).toHaveBeenCalled();
+  });
+
+  it('interactive: blocks when user declines', async () => {
+    const mockPi = makePi();
+    slopeExtension(mockPi as never, tmpDir);
+    const handler = getPlanGateHandler(mockPi);
+    const ctx = makeCtxWithEntries(tmpDir, [], false);
+    const result = await handler?.({ toolName: 'write', input: { path: 'foo.ts' } }, ctx);
+    expect(result).toEqual({ block: true, reason: expect.stringContaining('plan-gate') });
+  });
+});
+
+describe('isVaguePrompt regex', () => {
+  it('matches "optimize this"', () => {
+    expect(isVaguePrompt('optimize this')).toBe(true);
+  });
+
+  it('matches "improve" (bare verb)', () => {
+    expect(isVaguePrompt('improve')).toBe(true);
+  });
+
+  it('matches "clean up" (two-word verb)', () => {
+    expect(isVaguePrompt('clean up')).toBe(true);
+  });
+
+  it('matches "fix the bug" (lowercase, no specifier)', () => {
+    // Note: 'Fix' (capital F) is rejected by HAS_SYMBOL_RE as PascalCase — intentional false-negative.
+    expect(isVaguePrompt('fix the bug')).toBe(true);
+  });
+
+  it('does NOT match "Fix the bug" — capital F looks like PascalCase to the symbol regex', () => {
+    expect(isVaguePrompt('Fix the bug')).toBe(false);
+  });
+
+  it('matches "make it better"', () => {
+    expect(isVaguePrompt('make it better')).toBe(true);
+  });
+
+  it('does NOT match when path is present', () => {
+    expect(isVaguePrompt('optimize the bundle size in webpack.config.js')).toBe(false);
+  });
+
+  it('does NOT match when symbol is present — function call', () => {
+    expect(isVaguePrompt('refactor handleSubmit()')).toBe(false);
+  });
+
+  it('does NOT match when symbol is present — PascalCase', () => {
+    expect(isVaguePrompt('improve UserProfile component')).toBe(false);
+  });
+
+  it('does NOT match prompts >= 200 chars', () => {
+    const long = 'optimize ' + 'x'.repeat(200);
+    expect(isVaguePrompt(long)).toBe(false);
+  });
+
+  it('does NOT match unrelated verbs', () => {
+    expect(isVaguePrompt('write a poem about cats')).toBe(false);
+  });
+
+  it('does NOT match "add console.log to foo()"', () => {
+    expect(isVaguePrompt('add console.log to foo()')).toBe(false);
   });
 });
