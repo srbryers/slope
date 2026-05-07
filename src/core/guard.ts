@@ -104,7 +104,8 @@ export type GuardName =
   | 'claim-required'
   | 'review-stale'
   | 'worktree-reuse'
-  | 'workflow-step-gate';
+  | 'workflow-step-gate'
+  | 'roadmap-edit-shipped';
 
 /** Guard registration entry */
 export interface GuardDefinition {
@@ -407,6 +408,15 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     matcher: 'EnterWorktree',
     level: 'full',
     guardType: 'advisory',
+  },
+  {
+    name: 'roadmap-edit-shipped',
+    description: 'Block edits to roadmap.json that modify sprints with status:complete (paper-tickets)',
+    hookEvent: 'PreToolUse',
+    toolCategories: ['write_file'],
+    matcher: 'Edit|Write',
+    level: 'full',
+    guardType: 'mechanical',
   },
 ];
 
