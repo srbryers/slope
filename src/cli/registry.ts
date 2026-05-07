@@ -648,6 +648,13 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     ],
   },
   {
+    cmd: 'commit-ready', desc: 'Pre-commit checklist for agents', category: 'tooling',
+    flags: [
+      { flag: '--json', desc: 'Emit CommitReadyResult JSON' },
+      { flag: '--strict', desc: 'Exit non-zero when blockers exist' },
+    ],
+  },
+  {
     cmd: 'gate', desc: 'Initiative review gate aliases (agent-friendly)', category: 'tooling',
     subcommands: [
       { name: 'status', desc: 'Pending plan/pr gates per sprint', flags: [

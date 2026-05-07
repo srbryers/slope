@@ -32,6 +32,7 @@ import { nextCommand } from './commands/next.js';
 import { agentCommand } from './commands/agent.js';
 import { ticketCommand } from './commands/ticket.js';
 import { gateCommand } from './commands/gate.js';
+import { commitReadyCommand } from './commands/commit-ready.js';
 import { sessionCommand } from './commands/session.js';
 import { hookCommand } from './commands/hook.js';
 import { roadmapCommand } from './commands/roadmap.js';
@@ -211,6 +212,12 @@ switch (subcommand) {
     break;
   case 'gate':
     gateCommand(process.argv.slice(3)).catch(err => {
+      console.error('Error:', err.message);
+      process.exit(1);
+    });
+    break;
+  case 'commit-ready':
+    commitReadyCommand(process.argv.slice(3)).catch(err => {
       console.error('Error:', err.message);
       process.exit(1);
     });
