@@ -84,7 +84,7 @@ if (subcommand === '--help' || subcommand === '-h') {
 SLOPE CLI — Sprint Lifecycle & Operational Performance Engine
 
 Usage:
-  slope init [--claude-code|--cursor|--opencode|--generic|--all]  Initialize .slope/ directory
+  slope init [--claude-code|--cursor|--codex|--opencode|--generic|--all]  Initialize .slope/ directory
   slope init --team                         Enable multi-developer team mode
   slope init --with-example                 Also seed docs/retros/sprint-1.json with an example
   slope card                                Show handicap card
@@ -447,7 +447,7 @@ switch (subcommand) {
 SLOPE CLI — Sprint Lifecycle & Operational Performance Engine
 
 Usage:
-  slope init [--claude-code|--cursor|--opencode|--generic|--all]  Initialize .slope/ directory
+  slope init [--claude-code|--cursor|--codex|--opencode|--generic|--all]  Initialize .slope/ directory
   slope init --team                         Enable multi-developer team mode
   slope init --with-example                 Also seed docs/retros/sprint-1.json with an example
   slope card                                Show handicap card
@@ -516,6 +516,7 @@ Examples:
   slope init --cursor                       Also install Cursor IDE rules
   slope init --cursor                       Also add SLOPE MCP server to .cursor/mcp.json
   slope init --claude-code                  Also install Claude Code rules + hooks
+  slope init --codex                        Also install Codex CLI hooks + AGENTS.md guidance
   slope init --opencode                     Also install OpenCode AGENTS.md + MCP config
   slope init --team                          Enable multi-developer mode
   slope card                                Show handicap across all scorecards
