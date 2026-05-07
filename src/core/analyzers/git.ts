@@ -10,6 +10,39 @@ function git(cmd: string, cwd: string): string {
   }
 }
 
+/** Extract sprint IDs referenced in commit subjects.
+ *  Matches `S\d+` not followed by another digit or a dot — so `S75.5` does
+ *  NOT count as a reference to S75, and `S70+S71` correctly yields {70, 71}.
+ *  Pure function — separated from git I/O for testability.
+ */
+export function extractSprintReferences(commitSubjects: string[]): Set<number> {
+  const result = new Set<number>();
+  const re = /\bS(\d+)(?![\d.])/g;
+  for (const line of commitSubjects) {
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(line)) !== null) {
+      result.add(parseInt(m[1], 10));
+    }
+  }
+  return result;
+}
+
+/** Detect sprint IDs with shipped commits on the given ref (default: main).
+ *  Falls back to `master` then `HEAD` if main is unavailable. Returns an empty
+ *  set on any git failure so callers can run validation without a working repo.
+ */
+export function findShippedSprintsOnMain(cwd: string, ref?: string): Set<number> {
+  const isGit = git('rev-parse --is-inside-work-tree', cwd);
+  if (isGit !== 'true') return new Set();
+
+  const candidates = ref ? [ref] : ['main', 'master', 'HEAD'];
+  for (const r of candidates) {
+    const log = git(`log ${r} --oneline --no-decorate -n 5000`, cwd);
+    if (log) return extractSprintReferences(log.split('\n'));
+  }
+  return new Set();
+}
+
 function parseContributors(output: string): Array<{ name: string; email: string; commits: number }> {
   if (!output) return [];
   const contributors: Array<{ name: string; email: string; commits: number }> = [];

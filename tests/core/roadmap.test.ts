@@ -394,6 +394,97 @@ describe('validateRoadmap with scorecards', () => {
   });
 });
 
+// --- validateRoadmap with shipped sprint drift detection ---
+
+describe('validateRoadmap with shipped sprint IDs', () => {
+  it('errors when sprint shipped on main but status is null', () => {
+    const roadmap = makeRoadmap({
+      sprints: [
+        makeSprint(7),
+        makeSprint(8, { depends_on: [7] }),
+        makeSprint(9, { depends_on: [8] }),
+      ],
+    });
+    const shipped = new Set([7]);
+    const result = validateRoadmap(roadmap, undefined, shipped);
+    expect(
+      result.errors.some(
+        e => e.sprint === 7 && e.message.includes('shipped commits') && e.message.includes('planned'),
+      ),
+    ).toBe(true);
+  });
+
+  it('errors when sprint shipped but status is "planned"', () => {
+    const roadmap = makeRoadmap({
+      sprints: [
+        { ...makeSprint(7), status: 'planned' } as any,
+        makeSprint(8, { depends_on: [7] }),
+        makeSprint(9, { depends_on: [8] }),
+      ],
+    });
+    const result = validateRoadmap(roadmap, undefined, new Set([7]));
+    expect(
+      result.errors.some(e => e.sprint === 7 && e.message.includes('shipped commits')),
+    ).toBe(true);
+  });
+
+  it('does not error when shipped and status is "complete"', () => {
+    const roadmap = makeRoadmap({
+      sprints: [
+        { ...makeSprint(7), status: 'complete' } as any,
+        makeSprint(8, { depends_on: [7] }),
+        makeSprint(9, { depends_on: [8] }),
+      ],
+    });
+    const result = validateRoadmap(roadmap, undefined, new Set([7]));
+    expect(result.errors.filter(e => e.message.includes('shipped commits'))).toHaveLength(0);
+  });
+
+  it('warns when status is "complete" but sprint not in shipped set (phantom)', () => {
+    const roadmap = makeRoadmap({
+      sprints: [
+        { ...makeSprint(7), status: 'complete' } as any,
+        makeSprint(8, { depends_on: [7] }),
+        makeSprint(9, { depends_on: [8] }),
+      ],
+    });
+    const result = validateRoadmap(roadmap, undefined, new Set([8])); // 7 missing
+    expect(
+      result.warnings.some(
+        w => w.sprint === 7 && w.message.includes('no shipped commits'),
+      ),
+    ).toBe(true);
+  });
+
+  it('skips drift check when shippedSprintIds not provided', () => {
+    const roadmap = makeRoadmap({
+      sprints: [
+        makeSprint(7),
+        makeSprint(8, { depends_on: [7] }),
+        makeSprint(9, { depends_on: [8] }),
+      ],
+    });
+    const result = validateRoadmap(roadmap);
+    expect(result.errors.filter(e => e.message.includes('shipped commits'))).toHaveLength(0);
+    expect(result.warnings.filter(w => w.message.includes('shipped commits'))).toHaveLength(0);
+  });
+
+  it('runs alongside scorecard cross-check independently', () => {
+    const roadmap = makeRoadmap({
+      sprints: [
+        // S7: shipped + scorecard but status=planned → error from drift, warn from scorecards
+        { ...makeSprint(7), status: 'planned' } as any,
+        makeSprint(8, { depends_on: [7] }),
+        makeSprint(9, { depends_on: [8] }),
+      ],
+    });
+    const scorecards = [{ sprint_number: 7 }];
+    const result = validateRoadmap(roadmap, scorecards, new Set([7]));
+    expect(result.errors.some(e => e.message.includes('shipped commits'))).toBe(true);
+    expect(result.warnings.some(w => w.message.includes('scorecard'))).toBe(true);
+  });
+});
+
 // --- formatStrategicContext ---
 
 describe('formatStrategicContext', () => {

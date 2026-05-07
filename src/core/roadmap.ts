@@ -63,11 +63,14 @@ export interface RoadmapValidationResult {
 }
 
 /** Validate a roadmap definition for structural correctness.
- *  Optionally cross-check sprint status against scorecards when provided.
+ *  Optionally cross-check sprint status against scorecards and/or shipped
+ *  sprint commits on main when provided. Caller is responsible for collecting
+ *  scorecards (via loadScorecards) and shipped IDs (via findShippedSprintsOnMain).
  */
 export function validateRoadmap(
   roadmap: RoadmapDefinition,
   scorecards?: { sprint_number: number }[],
+  shippedSprintIds?: Set<number>,
 ): RoadmapValidationResult {
   const errors: RoadmapValidationError[] = [];
   const warnings: RoadmapValidationWarning[] = [];
@@ -205,6 +208,30 @@ export function validateRoadmap(
           type: 'warning',
           sprint: sprint.id,
           message: `S${sprint.id} is marked "complete" in roadmap but no scorecard exists (phantom sprint)`,
+        });
+      }
+    }
+  }
+
+  // Cross-validate sprint status against shipped commits on main when provided
+  if (shippedSprintIds) {
+    for (const sprint of roadmap.sprints) {
+      const status = (sprint as RoadmapSprint & { status?: string }).status;
+      const isShipped = shippedSprintIds.has(sprint.id);
+
+      if (isShipped && status !== 'complete') {
+        errors.push({
+          type: 'error',
+          sprint: sprint.id,
+          message: `S${sprint.id} has shipped commits on main but status is "${status ?? 'planned'}" — expected "complete"`,
+        });
+      }
+
+      if (!isShipped && status === 'complete') {
+        warnings.push({
+          type: 'warning',
+          sprint: sprint.id,
+          message: `S${sprint.id} is marked "complete" but no shipped commits found on main`,
         });
       }
     }
@@ -404,59 +431,51 @@ function computeDepthMap(sprints: RoadmapSprint[]): Map<number, number> {
 
 // --- Parse ---
 
+/** Cast a raw JSON object to RoadmapDefinition if minimally structurally valid.
+ *  Unlike parseRoadmap, this does not run full validation — useful when callers
+ *  want to flag validation issues against a structurally-cast roadmap (e.g.
+ *  drift detection should still run when ticket counts or numbering are off).
+ */
+export function castRoadmapStructure(json: unknown): RoadmapDefinition | null {
+  if (!json || typeof json !== 'object') return null;
+  const obj = json as Record<string, unknown>;
+  if (typeof obj.name !== 'string') return null;
+  if (!Array.isArray(obj.sprints)) return null;
+  if (!Array.isArray(obj.phases)) return null;
+  return obj as unknown as RoadmapDefinition;
+}
+
 /** Parse and validate a roadmap from a JSON object */
 export function parseRoadmap(json: unknown): { roadmap: RoadmapDefinition | null; validation: RoadmapValidationResult } {
-  // Type guard: check minimal structure
+  // Type guard: check minimal structure with explicit per-field error messages
   if (!json || typeof json !== 'object') {
     return {
       roadmap: null,
-      validation: {
-        valid: false,
-        errors: [{ type: 'error', message: 'Input is not an object' }],
-        warnings: [],
-      },
+      validation: { valid: false, errors: [{ type: 'error', message: 'Input is not an object' }], warnings: [] },
     };
   }
-
   const obj = json as Record<string, unknown>;
-
   if (typeof obj.name !== 'string') {
     return {
       roadmap: null,
-      validation: {
-        valid: false,
-        errors: [{ type: 'error', message: 'Missing required field: name' }],
-        warnings: [],
-      },
+      validation: { valid: false, errors: [{ type: 'error', message: 'Missing required field: name' }], warnings: [] },
     };
   }
-
   if (!Array.isArray(obj.sprints)) {
     return {
       roadmap: null,
-      validation: {
-        valid: false,
-        errors: [{ type: 'error', message: 'Missing required field: sprints (must be an array)' }],
-        warnings: [],
-      },
+      validation: { valid: false, errors: [{ type: 'error', message: 'Missing required field: sprints (must be an array)' }], warnings: [] },
     };
   }
-
   if (!Array.isArray(obj.phases)) {
     return {
       roadmap: null,
-      validation: {
-        valid: false,
-        errors: [{ type: 'error', message: 'Missing required field: phases (must be an array)' }],
-        warnings: [],
-      },
+      validation: { valid: false, errors: [{ type: 'error', message: 'Missing required field: phases (must be an array)' }], warnings: [] },
     };
   }
 
-  // Cast — validateRoadmap will catch structural issues in sprint/ticket fields
   const roadmap = obj as unknown as RoadmapDefinition;
   const validation = validateRoadmap(roadmap);
-
   return { roadmap: validation.valid ? roadmap : null, validation };
 }
 

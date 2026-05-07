@@ -3,6 +3,8 @@ import { join } from 'node:path';
 import {
   parseRoadmap,
   validateRoadmap,
+  castRoadmapStructure,
+  findShippedSprintsOnMain,
   computeCriticalPath,
   findParallelOpportunities,
   formatRoadmapSummary,
@@ -98,8 +100,21 @@ function validateSubcommand(flags: Record<string, string>, cwd: string): void {
   const loaded = loadRawRoadmap(flags, cwd);
   if (!loaded) process.exit(1);
 
-  const { path, raw } = loaded;
-  const { roadmap, validation } = parseRoadmap(raw);
+  const { path, raw } = loaded!;
+  const parsed = parseRoadmap(raw);
+  let { validation } = parsed;
+
+  // Re-cast structurally even if parseRoadmap returned null due to validation
+  // failure — drift checks should still fire on roadmaps that have ticket/
+  // numbering issues. Only skip if the JSON has no name/sprints/phases at all.
+  const roadmap = parsed.roadmap ?? castRoadmapStructure(raw);
+
+  if (roadmap) {
+    const config = loadConfig(cwd);
+    const scorecards = loadScorecards(config, cwd).map(s => ({ sprint_number: s.sprint_number }));
+    const shippedSprintIds = findShippedSprintsOnMain(cwd);
+    validation = validateRoadmap(roadmap, scorecards, shippedSprintIds);
+  }
 
   console.log(`\nRoadmap: ${path}`);
   console.log('\u2550'.repeat(40));

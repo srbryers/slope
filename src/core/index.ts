@@ -166,9 +166,11 @@ export {
   computeCriticalPath,
   findParallelOpportunities,
   parseRoadmap,
+  castRoadmapStructure,
   formatRoadmapSummary,
   formatStrategicContext,
 } from './roadmap.js';
+export { extractSprintReferences, findShippedSprintsOnMain } from './analyzers/git.js';
 export type {
   RoadmapDefinition,
   RoadmapSprint,
