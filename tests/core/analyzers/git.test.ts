@@ -173,4 +173,23 @@ describe('findShippedSprintsOnMain', () => {
 
     expect(findShippedSprintsOnMain(tmpDir, 'HEAD')).toEqual(new Set([99]));
   });
+
+  it('refuses unsafe refs (shell-injection guard)', () => {
+    gitInit(tmpDir);
+    gitCommit(tmpDir, 'feat(S99): only on HEAD');
+
+    // Semicolons, backticks, $(), spaces, pipes — anything outside the
+    // SAFE_REF_RE allowlist must short-circuit to an empty set rather than
+    // fall through to the shell.
+    for (const unsafe of [
+      'HEAD; echo pwned',
+      'HEAD`echo pwned`',
+      'HEAD$(echo pwned)',
+      'HEAD || echo pwned',
+      'HEAD | sh',
+      'HEAD\nrm -rf /',
+    ]) {
+      expect(findShippedSprintsOnMain(tmpDir, unsafe)).toEqual(new Set());
+    }
+  });
 });

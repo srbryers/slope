@@ -62,7 +62,10 @@ export async function postHoleEnforcementGuard(_input: HookInput, cwd: string): 
   const drifts: Drift[] = [];
   for (const id of [...shipped].sort((a, b) => b - a)) {
     const status = statusById.get(id);
-    const scorecardFile = join(scorecardDirAbs, scorecardPattern.replace('*', String(id)));
+    // Replace EVERY '*' so patterns with multiple wildcards are sanitized
+    // (CodeQL js/incomplete-sanitization): single .replace() leaves later
+    // occurrences as literal '*' which won't match real filenames.
+    const scorecardFile = join(scorecardDirAbs, scorecardPattern.replaceAll('*', String(id)));
     const hasScorecard = existsSync(scorecardFile);
 
     const issues: string[] = [];

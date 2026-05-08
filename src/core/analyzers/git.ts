@@ -27,9 +27,20 @@ export function extractSprintReferences(commitSubjects: string[]): Set<number> {
   return result;
 }
 
+/**
+ * Allowed characters in git refs (branch / tag / abbreviated SHA). Permissive
+ * enough for the names users actually pick (alphanumerics, slash, dot, dash,
+ * underscore, plus) — strict enough to forbid shell metacharacters that would
+ * make this function a shell-injection sink (CodeQL js/shell-command-...).
+ */
+const SAFE_REF_RE = /^[A-Za-z0-9/_.+-]+$/;
+
 /** Detect sprint IDs with shipped commits on the given ref (default: main).
  *  Falls back to `master` then `HEAD` if main is unavailable. Returns an empty
  *  set on any git failure so callers can run validation without a working repo.
+ *  Refs are validated against SAFE_REF_RE before being interpolated into the
+ *  shell command — refs containing whitespace, semicolons, backticks, etc.
+ *  short-circuit to an empty set rather than risk a shell injection.
  */
 export function findShippedSprintsOnMain(cwd: string, ref?: string): Set<number> {
   const isGit = git('rev-parse --is-inside-work-tree', cwd);
@@ -37,6 +48,7 @@ export function findShippedSprintsOnMain(cwd: string, ref?: string): Set<number>
 
   const candidates = ref ? [ref] : ['main', 'master', 'HEAD'];
   for (const r of candidates) {
+    if (!SAFE_REF_RE.test(r)) continue; // skip unsafe refs silently
     const log = git(`log ${r} --oneline --no-decorate -n 5000`, cwd);
     if (log) return extractSprintReferences(log.split('\n'));
   }
