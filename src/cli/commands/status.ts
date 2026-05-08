@@ -1,5 +1,7 @@
-import { checkConflicts } from '../../core/index.js';
+import { checkConflicts, findShippedSprintsOnMain } from '../../core/index.js';
 import type { SprintClaim, SlopeSession } from '../../core/index.js';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { loadConfig } from '../config.js';
 import { loadScorecards } from '../loader.js';
 import { resolveStore } from '../store.js';
@@ -80,7 +82,38 @@ async function showSprintStatus(store: { list: (n: number) => Promise<SprintClai
     }
   }
 
+  // Surface scorecard drift — shipped sprints with no scorecard on disk.
+  // Helps remind users to run `slope retro backfill` when post-hole work
+  // has been skipped (#318).
+  const drift = computeScorecardDrift(process.cwd());
+  if (drift.missing.length > 0) {
+    console.log(`\n  Scorecard drift: ${drift.missing.length} shipped sprint(s) without scorecards`);
+    const sample = drift.missing.slice(0, 5).map(n => `S${n}`).join(', ');
+    const more = drift.missing.length > 5 ? `, ...` : '';
+    console.log(`    Missing: ${sample}${more}`);
+    console.log(`    Backfill: slope retro backfill --all-missing`);
+  }
+
   console.log('');
+}
+
+/** Detect shipped sprints with no scorecard on disk. Used by status to
+ *  surface the "post-hole skipped" pattern (#318). */
+function computeScorecardDrift(cwd: string): { missing: number[] } {
+  try {
+    const config = loadConfig(cwd);
+    const retroDir = join(cwd, config.scorecardDir);
+    const pattern = config.scorecardPattern;
+    const shipped = findShippedSprintsOnMain(cwd);
+    const missing: number[] = [];
+    for (const id of [...shipped].sort((a, b) => a - b)) {
+      const scorecardPath = join(retroDir, pattern.replace('*', String(id)));
+      if (!existsSync(scorecardPath)) missing.push(id);
+    }
+    return { missing };
+  } catch {
+    return { missing: [] };
+  }
 }
 
 async function showSwarmStatus(

@@ -37,6 +37,7 @@ import { prCommand } from './commands/pr.js';
 import { sessionCommand } from './commands/session.js';
 import { hookCommand } from './commands/hook.js';
 import { roadmapCommand } from './commands/roadmap.js';
+import { retroCommand } from './commands/retro.js';
 import { extractCommand } from './commands/extract.js';
 import { distillCommand } from './commands/distill.js';
 import { guardCommand, guardManageCommand } from './commands/guard.js';
@@ -231,6 +232,12 @@ switch (subcommand) {
     break;
   case 'roadmap':
     roadmapCommand(process.argv.slice(3)).catch(err => {
+      console.error('Error:', err.message);
+      process.exit(1);
+    });
+    break;
+  case 'retro':
+    retroCommand(process.argv.slice(3)).catch(err => {
       console.error('Error:', err.message);
       process.exit(1);
     });
