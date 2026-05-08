@@ -1,0 +1,130 @@
+{
+  "sprint_number": 86,
+  "theme": "The Marshal — Drift Detection",
+  "par": 5,
+  "slope": 2,
+  "score": 7,
+  "score_label": "double_bogey",
+  "date": "2026-05-08",
+  "shots": [
+    {
+      "ticket_key": "S86-T1",
+      "title": "slope roadmap validate detects status drift against git log (#319)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "[code review] git.ts execSync lacks error logging when encoding fails; empty return masks debugging signals",
+          "gotcha_id": "review:code"
+        }
+      ]
+    },
+    {
+      "ticket_key": "S86-T2",
+      "title": "roadmap-edit-shipped guard blocks paper-tickets (#320)",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "[code review] deepEqual in roadmap-edit-shipped does not handle Date/RegExp/Map/Set; future schema changes risk infinite recursion",
+          "gotcha_id": "review:code"
+        }
+      ]
+    },
+    {
+      "ticket_key": "S86-T3",
+      "title": "post-hole-enforcement Stop guard surfaces drift (#291)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "moderate",
+          "description": "[architect review] post-hole-enforcement guard marked advisory but respects SLOPE_POST_HOLE_BLOCK env var for blocking; decision behavior not discoverable from guard registration",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "rough",
+          "severity": "moderate",
+          "description": "[code review] post-hole-enforcement calls findShippedSprintsOnMain on every Stop without timeout; git log on deep histories could block session end",
+          "gotcha_id": "review:code"
+        }
+      ]
+    },
+    {
+      "ticket_key": "S86-T4",
+      "title": "backfill scorecards for S70 + S74-S83 (#318)",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "moderate",
+          "description": "[architect review] Backfilled scorecards lack idempotency safeguards; re-running backfill overwrites manual corrections without warning",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "bunker",
+          "severity": "minor",
+          "description": "[architect review] Scorecard backfill to docs/retros/ assumes pattern config matches .json files; no validation against .slope/config.json scorecardPattern",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "bunker",
+          "severity": "moderate",
+          "description": "[architect review] Backfilled scorecards default to score:4/par without explicit api enforcement; consumers must check _backfilled flag to avoid inflating handicap",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "[code review] scorecard pattern matching silently fails if scorecardPattern contains no wildcards (e.g. sprint.json instead of sprint-*.json)",
+          "gotcha_id": "review:code"
+        }
+      ]
+    },
+    {
+      "ticket_key": "S86-T5",
+      "title": "briefing surfaces next planned sprint + theme/title (#290, #324)",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "minor",
+          "description": "[architect review] findNextPlannedSprint does not validate against roadmap dependency cycles; relies on separate validateRoadmap call to detect",
+          "gotcha_id": "review:architect"
+        }
+      ]
+    }
+  ],
+  "stats": {
+    "fairways_hit": 5,
+    "fairways_total": 5,
+    "greens_in_regulation": 5,
+    "greens_total": 5,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 9,
+    "hazard_penalties": 2,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [],
+  "special_plays": [],
+  "training": [],
+  "nutrition": [],
+  "bunker_locations": [],
+  "yardage_book_updates": [],
+  "course_management_notes": [
+    "Sprint built post-hoc as part of v1.54.0 release. Findings from architect+code reviews recorded via slope review amend."
+  ]
+}

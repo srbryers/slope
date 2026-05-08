@@ -1,0 +1,97 @@
+{
+  "sprint_number": 87,
+  "theme": "The Bug Clearing v2 — CLI fixes for external repos",
+  "par": 4,
+  "slope": 1,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-05-08",
+  "shots": [
+    {
+      "ticket_key": "S87-T1",
+      "title": "slope version reads from installed package, not cwd (#300)",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "minor",
+          "description": "[architect review] version.ts path traversal ../../.. assumes fixed build layout; no validation of package.json existence before parse could fail silently",
+          "gotcha_id": "review:architect"
+        }
+      ]
+    },
+    {
+      "ticket_key": "S87-T2",
+      "title": "formatter accepts legacy tickets field as shots alias (#298)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "minor",
+          "description": "[architect review] formatter.ts cast on result field does not validate enum membership; accepts any string as valid ShotResult",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "[code review] formatter.ts does not test invalid enum values in legacy tickets result field",
+          "gotcha_id": "review:code"
+        },
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "[code review] formatter.ts does not validate that legacy approach field is a valid ClubSelection enum member",
+          "gotcha_id": "review:code"
+        }
+      ]
+    },
+    {
+      "ticket_key": "S87-T3",
+      "title": "roadmap generate --dry-run no longer writes the file (#304)",
+      "club": "putter",
+      "result": "green",
+      "hazards": []
+    },
+    {
+      "ticket_key": "S87-T4",
+      "title": "slope init no longer creates example scorecard by default (#306)",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "[code review] init.ts console message 'pass --with-example to keep' is grammatically confusing; should say 'pass --with-example at next init run'",
+          "gotcha_id": "review:code"
+        }
+      ]
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 5,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [],
+  "special_plays": [],
+  "training": [],
+  "nutrition": [],
+  "bunker_locations": [],
+  "yardage_book_updates": [],
+  "course_management_notes": [
+    "Sprint built post-hoc as part of v1.54.0 release. Findings from architect+code reviews recorded via slope review amend."
+  ]
+}

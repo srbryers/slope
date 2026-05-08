@@ -1,0 +1,115 @@
+{
+  "sprint_number": 88,
+  "theme": "The Compass — Agent State & Status",
+  "par": 4,
+  "slope": 1,
+  "score": 7,
+  "score_label": "triple_plus",
+  "date": "2026-05-08",
+  "shots": [
+    {
+      "ticket_key": "S88-T1",
+      "title": "slope agent status — machine-readable next-step output (#310)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "moderate",
+          "description": "[architect review] AgentStatus.phase enum is missing 'pr_review' phase used by initiative logic downstream; limits reusability",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "bunker",
+          "severity": "moderate",
+          "description": "[architect review] AgentStatus.recommendedCommands array of strings is fragile; future parsing/typing will be harder; should be {cmd: string}[]",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "bunker",
+          "severity": "minor",
+          "description": "[architect review] collectAgentStatus couples to vision+roadmap+sprint-state+store independently; 7 try/catch blocks suggest fragile assumptions",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "rough",
+          "severity": "moderate",
+          "description": "[code review] AgentStatus shape exported as JSON for agent consumption but has no versioning marker; breaking changes will be silent",
+          "gotcha_id": "review:code"
+        },
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "[code review] loadRoadmap defined in ticket.ts duplicates logic in agent.ts; should extract to shared util",
+          "gotcha_id": "review:code"
+        }
+      ]
+    },
+    {
+      "ticket_key": "S88-T2",
+      "title": "slope agent next-md generates AGENT_NEXT.md (#315)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "[code review] nextMdSubcommand --output parsing doesn't validate = presence; --output without = produces undefined path",
+          "gotcha_id": "review:code"
+        }
+      ]
+    },
+    {
+      "ticket_key": "S88-T3",
+      "title": "slope sprint begin bundles start + claim + briefing + prep (#311)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "moderate",
+          "description": "[architect review] sprint begin imports briefing and prep dynamically with no error handling; mid-flow failure leaves sprint state persisted",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "rough",
+          "severity": "moderate",
+          "description": "[code review] sprint begin does not validate roadmap.sprints exists before calling sprint.tickets; corrupt roadmap causes runtime error",
+          "gotcha_id": "review:code"
+        }
+      ]
+    },
+    {
+      "ticket_key": "S88-T4",
+      "title": "slope ticket done releases claim and emits next step (#316)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": []
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 8,
+    "hazard_penalties": 2.5,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [],
+  "special_plays": [],
+  "training": [],
+  "nutrition": [],
+  "bunker_locations": [],
+  "yardage_book_updates": [],
+  "course_management_notes": [
+    "Sprint built post-hoc as part of v1.54.0 release. Findings from architect+code reviews recorded via slope review amend."
+  ]
+}

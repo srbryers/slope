@@ -1,0 +1,116 @@
+{
+  "sprint_number": 91,
+  "theme": "The Pit Crew — Automation Hooks",
+  "par": 4,
+  "slope": 1,
+  "score": 7,
+  "score_label": "triple_plus",
+  "date": "2026-05-08",
+  "shots": [
+    {
+      "ticket_key": "S91-T1",
+      "title": "slope vision create --write-md tracks markdown mirror (#305)",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "moderate",
+          "description": "[architect review] writeVisionMarkdown accepts absolute path without validation; --write-md=/etc/passwd could escape intended directory",
+          "gotcha_id": "review:architect"
+        }
+      ]
+    },
+    {
+      "ticket_key": "S91-T2",
+      "title": "branch hygiene checks in slope doctor (#322)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "moderate",
+          "description": "[architect review] detectMainBranch does not validate local branch existence; detached HEAD could report non-existent main branch as valid",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "[code review] git helper swallows all errors including permission denied; impossible to distinguish command failures from absence",
+          "gotcha_id": "review:code"
+        },
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "[code review] merged branch name regex depends on exact git output format; spacing changes cause silent false positives",
+          "gotcha_id": "review:code"
+        }
+      ]
+    },
+    {
+      "ticket_key": "S91-T3",
+      "title": "slope pr finalize auto-injects Closes #N (#321)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "moderate",
+          "description": "[architect review] git log fallback chain uses shell OR syntax in execSync string argument; first command will fail silently before retry succeeds",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "rough",
+          "severity": "moderate",
+          "description": "[code review] planPrFinalize calls gh without try-catch; auth failure mid-execution surfaces error without context to user",
+          "gotcha_id": "review:code"
+        }
+      ]
+    },
+    {
+      "ticket_key": "S91-T4",
+      "title": "pr-review guard surfaces review-tier recommendation (#302)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "moderate",
+          "description": "[architect review] inferBaseRef returns null safely but caller defaults to origin/main without verifying ref exists; failed recommendations go unreported",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "[code review] computeRecommendations silently fails and returns empty array; user cannot distinguish missing recommendations from computation error",
+          "gotcha_id": "review:code"
+        }
+      ]
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 8,
+    "hazard_penalties": 2.5,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [],
+  "special_plays": [],
+  "training": [],
+  "nutrition": [],
+  "bunker_locations": [],
+  "yardage_book_updates": [],
+  "course_management_notes": [
+    "Sprint built post-hoc as part of v1.54.0 release. Findings from architect+code reviews recorded via slope review amend."
+  ]
+}

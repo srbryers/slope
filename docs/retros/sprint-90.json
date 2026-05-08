@@ -1,0 +1,115 @@
+{
+  "sprint_number": 90,
+  "theme": "The Vault — Memory ↔ Store Reunification",
+  "par": 4,
+  "slope": 2,
+  "score": 9,
+  "score_label": "triple_plus",
+  "date": "2026-05-08",
+  "shots": [
+    {
+      "ticket_key": "S90-T1",
+      "title": "extend MemoryBackend interface (#294)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "minor",
+          "description": "[architect review] MemoryBackend.saveAll() docstring unclear—method semantics are truncate-then-insert (destructive), not append; rename to replaceAll() or clarify intent",
+          "gotcha_id": "review:architect"
+        }
+      ]
+    },
+    {
+      "ticket_key": "S90-T2",
+      "title": "implement SqliteMemoryBackend + JSON migration",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "moderate",
+          "description": "[architect review] PG schema v5 includes project_id (multi-tenant), SQLite v8 omits it; future PG MemoryBackend will have schema mismatch—add project_id to SQLite v8 now for forward compatibility",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "rough",
+          "severity": "critical",
+          "description": "[code review] importJsonIfPresent transaction doesn't halt on validateMemoryRow error—remaining rows import silently; wrap per-row validation in try-catch or throw early",
+          "gotcha_id": "review:code"
+        },
+        {
+          "type": "rough",
+          "severity": "moderate",
+          "description": "[code review] SqliteMemoryBackend.ensureSchema errors swallowed in constructor; if schema creation fails, getMemoryBackend falls back to JSON without signaling error",
+          "gotcha_id": "review:code"
+        },
+        {
+          "type": "rough",
+          "severity": "moderate",
+          "description": "[code review] renameJsonBackup silently ignores failures (permission denied, etc.); JSON stays in place; re-opens re-attempt import; user unaware of loop until log spam appears",
+          "gotcha_id": "review:code"
+        }
+      ]
+    },
+    {
+      "ticket_key": "S90-T3",
+      "title": "migrate memory.ts to use backend factory",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "moderate",
+          "description": "[architect review] Backend fallback doesn't distinguish between DB corruption and missing better-sqlite3 binding—both silently fall back to JSON, creating divergence where new writes bypass corrupted SQLite store",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "bunker",
+          "severity": "moderate",
+          "description": "[architect review] JSON to SQLite migration runs on every SqliteMemoryBackend instantiation with no process-level locking; two agents initializing simultaneously can race on JSON rename",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "[code review] getMemoryBackend creates new backend instance per call (no memoization)—multiple database opens, repeated schema checks, and re-attempted migrations on every memory operation",
+          "gotcha_id": "review:code"
+        }
+      ]
+    },
+    {
+      "ticket_key": "S90-T4",
+      "title": "tests + cleanup",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": []
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 8,
+    "hazard_penalties": 4.5,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [],
+  "special_plays": [],
+  "training": [],
+  "nutrition": [],
+  "bunker_locations": [],
+  "yardage_book_updates": [],
+  "course_management_notes": [
+    "Sprint built post-hoc as part of v1.54.0 release. Findings from architect+code reviews recorded via slope review amend."
+  ]
+}
