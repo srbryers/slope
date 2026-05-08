@@ -1065,7 +1065,7 @@ export async function initCommand(args: string[]): Promise<void> {
     const examplePath = join(scorecardDir, 'sprint-1.json');
     if (!existsSync(examplePath)) {
       writeFileSync(examplePath, JSON.stringify(EXAMPLE_SCORECARD, null, 2) + '\n');
-      console.log(`  Created ${examplePath} (example — pass --with-example to keep)`);
+      console.log(`  Created ${examplePath} (example scorecard — opt-in via --with-example)`);
     }
   }
 

@@ -50,10 +50,19 @@ slope version recommend                                    Analyze commits and r
 function getInstalledVersion(): string | null {
   try {
     const here = dirname(fileURLToPath(import.meta.url));
-    // dist/cli/commands -> dist/cli -> dist -> <package root>
-    const pkgPath = resolve(here, '..', '..', '..', 'package.json');
-    const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
-    return typeof pkg.version === 'string' ? pkg.version : null;
+    // Walk up looking for the slope package.json — resilient to build
+    // layout drift (dist/cli/commands → dist/cli → dist → root). Validates
+    // the package name to avoid picking up an unrelated package.json.
+    for (let i = 1; i <= 4; i++) {
+      const pkgPath = resolve(here, ...Array(i).fill('..'), 'package.json');
+      try {
+        const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
+        if (pkg && pkg.name === '@slope-dev/slope' && typeof pkg.version === 'string') {
+          return pkg.version;
+        }
+      } catch { /* try next ancestor */ }
+    }
+    return null;
   } catch {
     return null;
   }

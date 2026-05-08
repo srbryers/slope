@@ -82,6 +82,15 @@ function safeBunkerLabel(b: unknown): string {
  *  the wild use `tickets` with `id`/`approach` keys; this remaps them to
  *  ShotRecord shape so the formatter doesn't render an empty table.
  *  See GH #298. */
+// Canonical enum members — used to validate legacy `tickets` field values
+// before casting. Out-of-enum strings fall back to safe defaults (no
+// silent acceptance of unknown values).
+const VALID_CLUBS = new Set<ShotRecord['club']>(['driver', 'long_iron', 'short_iron', 'wedge', 'putter']);
+const VALID_RESULTS = new Set<ShotRecord['result']>([
+  'in_the_hole', 'green', 'fairway',
+  'missed_long', 'missed_short', 'missed_left', 'missed_right',
+]);
+
 function normalizeShotsFromCard(card: GolfScorecard & { tickets?: unknown[] }): ShotRecord[] {
   const canonical = card.shots;
   if (Array.isArray(canonical) && canonical.length > 0) return canonical;
@@ -96,15 +105,22 @@ function normalizeShotsFromCard(card: GolfScorecard & { tickets?: unknown[] }): 
       (typeof obj.id === 'string' && obj.id) ||
       (typeof obj.key === 'string' && obj.key) ||
       `T${i + 1}`;
-    const club =
+    const rawClub =
       (typeof obj.club === 'string' && obj.club) ||
       (typeof obj.approach === 'string' && obj.approach) ||
       'short_iron';
+    const club: ShotRecord['club'] = VALID_CLUBS.has(rawClub as ShotRecord['club'])
+      ? (rawClub as ShotRecord['club'])
+      : 'short_iron';
+    const rawResult = typeof obj.result === 'string' ? obj.result : 'green';
+    const result: ShotRecord['result'] = VALID_RESULTS.has(rawResult as ShotRecord['result'])
+      ? (rawResult as ShotRecord['result'])
+      : 'green';
     return {
       ticket_key: ticketKey as string,
       title: (typeof obj.title === 'string' && obj.title) || `Ticket ${ticketKey}`,
-      club: club as ShotRecord['club'],
-      result: (typeof obj.result === 'string' && obj.result) as ShotRecord['result'] || 'green',
+      club,
+      result,
       hazards: Array.isArray(obj.hazards) ? (obj.hazards as ShotRecord['hazards']) : [],
       ...(typeof obj.notes === 'string' ? { notes: obj.notes } : {}),
     };
