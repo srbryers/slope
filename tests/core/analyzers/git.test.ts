@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execSync } from 'node:child_process';
-import { analyzeGit } from '../../../src/core/analyzers/git.js';
+import { analyzeGit, extractSprintReferences, findShippedSprintsOnMain } from '../../../src/core/analyzers/git.js';
 
 function makeTmpDir(): string {
   return mkdtempSync(join(tmpdir(), 'slope-git-'));
@@ -101,5 +101,95 @@ describe('analyzeGit', () => {
     const result = await analyzeGit(tmpDir);
     // 1 commit in 90 days = 0.08/week → sporadic
     expect(result.inferredCadence).toBe('sporadic');
+  });
+});
+
+describe('extractSprintReferences', () => {
+  it('extracts sprint id from feat(SXX) prefix', () => {
+    expect(extractSprintReferences(['feat(S77): The 19th Hole'])).toEqual(new Set([77]));
+  });
+
+  it('extracts both ids from a multi-sprint commit', () => {
+    expect(extractSprintReferences(['feat(S70+S71): Session Insights'])).toEqual(new Set([70, 71]));
+  });
+
+  it('extracts id from bare (SXX) parenthetical', () => {
+    expect(extractSprintReferences(['feat(pi-extension): harness v1.53.0 (S84) (#303)'])).toEqual(new Set([84]));
+  });
+
+  it('handles ticket key references like SXX-N', () => {
+    expect(extractSprintReferences(['feat(S78-1): wire forceApi flag'])).toEqual(new Set([78]));
+  });
+
+  it('does not match S75 inside S75.5', () => {
+    expect(extractSprintReferences(['feat(S75.5): The Bug Clearing'])).toEqual(new Set());
+  });
+
+  it('aggregates across multiple commit subjects', () => {
+    const subjects = [
+      'feat(S77): The 19th Hole',
+      'feat(S78): The Wiring',
+      'chore: bump version 1.51.0',
+      'feat(S77-3): cleanup',
+    ];
+    expect(extractSprintReferences(subjects)).toEqual(new Set([77, 78]));
+  });
+
+  it('returns empty set for commits without sprint refs', () => {
+    expect(extractSprintReferences(['chore: bump version', 'fix: typo'])).toEqual(new Set());
+  });
+});
+
+describe('findShippedSprintsOnMain', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = makeTmpDir();
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('returns empty set for non-git directory', () => {
+    expect(findShippedSprintsOnMain(tmpDir)).toEqual(new Set());
+  });
+
+  it('detects sprint ids from commit subjects on the default branch', () => {
+    gitInit(tmpDir);
+    // git init may default to 'master' on older systems — write to whichever exists
+    gitCommit(tmpDir, 'feat(S70+S71): parallel session insights');
+    gitCommit(tmpDir, 'feat(S77): the 19th hole');
+    gitCommit(tmpDir, 'chore: bump version');
+
+    // Helper resolves main → master → HEAD
+    const result = findShippedSprintsOnMain(tmpDir);
+    expect(result).toEqual(new Set([70, 71, 77]));
+  });
+
+  it('honors explicit ref argument', () => {
+    gitInit(tmpDir);
+    gitCommit(tmpDir, 'feat(S99): only on HEAD');
+
+    expect(findShippedSprintsOnMain(tmpDir, 'HEAD')).toEqual(new Set([99]));
+  });
+
+  it('refuses unsafe refs (shell-injection guard)', () => {
+    gitInit(tmpDir);
+    gitCommit(tmpDir, 'feat(S99): only on HEAD');
+
+    // Semicolons, backticks, $(), spaces, pipes — anything outside the
+    // SAFE_REF_RE allowlist must short-circuit to an empty set rather than
+    // fall through to the shell.
+    for (const unsafe of [
+      'HEAD; echo pwned',
+      'HEAD`echo pwned`',
+      'HEAD$(echo pwned)',
+      'HEAD || echo pwned',
+      'HEAD | sh',
+      'HEAD\nrm -rf /',
+    ]) {
+      expect(findShippedSprintsOnMain(tmpDir, unsafe)).toEqual(new Set());
+    }
   });
 });

@@ -1,0 +1,48 @@
+{
+  "sprint_number": 74,
+  "theme": "The Foursome v2 \u2014 Multi-Agent Session Coordination",
+  "par": 4,
+  "slope": 3,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-03-24",
+  "shots": [
+    {
+      "ticket_key": "S74-1",
+      "title": "feat(S74): The Assembly Line \u2014 batch sprint execution (#206)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Backfilled from commit 5dc302ee on main. Original CI/PR signals not preserved."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 1,
+    "fairways_total": 1,
+    "greens_in_regulation": 1,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    "Backfilled retroactively on 2026-05-07",
+    "Source: 1 commit(s) on main matching feat(S74)",
+    "Original CI/PR/test data not recoverable"
+  ],
+  "special_plays": [],
+  "bunker_locations": [],
+  "yardage_book_updates": [],
+  "course_management_notes": [
+    "This scorecard was backfilled by the S86-4 audit; treat scores as placeholder par."
+  ],
+  "_backfilled": true,
+  "_backfill_source": "main commit log; sub-ticket detail not preserved",
+  "_auto_generated": true
+}

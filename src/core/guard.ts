@@ -104,7 +104,9 @@ export type GuardName =
   | 'claim-required'
   | 'review-stale'
   | 'worktree-reuse'
-  | 'workflow-step-gate';
+  | 'workflow-step-gate'
+  | 'roadmap-edit-shipped'
+  | 'post-hole-enforcement';
 
 /** Guard registration entry */
 export interface GuardDefinition {
@@ -405,6 +407,22 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     hookEvent: 'PreToolUse',
     toolCategories: ['enter_worktree'],
     matcher: 'EnterWorktree',
+    level: 'full',
+    guardType: 'advisory',
+  },
+  {
+    name: 'roadmap-edit-shipped',
+    description: 'Block edits to roadmap.json that modify sprints with status:complete (paper-tickets)',
+    hookEvent: 'PreToolUse',
+    toolCategories: ['write_file'],
+    matcher: 'Edit|Write',
+    level: 'full',
+    guardType: 'mechanical',
+  },
+  {
+    name: 'post-hole-enforcement',
+    description: 'Surface shipped sprints missing scorecards or roadmap status:complete at session end (advisory; set SLOPE_POST_HOLE_BLOCK=1 to block instead)',
+    hookEvent: 'Stop',
     level: 'full',
     guardType: 'advisory',
   },
