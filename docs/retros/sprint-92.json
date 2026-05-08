@@ -1,0 +1,69 @@
+{
+  "sprint_number": 92,
+  "theme": "Backlog Cleanup \u2014 empty the queue",
+  "par": 3,
+  "slope": 1,
+  "score": 3,
+  "score_label": "par",
+  "date": "2026-05-08",
+  "shots": [
+    {
+      "ticket_key": "S92-1",
+      "title": "fix(hook,doctor): align guard install counts (#307)",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [],
+      "notes": "PR #335"
+    },
+    {
+      "ticket_key": "S92-2",
+      "title": "feat(doctor): gitignore audit for common-noise patterns (#323)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "PR #336"
+    },
+    {
+      "ticket_key": "S92-3",
+      "title": "feat(retro): backfill command + status drift surfacing (#318)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "PR #337"
+    }
+  ],
+  "stats": {
+    "fairways_hit": 3,
+    "fairways_total": 3,
+    "greens_in_regulation": 3,
+    "greens_total": 3,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    "Released as v1.55.0",
+    "3 PRs merged: #335 (#307), #336 (#323), #337 (#318)",
+    "Followed direct-issue naming convention; commits don't reference S92 (validator will note this)."
+  ],
+  "special_plays": [],
+  "bunker_locations": [],
+  "yardage_book_updates": [
+    "src/cli/commands/hook.ts \u2014 re-read persisted count after install",
+    "src/cli/commands/doctor.ts \u2014 guard-prefix filter for installed count, gitignore-noise check + auto-fix",
+    "src/cli/commands/retro.ts \u2014 new command with backfill subcommand",
+    "src/cli/commands/status.ts \u2014 surface scorecard drift"
+  ],
+  "course_management_notes": [
+    "Empties the backlog from session-end of v1.54.0. Issue queue size: 3 \u2192 0."
+  ],
+  "training": [],
+  "nutrition": []
+}
