@@ -29,20 +29,23 @@
         78,
         80
       ],
-      "note": "S69 diverged \u2014 patch kit ran instead of The Referee. The Referee was rescheduled and now sits at S78 (renumbered after S73 Caddy's Notes was inserted). S80 added 2026-04-30 to address GH issues #290/#291 (sprint hygiene \u2014 read-side surfacing + post-hole command)."
+      "note": "S69 diverged \u2014 patch kit ran instead of The Referee. The Referee was rescheduled and now sits at S78 (renumbered after S73 Caddy's Notes was inserted). S80 added 2026-04-30 to address GH issues #290/#291 (sprint hygiene \u2014 read-side surfacing + post-hole command).",
+      "status": "complete"
     },
     {
       "name": "Phase 13 \u2014 Multi-Project & Teams",
       "sprints": [
         70,
         72
-      ]
+      ],
+      "status": "complete"
     },
     {
       "name": "Phase 14 \u2014 Agent Memory & Context",
       "sprints": [
         73
-      ]
+      ],
+      "status": "complete"
     },
     {
       "name": "Phase 15 \u2014 Loop Evolution",
@@ -63,15 +66,8 @@
         83,
         84
       ],
-      "note": "S77/S79 plan-and-review work; S81-S84 expanded Phase 16 into harness universality (Codex/OpenCode/Pi adapters + testing polish)."
-    },
-    {
-      "name": "Phase 17 \u2014 TBD (S85 placeholder)",
-      "sprints": [
-        85
-      ],
-      "status": "planned",
-      "note": "S85 theme TBD \u2014 current sprint per slope status."
+      "note": "S77/S79 plan-and-review work; S81-S84 expanded Phase 16 into harness universality (Codex/OpenCode/Pi adapters + testing polish).",
+      "status": "complete"
     },
     {
       "name": "Phase 18 \u2014 Drift Detection & Bug Clearing",
@@ -79,7 +75,7 @@
         86,
         87
       ],
-      "status": "planned",
+      "status": "complete",
       "note": "Builds the drift-detection scaffolding (S86) the project lacked during S70-S84, and clears accumulated CLI bugs from external users (S87, supersedes S75.5)."
     },
     {
@@ -88,7 +84,7 @@
         88,
         89
       ],
-      "status": "planned",
+      "status": "complete",
       "note": "Machine-readable state + bundled workflow commands. Foundation for agent-driven SLOPE usage filed as #309-316."
     },
     {
@@ -97,8 +93,14 @@
         90,
         91
       ],
-      "status": "planned",
+      "status": "complete",
       "note": "Memory\u2194store reunification (architectural debt from PR #293) + automation hooks for PR/issue/branch hygiene."
+    },
+    {
+      "name": "Phase 21 \u2014 TBD (next initiative)",
+      "sprints": [],
+      "status": "planned",
+      "note": "Next initiative \u2014 themes TBD. Backlog issues remaining: #307 (hook count), #318 (retro backfill tooling), #323 (gitignore audit)."
     }
   ],
   "sprints": [
@@ -945,8 +947,9 @@
       "par": 4,
       "slope": 1,
       "type": "tbd",
-      "status": "planned",
-      "tickets": []
+      "status": "superseded",
+      "tickets": [],
+      "note": "Superseded by S86-S91 (agent-DX initiative). Was a placeholder added during the PR #317 roadmap reconcile; never had its own work."
     },
     {
       "id": 86,
@@ -954,7 +957,7 @@
       "par": 5,
       "slope": 2,
       "type": "feature + guard",
-      "status": "planned",
+      "status": "complete",
       "depends_on": [
         85
       ],
@@ -1009,7 +1012,7 @@
       "par": 4,
       "slope": 1,
       "type": "bug fix",
-      "status": "planned",
+      "status": "complete",
       "depends_on": [],
       "note": "Supersedes S75.5. Highest-impact CLI bugs from external SLOPE users.",
       "tickets": [
@@ -1049,7 +1052,7 @@
       "par": 4,
       "slope": 1,
       "type": "feature + dx",
-      "status": "planned",
+      "status": "complete",
       "depends_on": [],
       "note": "Foundation primitives for the agent-DX batch (#309-316). #310 is the keystone \u2014 once status is machine-readable, downstream commands compose.",
       "tickets": [
@@ -1092,7 +1095,7 @@
       "par": 4,
       "slope": 1,
       "type": "feature + dx",
-      "status": "planned",
+      "status": "complete",
       "depends_on": [
         88
       ],
@@ -1134,7 +1137,7 @@
       "par": 4,
       "slope": 2,
       "type": "refactor + architecture",
-      "status": "planned",
+      "status": "complete",
       "depends_on": [],
       "note": "Address PR #293 architect finding A1: memory system bypasses store abstraction. Requires extending store interface and migrating memory module across both store backends.",
       "tickets": [
@@ -1183,7 +1186,7 @@
       "par": 4,
       "slope": 1,
       "type": "feature + automation",
-      "status": "planned",
+      "status": "complete",
       "depends_on": [],
       "note": "Hook-based automation: PR review prompts, issue auto-close, branch hygiene. Pairs nicely with S86 drift detection but doesn't depend on it.",
       "tickets": [
