@@ -29,6 +29,8 @@ import { statusCommand } from './commands/status.js';
 import { tournamentCommand } from './commands/tournament.js';
 import { autoCardCommand } from './commands/auto-card.js';
 import { nextCommand } from './commands/next.js';
+import { agentCommand } from './commands/agent.js';
+import { ticketCommand } from './commands/ticket.js';
 import { sessionCommand } from './commands/session.js';
 import { hookCommand } from './commands/hook.js';
 import { roadmapCommand } from './commands/roadmap.js';
@@ -193,6 +195,18 @@ switch (subcommand) {
     break;
   case 'next':
     nextCommand();
+    break;
+  case 'agent':
+    agentCommand(process.argv.slice(3)).catch(err => {
+      console.error('Error:', err.message);
+      process.exit(1);
+    });
+    break;
+  case 'ticket':
+    ticketCommand(process.argv.slice(3)).catch(err => {
+      console.error('Error:', err.message);
+      process.exit(1);
+    });
     break;
   case 'roadmap':
     roadmapCommand(process.argv.slice(3)).catch(err => {

@@ -626,4 +626,25 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
       { name: 'export', desc: 'Export memories to JSON file' },
     ],
   },
+  {
+    cmd: 'agent', desc: 'Machine-readable operational primitives for AI agents', category: 'tooling',
+    subcommands: [
+      { name: 'status', desc: 'Show current state (human or JSON)', flags: [
+        { flag: '--json', desc: 'Emit AgentStatus JSON' },
+      ]},
+      { name: 'next-md', desc: 'Generate AGENT_NEXT.md (current-state handoff)', flags: [
+        { flag: '--output=<path>', desc: 'Write to a custom path (default: AGENT_NEXT.md)' },
+      ]},
+    ],
+  },
+  {
+    cmd: 'ticket', desc: 'Per-ticket lifecycle commands', category: 'lifecycle',
+    subcommands: [
+      { name: 'done', desc: 'Mark ticket complete; release claim', flags: [
+        { flag: '<key>', desc: 'Ticket key (e.g. S1-1)' },
+        { flag: '--commit=<sha>', desc: 'Attach a specific commit SHA (default: HEAD)' },
+        { flag: '--notes=<text>', desc: 'Attach completion notes' },
+      ]},
+    ],
+  },
 ];
