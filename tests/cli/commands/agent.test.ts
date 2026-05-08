@@ -144,6 +144,7 @@ describe('agent status (GH #310)', () => {
 
   it('renders agent markdown with sprint, claim, and recommended commands (#315)', () => {
     const status: AgentStatus = {
+      _version: 1,
       vision: 'present',
       roadmap: 'valid',
       currentSprint: 8,
@@ -172,6 +173,7 @@ describe('agent status (GH #310)', () => {
 
   it('renders blocked section when blockedBy is non-empty', () => {
     const status: AgentStatus = {
+      _version: 1,
       vision: 'present',
       roadmap: 'valid',
       currentSprint: 9,
@@ -189,6 +191,7 @@ describe('agent status (GH #310)', () => {
 
   it('renders gracefully with all-empty status', () => {
     const status: AgentStatus = {
+      _version: 1,
       vision: 'missing',
       roadmap: 'missing',
       currentSprint: null,

@@ -154,10 +154,18 @@ async function beginCommand(args: string[], cwd: string): Promise<void> {
     store.close();
   }
 
-  // Step 3: briefing
+  // Step 3: briefing — wrapped so a briefing/prep failure doesn't leave the
+  // user with sprint-state created but no human-readable handoff. Sprint
+  // state is already persisted at this point; failures here are recoverable
+  // by re-running the individual command.
   console.log('\n' + '─'.repeat(50));
-  const { briefingCommand } = await import('./briefing.js');
-  await briefingCommand([`--sprint=${sprint}`]);
+  try {
+    const { briefingCommand } = await import('./briefing.js');
+    await briefingCommand([`--sprint=${sprint}`]);
+  } catch (err) {
+    console.error(`  Could not run briefing: ${(err as Error).message}`);
+    console.error(`  Sprint state was already created; retry with: slope briefing --sprint=${sprint}`);
+  }
 
   // Step 4: prep --lite
   console.log('\n' + '─'.repeat(50));
@@ -174,8 +182,14 @@ async function beginCommand(args: string[], cwd: string): Promise<void> {
   console.log('\n' + '─'.repeat(50));
   console.log('NEXT');
   console.log('─'.repeat(50));
-  const { collectAgentStatus } = await import('./agent.js');
-  const status = await collectAgentStatus(cwd);
+  let status;
+  try {
+    const { collectAgentStatus } = await import('./agent.js');
+    status = await collectAgentStatus(cwd);
+  } catch (err) {
+    console.error(`  Could not compute agent status: ${(err as Error).message}`);
+    return;
+  }
   if (status.requiredGates.length > 0) {
     console.log(`  Pending gates: ${status.requiredGates.join(', ')}`);
   }

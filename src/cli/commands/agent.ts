@@ -19,11 +19,21 @@ import { resolveStore } from '../store.js';
  * compact human-readable summary derived from the same data.
  */
 
+/** AgentStatus schema version. Bumped when the JSON shape changes in a
+ *  breaking way — agents consuming this should check `_version` and refuse
+ *  unknown values rather than risk silent misinterpretation. */
+export const AGENT_STATUS_VERSION = 1;
+
 export interface AgentStatus {
+  /** Schema version — bumped on breaking changes to the JSON shape. */
+  _version: number;
   vision: 'present' | 'missing';
   roadmap: 'valid' | 'invalid' | 'missing';
   currentSprint: number | null;
-  phase: 'planning' | 'reviewing' | 'implementing' | 'scoring' | 'complete' | 'unknown';
+  /** Sprint phase (sprint-state) OR initiative gate phase. 'pr_review' and
+   *  'plan_review' come from the initiative subsystem; the others come from
+   *  sprint-state.json. 'unknown' = no state on disk. */
+  phase: 'planning' | 'plan_review' | 'reviewing' | 'implementing' | 'scoring' | 'pr_review' | 'complete' | 'unknown';
   activeClaims: string[];
   nextTicket: string | null;
   blockedBy: number[];
@@ -177,6 +187,7 @@ export async function collectAgentStatus(cwd: string): Promise<AgentStatus> {
   });
 
   return {
+    _version: AGENT_STATUS_VERSION,
     vision,
     roadmap: roadmapState,
     currentSprint,
@@ -300,7 +311,12 @@ async function nextMdSubcommand(args: string[]): Promise<void> {
   const md = renderAgentMarkdown(status, { sprintTheme });
 
   const outputArg = args.find(a => a.startsWith('--output='));
-  const outputPath = outputArg ? outputArg.split('=')[1] : 'AGENT_NEXT.md';
+  // Reject --output= (empty value) and undefined splits — fall back to default
+  // path. Without this, an empty value would write to the cwd as a file named
+  // ''.
+  const outputPath = (outputArg && outputArg.length > '--output='.length)
+    ? outputArg.slice('--output='.length)
+    : 'AGENT_NEXT.md';
   const absPath = join(cwd, outputPath);
 
   writeFileSync(absPath, md);
