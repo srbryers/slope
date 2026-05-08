@@ -672,4 +672,14 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
       ]},
     ],
   },
+  {
+    cmd: 'pr', desc: 'Pull request helpers (auto-close, finalize)', category: 'tooling',
+    subcommands: [
+      { name: 'finalize', desc: 'Inject Closes #N for issue refs in commit messages (#321)', flags: [
+        { flag: '--pr=<N>', desc: 'PR number (default: resolved from current branch)' },
+        { flag: '--dry-run', desc: 'Print plan without modifying the PR body' },
+      ]},
+      { name: 'issues', desc: 'Print extracted issue refs from the branch commits' },
+    ],
+  },
 ];
