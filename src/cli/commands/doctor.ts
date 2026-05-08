@@ -32,6 +32,9 @@ export function runDoctorChecks(cwd: string): DoctorCheck[] {
   // 2. Check .gitignore contains .slope/
   checks.push(checkGitignore(cwd));
 
+  // 2b. Check .gitignore covers common-noise patterns (#323)
+  checks.push(...checkGitignoreNoise(cwd));
+
   // 3. Check SQLite store exists
   checks.push(checkStore(cwd));
 
@@ -92,6 +95,49 @@ function checkGitignore(cwd: string): DoctorCheck {
     return { name: 'gitignore', status: 'ok', message: '.slope/ is in .gitignore' };
   }
   return { name: 'gitignore', status: 'warn', message: '.slope/ not in .gitignore — local state may be committed', fixable: true };
+}
+
+/** Curated list of common-noise patterns that should typically be gitignored.
+ *  Used by checkGitignoreNoise (#323) so projects don't accidentally commit
+ *  macOS metadata, editor temps, OS junk, or agent caches. */
+export const COMMON_NOISE_PATTERNS: ReadonlyArray<{ pattern: string; reason: string }> = [
+  { pattern: '.DS_Store', reason: 'macOS Finder metadata' },
+  { pattern: '._*', reason: 'macOS resource forks' },
+  { pattern: 'Thumbs.db', reason: 'Windows thumbnail cache' },
+  { pattern: 'desktop.ini', reason: 'Windows folder metadata' },
+  { pattern: '*.swp', reason: 'Vim swap files' },
+  { pattern: '*.swo', reason: 'Vim swap files' },
+  { pattern: '*~', reason: 'Editor backup files (Emacs/etc.)' },
+  { pattern: '.idea/', reason: 'JetBrains IDE settings' },
+  { pattern: 'node_modules/', reason: 'Node dependencies' },
+];
+
+/** Check whether the project's .gitignore covers common-noise patterns.
+ *  Reports a warning per missing pattern so users can fix multiple in one
+ *  pass via slope doctor --fix. Returns [] if no .gitignore exists (the
+ *  primary checkGitignore handles that). */
+function checkGitignoreNoise(cwd: string): DoctorCheck[] {
+  const gitignorePath = join(cwd, '.gitignore');
+  if (!existsSync(gitignorePath)) return [];
+
+  // Strip inline comments and trim — matches the format we write in the
+  // --fix path so re-checks after a fix find the pattern as "present".
+  const lines = readFileSync(gitignorePath, 'utf8')
+    .split('\n')
+    .map(l => l.replace(/\s+#.*$/, '').trim())
+    .filter(l => l && !l.startsWith('#'));
+  const present = new Set(lines);
+
+  const missing = COMMON_NOISE_PATTERNS.filter(p => !present.has(p.pattern));
+  if (missing.length === 0) {
+    return [{ name: 'gitignore-noise', status: 'ok', message: 'Common-noise patterns covered' }];
+  }
+  return [{
+    name: 'gitignore-noise',
+    status: 'warn',
+    message: `${missing.length} common-noise pattern(s) missing: ${missing.slice(0, 3).map(m => m.pattern).join(', ')}${missing.length > 3 ? ', ...' : ''} — run \`slope doctor --fix\` to add`,
+    fixable: true,
+  }];
 }
 
 function checkStore(cwd: string): DoctorCheck {
@@ -480,6 +526,22 @@ export async function runDoctorFixes(cwd: string, checks: DoctorCheck[]): Promis
         if (!/^\/?\.slope\/?$/m.test(content)) {
           writeFileSync(gitignorePath, content + '\n# SLOPE local state (sessions, handoffs, sprint-state, DB)\n.slope/\n');
           fixed.push('Added .slope/ to .gitignore');
+        }
+        break;
+      }
+      case 'gitignore-noise': {
+        // Append any missing common-noise patterns under a single section
+        // header so reviewers can see why they appeared in one diff.
+        const gitignorePath = join(cwd, '.gitignore');
+        const content = existsSync(gitignorePath) ? readFileSync(gitignorePath, 'utf8') : '';
+        const lines = content.split('\n').map(l => l.trim());
+        const present = new Set(lines.filter(l => l && !l.startsWith('#')));
+        const missing = COMMON_NOISE_PATTERNS.filter(p => !present.has(p.pattern));
+        if (missing.length > 0) {
+          const block = '\n# Common-noise patterns (added by slope doctor --fix)\n' +
+            missing.map(p => `${p.pattern}    # ${p.reason}`).join('\n') + '\n';
+          writeFileSync(gitignorePath, content + block);
+          fixed.push(`Added ${missing.length} common-noise pattern(s) to .gitignore`);
         }
         break;
       }
