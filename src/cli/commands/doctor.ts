@@ -634,13 +634,18 @@ function git(cmd: string, cwd: string): string {
   }
 }
 
-/** Detect a reasonable "main" branch — main first, fall back to master. */
+/** Detect a reasonable "main" branch — main first, fall back to master.
+ *  Verifies the candidate exists locally before returning it; on detached
+ *  HEAD or a repo without main/master, returns null. */
 function detectMainBranch(cwd: string): string | null {
   // Try to read remote HEAD pointer (e.g., refs/remotes/origin/HEAD -> origin/main)
   const remoteHead = git('symbolic-ref --short refs/remotes/origin/HEAD', cwd);
   if (remoteHead) {
     const parts = remoteHead.split('/');
-    return parts[parts.length - 1] || null;
+    const candidate = parts[parts.length - 1];
+    // Verify the local branch actually exists — symbolic-ref can succeed
+    // even when the local branch is missing (e.g., detached HEAD).
+    if (candidate && git(`rev-parse --verify ${candidate}`, cwd)) return candidate;
   }
   // Fallback: pick whichever exists locally
   for (const candidate of ['main', 'master']) {

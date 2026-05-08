@@ -65,16 +65,24 @@ function computeRecommendations(cwd: string): ReviewRecommendation[] {
   }
 }
 
+function refExists(cwd: string, ref: string): boolean {
+  try {
+    execSync(`git rev-parse --verify ${ref}`, { cwd, stdio: ['pipe', 'pipe', 'pipe'] });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function inferBaseRef(cwd: string): string | null {
   try {
     const remoteHead = execSync('git symbolic-ref --short refs/remotes/origin/HEAD', { cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
-    if (remoteHead) return remoteHead; // e.g. "origin/main"
+    // Verify the ref exists locally — symbolic-ref can return a name that
+    // points at a branch the local repo doesn't track yet (no fetch).
+    if (remoteHead && refExists(cwd, remoteHead)) return remoteHead;
   } catch { /* fall through */ }
   for (const r of ['origin/main', 'origin/master', 'main', 'master']) {
-    try {
-      execSync(`git rev-parse --verify ${r}`, { cwd, stdio: ['pipe', 'pipe', 'pipe'] });
-      return r;
-    } catch { /* try next */ }
+    if (refExists(cwd, r)) return r;
   }
   return null;
 }

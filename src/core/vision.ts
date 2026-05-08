@@ -1,6 +1,6 @@
 // SLOPE — Vision Document: project intent and direction
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { join, dirname, resolve } from 'node:path';
 import type { VisionDocument } from './analyzers/types.js';
 
 const DEFAULT_VISION_PATH = '.slope/vision.json';
@@ -75,11 +75,26 @@ export function renderVisionMarkdown(vision: VisionDocument): string {
   return lines.join('\n');
 }
 
-/** Write the vision to a Markdown file at the given absolute or
- *  cwd-relative path. Creates parent directories as needed. */
+/** Write the vision to a Markdown file at the given cwd-relative path.
+ *  Creates parent directories as needed. Refuses paths that resolve outside
+ *  the project root (absolute paths or `..` traversal) unless
+ *  SLOPE_VISION_MD_ALLOW_ABS=1 is set — guards against accidental
+ *  /etc/passwd-style escapes via --write-md=<path>. */
 export function writeVisionMarkdown(vision: VisionDocument, mdPath: string, cwd?: string): string {
   const root = cwd ?? process.cwd();
-  const abs = mdPath.startsWith('/') ? mdPath : join(root, mdPath);
+  const allowAbsolute = process.env.SLOPE_VISION_MD_ALLOW_ABS === '1';
+  const isAbsolute = mdPath.startsWith('/');
+  const abs = isAbsolute ? mdPath : resolve(root, mdPath);
+
+  // Containment check — refuse paths outside the project root.
+  const rootResolved = resolve(root) + '/';
+  if (!allowAbsolute && !abs.startsWith(rootResolved)) {
+    throw new Error(
+      `writeVisionMarkdown: refusing to write outside project root (${root}). ` +
+      `Path "${mdPath}" resolves to "${abs}". Set SLOPE_VISION_MD_ALLOW_ABS=1 to override.`,
+    );
+  }
+
   const dir = dirname(abs);
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   writeFileSync(abs, renderVisionMarkdown(vision));

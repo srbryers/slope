@@ -77,8 +77,24 @@ function git(cmd: string): string {
   }
 }
 
+/** Wrapper around `gh` CLI invocations. Throws a contextual error when gh
+ *  is missing or auth fails so callers can surface a clear message instead
+ *  of the raw spawn ENOENT / 401 stderr. */
 function gh(cmd: string): string {
-  return execSync(`gh ${cmd}`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+  try {
+    return execSync(`gh ${cmd}`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+  } catch (err) {
+    const msg = (err as { stderr?: Buffer | string; message?: string }).stderr?.toString().trim()
+      ?? (err as Error).message
+      ?? 'unknown gh error';
+    if (/command not found|ENOENT/i.test(msg)) {
+      throw new Error('gh CLI is not installed. Install from https://cli.github.com/');
+    }
+    if (/authentication required|gh auth login|HTTP 401/i.test(msg)) {
+      throw new Error('gh CLI is not authenticated. Run `gh auth login` first.');
+    }
+    throw new Error(`gh ${cmd}: ${msg}`);
+  }
 }
 
 /**
@@ -166,11 +182,16 @@ export async function planPrFinalize(opts: FinalizeOptions): Promise<FinalizeRes
   const branch = meta.headRefName ?? '';
   const body = meta.body ?? '';
 
-  // Pull commit messages from the branch (commits not yet on base)
-  const log = branch
-    ? git(`log origin/${base}..origin/${branch} --format=%B || git log origin/${base}..HEAD --format=%B`)
-    : git(`log origin/${base}..HEAD --format=%B`);
-  const commitText = log || git(`log origin/${base}..HEAD --format=%B`);
+  // Pull commit messages from the branch (commits not yet on base).
+  // Try origin/<branch>..origin/<base> first; fall back to origin/<base>..HEAD
+  // when the branch doesn't have a remote (or the remote ref is stale). The
+  // previous version embedded a `||` shell fallback inside the git() arg
+  // string which obscured the failure mode.
+  const tryRange = branch ? `origin/${base}..origin/${branch}` : `origin/${base}..HEAD`;
+  let commitText = git(`log ${tryRange} --format=%B`);
+  if (!commitText) {
+    commitText = git(`log origin/${base}..HEAD --format=%B`);
+  }
 
   const fromCommits = extractIssueRefs(commitText);
   const fromTitle = extractIssueRefs(meta.title ?? '');
