@@ -433,6 +433,16 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     ],
   },
   {
+    cmd: 'retro', desc: 'Retrospective scorecard utilities', category: 'planning',
+    subcommands: [
+      { name: 'backfill', desc: 'Generate scorecard from git history (#318)', flags: [
+        { flag: '--sprint=<N>', desc: 'Sprint number (or use --all-missing)' },
+        { flag: '--all-missing', desc: 'Backfill every shipped sprint without a scorecard' },
+        { flag: '--dry-run', desc: 'Preview without writing' },
+      ]},
+    ],
+  },
+  {
     cmd: 'vision', desc: 'Display project vision document', category: 'planning',
     subcommands: [
       { name: 'create', desc: 'Create a new vision document', flags: [
