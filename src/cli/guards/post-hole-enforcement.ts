@@ -33,6 +33,15 @@ export async function postHoleEnforcementGuard(_input: HookInput, cwd: string): 
     return {};
   }
 
+  // Pattern must contain a '*' wildcard so each sprint's scorecard resolves
+  // to a unique filename. Misconfigured patterns (e.g. 'sprint.json') would
+  // collide every sprint to the same path, making this check meaningless.
+  if (!scorecardPattern.includes('*')) {
+    return {
+      context: `SLOPE post-hole enforcement: scorecardPattern "${scorecardPattern}" has no '*' wildcard — drift detection skipped. Update .slope/config.json to e.g. "sprint-*.json".`,
+    };
+  }
+
   if (!existsSync(roadmapAbs)) return {};
 
   // Loose JSON parse — only need .sprints[]; phases and other fields are

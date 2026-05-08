@@ -103,6 +103,14 @@ export async function roadmapEditShippedGuard(input: HookInput, cwd: string): Pr
   };
 }
 
+/** Detect built-in object types that need special equality handling.
+ *  Plain objects fall through to recursive key comparison. */
+function isNonPlainObject(v: unknown): boolean {
+  if (v === null || typeof v !== 'object') return false;
+  const proto = Object.getPrototypeOf(v);
+  return proto !== Object.prototype && proto !== null && !Array.isArray(v);
+}
+
 function deepEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (typeof a !== typeof b) return false;
@@ -116,6 +124,18 @@ function deepEqual(a: unknown, b: unknown): boolean {
       if (!deepEqual(a[i], b[i])) return false;
     }
     return true;
+  }
+
+  // Non-plain objects (Date, RegExp, Map, Set, etc.) — compare via JSON
+  // serialization as a conservative fallback. roadmap.json never contains
+  // these in practice, but guarding here prevents future schema additions
+  // from triggering infinite recursion or incorrect equality.
+  if (isNonPlainObject(a) || isNonPlainObject(b)) {
+    try {
+      return JSON.stringify(a) === JSON.stringify(b);
+    } catch {
+      return false; // circular references → conservatively flag as unequal
+    }
   }
 
   const ka = Object.keys(a as Record<string, unknown>).sort();

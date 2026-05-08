@@ -49,7 +49,10 @@ export function findShippedSprintsOnMain(cwd: string, ref?: string): Set<number>
   const candidates = ref ? [ref] : ['main', 'master', 'HEAD'];
   for (const r of candidates) {
     if (!SAFE_REF_RE.test(r)) continue; // skip unsafe refs silently
-    const log = git(`log ${r} --oneline --no-decorate -n 5000`, cwd);
+    // Cap at 1000 commits — plenty for sprint references (a project would
+    // need to ship hundreds of sprints to exhaust this) and avoids slowing
+    // session-end Stop hooks on deep-history repos.
+    const log = git(`log ${r} --oneline --no-decorate -n 1000`, cwd);
     if (log) return extractSprintReferences(log.split('\n'));
   }
   return new Set();

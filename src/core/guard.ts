@@ -421,7 +421,7 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
   },
   {
     name: 'post-hole-enforcement',
-    description: 'Surface shipped sprints missing scorecards or roadmap status:complete at session end',
+    description: 'Surface shipped sprints missing scorecards or roadmap status:complete at session end (advisory; set SLOPE_POST_HOLE_BLOCK=1 to block instead)',
     hookEvent: 'Stop',
     level: 'full',
     guardType: 'advisory',
