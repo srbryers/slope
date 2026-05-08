@@ -314,7 +314,12 @@ function installGuardHooks(cwd: string, level: 'scoring' | 'essential' | 'full',
   }
   saveHooksConfig(cwd, hooksConfig);
 
-  console.log(`\n  Installed ${guards.length} guard hooks (level: ${guards.some(g => g.level === 'full') ? 'full' : 'scoring'}):`);
+  // Re-read the config we just saved to report the actual persisted count.
+  // Previously reported guards.length, which over-counted when an adapter
+  // dropped a guard during installGuards() (#307 mismatch with slope doctor).
+  const persistedCount = Object.keys(loadHooksConfig(cwd).installed ?? {})
+    .filter(k => k.startsWith('guard-')).length;
+  console.log(`\n  Installed ${persistedCount} of ${guards.length} guard hooks (level: ${guards.some(g => g.level === 'full') ? 'full' : 'scoring'}):`);
   for (const g of guards) {
     console.log(`    ${g.name.padEnd(16)} [${g.hookEvent}] ${g.description}`);
   }

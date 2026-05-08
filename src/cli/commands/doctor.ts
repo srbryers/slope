@@ -361,7 +361,12 @@ function checkGuards(cwd: string): DoctorCheck[] {
 
   try {
     const hooksConfig = JSON.parse(readFileSync(hooksPath, 'utf8'));
-    const installedCount = Object.keys(hooksConfig.installed ?? {}).length;
+    // Count only guard-prefixed entries — session-start/session-end and
+    // other non-guard hooks live in the same registry but shouldn't
+    // contribute to the "guards installed" tally (#307).
+    const installed = hooksConfig.installed ?? {};
+    const installedGuards = Object.keys(installed).filter(k => k.startsWith('guard-'));
+    const installedCount = installedGuards.length;
     const totalGuards = GUARD_DEFINITIONS.length;
 
     if (installedCount === 0) {
@@ -375,13 +380,13 @@ function checkGuards(cwd: string): DoctorCheck[] {
       checks.push({
         name: 'guards',
         status: 'ok',
-        message: `${installedCount} hooks installed (${totalGuards} guards available) — run \`slope guard recommend\` to see suggestions`,
+        message: `${installedCount} of ${totalGuards} guard hooks installed — run \`slope hook add --level=full\` to install the rest`,
       });
     } else {
       checks.push({
         name: 'guards',
         status: 'ok',
-        message: `${installedCount} hooks installed (${totalGuards} guards available)`,
+        message: `${installedCount} of ${totalGuards} guard hooks installed`,
       });
     }
   } catch {
