@@ -30,7 +30,7 @@ export interface CliCommandMeta {
 }
 
 /** Command files that are internal implementation modules, not user-invocable top-level commands. */
-export const CLI_INTERNAL_MODULES = ['phase', 'review-state', 'review-run'] as const;
+export const CLI_INTERNAL_MODULES = ['phase', 'review-state', 'review-run', 'sprint-plan'] as const;
 
 export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
   // ── Lifecycle ──────────────────────────────────────────────────
@@ -644,6 +644,31 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
         { flag: '<key>', desc: 'Ticket key (e.g. S1-1)' },
         { flag: '--commit=<sha>', desc: 'Attach a specific commit SHA (default: HEAD)' },
         { flag: '--notes=<text>', desc: 'Attach completion notes' },
+      ]},
+    ],
+  },
+  {
+    cmd: 'commit-ready', desc: 'Pre-commit checklist for agents', category: 'tooling',
+    flags: [
+      { flag: '--json', desc: 'Emit CommitReadyResult JSON' },
+      { flag: '--strict', desc: 'Exit non-zero when blockers exist' },
+    ],
+  },
+  {
+    cmd: 'gate', desc: 'Initiative review gate aliases (agent-friendly)', category: 'tooling',
+    subcommands: [
+      { name: 'status', desc: 'Pending plan/pr gates per sprint', flags: [
+        { flag: '--json', desc: 'Emit pending list as JSON' },
+      ]},
+      { name: 'checklist', desc: 'Print review checklist', flags: [
+        { flag: '<gate>', desc: 'plan | pr' },
+        { flag: '<reviewer>', desc: 'reviewer type (architect, code, security, etc.)' },
+      ]},
+      { name: 'complete', desc: 'Record a completed review', flags: [
+        { flag: '<gate>', desc: 'plan | pr' },
+        { flag: '<reviewer>', desc: 'reviewer type' },
+        { flag: '--sprint=N', desc: 'Sprint number (required)' },
+        { flag: '--findings=N', desc: 'Number of findings (default: 0)' },
       ]},
     ],
   },

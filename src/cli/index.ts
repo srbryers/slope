@@ -31,6 +31,8 @@ import { autoCardCommand } from './commands/auto-card.js';
 import { nextCommand } from './commands/next.js';
 import { agentCommand } from './commands/agent.js';
 import { ticketCommand } from './commands/ticket.js';
+import { gateCommand } from './commands/gate.js';
+import { commitReadyCommand } from './commands/commit-ready.js';
 import { sessionCommand } from './commands/session.js';
 import { hookCommand } from './commands/hook.js';
 import { roadmapCommand } from './commands/roadmap.js';
@@ -82,7 +84,7 @@ if (subcommand === '--help' || subcommand === '-h') {
 SLOPE CLI — Sprint Lifecycle & Operational Performance Engine
 
 Usage:
-  slope init [--claude-code|--cursor|--opencode|--generic|--all]  Initialize .slope/ directory
+  slope init [--claude-code|--cursor|--codex|--opencode|--generic|--all]  Initialize .slope/ directory
   slope init --team                         Enable multi-developer team mode
   slope init --with-example                 Also seed docs/retros/sprint-1.json with an example
   slope card                                Show handicap card
@@ -204,6 +206,18 @@ switch (subcommand) {
     break;
   case 'ticket':
     ticketCommand(process.argv.slice(3)).catch(err => {
+      console.error('Error:', err.message);
+      process.exit(1);
+    });
+    break;
+  case 'gate':
+    gateCommand(process.argv.slice(3)).catch(err => {
+      console.error('Error:', err.message);
+      process.exit(1);
+    });
+    break;
+  case 'commit-ready':
+    commitReadyCommand(process.argv.slice(3)).catch(err => {
       console.error('Error:', err.message);
       process.exit(1);
     });
@@ -433,7 +447,7 @@ switch (subcommand) {
 SLOPE CLI — Sprint Lifecycle & Operational Performance Engine
 
 Usage:
-  slope init [--claude-code|--cursor|--opencode|--generic|--all]  Initialize .slope/ directory
+  slope init [--claude-code|--cursor|--codex|--opencode|--generic|--all]  Initialize .slope/ directory
   slope init --team                         Enable multi-developer team mode
   slope init --with-example                 Also seed docs/retros/sprint-1.json with an example
   slope card                                Show handicap card
@@ -502,6 +516,7 @@ Examples:
   slope init --cursor                       Also install Cursor IDE rules
   slope init --cursor                       Also add SLOPE MCP server to .cursor/mcp.json
   slope init --claude-code                  Also install Claude Code rules + hooks
+  slope init --codex                        Also install Codex CLI hooks + AGENTS.md guidance
   slope init --opencode                     Also install OpenCode AGENTS.md + MCP config
   slope init --team                          Enable multi-developer mode
   slope card                                Show handicap across all scorecards

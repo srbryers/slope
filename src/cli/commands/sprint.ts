@@ -725,6 +725,11 @@ export async function sprintCommand(args: string[]): Promise<void> {
     case 'begin':
       await beginCommand(args.slice(1), cwd);
       break;
+    case 'plan': {
+      const { sprintPlanCommand } = await import('./sprint-plan.js');
+      await sprintPlanCommand(args.slice(1));
+      break;
+    }
     case 'gate':
       gateCommand(args.slice(1), cwd);
       break;
@@ -759,6 +764,7 @@ slope sprint — Sprint lifecycle management
 Legacy commands:
   slope sprint start --number=N      Start sprint state tracking
   slope sprint begin --sprint=N --ticket=T  Bundled start + claim + briefing + prep (#311)
+  slope sprint plan --sprint=N [--output=path]  Generate markdown sprint plan (#312)
   slope sprint gate <name>           Mark a gate as complete
   slope sprint status                Show sprint state and gates
   slope sprint reset                 Clear sprint state

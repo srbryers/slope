@@ -137,6 +137,7 @@ export function detectProvidersFromArgs(args: string[]): InitProvider[] {
   if (args.includes('--generic')) providers.push('generic');
   if (args.includes('--ob1')) providers.push('ob1');
   if (args.includes('--pi')) providers.push('pi');
+  if (args.includes('--codex')) providers.push('codex');
   // Unified --harness=<id> flag
   const harnessArg = args.find(a => a.startsWith('--harness='));
   if (harnessArg) {
@@ -144,7 +145,7 @@ export function detectProvidersFromArgs(args: string[]): InitProvider[] {
     if (id && !providers.includes(id)) providers.push(id);
   }
   // --all includes all real harnesses + opencode; generic is a fallback, not included
-  if (args.includes('--all')) return ['claude-code', 'cursor', 'windsurf', 'opencode', 'ob1'];
+  if (args.includes('--all')) return ['claude-code', 'cursor', 'windsurf', 'opencode', 'ob1', 'codex'];
   return providers;
 }
 
@@ -659,7 +660,9 @@ function installDefaultHooks(cwd: string, provider: InitProvider): void {
         ? join(cwd, '.clinerules', 'hooks')
         : provider === 'ob1'
           ? join(cwd, '.ob1', 'hooks')
-          : join(cwd, '.cursor', 'hooks');
+          : provider === 'codex'
+            ? join(cwd, '.codex', 'hooks')
+            : join(cwd, '.cursor', 'hooks');
   mkdirSync(hooksDir, { recursive: true });
 
   const { loadHooksConfig } = { loadHooksConfig: (c: string) => {
@@ -776,6 +779,13 @@ const PROVIDER_NEXT_STEPS: Partial<Record<InitProvider, string[]>> = {
     'Restart OB1 to load the SLOPE MCP server',
     'MCP config installed to .ob1/mcp.json',
     'Guard hooks installed to .ob1/hooks/',
+  ],
+  codex: [
+    'Add SLOPE MCP server to .codex/config.toml: [mcp.slope] command="slope" args=["mcp"]',
+    'Guards installed to .codex/hooks.json',
+    'Track docs/vision.md and docs/backlog/roadmap.json as source of truth (.slope/ stays local)',
+    'Branch discipline: branch-before-commit guard blocks direct main commits — use feat/<desc>',
+    'First sprint: slope vision create, slope roadmap validate, slope sprint begin --sprint=1 --ticket=S1-1',
   ],
   generic: [
     'Checklist installed to SLOPE-CHECKLIST.md',
