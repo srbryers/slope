@@ -61,22 +61,53 @@ export class SecretDetectedError extends Error {
  * SQLite backend so projects without better-sqlite3 binding (or no slope.db)
  * never try to open one.
  *
+ * Memoized per-cwd — repeated calls return the same instance to avoid the
+ * overhead of opening a fresh DB connection (and re-running schema/migration
+ * checks) on every memory operation. Tests can call `clearMemoryBackendCache()`
+ * to reset between fixtures.
+ *
  * Override via `SLOPE_MEMORY_BACKEND=json|sqlite` for testing.
  */
+const _backendCache = new Map<string, MemoryBackend>();
+
+export function clearMemoryBackendCache(): void {
+  _backendCache.clear();
+}
+
 export function getMemoryBackend(cwd: string): MemoryBackend {
   const override = process.env.SLOPE_MEMORY_BACKEND;
-  if (override === 'json') return new JsonMemoryBackend(cwd);
+  // Cache key includes the override so a test toggling the env between calls
+  // doesn't get a stale instance.
+  const cacheKey = `${cwd}::${override ?? 'auto'}`;
+  const cached = _backendCache.get(cacheKey);
+  if (cached) return cached;
+
+  if (override === 'json') {
+    const b = new JsonMemoryBackend(cwd);
+    _backendCache.set(cacheKey, b);
+    return b;
+  }
 
   const dbPath = join(cwd, '.slope', 'slope.db');
   if (override === 'sqlite' || existsSync(dbPath)) {
     try {
-      return new SqliteMemoryBackend(cwd, dbPath);
+      const b = new SqliteMemoryBackend(cwd, dbPath);
+      _backendCache.set(cacheKey, b);
+      return b;
     } catch (err) {
-      console.error(`SLOPE memory: SQLite backend unavailable (${(err as Error).message}); falling back to JSON.`);
+      // Distinguish corruption / I/O errors from missing better-sqlite3
+      // binding so users can tell which layer is broken (#294 review).
+      const msg = (err as Error).message ?? String(err);
+      const cause = /better-sqlite3|cannot find module/i.test(msg)
+        ? 'better-sqlite3 binding unavailable'
+        : 'SQLite open failed (DB corrupt, locked, or unreadable)';
+      console.error(`SLOPE memory: ${cause} — ${msg}; falling back to JSON.`);
     }
   }
 
-  return new JsonMemoryBackend(cwd);
+  const fallback = new JsonMemoryBackend(cwd);
+  _backendCache.set(cacheKey, fallback);
+  return fallback;
 }
 
 // ── Public API ─────────────────────────────────────────
