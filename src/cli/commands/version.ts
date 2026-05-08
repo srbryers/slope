@@ -1,6 +1,7 @@
 import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { dirname, join, resolve } from 'node:path';
 
 /**
  * slope version bump [<version>] [--dry-run]
@@ -34,10 +35,37 @@ slope version recommend                                    Analyze commits and r
     return;
   }
 
-  // Default: show current version
-  const cwd = process.cwd();
-  const version = getCurrentVersion(cwd);
+  // Default: show installed slope version. Resolve from the slope package
+  // itself (relative to this compiled file), not from process.cwd() which
+  // would read whatever package.json the user happens to be standing in.
+  const version = getInstalledVersion();
   console.log(`@slope-dev/slope v${version ?? 'unknown'}`);
+}
+
+/** Read this slope installation's own version. Resolves package.json
+ *  relative to the compiled file path (dist/cli/commands/version.js →
+ *  ../../../package.json). Used by the default `slope version` output so
+ *  it doesn't accidentally report the version of whatever cwd happens to
+ *  contain a package.json (GH #300). */
+function getInstalledVersion(): string | null {
+  try {
+    const here = dirname(fileURLToPath(import.meta.url));
+    // Walk up looking for the slope package.json — resilient to build
+    // layout drift (dist/cli/commands → dist/cli → dist → root). Validates
+    // the package name to avoid picking up an unrelated package.json.
+    for (let i = 1; i <= 4; i++) {
+      const pkgPath = resolve(here, ...Array(i).fill('..'), 'package.json');
+      try {
+        const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
+        if (pkg && pkg.name === '@slope-dev/slope' && typeof pkg.version === 'string') {
+          return pkg.version;
+        }
+      } catch { /* try next ancestor */ }
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 async function versionBump(args: string[]): Promise<void> {

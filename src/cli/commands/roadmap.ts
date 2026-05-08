@@ -463,6 +463,24 @@ async function generateSubcommand(flags: Record<string, string>, cwd: string): P
   }
 
   const path = resolveRoadmapPath(flags, cwd);
+  const dryRun = flags['dry-run'] === 'true';
+
+  if (dryRun) {
+    // Preview only \u2014 don't write to disk (GH #304)
+    console.log(`\n  [dry-run] Would write to ${path}`);
+    console.log(`  Sprints: ${roadmap.sprints.length}`);
+    console.log(`  Tickets: ${roadmap.sprints.reduce((s: number, sp: RoadmapSprint) => s + sp.tickets.length, 0)}`);
+    console.log(`  Phases: ${roadmap.phases.length}`);
+    if (validation.warnings.length > 0) {
+      console.log('\nWarnings:');
+      for (const w of validation.warnings) {
+        console.log(`  \u26A0 ${w.message}`);
+      }
+    }
+    console.log('\n  Re-run without --dry-run to write the file.\n');
+    return;
+  }
+
   const dir = join(cwd, 'docs', 'backlog');
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   writeFileSync(path, JSON.stringify(roadmap, null, 2) + '\n');
@@ -517,12 +535,12 @@ Usage:
   slope roadmap status [--path=<file>] [--sprint=N]  Current progress
   slope roadmap show [--path=<file>]         Render summary (critical path, parallel tracks)
   slope roadmap sync [--path=<file>] [--dry-run]     Sync scorecards into roadmap
-  slope roadmap generate [--path=<file>]     Generate from vision + backlog analysis
+  slope roadmap generate [--path=<file>] [--dry-run] Generate from vision + backlog analysis
 
 Options:
   --path=<file>    Path to roadmap JSON (default: docs/backlog/roadmap.json)
   --sprint=N       Override current sprint number (for status)
-  --dry-run        Show what would change without writing (for sync)
+  --dry-run        Show what would change without writing (for sync and generate)
 `);
       if (sub) process.exit(1);
   }

@@ -26,18 +26,23 @@ afterEach(() => {
 });
 
 describe('versionCommand', () => {
-  it('shows current version with no subcommand', async () => {
+  // GH #300: default version output must read from the installed slope
+  // package, not from process.cwd(). The tmpdir we chdir into has a foreign
+  // package.json (version 1.5.0); slope should report its own version, not
+  // that one.
+  it('shows installed slope version (not cwd) with no subcommand', async () => {
     await versionCommand([]);
-
     const output = consoleSpy.mock.calls.map(c => c[0]).join('\n');
-    expect(output).toContain('v1.5.0');
+    expect(output).toContain('@slope-dev/slope');
+    expect(output).not.toContain('v1.5.0'); // cwd's foreign version must NOT leak through
+    expect(output).not.toContain('vunknown');
   });
 
-  it('shows current version with unknown subcommand', async () => {
+  it('shows installed slope version with unknown subcommand', async () => {
     await versionCommand(['show']);
-
     const output = consoleSpy.mock.calls.map(c => c[0]).join('\n');
-    expect(output).toContain('v1.5.0');
+    expect(output).toContain('@slope-dev/slope');
+    expect(output).not.toContain('v1.5.0');
   });
 
   it('bump rejects version strings with trailing content (shell injection)', async () => {
