@@ -97,10 +97,18 @@
       "note": "Memory\u2194store reunification (architectural debt from PR #293) + automation hooks for PR/issue/branch hygiene."
     },
     {
-      "name": "Phase 21 \u2014 TBD (next initiative)",
+      "name": "Phase 21 \u2014 Backlog Cleanup",
+      "sprints": [
+        92
+      ],
+      "status": "complete",
+      "note": "Closed the 3 remaining backlog items (#307, #318, #323) from the Phase 18-20 sweep. Shipped in v1.55.0."
+    },
+    {
+      "name": "Phase 22 \u2014 TBD (next initiative)",
       "sprints": [],
       "status": "planned",
-      "note": "Next initiative \u2014 themes TBD. Backlog issues remaining: #307 (hook count), #318 (retro backfill tooling), #323 (gitignore audit)."
+      "note": "Issue queue empty as of v1.55.0. Next initiative themes TBD."
     }
   ],
   "sprints": [
@@ -1217,6 +1225,38 @@
           "club": "wedge",
           "complexity": "small",
           "github_issue": 305
+        }
+      ]
+    },
+    {
+      "id": 92,
+      "theme": "Backlog Cleanup \u2014 empty the queue",
+      "par": 3,
+      "slope": 1,
+      "type": "bug fix + dx",
+      "status": "complete",
+      "note": "Three small follow-ups closing the last items from the Phase 18-20 backlog. Shipped in v1.55.0.",
+      "tickets": [
+        {
+          "key": "S92-1",
+          "title": "Align hook install count with slope doctor count (#307)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 307
+        },
+        {
+          "key": "S92-2",
+          "title": "slope doctor gitignore audit for common-noise patterns (#323)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 323
+        },
+        {
+          "key": "S92-3",
+          "title": "slope retro backfill CLI + status drift surfacing (#318)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 318
         }
       ]
     }
