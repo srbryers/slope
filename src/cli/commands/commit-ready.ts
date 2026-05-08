@@ -59,7 +59,10 @@ export async function collectCommitReady(cwd: string): Promise<CommitReadyResult
   checks.push(checkUncommittedChanges(cwd));
   const sprintCheck = checkSprintState(cwd);
   checks.push(sprintCheck);
-  checks.push(await checkActiveClaim(cwd, sprintCheck.ok ? extractSprintNumber(cwd) : null));
+  // Always run the claim check — even when sprint state is missing, the
+  // user benefits from a clear "no sprint -> start first, then claim"
+  // hint rather than a silent skip (#314 review finding).
+  checks.push(await checkActiveClaim(cwd, extractSprintNumber(cwd)));
   checks.push(checkRoadmap(cwd));
   checks.push(checkCodebaseMap(cwd));
   checks.push(checkPendingGates(cwd));
@@ -203,6 +206,18 @@ function checkRoadmap(cwd: string): CommitReadyCheck {
   }
 }
 
+/** Default commits-since-last-touch threshold before the codebase map is
+ *  considered stale. Configurable via SLOPE_CODEBASE_STALE_AT env var so
+ *  fast-moving repos can shorten and infrequent ones can lengthen. */
+function codebaseStaleThreshold(): number {
+  const raw = process.env.SLOPE_CODEBASE_STALE_AT;
+  if (raw && /^\d+$/.test(raw)) {
+    const n = parseInt(raw, 10);
+    if (n > 0) return n;
+  }
+  return 30;
+}
+
 function checkCodebaseMap(cwd: string): CommitReadyCheck {
   const mapPath = join(cwd, 'CODEBASE.md');
   if (!existsSync(mapPath)) {
@@ -214,16 +229,31 @@ function checkCodebaseMap(cwd: string): CommitReadyCheck {
       suggestion: 'slope map',
     };
   }
-  // Best-effort staleness: count commits since the file was last touched
-  // (works whether the map is gitignored or tracked).
-  const sinceLastTouch = git(`log --since="$(git log -1 --format=%cI -- CODEBASE.md 2>/dev/null)" --oneline`, cwd);
+
+  // Resolve the last-touch timestamp explicitly (don't embed `$()` in another
+  // git command — that depends on shell substitution which behaves
+  // differently across platforms and silently returns empty for untracked
+  // files, causing --since="" to list ALL commits and trigger a false
+  // positive). When CODEBASE.md is untracked, we can't compute staleness
+  // — fall back to existence-only check rather than spam warnings.
+  const lastTouch = git('log -1 --format=%cI -- CODEBASE.md', cwd);
+  if (!lastTouch) {
+    return {
+      name: 'codebase-map',
+      ok: true,
+      severity: 'info',
+      reason: 'Present (untracked — staleness unknown)',
+    };
+  }
+  const sinceLastTouch = git(`log --since=${JSON.stringify(lastTouch)} --oneline`, cwd);
   const commitsSince = sinceLastTouch ? sinceLastTouch.split('\n').length : 0;
-  if (commitsSince > 30) {
+  const threshold = codebaseStaleThreshold();
+  if (commitsSince > threshold) {
     return {
       name: 'codebase-map',
       ok: false,
       severity: 'warn',
-      reason: `CODEBASE.md is ${commitsSince} commits stale`,
+      reason: `CODEBASE.md is ${commitsSince} commits stale (threshold ${threshold}; override via SLOPE_CODEBASE_STALE_AT)`,
       suggestion: 'slope map',
     };
   }

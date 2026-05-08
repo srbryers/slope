@@ -73,7 +73,17 @@ export async function sprintPlanCommand(args: string[]): Promise<void> {
     hazardLines = [
       ...idx.shot_hazards.slice(0, 8).map(h => `- [S${h.sprint}] ${h.type}: ${h.description}`),
       ...idx.bunker_locations.slice(0, 5).map(b => {
-        const label = typeof b === 'string' ? b : (b as { area?: string; location?: string }).location ?? (b as { area?: string }).area ?? String(b);
+        // Defend against strings, plain objects, AND null/undefined — typeof
+        // null is 'object', so the previous cast would throw on null entries.
+        let label: string;
+        if (typeof b === 'string') {
+          label = b;
+        } else if (b && typeof b === 'object') {
+          const obj = b as { area?: string; location?: string };
+          label = obj.location ?? obj.area ?? JSON.stringify(b);
+        } else {
+          label = String(b);
+        }
         return `- bunker: ${label}`;
       }),
     ];
