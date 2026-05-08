@@ -1,0 +1,134 @@
+{
+  "sprint_number": 89,
+  "theme": "The Toolkit — Agent Workflow Commands",
+  "par": 4,
+  "slope": 1,
+  "score": 12,
+  "score_label": "triple_plus",
+  "date": "2026-05-08",
+  "shots": [
+    {
+      "ticket_key": "S89-T1",
+      "title": "slope sprint plan generates markdown plan file (#312)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "moderate",
+          "description": "[architect review] Kahn topo-sort fallback masks both cycles and incomplete traversals without distinguishing root cause; output order ambiguous on failure",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "rough",
+          "severity": "major",
+          "description": "[code review] Hazard extraction casts bunker_locations to object but array can contain strings; type assertion will throw at runtime",
+          "gotcha_id": "review:code"
+        }
+      ]
+    },
+    {
+      "ticket_key": "S89-T2",
+      "title": "slope gate aliases for initiative review machinery (#313)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "moderate",
+          "description": "[architect review] VALID_REVIEWERS includes both 'ux' and 'ux-designer'; unclear if these are equivalent or map to different review types",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "[code review] recordReview error in try/catch lacks stderr logging if Error.message is empty; user sees blank failure reason",
+          "gotcha_id": "review:code"
+        }
+      ]
+    },
+    {
+      "ticket_key": "S89-T3",
+      "title": "slope commit-ready pre-commit checklist (#314)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "critical",
+          "description": "[architect review] checkCodebaseMap staleness check uses nested git subshell that silently returns OK if CODEBASE.md is untracked/new",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "[architect review] commit-ready missing validation that sprint-state.json phase is consistent with its gates; can show pending gates in complete phase",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "rough",
+          "severity": "moderate",
+          "description": "[code review] checkCodebaseMap staleness hardcoded to 30 commits; no config override for fast-moving repos where 2 weeks of commits is stale threshold",
+          "gotcha_id": "review:code"
+        },
+        {
+          "type": "rough",
+          "severity": "major",
+          "description": "[code review] collectCommitReady skips claim check when sprintCheck.ok=false; user gets warn+no suggestion for missing sprint state",
+          "gotcha_id": "review:code"
+        },
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "[code review] checkPendingGates calls pendingGates(state) without validating state.gates object structure exists; incomplete gates return partial results",
+          "gotcha_id": "review:code"
+        }
+      ]
+    },
+    {
+      "ticket_key": "S89-T4",
+      "title": "first-class slope init --codex profile (#309)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "moderate",
+          "description": "[architect review] installDefaultHooks assumes .codex parent exists; recursive mkdir succeeds but permission errors would silently fail hooks installation",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "rough",
+          "severity": "moderate",
+          "description": "[code review] init --codex tests verify hooks installed but not executable (+x) or shebang validity; non-functional hooks could ship",
+          "gotcha_id": "review:code"
+        }
+      ]
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 11,
+    "hazard_penalties": 7.5,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [],
+  "special_plays": [],
+  "training": [],
+  "nutrition": [],
+  "bunker_locations": [],
+  "yardage_book_updates": [],
+  "course_management_notes": [
+    "Sprint built post-hoc as part of v1.54.0 release. Findings from architect+code reviews recorded via slope review amend."
+  ]
+}
