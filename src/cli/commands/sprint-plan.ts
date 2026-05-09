@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { parseRoadmap, extractHazardIndex, loadScorecards } from '../../core/index.js';
 import type { RoadmapDefinition, RoadmapSprint } from '../../core/index.js';
 import { loadConfig } from '../config.js';
@@ -92,16 +92,21 @@ export async function sprintPlanCommand(args: string[]): Promise<void> {
   // Render
   const md = renderSprintPlan(sprint, roadmap, hazardLines);
 
-  // Output path
+  // Output path — use resolve() so an absolute --output=/tmp/... is honored
+  // verbatim instead of being silently coerced to a repo-relative path
+  // (#341). join(cwd, '/tmp/x') drops the leading slash; resolve() doesn't.
   const outputPath = outputArg
     ? outputArg.slice('--output='.length)
     : `docs/backlog/sprint-${sprintId}-plan.md`;
-  const outputAbs = join(cwd, outputPath);
+  const outputAbs = resolve(cwd, outputPath);
 
   mkdirSync(dirname(outputAbs), { recursive: true });
   writeFileSync(outputAbs, md);
 
-  console.log(`Wrote ${outputPath}`);
+  // Report the resolved absolute path so the user knows exactly where the
+  // file landed — the previous "Wrote <relative>" form was misleading when
+  // an absolute path got rewritten.
+  console.log(`Wrote ${outputAbs}`);
   console.log(`  Tickets: ${sprint.tickets.length}`);
   console.log(`  Par: ${sprint.par} | Slope: ${sprint.slope}`);
 }

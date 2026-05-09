@@ -1,6 +1,13 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
+import { execSync } from 'node:child_process';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import { tmpdir } from 'node:os';
 import { renderSprintPlan } from '../../../src/cli/commands/sprint-plan.js';
 import type { RoadmapDefinition, RoadmapSprint, RoadmapTicket } from '../../../src/core/index.js';
+
+const REPO_ROOT = resolve(__dirname, '..', '..', '..');
+const SLOPE_BIN = resolve(REPO_ROOT, 'dist', 'cli', 'index.js');
 
 function makeTicket(key: string, overrides: Partial<RoadmapTicket> = {}): RoadmapTicket {
   return {
@@ -126,5 +133,71 @@ describe('renderSprintPlan (GH #312)', () => {
     const sprint = makeSprint(2);
     const md = renderSprintPlan(sprint, makeRoadmap([sprint]), []);
     expect(md).toContain('No recent hazards on file');
+  });
+});
+
+function setupRepoForCli(): string {
+  const dir = mkdtempSync(join(tmpdir(), 'slope-sprint-plan-'));
+  mkdirSync(join(dir, '.slope'), { recursive: true });
+  mkdirSync(join(dir, 'docs', 'backlog'), { recursive: true });
+  mkdirSync(join(dir, 'docs', 'retros'), { recursive: true });
+  writeFileSync(join(dir, '.slope', 'config.json'), JSON.stringify({
+    roadmapPath: 'docs/backlog/roadmap.json',
+    scorecardDir: 'docs/retros',
+    scorecardPattern: 'sprint-*.json',
+  }));
+  writeFileSync(join(dir, 'docs', 'backlog', 'roadmap.json'), JSON.stringify({
+    name: 'Test',
+    phases: [{ name: 'P1', sprints: [1] }],
+    sprints: [{
+      id: 1,
+      theme: 'Test sprint',
+      par: 4,
+      slope: 1,
+      type: 'feature',
+      tickets: [
+        { key: 'S1-1', title: 'first', club: 'wedge', complexity: 'small' },
+      ],
+    }],
+  }));
+  return dir;
+}
+
+describe('slope sprint plan --output (#341)', () => {
+  beforeAll(() => {
+    if (!existsSync(SLOPE_BIN)) {
+      throw new Error(`dist not built — run \`pnpm build\` first. Expected ${SLOPE_BIN}`);
+    }
+  });
+
+  it('honors absolute --output= path instead of stripping leading slash', () => {
+    const cwd = setupRepoForCli();
+    const outDir = mkdtempSync(join(tmpdir(), 'slope-sprint-plan-out-'));
+    const absOut = join(outDir, 'plan.md');
+    try {
+      const out = execSync(`node ${SLOPE_BIN} sprint plan --sprint=1 --output=${absOut}`, {
+        cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'],
+      });
+      // The plan must land at the absolute path, NOT a repo-relative tmp/
+      expect(existsSync(absOut)).toBe(true);
+      expect(existsSync(join(cwd, absOut.replace(/^\//, '')))).toBe(false);
+      // Reported path is the resolved absolute target — no surprises
+      expect(out).toContain(`Wrote ${absOut}`);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+      rmSync(outDir, { recursive: true, force: true });
+    }
+  });
+
+  it('still resolves relative --output= against cwd', () => {
+    const cwd = setupRepoForCli();
+    try {
+      execSync(`node ${SLOPE_BIN} sprint plan --sprint=1 --output=custom/plan.md`, {
+        cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'],
+      });
+      expect(existsSync(join(cwd, 'custom', 'plan.md'))).toBe(true);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
   });
 });
