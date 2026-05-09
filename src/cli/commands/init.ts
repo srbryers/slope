@@ -724,7 +724,19 @@ function installForProvider(cwd: string, provider: InitProvider, metaphor: Metap
       installOpenCodePlugin(cwd);
       break;
     case 'codex':
-      // Codex uses AGENTS.md (already generated) + .codex/hooks.json for guards
+      // Codex uses AGENTS.md as the project context surface — generate it
+      // here (was previously assumed already-generated, but only the
+      // opencode case calls installOpenCodeTemplates → AGENTS.md isn't
+      // produced unless --opencode was also passed). #340.
+      {
+        const agentsMdPath = join(cwd, 'AGENTS.md');
+        if (!existsSync(agentsMdPath)) {
+          writeFileSync(agentsMdPath, generateAgentsMd(metaphor));
+          console.log(`  Created ${agentsMdPath}`);
+        } else {
+          console.log(`  AGENTS.md already exists — leaving untouched`);
+        }
+      }
       installDefaultHooks(cwd, 'codex');
       console.log('\n  Codex CLI: Guards installed to .codex/hooks.json');
       console.log('  Codex CLI: AGENTS.md provides project context');
