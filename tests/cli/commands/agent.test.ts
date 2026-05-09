@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { collectAgentStatus, renderAgentMarkdown } from '../../../src/cli/commands/agent.js';
 import type { AgentStatus } from '../../../src/cli/commands/agent.js';
+import { resolveStore } from '../../../src/cli/store.js';
 
 function makeTmpRepo(): string {
   const dir = mkdtempSync(join(tmpdir(), 'slope-agent-'));
@@ -208,6 +209,59 @@ describe('agent status (GH #310)', () => {
     expect(md).toContain('Next command: —');
     expect(md).not.toContain('## Pending gates');
     expect(md).not.toContain('## Blocked');
+  });
+
+  it('reports the active claim as nextTicket instead of skipping ahead (#342)', async () => {
+    writeVision(cwd);
+    writeRoadmap(cwd, [
+      { id: 1, theme: 'A', par: 4, slope: 1, type: 'feature', tickets: [
+        { key: 'S1-1', title: 't1', club: 'wedge', complexity: 'small' },
+        { key: 'S1-2', title: 't2', club: 'wedge', complexity: 'small' },
+        { key: 'S1-3', title: 't3', club: 'wedge', complexity: 'small' },
+      ] },
+    ]);
+    writeSprintState(cwd, {
+      sprint: 1,
+      phase: 'implementing',
+      gates: { tests: false, code_review: false, architect_review: false, scorecard: false, review_md: false },
+      started_at: '2026-05-07T00:00:00Z',
+      updated_at: '2026-05-07T00:00:00Z',
+    });
+
+    // Create a real claim on S1-1 so the agent has work in flight
+    const store = await resolveStore(cwd);
+    await store.claim({ sprint_number: 1, player: 'agent', target: 'S1-1', scope: 'ticket' });
+    store.close();
+
+    const status = await collectAgentStatus(cwd);
+    expect(status.activeClaims).toContain('S1-1');
+    // The bug: status used to skip to S1-2 here. Finishing the in-flight
+    // ticket beats starting a new one — nextTicket should be S1-1.
+    expect(status.nextTicket).toBe('S1-1');
+    // And we shouldn't be told to claim again — we already hold one.
+    expect(status.recommendedCommands).not.toContain('slope claim S1-1');
+    expect(status.recommendedCommands).not.toContain('slope claim S1-2');
+  });
+
+  it('falls back to first un-claimed ticket when no claims exist (#342 regression)', async () => {
+    writeVision(cwd);
+    writeRoadmap(cwd, [
+      { id: 1, theme: 'A', par: 4, slope: 1, type: 'feature', tickets: [
+        { key: 'S1-1', title: 't1', club: 'wedge', complexity: 'small' },
+        { key: 'S1-2', title: 't2', club: 'wedge', complexity: 'small' },
+      ] },
+    ]);
+    writeSprintState(cwd, {
+      sprint: 1,
+      phase: 'implementing',
+      gates: { tests: false, code_review: false, architect_review: false, scorecard: false, review_md: false },
+      started_at: '2026-05-07T00:00:00Z',
+      updated_at: '2026-05-07T00:00:00Z',
+    });
+
+    const status = await collectAgentStatus(cwd);
+    expect(status.activeClaims).toEqual([]);
+    expect(status.nextTicket).toBe('S1-1');
   });
 
   it('returns null nextTicket when sprint is unknown to roadmap', async () => {

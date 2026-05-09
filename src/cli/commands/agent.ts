@@ -152,15 +152,23 @@ export async function collectAgentStatus(cwd: string): Promise<AgentStatus> {
     }
   }
 
-  // Next ticket: first ticket of the current sprint not currently claimed
+  // Next ticket: prefer the agent's existing active claim (in roadmap order)
+  // — finishing what's already in flight beats starting something new. Only
+  // when nothing is claimed do we recommend the first un-claimed ticket.
+  // (#342: status was reporting next=S1-2 while user already held S1-1.)
   let nextTicket: string | null = null;
   let blockedBy: number[] = [];
   if (roadmap && currentSprint != null) {
     const sprint = roadmap.sprints.find(s => s.id === currentSprint);
     if (sprint) {
       const claimed = new Set(activeClaims);
-      const next = sprint.tickets.find(t => !claimed.has(t.key));
-      nextTicket = next?.key ?? null;
+      const inFlight = sprint.tickets.find(t => claimed.has(t.key));
+      if (inFlight) {
+        nextTicket = inFlight.key;
+      } else {
+        const next = sprint.tickets.find(t => !claimed.has(t.key));
+        nextTicket = next?.key ?? null;
+      }
       blockedBy = computeBlockers(roadmap, sprint);
     }
   }
