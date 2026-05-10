@@ -137,8 +137,12 @@ export async function collectAgentStatus(cwd: string): Promise<AgentStatus> {
   // Phase
   const phase: AgentStatus['phase'] = sprintState?.phase ?? 'unknown';
 
-  // Active claims (from store)
+  // Active claims + completed tickets (from store, single open)
+  // Completed = any ticket with a `decision` event of kind `ticket_done`.
+  // `slope ticket done` writes those, so we use them to advance nextTicket
+  // past finished work even after the claim has been released. (#348)
   const activeClaims: string[] = [];
+  const completedTickets = new Set<string>();
   if (currentSprint != null) {
     try {
       const store = await resolveStore(cwd);
@@ -146,16 +150,26 @@ export async function collectAgentStatus(cwd: string): Promise<AgentStatus> {
       for (const c of claims) {
         if (c.target) activeClaims.push(c.target);
       }
+      try {
+        const events = await store.getEventsBySprint(currentSprint);
+        for (const e of events) {
+          if (e.type === 'decision' && e.ticket_key && (e.data as { kind?: string })?.kind === 'ticket_done') {
+            completedTickets.add(e.ticket_key);
+          }
+        }
+      } catch {
+        // events optional — older stores may not have them
+      }
       store.close();
     } catch {
       // store unavailable — return empty
     }
   }
 
-  // Next ticket: prefer the agent's existing active claim (in roadmap order)
-  // — finishing what's already in flight beats starting something new. Only
-  // when nothing is claimed do we recommend the first un-claimed ticket.
-  // (#342: status was reporting next=S1-2 while user already held S1-1.)
+  // Next ticket priority:
+  //   1. The agent's active claim (finishing in-flight work beats starting new) — #342
+  //   2. The first ticket that is neither claimed by anyone nor already done — #348
+  //   3. null when the sprint is exhausted
   let nextTicket: string | null = null;
   let blockedBy: number[] = [];
   if (roadmap && currentSprint != null) {
@@ -166,7 +180,7 @@ export async function collectAgentStatus(cwd: string): Promise<AgentStatus> {
       if (inFlight) {
         nextTicket = inFlight.key;
       } else {
-        const next = sprint.tickets.find(t => !claimed.has(t.key));
+        const next = sprint.tickets.find(t => !claimed.has(t.key) && !completedTickets.has(t.key));
         nextTicket = next?.key ?? null;
       }
       blockedBy = computeBlockers(roadmap, sprint);
