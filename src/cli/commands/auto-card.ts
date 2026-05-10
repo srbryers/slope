@@ -1,8 +1,8 @@
 import { execSync } from 'node:child_process';
 import { writeFileSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { buildScorecard, buildAgentBreakdowns, computeSlope, parseTestOutput, classifyShotFromSignals, buildGhCommand, parsePRJson, mergePRChecksWithCI } from '../../core/index.js';
-import type { ShotRecord, CISignal, PRSignal, ShotResult, AgentBreakdown } from '../../core/index.js';
+import { buildScorecard, buildAgentBreakdowns, computeSlope, parseTestOutput, classifyShotFromSignals, buildGhCommand, parsePRJson, mergePRChecksWithCI, parseRoadmap } from '../../core/index.js';
+import type { ShotRecord, CISignal, PRSignal, ShotResult, AgentBreakdown, RoadmapDefinition } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { resolveStore } from '../store.js';
 
@@ -52,6 +52,57 @@ function inferTicketKey(subject: string, index: number, sprintNumber: number): s
   return `S${sprintNumber}-${index + 1}`;
 }
 
+/** Load the roadmap if it parses cleanly. Returns null when missing or
+ *  invalid — auto-card still works in that case (legacy untracked behavior). */
+function loadRoadmap(cwd: string): RoadmapDefinition | null {
+  try {
+    const config = loadConfig();
+    const roadmapPath = join(cwd, config.roadmapPath);
+    if (!existsSync(roadmapPath)) return null;
+    return parseRoadmap(JSON.parse(readFileSync(roadmapPath, 'utf8'))).roadmap;
+  } catch {
+    return null;
+  }
+}
+
+/** Match a commit subject to a roadmap ticket key for the given sprint.
+ *  Accepts an explicit `S{N}-{M}` mention OR a `(S{N})` umbrella reference
+ *  combined with a positional fallback to the next un-assigned ticket.
+ *  Returns null when the commit references no ticket from this sprint —
+ *  the caller decides whether to drop the commit (default) or keep it
+ *  with a synthetic key (--include-untracked). (#352) */
+export function matchSprintTicket(
+  subject: string,
+  sprintNumber: number,
+  allowedKeys: ReadonlyArray<string>,
+  positionalCursor: { next: number },
+): string | null {
+  // 1. Explicit `S{N}-{M}` mention that's actually in this sprint
+  const exact = subject.match(/\bS(\d+)-(\d+)\b/i);
+  if (exact && parseInt(exact[1], 10) === sprintNumber) {
+    const key = `S${sprintNumber}-${exact[2]}`;
+    if (allowedKeys.includes(key)) return key;
+  }
+
+  // 2. Other-sprint key — definitely not ours, drop
+  if (exact && parseInt(exact[1], 10) !== sprintNumber) return null;
+
+  // 3. `(S{N})` umbrella — assume next un-assigned ticket from the sprint.
+  // The negative lookahead blocks `-`, `.`, and digits after the sprint
+  // number so we don't treat `(S1-9)` as an S1 umbrella (it's a specific
+  // ticket reference handled in step 1) or `(S10)` as `(S1)`.
+  const umbrella = subject.match(new RegExp(`[(\\s+]S${sprintNumber}(?![-.\\d])`, 'i'));
+  if (umbrella) {
+    while (positionalCursor.next < allowedKeys.length) {
+      return allowedKeys[positionalCursor.next++];
+    }
+    return null;
+  }
+
+  // 4. No reference to this sprint at all — drop
+  return null;
+}
+
 function inferClub(filesChanged: number): ShotRecord['club'] {
   if (filesChanged >= 10) return 'driver';
   if (filesChanged >= 5) return 'long_iron';
@@ -78,24 +129,80 @@ export async function autoCardCommand(args: string[]): Promise<void> {
 
   const sprintNumber = parseInt(opts.sprint ?? '', 10);
   if (!sprintNumber) {
-    console.error('\nUsage: slope auto-card --sprint=<N> [--since=<date>] [--branch=<ref>] [--theme=<text>] [--player=<name>] [--test-output=<file>] [--pr=<number>] [--swarm=<id>] [--dry-run]\n');
-    console.error('  --sprint       Sprint number (required)');
-    console.error('  --since        Git log start date, e.g. "2026-02-20" (optional)');
-    console.error('  --branch       Git ref to scan (default: HEAD)');
-    console.error('  --theme        Sprint theme (default: auto-generated)');
-    console.error('  --player       Player name for multi-developer repos');
-    console.error('  --test-output  Path to test runner output file (Vitest/Jest) for CI-aware scoring');
-    console.error('  --pr           PR number to fetch review/check metadata via `gh` CLI');
-    console.error('  --swarm        Swarm ID — map commits to agents for per-agent breakdowns');
-    console.error('  --dry-run      Print scorecard JSON without writing to disk\n');
+    console.error('\nUsage: slope auto-card --sprint=<N> [--since=<date>] [--branch=<ref>] [--theme=<text>] [--player=<name>] [--test-output=<file>] [--pr=<number>] [--swarm=<id>] [--include-untracked] [--dry-run]\n');
+    console.error('  --sprint             Sprint number (required)');
+    console.error('  --since              Git log start date, e.g. "2026-02-20" (optional)');
+    console.error('  --branch             Git ref to scan (default: HEAD)');
+    console.error('  --theme              Sprint theme (default: auto-generated)');
+    console.error('  --player             Player name for multi-developer repos');
+    console.error('  --test-output        Path to test runner output file (Vitest/Jest) for CI-aware scoring');
+    console.error('  --pr                 PR number to fetch review/check metadata via `gh` CLI');
+    console.error('  --swarm              Swarm ID — map commits to agents for per-agent breakdowns');
+    console.error('  --include-untracked  Keep commits with no roadmap ticket (legacy behavior; inflates par)');
+    console.error('  --dry-run            Print scorecard JSON without writing to disk\n');
     process.exit(1);
   }
 
-  const commits = getCommits(opts.since, opts.branch);
+  const allCommits = getCommits(opts.since, opts.branch);
 
-  if (commits.length === 0) {
+  if (allCommits.length === 0) {
     console.error('\nNo commits found. Try specifying --since or --branch.\n');
     process.exit(1);
+  }
+
+  // Filter commits to those that reference a roadmap ticket for this sprint
+  // (#352). Without this, every recent commit on HEAD becomes a shot — so a
+  // sprint with 6 planned tickets gets inflated to S1-7…S1-N from setup
+  // commits. Opt-out via --include-untracked for the legacy behavior.
+  const cwd = process.cwd();
+  const roadmap = loadRoadmap(cwd);
+  const sprint = roadmap?.sprints.find(s => s.id === sprintNumber);
+  const includeUntracked = args.includes('--include-untracked');
+
+  let commits: CommitInfo[];
+  let assignedKeys: (string | null)[];
+
+  if (sprint && !includeUntracked) {
+    const allowedKeys = sprint.tickets.map(t => t.key);
+    const cursor = { next: 0 };
+    const matches = allCommits.map(c => matchSprintTicket(c.subject, sprintNumber, allowedKeys, cursor));
+    const kept: CommitInfo[] = [];
+    const keptKeys: string[] = [];
+    const dropped: CommitInfo[] = [];
+    for (let i = 0; i < allCommits.length; i++) {
+      const key = matches[i];
+      if (key) {
+        kept.push(allCommits[i]);
+        keptKeys.push(key);
+      } else {
+        dropped.push(allCommits[i]);
+      }
+    }
+
+    if (dropped.length > 0) {
+      console.error(`  Filtered ${dropped.length} commit(s) with no S${sprintNumber} roadmap ticket reference:`);
+      for (const c of dropped.slice(0, 5)) {
+        console.error(`    - ${c.hash.slice(0, 8)} ${c.subject}`);
+      }
+      if (dropped.length > 5) console.error(`    ... and ${dropped.length - 5} more`);
+      console.error(`  Use --include-untracked to keep them as synthetic shots.\n`);
+    }
+
+    if (kept.length === 0) {
+      console.error(`  No commits in scan window reference S${sprintNumber} tickets.`);
+      console.error(`  Either narrow with --since=<date>/--branch=<ref>, or use --include-untracked.\n`);
+      process.exit(1);
+    }
+
+    commits = kept;
+    assignedKeys = keptKeys;
+  } else {
+    commits = allCommits;
+    assignedKeys = allCommits.map(() => null); // legacy positional inference
+    if (!sprint && !includeUntracked) {
+      // No roadmap entry for this sprint — surface a hint, but proceed.
+      console.error(`  Note: roadmap has no S${sprintNumber} sprint definition. Falling back to positional ticket keys; pass --include-untracked to silence this hint.\n`);
+    }
   }
 
   // Parse CI output if provided
@@ -146,7 +253,10 @@ export async function autoCardCommand(args: string[]): Promise<void> {
     });
 
     return {
-      ticket_key: inferTicketKey(commit.subject, i, sprintNumber),
+      // Prefer the roadmap-matched key (set above when filtering ran);
+      // fall back to legacy positional inference for --include-untracked
+      // and no-roadmap cases.
+      ticket_key: assignedKeys[i] ?? inferTicketKey(commit.subject, i, sprintNumber),
       title: commit.subject,
       club: inferClub(commit.filesChanged),
       result: classification.result as ShotResult,
@@ -196,7 +306,7 @@ export async function autoCardCommand(args: string[]): Promise<void> {
     return;
   }
 
-  const cwd = process.cwd();
+  // cwd already resolved above for the roadmap lookup
   const outPath = join(cwd, config.scorecardDir, `sprint-${sprintNumber}.json`);
 
   if (existsSync(outPath)) {
