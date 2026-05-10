@@ -92,6 +92,52 @@ describe('agent status (GH #310)', () => {
     expect(status.recommendedCommands).toContain('slope briefing');
   });
 
+  it('clears blockedBy when upstream sprint has a scorecard but no roadmap status field (#356)', async () => {
+    writeVision(cwd);
+    writeRoadmap(cwd, [
+      // S1 has NO `status: complete` — closing a sprint via gates+scorecard
+      // doesn't currently mutate the roadmap JSON. roadmap status reads
+      // scorecard files directly; agent status now does the same.
+      { id: 1, theme: 'Foundation', par: 4, slope: 1, type: 'feature', tickets: [
+        { key: 'S1-1', title: 't1', club: 'wedge', complexity: 'small' },
+      ] },
+      { id: 2, theme: 'Next', par: 4, slope: 1, type: 'feature', depends_on: [1], tickets: [
+        { key: 'S2-1', title: 't1', club: 'wedge', complexity: 'small' },
+        { key: 'S2-2', title: 't2', club: 'wedge', complexity: 'small' },
+      ] },
+    ]);
+    // Drop a real S1 scorecard on disk — this is the signal `roadmap status`
+    // already trusts as "S1 is done".
+    writeFileSync(join(cwd, 'docs', 'retros', 'sprint-1.json'), JSON.stringify({
+      sprint_number: 1,
+      theme: 'Foundation',
+      par: 4,
+      slope: 1,
+      score: 4,
+      score_label: 'par',
+      date: '2026-05-08',
+      shots: [],
+      stats: { fairways_hit: 0, fairways_total: 0, greens_in_regulation: 0, greens_total: 0, putts: 0, penalties: 0, hazards_hit: 0, hazard_penalties: 0, miss_directions: { long: 0, short: 0, left: 0, right: 0 } },
+      conditions: [],
+      special_plays: [],
+      bunker_locations: [],
+      yardage_book_updates: [],
+      course_management_notes: [],
+    }));
+    writeSprintState(cwd, {
+      sprint: 2,
+      phase: 'implementing',
+      gates: { tests: false, code_review: false, architect_review: false, scorecard: false, review_md: false },
+      started_at: '2026-05-09T00:00:00Z',
+      updated_at: '2026-05-09T00:00:00Z',
+    });
+
+    const status = await collectAgentStatus(cwd);
+    // S1 IS complete (scorecard exists); S2 is no longer blocked
+    expect(status.blockedBy).toEqual([]);
+    expect(status.recommendedCommands).not.toContain('slope roadmap status');
+  });
+
   it('reports blockedBy when current sprint depends on incomplete sprint', async () => {
     writeVision(cwd);
     writeRoadmap(cwd, [
