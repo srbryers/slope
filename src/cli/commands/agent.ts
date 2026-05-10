@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import {
   parseRoadmap,
   detectLatestSprint,
+  loadScorecards,
 } from '../../core/index.js';
 import type { RoadmapDefinition, RoadmapSprint } from '../../core/index.js';
 import { loadConfig } from '../config.js';
@@ -166,6 +167,26 @@ export async function collectAgentStatus(cwd: string): Promise<AgentStatus> {
     }
   }
 
+  // Sprints completed = roadmap entry has `status: complete` OR a scorecard
+  // exists on disk for that sprint. The scorecard signal matches what
+  // `slope roadmap status` uses (#356) — agent status was previously only
+  // looking at the roadmap status field, which isn't auto-updated when a
+  // sprint closes, so it kept reporting stale `blockedBy: [N]` even after
+  // the upstream sprint was completed.
+  const completedSprintIds = new Set<number>();
+  for (const s of roadmap?.sprints ?? []) {
+    if ((s as RoadmapSprint & { status?: string }).status === 'complete') {
+      completedSprintIds.add(s.id);
+    }
+  }
+  try {
+    for (const card of loadScorecards(config, cwd)) {
+      completedSprintIds.add(card.sprint_number);
+    }
+  } catch {
+    // scorecards optional — keep going with whatever the roadmap had
+  }
+
   // Next ticket priority:
   //   1. The agent's active claim (finishing in-flight work beats starting new) — #342
   //   2. The first ticket that is neither claimed by anyone nor already done — #348
@@ -183,7 +204,7 @@ export async function collectAgentStatus(cwd: string): Promise<AgentStatus> {
         const next = sprint.tickets.find(t => !claimed.has(t.key) && !completedTickets.has(t.key));
         nextTicket = next?.key ?? null;
       }
-      blockedBy = computeBlockers(roadmap, sprint);
+      blockedBy = computeBlockers(sprint, completedSprintIds);
     }
   }
 
@@ -222,13 +243,12 @@ export async function collectAgentStatus(cwd: string): Promise<AgentStatus> {
   };
 }
 
-function computeBlockers(roadmap: RoadmapDefinition, sprint: RoadmapSprint): number[] {
-  const completedIds = new Set(
-    roadmap.sprints
-      .filter(s => (s as RoadmapSprint & { status?: string }).status === 'complete')
-      .map(s => s.id),
-  );
-  return (sprint.depends_on ?? []).filter(d => !completedIds.has(d));
+/** A sprint is blocked when any of its `depends_on` upstreams is not yet
+ *  in the completed-sprint set. The set is built by the caller from BOTH
+ *  roadmap `status: complete` AND scorecards on disk — matching the
+ *  source of truth `slope roadmap status` already uses (#356). */
+function computeBlockers(sprint: RoadmapSprint, completedSprintIds: Set<number>): number[] {
+  return (sprint.depends_on ?? []).filter(d => !completedSprintIds.has(d));
 }
 
 function recommendCommands(state: {
