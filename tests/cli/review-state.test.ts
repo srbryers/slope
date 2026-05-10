@@ -80,6 +80,88 @@ describe('reviewStateCommand', () => {
     return reviewStateCommand(args);
   }
 
+  describe('--help is read-only (#353)', () => {
+    it('does NOT start a review when called as `slope review start --help`', async () => {
+      const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+      try {
+        await runCommand(['start', '--help']);
+        // No state file should be written — the bug was that --help
+        // triggered the start handler and wrote review-state.json.
+        expect(loadReviewState(tmpDir)).toBeNull();
+        // Help output should mention the subcommand
+        const helpText = log.mock.calls.map(c => c[0] as string).join('\n');
+        expect(helpText).toMatch(/Usage: slope review start/);
+        expect(helpText).toMatch(/--rounds|--tier/);
+      } finally {
+        log.mockRestore();
+      }
+    });
+
+    it('does NOT advance the round counter when called as `slope review round --help`', async () => {
+      // Pre-seed an in-progress review so the bug would have been visible
+      mkdirSync(join(tmpDir, '.slope'), { recursive: true });
+      const initial: ReviewState = {
+        rounds_required: 3,
+        rounds_completed: 1,
+        tier: 'deep',
+        started_at: '2026-05-10T00:00:00.000Z',
+      };
+      saveReviewState(tmpDir, initial);
+
+      const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+      try {
+        await runCommand(['round', '--help']);
+        // Counter must be untouched
+        const state = loadReviewState(tmpDir)!;
+        expect(state.rounds_completed).toBe(1);
+        const helpText = log.mock.calls.map(c => c[0] as string).join('\n');
+        expect(helpText).toMatch(/Usage: slope review round/);
+      } finally {
+        log.mockRestore();
+      }
+    });
+
+    it('prints subcommand-specific help for findings/amend/reset/recommend', async () => {
+      const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+      try {
+        for (const sub of ['findings', 'amend', 'reset', 'recommend']) {
+          log.mockClear();
+          await runCommand([sub, '--help']);
+          const helpText = log.mock.calls.map(c => c[0] as string).join('\n');
+          expect(helpText).toMatch(new RegExp(`Usage: slope review ${sub}`));
+        }
+      } finally {
+        log.mockRestore();
+      }
+    });
+
+    it('prints top-level help for `slope review --help` (no subcommand)', async () => {
+      const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+      try {
+        await runCommand(['--help']);
+        const helpText = log.mock.calls.map(c => c[0] as string).join('\n');
+        expect(helpText).toMatch(/Usage: slope review <subcommand>/);
+        expect(helpText).toContain('start');
+        expect(helpText).toContain('round');
+        expect(helpText).toContain('findings');
+      } finally {
+        log.mockRestore();
+      }
+    });
+
+    it('-h short flag is also read-only', async () => {
+      const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+      try {
+        await runCommand(['start', '-h']);
+        expect(loadReviewState(tmpDir)).toBeNull();
+        const helpText = log.mock.calls.map(c => c[0] as string).join('\n');
+        expect(helpText).toMatch(/Usage: slope review start/);
+      } finally {
+        log.mockRestore();
+      }
+    });
+  });
+
   describe('start', () => {
     it('creates review-state.json with --rounds', async () => {
       await runCommand(['start', '--rounds=2']);
