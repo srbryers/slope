@@ -243,6 +243,71 @@ describe('agent status (GH #310)', () => {
     expect(status.recommendedCommands).not.toContain('slope claim S1-2');
   });
 
+  it('advances past tickets recorded as done by `slope ticket done` (#348)', async () => {
+    writeVision(cwd);
+    writeRoadmap(cwd, [
+      { id: 1, theme: 'A', par: 4, slope: 1, type: 'feature', tickets: [
+        { key: 'S1-1', title: 't1', club: 'wedge', complexity: 'small' },
+        { key: 'S1-2', title: 't2', club: 'wedge', complexity: 'small' },
+        { key: 'S1-3', title: 't3', club: 'wedge', complexity: 'small' },
+      ] },
+    ]);
+    writeSprintState(cwd, {
+      sprint: 1,
+      phase: 'implementing',
+      gates: { tests: false, code_review: false, architect_review: false, scorecard: false, review_md: false },
+      started_at: '2026-05-07T00:00:00Z',
+      updated_at: '2026-05-07T00:00:00Z',
+    });
+
+    // Mirror what `slope ticket done S1-1` writes: a `decision` event with
+    // kind=ticket_done. The claim has already been released, so activeClaims
+    // is empty. Without the #348 fix, status would still recommend S1-1.
+    const store = await resolveStore(cwd);
+    await store.insertEvent({
+      type: 'decision',
+      sprint_number: 1,
+      ticket_key: 'S1-1',
+      data: { kind: 'ticket_done', player: 'agent', commit: 'abc1234' },
+    });
+    store.close();
+
+    const status = await collectAgentStatus(cwd);
+    expect(status.activeClaims).toEqual([]);
+    expect(status.nextTicket).toBe('S1-2');
+  });
+
+  it('returns null nextTicket when every ticket is done (#348)', async () => {
+    writeVision(cwd);
+    writeRoadmap(cwd, [
+      { id: 1, theme: 'A', par: 4, slope: 1, type: 'feature', tickets: [
+        { key: 'S1-1', title: 't1', club: 'wedge', complexity: 'small' },
+        { key: 'S1-2', title: 't2', club: 'wedge', complexity: 'small' },
+      ] },
+    ]);
+    writeSprintState(cwd, {
+      sprint: 1,
+      phase: 'implementing',
+      gates: { tests: true, code_review: true, architect_review: true, scorecard: false, review_md: false },
+      started_at: '2026-05-07T00:00:00Z',
+      updated_at: '2026-05-07T00:00:00Z',
+    });
+
+    const store = await resolveStore(cwd);
+    for (const k of ['S1-1', 'S1-2']) {
+      await store.insertEvent({
+        type: 'decision',
+        sprint_number: 1,
+        ticket_key: k,
+        data: { kind: 'ticket_done', player: 'agent' },
+      });
+    }
+    store.close();
+
+    const status = await collectAgentStatus(cwd);
+    expect(status.nextTicket).toBeNull();
+  });
+
   it('falls back to first un-claimed ticket when no claims exist (#342 regression)', async () => {
     writeVision(cwd);
     writeRoadmap(cwd, [
