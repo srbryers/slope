@@ -107,7 +107,7 @@ function computeScorecardDrift(cwd: string): { missing: number[] } {
     const shipped = findShippedSprintsOnMain(cwd);
     const missing: number[] = [];
     for (const id of [...shipped].sort((a, b) => a - b)) {
-      const scorecardPath = join(retroDir, pattern.replace('*', String(id)));
+      const scorecardPath = join(retroDir, pattern.replaceAll('*', String(id)));
       if (!existsSync(scorecardPath)) missing.push(id);
     }
     return { missing };

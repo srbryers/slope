@@ -15,7 +15,10 @@ export async function prReviewGuard(input: HookInput, cwd: string): Promise<Guar
   const response = (input.tool_response?.stdout as string) ?? (input.tool_response?.result as string) ?? '';
 
   if (!command.includes('gh pr create')) return {};
-  if (!response.includes('github.com/') || !response.includes('/pull/')) return {};
+  // Tightened substring check — anchor to the literal scheme + host so we
+  // don't fast-path on things like `evil.com/github.com/` before the regex
+  // gets a chance to reject them. (CodeQL js/incomplete-url-substring-sanitization)
+  if (!response.includes('https://github.com/') || !response.includes('/pull/')) return {};
 
   const urlMatch = response.match(/(https:\/\/github\.com\/[^\s]+\/pull\/\d+)/);
   const prUrl = urlMatch ? urlMatch[1] : 'the PR';
