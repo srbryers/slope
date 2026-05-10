@@ -490,9 +490,115 @@ function amendCommand(args: string[], cwd: string): void {
 
 // --- Main Command Router ---
 
+/** Per-subcommand usage text. Kept inside the dispatcher so `--help` can
+ *  short-circuit before any state-mutating handler runs (#353). */
+function printReviewHelp(sub: string | undefined): void {
+  switch (sub) {
+    case 'start':
+      console.log(`Usage: slope review start [--rounds=N | --tier=<tier>]
+
+Start a review on the current plan. Tiers map to round counts:
+  skip      0 rounds   research/infra/docs-only sprints
+  light     1 round    1-2 tickets, familiar patterns, single-package
+  standard  2 rounds   3-4 tickets, multi-package, schema/API changes
+  deep      3 rounds   5+ tickets, new infrastructure, architectural changes
+
+Without --rounds or --tier, the tier is auto-detected from the most recent
+plan file in .claude/plans/ or ~/.claude/plans/.`);
+      break;
+    case 'round':
+      console.log(`Usage: slope review round
+
+Mark one review round complete. Errors when no review is in progress
+(start one with \`slope review start\`).`);
+      break;
+    case 'status':
+      console.log(`Usage: slope review status
+
+Print the active review's tier and rounds-remaining counter, or "No
+active review" when none is in progress.`);
+      break;
+    case 'reset':
+      console.log(`Usage: slope review reset
+
+Clear any active review state. Use when a plan has been replaced or you
+want to restart the review counter.`);
+      break;
+    case 'recommend':
+      console.log(`Usage: slope review recommend
+
+Suggest which implementation review types (architect/code/ml/security/
+ux) apply to the current sprint based on the diff and ticket metadata.`);
+      break;
+    case 'findings':
+      console.log(`Usage: slope review findings <add|list|clear> [options]
+
+Subcommands:
+  add    Record a review finding (--type, --ticket, --severity, --description)
+  list   List recorded findings (optionally --sprint=N)
+  clear  Clear all findings`);
+      break;
+    case 'amend':
+      console.log(`Usage: slope review amend [--sprint=N]
+
+Apply recorded findings to the sprint scorecard as hazards and recompute
+the score. Defaults to the latest sprint with a scorecard on disk.`);
+      break;
+    case 'defer':
+      console.log(`Usage: slope review defer --from=<sprint> --description="..." [--to=<sprint>] [--severity=<low|medium|high|critical>] [--category=<text>]
+
+Record a finding to address in a future sprint instead of amending the
+current scorecard.`);
+      break;
+    case 'deferred':
+      console.log(`Usage: slope review deferred [--sprint=N]
+
+List deferred findings, optionally filtered by their target sprint.`);
+      break;
+    case 'resolve':
+      console.log(`Usage: slope review resolve <id> [--note="..."]
+
+Mark a deferred finding as resolved. Use \`slope review deferred\` to
+look up ids.`);
+      break;
+    case 'run':
+      console.log(`Usage: slope review run [options]
+
+Run a structured review pass on the current sprint plan or PR. Pass
+\`--help\` after \`run\` for full options.`);
+      break;
+    default:
+      console.log(`Usage: slope review <subcommand> [options]
+
+Subcommands:
+  start       Start a review (auto-detects tier or use --rounds/--tier)
+  round       Mark one review round complete
+  status      Show active review state
+  reset       Clear active review state
+  recommend   Suggest implementation review types for the current sprint
+  findings    Record/list/clear review findings
+  amend       Apply findings to the sprint scorecard
+  defer       Record a finding to address in a later sprint
+  deferred    List deferred findings
+  resolve     Mark a deferred finding as resolved
+  run         Run a structured review pass
+
+Use \`slope review <subcommand> --help\` for per-subcommand options.`);
+  }
+}
+
 export async function reviewStateCommand(args: string[]): Promise<void> {
   const cwd = process.cwd();
   const sub = args[0];
+
+  // --help/-h must short-circuit BEFORE any subcommand handler runs.
+  // Previously `slope review start --help` actually started a review and
+  // `slope review round --help` advanced the round counter — agents
+  // probing command syntax with --help were corrupting review state. (#353)
+  if (args.includes('--help') || args.includes('-h')) {
+    printReviewHelp(sub);
+    return;
+  }
 
   switch (sub) {
     case 'start':
