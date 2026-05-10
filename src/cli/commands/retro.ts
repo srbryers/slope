@@ -237,7 +237,7 @@ async function backfillSubcommand(args: string[]): Promise<void> {
   } else {
     const shipped = findShippedSprintsOnMain(cwd);
     for (const id of [...shipped].sort((a, b) => a - b)) {
-      const path = join(retroDir, pattern.replace('*', String(id)));
+      const path = join(retroDir, pattern.replaceAll('*', String(id)));
       if (!existsSync(path)) targets.push(id);
     }
     if (targets.length === 0) {
@@ -249,7 +249,7 @@ async function backfillSubcommand(args: string[]): Promise<void> {
 
   const results: BackfillResult[] = [];
   for (const sid of targets) {
-    const path = join(retroDir, pattern.replace('*', String(sid)));
+    const path = join(retroDir, pattern.replaceAll('*', String(sid)));
     if (existsSync(path)) {
       results.push({ sprint: sid, path, shots: 0, par: 0, slope: 0, written: false, reason: 'already exists' });
       continue;

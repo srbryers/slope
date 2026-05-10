@@ -145,4 +145,28 @@ describe('slope retro backfill CLI (#318)', () => {
     const out = execSync(`node ${SLOPE_BIN} retro backfill --sprint=1`, { cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
     expect(out).toContain('skipped (already exists)');
   });
+
+  it('honors a custom scorecardPattern with multiple wildcards', () => {
+    // Repoint config at a multi-wildcard pattern. The original
+    // implementation used .replace('*', …) which only swapped the FIRST
+    // wildcard, so target/skip detection silently looked at the wrong
+    // path. Now uses .replaceAll — both wildcards must be substituted.
+    writeFileSync(join(cwd, '.slope', 'config.json'), JSON.stringify({
+      roadmapPath: 'docs/backlog/roadmap.json',
+      scorecardDir: 'docs/retros',
+      scorecardPattern: 'sprint-*-final-*.json',
+    }));
+
+    commitWith(cwd, 'feat(S1-1): a');
+    // Pre-write a scorecard at the fully-substituted path so the CLI
+    // should report "already exists". If only the first '*' were
+    // replaced, it'd hunt for sprint-1-final-*.json (literal '*') and
+    // miss this file → backfill instead of skip.
+    writeFileSync(join(cwd, 'docs', 'retros', 'sprint-1-final-1.json'), '{}');
+
+    const out = execSync(`node ${SLOPE_BIN} retro backfill --sprint=1`, {
+      cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    expect(out).toContain('skipped (already exists)');
+  });
 });
