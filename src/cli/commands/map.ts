@@ -16,6 +16,49 @@ function exec(cmd: string, cwd: string): string {
   }
 }
 
+interface ProjectIdentity {
+  /** True when running inside the SLOPE source repo (package.json name === @slope-dev/slope).
+   *  False for downstream projects that installed SLOPE — they need a generic project map
+   *  rather than a map of SLOPE's own internals. (#351) */
+  isSlopeSelf: boolean;
+  /** Display title for the map. SLOPE keeps its hardcoded title; generic projects use
+   *  package.json `name` (or directory basename as fallback). */
+  title: string;
+  /** One-line description. SLOPE keeps its tagline; generic projects use package.json
+   *  `description`, or omit if absent. */
+  description: string | null;
+}
+
+function readProjectIdentity(cwd: string): ProjectIdentity {
+  const pkgPath = join(cwd, 'package.json');
+  let name: string | null = null;
+  let description: string | null = null;
+  if (existsSync(pkgPath)) {
+    try {
+      const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
+      if (typeof pkg.name === 'string') name = pkg.name;
+      if (typeof pkg.description === 'string') description = pkg.description;
+    } catch {
+      // Malformed package.json → treat as generic with no metadata
+    }
+  }
+  const isSlopeSelf = name === '@slope-dev/slope';
+  if (isSlopeSelf) {
+    return {
+      isSlopeSelf: true,
+      title: 'SLOPE Codebase Map',
+      description: 'Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint scoring.',
+    };
+  }
+  // Fallback title for repos with no package.json: directory basename
+  const fallback = cwd.split('/').filter(Boolean).pop() ?? 'Project';
+  return {
+    isSlopeSelf: false,
+    title: `${name ?? fallback} Codebase Map`,
+    description,
+  };
+}
+
 function countSourceFiles(root: string): { source: number; test: number } {
   let source = 0;
   let test = 0;
@@ -54,18 +97,29 @@ interface MapMetadata {
   flows: number;
 }
 
-function gatherMetadata(cwd: string, config: SlopeConfig): MapMetadata {
+function gatherMetadata(cwd: string, config: SlopeConfig, identity: ProjectIdentity): MapMetadata {
   const gitSha = exec('git rev-parse HEAD', cwd);
   const latestSprint = detectLatestSprint(config, cwd);
 
-  // Count source files in src/
-  const { source } = countSourceFiles(join(cwd, 'src'));
+  // SLOPE itself: count under src/ and tests/ (its own layout). Other repos
+  // may not have those dirs at all — count from the repo root, walking past
+  // node_modules/dist/.git as before. (#351)
+  let source = 0;
+  let testFiles = 0;
+  if (identity.isSlopeSelf) {
+    source = countSourceFiles(join(cwd, 'src')).source;
+    testFiles = countSourceFiles(join(cwd, 'tests')).test;
+  } else {
+    const counts = countSourceFiles(cwd);
+    source = counts.source;
+    testFiles = counts.test;
+  }
 
-  // Count test files in tests/
-  const { test: testFiles } = countSourceFiles(join(cwd, 'tests'));
-
-  // Count CLI commands from registry
-  const cliCommands = CLI_COMMAND_REGISTRY.length;
+  // CLI commands + guards are SLOPE's own registries — only meaningful when
+  // mapping SLOPE itself. Report 0 for downstream projects so the metadata
+  // doesn't lie about their surface.
+  const cliCommands = identity.isSlopeSelf ? CLI_COMMAND_REGISTRY.length : 0;
+  const guardsCount = identity.isSlopeSelf ? GUARD_DEFINITIONS.length : 0;
 
   // Count flows
   const flowsPath = join(cwd, config.flowsPath ?? '.slope/flows.json');
@@ -79,12 +133,72 @@ function gatherMetadata(cwd: string, config: SlopeConfig): MapMetadata {
     source_files: source,
     test_files: testFiles,
     cli_commands: cliCommands,
-    guards: GUARD_DEFINITIONS.length,
+    guards: guardsCount,
     flows: flowCount,
   };
 }
 
 // ── Section Generators ──────────────────────────────────────────
+
+/** Inventory generator for downstream (non-SLOPE) projects. Walks the
+ *  conventional monorepo workspace dirs (`packages/`, `apps/`, `libs/`)
+ *  plus a top-level `src/` if present, and prints one section per package.
+ *  Each package shows its package.json `name` + `description` (when
+ *  present) and a source/test file count. (#351) */
+function generateGenericPackageInventory(cwd: string): string {
+  const lines: string[] = [''];
+  const workspaceParents = ['packages', 'apps', 'libs'];
+  const sections: { kind: string; name: string; description: string; root: string }[] = [];
+
+  for (const parent of workspaceParents) {
+    const parentDir = join(cwd, parent);
+    if (!existsSync(parentDir)) continue;
+    let entries: string[];
+    try {
+      entries = readdirSync(parentDir, { withFileTypes: true })
+        .filter(d => d.isDirectory())
+        .map(d => d.name)
+        .sort();
+    } catch {
+      continue;
+    }
+    for (const name of entries) {
+      const root = join(parentDir, name);
+      const pkgPath = join(root, 'package.json');
+      let pkgName = `${parent}/${name}`;
+      let description = '';
+      if (existsSync(pkgPath)) {
+        try {
+          const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
+          if (typeof pkg.name === 'string') pkgName = pkg.name;
+          if (typeof pkg.description === 'string') description = pkg.description;
+        } catch {
+          /* keep folder-derived label */
+        }
+      }
+      sections.push({ kind: parent, name: pkgName, description, root });
+    }
+  }
+
+  // Also include a top-level `src/` if the project isn't a workspace
+  if (existsSync(join(cwd, 'src')) && sections.length === 0) {
+    sections.push({ kind: 'src', name: 'src/', description: '', root: join(cwd, 'src') });
+  }
+
+  if (sections.length === 0) {
+    return '\n_No packages, apps, or top-level src/ directory detected. The map can still track flows, sprint history, and gotchas._\n';
+  }
+
+  for (const s of sections) {
+    const { source, test } = countSourceFiles(s.root);
+    lines.push(`### \`${relative(cwd, s.root)}\``);
+    lines.push(`- Package: \`${s.name}\``);
+    if (s.description) lines.push(`- ${s.description}`);
+    lines.push(`- Source files: ${source} | Test files: ${test}`);
+    lines.push('');
+  }
+  return lines.join('\n');
+}
 
 function generatePackageInventory(cwd: string): string {
   const srcDir = join(cwd, 'src');
@@ -417,6 +531,54 @@ function updateMetadataBlock(content: string, meta: MapMetadata): string {
 
 // ── Template for new map ────────────────────────────────────────
 
+/** Map template for downstream projects (anything that isn't @slope-dev/slope itself).
+ *  Skips SLOPE-internal sections (API surface, CLI registry, guards, MCP) which
+ *  would otherwise dump SLOPE's own surface into the user's CODEBASE.md (#351). */
+function generateGenericMap(cwd: string, config: SlopeConfig, meta: MapMetadata, identity: ProjectIdentity): string {
+  return `---
+generated_at: "${meta.generated_at}"
+git_sha: "${meta.git_sha}"
+sprint: ${meta.sprint}
+source_files: ${meta.source_files}
+test_files: ${meta.test_files}
+flows: ${meta.flows}
+---
+
+# ${identity.title}
+${identity.description ? `\n${identity.description}\n` : ''}
+## Package Inventory
+
+<!-- AUTO-GENERATED: START packages -->
+${generateGenericPackageInventory(cwd)}
+<!-- AUTO-GENERATED: END packages -->
+
+## User Flows
+
+<!-- AUTO-GENERATED: START flows -->
+${generateFlowsSummary(cwd, config)}
+<!-- AUTO-GENERATED: END flows -->
+
+## Test Inventory
+
+<!-- AUTO-GENERATED: START tests -->
+${generateTestInventory(cwd)}
+<!-- AUTO-GENERATED: END tests -->
+
+## Recent Sprint History
+
+<!-- AUTO-GENERATED: START history -->
+${generateSprintHistory(cwd, config)}
+<!-- AUTO-GENERATED: END history -->
+
+## Known Gotchas
+
+Top recurring patterns from common-issues:
+
+<!-- AUTO-GENERATED: START gotchas -->
+${generateKnownGotchas(cwd, config)}
+<!-- AUTO-GENERATED: END gotchas -->`;
+}
+
 function generateFullMap(cwd: string, config: SlopeConfig, meta: MapMetadata): string {
   const sections = [
     `---
@@ -637,10 +799,20 @@ export async function mapCommand(args: string[]): Promise<void> {
   // Generate / update mode
   console.log('Updating codebase map...\n');
 
-  const meta = gatherMetadata(cwd, config);
+  const identity = readProjectIdentity(cwd);
+  const meta = gatherMetadata(cwd, config, identity);
 
-  if (existsSync(outputPath)) {
-    // Update existing map — replace auto-generated sections only
+  if (!identity.isSlopeSelf) {
+    // Downstream project — always (re)generate from the generic template.
+    // Surgical section updates would require the existing map to have the
+    // right markers, and v1.55.1 wrote SLOPE-internal sections into other
+    // repos' CODEBASE.md. Regenerating once corrects that. (#351)
+    const content = generateGenericMap(cwd, config, meta, identity);
+    writeFileSync(outputPath, content, 'utf8');
+    console.log(`  Generated project map for \`${identity.title}\``);
+  } else if (existsSync(outputPath)) {
+    // SLOPE-self update — replace auto-generated sections only, preserving
+    // any manual content between markers.
     let content = readFileSync(outputPath, 'utf8');
 
     content = updateMetadataBlock(content, meta);
@@ -657,7 +829,7 @@ export async function mapCommand(args: string[]): Promise<void> {
     writeFileSync(outputPath, content, 'utf8');
     console.log('  Updated auto-generated sections');
   } else {
-    // Create new map from template
+    // SLOPE-self, no existing map — create new from full template
     const content = generateFullMap(cwd, config, meta);
     writeFileSync(outputPath, content, 'utf8');
     console.log('  Created new codebase map');
@@ -668,7 +840,12 @@ export async function mapCommand(args: string[]): Promise<void> {
   const sizeKb = (Buffer.byteLength(finalContent, 'utf8') / 1024).toFixed(1);
   console.log(`  ${lineCount} lines, ${sizeKb}KB`);
   console.log(`  ${meta.source_files} source files, ${meta.test_files} test files`);
-  console.log(`  ${meta.cli_commands} CLI commands, ${meta.guards} guards`);
+  // CLI/guard counts are SLOPE-internal — only meaningful when mapping
+  // SLOPE itself. Suppress for downstream projects to avoid claiming a
+  // 0-command surface they don't have.
+  if (identity.isSlopeSelf) {
+    console.log(`  ${meta.cli_commands} CLI commands, ${meta.guards} guards`);
+  }
   console.log(`\nMap written to ${relative(cwd, outputPath)}\n`);
 }
 
