@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
 import { detectPlatforms, type InitProvider } from './init.js';
@@ -25,9 +25,17 @@ export interface DoctorCheck {
 /** Run all health checks on a SLOPE-configured repo. */
 export function runDoctorChecks(cwd: string): DoctorCheck[] {
   const checks: DoctorCheck[] = [];
+  const stateCwd = resolveSlopeStateCwd(cwd);
+  if (stateCwd !== cwd) {
+    checks.push({
+      name: 'worktree-state',
+      status: 'ok',
+      message: `Linked worktree using SLOPE state from ${stateCwd}`,
+    });
+  }
 
   // 1. Check .slope/config.json exists and is valid JSON
-  checks.push(checkConfig(cwd));
+  checks.push(checkConfig(stateCwd, cwd));
 
   // 2. Check .gitignore contains .slope/
   checks.push(checkGitignore(cwd));
@@ -36,10 +44,10 @@ export function runDoctorChecks(cwd: string): DoctorCheck[] {
   checks.push(...checkGitignoreNoise(cwd));
 
   // 3. Check SQLite store exists
-  checks.push(checkStore(cwd));
+  checks.push(checkStore(stateCwd, cwd));
 
   // 4. Check common-issues.json exists
-  checks.push(checkCommonIssues(cwd));
+  checks.push(checkCommonIssues(stateCwd, cwd));
 
   // 5. Check docs/retros/ directory exists
   checks.push(checkRetrosDir(cwd));
@@ -51,13 +59,13 @@ export function runDoctorChecks(cwd: string): DoctorCheck[] {
   checks.push(checkCodebaseMap(cwd));
 
   // 8. Check version drift
-  checks.push(checkVersion(cwd));
+  checks.push(checkVersion(stateCwd, cwd));
 
   // 9. Check config schema validity
-  checks.push(...checkConfigSchema(cwd));
+  checks.push(...checkConfigSchema(stateCwd, cwd));
 
   // 10. Check guards are installed for detected platforms
-  checks.push(...checkGuards(cwd));
+  checks.push(...checkGuards(stateCwd, cwd));
 
   // 11. Check hook script staleness
   checks.push(...checkHookScripts(cwd));
@@ -71,14 +79,44 @@ export function runDoctorChecks(cwd: string): DoctorCheck[] {
   return checks;
 }
 
-function checkConfig(cwd: string): DoctorCheck {
+function stateNote(stateCwd: string, cwd: string): string {
+  return stateCwd === cwd ? '' : ` (from primary worktree ${stateCwd})`;
+}
+
+function resolveSlopeStateCwd(cwd: string): string {
+  if (existsSync(join(cwd, '.slope', 'config.json'))) return cwd;
+  for (const worktree of listGitWorktrees(cwd)) {
+    if (resolve(worktree) === resolve(cwd)) continue;
+    if (existsSync(join(worktree, '.slope', 'config.json'))) return worktree;
+  }
+  return cwd;
+}
+
+function listGitWorktrees(cwd: string): string[] {
+  try {
+    const raw = execSync('git worktree list --porcelain', {
+      cwd,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    return raw
+      .split('\n')
+      .filter(line => line.startsWith('worktree '))
+      .map(line => line.slice('worktree '.length).trim())
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+function checkConfig(cwd: string, originalCwd = cwd): DoctorCheck {
   const configPath = join(cwd, '.slope', 'config.json');
   if (!existsSync(configPath)) {
     return { name: 'config', status: 'fail', message: '.slope/config.json missing — run `slope init`', fixable: true };
   }
   try {
     JSON.parse(readFileSync(configPath, 'utf8'));
-    return { name: 'config', status: 'ok', message: '.slope/config.json valid' };
+    return { name: 'config', status: 'ok', message: `.slope/config.json valid${stateNote(cwd, originalCwd)}` };
   } catch {
     // Corrupt config — not auto-fixable (would lose custom settings)
     return { name: 'config', status: 'fail', message: '.slope/config.json is invalid JSON — fix manually or delete and run `slope init`' };
@@ -140,20 +178,20 @@ function checkGitignoreNoise(cwd: string): DoctorCheck[] {
   }];
 }
 
-function checkStore(cwd: string): DoctorCheck {
+function checkStore(cwd: string, originalCwd = cwd): DoctorCheck {
   const dbPath = join(cwd, '.slope', 'slope.db');
   if (!existsSync(dbPath)) {
     return { name: 'store', status: 'warn', message: '.slope/slope.db missing — sessions and events will not be tracked', fixable: true };
   }
-  return { name: 'store', status: 'ok', message: '.slope/slope.db exists' };
+  return { name: 'store', status: 'ok', message: `.slope/slope.db exists${stateNote(cwd, originalCwd)}` };
 }
 
-function checkCommonIssues(cwd: string): DoctorCheck {
+function checkCommonIssues(cwd: string, originalCwd = cwd): DoctorCheck {
   const path = join(cwd, '.slope', 'common-issues.json');
   if (!existsSync(path)) {
     return { name: 'common-issues', status: 'warn', message: '.slope/common-issues.json missing', fixable: true };
   }
-  return { name: 'common-issues', status: 'ok', message: '.slope/common-issues.json exists' };
+  return { name: 'common-issues', status: 'ok', message: `.slope/common-issues.json exists${stateNote(cwd, originalCwd)}` };
 }
 
 function checkRetrosDir(cwd: string): DoctorCheck {
@@ -203,7 +241,7 @@ function getPackageVersion(): string {
   return pkg.version;
 }
 
-function checkVersion(cwd: string): DoctorCheck {
+function checkVersion(cwd: string, originalCwd = cwd): DoctorCheck {
   const configPath = join(cwd, '.slope', 'config.json');
   if (!existsSync(configPath)) {
     return { name: 'version', status: 'warn', message: 'Cannot check version — .slope/config.json missing', fixable: false };
@@ -217,13 +255,13 @@ function checkVersion(cwd: string): DoctorCheck {
     if (config.slopeVersion !== pkgVersion) {
       return { name: 'version', status: 'warn', message: `config.slopeVersion (${config.slopeVersion}) differs from package (${pkgVersion}) — run \`slope doctor --fix\``, fixable: true };
     }
-    return { name: 'version', status: 'ok', message: `config.slopeVersion matches package (${pkgVersion})` };
+    return { name: 'version', status: 'ok', message: `config.slopeVersion matches package (${pkgVersion})${stateNote(cwd, originalCwd)}` };
   } catch {
     return { name: 'version', status: 'warn', message: 'Cannot check version — .slope/config.json unreadable', fixable: false };
   }
 }
 
-function checkConfigSchema(cwd: string): DoctorCheck[] {
+function checkConfigSchema(cwd: string, originalCwd = cwd): DoctorCheck[] {
   const checks: DoctorCheck[] = [];
   const configPath = join(cwd, '.slope', 'config.json');
   if (!existsSync(configPath)) return checks;
@@ -269,7 +307,7 @@ function checkConfigSchema(cwd: string): DoctorCheck[] {
   }
 
   if (checks.length === 0) {
-    checks.push({ name: 'config-schema', status: 'ok', message: 'Config schema valid' });
+    checks.push({ name: 'config-schema', status: 'ok', message: `Config schema valid${stateNote(cwd, originalCwd)}` });
   }
 
   return checks;
@@ -391,7 +429,7 @@ function checkHookScripts(cwd: string): DoctorCheck[] {
   return checks;
 }
 
-function checkGuards(cwd: string): DoctorCheck[] {
+function checkGuards(cwd: string, originalCwd = cwd): DoctorCheck[] {
   const checks: DoctorCheck[] = [];
   const hooksPath = join(cwd, '.slope', 'hooks.json');
 
@@ -426,13 +464,13 @@ function checkGuards(cwd: string): DoctorCheck[] {
       checks.push({
         name: 'guards',
         status: 'ok',
-        message: `${installedCount} of ${totalGuards} guard hooks installed — run \`slope hook add --level=full\` to install the rest`,
+        message: `${installedCount} of ${totalGuards} guard hooks installed${stateNote(cwd, originalCwd)} — run \`slope hook add --level=full\` to install the rest`,
       });
     } else {
       checks.push({
         name: 'guards',
         status: 'ok',
-        message: `${installedCount} of ${totalGuards} guard hooks installed`,
+        message: `${installedCount} of ${totalGuards} guard hooks installed${stateNote(cwd, originalCwd)}`,
       });
     }
   } catch {
