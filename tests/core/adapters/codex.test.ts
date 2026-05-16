@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { mkdtempSync, mkdirSync, existsSync, readFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { CodexAdapter } from '../../../src/core/adapters/codex.js';
@@ -25,6 +25,19 @@ describe('CodexAdapter', () => {
 
     it('does not contain PreCompact', () => {
       expect(adapter.supportedEvents.has('PreCompact')).toBe(false);
+    });
+  });
+
+  describe('toolNames', () => {
+    it('uses current Codex matcher aliases for file edits', () => {
+      expect(adapter.toolNames.write_file).toBe('apply_patch|Edit|Write');
+    });
+
+    it('keeps SLOPE-specific workflow matcher names used by current installs', () => {
+      expect(adapter.toolNames.execute_command).toBe('Bash');
+      expect(adapter.toolNames.create_subagent).toBe('Agent');
+      expect(adapter.toolNames.exit_plan).toBe('ExitPlanMode');
+      expect(adapter.toolNames.enter_worktree).toBe('EnterWorktree');
     });
   });
 
@@ -117,14 +130,38 @@ describe('CodexAdapter', () => {
       const config = adapter.generateHooksConfig(guards, '/path/to/slope-guard.sh');
       expect(config).toBeDefined();
       // hazard is PreToolUse, stop-check is Stop
-      expect(config.PreToolUse).toBeDefined();
-      expect(config.Stop).toBeDefined();
+      expect(config.hooks.PreToolUse).toBeDefined();
+      expect(config.hooks.Stop).toBeDefined();
+    });
+
+    it('wraps events under the Codex hooks root', () => {
+      const guards = GUARD_DEFINITIONS.filter(g => g.name === 'hazard');
+      const config = adapter.generateHooksConfig(guards, '/path/to/slope-guard.sh');
+
+      expect(config).toHaveProperty('hooks');
+      expect(config).not.toHaveProperty('PreToolUse');
+      expect(config.hooks.PreToolUse?.[0]?.hooks[0]?.statusMessage).toBe('SLOPE hazard');
+    });
+
+    it('groups guards by event and matcher for Codex review ergonomics', () => {
+      const guards = GUARD_DEFINITIONS.filter(g => g.hookEvent === 'PreToolUse' && g.matcher === 'Bash').slice(0, 2);
+      expect(guards).toHaveLength(2);
+
+      const config = adapter.generateHooksConfig(guards, '/path/to/slope-guard.sh');
+
+      expect(config.hooks.PreToolUse).toHaveLength(1);
+      expect(config.hooks.PreToolUse?.[0]?.matcher).toBe('Bash');
+      expect(config.hooks.PreToolUse?.[0]?.hooks).toHaveLength(1);
+      expect(config.hooks.PreToolUse?.[0]?.hooks[0]?.command).toContain('__batch');
+      for (const guard of guards) {
+        expect(config.hooks.PreToolUse?.[0]?.hooks[0]?.command).toContain(guard.name);
+      }
     });
 
     it('skips PreCompact guards (unsupported)', () => {
       const guards = GUARD_DEFINITIONS.filter(g => g.hookEvent === 'PreCompact');
       const config = adapter.generateHooksConfig(guards, '/path/to/slope-guard.sh');
-      expect(config.PreCompact).toBeUndefined();
+      expect(config.hooks.PreCompact).toBeUndefined();
     });
   });
 
@@ -138,9 +175,73 @@ describe('CodexAdapter', () => {
 
       expect(existsSync(join(tmpDir, '.codex', 'hooks', 'slope-guard.sh'))).toBe(true);
       expect(existsSync(join(tmpDir, '.codex', 'hooks.json'))).toBe(true);
+      expect(statSync(join(tmpDir, '.codex', 'hooks', 'slope-guard.sh')).mode & 0o111).toBeTruthy();
 
       const config = JSON.parse(readFileSync(join(tmpDir, '.codex', 'hooks.json'), 'utf8'));
-      expect(config.PreToolUse).toBeDefined();
+      expect(config.hooks.PreToolUse).toBeDefined();
+      expect(readFileSync(join(tmpDir, '.codex', 'hooks', 'slope-guard.sh'), 'utf8')).toContain('#!/usr/bin/env bash');
+    });
+
+    it('can install Codex guards to the user-level hooks directory', () => {
+      const cwd = mkdtempSync(join(tmpdir(), 'slope-codex-user-cwd-'));
+      const homeDir = mkdtempSync(join(tmpdir(), 'slope-codex-user-home-'));
+
+      const guards = GUARD_DEFINITIONS.filter(g => g.name === 'branch-before-commit');
+      adapter.installGuards(cwd, guards, { scope: 'user', homeDir });
+
+      const scriptPath = join(homeDir, '.codex', 'hooks', 'slope-guard.sh');
+      const configPath = join(homeDir, '.codex', 'hooks.json');
+      expect(existsSync(scriptPath)).toBe(true);
+      expect(existsSync(configPath)).toBe(true);
+      expect(readFileSync(scriptPath, 'utf8')).toContain('if [ ! -d "$SLOPE_PROJECT_DIR/.slope" ]; then');
+
+      const config = JSON.parse(readFileSync(configPath, 'utf8'));
+      const commands = config.hooks.PreToolUse.flatMap((entry: { hooks: Array<{ command: string }> }) =>
+        entry.hooks.map(h => h.command),
+      );
+      expect(commands).toEqual([`"${scriptPath}" branch-before-commit`]);
+    });
+
+    it('does not duplicate user-level Codex hook entries on reinstall', () => {
+      const cwd = mkdtempSync(join(tmpdir(), 'slope-codex-user-repeat-cwd-'));
+      const homeDir = mkdtempSync(join(tmpdir(), 'slope-codex-user-repeat-home-'));
+      const guards = GUARD_DEFINITIONS.filter(g => g.name === 'branch-before-commit');
+
+      adapter.installGuards(cwd, guards, { scope: 'user', homeDir });
+      adapter.installGuards(cwd, guards, { scope: 'user', homeDir });
+
+      const config = JSON.parse(readFileSync(join(homeDir, '.codex', 'hooks.json'), 'utf8'));
+      const commands = config.hooks.PreToolUse.flatMap((entry: { hooks: Array<{ command: string }> }) =>
+        entry.hooks.map(h => h.command),
+      );
+      expect(commands.filter((cmd: string) => cmd.includes('branch-before-commit'))).toHaveLength(1);
+    });
+
+    it('preserves non-SLOPE hooks and does not duplicate managed entries', () => {
+      const tmpDir = mkdtempSync(join(tmpdir(), 'slope-codex-merge-'));
+      mkdirSync(join(tmpDir, '.codex'), { recursive: true });
+
+      const configPath = join(tmpDir, '.codex', 'hooks.json');
+      const existing = {
+        hooks: {
+          PreToolUse: [{
+            matcher: 'Bash',
+            hooks: [{ type: 'command', command: 'echo existing', timeout: 5 }],
+          }],
+        },
+      };
+      writeFileSync(configPath, JSON.stringify(existing, null, 2) + '\n');
+
+      const guards = GUARD_DEFINITIONS.filter(g => g.name === 'hazard');
+      adapter.installGuards(tmpDir, guards);
+      adapter.installGuards(tmpDir, guards);
+
+      const config = JSON.parse(readFileSync(configPath, 'utf8'));
+      const commands = config.hooks.PreToolUse.flatMap((entry: { hooks: Array<{ command: string }> }) =>
+        entry.hooks.map(h => h.command),
+      );
+      expect(commands.filter((cmd: string) => cmd === 'echo existing')).toHaveLength(1);
+      expect(commands.filter((cmd: string) => cmd.includes('slope-guard.sh') && cmd.includes('hazard'))).toHaveLength(1);
     });
   });
 });

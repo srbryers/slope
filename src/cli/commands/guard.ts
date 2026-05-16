@@ -125,14 +125,9 @@ export async function guardCommand(args: string[]): Promise<void> {
     return;
   }
 
-  // Check if guard is disabled
   const cwd = process.cwd();
   const config = loadConfig();
   const disabled = config.guidance?.disabled ?? [];
-  if (disabled.includes(name)) {
-    // Silently exit — disabled guards produce no output
-    return;
-  }
 
   // Load custom guard plugins
   loadPluginGuards(cwd, config.plugins);
@@ -157,6 +152,43 @@ export async function guardCommand(args: string[]): Promise<void> {
   // Used by stop-check to distinguish pre-existing dirty files from session changes.
   recordBaseline(input.session_id, cwd);
 
+  if (name === '__batch' as GuardName) {
+    await runGuardBatch(args.slice(1) as GuardName[], input, cwd, disabled);
+    return;
+  }
+
+  const execution = await runGuardByName(name, input, cwd, disabled);
+  if (!execution) return;
+  writeGuardOutput(execution.def, execution.result);
+}
+
+async function runGuardBatch(names: GuardName[], input: HookInput, cwd: string, disabled: string[]): Promise<void> {
+  const executions: Array<{ def: AnyGuardDefinition; result: GuardResult }> = [];
+  const seen = new Set<string>();
+  for (const name of names) {
+    if (seen.has(name)) continue;
+    seen.add(name);
+    const execution = await runGuardByName(name, input, cwd, disabled);
+    if (execution) executions.push(execution);
+  }
+  if (executions.length === 0) return;
+
+  const def = executions[0].def;
+  const result = combineGuardResults(executions.map(e => e.result));
+  writeGuardOutput(def, result);
+}
+
+async function runGuardByName(
+  name: GuardName,
+  input: HookInput,
+  cwd: string,
+  disabled: string[],
+): Promise<{ def: AnyGuardDefinition; result: GuardResult } | null> {
+  if (disabled.includes(name)) {
+    // Silently exit — disabled guards produce no output
+    return null;
+  }
+
   // Find guard definition (built-in or custom).
   // When multiple definitions share a name (e.g. sprint-completion fires on
   // PreToolUse, PostToolUse, and Stop), prefer the one matching the actual
@@ -177,7 +209,7 @@ export async function guardCommand(args: string[]): Promise<void> {
   // Skip sprint-workflow guards in adhoc sessions
   const relevance = GUARD_RELEVANCE[name];
   if (relevance?.when === 'sprint-workflow' && input.session_id && isAdhocSession(cwd, input.session_id)) {
-    return;
+    return null;
   }
 
   // Find and run the handler
@@ -197,10 +229,10 @@ export async function guardCommand(args: string[]): Promise<void> {
           process.stdout.write(output);
         }
       } catch { /* custom guard failed — silent passthrough */ }
-      return;
+      return null;
     }
     // No handler registered — passthrough
-    return;
+    return null;
   }
 
   const result = await handler(input, cwd);
@@ -208,7 +240,24 @@ export async function guardCommand(args: string[]): Promise<void> {
   // Record guard execution metrics (fire-and-forget)
   recordGuardExecution(cwd, name, input, result);
 
-  // Format output based on hook event type
+  return { def, result };
+}
+
+function combineGuardResults(results: GuardResult[]): GuardResult {
+  const nonEmpty = results.filter(r => r.context || r.decision || r.blockReason || r.suggestion);
+  if (nonEmpty.length === 0) return {};
+  const blockReasons = nonEmpty.map(r => r.blockReason).filter(Boolean) as string[];
+  const contexts = nonEmpty.map(r => r.context).filter(Boolean) as string[];
+  const decisions = nonEmpty.map(r => r.decision).filter(Boolean);
+  return {
+    ...(contexts.length > 0 && { context: contexts.join('\n\n') }),
+    ...(blockReasons.length > 0 && { blockReason: blockReasons.join('\n\n') }),
+    ...(decisions.includes('deny') ? { decision: 'deny' as const } : decisions.includes('ask') ? { decision: 'ask' as const } : decisions.includes('allow') ? { decision: 'allow' as const } : {}),
+    ...(nonEmpty.find(r => r.suggestion)?.suggestion && { suggestion: nonEmpty.find(r => r.suggestion)?.suggestion }),
+  };
+}
+
+function writeGuardOutput(def: AnyGuardDefinition, result: GuardResult): void {
   if (!result.context && !result.decision && !result.blockReason && !result.suggestion) {
     // No guidance to inject — silent passthrough
     return;

@@ -1,0 +1,40 @@
+{
+  "name": "slope",
+  "version": "1.55.3",
+  "description": "SLOPE sprint tracking, guard metadata, and Codex setup bundle.",
+  "author": {
+    "name": "SLOPE",
+    "email": "support@example.com",
+    "url": "https://github.com/srbryers/slope"
+  },
+  "homepage": "https://github.com/srbryers/slope",
+  "repository": "https://github.com/srbryers/slope",
+  "license": "MIT",
+  "keywords": [
+    "slope",
+    "sprint-tracking",
+    "codex",
+    "hooks"
+  ],
+  "hooks": "./hooks.json",
+  "interface": {
+    "displayName": "SLOPE",
+    "shortDescription": "Sprint tracking and hook metadata for Codex.",
+    "longDescription": "Bundles SLOPE guard hook metadata and a dispatcher script for future Codex plugin hook support. Runtime guard execution currently uses user or project hooks.json shims.",
+    "developerName": "SLOPE",
+    "category": "Productivity",
+    "capabilities": [
+      "Hooks",
+      "MCP"
+    ],
+    "websiteURL": "https://github.com/srbryers/slope",
+    "privacyPolicyURL": "https://github.com/srbryers/slope",
+    "termsOfServiceURL": "https://github.com/srbryers/slope",
+    "defaultPrompt": [
+      "Run slope briefing and summarize current sprint risks.",
+      "Check whether SLOPE hooks are installed correctly.",
+      "Review the current sprint plan and next ticket."
+    ],
+    "brandColor": "#2F6F5E"
+  }
+}

@@ -13,7 +13,7 @@ import './core/adapters/generic.js';
 export { registerAdapter, getAdapter, listAdapters, detectAdapter, clearAdapters, resolveToolMatcher, ADAPTER_PRIORITY, TOOL_CATEGORIES, CLAUDE_CODE_TOOLS } from './core/harness.js';
 
 // Framework types
-export type { HarnessAdapter, HarnessId, ToolCategory, ToolNameMap } from './core/harness.js';
+export type { HarnessAdapter, HarnessId, HarnessInstallOptions, ToolCategory, ToolNameMap } from './core/harness.js';
 
 // Adapter classes + singletons
 export { ClaudeCodeAdapter, claudeCodeAdapter } from './core/adapters/claude-code.js';

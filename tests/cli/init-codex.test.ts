@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { execSync } from 'node:child_process';
-import { mkdtempSync, rmSync, existsSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -52,12 +52,51 @@ describe('slope init --codex (GH #309)', () => {
     }
   });
 
+  it('installs Codex plugin bundle metadata without relying on plugin hooks', () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'slope-init-codex-plugin-'));
+    try {
+      execSync(`node ${SLOPE_BIN} init --codex`, { cwd, stdio: ['pipe', 'pipe', 'pipe'] });
+      const pluginRoot = join(cwd, '.codex', 'plugins', 'slope');
+      const manifestPath = join(pluginRoot, '.codex-plugin', 'plugin.json');
+      const hooksPath = join(pluginRoot, 'hooks.json');
+      const dispatcherPath = join(pluginRoot, 'hooks', 'slope-guard.sh');
+
+      expect(existsSync(manifestPath)).toBe(true);
+      expect(existsSync(hooksPath)).toBe(true);
+      expect(existsSync(dispatcherPath)).toBe(true);
+
+      const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+      const hooks = JSON.parse(readFileSync(hooksPath, 'utf8'));
+      expect(manifest.name).toBe('slope');
+      expect(manifest.hooks).toBe('./hooks.json');
+      expect(hooks.slopePluginHooksStatus).toBe('metadata-only');
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('does not overwrite an existing Codex plugin manifest', () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'slope-init-codex-plugin-existing-'));
+    const manifestPath = join(cwd, '.codex', 'plugins', 'slope', '.codex-plugin', 'plugin.json');
+    try {
+      require('node:fs').mkdirSync(join(cwd, '.codex', 'plugins', 'slope', '.codex-plugin'), { recursive: true });
+      const sentinel = '{"name":"custom-slope"}\n';
+      require('node:fs').writeFileSync(manifestPath, sentinel);
+
+      execSync(`node ${SLOPE_BIN} init --codex`, { cwd, stdio: ['pipe', 'pipe', 'pipe'] });
+      expect(readFileSync(manifestPath, 'utf8')).toBe(sentinel);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
   it('prints Codex-specific next steps including MCP config snippet', () => {
     const cwd = mkdtempSync(join(tmpdir(), 'slope-init-codex-next-'));
     try {
       const out = execSync(`node ${SLOPE_BIN} init --codex`, { cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
       expect(out).toContain('Platform: codex');
       expect(out).toContain('.codex/config.toml');
+      expect(out).toContain('.codex/plugins/slope');
       expect(out).toContain('Branch discipline');
       expect(out).toContain('slope sprint begin');
     } finally {

@@ -8,6 +8,7 @@ import '../../core/adapters/claude-code.js';
 import '../../core/adapters/cursor.js';
 import '../../core/adapters/windsurf.js';
 import '../../core/adapters/cline.js';
+import '../../core/adapters/codex.js';
 import '../../core/adapters/generic.js';
 
 const HOOK_TEMPLATES: Record<string, { description: string; managed: string[] }> = {
@@ -107,10 +108,10 @@ export async function hookCommand(args: string[]): Promise<void> {
   switch (sub) {
     case 'add':
       if (flags.level === 'full' || flags.level === 'scoring' || flags.level === 'essential') {
-        installGuardHooks(cwd, flags.level as 'scoring' | 'essential' | 'full', flags.harness);
+        installGuardHooks(cwd, flags.level as 'scoring' | 'essential' | 'full', flags.harness, flags.scope);
       } else if (hookName && isKnownAdapter(hookName)) {
         // `slope hook add claude-code` → shorthand for `--level=full --harness=claude-code`
-        installGuardHooks(cwd, 'full', hookName);
+        installGuardHooks(cwd, 'full', hookName, flags.scope);
       } else {
         addHook(hookName, cwd);
       }
@@ -131,6 +132,8 @@ slope hook — Manage SLOPE lifecycle hooks
 Usage:
   slope hook add <name>                         Install a hook from the catalog
   slope hook add --level=full [--harness=<id>]  Install guard hooks (auto-detect or specify harness)
+  slope hook add --level=full --harness=codex --scope=user
+                                                Install Codex guards in ~/.codex
   slope hook remove <name>                      Remove an installed hook
   slope hook list [--available]                  Show installed hooks (or full catalog)
   slope hook show <name>                        Display hook file contents
@@ -257,7 +260,7 @@ function showHook(name: string, cwd: string): void {
   process.exit(1);
 }
 
-function installGuardHooks(cwd: string, level: 'scoring' | 'essential' | 'full', harnessId?: string): void {
+function installGuardHooks(cwd: string, level: 'scoring' | 'essential' | 'full', harnessId?: string, scope?: string): void {
   // Load custom guard plugins
   const config = loadConfig(cwd);
   loadPluginGuards(cwd, config.plugins);
@@ -300,14 +303,28 @@ function installGuardHooks(cwd: string, level: 'scoring' | 'essential' | 'full',
     console.log('  Use --harness=<id> to specify one. Available: ' + listAdapters().join(', ') + '\n');
     return;
   }
+  if (scope && scope !== 'project' && scope !== 'user') {
+    console.error(`\n  Unknown hook scope: "${scope}". Expected "project" or "user".\n`);
+    process.exit(1);
+  }
+  if (scope === 'user' && adapter.id !== 'codex') {
+    console.error('\n  --scope=user is currently only supported for the Codex harness.\n');
+    process.exit(1);
+  }
 
   // Delegate installation to the adapter
-  adapter.installGuards(cwd, guards);
+  adapter.installGuards(cwd, guards, { scope: scope === 'user' ? 'user' : 'project' });
 
   // Update hooks registry
   const hooksConfig = loadHooksConfig(cwd);
   for (const g of guards) {
     hooksConfig.installed[`guard-${g.name}`] = {
+      provider: adapter.id,
+      installed_at: new Date().toISOString(),
+    };
+  }
+  if (scope === 'user' && adapter.id === 'codex') {
+    hooksConfig.installed['codex-user-guard-shim'] = {
       provider: adapter.id,
       installed_at: new Date().toISOString(),
     };
@@ -322,6 +339,9 @@ function installGuardHooks(cwd: string, level: 'scoring' | 'essential' | 'full',
   console.log(`\n  Installed ${persistedCount} of ${guards.length} guard hooks (level: ${guards.some(g => g.level === 'full') ? 'full' : 'scoring'}):`);
   for (const g of guards) {
     console.log(`    ${g.name.padEnd(16)} [${g.hookEvent}] ${g.description}`);
+  }
+  if (scope === 'user' && adapter.id === 'codex') {
+    console.log('  Codex scope: user (~/.codex). Avoid also installing project-local Codex hooks unless you want duplicate hook firing.');
   }
   console.log('');
 }

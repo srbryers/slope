@@ -52,7 +52,7 @@ export interface HarnessAdapter {
   /** Generate hooks configuration for this harness */
   generateHooksConfig(guards: AnyGuardDefinition[], guardScriptPath: string): unknown;
   /** Install guard hooks into the project for this harness */
-  installGuards(cwd: string, guards: AnyGuardDefinition[]): void;
+  installGuards(cwd: string, guards: AnyGuardDefinition[], options?: HarnessInstallOptions): void;
   /** Detect whether this harness is active in the given directory */
   detect(cwd: string): boolean;
   /** Hook events this harness supports (e.g. PreToolUse, PostToolUse, Stop, PreCompact) */
@@ -61,6 +61,13 @@ export interface HarnessAdapter {
   readonly supportsContextInjection: boolean;
   /** Return the path to this harness's hooks config file, or null if N/A */
   hooksConfigPath(cwd: string): string | null;
+}
+
+export interface HarnessInstallOptions {
+  /** Install into the project by default; some harnesses also support user-level hooks. */
+  scope?: 'project' | 'user';
+  /** Test override for user-level installs. Defaults to the current user's home directory. */
+  homeDir?: string;
 }
 
 // --- Claude Code Tool Name Map ---

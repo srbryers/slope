@@ -105,10 +105,12 @@
       "note": "Closed the 3 remaining backlog items (#307, #318, #323) from the Phase 18-20 sweep. Shipped in v1.55.0."
     },
     {
-      "name": "Phase 22 \u2014 TBD (next initiative)",
-      "sprints": [],
+      "name": "Phase 22 \u2014 Codex Hook Recovery",
+      "sprints": [
+        93
+      ],
       "status": "planned",
-      "note": "Issue queue empty as of v1.55.0. Next initiative themes TBD."
+      "note": "Recover Codex hook support after validating current Codex CLI hook docs and local 0.130 behavior."
     }
   ],
   "sprints": [
@@ -1257,6 +1259,54 @@
           "club": "short_iron",
           "complexity": "standard",
           "github_issue": 318
+        }
+      ]
+    },
+    {
+      "id": 93,
+      "theme": "Codex Hook Recovery \u2014 make SLOPE hooks actually load",
+      "par": 4,
+      "slope": 2,
+      "type": "bug fix + dx",
+      "status": "planned",
+      "depends_on": [
+        92
+      ],
+      "note": "Codex CLI hooks are enabled by default and load from hooks.json/config.toml under the user or trusted project .codex layer. SLOPE's Codex adapter had stale config-shape and init assumptions; this sprint hardens install, diagnostics, and docs.",
+      "tickets": [
+        {
+          "key": "S93-1",
+          "title": "Fix Codex guard hooks.json shape and idempotent install",
+          "club": "wedge",
+          "complexity": "small"
+        },
+        {
+          "key": "S93-2",
+          "title": "Add optional user-level Codex hook shim install path",
+          "club": "short_iron",
+          "complexity": "standard",
+          "depends_on": [
+            "S93-1"
+          ]
+        },
+        {
+          "key": "S93-3",
+          "title": "Generate SLOPE Codex plugin bundle for future plugin_hooks support",
+          "club": "short_iron",
+          "complexity": "standard",
+          "depends_on": [
+            "S93-1"
+          ]
+        },
+        {
+          "key": "S93-4",
+          "title": "Add diagnostics and docs for Codex hook trust, runtime path, and coverage limits",
+          "club": "short_iron",
+          "complexity": "standard",
+          "depends_on": [
+            "S93-2",
+            "S93-3"
+          ]
         }
       ]
     }

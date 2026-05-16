@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { runDoctorChecks, runDoctorFixes } from '../../../src/cli/commands/doctor.js';
@@ -151,6 +151,51 @@ describe('doctor checks', () => {
       const hookCheck = checks.find(c => c.name === 'hook-scripts');
       expect(hookCheck).toBeDefined();
       expect(hookCheck!.status).toBe('ok');
+    });
+
+    it('detects Codex hooks.json missing top-level hooks object', () => {
+      setupSlopeDir(cwd);
+      mkdirSync(join(cwd, '.codex'), { recursive: true });
+      writeFileSync(join(cwd, '.codex', 'hooks.json'), JSON.stringify({ PreToolUse: [] }));
+
+      const checks = runDoctorChecks(cwd);
+      const codexCheck = checks.find(c => c.name === 'codex-hooks' && c.message.includes('missing top-level "hooks"'));
+      expect(codexCheck).toBeDefined();
+      expect(codexCheck!.status).toBe('warn');
+      expect(codexCheck!.fixable).toBe(true);
+    });
+
+    it('fixes Codex hooks.json root event shape', async () => {
+      setupSlopeDir(cwd);
+      mkdirSync(join(cwd, '.codex'), { recursive: true });
+      const configPath = join(cwd, '.codex', 'hooks.json');
+      writeFileSync(configPath, JSON.stringify({
+        PreToolUse: [{ matcher: 'Bash', hooks: [] }],
+        custom: true,
+      }));
+
+      const checks = runDoctorChecks(cwd);
+      const fixed = await runDoctorFixes(cwd, checks);
+      expect(fixed).toContain('Repaired Codex project hooks.json top-level hooks shape');
+
+      const config = JSON.parse(readFileSync(configPath, 'utf8'));
+      expect(config.custom).toBe(true);
+      expect(config.hooks.PreToolUse).toHaveLength(1);
+      expect(config.PreToolUse).toBeUndefined();
+    });
+
+    it('detects non-executable Codex hook scripts', () => {
+      setupSlopeDir(cwd);
+      const hooksDir = join(cwd, '.codex', 'hooks');
+      mkdirSync(hooksDir, { recursive: true });
+      const scriptPath = join(hooksDir, 'slope-guard.sh');
+      writeFileSync(scriptPath, '#!/usr/bin/env bash\nexit 0\n');
+      chmodSync(scriptPath, 0o644);
+
+      const checks = runDoctorChecks(cwd);
+      const codexCheck = checks.find(c => c.name === 'codex-hooks' && c.message.includes('not executable'));
+      expect(codexCheck).toBeDefined();
+      expect(codexCheck!.status).toBe('warn');
     });
   });
 

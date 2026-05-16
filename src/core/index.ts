@@ -296,6 +296,7 @@ export type {
   ToolCategory,
   ToolNameMap,
   HarnessAdapter,
+  HarnessInstallOptions,
 } from './harness.js';
 
 // Adapters
