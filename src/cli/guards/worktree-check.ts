@@ -138,5 +138,7 @@ function isWorktreeRecoveryInput(input: HookInput): boolean {
     ? input.tool_input.command.trim()
     : '';
 
-  return command === 'EnterWorktree' || /^git\s+worktree\s+add(?:\s|$)/.test(command);
+  return command === 'EnterWorktree'
+    || /^git\s+worktree\s+add(?:\s|$)/.test(command)
+    || /^git\s+-C\s+(?:"[^"]+"|'[^']+'|\S+)\s+worktree\s+add(?:\s|$)/.test(command);
 }
