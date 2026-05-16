@@ -1,4 +1,4 @@
-import { writeFileSync, mkdirSync, existsSync, cpSync, readFileSync } from 'node:fs';
+import { writeFileSync, mkdirSync, existsSync, cpSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
@@ -547,6 +547,37 @@ function installOpenCodePlugin(cwd: string): void {
   }
 }
 
+function copyDirectoryMissing(srcDir: string, destDir: string): number {
+  if (!existsSync(srcDir)) return 0;
+  mkdirSync(destDir, { recursive: true });
+  let copied = 0;
+  for (const entry of readdirSync(srcDir)) {
+    const src = join(srcDir, entry);
+    const dest = join(destDir, entry);
+    const stat = statSync(src);
+    if (stat.isDirectory()) {
+      copied += copyDirectoryMissing(src, dest);
+    } else if (!existsSync(dest)) {
+      cpSync(src, dest);
+      copied++;
+    }
+  }
+  return copied;
+}
+
+function installCodexPluginBundle(cwd: string): void {
+  const src = join(getTemplatesRoot(), 'codex', 'plugins', 'slope');
+  const dest = join(cwd, '.codex', 'plugins', 'slope');
+  const copied = copyDirectoryMissing(src, dest);
+  if (copied > 0) {
+    console.log(`  Created Codex plugin bundle at ${dest}`);
+  } else if (existsSync(dest)) {
+    console.log(`  Codex plugin bundle already exists at ${dest}`);
+  } else {
+    console.warn(`  Warning: Codex plugin template not found: ${src}`);
+  }
+}
+
 function installOpenCodeMcpConfig(cwd: string): void {
   const mcpPath = join(cwd, 'opencode.json');
   let config: { $schema?: string; mcp?: Record<string, { type: string; command: string[]; enabled?: boolean }> } = {};
@@ -737,9 +768,11 @@ function installForProvider(cwd: string, provider: InitProvider, metaphor: Metap
           console.log(`  AGENTS.md already exists — leaving untouched`);
         }
       }
+      installCodexPluginBundle(cwd);
       installDefaultHooks(cwd, 'codex');
       console.log('\n  Codex CLI: Guards installed to .codex/hooks.json');
       console.log('  Codex CLI: AGENTS.md provides project context');
+      console.log('  Codex CLI: Plugin bundle installed to .codex/plugins/slope (metadata only until plugin_hooks works)');
       console.log('  Codex CLI: MCP server configured — add to .codex/config.toml:');
       console.log('    [mcp.slope]');
       console.log('    command = "slope"');
@@ -795,6 +828,7 @@ const PROVIDER_NEXT_STEPS: Partial<Record<InitProvider, string[]>> = {
   codex: [
     'Add SLOPE MCP server to .codex/config.toml: [mcp.slope] command="slope" args=["mcp"]',
     'Guards installed to .codex/hooks.json',
+    'Plugin bundle installed to .codex/plugins/slope for future plugin_hooks support',
     'Track docs/vision.md and docs/backlog/roadmap.json as source of truth (.slope/ stays local)',
     'Branch discipline: branch-before-commit guard blocks direct main commits — use feat/<desc>',
     'First sprint: slope vision create, slope roadmap validate, slope sprint begin --sprint=1 --ticket=S1-1',

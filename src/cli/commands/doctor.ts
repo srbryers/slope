@@ -1,4 +1,5 @@
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, statSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
@@ -11,6 +12,7 @@ import { detectAdapter, SLOPE_BIN_PREAMBLE, writeOrUpdateManagedScript } from '.
 import '../../core/adapters/claude-code.js';
 import '../../core/adapters/cursor.js';
 import '../../core/adapters/windsurf.js';
+import '../../core/adapters/codex.js';
 import '../../core/adapters/generic.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -62,10 +64,13 @@ export function runDoctorChecks(cwd: string): DoctorCheck[] {
   // 11. Check hook script staleness
   checks.push(...checkHookScripts(cwd));
 
-  // 12. Check MCP config for detected platforms
+  // 12. Check Codex hook config shape and runtime-path hazards
+  checks.push(...checkCodexHooks(cwd));
+
+  // 13. Check MCP config for detected platforms
   checks.push(...checkMcpConfig(cwd));
 
-  // 13. Branch hygiene — stale merged + remote-tracking refs (#322)
+  // 14. Branch hygiene — stale merged + remote-tracking refs (#322)
   checks.push(...checkBranchHygiene(cwd));
 
   return checks;
@@ -322,10 +327,15 @@ function checkHookScripts(cwd: string): DoctorCheck[] {
     cursor: join(cwd, '.cursor', 'hooks'),
     windsurf: join(cwd, '.windsurf', 'hooks'),
     cline: join(cwd, '.clinerules', 'hooks'),
+    codex: join(cwd, '.codex', 'hooks'),
     ob1: join(cwd, '.ob1', 'hooks'),
   };
   const hooksDir = hooksDirMap[adapter.id];
   if (!hooksDir) return checks;
+
+  if (adapter.id === 'codex') {
+    return checkCodexHookScripts(hooksDir);
+  }
 
   // Check guard dispatcher
   const dispatcherPath = join(hooksDir, 'slope-guard.sh');
@@ -389,6 +399,111 @@ function checkHookScripts(cwd: string): DoctorCheck[] {
   }
 
   return checks;
+}
+
+function checkCodexHookScripts(hooksDir: string): DoctorCheck[] {
+  const checks: DoctorCheck[] = [];
+  for (const name of ['slope-guard.sh', 'slope-session-start.sh', 'slope-session-end.sh']) {
+    const filePath = join(hooksDir, name);
+    if (!existsSync(filePath)) continue;
+    const content = readFileSync(filePath, 'utf8');
+    if (!content.startsWith('#!')) {
+      checks.push({
+        name: 'codex-hooks',
+        status: 'warn',
+        message: `${name} is missing a shebang — reinstall Codex hooks`,
+        fixable: false,
+      });
+    }
+    if ((statSync(filePath).mode & 0o111) === 0) {
+      checks.push({
+        name: 'codex-hooks',
+        status: 'warn',
+        message: `${name} is not executable — run \`chmod +x ${filePath}\``,
+        fixable: false,
+      });
+    }
+  }
+
+  if (checks.length === 0 && existsSync(join(hooksDir, 'slope-guard.sh'))) {
+    checks.push({ name: 'codex-hooks', status: 'ok', message: 'Codex hook scripts have shebangs and executable bits' });
+  }
+  return checks;
+}
+
+function checkCodexHooks(cwd: string): DoctorCheck[] {
+  const checks: DoctorCheck[] = [];
+  const projectHooksPath = join(cwd, '.codex', 'hooks.json');
+  const userHooksPath = join(homedir(), '.codex', 'hooks.json');
+
+  if (existsSync(projectHooksPath)) {
+    checks.push(...checkCodexHooksFile(projectHooksPath, 'project'));
+  }
+  if (existsSync(projectHooksPath) && existsSync(userHooksPath) && fileHasSlopeHooks(projectHooksPath) && fileHasSlopeHooks(userHooksPath)) {
+    checks.push({
+      name: 'codex-hooks',
+      status: 'warn',
+      message: 'SLOPE hooks found in both project .codex/hooks.json and ~/.codex/hooks.json — choose one runtime path to avoid duplicate firing',
+      fixable: false,
+    });
+  }
+
+  return checks;
+}
+
+function checkCodexHooksFile(filePath: string, label: string): DoctorCheck[] {
+  try {
+    const parsed = JSON.parse(readFileSync(filePath, 'utf8')) as Record<string, unknown>;
+    if (!parsed.hooks || typeof parsed.hooks !== 'object' || Array.isArray(parsed.hooks)) {
+      return [{
+        name: 'codex-hooks',
+        status: 'warn',
+        message: `Codex ${label} hooks config is missing top-level "hooks" object — reinstall with \`slope hook add --harness=codex --level=full\``,
+        fixable: label === 'project',
+      }];
+    }
+  } catch {
+    return [{
+      name: 'codex-hooks',
+      status: 'warn',
+      message: `Codex ${label} hooks config is invalid JSON`,
+      fixable: false,
+    }];
+  }
+  return [];
+}
+
+function fileHasSlopeHooks(filePath: string): boolean {
+  try {
+    return readFileSync(filePath, 'utf8').includes('slope-guard.sh');
+  } catch {
+    return false;
+  }
+}
+
+function repairCodexProjectHooksConfig(cwd: string): boolean {
+  const configPath = join(cwd, '.codex', 'hooks.json');
+  if (!existsSync(configPath)) return false;
+  try {
+    const parsed = JSON.parse(readFileSync(configPath, 'utf8')) as Record<string, unknown>;
+    if (parsed.hooks && typeof parsed.hooks === 'object' && !Array.isArray(parsed.hooks)) return false;
+
+    const eventNames = ['PreToolUse', 'PostToolUse', 'Stop', 'SessionStart'];
+    const hooks: Record<string, unknown> = {};
+    const rest: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(parsed)) {
+      if (eventNames.includes(key)) {
+        hooks[key] = value;
+      } else {
+        rest[key] = value;
+      }
+    }
+    if (Object.keys(hooks).length === 0) return false;
+    writeFileSync(configPath, JSON.stringify({ ...rest, hooks }, null, 2) + '\n');
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function checkGuards(cwd: string): DoctorCheck[] {
@@ -647,6 +762,12 @@ export async function runDoctorFixes(cwd: string, checks: DoctorCheck[]): Promis
             const result = writeOrUpdateManagedScript(filePath, generateSessionHookScript(name, commands));
             if (result === 'updated') fixed.push(`Updated slope-${name}.sh managed section`);
           }
+        }
+        break;
+      }
+      case 'codex-hooks': {
+        if (repairCodexProjectHooksConfig(cwd)) {
+          fixed.push('Repaired Codex project hooks.json top-level hooks shape');
         }
         break;
       }

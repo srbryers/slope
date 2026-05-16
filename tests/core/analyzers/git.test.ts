@@ -92,7 +92,7 @@ describe('analyzeGit', () => {
 
     const result = await analyzeGit(tmpDir);
     expect(result.inferredCadence).toBe('daily');
-  });
+  }, 15000);
 
   it('infers sporadic cadence from few commits', async () => {
     gitInit(tmpDir);

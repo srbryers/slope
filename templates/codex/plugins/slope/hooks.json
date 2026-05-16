@@ -1,0 +1,44 @@
+{
+  "slopePluginHooksStatus": "metadata-only",
+  "note": "Codex plugin hook discovery is not a reliable runtime path yet. Use user or project hooks.json shims for active SLOPE guards.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./hooks/slope-guard.sh branch-before-commit",
+            "timeout": 10,
+            "statusMessage": "SLOPE branch guard"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./hooks/slope-guard.sh commit-nudge",
+            "timeout": 10,
+            "statusMessage": "SLOPE commit nudge"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./hooks/slope-guard.sh stop-check",
+            "timeout": 10,
+            "statusMessage": "SLOPE stop check"
+          }
+        ]
+      }
+    ]
+  }
+}

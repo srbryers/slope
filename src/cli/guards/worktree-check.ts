@@ -35,6 +35,8 @@ export function resetWorktreeCheckState(sessionId = ''): void {
  * on subsequent invocations so they can recover once conflicts resolve.
  */
 export async function worktreeCheckGuard(input: HookInput, cwd: string): Promise<GuardResult> {
+  if (isWorktreeRecoveryInput(input)) return {};
+
   // Use stable session ID, or generate one for unidentified sessions
   const sessionId = input.session_id || randomUUID();
   const sentinel = sentinelPath(sessionId);
@@ -127,4 +129,14 @@ export async function worktreeCheckGuard(input: HookInput, cwd: string): Promise
   } finally {
     try { store.close(); } catch { /* ignore */ }
   }
+}
+
+function isWorktreeRecoveryInput(input: HookInput): boolean {
+  if (input.tool_name === 'EnterWorktree') return true;
+
+  const command = typeof input.tool_input?.command === 'string'
+    ? input.tool_input.command.trim()
+    : '';
+
+  return command === 'EnterWorktree' || /^git\s+worktree\s+add(?:\s|$)/.test(command);
 }
