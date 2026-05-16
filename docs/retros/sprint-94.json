@@ -1,0 +1,114 @@
+{
+  "sprint_number": 94,
+  "theme": "Guard Enforcement Hardening",
+  "type": "hardening + dx",
+  "player": "codex",
+  "par": 4,
+  "slope": 2,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-05-16",
+  "shots": [
+    {
+      "ticket_key": "S94-1",
+      "title": "Dispatcher-level regression tests for adhoc claim-required and suppressed workflow guards",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Commit 289714d covers real guardCommand stdin/stdout behavior, adhoc claim-required asks, suppressed workflow guard metrics, and batched write guard behavior."
+    },
+    {
+      "ticket_key": "S94-2",
+      "title": "Codex matcher coverage for claim-required under apply_patch/Edit/Write installs",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Commit 1c5acc5 locks claim-required into Codex write matcher coverage for generated configs, project installs, and user installs."
+    },
+    {
+      "ticket_key": "S94-3",
+      "title": "Doctor diagnostics for stale hook runtime resolution and local binary precedence",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "Codex hook behavior can look current while resolving a stale project-local package or stale dev dist output."
+        }
+      ],
+      "notes": "Commit e803279 adds codex-runtime diagnostics for project-local package precedence and stale SLOPE dev dist output."
+    },
+    {
+      "ticket_key": "S94-4",
+      "title": "Configurable implementation-write strictness and non-implementing phase behavior",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Commit e0262ff adds guidance.requireSprintForImplementationWrites with ask, deny, and off modes. Commits 2f0c0f1 and 8a91f97 handled sprint scoping and stale Claude lock cleanup."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 1,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "wind",
+      "description": "The #368 emergency patch fixed the immediate no-sprint gap, but the larger guard contract needed coverage at the dispatcher, install, runtime, and config layers.",
+      "impact": "moderate"
+    },
+    {
+      "type": "pin_position",
+      "description": "The default behavior had to stay advisory enough for adhoc work while allowing strict repos to deny implementation writes outside sprint or claim flow.",
+      "impact": "minor"
+    }
+  ],
+  "special_plays": [],
+  "bunker_locations": [
+    "Codex runtime resolution can prefer project-local node_modules/.bin/slope or SLOPE dev dist/cli/index.js before the global package."
+  ],
+  "yardage_book_updates": [
+    "tests/cli/commands/guard.test.ts now exercises the real guard dispatcher with hook-style JSON input and metrics assertions.",
+    "tests/core/adapters/codex.test.ts and tests/cli/commands/hook-codex.test.ts now lock claim-required under Codex apply_patch/Edit/Write matchers.",
+    "src/cli/commands/doctor.ts now reports codex-runtime resolution order and stale runtime warnings.",
+    "src/cli/guards/claim-required.ts now supports guidance.requireSprintForImplementationWrites policies."
+  ],
+  "course_management_notes": [
+    "Default no-sprint implementation writes ask for permission; strict mode denies; off mode allows outside-sprint implementation writes.",
+    "Active implementing sprints still preserve the existing missing-claim advisory by default, with strict mode upgrading that path to deny.",
+    "Full test suite passed after implementation: 199 test files, 3341 tests."
+  ],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Guard fixes need tests through the installed harness path, not only the guard helper function.",
+      "outcome": "Added dispatcher-level and Codex install coverage so matcher or batch suppression regressions fail in tests."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "cleanup",
+      "description": "Removed the stale .claude/scheduled_tasks.lock file requested at sprint start.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "A focused hardening sprint: small surface area, but the important path spans dispatcher output, installed matchers, runtime resolution, and config semantics.",
+    "advice_for_next_player": "When changing a workflow-control guard, add coverage for helper behavior, CLI dispatcher output, installed hook matchers, and the runtime binary that the hook will actually execute.",
+    "what_surprised_you": "The local auto-card path did not recognize the in-branch S94 roadmap entry and initially over-scanned history, so the reviewed scorecard needed manual correction.",
+    "excited_about_next": "Use the new strictness knob in a real repo and decide whether SLOPE itself should default to ask or deny for source writes without claims."
+  }
+}
