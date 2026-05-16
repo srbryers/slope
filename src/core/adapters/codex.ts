@@ -20,8 +20,8 @@ type CodexHooksFile = { hooks: CodexHooksByEvent } & Record<string, unknown>;
 const CODEX_TOOLS: ToolNameMap = {
   read_file: 'mcp__.*__read.*',
   write_file: 'apply_patch|Edit|Write',
-  search_files: 'mcp__.*__(glob|list|search).*',
-  search_content: 'mcp__.*__(grep|search).*',
+  search_files: 'mcp__.*__glob.*|mcp__.*__list.*|mcp__.*__search.*',
+  search_content: 'mcp__.*__grep.*|mcp__.*__search.*',
   execute_command: 'Bash',
   create_subagent: 'Agent',
   exit_plan: 'ExitPlanMode',

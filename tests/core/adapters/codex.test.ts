@@ -150,6 +150,15 @@ describe('CodexAdapter', () => {
       expect(config.hooks.PreToolUse?.[0]?.matcher).toBe('apply_patch|Edit|Write');
     });
 
+    it('keeps Codex search and edit matchers valid when categories are combined', () => {
+      const guards = GUARD_DEFINITIONS.filter(g => g.name === 'explore');
+      const config = adapter.generateHooksConfig(guards, '/path/to/slope-guard.sh');
+
+      expect(config.hooks.PreToolUse?.[0]?.matcher).toBe(
+        'mcp__.*__read.*|mcp__.*__glob.*|mcp__.*__list.*|mcp__.*__search.*|mcp__.*__grep.*|apply_patch|Edit|Write',
+      );
+    });
+
     it('groups guards by event and matcher for Codex review ergonomics', () => {
       const guards = GUARD_DEFINITIONS.filter(g => g.hookEvent === 'PreToolUse' && g.matcher === 'Bash').slice(0, 2);
       expect(guards).toHaveLength(2);
