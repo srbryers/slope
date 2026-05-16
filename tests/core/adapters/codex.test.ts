@@ -143,6 +143,13 @@ describe('CodexAdapter', () => {
       expect(config.hooks.PreToolUse?.[0]?.hooks[0]?.statusMessage).toBe('SLOPE hazard');
     });
 
+    it('resolves matcher from toolCategories using Codex tool names', () => {
+      const guards = GUARD_DEFINITIONS.filter(g => g.name === 'hazard');
+      const config = adapter.generateHooksConfig(guards, '/path/to/slope-guard.sh');
+
+      expect(config.hooks.PreToolUse?.[0]?.matcher).toBe('apply_patch|Edit|Write');
+    });
+
     it('groups guards by event and matcher for Codex review ergonomics', () => {
       const guards = GUARD_DEFINITIONS.filter(g => g.hookEvent === 'PreToolUse' && g.matcher === 'Bash').slice(0, 2);
       expect(guards).toHaveLength(2);

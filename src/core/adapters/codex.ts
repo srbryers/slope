@@ -7,7 +7,7 @@ import { existsSync, writeFileSync, readFileSync, mkdirSync, chmodSync } from 'n
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { HarnessAdapter, HarnessInstallOptions, ToolNameMap } from '../harness.js';
-import { registerAdapter } from '../harness.js';
+import { registerAdapter, resolveToolMatcher } from '../harness.js';
 import type { GuardResult, AnyGuardDefinition, PreToolUseOutput, PostToolUseOutput, StopOutput, Suggestion } from '../guard.js';
 
 type CodexHookHandler = { type: string; command: string; timeout?: number; statusMessage?: string };
@@ -123,8 +123,9 @@ export class CodexAdapter implements HarnessAdapter {
     for (const guard of guards) {
       const event = guard.hookEvent;
       if (!this.supportedEvents.has(event)) continue;
-      const key = `${event}\0${guard.matcher ?? ''}`;
-      const group = byEventAndMatcher.get(key) ?? { event, matcher: guard.matcher, guards: [] };
+      const matcher = resolveToolMatcher(this, 'toolCategories' in guard ? guard.toolCategories : undefined) ?? guard.matcher;
+      const key = `${event}\0${matcher ?? ''}`;
+      const group = byEventAndMatcher.get(key) ?? { event, matcher, guards: [] };
       group.guards.push(guard);
       byEventAndMatcher.set(key, group);
     }
