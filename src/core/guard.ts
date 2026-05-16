@@ -156,6 +156,8 @@ export interface GuidanceConfig {
   mapStaleWarnAt?: number;
   /** Commits behind before explore guard blocks Edit/Write (default 31) */
   mapStaleBlockAt?: number;
+  /** How claim-required handles implementation writes outside active sprint/claim flow (default ask) */
+  requireSprintForImplementationWrites?: 'ask' | 'deny' | 'off';
 }
 
 /** All guard definitions */

@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import type { HookInput, GuardResult } from '../../core/index.js';
+import { loadConfig } from '../config.js';
 import { loadSprintState } from '../sprint-state.js';
 import { loadSessionState, updateSessionState } from '../session-state.js';
 import { resolveStore } from '../store.js';
@@ -72,6 +73,8 @@ const IMPLEMENTATION_EXTENSIONS = new Set([
   '.yml',
 ]);
 
+type ImplementationWritePolicy = 'ask' | 'deny' | 'off';
+
 /**
  * Claim-required guard: fires PreToolUse on Edit|Write.
  * Warns (not blocks) when editing code without an active sprint claim.
@@ -82,12 +85,16 @@ export async function claimRequiredGuard(input: HookInput, cwd: string): Promise
   const sessionId = input.session_id;
   if (!sessionId) return {};
 
+  const policy = getImplementationWritePolicy(cwd);
+
   // Check if there's an active sprint with claims
   const sprintState = loadSprintState(cwd);
   if (sprintState && sprintState.phase === 'implementing') {
     // Session dedup for the advisory missing-claim warning only.
-    const sessionState = loadSessionState(cwd);
-    if (sessionState.claim_warned_session_id === sessionId) return {};
+    if (policy !== 'deny') {
+      const sessionState = loadSessionState(cwd);
+      if (sessionState.claim_warned_session_id === sessionId) return {};
+    }
 
     // Active sprint in implementing phase — check for claims
     try {
@@ -107,17 +114,31 @@ export async function claimRequiredGuard(input: HookInput, cwd: string): Promise
     const relativePath = normalizeHookPath(filePath, cwd);
     if (!relativePath || !isImplementationWritePath(relativePath)) return {};
 
+    return implementationWritePolicyResult(policy, [
+      `SLOPE claim-required: ${relativePath} looks like an implementation edit, but there is no active sprint state.`,
+      'Start or resume a sprint and claim the work before editing, or get explicit user approval to continue as adhoc work.',
+      'Suggested commands: `slope sprint start --number=<N> --phase=implementing` then `slope claim --target=<path> --ticket=<ticket>`.',
+    ]);
+  } else {
+    const filePath = input.tool_input?.file_path as string | undefined;
+    const relativePath = normalizeHookPath(filePath, cwd);
+    if (!relativePath || !isImplementationWritePath(relativePath)) return {};
+
+    return implementationWritePolicyResult(policy, [
+      `SLOPE claim-required: ${relativePath} looks like an implementation edit, but sprint ${sprintState.sprint} is in ${sprintState.phase} phase.`,
+      'Implementation edits should happen during the implementing phase with a claim, or with explicit user approval to continue outside the sprint workflow.',
+      'Suggested command: `slope sprint start --number=<N> --phase=implementing` or update the current sprint phase before editing.',
+    ]);
+  }
+
+  if (policy === 'deny') {
     return {
-      decision: 'ask',
-      context: [
-        `SLOPE claim-required: ${relativePath} looks like an implementation edit, but there is no active sprint state.`,
-        'Start or resume a sprint and claim the work before editing, or get explicit user approval to continue as adhoc work.',
-        'Suggested commands: `slope sprint start --number=<N> --phase=implementing` then `slope claim --target=<path> --ticket=<ticket>`.',
+      decision: 'deny',
+      blockReason: [
+        'SLOPE claim-required: No active sprint claim for this implementation edit.',
+        'Run `slope claim --target=<path> --ticket=<ticket>` before editing, or set `guidance.requireSprintForImplementationWrites` to "ask" or "off".',
       ].join('\n'),
     };
-  } else {
-    // Sprint exists but not in implementing phase — passthrough
-    return {};
   }
 
   // Mark as warned
@@ -125,6 +146,28 @@ export async function claimRequiredGuard(input: HookInput, cwd: string): Promise
 
   return {
     context: 'SLOPE: No active sprint claim. Consider running `slope claim` to track this work.',
+  };
+}
+
+function getImplementationWritePolicy(cwd: string): ImplementationWritePolicy {
+  const value = loadConfig(cwd).guidance?.requireSprintForImplementationWrites;
+  return value === 'deny' || value === 'off' || value === 'ask' ? value : 'ask';
+}
+
+function implementationWritePolicyResult(policy: ImplementationWritePolicy, lines: string[]): GuardResult {
+  if (policy === 'off') return {};
+  if (policy === 'deny') {
+    return {
+      decision: 'deny',
+      blockReason: [
+        ...lines,
+        'Strict mode is enabled by `guidance.requireSprintForImplementationWrites: "deny"`.',
+      ].join('\n'),
+    };
+  }
+  return {
+    decision: 'ask',
+    context: lines.join('\n'),
   };
 }
 

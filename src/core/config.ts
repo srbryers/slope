@@ -38,6 +38,7 @@ export interface SlopeConfig {
     protectedBranches?: string[];
     mapStaleWarnAt?: number;
     mapStaleBlockAt?: number;
+    requireSprintForImplementationWrites?: 'ask' | 'deny' | 'off';
   };
   orchestration?: {
     escalation?: EscalationConfig;
