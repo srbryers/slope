@@ -132,6 +132,17 @@ describe('worktreeCheckGuard', () => {
     expect(mockResolveStore).not.toHaveBeenCalled();
   });
 
+  it('allows git -C worktree add recovery commands', async () => {
+    const result = await worktreeCheckGuard({
+      ...makeInput(),
+      tool_name: 'Bash',
+      tool_input: { command: 'git -C /Users/sebastianbryers/Development/slope worktree add /tmp/slope-worktree HEAD' },
+    }, '/tmp/test');
+
+    expect(result).toEqual({});
+    expect(mockResolveStore).not.toHaveBeenCalled();
+  });
+
   it('allows when other session has worktree_path (isolated)', async () => {
     mockExecSync
       .mockReturnValueOnce('.git' as never)
