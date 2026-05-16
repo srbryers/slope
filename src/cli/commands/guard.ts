@@ -206,9 +206,11 @@ async function runGuardByName(
     input.hook_event_name = def.hookEvent;
   }
 
-  // Skip sprint-workflow guards in adhoc sessions
-  const relevance = GUARD_RELEVANCE[name];
-  if (relevance?.when === 'sprint-workflow' && input.session_id && isAdhocSession(cwd, input.session_id)) {
+  // Skip most sprint-workflow guards in adhoc sessions. Guards with
+  // suppressInAdhoc=false still run to steer implementation writes back into
+  // an explicit sprint/claim flow.
+  if (shouldSuppressGuardInAdhoc(name, cwd, input.session_id)) {
+    recordGuardSuppression(cwd, name, input, 'adhoc-session');
     return null;
   }
 
@@ -571,7 +573,13 @@ export async function guardManageCommand(args: string[]): Promise<void> {
 }
 
 /** Guard relevance metadata: when each guard is useful and why */
-const GUARD_RELEVANCE: Record<string, { when: string; why: string }> = {
+interface GuardRelevance {
+  when: string;
+  why: string;
+  suppressInAdhoc?: boolean;
+}
+
+const GUARD_RELEVANCE: Record<string, GuardRelevance> = {
   'explore': { when: 'always', why: 'Prevents unnecessary codebase exploration when map is available' },
   'hazard': { when: 'always', why: 'Warns about known issues before editing affected files' },
   'commit-nudge': { when: 'always', why: 'Prevents lost work from uncommitted changes' },
@@ -595,10 +603,20 @@ const GUARD_RELEVANCE: Record<string, { when: string; why: string }> = {
   'session-briefing': { when: 'always', why: 'Injects sprint context on session start for continuity' },
   'post-push': { when: 'sprint-workflow', why: 'Suggests next workflow step after pushing' },
   'phase-boundary': { when: 'sprint-workflow', why: 'Prevents starting new phase without cleanup' },
-  'claim-required': { when: 'sprint-workflow', why: 'Warns when editing without sprint claim' },
+  'claim-required': { when: 'sprint-workflow', why: 'Warns when editing without sprint claim', suppressInAdhoc: false },
   'review-stale': { when: 'sprint-workflow', why: 'Catches scored sprints missing reviews' },
   'workflow-step-gate': { when: 'sprint-workflow', why: 'Blocks file edits outside agent_work workflow steps' },
 };
+
+export function shouldSuppressGuardInAdhoc(name: string, cwd: string, sessionId: string): boolean {
+  const relevance = GUARD_RELEVANCE[name];
+  return Boolean(
+    relevance?.when === 'sprint-workflow' &&
+    relevance.suppressInAdhoc !== false &&
+    sessionId &&
+    isAdhocSession(cwd, sessionId),
+  );
+}
 
 /** Detect which workflow profiles apply to this repo */
 function detectWorkflowProfiles(cwd: string): Set<string> {
@@ -722,6 +740,21 @@ function recordGuardExecution(cwd: string, guardName: string, input: HookInput, 
       event: input.hook_event_name,
       tool: input.tool_name ?? '',
       decision,
+    });
+    appendFileSync(metricsPath, line + '\n');
+  } catch { /* never block guard execution */ }
+}
+
+function recordGuardSuppression(cwd: string, guardName: string, input: HookInput, reason: string): void {
+  try {
+    const metricsPath = join(cwd, '.slope', 'guard-metrics.jsonl');
+    const line = JSON.stringify({
+      ts: new Date().toISOString(),
+      guard: guardName,
+      event: input.hook_event_name,
+      tool: input.tool_name ?? '',
+      decision: 'suppressed',
+      reason,
     });
     appendFileSync(metricsPath, line + '\n');
   } catch { /* never block guard execution */ }

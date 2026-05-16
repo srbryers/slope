@@ -5,6 +5,73 @@ import { loadSprintState } from '../sprint-state.js';
 import { loadSessionState, updateSessionState } from '../session-state.js';
 import { resolveStore } from '../store.js';
 
+const IMPLEMENTATION_DIRS = [
+  'app/',
+  'client/',
+  'components/',
+  'lib/',
+  'packages/',
+  'scripts/',
+  'server/',
+  'src/',
+  'templates/',
+  'tests/',
+  'workers/',
+];
+
+const NON_IMPLEMENTATION_DIRS = [
+  '.git/',
+  '.slope/',
+  'docs/retros/',
+  'node_modules/',
+];
+
+const IMPLEMENTATION_FILES = new Set([
+  'astro.config.mjs',
+  'package-lock.json',
+  'package.json',
+  'pnpm-lock.yaml',
+  'rollup.config.js',
+  'tsconfig.json',
+  'vite.config.ts',
+  'vitest.config.ts',
+  'webpack.config.js',
+  'yarn.lock',
+]);
+
+const IMPLEMENTATION_EXTENSIONS = new Set([
+  '.astro',
+  '.c',
+  '.cjs',
+  '.cpp',
+  '.cs',
+  '.css',
+  '.go',
+  '.h',
+  '.hpp',
+  '.html',
+  '.java',
+  '.js',
+  '.json',
+  '.jsx',
+  '.kt',
+  '.mjs',
+  '.php',
+  '.py',
+  '.rb',
+  '.rs',
+  '.scss',
+  '.sh',
+  '.svelte',
+  '.swift',
+  '.toml',
+  '.ts',
+  '.tsx',
+  '.vue',
+  '.yaml',
+  '.yml',
+]);
+
 /**
  * Claim-required guard: fires PreToolUse on Edit|Write.
  * Warns (not blocks) when editing code without an active sprint claim.
@@ -15,13 +82,13 @@ export async function claimRequiredGuard(input: HookInput, cwd: string): Promise
   const sessionId = input.session_id;
   if (!sessionId) return {};
 
-  // Session dedup: warn once only
-  const sessionState = loadSessionState(cwd);
-  if (sessionState.claim_warned_session_id === sessionId) return {};
-
   // Check if there's an active sprint with claims
   const sprintState = loadSprintState(cwd);
   if (sprintState && sprintState.phase === 'implementing') {
+    // Session dedup for the advisory missing-claim warning only.
+    const sessionState = loadSessionState(cwd);
+    if (sessionState.claim_warned_session_id === sessionId) return {};
+
     // Active sprint in implementing phase — check for claims
     try {
       const claimsPath = join(cwd, '.slope', 'claims.json');
@@ -36,8 +103,18 @@ export async function claimRequiredGuard(input: HookInput, cwd: string): Promise
       }
     } catch { /* claims unavailable */ }
   } else if (!sprintState) {
-    // No sprint state — adhoc work, no warning needed (#263)
-    return {};
+    const filePath = input.tool_input?.file_path as string | undefined;
+    const relativePath = normalizeHookPath(filePath, cwd);
+    if (!relativePath || !isImplementationWritePath(relativePath)) return {};
+
+    return {
+      decision: 'ask',
+      context: [
+        `SLOPE claim-required: ${relativePath} looks like an implementation edit, but there is no active sprint state.`,
+        'Start or resume a sprint and claim the work before editing, or get explicit user approval to continue as adhoc work.',
+        'Suggested commands: `slope sprint start --number=<N> --phase=implementing` then `slope claim --target=<path> --ticket=<ticket>`.',
+      ].join('\n'),
+    };
   } else {
     // Sprint exists but not in implementing phase — passthrough
     return {};
@@ -49,6 +126,31 @@ export async function claimRequiredGuard(input: HookInput, cwd: string): Promise
   return {
     context: 'SLOPE: No active sprint claim. Consider running `slope claim` to track this work.',
   };
+}
+
+function normalizeHookPath(filePath: string | undefined, cwd: string): string | null {
+  if (!filePath) return null;
+  const normalizedCwd = cwd.replace(/\\/g, '/').replace(/\/$/, '');
+  const normalizedPath = filePath.replace(/\\/g, '/');
+  const relativePath = normalizedPath.startsWith(`${normalizedCwd}/`)
+    ? normalizedPath.slice(normalizedCwd.length + 1)
+    : normalizedPath;
+  return relativePath.replace(/^\.\//, '');
+}
+
+export function isImplementationWritePath(relativePath: string): boolean {
+  const path = relativePath.replace(/\\/g, '/').replace(/^\.\//, '');
+  if (!path || path.endsWith('/')) return false;
+  if (NON_IMPLEMENTATION_DIRS.some(dir => path.startsWith(dir))) return false;
+  if (path === 'README.md' || path.endsWith('.md')) return false;
+
+  const fileName = path.split('/').at(-1) ?? path;
+  if (IMPLEMENTATION_FILES.has(fileName)) return true;
+  if (IMPLEMENTATION_DIRS.some(dir => path.startsWith(dir))) return true;
+
+  const dotIndex = fileName.lastIndexOf('.');
+  if (dotIndex === -1) return false;
+  return IMPLEMENTATION_EXTENSIONS.has(fileName.slice(dotIndex));
 }
 
 /**
