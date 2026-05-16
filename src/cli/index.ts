@@ -521,7 +521,7 @@ Usage:
   slope sprint start|gate|status|reset               Manage sprint lifecycle state
   slope worktree cleanup [--path|--all] [--dry-run]  Clean up stale worktrees
   slope loop status|config|run|continuous|...        Autonomous sprint execution loop
-  slope doctor [--fix]                               Check repo health and fix issues
+  slope doctor [--fix] [--dry-run]                   Check repo health and fix issues
   slope version                                      Show current version
   slope version bump [<version>] [--dry-run]         Bump version, create PR, merge
 

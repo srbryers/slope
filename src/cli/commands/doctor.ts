@@ -912,6 +912,7 @@ export async function doctorCommand(args: string[]): Promise<void> {
   const cwd = process.cwd();
   let checks = runDoctorChecks(cwd);
   const shouldFix = args.includes('--fix');
+  const dryRun = args.includes('--dry-run');
 
   formatResults(checks);
 
@@ -919,6 +920,15 @@ export async function doctorCommand(args: string[]): Promise<void> {
     const fixable = checks.filter(c => (c.status === 'fail' || c.status === 'warn') && c.fixable);
     if (fixable.length === 0) {
       console.log('\n  Nothing to fix — all checks passed.');
+      return;
+    }
+
+    if (dryRun) {
+      console.log('\n  [dry-run] Fixes that would be applied:\n');
+      for (const check of fixable) {
+        console.log(`  [dry-run] ${check.name}: ${check.message}`);
+      }
+      console.log('\n  Re-run without --dry-run to apply fixes.');
       return;
     }
 

@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { chmodSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { runDoctorChecks, runDoctorFixes } from '../../../src/cli/commands/doctor.js';
+import { doctorCommand, runDoctorChecks, runDoctorFixes } from '../../../src/cli/commands/doctor.js';
 import { SLOPE_BIN_PREAMBLE } from '../../../src/core/harness.js';
 
 // Ensure metaphors are registered
@@ -47,6 +47,32 @@ describe('doctor checks', () => {
 
   afterEach(() => {
     rmSync(cwd, { recursive: true, force: true });
+  });
+
+  describe('doctor --fix --dry-run', () => {
+    it('previews fixable checks without writing changes', async () => {
+      setupSlopeDir(cwd);
+      const gitignorePath = join(cwd, '.gitignore');
+      const before = readFileSync(gitignorePath, 'utf8');
+      const logs: string[] = [];
+      const logSpy = vi.spyOn(console, 'log').mockImplementation((message = '') => {
+        logs.push(String(message));
+      });
+      const originalCwd = process.cwd();
+
+      try {
+        process.chdir(cwd);
+        await doctorCommand(['--fix', '--dry-run']);
+      } finally {
+        process.chdir(originalCwd);
+        logSpy.mockRestore();
+      }
+
+      expect(readFileSync(gitignorePath, 'utf8')).toBe(before);
+      expect(logs.join('\n')).toContain('[dry-run] Fixes that would be applied');
+      expect(logs.join('\n')).toContain('gitignore-noise');
+      expect(logs.join('\n')).not.toContain('Applying fixes');
+    });
   });
 
   // --- S65-1: version drift ---
