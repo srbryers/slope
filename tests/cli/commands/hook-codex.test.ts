@@ -10,6 +10,12 @@ function makeTmpDir(): string {
   return dir;
 }
 
+type CodexHookEntry = { matcher?: string; hooks: Array<{ command: string }> };
+
+function findHookGroupForCommand(groups: CodexHookEntry[] | undefined, commandPart: string): CodexHookEntry | undefined {
+  return groups?.find(group => group.hooks.some(hook => hook.command.includes(commandPart)));
+}
+
 describe('slope hook add --harness=codex', () => {
   let cwd: string;
   let origCwd: string;
@@ -59,5 +65,15 @@ describe('slope hook add --harness=codex', () => {
     expect(output).toContain('Installed 30 of 31 guard hooks (level: full)');
     expect(output).toContain('compaction');
     expect(output).toContain('unsupported by harness');
+  });
+
+  it('installs claim-required under the Codex write matcher for project-local full installs', async () => {
+    await hookCommand(['add', '--level=full', '--harness=codex']);
+
+    const codexConfig = JSON.parse(readFileSync(join(cwd, '.codex', 'hooks.json'), 'utf8'));
+    const group = findHookGroupForCommand(codexConfig.hooks.PreToolUse, 'claim-required');
+
+    expect(group).toBeDefined();
+    expect(group?.matcher?.split('|')).toEqual(expect.arrayContaining(['apply_patch', 'Edit', 'Write']));
   });
 });
