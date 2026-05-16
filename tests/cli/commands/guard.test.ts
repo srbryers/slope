@@ -9,7 +9,8 @@ import '../../../src/core/adapters/cursor.js';
 import '../../../src/core/adapters/windsurf.js';
 import '../../../src/core/adapters/generic.js';
 
-import { guardManageCommand } from '../../../src/cli/commands/guard.js';
+import { guardManageCommand, shouldSuppressGuardInAdhoc } from '../../../src/cli/commands/guard.js';
+import { setSessionMode } from '../../../src/cli/session-state.js';
 
 function makeTmpDir(): string {
   const dir = join(tmpdir(), `slope-guard-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
@@ -84,5 +85,27 @@ describe('slope guard recommend (S65-3)', () => {
     const output = logSpy.mock.calls.map(c => c[0]).join('\n');
     // Guards with when:'always' should show YES
     expect(output).toContain('YES');
+  });
+});
+
+describe('adhoc guard suppression', () => {
+  let cwd: string;
+
+  beforeEach(() => {
+    cwd = makeTmpDir();
+    mkdirSync(join(cwd, '.slope'), { recursive: true });
+    setSessionMode(cwd, 'test-session', 'adhoc');
+  });
+
+  afterEach(() => {
+    rmSync(cwd, { recursive: true, force: true });
+  });
+
+  it('keeps most sprint workflow guards suppressed in adhoc sessions', () => {
+    expect(shouldSuppressGuardInAdhoc('workflow-step-gate', cwd, 'test-session')).toBe(true);
+  });
+
+  it('allows claim-required to run in adhoc sessions', () => {
+    expect(shouldSuppressGuardInAdhoc('claim-required', cwd, 'test-session')).toBe(false);
   });
 });
