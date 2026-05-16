@@ -133,6 +133,13 @@ export const GUARD_DOCS: Record<string, GuardDoc> = {
     configuration: 'Disable: add "worktree-check" to guidance.disabled.',
     level: 'full',
   },
+  'claim-required': {
+    purpose: 'Keeps implementation edits connected to the sprint workflow. It catches code changes made with no active sprint state, outside the implementing phase, or without a matching claim.',
+    triggers: 'PreToolUse on Edit, Write, and Codex apply_patch. Fires when a file modification is attempted.',
+    behavior: 'Mixed — asks for permission by default on no-sprint or non-implementing implementation writes, warns by default for missing claims during implementing, and denies when strict mode is enabled.',
+    configuration: 'guidance.requireSprintForImplementationWrites controls implementation writes outside active sprint/claim flow: "ask" (default), "deny" (strict), or "off". Disable entirely: add "claim-required" to guidance.disabled.',
+    level: 'full',
+  },
   'sprint-completion': {
     purpose: 'Enforces sprint lifecycle gates. Blocks PR creation and session end when required gates (build, test, scorecard) are incomplete.',
     triggers: 'PreToolUse on Bash (blocks `gh pr create`), PostToolUse on Bash (auto-detects test pass), Stop (blocks session end).',

@@ -372,12 +372,12 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
   },
   {
     name: 'claim-required',
-    description: 'Warn when editing code without an active sprint claim',
+    description: 'Require sprint/claim workflow for implementation writes',
     hookEvent: 'PreToolUse',
     toolCategories: ['write_file'],
     matcher: 'Edit|Write',
     level: 'full',
-    guardType: 'advisory',
+    guardType: 'mixed',
   },
   {
     name: 'post-push',

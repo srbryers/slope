@@ -20,7 +20,7 @@
 | S94-1 | Short Iron | Green | — | Commit 289714d covers real guardCommand stdin/stdout behavior, adhoc claim-required asks, suppressed workflow guard metrics, and batched write guard behavior. |
 | S94-2 | Wedge | In the Hole | — | Commit 1c5acc5 locks claim-required into Codex write matcher coverage for generated configs, project installs, and user installs. |
 | S94-3 | Short Iron | Green | Rough: Codex hook behavior can look current while resolving a stale project-local package or stale dev dist output. | Commit e803279 adds codex-runtime diagnostics for project-local package precedence and stale SLOPE dev dist output. |
-| S94-4 | Short Iron | Green | — | Commit e0262ff adds guidance.requireSprintForImplementationWrites with ask, deny, and off modes. Commits 2f0c0f1 and 8a91f97 handled sprint scoping and stale Claude lock cleanup. |
+| S94-4 | Short Iron | Green | Rough: [code review] claim-required strictness config was exposed without guard docs coverage, and guard metadata still described the guard as purely advisory despite deny mode | Commit e0262ff adds guidance.requireSprintForImplementationWrites with ask, deny, and off modes. Commits 2f0c0f1 and 8a91f97 handled sprint scoping and stale Claude lock cleanup. |
 
 ### Conditions
 
@@ -34,6 +34,7 @@
 | Type | Ticket | Description |
 |---|---|---|
 | Rough | S94-3 | Codex hook behavior can look current while resolving a stale project-local package or stale dev dist output. |
+| Rough | S94-4 | [code review] claim-required strictness config was exposed without guard docs coverage, and guard metadata still described the guard as purely advisory despite deny mode |
 
 **Known hazards for future sprints:**
 - Codex runtime resolution can prefer project-local node_modules/.bin/slope or SLOPE dev dist/cli/index.js before the global package.
