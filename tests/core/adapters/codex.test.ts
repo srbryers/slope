@@ -151,10 +151,9 @@ describe('CodexAdapter', () => {
 
       expect(config.hooks.PreToolUse).toHaveLength(1);
       expect(config.hooks.PreToolUse?.[0]?.matcher).toBe('Bash');
-      expect(config.hooks.PreToolUse?.[0]?.hooks).toHaveLength(1);
-      expect(config.hooks.PreToolUse?.[0]?.hooks[0]?.command).toContain('__batch');
+      expect(config.hooks.PreToolUse?.[0]?.hooks).toHaveLength(2);
       for (const guard of guards) {
-        expect(config.hooks.PreToolUse?.[0]?.hooks[0]?.command).toContain(guard.name);
+        expect(config.hooks.PreToolUse?.[0]?.hooks.some(hook => hook.command === `"/path/to/slope-guard.sh" ${guard.name}`)).toBe(true);
       }
     });
 
@@ -193,7 +192,9 @@ describe('CodexAdapter', () => {
       const configPath = join(homeDir, '.codex', 'hooks.json');
       expect(existsSync(scriptPath)).toBe(true);
       expect(existsSync(configPath)).toBe(true);
-      expect(readFileSync(scriptPath, 'utf8')).toContain('if [ ! -d "$SLOPE_PROJECT_DIR/.slope" ]; then');
+      const script = readFileSync(scriptPath, 'utf8');
+      expect(script).toContain('if [ ! -d "$SLOPE_PROJECT_DIR/.slope" ]; then');
+      expect(script).toContain('dist/cli/index.js');
 
       const config = JSON.parse(readFileSync(configPath, 'utf8'));
       const commands = config.hooks.PreToolUse.flatMap((entry: { hooks: Array<{ command: string }> }) =>

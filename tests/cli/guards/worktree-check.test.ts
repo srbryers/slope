@@ -110,6 +110,28 @@ describe('worktreeCheckGuard', () => {
     expect(result.blockReason).toContain('EnterWorktree');
   });
 
+  it('allows EnterWorktree recovery even when another session exists', async () => {
+    const result = await worktreeCheckGuard({
+      ...makeInput(),
+      tool_name: 'EnterWorktree',
+      tool_input: {},
+    }, '/tmp/test');
+
+    expect(result).toEqual({});
+    expect(mockResolveStore).not.toHaveBeenCalled();
+  });
+
+  it('allows git worktree add recovery commands', async () => {
+    const result = await worktreeCheckGuard({
+      ...makeInput(),
+      tool_name: 'Bash',
+      tool_input: { command: 'git worktree add /tmp/slope-worktree HEAD' },
+    }, '/tmp/test');
+
+    expect(result).toEqual({});
+    expect(mockResolveStore).not.toHaveBeenCalled();
+  });
+
   it('allows when other session has worktree_path (isolated)', async () => {
     mockExecSync
       .mockReturnValueOnce('.git' as never)

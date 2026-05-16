@@ -133,14 +133,12 @@ export class CodexAdapter implements HarnessAdapter {
       if (!hooks[group.event]) hooks[group.event] = [];
 
       const entry: CodexHookGroup = {
-        hooks: [{
+        hooks: group.guards.map(guard => ({
           type: 'command',
-          command: formatCodexGuardCommand(guardScriptPath, group.guards.map(guard => guard.name)),
+          command: formatCodexGuardCommand(guardScriptPath, guard.name),
           timeout: 10,
-          statusMessage: group.guards.length === 1
-            ? `SLOPE ${group.guards[0].name}`
-            : `SLOPE ${group.guards.length} guards`,
-        }],
+          statusMessage: `SLOPE ${guard.name}`,
+        })),
       };
 
       if (group.matcher) entry.matcher = group.matcher;
@@ -166,9 +164,8 @@ export class CodexAdapter implements HarnessAdapter {
   }
 }
 
-function formatCodexGuardCommand(scriptPath: string, guardNames: string[]): string {
-  if (guardNames.length === 1) return `"${scriptPath}" ${guardNames[0]}`;
-  return `"${scriptPath}" __batch ${guardNames.join(' ')}`;
+function formatCodexGuardCommand(scriptPath: string, guardName: string): string {
+  return `"${scriptPath}" ${guardName}`;
 }
 
 function writeCodexGuardDispatcher(scriptPath: string, userLevel: boolean): void {
@@ -182,6 +179,8 @@ function writeCodexGuardDispatcher(scriptPath: string, userLevel: boolean): void
         '',
         'if [ -x "$SLOPE_PROJECT_DIR/node_modules/.bin/slope" ]; then',
         '  SLOPE_BIN="$SLOPE_PROJECT_DIR/node_modules/.bin/slope"',
+        'elif [ -f "$SLOPE_PROJECT_DIR/dist/cli/index.js" ] && [ -f "$SLOPE_PROJECT_DIR/package.json" ] && grep -q \'"name": "@slope-dev/slope"\' "$SLOPE_PROJECT_DIR/package.json"; then',
+        '  exec node "$SLOPE_PROJECT_DIR/dist/cli/index.js" guard "$@"',
         'elif command -v slope >/dev/null 2>&1; then',
         '  SLOPE_BIN="$(command -v slope)"',
         'else',
@@ -196,6 +195,8 @@ function writeCodexGuardDispatcher(scriptPath: string, userLevel: boolean): void
         '',
         'if [ -x "$SLOPE_PROJECT_DIR/node_modules/.bin/slope" ]; then',
         '  SLOPE_BIN="$SLOPE_PROJECT_DIR/node_modules/.bin/slope"',
+        'elif [ -f "$SLOPE_PROJECT_DIR/dist/cli/index.js" ] && [ -f "$SLOPE_PROJECT_DIR/package.json" ] && grep -q \'"name": "@slope-dev/slope"\' "$SLOPE_PROJECT_DIR/package.json"; then',
+        '  exec node "$SLOPE_PROJECT_DIR/dist/cli/index.js" guard "$@"',
         'elif command -v slope >/dev/null 2>&1; then',
         '  SLOPE_BIN="$(command -v slope)"',
         'else',
