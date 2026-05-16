@@ -1,0 +1,141 @@
+{
+  "sprint_number": 93,
+  "theme": "Codex Hook Recovery",
+  "type": "bugfix",
+  "player": "sebastianbryers",
+  "par": 4,
+  "slope": 2,
+  "score": 5,
+  "score_label": "bogey",
+  "date": "2026-05-16",
+  "shots": [
+    {
+      "ticket_key": "S93-1",
+      "title": "Recover Codex hook integration and user-level install path",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "Codex hook loading depends on user/project config layers rather than plugin hooks."
+        }
+      ],
+      "notes": "Commit b349b4e established the global Codex hook path and setup docs."
+    },
+    {
+      "ticket_key": "S93-2",
+      "title": "Repair hook recovery failures and stale dispatcher behavior",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "moderate",
+          "description": "worktree-check blocked the EnterWorktree recovery path it recommended."
+        }
+      ],
+      "notes": "Commit db249fb removed __batch dependency for Codex hooks and allowed worktree recovery commands."
+    },
+    {
+      "ticket_key": "S93-3",
+      "title": "Fix Codex hook install count reporting",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Commit 586cf6a reports 30 of 31 Codex-supported guard hooks and marks PreCompact unsupported."
+    },
+    {
+      "ticket_key": "S93-4",
+      "title": "Resolve Codex apply_patch and MCP search matchers",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "Raw Claude-style Edit|Write matchers left normal Codex apply_patch edits uncovered."
+        }
+      ],
+      "notes": "Commits c45f5b8 and 3f3af8f resolve toolCategories through the Codex adapter and preserve valid search matchers."
+    },
+    {
+      "ticket_key": "S93-5",
+      "title": "Verify global hooks and cross-repo policy",
+      "club": "wedge",
+      "result": "fairway",
+      "hazards": [],
+      "notes": "Confirmed ~/.codex hooks parse, dispatcher syntax passes, guard metrics fire, and Fathoms has no project-local .codex hooks."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 5,
+    "fairways_total": 5,
+    "greens_in_regulation": 4,
+    "greens_total": 5,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 3,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "wind",
+      "description": "Codex hook behavior differed from older assumptions about project-local and plugin hook loading.",
+      "impact": "major"
+    },
+    {
+      "type": "pin_position",
+      "description": "Global user-level hooks are the active runtime path; project-local .codex hooks should be removed where present to avoid duplicate firing.",
+      "impact": "minor"
+    },
+    {
+      "type": "rain",
+      "description": "Local repos can pin older @slope-dev/slope binaries, so global dispatchers must handle SLOPE's own dev repo carefully and releases must propagate runtime fixes.",
+      "impact": "minor"
+    }
+  ],
+  "special_plays": [
+    "scramble"
+  ],
+  "bunker_locations": [
+    "src/cli/guards/worktree-check.ts blocked EnterWorktree before the recovery path could run."
+  ],
+  "yardage_book_updates": [
+    "src/core/adapters/codex.ts - Codex hooks now use top-level hooks shape, one command per guard, user-level install support, dist fallback for SLOPE's own repo, supported hook count reporting, and Codex-resolved tool matchers.",
+    "src/cli/guards/worktree-check.ts - worktree recovery inputs pass through before concurrency checks.",
+    "src/cli/commands/hook.ts - install summary reports adapter-supported definitions and marks unsupported events.",
+    "docs/guides/codex-setup.md and docs/tech/codex-slope-hooks-handoff.md - global/project shim guidance and plugin hook limitations."
+  ],
+  "course_management_notes": [
+    "Global Codex hooks in ~/.codex are active and verified after restart.",
+    "Fathoms has no project-local .codex hooks, so it should not duplicate Codex guard firing; its .claude hooks are separate and only affect Claude Code.",
+    "Publish a patch release so other repos using project-local @slope-dev/slope binaries receive the runtime guard fixes."
+  ],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Used reviewer feedback to catch adapter matcher drift after the initial hook recovery landed.",
+      "outcome": "Added tests proving Codex file-edit guards match apply_patch and combined search/edit matchers stay valid."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "recovery",
+      "description": "Removed transient smoke session state after hook testing.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "A small integration bug turned into a useful hardening pass for Codex hooks, especially around recovery paths and cross-repo installs.",
+    "advice_for_next_player": "When adding a harness adapter, assert generated matchers from toolCategories, not only raw guard.matcher values.",
+    "what_surprised_you": "The installed hook count was correct, but the persisted registry count was misleading because multi-event guards deduplicate by name.",
+    "excited_about_next": "Cut a patch release and update dependent repos so the global hook setup is backed by current runtime behavior."
+  }
+}
