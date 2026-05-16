@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { chmodSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, writeFileSync, rmSync, readFileSync, utimesSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execSync } from 'node:child_process';
@@ -237,6 +237,71 @@ describe('doctor checks', () => {
       expect(config.custom).toBe(true);
       expect(config.hooks.PreToolUse).toHaveLength(1);
       expect(config.PreToolUse).toBeUndefined();
+    });
+
+    it('warns when Codex hooks will resolve a stale project-local slope package', () => {
+      setupSlopeDir(cwd);
+      mkdirSync(join(cwd, '.codex'), { recursive: true });
+      writeFileSync(join(cwd, '.codex', 'hooks.json'), JSON.stringify({
+        hooks: {
+          PreToolUse: [{
+            matcher: 'apply_patch',
+            hooks: [{ type: 'command', command: '"./.codex/hooks/slope-guard.sh" claim-required' }],
+          }],
+        },
+      }));
+      mkdirSync(join(cwd, 'node_modules', '@slope-dev', 'slope'), { recursive: true });
+      writeFileSync(join(cwd, 'node_modules', '@slope-dev', 'slope', 'package.json'), JSON.stringify({
+        name: '@slope-dev/slope',
+        version: '0.0.1',
+      }));
+
+      const checks = runDoctorChecks(cwd);
+      const runtimeCheck = checks.find(c =>
+        c.name === 'codex-runtime' &&
+        c.status === 'warn' &&
+        c.message.includes('project-local @slope-dev/slope 0.0.1'),
+      );
+
+      expect(runtimeCheck).toBeDefined();
+      expect(runtimeCheck!.message).toContain('before global/current');
+    });
+
+    it('warns when Codex hooks in the SLOPE dev repo would use stale dist output', () => {
+      setupSlopeDir(cwd);
+      mkdirSync(join(cwd, '.codex'), { recursive: true });
+      writeFileSync(join(cwd, '.codex', 'hooks.json'), JSON.stringify({
+        hooks: {
+          PreToolUse: [{
+            matcher: 'apply_patch',
+            hooks: [{ type: 'command', command: '"./.codex/hooks/slope-guard.sh" claim-required' }],
+          }],
+        },
+      }));
+      writeFileSync(join(cwd, 'package.json'), JSON.stringify({
+        name: '@slope-dev/slope',
+        version: '9.9.9',
+      }));
+      mkdirSync(join(cwd, 'src', 'cli', 'guards'), { recursive: true });
+      mkdirSync(join(cwd, 'dist', 'cli'), { recursive: true });
+      const distPath = join(cwd, 'dist', 'cli', 'index.js');
+      const sourcePath = join(cwd, 'src', 'cli', 'guards', 'claim-required.ts');
+      writeFileSync(distPath, '// old build\n');
+      writeFileSync(sourcePath, '// new source\n');
+      const oldDate = new Date('2024-01-01T00:00:00Z');
+      const newDate = new Date('2026-01-01T00:00:00Z');
+      utimesSync(distPath, oldDate, oldDate);
+      utimesSync(sourcePath, newDate, newDate);
+
+      const checks = runDoctorChecks(cwd);
+      const runtimeCheck = checks.find(c =>
+        c.name === 'codex-runtime' &&
+        c.status === 'warn' &&
+        c.message.includes('src/ is newer'),
+      );
+
+      expect(runtimeCheck).toBeDefined();
+      expect(runtimeCheck!.message).toContain('pnpm build');
     });
 
     it('detects non-executable Codex hook scripts', () => {

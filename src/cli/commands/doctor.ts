@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync, mkdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, statSync, readdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -473,11 +473,16 @@ function checkCodexHooks(cwd: string): DoctorCheck[] {
   const checks: DoctorCheck[] = [];
   const projectHooksPath = join(cwd, '.codex', 'hooks.json');
   const userHooksPath = join(homedir(), '.codex', 'hooks.json');
+  const hasProjectSlopeHooks = existsSync(projectHooksPath) && fileHasSlopeHooks(projectHooksPath);
+  const hasUserSlopeHooks = existsSync(userHooksPath) && fileHasSlopeHooks(userHooksPath);
 
   if (existsSync(projectHooksPath)) {
     checks.push(...checkCodexHooksFile(projectHooksPath, 'project'));
   }
-  if (existsSync(projectHooksPath) && existsSync(userHooksPath) && fileHasSlopeHooks(projectHooksPath) && fileHasSlopeHooks(userHooksPath)) {
+  if (hasProjectSlopeHooks || hasUserSlopeHooks || existsSync(join(cwd, '.codex'))) {
+    checks.push(...checkCodexRuntimeResolution(cwd));
+  }
+  if (hasProjectSlopeHooks && hasUserSlopeHooks) {
     checks.push({
       name: 'codex-hooks',
       status: 'warn',
@@ -487,6 +492,97 @@ function checkCodexHooks(cwd: string): DoctorCheck[] {
   }
 
   return checks;
+}
+
+function checkCodexRuntimeResolution(cwd: string): DoctorCheck[] {
+  const checks: DoctorCheck[] = [{
+    name: 'codex-runtime',
+    status: 'ok',
+    message: 'Codex dispatcher resolution: project node_modules/.bin/slope → SLOPE dev dist/cli/index.js → global slope',
+  }];
+
+  const currentVersion = getPackageVersion();
+  const localPackagePath = join(cwd, 'node_modules', '@slope-dev', 'slope', 'package.json');
+  if (existsSync(localPackagePath)) {
+    try {
+      const localPkg = JSON.parse(readFileSync(localPackagePath, 'utf8'));
+      const localVersion = typeof localPkg.version === 'string' ? localPkg.version : null;
+      if (localVersion && compareSemver(localVersion, currentVersion) < 0) {
+        checks.push({
+          name: 'codex-runtime',
+          status: 'warn',
+          message: `Codex hooks will prefer project-local @slope-dev/slope ${localVersion} before global/current ${currentVersion} — update the project dependency or remove the stale local install`,
+          fixable: false,
+        });
+      }
+    } catch {
+      checks.push({
+        name: 'codex-runtime',
+        status: 'warn',
+        message: 'Codex hooks will prefer project-local node_modules/.bin/slope, but node_modules/@slope-dev/slope/package.json is unreadable',
+        fixable: false,
+      });
+    }
+  }
+
+  const packagePath = join(cwd, 'package.json');
+  const distCliPath = join(cwd, 'dist', 'cli', 'index.js');
+  if (existsSync(packagePath)) {
+    try {
+      const pkg = JSON.parse(readFileSync(packagePath, 'utf8'));
+      if (pkg.name === '@slope-dev/slope') {
+        if (!existsSync(distCliPath)) {
+          checks.push({
+            name: 'codex-runtime',
+            status: 'warn',
+            message: 'Codex hooks in the SLOPE dev repo prefer dist/cli/index.js, but it is missing — run `pnpm build`',
+            fixable: false,
+          });
+        } else {
+          const newestSourceMtime = newestMtime(join(cwd, 'src'));
+          const distMtime = statSync(distCliPath).mtimeMs;
+          if (newestSourceMtime > distMtime) {
+            checks.push({
+              name: 'codex-runtime',
+              status: 'warn',
+              message: 'Codex hooks in the SLOPE dev repo prefer dist/cli/index.js, but src/ is newer — run `pnpm build` before relying on hooks',
+              fixable: false,
+            });
+          }
+        }
+      }
+    } catch { /* package.json diagnostics are handled elsewhere */ }
+  }
+
+  return checks;
+}
+
+function compareSemver(a: string, b: string): number {
+  const aParts = a.split('.').map(part => Number.parseInt(part, 10) || 0);
+  const bParts = b.split('.').map(part => Number.parseInt(part, 10) || 0);
+  for (let i = 0; i < 3; i++) {
+    const delta = (aParts[i] ?? 0) - (bParts[i] ?? 0);
+    if (delta !== 0) return delta;
+  }
+  return 0;
+}
+
+function newestMtime(path: string): number {
+  if (!existsSync(path)) return 0;
+  const stat = statSync(path);
+  if (!stat.isDirectory()) return stat.mtimeMs;
+
+  let newest = stat.mtimeMs;
+  for (const entry of readdirSync(path)) {
+    const childPath = join(path, entry);
+    const childStat = statSync(childPath);
+    if (childStat.isDirectory()) {
+      newest = Math.max(newest, newestMtime(childPath));
+    } else {
+      newest = Math.max(newest, childStat.mtimeMs);
+    }
+  }
+  return newest;
 }
 
 function checkCodexHooksFile(filePath: string, label: string): DoctorCheck[] {
