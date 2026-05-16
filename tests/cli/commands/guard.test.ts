@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { PassThrough } from 'node:stream';
+import type { HookInput } from '../../../src/core/index.js';
 
 // Ensure adapters are registered
 import '../../../src/core/adapters/claude-code.js';
@@ -9,13 +11,53 @@ import '../../../src/core/adapters/cursor.js';
 import '../../../src/core/adapters/windsurf.js';
 import '../../../src/core/adapters/generic.js';
 
-import { guardManageCommand, shouldSuppressGuardInAdhoc } from '../../../src/cli/commands/guard.js';
+import { guardCommand, guardManageCommand, shouldSuppressGuardInAdhoc } from '../../../src/cli/commands/guard.js';
 import { setSessionMode } from '../../../src/cli/session-state.js';
 
 function makeTmpDir(): string {
   const dir = join(tmpdir(), `slope-guard-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   mkdirSync(dir, { recursive: true });
   return dir;
+}
+
+function writeMinimalSlopeConfig(cwd: string): void {
+  mkdirSync(join(cwd, '.slope'), { recursive: true });
+  writeFileSync(join(cwd, '.slope', 'config.json'), JSON.stringify({
+    scorecardDir: 'docs/retros',
+    metaphor: 'golf',
+  }));
+}
+
+function makeHookInput(cwd: string, overrides: Partial<HookInput> = {}): HookInput {
+  return {
+    session_id: 'test-session',
+    cwd,
+    hook_event_name: 'PreToolUse',
+    tool_name: 'apply_patch',
+    tool_input: { file_path: join(cwd, 'src/example.ts') },
+    ...overrides,
+  };
+}
+
+async function runGuardCommandWithInput(args: string[], input: HookInput): Promise<string> {
+  const stdin = new PassThrough();
+  const originalStdin = process.stdin;
+  let output = '';
+  const writeSpy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk: string | Uint8Array) => {
+    output += typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString('utf8');
+    return true;
+  });
+
+  Object.defineProperty(process, 'stdin', { value: stdin, configurable: true });
+  try {
+    const command = guardCommand(args);
+    stdin.end(JSON.stringify(input));
+    await command;
+    return output;
+  } finally {
+    writeSpy.mockRestore();
+    Object.defineProperty(process, 'stdin', { value: originalStdin, configurable: true });
+  }
 }
 
 describe('slope guard recommend (S65-3)', () => {
@@ -30,12 +72,7 @@ describe('slope guard recommend (S65-3)', () => {
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    // Minimal .slope setup
-    mkdirSync(join(cwd, '.slope'), { recursive: true });
-    writeFileSync(join(cwd, '.slope', 'config.json'), JSON.stringify({
-      scorecardDir: 'docs/retros',
-      metaphor: 'golf',
-    }));
+    writeMinimalSlopeConfig(cwd);
     writeFileSync(join(cwd, '.slope', 'hooks.json'), JSON.stringify({ installed: {} }));
   });
 
@@ -88,12 +125,71 @@ describe('slope guard recommend (S65-3)', () => {
   });
 });
 
+describe('guardCommand dispatcher path', () => {
+  let cwd: string;
+  let origCwd: string;
+
+  beforeEach(() => {
+    cwd = makeTmpDir();
+    origCwd = process.cwd();
+    process.chdir(cwd);
+    writeMinimalSlopeConfig(cwd);
+    setSessionMode(cwd, 'test-session', 'adhoc');
+  });
+
+  afterEach(() => {
+    process.chdir(origCwd);
+    rmSync(cwd, { recursive: true, force: true });
+    vi.restoreAllMocks();
+  });
+
+  it('emits ask output for claim-required on adhoc implementation writes with no sprint state', async () => {
+    const output = await runGuardCommandWithInput(['claim-required'], makeHookInput(cwd));
+    const parsed = JSON.parse(output);
+
+    expect(parsed.hookSpecificOutput.hookEventName).toBe('PreToolUse');
+    expect(parsed.hookSpecificOutput.permissionDecision).toBe('ask');
+    expect(parsed.hookSpecificOutput.additionalContext).toContain('no active sprint state');
+
+    const metrics = readFileSync(join(cwd, '.slope', 'guard-metrics.jsonl'), 'utf8');
+    expect(metrics).toContain('"guard":"claim-required"');
+    expect(metrics).toContain('"decision":"ask"');
+  });
+
+  it('records suppressed metrics for adhoc workflow guards that do not run', async () => {
+    const output = await runGuardCommandWithInput(['workflow-step-gate'], makeHookInput(cwd));
+
+    expect(output).toBe('');
+    const metrics = readFileSync(join(cwd, '.slope', 'guard-metrics.jsonl'), 'utf8');
+    expect(metrics).toContain('"guard":"workflow-step-gate"');
+    expect(metrics).toContain('"decision":"suppressed"');
+    expect(metrics).toContain('"reason":"adhoc-session"');
+  });
+
+  it('keeps claim-required effective when batched with suppressed write guards', async () => {
+    const output = await runGuardCommandWithInput(
+      ['__batch', 'workflow-step-gate', 'claim-required'],
+      makeHookInput(cwd),
+    );
+    const parsed = JSON.parse(output);
+
+    expect(parsed.hookSpecificOutput.permissionDecision).toBe('ask');
+    expect(parsed.hookSpecificOutput.additionalContext).toContain('slope claim');
+
+    const metrics = readFileSync(join(cwd, '.slope', 'guard-metrics.jsonl'), 'utf8');
+    expect(metrics).toContain('"guard":"workflow-step-gate"');
+    expect(metrics).toContain('"decision":"suppressed"');
+    expect(metrics).toContain('"guard":"claim-required"');
+    expect(metrics).toContain('"decision":"ask"');
+  });
+});
+
 describe('adhoc guard suppression', () => {
   let cwd: string;
 
   beforeEach(() => {
     cwd = makeTmpDir();
-    mkdirSync(join(cwd, '.slope'), { recursive: true });
+    writeMinimalSlopeConfig(cwd);
     setSessionMode(cwd, 'test-session', 'adhoc');
   });
 
