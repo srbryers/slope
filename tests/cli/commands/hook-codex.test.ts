@@ -49,4 +49,15 @@ describe('slope hook add --harness=codex', () => {
     const slopeConfig = JSON.parse(readFileSync(join(cwd, '.slope', 'hooks.json'), 'utf8'));
     expect(Object.keys(slopeConfig.installed).some(k => k.startsWith('guard-'))).toBe(true);
   });
+
+  it('reports installed guard definitions instead of persisted unique guard names', async () => {
+    const log = vi.mocked(console.log);
+
+    await hookCommand(['add', '--level=full', '--harness=codex']);
+
+    const output = log.mock.calls.map(call => call.join(' ')).join('\n');
+    expect(output).toContain('Installed 30 of 31 guard hooks (level: full)');
+    expect(output).toContain('compaction');
+    expect(output).toContain('unsupported by harness');
+  });
 });
