@@ -154,7 +154,7 @@ function saveExploreState(cwd: string, state: ExploreState): void {
   const dir = join(cwd, '.slope', 'guard-state');
   mkdirSync(dir, { recursive: true });
   const statePath = join(cwd, EXPLORE_STATE_FILE);
-  const tmpPath = `${statePath}.tmp`;
+  const tmpPath = `${statePath}.${process.pid}.tmp`;
   writeFileSync(tmpPath, JSON.stringify(state, null, 2) + '\n');
   renameSync(tmpPath, statePath);
 }
