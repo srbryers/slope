@@ -1,0 +1,88 @@
+{
+  "sprint_number": 97,
+  "player": "sebastianbryers",
+  "theme": "Review Recommendation Repair",
+  "par": 3,
+  "slope": 1,
+  "score": 3,
+  "score_label": "par",
+  "date": "2026-05-17",
+  "shots": [
+    {
+      "ticket_key": "S97-1",
+      "title": "Teach plan-analysis ticket counting to read slope sprint plan ticket tables",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Shared plan-analysis now counts H3 ticket headers, table rows emitted by slope sprint plan, and decimal inserted-sprint labels."
+    },
+    {
+      "ticket_key": "S97-2",
+      "title": "Add review recommend and review-tier regressions for table-form sprint plans",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added focused plan-analysis tests plus command-level review recommend coverage. Built CLI smoke test now reports Sprint 97 (2 tickets, slope 1) from generated table-form plan."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 2,
+    "fairways_total": 2,
+    "greens_in_regulation": 2,
+    "greens_total": 2,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "pin_position",
+      "impact": "minor",
+      "description": "The fix needed to stay in the shared plan-analysis helper so review recommend and review-tier guard remain aligned."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Generated plan formats are contracts for downstream review tooling.",
+      "outcome": "Added direct parser coverage for table-form plans and command-level coverage for review recommend."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "Full local suite passed after the parser change.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "A small follow-up that paid down a workflow mismatch before it could keep confusing review gates.",
+    "advice_for_next_player": "When one command generates Markdown another command parses, add regression coverage using the generated shape.",
+    "what_surprised_you": "The review-tier guard already shared the same helper, so the command fix covered both paths.",
+    "excited_about_next": "Return to the Codex plugin work with the review recommendation flow trustworthy again."
+  },
+  "bunker_locations": [
+    "Generated plan Markdown is a downstream parser contract; when changing slope sprint plan output, update plan-analysis tests too."
+  ],
+  "yardage_book_updates": [],
+  "course_management_notes": [
+    "Validation used pnpm typecheck, pnpm build, pnpm test, and a generated-plan CLI smoke test."
+  ],
+  "slope_factors": [
+    "markdown_parser",
+    "review_workflow"
+  ],
+  "_auto_generated": true,
+  "_commits": 2,
+  "_ci_signal": null,
+  "_pr_signal": null,
+  "_note": "Auto-generated from git only (no CI). Shots default to green. Provide --test-output for better scoring."
+}
