@@ -1,13 +1,17 @@
-import { existsSync, readFileSync, readdirSync, unlinkSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, unlinkSync, statSync, mkdirSync, writeFileSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
 import { execSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import type { HookInput, GuardResult } from '../../core/index.js';
 import { loadConfig } from '../config.js';
-import { loadSessionState, updateSessionState, dedupGuardContext } from '../session-state.js';
+import { loadSessionState, updateSessionState } from '../session-state.js';
+import { loadSprintState } from '../sprint-state.js';
 
 const DEFAULT_INDEX_PATHS = ['CODEBASE.md', '.slope/index.json', 'docs/architecture.md'];
 const DEFAULT_STALE_WARN_AT = 11;
 const DEFAULT_STALE_BLOCK_AT = 31;
+const EXPLORE_STATE_FILE = '.slope/guard-state/explore.json';
+const FALLBACK_CONTEXT_TTL_MS = 12 * 60 * 60 * 1000;
 
 /**
  * Explore guard: fires on Read|Glob|Grep|Edit|Write (PreToolUse).
@@ -54,35 +58,105 @@ export async function exploreGuard(input: HookInput, cwd: string): Promise<Guard
         };
       }
       // Read/Glob/Grep — warn but don't block
-      const staleCtx = prependHandoff(handoffContext, `SLOPE: Codebase map is ${staleness.distance} commits stale. Run \`slope map\` to refresh.`);
-      const staleDedup = dedupGuardContext(cwd, input.session_id, 'explore', staleCtx);
-      return { context: staleDedup ?? staleCtx };
+      return exploreContextOnce(cwd, input, handoffContext, `SLOPE: Codebase map is ${staleness.distance} commits stale. Run \`slope map\` to refresh.`);
     }
 
     if (staleness.level === 'warn') {
-      const warnCtx = prependHandoff(handoffContext, `SLOPE: Codebase map at CODEBASE.md is ${staleness.distance} commits stale. Run 'slope map' to refresh, or explore if needed.`);
-      const warnDedup = dedupGuardContext(cwd, input.session_id, 'explore', warnCtx);
-      return { context: warnDedup ?? warnCtx };
+      return exploreContextOnce(cwd, input, handoffContext, `SLOPE: Codebase map at CODEBASE.md is ${staleness.distance} commits stale. Run 'slope map' to refresh, or explore if needed.`);
     }
 
     // Current map — estimate token size
     const content = readFileSync(mapPath, 'utf8');
     const approxTokens = Math.round(content.length / 4 / 1000);
 
-    const mapCtx = prependHandoff(handoffContext, `SLOPE: Codebase map at CODEBASE.md (~${approxTokens}k tokens, L1). Try \`context_search\` (L1.5) before reading full files (L2).`);
-    const mapDedup = dedupGuardContext(cwd, input.session_id, 'explore', mapCtx);
-    return { context: mapDedup ?? mapCtx };
+    return exploreContextOnce(cwd, input, handoffContext, `SLOPE: Codebase map at CODEBASE.md (~${approxTokens}k tokens, L1). Try \`context_search\` (L1.5) before reading full files (L2).`);
   }
 
   // Fallback: other index files found but no CODEBASE.md
-  const fallbackCtx = prependHandoff(handoffContext, `SLOPE: Codebase index available at: ${found.join(', ')} — check before deep exploration.`);
-  const fallbackDedup = dedupGuardContext(cwd, input.session_id, 'explore', fallbackCtx);
-  return { context: fallbackDedup ?? fallbackCtx };
+  return exploreContextOnce(cwd, input, handoffContext, `SLOPE: Codebase index available at: ${found.join(', ')} — check before deep exploration.`);
 }
 
 /** Prepend handoff context if available. */
 function prependHandoff(handoff: string | null, context: string): string {
   return handoff ? `${handoff}\n\n${context}` : context;
+}
+
+interface ExploreState {
+  entries: Record<string, { shown_at: number; count: number }>;
+}
+
+function exploreContextOnce(cwd: string, input: HookInput, handoff: string | null, context: string): GuardResult {
+  if (shouldSuppressExploreContext(cwd, input, context)) {
+    return handoff ? { context: handoff } : {};
+  }
+
+  return { context: prependHandoff(handoff, context) };
+}
+
+function shouldSuppressExploreContext(cwd: string, input: HookInput, context: string): boolean {
+  const state = loadExploreState(cwd);
+  const key = exploreContextKey(cwd, input, context);
+  const now = Date.now();
+
+  for (const [entryKey, entry] of Object.entries(state.entries)) {
+    if (!entry.shown_at || now - entry.shown_at > FALLBACK_CONTEXT_TTL_MS) {
+      delete state.entries[entryKey];
+    }
+  }
+
+  const existing = state.entries[key];
+  if (existing) {
+    existing.count += 1;
+    saveExploreState(cwd, state);
+    return true;
+  }
+
+  state.entries[key] = { shown_at: now, count: 1 };
+  saveExploreState(cwd, state);
+  return false;
+}
+
+function exploreContextKey(cwd: string, input: HookInput, context: string): string {
+  const contextHash = createHash('sha256').update(context).digest('hex').slice(0, 12);
+  if (input.session_id) return `session:${input.session_id}:${contextHash}`;
+
+  return [
+    'fallback',
+    currentBranch(cwd),
+    String(loadSprintState(cwd)?.sprint ?? 'none'),
+    contextHash,
+  ].join(':');
+}
+
+function currentBranch(cwd: string): string {
+  try {
+    return execSync('git rev-parse --abbrev-ref HEAD 2>/dev/null', { cwd, encoding: 'utf8', timeout: 2000 }).trim() || 'unknown';
+  } catch {
+    return 'unknown';
+  }
+}
+
+function loadExploreState(cwd: string): ExploreState {
+  const statePath = join(cwd, EXPLORE_STATE_FILE);
+  if (!existsSync(statePath)) return { entries: {} };
+  try {
+    const raw = JSON.parse(readFileSync(statePath, 'utf8')) as Partial<ExploreState>;
+    if (!raw || typeof raw !== 'object' || !raw.entries || typeof raw.entries !== 'object') {
+      return { entries: {} };
+    }
+    return { entries: raw.entries };
+  } catch {
+    return { entries: {} };
+  }
+}
+
+function saveExploreState(cwd: string, state: ExploreState): void {
+  const dir = join(cwd, '.slope', 'guard-state');
+  mkdirSync(dir, { recursive: true });
+  const statePath = join(cwd, EXPLORE_STATE_FILE);
+  const tmpPath = `${statePath}.tmp`;
+  writeFileSync(tmpPath, JSON.stringify(state, null, 2) + '\n');
+  renameSync(tmpPath, statePath);
 }
 
 /**

@@ -35,6 +35,15 @@ function makeInput(toolName: string): HookInput {
   };
 }
 
+function makeInputWithoutSession(toolName: string): HookInput {
+  return {
+    session_id: '',
+    cwd: tmpDir,
+    hook_event_name: 'PreToolUse',
+    tool_name: toolName,
+  };
+}
+
 function writeCodebaseMap(gitSha: string): void {
   const content = `---
 generated_at: "2024-01-01T00:00:00Z"
@@ -74,6 +83,24 @@ describe('explore guard — tiered staleness', () => {
     const result = await exploreGuard(makeInput('Read'), tmpDir);
     expect(result.context).toContain('CODEBASE.md');
     expect(result.context).toContain('k tokens');
+  });
+
+  it('suppresses repeated map guidance within the same session', async () => {
+    writeFileSync(join(tmpDir, 'CODEBASE.md'), '# Map\nSome content');
+    const first = await exploreGuard(makeInput('Read'), tmpDir);
+    const second = await exploreGuard(makeInput('Grep'), tmpDir);
+
+    expect(first.context).toContain('CODEBASE.md');
+    expect(second).toEqual({});
+  });
+
+  it('suppresses repeated map guidance even when Codex omits session_id', async () => {
+    writeFileSync(join(tmpDir, 'CODEBASE.md'), '# Map\nSome content');
+    const first = await exploreGuard(makeInputWithoutSession('Read'), tmpDir);
+    const second = await exploreGuard(makeInputWithoutSession('Read'), tmpDir);
+
+    expect(first.context).toContain('CODEBASE.md');
+    expect(second).toEqual({});
   });
 
   it('returns warning context when map is in warn range (11-30 commits)', async () => {
