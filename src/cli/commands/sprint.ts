@@ -373,6 +373,53 @@ function getStore(cwd: string) {
   return createStore({ storePath: config.store_path ?? '.slope/slope.db', cwd });
 }
 
+const SPRINT_PHASE_ORDER: Record<SprintPhase, number> = {
+  planning: 0,
+  reviewing: 1,
+  implementing: 2,
+  scoring: 3,
+  complete: 4,
+};
+
+function workflowPhaseToSprintPhase(workflowPhase: string | undefined): SprintPhase | null {
+  switch (workflowPhase) {
+    case 'pre_hole':
+      return 'planning';
+    case 'plan_review':
+      return 'reviewing';
+    case 'per_ticket':
+      return 'implementing';
+    case 'post_hole':
+    case 'validate':
+      return 'scoring';
+    default:
+      return null;
+  }
+}
+
+function sprintNumberFromId(sprintId: string | undefined): number | null {
+  if (!sprintId) return null;
+  const parsed = Number(sprintId.replace(/^S/i, ''));
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function syncSprintStateWithWorkflow(cwd: string, sprintId: string | undefined, workflowPhase: string | undefined): void {
+  const nextPhase = workflowPhaseToSprintPhase(workflowPhase);
+  const sprint = sprintNumberFromId(sprintId);
+  if (!nextPhase || sprint === null) return;
+
+  const existing = loadSprintState(cwd);
+  if (!existing) {
+    saveSprintState(cwd, createSprintState(sprint, nextPhase));
+    return;
+  }
+  if (existing.sprint !== sprint || existing.phase === 'complete') return;
+  if (SPRINT_PHASE_ORDER[nextPhase] <= SPRINT_PHASE_ORDER[existing.phase]) return;
+
+  existing.phase = nextPhase;
+  saveSprintState(cwd, existing);
+}
+
 async function runWorkflowCommand(args: string[], cwd: string): Promise<void> {
   const sprintArg = args.find(a => a.startsWith('--sprint=') || !a.startsWith('--'));
   const workflowArg = args.find(a => a.startsWith('--workflow='));
@@ -435,6 +482,7 @@ async function runWorkflowCommand(args: string[], cwd: string): Promise<void> {
 
     // Auto-execute any initial command steps
     const next = await autoRunCommandSteps(exec.id, resolved, store, cwd);
+    syncSprintStateWithWorkflow(cwd, sprintId, next.phase);
 
     if (next.is_complete) {
       console.log('Workflow complete.');
@@ -519,6 +567,7 @@ async function resumeCommand(args: string[], cwd: string): Promise<void> {
 
     // Auto-execute any pending command steps
     const next = await autoRunCommandSteps(exec.id, def, store, cwd);
+    syncSprintStateWithWorkflow(cwd, sprintArg, next.phase);
 
     if (next.is_complete) {
       console.log(`Workflow for sprint ${sprintArg} is complete.`);
@@ -578,6 +627,7 @@ async function skipCommand(args: string[], cwd: string): Promise<void> {
     if (result.is_complete) {
       console.log(`Step "${stepId}" skipped. Workflow is now complete.`);
     } else {
+      syncSprintStateWithWorkflow(cwd, sprintArg, result.advanced_to?.phase);
       console.log(`Step "${stepId}" skipped (reason: ${reason}).`);
       console.log(`Next: ${result.advanced_to?.phase}/${result.advanced_to?.step}`);
     }
