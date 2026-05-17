@@ -2,11 +2,12 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   parseRoadmap,
-  detectLatestSprint,
   loadScorecards,
+  formatSprintLabel,
 } from '../../core/index.js';
 import type { RoadmapDefinition, RoadmapSprint } from '../../core/index.js';
 import { loadConfig } from '../config.js';
+import { inferSprintContext } from '../sprint-inference.js';
 import { loadSprintState } from '../sprint-state.js';
 import { resolveStore } from '../store.js';
 
@@ -123,13 +124,14 @@ export async function collectAgentStatus(cwd: string): Promise<AgentStatus> {
     }
   }
 
-  // Current sprint — sprint-state.json wins; otherwise fall back to detectLatestSprint
+  // Current sprint — sprint-state.json wins; otherwise infer from roadmap
+  // pending work before falling back to scorecards (#364).
   const sprintState = loadSprintState(cwd);
   let currentSprint: number | null = sprintState?.sprint ?? null;
   if (currentSprint == null) {
     try {
-      const latest = detectLatestSprint(config, cwd);
-      currentSprint = latest > 0 ? latest : null;
+      const inferred = inferSprintContext(cwd, config);
+      currentSprint = inferred.source === 'initial' && !roadmap ? null : inferred.sprint;
     } catch {
       // best-effort
     }
@@ -281,7 +283,7 @@ function recommendCommands(state: {
   // No active sprint state
   if (state.sprintState == null) {
     if (state.currentSprint != null) {
-      cmds.push(`slope sprint start --sprint=${state.currentSprint}`);
+      cmds.push(`slope sprint start --number=${state.currentSprint}`);
     } else {
       cmds.push('slope briefing');
     }
@@ -371,7 +373,7 @@ export function renderAgentMarkdown(
 ): string {
   const lines: string[] = [];
   const sprintLabel = s.currentSprint != null
-    ? `S${s.currentSprint}${opts.sprintTheme ? ` ${opts.sprintTheme}` : ''}`
+    ? `${formatSprintLabel(s.currentSprint)}${opts.sprintTheme ? ` ${opts.sprintTheme}` : ''}`
     : '—';
 
   lines.push('# Agent Next');
@@ -388,7 +390,7 @@ export function renderAgentMarkdown(
   if (s.blockedBy.length > 0) {
     lines.push('## Blocked');
     lines.push('');
-    lines.push(`This sprint is blocked by: ${s.blockedBy.map(id => `S${id}`).join(', ')}`);
+    lines.push(`This sprint is blocked by: ${s.blockedBy.map(formatSprintLabel).join(', ')}`);
     lines.push('');
     lines.push('Resolve those before proceeding here.');
     lines.push('');
@@ -430,12 +432,12 @@ function printHumanStatus(s: AgentStatus): void {
   lines.push('═'.repeat(50));
   lines.push(`  Vision:        ${s.vision}`);
   lines.push(`  Roadmap:       ${s.roadmap}`);
-  lines.push(`  Sprint:        ${s.currentSprint ?? '—'}`);
+  lines.push(`  Sprint:        ${s.currentSprint != null ? formatSprintLabel(s.currentSprint) : '—'}`);
   lines.push(`  Phase:         ${s.phase}`);
   lines.push(`  Claims:        ${s.activeClaims.length > 0 ? s.activeClaims.join(', ') : 'none'}`);
   lines.push(`  Next ticket:   ${s.nextTicket ?? '—'}`);
   if (s.blockedBy.length > 0) {
-    lines.push(`  Blocked by:    ${s.blockedBy.map(id => `S${id}`).join(', ')}`);
+    lines.push(`  Blocked by:    ${s.blockedBy.map(formatSprintLabel).join(', ')}`);
   }
   if (s.requiredGates.length > 0) {
     lines.push(`  Pending gates: ${s.requiredGates.join(', ')}`);

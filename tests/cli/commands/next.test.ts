@@ -1,0 +1,92 @@
+import { describe, it, expect, afterEach, vi } from 'vitest';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { nextCommand } from '../../../src/cli/commands/next.js';
+
+function makeRepo(): string {
+  const cwd = mkdtempSync(join(tmpdir(), 'slope-next-'));
+  mkdirSync(join(cwd, '.slope'), { recursive: true });
+  mkdirSync(join(cwd, 'docs', 'backlog'), { recursive: true });
+  mkdirSync(join(cwd, 'docs', 'retros'), { recursive: true });
+  writeFileSync(join(cwd, '.slope', 'config.json'), JSON.stringify({
+    roadmapPath: 'docs/backlog/roadmap.json',
+    scorecardDir: 'docs/retros',
+    scorecardPattern: 'sprint-*.json',
+  }));
+  return cwd;
+}
+
+function writeScorecard(cwd: string, sprint: number): void {
+  writeFileSync(join(cwd, 'docs', 'retros', `sprint-${sprint}.json`), JSON.stringify({
+    sprint_number: sprint,
+    theme: `Sprint ${sprint}`,
+    par: 4,
+    slope: 1,
+    score: 4,
+    score_label: 'par',
+    shots: [],
+    stats: { fairways_hit: 0, fairways_total: 0, greens_in_regulation: 0, greens_total: 0, putts: 0, penalties: 0, hazards_hit: 0, hazard_penalties: 0, miss_directions: { long: 0, short: 0, left: 0, right: 0 } },
+    conditions: [],
+    special_plays: [],
+    bunker_locations: [],
+    yardage_book_updates: [],
+    course_management_notes: [],
+  }));
+}
+
+function writeRoadmap(cwd: string): void {
+  writeFileSync(join(cwd, 'docs', 'backlog', 'roadmap.json'), JSON.stringify({
+    name: 'Test',
+    phases: [{ name: 'P1', sprints: [43, 435, 44] }],
+    sprints: [
+      { id: 43, theme: 'Done', par: 4, slope: 1, type: 'feature', status: 'complete', tickets: [
+        { key: 'S43-1', title: 'done', club: 'wedge', complexity: 'small' },
+        { key: 'S43-2', title: 'done', club: 'wedge', complexity: 'small' },
+        { key: 'S43-3', title: 'done', club: 'wedge', complexity: 'small' },
+      ] },
+      { id: 435, theme: 'Inserted work', par: 4, slope: 1, type: 'bug fix', status: 'planned', tickets: [
+        { key: 'S43.5-1', title: 'inserted', club: 'wedge', complexity: 'small' },
+        { key: 'S43.5-2', title: 'inserted', club: 'wedge', complexity: 'small' },
+        { key: 'S43.5-3', title: 'inserted', club: 'wedge', complexity: 'small' },
+      ] },
+      { id: 44, theme: 'Later', par: 4, slope: 1, type: 'feature', status: 'planned', tickets: [
+        { key: 'S44-1', title: 'later', club: 'wedge', complexity: 'small' },
+        { key: 'S44-2', title: 'later', club: 'wedge', complexity: 'small' },
+        { key: 'S44-3', title: 'later', club: 'wedge', complexity: 'small' },
+      ] },
+    ],
+  }));
+}
+
+describe('slope next', () => {
+  const repos: string[] = [];
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    for (const repo of repos.splice(0)) rmSync(repo, { recursive: true, force: true });
+  });
+
+  it('prefers a pending inserted roadmap sprint over scorecard+1 fallback', () => {
+    const cwd = makeRepo();
+    repos.push(cwd);
+    writeScorecard(cwd, 99);
+    writeRoadmap(cwd);
+    const originalCwd = process.cwd();
+    const logs: string[] = [];
+    vi.spyOn(console, 'log').mockImplementation((msg = '') => logs.push(String(msg)));
+
+    try {
+      process.chdir(cwd);
+      nextCommand();
+    } finally {
+      process.chdir(originalCwd);
+    }
+
+    const output = logs.join('\n');
+    expect(output).toContain('Latest scorecard: S99');
+    expect(output).toContain('Next sprint: S43.5');
+    expect(output).toContain('roadmap state overrides scorecard fallback to S100');
+    expect(output).toContain('slope briefing --sprint=435');
+  });
+});

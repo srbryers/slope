@@ -62,6 +62,42 @@ export interface RoadmapValidationResult {
   warnings: RoadmapValidationWarning[];
 }
 
+/** Return true for encoded inserted half-sprint ids like 435 => S43.5.
+ *  Decimal roadmap ids such as 75.5 are already explicit and are left as-is.
+ *  The encoding is intentionally limited to three-digit ids ending in 5 so
+ *  ordinary ids like 95, 100, 101, and 203 stay canonical.
+ */
+export function isEncodedInsertedSprintId(id: number): boolean {
+  return Number.isInteger(id) && id >= 100 && id < 1000 && id % 10 === 5;
+}
+
+/** Numeric value used for ordering sprint ids. Encoded inserted ids sort
+ *  between their surrounding canonical sprints: 435 sorts as 43.5.
+ */
+export function sprintOrderValue(id: number): number {
+  if (isEncodedInsertedSprintId(id)) {
+    return Math.floor(id / 10) + (id % 10) / 10;
+  }
+  return id;
+}
+
+/** Format the numeric portion of a sprint id for human-facing output. */
+export function formatSprintNumber(id: number): string {
+  if (isEncodedInsertedSprintId(id)) {
+    return `${Math.floor(id / 10)}.${id % 10}`;
+  }
+  return Number.isInteger(id) ? String(id) : String(id);
+}
+
+/** Format a full sprint label, e.g. S95 or S43.5. */
+export function formatSprintLabel(id: number): string {
+  return `S${formatSprintNumber(id)}`;
+}
+
+export function compareSprintIds(a: number, b: number): number {
+  return sprintOrderValue(a) - sprintOrderValue(b);
+}
+
 /** Validate a roadmap definition for structural correctness.
  *  Optionally cross-check sprint status against scorecards and/or shipped
  *  sprint commits on main when provided. Caller is responsible for collecting
@@ -83,12 +119,15 @@ export function validateRoadmap(
   }
 
   // Check: sprint numbering continuity
-  const sortedIds = [...sprintIds].sort((a, b) => a - b);
+  const sortedIds = [...sprintIds].sort(compareSprintIds);
   for (let i = 1; i < sortedIds.length; i++) {
-    if (sortedIds[i] !== sortedIds[i - 1] + 1) {
+    const prev = sprintOrderValue(sortedIds[i - 1]);
+    const current = sprintOrderValue(sortedIds[i]);
+    const allowedInsertedStep = current > prev && current <= Math.floor(prev) + 1;
+    if (!allowedInsertedStep && current !== prev + 1) {
       errors.push({
         type: 'error',
-        message: `Sprint numbering gap: S${sortedIds[i - 1]} → S${sortedIds[i]}`,
+        message: `Sprint numbering gap: ${formatSprintLabel(sortedIds[i - 1])} → ${formatSprintLabel(sortedIds[i])}`,
       });
     }
   }
@@ -107,26 +146,26 @@ export function validateRoadmap(
       warnings.push({
         type: 'warning',
         sprint: sprint.id,
-        message: `S${sprint.id} has ${sprint.tickets.length} tickets (recommended 3-4)`,
+        message: `${formatSprintLabel(sprint.id)} has ${sprint.tickets.length} tickets (recommended 3-4)`,
       });
     }
     if (sprint.tickets.length > 4) {
       warnings.push({
         type: 'warning',
         sprint: sprint.id,
-        message: `S${sprint.id} has ${sprint.tickets.length} tickets (recommended 3-4)`,
+        message: `${formatSprintLabel(sprint.id)} has ${sprint.tickets.length} tickets (recommended 3-4)`,
       });
     }
 
     // Check: ticket key format matches sprint
     for (const ticket of sprint.tickets) {
-      const expected = `S${sprint.id}-`;
+      const expected = `${formatSprintLabel(sprint.id)}-`;
       if (!ticket.key.startsWith(expected)) {
         errors.push({
           type: 'error',
           sprint: sprint.id,
           ticket: ticket.key,
-          message: `Ticket ${ticket.key} does not match sprint S${sprint.id} (expected prefix ${expected})`,
+          message: `Ticket ${ticket.key} does not match sprint ${formatSprintLabel(sprint.id)} (expected prefix ${expected})`,
         });
       }
     }
@@ -151,7 +190,7 @@ export function validateRoadmap(
         errors.push({
           type: 'error',
           sprint: sprint.id,
-          message: `S${sprint.id} depends on S${dep} which does not exist in the roadmap`,
+          message: `${formatSprintLabel(sprint.id)} depends on ${formatSprintLabel(dep)} which does not exist in the roadmap`,
         });
       }
     }
@@ -161,7 +200,7 @@ export function validateRoadmap(
       errors.push({
         type: 'error',
         sprint: sprint.id,
-        message: `S${sprint.id} has invalid par ${sprint.par} (must be 3, 4, or 5)`,
+        message: `${formatSprintLabel(sprint.id)} has invalid par ${sprint.par} (must be 3, 4, or 5)`,
       });
     }
   }
@@ -171,7 +210,7 @@ export function validateRoadmap(
   if (cycle) {
     errors.push({
       type: 'error',
-      message: `Dependency cycle detected: ${cycle.map(id => `S${id}`).join(' → ')}`,
+      message: `Dependency cycle detected: ${cycle.map(formatSprintLabel).join(' → ')}`,
     });
   }
 
@@ -181,7 +220,7 @@ export function validateRoadmap(
       if (!sprintIds.has(sid)) {
         errors.push({
           type: 'error',
-          message: `Phase "${phase.name}" references S${sid} which does not exist`,
+          message: `Phase "${phase.name}" references ${formatSprintLabel(sid)} which does not exist`,
         });
       }
     }
@@ -199,7 +238,7 @@ export function validateRoadmap(
         warnings.push({
           type: 'warning',
           sprint: sprint.id,
-          message: `S${sprint.id} has a scorecard but roadmap status is "${status ?? 'planned'}" — expected "complete"`,
+          message: `${formatSprintLabel(sprint.id)} has a scorecard but roadmap status is "${status ?? 'planned'}" — expected "complete"`,
         });
       }
 
@@ -207,7 +246,7 @@ export function validateRoadmap(
         warnings.push({
           type: 'warning',
           sprint: sprint.id,
-          message: `S${sprint.id} is marked "complete" in roadmap but no scorecard exists (phantom sprint)`,
+          message: `${formatSprintLabel(sprint.id)} is marked "complete" in roadmap but no scorecard exists (phantom sprint)`,
         });
       }
     }
@@ -223,7 +262,7 @@ export function validateRoadmap(
         errors.push({
           type: 'error',
           sprint: sprint.id,
-          message: `S${sprint.id} has shipped commits on main but status is "${status ?? 'planned'}" — expected "complete"`,
+          message: `${formatSprintLabel(sprint.id)} has shipped commits on main but status is "${status ?? 'planned'}" — expected "complete"`,
         });
       }
 
@@ -231,7 +270,7 @@ export function validateRoadmap(
         warnings.push({
           type: 'warning',
           sprint: sprint.id,
-          message: `S${sprint.id} is marked "complete" but no shipped commits found on main`,
+          message: `${formatSprintLabel(sprint.id)} is marked "complete" but no shipped commits found on main`,
         });
       }
     }
@@ -501,9 +540,9 @@ export function formatRoadmapSummary(roadmap: RoadmapDefinition): string {
     lines.push('');
     for (const sprint of phaseSprints) {
       const deps = sprint.depends_on?.length
-        ? ` (depends on: ${sprint.depends_on.map(d => `S${d}`).join(', ')})`
+        ? ` (depends on: ${sprint.depends_on.map(formatSprintLabel).join(', ')})`
         : ' (no dependencies)';
-      lines.push(`- **S${sprint.id}** — ${sprint.theme} | Par ${sprint.par} | ${sprint.tickets.length} tickets${deps}`);
+      lines.push(`- **${formatSprintLabel(sprint.id)}** — ${sprint.theme} | Par ${sprint.par} | ${sprint.tickets.length} tickets${deps}`);
     }
     lines.push('');
   }
@@ -511,7 +550,7 @@ export function formatRoadmapSummary(roadmap: RoadmapDefinition): string {
   // Critical path
   lines.push('## Critical Path');
   lines.push('');
-  lines.push(`${criticalPath.path.map(id => `S${id}`).join(' → ')} (${criticalPath.length} sprints, par ${criticalPath.totalPar})`);
+  lines.push(`${criticalPath.path.map(formatSprintLabel).join(' → ')} (${criticalPath.length} sprints, par ${criticalPath.totalPar})`);
   lines.push('');
 
   // Parallel opportunities
@@ -519,7 +558,7 @@ export function formatRoadmapSummary(roadmap: RoadmapDefinition): string {
     lines.push('## Parallel Opportunities');
     lines.push('');
     for (const group of parallelGroups) {
-      lines.push(`- ${group.sprints.map(id => `S${id}`).join(', ')}: ${group.reason}`);
+      lines.push(`- ${group.sprints.map(formatSprintLabel).join(', ')}: ${group.reason}`);
     }
     lines.push('');
   }
@@ -554,17 +593,17 @@ export function formatStrategicContext(
   // Find what depends on this sprint
   const dependents = roadmap.sprints
     .filter(s => s.depends_on?.includes(currentSprint))
-    .map(s => `S${s.id}`);
+    .map(s => formatSprintLabel(s.id));
 
   const lines: string[] = [];
-  lines.push(`Sprint ${sprintIndex} of ${totalSprints} — S${currentSprint}: ${sprint.theme}`);
+  lines.push(`Sprint ${sprintIndex} of ${totalSprints} — ${formatSprintLabel(currentSprint)}: ${sprint.theme}`);
 
   if (phase) {
     lines.push(`Phase: ${phase.name}`);
   }
 
   if (onCriticalPath) {
-    lines.push(`On critical path: ${criticalPath.path.map(id => `S${id}`).join(' → ')}`);
+    lines.push(`On critical path: ${criticalPath.path.map(formatSprintLabel).join(' → ')}`);
   }
 
   if (dependents.length > 0) {
@@ -581,8 +620,8 @@ export function formatStrategicContext(
       });
     const status = blockers.length === 0
       ? 'ready'
-      : `blocked by ${blockers.map(b => `S${b}`).join(', ')}`;
-    lines.push(`Next: S${next.id}: ${next.theme} (${status})`);
+      : `blocked by ${blockers.map(formatSprintLabel).join(', ')}`;
+    lines.push(`Next: ${formatSprintLabel(next.id)}: ${next.theme} (${status})`);
   }
 
   return lines.join('\n');
@@ -597,12 +636,13 @@ export function findNextPlannedSprint(
   roadmap: RoadmapDefinition,
   currentSprint: number,
 ): RoadmapSprint | null {
+  const currentOrder = sprintOrderValue(currentSprint);
   const candidates = roadmap.sprints
     .filter(s => {
       const status = (s as RoadmapSprint & { status?: string }).status;
-      return status !== 'complete' && s.id > currentSprint;
+      return status !== 'complete' && sprintOrderValue(s.id) > currentOrder;
     })
-    .sort((a, b) => a.id - b.id);
+    .sort((a, b) => compareSprintIds(a.id, b.id));
 
   if (candidates.length === 0) return null;
 

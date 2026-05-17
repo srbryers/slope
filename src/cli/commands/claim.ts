@@ -1,6 +1,6 @@
 import { checkConflicts } from '../../core/index.js';
 import { loadConfig } from '../config.js';
-import { loadScorecards } from '../loader.js';
+import { inferSprintContext } from '../sprint-inference.js';
 import { resolveStore } from '../store.js';
 import type { ClaimScope, SprintClaim } from '../../core/index.js';
 
@@ -16,11 +16,7 @@ function parseArgs(args: string[]): Record<string, string> {
 function resolveSprint(flags: Record<string, string>, cwd: string): number {
   if (flags.sprint) return parseInt(flags.sprint, 10);
   const config = loadConfig(cwd);
-  if (config.currentSprint) return config.currentSprint;
-  const scorecards = loadScorecards(config, cwd);
-  if (scorecards.length === 0) return 1;
-  const maxSprint = Math.max(...scorecards.map(s => s.sprint_number));
-  return maxSprint + 1;
+  return inferSprintContext(cwd, config).sprint;
 }
 
 export async function claimCommand(args: string[]): Promise<void> {

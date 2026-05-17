@@ -84,6 +84,14 @@ describe('loadScorecards — numeric sort', () => {
     const numbers = cards.map(c => c.sprint_number);
     expect(numbers).toEqual([5, 10]);
   });
+
+  it('loads and sorts decimal scorecard filenames for inserted sub-sprints', () => {
+    writeCard(retrosDir, 'sprint-44.json', 44);
+    writeCard(retrosDir, 'sprint-43.5.json', 43.5);
+
+    const cards = loadScorecards(baseConfig, TMP);
+    expect(cards.map(c => c.sprint_number)).toEqual([43.5, 44]);
+  });
 });
 
 describe('detectLatestSprint', () => {
@@ -104,6 +112,14 @@ describe('detectLatestSprint', () => {
 
     const latest = detectLatestSprint(baseConfig, TMP);
     expect(latest).toBe(20);
+  });
+
+  it('orders decimal inserted scorecards before the next canonical sprint', () => {
+    writeCard(retrosDir, 'sprint-43.5.json', 43.5);
+    writeCard(retrosDir, 'sprint-44.json', 44);
+
+    const latest = detectLatestSprint(baseConfig, TMP);
+    expect(latest).toBe(44);
   });
 
   it('returns 0 for no scorecards', () => {

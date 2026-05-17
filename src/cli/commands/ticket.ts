@@ -1,7 +1,7 @@
 import { execSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { parseRoadmap } from '../../core/index.js';
+import { formatSprintLabel, parseRoadmap } from '../../core/index.js';
 import type { RoadmapDefinition } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { loadSprintState } from '../sprint-state.js';
@@ -66,12 +66,19 @@ async function doneSubcommand(args: string[]): Promise<void> {
   const flags = parseFlags(args);
   const cwd = process.cwd();
 
-  // Resolve current sprint — sprint state wins; otherwise infer from ticket key (S{N}-...)
+  const roadmap = loadRoadmap(cwd);
+
+  // Resolve current sprint — sprint state wins; otherwise match the roadmap
+  // ticket before falling back to the display label in S{N}-... keys.
   const state = loadSprintState(cwd);
   let sprintNumber: number | null = state?.sprint ?? null;
+  if (sprintNumber == null && roadmap) {
+    const roadmapSprint = roadmap.sprints.find(s => s.tickets.some(t => t.key === ticketKey));
+    if (roadmapSprint) sprintNumber = roadmapSprint.id;
+  }
   if (sprintNumber == null) {
-    const m = ticketKey.match(/^S(\d+)-/i);
-    if (m) sprintNumber = parseInt(m[1], 10);
+    const m = ticketKey.match(/^S(\d+(?:\.\d+)?)-/i);
+    if (m) sprintNumber = parseFloat(m[1]);
   }
   if (sprintNumber == null) {
     console.error(`Could not resolve sprint for ticket ${ticketKey}.`);
@@ -80,12 +87,11 @@ async function doneSubcommand(args: string[]): Promise<void> {
   }
 
   // 1. Verify ticket exists in roadmap (best-effort — warn but don't block)
-  const roadmap = loadRoadmap(cwd);
   if (roadmap) {
     const sprint = roadmap.sprints.find(s => s.id === sprintNumber);
     const ticketDefined = sprint?.tickets.some(t => t.key === ticketKey);
     if (!ticketDefined) {
-      console.warn(`Warning: ticket ${ticketKey} not found in roadmap S${sprintNumber}. Continuing anyway.`);
+      console.warn(`Warning: ticket ${ticketKey} not found in roadmap ${formatSprintLabel(sprintNumber)}. Continuing anyway.`);
     }
   }
 
@@ -97,7 +103,7 @@ async function doneSubcommand(args: string[]): Promise<void> {
     const existing = await store.list(sprintNumber);
     const ownClaim = existing.find(c => c.target === ticketKey && c.player === player);
     if (!ownClaim) {
-      console.error(`No active claim for ${ticketKey} by ${player} on S${sprintNumber}.`);
+      console.error(`No active claim for ${ticketKey} by ${player} on ${formatSprintLabel(sprintNumber)}.`);
       console.error('Run `slope claim --target=' + ticketKey + ' --sprint=' + sprintNumber + '` first.');
       process.exit(1);
     }
@@ -129,7 +135,7 @@ async function doneSubcommand(args: string[]): Promise<void> {
     }
 
     console.log(`\nTicket ${ticketKey}: done.`);
-    console.log(`  Sprint:  S${sprintNumber}`);
+    console.log(`  Sprint:  ${formatSprintLabel(sprintNumber)}`);
     console.log(`  Player:  ${player}`);
     if (sha) console.log(`  Commit:  ${sha}`);
     if (flags.notes) console.log(`  Notes:   ${flags.notes}`);

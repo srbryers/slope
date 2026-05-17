@@ -6,6 +6,8 @@ import {
   parseRoadmap,
   formatRoadmapSummary,
   formatStrategicContext,
+  formatSprintLabel,
+  sprintOrderValue,
   findNextPlannedSprint,
 } from '../../src/core/roadmap.js';
 import type { RoadmapDefinition, RoadmapSprint, RoadmapTicket } from '../../src/core/roadmap.js';
@@ -43,6 +45,23 @@ function makeRoadmap(overrides: Partial<RoadmapDefinition> = {}): RoadmapDefinit
   };
 }
 
+describe('sprint id formatting', () => {
+  it('formats canonical, decimal, and encoded inserted sprint ids', () => {
+    expect(formatSprintLabel(43)).toBe('S43');
+    expect(formatSprintLabel(43.5)).toBe('S43.5');
+    expect(formatSprintLabel(435)).toBe('S43.5');
+    expect(formatSprintLabel(95)).toBe('S95');
+    expect(formatSprintLabel(100)).toBe('S100');
+    expect(formatSprintLabel(101)).toBe('S101');
+    expect(formatSprintLabel(203)).toBe('S203');
+  });
+
+  it('sorts encoded inserted ids between surrounding canonical sprints', () => {
+    expect(sprintOrderValue(435)).toBe(43.5);
+    expect([44, 435, 43].sort((a, b) => sprintOrderValue(a) - sprintOrderValue(b))).toEqual([43, 435, 44]);
+  });
+});
+
 // --- validateRoadmap ---
 
 describe('validateRoadmap', () => {
@@ -66,6 +85,34 @@ describe('validateRoadmap', () => {
     const result = validateRoadmap(roadmap);
     expect(result.valid).toBe(false);
     expect(result.errors.some(e => e.message.includes('gap'))).toBe(true);
+  });
+
+  it('allows inserted decimal sprint ids between canonical sprints', () => {
+    const roadmap = makeRoadmap({
+      sprints: [makeSprint(75), makeSprint(75.5), makeSprint(76)],
+      phases: [{ name: 'P1', sprints: [75, 75.5, 76] }],
+    });
+    const result = validateRoadmap(roadmap);
+    expect(result.errors.some(e => e.message.includes('gap'))).toBe(false);
+  });
+
+  it('accepts encoded inserted sprint ids with decimal ticket prefixes', () => {
+    const roadmap = makeRoadmap({
+      sprints: [
+        makeSprint(43),
+        makeSprint(435, {
+          tickets: [
+            { ...makeTicket(435, 1), key: 'S43.5-1' },
+            { ...makeTicket(435, 2), key: 'S43.5-2' },
+            { ...makeTicket(435, 3), key: 'S43.5-3' },
+          ],
+        }),
+        makeSprint(44),
+      ],
+      phases: [{ name: 'P1', sprints: [43, 435, 44] }],
+    });
+    const result = validateRoadmap(roadmap);
+    expect(result.errors).toEqual([]);
   });
 
   it('detects duplicate sprint IDs', () => {
@@ -527,6 +574,25 @@ describe('findNextPlannedSprint', () => {
     });
     const next = findNextPlannedSprint(roadmap, 8);
     expect(next?.id).toBe(9);
+  });
+
+  it('orders encoded inserted sprints before the next canonical sprint', () => {
+    const roadmap = makeRoadmap({
+      sprints: [
+        { ...makeSprint(43), status: 'complete' } as any,
+        makeSprint(435, {
+          tickets: [
+            { ...makeTicket(435, 1), key: 'S43.5-1' },
+            { ...makeTicket(435, 2), key: 'S43.5-2' },
+            { ...makeTicket(435, 3), key: 'S43.5-3' },
+          ],
+        }),
+        makeSprint(44),
+      ],
+      phases: [{ name: 'P1', sprints: [43, 435, 44] }],
+    });
+    const next = findNextPlannedSprint(roadmap, 43);
+    expect(next?.id).toBe(435);
   });
 
   it('skips complete sprints', () => {
