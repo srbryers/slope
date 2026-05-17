@@ -1,0 +1,112 @@
+{
+  "sprint_number": 96,
+  "player": "sebastianbryers",
+  "theme": "Vision & Roadmap Generation Repair",
+  "par": 4,
+  "slope": 2,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-05-17",
+  "shots": [
+    {
+      "ticket_key": "S96-1",
+      "title": "Make vision priorities and non-goals split only on top-level commas (#376)",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added top-level comma parser for vision priorities/non-goals, preserving commas inside (), [], {}, and quoted strings."
+    },
+    {
+      "ticket_key": "S96-2",
+      "title": "Add vision create/update regression coverage for parenthesized commas (#376)",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Covered direct parser behavior plus create/update command writes for priorities and non-goals."
+    },
+    {
+      "ticket_key": "S96-3",
+      "title": "Remove shallow Investigate-and-plan roadmap stubs and fail loudly with no concrete backlog (#377)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Removed placeholder sprint fallback and added RoadmapGenerationError for empty/no-signal generation."
+    },
+    {
+      "ticket_key": "S96-4",
+      "title": "Update roadmap generate CLI messaging and tests for concrete backlog requirements (#377)",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "auto-card could not match fix(96) commit subjects to explicit S96-N ticket keys, requiring include-untracked and manual scorecard correction."
+        }
+      ],
+      "notes": "CLI now says concrete backlog signals are required and prints a clear failure path instead of writing placeholders."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 1,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "rough",
+      "impact": "minor",
+      "description": "Commit subjects used sprint-level fix(96)/docs(96) scopes rather than explicit S96-N ticket keys, so auto-card could not assign all roadmap tickets automatically."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "When fixing generated output quality, delete misleading fallbacks before adding richer generation paths.",
+      "outcome": "roadmap generate now fails loudly with no concrete backlog instead of producing unusable planning stubs."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "review",
+      "description": "Local review recommendation was probed; it requires architect review for a four-ticket sprint, but the command undercounted table-form sprint plans and should be fixed separately.",
+      "status": "watch"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Small surface area, but worth being strict because the old generator looked successful while producing work no one should use.",
+    "advice_for_next_player": "Keep roadmap generation honest: either mine real backlog signals or stop with an actionable error.",
+    "what_surprised_you": "review recommend still reads H3-style plans, while slope sprint plan now emits a ticket table.",
+    "excited_about_next": "Release this with the superseded-sprint fix so global slope has the current planning behavior."
+  },
+  "bunker_locations": [
+    "auto-card could not match fix(96) commit subjects to explicit S96-N ticket keys, requiring include-untracked and manual scorecard correction."
+  ],
+  "yardage_book_updates": [
+    "Use explicit S{N}-{M} ticket keys in commit subjects when auto-card should map commits to planned roadmap tickets without manual correction."
+  ],
+  "course_management_notes": [
+    "roadmap generate now refuses no-signal output; this is intentionally narrower than building full CODEBASE/GitHub issue mining in the same sprint."
+  ],
+  "slope_factors": [
+    "cli_parser",
+    "generation_failure_mode"
+  ],
+  "_auto_generated": true,
+  "_commits": 3,
+  "_ci_signal": null,
+  "_pr_signal": null,
+  "_note": "Auto-generated from git only (no CI). Shots default to green. Provide --test-output for better scoring."
+}
