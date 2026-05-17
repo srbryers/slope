@@ -98,6 +98,12 @@ export function compareSprintIds(a: number, b: number): number {
   return sprintOrderValue(a) - sprintOrderValue(b);
 }
 
+/** Return true when a roadmap sprint should still be considered selectable work. */
+export function isRoadmapSprintPending(sprint: RoadmapSprint): boolean {
+  const status = (sprint as RoadmapSprint & { status?: string }).status;
+  return status !== 'complete' && status !== 'superseded';
+}
+
 /** Validate a roadmap definition for structural correctness.
  *  Optionally cross-check sprint status against scorecards and/or shipped
  *  sprint commits on main when provided. Caller is responsible for collecting
@@ -639,8 +645,7 @@ export function findNextPlannedSprint(
   const currentOrder = sprintOrderValue(currentSprint);
   const candidates = roadmap.sprints
     .filter(s => {
-      const status = (s as RoadmapSprint & { status?: string }).status;
-      return status !== 'complete' && sprintOrderValue(s.id) > currentOrder;
+      return isRoadmapSprintPending(s) && sprintOrderValue(s.id) > currentOrder;
     })
     .sort((a, b) => compareSprintIds(a.id, b.id));
 

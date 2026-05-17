@@ -173,6 +173,7 @@ export {
   formatSprintNumber,
   findNextPlannedSprint,
   isEncodedInsertedSprintId,
+  isRoadmapSprintPending,
   sprintOrderValue,
   compareSprintIds,
 } from './roadmap.js';

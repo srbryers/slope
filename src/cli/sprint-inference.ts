@@ -6,6 +6,7 @@ import {
   detectLatestSprint,
   formatSprintLabel,
   isEncodedInsertedSprintId,
+  isRoadmapSprintPending,
   loadScorecards,
   parseRoadmap,
   sprintOrderValue,
@@ -49,8 +50,7 @@ export function inferSprintContext(cwd: string = process.cwd(), config: SlopeCon
   const completedIds = new Set<number>(scorecards.map(card => card.sprint_number));
   const pendingSprints = roadmap?.sprints
     .filter(sprint => {
-      const status = (sprint as RoadmapSprint & { status?: string }).status;
-      return status !== 'complete' && !completedIds.has(sprint.id);
+      return isRoadmapSprintPending(sprint) && !completedIds.has(sprint.id);
     })
     .sort((a, b) => compareSprintIds(a.id, b.id)) ?? [];
 
