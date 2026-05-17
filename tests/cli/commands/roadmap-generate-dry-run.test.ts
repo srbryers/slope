@@ -63,5 +63,26 @@ describe('slope roadmap generate --dry-run (GH #304)', () => {
     const out = execSync(`node ${SLOPE_BIN} roadmap`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
     expect(out).toMatch(/generate\s+\[--path=<file>\]\s+\[--dry-run\]/);
     expect(out).toContain('sync and generate');
+    expect(out).toContain('concrete backlog signals');
+  });
+
+  it('fails loudly instead of writing placeholders when no backlog can be mined', () => {
+    const cwd = setupRepo();
+    const roadmapPath = join(cwd, 'docs', 'backlog', 'roadmap.json');
+    try {
+      execSync(`node ${SLOPE_BIN} roadmap generate --dry-run`, {
+        cwd,
+        encoding: 'utf8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+      throw new Error('Expected roadmap generate to fail without concrete backlog signals');
+    } catch (err) {
+      const error = err as { stderr?: string };
+      expect(error.stderr).toContain('vision is too abstract');
+      expect(error.stderr).toContain('no placeholder planning tickets were created');
+      expect(existsSync(roadmapPath)).toBe(false);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
   });
 });

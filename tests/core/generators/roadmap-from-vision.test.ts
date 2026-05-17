@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { generateRoadmapFromVision } from '../../../src/core/generators/roadmap.js';
+import { RoadmapGenerationError, generateRoadmapFromVision } from '../../../src/core/generators/roadmap.js';
 import { validateRoadmap } from '../../../src/core/roadmap.js';
 import type { VisionDocument } from '../../../src/core/analyzers/types.js';
 import type { ComplexityProfile } from '../../../src/core/analyzers/complexity.js';
@@ -56,18 +56,15 @@ function makeRemoteBacklog(issues: GitHubIssue[]): GitHubBacklogAnalysis {
 }
 
 describe('generateRoadmapFromVision', () => {
-  it('creates sprints from vision priorities with empty backlog', () => {
-    const roadmap = generateRoadmapFromVision(makeVision(), makeEmptyBacklog());
-    expect(roadmap.sprints).toHaveLength(2);
-    expect(roadmap.phases).toHaveLength(2);
-    expect(roadmap.sprints[0].theme).toBe('reliability');
-    expect(roadmap.sprints[0].tickets).toHaveLength(1);
-    expect(roadmap.sprints[0].tickets[0].title).toContain('reliability');
-    expect(roadmap.sprints[1].theme).toBe('speed');
+  it('fails loudly instead of creating placeholder sprints with empty backlog', () => {
+    expect(() => generateRoadmapFromVision(makeVision(), makeEmptyBacklog())).toThrow(RoadmapGenerationError);
+    expect(() => generateRoadmapFromVision(makeVision(), makeEmptyBacklog())).toThrow('vision is too abstract');
   });
 
-  it('passes validateRoadmap', () => {
-    const result = validateRoadmap(generateRoadmapFromVision(makeVision(), makeEmptyBacklog()));
+  it('passes validateRoadmap when concrete backlog exists', () => {
+    const todos = [makeTodo({ text: 'Add retry test coverage', file: 'src/reliability.ts', line: 5 })];
+    const backlog: MergedBacklog = { local: makeLocalBacklog(todos), totalItems: 1 };
+    const result = validateRoadmap(generateRoadmapFromVision(makeVision({ priorities: ['reliability'] }), backlog));
     expect(result.valid).toBe(true);
     expect(result.errors).toHaveLength(0);
   });
@@ -112,13 +109,17 @@ describe('generateRoadmapFromVision', () => {
   });
 
   it('uses complexity profile for par/slope', () => {
-    const roadmap = generateRoadmapFromVision(makeVision({ priorities: ['reliability'] }), makeEmptyBacklog(), makeComplexity());
+    const todos = [makeTodo({ text: 'Add retry test coverage', file: 'src/reliability.ts', line: 5 })];
+    const backlog: MergedBacklog = { local: makeLocalBacklog(todos), totalItems: 1 };
+    const roadmap = generateRoadmapFromVision(makeVision({ priorities: ['reliability'] }), backlog, makeComplexity());
     expect(roadmap.sprints[0].par).toBe(4);
     expect(roadmap.sprints[0].slope).toBe(2);
   });
 
   it('uses defaults when no complexity provided', () => {
-    const roadmap = generateRoadmapFromVision(makeVision({ priorities: ['reliability'] }), makeEmptyBacklog());
+    const todos = [makeTodo({ text: 'Add retry test coverage', file: 'src/reliability.ts', line: 5 })];
+    const backlog: MergedBacklog = { local: makeLocalBacklog(todos), totalItems: 1 };
+    const roadmap = generateRoadmapFromVision(makeVision({ priorities: ['reliability'] }), backlog);
     expect(roadmap.sprints[0].par).toBe(4);
     expect(roadmap.sprints[0].slope).toBe(3);
   });
@@ -134,9 +135,21 @@ describe('generateRoadmapFromVision', () => {
   });
 
   it('creates proper phase names with capitalized priority', () => {
-    const roadmap = generateRoadmapFromVision(makeVision({ priorities: ['dx'] }), makeEmptyBacklog());
+    const todos = [makeTodo({ text: 'Improve CLI tooling', file: 'src/cli/tool.ts', line: 1 })];
+    const backlog: MergedBacklog = { local: makeLocalBacklog(todos), totalItems: 1 };
+    const roadmap = generateRoadmapFromVision(makeVision({ priorities: ['dx'] }), backlog);
     expect(roadmap.phases[0].name).toContain('Dx');
     expect(roadmap.phases[0].sprints).toEqual([1]);
+  });
+
+  it('does not create investigate-and-plan placeholders for unmatched priorities', () => {
+    const todos = [makeTodo({ text: 'Add database index', file: 'src/db.ts', line: 1 })];
+    const backlog: MergedBacklog = { local: makeLocalBacklog(todos), totalItems: 1 };
+    const roadmap = generateRoadmapFromVision(makeVision({ priorities: ['reliability'] }), backlog);
+
+    const allTickets = roadmap.sprints.flatMap(s => s.tickets);
+    expect(allTickets.map(t => t.title)).not.toContain('Investigate and plan reliability improvements');
+    expect(roadmap.sprints.find(s => s.theme === 'General')?.tickets[0].title).toContain('database index');
   });
 
   it('generates valid ticket keys', () => {
