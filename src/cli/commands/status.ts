@@ -1,9 +1,9 @@
-import { checkConflicts, findShippedSprintsOnMain } from '../../core/index.js';
+import { checkConflicts, findShippedSprintsOnMain, formatSprintLabel } from '../../core/index.js';
 import type { SprintClaim, SlopeSession } from '../../core/index.js';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { loadConfig } from '../config.js';
-import { loadScorecards } from '../loader.js';
+import { inferSprintContext } from '../sprint-inference.js';
 import { resolveStore } from '../store.js';
 
 function parseArgs(args: string[]): Record<string, string> {
@@ -18,11 +18,7 @@ function parseArgs(args: string[]): Record<string, string> {
 function resolveSprint(flags: Record<string, string>, cwd: string): number {
   if (flags.sprint) return parseInt(flags.sprint, 10);
   const config = loadConfig(cwd);
-  if (config.currentSprint) return config.currentSprint;
-  const scorecards = loadScorecards(config, cwd);
-  if (scorecards.length === 0) return 1;
-  const maxSprint = Math.max(...scorecards.map(s => s.sprint_number));
-  return maxSprint + 1;
+  return inferSprintContext(cwd, config).sprint;
 }
 
 export async function statusCommand(args: string[]): Promise<void> {
@@ -47,7 +43,7 @@ export async function statusCommand(args: string[]): Promise<void> {
 async function showSprintStatus(store: { list: (n: number) => Promise<SprintClaim[]>; close: () => void }, sprintNumber: number): Promise<void> {
   const claims = await store.list(sprintNumber);
 
-  console.log(`\nSprint ${sprintNumber} — Course Status`);
+  console.log(`\n${formatSprintLabel(sprintNumber)} — Course Status`);
   console.log('═'.repeat(40));
 
   if (claims.length === 0) {

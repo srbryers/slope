@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import type { GolfScorecard } from './types.js';
 import type { SlopeConfig } from './config.js';
 import { normalizeStats } from './builder.js';
+import { compareSprintIds } from './roadmap.js';
 
 /**
  * Load SLOPE scorecards from the configured directory.
@@ -14,18 +15,18 @@ export function loadScorecards(config: SlopeConfig, cwd: string = process.cwd())
     return [];
   }
 
-  // Build regex from pattern (e.g. "sprint-*.json" → /^sprint-(\d+)\.json$/)
+  // Build regex from pattern (e.g. "sprint-*.json" → /^sprint-(\d+(?:\.\d+)?)\.json$/)
   const patternParts = config.scorecardPattern.split('*');
   const prefix = patternParts[0] ?? '';
   const suffix = patternParts[1] ?? '';
-  const regex = new RegExp(`^${escapeRegex(prefix)}(\\d+)${escapeRegex(suffix)}$`);
+  const regex = new RegExp(`^${escapeRegex(prefix)}(\\d+(?:\\.\\d+)?)${escapeRegex(suffix)}$`);
 
   const files = readdirSync(dir)
     .filter((f: string) => regex.test(f))
     .sort((a, b) => {
-      const na = parseInt(a.match(regex)?.[1] ?? '0', 10);
-      const nb = parseInt(b.match(regex)?.[1] ?? '0', 10);
-      return na - nb;
+      const na = parseFloat(a.match(regex)?.[1] ?? '0');
+      const nb = parseFloat(b.match(regex)?.[1] ?? '0');
+      return compareSprintIds(na, nb);
     });
 
   const scorecards: GolfScorecard[] = [];
@@ -33,7 +34,7 @@ export function loadScorecards(config: SlopeConfig, cwd: string = process.cwd())
   for (const file of files) {
     const match = file.match(regex);
     if (!match) continue;
-    const num = parseInt(match[1], 10);
+    const num = parseFloat(match[1]);
     if (num < config.minSprint) continue;
 
     try {
@@ -55,7 +56,10 @@ export function loadScorecards(config: SlopeConfig, cwd: string = process.cwd())
 export function detectLatestSprint(config: SlopeConfig, cwd: string = process.cwd()): number {
   const cards = loadScorecards(config, cwd);
   if (cards.length === 0) return 0;
-  return Math.max(...cards.map((c) => c.sprint_number));
+  return cards
+    .map((c) => c.sprint_number)
+    .sort(compareSprintIds)
+    .at(-1) ?? 0;
 }
 
 /**

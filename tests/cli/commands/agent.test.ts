@@ -92,6 +92,43 @@ describe('agent status (GH #310)', () => {
     expect(status.recommendedCommands).toContain('slope briefing');
   });
 
+  it('uses pending inserted roadmap sprint when no active sprint state exists (#364)', async () => {
+    writeVision(cwd);
+    writeRoadmap(cwd, [
+      { id: 43, theme: 'Done', par: 4, slope: 1, type: 'feature', status: 'complete', tickets: [
+        { key: 'S43-1', title: 't1', club: 'wedge', complexity: 'small' },
+        { key: 'S43-2', title: 't2', club: 'wedge', complexity: 'small' },
+        { key: 'S43-3', title: 't3', club: 'wedge', complexity: 'small' },
+      ] },
+      { id: 435, theme: 'Inserted', par: 4, slope: 1, type: 'bug fix', status: 'planned', tickets: [
+        { key: 'S43.5-1', title: 't1', club: 'wedge', complexity: 'small' },
+        { key: 'S43.5-2', title: 't2', club: 'wedge', complexity: 'small' },
+        { key: 'S43.5-3', title: 't3', club: 'wedge', complexity: 'small' },
+      ] },
+    ]);
+    writeFileSync(join(cwd, 'docs', 'retros', 'sprint-99.json'), JSON.stringify({
+      sprint_number: 99,
+      theme: 'Latest',
+      par: 4,
+      slope: 1,
+      score: 4,
+      score_label: 'par',
+      shots: [],
+      stats: { fairways_hit: 0, fairways_total: 0, greens_in_regulation: 0, greens_total: 0, putts: 0, penalties: 0, hazards_hit: 0, hazard_penalties: 0, miss_directions: { long: 0, short: 0, left: 0, right: 0 } },
+      conditions: [],
+      special_plays: [],
+      bunker_locations: [],
+      yardage_book_updates: [],
+      course_management_notes: [],
+    }));
+
+    const status = await collectAgentStatus(cwd);
+    expect(status.currentSprint).toBe(435);
+    expect(status.phase).toBe('unknown');
+    expect(status.nextTicket).toBe('S43.5-1');
+    expect(status.recommendedCommands).toContain('slope sprint start --number=435');
+  });
+
   it('clears blockedBy when upstream sprint has a scorecard but no roadmap status field (#356)', async () => {
     writeVision(cwd);
     writeRoadmap(cwd, [

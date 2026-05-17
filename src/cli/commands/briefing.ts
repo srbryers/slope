@@ -4,6 +4,7 @@ import { formatBriefing, parseRoadmap, castRoadmapStructure, getRole, hasRole, l
 import type { CommonIssuesFile, SessionEntry, SprintClaim, RoadmapDefinition, SlopeEvent, RoleDefinition } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { loadScorecards } from '../loader.js';
+import { inferSprintContext } from '../sprint-inference.js';
 import { resolveStore } from '../store.js';
 import { resolveMetaphor } from '../metaphor.js';
 
@@ -75,13 +76,8 @@ export async function briefingCommand(args: string[]): Promise<void> {
   let sprintNumber: number;
   if (sprintFlag) {
     sprintNumber = sprintFlag;
-  } else if (config.currentSprint) {
-    sprintNumber = config.currentSprint;
-  } else if (scorecards.length > 0) {
-    const maxSprint = Math.max(...scorecards.map(s => s.sprint_number));
-    sprintNumber = maxSprint + 1;
   } else {
-    sprintNumber = 1;
+    sprintNumber = inferSprintContext(cwd, config).sprint;
   }
 
   // Load claims and events from store

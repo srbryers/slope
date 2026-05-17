@@ -46,6 +46,42 @@ function setupRepoWithClaim(): string {
   return dir;
 }
 
+function setupInsertedRepoWithClaim(): string {
+  const dir = mkdtempSync(join(tmpdir(), 'slope-done-inserted-'));
+  mkdirSync(join(dir, '.slope'), { recursive: true });
+  mkdirSync(join(dir, 'docs', 'backlog'), { recursive: true });
+  mkdirSync(join(dir, 'docs', 'retros'), { recursive: true });
+  writeFileSync(join(dir, '.slope', 'config.json'), JSON.stringify({
+    roadmapPath: 'docs/backlog/roadmap.json',
+    scorecardDir: 'docs/retros',
+    scorecardPattern: 'sprint-*.json',
+  }));
+  writeFileSync(join(dir, 'docs', 'backlog', 'roadmap.json'), JSON.stringify({
+    name: 'Test',
+    phases: [{ name: 'P1', sprints: [435] }],
+    sprints: [{
+      id: 435,
+      theme: 'Inserted',
+      par: 4,
+      slope: 1,
+      type: 'bugfix',
+      tickets: [
+        { key: 'S43.5-1', title: 'a', club: 'wedge', complexity: 'small' },
+        { key: 'S43.5-2', title: 'b', club: 'wedge', complexity: 'small' },
+        { key: 'S43.5-3', title: 'c', club: 'wedge', complexity: 'small' },
+      ],
+    }],
+  }));
+  execSync('git init -q', { cwd: dir });
+  execSync('git config user.email t@t', { cwd: dir });
+  execSync('git config user.name t', { cwd: dir });
+  execSync('git commit -q --allow-empty -m init', { cwd: dir });
+  execSync(`node ${SLOPE_BIN} claim --sprint=435 --target=S43.5-1`, {
+    cwd: dir, stdio: ['pipe', 'pipe', 'pipe'],
+  });
+  return dir;
+}
+
 describe('slope ticket done (GH #316)', () => {
   beforeAll(() => {
     if (!existsSync(SLOPE_BIN)) {
@@ -87,6 +123,20 @@ describe('slope ticket done (GH #316)', () => {
         cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'],
       });
       expect(out).toContain('Notes:   all green');
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('resolves inserted roadmap ticket labels to the encoded sprint id', () => {
+    const cwd = setupInsertedRepoWithClaim();
+    try {
+      const out = execSync(`node ${SLOPE_BIN} ticket done S43.5-1`, {
+        cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'],
+      });
+      expect(out).toContain('Ticket S43.5-1: done.');
+      expect(out).toContain('Sprint:  S43.5');
+      expect(out).toContain('Claim:   released');
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }

@@ -22,9 +22,31 @@ function makeInput(cwd: string, filePath: string): HookInput {
 function writeConfig(cwd: string, guidance: Record<string, unknown> = {}): void {
   mkdirSync(join(cwd, '.slope'), { recursive: true });
   writeFileSync(join(cwd, '.slope', 'config.json'), JSON.stringify({
+    roadmapPath: 'docs/backlog/roadmap.json',
     scorecardDir: 'docs/retros',
+    scorecardPattern: 'sprint-*.json',
     metaphor: 'golf',
     guidance,
+  }));
+}
+
+function writeInsertedRoadmap(cwd: string): void {
+  mkdirSync(join(cwd, 'docs', 'backlog'), { recursive: true });
+  writeFileSync(join(cwd, 'docs', 'backlog', 'roadmap.json'), JSON.stringify({
+    name: 'Test',
+    phases: [{ name: 'P1', sprints: [43, 435] }],
+    sprints: [
+      { id: 43, theme: 'Done', par: 4, slope: 1, type: 'feature', status: 'complete', tickets: [
+        { key: 'S43-1', title: 'done', club: 'wedge', complexity: 'small' },
+        { key: 'S43-2', title: 'done', club: 'wedge', complexity: 'small' },
+        { key: 'S43-3', title: 'done', club: 'wedge', complexity: 'small' },
+      ] },
+      { id: 435, theme: 'Inserted', par: 4, slope: 1, type: 'bug fix', status: 'planned', tickets: [
+        { key: 'S43.5-1', title: 'inserted', club: 'wedge', complexity: 'small' },
+        { key: 'S43.5-2', title: 'inserted', club: 'wedge', complexity: 'small' },
+        { key: 'S43.5-3', title: 'inserted', club: 'wedge', complexity: 'small' },
+      ] },
+    ],
   }));
 }
 
@@ -131,6 +153,21 @@ describe('claimRequiredGuard', () => {
       writeConfig(cwd);
       const result = await claimRequiredGuard(makeInput(cwd, join(cwd, 'README.md')), cwd);
       expect(result).toEqual({});
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('includes pending inserted sprint context when no sprint state is active', async () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'slope-claim-required-'));
+    try {
+      writeConfig(cwd);
+      writeInsertedRoadmap(cwd);
+      const result = await claimRequiredGuard(makeInput(cwd, join(cwd, 'src/foo.ts')), cwd);
+
+      expect(result.decision).toBe('ask');
+      expect(result.context).toContain('Detected likely sprint context: S43.5');
+      expect(result.context).toContain('slope sprint start --number=435 --phase=implementing');
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }

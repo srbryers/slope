@@ -1,7 +1,10 @@
+import { execSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
+import { formatSprintLabel } from '../../core/index.js';
 import type { HookInput, GuardResult } from '../../core/index.js';
 import { loadConfig } from '../config.js';
+import { inferSprintContext } from '../sprint-inference.js';
 import { loadSprintState } from '../sprint-state.js';
 import { loadSessionState, updateSessionState } from '../session-state.js';
 import { resolveStore } from '../store.js';
@@ -114,10 +117,14 @@ export async function claimRequiredGuard(input: HookInput, cwd: string): Promise
     const relativePath = normalizeHookPath(filePath, cwd);
     if (!relativePath || !isImplementationWritePath(relativePath)) return {};
 
+    const hint = inferMissingSprintHint(cwd);
     return implementationWritePolicyResult(policy, [
       `SLOPE claim-required: ${relativePath} looks like an implementation edit, but there is no active sprint state.`,
+      ...(hint ? [`Detected likely sprint context: ${hint.label} (${hint.source}).`] : []),
       'Start or resume a sprint and claim the work before editing, or get explicit user approval to continue as adhoc work.',
-      'Suggested commands: `slope sprint start --number=<N> --phase=implementing` then `slope claim --target=<path> --ticket=<ticket>`.',
+      hint
+        ? `Suggested commands: \`slope sprint start --number=${hint.sprint} --phase=implementing\` then \`slope claim --target=<path> --ticket=<ticket>\`.`
+        : 'Suggested commands: `slope sprint start --number=<N> --phase=implementing` then `slope claim --target=<path> --ticket=<ticket>`.',
     ]);
   } else {
     const filePath = input.tool_input?.file_path as string | undefined;
@@ -147,6 +154,44 @@ export async function claimRequiredGuard(input: HookInput, cwd: string): Promise
   return {
     context: 'SLOPE: No active sprint claim. Consider running `slope claim` to track this work.',
   };
+}
+
+function inferMissingSprintHint(cwd: string): { sprint: number; label: string; source: string } | null {
+  try {
+    const inferred = inferSprintContext(cwd);
+    if (inferred.source === 'roadmap') {
+      return { sprint: inferred.sprint, label: inferred.label, source: 'pending roadmap sprint' };
+    }
+  } catch { /* fall through */ }
+
+  const branch = readGit(cwd, 'rev-parse --abbrev-ref HEAD');
+  const branchSprint = parseSprintReference(branch);
+  if (branchSprint != null) {
+    return { sprint: branchSprint, label: formatSprintLabel(branchSprint), source: `branch ${branch}` };
+  }
+
+  const subject = readGit(cwd, 'log -1 --format=%s');
+  const commitSprint = parseSprintReference(subject);
+  if (commitSprint != null) {
+    return { sprint: commitSprint, label: formatSprintLabel(commitSprint), source: 'latest commit' };
+  }
+
+  return null;
+}
+
+function readGit(cwd: string, command: string): string {
+  try {
+    return execSync(`git ${command}`, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  } catch {
+    return '';
+  }
+}
+
+function parseSprintReference(text: string): number | null {
+  const match = text.match(/\bS(\d+(?:\.\d+)?)\b/i);
+  if (!match) return null;
+  const sprint = Number.parseFloat(match[1]);
+  return Number.isFinite(sprint) && sprint > 0 ? sprint : null;
 }
 
 function getImplementationWritePolicy(cwd: string): ImplementationWritePolicy {

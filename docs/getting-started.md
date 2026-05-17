@@ -185,6 +185,23 @@ slope release --target=<ticket>          # Release a claim when done
 slope session end                       # End the session
 ```
 
+### Inserted Sub-Sprints
+
+Use a decimal sprint label when work is inserted between two existing sprints, for example `S43.5` between `S43` and `S44`.
+
+SLOPE supports two roadmap representations:
+
+- natural decimal ids: `"id": 43.5` with ticket keys like `S43.5-1`
+- encoded half-sprint integer ids: `"id": 435` displayed as `S43.5`, also with ticket keys like `S43.5-1`
+
+When no active sprint state exists, `slope next`, `slope status`, `slope briefing`, and `slope agent status` prefer pending roadmap sub-sprints over the plain scorecard `+1` fallback. Start the inserted sprint with the roadmap id SLOPE reports:
+
+```bash
+slope next
+slope sprint start --number=435 --phase=implementing
+slope claim --sprint=435 --target=S43.5-1
+```
+
 ### After a Sprint
 
 ```bash
