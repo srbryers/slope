@@ -10,6 +10,62 @@ function parseArgs(args: string[]): Record<string, string> {
   return result;
 }
 
+export function splitTopLevelCommaList(input: string): string[] {
+  const items: string[] = [];
+  let current = '';
+  let parenDepth = 0;
+  let bracketDepth = 0;
+  let braceDepth = 0;
+  let quote: '"' | "'" | null = null;
+  let escaped = false;
+
+  for (const char of input) {
+    if (escaped) {
+      current += char;
+      escaped = false;
+      continue;
+    }
+
+    if (char === '\\') {
+      current += char;
+      escaped = true;
+      continue;
+    }
+
+    if (quote) {
+      current += char;
+      if (char === quote) quote = null;
+      continue;
+    }
+
+    if (char === '"' || char === "'") {
+      quote = char;
+      current += char;
+      continue;
+    }
+
+    if (char === '(') parenDepth++;
+    if (char === ')' && parenDepth > 0) parenDepth--;
+    if (char === '[') bracketDepth++;
+    if (char === ']' && bracketDepth > 0) bracketDepth--;
+    if (char === '{') braceDepth++;
+    if (char === '}' && braceDepth > 0) braceDepth--;
+
+    if (char === ',' && parenDepth === 0 && bracketDepth === 0 && braceDepth === 0) {
+      const trimmed = current.trim();
+      if (trimmed) items.push(trimmed);
+      current = '';
+      continue;
+    }
+
+    current += char;
+  }
+
+  const trimmed = current.trim();
+  if (trimmed) items.push(trimmed);
+  return items;
+}
+
 function createSubcommand(flags: Record<string, string>): void {
   if (!flags.purpose) {
     console.error('Error: --purpose is required.');
@@ -17,9 +73,7 @@ function createSubcommand(flags: Record<string, string>): void {
     process.exit(1);
   }
 
-  const priorities = flags.priorities
-    ? flags.priorities.split(',').map(s => s.trim()).filter(Boolean)
-    : [];
+  const priorities = flags.priorities ? splitTopLevelCommaList(flags.priorities) : [];
 
   if (priorities.length === 0) {
     console.error('Error: --priorities is required (comma-separated list).');
@@ -32,9 +86,7 @@ function createSubcommand(flags: Record<string, string>): void {
       priorities,
       audience: flags.audience,
       techDirection: flags['tech-direction'],
-      nonGoals: flags['non-goals']
-        ? flags['non-goals'].split(',').map(s => s.trim()).filter(Boolean)
-        : undefined,
+      nonGoals: flags['non-goals'] ? splitTopLevelCommaList(flags['non-goals']) : undefined,
     });
     console.log('\nVision created successfully.\n');
     console.log(`  Purpose:    ${vision.purpose}`);
@@ -59,10 +111,10 @@ function createSubcommand(flags: Record<string, string>): void {
 function updateSubcommand(flags: Record<string, string>): void {
   const fields: Record<string, unknown> = {};
   if (flags.purpose) fields.purpose = flags.purpose;
-  if (flags.priorities) fields.priorities = flags.priorities.split(',').map(s => s.trim()).filter(Boolean);
+  if (flags.priorities) fields.priorities = splitTopLevelCommaList(flags.priorities);
   if (flags.audience) fields.audience = flags.audience;
   if (flags['tech-direction']) fields.techDirection = flags['tech-direction'];
-  if (flags['non-goals']) fields.nonGoals = flags['non-goals'].split(',').map(s => s.trim()).filter(Boolean);
+  if (flags['non-goals']) fields.nonGoals = splitTopLevelCommaList(flags['non-goals']);
 
   if (Object.keys(fields).length === 0) {
     console.error('Error: provide at least one field to update.');
@@ -108,10 +160,10 @@ Usage:
 
 Create options:
   --purpose="..."             Project purpose (required)
-  --priorities="a,b,c"        Comma-separated priorities (required)
+  --priorities="a,b,c"        Comma-separated priorities; commas inside (), [], {} are preserved (required)
   --audience="..."            Target audience
   --tech-direction="..."      Technical direction
-  --non-goals="a,b"           Comma-separated non-goals
+  --non-goals="a,b"           Comma-separated non-goals; commas inside (), [], {} are preserved
   --write-md[=<path>]         Also write tracked Markdown (default: docs/vision.md)
 
 Update options:
