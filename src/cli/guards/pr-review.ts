@@ -22,9 +22,10 @@ export async function prReviewGuard(input: HookInput, cwd: string): Promise<Guar
   // source of truth: it requires `https://github.com/` literally followed by
   // a path containing `/pull/<digits>`. If it matches, treat it as a real
   // PR URL; if not, the guard skips.
-  const urlMatch = response.match(/(https:\/\/github\.com\/[^\s]+\/pull\/\d+)/);
+  const urlMatch = response.match(/(https:\/\/github\.com\/[^\s]+\/pull\/(\d+))/);
   if (!urlMatch) return {};
   const prUrl = urlMatch[1];
+  const prNumber = urlMatch[2];
 
   const recs = computeRecommendations(cwd);
   const recLine = formatRecommendations(recs);
@@ -35,6 +36,7 @@ export async function prReviewGuard(input: HookInput, cwd: string): Promise<Guar
     context: [
       `A pull request was just created (${prUrl}).`,
       ...(recLine ? [`Recommended reviews based on diff: ${recLine}`] : []),
+      `Run \`slope pr review --pr=${prNumber}\` to generate the transport-independent review workflow.`,
       `After the review, capture findings with \`slope review findings add\`, then \`slope review amend\` to apply to scorecard.`,
       'Tip: also run `slope pr finalize` to add Closes #N for any issues referenced in commits.',
     ].join(' '),

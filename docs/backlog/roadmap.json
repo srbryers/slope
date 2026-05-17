@@ -109,8 +109,16 @@
       "sprints": [
         93
       ],
-      "status": "planned",
+      "status": "complete",
       "note": "Recover Codex hook support after validating current Codex CLI hook docs and local 0.130 behavior."
+    },
+    {
+      "name": "Phase 23 \u2014 Guard Enforcement Hardening",
+      "sprints": [
+        94
+      ],
+      "status": "planned",
+      "note": "Close the remaining enforcement/diagnostic gaps exposed by #368: full dispatcher coverage, Codex matcher coverage, stale runtime detection, and configurable strictness for implementation writes outside sprint state."
     }
   ],
   "sprints": [
@@ -1268,7 +1276,7 @@
       "par": 4,
       "slope": 2,
       "type": "bug fix + dx",
-      "status": "planned",
+      "status": "complete",
       "depends_on": [
         92
       ],
@@ -1307,6 +1315,58 @@
             "S93-2",
             "S93-3"
           ]
+        }
+      ]
+    },
+    {
+      "id": 94,
+      "theme": "Guard Enforcement Hardening \u2014 make workflow-control guards provable",
+      "par": 4,
+      "slope": 2,
+      "type": "hardening + dx",
+      "status": "planned",
+      "depends_on": [
+        93
+      ],
+      "note": "Follow-up to #368 and v1.55.5. The patch fixed the immediate no-sprint adhoc write gap; S94 expands coverage to the full dispatcher/runtime path and makes strictness/diagnostics explicit.",
+      "tickets": [
+        {
+          "key": "S94-1",
+          "title": "Dispatcher-level regression tests for adhoc claim-required and suppressed workflow guards",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 368
+        },
+        {
+          "key": "S94-2",
+          "title": "Codex matcher coverage for claim-required under apply_patch/Edit/Write installs",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 368
+        },
+        {
+          "key": "S94-3",
+          "title": "Doctor diagnostics for stale hook runtime resolution and local binary precedence",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 368
+        },
+        {
+          "key": "S94-4",
+          "title": "Configurable implementation-write strictness and non-implementing phase behavior",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 368,
+          "depends_on": [
+            "S94-1"
+          ]
+        },
+        {
+          "key": "S94-5",
+          "title": "Transport-independent post-PR review workflow",
+          "club": "wedge",
+          "complexity": "small",
+          "note": "Close the connector-created PR gap where pr-review cannot fire because no Bash gh pr create hook event exists."
         }
       ]
     }

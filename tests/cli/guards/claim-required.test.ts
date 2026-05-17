@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
@@ -17,6 +17,32 @@ function makeInput(cwd: string, filePath: string): HookInput {
     tool_name: 'apply_patch',
     tool_input: { file_path: filePath },
   };
+}
+
+function writeConfig(cwd: string, guidance: Record<string, unknown> = {}): void {
+  mkdirSync(join(cwd, '.slope'), { recursive: true });
+  writeFileSync(join(cwd, '.slope', 'config.json'), JSON.stringify({
+    scorecardDir: 'docs/retros',
+    metaphor: 'golf',
+    guidance,
+  }));
+}
+
+function writeSprintState(cwd: string, phase: string): void {
+  mkdirSync(join(cwd, '.slope'), { recursive: true });
+  writeFileSync(join(cwd, '.slope', 'sprint-state.json'), JSON.stringify({
+    sprint: 94,
+    phase,
+    gates: {
+      tests: false,
+      code_review: false,
+      architect_review: false,
+      scorecard: false,
+      review_md: false,
+    },
+    started_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }));
 }
 
 describe('claimOverlapsPath', () => {
@@ -87,6 +113,7 @@ describe('claimRequiredGuard', () => {
   it('asks before implementation writes when no sprint state is active', async () => {
     const cwd = mkdtempSync(join(tmpdir(), 'slope-claim-required-'));
     try {
+      writeConfig(cwd);
       const result = await claimRequiredGuard(makeInput(cwd, join(cwd, 'src/foo.ts')), cwd);
 
       expect(result.decision).toBe('ask');
@@ -101,8 +128,90 @@ describe('claimRequiredGuard', () => {
   it('does not interrupt non-implementation writes when no sprint state is active', async () => {
     const cwd = mkdtempSync(join(tmpdir(), 'slope-claim-required-'));
     try {
+      writeConfig(cwd);
       const result = await claimRequiredGuard(makeInput(cwd, join(cwd, 'README.md')), cwd);
       expect(result).toEqual({});
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('denies no-sprint implementation writes in strict mode', async () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'slope-claim-required-'));
+    try {
+      writeConfig(cwd, { requireSprintForImplementationWrites: 'deny' });
+      const result = await claimRequiredGuard(makeInput(cwd, join(cwd, 'src/foo.ts')), cwd);
+
+      expect(result.decision).toBe('deny');
+      expect(result.blockReason).toContain('Strict mode');
+      expect(result.blockReason).toContain('no active sprint state');
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('allows no-sprint implementation writes when the policy is off', async () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'slope-claim-required-'));
+    try {
+      writeConfig(cwd, { requireSprintForImplementationWrites: 'off' });
+      const result = await claimRequiredGuard(makeInput(cwd, join(cwd, 'src/foo.ts')), cwd);
+      expect(result).toEqual({});
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('asks before implementation writes when sprint is not in implementing phase', async () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'slope-claim-required-'));
+    try {
+      writeConfig(cwd);
+      writeSprintState(cwd, 'planning');
+      const result = await claimRequiredGuard(makeInput(cwd, join(cwd, 'src/foo.ts')), cwd);
+
+      expect(result.decision).toBe('ask');
+      expect(result.context).toContain('planning phase');
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('denies implementation writes outside implementing phase in strict mode', async () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'slope-claim-required-'));
+    try {
+      writeConfig(cwd, { requireSprintForImplementationWrites: 'deny' });
+      writeSprintState(cwd, 'reviewing');
+      const result = await claimRequiredGuard(makeInput(cwd, join(cwd, 'src/foo.ts')), cwd);
+
+      expect(result.decision).toBe('deny');
+      expect(result.blockReason).toContain('reviewing phase');
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('preserves the implementing phase missing-claim advisory by default', async () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'slope-claim-required-'));
+    try {
+      writeConfig(cwd);
+      writeSprintState(cwd, 'implementing');
+      const result = await claimRequiredGuard(makeInput(cwd, join(cwd, 'src/foo.ts')), cwd);
+
+      expect(result.decision).toBeUndefined();
+      expect(result.context).toContain('No active sprint claim');
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('upgrades implementing phase missing-claim edits to deny in strict mode', async () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'slope-claim-required-'));
+    try {
+      writeConfig(cwd, { requireSprintForImplementationWrites: 'deny' });
+      writeSprintState(cwd, 'implementing');
+      const result = await claimRequiredGuard(makeInput(cwd, join(cwd, 'src/foo.ts')), cwd);
+
+      expect(result.decision).toBe('deny');
+      expect(result.blockReason).toContain('No active sprint claim');
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }

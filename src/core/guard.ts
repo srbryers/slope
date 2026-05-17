@@ -156,6 +156,8 @@ export interface GuidanceConfig {
   mapStaleWarnAt?: number;
   /** Commits behind before explore guard blocks Edit/Write (default 31) */
   mapStaleBlockAt?: number;
+  /** How claim-required handles implementation writes outside active sprint/claim flow (default ask) */
+  requireSprintForImplementationWrites?: 'ask' | 'deny' | 'off';
 }
 
 /** All guard definitions */
@@ -370,12 +372,12 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
   },
   {
     name: 'claim-required',
-    description: 'Warn when editing code without an active sprint claim',
+    description: 'Require sprint/claim workflow for implementation writes',
     hookEvent: 'PreToolUse',
     toolCategories: ['write_file'],
     matcher: 'Edit|Write',
     level: 'full',
-    guardType: 'advisory',
+    guardType: 'mixed',
   },
   {
     name: 'post-push',

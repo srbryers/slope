@@ -108,7 +108,7 @@ export const GUARD_DOCS: Record<string, GuardDoc> = {
   'pr-review': {
     purpose: 'Prompts for the review workflow after PR creation. Ensures sprint review artifacts are created.',
     triggers: 'PostToolUse on Bash. Fires after a shell command completes (checks for `gh pr create`).',
-    behavior: 'Advisory — if the command created a PR, injects a reminder to run `slope review recommend` and create review artifacts.',
+    behavior: 'Advisory — if the command created a PR, injects a reminder to run `slope pr review --pr=<N>` and create review artifacts. For connector/API-created PRs where this Bash guard cannot fire, run the same command manually.',
     configuration: 'Disable: add "pr-review" to guidance.disabled.',
     level: 'full',
   },
@@ -131,6 +131,13 @@ export const GUARD_DOCS: Record<string, GuardDoc> = {
     triggers: 'PreToolUse on Read, Glob, Grep, Edit, Write, Bash. Fires on most tool calls.',
     behavior: 'Block — if another session is active in the same directory, denies the tool call and requires `EnterWorktree` for isolation.',
     configuration: 'Disable: add "worktree-check" to guidance.disabled.',
+    level: 'full',
+  },
+  'claim-required': {
+    purpose: 'Keeps implementation edits connected to the sprint workflow. It catches code changes made with no active sprint state, outside the implementing phase, or without a matching claim.',
+    triggers: 'PreToolUse on Edit, Write, and Codex apply_patch. Fires when a file modification is attempted.',
+    behavior: 'Mixed — asks for permission by default on no-sprint or non-implementing implementation writes, warns by default for missing claims during implementing, and denies when strict mode is enabled.',
+    configuration: 'guidance.requireSprintForImplementationWrites controls implementation writes outside active sprint/claim flow: "ask" (default), "deny" (strict), or "off". Disable entirely: add "claim-required" to guidance.disabled.',
     level: 'full',
   },
   'sprint-completion': {

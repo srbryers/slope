@@ -81,6 +81,14 @@ describe('prReviewGuard recommendations (GH #302)', () => {
     );
     expect(result.suggestion?.context).toContain('slope pr finalize');
   });
+
+  it('points agents to the transport-independent PR review command', async () => {
+    const result = await prReviewGuard(
+      makeInput('https://github.com/x/y/pull/42'),
+      cwd,
+    );
+    expect(result.suggestion?.context).toContain('slope pr review --pr=42');
+  });
 });
 
 describe('prReviewGuard internals', () => {

@@ -6,6 +6,12 @@ import { CodexAdapter } from '../../../src/core/adapters/codex.js';
 import { GUARD_DEFINITIONS } from '../../../src/core/guard.js';
 import type { GuardResult } from '../../../src/core/guard.js';
 
+type CodexHookEntry = { matcher?: string; hooks: Array<{ command: string; statusMessage?: string }> };
+
+function findHookGroupForCommand(groups: CodexHookEntry[] | undefined, commandPart: string): CodexHookEntry | undefined {
+  return groups?.find(group => group.hooks.some(hook => hook.command.includes(commandPart)));
+}
+
 describe('CodexAdapter', () => {
   let adapter: CodexAdapter;
 
@@ -159,6 +165,16 @@ describe('CodexAdapter', () => {
       );
     });
 
+    it('keeps claim-required in the Codex write matcher group', () => {
+      const guards = GUARD_DEFINITIONS.filter(g => g.name === 'claim-required');
+      const config = adapter.generateHooksConfig(guards, '/path/to/slope-guard.sh');
+
+      const group = findHookGroupForCommand(config.hooks.PreToolUse, 'claim-required');
+      expect(group).toBeDefined();
+      expect(group?.matcher?.split('|')).toEqual(expect.arrayContaining(['apply_patch', 'Edit', 'Write']));
+      expect(group?.hooks[0]?.statusMessage).toBe('SLOPE claim-required');
+    });
+
     it('groups guards by event and matcher for Codex review ergonomics', () => {
       const guards = GUARD_DEFINITIONS.filter(g => g.hookEvent === 'PreToolUse' && g.matcher === 'Bash').slice(0, 2);
       expect(guards).toHaveLength(2);
@@ -232,6 +248,19 @@ describe('CodexAdapter', () => {
         entry.hooks.map(h => h.command),
       );
       expect(commands.filter((cmd: string) => cmd.includes('branch-before-commit'))).toHaveLength(1);
+    });
+
+    it('installs claim-required under apply_patch/Edit/Write for user-level full installs', () => {
+      const cwd = mkdtempSync(join(tmpdir(), 'slope-codex-user-full-cwd-'));
+      const homeDir = mkdtempSync(join(tmpdir(), 'slope-codex-user-full-home-'));
+      const guards = GUARD_DEFINITIONS.filter(g => g.level === 'full');
+
+      adapter.installGuards(cwd, guards, { scope: 'user', homeDir });
+
+      const config = JSON.parse(readFileSync(join(homeDir, '.codex', 'hooks.json'), 'utf8'));
+      const group = findHookGroupForCommand(config.hooks.PreToolUse, 'claim-required');
+      expect(group).toBeDefined();
+      expect(group?.matcher?.split('|')).toEqual(expect.arrayContaining(['apply_patch', 'Edit', 'Write']));
     });
 
     it('preserves non-SLOPE hooks and does not duplicate managed entries', () => {
