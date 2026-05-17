@@ -117,8 +117,16 @@
       "sprints": [
         94
       ],
+      "status": "complete",
+      "note": "Closed the remaining enforcement/diagnostic gaps exposed by #368: full dispatcher coverage, Codex matcher coverage, stale runtime detection, configurable strictness for implementation writes outside sprint state, and transport-independent PR review handoff. Shipped in v1.55.6."
+    },
+    {
+      "name": "Phase 24 \u2014 Sprint State Inference",
+      "sprints": [
+        95
+      ],
       "status": "planned",
-      "note": "Close the remaining enforcement/diagnostic gaps exposed by #368: full dispatcher coverage, Codex matcher coverage, stale runtime detection, and configurable strictness for implementation writes outside sprint state."
+      "note": "Resolve #364 by making roadmap-inserted sub-sprints and missing active state explicit in next/status/briefing and guard guidance."
     }
   ],
   "sprints": [
@@ -1324,11 +1332,13 @@
       "par": 4,
       "slope": 2,
       "type": "hardening + dx",
-      "status": "planned",
+      "status": "complete",
       "depends_on": [
         93
       ],
-      "note": "Follow-up to #368 and v1.55.5. The patch fixed the immediate no-sprint adhoc write gap; S94 expands coverage to the full dispatcher/runtime path and makes strictness/diagnostics explicit.",
+      "score": 5,
+      "score_label": "par",
+      "note": "Follow-up to #368 and v1.55.5. Shipped in v1.55.6 with dispatcher/runtime coverage, configurable strictness, diagnostics, and explicit post-PR review handoff.",
       "tickets": [
         {
           "key": "S94-1",
@@ -1367,6 +1377,58 @@
           "club": "wedge",
           "complexity": "small",
           "note": "Close the connector-created PR gap where pr-review cannot fire because no Bash gh pr create hook event exists."
+        }
+      ]
+    },
+    {
+      "id": 95,
+      "theme": "Inserted Sprint Recovery \u2014 make next/status respect sub-sprints",
+      "par": 4,
+      "slope": 2,
+      "type": "bug fix + dx",
+      "status": "planned",
+      "depends_on": [
+        94
+      ],
+      "note": "Scope for #364. Prevent agents from falling through to scorecard+1 when a pending inserted roadmap sprint like id 435 / S43.5 is the real work context but no active sprint state exists.",
+      "tickets": [
+        {
+          "key": "S95-1",
+          "title": "Normalize and display inserted sprint identifiers like roadmap id 435 as S43.5 (#364)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 364
+        },
+        {
+          "key": "S95-2",
+          "title": "Teach slope next/status/briefing to prefer pending inserted roadmap sprints over scorecard+1 fallback (#364)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 364,
+          "depends_on": [
+            "S95-1"
+          ]
+        },
+        {
+          "key": "S95-3",
+          "title": "Warn when branch/roadmap/commit context implies a sprint but no active sprint state exists (#364)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 364,
+          "depends_on": [
+            "S95-1"
+          ]
+        },
+        {
+          "key": "S95-4",
+          "title": "Document and test starting, claiming, and scorecarding inserted sub-sprints (#364)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 364,
+          "depends_on": [
+            "S95-1",
+            "S95-2"
+          ]
         }
       ]
     }
