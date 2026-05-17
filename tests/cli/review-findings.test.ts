@@ -107,6 +107,34 @@ describe('review recommend', () => {
     expect(logged).toContain('optional');
   });
 
+  it('counts tickets from slope sprint plan table output', async () => {
+    const plansDir = join(tmpDir, '.claude', 'plans');
+    mkdirSync(plansDir, { recursive: true });
+    writeFileSync(join(plansDir, 'sprint-97.md'), [
+      '# Sprint 97 Plan — Review Recommendation Repair',
+      '',
+      '**Par:** 3  |  **Slope:** 2  |  **Type:** bug fix',
+      '',
+      '## Tickets',
+      '',
+      '| Key | Title | Club | Complexity | Depends on |',
+      '|---|---|---|---|---|',
+      '| S97-1 | Teach plan-analysis ticket counting to read tables | wedge | small | — |',
+      '| S97-2 | Add review recommend regression coverage | wedge | small | S97-1 |',
+      '| S97-3 | Verify review-tier guard recommendation | wedge | small | S97-1 |',
+      '| S97-4 | Update scorecard and release notes | wedge | small | S97-2 |',
+    ].join('\n'));
+
+    const spy = vi.spyOn(console, 'log');
+    await runCommand(['recommend']);
+    const logged = spy.mock.calls.map(c => c[0]).join('\n');
+    spy.mockRestore();
+
+    expect(logged).toContain('Recommended reviews for Sprint 97 (4 tickets, slope 2)');
+    expect(logged).toContain('architect');
+    expect(logged).toContain('required');
+  });
+
   it('outputs no recommendations when no plan', async () => {
     const spy = vi.spyOn(console, 'log');
     await runCommand(['recommend']);

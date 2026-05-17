@@ -60,11 +60,16 @@ export function findPlanContent(cwd: string): PlanFile | null {
 
 /**
  * Count tickets in plan content.
- * Matches `### T\d+:` or `### S\d+-\d+:` patterns, falls back to all H3 headers.
+ * Matches `### T\d+:` or `### S\d+-\d+:` patterns, then the Markdown
+ * ticket table emitted by `slope sprint plan`, and finally falls back to
+ * all H3 headers.
  */
 export function countTickets(content: string): number {
   const ticketHeaders = content.match(/^###\s+(?:T\d+|S\d+-\d+):/gm) ?? [];
   if (ticketHeaders.length > 0) return ticketHeaders.length;
+
+  const ticketTableRows = content.match(/^\|\s*(?:T\d+|S\d+(?:\.\d+)?-\d+)\s*\|/gim) ?? [];
+  if (ticketTableRows.length > 0) return ticketTableRows.length;
 
   // Fallback: count ### level headers that look like tickets
   const h3Headers = content.match(/^###\s+/gm) ?? [];
