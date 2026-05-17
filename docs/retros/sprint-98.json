@@ -1,0 +1,121 @@
+{
+  "sprint_number": 98,
+  "player": "sebastianbryers",
+  "theme": "Guard Noise & Workflow Phase Repair",
+  "par": 5,
+  "slope": 2,
+  "score": 5,
+  "score_label": "par",
+  "date": "2026-05-17",
+  "shots": [
+    {
+      "ticket_key": "S98-1",
+      "title": "Suppress duplicate guard-explore guidance within a Codex/agent session (#382)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Replaced compressed duplicate explore reminders with true one-shot context. Added a guard-state fallback key for Codex hook payloads that omit session_id."
+    },
+    {
+      "ticket_key": "S98-2",
+      "title": "Add a sprint phase update path for existing sprint state (#383)",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added slope sprint phase <phase> and made slope sprint start --number=N --phase=X update same-sprint state instead of no-oping."
+    },
+    {
+      "ticket_key": "S98-3",
+      "title": "Sync workflow per-ticket and post-hole phases into sprint-state lifecycle (#383)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Mapped workflow plan_review to reviewing, per_ticket to implementing, and post/validate phases to scoring without downgrading later sprint-state phases."
+    },
+    {
+      "ticket_key": "S98-4",
+      "title": "Add guard and workflow regressions for explore dedup and phase advancement (#382/#383)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added focused explore guard regressions for session and no-session hook inputs plus workflow tests for lightweight and standard per-ticket phase transitions."
+    },
+    {
+      "ticket_key": "S98-5",
+      "title": "Surface guard-pr-review as PostToolUse additional context instead of a dropped/block-style suggestion (#384)",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Changed pr-review to return context-only guidance so PostToolUse emits additionalContext instead of a high-priority block-style suggestion. Added a formatter regression."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 5,
+    "fairways_total": 5,
+    "greens_in_regulation": 5,
+    "greens_total": 5,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "wind",
+      "impact": "minor",
+      "description": "The active Codex session was still running old dist code until the CLI was rebuilt, so the old repeated explore reminders continued during implementation."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Guard de-duplication should suppress non-actionable repeats, not replace them with smaller repeated messages.",
+      "outcome": "Explore guidance now returns no hook output after the first identical context in a session or fallback branch/sprint window."
+    },
+    {
+      "type": "lessons",
+      "description": "Workflow state and sprint-state are separate contracts and must be bridged when guards depend on lifecycle phase.",
+      "outcome": "Workflow commands now keep sprint-state aligned when execution enters implementation or scoring phases."
+    },
+    {
+      "type": "lessons",
+      "description": "PostToolUse review nudges should be advisory context unless they truly need to stop the tool flow.",
+      "outcome": "guard-pr-review now surfaces the post-PR review command as additionalContext, matching the visible reminder behavior intended by the workflow."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "Focused guard/workflow tests, typecheck, build, runtime smokes, full test suite, roadmap validation, and map check passed.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "A clean repair of two related guard-noise issues before returning to plugin packaging.",
+    "advice_for_next_player": "When guard output appears in every tool response, test both the guard function and the installed CLI path because stale dist can mask the fix.",
+    "what_surprised_you": "The existing de-duper was technically working but still emitted a repeated compressed reminder, which preserved the user's real noise problem.",
+    "excited_about_next": "Move back to Codex plugin packaging with the runtime guard behavior quieter and phase-aware."
+  },
+  "bunker_locations": [
+    "Codex hook payloads may omit session_id; de-dup keys need a fallback that is stable enough to suppress repeats without silencing future sprint work.",
+    "Workflow execution phase and .slope/sprint-state.json phase can drift unless workflow commands explicitly synchronize the lifecycle state."
+  ],
+  "yardage_book_updates": [],
+  "course_management_notes": [
+    "Validation used pnpm vitest run tests/cli/guards/explore.test.ts tests/cli/sprint-workflow.test.ts tests/cli/guards/claim-required.test.ts, pnpm typecheck, pnpm build, runtime dist smokes, pnpm test, slope roadmap validate, and slope map --check.",
+    "slope roadmap validate remains valid with pre-existing roadmap warnings; slope map --check is current with a sprint-currency warning from CODEBASE.md metadata.",
+    "slope review recommend was run against a temporary S98 Claude plan and recommended architect required plus code optional. A tracked stale Sprint 25 Claude plan was removed because it caused false recommendation targeting.",
+    "Issue #384 was added after the draft PR opened; the guard protocol regression now checks PostToolUse output shape directly."
+  ],
+  "slope_factors": [
+    "guard_runtime",
+    "workflow_state"
+  ]
+}

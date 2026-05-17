@@ -3,9 +3,12 @@ import {
   saveSprintState,
   createSprintState,
   updateGate,
+  updateSprintPhase,
   clearSprintState,
   isSprintComplete,
   pendingGates,
+  isSprintPhase,
+  SPRINT_PHASES,
   type GateName,
   type SprintPhase,
 } from '../sprint-state.js';
@@ -217,18 +220,50 @@ function startCommand(args: string[], cwd: string): void {
     process.exit(1);
   }
 
+  const phaseArg = args.find(a => a.startsWith('--phase='));
+  const phaseInput = phaseArg?.slice('--phase='.length) ?? 'planning';
+  if (!isSprintPhase(phaseInput)) {
+    console.error(`Error: invalid phase "${phaseInput}". Valid phases: ${SPRINT_PHASES.join(', ')}`);
+    process.exit(1);
+  }
+  const phase = phaseInput as SprintPhase;
+
   const existing = loadSprintState(cwd);
   if (existing && existing.sprint === sprint) {
+    if (phaseArg && existing.phase !== phase) {
+      existing.phase = phase;
+      saveSprintState(cwd, existing);
+      console.log(`Sprint ${sprint} phase updated: ${phase}.`);
+      return;
+    }
     console.log(`Sprint ${sprint} state already exists (phase: ${existing.phase}).`);
     return;
   }
 
-  const phaseArg = args.find(a => a.startsWith('--phase='));
-  const phase = (phaseArg?.slice('--phase='.length) ?? 'planning') as SprintPhase;
-
   const state = createSprintState(sprint, phase);
   saveSprintState(cwd, state);
   console.log(`Sprint ${sprint} started (phase: ${phase}). Use 'slope sprint gate <name>' to mark gates.`);
+}
+
+function phaseCommand(args: string[], cwd: string): void {
+  const phaseInput = args[0];
+  if (!phaseInput || !isSprintPhase(phaseInput)) {
+    console.error(`Error: phase required. Usage: slope sprint phase <${SPRINT_PHASES.join('|')}>`);
+    process.exit(1);
+  }
+
+  const before = loadSprintState(cwd);
+  if (!before) {
+    console.error("No active sprint. Run 'slope sprint start --number=N' first.");
+    process.exit(1);
+  }
+
+  updateSprintPhase(cwd, phaseInput);
+  if (before.phase === phaseInput) {
+    console.log(`Sprint ${before.sprint} already in ${phaseInput} phase.`);
+  } else {
+    console.log(`Sprint ${before.sprint} phase updated: ${before.phase} -> ${phaseInput}.`);
+  }
 }
 
 function gateCommand(args: string[], cwd: string): void {
@@ -338,6 +373,53 @@ function getStore(cwd: string) {
   return createStore({ storePath: config.store_path ?? '.slope/slope.db', cwd });
 }
 
+const SPRINT_PHASE_ORDER: Record<SprintPhase, number> = {
+  planning: 0,
+  reviewing: 1,
+  implementing: 2,
+  scoring: 3,
+  complete: 4,
+};
+
+function workflowPhaseToSprintPhase(workflowPhase: string | undefined): SprintPhase | null {
+  switch (workflowPhase) {
+    case 'pre_hole':
+      return 'planning';
+    case 'plan_review':
+      return 'reviewing';
+    case 'per_ticket':
+      return 'implementing';
+    case 'post_hole':
+    case 'validate':
+      return 'scoring';
+    default:
+      return null;
+  }
+}
+
+function sprintNumberFromId(sprintId: string | undefined): number | null {
+  if (!sprintId) return null;
+  const parsed = Number(sprintId.replace(/^S/i, ''));
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function syncSprintStateWithWorkflow(cwd: string, sprintId: string | undefined, workflowPhase: string | undefined): void {
+  const nextPhase = workflowPhaseToSprintPhase(workflowPhase);
+  const sprint = sprintNumberFromId(sprintId);
+  if (!nextPhase || sprint === null) return;
+
+  const existing = loadSprintState(cwd);
+  if (!existing) {
+    saveSprintState(cwd, createSprintState(sprint, nextPhase));
+    return;
+  }
+  if (existing.sprint !== sprint || existing.phase === 'complete') return;
+  if (SPRINT_PHASE_ORDER[nextPhase] <= SPRINT_PHASE_ORDER[existing.phase]) return;
+
+  existing.phase = nextPhase;
+  saveSprintState(cwd, existing);
+}
+
 async function runWorkflowCommand(args: string[], cwd: string): Promise<void> {
   const sprintArg = args.find(a => a.startsWith('--sprint=') || !a.startsWith('--'));
   const workflowArg = args.find(a => a.startsWith('--workflow='));
@@ -400,6 +482,7 @@ async function runWorkflowCommand(args: string[], cwd: string): Promise<void> {
 
     // Auto-execute any initial command steps
     const next = await autoRunCommandSteps(exec.id, resolved, store, cwd);
+    syncSprintStateWithWorkflow(cwd, sprintId, next.phase);
 
     if (next.is_complete) {
       console.log('Workflow complete.');
@@ -484,6 +567,7 @@ async function resumeCommand(args: string[], cwd: string): Promise<void> {
 
     // Auto-execute any pending command steps
     const next = await autoRunCommandSteps(exec.id, def, store, cwd);
+    syncSprintStateWithWorkflow(cwd, sprintArg, next.phase);
 
     if (next.is_complete) {
       console.log(`Workflow for sprint ${sprintArg} is complete.`);
@@ -543,6 +627,7 @@ async function skipCommand(args: string[], cwd: string): Promise<void> {
     if (result.is_complete) {
       console.log(`Step "${stepId}" skipped. Workflow is now complete.`);
     } else {
+      syncSprintStateWithWorkflow(cwd, sprintArg, result.advanced_to?.phase);
       console.log(`Step "${stepId}" skipped (reason: ${reason}).`);
       console.log(`Next: ${result.advanced_to?.phase}/${result.advanced_to?.step}`);
     }
@@ -733,6 +818,9 @@ export async function sprintCommand(args: string[]): Promise<void> {
     case 'gate':
       gateCommand(args.slice(1), cwd);
       break;
+    case 'phase':
+      phaseCommand(args.slice(1), cwd);
+      break;
     case 'status':
       await workflowStatusCommand(args.slice(1), cwd);
       break;
@@ -765,6 +853,7 @@ Legacy commands:
   slope sprint start --number=N      Start sprint state tracking
   slope sprint begin --sprint=N --ticket=T  Bundled start + claim + briefing + prep (#311)
   slope sprint plan --sprint=N [--output=path]  Generate markdown sprint plan (#312)
+  slope sprint phase <phase>       Update current sprint phase
   slope sprint gate <name>           Mark a gate as complete
   slope sprint status                Show sprint state and gates
   slope sprint reset                 Clear sprint state

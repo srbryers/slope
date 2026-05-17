@@ -2,7 +2,8 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync, unlinkS
 import { join } from 'node:path';
 
 /** Sprint lifecycle phases */
-export type SprintPhase = 'planning' | 'reviewing' | 'implementing' | 'scoring' | 'complete';
+export const SPRINT_PHASES = ['planning', 'reviewing', 'implementing', 'scoring', 'complete'] as const;
+export type SprintPhase = typeof SPRINT_PHASES[number];
 
 /** Gate names that must be completed before PR */
 export type GateName = 'tests' | 'code_review' | 'architect_review' | 'scorecard' | 'review_md';
@@ -28,6 +29,11 @@ export interface SprintState {
 const SPRINT_STATE_FILE = '.slope/sprint-state.json';
 
 const ALL_GATES: GateName[] = ['tests', 'code_review', 'architect_review', 'scorecard', 'review_md'];
+
+/** Validate a user-provided sprint lifecycle phase. */
+export function isSprintPhase(value: string): value is SprintPhase {
+  return (SPRINT_PHASES as readonly string[]).includes(value);
+}
 
 /** Load sprint state from .slope/sprint-state.json. Returns null if missing or malformed. */
 export function loadSprintState(cwd: string): SprintState | null {
@@ -70,6 +76,15 @@ export function updateGate(cwd: string, gate: GateName, value: boolean): void {
   if (!state) return;
   state.gates[gate] = value;
   saveSprintState(cwd, state);
+}
+
+/** Update the current sprint lifecycle phase. */
+export function updateSprintPhase(cwd: string, phase: SprintPhase): SprintState | null {
+  const state = loadSprintState(cwd);
+  if (!state) return null;
+  state.phase = phase;
+  saveSprintState(cwd, state);
+  return state;
 }
 
 /** Check if all gates are true. */

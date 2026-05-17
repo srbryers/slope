@@ -55,23 +55,23 @@ describe('prReviewGuard recommendations (GH #302)', () => {
     expect(result).toEqual({});
   });
 
-  it('emits a suggestion with PR URL extracted from output', async () => {
+  it('emits context with PR URL extracted from output', async () => {
     const result = await prReviewGuard(
       makeInput('Created: https://github.com/foo/bar/pull/42'),
       cwd,
     );
-    expect(result.suggestion).toBeDefined();
-    expect(result.suggestion?.context).toContain('https://github.com/foo/bar/pull/42');
+    expect(result.suggestion).toBeUndefined();
+    expect(result.context).toContain('https://github.com/foo/bar/pull/42');
   });
 
-  it('includes recommended review types in the suggestion context', async () => {
+  it('includes recommended review types in the context', async () => {
     const result = await prReviewGuard(
       makeInput('Created: https://github.com/foo/bar/pull/42'),
       cwd,
     );
     // Auth files trigger security review (required)
-    expect(result.suggestion?.context).toMatch(/Recommended reviews based on diff:/);
-    expect(result.suggestion?.context).toMatch(/security/);
+    expect(result.context).toMatch(/Recommended reviews based on diff:/);
+    expect(result.context).toMatch(/security/);
   });
 
   it('mentions slope pr finalize as a related action', async () => {
@@ -79,7 +79,7 @@ describe('prReviewGuard recommendations (GH #302)', () => {
       makeInput('https://github.com/x/y/pull/1'),
       cwd,
     );
-    expect(result.suggestion?.context).toContain('slope pr finalize');
+    expect(result.context).toContain('slope pr finalize');
   });
 
   it('points agents to the transport-independent PR review command', async () => {
@@ -87,7 +87,7 @@ describe('prReviewGuard recommendations (GH #302)', () => {
       makeInput('https://github.com/x/y/pull/42'),
       cwd,
     );
-    expect(result.suggestion?.context).toContain('slope pr review --pr=42');
+    expect(result.context).toContain('slope pr review --pr=42');
   });
 });
 

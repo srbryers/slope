@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { sprintCommand } from '../../src/cli/commands/sprint.js';
@@ -85,6 +85,16 @@ describe('slope sprint run', () => {
     );
     expect(output).toContain('sprint-lightweight');
     expect(output).toContain('started');
+  });
+
+  it('syncs sprint-state to implementing when workflow starts in per_ticket', async () => {
+    await captureLog(() =>
+      sprintCommand(['run', 'S98', '--workflow=sprint-lightweight', '--var=tickets=T1,T2'])
+    );
+
+    const state = JSON.parse(readFileSync(join(tmpDir, '.slope', 'sprint-state.json'), 'utf8'));
+    expect(state.sprint).toBe(98);
+    expect(state.phase).toBe('implementing');
   });
 });
 
@@ -234,6 +244,63 @@ describe('slope sprint skip', () => {
     );
     expect(output).toContain('skipped');
   });
+
+  it('syncs sprint-state to implementing when standard workflow enters per_ticket', async () => {
+    const execId = await startWorkflow('S99', 'sprint-standard');
+
+    await captureLog(() =>
+      sprintCommand(['start', '--number=99', '--phase=planning'])
+    );
+
+    const store = createStore({ storePath: '.slope/slope.db', cwd: tmpDir });
+    try {
+      await store.recordStepResult({ execution_id: execId, phase: 'pre_hole', step_id: 'briefing', status: 'skipped' });
+      await store.recordStepResult({ execution_id: execId, phase: 'pre_hole', step_id: 'verify_previous', status: 'skipped' });
+      await store.recordStepResult({ execution_id: execId, phase: 'plan_review', step_id: 'write_plan', status: 'skipped' });
+      await store.recordStepResult({ execution_id: execId, phase: 'plan_review', step_id: 'review_plan', status: 'skipped' });
+      await store.updateExecutionState(execId, 'plan_review', 'revise_plan');
+    } finally {
+      store.close();
+    }
+
+    const output = await captureLog(() =>
+      sprintCommand(['skip', 'S99', '--step=revise_plan', '--reason=review-complete'])
+    );
+    const state = JSON.parse(readFileSync(join(tmpDir, '.slope', 'sprint-state.json'), 'utf8'));
+
+    expect(output).toContain('Next: per_ticket/pre_shot');
+    expect(state.phase).toBe('implementing');
+  });
+});
+
+describe('slope sprint phase', () => {
+  it('updates an existing sprint state phase', async () => {
+    await captureLog(() =>
+      sprintCommand(['start', '--number=98', '--phase=planning'])
+    );
+
+    const output = await captureLog(() =>
+      sprintCommand(['phase', 'implementing'])
+    );
+    const state = JSON.parse(readFileSync(join(tmpDir, '.slope', 'sprint-state.json'), 'utf8'));
+
+    expect(output).toContain('planning -> implementing');
+    expect(state.phase).toBe('implementing');
+  });
+
+  it('lets sprint start --phase update same-sprint state', async () => {
+    await captureLog(() =>
+      sprintCommand(['start', '--number=98', '--phase=planning'])
+    );
+
+    const output = await captureLog(() =>
+      sprintCommand(['start', '--number=98', '--phase=implementing'])
+    );
+    const state = JSON.parse(readFileSync(join(tmpDir, '.slope', 'sprint-state.json'), 'utf8'));
+
+    expect(output).toContain('phase updated: implementing');
+    expect(state.phase).toBe('implementing');
+  });
 });
 
 describe('slope sprint (help)', () => {
@@ -242,6 +309,7 @@ describe('slope sprint (help)', () => {
       sprintCommand([])
     );
     expect(output).toContain('slope sprint run');
+    expect(output).toContain('slope sprint phase');
     expect(output).toContain('slope sprint resume');
     expect(output).toContain('slope sprint skip');
     expect(output).toContain('--workflow');

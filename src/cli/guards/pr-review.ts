@@ -1,12 +1,13 @@
 import { execSync } from 'node:child_process';
-import type { HookInput, GuardResult, Suggestion } from '../../core/index.js';
+import type { HookInput, GuardResult } from '../../core/index.js';
 import { recommendReviews } from '../../core/review.js';
 import type { ReviewRecommendation } from '../../core/index.js';
 
 /**
  * PR review guard: fires PostToolUse on Bash.
  *
- * Detects `gh pr create` output and prompts for review workflow choice.
+ * Detects `gh pr create` output and reminds the agent to run the post-PR
+ * review workflow.
  * As of S91-4 (#302) the suggestion includes recommended review types
  * computed from the PR's diff (file patterns) and current sprint metadata.
  */
@@ -30,28 +31,15 @@ export async function prReviewGuard(input: HookInput, cwd: string): Promise<Guar
   const recs = computeRecommendations(cwd);
   const recLine = formatRecommendations(recs);
 
-  const suggestion: Suggestion = {
-    id: 'pr-review',
-    title: 'PR Review',
+  return {
     context: [
-      `A pull request was just created (${prUrl}).`,
-      ...(recLine ? [`Recommended reviews based on diff: ${recLine}`] : []),
+      `SLOPE PR Review: A pull request was just created (${prUrl}).`,
+      ...(recLine ? [`Recommended reviews based on diff: ${recLine}.`] : []),
       `Run \`slope pr review --pr=${prNumber}\` to generate the transport-independent review workflow.`,
-      `After the review, capture findings with \`slope review findings add\`, then \`slope review amend\` to apply to scorecard.`,
+      `After review, capture findings with \`slope review findings add\`, then \`slope review amend\` to apply them to the scorecard.`,
       'Tip: also run `slope pr finalize` to add Closes #N for any issues referenced in commits.',
     ].join(' '),
-    options: [
-      { id: 'code', label: 'Code Review', description: 'Detailed line-by-line code review of the diff' },
-      { id: 'architect', label: 'Architect Review', description: 'High-level architecture and design review' },
-      { id: 'both', label: 'Both', description: 'Run code review followed by architect review' },
-      { id: 'manual', label: 'Manual Review', description: 'User will review manually, no automated review' },
-      { id: 'skip', label: 'Skip / Merge Now', description: 'No review needed, proceed to merge' },
-    ],
-    requiresDecision: true,
-    priority: 'high',
   };
-
-  return { suggestion };
 }
 
 /** Inspect the current branch's diff and call recommendReviews(). Best-effort
