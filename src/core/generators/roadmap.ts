@@ -10,6 +10,13 @@ import type { TodoEntry } from '../analyzers/backlog.js';
 
 const ISSUE_REF_PATTERN = /(?:depends\s+on\s+#(\d+)|blocked\s+by\s+#(\d+)|requires\s+#(\d+)|after\s+#(\d+))/gi;
 
+export class RoadmapGenerationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'RoadmapGenerationError';
+  }
+}
+
 /**
  * Generate a roadmap from repo analysis data.
  *
@@ -331,14 +338,7 @@ export function generateRoadmapFromVision(
       });
     }
 
-    if (tickets.length === 0) {
-      tickets.push({
-        key: `S${sprintNum}-1`,
-        title: `Investigate and plan ${priority} improvements`,
-        club: 'short_iron' as RoadmapClub,
-        complexity: 'standard',
-      });
-    }
+    if (tickets.length === 0) continue;
 
     sprints.push({
       id: sprintNum,
@@ -390,6 +390,12 @@ export function generateRoadmapFromVision(
       name: `Phase ${phases.length + 1} — General`,
       sprints: [sprintNum],
     });
+  }
+
+  if (sprints.length === 0) {
+    throw new RoadmapGenerationError(
+      'vision is too abstract for auto-generation. Roadmap generation needs concrete backlog signals from source TODO/FIXME/HACK comments or synced issue data; no placeholder planning tickets were created.',
+    );
   }
 
   return {

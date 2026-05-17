@@ -629,7 +629,7 @@ export type { MergedBacklog } from './analyzers/backlog-merged.js';
 export { generateConfig } from './generators/config.js';
 export { generateFirstSprint } from './generators/first-sprint.js';
 export { generateCommonIssues } from './generators/common-issues.js';
-export { generateRoadmap, generateRoadmapFromVision } from './generators/roadmap.js';
+export { generateRoadmap, generateRoadmapFromVision, RoadmapGenerationError } from './generators/roadmap.js';
 export type { GeneratedConfig } from './generators/config.js';
 export type { GeneratedSprint } from './generators/first-sprint.js';
 

@@ -16,6 +16,7 @@ import {
   runAnalyzers,
   estimateComplexity,
   generateRoadmapFromVision,
+  RoadmapGenerationError,
 } from '../../core/index.js';
 import type { RoadmapDefinition, RoadmapSprint, RoadmapTicket, RoadmapClub, GolfScorecard } from '../../core/index.js';
 import { loadConfig } from '../config.js';
@@ -437,7 +438,7 @@ async function generateSubcommand(flags: Record<string, string>, cwd: string): P
     process.exit(1);
   }
 
-  console.log('\nGenerating roadmap from vision + backlog...');
+  console.log('\nGenerating roadmap from vision + concrete backlog signals...');
 
   const localBacklog = await analyzeBacklog(cwd);
   const backlog = mergeBacklogs(localBacklog);
@@ -450,7 +451,20 @@ async function generateSubcommand(flags: Record<string, string>, cwd: string): P
     console.log('  Warning: Could not estimate complexity, using defaults.');
   }
 
-  const roadmap = generateRoadmapFromVision(vision, backlog, complexity);
+  let roadmap: ReturnType<typeof generateRoadmapFromVision>;
+  try {
+    roadmap = generateRoadmapFromVision(vision, backlog, complexity);
+  } catch (err) {
+    if (err instanceof RoadmapGenerationError) {
+      console.error(`\nError: ${err.message}`);
+      console.error('\nTo generate a useful roadmap, provide at least one concrete backlog signal:');
+      console.error('  - add TODO/FIXME/HACK comments in source files');
+      console.error('  - sync or provide issue data before generation');
+      console.error('  - write the roadmap manually when the vision is intentionally high-level\n');
+      process.exit(1);
+    }
+    throw err;
+  }
 
   const validation = validateRoadmap(roadmap);
   if (!validation.valid) {
@@ -535,12 +549,16 @@ Usage:
   slope roadmap status [--path=<file>] [--sprint=N]  Current progress
   slope roadmap show [--path=<file>]         Render summary (critical path, parallel tracks)
   slope roadmap sync [--path=<file>] [--dry-run]     Sync scorecards into roadmap
-  slope roadmap generate [--path=<file>] [--dry-run] Generate from vision + backlog analysis
+  slope roadmap generate [--path=<file>] [--dry-run] Generate from vision + concrete backlog signals
 
 Options:
   --path=<file>    Path to roadmap JSON (default: docs/backlog/roadmap.json)
   --sprint=N       Override current sprint number (for status)
   --dry-run        Show what would change without writing (for sync and generate)
+
+Generate requires concrete backlog signals from source TODO/FIXME/HACK comments
+or synced issue data. It fails instead of creating placeholder planning tickets
+when there is nothing concrete to mine.
 `);
       if (sub) process.exit(1);
   }
