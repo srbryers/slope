@@ -607,6 +607,18 @@ describe('findNextPlannedSprint', () => {
     expect(next?.id).toBe(9);
   });
 
+  it('skips superseded sprints', () => {
+    const roadmap = makeRoadmap({
+      sprints: [
+        { ...makeSprint(7), status: 'complete' } as any,
+        { ...makeSprint(8), status: 'superseded' } as any,
+        { ...makeSprint(9), status: 'planned' } as any,
+      ],
+    });
+    const next = findNextPlannedSprint(roadmap, 7);
+    expect(next?.id).toBe(9);
+  });
+
   it('returns null when no later sprints exist', () => {
     const roadmap = makeRoadmap({
       sprints: [

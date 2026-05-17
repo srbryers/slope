@@ -59,6 +59,25 @@ function writeRoadmap(cwd: string): void {
   }));
 }
 
+function writeSupersededRoadmap(cwd: string): void {
+  writeFileSync(join(cwd, 'docs', 'backlog', 'roadmap.json'), JSON.stringify({
+    name: 'Test',
+    phases: [{ name: 'P1', sprints: [75.5, 96] }],
+    sprints: [
+      { id: 75.5, theme: 'Old inserted work', par: 4, slope: 1, type: 'bug fix', status: 'superseded', tickets: [
+        { key: 'S75.5-1', title: 'old', club: 'wedge', complexity: 'small' },
+        { key: 'S75.5-2', title: 'old', club: 'wedge', complexity: 'small' },
+        { key: 'S75.5-3', title: 'old', club: 'wedge', complexity: 'small' },
+      ] },
+      { id: 96, theme: 'Current work', par: 4, slope: 1, type: 'feature', status: 'planned', tickets: [
+        { key: 'S96-1', title: 'current', club: 'wedge', complexity: 'small' },
+        { key: 'S96-2', title: 'current', club: 'wedge', complexity: 'small' },
+        { key: 'S96-3', title: 'current', club: 'wedge', complexity: 'small' },
+      ] },
+    ],
+  }));
+}
+
 describe('slope next', () => {
   const repos: string[] = [];
 
@@ -88,5 +107,27 @@ describe('slope next', () => {
     expect(output).toContain('Next sprint: S43.5');
     expect(output).toContain('roadmap state overrides scorecard fallback to S100');
     expect(output).toContain('slope briefing --sprint=435');
+  });
+
+  it('ignores superseded roadmap sprints when selecting the next sprint', () => {
+    const cwd = makeRepo();
+    repos.push(cwd);
+    writeScorecard(cwd, 95);
+    writeSupersededRoadmap(cwd);
+    const originalCwd = process.cwd();
+    const logs: string[] = [];
+    vi.spyOn(console, 'log').mockImplementation((msg = '') => logs.push(String(msg)));
+
+    try {
+      process.chdir(cwd);
+      nextCommand();
+    } finally {
+      process.chdir(originalCwd);
+    }
+
+    const output = logs.join('\n');
+    expect(output).toContain('Latest scorecard: S95');
+    expect(output).toContain('Next sprint: S96');
+    expect(output).not.toContain('S75.5');
   });
 });
