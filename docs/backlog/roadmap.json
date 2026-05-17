@@ -149,7 +149,7 @@
       "sprints": [
         98
       ],
-      "status": "planned",
+      "status": "complete",
       "note": "Close #382/#383 before Codex plugin work: suppress repeated explore guidance and make workflow per-ticket state advance sprint-state into implementing."
     }
   ],
@@ -1538,10 +1538,12 @@
     {
       "id": 98,
       "theme": "Guard Noise & Workflow Phase Repair",
-      "par": 4,
+      "par": 5,
       "slope": 2,
       "type": "bug fix + dx",
-      "status": "planned",
+      "status": "complete",
+      "score": 5,
+      "score_label": "par",
       "depends_on": [
         97
       ],
@@ -1581,6 +1583,16 @@
             "S98-1",
             "S98-2",
             "S98-3"
+          ]
+        },
+        {
+          "key": "S98-5",
+          "title": "Surface guard-pr-review as PostToolUse additional context instead of a dropped/block-style suggestion (#384)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 384,
+          "depends_on": [
+            "S98-4"
           ]
         }
       ]
