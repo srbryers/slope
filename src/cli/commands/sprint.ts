@@ -3,9 +3,12 @@ import {
   saveSprintState,
   createSprintState,
   updateGate,
+  updateSprintPhase,
   clearSprintState,
   isSprintComplete,
   pendingGates,
+  isSprintPhase,
+  SPRINT_PHASES,
   type GateName,
   type SprintPhase,
 } from '../sprint-state.js';
@@ -217,18 +220,50 @@ function startCommand(args: string[], cwd: string): void {
     process.exit(1);
   }
 
+  const phaseArg = args.find(a => a.startsWith('--phase='));
+  const phaseInput = phaseArg?.slice('--phase='.length) ?? 'planning';
+  if (!isSprintPhase(phaseInput)) {
+    console.error(`Error: invalid phase "${phaseInput}". Valid phases: ${SPRINT_PHASES.join(', ')}`);
+    process.exit(1);
+  }
+  const phase = phaseInput as SprintPhase;
+
   const existing = loadSprintState(cwd);
   if (existing && existing.sprint === sprint) {
+    if (phaseArg && existing.phase !== phase) {
+      existing.phase = phase;
+      saveSprintState(cwd, existing);
+      console.log(`Sprint ${sprint} phase updated: ${phase}.`);
+      return;
+    }
     console.log(`Sprint ${sprint} state already exists (phase: ${existing.phase}).`);
     return;
   }
 
-  const phaseArg = args.find(a => a.startsWith('--phase='));
-  const phase = (phaseArg?.slice('--phase='.length) ?? 'planning') as SprintPhase;
-
   const state = createSprintState(sprint, phase);
   saveSprintState(cwd, state);
   console.log(`Sprint ${sprint} started (phase: ${phase}). Use 'slope sprint gate <name>' to mark gates.`);
+}
+
+function phaseCommand(args: string[], cwd: string): void {
+  const phaseInput = args[0];
+  if (!phaseInput || !isSprintPhase(phaseInput)) {
+    console.error(`Error: phase required. Usage: slope sprint phase <${SPRINT_PHASES.join('|')}>`);
+    process.exit(1);
+  }
+
+  const before = loadSprintState(cwd);
+  if (!before) {
+    console.error("No active sprint. Run 'slope sprint start --number=N' first.");
+    process.exit(1);
+  }
+
+  updateSprintPhase(cwd, phaseInput);
+  if (before.phase === phaseInput) {
+    console.log(`Sprint ${before.sprint} already in ${phaseInput} phase.`);
+  } else {
+    console.log(`Sprint ${before.sprint} phase updated: ${before.phase} -> ${phaseInput}.`);
+  }
 }
 
 function gateCommand(args: string[], cwd: string): void {
@@ -733,6 +768,9 @@ export async function sprintCommand(args: string[]): Promise<void> {
     case 'gate':
       gateCommand(args.slice(1), cwd);
       break;
+    case 'phase':
+      phaseCommand(args.slice(1), cwd);
+      break;
     case 'status':
       await workflowStatusCommand(args.slice(1), cwd);
       break;
@@ -765,6 +803,7 @@ Legacy commands:
   slope sprint start --number=N      Start sprint state tracking
   slope sprint begin --sprint=N --ticket=T  Bundled start + claim + briefing + prep (#311)
   slope sprint plan --sprint=N [--output=path]  Generate markdown sprint plan (#312)
+  slope sprint phase <phase>       Update current sprint phase
   slope sprint gate <name>           Mark a gate as complete
   slope sprint status                Show sprint state and gates
   slope sprint reset                 Clear sprint state

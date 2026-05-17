@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { sprintCommand } from '../../src/cli/commands/sprint.js';
@@ -236,12 +236,43 @@ describe('slope sprint skip', () => {
   });
 });
 
+describe('slope sprint phase', () => {
+  it('updates an existing sprint state phase', async () => {
+    await captureLog(() =>
+      sprintCommand(['start', '--number=98', '--phase=planning'])
+    );
+
+    const output = await captureLog(() =>
+      sprintCommand(['phase', 'implementing'])
+    );
+    const state = JSON.parse(readFileSync(join(tmpDir, '.slope', 'sprint-state.json'), 'utf8'));
+
+    expect(output).toContain('planning -> implementing');
+    expect(state.phase).toBe('implementing');
+  });
+
+  it('lets sprint start --phase update same-sprint state', async () => {
+    await captureLog(() =>
+      sprintCommand(['start', '--number=98', '--phase=planning'])
+    );
+
+    const output = await captureLog(() =>
+      sprintCommand(['start', '--number=98', '--phase=implementing'])
+    );
+    const state = JSON.parse(readFileSync(join(tmpDir, '.slope', 'sprint-state.json'), 'utf8'));
+
+    expect(output).toContain('phase updated: implementing');
+    expect(state.phase).toBe('implementing');
+  });
+});
+
 describe('slope sprint (help)', () => {
   it('shows help with workflow commands listed', async () => {
     const output = await captureLog(() =>
       sprintCommand([])
     );
     expect(output).toContain('slope sprint run');
+    expect(output).toContain('slope sprint phase');
     expect(output).toContain('slope sprint resume');
     expect(output).toContain('slope sprint skip');
     expect(output).toContain('--workflow');
