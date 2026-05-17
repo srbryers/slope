@@ -1360,6 +1360,13 @@
           "depends_on": [
             "S94-1"
           ]
+        },
+        {
+          "key": "S94-5",
+          "title": "Transport-independent post-PR review workflow",
+          "club": "wedge",
+          "complexity": "small",
+          "note": "Close the connector-created PR gap where pr-review cannot fire because no Bash gh pr create hook event exists."
         }
       ]
     }

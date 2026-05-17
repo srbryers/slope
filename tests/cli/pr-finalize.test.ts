@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { extractIssueRefs, existingAutoCloseRefs } from '../../src/cli/commands/pr.js';
+import {
+  defaultReviewType,
+  extractIssueRefs,
+  existingAutoCloseRefs,
+  formatReviewRecommendations,
+} from '../../src/cli/commands/pr.js';
 
 describe('extractIssueRefs (GH #321)', () => {
   it('extracts a single issue ref', () => {
@@ -60,5 +65,25 @@ describe('existingAutoCloseRefs (GH #321)', () => {
   it('matches "fixed" / "closed" past tense', () => {
     expect(existingAutoCloseRefs('Fixed #42')).toEqual(new Set([42]));
     expect(existingAutoCloseRefs('Closed #43')).toEqual(new Set([43]));
+  });
+});
+
+describe('pr review workflow helpers (S94-5)', () => {
+  it('defaults transport-independent PR review to both architect and code prompts', () => {
+    expect(defaultReviewType([
+      { review_type: 'architect', priority: 'required', reason: '4 tickets warrants architectural review' },
+      { review_type: 'code', priority: 'optional', reason: 'Baseline code review' },
+    ])).toBe('both');
+  });
+
+  it('formats review recommendations for command output', () => {
+    const output = formatReviewRecommendations([
+      { review_type: 'architect', priority: 'required', reason: '4 tickets warrants architectural review' },
+      { review_type: 'code', priority: 'optional', reason: 'Baseline code review' },
+    ]);
+
+    expect(output).toContain('architect');
+    expect(output).toContain('required');
+    expect(output).toContain('Baseline code review');
   });
 });

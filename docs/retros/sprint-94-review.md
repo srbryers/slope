@@ -4,16 +4,16 @@
 
 | Metric | Value |
 |---|---|
-| Par | 4 |
+| Par | 5 |
 | Slope | 2 |
-| Score | 4 |
+| Score | 5 |
 | Label | Par |
-| Fairway % | 100% (4/4) |
-| GIR % | 100% (4/4) |
+| Fairway % | 100% (5/5) |
+| GIR % | 100% (5/5) |
 | Putts | 0 |
 | Penalties | 0 |
 
-### Shot-by-Shot (Tickets Delivered: 4)
+### Shot-by-Shot (Tickets Delivered: 5)
 
 | Ticket | Club | Result | Hazards | Notes |
 |---|---|---|---|---|
@@ -21,6 +21,7 @@
 | S94-2 | Wedge | In the Hole | — | Commit 1c5acc5 locks claim-required into Codex write matcher coverage for generated configs, project installs, and user installs. |
 | S94-3 | Short Iron | Green | Rough: Codex hook behavior can look current while resolving a stale project-local package or stale dev dist output. | Commit e803279 adds codex-runtime diagnostics for project-local package precedence and stale SLOPE dev dist output. |
 | S94-4 | Short Iron | Green | Rough: [code review] claim-required strictness config was exposed without guard docs coverage, and guard metadata still described the guard as purely advisory despite deny mode | Commit e0262ff adds guidance.requireSprintForImplementationWrites with ask, deny, and off modes. Commits 2f0c0f1 and 8a91f97 handled sprint scoping and stale Claude lock cleanup. |
+| S94-5 | Wedge | Green | — | Added slope pr review so agents can run post-PR recommendations and review prompts after gh, MCP connector, or API PR creation paths. |
 
 ### Conditions
 
@@ -55,6 +56,7 @@
 
 - Default no-sprint implementation writes ask for permission; strict mode denies; off mode allows outside-sprint implementation writes.
 - Active implementing sprints still preserve the existing missing-claim advisory by default, with strict mode upgrading that path to deny.
+- After any connector/API-created PR, run slope pr review --pr=<N> --sprint=<N> to get the same recommendation and prompt flow as gh pr create.
 - Full test suite passed after implementation: 199 test files, 3341 tests.
 
 ### 19th Hole

@@ -111,6 +111,28 @@ This is enough for the emergency patch, but not enough for a mature workflow-con
 - Tests cover no sprint, planning/reviewing/scoring phases, and implementing phase.
 - Strict mode produces a block/deny output with actionable recovery commands.
 
+### S94-5: Transport-independent post-PR review workflow
+
+**Club:** wedge
+**Files:**
+- `src/cli/commands/pr.ts`
+- `src/cli/guards/pr-review.ts`
+- `src/cli/guards/docs.ts`
+- `tests/cli/pr-finalize.test.ts`
+- `tests/cli/guards/pr-review-recommend.test.ts`
+
+**Scope:**
+
+1. Add an explicit post-PR command agents can run after any PR creation transport, including GitHub MCP connector/API flows that do not trigger Bash hooks.
+2. Keep the existing `gh pr create` guard path, but have it point to the transport-independent command.
+3. Reuse the existing `slope review run` prompt generator so the new command does not fork review semantics.
+4. Compute recommendations from PR diff files plus sprint scorecard signals where available.
+
+**Acceptance:**
+- `slope pr review --pr=<N> --sprint=<N>` prints recommendations and review prompts.
+- `slope pr review --json` delegates to `slope review run --json` for agent consumption.
+- Tests cover the default review type and the `pr-review` guard handoff text.
+
 ---
 
 ## Verification

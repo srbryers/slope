@@ -1,4 +1,9 @@
 import { execSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { detectLatestSprint, loadConfig, normalizeScorecard, recommendReviews } from '../../core/index.js';
+import type { ReviewRecommendation } from '../../core/index.js';
+import { reviewRunCommand } from './review-run.js';
 
 /**
  * `slope pr ...` — agent-friendly PR helpers.
@@ -8,6 +13,8 @@ import { execSync } from 'node:child_process';
  *                                            body for any issue refs in commit
  *                                            messages that GitHub's auto-close
  *                                            parser would otherwise miss (#321).
+ *   slope pr review [--pr=N] [--sprint=N]    Run the post-PR review workflow
+ *                                            for any PR creation transport.
  *   slope pr issues [--pr=N]                 Print extracted issue refs (helper).
  *
  * Background: commits like `fix: ... (GH #297, #299)` or `… closes #314` mix
@@ -22,6 +29,24 @@ interface FinalizeOptions {
   dryRun?: boolean;
 }
 
+interface PrReviewOptions {
+  pr?: number;
+  sprint?: number;
+  type?: 'architect' | 'code' | 'both';
+  json?: boolean;
+}
+
+interface PrReviewPlan {
+  pr: number;
+  sprint?: number;
+  ticketCount: number;
+  slope: number;
+  changedFiles: string[];
+  hasNewInfra: boolean;
+  recommendations: ReviewRecommendation[];
+  reviewType: 'architect' | 'code' | 'both';
+}
+
 export async function prCommand(args: string[]): Promise<void> {
   const sub = args[0];
 
@@ -32,6 +57,11 @@ export async function prCommand(args: string[]): Promise<void> {
 
   if (sub === 'finalize') {
     await finalizeSubcommand(args.slice(1));
+    return;
+  }
+
+  if (sub === 'review') {
+    await reviewSubcommand(args.slice(1));
     return;
   }
 
@@ -52,6 +82,9 @@ slope pr — Pull request helpers
 Usage:
   slope pr finalize [--pr=N] [--dry-run]   Inject Closes #N for issues referenced in commit
                                            messages but missing from PR body (#321).
+  slope pr review [--pr=N] [--sprint=N]    Run review recommendation + prompt generation
+                                           after PR creation, regardless of whether the
+                                           PR was created by gh, MCP, or another API.
   slope pr issues [--pr=N]                 Print extracted issue refs from the branch's
                                            commit messages.
 
@@ -69,12 +102,107 @@ function parseFlags(args: string[]): FinalizeOptions {
   return opts;
 }
 
+function parseReviewFlags(args: string[]): PrReviewOptions {
+  const opts: PrReviewOptions = {};
+  for (const a of args) {
+    if (a.startsWith('--pr=')) opts.pr = parseInt(a.slice('--pr='.length), 10);
+    else if (a.startsWith('--sprint=')) opts.sprint = parseInt(a.slice('--sprint='.length), 10);
+    else if (a.startsWith('--type=')) {
+      const type = a.slice('--type='.length);
+      if (type === 'architect' || type === 'code' || type === 'both') opts.type = type;
+    } else if (a === '--json') {
+      opts.json = true;
+    }
+  }
+  return opts;
+}
+
 function git(cmd: string): string {
   try {
     return execSync(`git ${cmd}`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
   } catch {
     return '';
   }
+}
+
+function inferSprintNumber(explicit?: number): number | undefined {
+  if (explicit && !isNaN(explicit)) return explicit;
+  try {
+    const config = loadConfig();
+    return config.currentSprint ?? (detectLatestSprint(config, process.cwd()) || undefined);
+  } catch {
+    return undefined;
+  }
+}
+
+function loadSprintReviewSignals(sprint?: number): { ticketCount: number; slope: number } {
+  if (!sprint) return { ticketCount: 1, slope: 1 };
+  try {
+    const config = loadConfig();
+    const scorecardPath = join(process.cwd(), config.scorecardDir, `sprint-${sprint}.json`);
+    if (!existsSync(scorecardPath)) return { ticketCount: 1, slope: 1 };
+    const card = normalizeScorecard(JSON.parse(readFileSync(scorecardPath, 'utf8')));
+    return {
+      ticketCount: card.shots?.length ?? 1,
+      slope: card.slope ?? 1,
+    };
+  } catch {
+    return { ticketCount: 1, slope: 1 };
+  }
+}
+
+function changedFilesForPr(pr: number): string[] {
+  try {
+    const raw = gh(`pr diff ${pr} --name-only`);
+    return raw ? raw.split('\n').filter(Boolean) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function defaultReviewType(_recommendations: ReviewRecommendation[]): 'architect' | 'code' | 'both' {
+  // Keep the transport-independent command aligned with `slope review run`,
+  // whose default is both. Recommendations are printed for prioritization,
+  // but the baseline code review remains useful for AI-authored diffs.
+  return 'both';
+}
+
+export function formatReviewRecommendations(recommendations: ReviewRecommendation[]): string {
+  if (recommendations.length === 0) return '  (none)';
+  return recommendations
+    .map((rec) => {
+      const type = rec.review_type.padEnd(14);
+      const priority = rec.priority.padEnd(13);
+      return `  ${type} ${priority} ${rec.reason}`;
+    })
+    .join('\n');
+}
+
+export async function planPrReview(opts: PrReviewOptions): Promise<PrReviewPlan | null> {
+  const pr = resolvePrNumber(opts);
+  if (!pr) return null;
+
+  const sprint = inferSprintNumber(opts.sprint);
+  const { ticketCount, slope } = loadSprintReviewSignals(sprint);
+  const changedFiles = changedFilesForPr(pr);
+  const hasNewInfra = changedFiles.some(p => /(\.sql|migration|schema|infra|terraform|k8s|deploy)/i.test(p));
+  const recommendations = recommendReviews({
+    ticketCount,
+    slope,
+    filePatterns: changedFiles,
+    hasNewInfra,
+  });
+
+  return {
+    pr,
+    sprint,
+    ticketCount,
+    slope,
+    changedFiles,
+    hasNewInfra,
+    recommendations,
+    reviewType: opts.type ?? defaultReviewType(recommendations),
+  };
 }
 
 /** Wrapper around `gh` CLI invocations. Throws a contextual error when gh
@@ -247,6 +375,34 @@ async function finalizeSubcommand(args: string[]): Promise<void> {
   // gh expects the body via --body — pass through stdin to avoid shell quoting hazards
   execSync(`gh pr edit ${plan.pr} --body-file -`, { input: newBody, encoding: 'utf8' });
   console.log(`\n  Updated PR #${plan.pr} body with ${plan.toAdd.length} Closes line(s).\n`);
+}
+
+async function reviewSubcommand(args: string[]): Promise<void> {
+  const opts = parseReviewFlags(args);
+  const plan = await planPrReview(opts);
+
+  if (!plan) {
+    console.error('\nCould not resolve PR — pass --pr=N or run from a branch with an open PR.\n');
+    process.exit(1);
+  }
+
+  const reviewArgs = [`--pr=${plan.pr}`, `--type=${plan.reviewType}`];
+  if (plan.sprint) reviewArgs.push(`--sprint=${plan.sprint}`);
+  if (opts.json) {
+    reviewArgs.push('--json');
+    await reviewRunCommand(reviewArgs);
+    return;
+  }
+
+  console.log(`\nPR #${plan.pr} review workflow${plan.sprint ? ` for Sprint ${plan.sprint}` : ''}`);
+  console.log(`Files changed: ${plan.changedFiles.length}`);
+  console.log(`Signals: ${plan.ticketCount} ticket${plan.ticketCount !== 1 ? 's' : ''}, slope ${plan.slope}${plan.hasNewInfra ? ', infrastructure/schema paths' : ''}`);
+  console.log('\nRecommended reviews:\n');
+  console.log('  Type           Priority      Reason');
+  console.log(formatReviewRecommendations(plan.recommendations));
+  console.log('\nReview prompts:\n');
+
+  await reviewRunCommand(reviewArgs);
 }
 
 async function issuesSubcommand(args: string[]): Promise<void> {

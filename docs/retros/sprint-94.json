@@ -2,9 +2,9 @@
   "sprint_number": 94,
   "player": "codex",
   "theme": "Guard Enforcement Hardening",
-  "par": 4,
+  "par": 5,
   "slope": 2,
-  "score": 4,
+  "score": 5,
   "score_label": "par",
   "date": "2026-05-16",
   "shots": [
@@ -52,13 +52,21 @@
         }
       ],
       "notes": "Commit e0262ff adds guidance.requireSprintForImplementationWrites with ask, deny, and off modes. Commits 2f0c0f1 and 8a91f97 handled sprint scoping and stale Claude lock cleanup."
+    },
+    {
+      "ticket_key": "S94-5",
+      "title": "Transport-independent post-PR review workflow",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [],
+      "notes": "Added slope pr review so agents can run post-PR recommendations and review prompts after gh, MCP connector, or API PR creation paths."
     }
   ],
   "stats": {
-    "fairways_hit": 4,
-    "fairways_total": 4,
-    "greens_in_regulation": 4,
-    "greens_total": 4,
+    "fairways_hit": 5,
+    "fairways_total": 5,
+    "greens_in_regulation": 5,
+    "greens_total": 5,
     "putts": 0,
     "penalties": 0,
     "hazards_hit": 2,
@@ -111,11 +119,13 @@
     "tests/cli/commands/guard.test.ts now exercises the real guard dispatcher with hook-style JSON input and metrics assertions.",
     "tests/core/adapters/codex.test.ts and tests/cli/commands/hook-codex.test.ts now lock claim-required under Codex apply_patch/Edit/Write matchers.",
     "src/cli/commands/doctor.ts now reports codex-runtime resolution order and stale runtime warnings.",
-    "src/cli/guards/claim-required.ts now supports guidance.requireSprintForImplementationWrites policies."
+    "src/cli/guards/claim-required.ts now supports guidance.requireSprintForImplementationWrites policies.",
+    "src/cli/commands/pr.ts now exposes slope pr review for connector/API PR creation paths that do not trigger the Bash pr-review guard."
   ],
   "course_management_notes": [
     "Default no-sprint implementation writes ask for permission; strict mode denies; off mode allows outside-sprint implementation writes.",
     "Active implementing sprints still preserve the existing missing-claim advisory by default, with strict mode upgrading that path to deny.",
+    "After any connector/API-created PR, run slope pr review --pr=<N> --sprint=<N> to get the same recommendation and prompt flow as gh pr create.",
     "Full test suite passed after implementation: 199 test files, 3341 tests."
   ]
 }
