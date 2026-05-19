@@ -1651,6 +1651,54 @@
           ]
         }
       ]
+    },
+    {
+      "id": 100,
+      "theme": "Review Closeout Guard Repair",
+      "par": 4,
+      "slope": 3,
+      "type": "bug fix + workflow guard",
+      "status": "planned",
+      "depends_on": [
+        99
+      ],
+      "note": "Close the remaining review/closeout reliability gaps before Codex plugin packaging: review recommendations must use active SLOPE context, PR review enforcement must be recorded as workflow state, and shipped-sprint validation must recognize normal squash merges.",
+      "tickets": [
+        {
+          "key": "S100-1",
+          "title": "Make review recommend prefer active sprint state over stale global Claude plans (#392)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 392
+        },
+        {
+          "key": "S100-2",
+          "title": "Add review recommend explicit sprint/context regressions (#392)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 392,
+          "depends_on": [
+            "S100-1"
+          ]
+        },
+        {
+          "key": "S100-3",
+          "title": "Record and enforce PR review completion in post-hole closeout (#390)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 390,
+          "depends_on": [
+            "S100-1"
+          ]
+        },
+        {
+          "key": "S100-4",
+          "title": "Teach shipped-sprint detection to recognize squash merges via sprint artifacts (#393)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 393
+        }
+      ]
     }
   ]
 }
