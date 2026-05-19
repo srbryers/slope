@@ -74,12 +74,12 @@ export function findShippedSprintsOnMain(cwd: string, ref?: string): Set<number>
     // Cap at 1000 commits — plenty for sprint references (a project would
     // need to ship hundreds of sprints to exhaust this) and avoids slowing
     // session-end Stop hooks on deep-history repos.
-    const log = git(`log ${r} --format=%s --name-only -n 1000`, cwd);
-    if (log) {
-      const lines = log.split('\n');
+    const subjects = git(`log ${r} --format=%s -n 1000`, cwd);
+    const files = git(`log ${r} --name-only --format= -n 1000`, cwd);
+    if (subjects || files) {
       return unionSets(
-        extractSprintReferences(lines),
-        extractSprintArtifactReferences(lines),
+        extractSprintReferences(subjects ? subjects.split('\n') : []),
+        extractSprintArtifactReferences(files ? files.split('\n') : []),
       );
     }
   }

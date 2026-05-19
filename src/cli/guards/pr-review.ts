@@ -49,11 +49,14 @@ export async function prReviewGuard(input: HookInput, cwd: string): Promise<Guar
 function recordPendingReview(cwd: string, pr: number): void {
   try {
     const state = loadSprintState(cwd);
-    const branch = execSync('git branch --show-current', { cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+    let branch: string | undefined;
+    try {
+      branch = execSync('git branch --show-current', { cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim() || undefined;
+    } catch { /* branch is metadata only */ }
     recordPrReviewPending(cwd, {
       pr,
       sprint: isActiveSprintState(state) ? state.sprint : undefined,
-      branch: branch || undefined,
+      branch,
     });
   } catch { /* review marker is best-effort; the reminder still fires */ }
 }

@@ -204,6 +204,18 @@ describe('findShippedSprintsOnMain', () => {
     expect(findShippedSprintsOnMain(tmpDir, 'HEAD')).toEqual(new Set([99]));
   });
 
+  it('does not treat arbitrary S-prefixed file paths as shipped sprint refs', () => {
+    gitInit(tmpDir);
+    gitCommitFile(
+      tmpDir,
+      'src/S88Widget.ts',
+      'export const widget = true;\n',
+      'Add widget without sprint subject',
+    );
+
+    expect(findShippedSprintsOnMain(tmpDir, 'HEAD')).toEqual(new Set());
+  });
+
   it('refuses unsafe refs (shell-injection guard)', () => {
     gitInit(tmpDir);
     gitCommit(tmpDir, 'feat(S99): only on HEAD');
