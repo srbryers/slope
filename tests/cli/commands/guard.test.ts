@@ -12,7 +12,8 @@ import '../../../src/core/adapters/windsurf.js';
 import '../../../src/core/adapters/generic.js';
 
 import { guardCommand, guardManageCommand, shouldSuppressGuardInAdhoc } from '../../../src/cli/commands/guard.js';
-import { setSessionMode } from '../../../src/cli/session-state.js';
+import { loadSessionState, setSessionMode } from '../../../src/cli/session-state.js';
+import { createSprintState, saveSprintState } from '../../../src/cli/sprint-state.js';
 
 function makeTmpDir(): string {
   const dir = join(tmpdir(), `slope-guard-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
@@ -199,6 +200,13 @@ describe('adhoc guard suppression', () => {
 
   it('keeps most sprint workflow guards suppressed in adhoc sessions', () => {
     expect(shouldSuppressGuardInAdhoc('workflow-step-gate', cwd, 'test-session')).toBe(true);
+  });
+
+  it('promotes adhoc sessions when live sprint-state appears', () => {
+    saveSprintState(cwd, createSprintState(74, 'planning'));
+
+    expect(shouldSuppressGuardInAdhoc('workflow-step-gate', cwd, 'test-session')).toBe(false);
+    expect(loadSessionState(cwd).session_mode).toBe('sprint');
   });
 
   it('allows claim-required to run in adhoc sessions', () => {
