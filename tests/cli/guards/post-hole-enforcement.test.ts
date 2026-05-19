@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execSync } from 'node:child_process';
 import { postHoleEnforcementGuard } from '../../../src/cli/guards/post-hole-enforcement.js';
+import { recordPrReviewComplete, recordPrReviewPending } from '../../../src/cli/pr-review-state.js';
 import type { HookInput } from '../../../src/core/index.js';
 
 function makeTmpRepo(): string {
@@ -74,6 +75,25 @@ describe('postHoleEnforcementGuard', () => {
   it('returns empty when no shipped sprints found', async () => {
     writeRoadmap(cwd, [{ id: 1, status: 'planned' }]);
     commit(cwd, 'chore: bump version'); // no S\d+ refs
+    const result = await postHoleEnforcementGuard(stopInput, cwd);
+    expect(result).toEqual({});
+  });
+
+  it('warns when a created PR has no recorded PR review', async () => {
+    writeRoadmap(cwd, [{ id: 7, status: 'planned' }]);
+    recordPrReviewPending(cwd, { pr: 42, sprint: 7, branch: 'fix/test' });
+
+    const result = await postHoleEnforcementGuard(stopInput, cwd);
+    expect(result.context).toContain('SLOPE PR review enforcement');
+    expect(result.context).toContain('PR #42');
+    expect(result.context).toContain('slope pr review --pr=42 --sprint=7');
+  });
+
+  it('does not warn when created PR review is recorded complete', async () => {
+    writeRoadmap(cwd, [{ id: 7, status: 'planned' }]);
+    recordPrReviewPending(cwd, { pr: 42, sprint: 7, branch: 'fix/test' });
+    recordPrReviewComplete(cwd, { pr: 42, sprint: 7, reviewType: 'both' });
+
     const result = await postHoleEnforcementGuard(stopInput, cwd);
     expect(result).toEqual({});
   });

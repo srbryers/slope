@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execSync } from 'node:child_process';
-import { analyzeGit, extractSprintReferences, findShippedSprintsOnMain } from '../../../src/core/analyzers/git.js';
+import { analyzeGit, extractSprintArtifactReferences, extractSprintReferences, findShippedSprintsOnMain } from '../../../src/core/analyzers/git.js';
 
 function makeTmpDir(): string {
   return mkdtempSync(join(tmpdir(), 'slope-git-'));
@@ -19,6 +19,14 @@ function gitCommit(cwd: string, message: string): void {
   writeFileSync(join(cwd, `file-${Date.now()}-${Math.random()}.txt`), message);
   execSync('git add -A', { cwd, stdio: 'pipe' });
   execSync(`git commit -m "${message}" --allow-empty`, { cwd, stdio: 'pipe' });
+}
+
+function gitCommitFile(cwd: string, file: string, content: string, message: string): void {
+  const fullPath = join(cwd, file);
+  mkdirSync(dirname(fullPath), { recursive: true });
+  writeFileSync(fullPath, content);
+  execSync('git add -A', { cwd, stdio: 'pipe' });
+  execSync(`git commit -m "${message}"`, { cwd, stdio: 'pipe' });
 }
 
 describe('analyzeGit', () => {
@@ -140,6 +148,16 @@ describe('extractSprintReferences', () => {
   });
 });
 
+describe('extractSprintArtifactReferences', () => {
+  it('extracts sprint ids from scorecard and review artifact paths', () => {
+    expect(extractSprintArtifactReferences([
+      'docs/retros/sprint-99.json',
+      'docs/retros/sprint-100-review.md',
+      'docs/backlog/roadmap.json',
+    ])).toEqual(new Set([99, 100]));
+  });
+});
+
 describe('findShippedSprintsOnMain', () => {
   let tmpDir: string;
 
@@ -172,6 +190,30 @@ describe('findShippedSprintsOnMain', () => {
     gitCommit(tmpDir, 'feat(S99): only on HEAD');
 
     expect(findShippedSprintsOnMain(tmpDir, 'HEAD')).toEqual(new Set([99]));
+  });
+
+  it('detects shipped sprints from scorecard artifacts in squash merge commits', () => {
+    gitInit(tmpDir);
+    gitCommitFile(
+      tmpDir,
+      'docs/retros/sprint-99.json',
+      JSON.stringify({ sprint_number: 99 }),
+      'Fix session state source-of-truth drift (#391)',
+    );
+
+    expect(findShippedSprintsOnMain(tmpDir, 'HEAD')).toEqual(new Set([99]));
+  });
+
+  it('does not treat arbitrary S-prefixed file paths as shipped sprint refs', () => {
+    gitInit(tmpDir);
+    gitCommitFile(
+      tmpDir,
+      'src/S88Widget.ts',
+      'export const widget = true;\n',
+      'Add widget without sprint subject',
+    );
+
+    expect(findShippedSprintsOnMain(tmpDir, 'HEAD')).toEqual(new Set());
   });
 
   it('refuses unsafe refs (shell-injection guard)', () => {

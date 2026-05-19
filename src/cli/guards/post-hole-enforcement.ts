@@ -3,6 +3,8 @@ import { join } from 'node:path';
 import type { HookInput, GuardResult } from '../../core/index.js';
 import { findShippedSprintsOnMain } from '../../core/index.js';
 import { loadConfig } from '../config.js';
+import { pendingPrReviews } from '../pr-review-state.js';
+import type { PrReviewRecord } from '../pr-review-state.js';
 
 /**
  * Post-hole enforcement guard: fires on Stop.
@@ -64,31 +66,44 @@ export async function postHoleEnforcementGuard(_input: HookInput, cwd: string): 
     }
   }
 
-  const shipped = findShippedSprintsOnMain(cwd);
-  if (shipped.size === 0) return {};
-
   type Drift = { sprint: number; issues: string[] };
+  const shipped = findShippedSprintsOnMain(cwd);
   const drifts: Drift[] = [];
-  for (const id of [...shipped].sort((a, b) => b - a)) {
-    const status = statusById.get(id);
-    // Replace EVERY '*' so patterns with multiple wildcards are sanitized
-    // (CodeQL js/incomplete-sanitization): single .replace() leaves later
-    // occurrences as literal '*' which won't match real filenames.
-    const scorecardFile = join(scorecardDirAbs, scorecardPattern.replaceAll('*', String(id)));
-    const hasScorecard = existsSync(scorecardFile);
+  if (shipped.size > 0) {
+    for (const id of [...shipped].sort((a, b) => b - a)) {
+      const status = statusById.get(id);
+      // Replace EVERY '*' so patterns with multiple wildcards are sanitized
+      // (CodeQL js/incomplete-sanitization): single .replace() leaves later
+      // occurrences as literal '*' which won't match real filenames.
+      const scorecardFile = join(scorecardDirAbs, scorecardPattern.replaceAll('*', String(id)));
+      const hasScorecard = existsSync(scorecardFile);
 
-    const issues: string[] = [];
-    if (status !== 'complete') issues.push(`status="${status ?? 'unset'}"`);
-    if (!hasScorecard) issues.push('no scorecard');
+      const issues: string[] = [];
+      if (status !== 'complete') issues.push(`status="${status ?? 'unset'}"`);
+      if (!hasScorecard) issues.push('no scorecard');
 
-    if (issues.length > 0) drifts.push({ sprint: id, issues });
+      if (issues.length > 0) drifts.push({ sprint: id, issues });
+    }
   }
 
-  if (drifts.length === 0) return {};
+  const prReviewGaps = pendingPrReviews(cwd);
+  if (drifts.length === 0 && prReviewGaps.length === 0) return {};
 
+  const sections: string[] = [];
+  if (drifts.length > 0) sections.push(formatCloseoutDriftMessage(drifts));
+  if (prReviewGaps.length > 0) sections.push(formatPendingPrReviewMessage(prReviewGaps));
+
+  const message = sections.join('\n\n');
+
+  if (process.env.SLOPE_POST_HOLE_BLOCK === '1') {
+    return { decision: 'deny', blockReason: message };
+  }
+  return { context: message };
+}
+
+function formatCloseoutDriftMessage(drifts: Array<{ sprint: number; issues: string[] }>): string {
   const shown = drifts.slice(0, 5);
   const remainder = drifts.length - shown.length;
-
   const lines = [
     `SLOPE post-hole enforcement: ${drifts.length} shipped sprint${drifts.length === 1 ? '' : 's'} with incomplete close-out:`,
     '',
@@ -106,11 +121,25 @@ export async function postHoleEnforcementGuard(_input: HookInput, cwd: string): 
     '  - Validate scorecard: slope validate',
     '  - Roadmap status: edit docs/backlog/roadmap.json (or slope sprint complete)',
   );
+  return lines.join('\n');
+}
 
-  const message = lines.join('\n');
-
-  if (process.env.SLOPE_POST_HOLE_BLOCK === '1') {
-    return { decision: 'deny', blockReason: message };
-  }
-  return { context: message };
+function formatPendingPrReviewMessage(records: PrReviewRecord[]): string {
+  const shown = records.slice(0, 5);
+  const remainder = records.length - shown.length;
+  const lines = [
+    `SLOPE PR review enforcement: ${records.length} created PR${records.length === 1 ? '' : 's'} missing a \`slope pr review\` record:`,
+    '',
+    ...shown.map(record => {
+      const sprintArg = record.sprint ? ` --sprint=${record.sprint}` : '';
+      const sprintLabel = record.sprint ? ` (S${record.sprint})` : '';
+      return `  • PR #${record.pr}${sprintLabel}: slope pr review --pr=${record.pr}${sprintArg}`;
+    }),
+  ];
+  if (remainder > 0) lines.push(`  …and ${remainder} more`);
+  lines.push(
+    '',
+    'Run the review command before presenting the PR as ready to merge.',
+  );
+  return lines.join('\n');
 }

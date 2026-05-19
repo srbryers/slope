@@ -1,0 +1,114 @@
+{
+  "sprint_number": 100,
+  "player": "sebastianbryers",
+  "theme": "Review Closeout Guard Repair",
+  "par": 4,
+  "slope": 3,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-05-19",
+  "shots": [
+    {
+      "ticket_key": "S100-1",
+      "title": "Make review recommend prefer active sprint state over stale global Claude plans (#392)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Changed review recommendation context resolution so explicit --sprint and active sprint-state win before local or global Claude plan discovery."
+    },
+    {
+      "ticket_key": "S100-2",
+      "title": "Add review recommend explicit sprint/context regressions (#392)",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added regressions for active sprint-state overriding stale plans, explicit --sprint overriding stale plans, and local SLOPE context suppressing unrelated global plan fallback."
+    },
+    {
+      "ticket_key": "S100-3",
+      "title": "Record and enforce PR review completion in post-hole closeout (#390)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added .slope/pr-reviews.json state, made the PR creation guard record pending reviews, made slope pr review mark them reviewed, and extended post-hole enforcement to surface pending PR review records."
+    },
+    {
+      "ticket_key": "S100-4",
+      "title": "Teach shipped-sprint detection to recognize squash merges via sprint artifacts (#393)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Enhanced shipped-sprint detection to read docs/retros/sprint-N artifacts from git history while keeping S-prefixed subject parsing isolated from arbitrary file paths."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "wind",
+      "impact": "minor",
+      "description": "The first full test rerun overlapped with a build, causing a transient dist import failure in a CLI map test; rerunning sequentially passed."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Review recommendation is a workflow decision and should use active SLOPE state before generic plan discovery.",
+      "outcome": "Compiled review recommend now reports Sprint 100 instead of the stale Sprint 29 global Claude plan."
+    },
+    {
+      "type": "lessons",
+      "description": "A reminder hook is not enough for post-PR review discipline; the workflow needs durable pending/reviewed state.",
+      "outcome": "PR creation now records pending review state and post-hole enforcement surfaces unreviewed PRs."
+    },
+    {
+      "type": "lessons",
+      "description": "Shipped-sprint detection should inspect shipped artifacts without broadening S-token matching to arbitrary file paths.",
+      "outcome": "The validator recognizes squash commits that add sprint scorecards and avoids false positives from S-prefixed source filenames."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "Focused tests, typecheck, build, sequential full test suite, compiled CLI smokes, roadmap validation, and map check passed.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "A compact closeout reliability sprint with three related guard-state repairs.",
+    "advice_for_next_player": "When a command can fall back to external agent artifacts, test with stale artifacts present and active SLOPE state set.",
+    "what_surprised_you": "The shipped-sprint warning was not a roadmap problem; it was a detector blind spot for normal squash-merge subjects.",
+    "excited_about_next": "The Codex plugin work now has a cleaner guard/review base to package."
+  },
+  "bunker_locations": [
+    "Review recommendation must not let stale global Claude plans override active SLOPE sprint-state.",
+    "PR review enforcement needs a durable pending/reviewed record; reminders alone are easy for agents to skip.",
+    "Shipped-sprint git analysis must keep subject parsing separate from file path artifact parsing to avoid false S-token matches."
+  ],
+  "yardage_book_updates": [],
+  "course_management_notes": [
+    "Validation used pnpm vitest run tests/cli/review-findings.test.ts tests/core/analyzers/git.test.ts tests/cli/pr-review-state.test.ts tests/cli/guards/pr-review.test.ts tests/cli/guards/post-hole-enforcement.test.ts tests/cli/pr-finalize.test.ts.",
+    "Additional validation used pnpm typecheck, pnpm build, sequential pnpm test, node dist/cli/index.js review recommend, node dist/cli/index.js roadmap validate, and slope map --check.",
+    "slope review recommend now chooses S100 from active sprint-state; node dist roadmap validation no longer emits false shipped-commit warnings for S94-S99."
+  ],
+  "slope_factors": [
+    "guard_runtime",
+    "workflow_state",
+    "git_history"
+  ]
+}

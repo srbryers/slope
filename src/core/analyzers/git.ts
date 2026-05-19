@@ -27,6 +27,28 @@ export function extractSprintReferences(commitSubjects: string[]): Set<number> {
   return result;
 }
 
+/** Extract sprint IDs from shipped sprint artifact paths in git log output.
+ *  This catches normal GitHub squash merges whose subject is PR-oriented
+ *  (`Fix thing (#123)`) while the commit itself adds `docs/retros/sprint-N.json`.
+ */
+export function extractSprintArtifactReferences(logLines: string[]): Set<number> {
+  const result = new Set<number>();
+  const re = /^docs\/retros\/sprint-(\d+)(?:\.json|-review\.md)$/i;
+  for (const line of logLines) {
+    const m = line.trim().match(re);
+    if (m) result.add(parseInt(m[1], 10));
+  }
+  return result;
+}
+
+function unionSets<T>(...sets: Set<T>[]): Set<T> {
+  const result = new Set<T>();
+  for (const set of sets) {
+    for (const value of set) result.add(value);
+  }
+  return result;
+}
+
 /**
  * Allowed characters in git refs (branch / tag / abbreviated SHA). Permissive
  * enough for the names users actually pick (alphanumerics, slash, dot, dash,
@@ -52,8 +74,14 @@ export function findShippedSprintsOnMain(cwd: string, ref?: string): Set<number>
     // Cap at 1000 commits — plenty for sprint references (a project would
     // need to ship hundreds of sprints to exhaust this) and avoids slowing
     // session-end Stop hooks on deep-history repos.
-    const log = git(`log ${r} --oneline --no-decorate -n 1000`, cwd);
-    if (log) return extractSprintReferences(log.split('\n'));
+    const subjects = git(`log ${r} --format=%s -n 1000`, cwd);
+    const files = git(`log ${r} --name-only --format= -n 1000`, cwd);
+    if (subjects || files) {
+      return unionSets(
+        extractSprintReferences(subjects ? subjects.split('\n') : []),
+        extractSprintArtifactReferences(files ? files.split('\n') : []),
+      );
+    }
   }
   return new Set();
 }

@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { detectLatestSprint, loadConfig, normalizeScorecard, recommendReviews } from '../../core/index.js';
 import type { ReviewRecommendation } from '../../core/index.js';
 import { reviewRunCommand } from './review-run.js';
+import { recordPrReviewComplete } from '../pr-review-state.js';
 
 /**
  * `slope pr ...` — agent-friendly PR helpers.
@@ -123,6 +124,11 @@ function git(cmd: string): string {
   } catch {
     return '';
   }
+}
+
+function currentBranch(): string | undefined {
+  const branch = git('branch --show-current');
+  return branch || undefined;
 }
 
 function inferSprintNumber(explicit?: number): number | undefined {
@@ -391,6 +397,12 @@ async function reviewSubcommand(args: string[]): Promise<void> {
   if (opts.json) {
     reviewArgs.push('--json');
     await reviewRunCommand(reviewArgs);
+    recordPrReviewComplete(process.cwd(), {
+      pr: plan.pr,
+      sprint: plan.sprint,
+      branch: currentBranch(),
+      reviewType: plan.reviewType,
+    });
     return;
   }
 
@@ -403,6 +415,12 @@ async function reviewSubcommand(args: string[]): Promise<void> {
   console.log('\nReview prompts:\n');
 
   await reviewRunCommand(reviewArgs);
+  recordPrReviewComplete(process.cwd(), {
+    pr: plan.pr,
+    sprint: plan.sprint,
+    branch: currentBranch(),
+    reviewType: plan.reviewType,
+  });
 }
 
 async function issuesSubcommand(args: string[]): Promise<void> {

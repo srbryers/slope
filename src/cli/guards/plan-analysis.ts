@@ -8,6 +8,11 @@ export interface PlanFile {
   content: string;
 }
 
+export interface FindPlanContentOptions {
+  includeRepoLocal?: boolean;
+  includeGlobal?: boolean;
+}
+
 /** Extracted ticket info for specialist selection */
 export interface TicketInfo {
   title: string;
@@ -19,15 +24,17 @@ export interface TicketInfo {
  * Searches repo-local first ({cwd}/.claude/plans/), then falls back
  * to global (~/.claude/plans/) since Claude Code writes plans there.
  */
-export function findPlanContent(cwd: string): PlanFile | null {
+export function findPlanContent(cwd: string, options: FindPlanContentOptions = {}): PlanFile | null {
   const repoLocal = join(cwd, '.claude', 'plans');
   const global = join(homedir(), '.claude', 'plans');
+  const includeRepoLocal = options.includeRepoLocal ?? true;
+  const includeGlobal = options.includeGlobal ?? true;
 
   // Deduplicate when cwd is the home directory
   const searchDirs: Array<{ dir: string; relative: boolean }> = [
-    { dir: repoLocal, relative: true },
+    ...(includeRepoLocal ? [{ dir: repoLocal, relative: true }] : []),
   ];
-  if (global.replace(/\\/g, '/') !== repoLocal.replace(/\\/g, '/')) {
+  if (includeGlobal && global.replace(/\\/g, '/') !== repoLocal.replace(/\\/g, '/')) {
     searchDirs.push({ dir: global, relative: false });
   }
 
