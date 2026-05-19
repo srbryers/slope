@@ -1,0 +1,107 @@
+{
+  "sprint_number": 99,
+  "player": "sebastianbryers",
+  "theme": "Session State Source-of-Truth Repair",
+  "par": 4,
+  "slope": 3,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-05-19",
+  "shots": [
+    {
+      "ticket_key": "S99-1",
+      "title": "Make sprint-state the active sprint source for status and briefing (#389)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added active sprint-state precedence to sprint inference so status, briefing, claim defaults, and other inferred sprint commands agree with .slope/sprint-state.json."
+    },
+    {
+      "ticket_key": "S99-2",
+      "title": "Promote adhoc session mode to sprint when a sprint starts mid-session (#387/#388)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added session-mode synchronization that promotes an adhoc-pinned session to sprint mode whenever active sprint-state appears."
+    },
+    {
+      "ticket_key": "S99-3",
+      "title": "Keep workflow guard suppression aligned with live sprint state (#387)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Routed adhoc guard suppression through live sprint-state synchronization so workflow guards no longer stay suppressed after mid-session sprint start."
+    },
+    {
+      "ticket_key": "S99-4",
+      "title": "Add fresh-session and worktree regressions for sprint status/session mode drift (#387/#388/#389)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added focused tests for sprint inference, slope status, guard suppression, and session-briefing dedup after sprint-state appears."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "wind",
+      "impact": "minor",
+      "description": "slope review recommend still selected a stale Sprint 29 plan, so PR review routing should use the concrete PR review command for this sprint."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Session mode is derived state; active sprint-state must be allowed to repair stale adhoc pins.",
+      "outcome": "isAdhocSession now synchronizes with live sprint-state before suppressing sprint-workflow guards."
+    },
+    {
+      "type": "lessons",
+      "description": "Sprint inference should prefer the explicit sprint-state file over stale config or copied worktree database state.",
+      "outcome": "inferSprintContext now returns source=sprint-state for active sprint-state and ignores completed sprint-state as stale."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "Focused regressions, typecheck, build, compiled CLI smokes, full test suite, roadmap validation, and map check passed.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "A compact repair with a clear source-of-truth boundary.",
+    "advice_for_next_player": "When a guard suppresses based on session-local state, test the path where the underlying sprint state changes after the session has already started.",
+    "what_surprised_you": "The narrow status fix was not enough; the shared sprint inference path needed the same precedence so briefing and claim defaults stay aligned.",
+    "excited_about_next": "The guard workflow is in better shape for the upcoming /review-pr enforcement work."
+  },
+  "bunker_locations": [
+    "Derived session_mode can drift from .slope/sprint-state.json unless guard suppression checks resynchronize before deciding.",
+    "Commands that infer a sprint from config/roadmap/scorecards must treat active sprint-state as the current local source of truth."
+  ],
+  "yardage_book_updates": [],
+  "course_management_notes": [
+    "Validation used pnpm vitest run tests/cli/sprint-inference.test.ts tests/cli/commands/status.test.ts tests/cli/commands/guard.test.ts tests/cli/guards/session-briefing.test.ts tests/cli/sprint-workflow.test.ts.",
+    "Additional validation used pnpm typecheck, pnpm build, compiled CLI smokes for status/session-mode, pnpm test, slope roadmap validate, and slope map --check.",
+    "Issue #388 is a duplicate symptom of #387 and should be closed by the same PR."
+  ],
+  "slope_factors": [
+    "guard_runtime",
+    "workflow_state"
+  ]
+}
