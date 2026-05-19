@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
+import { isActiveSprintState, loadSprintState } from './sprint-state.js';
 
 const SESSION_STATE_FILE = '.slope/.session-state.json';
 
@@ -67,8 +68,29 @@ export function setSessionMode(cwd: string, sessionId: string, mode: SessionMode
  *  Returns false if mode is 'sprint', unset, or set by a different session. */
 export function isAdhocSession(cwd: string, sessionId: string): boolean {
   if (!sessionId) return false;
+  const mode = syncSessionModeWithSprintState(cwd, sessionId);
+  return mode === 'adhoc';
+}
+
+/** Keep pinned session mode aligned with live sprint-state.
+ *  If a sprint starts after a session was pinned adhoc, promote the session
+ *  back to sprint mode so sprint-workflow guards do not stay suppressed. */
+export function syncSessionModeWithSprintState(cwd: string, sessionId: string): SessionMode | null {
+  if (!sessionId) return null;
   const state = loadSessionState(cwd);
-  return state.session_mode === 'adhoc' && state.session_mode_id === sessionId;
+  const sprintState = loadSprintState(cwd);
+
+  if (isActiveSprintState(sprintState)) {
+    if (state.session_mode !== 'sprint' || state.session_mode_id !== sessionId) {
+      state.session_mode = 'sprint';
+      state.session_mode_id = sessionId;
+      saveSessionState(cwd, state);
+    }
+    return 'sprint';
+  }
+
+  if (state.session_mode_id !== sessionId) return null;
+  return state.session_mode ?? null;
 }
 
 // ── Context dedup ───────────────────────────────────

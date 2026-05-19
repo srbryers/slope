@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import type { HookInput, GuardResult, Suggestion } from '../../core/index.js';
 import { loadConfig, parseRoadmap, formatStrategicContext } from '../../core/index.js';
 import { loadSprintState } from '../sprint-state.js';
-import { loadSessionState, updateSessionState, setSessionMode } from '../session-state.js';
+import { loadSessionState, updateSessionState, setSessionMode, syncSessionModeWithSprintState } from '../session-state.js';
 
 /**
  * Session-briefing guard: fires PostToolUse on all tools.
@@ -16,7 +16,10 @@ export async function sessionBriefingGuard(input: HookInput, cwd: string): Promi
 
   // Dedup: only fire once per session
   const sessionState = loadSessionState(cwd);
-  if (sessionState.briefing_session_id === sessionId) return {};
+  if (sessionState.briefing_session_id === sessionId) {
+    syncSessionModeWithSprintState(cwd, sessionId);
+    return {};
+  }
 
   // Mark as briefed (atomic write)
   updateSessionState(cwd, 'briefing_session_id', sessionId);

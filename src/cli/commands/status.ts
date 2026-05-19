@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { loadConfig } from '../config.js';
 import { inferSprintContext } from '../sprint-inference.js';
 import { resolveStore } from '../store.js';
+import { isActiveSprintState, loadSprintState } from '../sprint-state.js';
 
 function parseArgs(args: string[]): Record<string, string> {
   const result: Record<string, string> = {};
@@ -17,6 +18,8 @@ function parseArgs(args: string[]): Record<string, string> {
 
 function resolveSprint(flags: Record<string, string>, cwd: string): number {
   if (flags.sprint) return parseInt(flags.sprint, 10);
+  const sprintState = loadSprintState(cwd);
+  if (isActiveSprintState(sprintState)) return sprintState.sprint;
   const config = loadConfig(cwd);
   return inferSprintContext(cwd, config).sprint;
 }

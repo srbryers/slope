@@ -57,6 +57,11 @@ export function loadSprintState(cwd: string): SprintState | null {
   }
 }
 
+/** True when sprint-state represents an active workflow sprint. */
+export function isActiveSprintState(state: SprintState | null): state is SprintState {
+  return Boolean(state && state.phase !== 'complete');
+}
+
 /** Save sprint state atomically via tmp + rename. */
 export function saveSprintState(cwd: string, state: SprintState): void {
   const dir = join(cwd, '.slope');
