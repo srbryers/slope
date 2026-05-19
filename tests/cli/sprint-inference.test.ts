@@ -1,0 +1,42 @@
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { inferSprintContext } from '../../src/cli/sprint-inference.js';
+import { createSprintState, saveSprintState } from '../../src/cli/sprint-state.js';
+
+let tmpDir: string;
+
+beforeEach(() => {
+  tmpDir = mkdtempSync(join(tmpdir(), 'slope-sprint-inference-'));
+  mkdirSync(join(tmpDir, '.slope'), { recursive: true });
+  writeFileSync(join(tmpDir, '.slope', 'config.json'), JSON.stringify({
+    currentSprint: 18,
+    scorecardDir: 'docs/retros',
+    scorecardPattern: 'sprint-*.json',
+  }));
+});
+
+afterEach(() => {
+  rmSync(tmpDir, { recursive: true, force: true });
+});
+
+describe('inferSprintContext', () => {
+  it('prefers active sprint-state over stale config currentSprint', () => {
+    saveSprintState(tmpDir, createSprintState(74, 'planning'));
+
+    const context = inferSprintContext(tmpDir);
+
+    expect(context.sprint).toBe(74);
+    expect(context.source).toBe('sprint-state');
+  });
+
+  it('ignores completed sprint-state when inferring current work', () => {
+    saveSprintState(tmpDir, createSprintState(74, 'complete'));
+
+    const context = inferSprintContext(tmpDir);
+
+    expect(context.sprint).toBe(18);
+    expect(context.source).toBe('config');
+  });
+});

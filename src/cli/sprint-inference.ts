@@ -13,11 +13,12 @@ import {
 } from '../core/index.js';
 import type { RoadmapDefinition, RoadmapSprint, SlopeConfig } from '../core/index.js';
 import { loadConfig } from './config.js';
+import { isActiveSprintState, loadSprintState } from './sprint-state.js';
 
 export interface InferredSprintContext {
   sprint: number;
   label: string;
-  source: 'config' | 'roadmap' | 'scorecards' | 'initial';
+  source: 'sprint-state' | 'config' | 'roadmap' | 'scorecards' | 'initial';
   latestScorecard: number;
   roadmapSprint?: RoadmapSprint;
 }
@@ -36,6 +37,16 @@ export function loadRoadmapForInference(cwd: string, config: SlopeConfig): Roadm
 
 export function inferSprintContext(cwd: string = process.cwd(), config: SlopeConfig = loadConfig(cwd)): InferredSprintContext {
   const latestScorecard = detectLatestSprint(config, cwd);
+  const sprintState = loadSprintState(cwd);
+  if (isActiveSprintState(sprintState)) {
+    return {
+      sprint: sprintState.sprint,
+      label: formatSprintLabel(sprintState.sprint),
+      source: 'sprint-state',
+      latestScorecard,
+    };
+  }
+
   if (config.currentSprint) {
     return {
       sprint: config.currentSprint,
