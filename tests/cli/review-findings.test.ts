@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { loadFindings } from '../../src/cli/commands/review-state.js';
 import type { FindingsFile } from '../../src/cli/commands/review-state.js';
+import { createSprintState, saveSprintState } from '../../src/cli/sprint-state.js';
 
 let tmpDir: string;
 let origCwd: typeof process.cwd;
@@ -26,6 +27,29 @@ afterEach(() => {
 async function runCommand(args: string[]) {
   const { reviewStateCommand } = await import('../../src/cli/commands/review-state.js');
   return reviewStateCommand(args);
+}
+
+function writeRoadmap(sprints: Array<{ id: number; slope: number; tickets: string[] }>): void {
+  const dir = join(tmpDir, 'docs', 'backlog');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'roadmap.json'), JSON.stringify({
+    name: 'Test Roadmap',
+    phases: [],
+    sprints: sprints.map(sprint => ({
+      id: sprint.id,
+      theme: `Sprint ${sprint.id}`,
+      par: 4,
+      slope: sprint.slope,
+      type: 'bug fix',
+      status: 'planned',
+      tickets: sprint.tickets.map((title, index) => ({
+        key: `S${sprint.id}-${index + 1}`,
+        title,
+        club: 'wedge',
+        complexity: 'small',
+      })),
+    })),
+  }, null, 2));
 }
 
 // --- loadFindings ---
@@ -135,7 +159,56 @@ describe('review recommend', () => {
     expect(logged).toContain('required');
   });
 
+  it('prefers active sprint-state over a stale plan file', async () => {
+    writeRoadmap([
+      { id: 74, slope: 3, tickets: ['Current source of truth', 'Guard repair', 'Regression coverage'] },
+    ]);
+    saveSprintState(tmpDir, createSprintState(74, 'implementing'));
+
+    const plansDir = join(tmpDir, '.claude', 'plans');
+    mkdirSync(plansDir, { recursive: true });
+    writeFileSync(join(plansDir, 'stale-sprint-29.md'), [
+      '# Sprint 29 — Stale Global-ish Plan',
+      '**Slope:** 1',
+      '### S29-1: Old UI',
+      '`src/ui/old.ts`',
+    ].join('\n'));
+
+    const spy = vi.spyOn(console, 'log');
+    await runCommand(['recommend']);
+    const logged = spy.mock.calls.map(c => c[0]).join('\n');
+    spy.mockRestore();
+
+    expect(logged).toContain('Recommended reviews for Sprint 74 (3 tickets, slope 3)');
+    expect(logged).not.toContain('Sprint 29');
+  });
+
+  it('honors explicit --sprint over a stale plan file', async () => {
+    writeRoadmap([
+      { id: 88, slope: 2, tickets: ['Explicit review target', 'Second ticket'] },
+    ]);
+
+    const plansDir = join(tmpDir, '.claude', 'plans');
+    mkdirSync(plansDir, { recursive: true });
+    writeFileSync(join(plansDir, 'stale-sprint-29.md'), [
+      '# Sprint 29 — Stale Plan',
+      '**Slope:** 5',
+      '### S29-1: Old work',
+    ].join('\n'));
+
+    const spy = vi.spyOn(console, 'log');
+    await runCommand(['recommend', '--sprint=88']);
+    const logged = spy.mock.calls.map(c => c[0]).join('\n');
+    spy.mockRestore();
+
+    expect(logged).toContain('Recommended reviews for Sprint 88 (2 tickets, slope 2)');
+    expect(logged).not.toContain('Sprint 29');
+  });
+
   it('outputs no recommendations when no plan', async () => {
+    mkdirSync(join(tmpDir, '.slope'), { recursive: true });
+    writeFileSync(join(tmpDir, '.slope/config.json'), JSON.stringify({ scorecardDir: 'docs/retros' }));
+
     const spy = vi.spyOn(console, 'log');
     await runCommand(['recommend']);
     const logged = spy.mock.calls.map(c => c[0]).join('\n');

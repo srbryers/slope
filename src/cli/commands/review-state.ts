@@ -7,7 +7,10 @@ import { createDeferred, listDeferred, resolveDeferred } from '../../core/deferr
 import type { DeferredSeverity } from '../../core/deferred.js';
 import { HAZARD_SEVERITY_PENALTIES } from '../../core/constants.js';
 import type { GolfScorecard } from '../../core/types.js';
+import type { RoadmapSprint, SlopeConfig } from '../../core/index.js';
 import { findPlanContent, countTickets, countPackageRefs } from '../guards/plan-analysis.js';
+import { inferSprintContext, loadRoadmapForInference } from '../sprint-inference.js';
+import { isActiveSprintState, loadSprintState } from '../sprint-state.js';
 
 export interface ReviewState {
   rounds_required: number;
@@ -186,50 +189,147 @@ function saveFindings(cwd: string, data: FindingsFile): void {
 
 // --- Review Recommend ---
 
-function recommendCommand(cwd: string): void {
-  const plan = findPlanContent(cwd);
-  let ticketCount = 0;
-  let slope = 0;
-  let filePatterns: string[] = [];
-  let sprintNumber = 0;
-  let hasNewInfra = false;
+interface ReviewRecommendationContext {
+  ticketCount: number;
+  slope: number;
+  filePatterns: string[];
+  sprintNumber: number;
+  hasNewInfra: boolean;
+}
 
-  if (plan) {
-    ticketCount = countTickets(plan.content);
-    // Extract slope from plan content
-    const slopeMatch = plan.content.match(/\*\*Slope:\*\*\s*(\d+)/);
-    if (slopeMatch) slope = parseInt(slopeMatch[1], 10);
-    // Extract sprint number
-    const sprintMatch = plan.content.match(/Sprint\s+(\d+)/);
-    if (sprintMatch) sprintNumber = parseInt(sprintMatch[1], 10);
-    // Extract file patterns from "Files to modify" sections
-    const fileMatches = plan.content.matchAll(/`([^`]+\.[a-z]+)`/g);
-    for (const m of fileMatches) filePatterns.push(m[1]);
-    // Check for new infrastructure keywords
-    hasNewInfra = /\b(new module|new package|new service|new infrastructure)\b/i.test(plan.content);
-  } else {
-    // Fallback: read current sprint's scorecard for ticket count and slope
+function parseSprintArg(args: string[]): number | null {
+  const sprintArg = args.find(a => a.startsWith('--sprint='));
+  if (!sprintArg) return null;
+  const value = parseInt(sprintArg.slice('--sprint='.length), 10);
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+function hasLocalSlopeContext(cwd: string, config: SlopeConfig): boolean {
+  return existsSync(join(cwd, '.slope', 'config.json'))
+    || existsSync(join(cwd, '.slope', 'sprint-state.json'))
+    || existsSync(join(cwd, config.roadmapPath))
+    || existsSync(join(cwd, config.scorecardDir));
+}
+
+function collectStringValues(value: unknown, out: string[] = []): string[] {
+  if (typeof value === 'string') {
+    out.push(value);
+  } else if (Array.isArray(value)) {
+    for (const item of value) collectStringValues(item, out);
+  } else if (value && typeof value === 'object') {
+    for (const item of Object.values(value)) collectStringValues(item, out);
+  }
+  return out;
+}
+
+function recommendationFromPlan(content: string): ReviewRecommendationContext {
+  const filePatterns: string[] = [];
+  const slopeMatch = content.match(/\*\*Slope:\*\*\s*(\d+)/);
+  const sprintMatch = content.match(/Sprint\s+(\d+)/);
+  const fileMatches = content.matchAll(/`([^`]+\.[a-z]+)`/g);
+  for (const m of fileMatches) filePatterns.push(m[1]);
+
+  return {
+    ticketCount: countTickets(content),
+    slope: slopeMatch ? parseInt(slopeMatch[1], 10) : 0,
+    sprintNumber: sprintMatch ? parseInt(sprintMatch[1], 10) : 0,
+    filePatterns,
+    hasNewInfra: /\b(new module|new package|new service|new infrastructure)\b/i.test(content),
+  };
+}
+
+function recommendationFromRoadmapSprint(sprint: RoadmapSprint): ReviewRecommendationContext {
+  const stringValues = collectStringValues(sprint);
+  const filePatterns = stringValues.filter(value => /[/.]/.test(value));
+  return {
+    ticketCount: sprint.tickets?.length ?? 0,
+    slope: sprint.slope ?? 0,
+    sprintNumber: sprint.id,
+    filePatterns,
+    hasNewInfra: /\b(new module|new package|new service|new infrastructure)\b/i.test(stringValues.join('\n')),
+  };
+}
+
+function recommendationFromScorecard(card: GolfScorecard): ReviewRecommendationContext {
+  const stringValues = collectStringValues(card);
+  return {
+    ticketCount: card.shots?.length ?? 0,
+    slope: card.slope ?? 0,
+    sprintNumber: card.sprint_number,
+    filePatterns: stringValues.filter(value => /[/.]/.test(value)),
+    hasNewInfra: /\b(new module|new package|new service|new infrastructure)\b/i.test(stringValues.join('\n')),
+  };
+}
+
+function recommendationFromSprint(cwd: string, config: SlopeConfig, sprintNumber: number): ReviewRecommendationContext | null {
+  const roadmap = loadRoadmapForInference(cwd, config);
+  const roadmapSprint = roadmap?.sprints.find(sprint => sprint.id === sprintNumber);
+  if (roadmapSprint) return recommendationFromRoadmapSprint(roadmapSprint);
+
+  const scorecardPath = join(cwd, config.scorecardDir, `sprint-${sprintNumber}.json`);
+  if (existsSync(scorecardPath)) {
     try {
-      const config = loadConfig(cwd);
-      sprintNumber = config.currentSprint ?? detectLatestSprint(config, cwd);
-      const scorecardPath = join(cwd, config.scorecardDir, `sprint-${sprintNumber}.json`);
-      if (existsSync(scorecardPath)) {
-        const card = normalizeScorecard(JSON.parse(readFileSync(scorecardPath, 'utf8')));
-        ticketCount = card.shots?.length ?? 0;
-        slope = card.slope ?? 0;
-      }
-    } catch { /* no config or scorecard */ }
+      const card = normalizeScorecard(JSON.parse(readFileSync(scorecardPath, 'utf8')));
+      return recommendationFromScorecard(card);
+    } catch { /* malformed scorecard: fall through */ }
   }
 
-  const recs = recommendReviews({
-    ticketCount,
-    slope,
-    filePatterns,
-    hasNewInfra,
-  });
+  return null;
+}
 
-  const sprintLabel = sprintNumber > 0 ? ` for Sprint ${sprintNumber}` : '';
-  console.log(`Recommended reviews${sprintLabel} (${ticketCount} ticket${ticketCount !== 1 ? 's' : ''}, slope ${slope}):\n`);
+function inferRecommendationContext(args: string[], cwd: string): ReviewRecommendationContext {
+  const config = loadConfig(cwd);
+  const explicitSprint = parseSprintArg(args);
+  if (explicitSprint) {
+    return recommendationFromSprint(cwd, config, explicitSprint) ?? {
+      ticketCount: 0,
+      slope: 0,
+      filePatterns: [],
+      sprintNumber: explicitSprint,
+      hasNewInfra: false,
+    };
+  }
+
+  const sprintState = loadSprintState(cwd);
+  if (isActiveSprintState(sprintState)) {
+    const context = recommendationFromSprint(cwd, config, sprintState.sprint);
+    if (context) return context;
+  }
+
+  const localPlan = findPlanContent(cwd, { includeGlobal: false });
+  if (localPlan) return recommendationFromPlan(localPlan.content);
+
+  if (hasLocalSlopeContext(cwd, config)) {
+    const inferred = inferSprintContext(cwd, config);
+    const context = recommendationFromSprint(cwd, config, inferred.sprint);
+    if (context) return context;
+    return {
+      ticketCount: 0,
+      slope: 0,
+      filePatterns: [],
+      sprintNumber: inferred.sprint,
+      hasNewInfra: false,
+    };
+  }
+
+  const globalPlan = findPlanContent(cwd, { includeRepoLocal: false, includeGlobal: true });
+  if (globalPlan) return recommendationFromPlan(globalPlan.content);
+
+  return {
+    ticketCount: 0,
+    slope: 0,
+    filePatterns: [],
+    sprintNumber: 0,
+    hasNewInfra: false,
+  };
+}
+
+function recommendCommand(args: string[], cwd: string): void {
+  const context = inferRecommendationContext(args, cwd);
+  const recs = recommendReviews(context);
+
+  const sprintLabel = context.sprintNumber > 0 ? ` for Sprint ${context.sprintNumber}` : '';
+  console.log(`Recommended reviews${sprintLabel} (${context.ticketCount} ticket${context.ticketCount !== 1 ? 's' : ''}, slope ${context.slope}):\n`);
   console.log('  Type           Priority      Reason');
   for (const rec of recs) {
     const type = rec.review_type.padEnd(14);
@@ -525,10 +625,11 @@ Clear any active review state. Use when a plan has been replaced or you
 want to restart the review counter.`);
       break;
     case 'recommend':
-      console.log(`Usage: slope review recommend
+      console.log(`Usage: slope review recommend [--sprint=N]
 
 Suggest which implementation review types (architect/code/ml/security/
-ux) apply to the current sprint based on the diff and ticket metadata.`);
+ux) apply to the current sprint based on active sprint state, roadmap,
+scorecard, or plan metadata.`);
       break;
     case 'findings':
       console.log(`Usage: slope review findings <add|list|clear> [options]
@@ -614,7 +715,7 @@ export async function reviewStateCommand(args: string[]): Promise<void> {
       resetCommand(cwd);
       break;
     case 'recommend':
-      recommendCommand(cwd);
+      recommendCommand(args.slice(1), cwd);
       break;
     case 'findings':
       findingsCommand(args.slice(1), cwd);
