@@ -10,14 +10,16 @@ function git(cmd: string, cwd: string): string {
   }
 }
 
-/** Extract sprint IDs referenced in commit subjects.
+/** Extract shipped sprint IDs referenced in commit subjects.
  *  Matches `S\d+` not followed by another digit or a dot — so `S75.5` does
  *  NOT count as a reference to S75, and `S70+S71` correctly yields {70, 71}.
+ *  Ticket zero (`S101-0`) is reserved for sprint scoping/planning commits and
+ *  does not mean implementation for that sprint has shipped.
  *  Pure function — separated from git I/O for testability.
  */
 export function extractSprintReferences(commitSubjects: string[]): Set<number> {
   const result = new Set<number>();
-  const re = /\bS(\d+)(?![\d.])/g;
+  const re = /\bS(\d+)(?!(?:[\d.]|-0\b))/g;
   for (const line of commitSubjects) {
     let m: RegExpExecArray | null;
     while ((m = re.exec(line)) !== null) {

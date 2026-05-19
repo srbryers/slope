@@ -129,6 +129,14 @@ describe('extractSprintReferences', () => {
     expect(extractSprintReferences(['feat(S78-1): wire forceApi flag'])).toEqual(new Set([78]));
   });
 
+  it('does not treat ticket-zero scoping commits as shipped sprint refs', () => {
+    expect(extractSprintReferences(['docs(S101-0): scope guard utilization sprint'])).toEqual(new Set());
+  });
+
+  it('still treats nonzero ticket commits as shipped sprint refs', () => {
+    expect(extractSprintReferences(['fix(S101-2): normalize apply_patch paths'])).toEqual(new Set([101]));
+  });
+
   it('does not match S75 inside S75.5', () => {
     expect(extractSprintReferences(['feat(S75.5): The Bug Clearing'])).toEqual(new Set());
   });
@@ -202,6 +210,13 @@ describe('findShippedSprintsOnMain', () => {
     );
 
     expect(findShippedSprintsOnMain(tmpDir, 'HEAD')).toEqual(new Set([99]));
+  });
+
+  it('does not mark sprint scoping commits as shipped work', () => {
+    gitInit(tmpDir);
+    gitCommit(tmpDir, 'docs(S101-0): scope guard utilization sprint');
+
+    expect(findShippedSprintsOnMain(tmpDir, 'HEAD')).toEqual(new Set());
   });
 
   it('does not treat arbitrary S-prefixed file paths as shipped sprint refs', () => {
