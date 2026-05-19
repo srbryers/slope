@@ -1701,6 +1701,57 @@
           "github_issue": 393
         }
       ]
+    },
+    {
+      "id": 101,
+      "theme": "Guard Utilization & Payload Diagnostics",
+      "par": 4,
+      "slope": 3,
+      "type": "bug fix + diagnostics",
+      "status": "planned",
+      "depends_on": [
+        100
+      ],
+      "note": "Fix the guard underutilization exposed in Codex: file-aware guards fire on apply_patch but cannot resolve touched paths, hazard guidance is underfed by sparse common-issues data, and guard metrics collapse different silent outcomes into one bucket.",
+      "tickets": [
+        {
+          "key": "S101-1",
+          "title": "Add Codex apply_patch regression coverage for file-aware guards (#396)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 396
+        },
+        {
+          "key": "S101-2",
+          "title": "Normalize touched paths from file_path/path/apply_patch payloads across edit-time guards (#396)",
+          "club": "long_iron",
+          "complexity": "multi-package",
+          "github_issue": 396,
+          "depends_on": [
+            "S101-1"
+          ]
+        },
+        {
+          "key": "S101-3",
+          "title": "Feed hazard guard from scorecard hazard history when common issues are sparse (#397)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 397,
+          "depends_on": [
+            "S101-2"
+          ]
+        },
+        {
+          "key": "S101-4",
+          "title": "Record actionable silent reasons in guard metrics and diagnostics (#398)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 398,
+          "depends_on": [
+            "S101-2"
+          ]
+        }
+      ]
     }
   ]
 }
