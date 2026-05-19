@@ -1,6 +1,12 @@
 import { describe, it, expect } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { execSync } from 'node:child_process';
 import '../../../src/core/adapters/claude-code.js';
 import { prReviewGuard } from '../../../src/cli/guards/pr-review.js';
+import { loadPrReviewState } from '../../../src/cli/pr-review-state.js';
+import { createSprintState, saveSprintState } from '../../../src/cli/sprint-state.js';
 import { formatPostToolUseOutput } from '../../../src/core/index.js';
 import type { HookInput } from '../../../src/core/index.js';
 
@@ -84,5 +90,32 @@ describe('prReviewGuard', () => {
 
     const result = await prReviewGuard(input, '/tmp/test');
     expect(result.context).toContain('pull/7');
+  });
+
+  it('records a pending PR review when gh pr create succeeds in a sprint repo', async () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'slope-pr-review-guard-'));
+    try {
+      execSync('git init -q', { cwd });
+      execSync('git config user.email test@test', { cwd });
+      execSync('git config user.name test', { cwd });
+      saveSprintState(cwd, createSprintState(100, 'implementing'));
+
+      const input = makeInput(
+        'gh pr create --title "feat: test" --body "body"',
+        'https://github.com/owner/repo/pull/42',
+      );
+
+      await prReviewGuard(input, cwd);
+
+      const state = loadPrReviewState(cwd);
+      expect(state.reviews).toHaveLength(1);
+      expect(state.reviews[0]).toMatchObject({
+        pr: 42,
+        sprint: 100,
+        status: 'pending',
+      });
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
   });
 });

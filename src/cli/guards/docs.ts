@@ -106,9 +106,9 @@ export const GUARD_DOCS: Record<string, GuardDoc> = {
     level: 'full',
   },
   'pr-review': {
-    purpose: 'Prompts for the review workflow after PR creation. Ensures sprint review artifacts are created.',
+    purpose: 'Prompts for the review workflow after PR creation and records pending PR-review state.',
     triggers: 'PostToolUse on Bash. Fires after a shell command completes (checks for `gh pr create`).',
-    behavior: 'Advisory — if the command created a PR, injects a reminder to run `slope pr review --pr=<N>` and create review artifacts. For connector/API-created PRs where this Bash guard cannot fire, run the same command manually.',
+    behavior: 'Advisory — if the command created a PR, records it as pending in `.slope/pr-reviews.json` and injects a reminder to run `slope pr review --pr=<N>`. The post-hole guard surfaces pending records before the session ends.',
     configuration: 'Disable: add "pr-review" to guidance.disabled.',
     level: 'full',
   },

@@ -2,6 +2,8 @@ import { execSync } from 'node:child_process';
 import type { HookInput, GuardResult } from '../../core/index.js';
 import { recommendReviews } from '../../core/review.js';
 import type { ReviewRecommendation } from '../../core/index.js';
+import { recordPrReviewPending } from '../pr-review-state.js';
+import { isActiveSprintState, loadSprintState } from '../sprint-state.js';
 
 /**
  * PR review guard: fires PostToolUse on Bash.
@@ -28,6 +30,8 @@ export async function prReviewGuard(input: HookInput, cwd: string): Promise<Guar
   const prUrl = urlMatch[1];
   const prNumber = urlMatch[2];
 
+  recordPendingReview(cwd, parseInt(prNumber, 10));
+
   const recs = computeRecommendations(cwd);
   const recLine = formatRecommendations(recs);
 
@@ -40,6 +44,18 @@ export async function prReviewGuard(input: HookInput, cwd: string): Promise<Guar
       'Tip: also run `slope pr finalize` to add Closes #N for any issues referenced in commits.',
     ].join(' '),
   };
+}
+
+function recordPendingReview(cwd: string, pr: number): void {
+  try {
+    const state = loadSprintState(cwd);
+    const branch = execSync('git branch --show-current', { cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+    recordPrReviewPending(cwd, {
+      pr,
+      sprint: isActiveSprintState(state) ? state.sprint : undefined,
+      branch: branch || undefined,
+    });
+  } catch { /* review marker is best-effort; the reminder still fires */ }
 }
 
 /** Inspect the current branch's diff and call recommendReviews(). Best-effort
