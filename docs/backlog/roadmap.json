@@ -1596,6 +1596,59 @@
           ]
         }
       ]
+    },
+    {
+      "id": 99,
+      "theme": "Session State Source-of-Truth Repair",
+      "par": 4,
+      "slope": 3,
+      "type": "bug fix + dx",
+      "status": "planned",
+      "depends_on": [
+        98
+      ],
+      "note": "Fix the session-state split exposed by mid-session sprint starts: status commands, briefing, and workflow guards must agree on the active sprint and must not stay pinned in adhoc mode once a sprint is started.",
+      "tickets": [
+        {
+          "key": "S99-1",
+          "title": "Make sprint-state the active sprint source for status and briefing (#389)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 389
+        },
+        {
+          "key": "S99-2",
+          "title": "Promote adhoc session mode to sprint when a sprint starts mid-session (#387/#388)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 387,
+          "depends_on": [
+            "S99-1"
+          ]
+        },
+        {
+          "key": "S99-3",
+          "title": "Keep workflow guard suppression aligned with live sprint state (#387)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 387,
+          "depends_on": [
+            "S99-2"
+          ]
+        },
+        {
+          "key": "S99-4",
+          "title": "Add fresh-session and worktree regressions for sprint status/session mode drift (#387/#388/#389)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 387,
+          "depends_on": [
+            "S99-1",
+            "S99-2",
+            "S99-3"
+          ]
+        }
+      ]
     }
   ]
 }
