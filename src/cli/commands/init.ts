@@ -926,6 +926,41 @@ export function printInstallSummary(providers: InitProvider[]): void {
   console.log('');
 }
 
+export function printInitHelp(): void {
+  console.log(`
+Usage:
+  slope init [options]
+  slope init --interactive
+  slope init --harness=<id>
+  slope init [--claude-code|--cursor|--windsurf|--cline|--codex|--opencode|--ob1|--pi|--generic|--all]
+
+Options:
+  --help, -h              Show this help without writing files
+  --interactive, -i       Run guided setup wizard
+  --harness=<id>          Install templates/hooks for a specific harness
+  --claude-code           Install Claude Code rules, hooks, MCP config, and CLAUDE.md
+  --cursor                Install Cursor rules, hooks, MCP config, and .cursorrules
+  --windsurf              Install Windsurf rules, hooks, MCP config, and .windsurfrules
+  --cline                 Install Cline rules and guidance files
+  --codex                 Install Codex hooks and AGENTS.md guidance
+  --opencode              Install OpenCode AGENTS.md, MCP config, and plugin
+  --ob1                   Install OB1 MCP config and hooks
+  --pi                    Install Pi extension and skills
+  --generic               Install generic SLOPE checklist
+  --all                   Install all supported harness templates except generic
+  --team                  Enable multi-developer team mode
+  --with-example          Seed docs/retros/sprint-1.json with an example scorecard
+  --metaphor=<id>         Set metaphor theme, e.g. golf or gaming
+  --auto-install          Add @slope-dev/slope as a dev dependency when possible
+  --migrate               Upgrade an existing .slope/config.json in place
+
+Examples:
+  slope init --codex
+  slope init --claude-code --metaphor=golf
+  slope init --harness=cursor --with-example
+`);
+}
+
 async function runInteractiveInit(cwd: string, _args: string[]): Promise<void> {
   // Check for TTY — @clack/prompts requires an interactive terminal
   if (!process.stdin.isTTY) {
@@ -951,6 +986,13 @@ async function runInteractiveInit(cwd: string, _args: string[]): Promise<void> {
 
 export async function initCommand(args: string[]): Promise<void> {
   const cwd = process.cwd();
+
+  // Help must be read-only. Agents often probe commands with --help before
+  // running setup, so short-circuit before any init side effects. (GH #402)
+  if (args.includes('--help') || args.includes('-h')) {
+    printInitHelp();
+    return;
+  }
 
   // Interactive mode: prompt for project details, then exit
   // (do not fall through to non-interactive path which would overwrite the config)

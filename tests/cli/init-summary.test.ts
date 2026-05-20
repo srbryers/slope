@@ -10,6 +10,26 @@ let tmpDir: string;
 let originalCwd: string;
 let consoleSpy: ReturnType<typeof vi.spyOn>;
 
+const INIT_ARTIFACTS = [
+  '.slope',
+  '.claude',
+  '.cursor',
+  '.codex',
+  '.windsurf',
+  '.clinerules',
+  '.ob1',
+  '.pi',
+  '.agents',
+  'docs',
+  'AGENTS.md',
+  'CLAUDE.md',
+  '.mcp.json',
+  'opencode.json',
+  'CODEBASE.md',
+  'SLOPE-CHECKLIST.md',
+  '.gitignore',
+];
+
 beforeEach(() => {
   tmpDir = mkdtempSync(join(tmpdir(), 'slope-init-summary-'));
   originalCwd = process.cwd();
@@ -23,6 +43,12 @@ afterEach(() => {
   rmSync(tmpDir, { recursive: true, force: true });
   vi.restoreAllMocks();
 });
+
+function expectNoInitArtifacts(): void {
+  for (const artifact of INIT_ARTIFACTS) {
+    expect(existsSync(join(tmpDir, artifact)), artifact).toBe(false);
+  }
+}
 
 describe('printInstallSummary', () => {
   it('prints core files section', () => {
@@ -136,6 +162,31 @@ describe('printInstallSummary', () => {
 });
 
 describe('initCommand prints summary', () => {
+  it('prints help and does not write files for --help', async () => {
+    await initCommand(['--help']);
+
+    const output = consoleSpy.mock.calls.map(c => String(c[0])).join('\n');
+    expect(output).toContain('Usage:');
+    expect(output).toContain('slope init [options]');
+    expect(output).toContain('--claude-code');
+    expect(output).toContain('--codex');
+    expect(output).toContain('--all');
+    expect(output).toContain('--harness=<id>');
+    expect(output).toContain('--interactive');
+    expect(output).toContain('--with-example');
+    expect(output).toContain('--metaphor=<id>');
+    expectNoInitArtifacts();
+  });
+
+  it('prints help and does not write files for -h', async () => {
+    await initCommand(['-h']);
+
+    const output = consoleSpy.mock.calls.map(c => String(c[0])).join('\n');
+    expect(output).toContain('Usage:');
+    expect(output).toContain('--help, -h');
+    expectNoInitArtifacts();
+  });
+
   it('prints summary after --claude-code init', async () => {
     await initCommand(['--claude-code']);
 
