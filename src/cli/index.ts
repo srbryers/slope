@@ -50,7 +50,7 @@ import { mapCommand } from './commands/map.js';
 import { flowsCommand } from './commands/flows.js';
 import { workflowCommand } from './commands/workflow.js';
 import { inspirationsCommand } from './commands/inspirations.js';
-import { reviewStateCommand } from './commands/review-state.js';
+import { reviewStateCommand, shouldRouteToReviewState } from './commands/review-state.js';
 import { analyzeCommand } from './commands/analyze.js';
 import { visionCommand } from './commands/vision.js';
 import { transcriptCommand } from './commands/transcript.js';
@@ -131,8 +131,7 @@ switch (subcommand) {
     break;
   case 'review': {
     const reviewArgs = process.argv.slice(3);
-    const reviewSub = reviewArgs[0];
-    if (['start', 'round', 'status', 'reset', 'recommend', 'findings', 'amend', 'defer', 'deferred', 'resolve', 'run'].includes(reviewSub)) {
+    if (shouldRouteToReviewState(reviewArgs)) {
       reviewStateCommand(reviewArgs).catch(err => {
         console.error('Error:', err.message);
         process.exit(1);
