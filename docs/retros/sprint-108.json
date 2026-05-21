@@ -1,0 +1,75 @@
+{
+  "sprint_number": 108,
+  "player": "sebastianbryers",
+  "theme": "npm Publish Backfill Recovery",
+  "par": 3,
+  "slope": 1,
+  "score": 3,
+  "score_label": "par",
+  "date": "2026-05-21",
+  "shots": [
+    {
+      "ticket_key": "S108-1",
+      "title": "Add manual publish backfill path for failed npm release (#406)",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [],
+      "notes": "Added workflow_dispatch to the npm publish workflow so the repaired workflow on main can publish a historical tag such as v1.55.12, restricted the manual input to release tag refs, and updated the npm publishing guide with the exact backfill command."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 1,
+    "fairways_total": 1,
+    "greens_in_regulation": 1,
+    "greens_total": 1,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Rerunning a failed release workflow can reuse the workflow definition from the old tag commit.",
+      "outcome": "Backfill recovery now dispatches the repaired workflow from main while explicitly checking out the historical package ref."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "Validated publish.yml YAML parsing, diff whitespace, TypeScript typecheck, and required security review.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Small but important release plumbing: the repo fix needed a way to apply itself to the already-published GitHub release tag.",
+    "advice_for_next_player": "For failed publish recovery, check both the current workflow and the workflow that exists on the failed release tag before choosing rerun vs workflow_dispatch.",
+    "what_surprised_you": "The v1.55.12 tag still contains the old token-based publish workflow, so a plain rerun would not exercise the trusted-publishing repair.",
+    "excited_about_next": "Once npm trusted publishing is configured, v1.55.12 can be published without moving the release tag."
+  },
+  "bunker_locations": [
+    "Creating a GitHub Release from a stale commit runs the workflow version at that commit, not HEAD.",
+    "Backfilling a failed package publish may need workflow_dispatch from main with an explicit historical checkout ref."
+  ],
+  "yardage_book_updates": [],
+  "course_management_notes": [
+    "Validation used ruby YAML parsing for .github/workflows/publish.yml.",
+    "Validation used git diff --check HEAD~1..HEAD.",
+    "Validation used pnpm run typecheck.",
+    "Required security review tightened the manual publish input from arbitrary refs to release tag refs only.",
+    "npm still reports @slope-dev/slope latest as 1.55.11 until the trusted publisher is configured and the manual backfill workflow is dispatched for v1.55.12."
+  ],
+  "slope_factors": [
+    "release",
+    "github_actions",
+    "npm"
+  ]
+}
