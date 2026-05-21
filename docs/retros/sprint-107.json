@@ -1,0 +1,74 @@
+{
+  "sprint_number": 107,
+  "player": "sebastianbryers",
+  "theme": "Codex Plugin Packaging",
+  "par": 4,
+  "slope": 2,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-05-21",
+  "shots": [
+    {
+      "ticket_key": "S107-1",
+      "title": "Package SLOPE's Codex integration as a Codex plugin (#366)",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Upgraded the Codex bundle from a metadata stub into a named local plugin package with skills, MCP metadata, generated full guard hook metadata, local marketplace metadata, install/update behavior, version-bump alignment, docs, and init regression tests."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 1,
+    "fairways_total": 1,
+    "greens_in_regulation": 1,
+    "greens_total": 1,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Codex plugin packaging has two separate surfaces: stable marketplace plugins and under-development plugin_hooks.",
+      "outcome": "The SLOPE bundle now includes local marketplace metadata while keeping active guard enforcement on the stable hooks.json shim until plugin_hooks is enabled."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "Plugin JSON, hook JSON, MCP JSON, dispatcher shell syntax, typecheck, build, focused Codex tests, and full Vitest suite passed.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "A packaging sprint more than a runtime rewrite: most of the work was making the boundary explicit, updateable, and honest about Codex's current plugin-hook limits.",
+    "advice_for_next_player": "Keep active guard behavior on hooks.json until Codex reports plugin_hooks as stable; use marketplace metadata for plugin discovery and skills.",
+    "what_surprised_you": "The existing bundle already existed, but without marketplace metadata or generated full guard metadata it was closer to a placeholder than an installable plugin package.",
+    "excited_about_next": "Once plugin_hooks stabilizes, the same bundle can become the active hook runtime without moving SLOPE guard logic out of the CLI."
+  },
+  "bunker_locations": [
+    "Codex plugin packaging needs marketplace metadata under .agents/plugins/marketplace.json; a loose plugin folder is not enough for stable marketplace discovery.",
+    "Codex plugin_hooks is still under development and disabled in local codex-cli 0.130.0, so SLOPE guard enforcement must continue to use project or user hooks.json shims.",
+    "Version bumps must update templates/codex/plugins/slope/.codex-plugin/plugin.json so the packaged plugin does not drift from @slope-dev/slope."
+  ],
+  "yardage_book_updates": [],
+  "course_management_notes": [
+    "Validation used python3 -m json.tool on plugin.json, hooks.json, and .mcp.json plus bash -n on the plugin dispatcher.",
+    "Additional validation used pnpm run typecheck, pnpm run build, pnpm vitest run tests/cli/init-codex.test.ts tests/core/adapters/codex.test.ts tests/cli/commands/hook-codex.test.ts tests/cli/init-summary.test.ts, and pnpm test.",
+    "Local Codex CLI check used codex features list and confirmed plugins is stable while plugin_hooks remains under development and disabled."
+  ],
+  "slope_factors": [
+    "agent_dx",
+    "codex_plugin",
+    "architecture"
+  ]
+}
