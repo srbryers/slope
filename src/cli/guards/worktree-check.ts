@@ -116,7 +116,7 @@ export async function worktreeCheckGuard(input: HookInput, cwd: string): Promise
       // Do NOT write sentinel — denied sessions should re-check next invocation
       return {
         decision: 'deny',
-        blockReason: `BLOCKED: Another session is active in this directory:\n${sessionList}\n\nYou MUST use \`EnterWorktree\` to create an isolated working copy before proceeding. Do not attempt any other tool calls until you are in a worktree.`,
+        blockReason: `BLOCKED: Another session is active in this directory:\n${sessionList}\n\nYou MUST use \`EnterWorktree\` to create an isolated working copy before proceeding. If this harness does not expose EnterWorktree, run \`slope worktree start --branch=<branch> --role=secondary --ide=<ide>\` from the primary checkout. Do not attempt implementation work until you are in a worktree.`,
       };
     }
 

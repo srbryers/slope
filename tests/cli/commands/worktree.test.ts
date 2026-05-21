@@ -86,6 +86,28 @@ describe('slope worktree cleanup', () => {
   it('prints help for --help flag', async () => {
     await worktreeCommand(['--help']);
     expect(console.log).toHaveBeenCalledWith(expect.stringContaining('slope worktree'));
+    expect(console.log).toHaveBeenCalledWith(expect.stringContaining('start'));
     expect(console.log).toHaveBeenCalledWith(expect.stringContaining('cleanup'));
+  });
+
+  it('previews persistent worktree start with session and claim metadata', async () => {
+    mockExecSync
+      .mockReturnValueOnce('/repo' as any) // git rev-parse --show-toplevel
+      .mockReturnValueOnce('.git' as any) // git-common-dir
+      .mockReturnValueOnce('.git' as any); // git-dir
+
+    await worktreeCommand([
+      'start',
+      '--branch=codex/example',
+      '--base=HEAD',
+      '--role=secondary',
+      '--ide=codex',
+      '--target=423',
+      '--dry-run',
+    ]);
+
+    expect(console.log).toHaveBeenCalledWith(expect.stringContaining('git worktree add'));
+    expect(console.log).toHaveBeenCalledWith(expect.stringContaining('register session role=secondary ide=codex branch=codex/example'));
+    expect(console.log).toHaveBeenCalledWith(expect.stringContaining('claim 423 (ticket)'));
   });
 });
