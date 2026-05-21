@@ -128,6 +128,25 @@ function checkConfig(cwd: string, originalCwd = cwd): DoctorCheck {
   }
 }
 
+function readSlopeConfig(cwd: string): Record<string, unknown> | null {
+  const configPath = join(cwd, '.slope', 'config.json');
+  if (!existsSync(configPath)) return null;
+  try {
+    return JSON.parse(readFileSync(configPath, 'utf8')) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+function configuredPath(cwd: string, key: string, fallback: string): { configured: string; path: string } {
+  const config = readSlopeConfig(cwd);
+  const raw = config?.[key];
+  const configured = typeof raw === 'string' && raw.trim()
+    ? raw
+    : fallback;
+  return { configured, path: resolve(cwd, configured) };
+}
+
 function checkGitignore(cwd: string): DoctorCheck {
   const gitignorePath = join(cwd, '.gitignore');
   if (!existsSync(gitignorePath)) {
@@ -184,19 +203,19 @@ function checkGitignoreNoise(cwd: string): DoctorCheck[] {
 }
 
 function checkStore(cwd: string, originalCwd = cwd): DoctorCheck {
-  const dbPath = join(cwd, '.slope', 'slope.db');
+  const { configured, path: dbPath } = configuredPath(cwd, 'store_path', '.slope/slope.db');
   if (!existsSync(dbPath)) {
-    return { name: 'store', status: 'warn', message: '.slope/slope.db missing — sessions and events will not be tracked', fixable: true };
+    return { name: 'store', status: 'warn', message: `${configured} missing — sessions and events will not be tracked`, fixable: true };
   }
-  return { name: 'store', status: 'ok', message: `.slope/slope.db exists${stateNote(cwd, originalCwd)}` };
+  return { name: 'store', status: 'ok', message: `${configured} exists${stateNote(cwd, originalCwd)}` };
 }
 
 function checkCommonIssues(cwd: string, originalCwd = cwd): DoctorCheck {
-  const path = join(cwd, '.slope', 'common-issues.json');
+  const { configured, path } = configuredPath(cwd, 'commonIssuesPath', '.slope/common-issues.json');
   if (!existsSync(path)) {
-    return { name: 'common-issues', status: 'warn', message: '.slope/common-issues.json missing', fixable: true };
+    return { name: 'common-issues', status: 'warn', message: `${configured} missing`, fixable: true };
   }
-  return { name: 'common-issues', status: 'ok', message: `.slope/common-issues.json exists${stateNote(cwd, originalCwd)}` };
+  return { name: 'common-issues', status: 'ok', message: `${configured} exists${stateNote(cwd, originalCwd)}` };
 }
 
 function checkRetrosDir(cwd: string): DoctorCheck {
@@ -797,18 +816,20 @@ export async function runDoctorFixes(cwd: string, checks: DoctorCheck[]): Promis
       case 'store': {
         try {
           const { createStore } = await import('../../store/index.js');
-          const store = createStore({ storePath: '.slope/slope.db', cwd });
+          const { configured: storePath } = configuredPath(cwd, 'store_path', '.slope/slope.db');
+          const store = createStore({ storePath, cwd });
           store.close();
-          fixed.push('Created .slope/slope.db');
+          fixed.push(`Created ${storePath}`);
         } catch (err) {
           console.error(`  Could not create store: ${(err as Error).message}`);
         }
         break;
       }
       case 'common-issues': {
-        mkdirSync(join(cwd, '.slope'), { recursive: true });
-        writeFileSync(join(cwd, '.slope', 'common-issues.json'), JSON.stringify({ recurring_patterns: [] }, null, 2) + '\n');
-        fixed.push('Created .slope/common-issues.json');
+        const { configured, path } = configuredPath(cwd, 'commonIssuesPath', '.slope/common-issues.json');
+        mkdirSync(dirname(path), { recursive: true });
+        writeFileSync(path, JSON.stringify({ recurring_patterns: [] }, null, 2) + '\n');
+        fixed.push(`Created ${configured}`);
         break;
       }
       case 'retros-dir': {
