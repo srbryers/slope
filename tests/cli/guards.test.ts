@@ -45,6 +45,34 @@ function makeInput(overrides: Partial<HookInput> = {}): HookInput {
   };
 }
 
+function applyPatchCommand(path: string): string {
+  return [
+    '*** Begin Patch',
+    `*** Update File: ${path}`,
+    '@@',
+    '-old',
+    '+new',
+    '*** End Patch',
+  ].join('\n');
+}
+
+function writeSprintState(sprint: number): void {
+  mkdirSync(join(tmpDir, '.slope'), { recursive: true });
+  writeFileSync(join(tmpDir, '.slope/sprint-state.json'), JSON.stringify({
+    sprint,
+    phase: 'implementing',
+    gates: {
+      tests: false,
+      code_review: false,
+      architect_review: false,
+      scorecard: false,
+      review_md: false,
+    },
+    started_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }));
+}
+
 beforeEach(() => {
   tmpDir = mkdtempSync(join(tmpdir(), 'slope-guard-'));
   mockConfig.guidance = {};
@@ -142,6 +170,33 @@ describe('hazardGuard', () => {
     );
     expect(result.context).toContain('SLOPE hazards');
     expect(result.context).toContain('Migration conflict in core');
+  });
+
+  it('warns for Codex apply_patch input when patch touches an area with known issues', async () => {
+    mkdirSync(join(tmpDir, '.slope'), { recursive: true });
+    writeFileSync(join(tmpDir, '.slope/common-issues.json'), JSON.stringify({
+      recurring_patterns: [
+        {
+          id: 1,
+          title: 'Version command regression',
+          category: 'testing',
+          sprints_hit: [100],
+          gotcha_refs: [],
+          description: 'src/cli/commands changes need direct CLI smoke tests',
+          prevention: 'Smoke test the built command after editing src/cli/commands',
+        },
+      ],
+    }));
+
+    const result = await hazardGuard(
+      makeInput({
+        tool_name: 'apply_patch',
+        tool_input: { command: applyPatchCommand(join(tmpDir, 'src/cli/commands/version.ts')) },
+      }),
+      tmpDir,
+    );
+    expect(result.context).toContain('SLOPE hazards');
+    expect(result.context).toContain('Version command regression');
   });
 
   it('returns empty when area has no matching issues', async () => {
@@ -384,6 +439,31 @@ describe('scopeDriftGuard', () => {
     expect(result.context).toContain('scope drift');
     expect(result.context).toContain('src/core');
     spy.mockRestore();
+  });
+
+  it('warns for Codex apply_patch input when patch touches outside claimed areas', async () => {
+    writeSprintState(10);
+    const { createStore } = await import('../../src/store/index.js');
+    const store = createStore({ storePath: '.slope/slope.db', cwd: tmpDir });
+    await store.claim({
+      sprint_number: 10,
+      player: 'test',
+      target: 'src/core',
+      scope: 'area',
+    });
+    store.close();
+
+    const result = await scopeDriftGuard(
+      makeInput({
+        tool_name: 'apply_patch',
+        tool_input: { command: applyPatchCommand(join(tmpDir, 'src/cli/commands/version.ts')) },
+      }),
+      tmpDir,
+    );
+
+    expect(result.context).toContain('scope drift');
+    expect(result.context).toContain('src/cli/commands/version.ts');
+    expect(result.context).toContain('src/core');
   });
 
   it('fails open when disk state is older than 24 hours', async () => {

@@ -19,6 +19,25 @@ function makeInput(cwd: string, filePath: string): HookInput {
   };
 }
 
+function makeApplyPatchInput(cwd: string, filePath: string): HookInput {
+  return {
+    session_id: 'test-session',
+    cwd,
+    hook_event_name: 'PreToolUse',
+    tool_name: 'apply_patch',
+    tool_input: {
+      command: [
+        '*** Begin Patch',
+        `*** Update File: ${filePath}`,
+        '@@',
+        '-old',
+        '+new',
+        '*** End Patch',
+      ].join('\n'),
+    },
+  };
+}
+
 function writeConfig(cwd: string, guidance: Record<string, unknown> = {}): void {
   mkdirSync(join(cwd, '.slope'), { recursive: true });
   writeFileSync(join(cwd, '.slope', 'config.json'), JSON.stringify({
@@ -141,6 +160,21 @@ describe('claimRequiredGuard', () => {
       expect(result.decision).toBe('ask');
       expect(result.context).toContain('no active sprint state');
       expect(result.context).toContain('slope sprint start');
+      expect(result.context).toContain('slope claim');
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('asks before Codex apply_patch implementation writes when no sprint state is active', async () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'slope-claim-required-'));
+    try {
+      writeConfig(cwd);
+      const result = await claimRequiredGuard(makeApplyPatchInput(cwd, join(cwd, 'src/foo.ts')), cwd);
+
+      expect(result.decision).toBe('ask');
+      expect(result.context).toContain('src/foo.ts');
+      expect(result.context).toContain('no active sprint state');
       expect(result.context).toContain('slope claim');
     } finally {
       rmSync(cwd, { recursive: true, force: true });

@@ -4,6 +4,7 @@ import type { HookInput, GuardResult } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import type { CommonIssuesFile } from '../../core/index.js';
 import { dedupGuardContext } from '../session-state.js';
+import { normalizeTouchedPath, resolveTouchedPaths } from './hook-input.js';
 
 // ── Disk state for compaction survival ──────────────
 
@@ -58,81 +59,104 @@ function pruneState(state: HazardState, currentSprint: number): HazardState {
  * Writes state to disk so warnings survive context compaction.
  */
 export async function hazardGuard(input: HookInput, cwd: string): Promise<GuardResult> {
-  const filePath = input.tool_input?.file_path as string | undefined;
-  if (!filePath) return {};
+  const areas = resolveTouchedAreas(input, cwd);
+  if (areas.length === 0) return {};
 
-  const config = loadConfig();
-  const recency = config.guidance?.hazardRecency ?? 5;
+  const config = loadConfig(cwd);
   const currentSprint = config.currentSprint ?? 0;
-
-  // Determine the area from the file path (use directory)
-  const area = dirname(filePath).replace(cwd + '/', '').replace(cwd, '');
-  if (!area || area === '.') return {};
 
   // Load and prune disk state
   let state = loadHazardState(cwd);
   state = pruneState(state, currentSprint);
 
-  // Compute fresh warnings from common issues (ranked by recency)
-  const MAX_HAZARDS = 3;
-  const freshWarnings: Array<{ lastSprint: number; text: string }> = [];
-
+  let issues: CommonIssuesFile | null = null;
   try {
     const issuesPath = join(cwd, config.commonIssuesPath);
     if (existsSync(issuesPath)) {
-      const issues: CommonIssuesFile = JSON.parse(readFileSync(issuesPath, 'utf8'));
-      const areaLower = area.toLowerCase();
-
-      for (const pattern of issues.recurring_patterns) {
-        // Check if pattern is relevant to this area
-        const text = `${pattern.title} ${pattern.description} ${pattern.prevention}`.toLowerCase();
-        if (text.includes(areaLower) || areaLower.split('/').some(seg => text.includes(seg))) {
-          const lastSprint = Math.max(...pattern.sprints_hit);
-          freshWarnings.push({ lastSprint, text: `[${pattern.category}] ${pattern.title} (S${lastSprint}) — ${pattern.prevention.slice(0, 80)}` });
-        }
-      }
+      issues = JSON.parse(readFileSync(issuesPath, 'utf8'));
     }
   } catch { /* skip — common issues are optional */ }
 
-  // Sort by recency (most recent first) and cap at top N
+  for (const area of areas) {
+    // Compute fresh warnings from common issues (ranked by recency)
+    const freshTexts = computeFreshWarnings(area, issues);
+
+    // Merge fresh warnings with any disk-cached warnings for this area
+    const cached = state.entries.find(e => e.area === area);
+    const allWarnings = freshTexts.length > 0 ? freshTexts : (cached?.warnings ?? []);
+
+    if (freshTexts.length === 0 && cached) {
+      state.entries = state.entries.filter(e => e.area !== area);
+      saveHazardState(cwd, state);
+    }
+
+    // Persist fresh warnings to disk (update or add entry)
+    if (freshTexts.length > 0) {
+      const entry: HazardStateEntry = {
+        area,
+        warnings: freshTexts,
+        sprint: currentSprint,
+        timestamp: Date.now(),
+      };
+      state.entries = state.entries.filter(e => e.area !== area);
+      state.entries.push(entry);
+      saveHazardState(cwd, state);
+    }
+
+    if (allWarnings.length === 0) continue;
+
+    const fullContext = formatHazardContext(area, allWarnings);
+
+    // Session dedup: if this exact context was already injected, return compressed reference
+    const dedup = dedupGuardContext(cwd, input.session_id, 'hazard', fullContext);
+    if (dedup) return { context: dedup };
+
+    return { context: fullContext };
+  }
+
+  return {};
+}
+
+function resolveTouchedAreas(input: HookInput, cwd: string): string[] {
+  const seen = new Set<string>();
+  const areas: string[] = [];
+  for (const touchedPath of resolveTouchedPaths(input)) {
+    const relativePath = normalizeTouchedPath(touchedPath, cwd);
+    if (!relativePath) continue;
+    const area = dirname(relativePath);
+    if (!area || area === '.' || seen.has(area)) continue;
+    seen.add(area);
+    areas.push(area);
+  }
+  return areas;
+}
+
+function computeFreshWarnings(area: string, issues: CommonIssuesFile | null): string[] {
+  if (!issues) return [];
+
+  const areaLower = area.toLowerCase();
+  const freshWarnings: Array<{ lastSprint: number; text: string }> = [];
+
+  for (const pattern of issues.recurring_patterns) {
+    // Check if pattern is relevant to this area
+    const text = `${pattern.title} ${pattern.description} ${pattern.prevention}`.toLowerCase();
+    if (text.includes(areaLower) || areaLower.split('/').some(seg => text.includes(seg))) {
+      const lastSprint = Math.max(...pattern.sprints_hit);
+      freshWarnings.push({ lastSprint, text: `[${pattern.category}] ${pattern.title} (S${lastSprint}) — ${pattern.prevention.slice(0, 80)}` });
+    }
+  }
+
+  // Sort by recency (most recent first)
   freshWarnings.sort((a, b) => b.lastSprint - a.lastSprint);
-  const freshTexts = freshWarnings.map(w => w.text);
+  return freshWarnings.map(w => w.text);
+}
 
-  // Merge fresh warnings with any disk-cached warnings for this area
-  const cached = state.entries.find(e => e.area === area);
-  const allWarnings = freshTexts.length > 0 ? freshTexts : (cached?.warnings ?? []);
-
-  if (freshTexts.length === 0 && cached) {
-    state.entries = state.entries.filter(e => e.area !== area);
-    saveHazardState(cwd, state);
-  }
-
-  // Persist fresh warnings to disk (update or add entry)
-  if (freshTexts.length > 0) {
-    const entry: HazardStateEntry = {
-      area,
-      warnings: freshTexts,
-      sprint: currentSprint,
-      timestamp: Date.now(),
-    };
-    state.entries = state.entries.filter(e => e.area !== area);
-    state.entries.push(entry);
-    saveHazardState(cwd, state);
-  }
-
-  if (allWarnings.length === 0) return {};
-
-  // Cap output at top N, show overflow count
-  const shown = allWarnings.slice(0, MAX_HAZARDS);
+function formatHazardContext(area: string, allWarnings: string[]): string {
+  const maxHazards = 3;
+  const shown = allWarnings.slice(0, maxHazards);
   const overflow = allWarnings.length - shown.length;
-  const header = `SLOPE hazards (${area}, ${allWarnings.length} total${overflow > 0 ? `, showing top ${MAX_HAZARDS}` : ''}):`;
+  const header = `SLOPE hazards (${area}, ${allWarnings.length} total${overflow > 0 ? `, showing top ${maxHazards}` : ''}):`;
   const lines = [header, ...shown.map(w => `• ${w}`)];
   if (overflow > 0) lines.push(`  (+${overflow} more — run \`slope briefing --area=${area}\` for all)`);
-  const fullContext = lines.join('\n');
-
-  // Session dedup: if this exact context was already injected, return compressed reference
-  const dedup = dedupGuardContext(cwd, input.session_id, 'hazard', fullContext);
-  if (dedup) return { context: dedup };
-
-  return { context: fullContext };
+  return lines.join('\n');
 }

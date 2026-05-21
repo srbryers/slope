@@ -8,6 +8,7 @@ import { inferSprintContext } from '../sprint-inference.js';
 import { loadSprintState } from '../sprint-state.js';
 import { loadSessionState, updateSessionState } from '../session-state.js';
 import { resolveStore } from '../store.js';
+import { normalizeTouchedPath, resolveTouchedPaths } from './hook-input.js';
 
 const IMPLEMENTATION_DIRS = [
   'app/',
@@ -113,8 +114,7 @@ export async function claimRequiredGuard(input: HookInput, cwd: string): Promise
       }
     } catch { /* claims unavailable */ }
   } else if (!sprintState) {
-    const filePath = input.tool_input?.file_path as string | undefined;
-    const relativePath = normalizeHookPath(filePath, cwd);
+    const relativePath = findImplementationWritePath(input, cwd);
     if (!relativePath || !isImplementationWritePath(relativePath)) return {};
 
     const hint = inferMissingSprintHint(cwd);
@@ -127,8 +127,7 @@ export async function claimRequiredGuard(input: HookInput, cwd: string): Promise
         : 'Suggested commands: `slope sprint start --number=<N> --phase=implementing` then `slope claim --target=<path> --ticket=<ticket>`.',
     ]);
   } else {
-    const filePath = input.tool_input?.file_path as string | undefined;
-    const relativePath = normalizeHookPath(filePath, cwd);
+    const relativePath = findImplementationWritePath(input, cwd);
     if (!relativePath || !isImplementationWritePath(relativePath)) return {};
 
     return implementationWritePolicyResult(policy, [
@@ -216,14 +215,12 @@ function implementationWritePolicyResult(policy: ImplementationWritePolicy, line
   };
 }
 
-function normalizeHookPath(filePath: string | undefined, cwd: string): string | null {
-  if (!filePath) return null;
-  const normalizedCwd = cwd.replace(/\\/g, '/').replace(/\/$/, '');
-  const normalizedPath = filePath.replace(/\\/g, '/');
-  const relativePath = normalizedPath.startsWith(`${normalizedCwd}/`)
-    ? normalizedPath.slice(normalizedCwd.length + 1)
-    : normalizedPath;
-  return relativePath.replace(/^\.\//, '');
+function findImplementationWritePath(input: HookInput, cwd: string): string | null {
+  for (const touchedPath of resolveTouchedPaths(input)) {
+    const relativePath = normalizeTouchedPath(touchedPath, cwd);
+    if (relativePath && isImplementationWritePath(relativePath)) return relativePath;
+  }
+  return null;
 }
 
 export function isImplementationWritePath(relativePath: string): boolean {
@@ -269,13 +266,10 @@ async function detectCrossSessionOverlap(
   cwd: string,
   sprintNumber: number,
 ): Promise<string | null> {
-  const filePath = input.tool_input?.file_path as string | undefined;
-  if (!filePath) return null;
-
-  const relativePath = filePath.startsWith(cwd)
-    ? filePath.slice(cwd.length + 1)
-    : filePath;
-  const fileArea = dirname(relativePath);
+  const relativePaths = resolveTouchedPaths(input)
+    .map(filePath => normalizeTouchedPath(filePath, cwd))
+    .filter((filePath): filePath is string => Boolean(filePath));
+  if (relativePaths.length === 0) return null;
 
   try {
     const store = await resolveStore(cwd);
@@ -288,13 +282,16 @@ async function detectCrossSessionOverlap(
       c.session_id && c.session_id !== input.session_id,
     );
 
-    for (const claim of otherClaims) {
-      const overlaps = claimOverlapsPath(claim.scope, claim.target, relativePath, fileArea);
+    for (const relativePath of relativePaths) {
+      const fileArea = dirname(relativePath);
+      for (const claim of otherClaims) {
+        const overlaps = claimOverlapsPath(claim.scope, claim.target, relativePath, fileArea);
 
-      if (overlaps) {
-        const agent = sessions.find(s => s.session_id === claim.session_id);
-        const agentDesc = agent?.agent_role ?? agent?.role ?? 'another agent';
-        return `SLOPE multi-agent: ${relativePath} overlaps with ${agentDesc}'s claim on "${claim.target}". Coordinate to avoid conflicts.`;
+        if (overlaps) {
+          const agent = sessions.find(s => s.session_id === claim.session_id);
+          const agentDesc = agent?.agent_role ?? agent?.role ?? 'another agent';
+          return `SLOPE multi-agent: ${relativePath} overlaps with ${agentDesc}'s claim on "${claim.target}". Coordinate to avoid conflicts.`;
+        }
       }
     }
   } catch { /* store unavailable — skip overlap check */ }

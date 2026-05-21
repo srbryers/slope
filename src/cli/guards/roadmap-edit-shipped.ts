@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { HookInput, GuardResult } from '../../core/index.js';
 import { loadConfig } from '../../core/index.js';
+import { getApplyPatchText, resolveTouchedPaths, toAbsoluteTouchedPath } from './hook-input.js';
 
 const DEFAULT_ROADMAP_PATH = 'docs/backlog/roadmap.json';
 
@@ -17,9 +18,6 @@ const DEFAULT_ROADMAP_PATH = 'docs/backlog/roadmap.json';
 export async function roadmapEditShippedGuard(input: HookInput, cwd: string): Promise<GuardResult> {
   if (process.env.SLOPE_ALLOW_SHIPPED_EDIT === '1') return {};
 
-  const filePath = input.tool_input?.file_path as string | undefined;
-  if (!filePath) return {};
-
   let roadmapAbs: string;
   try {
     const config = loadConfig(cwd);
@@ -28,7 +26,9 @@ export async function roadmapEditShippedGuard(input: HookInput, cwd: string): Pr
     roadmapAbs = resolve(cwd, DEFAULT_ROADMAP_PATH);
   }
 
-  if (resolve(filePath) !== roadmapAbs) return {};
+  const touchesRoadmap = resolveTouchedPaths(input)
+    .some(filePath => toAbsoluteTouchedPath(filePath, cwd) === roadmapAbs);
+  if (!touchesRoadmap) return {};
 
   let currentContent: string;
   try {
@@ -37,17 +37,8 @@ export async function roadmapEditShippedGuard(input: HookInput, cwd: string): Pr
     return {}; // file doesn't exist yet — nothing to protect
   }
 
-  const newString = input.tool_input?.new_string as string | undefined;
-  const oldString = input.tool_input?.old_string as string | undefined;
-  if (newString === undefined) return {};
-
-  let wouldBeContent: string;
-  if (oldString !== undefined) {
-    if (!currentContent.includes(oldString)) return {}; // Edit will fail with its own error
-    wouldBeContent = currentContent.replace(oldString, newString);
-  } else {
-    wouldBeContent = newString;
-  }
+  const wouldBeContent = resolveWouldBeContent(input, roadmapAbs, currentContent, cwd);
+  if (wouldBeContent === null) return {};
 
   let current: { sprints?: unknown[] };
   let next: { sprints?: unknown[] };
@@ -101,6 +92,117 @@ export async function roadmapEditShippedGuard(input: HookInput, cwd: string): Pr
       'correct shipped-sprint history.',
     ].join('\n'),
   };
+}
+
+function resolveWouldBeContent(
+  input: HookInput,
+  roadmapAbs: string,
+  currentContent: string,
+  cwd: string,
+): string | null {
+  const newString = input.tool_input?.new_string as string | undefined;
+  const oldString = input.tool_input?.old_string as string | undefined;
+  if (newString !== undefined) {
+    if (oldString !== undefined) {
+      if (!currentContent.includes(oldString)) return null; // Edit will fail with its own error
+      return currentContent.replace(oldString, newString);
+    }
+    return newString;
+  }
+
+  const patchText = getApplyPatchText(input);
+  if (!patchText) return null;
+  return applyPatchToFileContent(patchText, roadmapAbs, currentContent, cwd);
+}
+
+function applyPatchToFileContent(
+  patchText: string,
+  targetAbs: string,
+  currentContent: string,
+  cwd: string,
+): string | null {
+  let nextContent = currentContent;
+  let inTargetFile = false;
+  let operation: 'add' | 'update' | 'delete' | null = null;
+  let currentHunk: string[] = [];
+  const addedFileLines: string[] = [];
+  let touchedTarget = false;
+
+  const flushHunk = (): boolean => {
+    if (!inTargetFile || operation !== 'update' || currentHunk.length === 0) {
+      currentHunk = [];
+      return true;
+    }
+
+    const replacement = applyHunk(nextContent, currentHunk);
+    currentHunk = [];
+    if (replacement === null) return false;
+    nextContent = replacement;
+    return true;
+  };
+
+  for (const line of patchText.split(/\r?\n/)) {
+    const fileMatch = line.match(/^\*\*\* (Add|Update|Delete) File: (.+)$/);
+    if (fileMatch) {
+      if (!flushHunk()) return null;
+
+      operation = fileMatch[1].toLowerCase() as 'add' | 'update' | 'delete';
+      inTargetFile = toAbsoluteTouchedPath(fileMatch[2], cwd) === targetAbs;
+      if (inTargetFile) {
+        touchedTarget = true;
+        if (operation === 'delete') nextContent = JSON.stringify({ sprints: [] });
+        addedFileLines.length = 0;
+      }
+      continue;
+    }
+
+    if (!inTargetFile) continue;
+    if (line === '*** End Patch') break;
+    if (line.startsWith('*** ')) continue;
+
+    if (operation === 'add') {
+      if (line.startsWith('+')) addedFileLines.push(line.slice(1));
+      continue;
+    }
+
+    if (operation !== 'update') continue;
+    if (line.startsWith('@@')) {
+      if (!flushHunk()) return null;
+      continue;
+    }
+    currentHunk.push(line);
+  }
+
+  if (!flushHunk()) return null;
+  if (operation === 'add' && inTargetFile) nextContent = addedFileLines.join('\n');
+
+  return touchedTarget ? nextContent : null;
+}
+
+function applyHunk(content: string, hunkLines: string[]): string | null {
+  const oldLines: string[] = [];
+  const newLines: string[] = [];
+
+  for (const line of hunkLines) {
+    if (line === '\\ No newline at end of file') continue;
+    const marker = line[0];
+    const text = line.slice(1);
+    if (marker === ' ') {
+      oldLines.push(text);
+      newLines.push(text);
+    } else if (marker === '-') {
+      oldLines.push(text);
+    } else if (marker === '+') {
+      newLines.push(text);
+    }
+  }
+
+  const oldBlock = oldLines.join('\n');
+  const newBlock = newLines.join('\n');
+  if (!oldBlock) return null;
+  if (!content.includes(oldBlock)) return null;
+
+  return content.replace(oldBlock, newBlock);
 }
 
 /** Detect built-in object types that need special equality handling.

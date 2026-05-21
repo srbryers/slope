@@ -71,6 +71,43 @@ function editInput(filePath: string, oldString: string, newString: string): Hook
   };
 }
 
+function applyPatchInput(filePath: string, oldLine: string, newLine: string): HookInput {
+  return {
+    session_id: 'test',
+    cwd: '/tmp',
+    hook_event_name: 'PreToolUse',
+    tool_name: 'apply_patch',
+    tool_input: {
+      command: [
+        '*** Begin Patch',
+        `*** Update File: ${filePath}`,
+        '@@',
+        `-${oldLine}`,
+        `+${newLine}`,
+        '*** End Patch',
+      ].join('\n'),
+    },
+    tool_response: {},
+  };
+}
+
+function deletePatchInput(filePath: string): HookInput {
+  return {
+    session_id: 'test',
+    cwd: '/tmp',
+    hook_event_name: 'PreToolUse',
+    tool_name: 'apply_patch',
+    tool_input: {
+      command: [
+        '*** Begin Patch',
+        `*** Delete File: ${filePath}`,
+        '*** End Patch',
+      ].join('\n'),
+    },
+    tool_response: {},
+  };
+}
+
 describe('roadmapEditShippedGuard', () => {
   let cwd: string;
   let originalEnv: string | undefined;
@@ -161,6 +198,28 @@ describe('roadmapEditShippedGuard', () => {
     const newString = '"title": "Hijacked"';
     const result = await roadmapEditShippedGuard(editInput(path, oldString, newString), cwd);
     expect(result.decision).toBe('deny');
+  });
+
+  it('blocks Codex apply_patch edits to shipped sprint fields', async () => {
+    const path = writeRoadmap(cwd, baseRoadmap());
+    const result = await roadmapEditShippedGuard(
+      applyPatchInput(
+        path,
+        '      "theme": "Shipped sprint",',
+        '      "theme": "Rewritten history",',
+      ),
+      cwd,
+    );
+    expect(result.decision).toBe('deny');
+    expect(result.blockReason).toContain('S1');
+    expect(result.blockReason).toContain('shipped sprint fields modified');
+  });
+
+  it('blocks Codex apply_patch deleting a roadmap with shipped sprints', async () => {
+    const path = writeRoadmap(cwd, baseRoadmap());
+    const result = await roadmapEditShippedGuard(deletePatchInput(path), cwd);
+    expect(result.decision).toBe('deny');
+    expect(result.blockReason).toContain('removed');
   });
 
   it('allows Edit when old_string does not match current content', async () => {
