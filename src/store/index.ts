@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { createRequire } from 'node:module';
-import Database from 'better-sqlite3';
+import type DatabaseConstructor from 'better-sqlite3';
 import type { Database as DatabaseType } from 'better-sqlite3';
 import type { SprintClaim, GolfScorecard, SlopeEvent, EventType, WorkflowExecution, WorkflowStepResult, CompletedStep } from '../core/index.js';
 import type { CommonIssuesFile, StoreStats } from '../core/index.js';
@@ -19,6 +19,11 @@ function generateId(prefix: string): string {
 
 function nowISO(): string {
   return new Date().toISOString();
+}
+
+function loadDatabaseConstructor(): typeof DatabaseConstructor {
+  const esmRequire = createRequire(import.meta.url);
+  return esmRequire('better-sqlite3') as typeof DatabaseConstructor;
 }
 
 /** Sequential schema migrations — each runs exactly once */
@@ -219,6 +224,7 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
 
   constructor(dbPath: string) {
     mkdirSync(dirname(dbPath), { recursive: true });
+    const Database = loadDatabaseConstructor();
     this.db = new Database(dbPath);
     this.db.pragma('journal_mode = WAL');
     this.db.pragma('foreign_keys = ON');

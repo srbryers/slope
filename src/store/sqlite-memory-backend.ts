@@ -13,13 +13,19 @@
 
 import { existsSync, renameSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import Database from 'better-sqlite3';
+import { createRequire } from 'node:module';
+import type DatabaseConstructor from 'better-sqlite3';
 import type { Database as DatabaseType } from 'better-sqlite3';
 import type { MemoryBackend } from '../core/memory-backend.js';
 import type { Memory, MemoriesFile, MemoryCategory, MemorySource } from '../core/memory-types.js';
 import { validateMemoryRow } from '../core/memory-validation.js';
 
 const CURRENT_VERSION = 1;
+
+function loadDatabaseConstructor(): typeof DatabaseConstructor {
+  const esmRequire = createRequire(import.meta.url);
+  return esmRequire('better-sqlite3') as typeof DatabaseConstructor;
+}
 
 interface MemoryRow {
   id: string;
@@ -55,6 +61,7 @@ export class SqliteMemoryBackend implements MemoryBackend {
 
   constructor(cwd: string, dbPath: string) {
     this.cwd = cwd;
+    const Database = loadDatabaseConstructor();
     this.db = new Database(dbPath);
     this.ensureSchema();
     this.importJsonIfPresent();

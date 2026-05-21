@@ -1,8 +1,9 @@
-import { existsSync, copyFileSync } from 'node:fs';
+import { existsSync, copyFileSync, readFileSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
-import Database from 'better-sqlite3';
+import { createRequire } from 'node:module';
+import type DatabaseConstructor from 'better-sqlite3';
+import type { Database as DatabaseType } from 'better-sqlite3';
 import { resolveStore, getStoreInfo } from '../store.js';
-import { LATEST_SCHEMA_VERSION } from '../../store/index.js';
 
 function parseArgs(args: string[]): Record<string, string> {
   const result: Record<string, string> = {};
@@ -11,6 +12,63 @@ function parseArgs(args: string[]): Record<string, string> {
     if (match) result[match[1]] = match[2] ?? 'true';
   }
   return result;
+}
+
+function loadDatabaseConstructor(): typeof DatabaseConstructor {
+  const esmRequire = createRequire(import.meta.url);
+  return esmRequire('better-sqlite3') as typeof DatabaseConstructor;
+}
+
+function detectInstallCommand(cwd: string): string {
+  if (existsSync(join(cwd, 'pnpm-lock.yaml'))) return 'pnpm install';
+  if (existsSync(join(cwd, 'package-lock.json'))) return 'npm ci';
+  if (existsSync(join(cwd, 'yarn.lock'))) return 'yarn install';
+  if (existsSync(join(cwd, 'bun.lockb')) || existsSync(join(cwd, 'bun.lock'))) return 'bun install';
+  return 'npm install';
+}
+
+function detectExpectedNode(cwd: string): string | null {
+  for (const file of ['.nvmrc', '.node-version']) {
+    const path = join(cwd, file);
+    if (existsSync(path)) {
+      const version = readFileSync(path, 'utf8').trim();
+      if (version) return `${file} (${version})`;
+    }
+  }
+  const packagePath = join(cwd, 'package.json');
+  if (existsSync(packagePath)) {
+    try {
+      const pkg = JSON.parse(readFileSync(packagePath, 'utf8')) as { engines?: { node?: unknown } };
+      if (typeof pkg.engines?.node === 'string' && pkg.engines.node.trim()) {
+        return `package.json engines.node (${pkg.engines.node})`;
+      }
+    } catch { /* ignore malformed package.json here */ }
+  }
+  return null;
+}
+
+function isNativeSqliteSetupError(message: string): boolean {
+  return /better[-_]sqlite3|better_sqlite3|NODE_MODULE_VERSION|ERR_DLOPEN_FAILED|compiled against a different Node\.js version|Cannot find module.*better-sqlite3/i.test(message);
+}
+
+export function storeRecoverySuggestions(message: string, cwd: string): string[] {
+  if (!isNativeSqliteSetupError(message)) return [];
+
+  const suggestions: string[] = [];
+  const installCommand = detectInstallCommand(cwd);
+  if (!existsSync(join(cwd, 'node_modules'))) {
+    suggestions.push(`Install this worktree's dependencies first: ${installCommand}.`);
+  } else {
+    suggestions.push(`Rebuild or reinstall native dependencies for the active Node version: ${installCommand}.`);
+  }
+
+  const expectedNode = detectExpectedNode(cwd);
+  if (expectedNode) {
+    suggestions.push(`Use the repo's expected Node version from ${expectedNode} before running SLOPE.`);
+  }
+
+  suggestions.push('In fresh parallel worktrees, prefer the worktree-local SLOPE binary after dependencies are installed.');
+  return suggestions;
 }
 
 export async function storeCommand(args: string[]): Promise<void> {
@@ -53,14 +111,22 @@ async function storeStatus(flags: Record<string, string>, cwd: string): Promise<
   try {
     store = await resolveStore(cwd);
   } catch (err) {
+    const message = (err as Error).message;
+    const recovery = storeRecoverySuggestions(message, cwd);
     if (jsonMode) {
-      console.log(JSON.stringify({ ...info, error: (err as Error).message }));
+      console.log(JSON.stringify({ ...info, error: message, ...(recovery.length > 0 ? { recovery } : {}) }));
     } else {
       console.log(`\nStore type:     ${info.type}`);
       if (info.path) console.log(`Path:           ${info.path}`);
       if (info.sanitizedUrl) console.log(`URL:            ${info.sanitizedUrl}`);
       if (info.projectId) console.log(`Project ID:     ${info.projectId}`);
-      console.log(`Status:         ERROR — ${(err as Error).message}`);
+      console.log(`Status:         ERROR — ${message}`);
+      if (recovery.length > 0) {
+        console.log(`Recovery:`);
+        for (const suggestion of recovery) {
+          console.log(`  - ${suggestion}`);
+        }
+      }
     }
     return;
   }
@@ -109,6 +175,7 @@ Usage:
   const store = await resolveStore(cwd);
   try {
     const version = await store.getSchemaVersion();
+    const { LATEST_SCHEMA_VERSION } = await import('../../store/index.js');
     console.log(`\nCurrent schema version: ${version}`);
     console.log(`Total migrations:       ${LATEST_SCHEMA_VERSION}`);
     if (version >= LATEST_SCHEMA_VERSION) {
@@ -157,8 +224,9 @@ async function backupStore(flags: Record<string, string>, cwd: string): Promise<
   }
 
   // Checkpoint WAL to flush pending writes before copying
-  let db: ReturnType<typeof Database>;
+  let db: DatabaseType;
   try {
+    const Database = loadDatabaseConstructor();
     db = new Database(dbPath);
   } catch (err) {
     console.error(`Error: Cannot open database for backup: ${(err as Error).message}`);
@@ -204,6 +272,7 @@ async function restoreStore(flags: Record<string, string>, cwd: string): Promise
 
   // Validate the backup file is a valid SLOPE database
   try {
+    const Database = loadDatabaseConstructor();
     const db = new Database(fromPath, { readonly: true });
     let validationError: string | null = null;
     try {
