@@ -1,0 +1,73 @@
+{
+  "sprint_number": 106,
+  "player": "sebastianbryers",
+  "theme": "Scorecard Hazard Fallback",
+  "par": 4,
+  "slope": 1,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-05-21",
+  "shots": [
+    {
+      "ticket_key": "S106-1",
+      "title": "Feed hazard guard from scorecard hazard index (#397)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Added a scorecard-derived fallback for hazard guard warnings when common issues do not match, preserved common-issues precedence, documented source ordering, and covered shot hazards plus bunker locations in tests."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 1,
+    "fairways_total": 1,
+    "greens_in_regulation": 1,
+    "greens_total": 1,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Scorecard fallback matching needs to be narrower than common-issue matching so generic path segments do not create noisy guard warnings.",
+      "outcome": "The fallback ignores generic and very short path segments unless the full touched area appears in the scorecard text."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "Focused guard and briefing tests, typecheck, build, guard docs smoke test, and full Vitest suite passed.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "A targeted guard-feeding change with clear source precedence and enough tests to protect against both silence and warning spam.",
+    "advice_for_next_player": "When expanding guard inputs, keep the hook output compact and document precedence so richer context does not become surprising behavior.",
+    "what_surprised_you": "The existing hazard docs already claimed recent scorecard hazards were involved, so the implementation needed to make that contract true rather than introduce a new surface.",
+    "excited_about_next": "Use this richer guard signal to evaluate whether remaining underused guards need better payload coverage or should be retired."
+  },
+  "bunker_locations": [
+    "Hazard guard fallback should keep common-issues.json as the first source and only read recent scorecards when no common issue matches the touched area.",
+    "Scorecard-derived hazard matching should avoid generic path segments such as src, test, tests, package, and packages to prevent broad false positives."
+  ],
+  "yardage_book_updates": [],
+  "course_management_notes": [
+    "Validation used pnpm vitest run tests/cli/guards.test.ts tests/cli/commands/guard.test.ts tests/core/briefing.test.ts.",
+    "Additional validation used pnpm run typecheck, pnpm run build, node dist/cli/index.js guard docs hazard, and pnpm test.",
+    "The fallback uses guidance.hazardRecency to limit recent scorecards and dedupes repeated scorecard warning text after sorting newest first."
+  ],
+  "slope_factors": [
+    "agent_dx",
+    "guard_signals",
+    "hazard_detection"
+  ]
+}

@@ -73,6 +73,26 @@ function writeSprintState(sprint: number): void {
   }));
 }
 
+function writeScorecard(sprint: number, overrides: Record<string, unknown> = {}): void {
+  mkdirSync(join(tmpDir, 'docs/retros'), { recursive: true });
+  writeFileSync(join(tmpDir, `docs/retros/sprint-${sprint}.json`), JSON.stringify({
+    sprint_number: sprint,
+    theme: `Sprint ${sprint}`,
+    par: 4,
+    slope: 1,
+    score: 4,
+    score_label: 'par',
+    date: '2026-05-21',
+    shots: [],
+    conditions: [],
+    special_plays: [],
+    yardage_book_updates: [],
+    bunker_locations: [],
+    course_management_notes: [],
+    ...overrides,
+  }, null, 2));
+}
+
 beforeEach(() => {
   tmpDir = mkdtempSync(join(tmpdir(), 'slope-guard-'));
   mockConfig.guidance = {};
@@ -220,6 +240,82 @@ describe('hazardGuard', () => {
       tmpDir,
     );
     expect(result).toEqual({ metricReason: 'no-match' });
+  });
+
+  it('falls back to scorecard shot hazards when common issues are empty', async () => {
+    mkdirSync(join(tmpDir, '.slope'), { recursive: true });
+    writeFileSync(join(tmpDir, '.slope/common-issues.json'), JSON.stringify({ recurring_patterns: [] }));
+    writeScorecard(104, {
+      shots: [
+        {
+          ticket_key: 'S104-1',
+          title: 'Guard metrics work',
+          club: 'short_iron',
+          result: 'green',
+          hazards: [
+            { type: 'rough', description: 'src/cli/guards metric-only fields must stay out of hook output' },
+          ],
+        },
+      ],
+    });
+
+    const result = await hazardGuard(
+      makeInput({ tool_input: { file_path: join(tmpDir, 'src/cli/guards/hazard.ts') } }),
+      tmpDir,
+    );
+
+    expect(result.context).toContain('SLOPE hazards');
+    expect(result.context).toContain('[scorecard:rough]');
+    expect(result.context).toContain('metric-only fields');
+    expect(result.context).toContain('S104');
+    expect(result.metricReason).toBe('matched');
+  });
+
+  it('falls back to scorecard bunker locations and keeps newest first', async () => {
+    mkdirSync(join(tmpDir, '.slope'), { recursive: true });
+    writeFileSync(join(tmpDir, '.slope/common-issues.json'), JSON.stringify({ recurring_patterns: [] }));
+    writeScorecard(101, {
+      bunker_locations: ['src/cli/guards: older hazard'],
+    });
+    writeScorecard(105, {
+      bunker_locations: ['src/cli/guards: newer hazard'],
+    });
+
+    const result = await hazardGuard(
+      makeInput({ tool_input: { file_path: join(tmpDir, 'src/cli/guards/hazard.ts') } }),
+      tmpDir,
+    );
+
+    expect(result.context).toContain('[scorecard:bunker]');
+    expect(result.context?.indexOf('newer hazard')).toBeLessThan(result.context?.indexOf('older hazard') ?? 0);
+  });
+
+  it('prefers common issues over scorecard fallback when both match', async () => {
+    mkdirSync(join(tmpDir, '.slope'), { recursive: true });
+    writeFileSync(join(tmpDir, '.slope/common-issues.json'), JSON.stringify({
+      recurring_patterns: [
+        {
+          id: 1,
+          title: 'Guard common issue',
+          category: 'testing',
+          sprints_hit: [106],
+          gotcha_refs: [],
+          description: 'src/cli/guards common issue',
+          prevention: 'Use the common issue first',
+        },
+      ],
+    }));
+    writeScorecard(105, {
+      bunker_locations: ['src/cli/guards: scorecard fallback should not appear'],
+    });
+
+    const result = await hazardGuard(
+      makeInput({ tool_input: { file_path: join(tmpDir, 'src/cli/guards/hazard.ts') } }),
+      tmpDir,
+    );
+
+    expect(result.context).toContain('Guard common issue');
+    expect(result.context).not.toContain('scorecard fallback should not appear');
   });
 
   it('does not include permissionDecision (non-blocking)', async () => {

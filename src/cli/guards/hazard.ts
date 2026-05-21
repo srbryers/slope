@@ -2,7 +2,8 @@ import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import type { HookInput, GuardResult } from '../../core/index.js';
 import { loadConfig } from '../config.js';
-import type { CommonIssuesFile } from '../../core/index.js';
+import { loadScorecards } from '../../core/index.js';
+import type { CommonIssuesFile, GolfScorecard } from '../../core/index.js';
 import { dedupGuardContext } from '../session-state.js';
 import { normalizeTouchedPath, resolveTouchedPaths } from './hook-input.js';
 
@@ -22,6 +23,8 @@ interface HazardState {
 const GUARD_STATE_DIR = '.slope/guard-state';
 const STATE_FILE = 'hazard.json';
 const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+const DEFAULT_HAZARD_RECENCY = 5;
+const GENERIC_AREA_SEGMENTS = new Set(['src', 'test', 'tests', 'package', 'packages']);
 
 function loadHazardState(cwd: string): HazardState {
   try {
@@ -77,9 +80,28 @@ export async function hazardGuard(input: HookInput, cwd: string): Promise<GuardR
     }
   } catch { /* skip — common issues are optional */ }
 
+  const hazardRecency = config.guidance?.hazardRecency ?? DEFAULT_HAZARD_RECENCY;
+  let recentScorecards: GolfScorecard[] | null = null;
+  let scorecardSourceAvailable = false;
+  const loadRecentScorecards = (): GolfScorecard[] => {
+    if (recentScorecards) return recentScorecards;
+    try {
+      const scorecards = loadScorecards(config, cwd);
+      recentScorecards = hazardRecency > 0 ? scorecards.slice(-hazardRecency) : scorecards;
+      scorecardSourceAvailable = recentScorecards.length > 0;
+    } catch {
+      recentScorecards = [];
+      scorecardSourceAvailable = false;
+    }
+    return recentScorecards;
+  };
+
   for (const area of areas) {
     // Compute fresh warnings from common issues (ranked by recency)
-    const freshTexts = computeFreshWarnings(area, issues);
+    const commonWarnings = computeFreshWarnings(area, issues);
+    const freshTexts = commonWarnings.length > 0
+      ? commonWarnings
+      : computeScorecardWarnings(area, loadRecentScorecards());
 
     // Merge fresh warnings with any disk-cached warnings for this area
     const cached = state.entries.find(e => e.area === area);
@@ -114,7 +136,7 @@ export async function hazardGuard(input: HookInput, cwd: string): Promise<GuardR
     return { context: fullContext, metricReason: 'matched' };
   }
 
-  return { metricReason: issues ? 'no-match' : 'state-unavailable' };
+  return { metricReason: issues || scorecardSourceAvailable ? 'no-match' : 'state-unavailable' };
 }
 
 function resolveTouchedAreas(input: HookInput, cwd: string): string[] {
@@ -134,13 +156,12 @@ function resolveTouchedAreas(input: HookInput, cwd: string): string[] {
 function computeFreshWarnings(area: string, issues: CommonIssuesFile | null): string[] {
   if (!issues) return [];
 
-  const areaLower = area.toLowerCase();
   const freshWarnings: Array<{ lastSprint: number; text: string }> = [];
 
   for (const pattern of issues.recurring_patterns) {
     // Check if pattern is relevant to this area
     const text = `${pattern.title} ${pattern.description} ${pattern.prevention}`.toLowerCase();
-    if (text.includes(areaLower) || areaLower.split('/').some(seg => text.includes(seg))) {
+    if (areaMatchesText(area, text, { includeGenericSegments: true })) {
       const lastSprint = Math.max(...pattern.sprints_hit);
       freshWarnings.push({ lastSprint, text: `[${pattern.category}] ${pattern.title} (S${lastSprint}) — ${pattern.prevention.slice(0, 80)}` });
     }
@@ -149,6 +170,68 @@ function computeFreshWarnings(area: string, issues: CommonIssuesFile | null): st
   // Sort by recency (most recent first)
   freshWarnings.sort((a, b) => b.lastSprint - a.lastSprint);
   return freshWarnings.map(w => w.text);
+}
+
+function computeScorecardWarnings(area: string, scorecards: GolfScorecard[]): string[] {
+  const warnings: Array<{ sprint: number; text: string }> = [];
+
+  for (const sc of scorecards) {
+    const sprint = sc.sprint_number ?? (sc as unknown as { sprint?: number }).sprint ?? 0;
+
+    for (const shot of sc.shots ?? []) {
+      for (const hazard of shot.hazards ?? []) {
+        const description = hazard.description ?? '';
+        const haystack = `${shot.ticket_key} ${shot.title} ${hazard.type} ${description}`.toLowerCase();
+        if (!areaMatchesText(area, haystack)) continue;
+        warnings.push({
+          sprint,
+          text: `[scorecard:${hazard.type}] ${description || shot.title} (S${sprint})`,
+        });
+      }
+    }
+
+    for (const location of sc.bunker_locations ?? []) {
+      const locationText = typeof location === 'string'
+        ? location
+        : String((location as Record<string, unknown>).area ?? '');
+      if (!locationText || !areaMatchesText(area, locationText.toLowerCase())) continue;
+      warnings.push({
+        sprint,
+        text: `[scorecard:bunker] ${locationText} (S${sprint})`,
+      });
+    }
+  }
+
+  warnings.sort((a, b) => b.sprint - a.sprint);
+
+  const seen = new Set<string>();
+  const unique: string[] = [];
+  for (const warning of warnings) {
+    const key = warning.text.replace(/ \(S\d+\)$/, '');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(warning.text);
+  }
+
+  return unique;
+}
+
+function areaMatchesText(
+  area: string,
+  lowerText: string,
+  opts: { includeGenericSegments?: boolean } = {},
+): boolean {
+  const areaLower = area.toLowerCase();
+  if (lowerText.includes(areaLower)) return true;
+
+  const segments = areaLower
+    .split('/')
+    .map(seg => seg.trim())
+    .filter(Boolean)
+    .filter(seg => opts.includeGenericSegments || seg.length >= 4)
+    .filter(seg => opts.includeGenericSegments || !GENERIC_AREA_SEGMENTS.has(seg));
+
+  return segments.some(seg => lowerText.includes(seg));
 }
 
 function formatHazardContext(area: string, allWarnings: string[]): string {
