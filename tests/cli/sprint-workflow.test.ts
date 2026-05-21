@@ -53,6 +53,25 @@ async function startWorkflow(sprintId: string, workflowName = 'sprint-lightweigh
   }
 }
 
+function writeScorecard(sprint: number): void {
+  mkdirSync(join(tmpDir, 'docs', 'retros'), { recursive: true });
+  writeFileSync(join(tmpDir, 'docs', 'retros', `sprint-${sprint}.json`), JSON.stringify({
+    sprint_number: sprint,
+    theme: `Sprint ${sprint}`,
+    par: 4,
+    slope: 1,
+    score: 4,
+    score_label: 'par',
+    shots: [],
+    stats: { fairways_hit: 0, fairways_total: 0, greens_in_regulation: 0, greens_total: 0, putts: 0, penalties: 0, hazards_hit: 0, hazard_penalties: 0, miss_directions: { long: 0, short: 0, left: 0, right: 0 } },
+    conditions: [],
+    special_plays: [],
+    bunker_locations: [],
+    yardage_book_updates: [],
+    course_management_notes: [],
+  }));
+}
+
 describe('slope sprint run', () => {
   it('starts a workflow execution', async () => {
     const output = await captureLog(() =>
@@ -137,6 +156,49 @@ describe('slope sprint status (workflow mode)', () => {
       sprintCommand(['status'])
     );
     expect(output).toContain('No active sprint');
+  });
+});
+
+describe('slope sprint workflow cleanup', () => {
+  it('dry-runs stale running executions without pausing them', async () => {
+    await startWorkflow('S1');
+    await startWorkflow('S2');
+    writeScorecard(1);
+
+    const output = await captureLog(() =>
+      sprintCommand(['workflow', 'cleanup', '--stale', '--dry-run'])
+    );
+
+    expect(output).toContain('Would pause S1');
+    expect(output).toContain('scorecard exists');
+
+    const store = createStore({ storePath: '.slope/slope.db', cwd: tmpDir });
+    try {
+      expect(await store.getExecutionBySprint('S1')).toMatchObject({ status: 'running' });
+    } finally {
+      store.close();
+    }
+  });
+
+  it('pauses stale running executions while leaving current ones active', async () => {
+    await startWorkflow('S1');
+    await startWorkflow('S2');
+    writeScorecard(1);
+
+    const output = await captureLog(() =>
+      sprintCommand(['workflow', 'cleanup', '--stale'])
+    );
+
+    expect(output).toContain('Paused S1');
+    expect(output).toContain('1 stale workflow execution(s) paused');
+
+    const store = createStore({ storePath: '.slope/slope.db', cwd: tmpDir });
+    try {
+      expect(await store.getExecutionBySprint('S1')).toMatchObject({ status: 'paused' });
+      expect(await store.getExecutionBySprint('S2')).toMatchObject({ status: 'running' });
+    } finally {
+      store.close();
+    }
   });
 });
 

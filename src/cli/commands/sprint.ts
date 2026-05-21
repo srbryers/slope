@@ -13,8 +13,8 @@ import {
   type GateName,
   type SprintPhase,
 } from '../sprint-state.js';
-import { WorkflowEngine, loadWorkflow, resolveVariables, validateWorkflow, loadConfig } from '../../core/index.js';
-import type { WorkflowDefinition, WorkflowExecution } from '../../core/index.js';
+import { WorkflowEngine, loadWorkflow, resolveVariables, validateWorkflow, loadConfig, loadScorecards, parseRoadmap, castRoadmapStructure } from '../../core/index.js';
+import type { RoadmapSprint, WorkflowDefinition, WorkflowExecution } from '../../core/index.js';
 import { createHash } from 'node:crypto';
 
 /** Get workflow definition from execution snapshot (preferred) or disk (fallback for old executions) */
@@ -34,7 +34,7 @@ function getDefinition(exec: WorkflowExecution, cwd: string): { def: WorkflowDef
   // Fallback for old executions without snapshot
   return { def: loadWorkflow(exec.workflow_name, cwd), drifted: false };
 }
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, dirname, basename } from 'node:path';
 import { createStore } from '../../store/index.js';
 
@@ -532,6 +532,90 @@ async function workflowStatusCommand(args: string[], cwd: string): Promise<void>
   }
 }
 
+interface StaleWorkflowExecution {
+  exec: WorkflowExecution;
+  reason: string;
+}
+
+function completedRoadmapSprintIds(cwd: string, config: ReturnType<typeof loadConfig>): Set<number> {
+  if (!config.roadmapPath) return new Set();
+  const roadmapPath = join(cwd, config.roadmapPath);
+  if (!existsSync(roadmapPath)) return new Set();
+  try {
+    const raw = JSON.parse(readFileSync(roadmapPath, 'utf8'));
+    const parsed = parseRoadmap(raw);
+    const roadmap = parsed.roadmap ?? castRoadmapStructure(raw);
+    if (!roadmap) return new Set();
+    return new Set(
+      roadmap.sprints
+        .filter(sprint => {
+          const status = (sprint as RoadmapSprint & { status?: string }).status;
+          return status === 'complete' || status === 'superseded';
+        })
+        .map(sprint => sprint.id),
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+async function findStaleWorkflowExecutions(cwd: string, store: ReturnType<typeof createStore>): Promise<StaleWorkflowExecution[]> {
+  const config = loadConfig(cwd);
+  const scorecardSprintIds = new Set(loadScorecards(config, cwd).map(card => card.sprint_number));
+  const roadmapDoneIds = completedRoadmapSprintIds(cwd, config);
+  const running = await store.listExecutions({ status: 'running' });
+  const stale: StaleWorkflowExecution[] = [];
+
+  for (const exec of running) {
+    const sprint = sprintNumberFromId(exec.sprint_id);
+    if (sprint === null) continue;
+    const reasons: string[] = [];
+    if (scorecardSprintIds.has(sprint)) reasons.push('scorecard exists');
+    if (roadmapDoneIds.has(sprint)) reasons.push('roadmap complete/superseded');
+    if (reasons.length > 0) {
+      stale.push({ exec, reason: reasons.join(', ') });
+    }
+  }
+
+  return stale;
+}
+
+async function workflowCleanupCommand(args: string[], cwd: string): Promise<void> {
+  const action = args[0];
+  const dryRun = args.includes('--dry-run');
+  const staleOnly = args.includes('--stale');
+
+  if (action !== 'cleanup' || !staleOnly) {
+    console.error('Usage: slope sprint workflow cleanup --stale [--dry-run]');
+    process.exit(1);
+  }
+
+  const store = getStore(cwd);
+  try {
+    const stale = await findStaleWorkflowExecutions(cwd, store);
+    if (stale.length === 0) {
+      console.log('No stale running workflow executions found.');
+      return;
+    }
+
+    const engine = new WorkflowEngine();
+    for (const { exec, reason } of stale) {
+      const label = exec.sprint_id ?? exec.id;
+      if (dryRun) {
+        console.log(`[dry-run] Would pause ${label} (${exec.workflow_name}) at ${exec.current_phase}/${exec.current_step} — ${reason}`);
+      } else {
+        await engine.pause(exec.id, store);
+        console.log(`Paused ${label} (${exec.workflow_name}) at ${exec.current_phase}/${exec.current_step} — ${reason}`);
+      }
+    }
+
+    const suffix = dryRun ? 'would be paused' : 'paused';
+    console.log(`\n${stale.length} stale workflow execution(s) ${suffix}.`);
+  } finally {
+    store.close();
+  }
+}
+
 function printExecution(exec: { id: string; workflow_name: string; sprint_id?: string; current_phase?: string; current_step?: string; status: string; completed_steps: unknown[]; started_at: string }): void {
   console.log(`  Execution: ${exec.id}`);
   console.log(`  Workflow:  ${exec.workflow_name}`);
@@ -834,6 +918,9 @@ export async function sprintCommand(args: string[]): Promise<void> {
     case 'run':
       await runWorkflowCommand(args.slice(1), cwd);
       break;
+    case 'workflow':
+      await workflowCleanupCommand(args.slice(1), cwd);
+      break;
     case 'resume':
       await resumeCommand(args.slice(1), cwd);
       break;
@@ -867,6 +954,7 @@ Workflow commands:
   slope sprint status [sprint_id]    Show workflow execution progress
   slope sprint resume <sprint_id>    Resume a paused workflow execution
   slope sprint pause <sprint_id>     Pause a running workflow execution
+  slope sprint workflow cleanup --stale [--dry-run]         Pause stale completed/superseded executions
   slope sprint skip <id> --step=<s> --reason="..."          Skip a blocking step
 `);
       if (sub) process.exit(1);
