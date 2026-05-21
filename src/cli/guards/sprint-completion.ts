@@ -3,7 +3,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { HookInput, GuardResult } from '../../core/index.js';
 import { loadConfig } from '../config.js';
-import { loadSprintState, saveSprintState, updateGate, isSprintComplete, pendingGates } from '../sprint-state.js';
+import { loadSprintState, mutateSprintState, updateGate, isSprintComplete, pendingGates } from '../sprint-state.js';
 
 /**
  * Sprint-completion guard: enforces post-implementation gates.
@@ -282,10 +282,14 @@ function handlePrMerge(input: HookInput, cwd: string): GuardResult {
   const exitCode = response.exit_code ?? response.exitCode;
   if (exitCode !== 0 && exitCode !== '0' && exitCode !== undefined) return {};
 
-  state.phase = 'scoring';
-  saveSprintState(cwd, state);
+  const updated = mutateSprintState(cwd, current => {
+    if (current.phase === 'scoring' || current.phase === 'complete') return false;
+    current.phase = 'scoring';
+    return true;
+  });
+  if (!updated) return {};
 
-  const pending = pendingGates(state);
+  const pending = pendingGates(updated);
   return {
     context: [
       `SLOPE: PR merged — sprint phase is now 'scoring'. Remaining gates:`,

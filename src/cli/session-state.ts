@@ -1,6 +1,7 @@
-import { existsSync, readFileSync, writeFileSync, mkdirSync, renameSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
+import { atomicWriteFileSync, withFileLockSync } from './atomic-write.js';
 import { isActiveSprintState, loadSprintState } from './sprint-state.js';
 
 const SESSION_STATE_FILE = '.slope/.session-state.json';
@@ -37,30 +38,46 @@ export function loadSessionState(cwd: string): SessionState {
   }
 }
 
-/** Save consolidated session state atomically via tmp + rename. */
-export function saveSessionState(cwd: string, state: SessionState): void {
-  const dir = join(cwd, '.slope');
-  mkdirSync(dir, { recursive: true });
+function sessionStatePath(cwd: string): string {
+  return join(cwd, SESSION_STATE_FILE);
+}
 
-  const filePath = join(cwd, SESSION_STATE_FILE);
-  const tmpPath = filePath + '.tmp';
-  writeFileSync(tmpPath, JSON.stringify(state, null, 2) + '\n');
-  renameSync(tmpPath, filePath);
+function saveSessionStateUnlocked(filePath: string, state: SessionState): void {
+  atomicWriteFileSync(filePath, JSON.stringify(state, null, 2) + '\n');
+}
+
+function mutateSessionState(cwd: string, mutator: (state: SessionState) => boolean): SessionState {
+  const filePath = sessionStatePath(cwd);
+  return withFileLockSync(filePath, () => {
+    const state = loadSessionState(cwd);
+    if (mutator(state)) {
+      saveSessionStateUnlocked(filePath, state);
+    }
+    return state;
+  });
+}
+
+/** Save consolidated session state atomically via unique tmp + rename. */
+export function saveSessionState(cwd: string, state: SessionState): void {
+  const filePath = sessionStatePath(cwd);
+  withFileLockSync(filePath, () => saveSessionStateUnlocked(filePath, state));
 }
 
 /** Update a single field in session state and save atomically. */
 export function updateSessionState(cwd: string, field: keyof SessionState, value: string): void {
-  const state = loadSessionState(cwd);
-  (state as Record<string, unknown>)[field] = value;
-  saveSessionState(cwd, state);
+  mutateSessionState(cwd, state => {
+    (state as Record<string, unknown>)[field] = value;
+    return true;
+  });
 }
 
 /** Set the session mode (adhoc or sprint) for a given session. */
 export function setSessionMode(cwd: string, sessionId: string, mode: SessionMode): void {
-  const state = loadSessionState(cwd);
-  state.session_mode = mode;
-  state.session_mode_id = sessionId;
-  saveSessionState(cwd, state);
+  mutateSessionState(cwd, state => {
+    state.session_mode = mode;
+    state.session_mode_id = sessionId;
+    return true;
+  });
 }
 
 /** Check if the current session is in adhoc mode.
@@ -77,18 +94,21 @@ export function isAdhocSession(cwd: string, sessionId: string): boolean {
  *  back to sprint mode so sprint-workflow guards do not stay suppressed. */
 export function syncSessionModeWithSprintState(cwd: string, sessionId: string): SessionMode | null {
   if (!sessionId) return null;
-  const state = loadSessionState(cwd);
   const sprintState = loadSprintState(cwd);
 
   if (isActiveSprintState(sprintState)) {
-    if (state.session_mode !== 'sprint' || state.session_mode_id !== sessionId) {
+    mutateSessionState(cwd, state => {
+      if (state.session_mode === 'sprint' && state.session_mode_id === sessionId) {
+        return false;
+      }
       state.session_mode = 'sprint';
       state.session_mode_id = sessionId;
-      saveSessionState(cwd, state);
-    }
+      return true;
+    });
     return 'sprint';
   }
 
+  const state = loadSessionState(cwd);
   if (state.session_mode_id !== sessionId) return null;
   return state.session_mode ?? null;
 }
@@ -115,13 +135,12 @@ function loadDedupState(cwd: string): ContextDedupState | null {
   try { return JSON.parse(readFileSync(path, 'utf8')); } catch { return null; }
 }
 
-function saveDedupState(cwd: string, state: ContextDedupState): void {
-  const dir = join(cwd, '.slope');
-  mkdirSync(dir, { recursive: true });
-  const filePath = join(cwd, CONTEXT_DEDUP_FILE);
-  const tmpPath = filePath + '.tmp';
-  writeFileSync(tmpPath, JSON.stringify(state) + '\n');
-  renameSync(tmpPath, filePath);
+function dedupStatePath(cwd: string): string {
+  return join(cwd, CONTEXT_DEDUP_FILE);
+}
+
+function saveDedupStateUnlocked(filePath: string, state: ContextDedupState): void {
+  atomicWriteFileSync(filePath, JSON.stringify(state) + '\n');
 }
 
 function hashContent(content: string): string {
@@ -142,41 +161,45 @@ export function dedupGuardContext(
   if (!sessionId || !context) return null;
 
   const hash = hashContent(context);
-  let state = loadDedupState(cwd);
+  const filePath = dedupStatePath(cwd);
 
-  // Reset if session changed
-  if (!state || state.session_id !== sessionId) {
-    state = { session_id: sessionId, seen: {}, total_chars: 0 };
-  }
+  return withFileLockSync(filePath, () => {
+    let state = loadDedupState(cwd);
 
-  // Prune entries older than 24 hours (prevents unbounded growth across long sessions)
-  const DEDUP_MAX_AGE_MS = 24 * 60 * 60 * 1000;
-  const now = Date.now();
-  for (const [h, entry] of Object.entries(state.seen)) {
-    if (entry.ts && (now - entry.ts) > DEDUP_MAX_AGE_MS) {
-      delete state.seen[h];
+    // Reset if session changed
+    if (!state || state.session_id !== sessionId) {
+      state = { session_id: sessionId, seen: {}, total_chars: 0 };
     }
-  }
 
-  const existing = state.seen[hash];
-  if (existing) {
-    // Already injected — return compressed reference
-    existing.count++;
-    existing.ts = now;
-    saveDedupState(cwd, state);
-    return `SLOPE ${guardName}: (same as prior warning, shown ${existing.count}x)`;
-  }
+    // Prune entries older than 24 hours (prevents unbounded growth across long sessions)
+    const DEDUP_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    for (const [h, entry] of Object.entries(state.seen)) {
+      if (entry.ts && (now - entry.ts) > DEDUP_MAX_AGE_MS) {
+        delete state.seen[h];
+      }
+    }
 
-  // Check token budget — if exceeded, return short message instead of full context
-  const budget = DEFAULT_CONTEXT_BUDGET_CHARS;
-  if ((state.total_chars ?? 0) + context.length > budget) {
-    saveDedupState(cwd, state);
-    return `SLOPE ${guardName}: context budget exhausted (${Math.round((state.total_chars ?? 0) / 4)}+ tokens injected). Run \`slope briefing --compact\` for status.`;
-  }
+    const existing = state.seen[hash];
+    if (existing) {
+      // Already injected — return compressed reference
+      existing.count++;
+      existing.ts = now;
+      saveDedupStateUnlocked(filePath, state);
+      return `SLOPE ${guardName}: (same as prior warning, shown ${existing.count}x)`;
+    }
 
-  // New content — track chars and record
-  state.total_chars = (state.total_chars ?? 0) + context.length;
-  state.seen[hash] = { guard: guardName, count: 1, ts: now };
-  saveDedupState(cwd, state);
-  return null;
+    // Check token budget — if exceeded, return short message instead of full context
+    const budget = DEFAULT_CONTEXT_BUDGET_CHARS;
+    if ((state.total_chars ?? 0) + context.length > budget) {
+      saveDedupStateUnlocked(filePath, state);
+      return `SLOPE ${guardName}: context budget exhausted (${Math.round((state.total_chars ?? 0) / 4)}+ tokens injected). Run \`slope briefing --compact\` for status.`;
+    }
+
+    // New content — track chars and record
+    state.total_chars = (state.total_chars ?? 0) + context.length;
+    state.seen[hash] = { guard: guardName, count: 1, ts: now };
+    saveDedupStateUnlocked(filePath, state);
+    return null;
+  });
 }
