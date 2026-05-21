@@ -24,8 +24,8 @@ export const GUARD_DOCS: Record<string, GuardDoc> = {
   hazard: {
     purpose: 'Warns about known issues and recurring patterns in file areas being edited. Prevents the agent from repeating past mistakes.',
     triggers: 'PreToolUse on Edit, Write. Fires when the agent is about to modify a file.',
-    behavior: 'Advisory — injects context with relevant hazards from common-issues.json and recent scorecard hazards for the file area being edited.',
-    configuration: 'guidance.hazardRecency (default: 5) controls how many sprints back to look for hazards. Disable: add "hazard" to guidance.disabled.',
+    behavior: 'Advisory — injects context with relevant hazards for the file area being edited. Source precedence is common-issues.json first, recent scorecard shot hazards and bunker locations second, then compact cached guard state.',
+    configuration: 'guidance.hazardRecency (default: 5) controls how many recent scorecards the fallback source reads. Disable: add "hazard" to guidance.disabled.',
     level: 'full',
   },
   'commit-nudge': {
