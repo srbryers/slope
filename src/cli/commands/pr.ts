@@ -94,6 +94,29 @@ Defaults:
 `);
 }
 
+function printReviewHelp(): void {
+  console.log(`
+slope pr review — Generate post-PR review prompts
+
+Usage:
+  slope pr review [--pr=N] [--sprint=N] [--type=architect|code|both] [--json]
+
+Options:
+  --help, -h                       Show this help without resolving PR state
+  --pr=N                           Review a specific pull request
+  --sprint=N                       Use a specific sprint for review context
+  --type=architect|code|both       Select review prompt type (default: both)
+  --json                           Emit machine-readable review prompts
+
+Defaults:
+  --pr   Resolved from current branch via \`gh pr view --json number\`.
+`);
+}
+
+function hasHelpFlag(args: string[]): boolean {
+  return args.includes('--help') || args.includes('-h');
+}
+
 function parseFlags(args: string[]): FinalizeOptions {
   const opts: FinalizeOptions = {};
   for (const a of args) {
@@ -384,6 +407,13 @@ async function finalizeSubcommand(args: string[]): Promise<void> {
 }
 
 async function reviewSubcommand(args: string[]): Promise<void> {
+  // Help must be read-only. Agents probe subcommand syntax with --help, so do
+  // not infer PRs, read diffs, or record review state on help flags. (GH #405)
+  if (hasHelpFlag(args)) {
+    printReviewHelp();
+    return;
+  }
+
   const opts = parseReviewFlags(args);
   const plan = await planPrReview(opts);
 
