@@ -1,0 +1,79 @@
+{
+  "sprint_number": 104,
+  "player": "sebastianbryers",
+  "theme": "npm Trusted Publishing Repair",
+  "par": 3,
+  "slope": 1,
+  "score": 3,
+  "score_label": "par",
+  "date": "2026-05-21",
+  "shots": [
+    {
+      "ticket_key": "S104-1",
+      "title": "Move publish workflow to npm trusted publishing (#406)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "The repo workflow can be corrected, but npm package trusted-publisher settings must be configured on npmjs.com before the failed release can be rerun."
+        }
+      ],
+      "notes": "Updated the publish workflow to Node 24, npm 11.5.1+, OIDC trusted publishing without NPM_TOKEN, and documented npm-side maintenance steps."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 1,
+    "fairways_total": 1,
+    "greens_in_regulation": 1,
+    "greens_total": 1,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 1,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "npm trusted publishing is split between repo workflow configuration and npm package settings.",
+      "outcome": "The repo now uses OIDC-compatible publishing, but the npm trusted publisher must be configured for package scope authorization."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "Validation used YAML parsing, git diff checks, npm registry version check, and workflow review against npm trusted publishing requirements.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "A release-infra fix with one external dependency that cannot be closed from the repository alone.",
+    "advice_for_next_player": "Before rerunning a failed publish, verify npm trusted publisher settings and then confirm npm view reports the target version.",
+    "what_surprised_you": "The workflow already had id-token permission, but still used a stale token-based publish path.",
+    "excited_about_next": "Once npm settings are configured, v1.55.12 can be rerun and future releases should not depend on long-lived tokens."
+  },
+  "bunker_locations": [
+    "GitHub workflow OIDC is necessary but insufficient; npm package settings must authorize the workflow filename and repository.",
+    "Node 22 in Actions may carry npm 10, below npm's trusted-publishing CLI requirement."
+  ],
+  "yardage_book_updates": [],
+  "course_management_notes": [
+    "Validation used ruby -e \"require 'yaml'; YAML.load_file('.github/workflows/publish.yml')\".",
+    "Validation used git diff --check and npm view @slope-dev/slope version --registry https://registry.npmjs.org.",
+    "npm currently reports @slope-dev/slope latest as 1.55.11; v1.55.12 still needs the publish workflow rerun after npm trusted publisher setup."
+  ],
+  "slope_factors": [
+    "release_infra",
+    "npm_publish",
+    "trusted_publishing"
+  ]
+}
