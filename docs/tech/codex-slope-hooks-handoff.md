@@ -1,7 +1,7 @@
 # Codex SLOPE Hooks Handoff
 
 **Date:** 2026-05-16
-**Status:** Global Codex hooks are active locally; SLOPE plugin packaging remains blocked by Codex plugin hook discovery.
+**Status:** Global Codex hooks are active locally; SLOPE plugin runtime hooks remain blocked by Codex plugin hook discovery. SLOPE now ships a named Codex plugin bundle for skills, MCP metadata, local marketplace metadata, and future plugin hook metadata.
 
 ## Current Local State
 
@@ -32,22 +32,25 @@ Observed locally on Codex CLI `0.130.0`:
 - Config-layer hooks are discovered by `/hooks`.
 - Plugin-local hooks are not currently a reliable trust/review/runtime surface.
 
-## SLOPE Work Needed
+## SLOPE Work Completed
 
 In `/Users/sebastianbryers/Development/slope`:
 
-1. Update `src/core/adapters/codex.ts`.
-2. Change `CodexAdapter.installGuards()` so the Codex harness can install a user-level/global shim when requested.
-3. Generate a Codex plugin bundle for SLOPE with:
+1. `src/core/adapters/codex.ts` installs project or user-level hook shims.
+2. `slope init --codex` generates a Codex plugin bundle for SLOPE with:
    - `.codex-plugin/plugin.json`
    - packaged guard dispatcher script
    - bundled hook metadata for future plugin-hook support
-4. Keep the global/project `hooks.json` shim as the active runtime path until Codex plugin hook loading works.
-5. Add tests in `tests/core/adapters/codex.test.ts` for:
+   - `skills/` workflow guidance
+   - `.mcp.json` server metadata
+   - `.codex/.agents/plugins/marketplace.json` local marketplace metadata
+3. The global/project `hooks.json` shim remains the active runtime path until Codex plugin hook loading works.
+4. Tests cover:
    - top-level `{ "hooks": ... }` shape
    - current Codex matcher names (`Bash`, `Agent`, `ExitPlanMode`, `EnterWorktree`)
    - optional global install path
    - no duplicate install on repeated `slope hook add --level=full --harness=codex`
+   - `slope init --codex` plugin bundle install/update behavior
 
 ## Important Findings
 

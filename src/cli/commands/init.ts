@@ -1,11 +1,11 @@
-import { writeFileSync, mkdirSync, existsSync, cpSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { writeFileSync, mkdirSync, existsSync, cpSync, readFileSync, readdirSync, statSync, chmodSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
 import { createConfig } from '../config.js';
 import { saveHooksConfig } from '../hooks-config.js';
 import { resolveMetaphor } from '../metaphor.js';
-import { detectPackageManager, createVision, analyzeStack, SLOPE_BIN_PREAMBLE, writeOrUpdateManagedScript } from '../../core/index.js';
+import { detectPackageManager, createVision, analyzeStack, SLOPE_BIN_PREAMBLE, writeOrUpdateManagedScript, GUARD_DEFINITIONS } from '../../core/index.js';
 import type { StackProfile } from '../../core/analyzers/types.js';
 import type { MetaphorDefinition } from '../../core/index.js';
 import {
@@ -547,34 +547,160 @@ function installOpenCodePlugin(cwd: string): void {
   }
 }
 
-function copyDirectoryMissing(srcDir: string, destDir: string): number {
-  if (!existsSync(srcDir)) return 0;
+type TemplateCopyResult = { copied: number; updated: number };
+
+function copyCodexPluginTemplate(srcDir: string, destDir: string, relativeDir = ''): TemplateCopyResult {
+  if (!existsSync(srcDir)) return { copied: 0, updated: 0 };
   mkdirSync(destDir, { recursive: true });
   let copied = 0;
+  let updated = 0;
   for (const entry of readdirSync(srcDir)) {
     const src = join(srcDir, entry);
     const dest = join(destDir, entry);
+    const relativePath = relativeDir ? join(relativeDir, entry) : entry;
     const stat = statSync(src);
     if (stat.isDirectory()) {
-      copied += copyDirectoryMissing(src, dest);
+      const result = copyCodexPluginTemplate(src, dest, relativePath);
+      copied += result.copied;
+      updated += result.updated;
     } else if (!existsSync(dest)) {
       cpSync(src, dest);
+      if (relativePath === join('hooks', 'slope-guard.sh')) chmodSync(dest, 0o755);
       copied++;
+    } else if (isManagedCodexPluginFile(relativePath, dest) && readFileSync(src, 'utf8') !== readFileSync(dest, 'utf8')) {
+      cpSync(src, dest, { force: true });
+      if (relativePath === join('hooks', 'slope-guard.sh')) chmodSync(dest, 0o755);
+      updated++;
     }
   }
-  return copied;
+  return { copied, updated };
+}
+
+function isManagedCodexPluginFile(relativePath: string, destPath: string): boolean {
+  const normalizedPath = relativePath.replace(/\\/g, '/');
+  if (normalizedPath === '.codex-plugin/plugin.json') return false;
+  if (!existsSync(destPath)) return false;
+  try {
+    const existing = readFileSync(destPath, 'utf8');
+    if (normalizedPath === 'hooks.json') return existing.includes('"slopePluginHooksStatus"');
+    if (normalizedPath === 'hooks/slope-guard.sh') return existing.includes('SLOPE Codex plugin dispatcher');
+    if (normalizedPath === '.mcp.json') return existing.includes('"mcpServers"') && existing.includes('"slope"');
+    if (normalizedPath.startsWith('skills/') && normalizedPath.endsWith('SKILL.md')) {
+      return existing.includes('SLOPE');
+    }
+  } catch { /* leave customized files alone */ }
+  return false;
 }
 
 function installCodexPluginBundle(cwd: string): void {
   const src = join(getTemplatesRoot(), 'codex', 'plugins', 'slope');
   const dest = join(cwd, '.codex', 'plugins', 'slope');
-  const copied = copyDirectoryMissing(src, dest);
-  if (copied > 0) {
-    console.log(`  Created Codex plugin bundle at ${dest}`);
+  if (!existsSync(src)) {
+    console.warn(`  Warning: Codex plugin template not found: ${src}`);
+    return;
+  }
+  const result = copyCodexPluginTemplate(src, dest);
+  const hooksUpdated = writeCodexPluginHooksMetadata(dest);
+  const manifestUpdated = syncCodexPluginManifest(dest);
+  const marketplaceUpdated = writeCodexPluginMarketplace(cwd);
+  if (result.copied > 0 || result.updated > 0 || hooksUpdated || manifestUpdated || marketplaceUpdated) {
+    console.log(`  Created/updated Codex plugin bundle at ${dest}`);
   } else if (existsSync(dest)) {
     console.log(`  Codex plugin bundle already exists at ${dest}`);
-  } else {
-    console.warn(`  Warning: Codex plugin template not found: ${src}`);
+  }
+}
+
+function writeCodexPluginMarketplace(cwd: string): boolean {
+  const marketplacePath = join(cwd, '.codex', '.agents', 'plugins', 'marketplace.json');
+  const slopeEntry = {
+    name: 'slope',
+    source: {
+      source: 'local',
+      path: './plugins/slope',
+    },
+    policy: {
+      installation: 'AVAILABLE',
+      authentication: 'ON_INSTALL',
+    },
+    category: 'Productivity',
+  };
+
+  let existing: Record<string, unknown> = {};
+  if (existsSync(marketplacePath)) {
+    try {
+      existing = JSON.parse(readFileSync(marketplacePath, 'utf8')) as Record<string, unknown>;
+    } catch { /* rewrite invalid local marketplace metadata */ }
+  }
+
+  const existingPlugins = Array.isArray(existing.plugins)
+    ? existing.plugins.filter(plugin => !isRecord(plugin) || plugin.name !== 'slope')
+    : [];
+  const existingInterface = isRecord(existing.interface) ? existing.interface : {};
+
+  const marketplace = {
+    ...existing,
+    name: typeof existing.name === 'string' ? existing.name : 'slope-local',
+    interface: {
+      displayName: 'SLOPE Local',
+      ...existingInterface,
+    },
+    plugins: [
+      ...existingPlugins,
+      slopeEntry,
+    ],
+  };
+
+  return writeJsonIfChanged(marketplacePath, marketplace);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function writeCodexPluginHooksMetadata(pluginRoot: string): boolean {
+  const adapter = getAdapter('codex');
+  if (!adapter) return false;
+  const generated = adapter.generateHooksConfig(GUARD_DEFINITIONS, './hooks/slope-guard.sh') as { hooks?: unknown };
+  const hooksPath = join(pluginRoot, 'hooks.json');
+  const payload = {
+    slopePluginHooksStatus: 'metadata-only',
+    note: 'Codex plugin_hooks is under development. Use user or project hooks.json shims for active SLOPE guards until plugin hook loading is stable.',
+    hooks: generated.hooks ?? {},
+  };
+  return writeJsonIfChanged(hooksPath, payload);
+}
+
+function syncCodexPluginManifest(pluginRoot: string): boolean {
+  const manifestPath = join(pluginRoot, '.codex-plugin', 'plugin.json');
+  if (!existsSync(manifestPath)) return false;
+  try {
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as Record<string, unknown>;
+    if (manifest.name !== 'slope') return false;
+    const version = getSlopePackageVersion();
+    if (version) manifest.version = version;
+    manifest.skills = './skills/';
+    manifest.hooks = './hooks.json';
+    manifest.mcpServers = './.mcp.json';
+    return writeJsonIfChanged(manifestPath, manifest);
+  } catch {
+    return false;
+  }
+}
+
+function writeJsonIfChanged(filePath: string, value: unknown): boolean {
+  const next = JSON.stringify(value, null, 2) + '\n';
+  if (existsSync(filePath) && readFileSync(filePath, 'utf8') === next) return false;
+  mkdirSync(dirname(filePath), { recursive: true });
+  writeFileSync(filePath, next);
+  return true;
+}
+
+function getSlopePackageVersion(): string | null {
+  try {
+    const pkg = JSON.parse(readFileSync(join(__dirname, '..', '..', '..', 'package.json'), 'utf8')) as { version?: unknown };
+    return typeof pkg.version === 'string' ? pkg.version : null;
+  } catch {
+    return null;
   }
 }
 
@@ -772,7 +898,7 @@ function installForProvider(cwd: string, provider: InitProvider, metaphor: Metap
       installDefaultHooks(cwd, 'codex');
       console.log('\n  Codex CLI: Guards installed to .codex/hooks.json');
       console.log('  Codex CLI: AGENTS.md provides project context');
-      console.log('  Codex CLI: Plugin bundle installed to .codex/plugins/slope (metadata only until plugin_hooks works)');
+      console.log('  Codex CLI: Plugin bundle installed to .codex/plugins/slope (skills, MCP metadata, marketplace metadata, future plugin hooks)');
       console.log('  Codex CLI: MCP server configured — add to .codex/config.toml:');
       console.log('    [mcp.slope]');
       console.log('    command = "slope"');
@@ -828,7 +954,7 @@ const PROVIDER_NEXT_STEPS: Partial<Record<InitProvider, string[]>> = {
   codex: [
     'Add SLOPE MCP server to .codex/config.toml: [mcp.slope] command="slope" args=["mcp"]',
     'Guards installed to .codex/hooks.json',
-    'Plugin bundle installed to .codex/plugins/slope for future plugin_hooks support',
+    'Plugin bundle installed to .codex/plugins/slope with skills, MCP metadata, marketplace metadata, and future plugin_hooks metadata',
     'Track docs/vision.md and docs/backlog/roadmap.json as source of truth (.slope/ stays local)',
     'Branch discipline: branch-before-commit guard blocks direct main commits — use feat/<desc>',
     'First sprint: slope vision create, slope roadmap validate, slope sprint begin --sprint=1 --ticket=S1-1',
@@ -868,6 +994,13 @@ const PROVIDER_FILES: Partial<Record<InitProvider, string[]>> = {
     'AGENTS.md (project context)',
     'opencode.json (SLOPE MCP server)',
     '.opencode/plugins/slope-plugin.ts (session lifecycle plugin)',
+  ],
+  codex: [
+    'AGENTS.md (project context)',
+    '.codex/hooks.json (active guard hook shim)',
+    '.codex/hooks/ (session hooks and guard dispatcher)',
+    '.codex/.agents/plugins/marketplace.json (local Codex marketplace metadata)',
+    '.codex/plugins/slope/ (Codex plugin bundle: skills, MCP metadata, hook metadata)',
   ],
   generic: [
     'SLOPE-CHECKLIST.md (sprint checklist)',
