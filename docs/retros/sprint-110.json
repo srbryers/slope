@@ -1,0 +1,93 @@
+{
+  "sprint_number": 110,
+  "player": "codex",
+  "theme": "v1.55.14 Release Cycle Probe",
+  "par": 3,
+  "slope": 2,
+  "score": 4,
+  "score_label": "bogey",
+  "date": "2026-05-21",
+  "shots": [
+    {
+      "ticket_key": "S110-1",
+      "title": "Bump v1.55.14 and run release validation for npm publish recovery (#406)",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "The release path is repo-clean, but npm registry publication still depends on npm-side trusted publisher/package authorization."
+        }
+      ],
+      "notes": "Bumped package.json and the bundled Codex plugin manifest to 1.55.14, validated typecheck, build, and the full test suite locally, created GitHub release v1.55.14, and watched the publish workflow. GitHub Actions passed install/build/test/typecheck and signed npm provenance, then npm rejected publish with the same E404 permission/package authorization error."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 1,
+    "fairways_total": 1,
+    "greens_in_regulation": 1,
+    "greens_total": 1,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 1,
+    "hazard_penalties": 1,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "type": "release",
+  "conditions": [
+    {
+      "type": "rough",
+      "description": "npm still reports @slope-dev/slope latest as 1.55.11 before the release cycle, despite GitHub releases through v1.55.13.",
+      "impact": "moderate"
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Release cycle probes need both local validation and live registry verification.",
+      "outcome": "Validated the package bump locally, then verified the GitHub release workflow still fails at npm publish with E404 after provenance signing."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "Validated pnpm run typecheck, pnpm run build, pnpm test, and git diff --check before publishing the release branch; GitHub Actions repeated install, build, test, and typecheck successfully.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "A tiny repo change with a very real external dependency: the release machinery can be clean while npm remains the deciding green.",
+    "advice_for_next_player": "Always verify npm view after a GitHub release; a successful release event and provenance signature are not proof that npm accepted the publish.",
+    "what_surprised_you": "The workflow reached npm far enough to sign provenance, which makes the remaining failure very specifically package authorization or trusted-publisher access.",
+    "excited_about_next": "Once npm-side authorization is corrected, rerunning the release or dispatching the backfill workflow should have a much cleaner path."
+  },
+  "bunker_locations": [
+    "Creating a GitHub release is not enough; npm-side trusted publisher authorization must accept the publish.",
+    "Release bump commits must go through a feature branch and PR, not direct commits on main.",
+    "npm auto-corrected bin entries during pack, warning that bin paths without ./ were removed.",
+    "actions/setup-node@v4 ignored package-manager-cache, warning that the workflow input is not valid."
+  ],
+  "yardage_book_updates": [],
+  "course_management_notes": [
+    "Package version bumped from 1.55.13 to 1.55.14.",
+    "Codex plugin template version bumped from 1.55.13 to 1.55.14.",
+    "Before release, npm view @slope-dev/slope version still reported 1.55.11.",
+    "Created GitHub release v1.55.14, which triggered Publish to npm run 26259794247.",
+    "Publish run passed install, build, test, typecheck, and npm 11.5.1 setup.",
+    "npm publish signed provenance and published to the transparency log, then failed with E404 for @slope-dev/slope@1.55.14.",
+    "After the failed release, npm view @slope-dev/slope version still reported 1.55.11.",
+    "Local validation passed with 211 test files and 3433 tests."
+  ],
+  "slope_factors": [
+    "release",
+    "npm",
+    "github_actions"
+  ]
+}
