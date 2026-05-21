@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "slope": {
+      "command": "slope",
+      "args": ["mcp"]
+    }
+  }
+}

@@ -1,29 +1,206 @@
 {
   "slopePluginHooksStatus": "metadata-only",
-  "note": "Codex plugin hook discovery is not a reliable runtime path yet. Use user or project hooks.json shims for active SLOPE guards.",
+  "note": "Codex plugin_hooks is under development. Use user or project hooks.json shims for active SLOPE guards until plugin hook loading is stable.",
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
-            "command": "./hooks/slope-guard.sh branch-before-commit",
+            "command": "\"./hooks/slope-guard.sh\" explore",
             "timeout": 10,
-            "statusMessage": "SLOPE branch guard"
+            "statusMessage": "SLOPE explore"
           }
-        ]
+        ],
+        "matcher": "mcp__.*__read.*|mcp__.*__glob.*|mcp__.*__list.*|mcp__.*__search.*|mcp__.*__grep.*|apply_patch|Edit|Write"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"./hooks/slope-guard.sh\" hazard",
+            "timeout": 10,
+            "statusMessage": "SLOPE hazard"
+          },
+          {
+            "type": "command",
+            "command": "\"./hooks/slope-guard.sh\" scope-drift",
+            "timeout": 10,
+            "statusMessage": "SLOPE scope-drift"
+          },
+          {
+            "type": "command",
+            "command": "\"./hooks/slope-guard.sh\" workflow-step-gate",
+            "timeout": 10,
+            "statusMessage": "SLOPE workflow-step-gate"
+          },
+          {
+            "type": "command",
+            "command": "\"./hooks/slope-guard.sh\" stale-flows",
+            "timeout": 10,
+            "statusMessage": "SLOPE stale-flows"
+          },
+          {
+            "type": "command",
+            "command": "\"./hooks/slope-guard.sh\" claim-required",
+            "timeout": 10,
+            "statusMessage": "SLOPE claim-required"
+          },
+          {
+            "type": "command",
+            "command": "\"./hooks/slope-guard.sh\" roadmap-edit-shipped",
+            "timeout": 10,
+            "statusMessage": "SLOPE roadmap-edit-shipped"
+          }
+        ],
+        "matcher": "apply_patch|Edit|Write"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"./hooks/slope-guard.sh\" subagent-gate",
+            "timeout": 10,
+            "statusMessage": "SLOPE subagent-gate"
+          }
+        ],
+        "matcher": "Agent"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"./hooks/slope-guard.sh\" workflow-gate",
+            "timeout": 10,
+            "statusMessage": "SLOPE workflow-gate"
+          }
+        ],
+        "matcher": "ExitPlanMode"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"./hooks/slope-guard.sh\" version-check",
+            "timeout": 10,
+            "statusMessage": "SLOPE version-check"
+          },
+          {
+            "type": "command",
+            "command": "\"./hooks/slope-guard.sh\" branch-before-commit",
+            "timeout": 10,
+            "statusMessage": "SLOPE branch-before-commit"
+          },
+          {
+            "type": "command",
+            "command": "\"./hooks/slope-guard.sh\" sprint-completion",
+            "timeout": 10,
+            "statusMessage": "SLOPE sprint-completion"
+          },
+          {
+            "type": "command",
+            "command": "\"./hooks/slope-guard.sh\" worktree-merge",
+            "timeout": 10,
+            "statusMessage": "SLOPE worktree-merge"
+          },
+          {
+            "type": "command",
+            "command": "\"./hooks/slope-guard.sh\" worktree-self-remove",
+            "timeout": 10,
+            "statusMessage": "SLOPE worktree-self-remove"
+          },
+          {
+            "type": "command",
+            "command": "\"./hooks/slope-guard.sh\" phase-boundary",
+            "timeout": 10,
+            "statusMessage": "SLOPE phase-boundary"
+          }
+        ],
+        "matcher": "Bash"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"./hooks/slope-guard.sh\" worktree-check",
+            "timeout": 10,
+            "statusMessage": "SLOPE worktree-check"
+          }
+        ],
+        "matcher": "apply_patch|Edit|Write|Bash"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"./hooks/slope-guard.sh\" worktree-reuse",
+            "timeout": 10,
+            "statusMessage": "SLOPE worktree-reuse"
+          }
+        ],
+        "matcher": "EnterWorktree"
       }
     ],
     "PostToolUse": [
       {
-        "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
-            "command": "./hooks/slope-guard.sh commit-nudge",
+            "command": "\"./hooks/slope-guard.sh\" commit-nudge",
             "timeout": 10,
-            "statusMessage": "SLOPE commit nudge"
+            "statusMessage": "SLOPE commit-nudge"
+          },
+          {
+            "type": "command",
+            "command": "\"./hooks/slope-guard.sh\" review-tier",
+            "timeout": 10,
+            "statusMessage": "SLOPE review-tier"
+          }
+        ],
+        "matcher": "apply_patch|Edit|Write"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"./hooks/slope-guard.sh\" push-nudge",
+            "timeout": 10,
+            "statusMessage": "SLOPE push-nudge"
+          },
+          {
+            "type": "command",
+            "command": "\"./hooks/slope-guard.sh\" pr-review",
+            "timeout": 10,
+            "statusMessage": "SLOPE pr-review"
+          },
+          {
+            "type": "command",
+            "command": "\"./hooks/slope-guard.sh\" sprint-completion",
+            "timeout": 10,
+            "statusMessage": "SLOPE sprint-completion"
+          },
+          {
+            "type": "command",
+            "command": "\"./hooks/slope-guard.sh\" post-push",
+            "timeout": 10,
+            "statusMessage": "SLOPE post-push"
+          }
+        ],
+        "matcher": "Bash"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"./hooks/slope-guard.sh\" transcript",
+            "timeout": 10,
+            "statusMessage": "SLOPE transcript"
+          },
+          {
+            "type": "command",
+            "command": "\"./hooks/slope-guard.sh\" session-briefing",
+            "timeout": 10,
+            "statusMessage": "SLOPE session-briefing"
           }
         ]
       }
@@ -33,9 +210,33 @@
         "hooks": [
           {
             "type": "command",
-            "command": "./hooks/slope-guard.sh stop-check",
+            "command": "\"./hooks/slope-guard.sh\" stop-check",
             "timeout": 10,
-            "statusMessage": "SLOPE stop check"
+            "statusMessage": "SLOPE stop-check"
+          },
+          {
+            "type": "command",
+            "command": "\"./hooks/slope-guard.sh\" next-action",
+            "timeout": 10,
+            "statusMessage": "SLOPE next-action"
+          },
+          {
+            "type": "command",
+            "command": "\"./hooks/slope-guard.sh\" sprint-completion",
+            "timeout": 10,
+            "statusMessage": "SLOPE sprint-completion"
+          },
+          {
+            "type": "command",
+            "command": "\"./hooks/slope-guard.sh\" review-stale",
+            "timeout": 10,
+            "statusMessage": "SLOPE review-stale"
+          },
+          {
+            "type": "command",
+            "command": "\"./hooks/slope-guard.sh\" post-hole-enforcement",
+            "timeout": 10,
+            "statusMessage": "SLOPE post-hole-enforcement"
           }
         ]
       }

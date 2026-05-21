@@ -32,10 +32,16 @@ After installing or changing Codex hooks, restart Codex and run `/hooks`. Codex 
 `slope init --codex` creates `.codex/plugins/slope/` with:
 
 - `.codex-plugin/plugin.json`
+- `.mcp.json`
 - `hooks.json`
 - `hooks/slope-guard.sh`
+- `skills/`
 
-This bundle is metadata for future Codex `plugin_hooks` support. Keep using project or user `hooks.json` shims as the active runtime path until Codex plugin hook loading is reliable.
+It also writes `.codex/.agents/plugins/marketplace.json` so `.codex/` can be used as a local Codex marketplace root.
+
+This bundle is the named SLOPE adapter boundary for Codex. It packages SLOPE skills, MCP server metadata, hook metadata, local marketplace metadata, and a dispatcher script over the SLOPE CLI. Keep using project or user `hooks.json` shims as the active guard runtime path until Codex `plugin_hooks` is stable.
+
+`slope init --codex` updates SLOPE-owned plugin metadata on repeated runs. Existing non-SLOPE plugin manifests are left alone.
 
 ## Verification
 
@@ -47,3 +53,5 @@ codex debug prompt-input 'global hooks only parse smoke'
 ```
 
 Then run a harmless command in a SLOPE repo and confirm `.slope/guard-metrics.jsonl` receives a fresh entry.
+
+To register the project-local plugin bundle as a Codex marketplace source, run `codex plugin marketplace add .codex` from the repository root.
