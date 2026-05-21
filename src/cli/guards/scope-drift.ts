@@ -2,8 +2,11 @@ import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { HookInput, GuardResult } from '../../core/index.js';
 import { loadConfig } from '../config.js';
+import type { SlopeConfig } from '../config.js';
+import { loadSprintState } from '../sprint-state.js';
 import { resolveStore } from '../store.js';
 import { dedupGuardContext } from '../session-state.js';
+import { normalizeTouchedPath, resolveTouchedPaths } from './hook-input.js';
 
 // ── Disk state for compaction survival ──────────────
 
@@ -59,19 +62,17 @@ function pruneState(state: DriftState, currentSprint: number): DriftState {
  * Writes state to disk so warnings survive context compaction.
  */
 export async function scopeDriftGuard(input: HookInput, cwd: string): Promise<GuardResult> {
-  const config = loadConfig();
+  const config = loadConfig(cwd);
   if (config.guidance?.scopeDrift === false) return {};
 
-  const filePath = input.tool_input?.file_path as string | undefined;
-  if (!filePath) return {};
-
   // Normalize file path relative to cwd
-  const relativePath = filePath.startsWith(cwd)
-    ? filePath.slice(cwd.length + 1)
-    : filePath;
+  const relativePaths = resolveTouchedPaths(input)
+    .map(filePath => normalizeTouchedPath(filePath, cwd))
+    .filter((filePath): filePath is string => Boolean(filePath));
+  if (relativePaths.length === 0) return {};
 
   // Look up active claims for the current sprint
-  const sprintNumber = config.currentSprint;
+  const sprintNumber = resolveCurrentSprint(cwd, config);
   if (!sprintNumber) return {}; // Can't check without a sprint
 
   // Load and prune disk state
@@ -89,16 +90,19 @@ export async function scopeDriftGuard(input: HookInput, cwd: string): Promise<Gu
     const areaClaims = claims.filter(c => c.scope === 'area');
     if (areaClaims.length === 0) return {}; // No area claims — ticket-only claims don't restrict files
 
-    const inScope = areaClaims.some(c => relativePath.startsWith(c.target));
+    const outOfScopePath = relativePaths.find(relativePath =>
+      !areaClaims.some(c => isWithinClaimedArea(relativePath, c.target)),
+    );
 
-    if (inScope) {
-      // File is in scope — clear any cached drift entry for this file
-      state.entries = state.entries.filter(e => e.file !== relativePath);
+    if (!outOfScopePath) {
+      // Files are in scope — clear any cached drift entries for these files
+      state.entries = state.entries.filter(e => !relativePaths.includes(e.file));
       saveDriftState(cwd, state);
       return {};
     }
 
     // Out of scope — cache drift violation to disk
+    const relativePath = outOfScopePath;
     const claimedAreas = areaClaims.map(c => c.target).join(', ');
     const entry: DriftStateEntry = {
       file: relativePath,
@@ -115,12 +119,22 @@ export async function scopeDriftGuard(input: HookInput, cwd: string): Promise<Gu
     return { context: dedup ?? driftMsg };
   } catch {
     // Store not available — fall back to disk state (advisory, not blocking)
-    const cached = state.entries.find(e => e.file === relativePath);
+    const cached = state.entries.find(e => relativePaths.includes(e.file));
     if (cached && (Date.now() - cached.timestamp) < STALE_MS) {
-      const cachedMsg = `SLOPE scope drift: ${relativePath} is outside claimed areas (${cached.claimedAreas}). Intentional?`;
+      const cachedMsg = `SLOPE scope drift: ${cached.file} is outside claimed areas (${cached.claimedAreas}). Intentional?`;
       const dedup = dedupGuardContext(cwd, input.session_id, 'scope-drift', cachedMsg);
       return { context: dedup ?? cachedMsg };
     }
     return {}; // No cached state or too stale — fail open
   }
+}
+
+function resolveCurrentSprint(cwd: string, config: SlopeConfig): number | undefined {
+  const sprintState = loadSprintState(cwd);
+  return sprintState?.sprint ?? config.currentSprint;
+}
+
+function isWithinClaimedArea(relativePath: string, target: string): boolean {
+  const normalizedTarget = target.replace(/\\/g, '/').replace(/\/$/, '');
+  return relativePath === normalizedTarget || relativePath.startsWith(`${normalizedTarget}/`);
 }
