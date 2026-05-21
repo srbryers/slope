@@ -1,0 +1,73 @@
+{
+  "sprint_number": 105,
+  "player": "sebastianbryers",
+  "theme": "Guard Metric Silent Reasons",
+  "par": 3,
+  "slope": 1,
+  "score": 3,
+  "score_label": "par",
+  "date": "2026-05-21",
+  "shots": [
+    {
+      "ticket_key": "S105-1",
+      "title": "Record actionable guard metric reasons (#398)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Added metric-only guard reason codes, reason aggregation in guard analytics, CLI reason counts, and focused tests for JSONL output shape plus guard-specific silent reasons."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 1,
+    "fairways_total": 1,
+    "greens_in_regulation": 1,
+    "greens_total": 1,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Reason-only guard results need to remain invisible to hook output while still being captured in metrics.",
+      "outcome": "Adapters and batched guard output still key off context, decisions, block reasons, and suggestions; metricReason is only consumed by recordGuardExecution."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "Focused guard/analytics tests, typecheck, build, guard metrics smoke, and full Vitest suite passed.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "A compact telemetry change with clear acceptance criteria and useful immediate feedback from the live guard metrics file.",
+    "advice_for_next_player": "When adding guard result metadata, verify both direct guard tests and real guardCommand JSONL output so internal fields do not leak into hook responses.",
+    "what_surprised_you": "The live metrics immediately showed old adhoc suppressions and a new irrelevant-command reason, which confirms the CLI surface makes underutilization easier to diagnose.",
+    "excited_about_next": "Use the new reason counts to decide whether hazard and other guards are redundant, underfed, or missing payload data."
+  },
+  "bunker_locations": [
+    "Reason-only GuardResult fields must remain hook-internal; adapters and batched output should keep ignoring results without context, decisions, block reasons, or suggestions.",
+    "review recommend can undercount ad hoc GitHub issue work when the active sprint has no roadmap or plan ticket entry."
+  ],
+  "yardage_book_updates": [],
+  "course_management_notes": [
+    "Validation used pnpm vitest run tests/core/analytics.test.ts tests/cli/commands/guard.test.ts tests/cli/guards.test.ts tests/cli/guards/pr-review.test.ts tests/cli/guards/pr-review-recommend.test.ts.",
+    "Additional validation used pnpm run typecheck, pnpm run build, node dist/cli/index.js guard metrics, and pnpm test.",
+    "slope review recommend reported only optional code review for S105; manual code and architecture review found no issues."
+  ],
+  "slope_factors": [
+    "agent_dx",
+    "guard_metrics",
+    "diagnostics"
+  ]
+}
