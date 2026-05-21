@@ -2,6 +2,7 @@ import {
   loadSprintState,
   saveSprintState,
   createSprintState,
+  mutateSprintState,
   updateGate,
   updateSprintPhase,
   clearSprintState,
@@ -231,8 +232,7 @@ function startCommand(args: string[], cwd: string): void {
   const existing = loadSprintState(cwd);
   if (existing && existing.sprint === sprint) {
     if (phaseArg && existing.phase !== phase) {
-      existing.phase = phase;
-      saveSprintState(cwd, existing);
+      updateSprintPhase(cwd, phase);
       console.log(`Sprint ${sprint} phase updated: ${phase}.`);
       return;
     }
@@ -416,8 +416,12 @@ function syncSprintStateWithWorkflow(cwd: string, sprintId: string | undefined, 
   if (existing.sprint !== sprint || existing.phase === 'complete') return;
   if (SPRINT_PHASE_ORDER[nextPhase] <= SPRINT_PHASE_ORDER[existing.phase]) return;
 
-  existing.phase = nextPhase;
-  saveSprintState(cwd, existing);
+  mutateSprintState(cwd, current => {
+    if (current.sprint !== sprint || current.phase === 'complete') return false;
+    if (SPRINT_PHASE_ORDER[nextPhase] <= SPRINT_PHASE_ORDER[current.phase]) return false;
+    current.phase = nextPhase;
+    return true;
+  });
 }
 
 async function runWorkflowCommand(args: string[], cwd: string): Promise<void> {

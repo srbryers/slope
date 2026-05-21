@@ -1,5 +1,6 @@
-import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync, unlinkSync } from 'node:fs';
+import { readFileSync, existsSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
+import { atomicWriteFileSync, withFileLockSync } from './atomic-write.js';
 
 /** Sprint lifecycle phases */
 export const SPRINT_PHASES = ['planning', 'reviewing', 'implementing', 'scoring', 'complete'] as const;
@@ -62,34 +63,48 @@ export function isActiveSprintState(state: SprintState | null): state is SprintS
   return Boolean(state && state.phase !== 'complete');
 }
 
-/** Save sprint state atomically via tmp + rename. */
-export function saveSprintState(cwd: string, state: SprintState): void {
-  const dir = join(cwd, '.slope');
-  mkdirSync(dir, { recursive: true });
+function sprintStatePath(cwd: string): string {
+  return join(cwd, SPRINT_STATE_FILE);
+}
 
+function saveSprintStateUnlocked(filePath: string, state: SprintState): void {
   state.updated_at = new Date().toISOString();
+  atomicWriteFileSync(filePath, JSON.stringify(state, null, 2) + '\n');
+}
 
-  const filePath = join(cwd, SPRINT_STATE_FILE);
-  const tmpPath = filePath + '.tmp';
-  writeFileSync(tmpPath, JSON.stringify(state, null, 2) + '\n');
-  renameSync(tmpPath, filePath);
+/** Save sprint state atomically via unique tmp + rename. */
+export function saveSprintState(cwd: string, state: SprintState): void {
+  const filePath = sprintStatePath(cwd);
+  withFileLockSync(filePath, () => saveSprintStateUnlocked(filePath, state));
+}
+
+/** Mutate sprint state while holding the state file lock. Returns null if missing/corrupt. */
+export function mutateSprintState(cwd: string, mutator: (state: SprintState) => boolean): SprintState | null {
+  const filePath = sprintStatePath(cwd);
+  return withFileLockSync(filePath, () => {
+    const state = loadSprintState(cwd);
+    if (!state) return null;
+    if (mutator(state)) {
+      saveSprintStateUnlocked(filePath, state);
+    }
+    return state;
+  });
 }
 
 /** Update a single gate and save. */
 export function updateGate(cwd: string, gate: GateName, value: boolean): void {
-  const state = loadSprintState(cwd);
-  if (!state) return;
-  state.gates[gate] = value;
-  saveSprintState(cwd, state);
+  mutateSprintState(cwd, state => {
+    state.gates[gate] = value;
+    return true;
+  });
 }
 
 /** Update the current sprint lifecycle phase. */
 export function updateSprintPhase(cwd: string, phase: SprintPhase): SprintState | null {
-  const state = loadSprintState(cwd);
-  if (!state) return null;
-  state.phase = phase;
-  saveSprintState(cwd, state);
-  return state;
+  return mutateSprintState(cwd, state => {
+    state.phase = phase;
+    return true;
+  });
 }
 
 /** Check if all gates are true. */
@@ -124,8 +139,9 @@ export function createSprintState(sprint: number, phase: SprintPhase = 'planning
 
 /** Delete the sprint state file. */
 export function clearSprintState(cwd: string): void {
-  const statePath = join(cwd, SPRINT_STATE_FILE);
-  if (existsSync(statePath)) {
-    unlinkSync(statePath);
-  }
+  const statePath = sprintStatePath(cwd);
+  if (!existsSync(statePath)) return;
+  withFileLockSync(statePath, () => {
+    if (existsSync(statePath)) unlinkSync(statePath);
+  });
 }

@@ -13,6 +13,26 @@ function parseArgs(args: string[]): Record<string, string> {
   return result;
 }
 
+function hasHelpFlag(args: string[]): boolean {
+  return args.includes('--help') || args.includes('-h');
+}
+
+function printClaimHelp(): void {
+  console.log(`slope claim --target=<target> [options]
+
+Register a sprint claim for a ticket, file, or area.
+
+Options:
+  --target=<target>      Ticket, file path, or area to claim
+  --scope=<scope>        Claim scope: ticket or area (default: ticket)
+  --sprint=<number>      Sprint number (default: inferred from context)
+  --player=<name>        Player name (default: USER env var)
+  --notes=<text>         Optional claim notes
+  --force                Override overlap conflicts
+  --help, -h             Show this help
+`);
+}
+
 function resolveSprint(flags: Record<string, string>, cwd: string): number {
   if (flags.sprint) return parseInt(flags.sprint, 10);
   const config = loadConfig(cwd);
@@ -20,6 +40,11 @@ function resolveSprint(flags: Record<string, string>, cwd: string): number {
 }
 
 export async function claimCommand(args: string[]): Promise<void> {
+  if (hasHelpFlag(args)) {
+    printClaimHelp();
+    return;
+  }
+
   const flags = parseArgs(args);
   const force = args.includes('--force');
   const cwd = process.cwd();
