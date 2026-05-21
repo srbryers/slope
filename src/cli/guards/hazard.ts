@@ -60,7 +60,7 @@ function pruneState(state: HazardState, currentSprint: number): HazardState {
  */
 export async function hazardGuard(input: HookInput, cwd: string): Promise<GuardResult> {
   const areas = resolveTouchedAreas(input, cwd);
-  if (areas.length === 0) return {};
+  if (areas.length === 0) return { metricReason: 'no-file-path' };
 
   const config = loadConfig(cwd);
   const currentSprint = config.currentSprint ?? 0;
@@ -109,12 +109,12 @@ export async function hazardGuard(input: HookInput, cwd: string): Promise<GuardR
 
     // Session dedup: if this exact context was already injected, return compressed reference
     const dedup = dedupGuardContext(cwd, input.session_id, 'hazard', fullContext);
-    if (dedup) return { context: dedup };
+    if (dedup) return { context: dedup, metricReason: 'deduped' };
 
-    return { context: fullContext };
+    return { context: fullContext, metricReason: 'matched' };
   }
 
-  return {};
+  return { metricReason: issues ? 'no-match' : 'state-unavailable' };
 }
 
 function resolveTouchedAreas(input: HookInput, cwd: string): string[] {

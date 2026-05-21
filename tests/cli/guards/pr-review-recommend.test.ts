@@ -47,12 +47,12 @@ describe('prReviewGuard recommendations (GH #302)', () => {
       { ...makeInput(''), tool_input: { command: 'gh pr view 1' } },
       cwd,
     );
-    expect(result).toEqual({});
+    expect(result).toEqual({ metricReason: 'irrelevant-command' });
   });
 
   it('does not fire when output is missing PR URL', async () => {
     const result = await prReviewGuard(makeInput('error: failed'), cwd);
-    expect(result).toEqual({});
+    expect(result).toEqual({ metricReason: 'no-match' });
   });
 
   it('emits context with PR URL extracted from output', async () => {

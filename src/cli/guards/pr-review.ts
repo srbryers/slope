@@ -17,7 +17,7 @@ export async function prReviewGuard(input: HookInput, cwd: string): Promise<Guar
   const command = (input.tool_input?.command as string) ?? '';
   const response = (input.tool_response?.stdout as string) ?? (input.tool_response?.result as string) ?? '';
 
-  if (!command.includes('gh pr create')) return {};
+  if (!command.includes('gh pr create')) return { metricReason: 'irrelevant-command' };
 
   // Substring fast-path used to gate the regex match, but `includes()` over
   // arbitrary text can never tightly bound a URL — CodeQL flags it as
@@ -26,7 +26,7 @@ export async function prReviewGuard(input: HookInput, cwd: string): Promise<Guar
   // a path containing `/pull/<digits>`. If it matches, treat it as a real
   // PR URL; if not, the guard skips.
   const urlMatch = response.match(/(https:\/\/github\.com\/[^\s]+\/pull\/(\d+))/);
-  if (!urlMatch) return {};
+  if (!urlMatch) return { metricReason: 'no-match' };
   const prUrl = urlMatch[1];
   const prNumber = urlMatch[2];
 
@@ -36,6 +36,7 @@ export async function prReviewGuard(input: HookInput, cwd: string): Promise<Guar
   const recLine = formatRecommendations(recs);
 
   return {
+    metricReason: 'matched',
     context: [
       `SLOPE PR Review: A pull request was just created (${prUrl}).`,
       ...(recLine ? [`Recommended reviews based on diff: ${recLine}.`] : []),

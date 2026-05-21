@@ -304,6 +304,28 @@ describe('computeGuardMetrics', () => {
     expect(result.by_guard[0].silent).toBe(1);
   });
 
+  it('aggregates reason counts for silent, context, and suppressed outcomes', () => {
+    const lines = [
+      JSON.stringify({ ts: '2025-01-01', guard: 'hazard', event: 'PreToolUse', tool: 'Edit', decision: 'silent', reason: 'no-file-path' }),
+      JSON.stringify({ ts: '2025-01-01', guard: 'hazard', event: 'PreToolUse', tool: 'Edit', decision: 'silent', reason: 'no-match' }),
+      JSON.stringify({ ts: '2025-01-01', guard: 'hazard', event: 'PreToolUse', tool: 'Edit', decision: 'context', reason: 'deduped' }),
+      JSON.stringify({ ts: '2025-01-01', guard: 'workflow-step-gate', event: 'PreToolUse', tool: 'Edit', decision: 'suppressed', reason: 'adhoc-session' }),
+    ];
+    const result = computeGuardMetrics(lines);
+    const hazard = result.by_guard.find(g => g.guard === 'hazard');
+    const workflow = result.by_guard.find(g => g.guard === 'workflow-step-gate');
+
+    expect(hazard?.silent).toBe(2);
+    expect(hazard?.context).toBe(1);
+    expect(hazard?.reason_counts).toEqual({
+      'deduped': 1,
+      'no-file-path': 1,
+      'no-match': 1,
+    });
+    expect(workflow?.silent).toBe(1);
+    expect(workflow?.reason_counts).toEqual({ 'adhoc-session': 1 });
+  });
+
   it('computes block_rate correctly', () => {
     const lines = [
       JSON.stringify({ ts: '2025-01-01', guard: 'g', event: 'PreToolUse', tool: 'X', decision: 'deny' }),

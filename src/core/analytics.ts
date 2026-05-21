@@ -130,6 +130,7 @@ export interface GuardMetrics {
   context: number;
   silent: number;
   block_rate: number;      // (deny / total) * 100
+  reason_counts?: Record<string, number>; // reason counts for silent/context/suppressed outcomes
 }
 
 export interface GuardEffectivenessReport {
@@ -140,7 +141,7 @@ export interface GuardEffectivenessReport {
 }
 
 /** Possible decision values in guard metrics JSONL (superset of GuardResult.decision) */
-export type GuardDecision = 'allow' | 'deny' | 'ask' | 'context' | 'silent';
+export type GuardDecision = 'allow' | 'deny' | 'ask' | 'context' | 'silent' | 'suppressed';
 
 interface GuardMetricLine {
   ts: string;
@@ -148,6 +149,16 @@ interface GuardMetricLine {
   event: string;
   tool?: string;
   decision: string;
+  reason?: unknown;
+}
+
+interface GuardMetricCounts {
+  allow: number;
+  deny: number;
+  ask: number;
+  context: number;
+  silent: number;
+  reasonCounts: Map<string, number>;
 }
 
 /**
@@ -156,7 +167,7 @@ interface GuardMetricLine {
  * Malformed lines are skipped gracefully.
  */
 export function computeGuardMetrics(lines: string[]): GuardEffectivenessReport {
-  const byGuard = new Map<string, { allow: number; deny: number; ask: number; context: number; silent: number }>();
+  const byGuard = new Map<string, GuardMetricCounts>();
 
   for (const line of lines) {
     const trimmed = line.trim();
@@ -172,7 +183,7 @@ export function computeGuardMetrics(lines: string[]): GuardEffectivenessReport {
     if (!parsed.guard || typeof parsed.guard !== 'string') continue;
 
     if (!byGuard.has(parsed.guard)) {
-      byGuard.set(parsed.guard, { allow: 0, deny: 0, ask: 0, context: 0, silent: 0 });
+      byGuard.set(parsed.guard, { allow: 0, deny: 0, ask: 0, context: 0, silent: 0, reasonCounts: new Map() });
     }
     const entry = byGuard.get(parsed.guard)!;
 
@@ -180,8 +191,19 @@ export function computeGuardMetrics(lines: string[]): GuardEffectivenessReport {
       case 'allow': entry.allow++; break;
       case 'deny': entry.deny++; break;
       case 'ask': entry.ask++; break;
-      case 'context': entry.context++; break;
-      default: entry.silent++; break;
+      case 'context':
+        entry.context++;
+        recordMetricReason(entry, parsed.reason);
+        break;
+      case 'silent':
+      case 'suppressed':
+        entry.silent++;
+        recordMetricReason(entry, parsed.reason);
+        break;
+      default:
+        entry.silent++;
+        recordMetricReason(entry, parsed.reason);
+        break;
     }
   }
 
@@ -199,8 +221,13 @@ export function computeGuardMetrics(lines: string[]): GuardEffectivenessReport {
     metrics.push({
       guard,
       total,
-      ...counts,
+      allow: counts.allow,
+      deny: counts.deny,
+      ask: counts.ask,
+      context: counts.context,
+      silent: counts.silent,
       block_rate: blockRate,
+      reason_counts: toReasonCountsObject(counts.reasonCounts),
     });
 
     totalExecutions += total;
@@ -226,6 +253,19 @@ export function computeGuardMetrics(lines: string[]): GuardEffectivenessReport {
     most_active: mostActive,
     most_blocking: mostBlocking,
   };
+}
+
+function recordMetricReason(entry: GuardMetricCounts, reason: unknown): void {
+  if (typeof reason !== 'string') return;
+  const normalized = reason.trim();
+  if (!normalized) return;
+  entry.reasonCounts.set(normalized, (entry.reasonCounts.get(normalized) ?? 0) + 1);
+}
+
+function toReasonCountsObject(reasonCounts: Map<string, number>): Record<string, number> {
+  return Object.fromEntries(
+    [...reasonCounts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])),
+  );
 }
 
 // --- Convergence Detection ---

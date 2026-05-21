@@ -167,6 +167,24 @@ describe('guardCommand dispatcher path', () => {
     expect(metrics).toContain('"reason":"adhoc-session"');
   });
 
+  it('records guard-specific silent reason metrics', async () => {
+    const output = await runGuardCommandWithInput(
+      ['hazard'],
+      makeHookInput(cwd, { tool_input: {} }),
+    );
+
+    expect(output).toBe('');
+    const metrics = readFileSync(join(cwd, '.slope', 'guard-metrics.jsonl'), 'utf8')
+      .trim()
+      .split('\n')
+      .map(line => JSON.parse(line));
+    expect(metrics.at(-1)).toMatchObject({
+      guard: 'hazard',
+      decision: 'silent',
+      reason: 'no-file-path',
+    });
+  });
+
   it('keeps claim-required effective when batched with suppressed write guards', async () => {
     const output = await runGuardCommandWithInput(
       ['__batch', 'workflow-step-gate', 'claim-required'],
@@ -182,6 +200,21 @@ describe('guardCommand dispatcher path', () => {
     expect(metrics).toContain('"decision":"suppressed"');
     expect(metrics).toContain('"guard":"claim-required"');
     expect(metrics).toContain('"decision":"ask"');
+  });
+
+  it('prints metric reason counts in the metrics command', async () => {
+    writeFileSync(join(cwd, '.slope', 'guard-metrics.jsonl'), [
+      JSON.stringify({ ts: '2026-05-21T00:00:00.000Z', guard: 'hazard', event: 'PreToolUse', tool: 'apply_patch', decision: 'silent', reason: 'no-file-path' }),
+      JSON.stringify({ ts: '2026-05-21T00:00:01.000Z', guard: 'hazard', event: 'PreToolUse', tool: 'apply_patch', decision: 'context', reason: 'deduped' }),
+    ].join('\n') + '\n');
+
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    await guardManageCommand(['metrics']);
+    const output = logSpy.mock.calls.map(c => String(c[0])).join('\n');
+
+    expect(output).toContain('Reasons (silent/context/suppressed)');
+    expect(output).toContain('no-file-path');
+    expect(output).toContain('deduped');
   });
 });
 

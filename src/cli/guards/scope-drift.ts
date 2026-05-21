@@ -125,7 +125,7 @@ export async function scopeDriftGuard(input: HookInput, cwd: string): Promise<Gu
       const dedup = dedupGuardContext(cwd, input.session_id, 'scope-drift', cachedMsg);
       return { context: dedup ?? cachedMsg };
     }
-    return {}; // No cached state or too stale — fail open
+    return { metricReason: 'state-unavailable' }; // No cached state or too stale — fail open
   }
 }
 
