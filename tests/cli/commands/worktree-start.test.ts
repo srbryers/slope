@@ -83,4 +83,21 @@ describe('slope worktree start', () => {
       store.close();
     }
   });
+
+  it('passes worktree paths as process arguments instead of shell fragments', async () => {
+    const markerPath = join(cwd, 'shell-injection-marker');
+    const worktreePath = join(cwd, '.slope', 'worktrees', `safe-$(touch ${markerPath})`);
+
+    await worktreeCommand([
+      'start',
+      '--branch=codex/worktree-shell-safe',
+      '--base=HEAD',
+      `--path=${worktreePath}`,
+      '--role=secondary',
+      '--ide=codex',
+    ]);
+
+    expect(existsSync(markerPath)).toBe(false);
+    expect(existsSync(worktreePath)).toBe(true);
+  });
 });

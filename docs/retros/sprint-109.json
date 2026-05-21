@@ -62,9 +62,14 @@
           "type": "rough",
           "severity": "minor",
           "description": "macOS realpath normalization can expose /var and /private path spellings differently in worktree integration tests."
+        },
+        {
+          "type": "rough",
+          "severity": "moderate",
+          "description": "The first worktree start implementation built git commands through the shell, which could interpret metacharacters in user-supplied paths or branch names."
         }
       ],
-      "notes": "Added slope worktree start with branch/base/path/role/ide/target options, linked shared state paths back to the primary checkout, registered a secondary session, and optionally claimed a ticket or ownership area."
+      "notes": "Added slope worktree start with branch/base/path/role/ide/target options, linked shared state paths back to the primary checkout, registered a secondary session, and optionally claimed a ticket or ownership area. Review replaced shell-built process calls with argument-vector execFileSync calls and added a shell-metacharacter path regression test."
     },
     {
       "ticket_key": "S109-6",
@@ -82,7 +87,7 @@
     "greens_total": 6,
     "putts": 0,
     "penalties": 0,
-    "hazards_hit": 3,
+    "hazards_hit": 4,
     "hazard_penalties": 0,
     "miss_directions": {
       "long": 0,
@@ -128,6 +133,7 @@
   "bunker_locations": [
     "Fully gated sprint-state files can still exist locally after the sprint is effectively closed.",
     "Linked worktrees must resolve shared state paths from config, not from literal default paths.",
+    "Worktree commands should pass user-controlled paths and branch names as process arguments, not interpolated shell strings.",
     "Direct MCP tools should be labeled differently from execute() APIs in search output.",
     "Native optional dependencies need lazy-load boundaries if status commands are expected to diagnose setup failures."
   ],
@@ -138,12 +144,13 @@
     "src/store/index.ts and src/store/sqlite-memory-backend.ts now lazy-load better-sqlite3.",
     "src/cli/commands/store.ts now emits native SQLite recovery guidance in JSON status output.",
     "src/mcp/registry.ts now records direct MCP-tool availability metadata.",
-    "src/cli/commands/worktree.ts now implements slope worktree start for persistent secondary worktrees.",
+    "src/cli/commands/worktree.ts now implements slope worktree start for persistent secondary worktrees and avoids shell interpolation for git/gh calls with user-controlled branch and path values.",
     "src/cli/commands/sprint.ts now implements stale workflow cleanup."
   ],
   "course_management_notes": [
     "Focused ticket validation covered sprint-state, sprint-inference, next, session-briefing, doctor, store, MCP, worktree, workflow, and store backend suites.",
     "Full validation passed with 211 test files and 3432 tests.",
+    "Security/code review caught shell interpolation in worktree process calls; affected worktree tests and typecheck passed after the fix.",
     "pnpm run typecheck passed after the full issue batch.",
     "pnpm run build passed after the native SQLite lazy-load change.",
     "slope map --check reported the codebase map current."

@@ -21,7 +21,7 @@
 | S109-2 | Wedge | In the Hole | - | Doctor now honors configured store_path and commonIssuesPath in linked worktrees, covering #422. |
 | S109-3 | Short Iron | Green | Rough: native SQLite imports happened too early for diagnostic status output. | Lazy-loaded better-sqlite3 and added structured recovery guidance to store status, covering #425. |
 | S109-4 | Wedge | In the Hole | - | Search output now marks direct MCP tools that are not available inside execute(), covering #424. |
-| S109-5 | Long Iron | Green | Rough: /var vs /private path normalization surfaced in macOS worktree tests. | Added persistent slope worktree start with linked config, session registration, and optional claims, covering #423. |
+| S109-5 | Long Iron | Green | Rough: /var vs /private path normalization surfaced in macOS worktree tests. Rough: initial git/gh process calls interpolated user-controlled branch/path values through the shell. | Added persistent slope worktree start with linked config, session registration, and optional claims, then replaced shell-built process calls with argument-vector execFileSync calls and a shell-metacharacter path regression test, covering #423. |
 | S109-6 | Short Iron | Green | - | Added stale workflow cleanup with dry-run support for completed or superseded sprint executions, covering #426. |
 
 ### Conditions
@@ -37,6 +37,7 @@ Known hazards for future sprints:
 
 - Fully gated sprint-state files can still exist locally after the sprint is effectively closed.
 - Linked worktrees must resolve shared state paths from config, not from literal default paths.
+- Worktree commands should pass user-controlled paths and branch names as process arguments, not interpolated shell strings.
 - Direct MCP tools should be labeled differently from execute() APIs in search output.
 - Native optional dependencies need lazy-load boundaries if status commands are expected to diagnose setup failures.
 
@@ -56,6 +57,7 @@ Known hazards for future sprints:
 
 - Focused ticket validation covered sprint-state, sprint-inference, next, session-briefing, doctor, store, MCP, worktree, workflow, and store backend suites.
 - Full validation passed with 211 test files and 3432 tests.
+- Security/code review caught shell interpolation in worktree process calls; affected worktree tests and typecheck passed after the fix.
 - pnpm run typecheck passed after the full issue batch.
 - pnpm run build passed after the native SQLite lazy-load change.
 - slope map --check reported the codebase map current.

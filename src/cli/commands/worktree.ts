@@ -3,7 +3,7 @@
 //   slope worktree start --branch=<name> [--base=<ref>] [--path=<path>] [--role=secondary] [--ide=<id>] [--target=<claim>]
 //   slope worktree cleanup [--path=<path>] [--all] [--dry-run]
 
-import { execSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
@@ -61,8 +61,8 @@ function parseFlagArgs(args: string[]): { flags: Record<string, string>; boolean
   return { flags, booleans };
 }
 
-function shellQuote(value: string): string {
-  return JSON.stringify(value);
+function formatShellArg(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
 function branchSlug(branch: string): string {
@@ -111,13 +111,13 @@ function isInsideWorktree(cwd: string): boolean {
   }
 }
 
-function gitOutput(cwd: string, command: string): string {
-  return execSync(command, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+function gitOutput(cwd: string, args: string[]): string {
+  return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 }
 
 function findProjectRoot(cwd: string): string {
   try {
-    return gitOutput(cwd, 'git rev-parse --show-toplevel');
+    return gitOutput(cwd, ['rev-parse', '--show-toplevel']);
   } catch {
     return cwd;
   }
@@ -125,12 +125,12 @@ function findProjectRoot(cwd: string): string {
 
 function resolveDefaultBase(projectRoot: string): string {
   try {
-    const head = gitOutput(projectRoot, 'git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null');
+    const head = gitOutput(projectRoot, ['symbolic-ref', 'refs/remotes/origin/HEAD']);
     if (head) return head.replace('refs/remotes/', '');
   } catch { /* try fallbacks */ }
   for (const ref of ['origin/main', 'main', 'HEAD']) {
     try {
-      execSync(`git rev-parse --verify ${shellQuote(ref)} 2>/dev/null`, { cwd: projectRoot, stdio: 'ignore' });
+      execFileSync('git', ['rev-parse', '--verify', ref], { cwd: projectRoot, stdio: 'ignore' });
       return ref;
     } catch { /* try next */ }
   }
@@ -186,14 +186,14 @@ async function startCommand(args: string[]): Promise<void> {
 
   const dryRun = booleans.has('dry-run');
   if (dryRun) {
-    console.log(`[dry-run] git worktree add ${shellQuote(worktreePath)} -b ${shellQuote(branch)} ${shellQuote(base)}`);
+    console.log(`[dry-run] git worktree add ${formatShellArg(worktreePath)} -b ${formatShellArg(branch)} ${formatShellArg(base)}`);
     console.log(`[dry-run] register session role=${flags.role ?? 'secondary'} ide=${flags.ide ?? process.env.SLOPE_IDE ?? 'unknown'} branch=${branch}`);
     if (flags.target) console.log(`[dry-run] claim ${flags.target} (${flags.scope ?? 'ticket'})`);
     return;
   }
 
   mkdirSync(dirname(worktreePath), { recursive: true });
-  execSync(`git worktree add ${shellQuote(worktreePath)} -b ${shellQuote(branch)} ${shellQuote(base)}`, {
+  execFileSync('git', ['worktree', 'add', worktreePath, '-b', branch, base], {
     cwd: projectRoot,
     stdio: 'pipe',
   });
@@ -255,7 +255,7 @@ async function startCommand(args: string[]): Promise<void> {
     if (linkedConfig) console.log(`  Config:  linked .slope/config.json to primary state paths`);
     if (claim) console.log(`  Claim:   ${claim.target} (${claim.scope}) sprint ${claim.sprint_number}`);
     console.log(`\nNext:`);
-    console.log(`  cd ${shellQuote(worktreePath)}`);
+    console.log(`  cd ${formatShellArg(worktreePath)}`);
     console.log('');
   } finally {
     store.close();
@@ -265,7 +265,7 @@ async function startCommand(args: string[]): Promise<void> {
 /** Check if gh CLI is available */
 function hasGhCli(): boolean {
   try {
-    execSync('gh --version', { encoding: 'utf8', stdio: 'pipe' });
+    execFileSync('gh', ['--version'], { encoding: 'utf8', stdio: 'pipe' });
     return true;
   } catch {
     return false;
@@ -275,8 +275,9 @@ function hasGhCli(): boolean {
 /** Check if a branch's PR is merged */
 function isPrMerged(branch: string): boolean {
   try {
-    const result = execSync(
-      `gh pr list --head "${branch}" --state merged --json url --limit 1`,
+    const result = execFileSync(
+      'gh',
+      ['pr', 'list', '--head', branch, '--state', 'merged', '--json', 'url', '--limit', '1'],
       { encoding: 'utf8', stdio: 'pipe' },
     );
     const prs = JSON.parse(result);
@@ -308,7 +309,7 @@ function cleanupWorktree(wt: WorktreeInfo, dryRun: boolean, ghAvailable: boolean
 
   // Remove worktree
   try {
-    execSync(`git worktree remove "${wt.path}" --force`, { encoding: 'utf8', stdio: 'pipe' });
+    execFileSync('git', ['worktree', 'remove', wt.path, '--force'], { encoding: 'utf8', stdio: 'pipe' });
     console.log(`  Removed worktree: ${wt.path}`);
   } catch (err) {
     console.error(`  Error removing worktree ${wt.path}: ${(err as Error).message}`);
@@ -318,13 +319,13 @@ function cleanupWorktree(wt: WorktreeInfo, dryRun: boolean, ghAvailable: boolean
   // Delete local branch
   if (branch) {
     try {
-      execSync(`git branch -d "${branch}"`, { encoding: 'utf8', stdio: 'pipe' });
+      execFileSync('git', ['branch', '-d', branch], { encoding: 'utf8', stdio: 'pipe' });
       console.log(`  Deleted branch: ${branch}`);
     } catch { /* branch already deleted or not fully merged — ignore */ }
 
     // Delete remote branch
     try {
-      execSync(`git push origin --delete "${branch}"`, { encoding: 'utf8', stdio: 'pipe' });
+      execFileSync('git', ['push', 'origin', '--delete', branch], { encoding: 'utf8', stdio: 'pipe' });
       console.log(`  Deleted remote branch: origin/${branch}`);
     } catch { /* remote branch already gone — ignore */ }
   }
