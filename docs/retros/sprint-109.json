@@ -1,0 +1,159 @@
+{
+  "sprint_number": 109,
+  "player": "codex",
+  "theme": "GitHub Issue Batch Triage and Agent-DX Hardening",
+  "par": 5,
+  "slope": 4,
+  "score": 5,
+  "score_label": "par",
+  "date": "2026-05-21",
+  "shots": [
+    {
+      "ticket_key": "S109-1",
+      "title": "Ignore fully closed sprint state when inferring the active sprint (#420, #421)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "A fully gated local sprint state could still look active enough to override the roadmap and latest scorecard context."
+        }
+      ],
+      "notes": "Added active-state detection that treats complete closeout gates as inactive, then routed session briefing through shared sprint inference so stale S1/S108 state no longer wins over the inferred current sprint."
+    },
+    {
+      "ticket_key": "S109-2",
+      "title": "Honor configured doctor state paths in linked worktrees (#422)",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Made doctor resolve store_path and commonIssuesPath from config for both checks and --fix, so secondary worktrees using shared state no longer report missing literal local .slope paths."
+    },
+    {
+      "ticket_key": "S109-3",
+      "title": "Diagnose native SQLite setup failures without blocking status commands (#425)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "Top-level better-sqlite3 imports meant even status-oriented store commands could fail before they had a chance to explain the native dependency problem."
+        }
+      ],
+      "notes": "Lazy-loaded native SQLite backends at database-open time and added structured store status recovery hints with reinstall, rebuild, and Node version guidance."
+    },
+    {
+      "ticket_key": "S109-4",
+      "title": "Mark direct MCP tools as unavailable inside execute() search results (#424)",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added registry availability metadata and surfaced an MCP-tool marker in compact search output for store and testing tools that are direct MCP calls rather than execute() APIs."
+    },
+    {
+      "ticket_key": "S109-5",
+      "title": "Add a persistent worktree start command for isolated agent setup (#423)",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "macOS realpath normalization can expose /var and /private path spellings differently in worktree integration tests."
+        }
+      ],
+      "notes": "Added slope worktree start with branch/base/path/role/ide/target options, linked shared state paths back to the primary checkout, registered a secondary session, and optionally claimed a ticket or ownership area."
+    },
+    {
+      "ticket_key": "S109-6",
+      "title": "Add stale workflow cleanup for completed sprint executions (#426)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Added slope sprint workflow cleanup --stale with dry-run support, pausing running workflow executions only when their sprint has a scorecard or completed/superseded roadmap status."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 6,
+    "fairways_total": 6,
+    "greens_in_regulation": 6,
+    "greens_total": 6,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 3,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "type": "issue batch + dx",
+  "conditions": [
+    {
+      "type": "rough",
+      "description": "The batch crossed CLI inference, state guards, store backends, MCP registry output, worktree setup, workflow cleanup, and tests.",
+      "impact": "moderate"
+    },
+    {
+      "type": "wind",
+      "description": "Several issues were agent-DX bugs where the observed failure was one command but the fix belonged in shared plumbing.",
+      "impact": "minor"
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Agent recovery flows need tests for stale local state, linked worktree config, and direct-vs-execute MCP boundaries.",
+      "outcome": "Added focused regression tests around sprint inference, session briefing, doctor path resolution, native store status, MCP search metadata, worktree start, and stale workflow cleanup."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "Ran focused suites after each ticket, then ran the full local suite, typecheck, build for the native-store slice, and map staleness check.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "A proper agent-DX cleanup round: most shots were small on the surface, but each one protected a recovery path agents hit when context or environment gets weird.",
+    "advice_for_next_player": "When a command reports stale context, check whether local state, roadmap inference, and scorecard closeout gates are all expressing the same lifecycle model.",
+    "what_surprised_you": "The native SQLite issue was less about store status itself and more about when the CLI decided to load native modules.",
+    "excited_about_next": "The next batch of agent work should have clearer diagnostics, cleaner isolated worktree starts, and fewer stale workflow leftovers."
+  },
+  "bunker_locations": [
+    "Fully gated sprint-state files can still exist locally after the sprint is effectively closed.",
+    "Linked worktrees must resolve shared state paths from config, not from literal default paths.",
+    "Direct MCP tools should be labeled differently from execute() APIs in search output.",
+    "Native optional dependencies need lazy-load boundaries if status commands are expected to diagnose setup failures."
+  ],
+  "yardage_book_updates": [
+    "src/cli/sprint-state.ts now exposes active-state detection that ignores complete closeout gate state.",
+    "src/cli/guards/session-briefing.ts now uses shared sprint inference for briefing context.",
+    "src/cli/commands/doctor.ts now resolves configured store and common-issues paths.",
+    "src/store/index.ts and src/store/sqlite-memory-backend.ts now lazy-load better-sqlite3.",
+    "src/cli/commands/store.ts now emits native SQLite recovery guidance in JSON status output.",
+    "src/mcp/registry.ts now records direct MCP-tool availability metadata.",
+    "src/cli/commands/worktree.ts now implements slope worktree start for persistent secondary worktrees.",
+    "src/cli/commands/sprint.ts now implements stale workflow cleanup."
+  ],
+  "course_management_notes": [
+    "Focused ticket validation covered sprint-state, sprint-inference, next, session-briefing, doctor, store, MCP, worktree, workflow, and store backend suites.",
+    "Full validation passed with 211 test files and 3432 tests.",
+    "pnpm run typecheck passed after the full issue batch.",
+    "pnpm run build passed after the native SQLite lazy-load change.",
+    "slope map --check reported the codebase map current."
+  ],
+  "slope_factors": [
+    "cli",
+    "state",
+    "mcp",
+    "worktrees",
+    "store",
+    "workflow"
+  ]
+}
