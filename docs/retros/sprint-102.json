@@ -1,0 +1,87 @@
+{
+  "sprint_number": 102,
+  "player": "sebastianbryers",
+  "theme": "State Write Race and Claim Help Fixes",
+  "par": 4,
+  "slope": 2,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-05-21",
+  "shots": [
+    {
+      "ticket_key": "S102-1",
+      "title": "Make slope claim --help read-only (#410)",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added early --help/-h handling before store resolution, target validation, and session mutation, with read-only regression coverage."
+    },
+    {
+      "ticket_key": "S102-2",
+      "title": "Harden SLOPE state writes against concurrent races (#409)",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "The initial fix covered fixed temp filenames; review identified stale read-modify-write phase transitions and added a locked sprint-state mutator."
+        }
+      ],
+      "notes": "Added unique same-directory temp writes, file locks, locked sprint/session state mutation paths, and child-process concurrency regressions."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 2,
+    "fairways_total": 2,
+    "greens_in_regulation": 2,
+    "greens_total": 2,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 1,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Concurrent state safety needs both unique temp files and a lock around read-modify-write operations.",
+      "outcome": "Sprint/session state updates now serialize gate, phase, mode, and dedup mutations instead of relying only on atomic rename."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "Focused concurrency tests, typecheck, build, and the full Vitest suite passed.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "A compact reliability sprint that exposed the difference between atomic file replacement and safe state mutation.",
+    "advice_for_next_player": "When fixing state races, test both rename failures and lost-update behavior across separate processes.",
+    "what_surprised_you": "S102 was not in the roadmap, so auto-card fell back to a full-history scorecard and had to be replaced manually.",
+    "excited_about_next": "The remaining agent-DX issues can build on a less fragile guard-state foundation."
+  },
+  "bunker_locations": [
+    "Fixed temp filenames cause ENOENT under concurrent writers; use unique temp paths in the target directory.",
+    "Atomic rename alone does not prevent lost updates when callers load, mutate, then save stale state."
+  ],
+  "yardage_book_updates": [],
+  "course_management_notes": [
+    "Validation used pnpm vitest run tests/cli/atomic-write.test.ts tests/cli/commands/claim-help.test.ts tests/cli/sprint-state.test.ts tests/cli/guards/sprint-completion.test.ts tests/cli/guards/workflow-gate.test.ts tests/cli/sprint-workflow.test.ts.",
+    "Additional validation used pnpm run typecheck, pnpm run build, and pnpm test.",
+    "slope review --help currently generates a sprint review instead of printing help; this was observed during closeout and should be tracked separately."
+  ],
+  "slope_factors": [
+    "state_management",
+    "guard_runtime",
+    "agent_dx"
+  ]
+}
