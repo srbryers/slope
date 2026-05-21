@@ -137,7 +137,7 @@ describe('exploreGuard', () => {
 describe('hazardGuard', () => {
   it('returns empty when no file path in input', async () => {
     const result = await hazardGuard(makeInput({ tool_input: {} }), tmpDir);
-    expect(result).toEqual({});
+    expect(result).toEqual({ metricReason: 'no-file-path' });
   });
 
   it('returns empty when no common issues file', async () => {
@@ -145,7 +145,7 @@ describe('hazardGuard', () => {
       makeInput({ tool_input: { file_path: join(tmpDir, 'src/foo.ts') } }),
       tmpDir,
     );
-    expect(result).toEqual({});
+    expect(result).toEqual({ metricReason: 'state-unavailable' });
   });
 
   it('warns when editing in area with known issues', async () => {
@@ -219,7 +219,7 @@ describe('hazardGuard', () => {
       makeInput({ tool_input: { file_path: join(tmpDir, 'packages/cli/src/index.ts') } }),
       tmpDir,
     );
-    expect(result).toEqual({});
+    expect(result).toEqual({ metricReason: 'no-match' });
   });
 
   it('does not include permissionDecision (non-blocking)', async () => {
@@ -244,6 +244,31 @@ describe('hazardGuard', () => {
     );
     expect(result.decision).toBeUndefined();
     expect(result.blockReason).toBeUndefined();
+  });
+
+  it('tags repeated hazard context as deduped for metrics', async () => {
+    mkdirSync(join(tmpDir, '.slope'), { recursive: true });
+    writeFileSync(join(tmpDir, '.slope/common-issues.json'), JSON.stringify({
+      recurring_patterns: [
+        {
+          id: 1,
+          title: 'Core issue',
+          category: 'testing',
+          sprints_hit: [8],
+          gotcha_refs: [],
+          description: 'Affects core package testing',
+          prevention: 'Run tests after editing core',
+        },
+      ],
+    }));
+
+    const input = makeInput({ tool_input: { file_path: join(tmpDir, 'packages/core/src/foo.ts') } });
+    const first = await hazardGuard(input, tmpDir);
+    const second = await hazardGuard(input, tmpDir);
+
+    expect(first.metricReason).toBe('matched');
+    expect(second.context).toContain('same as prior warning');
+    expect(second.metricReason).toBe('deduped');
   });
 
   it('writes warnings to disk state for compaction survival', async () => {
@@ -317,7 +342,7 @@ describe('hazardGuard', () => {
       makeInput({ tool_input: { file_path: join(tmpDir, 'packages/core/src/foo.ts') } }),
       tmpDir,
     );
-    expect(result).toEqual({});
+    expect(result).toEqual({ metricReason: 'state-unavailable' });
   });
 
   it('keeps entries from old sprint if still fresh (<7 days)', async () => {
@@ -359,7 +384,7 @@ describe('hazardGuard', () => {
       makeInput({ tool_input: { file_path: join(tmpDir, 'packages/core/src/foo.ts') } }),
       tmpDir,
     );
-    expect(result).toEqual({});
+    expect(result).toEqual({ metricReason: 'state-unavailable' });
   });
 });
 
@@ -485,6 +510,21 @@ describe('scopeDriftGuard', () => {
       tmpDir,
     );
     expect(result).toEqual({});
+  });
+
+  it('tags store failures without cached drift as state-unavailable', async () => {
+    writeSprintState(10);
+
+    const storeModule = await import('../../src/cli/store.js');
+    const spy = vi.spyOn(storeModule, 'resolveStore').mockRejectedValueOnce(new Error('store unavailable'));
+
+    const result = await scopeDriftGuard(
+      makeInput({ tool_input: { file_path: join(tmpDir, 'packages/other/src/bar.ts') } }),
+      tmpDir,
+    );
+
+    expect(result).toEqual({ metricReason: 'state-unavailable' });
+    spy.mockRestore();
   });
 
   it('clears disk state on sprint change', async () => {

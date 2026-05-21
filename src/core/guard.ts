@@ -64,6 +64,16 @@ export interface Suggestion {
   priority?: 'critical' | 'high' | 'normal';
 }
 
+/** Machine-readable reason code recorded in guard metrics. */
+export type GuardMetricReason =
+  | 'no-file-path'
+  | 'no-match'
+  | 'deduped'
+  | 'irrelevant-command'
+  | 'state-unavailable'
+  | 'adhoc-session'
+  | (string & {});
+
 /** A guard's response — what guidance to inject */
 export interface GuardResult {
   /** Text injected into the agent's context */
@@ -74,6 +84,8 @@ export interface GuardResult {
   blockReason?: string;
   /** Structured suggestion — adapter formats for platform */
   suggestion?: Suggestion;
+  /** Optional machine-readable reason for metrics; never emitted to hook output */
+  metricReason?: GuardMetricReason;
 }
 
 /** Known guard names */

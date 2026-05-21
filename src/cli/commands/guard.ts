@@ -467,6 +467,18 @@ export async function guardManageCommand(args: string[]): Promise<void> {
       for (const m of report.by_guard) {
         console.log(`  ${m.guard.padEnd(22)} ${String(m.total).padStart(5)}  ${String(m.allow).padStart(5)}  ${String(m.deny).padStart(5)}  ${String(m.context).padStart(7)}  ${String(m.silent).padStart(6)}  ${String(m.block_rate.toFixed(0)).padStart(5)}%`);
       }
+      const reasonRows = report.by_guard.flatMap(m =>
+        Object.entries(m.reason_counts ?? {}).map(([reason, count]) => ({ guard: m.guard, reason, count })),
+      );
+      if (reasonRows.length > 0) {
+        console.log('');
+        console.log('  Reasons (silent/context/suppressed):');
+        console.log('  Guard                 Reason                Count');
+        console.log('  ────────────────────  ────────────────────  ─────');
+        for (const row of reasonRows) {
+          console.log(`  ${row.guard.padEnd(22)} ${row.reason.padEnd(20)}  ${String(row.count).padStart(5)}`);
+        }
+      }
       console.log('');
       break;
     }
@@ -740,9 +752,14 @@ function recordGuardExecution(cwd: string, guardName: string, input: HookInput, 
       event: input.hook_event_name,
       tool: input.tool_name ?? '',
       decision,
+      ...(shouldRecordMetricReason(decision, result.metricReason) ? { reason: result.metricReason } : {}),
     });
     appendFileSync(metricsPath, line + '\n');
   } catch { /* never block guard execution */ }
+}
+
+function shouldRecordMetricReason(decision: string, reason: string | undefined): boolean {
+  return Boolean(reason && (decision === 'silent' || decision === 'context'));
 }
 
 function recordGuardSuppression(cwd: string, guardName: string, input: HookInput, reason: string): void {
