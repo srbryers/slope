@@ -32,13 +32,25 @@ If a GitHub release exists but npm is behind:
    npm view @slope-dev/slope version --registry https://registry.npmjs.org
    ```
 2. Confirm the trusted publisher settings above on npmjs.com.
-3. Re-run the failed `Publish to npm` workflow for the release tag.
-4. Verify npm now reports the release version:
+3. If the release tag already contains the current trusted-publishing workflow, re-run the failed `Publish to npm` workflow for the release tag.
+4. If the release tag predates a publish workflow repair, dispatch the current workflow from `main` and pass the release tag ref as the package checkout ref:
+   ```sh
+   gh workflow run publish.yml --ref main -f publish_ref=refs/tags/vX.Y.Z
+   gh run watch
+   ```
+   This loads the repaired workflow from `main` while publishing the package contents from the historical tag.
+5. Verify npm now reports the release version:
    ```sh
    npm view @slope-dev/slope version --registry https://registry.npmjs.org
    ```
 
-For the `v1.55.12` incident, npm reported `1.55.11` after the GitHub release was published. After trusted publishing is configured, re-run the `v1.55.12` publish workflow and verify npm reports `1.55.12`.
+For the `v1.55.12` incident, npm reported `1.55.11` after the GitHub release was published, and the `v1.55.12` tag still contains the old token-based workflow. After trusted publishing is configured, dispatch the repaired workflow with:
+
+```sh
+gh workflow run publish.yml --ref main -f publish_ref=refs/tags/v1.55.12
+gh run watch
+npm view @slope-dev/slope version --registry https://registry.npmjs.org
+```
 
 ## Token Fallback
 

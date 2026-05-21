@@ -3,6 +3,12 @@ name: Publish to npm
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      publish_ref:
+        description: Release tag ref to check out and publish, e.g. refs/tags/v1.55.12
+        required: true
+        type: string
 
 jobs:
   publish:
@@ -11,7 +17,19 @@ jobs:
       contents: read
       id-token: write
     steps:
+      - name: Validate manual publish ref
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          PUBLISH_REF: ${{ inputs.publish_ref }}
+        run: |
+          if ! printf '%s\n' "$PUBLISH_REF" | grep -Eq '^refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::publish_ref must be a release tag ref like refs/tags/v1.55.12"
+            exit 1
+          fi
+
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_ref || github.ref }}
 
       - uses: actions/setup-node@v4
         with:
