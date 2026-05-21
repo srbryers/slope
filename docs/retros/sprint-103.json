@@ -1,0 +1,70 @@
+{
+  "sprint_number": 103,
+  "player": "sebastianbryers",
+  "theme": "Review Help Read-Only Routing",
+  "par": 3,
+  "slope": 0,
+  "score": 1,
+  "score_label": "eagle",
+  "date": "2026-05-21",
+  "shots": [
+    {
+      "ticket_key": "S103-1",
+      "title": "Route slope review --help before review generation (#412)",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Reused the existing read-only review-state help dispatcher for top-level review --help/-h and added routing regression coverage."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 1,
+    "fairways_total": 1,
+    "greens_in_regulation": 1,
+    "greens_total": 1,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Top-level dispatcher tests are needed when a subcommand module already has correct --help behavior.",
+      "outcome": "The routing predicate now covers top-level review help without importing the full CLI entrypoint in tests."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "Focused review-state tests, compiled CLI help smokes, typecheck, build, and full Vitest suite passed.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "A small follow-up that cleanly reused the existing help machinery.",
+    "advice_for_next_player": "When fixing help behavior, verify both the command handler and the top-level CLI route.",
+    "what_surprised_you": "The read-only handler was already correct; only the CLI entrypoint bypassed it.",
+    "excited_about_next": "The remaining open items can move back to guard telemetry and plugin packaging."
+  },
+  "bunker_locations": [
+    "A subcommand can have correct read-only help while the top-level CLI dispatcher still routes --help into the mutating default path."
+  ],
+  "yardage_book_updates": [],
+  "course_management_notes": [
+    "Validation used pnpm vitest run tests/cli/review-state.test.ts tests/cli/guards/sprint-completion.test.ts.",
+    "Additional validation used pnpm run typecheck, pnpm run build, node dist/cli/index.js review --help, node dist/cli/index.js review -h, and pnpm test."
+  ],
+  "slope_factors": [
+    "agent_dx",
+    "cli_dispatch"
+  ]
+}

@@ -3,7 +3,7 @@ import { mkdirSync, writeFileSync, rmSync, existsSync, readFileSync } from 'node
 import { join } from 'node:path';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { loadReviewState, saveReviewState } from '../../src/cli/commands/review-state.js';
+import { loadReviewState, saveReviewState, shouldRouteToReviewState } from '../../src/cli/commands/review-state.js';
 import type { ReviewState } from '../../src/cli/commands/review-state.js';
 
 let tmpDir: string;
@@ -81,6 +81,14 @@ describe('reviewStateCommand', () => {
   }
 
   describe('--help is read-only (#353)', () => {
+    it('routes top-level review help to the read-only review-state dispatcher (#412)', () => {
+      expect(shouldRouteToReviewState(['--help'])).toBe(true);
+      expect(shouldRouteToReviewState(['-h'])).toBe(true);
+      expect(shouldRouteToReviewState(['start', '--help'])).toBe(true);
+      expect(shouldRouteToReviewState(['docs/retros/sprint-1.json'])).toBe(false);
+      expect(shouldRouteToReviewState(['--plain'])).toBe(false);
+    });
+
     it('does NOT start a review when called as `slope review start --help`', async () => {
       const log = vi.spyOn(console, 'log').mockImplementation(() => {});
       try {

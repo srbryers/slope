@@ -590,6 +590,26 @@ function amendCommand(args: string[], cwd: string): void {
 
 // --- Main Command Router ---
 
+export const REVIEW_STATE_SUBCOMMANDS = [
+  'start',
+  'round',
+  'status',
+  'reset',
+  'recommend',
+  'findings',
+  'amend',
+  'defer',
+  'deferred',
+  'resolve',
+  'run',
+];
+
+export function shouldRouteToReviewState(args: string[]): boolean {
+  const sub = args[0];
+  const help = args.includes('--help') || args.includes('-h');
+  return REVIEW_STATE_SUBCOMMANDS.includes(sub) || (help && (!sub || sub.startsWith('-')));
+}
+
 /** Per-subcommand usage text. Kept inside the dispatcher so `--help` can
  *  short-circuit before any state-mutating handler runs (#353). */
 function printReviewHelp(sub: string | undefined): void {
