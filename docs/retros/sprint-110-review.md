@@ -11,7 +11,7 @@
 | Fairway % | 100% (1/1) |
 | GIR % | 100% (1/1) |
 | Putts | 0 |
-| Penalties | 0 |
+| Penalties | 1 |
 
 ### Shot-by-Shot (Tickets Delivered: 1)
 
@@ -24,8 +24,8 @@
 Known hazards for future sprints:
 
 - Creating a GitHub release is not enough; npm-side trusted publisher authorization must accept the publish.
-- Release bump commits must go through a feature branch and PR, not direct commits on main.
-- npm auto-corrected bin entries during pack, warning that bin paths without ./ were removed.
+- The publish workflow can pass build/test/typecheck and provenance signing but still fail at the final npm PUT with E404.
+- npm auto-corrected bin entries during publish, warning that bin script entries were removed; local npm pack did not reproduce that warning, so investigate before the next publish attempt.
 - actions/setup-node@v4 ignored package-manager-cache, warning that the workflow input is not valid.
 
 ### Training Log
@@ -38,16 +38,17 @@ Known hazards for future sprints:
 
 | Category | Status | Notes |
 |---|---|---|
-| testing | healthy | Validated pnpm run typecheck, pnpm run build, pnpm test, and git diff --check before publishing the release branch; GitHub Actions repeated install, build, test, and typecheck successfully. |
+| testing | healthy | Validated pnpm run typecheck, pnpm run build, pnpm test, and git diff --check before creating the release; GitHub Actions repeated install, build, test, and typecheck successfully. |
 
 ### Course Management Notes
 
 - Package version bumped from 1.55.13 to 1.55.14.
 - Codex plugin template version bumped from 1.55.13 to 1.55.14.
 - Before release, npm view @slope-dev/slope version still reported 1.55.11.
+- Fast-forwarded main to 3075b3f for the 1.55.14 release bump.
 - Created GitHub release v1.55.14, which triggered Publish to npm run 26259794247.
 - Publish run passed install, build, test, typecheck, and npm 11.5.1 setup.
-- npm publish signed provenance and published to the transparency log, then failed with E404 for @slope-dev/slope@1.55.14.
+- npm publish signed provenance and published to the transparency log at logIndex 1596380075, then failed with E404 for @slope-dev/slope@1.55.14.
 - After the failed release, npm view @slope-dev/slope version still reported 1.55.11.
 - Local validation passed with 211 test files and 3433 tests.
 
