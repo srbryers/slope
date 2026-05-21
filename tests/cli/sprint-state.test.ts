@@ -5,6 +5,7 @@ import {
   loadSprintState,
   saveSprintState,
   updateGate,
+  isActiveSprintState,
   isSprintComplete,
   pendingGates,
   createSprintState,
@@ -119,6 +120,26 @@ describe('isSprintComplete', () => {
     state.gates.scorecard = true;
     state.gates.review_md = true;
     expect(isSprintComplete(state)).toBe(true);
+  });
+});
+
+describe('isActiveSprintState', () => {
+  it('returns false for scoring state when every closeout gate is complete', () => {
+    const state = createSprintState(22, 'scoring');
+    state.gates.tests = true;
+    state.gates.code_review = true;
+    state.gates.architect_review = true;
+    state.gates.scorecard = true;
+    state.gates.review_md = true;
+
+    expect(isActiveSprintState(state)).toBe(false);
+  });
+
+  it('returns true for scoring state while any closeout gate is still open', () => {
+    const state = createSprintState(22, 'scoring');
+    state.gates.tests = true;
+
+    expect(isActiveSprintState(state)).toBe(true);
   });
 });
 

@@ -60,7 +60,7 @@ export function loadSprintState(cwd: string): SprintState | null {
 
 /** True when sprint-state represents an active workflow sprint. */
 export function isActiveSprintState(state: SprintState | null): state is SprintState {
-  return Boolean(state && state.phase !== 'complete');
+  return Boolean(state && state.phase !== 'complete' && !isSprintComplete(state));
 }
 
 function sprintStatePath(cwd: string): string {

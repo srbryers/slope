@@ -39,4 +39,19 @@ describe('inferSprintContext', () => {
     expect(context.sprint).toBe(18);
     expect(context.source).toBe('config');
   });
+
+  it('ignores fully gated scoring sprint-state when inferring current work', () => {
+    const state = createSprintState(74, 'scoring');
+    state.gates.tests = true;
+    state.gates.code_review = true;
+    state.gates.architect_review = true;
+    state.gates.scorecard = true;
+    state.gates.review_md = true;
+    saveSprintState(tmpDir, state);
+
+    const context = inferSprintContext(tmpDir);
+
+    expect(context.sprint).toBe(18);
+    expect(context.source).toBe('config');
+  });
 });
