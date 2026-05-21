@@ -1,8 +1,9 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { HookInput, GuardResult, Suggestion } from '../../core/index.js';
-import { loadConfig, parseRoadmap, formatStrategicContext } from '../../core/index.js';
-import { loadSprintState } from '../sprint-state.js';
+import { loadConfig, parseRoadmap, castRoadmapStructure, formatStrategicContext } from '../../core/index.js';
+import { inferSprintContext } from '../sprint-inference.js';
+import { isActiveSprintState, loadSprintState } from '../sprint-state.js';
 import { loadSessionState, updateSessionState, setSessionMode, syncSessionModeWithSprintState } from '../session-state.js';
 
 /**
@@ -30,7 +31,7 @@ export async function sessionBriefingGuard(input: HookInput, cwd: string): Promi
   const lines: string[] = [];
 
   // Sprint state + session mode
-  const hasActiveSprint = sprintState && (sprintState.phase === 'implementing' || sprintState.phase === 'scoring');
+  const hasActiveSprint = isActiveSprintState(sprintState) && (sprintState.phase === 'implementing' || sprintState.phase === 'scoring');
   const isPlanning = sprintState && sprintState.phase === 'planning';
   if (hasActiveSprint) {
     setSessionMode(cwd, sessionId, 'sprint');
@@ -68,10 +69,13 @@ export async function sessionBriefingGuard(input: HookInput, cwd: string): Promi
       const roadmapFile = join(cwd, config.roadmapPath);
       if (existsSync(roadmapFile)) {
         const raw = JSON.parse(readFileSync(roadmapFile, 'utf8'));
-        const { roadmap } = parseRoadmap(raw);
+        const parsed = parseRoadmap(raw);
+        const roadmap = parsed.roadmap ?? castRoadmapStructure(raw);
         if (roadmap) {
-          const nextSprint = sprintState ? sprintState.sprint : 1;
-          const ctx = formatStrategicContext(roadmap, nextSprint);
+          const inferred = inferSprintContext(cwd, config);
+          const ctx = inferred.source === 'initial'
+            ? null
+            : formatStrategicContext(roadmap, inferred.sprint);
           if (ctx) lines.push(ctx);
         }
       }

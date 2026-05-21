@@ -1,7 +1,18 @@
-// slope worktree cleanup — Clean up stale git worktrees
-// Usage: slope worktree cleanup [--path=<path>] [--all] [--dry-run]
+// slope worktree — Manage persistent git worktrees
+// Usage:
+//   slope worktree start --branch=<name> [--base=<ref>] [--path=<path>] [--role=secondary] [--ide=<id>] [--target=<claim>]
+//   slope worktree cleanup [--path=<path>] [--all] [--dry-run]
 
-import { execSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join, relative, resolve } from 'node:path';
+import { checkConflicts } from '../../core/index.js';
+import { STALE_SESSION_THRESHOLD_MS } from '../../core/constants.js';
+import type { ClaimScope, SprintClaim } from '../../core/index.js';
+import { loadConfig } from '../config.js';
+import { inferSprintContext } from '../sprint-inference.js';
+import { resolveStore } from '../store.js';
 
 interface WorktreeInfo {
   path: string;
@@ -33,6 +44,29 @@ function parseArgs(args: string[]): {
   }
 
   return { subcommand, targetPath, all, dryRun };
+}
+
+function parseFlagArgs(args: string[]): { flags: Record<string, string>; booleans: Set<string> } {
+  const flags: Record<string, string> = {};
+  const booleans = new Set<string>();
+  for (const arg of args) {
+    const match = arg.match(/^--([\w-]+)(?:=(.+))?$/);
+    if (!match) continue;
+    if (match[2] === undefined) {
+      booleans.add(match[1]);
+    } else {
+      flags[match[1]] = match[2];
+    }
+  }
+  return { flags, booleans };
+}
+
+function formatShellArg(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
+function branchSlug(branch: string): string {
+  return branch.replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'worktree';
 }
 
 /** Parse `git worktree list --porcelain` output */
@@ -77,10 +111,161 @@ function isInsideWorktree(cwd: string): boolean {
   }
 }
 
+function gitOutput(cwd: string, args: string[]): string {
+  return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+}
+
+function findProjectRoot(cwd: string): string {
+  try {
+    return gitOutput(cwd, ['rev-parse', '--show-toplevel']);
+  } catch {
+    return cwd;
+  }
+}
+
+function resolveDefaultBase(projectRoot: string): string {
+  try {
+    const head = gitOutput(projectRoot, ['symbolic-ref', 'refs/remotes/origin/HEAD']);
+    if (head) return head.replace('refs/remotes/', '');
+  } catch { /* try fallbacks */ }
+  for (const ref of ['origin/main', 'main', 'HEAD']) {
+    try {
+      execFileSync('git', ['rev-parse', '--verify', ref], { cwd: projectRoot, stdio: 'ignore' });
+      return ref;
+    } catch { /* try next */ }
+  }
+  return 'HEAD';
+}
+
+function writeLinkedSlopeConfig(projectRoot: string, worktreePath: string): boolean {
+  const sourceConfigPath = join(projectRoot, '.slope', 'config.json');
+  if (!existsSync(sourceConfigPath)) return false;
+
+  const config = JSON.parse(readFileSync(sourceConfigPath, 'utf8')) as Record<string, unknown>;
+  const statePaths: Array<[string, string]> = [
+    ['store_path', '.slope/slope.db'],
+    ['commonIssuesPath', '.slope/common-issues.json'],
+  ];
+  for (const [key, fallback] of statePaths) {
+    const raw = config[key];
+    const configured = typeof raw === 'string' && raw.trim()
+      ? raw
+      : fallback;
+    const absoluteStatePath = resolve(projectRoot, configured);
+    config[key] = relative(worktreePath, absoluteStatePath);
+  }
+
+  const targetConfigPath = join(worktreePath, '.slope', 'config.json');
+  mkdirSync(dirname(targetConfigPath), { recursive: true });
+  writeFileSync(targetConfigPath, JSON.stringify(config, null, 2) + '\n');
+  return true;
+}
+
+async function startCommand(args: string[]): Promise<void> {
+  const { flags, booleans } = parseFlagArgs(args);
+  const cwd = process.cwd();
+  const projectRoot = findProjectRoot(cwd);
+
+  if (isInsideWorktree(cwd)) {
+    console.error('Error: Already inside a secondary worktree. Start new worktrees from the primary checkout.');
+    process.exit(1);
+  }
+
+  const branch = flags.branch;
+  if (!branch) {
+    console.error('Error: --branch=<name> is required');
+    process.exit(1);
+  }
+
+  const base = flags.base ?? resolveDefaultBase(projectRoot);
+  const worktreePath = resolve(projectRoot, flags.path ?? join('.slope', 'worktrees', branchSlug(branch)));
+  if (existsSync(worktreePath)) {
+    console.error(`Error: Worktree path already exists: ${worktreePath}`);
+    process.exit(1);
+  }
+
+  const dryRun = booleans.has('dry-run');
+  if (dryRun) {
+    console.log(`[dry-run] git worktree add ${formatShellArg(worktreePath)} -b ${formatShellArg(branch)} ${formatShellArg(base)}`);
+    console.log(`[dry-run] register session role=${flags.role ?? 'secondary'} ide=${flags.ide ?? process.env.SLOPE_IDE ?? 'unknown'} branch=${branch}`);
+    if (flags.target) console.log(`[dry-run] claim ${flags.target} (${flags.scope ?? 'ticket'})`);
+    return;
+  }
+
+  mkdirSync(dirname(worktreePath), { recursive: true });
+  execFileSync('git', ['worktree', 'add', worktreePath, '-b', branch, base], {
+    cwd: projectRoot,
+    stdio: 'pipe',
+  });
+  const linkedConfig = writeLinkedSlopeConfig(projectRoot, worktreePath);
+
+  const store = await resolveStore(projectRoot);
+  try {
+    await store.cleanStaleSessions(STALE_SESSION_THRESHOLD_MS);
+    const sessionId = flags['session-id'] || randomUUID();
+    const role = (flags.role ?? 'secondary') as 'primary' | 'secondary' | 'observer';
+    const ide = flags.ide ?? process.env.SLOPE_IDE ?? 'unknown';
+    const session = await store.registerSession({
+      session_id: sessionId,
+      role,
+      ide,
+      branch,
+      worktree_path: worktreePath,
+    });
+
+    let claim: SprintClaim | null = null;
+    if (flags.target) {
+      const config = loadConfig(projectRoot);
+      const sprintNumber = flags.sprint ? parseInt(flags.sprint, 10) : inferSprintContext(projectRoot, config).sprint;
+      const scope = (flags.scope ?? 'ticket') as ClaimScope;
+      const player = flags.player || process.env.USER || 'unknown';
+      const pendingClaim: SprintClaim = {
+        id: '__pending__',
+        sprint_number: sprintNumber,
+        player,
+        target: flags.target,
+        scope,
+        claimed_at: new Date().toISOString(),
+        session_id: session.session_id,
+        ...(flags.notes ? { notes: flags.notes } : {}),
+      };
+      const conflicts = checkConflicts([...(await store.list(sprintNumber)), pendingClaim]);
+      const overlaps = conflicts.filter(c => c.severity === 'overlap');
+      if (overlaps.length > 0 && !booleans.has('force')) {
+        console.error(`\nClaim blocked — overlap conflict(s) detected:`);
+        for (const c of overlaps) console.error(`  [!!] ${c.reason}`);
+        console.error(`\nWorktree and session were created. Re-run claim with --force if this overlap is intentional.`);
+      } else {
+        claim = await store.claim({
+          sprint_number: sprintNumber,
+          player,
+          target: flags.target,
+          scope,
+          session_id: session.session_id,
+          ...(flags.notes ? { notes: flags.notes } : {}),
+        });
+      }
+    }
+
+    console.log(`\nWorktree started:`);
+    console.log(`  Path:    ${worktreePath}`);
+    console.log(`  Branch:  ${branch}`);
+    console.log(`  Base:    ${base}`);
+    console.log(`  Session: ${session.session_id} [${session.role}] ${session.ide}`);
+    if (linkedConfig) console.log(`  Config:  linked .slope/config.json to primary state paths`);
+    if (claim) console.log(`  Claim:   ${claim.target} (${claim.scope}) sprint ${claim.sprint_number}`);
+    console.log(`\nNext:`);
+    console.log(`  cd ${formatShellArg(worktreePath)}`);
+    console.log('');
+  } finally {
+    store.close();
+  }
+}
+
 /** Check if gh CLI is available */
 function hasGhCli(): boolean {
   try {
-    execSync('gh --version', { encoding: 'utf8', stdio: 'pipe' });
+    execFileSync('gh', ['--version'], { encoding: 'utf8', stdio: 'pipe' });
     return true;
   } catch {
     return false;
@@ -90,8 +275,9 @@ function hasGhCli(): boolean {
 /** Check if a branch's PR is merged */
 function isPrMerged(branch: string): boolean {
   try {
-    const result = execSync(
-      `gh pr list --head "${branch}" --state merged --json url --limit 1`,
+    const result = execFileSync(
+      'gh',
+      ['pr', 'list', '--head', branch, '--state', 'merged', '--json', 'url', '--limit', '1'],
       { encoding: 'utf8', stdio: 'pipe' },
     );
     const prs = JSON.parse(result);
@@ -123,7 +309,7 @@ function cleanupWorktree(wt: WorktreeInfo, dryRun: boolean, ghAvailable: boolean
 
   // Remove worktree
   try {
-    execSync(`git worktree remove "${wt.path}" --force`, { encoding: 'utf8', stdio: 'pipe' });
+    execFileSync('git', ['worktree', 'remove', wt.path, '--force'], { encoding: 'utf8', stdio: 'pipe' });
     console.log(`  Removed worktree: ${wt.path}`);
   } catch (err) {
     console.error(`  Error removing worktree ${wt.path}: ${(err as Error).message}`);
@@ -133,13 +319,13 @@ function cleanupWorktree(wt: WorktreeInfo, dryRun: boolean, ghAvailable: boolean
   // Delete local branch
   if (branch) {
     try {
-      execSync(`git branch -d "${branch}"`, { encoding: 'utf8', stdio: 'pipe' });
+      execFileSync('git', ['branch', '-d', branch], { encoding: 'utf8', stdio: 'pipe' });
       console.log(`  Deleted branch: ${branch}`);
     } catch { /* branch already deleted or not fully merged — ignore */ }
 
     // Delete remote branch
     try {
-      execSync(`git push origin --delete "${branch}"`, { encoding: 'utf8', stdio: 'pipe' });
+      execFileSync('git', ['push', 'origin', '--delete', branch], { encoding: 'utf8', stdio: 'pipe' });
       console.log(`  Deleted remote branch: origin/${branch}`);
     } catch { /* remote branch already gone — ignore */ }
   }
@@ -219,6 +405,10 @@ async function cleanupCommand(args: string[]): Promise<void> {
 export async function worktreeCommand(args: string[]): Promise<void> {
   const sub = args[0];
 
+  if (sub === 'start') {
+    return startCommand(args.slice(1));
+  }
+
   if (sub === 'cleanup') {
     return cleanupCommand(args.slice(1));
   }
@@ -228,9 +418,22 @@ export async function worktreeCommand(args: string[]): Promise<void> {
 slope worktree — Manage git worktrees
 
 Usage:
+  slope worktree start --branch=<name> [--base=<ref>] [--path=<path>] [--role=secondary] [--ide=<id>] [--target=<claim>]
   slope worktree cleanup [--path=<path>] [--all] [--dry-run]
 
 Options:
+  start:
+    --branch=<name>      New branch name for the worktree
+    --base=<ref>         Base ref (default: origin default branch, main, or HEAD)
+    --path=<path>        Worktree path (default: .slope/worktrees/<branch>)
+    --role=<role>        Session role: primary, secondary, observer (default: secondary)
+    --ide=<id>           IDE/harness id (default: SLOPE_IDE or unknown)
+    --target=<claim>     Optional ticket or area claim to register
+    --scope=<scope>      Claim scope: ticket or area (default: ticket)
+    --sprint=<number>    Sprint number for optional claim
+    --dry-run            Preview worktree/session/claim actions
+
+  cleanup:
   --path=<path>  Target a specific worktree
   --all          Clean up all secondary worktrees
   --dry-run      Preview what would happen without making changes

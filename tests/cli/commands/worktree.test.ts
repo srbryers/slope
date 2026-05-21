@@ -3,16 +3,19 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // Mock execSync before importing the module
 vi.mock('node:child_process', () => ({
   execSync: vi.fn(),
+  execFileSync: vi.fn(),
 }));
 
-import { execSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 import { worktreeCommand } from '../../../src/cli/commands/worktree.js';
 
 const mockExecSync = vi.mocked(execSync);
+const mockExecFileSync = vi.mocked(execFileSync);
 
 describe('slope worktree cleanup', () => {
   beforeEach(() => {
     mockExecSync.mockReset();
+    mockExecFileSync.mockReset();
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
   });
@@ -58,8 +61,8 @@ describe('slope worktree cleanup', () => {
     mockExecSync
       .mockReturnValueOnce('.git' as any) // git-common-dir
       .mockReturnValueOnce('.git' as any) // git-dir
-      .mockReturnValueOnce(porcelainOutput as any) // git worktree list --porcelain
-      .mockImplementation(() => { throw new Error('no gh'); }); // gh --version fails
+      .mockReturnValueOnce(porcelainOutput as any); // git worktree list --porcelain
+    mockExecFileSync.mockImplementation(() => { throw new Error('no gh'); }); // gh --version fails
 
     await worktreeCommand(['cleanup', '--all', '--dry-run']);
     expect(console.log).toHaveBeenCalledWith(expect.stringContaining('[dry-run] Would remove worktree'));
@@ -86,6 +89,28 @@ describe('slope worktree cleanup', () => {
   it('prints help for --help flag', async () => {
     await worktreeCommand(['--help']);
     expect(console.log).toHaveBeenCalledWith(expect.stringContaining('slope worktree'));
+    expect(console.log).toHaveBeenCalledWith(expect.stringContaining('start'));
     expect(console.log).toHaveBeenCalledWith(expect.stringContaining('cleanup'));
+  });
+
+  it('previews persistent worktree start with session and claim metadata', async () => {
+    mockExecSync
+      .mockReturnValueOnce('.git' as any) // git-common-dir
+      .mockReturnValueOnce('.git' as any); // git-dir
+    mockExecFileSync.mockReturnValueOnce('/repo' as any); // git rev-parse --show-toplevel
+
+    await worktreeCommand([
+      'start',
+      '--branch=codex/example',
+      '--base=HEAD',
+      '--role=secondary',
+      '--ide=codex',
+      '--target=423',
+      '--dry-run',
+    ]);
+
+    expect(console.log).toHaveBeenCalledWith(expect.stringContaining('git worktree add'));
+    expect(console.log).toHaveBeenCalledWith(expect.stringContaining('register session role=secondary ide=codex branch=codex/example'));
+    expect(console.log).toHaveBeenCalledWith(expect.stringContaining('claim 423 (ticket)'));
   });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createSlopeToolsServer, SLOPE_MCP_TOOL_NAMES, detectSetupHints, buildSetupHint } from '../../src/mcp/index.js';
+import { createSlopeToolsServer, SLOPE_MCP_TOOL_NAMES, detectSetupHints, buildSetupHint, formatSearchResults } from '../../src/mcp/index.js';
 import type { SetupHints } from '../../src/mcp/index.js';
 import { SLOPE_REGISTRY, SLOPE_TYPES } from '../../src/mcp/registry.js';
 import { runInSandbox } from '../../src/mcp/sandbox.js';
@@ -123,6 +123,16 @@ describe('registry', () => {
     for (const name of expectedStoreTools) {
       expect(storeNames).toContain(name);
     }
+  });
+
+  it('marks testing session entries as direct MCP tools, not execute sandbox functions', () => {
+    const entry = SLOPE_REGISTRY.find(e => e.name === 'testing_session_status');
+    expect(entry).toBeDefined();
+    expect(entry!.availability).toBe('mcp_tool');
+    expect(entry!.description).toContain('Not available inside execute()');
+
+    const output = formatSearchResults([entry!], true);
+    expect(output).toContain('testing/testing_session_status [MCP tool; not available in execute()]');
   });
 
   it('SLOPE_TYPES contains key type definitions', () => {

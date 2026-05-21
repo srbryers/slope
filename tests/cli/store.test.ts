@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { pathToFileURL } from 'node:url';
 import { storeCommand } from '../../src/cli/commands/store.js';
 import { getStoreInfo } from '../../src/cli/store.js';
 import { SqliteSlopeStore } from '../../src/store/index.js';
@@ -113,6 +114,33 @@ describe('slope store status', () => {
     expect(typeof parsed.claims).toBe('number');
     expect(typeof parsed.scorecards).toBe('number');
     expect(typeof parsed.events).toBe('number');
+  });
+
+  it('--json includes recovery suggestions for native SQLite setup errors', async () => {
+    const modulePath = join(tmpDir, 'native-error-store.mjs');
+    writeFileSync(modulePath, `
+      export function createStore() {
+        throw new Error("The module '/tmp/better_sqlite3.node' was compiled against a different Node.js version using NODE_MODULE_VERSION 127. This version of Node.js requires NODE_MODULE_VERSION 141.");
+      }
+    `);
+    writeFileSync(join(tmpDir, 'package.json'), JSON.stringify({ engines: { node: '>=22 <23' } }));
+    writeFileSync(join(tmpDir, 'pnpm-lock.yaml'), 'lockfileVersion: 9.0\n');
+    writeFileSync(join(tmpDir, '.slope', 'config.json'), JSON.stringify({
+      store: pathToFileURL(modulePath).href,
+      scorecardDir: 'docs/retros',
+      scorecardPattern: 'sprint-*.json',
+      metaphor: 'golf',
+    }));
+    const logs: string[] = [];
+    const spy = vi.spyOn(console, 'log').mockImplementation((...args) => { logs.push(args.join(' ')); });
+
+    await storeCommand(['status', '--json']);
+
+    spy.mockRestore();
+    const parsed = JSON.parse(logs.join('\n'));
+    expect(parsed.error).toContain('NODE_MODULE_VERSION');
+    expect(parsed.recovery).toContain('Install this worktree\'s dependencies first: pnpm install.');
+    expect(parsed.recovery.join('\n')).toContain('package.json engines.node (>=22 <23)');
   });
 });
 

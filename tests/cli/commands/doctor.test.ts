@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { chmodSync, mkdirSync, writeFileSync, rmSync, readFileSync, utimesSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execSync } from 'node:child_process';
 import { doctorCommand, runDoctorChecks, runDoctorFixes } from '../../../src/cli/commands/doctor.js';
@@ -98,6 +98,40 @@ describe('doctor checks', () => {
         expect(checks.find(c => c.name === 'common-issues')).toMatchObject({ status: 'ok' });
         expect(checks.find(c => c.name === 'version')?.message).not.toContain('missing');
         expect(checks.find(c => c.name === 'guards')?.message).not.toContain('No hooks installed');
+      } finally {
+        execSync(`git worktree remove --force "${linked}"`, { cwd, stdio: 'ignore' });
+      }
+    });
+
+    it('honors configured shared store paths from a linked worktree config', () => {
+      setupSlopeDir(cwd);
+      writeFileSync(join(cwd, '.slope', 'slope.db'), '');
+      writeFileSync(join(cwd, 'README.md'), '# test repo\n');
+      execSync('git init', { cwd, stdio: 'ignore' });
+      execSync('git config user.email test@example.com', { cwd, stdio: 'ignore' });
+      execSync('git config user.name "Test User"', { cwd, stdio: 'ignore' });
+      execSync('git add .gitignore README.md docs/backlog/roadmap.json', { cwd, stdio: 'ignore' });
+      execSync('git commit -m init', { cwd, stdio: 'ignore' });
+
+      const linked = join(tmpdir(), `slope-doctor-linked-config-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+      execSync(`git worktree add -b linked-config-test "${linked}"`, { cwd, stdio: 'ignore' });
+      try {
+        mkdirSync(join(linked, '.slope'), { recursive: true });
+        writeFileSync(join(linked, '.slope', 'config.json'), JSON.stringify({
+          scorecardDir: 'docs/retros',
+          scorecardPattern: 'sprint-*.json',
+          store_path: relative(linked, join(cwd, '.slope', 'slope.db')),
+          commonIssuesPath: relative(linked, join(cwd, '.slope', 'common-issues.json')),
+          metaphor: 'golf',
+          slopeVersion: '1.25.5',
+        }, null, 2));
+
+        const checks = runDoctorChecks(linked);
+
+        expect(checks.find(c => c.name === 'store')).toMatchObject({ status: 'ok' });
+        expect(checks.find(c => c.name === 'common-issues')).toMatchObject({ status: 'ok' });
+        expect(checks.find(c => c.name === 'store')?.message).not.toContain('.slope/slope.db missing');
+        expect(checks.find(c => c.name === 'common-issues')?.message).not.toContain('.slope/common-issues.json missing');
       } finally {
         execSync(`git worktree remove --force "${linked}"`, { cwd, stdio: 'ignore' });
       }

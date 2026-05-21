@@ -3,6 +3,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { nextCommand } from '../../../src/cli/commands/next.js';
+import { createSprintState, saveSprintState } from '../../../src/cli/sprint-state.js';
 
 function makeRepo(): string {
   const cwd = mkdtempSync(join(tmpdir(), 'slope-next-'));
@@ -78,6 +79,30 @@ function writeSupersededRoadmap(cwd: string): void {
   }));
 }
 
+function writeLinearRoadmap(cwd: string): void {
+  writeFileSync(join(cwd, 'docs', 'backlog', 'roadmap.json'), JSON.stringify({
+    name: 'Test',
+    phases: [{ name: 'P1', sprints: [1, 30, 31] }],
+    sprints: [
+      { id: 1, theme: 'Historical', par: 4, slope: 1, type: 'feature', status: 'complete', tickets: [
+        { key: 'S1-1', title: 'old', club: 'wedge', complexity: 'small' },
+        { key: 'S1-2', title: 'old', club: 'wedge', complexity: 'small' },
+        { key: 'S1-3', title: 'old', club: 'wedge', complexity: 'small' },
+      ] },
+      { id: 30, theme: 'Current work', par: 4, slope: 1, type: 'feature', status: 'planned', tickets: [
+        { key: 'S30-1', title: 'current', club: 'wedge', complexity: 'small' },
+        { key: 'S30-2', title: 'current', club: 'wedge', complexity: 'small' },
+        { key: 'S30-3', title: 'current', club: 'wedge', complexity: 'small' },
+      ] },
+      { id: 31, theme: 'Next work', par: 4, slope: 1, type: 'feature', status: 'planned', depends_on: [30], tickets: [
+        { key: 'S31-1', title: 'next', club: 'wedge', complexity: 'small' },
+        { key: 'S31-2', title: 'next', club: 'wedge', complexity: 'small' },
+        { key: 'S31-3', title: 'next', club: 'wedge', complexity: 'small' },
+      ] },
+    ],
+  }));
+}
+
 describe('slope next', () => {
   const repos: string[] = [];
 
@@ -129,5 +154,34 @@ describe('slope next', () => {
     expect(output).toContain('Latest scorecard: S95');
     expect(output).toContain('Next sprint: S96');
     expect(output).not.toContain('S75.5');
+  });
+
+  it('does not let fully gated scoring sprint-state reset next sprint output', () => {
+    const cwd = makeRepo();
+    repos.push(cwd);
+    writeScorecard(cwd, 29);
+    writeLinearRoadmap(cwd);
+    const state = createSprintState(1, 'scoring');
+    state.gates.tests = true;
+    state.gates.code_review = true;
+    state.gates.architect_review = true;
+    state.gates.scorecard = true;
+    state.gates.review_md = true;
+    saveSprintState(cwd, state);
+    const originalCwd = process.cwd();
+    const logs: string[] = [];
+    vi.spyOn(console, 'log').mockImplementation((msg = '') => logs.push(String(msg)));
+
+    try {
+      process.chdir(cwd);
+      nextCommand();
+    } finally {
+      process.chdir(originalCwd);
+    }
+
+    const output = logs.join('\n');
+    expect(output).toContain('Latest scorecard: S29');
+    expect(output).toContain('Next sprint: S30');
+    expect(output).not.toContain('Next sprint: S1');
   });
 });

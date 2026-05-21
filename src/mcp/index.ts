@@ -26,6 +26,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { SLOPE_REGISTRY, SLOPE_TYPES } from './registry.js';
+import type { FunctionRegistryEntry } from './registry.js';
 import { runInSandbox } from './sandbox.js';
 import type { SlopeStore, SlopeConfig } from '../core/index.js';
 import { checkConflicts, loadFlows, checkFlowStaleness, checkStoreHealth, METAPHOR_SCHEMA, listMetaphors, buildInterviewContext, generateInterviewSteps, loadConfig, parseTestPlan, getAreasNeedingTest, hasEmbeddingSupport, embed, deduplicateByFile, formatContextForAgent, WorkflowEngine, loadWorkflow, listWorkflows, resolveVariables } from '../core/index.js';
@@ -114,6 +115,20 @@ export function buildSetupHint(hints: SetupHints): string | null {
   );
 }
 
+export function formatSearchResults(results: FunctionRegistryEntry[], useCompact: boolean): string {
+  if (useCompact) {
+    const compactResults = results.map(e => {
+      const availability = e.availability === 'mcp_tool'
+        ? ' [MCP tool; not available in execute()]'
+        : '';
+      return `${e.module}/${e.name}${availability}: ${e.description}`;
+    });
+    return `SLOPE API (${results.length} functions):\n${compactResults.join('\n')}\n\nUse search({ query: "name" }) or search({ module: "core", compact: false }) for full signatures and examples.`;
+  }
+
+  return JSON.stringify(results, null, 2);
+}
+
 export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHints, storeType?: string, config?: SlopeConfig): McpServer {
   const server = new McpServer({
     name: 'slope-tools',
@@ -161,13 +176,7 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
 
       // Compact mode: name + module + description only (default for unfiltered discovery)
       const useCompact = compact ?? (!query && !module);
-      let outputText: string;
-      if (useCompact) {
-        const compactResults = results.map(e => `${e.module}/${e.name}: ${e.description}`);
-        outputText = `SLOPE API (${results.length} functions):\n${compactResults.join('\n')}\n\nUse search({ query: "name" }) or search({ module: "core", compact: false }) for full signatures and examples.`;
-      } else {
-        outputText = JSON.stringify(results, null, 2);
-      }
+      const outputText = formatSearchResults(results, useCompact);
 
       const content: Array<{ type: 'text'; text: string }> = [
         { type: 'text' as const, text: outputText },

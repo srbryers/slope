@@ -8,6 +8,7 @@ export interface FunctionRegistryEntry {
   description: string;
   signature: string;
   example: string;
+  availability?: 'execute' | 'mcp_tool';
 }
 
 export const SLOPE_REGISTRY: FunctionRegistryEntry[] = [
@@ -601,37 +602,42 @@ export const SLOPE_REGISTRY: FunctionRegistryEntry[] = [
   {
     name: 'session_status',
     module: 'store',
-    description: 'MCP tool: Returns active sessions and claims from the SlopeStore.',
+    description: 'Direct MCP tool: Returns active sessions and claims from the SlopeStore. Not available inside execute().',
     signature: 'session_status(): { sessions: SlopeSession[]; claims: SprintClaim[] }',
     example: '// Called via MCP tool, not directly',
+    availability: 'mcp_tool',
   },
   {
     name: 'acquire_claim',
     module: 'store',
-    description: 'MCP tool: Claims a ticket or area for the current sprint via SlopeStore.',
+    description: 'Direct MCP tool: Claims a ticket or area for the current sprint via SlopeStore. Not available inside execute().',
     signature: 'acquire_claim(sessionId: string, target: string, scope: ClaimScope, sprintNumber: number, player: string): SprintClaim',
     example: '// Called via MCP tool, not directly',
+    availability: 'mcp_tool',
   },
   {
     name: 'check_conflicts',
     module: 'store',
-    description: 'MCP tool: Detects overlapping and adjacent conflicts among active claims.',
+    description: 'Direct MCP tool: Detects overlapping and adjacent conflicts among active claims. Not available inside execute().',
     signature: 'check_conflicts(sprintNumber?: number): { claims: number; conflicts: SprintConflict[] }',
     example: '// Called via MCP tool, not directly',
+    availability: 'mcp_tool',
   },
   {
     name: 'store_status',
     module: 'store',
-    description: 'MCP tool: Check store health — schema version, row counts, and error status.',
+    description: 'Direct MCP tool: Check store health — schema version, row counts, and error status. Not available inside execute().',
     signature: 'store_status(): StoreHealthResult',
     example: '// Called via MCP tool, not directly',
+    availability: 'mcp_tool',
   },
   {
     name: 'context_search',
     module: 'store',
-    description: 'MCP tool: Semantic code search — returns relevant snippets instead of full files. Falls back to grep when no embedding index exists.',
+    description: 'Direct MCP tool: Semantic code search — returns relevant snippets instead of full files. Falls back to grep when no embedding index exists. Not available inside execute().',
     signature: 'context_search(query: string, top?: number, format?: "paths" | "snippets"): { text: string }',
     example: '// Called via MCP tool: context_search({ query: "guard system" })',
+    availability: 'mcp_tool',
   },
 
   // ─── Transcript ───
@@ -893,37 +899,42 @@ export const SLOPE_REGISTRY: FunctionRegistryEntry[] = [
   {
     name: 'testing_session_start',
     module: 'testing',
-    description: 'Start a manual testing session. Creates a git worktree, returns setup steps from config. One active session at a time.',
+    description: 'Direct MCP tool: Start a manual testing session. Creates a git worktree, returns setup steps from config. One active session at a time. Not available inside execute().',
     signature: 'testing_session_start({ purpose?: string, sprint?: number })',
     example: 'Call via MCP: testing_session_start({ purpose: "Test checkout flow" })',
+    availability: 'mcp_tool',
   },
   {
     name: 'testing_session_finding',
     module: 'testing',
-    description: 'Record a finding (bug, observation) during an active testing session.',
+    description: 'Direct MCP tool: Record a finding (bug, observation) during an active testing session. Not available inside execute().',
     signature: 'testing_session_finding({ description: string, severity?: "low"|"medium"|"high"|"critical", ticket?: string })',
     example: 'Call via MCP: testing_session_finding({ description: "Button unresponsive on mobile", severity: "high" })',
+    availability: 'mcp_tool',
   },
   {
     name: 'testing_session_end',
     module: 'testing',
-    description: 'End the active testing session. Returns summary of findings and cleans up worktree. Run teardown steps BEFORE calling this.',
+    description: 'Direct MCP tool: End the active testing session. Returns summary of findings and cleans up worktree. Run teardown steps BEFORE calling this. Not available inside execute().',
     signature: 'testing_session_end({ session_id?: string, skip_cleanup?: boolean })',
     example: 'Call via MCP: testing_session_end()',
+    availability: 'mcp_tool',
   },
   {
     name: 'testing_session_status',
     module: 'testing',
-    description: 'Show active testing session info and findings, or indicate no active session.',
+    description: 'Direct MCP tool: Show active testing session info and findings, or indicate no active session. Not available inside execute().',
     signature: 'testing_session_status()',
     example: 'Call via MCP: testing_session_status()',
+    availability: 'mcp_tool',
   },
   {
     name: 'testing_plan_status',
     module: 'testing',
-    description: 'Show test plan coverage summary: tested, untested, stale, and issue counts per section. Reads the markdown test plan configured in .slope/config.json testing.testPlanPath.',
+    description: 'Direct MCP tool: Show test plan coverage summary: tested, untested, stale, and issue counts per section. Reads the markdown test plan configured in .slope/config.json testing.testPlanPath. Not available inside execute().',
     signature: 'testing_plan_status()',
     example: 'Call via MCP: testing_plan_status()',
+    availability: 'mcp_tool',
   },
   // ─── Workflow Engine ───
   {
