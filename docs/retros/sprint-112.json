@@ -1,0 +1,97 @@
+{
+  "sprint_number": 112,
+  "player": "codex",
+  "theme": "GitHub Actions Node 24 Warning Cleanup",
+  "par": 3,
+  "slope": 1,
+  "score": 3,
+  "score_label": "par",
+  "date": "2026-05-22",
+  "shots": [
+    {
+      "ticket_key": "S112-1",
+      "title": "Update GitHub workflow actions to Node 24-capable major versions",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "The first full test run hit an existing git analyzer timing boundary, then the targeted rerun and second full suite passed."
+        }
+      ],
+      "notes": "Updated CI, publish, and docs-sync workflow actions from Node 20-era pins to Node 24-era major versions: actions/checkout@v6, actions/setup-node@v6, pnpm/action-setup@v6, and peter-evans/create-pull-request@v8. Removed the stale package-manager-cache input from publish.yml. Validation passed with typecheck, build, git diff --check, a targeted flaky-test rerun, and a second full pnpm test run."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 1,
+    "fairways_total": 1,
+    "greens_in_regulation": 1,
+    "greens_total": 1,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 1,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "type": "maintenance",
+  "conditions": [
+    {
+      "type": "rough",
+      "description": "GitHub-hosted Actions are transitioning JavaScript actions from Node 20 to Node 24, so pinned action majors need current runtime support.",
+      "impact": "low"
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Action runtime warnings are best fixed by upgrading action major versions rather than forcing runtime env vars.",
+      "outcome": "Moved all local workflow JS action pins with available Node 24-era majors and removed the invalid setup-node input."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "pnpm run typecheck, pnpm run build, git diff --check, targeted git analyzer test rerun, and second full pnpm test passed.",
+      "status": "healthy"
+    },
+    {
+      "category": "workflow",
+      "description": "No stale Node 20-era action pins or package-manager-cache input remain in .github/workflows.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "A tidy maintenance pass after the release repair: small YAML changes, big reduction in future CI noise.",
+    "advice_for_next_player": "When GitHub warns about action runtimes, check each action's current major before using runner env overrides.",
+    "what_surprised_you": "The only local turbulence was a pre-existing timeout-prone git analyzer test, not the workflow edit.",
+    "excited_about_next": "The next release or CI run should be quieter and closer to the upcoming GitHub runner default."
+  },
+  "bunker_locations": [
+    "Some local tests have tight timing limits and can require a focused rerun before the full suite settles."
+  ],
+  "yardage_book_updates": [
+    "For GitHub Actions Node runtime warnings, prefer upgrading action majors with Node 24 support and remove invalid legacy inputs."
+  ],
+  "course_management_notes": [
+    "actions/checkout moved from v4 to v6 in CI, publish, and docs sync.",
+    "actions/setup-node moved from v4 to v6 in CI, publish, and docs sync.",
+    "pnpm/action-setup moved from v4 to v6 in CI, publish, and docs sync.",
+    "peter-evans/create-pull-request moved from v7 to v8 in docs sync.",
+    "Removed package-manager-cache from publish.yml.",
+    "First full pnpm test run failed on tests/core/analyzers/git.test.ts due a 5000ms timeout.",
+    "pnpm vitest run tests/core/analyzers/git.test.ts passed on rerun.",
+    "Second full pnpm test passed: 211 test files and 3433 tests."
+  ],
+  "slope_factors": [
+    "github_actions",
+    "maintenance",
+    "ci"
+  ]
+}

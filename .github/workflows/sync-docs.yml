@@ -14,15 +14,15 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0 # Full history for changelog
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 10
 
@@ -55,7 +55,7 @@ jobs:
         run: npx wrangler kv key put --namespace-id=${{ secrets.SLOPE_STATS_KV_NS_ID }} "stats" --path=stats.json --remote
 
       - name: Checkout slope-web
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: srbryers/slope-web
           token: ${{ secrets.SLOPE_WEB_PAT }}
@@ -67,7 +67,7 @@ jobs:
       # SLOPE_WEB_PAT requires repo scope (read/write) on srbryers/slope-web
       # to checkout, push commits, and create pull requests.
       - name: Create PR on slope-web
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v8
         with:
           token: ${{ secrets.SLOPE_WEB_PAT }}
           path: slope-web
