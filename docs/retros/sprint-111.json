@@ -1,0 +1,94 @@
+{
+  "sprint_number": 111,
+  "player": "codex",
+  "theme": "Trusted Publisher Release Rerun",
+  "par": 3,
+  "slope": 1,
+  "score": 2,
+  "score_label": "birdie",
+  "date": "2026-05-22",
+  "shots": [
+    {
+      "ticket_key": "S111-1",
+      "title": "Rerun v1.55.14 publish after npm trusted publisher connection (#406)",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Reran the failed v1.55.14 Publish to npm workflow after the npm package trusted publisher was configured for srbryers/slope .github/workflows/publish.yml. The rerun passed install, build, test, typecheck, trusted publishing setup, and npm publish. npm registry verification now reports @slope-dev/slope latest as 1.55.14, and issue #406 was closed with the successful run details."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 1,
+    "fairways_total": 1,
+    "greens_in_regulation": 1,
+    "greens_total": 1,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "type": "release",
+  "conditions": [
+    {
+      "type": "normal",
+      "description": "npm trusted publisher is now configured for the package and release workflow.",
+      "impact": "positive"
+    }
+  ],
+  "special_plays": [
+    {
+      "type": "recovery",
+      "description": "Recovered the failed v1.55.14 release by rerunning the same GitHub Actions run after external npm authorization was corrected.",
+      "outcome": "Published @slope-dev/slope@1.55.14 without another version bump."
+    }
+  ],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Trusted publisher fixes can be verified by rerunning the failed release workflow instead of cutting a new version.",
+      "outcome": "The second attempt for run 26259794247 succeeded and npm latest advanced from 1.55.11 to 1.55.14."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "release",
+      "description": "GitHub Actions passed install, build, test, typecheck, trusted publishing setup, and publish on the rerun.",
+      "status": "healthy"
+    },
+    {
+      "category": "registry",
+      "description": "npm view @slope-dev/slope version --registry https://registry.npmjs.org reports 1.55.14.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "A clean recovery: the exact same release machinery succeeded once npm trusted the workflow.",
+    "advice_for_next_player": "When npm E404 appears after provenance signing, check package trusted publisher settings before touching repo code.",
+    "what_surprised_you": "Rerunning the failed release attempt was enough; no new version bump or release tag was required.",
+    "excited_about_next": "The normal release path is unblocked again."
+  },
+  "bunker_locations": [
+    "The workflow still emits non-blocking warnings about actions/setup-node package-manager-cache and Node.js 20 action deprecation."
+  ],
+  "yardage_book_updates": [
+    "For npm trusted-publisher recovery, rerun the failed release workflow attempt and verify npm view before closing the issue."
+  ],
+  "course_management_notes": [
+    "Reran Publish to npm run 26259794247 after npm trusted publisher configuration was added.",
+    "Attempt 2 succeeded: https://github.com/srbryers/slope/actions/runs/26259794247/attempts/2",
+    "npm latest advanced to 1.55.14.",
+    "npm metadata for 1.55.14 includes both bins: slope -> dist/cli/index.js and mcp-slope-tools -> dist/mcp/index.js.",
+    "Closed GitHub issue #406 as fixed."
+  ],
+  "slope_factors": [
+    "release",
+    "npm",
+    "github_actions"
+  ]
+}
