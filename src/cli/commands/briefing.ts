@@ -154,6 +154,7 @@ export async function briefingCommand(args: string[]): Promise<void> {
       filter,
       roadmap,
       currentSprint: sprintNumber,
+      claims,
     });
     const skillSummary = skillBriefing.recommendations.map(r => r.id).slice(0, 3).join(', ');
 

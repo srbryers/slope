@@ -123,6 +123,17 @@ export function compareSprintIds(a: number, b: number): number {
   return sprintOrderValue(a) - sprintOrderValue(b);
 }
 
+/** Return the next canonical sprint id after a completed sprint/inserted sprint. */
+export function nextCanonicalSprintId(id: number): number {
+  if (isEncodedInsertedSprintId(id)) {
+    return Math.floor(id / 10) + 1;
+  }
+  if (!Number.isInteger(id)) {
+    return Math.floor(id) + 1;
+  }
+  return id + 1;
+}
+
 /** Return true when a roadmap sprint should still be considered selectable work. */
 export function isRoadmapSprintPending(sprint: RoadmapSprint): boolean {
   const status = (sprint as RoadmapSprint & { status?: string }).status;

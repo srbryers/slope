@@ -1175,6 +1175,20 @@ describe('buildSkillBriefing', () => {
     expect(result.recommendations[0].score).toBeGreaterThan(0);
   });
 
+  it('recommends registered skills from claimed and changed file paths', () => {
+    const result = buildSkillBriefing({
+      registry: makeSkillRegistry(),
+      scorecards: [],
+      commonIssues: makeIssues([]),
+      claims: [makeClaim({ target: 'docs/pull-request-review.md' })],
+      changedFiles: ['docs/review-checklist.md'],
+    });
+
+    const reviewRec = result.recommendations.find(r => r.id === 'review-helper');
+    expect(reviewRec).toBeDefined();
+    expect(reviewRec?.reason).toContain('changed files');
+  });
+
   it('surfaces repeated relevant topics that have no matching registered skill', () => {
     const result = buildSkillBriefing({
       registry: makeSkillRegistry(),

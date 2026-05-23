@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import type { GolfScorecard } from './types.js';
 import type { SlopeConfig } from './config.js';
 import { normalizeStats } from './builder.js';
-import { compareSprintIds } from './roadmap.js';
+import { compareSprintIds, nextCanonicalSprintId } from './roadmap.js';
 
 /**
  * Load SLOPE scorecards from the configured directory.
@@ -68,7 +68,7 @@ export function detectLatestSprint(config: SlopeConfig, cwd: string = process.cw
 export function resolveCurrentSprint(config: SlopeConfig, cwd: string = process.cwd()): number {
   if (config.currentSprint) return config.currentSprint;
   const latest = detectLatestSprint(config, cwd);
-  return latest + 1;
+  return latest > 0 ? nextCanonicalSprintId(latest) : 1;
 }
 
 /**

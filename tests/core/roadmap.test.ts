@@ -7,6 +7,7 @@ import {
   formatRoadmapSummary,
   formatStrategicContext,
   formatSprintLabel,
+  nextCanonicalSprintId,
   parseSprintNumber,
   sprintOrderValue,
   findNextPlannedSprint,
@@ -70,6 +71,12 @@ describe('sprint id formatting', () => {
     expect(parseSprintNumber('S114.5')).toBe(114.5);
     expect(parseSprintNumber('114abc')).toBeNull();
     expect(parseSprintNumber('114.')).toBeNull();
+  });
+
+  it('computes the next canonical sprint after inserted sprint ids', () => {
+    expect(nextCanonicalSprintId(114)).toBe(115);
+    expect(nextCanonicalSprintId(114.5)).toBe(115);
+    expect(nextCanonicalSprintId(435)).toBe(44);
   });
 });
 

@@ -244,10 +244,12 @@ export function buildSkillBriefing(opts: {
   filter?: BriefingFilter;
   roadmap?: RoadmapDefinition;
   currentSprint?: number;
+  claims?: SprintClaim[];
+  changedFiles?: string[];
   maxRecommendations?: number;
   maxGaps?: number;
 }): SkillBriefingResult {
-  const { registry, scorecards, commonIssues, filter, roadmap, currentSprint } = opts;
+  const { registry, scorecards, commonIssues, filter, roadmap, currentSprint, claims, changedFiles } = opts;
   if (!registry || !Array.isArray(registry.skills) || registry.skills.length === 0) {
     return { recommendations: [], gaps: [] };
   }
@@ -268,16 +270,21 @@ export function buildSkillBriefing(opts: {
     ...recentHazards.map(h => `${h.type} ${h.ticket} ${h.description}`),
     ...hazardIndex.bunker_locations.slice(-10).map(b => b.location),
   ].join(' '));
+  const changedFilesText = normalizeSearchText([
+    ...(claims ?? []).map(c => c.target),
+    ...(changedFiles ?? []),
+  ].join(' '));
   const historicalSkillIds = collectScorecardSkillIds(scorecards);
 
   const contextTokens = new Set([
     ...tokensFromText(sprintText),
     ...tokensFromText(filterText),
     ...tokensFromText(hazardText),
+    ...tokensFromText(changedFilesText),
   ]);
 
   const recommendations = registry.skills
-    .map(skill => scoreSkill(skill, { sprintText, filterText, hazardText, contextTokens, historicalSkillIds }))
+    .map(skill => scoreSkill(skill, { sprintText, filterText, hazardText, changedFilesText, contextTokens, historicalSkillIds }))
     .filter((rec): rec is SkillBriefingRecommendation => rec != null)
     .sort((a, b) => b.score - a.score || a.id.localeCompare(b.id))
     .slice(0, opts.maxRecommendations ?? 5);
@@ -378,6 +385,7 @@ export function formatBriefing(opts: {
     filter: effectiveFilter,
     roadmap,
     currentSprint,
+    claims,
   });
 
   if (skillBriefing.recommendations.length > 0 || skillBriefing.gaps.length > 0) {
@@ -599,6 +607,7 @@ function scoreSkill(
     sprintText: string;
     filterText: string;
     hazardText: string;
+    changedFilesText: string;
     contextTokens: Set<string>;
     historicalSkillIds: Set<string>;
   },
@@ -626,6 +635,11 @@ function scoreSkill(
       score += 3;
       matchedTerms.add(phrase);
       addReason(reasons, 'recent hazards');
+    }
+    if (containsPhrase(context.changedFilesText, normalized)) {
+      score += 4;
+      matchedTerms.add(phrase);
+      addReason(reasons, 'changed files');
     }
   }
 
