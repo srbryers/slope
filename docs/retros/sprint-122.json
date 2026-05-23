@@ -1,0 +1,117 @@
+{
+  "sprint_number": 122,
+  "player": "codex",
+  "theme": "Hook CWD Guard Correctness",
+  "par": 3,
+  "slope": 1,
+  "score": 3,
+  "score_label": "par",
+  "date": "2026-05-23",
+  "shots": [
+    {
+      "ticket_key": "S122-1",
+      "title": "Route guard execution through hook payload cwd with process cwd fallback",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Moved guardCommand config/plugin loading, baseline recording, suppression, metrics, and handler execution to use the normalized hook input cwd, falling back to process.cwd() only when stdin has no usable cwd."
+    },
+    {
+      "ticket_key": "S122-2",
+      "title": "Add regression coverage for branch-before-commit in Codex worktrees",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added branch-before-commit and dispatcher tests proving the guard checks branch/config/metrics in the hook payload cwd instead of the launcher cwd."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 2,
+    "fairways_total": 2,
+    "greens_in_regulation": 2,
+    "greens_total": 2,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "type": "bugfix",
+  "conditions": [],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Hook dispatchers should resolve the runtime workspace from hook payloads before loading repo-local configuration.",
+      "outcome": "S122 normalizes HookInput up front, then uses that cwd for config, plugins, metrics, suppression, and guard handlers."
+    },
+    {
+      "type": "lessons",
+      "description": "Guard handlers that receive cwd should pass it through to config loading instead of relying on process.cwd().",
+      "outcome": "Branch, nudge, compaction, transcript, and subagent guards now load configuration from the effective guard cwd."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "Focused guard tests, typecheck, build, full pnpm test, scorecard validation, roadmap validation, map check, and whitespace checks passed.",
+      "status": "healthy"
+    },
+    {
+      "category": "workflow",
+      "description": "The fix is tied to GitHub issue #447 and includes a Codex worktree regression test.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Small but satisfying: the bug lived in one early cwd choice, and the fix made the whole guard path more honest.",
+    "advice_for_next_player": "When a hook payload includes cwd, normalize it before any repo-local config or plugin work begins.",
+    "what_surprised_you": "Several guard handlers already accepted cwd but still loaded config from process.cwd(), so the central fix needed a small follow-through pass.",
+    "excited_about_next": "Codex worktree commits should no longer get blocked by the branch state of the launcher checkout."
+  },
+  "bunker_locations": [
+    "Guard command dispatch must read HookInput before loading repo-local guard config in worktree-aware harnesses.",
+    "Guard handlers that receive cwd should use loadConfig(cwd) when reading guidance settings.",
+    "Regression tests for hook cwd bugs should verify both emitted guard output and metrics location."
+  ],
+  "yardage_book_updates": [
+    "guardCommand now normalizes HookInput and treats input.cwd as the effective guard cwd when present.",
+    "branch-before-commit now checks protected-branch config from the effective guard cwd.",
+    "Commit/push nudges, compaction, subagent gate, and transcript guards now load config from their handler cwd.",
+    "tests/cli/commands/guard.test.ts includes a Codex-style launcher-main plus hook-feature-branch regression path."
+  ],
+  "course_management_notes": [
+    "Planned Phase 37 and Sprint 122 for GitHub issue #447.",
+    "Changed src/cli/commands/guard.ts so guard execution reads stdin before loading config and uses HookInput.cwd when present.",
+    "Changed guard handlers with internal loadConfig() calls to pass the effective cwd.",
+    "Added unit coverage for branch-before-commit checking branch state and config from the effective cwd.",
+    "Added dispatcher coverage proving branch-before-commit allows a feature-branch hook cwd even when the launcher cwd is on main.",
+    "pnpm vitest run tests/cli/guards/branch-before-commit.test.ts tests/cli/commands/guard.test.ts passed: 30 tests.",
+    "pnpm typecheck passed.",
+    "pnpm build passed.",
+    "pnpm test passed: 214 passed test files, 1 skipped test file, 3481 passed tests, and 23 skipped tests.",
+    "node dist/cli/index.js validate --skills passed before closeout.",
+    "node dist/cli/index.js roadmap validate passed before closeout with standing warnings only plus the expected branch-local S122 warning.",
+    "node dist/cli/index.js map --check passed: Overall CURRENT.",
+    "git diff --check passed.",
+    "slope review recommend suggested architect review and optional code review; self-review found no blocking issues."
+  ],
+  "skills_used": [
+    "slope-sprint-workflow"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow",
+    "slope-performance-analysis"
+  ],
+  "skill_gaps_found": [],
+  "slope_factors": [
+    "guard_dispatch",
+    "codex_worktrees",
+    "hook_payload_cwd"
+  ]
+}

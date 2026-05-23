@@ -241,8 +241,8 @@
       "sprints": [
         122
       ],
-      "status": "planned",
-      "note": "Fix GitHub issue #447 so tool hooks prefer the payload cwd in Codex worktrees before falling back to the launcher cwd."
+      "status": "complete",
+      "note": "Fixed GitHub issue #447 so tool hooks prefer the payload cwd in Codex worktrees before falling back to the launcher cwd."
     }
   ],
   "sprints": [
@@ -2528,7 +2528,9 @@
       "par": 3,
       "slope": 1,
       "type": "bugfix",
-      "status": "planned",
+      "status": "complete",
+      "score": 3,
+      "score_label": "par",
       "depends_on": [
         121
       ],
