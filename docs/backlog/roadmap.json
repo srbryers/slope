@@ -217,8 +217,8 @@
       "sprints": [
         119
       ],
-      "status": "planned",
-      "note": "Address the new GitHub issue batch for skills validation, scanning, help behavior, and sprint-specific briefing recommendations."
+      "status": "complete",
+      "note": "Closed the new GitHub issue batch for skills validation, scanning, help behavior, and sprint-specific briefing recommendations."
     }
   ],
   "sprints": [
@@ -2400,7 +2400,9 @@
       "par": 4,
       "slope": 3,
       "type": "bugfix + enhancement",
-      "status": "planned",
+      "status": "complete",
+      "score": 4,
+      "score_label": "par",
       "depends_on": [
         118
       ],
