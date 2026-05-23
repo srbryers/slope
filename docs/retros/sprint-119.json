@@ -1,0 +1,141 @@
+{
+  "sprint_number": 119,
+  "player": "codex",
+  "theme": "Skill Registry Follow-ups",
+  "par": 4,
+  "slope": 3,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-05-23",
+  "shots": [
+    {
+      "ticket_key": "S119-1",
+      "title": "Prevent validate --skills from crashing when stats.miss_directions is missing (#440)",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "validateScorecard now normalizes scorecard stats before reading miss_directions, so legacy or sparse scorecards report validation findings instead of throwing."
+    },
+    {
+      "ticket_key": "S119-2",
+      "title": "Make slope skills --help exit successfully (#443)",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added explicit skills help handling for --help and -h, preserving usage output while returning a successful CLI exit."
+    },
+    {
+      "ticket_key": "S119-3",
+      "title": "Ignore worktrees, virtualenvs, dependencies, and generated folders during skills scan (#441)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "skills scan now prunes common generated, dependency, cache, virtualenv, and worktree directories by default, uses lstat so symlinked directories are not followed, and still scans an explicitly requested root."
+    },
+    {
+      "ticket_key": "S119-4",
+      "title": "Honor requested sprint skill metadata in briefing recommendations (#442)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Briefing recommendations now bias skills and gaps recorded on the requested sprint scorecard, keeping historical context useful without letting recency override an explicit sprint request."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "type": "bugfix + enhancement",
+  "conditions": [
+    "Fresh GitHub issue batch #440-#443 after the v1.56.1 release"
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Validators should normalize sparse historical data before derived checks.",
+      "outcome": "validate --skills no longer crashes when miss_directions is omitted from a scorecard stats block."
+    },
+    {
+      "type": "lessons",
+      "description": "Broad filesystem scans need conservative default pruning with an explicit-root escape hatch.",
+      "outcome": "skills scan avoids noisy dependency/generated/worktree trees by default while still honoring an explicitly requested scan root."
+    },
+    {
+      "type": "lessons",
+      "description": "Briefing recommendations should respect the sprint the user asked about, not just the most recent scorecards.",
+      "outcome": "Requested sprint skill metadata and skill gaps now receive explicit recommendation weight and evidence."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "Focused validation, skills, and briefing tests passed; full pnpm test, build, typecheck, CLI smoke, map check, roadmap validation, diff check, and npm pack dry run also passed.",
+      "status": "healthy"
+    },
+    {
+      "category": "issue_queue",
+      "description": "Implemented the four new GitHub issues in one sprint and prepared PR closure references for #440, #441, #442, and #443.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Tidy and a little satisfying: each report mapped to a narrow product behavior, and the tests made the fixes feel well pinned down.",
+    "advice_for_next_player": "Keep skill-registry work covered at both core and CLI boundaries; these bugs mostly hide where old scorecards or broad repo roots meet user-facing commands.",
+    "what_surprised_you": "The broad validate command still exposes old GIR overflow scorecards even though modern scorecards are clean.",
+    "excited_about_next": "The skill registry now behaves better in real repos: quieter scans, cleaner help, safer validation, and sprint-aware briefing."
+  },
+  "bunker_locations": [
+    "Repo-wide validate --skills still exits nonzero on pre-existing historical S70 and S74-S83 GIR overflow scorecards.",
+    "Skill scanners should default to pruning generated/dependency/worktree directories and avoid following symlinked directories.",
+    "Briefing fixtures need skill ids and gap terms that do not accidentally overlap unrelated registered skill metadata."
+  ],
+  "yardage_book_updates": [
+    "src/core/validation.ts normalizes stats before validating miss direction totals.",
+    "src/cli/commands/skills.ts now treats skills --help and skills -h as successful help requests.",
+    "src/core/skills.ts skips common generated, dependency, virtualenv, cache, and worktree directories during recursive scans.",
+    "src/core/briefing.ts now weights requested sprint scorecard skills and skill gaps in skill briefing output.",
+    "tests/core/validation.test.ts, tests/cli/skills.test.ts, tests/core/skills.test.ts, and tests/core/briefing.test.ts cover the GitHub issue regressions."
+  ],
+  "course_management_notes": [
+    "Created S119 from GitHub issues #440, #441, #442, and #443.",
+    "pnpm vitest run tests/core/validation.test.ts tests/core/skills.test.ts tests/cli/skills.test.ts tests/core/briefing.test.ts tests/cli/validate-skills.test.ts passed: 145 tests.",
+    "pnpm build passed.",
+    "pnpm typecheck passed.",
+    "pnpm test passed: 214 test files and 3478 tests.",
+    "node dist/cli/index.js skills --help passed with exit code 0.",
+    "node dist/cli/index.js briefing --sprint=119 --compact passed.",
+    "node dist/cli/index.js roadmap validate passed as structurally valid with standing roadmap warnings plus branch-local S119 warnings before the scorecard was added.",
+    "node dist/cli/index.js map --check passed: Overall CURRENT.",
+    "git diff --check passed.",
+    "npm pack --dry-run passed for @slope-dev/slope@1.56.1 with 1018 files.",
+    "node dist/cli/index.js validate --skills against the full historical scorecard set still exits 1 because of pre-existing S70 and S74-S83 GIR overflow scorecards; S119 uses targeted scorecard and regression validation."
+  ],
+  "skills_used": [
+    "slope-sprint-workflow"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow",
+    "slope-api-reference",
+    "slope-performance-analysis"
+  ],
+  "skill_gaps_found": [],
+  "slope_factors": [
+    "skill_registry",
+    "scorecard_validation",
+    "filesystem_scanning",
+    "briefing_recommendations"
+  ]
+}
