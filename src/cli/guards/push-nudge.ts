@@ -13,7 +13,7 @@ export async function pushNudgeGuard(input: HookInput, cwd: string): Promise<Gua
   // Only fire after git commit commands
   if (!command.includes('git commit')) return {};
 
-  const config = loadConfig();
+  const config = loadConfig(cwd);
   const guidance = config.guidance ?? {};
   const pushCommitThreshold = guidance.pushCommitThreshold ?? 5;
   const pushInterval = guidance.pushInterval ?? 30;

@@ -38,7 +38,7 @@ export async function branchBeforeCommitGuard(input: HookInput, cwd: string): Pr
   }
 
   // Check against protected branches (configurable, default: main/master)
-  const config = loadConfig();
+  const config = loadConfig(cwd);
   const protectedBranches = config.guidance?.protectedBranches ?? DEFAULT_PROTECTED;
 
   // HEAD means initial repo with no commits — allow

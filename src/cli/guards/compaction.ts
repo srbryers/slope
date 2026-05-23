@@ -35,7 +35,7 @@ export async function compactionGuard(input: HookInput, cwd: string): Promise<Gu
   const sessionId = input.session_id;
   if (!sessionId) return {};
 
-  const config = loadConfig();
+  const config = loadConfig(cwd);
   const handoffsDir = join(cwd, config.guidance?.handoffsDir ?? '.slope/handoffs');
 
   const handoff: HandoffData = {

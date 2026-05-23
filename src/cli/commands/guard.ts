@@ -125,28 +125,21 @@ export async function guardCommand(args: string[]): Promise<void> {
     return;
   }
 
-  const cwd = process.cwd();
-  const config = loadConfig();
-  const disabled = config.guidance?.disabled ?? [];
-
-  // Load custom guard plugins
-  loadPluginGuards(cwd, config.plugins);
+  const fallbackCwd = process.cwd();
 
   // Read hook input from stdin
   let input: HookInput;
   try {
-    input = await readStdin();
-    // Backfill required fields that Claude Code may omit from hook JSON
-    if (!input.session_id) input.session_id = '';
-    if (!input.cwd) input.cwd = cwd;
-    if (!input.hook_event_name) input.hook_event_name = '';
+    input = normalizeHookInput(await readStdin(), fallbackCwd);
   } catch {
-    input = {
-      session_id: '',
-      cwd,
-      hook_event_name: '',
-    };
+    input = normalizeHookInput(null, fallbackCwd);
   }
+  const cwd = input.cwd;
+  const config = loadConfig(cwd);
+  const disabled = config.guidance?.disabled ?? [];
+
+  // Load custom guard plugins from the hook target workspace.
+  loadPluginGuards(cwd, config.plugins);
 
   // Record git status baseline on first guard call for this session.
   // Used by stop-check to distinguish pre-existing dirty files from session changes.
@@ -305,6 +298,15 @@ async function readStdin(): Promise<HookInput> {
       if (data === '') reject(new Error('No stdin'));
     }, 100);
   });
+}
+
+function normalizeHookInput(input: HookInput | null, fallbackCwd: string): HookInput {
+  return {
+    ...(input ?? {}),
+    session_id: input?.session_id ?? '',
+    cwd: typeof input?.cwd === 'string' && input.cwd.length > 0 ? input.cwd : fallbackCwd,
+    hook_event_name: input?.hook_event_name ?? '',
+  };
 }
 
 function printUsage(): void {

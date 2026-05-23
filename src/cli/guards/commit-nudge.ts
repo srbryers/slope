@@ -9,7 +9,7 @@ import { dedupGuardContext } from '../session-state.js';
  * Nudges to commit/push after prolonged editing.
  */
 export async function commitNudgeGuard(input: HookInput, cwd: string): Promise<GuardResult> {
-  const config = loadConfig();
+  const config = loadConfig(cwd);
   const commitInterval = config.guidance?.commitInterval ?? 15;
   const pushInterval = config.guidance?.pushInterval ?? 30;
 
