@@ -193,8 +193,8 @@
       "sprints": [
         116
       ],
-      "status": "planned",
-      "note": "Publish the skill registry and skill-aware briefing work as v1.56.0, including roadmap cleanup for superseded S75.5 status."
+      "status": "complete",
+      "note": "Published the skill registry and skill-aware briefing work as v1.56.0, including roadmap cleanup for superseded S75.5 status."
     }
   ],
   "sprints": [
@@ -2282,7 +2282,9 @@
       "par": 4,
       "slope": 2,
       "type": "release + cleanup",
-      "status": "planned",
+      "status": "complete",
+      "score": 4,
+      "score_label": "par",
       "depends_on": [
         115
       ],
