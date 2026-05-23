@@ -227,6 +227,14 @@
       ],
       "status": "complete",
       "note": "Cleared the repo-wide validate --skills failure caused by legacy scorecards that predate explicit greens_total stats."
+    },
+    {
+      "name": "Phase 36 \u2014 Skill Registry Patch Release",
+      "sprints": [
+        121
+      ],
+      "status": "planned",
+      "note": "Publish the S119/S120 skill registry and validation fixes as v1.56.2 using the trusted-publisher release flow."
     }
   ],
   "sprints": [
@@ -2472,6 +2480,35 @@
           "title": "Infer missing greens_total for legacy scorecards so repo-wide validate --skills passes",
           "club": "wedge",
           "complexity": "small"
+        }
+      ]
+    },
+    {
+      "id": 121,
+      "theme": "Skill Registry Patch Release",
+      "par": 3,
+      "slope": 1,
+      "type": "release",
+      "status": "planned",
+      "depends_on": [
+        120
+      ],
+      "note": "Release the S119 skill registry follow-ups and S120 historical validation cleanup as v1.56.2.",
+      "tickets": [
+        {
+          "key": "S121-1",
+          "title": "Bump @slope-dev/slope and bundled Codex plugin to v1.56.2",
+          "club": "wedge",
+          "complexity": "small"
+        },
+        {
+          "key": "S121-2",
+          "title": "Run release validation, publish v1.56.2, and verify npm",
+          "club": "short_iron",
+          "complexity": "standard",
+          "depends_on": [
+            "S121-1"
+          ]
         }
       ]
     }
