@@ -1,12 +1,14 @@
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { existsSync, writeFileSync, mkdirSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { randomUUID } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import type { HookInput, GuardResult } from '../../core/index.js';
 import { STALE_SESSION_THRESHOLD_MS } from '../../core/constants.js';
 import { SlopeStoreError } from '../../core/store.js';
 import { resolveStore } from '../store.js';
+
+const COMMAND_TEXT_KEYS = ['command', 'cmd', 'input'] as const;
 
 /** Get the sentinel file path for a session (persists across process invocations) */
 function sentinelPath(sessionId: string): string {
@@ -37,8 +39,9 @@ export function resetWorktreeCheckState(sessionId = ''): void {
 export async function worktreeCheckGuard(input: HookInput, cwd: string): Promise<GuardResult> {
   if (isWorktreeRecoveryInput(input)) return {};
 
-  // Use stable session ID, or generate one for unidentified sessions
-  const sessionId = input.session_id || randomUUID();
+  // Use a stable ID; hook payloads can omit session_id, and a fresh random
+  // value on every invocation makes one session look like many sessions.
+  const sessionId = resolveSessionId(input, cwd);
   const sentinel = sentinelPath(sessionId);
   // Only fire once per session on pass — denied sessions re-check next time
   if (existsSync(sentinel)) return {};
@@ -47,7 +50,7 @@ export async function worktreeCheckGuard(input: HookInput, cwd: string): Promise
   // or a path like '../../.git' for a worktree
   let gitCommonDir: string;
   try {
-    gitCommonDir = execSync('git rev-parse --git-common-dir 2>/dev/null', { cwd, encoding: 'utf8' }).trim();
+    gitCommonDir = gitRevParse(cwd, '--git-common-dir');
   } catch {
     // Not a git repo — allow
     return {};
@@ -59,7 +62,7 @@ export async function worktreeCheckGuard(input: HookInput, cwd: string): Promise
   // Get current branch for session registration
   let branch: string;
   try {
-    branch = execSync('git rev-parse --abbrev-ref HEAD 2>/dev/null', { cwd, encoding: 'utf8' }).trim();
+    branch = gitRevParse(cwd, '--abbrev-ref', 'HEAD');
   } catch {
     branch = 'unknown';
   }
@@ -134,11 +137,37 @@ export async function worktreeCheckGuard(input: HookInput, cwd: string): Promise
 function isWorktreeRecoveryInput(input: HookInput): boolean {
   if (input.tool_name === 'EnterWorktree') return true;
 
-  const command = typeof input.tool_input?.command === 'string'
-    ? input.tool_input.command.trim()
-    : '';
+  const command = extractCommandText(input);
 
   return command === 'EnterWorktree'
     || /^git\s+worktree\s+add(?:\s|$)/.test(command)
     || /^git\s+-C\s+(?:"[^"]+"|'[^']+'|\S+)\s+worktree\s+add(?:\s|$)/.test(command);
+}
+
+function gitRevParse(cwd: string, ...args: string[]): string {
+  return execFileSync('git', ['rev-parse', ...args], {
+    cwd,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'ignore'],
+  }).trim();
+}
+
+function resolveSessionId(input: HookInput, cwd: string): string {
+  const explicit = typeof input.session_id === 'string' ? input.session_id.trim() : '';
+  if (explicit) return explicit;
+
+  const source = typeof input.transcript_path === 'string' && input.transcript_path.trim()
+    ? `transcript:${input.transcript_path.trim()}`
+    : `cwd:${cwd}`;
+  const digest = createHash('sha256').update(source).digest('hex').slice(0, 16);
+  return `anonymous-${digest}`;
+}
+
+function extractCommandText(input: HookInput): string {
+  const toolInput = input.tool_input ?? {};
+  for (const key of COMMAND_TEXT_KEYS) {
+    const value = toolInput[key];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return '';
 }

@@ -1,0 +1,104 @@
+{
+  "sprint_number": 117,
+  "player": "codex",
+  "theme": "Worktree Guard Hardening",
+  "par": 3,
+  "slope": 2,
+  "score": 3,
+  "score_label": "par",
+  "date": "2026-05-23",
+  "shots": [
+    {
+      "ticket_key": "S117-1",
+      "title": "Harden worktree-check guard recovery command and git probing paths",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Replaced per-call random fallback session ids with stable anonymous ids, expanded recovery command parsing to include Codex-style cmd payloads, and moved git rev-parse probes to execFileSync argv calls with regression coverage."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 1,
+    "fairways_total": 1,
+    "greens_in_regulation": 1,
+    "greens_total": 1,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "type": "guard hardening",
+  "conditions": [],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Hook payloads can omit session_id; guard fallback ids must be stable across invocations.",
+      "outcome": "worktree-check now derives anonymous ids from transcript_path or cwd so one unidentified session does not look like many concurrent sessions."
+    },
+    {
+      "type": "lessons",
+      "description": "Guard recovery commands need to account for harness payload shape differences.",
+      "outcome": "worktree-check now reads command text from command, cmd, or input fields before deciding whether to allow worktree recovery."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "Focused worktree/stop-check guard tests, typecheck, build, and the full pnpm test suite passed.",
+      "status": "healthy"
+    },
+    {
+      "category": "workflow",
+      "description": "S117 came from the SLOPE-generated local backlog after GitHub reported no open issues.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Small but useful: the local backlog pointed at exactly the kind of guard edge case that only shows up in real agent traffic.",
+    "advice_for_next_player": "When a guard tracks session identity, test missing-id behavior across repeated invocations, not only the first call.",
+    "what_surprised_you": "The old random fallback was meant to be safe, but it could turn a single anonymous session into a false multi-session conflict.",
+    "excited_about_next": "The worktree guard is a little more tolerant of Codex-shaped payloads and less dependent on shell parsing."
+  },
+  "bunker_locations": [
+    "Missing hook session_id must not create a fresh guard identity on every invocation.",
+    "Worktree recovery command detection should read command text from command, cmd, and input payload fields.",
+    "Guard git probes should use argv-based child process calls instead of shell strings."
+  ],
+  "yardage_book_updates": [
+    "src/cli/guards/worktree-check.ts now resolves stable anonymous session ids from transcript_path or cwd.",
+    "src/cli/guards/worktree-check.ts now parses recovery commands from command, cmd, and input hook payload keys.",
+    "src/cli/guards/worktree-check.ts now uses execFileSync('git', ['rev-parse', ...]) for git-common-dir and branch probes."
+  ],
+  "course_management_notes": [
+    "GitHub issue queue was empty, so S117 used slope-loop/backlog.json item S-LOCAL-117.",
+    "Added a cmd-payload recovery regression for git worktree add.",
+    "Updated missing-session regression to prove the anonymous fallback is stable and sentinel caching prevents repeated self-registration.",
+    "pnpm vitest run tests/cli/guards/worktree-check.test.ts tests/cli/guards/stop-check.test.ts passed: 38 tests.",
+    "pnpm typecheck passed.",
+    "pnpm build passed.",
+    "pnpm test passed: 214 test files and 3472 tests.",
+    "node dist/cli/index.js map --check passed before scorecard creation: Overall CURRENT.",
+    "node dist/cli/index.js roadmap validate passed as structurally valid with only standing roadmap warnings plus expected branch-local S117 warnings before the PR reaches main."
+  ],
+  "skills_used": [
+    "slope-sprint-workflow"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow",
+    "slope-api-reference",
+    "slope-performance-analysis"
+  ],
+  "skill_gaps_found": [],
+  "slope_factors": [
+    "worktree_guard",
+    "hook_payload_shapes",
+    "multi_session_safety"
+  ]
+}

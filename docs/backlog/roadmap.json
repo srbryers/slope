@@ -195,6 +195,14 @@
       ],
       "status": "complete",
       "note": "Published the skill registry and skill-aware briefing work as v1.56.0, including roadmap cleanup for superseded S75.5 status."
+    },
+    {
+      "name": "Phase 32 \u2014 Worktree Guard Hardening",
+      "sprints": [
+        117
+      ],
+      "status": "complete",
+      "note": "Used the SLOPE-generated local backlog to harden the worktree-check guard against recurring multi-session and payload-shape hazards."
     }
   ],
   "sprints": [
@@ -2314,6 +2322,28 @@
             "S116-1",
             "S116-2"
           ]
+        }
+      ]
+    },
+    {
+      "id": 117,
+      "theme": "Worktree Guard Hardening",
+      "par": 3,
+      "slope": 2,
+      "type": "guard hardening",
+      "status": "complete",
+      "score": 3,
+      "score_label": "par",
+      "depends_on": [
+        116
+      ],
+      "note": "Address the SLOPE-generated S-LOCAL-117 backlog item by hardening src/cli/guards/worktree-check.ts and adding regression coverage.",
+      "tickets": [
+        {
+          "key": "S117-1",
+          "title": "Harden worktree-check guard recovery command and git probing paths",
+          "club": "short_iron",
+          "complexity": "standard"
         }
       ]
     }

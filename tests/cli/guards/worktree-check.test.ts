@@ -6,7 +6,7 @@ import { SlopeStoreError } from '../../../src/core/store.js';
 import type { SlopeStore, SlopeSession } from '../../../src/core/store.js';
 
 vi.mock('node:child_process', () => ({
-  execSync: vi.fn(),
+  execFileSync: vi.fn(),
 }));
 
 // Track sentinel files in memory instead of real filesystem
@@ -41,11 +41,11 @@ vi.mock('../../../src/cli/store.js', () => ({
   resolveStore: vi.fn(),
 }));
 
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { resolveStore } from '../../../src/cli/store.js';
 
-const mockExecSync = vi.mocked(execSync);
+const mockExecFileSync = vi.mocked(execFileSync);
 const mockResolveStore = vi.mocked(resolveStore);
 const mockWriteFileSync = vi.mocked(writeFileSync);
 
@@ -70,9 +70,9 @@ function makeSession(overrides: Partial<SlopeSession> = {}): SlopeSession {
   };
 }
 
-/** Set up execSync to return main repo on a given branch */
+/** Set up execFileSync to return main repo on a given branch */
 function mockGitMainRepo(branch = 'feat/foo'): void {
-  mockExecSync
+  mockExecFileSync
     .mockReturnValueOnce('.git' as never)       // git-common-dir
     .mockReturnValueOnce(branch as never);       // branch
 }
@@ -94,7 +94,7 @@ describe('worktreeCheckGuard', () => {
   });
 
   it('denies when concurrent session exists in same repo', async () => {
-    mockExecSync
+    mockExecFileSync
       .mockReturnValueOnce('.git' as never)         // git-common-dir
       .mockReturnValueOnce('feat/foo' as never);     // branch
 
@@ -143,8 +143,19 @@ describe('worktreeCheckGuard', () => {
     expect(mockResolveStore).not.toHaveBeenCalled();
   });
 
+  it('allows git worktree add recovery commands from cmd payloads', async () => {
+    const result = await worktreeCheckGuard({
+      ...makeInput(),
+      tool_name: 'Bash',
+      tool_input: { cmd: 'git worktree add /tmp/slope-worktree HEAD' },
+    }, '/tmp/test');
+
+    expect(result).toEqual({});
+    expect(mockResolveStore).not.toHaveBeenCalled();
+  });
+
   it('allows when other session has worktree_path (isolated)', async () => {
-    mockExecSync
+    mockExecFileSync
       .mockReturnValueOnce('.git' as never)
       .mockReturnValueOnce('feat/foo' as never);
 
@@ -158,7 +169,7 @@ describe('worktreeCheckGuard', () => {
   });
 
   it('allows when current session is alone', async () => {
-    mockExecSync
+    mockExecFileSync
       .mockReturnValueOnce('.git' as never)
       .mockReturnValueOnce('feat/foo' as never);
 
@@ -171,7 +182,7 @@ describe('worktreeCheckGuard', () => {
   });
 
   it('allows when in a worktree (already isolated)', async () => {
-    mockExecSync
+    mockExecFileSync
       .mockReturnValueOnce('../../.git' as never); // git-common-dir != '.git'
 
     const result = await worktreeCheckGuard(makeInput(), '/tmp/test');
@@ -181,7 +192,7 @@ describe('worktreeCheckGuard', () => {
   });
 
   it('silently passes on store resolve error (#263)', async () => {
-    mockExecSync
+    mockExecFileSync
       .mockReturnValueOnce('.git' as never)
       .mockReturnValueOnce('feat/foo' as never);
 
@@ -192,7 +203,7 @@ describe('worktreeCheckGuard', () => {
   });
 
   it('silently passes on store query error (#263)', async () => {
-    mockExecSync
+    mockExecFileSync
       .mockReturnValueOnce('.git' as never)
       .mockReturnValueOnce('feat/foo' as never);
 
@@ -203,7 +214,7 @@ describe('worktreeCheckGuard', () => {
   });
 
   it('fires on feature branch (no longer gated to main/master)', async () => {
-    mockExecSync
+    mockExecFileSync
       .mockReturnValueOnce('.git' as never)
       .mockReturnValueOnce('feat/worktree-guard' as never);
 
@@ -217,7 +228,7 @@ describe('worktreeCheckGuard', () => {
   });
 
   it('cleans stale sessions before checking', async () => {
-    mockExecSync
+    mockExecFileSync
       .mockReturnValueOnce('.git' as never)
       .mockReturnValueOnce('main' as never);
 
@@ -230,7 +241,7 @@ describe('worktreeCheckGuard', () => {
   });
 
   it('handles SESSION_CONFLICT on register (session already exists)', async () => {
-    mockExecSync
+    mockExecFileSync
       .mockReturnValueOnce('.git' as never)
       .mockReturnValueOnce('main' as never);
 
@@ -247,7 +258,7 @@ describe('worktreeCheckGuard', () => {
   });
 
   it('closes store in finally block even on error', async () => {
-    mockExecSync
+    mockExecFileSync
       .mockReturnValueOnce('.git' as never)
       .mockReturnValueOnce('main' as never);
 
@@ -258,7 +269,7 @@ describe('worktreeCheckGuard', () => {
   });
 
   it('closes store on successful path', async () => {
-    mockExecSync
+    mockExecFileSync
       .mockReturnValueOnce('.git' as never)
       .mockReturnValueOnce('main' as never);
 
@@ -334,13 +345,13 @@ describe('worktreeCheckGuard', () => {
       makeSession({ session_id: 'session-b' }),
     ]);
 
-    mockExecSync
+    mockExecFileSync
       .mockReturnValueOnce('.git' as never)
       .mockReturnValueOnce('main' as never);
     const first = await worktreeCheckGuard(makeInput('session-a'), '/tmp/test');
     expect(first.decision).toBe('deny');
 
-    mockExecSync
+    mockExecFileSync
       .mockReturnValueOnce('.git' as never)
       .mockReturnValueOnce('main' as never);
     const second = await worktreeCheckGuard(makeInput('session-b'), '/tmp/test');
@@ -348,7 +359,7 @@ describe('worktreeCheckGuard', () => {
   });
 
   it('resets state correctly via unlinkSync', async () => {
-    mockExecSync
+    mockExecFileSync
       .mockReturnValueOnce('.git' as never)
       .mockReturnValueOnce('main' as never);
 
@@ -361,7 +372,7 @@ describe('worktreeCheckGuard', () => {
 
     resetWorktreeCheckState('reset-test');
 
-    mockExecSync
+    mockExecFileSync
       .mockReturnValueOnce('.git' as never)
       .mockReturnValueOnce('main' as never);
     const result = await worktreeCheckGuard(makeInput('reset-test'), '/tmp/test');
@@ -369,7 +380,7 @@ describe('worktreeCheckGuard', () => {
   });
 
   it('returns empty when not a git repo', async () => {
-    mockExecSync.mockImplementation(() => { throw new Error('not a git repo'); });
+    mockExecFileSync.mockImplementation(() => { throw new Error('not a git repo'); });
     const result = await worktreeCheckGuard(makeInput(), '/tmp/test');
     expect(result).toEqual({});
   });
@@ -427,15 +438,17 @@ describe('worktreeCheckGuard', () => {
     expect(result.decision).toBe('deny');
   });
 
-  it('generates random session ID when input has none', async () => {
+  it('uses a stable anonymous session ID when input has none', async () => {
     mockGitMainRepo();
     (mockStore.getActiveSessions as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 
     await worktreeCheckGuard(makeInput(''), '/tmp/test');
     const call = (mockStore.registerSession as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    expect(call.session_id).not.toBe('unknown');
-    expect(call.session_id).not.toBe('');
-    expect(call.session_id).toMatch(/^[0-9a-f-]{36}$/);
+    expect(call.session_id).toMatch(/^anonymous-[0-9a-f]{16}$/);
+
+    const second = await worktreeCheckGuard(makeInput(''), '/tmp/test');
+    expect(second).toEqual({});
+    expect(mockStore.registerSession).toHaveBeenCalledTimes(1);
   });
 
   it('recovers swarm_id via SESSION_CONFLICT and still allows same-swarm', async () => {
@@ -466,7 +479,7 @@ describe('worktreeCheckGuard', () => {
   });
 
   it('uses branch unknown fallback when git branch fails', async () => {
-    mockExecSync
+    mockExecFileSync
       .mockReturnValueOnce('.git' as never)                              // git-common-dir
       .mockImplementationOnce(() => { throw new Error('detached'); });    // branch fails
 
