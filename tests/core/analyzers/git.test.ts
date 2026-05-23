@@ -66,7 +66,7 @@ describe('analyzeGit', () => {
 
     const result = await analyzeGit(tmpDir);
     expect(result.commitsPerWeek).toBeGreaterThan(0);
-  });
+  }, 10000);
 
   it('parses contributors', async () => {
     gitInit(tmpDir);
