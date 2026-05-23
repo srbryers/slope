@@ -225,8 +225,8 @@
       "sprints": [
         120
       ],
-      "status": "planned",
-      "note": "Clear the repo-wide validate --skills failure caused by legacy scorecards that predate explicit greens_total stats."
+      "status": "complete",
+      "note": "Cleared the repo-wide validate --skills failure caused by legacy scorecards that predate explicit greens_total stats."
     }
   ],
   "sprints": [
@@ -2459,7 +2459,9 @@
       "par": 3,
       "slope": 1,
       "type": "bugfix",
-      "status": "planned",
+      "status": "complete",
+      "score": 3,
+      "score_label": "par",
       "depends_on": [
         119
       ],
