@@ -234,6 +234,19 @@ describe('validateScorecard - miss directions', () => {
     }));
     expect(result.errors.filter(e => e.code === 'MISS_DIRECTION_MISMATCH')).toHaveLength(0);
   });
+
+  it('treats missing miss_directions as zeroes instead of throwing (#440)', () => {
+    const shots = [
+      makeShot({ result: 'green' }),
+      makeShot({ result: 'in_the_hole' }),
+    ];
+    const stats = makeStats({ fairways_total: 2, fairways_hit: 2, greens_total: 2, greens_in_regulation: 2 });
+    delete (stats as Partial<HoleStats>).miss_directions;
+
+    const result = validateScorecard(makeCard({ shots, stats }));
+
+    expect(result.errors.filter(e => e.code === 'MISS_DIRECTION_MISMATCH')).toHaveLength(0);
+  });
 });
 
 // --- Rule 6: basic field validation ---

@@ -1,7 +1,7 @@
 // Skill registry — index repo-local Agent Skills metadata without executing skills.
 
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
-import { basename, dirname, isAbsolute, join, relative } from 'node:path';
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { basename, dirname, isAbsolute, join, relative, sep } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import type { SlopeConfig } from './config.js';
 
@@ -65,7 +65,32 @@ export interface ParsedSkillMarkdown {
   warnings: string[];
 }
 
-const SKIP_DIRS = new Set(['.git', 'node_modules', 'dist', 'coverage']);
+const SKIP_DIRS = new Set([
+  '.cache',
+  '.eggs',
+  '.git',
+  '.mypy_cache',
+  '.next',
+  '.npm',
+  '.parcel-cache',
+  '.pnpm-store',
+  '.pytest_cache',
+  '.ruff_cache',
+  '.tox',
+  '.turbo',
+  '.venv',
+  '.worktrees',
+  '.yarn',
+  '__pycache__',
+  'build',
+  'coverage',
+  'dist',
+  'env',
+  'node_modules',
+  'out',
+  'target',
+  'venv',
+]);
 const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
 
 export function resolveSkillRoots(config: SlopeConfig, cwd: string = process.cwd()): string[] {
@@ -309,15 +334,15 @@ function findSkillMarkdownFiles(root: string): string[] {
     }
 
     for (const entry of entries.sort()) {
-      if (SKIP_DIRS.has(entry)) continue;
       const fullPath = join(dir, entry);
       let stat;
       try {
-        stat = statSync(fullPath);
+        stat = lstatSync(fullPath);
       } catch {
         continue;
       }
       if (stat.isDirectory()) {
+        if (shouldSkipScanDir(root, fullPath, entry)) continue;
         visit(fullPath);
       } else if (entry === 'SKILL.md') {
         found.push(fullPath);
@@ -326,6 +351,12 @@ function findSkillMarkdownFiles(root: string): string[] {
   };
   visit(root);
   return found.sort();
+}
+
+function shouldSkipScanDir(root: string, fullPath: string, entry: string): boolean {
+  if (SKIP_DIRS.has(entry)) return true;
+  const segments = relative(root, fullPath).split(sep);
+  return segments.length >= 2 && segments[0] === '.claude' && segments[1] === 'worktrees';
 }
 
 function mergeSkill(target: SkillDefinition, source: SkillDefinition): void {

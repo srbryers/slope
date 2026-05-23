@@ -43,6 +43,19 @@ function rootsFor(config: SlopeConfig, args: string[]): string[] {
   return config.skillRoots && config.skillRoots.length > 0 ? config.skillRoots : [...DEFAULT_SKILL_ROOTS];
 }
 
+function printSkillsHelp(): void {
+  console.log(`
+slope skills — Repo-local Agent Skills registry
+
+Usage:
+  slope skills scan [--root=<path>] [--output=<path>]  Scan skill roots into .slope/skills.json
+  slope skills list [--json] [--output=<path>]         List registered skills
+  slope skills validate [--output=<path>]              Validate registry metadata and source paths
+
+SLOPE indexes, recommends, and validates skill metadata. It does not execute skills.
+`);
+}
+
 function skillsScan(args: string[], cwd: string, config: SlopeConfig): void {
   const roots = rootsFor(config, args);
   const output = registryPath(cwd, config, args);
@@ -116,6 +129,11 @@ export async function skillsCommand(args: string[]): Promise<void> {
   const sub = args[0];
   const rest = args.slice(1);
 
+  if (sub === '--help' || sub === '-h') {
+    printSkillsHelp();
+    return;
+  }
+
   switch (sub) {
     case 'scan':
       skillsScan(rest, cwd, config);
@@ -127,16 +145,7 @@ export async function skillsCommand(args: string[]): Promise<void> {
       skillsValidate(rest, cwd, config);
       break;
     default:
-      console.log(`
-slope skills — Repo-local Agent Skills registry
-
-Usage:
-  slope skills scan [--root=<path>] [--output=<path>]  Scan skill roots into .slope/skills.json
-  slope skills list [--json] [--output=<path>]         List registered skills
-  slope skills validate [--output=<path>]              Validate registry metadata and source paths
-
-SLOPE indexes, recommends, and validates skill metadata. It does not execute skills.
-`);
+      printSkillsHelp();
       if (sub) process.exit(1);
       break;
   }

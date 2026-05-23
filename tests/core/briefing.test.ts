@@ -8,7 +8,7 @@ import {
   buildSkillBriefing,
 } from '../../src/core/briefing.js';
 import type { CommonIssuesFile, RecurringPattern } from '../../src/core/briefing.js';
-import type { SkillRegistryFile } from '../../src/core/skills.js';
+import type { SkillDefinition, SkillRegistryFile } from '../../src/core/skills.js';
 import type { GolfScorecard, ShotRecord, HoleStats, SprintClaim, SlopeEvent } from '../../src/core/types.js';
 import { golf, gaming } from '../../src/core/metaphors/index.js';
 import { backend, frontend, generalist } from '../../src/core/roles.js';
@@ -108,6 +108,24 @@ function makeSkillRegistry(): SkillRegistryFile {
         triggers: ['briefing', 'scorecard', 'sprint'],
       },
     ],
+  };
+}
+
+function makeSkill(id: string, description = `${id} skill.`): SkillDefinition {
+  return {
+    id,
+    name: id,
+    description,
+    path: `.agents/skills/${id}/SKILL.md`,
+    directory: `.agents/skills/${id}`,
+    root: '.agents/skills',
+    sources: [{
+      path: `.agents/skills/${id}/SKILL.md`,
+      directory: `.agents/skills/${id}`,
+      root: '.agents/skills',
+      metadata_sources: ['SKILL.md'],
+    }],
+    triggers: [],
   };
 }
 
@@ -1187,6 +1205,52 @@ describe('buildSkillBriefing', () => {
     const reviewRec = result.recommendations.find(r => r.id === 'review-helper');
     expect(reviewRec).toBeDefined();
     expect(reviewRec?.reason).toContain('changed files');
+  });
+
+  it('prioritizes skills explicitly referenced by the requested sprint scorecard (#442)', () => {
+    const registry = makeSkillRegistry();
+    registry.skills.push(
+      makeSkill('frontend-product-audit'),
+      makeSkill('information-architecture-audit'),
+    );
+
+    const result = buildSkillBriefing({
+      registry,
+      scorecards: [
+        makeCard({ sprint_number: 147, skills_recommended: ['slope-sprint-workflow'] }),
+        makeCard({
+          sprint_number: 148,
+          skills_recommended: ['frontend-product-audit'],
+          skills_created: ['information-architecture-audit'],
+        }),
+      ],
+      commonIssues: makeIssues([]),
+      currentSprint: 148,
+    });
+
+    expect(result.recommendations.slice(0, 2).map(r => r.id)).toEqual([
+      'frontend-product-audit',
+      'information-architecture-audit',
+    ]);
+    expect(result.recommendations[0].reason).toContain('requested sprint scorecard');
+  });
+
+  it('surfaces skill gaps from the requested sprint scorecard (#442)', () => {
+    const result = buildSkillBriefing({
+      registry: makeSkillRegistry(),
+      scorecards: [
+        makeCard({ sprint_number: 120, skill_gaps_found: ['older gap'] }),
+        makeCard({ sprint_number: 148, skill_gaps_found: ['browser snapshot qa'] }),
+      ],
+      commonIssues: makeIssues([]),
+      currentSprint: 148,
+    });
+
+    expect(result.gaps[0]).toMatchObject({
+      topic: 'browser snapshot qa',
+      reason: 'recorded in requested sprint skill_gaps_found',
+      evidence: ['S148'],
+    });
   });
 
   it('surfaces repeated relevant topics that have no matching registered skill', () => {
