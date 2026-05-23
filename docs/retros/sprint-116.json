@@ -1,0 +1,131 @@
+{
+  "sprint_number": 116,
+  "player": "codex",
+  "theme": "Skill Awareness Release",
+  "par": 4,
+  "slope": 2,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-05-23",
+  "shots": [
+    {
+      "ticket_key": "S116-1",
+      "title": "Treat superseded roadmap sprints as terminal in roadmap status",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Updated roadmap status so explicit complete and superseded sprint statuses count as terminal phase progress, render superseded rows clearly, and do not block dependent sprints."
+    },
+    {
+      "ticket_key": "S116-2",
+      "title": "Bump @slope-dev/slope and bundled Codex plugin to v1.56.0",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Used the release bump script to move the package and bundled Codex plugin manifest from 1.55.14 to 1.56.0 after the local version recommendation called for a minor release."
+    },
+    {
+      "ticket_key": "S116-3",
+      "title": "Run release validation, publish v1.56.0, and verify npm",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "The first CodeQL actions analysis check failed before analysis because checkout could not fetch the PR ref; an empty retrigger commit cleared the transient failure."
+        }
+      ],
+      "notes": "Merged PR #437, published GitHub release v1.56.0, watched the trusted-publisher npm workflow pass, verified npm latest is 1.56.0, and smoke-tested the installed package."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 3,
+    "fairways_total": 3,
+    "greens_in_regulation": 3,
+    "greens_total": 3,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 1,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "type": "release + cleanup",
+  "conditions": [],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Superseded roadmap entries need to be terminal everywhere they are displayed, not only when selecting the next sprint.",
+      "outcome": "Roadmap status now treats complete and superseded sprint statuses as terminal for phase counts, row labels, and dependency blocking."
+    },
+    {
+      "type": "lessons",
+      "description": "Release scorecards should wait for registry verification before claiming publish success.",
+      "outcome": "S116 closeout records the successful trusted-publisher workflow, npm latest verification, and installed-package smoke test."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "Focused roadmap regressions, build, typecheck, full pnpm test, npm pack dry run, CI, and published-package smoke test passed.",
+      "status": "healthy"
+    },
+    {
+      "category": "release",
+      "description": "GitHub release v1.56.0 and npm trusted publishing completed successfully; npm latest now resolves to 1.56.0.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Tidy and satisfying: a small roadmap display bug got cleaned up while the skill-awareness work finally made it onto npm.",
+    "advice_for_next_player": "For release sprints, keep code cleanup, version bump, PR validation, GitHub release, npm verification, and closeout artifacts as distinct checkpoints.",
+    "what_surprised_you": "The only wobble was outside the code path: a transient CodeQL checkout failure that passed cleanly after a retrigger.",
+    "excited_about_next": "The next sprint can assume the skill-aware planning features are available from the public package, not just the repo."
+  },
+  "bunker_locations": [
+    "Roadmap status displays must treat complete and superseded as terminal statuses in phase counts and dependency blocking.",
+    "If a CodeQL job fails before checkout or analysis and GitHub will not rerun it, an empty retrigger commit can clear the lane without changing code.",
+    "Release closeout should verify the npm registry and an installed package before recording publish success."
+  ],
+  "yardage_book_updates": [
+    "slope roadmap status now counts explicit complete and superseded roadmap statuses as terminal progress.",
+    "Superseded roadmap rows render as superseded instead of pending.",
+    "Version bump path remains node scripts/version-bump.mjs <version>, updating package.json and the bundled Codex plugin manifest together.",
+    "The v1.56.0 release path uses GitHub release publishing with npm trusted publisher OIDC."
+  ],
+  "course_management_notes": [
+    "Added roadmap regression coverage proving superseded sprints count as terminal progress and do not block dependent active sprints.",
+    "Bumped @slope-dev/slope and templates/codex/plugins/slope/.codex-plugin/plugin.json from 1.55.14 to 1.56.0.",
+    "pnpm vitest run tests/cli/roadmap.test.ts tests/core/roadmap.test.ts tests/cli/commands/next.test.ts passed: 86 tests.",
+    "pnpm build passed.",
+    "pnpm typecheck passed.",
+    "pnpm test passed: 214 test files and 3471 tests.",
+    "npm pack --dry-run passed for @slope-dev/slope@1.56.0 with 1018 files.",
+    "node dist/cli/index.js validate --skills passed before release.",
+    "node dist/cli/index.js map --check passed before release.",
+    "node dist/cli/index.js roadmap validate passed as structurally valid; before the closeout commit reaches main it reports the expected S116 shipped-commit warning.",
+    "PR #437 merged on 2026-05-23 at commit 43f33ce307144d8304110017b9c9027118838b28.",
+    "GitHub release v1.56.0 published on 2026-05-23 at 17:51:36Z.",
+    "Publish to npm workflow run 26339519443 passed in 2m51s.",
+    "npm view @slope-dev/slope version returned 1.56.0 and the latest dist-tag points to 1.56.0.",
+    "npm exec --yes --package @slope-dev/slope@1.56.0 -- slope version returned @slope-dev/slope v1.56.0."
+  ],
+  "skills_used": [
+    "slope-sprint-workflow"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow"
+  ],
+  "skill_gaps_found": [],
+  "slope_factors": [
+    "skill_awareness_release",
+    "roadmap_status_cleanup",
+    "trusted_publisher_release"
+  ]
+}
