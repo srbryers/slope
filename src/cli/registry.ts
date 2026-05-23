@@ -139,7 +139,10 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
   },
   {
     cmd: 'validate', desc: 'Validate scorecard(s)', category: 'scoring',
-    flags: [{ flag: '<path>', desc: 'Scorecard JSON file to validate' }],
+    flags: [
+      { flag: '<path>', desc: 'Scorecard JSON file to validate' },
+      { flag: '--skills', desc: 'Check scorecard skill references against .slope/skills.json' },
+    ],
   },
   {
     cmd: 'review', desc: 'Format sprint review or manage review state', category: 'scoring',
@@ -349,6 +352,22 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
       { name: 'link', desc: 'Link inspiration to a sprint', flags: [
         { flag: '--id=<id>', desc: 'Inspiration ID (required)' },
         { flag: '--sprint=<N>', desc: 'Sprint number (required)' },
+      ]},
+    ],
+  },
+  {
+    cmd: 'skills', desc: 'Manage repo-local Agent Skills registry', category: 'tooling',
+    subcommands: [
+      { name: 'scan', desc: 'Scan configured skill roots into .slope/skills.json', flags: [
+        { flag: '--root=<path>', desc: 'Skill root to scan (repeatable or comma-separated)' },
+        { flag: '--output=<path>', desc: 'Registry output path (default: .slope/skills.json)' },
+      ]},
+      { name: 'list', desc: 'List registered skills', flags: [
+        { flag: '--json', desc: 'Output raw skill entries as JSON' },
+        { flag: '--output=<path>', desc: 'Registry path to read' },
+      ]},
+      { name: 'validate', desc: 'Validate registry metadata and source paths', flags: [
+        { flag: '--output=<path>', desc: 'Registry path to read' },
       ]},
     ],
   },

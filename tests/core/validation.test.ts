@@ -261,6 +261,44 @@ describe('validateScorecard - basic fields', () => {
   });
 });
 
+describe('validateScorecard - skill fields', () => {
+  it('accepts skill tracking fields with known skill ids', () => {
+    const result = validateScorecard(makeCard({
+      skills_used: ['slope-sprint-workflow'],
+      skills_recommended: ['slope-sprint-workflow'],
+      skills_skipped: ['slope-api-reference'],
+      skills_created: ['skill-registry'],
+      skill_gaps_found: ['release triage skill gap'],
+    }), {
+      knownSkillIds: ['slope-sprint-workflow', 'slope-api-reference', 'skill-registry'],
+    });
+
+    expect(result.errors.filter(e => e.code === 'INVALID_SKILL_FIELD')).toHaveLength(0);
+    expect(result.errors.filter(e => e.code === 'UNKNOWN_SKILL_REFERENCE')).toHaveLength(0);
+  });
+
+  it('fails when skill fields are not arrays of strings', () => {
+    const result = validateScorecard(makeCard({
+      skills_used: 'slope-sprint-workflow' as any,
+      skill_gaps_found: [42] as any,
+    }));
+
+    expect(result.errors.filter(e => e.code === 'INVALID_SKILL_FIELD')).toHaveLength(2);
+  });
+
+  it('fails when referenced skills are not registered', () => {
+    const result = validateScorecard(makeCard({
+      skills_used: ['missing-skill'],
+      skill_gaps_found: ['missing-skill'],
+    }), {
+      knownSkillIds: ['slope-sprint-workflow'],
+    });
+
+    expect(result.errors.some(e => e.code === 'UNKNOWN_SKILL_REFERENCE' && e.field === 'skills_used')).toBe(true);
+    expect(result.errors.some(e => e.code === 'UNKNOWN_SKILL_REFERENCE' && e.field === 'skill_gaps_found')).toBe(false);
+  });
+});
+
 // --- Sprint field normalization ---
 
 describe('validateScorecard - sprint field normalization', () => {

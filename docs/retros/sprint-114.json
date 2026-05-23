@@ -1,0 +1,140 @@
+{
+  "sprint_number": 114,
+  "player": "codex",
+  "theme": "Skill Registry MVP",
+  "par": 5,
+  "slope": 3,
+  "score": 5,
+  "score_label": "par",
+  "date": "2026-05-23",
+  "shots": [
+    {
+      "ticket_key": "S114-1",
+      "title": "Add skill registry config, types, and .slope/skills.json persistence",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added the core skill registry schema, config defaults, persistence helpers, and exported API surface for repo-local skill metadata."
+    },
+    {
+      "ticket_key": "S114-2",
+      "title": "Scan configured skill roots and parse SKILL.md plus agents/openai.yaml metadata",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "moderate",
+          "description": "CodeQL flagged slug-normalization regexes as vulnerable to slow matching on hyphen-heavy skill names."
+        }
+      ],
+      "notes": "Implemented deterministic skill root scanning, YAML frontmatter parsing, agents/openai.yaml metadata capture, duplicate provider-root merging, registry validation, and linear-time skill id normalization."
+    },
+    {
+      "ticket_key": "S114-3",
+      "title": "Add slope skills scan/list/validate commands and command registry docs",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "moderate",
+          "description": "Self-review found that absolute --root and --output paths were being joined under cwd instead of preserved."
+        }
+      ],
+      "notes": "Added slope skills scan/list/validate, CLI dispatch, command registry metadata, smoke coverage, and absolute path regression coverage."
+    },
+    {
+      "ticket_key": "S114-4",
+      "title": "Add scorecard skill fields and validate --skills reference checks",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "Self-review found malformed skill registry files could be loaded far enough to crash list/reference checks."
+        }
+      ],
+      "notes": "Added scorecard skill fields, builder support, structural validation, validate --skills reference checks, malformed registry rejection, and CLI regression coverage."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 3,
+    "hazard_penalties": 0.5,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "type": "feature",
+  "conditions": [],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "CLI path handling needs explicit absolute-path regression coverage.",
+      "outcome": "Added absolute --root/--output coverage for slope skills scan and resolved explicit validate paths against cwd."
+    },
+    {
+      "type": "lessons",
+      "description": "Regex-based normalization over repo metadata can trip CodeQL even when the input looks mundane.",
+      "outcome": "Replaced skill id slug regexes with a linear scanner and added hyphen-heavy regression coverage."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "Validated targeted skill/scorecard tests, typecheck, build, built CLI smoke tests, and the full Vitest suite.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "This was a satisfying first layer: SLOPE can now see skills as metadata without pretending to run them.",
+    "advice_for_next_player": "Keep S114.5 deterministic. Use this registry as input to briefing recommendations before attempting smarter gap detection.",
+    "what_surprised_you": "The useful review catches were plain path and malformed-file resilience, not the YAML parsing itself.",
+    "excited_about_next": "Briefing can now recommend skills from a real registry instead of relying on tribal memory."
+  },
+  "bunker_locations": [
+    "Any CLI path flag that accepts user filesystem input should preserve absolute paths and resolve relative paths against cwd in tests.",
+    "Registry loaders should reject malformed top-level shapes before downstream code maps over arrays."
+  ],
+  "yardage_book_updates": [
+    "Skill registry files live at config.skillsPath, defaulting to .slope/skills.json.",
+    "SLOPE indexes SKILL.md and optional agents/openai.yaml metadata but does not execute skills.",
+    "Skill id normalization should stay linear and avoid regex trimming over uncontrolled metadata.",
+    "Scorecard skill reference fields are skills_used, skills_created, skills_recommended, and skills_skipped; validate --skills checks these against the local registry.",
+    "skill_gaps_found is free-form and intentionally not registry-checked."
+  ],
+  "course_management_notes": [
+    "Added src/core/skills.ts with scan, load/save, validation, duplicate merge, frontmatter parsing, and agents/openai.yaml metadata capture.",
+    "Added slope skills scan/list/validate and command registry metadata.",
+    "Added scorecard skill fields and validate --skills reference checking.",
+    "slope skills scan --root=.agents/skills, slope skills list, slope skills validate, and slope validate --skills smoke tests passed on the built CLI.",
+    "pnpm build passed.",
+    "CodeQL high-severity regex alert was fixed with linear skill id normalization.",
+    "Full pnpm test passed: 214 test files and 3457 tests."
+  ],
+  "skills_used": [
+    "slope-sprint-workflow"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow"
+  ],
+  "skill_gaps_found": [
+    "SLOPE needed first-class skill registry and scorecard skill tracking before skill-aware briefing can be deterministic."
+  ],
+  "slope_factors": [
+    "new_area",
+    "multi_package",
+    "schema_changes"
+  ]
+}

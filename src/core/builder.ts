@@ -169,6 +169,11 @@ export interface ScorecardInput {
   bunker_locations?: string[];
   yardage_book_updates?: string[];
   course_management_notes?: string[];
+  skills_used?: string[];
+  skills_created?: string[];
+  skills_recommended?: string[];
+  skills_skipped?: string[];
+  skill_gaps_found?: string[];
 
   // Multi-agent (swarm) sprints
   agents?: AgentBreakdown[];
@@ -221,6 +226,11 @@ export function buildScorecard(input: ScorecardInput): GolfScorecard {
     bunker_locations: input.bunker_locations ?? [],
     yardage_book_updates: input.yardage_book_updates ?? [],
     course_management_notes: input.course_management_notes ?? [],
+    ...(input.skills_used ? { skills_used: input.skills_used } : {}),
+    ...(input.skills_created ? { skills_created: input.skills_created } : {}),
+    ...(input.skills_recommended ? { skills_recommended: input.skills_recommended } : {}),
+    ...(input.skills_skipped ? { skills_skipped: input.skills_skipped } : {}),
+    ...(input.skill_gaps_found ? { skill_gaps_found: input.skill_gaps_found } : {}),
     ...(input.agents ? { agents: input.agents } : {}),
     ...(input.inspired_by ? { inspired_by: input.inspired_by } : {}),
   };

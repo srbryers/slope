@@ -74,6 +74,7 @@ import { worktreeCommand } from './commands/worktree.js';
 import { orgCommand } from './commands/org.js';
 import { memoryCommand } from './commands/memory.js';
 import { phaseCommand } from './commands/phase.js';
+import { skillsCommand } from './commands/skills.js';
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -93,6 +94,7 @@ Usage:
   slope card --player=<name>                Show handicap for a specific player
   slope card --team                         Show per-player comparison table
   slope validate [path]                     Validate scorecard(s)
+  slope skills scan|list|validate           Manage repo-local skill registry
   slope review [path] [--plain]             Format sprint review markdown
   slope briefing                            Pre-round briefing
   slope version                             Show current version
@@ -127,7 +129,7 @@ switch (subcommand) {
     cardCommand(process.argv.slice(3));
     break;
   case 'validate':
-    validateCommand(process.argv[3]);
+    validateCommand(process.argv.slice(3));
     break;
   case 'review': {
     const reviewArgs = process.argv.slice(3);
@@ -413,6 +415,12 @@ switch (subcommand) {
       process.exit(1);
     });
     break;
+  case 'skills':
+    skillsCommand(process.argv.slice(3)).catch(err => {
+      console.error('Error:', err.message);
+      process.exit(1);
+    });
+    break;
   case 'doctor':
     doctorCommand(process.argv.slice(3)).catch(err => {
       console.error('Error:', err.message);
@@ -467,6 +475,7 @@ Usage:
   slope card --player=<name>                Show handicap for a specific player
   slope card --team                         Show per-player comparison table
   slope validate [path]                     Validate scorecard(s)
+  slope validate [path] --skills            Validate scorecard skill references
   slope review [path] [--plain]             Format sprint review markdown
   slope review start [--rounds=N|--tier=T]  Start plan review lifecycle
   slope review round                        Record a completed review round
@@ -511,6 +520,7 @@ Usage:
   slope transcript list|show|stats          View session transcript data
   slope metaphor list|set|show              Manage metaphor display themes
   slope plugin list|validate                Manage custom plugins
+  slope skills scan|list|validate           Manage repo-local skill registry
   slope initiative create|status|next|advance|review  Multi-sprint initiative orchestration
   slope index [--full|--status|--prune]               Semantic embedding index
   slope context "query" [options]                     Semantic context search

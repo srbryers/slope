@@ -20,6 +20,10 @@ export interface ScorecardValidationResult {
   warnings: ScorecardValidationWarning[];
 }
 
+export interface ScorecardValidationOptions {
+  knownSkillIds?: Set<string> | string[];
+}
+
 // --- Helpers ---
 
 const MISS_RESULTS: Record<string, 'long' | 'short' | 'left' | 'right'> = {
@@ -30,6 +34,8 @@ const MISS_RESULTS: Record<string, 'long' | 'short' | 'left' | 'right'> = {
 };
 
 const GOOD_RESULTS = new Set<ShotResult>(['fairway', 'green', 'in_the_hole']);
+const SKILL_REFERENCE_FIELDS = ['skills_used', 'skills_created', 'skills_recommended', 'skills_skipped'] as const;
+const SKILL_NOTE_FIELDS = ['skill_gaps_found'] as const;
 
 function isValidISODate(s: string): boolean {
   const d = new Date(s);
@@ -42,9 +48,17 @@ function isValidISODate(s: string): boolean {
  * Validate a SLOPE scorecard for internal consistency.
  * Accepts either `sprint_number` (TypeScript type) or `sprint` (retro JSON field name).
  */
-export function validateScorecard(card: GolfScorecard & { sprint?: number }): ScorecardValidationResult {
+export function validateScorecard(
+  card: GolfScorecard & { sprint?: number },
+  options: ScorecardValidationOptions = {},
+): ScorecardValidationResult {
   const errors: ScorecardValidationError[] = [];
   const warnings: ScorecardValidationWarning[] = [];
+  const knownSkillIds = options.knownSkillIds
+    ? options.knownSkillIds instanceof Set
+      ? options.knownSkillIds
+      : new Set(options.knownSkillIds)
+    : null;
 
   // Normalize sprint field — retro JSONs use "sprint", TS type uses "sprint_number"
   const sprintNumber = card.sprint_number ?? card.sprint;
@@ -62,6 +76,8 @@ export function validateScorecard(card: GolfScorecard & { sprint?: number }): Sc
   if (sprintNumber == null || typeof sprintNumber !== 'number' || sprintNumber <= 0) {
     errors.push({ code: 'MISSING_SPRINT', message: 'sprint_number (or sprint) is required and must be > 0', field: 'sprint_number' });
   }
+
+  validateSkillFields(card as unknown as Record<string, unknown>, errors, knownSkillIds);
 
   // Rule 1: score_label matches computeScoreLabel(score, par)
   if (typeof card.score === 'number' && card.score > 0 && [3, 4, 5].includes(card.par)) {
@@ -172,4 +188,50 @@ export function validateScorecard(card: GolfScorecard & { sprint?: number }): Sc
     errors,
     warnings,
   };
+}
+
+function validateSkillFields(
+  card: Record<string, unknown>,
+  errors: ScorecardValidationError[],
+  knownSkillIds: Set<string> | null,
+): void {
+  for (const field of [...SKILL_REFERENCE_FIELDS, ...SKILL_NOTE_FIELDS]) {
+    const value = card[field];
+    if (value == null) continue;
+    if (!Array.isArray(value)) {
+      errors.push({
+        code: 'INVALID_SKILL_FIELD',
+        message: `${field} must be an array of strings`,
+        field,
+      });
+      continue;
+    }
+
+    for (const item of value) {
+      if (typeof item !== 'string' || item.trim().length === 0) {
+        errors.push({
+          code: 'INVALID_SKILL_FIELD',
+          message: `${field} must contain only non-empty strings`,
+          field,
+        });
+      }
+    }
+  }
+
+  if (!knownSkillIds) return;
+
+  for (const field of SKILL_REFERENCE_FIELDS) {
+    const values = card[field];
+    if (!Array.isArray(values)) continue;
+    for (const value of values) {
+      if (typeof value !== 'string' || value.trim().length === 0) continue;
+      if (!knownSkillIds.has(value)) {
+        errors.push({
+          code: 'UNKNOWN_SKILL_REFERENCE',
+          message: `${field} references unknown skill "${value}"`,
+          field,
+        });
+      }
+    }
+  }
 }

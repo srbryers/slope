@@ -85,6 +85,7 @@ export type {
   ScorecardValidationError,
   ScorecardValidationWarning,
   ScorecardValidationResult,
+  ScorecardValidationOptions,
 } from './validation.js';
 
 // Dispersion
@@ -496,6 +497,28 @@ export type {
   InspirationsFile,
   InspirationValidationResult,
 } from './inspirations.js';
+
+// Skills
+export {
+  DEFAULT_SKILLS_PATH,
+  DEFAULT_SKILL_ROOTS,
+  resolveSkillRoots,
+  parseSkillMarkdown,
+  scanSkills,
+  validateSkillRegistry,
+  loadSkillRegistry,
+  saveSkillRegistry,
+  skillIds,
+} from './skills.js';
+export type {
+  SkillMetadataSource,
+  SkillSource,
+  SkillDefinition,
+  SkillRegistryFile,
+  SkillScanResult,
+  SkillRegistryValidationResult,
+  ParsedSkillMarkdown,
+} from './skills.js';
 
 // Imports (blast radius)
 export {
