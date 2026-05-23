@@ -1,0 +1,128 @@
+{
+  "sprint_number": 121,
+  "player": "codex",
+  "theme": "Skill Registry Patch Release",
+  "par": 3,
+  "slope": 1,
+  "score": 3,
+  "score_label": "par",
+  "date": "2026-05-23",
+  "shots": [
+    {
+      "ticket_key": "S121-1",
+      "title": "Bump @slope-dev/slope and bundled Codex plugin to v1.56.2",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Used scripts/version-bump.mjs to move package.json and the bundled Codex plugin manifest from 1.56.1 to 1.56.2, then confirmed the built CLI reported @slope-dev/slope v1.56.2."
+    },
+    {
+      "ticket_key": "S121-2",
+      "title": "Run release validation, publish v1.56.2, and verify npm",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "An initial local parallel build/test attempt exposed a transient dist export race; rerunning build and tests sequentially passed cleanly."
+        }
+      ],
+      "notes": "Merged PR #449, published GitHub release v1.56.2, watched the trusted-publisher npm workflow pass, verified npm latest is 1.56.2, and smoke-tested the installed package."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 2,
+    "fairways_total": 2,
+    "greens_in_regulation": 2,
+    "greens_total": 2,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 1,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "type": "release",
+  "conditions": [],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Do not run dist-producing builds in parallel with tests that shell into the generated CLI.",
+      "outcome": "An initial local parallel build/test attempt exposed a transient dist export race; rerunning build and tests sequentially passed cleanly."
+    },
+    {
+      "type": "lessons",
+      "description": "Release closeout should stay split from the tag commit.",
+      "outcome": "The version bump merged first, then the GitHub release and npm facts were recorded in this post-release closeout."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "Build, typecheck, focused init-codex tests, full pnpm test, npm pack dry run, PR CI, and release workflow tests passed.",
+      "status": "healthy"
+    },
+    {
+      "category": "release",
+      "description": "GitHub release v1.56.2 and npm trusted publishing completed successfully; npm latest now resolves to 1.56.2.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Contained and disciplined: the release path stayed narrow, and trusted publishing completed without manual recovery.",
+    "advice_for_next_player": "Keep build and test sequential when tests use generated dist output, then verify npm with metadata and an installed CLI smoke test.",
+    "what_surprised_you": "The only bump was local validation sequencing; the GitHub and npm release path itself was smooth.",
+    "excited_about_next": "The skill registry follow-ups and historical scorecard validation cleanup are now available from the public package."
+  },
+  "bunker_locations": [
+    "Tests that execute dist/cli should not run while pnpm build is rewriting dist.",
+    "Release scorecards should wait for registry verification before claiming publish success.",
+    "Trusted publishing still needs an npm metadata check and installed-package smoke test after the GitHub workflow passes."
+  ],
+  "yardage_book_updates": [
+    "Version bump path remains node scripts/version-bump.mjs <version>, updating package.json and the bundled Codex plugin manifest together.",
+    "The v1.56.2 release path uses GitHub release publishing with npm trusted publisher OIDC.",
+    "npm exec --yes --package @slope-dev/slope@<version> -- slope version remains the installed-package smoke test.",
+    "Keep pnpm build and pnpm test sequential during release validation because CLI tests can load generated dist output."
+  ],
+  "course_management_notes": [
+    "Added S121 to the roadmap as the skill registry patch release sprint.",
+    "Bumped @slope-dev/slope and templates/codex/plugins/slope/.codex-plugin/plugin.json from 1.56.1 to 1.56.2.",
+    "pnpm build passed locally.",
+    "pnpm typecheck passed locally.",
+    "pnpm vitest run tests/cli/init-codex.test.ts passed locally: 9 tests.",
+    "pnpm test passed locally after a sequential rebuild: 214 passed test files, 1 skipped test file, 3479 passed tests, and 23 skipped tests.",
+    "npm pack --dry-run passed for @slope-dev/slope@1.56.2 with 1018 files, package size 917.2 kB, and unpacked size 4.3 MB.",
+    "node dist/cli/index.js validate --skills passed before release.",
+    "node dist/cli/index.js roadmap validate passed before release with standing warnings only plus the expected branch-local S121 warning.",
+    "node dist/cli/index.js map --check passed before release: Overall CURRENT.",
+    "node dist/cli/index.js version returned @slope-dev/slope v1.56.2.",
+    "git diff --check passed before release.",
+    "PR #449 merged on 2026-05-23 at commit 45d6ca8a81087ee03f69f52189091d04beb0e0b7.",
+    "GitHub release v1.56.2 published on 2026-05-23 at 19:40:22Z.",
+    "Publish to npm workflow run 26341764973 passed in 3m2s.",
+    "npm view @slope-dev/slope version returned 1.56.2 and the latest dist-tag points to 1.56.2.",
+    "npm exec --yes --package @slope-dev/slope@1.56.2 -- slope version returned @slope-dev/slope v1.56.2."
+  ],
+  "skills_used": [
+    "slope-sprint-workflow"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow",
+    "slope-performance-analysis"
+  ],
+  "skill_gaps_found": [],
+  "slope_factors": [
+    "patch_release",
+    "trusted_publisher_release",
+    "registry_verification",
+    "validation_sequencing",
+    "dist_cli_tests"
+  ]
+}

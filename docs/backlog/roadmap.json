@@ -233,8 +233,8 @@
       "sprints": [
         121
       ],
-      "status": "planned",
-      "note": "Publish the S119/S120 skill registry and validation fixes as v1.56.2 using the trusted-publisher release flow."
+      "status": "complete",
+      "note": "Published the S119/S120 skill registry and validation fixes as v1.56.2 using the trusted-publisher release flow."
     }
   ],
   "sprints": [
@@ -2489,7 +2489,9 @@
       "par": 3,
       "slope": 1,
       "type": "release",
-      "status": "planned",
+      "status": "complete",
+      "score": 3,
+      "score_label": "par",
       "depends_on": [
         120
       ],
