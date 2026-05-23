@@ -88,6 +88,13 @@ describe('saveSprintState', () => {
     expect(loaded!.phase).toBe('implementing');
     expect(loaded!.gates.tests).toBe(false);
   });
+
+  it('round-trips decimal inserted sprint ids', () => {
+    const state = createSprintState(114.5, 'planning');
+    saveSprintState(tmpDir, state);
+    const loaded = loadSprintState(tmpDir);
+    expect(loaded?.sprint).toBe(114.5);
+  });
 });
 
 describe('updateGate', () => {

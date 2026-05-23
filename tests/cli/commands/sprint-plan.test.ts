@@ -81,6 +81,21 @@ describe('renderSprintPlan (GH #312)', () => {
     expect(md).toContain('- S1 (complete)');
   });
 
+  it('renders decimal inserted sprint ids without truncating', () => {
+    const completed = makeSprint(114);
+    (completed as RoadmapSprint & { status?: string }).status = 'complete';
+    const inserted = makeSprint(114.5, {
+      theme: 'Skill-aware briefing',
+      depends_on: [114],
+      tickets: [makeTicket('S114.5-1'), makeTicket('S114.5-2'), makeTicket('S114.5-3')],
+    });
+    const md = renderSprintPlan(inserted, makeRoadmap([completed, inserted]), []);
+
+    expect(md).toContain('# Sprint 114.5 Plan — Skill-aware briefing');
+    expect(md).toContain('| S114.5-1 | Title for S114.5-1 |');
+    expect(md).toContain('- S114 (complete)');
+  });
+
   it('marks pending dependencies', () => {
     const upstream = makeSprint(1); // no status
     const sprint = makeSprint(2, { depends_on: [1] });

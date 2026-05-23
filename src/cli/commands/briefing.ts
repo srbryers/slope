@@ -1,6 +1,6 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { formatBriefing, parseRoadmap, castRoadmapStructure, getRole, hasRole, loadCustomRoles, filterScorecardsByPlayer, filterHazardsByVisibility, formatDeferredForBriefing, loadDeferred, computeHandicapCard, formatStrategicContext } from '../../core/index.js';
+import { formatBriefing, parseRoadmap, castRoadmapStructure, getRole, hasRole, loadCustomRoles, filterScorecardsByPlayer, filterHazardsByVisibility, formatDeferredForBriefing, loadDeferred, computeHandicapCard, formatStrategicContext, parseSprintNumber } from '../../core/index.js';
 import type { CommonIssuesFile, SessionEntry, SprintClaim, RoadmapDefinition, SlopeEvent, RoleDefinition } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { loadScorecards } from '../loader.js';
@@ -46,7 +46,12 @@ export async function briefingCommand(args: string[]): Promise<void> {
     } else if (arg.startsWith('--keywords=')) {
       keywords.push(...arg.slice('--keywords='.length).split(',').map(s => s.trim()).filter(Boolean));
     } else if (arg.startsWith('--sprint=')) {
-      sprintFlag = parseInt(arg.slice('--sprint='.length), 10);
+      const parsed = parseSprintNumber(arg.slice('--sprint='.length));
+      if (!parsed) {
+        console.error('Error: --sprint must be a positive sprint id, e.g. 114 or 114.5');
+        process.exit(1);
+      }
+      sprintFlag = parsed;
     } else if (arg.startsWith('--role=')) {
       roleFlag = arg.slice('--role='.length).trim();
     } else if (arg.startsWith('--player=')) {

@@ -7,6 +7,7 @@ import {
   formatRoadmapSummary,
   formatStrategicContext,
   formatSprintLabel,
+  parseSprintNumber,
   sprintOrderValue,
   findNextPlannedSprint,
 } from '../../src/core/roadmap.js';
@@ -61,6 +62,14 @@ describe('sprint id formatting', () => {
     expect(sprintOrderValue(435)).toBe(43.5);
     expect(sprintOrderValue(105)).toBe(105);
     expect([44, 435, 43].sort((a, b) => sprintOrderValue(a) - sprintOrderValue(b))).toEqual([43, 435, 44]);
+  });
+
+  it('parses canonical and decimal sprint ids without truncating', () => {
+    expect(parseSprintNumber('114')).toBe(114);
+    expect(parseSprintNumber('114.5')).toBe(114.5);
+    expect(parseSprintNumber('S114.5')).toBe(114.5);
+    expect(parseSprintNumber('114abc')).toBeNull();
+    expect(parseSprintNumber('114.')).toBeNull();
   });
 });
 

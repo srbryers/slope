@@ -1,7 +1,7 @@
 import { execSync } from 'node:child_process';
 import { writeFileSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { buildScorecard, buildAgentBreakdowns, computeSlope, parseTestOutput, classifyShotFromSignals, buildGhCommand, parsePRJson, mergePRChecksWithCI, parseRoadmap } from '../../core/index.js';
+import { buildScorecard, buildAgentBreakdowns, computeSlope, parseTestOutput, classifyShotFromSignals, buildGhCommand, parsePRJson, mergePRChecksWithCI, parseRoadmap, formatSprintNumber, parseSprintNumber } from '../../core/index.js';
 import type { ShotRecord, CISignal, PRSignal, ShotResult, AgentBreakdown, RoadmapDefinition } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { resolveStore } from '../store.js';
@@ -47,9 +47,9 @@ function getCommits(since?: string, branch?: string): CommitInfo[] {
 }
 
 function inferTicketKey(subject: string, index: number, sprintNumber: number): string {
-  const ticketMatch = subject.match(/\b[A-Z]+-\d+\b/) ?? subject.match(/\bS\d+-\d+\b/i);
+  const ticketMatch = subject.match(/\b[A-Z]+-\d+\b/) ?? subject.match(/\bS\d+(?:\.\d+)?-\d+\b/i);
   if (ticketMatch) return ticketMatch[0];
-  return `S${sprintNumber}-${index + 1}`;
+  return `S${formatSprintNumber(sprintNumber)}-${index + 1}`;
 }
 
 /** Load the roadmap if it parses cleanly. Returns null when missing or
@@ -78,20 +78,22 @@ export function matchSprintTicket(
   positionalCursor: { next: number },
 ): string | null {
   // 1. Explicit `S{N}-{M}` mention that's actually in this sprint
-  const exact = subject.match(/\bS(\d+)-(\d+)\b/i);
-  if (exact && parseInt(exact[1], 10) === sprintNumber) {
-    const key = `S${sprintNumber}-${exact[2]}`;
+  const exact = subject.match(/\bS(\d+(?:\.\d+)?)-(\d+)\b/i);
+  const exactSprint = exact ? parseSprintNumber(exact[1]) : null;
+  if (exact && exactSprint === sprintNumber) {
+    const key = `S${formatSprintNumber(sprintNumber)}-${exact[2]}`;
     if (allowedKeys.includes(key)) return key;
   }
 
   // 2. Other-sprint key — definitely not ours, drop
-  if (exact && parseInt(exact[1], 10) !== sprintNumber) return null;
+  if (exact && exactSprint !== sprintNumber) return null;
 
   // 3. `(S{N})` umbrella — assume next un-assigned ticket from the sprint.
   // The negative lookahead blocks `-`, `.`, and digits after the sprint
   // number so we don't treat `(S1-9)` as an S1 umbrella (it's a specific
   // ticket reference handled in step 1) or `(S10)` as `(S1)`.
-  const umbrella = subject.match(new RegExp(`[(\\s+]S${sprintNumber}(?![-.\\d])`, 'i'));
+  const sprintToken = escapeRegex(formatSprintNumber(sprintNumber));
+  const umbrella = subject.match(new RegExp(`[(\\s+]S${sprintToken}(?![-.\\d])`, 'i'));
   if (umbrella) {
     while (positionalCursor.next < allowedKeys.length) {
       return allowedKeys[positionalCursor.next++];
@@ -127,7 +129,7 @@ export async function autoCardCommand(args: string[]): Promise<void> {
   const opts = parseArgs(args);
   const config = loadConfig();
 
-  const sprintNumber = parseInt(opts.sprint ?? '', 10);
+  const sprintNumber = parseSprintNumber(opts.sprint ?? '');
   if (!sprintNumber) {
     console.error('\nUsage: slope auto-card --sprint=<N> [--since=<date>] [--branch=<ref>] [--theme=<text>] [--player=<name>] [--test-output=<file>] [--pr=<number>] [--swarm=<id>] [--include-untracked] [--dry-run]\n');
     console.error('  --sprint             Sprint number (required)');
@@ -189,7 +191,7 @@ export async function autoCardCommand(args: string[]): Promise<void> {
     }
 
     if (kept.length === 0) {
-      console.error(`  No commits in scan window reference S${sprintNumber} tickets.`);
+      console.error(`  No commits in scan window reference S${formatSprintNumber(sprintNumber)} tickets.`);
       console.error(`  Either narrow with --since=<date>/--branch=<ref>, or use --include-untracked.\n`);
       process.exit(1);
     }
@@ -201,7 +203,7 @@ export async function autoCardCommand(args: string[]): Promise<void> {
     assignedKeys = allCommits.map(() => null); // legacy positional inference
     if (!sprint && !includeUntracked) {
       // No roadmap entry for this sprint — surface a hint, but proceed.
-      console.error(`  Note: roadmap has no S${sprintNumber} sprint definition. Falling back to positional ticket keys; pass --include-untracked to silence this hint.\n`);
+      console.error(`  Note: roadmap has no S${formatSprintNumber(sprintNumber)} sprint definition. Falling back to positional ticket keys; pass --include-untracked to silence this hint.\n`);
     }
   }
 
@@ -266,7 +268,7 @@ export async function autoCardCommand(args: string[]): Promise<void> {
   });
 
   const slopeFactors = inferSlopeFactors(commits);
-  const theme = opts.theme ?? `Sprint ${sprintNumber}`;
+  const theme = opts.theme ?? `Sprint ${formatSprintNumber(sprintNumber)}`;
 
   // Build per-agent breakdowns when --swarm is provided
   let agents: AgentBreakdown[] | undefined;
@@ -330,6 +332,10 @@ export async function autoCardCommand(args: string[]): Promise<void> {
     console.log(`  Agents: ${card.agents.length} (${card.agents.map(a => `${a.agent_role}: ${a.shots.length} shots`).join(', ')})`);
   }
   console.log(`\n  Review shot results before filing.\n`);
+}
+
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 /**

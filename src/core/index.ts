@@ -172,6 +172,7 @@ export {
   formatStrategicContext,
   formatSprintLabel,
   formatSprintNumber,
+  parseSprintNumber,
   findNextPlannedSprint,
   isEncodedInsertedSprintId,
   isRoadmapSprintPending,
