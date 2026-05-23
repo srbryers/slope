@@ -342,11 +342,36 @@ function mergeSkill(target: SkillDefinition, source: SkillDefinition): void {
 }
 
 function normalizeSkillId(value: string): string {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9._-]+/g, '-')
-    .replace(/^-+|-+$/g, '') || 'skill';
+  let slug = '';
+  let lastReplacement = false;
+
+  for (const char of value.trim().toLowerCase()) {
+    if (isSkillIdChar(char)) {
+      slug += char;
+      lastReplacement = false;
+    } else if (!lastReplacement) {
+      slug += '-';
+      lastReplacement = true;
+    }
+  }
+
+  let start = 0;
+  let end = slug.length;
+  while (start < end && slug[start] === '-') start += 1;
+  while (end > start && slug[end - 1] === '-') end -= 1;
+
+  return slug.slice(start, end) || 'skill';
+}
+
+function isSkillIdChar(char: string): boolean {
+  const code = char.charCodeAt(0);
+  return (
+    (code >= 97 && code <= 122)
+    || (code >= 48 && code <= 57)
+    || char === '.'
+    || char === '_'
+    || char === '-'
+  );
 }
 
 function firstString(...values: unknown[]): string | undefined {

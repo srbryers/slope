@@ -106,6 +106,21 @@ Set up the repo.
     expect(result.registry.skills[0].id).toBe('setup');
   });
 
+  it('normalizes hyphen-heavy skill names in linear time', () => {
+    const paddedName = `${'-'.repeat(5000)}Skill Name${'-'.repeat(5000)}`;
+    writeSkill('.agents/skills', 'slow-name', `---
+name: ${JSON.stringify(paddedName)}
+description: Normalize safely.
+---
+
+Use this skill.
+`);
+
+    const result = scanSkills({ cwd: tmpDir, roots: ['.agents/skills'] });
+
+    expect(result.registry.skills[0].id).toBe('skill-name');
+  });
+
   it('merges duplicate skill ids across provider roots', () => {
     const skill = `---
 name: slope-sprint-workflow

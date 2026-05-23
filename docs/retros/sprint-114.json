@@ -21,8 +21,14 @@
       "title": "Scan configured skill roots and parse SKILL.md plus agents/openai.yaml metadata",
       "club": "long_iron",
       "result": "green",
-      "hazards": [],
-      "notes": "Implemented deterministic skill root scanning, YAML frontmatter parsing, agents/openai.yaml metadata capture, duplicate provider-root merging, and registry validation."
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "moderate",
+          "description": "CodeQL flagged slug-normalization regexes as vulnerable to slow matching on hyphen-heavy skill names."
+        }
+      ],
+      "notes": "Implemented deterministic skill root scanning, YAML frontmatter parsing, agents/openai.yaml metadata capture, duplicate provider-root merging, registry validation, and linear-time skill id normalization."
     },
     {
       "ticket_key": "S114-3",
@@ -60,7 +66,7 @@
     "greens_total": 4,
     "putts": 0,
     "penalties": 0,
-    "hazards_hit": 2,
+    "hazards_hit": 3,
     "hazard_penalties": 0.5,
     "miss_directions": {
       "long": 0,
@@ -77,6 +83,11 @@
       "type": "lessons",
       "description": "CLI path handling needs explicit absolute-path regression coverage.",
       "outcome": "Added absolute --root/--output coverage for slope skills scan and resolved explicit validate paths against cwd."
+    },
+    {
+      "type": "lessons",
+      "description": "Regex-based normalization over repo metadata can trip CodeQL even when the input looks mundane.",
+      "outcome": "Replaced skill id slug regexes with a linear scanner and added hyphen-heavy regression coverage."
     }
   ],
   "nutrition": [
@@ -99,6 +110,7 @@
   "yardage_book_updates": [
     "Skill registry files live at config.skillsPath, defaulting to .slope/skills.json.",
     "SLOPE indexes SKILL.md and optional agents/openai.yaml metadata but does not execute skills.",
+    "Skill id normalization should stay linear and avoid regex trimming over uncontrolled metadata.",
     "Scorecard skill reference fields are skills_used, skills_created, skills_recommended, and skills_skipped; validate --skills checks these against the local registry.",
     "skill_gaps_found is free-form and intentionally not registry-checked."
   ],
@@ -108,7 +120,8 @@
     "Added scorecard skill fields and validate --skills reference checking.",
     "slope skills scan --root=.agents/skills, slope skills list, slope skills validate, and slope validate --skills smoke tests passed on the built CLI.",
     "pnpm build passed.",
-    "Full pnpm test passed: 214 test files and 3456 tests."
+    "CodeQL high-severity regex alert was fixed with linear skill id normalization.",
+    "Full pnpm test passed: 214 test files and 3457 tests."
   ],
   "skills_used": [
     "slope-sprint-workflow"
