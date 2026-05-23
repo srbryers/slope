@@ -1,0 +1,99 @@
+{
+  "sprint_number": 120,
+  "player": "codex",
+  "theme": "Historical Scorecard Validation Cleanup",
+  "par": 3,
+  "slope": 1,
+  "score": 3,
+  "score_label": "par",
+  "date": "2026-05-23",
+  "shots": [
+    {
+      "ticket_key": "S120-1",
+      "title": "Infer missing greens_total for legacy scorecards so repo-wide validate --skills passes",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "normalizeStats now falls back to shots.length when legacy full-shape stats omit greens_total, preserving explicit zero totals while allowing old S70 and S74-S83 cards to validate."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 1,
+    "fairways_total": 1,
+    "greens_in_regulation": 1,
+    "greens_total": 1,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "type": "bugfix",
+  "conditions": [
+    "Follow-up from S119 closeout after repo-wide validate --skills exposed legacy scorecard GIR_OVERFLOW errors"
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Normalization should distinguish omitted legacy totals from explicit zero totals.",
+      "outcome": "Missing greens_total now uses the scorecard shot count, while explicit greens_total: 0 still validates as zero."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "Focused validation tests, build, typecheck, full pnpm test, repo-wide validate --skills, roadmap validation, map check, and diff check passed.",
+      "status": "healthy"
+    },
+    {
+      "category": "validation",
+      "description": "The historical scorecard set now validates with --skills instead of failing on S70 and S74-S83 GIR overflow errors.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Small and clean: the failure was a compatibility edge in normalization, not bad historical intent.",
+    "advice_for_next_player": "When validating older scorecards, prefer shape-aware normalization over mass-editing historical records.",
+    "what_surprised_you": "The old cards had greens_in_regulation and shot counts, so the missing total was enough information to recover safely.",
+    "excited_about_next": "Repo-wide validation is useful again as a real gate instead of a known-failing command."
+  },
+  "bunker_locations": [
+    "Legacy scorecards can have modern-looking stats with individual total fields omitted.",
+    "Normalization fallback rules should keep explicit zero distinct from missing or null fields."
+  ],
+  "yardage_book_updates": [
+    "src/core/builder.ts normalizeStats now defaults missing fairways_total and greens_total to shotCount for full-shape stats.",
+    "tests/core/validation.test.ts covers legacy stats that omit greens_total while preserving GIR validation."
+  ],
+  "course_management_notes": [
+    "Confirmed S70 and S74-S83 all omitted stats.greens_total while reporting greens_in_regulation.",
+    "pnpm vitest run tests/core/validation.test.ts passed: 34 tests.",
+    "pnpm build passed.",
+    "pnpm typecheck passed.",
+    "pnpm test passed: 214 test files and 3479 tests.",
+    "node dist/cli/index.js validate --skills passed repo-wide.",
+    "node dist/cli/index.js roadmap validate passed as structurally valid with standing warnings plus expected branch-local S120 warnings before the scorecard was added.",
+    "node dist/cli/index.js map --check passed: Overall CURRENT.",
+    "git diff --check passed.",
+    "node dist/cli/index.js review recommend reported only optional code review for the one-ticket, slope-1 sprint."
+  ],
+  "skills_used": [
+    "slope-sprint-workflow"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow",
+    "slope-api-reference",
+    "slope-performance-analysis"
+  ],
+  "skill_gaps_found": [],
+  "slope_factors": [
+    "legacy_scorecards",
+    "validation_normalization"
+  ]
+}

@@ -219,6 +219,14 @@
       ],
       "status": "complete",
       "note": "Closed the new GitHub issue batch for skills validation, scanning, help behavior, and sprint-specific briefing recommendations."
+    },
+    {
+      "name": "Phase 35 \u2014 Historical Scorecard Validation Cleanup",
+      "sprints": [
+        120
+      ],
+      "status": "complete",
+      "note": "Cleared the repo-wide validate --skills failure caused by legacy scorecards that predate explicit greens_total stats."
     }
   ],
   "sprints": [
@@ -2442,6 +2450,28 @@
           "depends_on": [
             "S119-3"
           ]
+        }
+      ]
+    },
+    {
+      "id": 120,
+      "theme": "Historical Scorecard Validation Cleanup",
+      "par": 3,
+      "slope": 1,
+      "type": "bugfix",
+      "status": "complete",
+      "score": 3,
+      "score_label": "par",
+      "depends_on": [
+        119
+      ],
+      "note": "Make legacy scorecards without stats.greens_total validate correctly by inferring the total from shots.length.",
+      "tickets": [
+        {
+          "key": "S120-1",
+          "title": "Infer missing greens_total for legacy scorecards so repo-wide validate --skills passes",
+          "club": "wedge",
+          "complexity": "small"
         }
       ]
     }
