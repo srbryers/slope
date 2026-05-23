@@ -207,6 +207,10 @@ export function loadSkillRegistry(registryPath: string): SkillRegistryFile | nul
   try {
     const raw = JSON.parse(readFileSync(registryPath, 'utf8')) as unknown;
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+    const candidate = raw as Partial<SkillRegistryFile>;
+    if (candidate.version !== '1' || !Array.isArray(candidate.roots) || !Array.isArray(candidate.skills)) {
+      return null;
+    }
     return raw as SkillRegistryFile;
   } catch {
     return null;
@@ -221,7 +225,8 @@ export function saveSkillRegistry(registry: SkillRegistryFile, registryPath: str
 }
 
 export function skillIds(registry: SkillRegistryFile | null): Set<string> {
-  return new Set((registry?.skills ?? []).map(skill => skill.id));
+  const skills = Array.isArray(registry?.skills) ? registry.skills : [];
+  return new Set(skills.map(skill => skill.id));
 }
 
 function readSkill(skillPath: string, absoluteRoot: string, cwd: string): { skill: SkillDefinition | null; warnings: string[] } {

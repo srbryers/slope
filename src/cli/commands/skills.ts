@@ -60,7 +60,7 @@ function skillsList(args: string[], cwd: string, config: SlopeConfig): void {
   const output = registryPath(cwd, config, args);
   const registry = loadSkillRegistry(output);
   if (!registry) {
-    console.log('No skill registry found. Run `slope skills scan` to create .slope/skills.json.\n');
+    console.log('No valid skill registry found. Run `slope skills scan` to create .slope/skills.json.\n');
     return;
   }
 
@@ -89,7 +89,7 @@ function skillsValidate(args: string[], cwd: string, config: SlopeConfig): void 
   const output = registryPath(cwd, config, args);
   const registry = loadSkillRegistry(output);
   if (!registry) {
-    console.error('No skill registry found. Run `slope skills scan` first.');
+    console.error('No valid skill registry found. Run `slope skills scan` first.');
     process.exit(1);
   }
 

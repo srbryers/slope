@@ -173,6 +173,15 @@ Set up the repo.
     expect(skillIds(loaded).has('setup')).toBe(true);
   });
 
+  it('returns null for malformed registry files', () => {
+    const path = join(tmpDir, '.slope', 'skills.json');
+    mkdirSync(join(tmpDir, '.slope'), { recursive: true });
+    writeFileSync(path, JSON.stringify({ version: '1', roots: [], skills: null }));
+
+    expect(loadSkillRegistry(path)).toBeNull();
+    expect(skillIds(null)).toEqual(new Set());
+  });
+
   it('validates duplicate ids and missing source paths', () => {
     writeSkill('.agents/skills', 'setup', `---
 name: setup

@@ -18,7 +18,7 @@ export function validateCommand(input?: string | string[]): void {
     const registryPath = join(cwd, config.skillsPath ?? DEFAULT_SKILLS_PATH);
     const registry = loadSkillRegistry(registryPath);
     if (!registry) {
-      console.log(`\n✗ Skill registry not found at ${registryPath}. Run \`slope skills scan\` first.`);
+      console.log(`\n✗ Skill registry not found or invalid at ${registryPath}. Run \`slope skills scan\` first.`);
       registryAvailable = false;
     } else {
       knownSkillIds = skillIds(registry);
