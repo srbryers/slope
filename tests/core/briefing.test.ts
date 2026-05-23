@@ -5,8 +5,10 @@ import {
   computeNutritionTrend,
   formatBriefing,
   hazardBriefing,
+  buildSkillBriefing,
 } from '../../src/core/briefing.js';
 import type { CommonIssuesFile, RecurringPattern } from '../../src/core/briefing.js';
+import type { SkillRegistryFile } from '../../src/core/skills.js';
 import type { GolfScorecard, ShotRecord, HoleStats, SprintClaim, SlopeEvent } from '../../src/core/types.js';
 import { golf, gaming } from '../../src/core/metaphors/index.js';
 import { backend, frontend, generalist } from '../../src/core/roles.js';
@@ -65,6 +67,47 @@ function makeCard(overrides: Partial<GolfScorecard> = {}): GolfScorecard {
     bunker_locations: [],
     course_management_notes: [],
     ...overrides,
+  };
+}
+
+function makeSkillRegistry(): SkillRegistryFile {
+  return {
+    version: '1',
+    generated_at: '2026-05-23T00:00:00.000Z',
+    roots: ['.agents/skills'],
+    skills: [
+      {
+        id: 'review-helper',
+        name: 'review-helper',
+        description: 'Review pull requests and code review findings.',
+        path: '.agents/skills/review-helper/SKILL.md',
+        directory: '.agents/skills/review-helper',
+        root: '.agents/skills',
+        sources: [{
+          path: '.agents/skills/review-helper/SKILL.md',
+          directory: '.agents/skills/review-helper',
+          root: '.agents/skills',
+          metadata_sources: ['SKILL.md'],
+        }],
+        triggers: ['review', 'pull request'],
+        tags: ['github'],
+      },
+      {
+        id: 'slope-sprint-workflow',
+        name: 'slope-sprint-workflow',
+        description: 'Sprint lifecycle, briefing, scorecard, and review workflow.',
+        path: '.agents/skills/slope-sprint-workflow/SKILL.md',
+        directory: '.agents/skills/slope-sprint-workflow',
+        root: '.agents/skills',
+        sources: [{
+          path: '.agents/skills/slope-sprint-workflow/SKILL.md',
+          directory: '.agents/skills/slope-sprint-workflow',
+          root: '.agents/skills',
+          metadata_sources: ['SKILL.md'],
+        }],
+        triggers: ['briefing', 'scorecard', 'sprint'],
+      },
+    ],
   };
 }
 
@@ -1090,6 +1133,100 @@ describe('formatBriefing — ROLE-BASED CONTEXT', () => {
       role: undefined,
     });
     expect(baseOutput).toBe(withoutRole);
+  });
+});
+
+// --- buildSkillBriefing / skill-aware briefing ---
+
+describe('buildSkillBriefing', () => {
+  it('recommends registered skills from roadmap, filters, hazards, and scorecard history', () => {
+    const registry = makeSkillRegistry();
+    const roadmap = {
+      name: 'Test Roadmap',
+      phases: [{ name: 'P1', sprints: [114.5] }],
+      sprints: [{
+        id: 114.5,
+        theme: 'Skill-aware briefing and review flow',
+        par: 4 as const,
+        slope: 3,
+        type: 'feature',
+        tickets: [
+          { key: 'S114.5-1', title: 'Add briefing recommendations', club: 'short_iron' as const, complexity: 'standard' as const },
+        ],
+      }],
+    };
+    const card = makeCard({
+      sprint_number: 114,
+      skills_recommended: ['slope-sprint-workflow'],
+      shots: [makeShot({ hazards: [{ type: 'rough', description: 'review flow drifted from scorecard workflow' }] })],
+    });
+
+    const result = buildSkillBriefing({
+      registry,
+      scorecards: [card],
+      commonIssues: makeIssues([]),
+      filter: { keywords: ['briefing', 'review'] },
+      roadmap,
+      currentSprint: 114.5,
+    });
+
+    expect(result.recommendations.map(r => r.id)).toContain('slope-sprint-workflow');
+    expect(result.recommendations.map(r => r.id)).toContain('review-helper');
+    expect(result.recommendations[0].score).toBeGreaterThan(0);
+  });
+
+  it('surfaces repeated relevant topics that have no matching registered skill', () => {
+    const result = buildSkillBriefing({
+      registry: makeSkillRegistry(),
+      scorecards: [],
+      commonIssues: makeIssues([
+        makePattern({
+          title: 'Compiled-package default not visible in tests',
+          category: 'testing',
+          sprints_hit: [80, 84, 88],
+          description: 'dist build drift',
+          prevention: 'Run build before dist CLI tests',
+        }),
+      ]),
+      filter: { categories: ['testing'] },
+    });
+
+    expect(result.gaps[0].topic).toBe('Compiled-package default not visible in tests');
+    expect(result.gaps[0].reason).toContain('no matching registered skill');
+  });
+
+  it('does not turn one-off filter terms into skill gaps', () => {
+    const result = buildSkillBriefing({
+      registry: makeSkillRegistry(),
+      scorecards: [],
+      commonIssues: makeIssues([]),
+      filter: { keywords: ['roadmap', 'skills'] },
+    });
+
+    expect(result.gaps).toEqual([]);
+  });
+});
+
+describe('formatBriefing — skill-aware section', () => {
+  it('renders recommended skills and gaps when a registry is provided', () => {
+    const output = formatBriefing({
+      scorecards: [makeCard({ skills_recommended: ['slope-sprint-workflow'] })],
+      commonIssues: makeIssues([
+        makePattern({
+          title: 'Compiled-package default not visible in tests',
+          category: 'testing',
+          sprints_hit: [80, 84],
+          description: 'dist build drift',
+          prevention: 'Run build before dist CLI tests',
+        }),
+      ]),
+      filter: { categories: ['testing'] },
+      skillRegistry: makeSkillRegistry(),
+    });
+
+    expect(output).toContain('RECOMMENDED SKILLS');
+    expect(output).toContain('slope-sprint-workflow');
+    expect(output).toContain('Skill gaps to consider');
   });
 });
 

@@ -15,6 +15,7 @@ import { generateTrainingPlan } from './advisor.js';
 import { checkConflicts } from './registry.js';
 import type { RoadmapDefinition } from './roadmap.js';
 import { formatStrategicContext } from './roadmap.js';
+import type { SkillDefinition, SkillRegistryFile } from './skills.js';
 
 // --- Input types ---
 
@@ -68,6 +69,25 @@ export interface NutritionTrend {
   needs_attention: number;
   neglected: number;
   trend: 'healthy' | 'mixed' | 'neglected';
+}
+
+export interface SkillBriefingRecommendation {
+  id: string;
+  name: string;
+  reason: string;
+  matched_terms: string[];
+  score: number;
+}
+
+export interface SkillGapRecommendation {
+  topic: string;
+  reason: string;
+  evidence: string[];
+}
+
+export interface SkillBriefingResult {
+  recommendations: SkillBriefingRecommendation[];
+  gaps: SkillGapRecommendation[];
 }
 
 // --- Library functions ---
@@ -217,6 +237,62 @@ export function hazardBriefing(opts: {
   return warnings;
 }
 
+export function buildSkillBriefing(opts: {
+  registry?: SkillRegistryFile | null;
+  scorecards: GolfScorecard[];
+  commonIssues: CommonIssuesFile;
+  filter?: BriefingFilter;
+  roadmap?: RoadmapDefinition;
+  currentSprint?: number;
+  maxRecommendations?: number;
+  maxGaps?: number;
+}): SkillBriefingResult {
+  const { registry, scorecards, commonIssues, filter, roadmap, currentSprint } = opts;
+  if (!registry || !Array.isArray(registry.skills) || registry.skills.length === 0) {
+    return { recommendations: [], gaps: [] };
+  }
+
+  const sprint = currentSprint != null
+    ? roadmap?.sprints.find(s => s.id === currentSprint)
+    : undefined;
+  const sprintText = normalizeSearchText(sprint ? collectStringValues(sprint).join(' ') : '');
+  const filterText = normalizeSearchText([
+    ...(filter?.categories ?? []),
+    ...(filter?.keywords ?? []),
+  ].join(' '));
+  const hazardIndex = extractHazardIndex(scorecards);
+  const recentHazards = [...hazardIndex.shot_hazards]
+    .sort((a, b) => b.sprint - a.sprint)
+    .slice(0, 20);
+  const hazardText = normalizeSearchText([
+    ...recentHazards.map(h => `${h.type} ${h.ticket} ${h.description}`),
+    ...hazardIndex.bunker_locations.slice(-10).map(b => b.location),
+  ].join(' '));
+  const historicalSkillIds = collectScorecardSkillIds(scorecards);
+
+  const contextTokens = new Set([
+    ...tokensFromText(sprintText),
+    ...tokensFromText(filterText),
+    ...tokensFromText(hazardText),
+  ]);
+
+  const recommendations = registry.skills
+    .map(skill => scoreSkill(skill, { sprintText, filterText, hazardText, contextTokens, historicalSkillIds }))
+    .filter((rec): rec is SkillBriefingRecommendation => rec != null)
+    .sort((a, b) => b.score - a.score || a.id.localeCompare(b.id))
+    .slice(0, opts.maxRecommendations ?? 5);
+
+  const gaps = findSkillGaps({
+    registry,
+    commonIssues,
+    filter,
+    scorecards,
+    maxGaps: opts.maxGaps ?? 3,
+  });
+
+  return { recommendations, gaps };
+}
+
 /**
  * Format the complete pre-round briefing.
  * Combines handicap card, filtered hazards, filtered common issues,
@@ -238,8 +314,9 @@ export function formatBriefing(opts: {
   recentEvents?: SlopeEvent[];
   eventRecencyWindow?: number;
   prSignal?: PRSignal;
+  skillRegistry?: SkillRegistryFile | null;
 }): string {
-  const { scorecards, commonIssues, lastSession, filter, includeTraining = true, claims, roadmap, currentSprint, metaphor: m, role, recentEvents, eventRecencyWindow = 5, prSignal } = opts;
+  const { scorecards, commonIssues, lastSession, filter, includeTraining = true, claims, roadmap, currentSprint, metaphor: m, role, recentEvents, eventRecencyWindow = 5, prSignal, skillRegistry } = opts;
   const lines: string[] = [];
 
   // Merge role's briefingFilter with explicit filter (explicit filter takes precedence)
@@ -290,6 +367,36 @@ export function formatBriefing(opts: {
       lines.push('STRATEGIC CONTEXT');
       for (const line of context.split('\n')) {
         lines.push(`  ${line}`);
+      }
+    }
+  }
+
+  const skillBriefing = buildSkillBriefing({
+    registry: skillRegistry,
+    scorecards,
+    commonIssues,
+    filter: effectiveFilter,
+    roadmap,
+    currentSprint,
+  });
+
+  if (skillBriefing.recommendations.length > 0 || skillBriefing.gaps.length > 0) {
+    lines.push('');
+    lines.push('\u2500'.repeat(50));
+    lines.push('RECOMMENDED SKILLS');
+    if (skillBriefing.recommendations.length === 0) {
+      lines.push('  No registered skills matched this briefing context.');
+    } else {
+      for (const rec of skillBriefing.recommendations) {
+        const terms = rec.matched_terms.length > 0 ? ` (${rec.matched_terms.join(', ')})` : '';
+        lines.push(`  ${rec.id}: ${rec.reason}${terms}`);
+      }
+    }
+    if (skillBriefing.gaps.length > 0) {
+      lines.push('');
+      lines.push('  Skill gaps to consider:');
+      for (const gap of skillBriefing.gaps) {
+        lines.push(`    - ${gap.topic}: ${gap.reason}`);
       }
     }
   }
@@ -484,6 +591,211 @@ export function formatBriefing(opts: {
 
   lines.push('');
   return lines.join('\n');
+}
+
+function scoreSkill(
+  skill: SkillDefinition,
+  context: {
+    sprintText: string;
+    filterText: string;
+    hazardText: string;
+    contextTokens: Set<string>;
+    historicalSkillIds: Set<string>;
+  },
+): SkillBriefingRecommendation | null {
+  let score = 0;
+  const matchedTerms = new Set<string>();
+  const reasons: string[] = [];
+  const phrases = skillMatchPhrases(skill);
+
+  for (const phrase of phrases) {
+    const normalized = normalizeSearchText(phrase);
+    if (!normalized || normalized.length < 3) continue;
+    if (SKILL_STOPWORDS.has(normalized)) continue;
+    if (containsPhrase(context.sprintText, normalized)) {
+      score += 5;
+      matchedTerms.add(phrase);
+      addReason(reasons, 'sprint text');
+    }
+    if (containsPhrase(context.filterText, normalized)) {
+      score += 4;
+      matchedTerms.add(phrase);
+      addReason(reasons, 'briefing filters');
+    }
+    if (containsPhrase(context.hazardText, normalized)) {
+      score += 3;
+      matchedTerms.add(phrase);
+      addReason(reasons, 'recent hazards');
+    }
+  }
+
+  const skillTokens = tokensFromText([
+    skill.id,
+    skill.name,
+    skill.description,
+    ...(skill.triggers ?? []),
+    ...(skill.tags ?? []),
+  ].join(' '));
+  const tokenMatches = [...skillTokens].filter(token => context.contextTokens.has(token)).slice(0, 5);
+  if (tokenMatches.length > 0) {
+    score += tokenMatches.length;
+    for (const token of tokenMatches) matchedTerms.add(token);
+    addReason(reasons, 'related terminology');
+  }
+
+  if (context.historicalSkillIds.has(skill.id)) {
+    score += 2;
+    addReason(reasons, 'scorecard skill history');
+  }
+
+  if (score <= 0) return null;
+  return {
+    id: skill.id,
+    name: skill.name,
+    reason: `matches ${reasons.join(', ')}`,
+    matched_terms: [...matchedTerms].sort((a, b) => a.localeCompare(b)).slice(0, 5),
+    score,
+  };
+}
+
+function findSkillGaps(opts: {
+  registry: SkillRegistryFile;
+  commonIssues: CommonIssuesFile;
+  filter?: BriefingFilter;
+  scorecards: GolfScorecard[];
+  maxGaps: number;
+}): SkillGapRecommendation[] {
+  const gaps: SkillGapRecommendation[] = [];
+  const relevantIssues = opts.filter
+    ? filterCommonIssues(opts.commonIssues, opts.filter)
+    : filterCommonIssues(opts.commonIssues, {}).slice(0, 5);
+
+  for (const issue of relevantIssues) {
+    if (issue.sprints_hit.length < 2) continue;
+    if (isCoveredBySkill(issue.title, opts.registry.skills)) continue;
+    gaps.push({
+      topic: issue.title,
+      reason: `recurs across ${issue.sprints_hit.length} sprint(s) but has no matching registered skill`,
+      evidence: issue.sprints_hit.map(s => `S${s}`).slice(-5),
+    });
+    if (gaps.length >= opts.maxGaps) return gaps;
+  }
+
+  const seenGapTopics = new Set(gaps.map(g => normalizeSearchText(g.topic)));
+  for (const card of opts.scorecards.slice(-10)) {
+    for (const gap of card.skill_gaps_found ?? []) {
+      const normalized = normalizeSearchText(gap);
+      if (!normalized || seenGapTopics.has(normalized)) continue;
+      if (isCoveredBySkill(gap, opts.registry.skills)) continue;
+      seenGapTopics.add(normalized);
+      gaps.push({
+        topic: gap,
+        reason: 'recorded in recent scorecard skill_gaps_found',
+        evidence: [`S${card.sprint_number}`],
+      });
+      if (gaps.length >= opts.maxGaps) return gaps;
+    }
+  }
+
+  return gaps;
+}
+
+function isCoveredBySkill(topic: string, skills: SkillDefinition[]): boolean {
+  const normalized = normalizeSearchText(topic);
+  const topicTokens = tokensFromText(normalized);
+  if (topicTokens.size === 0) return false;
+  return skills.some(skill => {
+    const phrases = skillMatchPhrases(skill).map(normalizeSearchText);
+    if (phrases.some(phrase => phrase && containsPhrase(normalized, phrase))) return true;
+    const skillTokens = tokensFromText([
+      skill.id,
+      skill.name,
+      skill.description,
+      ...(skill.triggers ?? []),
+      ...(skill.tags ?? []),
+    ].join(' '));
+    let matches = 0;
+    for (const token of topicTokens) {
+      if (skillTokens.has(token)) matches += 1;
+    }
+    return matches >= Math.min(2, topicTokens.size);
+  });
+}
+
+function skillMatchPhrases(skill: SkillDefinition): string[] {
+  return uniqueStrings([
+    skill.id,
+    skill.name,
+    ...skill.id.split(/[._-]+/).filter(Boolean),
+    ...(skill.triggers ?? []),
+    ...(skill.tags ?? []),
+  ]);
+}
+
+function collectScorecardSkillIds(scorecards: GolfScorecard[]): Set<string> {
+  const ids = new Set<string>();
+  for (const card of scorecards) {
+    for (const id of [
+      ...(card.skills_used ?? []),
+      ...(card.skills_created ?? []),
+      ...(card.skills_recommended ?? []),
+      ...(card.skills_skipped ?? []),
+    ]) {
+      ids.add(id);
+    }
+  }
+  return ids;
+}
+
+function collectStringValues(value: unknown, out: string[] = []): string[] {
+  if (typeof value === 'string') {
+    out.push(value);
+  } else if (Array.isArray(value)) {
+    for (const item of value) collectStringValues(item, out);
+  } else if (value && typeof value === 'object') {
+    for (const item of Object.values(value)) collectStringValues(item, out);
+  }
+  return out;
+}
+
+const SKILL_STOPWORDS = new Set([
+  'and', 'for', 'from', 'into', 'this', 'that', 'the', 'use', 'uses', 'with',
+  'when', 'work', 'slope', 'skill', 'skills', 'agent', 'agents',
+]);
+
+function tokensFromText(text: string): Set<string> {
+  return new Set(normalizeSearchText(text)
+    .split(' ')
+    .filter(token => token.length >= 3 && !SKILL_STOPWORDS.has(token)));
+}
+
+function normalizeSearchText(value: string): string {
+  let out = '';
+  let lastSpace = true;
+  for (const char of value.toLowerCase()) {
+    const code = char.charCodeAt(0);
+    const isAlphaNum = (code >= 97 && code <= 122) || (code >= 48 && code <= 57);
+    if (isAlphaNum) {
+      out += char;
+      lastSpace = false;
+    } else if (!lastSpace) {
+      out += ' ';
+      lastSpace = true;
+    }
+  }
+  return out.trim();
+}
+
+function containsPhrase(text: string, phrase: string): boolean {
+  return ` ${text} `.includes(` ${phrase} `);
+}
+
+function uniqueStrings(values: string[]): string[] {
+  return [...new Set(values.map(v => v.trim()).filter(Boolean))];
+}
+
+function addReason(reasons: string[], reason: string): void {
+  if (!reasons.includes(reason)) reasons.push(reason);
 }
 
 /**

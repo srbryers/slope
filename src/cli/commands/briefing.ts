@@ -1,6 +1,6 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { formatBriefing, parseRoadmap, castRoadmapStructure, getRole, hasRole, loadCustomRoles, filterScorecardsByPlayer, filterHazardsByVisibility, formatDeferredForBriefing, loadDeferred, computeHandicapCard, formatStrategicContext, parseSprintNumber } from '../../core/index.js';
+import { DEFAULT_SKILLS_PATH, buildSkillBriefing, formatBriefing, parseRoadmap, castRoadmapStructure, getRole, hasRole, loadCustomRoles, filterScorecardsByPlayer, filterHazardsByVisibility, formatDeferredForBriefing, loadDeferred, computeHandicapCard, formatStrategicContext, loadSkillRegistry, parseSprintNumber } from '../../core/index.js';
 import type { CommonIssuesFile, SessionEntry, SprintClaim, RoadmapDefinition, SlopeEvent, RoleDefinition } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { loadScorecards } from '../loader.js';
@@ -119,6 +119,8 @@ export async function briefingCommand(args: string[]): Promise<void> {
     ? { categories: categories.length > 0 ? categories : undefined, keywords: keywords.length > 0 ? keywords : undefined }
     : undefined;
 
+  const skillRegistry = loadSkillRegistry(join(cwd, config.skillsPath ?? DEFAULT_SKILLS_PATH));
+
   // Filter scorecards by player if requested
   const effectiveScorecards = playerFlag
     ? filterScorecardsByPlayer(scorecards, playerFlag)
@@ -145,17 +147,27 @@ export async function briefingCommand(args: string[]): Promise<void> {
     const claimList = claims.length > 0 ? claims.map(c => c.target).join(', ') : 'none';
     const ctx = roadmap ? formatStrategicContext(roadmap, sprintNumber) : '';
     const ctxLine = ctx ? `\n${ctx.split('\n')[0]}` : '';
+    const skillBriefing = buildSkillBriefing({
+      registry: skillRegistry,
+      scorecards: effectiveScorecards,
+      commonIssues: visibleIssues,
+      filter,
+      roadmap,
+      currentSprint: sprintNumber,
+    });
+    const skillSummary = skillBriefing.recommendations.map(r => r.id).slice(0, 3).join(', ');
 
     console.log(`\nSLOPE BRIEFING (compact) — S${sprintNumber}`);
     console.log(`Handicap: ${hcp} | Fairways: ${fwy}% | GIR: ${gir}% | Scorecards: ${effectiveScorecards.length}`);
     console.log(`Hazards: ${hazardCount}${topHazards ? ` — top: ${topHazards}` : ''}`);
+    if (skillSummary) console.log(`Skills: ${skillSummary}`);
     console.log(`Claims: ${claimList}${ctxLine}`);
     console.log(`\nRun \`slope briefing\` (without --compact) for full details.\n`);
     return;
   }
 
   const metaphor = resolveMetaphor(args, config.metaphor);
-  const output = formatBriefing({ scorecards: effectiveScorecards, commonIssues: visibleIssues, lastSession, filter, includeTraining, claims, roadmap, currentSprint: sprintNumber, metaphor, role, recentEvents });
+  const output = formatBriefing({ scorecards: effectiveScorecards, commonIssues: visibleIssues, lastSession, filter, includeTraining, claims, roadmap, currentSprint: sprintNumber, metaphor, role, recentEvents, skillRegistry });
   console.log('');
   console.log(output);
 
