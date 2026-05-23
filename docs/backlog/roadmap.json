@@ -203,6 +203,14 @@
       ],
       "status": "complete",
       "note": "Used the SLOPE-generated local backlog to harden the worktree-check guard against recurring multi-session and payload-shape hazards."
+    },
+    {
+      "name": "Phase 33 \u2014 Guard Hardening Release",
+      "sprints": [
+        118
+      ],
+      "status": "planned",
+      "note": "Publish the S117 worktree-check guard hardening as v1.56.1 and verify the trusted-publisher npm release."
     }
   ],
   "sprints": [
@@ -2344,6 +2352,35 @@
           "title": "Harden worktree-check guard recovery command and git probing paths",
           "club": "short_iron",
           "complexity": "standard"
+        }
+      ]
+    },
+    {
+      "id": 118,
+      "theme": "Guard Hardening Release",
+      "par": 3,
+      "slope": 1,
+      "type": "release",
+      "status": "planned",
+      "depends_on": [
+        117
+      ],
+      "note": "Release the S117 worktree-check guard hardening as v1.56.1 via GitHub trusted publishing and verify npm.",
+      "tickets": [
+        {
+          "key": "S118-1",
+          "title": "Bump @slope-dev/slope and bundled Codex plugin to v1.56.1",
+          "club": "wedge",
+          "complexity": "small"
+        },
+        {
+          "key": "S118-2",
+          "title": "Run release validation, publish v1.56.1, and verify npm",
+          "club": "short_iron",
+          "complexity": "standard",
+          "depends_on": [
+            "S118-1"
+          ]
         }
       ]
     }
