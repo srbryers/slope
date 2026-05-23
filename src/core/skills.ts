@@ -1,7 +1,7 @@
 // Skill registry — index repo-local Agent Skills metadata without executing skills.
 
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
-import { basename, dirname, join, relative } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import type { SlopeConfig } from './config.js';
 
@@ -72,7 +72,7 @@ export function resolveSkillRoots(config: SlopeConfig, cwd: string = process.cwd
   const roots = config.skillRoots && config.skillRoots.length > 0
     ? config.skillRoots
     : [...DEFAULT_SKILL_ROOTS];
-  return roots.map(root => join(cwd, root));
+  return roots.map(root => isAbsolute(root) ? root : join(cwd, root));
 }
 
 export function parseSkillMarkdown(content: string): ParsedSkillMarkdown {
@@ -119,7 +119,7 @@ export function scanSkills(opts: {
   const byId = new Map<string, SkillDefinition>();
 
   for (const configuredRoot of roots) {
-    const absoluteRoot = join(cwd, configuredRoot);
+    const absoluteRoot = isAbsolute(configuredRoot) ? configuredRoot : join(cwd, configuredRoot);
     if (!existsSync(absoluteRoot)) continue;
 
     for (const skillPath of findSkillMarkdownFiles(absoluteRoot)) {

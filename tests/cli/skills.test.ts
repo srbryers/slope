@@ -70,6 +70,18 @@ describe('slope skills scan', () => {
     const registry = JSON.parse(readFileSync(join(tmpDir, '.slope', 'skills.json'), 'utf8'));
     expect(registry.roots).toEqual(['.agents/skills']);
   });
+
+  it('honors absolute root and output paths', async () => {
+    writeSkill();
+    const root = join(tmpDir, '.agents', 'skills');
+    const output = join(tmpDir, 'custom', 'skills.json');
+
+    await skillsCommand(['scan', `--root=${root}`, `--output=${output}`]);
+
+    expect(existsSync(output)).toBe(true);
+    const registry = JSON.parse(readFileSync(output, 'utf8'));
+    expect(registry.skills[0].id).toBe('review-helper');
+  });
 });
 
 describe('slope skills list', () => {

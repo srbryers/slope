@@ -1,6 +1,6 @@
 // slope skills — scan and validate repo-local skill metadata.
 
-import { join } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 import {
   DEFAULT_SKILLS_PATH,
   DEFAULT_SKILL_ROOTS,
@@ -33,7 +33,8 @@ function parseRepeatable(args: string[], flag: string): string[] {
 }
 
 function registryPath(cwd: string, config: SlopeConfig, args: string[]): string {
-  return join(cwd, parseFlag(args, '--output') ?? config.skillsPath ?? DEFAULT_SKILLS_PATH);
+  const output = parseFlag(args, '--output') ?? config.skillsPath ?? DEFAULT_SKILLS_PATH;
+  return isAbsolute(output) ? output : join(cwd, output);
 }
 
 function rootsFor(config: SlopeConfig, args: string[]): string[] {

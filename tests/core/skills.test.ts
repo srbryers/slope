@@ -91,6 +91,21 @@ context_files:
     });
   });
 
+  it('honors absolute scan roots', () => {
+    writeSkill('custom-skills', 'setup', `---
+name: setup
+description: Configure a project.
+---
+
+Set up the repo.
+`);
+
+    const result = scanSkills({ cwd: tmpDir, roots: [join(tmpDir, 'custom-skills')] });
+
+    expect(result.registry.skills).toHaveLength(1);
+    expect(result.registry.skills[0].id).toBe('setup');
+  });
+
   it('merges duplicate skill ids across provider roots', () => {
     const skill = `---
 name: slope-sprint-workflow
