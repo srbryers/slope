@@ -211,6 +211,14 @@
       ],
       "status": "complete",
       "note": "Published the S117 worktree-check guard hardening as v1.56.1 and verified the trusted-publisher npm release."
+    },
+    {
+      "name": "Phase 34 \u2014 Skill Registry Follow-ups",
+      "sprints": [
+        119
+      ],
+      "status": "planned",
+      "note": "Address the new GitHub issue batch for skills validation, scanning, help behavior, and sprint-specific briefing recommendations."
     }
   ],
   "sprints": [
@@ -2382,6 +2390,55 @@
           "complexity": "standard",
           "depends_on": [
             "S118-1"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 119,
+      "theme": "Skill Registry Follow-ups",
+      "par": 4,
+      "slope": 3,
+      "type": "bugfix + enhancement",
+      "status": "planned",
+      "depends_on": [
+        118
+      ],
+      "note": "Fix the fresh #440-#443 GitHub issue batch around skills validation, scanning, help exit codes, and briefing recommendations.",
+      "tickets": [
+        {
+          "key": "S119-1",
+          "title": "Prevent validate --skills from crashing when stats.miss_directions is missing (#440)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 440
+        },
+        {
+          "key": "S119-2",
+          "title": "Make slope skills --help exit successfully (#443)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 443
+        },
+        {
+          "key": "S119-3",
+          "title": "Ignore worktrees, virtualenvs, dependencies, and generated folders during skills scan (#441)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 441,
+          "depends_on": [
+            "S119-1",
+            "S119-2"
+          ]
+        },
+        {
+          "key": "S119-4",
+          "title": "Honor requested sprint skill metadata in briefing recommendations (#442)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 442,
+          "depends_on": [
+            "S119-3"
           ]
         }
       ]
