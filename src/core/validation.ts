@@ -1,5 +1,6 @@
 import type { GolfScorecard, HazardSeverity, ShotResult } from './types.js';
 import { computeScoreLabel } from './handicap.js';
+import { normalizeStats } from './builder.js';
 
 // --- Validation-specific types ---
 
@@ -92,7 +93,7 @@ export function validateScorecard(
   }
 
   // Rule 2: stat bounds
-  const stats = card.stats;
+  const stats = card.stats ? normalizeStats(card.stats, card.shots?.length ?? 0) : null;
   if (stats) {
     if (stats.fairways_hit > stats.fairways_total) {
       errors.push({
