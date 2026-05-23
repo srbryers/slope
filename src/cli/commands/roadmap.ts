@@ -33,6 +33,15 @@ function parseArgs(args: string[]): Record<string, string> {
 }
 
 const DEFAULT_ROADMAP_PATH = 'docs/backlog/roadmap.json';
+const TERMINAL_ROADMAP_STATUSES = new Set(['complete', 'superseded']);
+
+function getRoadmapStatus(sprint: RoadmapSprint): string | undefined {
+  return (sprint as RoadmapSprint & { status?: string }).status;
+}
+
+function isTerminalRoadmapSprint(sprint: RoadmapSprint, completedSprints: Set<number>): boolean {
+  return completedSprints.has(sprint.id) || TERMINAL_ROADMAP_STATUSES.has(getRoadmapStatus(sprint) ?? '');
+}
 
 function resolveRoadmapPath(flags: Record<string, string>, cwd: string): string {
   if (flags.path) return flags.path;
@@ -285,19 +294,26 @@ function statusSubcommand(flags: Record<string, string>, cwd: string): void {
     }
 
     const phaseSprints = roadmap.sprints.filter(s => phase.sprints.includes(s.id));
-    const completed = phaseSprints.filter(s => completedSprints.has(s.id)).length;
+    const completed = phaseSprints.filter(s => isTerminalRoadmapSprint(s, completedSprints)).length;
     console.log(`## ${phase.name || 'Unnamed Phase'} (${completed}/${phaseSprints.length})`);
 
     for (const sprint of phaseSprints) {
-      const isCompleted = completedSprints.has(sprint.id);
+      const explicitStatus = getRoadmapStatus(sprint);
+      const isCompleted = completedSprints.has(sprint.id) || explicitStatus === 'complete';
+      const isSuperseded = explicitStatus === 'superseded';
       const isCurrent = sprint.id === currentSprint;
 
       // Check if blocked: all dependencies must be completed
-      const blockedBy = (sprint.depends_on ?? []).filter(dep => !completedSprints.has(dep));
-      const isBlocked = !isCompleted && blockedBy.length > 0;
+      const blockedBy = (sprint.depends_on ?? []).filter(dep => {
+        const dependency = roadmap.sprints.find(s => s.id === dep);
+        return dependency ? !isTerminalRoadmapSprint(dependency, completedSprints) : !completedSprints.has(dep);
+      });
+      const isBlocked = !isCompleted && !isSuperseded && blockedBy.length > 0;
 
       let status: string;
-      if (isCompleted) {
+      if (isSuperseded) {
+        status = '\u21B7 superseded';
+      } else if (isCompleted) {
         status = '\u2713 completed';
       } else if (isCurrent) {
         status = '\u25B6 active';

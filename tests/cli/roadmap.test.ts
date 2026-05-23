@@ -277,6 +277,29 @@ describe('slope roadmap status', () => {
     expect(output).toContain('active');
   });
 
+  it('treats superseded sprints as terminal progress', () => {
+    const roadmap = makeRoadmapJson({
+      phases: [{ name: 'Phase 1', sprints: [7, 8, 9] }],
+      sprints: [
+        { ...makeRoadmapJson().sprints[0], status: 'complete' } as any,
+        { ...makeRoadmapJson().sprints[1], status: 'superseded' } as any,
+        { ...makeRoadmapJson().sprints[2], depends_on: [8] },
+      ],
+    });
+    writeRoadmap(tmpDir, roadmap);
+    writeConfig(tmpDir, { currentSprint: 9 });
+
+    roadmapCommand(['status']);
+
+    const output = consoleOutput.join('\n');
+    expect(output).toContain('Phase 1 (2/3)');
+    expect(output).toContain('S8');
+    expect(output).toContain('\u21B7 superseded');
+    expect(output).toContain('S9');
+    expect(output).toContain('\u25B6 active');
+    expect(output).not.toContain('blocked by S8');
+  });
+
   it('shows strategic context for current sprint', () => {
     writeRoadmap(tmpDir, makeRoadmapJson());
     writeConfig(tmpDir, { currentSprint: 8 });
