@@ -141,6 +141,42 @@ Guide.
     expect(result.warnings.some(w => w.includes('Merged duplicate skill id'))).toBe(true);
   });
 
+  it('skips dependency, generated, and nested worktree folders by default (#441)', () => {
+    const skill = (name: string) => `---
+name: ${name}
+description: ${name} skill.
+---
+
+Use ${name}.
+`;
+    writeSkill('.agents/skills', 'repo-helper', skill('repo-helper'));
+    writeSkill('node_modules/pkg/.agents/skills', 'dependency-helper', skill('dependency-helper'));
+    writeSkill('.venv/lib/python3.12/site-packages/fastapi/.agents/skills', 'fastapi', skill('fastapi'));
+    writeSkill('.claude/worktrees/testing/.claude/skills', 'worktree-helper', skill('worktree-helper'));
+    writeSkill('dist/generated/skills', 'generated-helper', skill('generated-helper'));
+
+    const result = scanSkills({ cwd: tmpDir, roots: ['.'] });
+
+    expect(result.registry.skills.map(s => s.id)).toEqual(['repo-helper']);
+  });
+
+  it('still scans ignored-name locations when they are explicit roots (#441)', () => {
+    writeSkill('.venv/lib/python3.12/site-packages/fastapi/.agents/skills', 'fastapi', `---
+name: fastapi
+description: FastAPI helper.
+---
+
+Use FastAPI.
+`);
+
+    const result = scanSkills({
+      cwd: tmpDir,
+      roots: ['.venv/lib/python3.12/site-packages/fastapi/.agents/skills'],
+    });
+
+    expect(result.registry.skills.map(s => s.id)).toEqual(['fastapi']);
+  });
+
   it('parses agents/openai.yaml metadata without making it executable', () => {
     writeSkill(
       '.agents/skills',
