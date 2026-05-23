@@ -100,6 +100,20 @@ describe('validateScorecard - stat bounds', () => {
     expect(result.errors.some(e => e.code === 'GIR_OVERFLOW')).toBe(true);
   });
 
+  it('infers missing greens_total from shots for legacy stats', () => {
+    const shots = [
+      makeShot({ result: 'green' }),
+      makeShot({ result: 'in_the_hole' }),
+    ];
+    const stats = makeStats({ fairways_hit: 2, fairways_total: 2, greens_in_regulation: 2 });
+    delete (stats as Partial<HoleStats>).greens_total;
+
+    const result = validateScorecard(makeCard({ shots, stats }));
+
+    expect(result.errors.filter(e => e.code === 'GIR_OVERFLOW')).toHaveLength(0);
+    expect(result.valid).toBe(true);
+  });
+
   it('passes when stats are within bounds', () => {
     const result = validateScorecard(makeCard());
     expect(result.errors.filter(e => e.code === 'FAIRWAYS_OVERFLOW')).toHaveLength(0);

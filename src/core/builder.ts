@@ -104,11 +104,14 @@ export function normalizeStats(raw: unknown, shotCount = 0): HoleStats {
   const s = raw as Record<string, unknown>;
 
   if ('fairways_hit' in s && 'fairways_total' in s) {
+    const numberOrDefault = (value: unknown, fallback: number) => (
+      value == null ? fallback : Number(value) || 0
+    );
     return {
       fairways_hit: Number(s.fairways_hit) || 0,
-      fairways_total: Number(s.fairways_total) || 0,
+      fairways_total: numberOrDefault(s.fairways_total, shotCount),
       greens_in_regulation: Number(s.greens_in_regulation) || 0,
-      greens_total: Number(s.greens_total) || 0,
+      greens_total: numberOrDefault(s.greens_total, shotCount),
       putts: Number(s.putts) || 0,
       penalties: Number(s.penalties) || 0,
       hazards_hit: Number(s.hazards_hit) || 0,
