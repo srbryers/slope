@@ -1,16 +1,32 @@
 import { readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
-import { validateScorecard } from '../../core/index.js';
+import { isAbsolute, join } from 'node:path';
+import { DEFAULT_SKILLS_PATH, loadSkillRegistry, skillIds, validateScorecard } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { updateGate } from '../sprint-state.js';
 
-export function validateCommand(path?: string): void {
+export function validateCommand(input?: string | string[]): void {
+  const args = Array.isArray(input) ? input : input ? [input] : [];
+  const validateSkills = args.includes('--skills');
+  const path = args.find(arg => !arg.startsWith('--'));
   const cwd = process.cwd();
   const config = loadConfig();
   const files: string[] = [];
+  let knownSkillIds: Set<string> | null = null;
+  let registryAvailable = true;
+
+  if (validateSkills) {
+    const registryPath = join(cwd, config.skillsPath ?? DEFAULT_SKILLS_PATH);
+    const registry = loadSkillRegistry(registryPath);
+    if (!registry) {
+      console.log(`\n✗ Skill registry not found at ${registryPath}. Run \`slope skills scan\` first.`);
+      registryAvailable = false;
+    } else {
+      knownSkillIds = skillIds(registry);
+    }
+  }
 
   if (path) {
-    files.push(path);
+    files.push(isAbsolute(path) ? path : join(cwd, path));
   } else {
     // Validate all scorecards matching config
     const dir = join(cwd, config.scorecardDir);
@@ -52,7 +68,7 @@ export function validateCommand(path?: string): void {
     }
 
     const card = { ...raw, sprint_number: raw.sprint_number ?? raw.sprint };
-    const result = validateScorecard(card);
+    const result = validateScorecard(card, knownSkillIds ? { knownSkillIds } : {});
 
     const sprintLabel = card.sprint_number ? `Sprint ${card.sprint_number}` : file;
 
@@ -78,9 +94,9 @@ export function validateCommand(path?: string): void {
   console.log('');
 
   // Mark scorecard gate complete on successful validation
-  if (allValid) {
+  if (allValid && registryAvailable) {
     updateGate(cwd, 'scorecard', true);
   }
 
-  process.exit(allValid ? 0 : 1);
+  process.exit(allValid && registryAvailable ? 0 : 1);
 }

@@ -146,6 +146,16 @@ export interface GolfScorecard extends HoleScore {
   bunker_locations: string[];
   course_management_notes: string[];
   nineteenth_hole?: NineteenthHole;
+  /** Skill IDs used during this sprint */
+  skills_used?: string[];
+  /** Skill IDs created or materially updated during this sprint */
+  skills_created?: string[];
+  /** Skill IDs recommended during planning or review */
+  skills_recommended?: string[];
+  /** Skill IDs considered but intentionally skipped */
+  skills_skipped?: string[];
+  /** Repeated work patterns that may need a future skill */
+  skill_gaps_found?: string[];
   /** Per-agent breakdowns for multi-agent (swarm) sprints */
   agents?: AgentBreakdown[];
   /** External inspiration sources that influenced this sprint */

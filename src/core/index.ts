@@ -85,6 +85,7 @@ export type {
   ScorecardValidationError,
   ScorecardValidationWarning,
   ScorecardValidationResult,
+  ScorecardValidationOptions,
 } from './validation.js';
 
 // Dispersion
