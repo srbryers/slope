@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { PassThrough } from 'node:stream';
+import { execFileSync } from 'node:child_process';
 import type { HookInput } from '../../../src/core/index.js';
 
 // Ensure adapters are registered
@@ -27,6 +28,14 @@ function writeMinimalSlopeConfig(cwd: string): void {
     scorecardDir: 'docs/retros',
     metaphor: 'golf',
   }));
+}
+
+function initGitRepo(cwd: string, branch: string): void {
+  execFileSync('git', ['init', '-q'], { cwd, stdio: 'ignore' });
+  execFileSync('git', ['config', 'user.email', 'test@test.com'], { cwd, stdio: 'ignore' });
+  execFileSync('git', ['config', 'user.name', 'Test User'], { cwd, stdio: 'ignore' });
+  execFileSync('git', ['checkout', '-q', '-b', branch], { cwd, stdio: 'ignore' });
+  execFileSync('git', ['commit', '-q', '--allow-empty', '-m', 'initial'], { cwd, stdio: 'ignore' });
 }
 
 function makeHookInput(cwd: string, overrides: Partial<HookInput> = {}): HookInput {
@@ -200,6 +209,32 @@ describe('guardCommand dispatcher path', () => {
     expect(metrics).toContain('"decision":"suppressed"');
     expect(metrics).toContain('"guard":"claim-required"');
     expect(metrics).toContain('"decision":"ask"');
+  });
+
+  it('uses hook input cwd instead of launcher cwd when running branch-before-commit', async () => {
+    initGitRepo(cwd, 'main');
+    const worktreeCwd = makeTmpDir();
+
+    try {
+      writeMinimalSlopeConfig(worktreeCwd);
+      initGitRepo(worktreeCwd, 'feat/hook-cwd');
+
+      const output = await runGuardCommandWithInput(
+        ['branch-before-commit'],
+        makeHookInput(worktreeCwd, {
+          tool_name: 'Bash',
+          tool_input: { command: 'git commit -m "feat: keep worktree branch"' },
+        }),
+      );
+
+      expect(output).toBe('');
+      const worktreeMetrics = readFileSync(join(worktreeCwd, '.slope', 'guard-metrics.jsonl'), 'utf8');
+      expect(worktreeMetrics).toContain('"guard":"branch-before-commit"');
+      expect(worktreeMetrics).toContain('"decision":"silent"');
+      expect(existsSync(join(cwd, '.slope', 'guard-metrics.jsonl'))).toBe(false);
+    } finally {
+      rmSync(worktreeCwd, { recursive: true, force: true });
+    }
   });
 
   it('prints metric reason counts in the metrics command', async () => {
