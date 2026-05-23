@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { formatSprintReview } from '../../core/index.js';
+import { formatSprintReview, compareSprintIds, parseSprintNumber } from '../../core/index.js';
 import type { GolfScorecard, ProjectStats } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { resolveMetaphor } from '../metaphor.js';
@@ -17,18 +17,19 @@ export function reviewCommand(path?: string, mode?: string, metaphorFlag?: strin
     const patternParts = config.scorecardPattern.split('*');
     const prefix = patternParts[0] ?? '';
     const suffix = patternParts[1] ?? '';
-    const regex = new RegExp(`^${prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\d+)${suffix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`);
+    const regex = new RegExp(`^${prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\d+(?:\\.\\d+)?)${suffix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`);
 
     try {
       const files = readdirSync(dir)
         .filter((f: string) => {
           const m = f.match(regex);
-          return m && parseInt(m[1], 10) >= config.minSprint;
+          const sprint = m ? parseSprintNumber(m[1]) : null;
+          return sprint != null && sprint >= config.minSprint;
         })
         .sort((a, b) => {
-          const na = parseInt(a.match(regex)?.[1] ?? '0', 10);
-          const nb = parseInt(b.match(regex)?.[1] ?? '0', 10);
-          return na - nb;
+          const na = parseSprintNumber(a.match(regex)?.[1] ?? '0') ?? 0;
+          const nb = parseSprintNumber(b.match(regex)?.[1] ?? '0') ?? 0;
+          return compareSprintIds(na, nb);
         });
       if (files.length === 0) {
         console.log('\nNo scorecards found.\n');

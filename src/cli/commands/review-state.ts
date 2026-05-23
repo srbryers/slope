@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdirSync } from '
 import { join } from 'node:path';
 import type { ReviewFinding, ReviewType, HazardSeverity } from '../../core/types.js';
 import { recommendReviews, amendScorecardWithFindings } from '../../core/review.js';
-import { loadConfig, detectLatestSprint, normalizeScorecard } from '../../core/index.js';
+import { loadConfig, detectLatestSprint, normalizeScorecard, parseSprintNumber } from '../../core/index.js';
 import { createDeferred, listDeferred, resolveDeferred } from '../../core/deferred.js';
 import type { DeferredSeverity } from '../../core/deferred.js';
 import { HAZARD_SEVERITY_PENALTIES } from '../../core/constants.js';
@@ -200,8 +200,7 @@ interface ReviewRecommendationContext {
 function parseSprintArg(args: string[]): number | null {
   const sprintArg = args.find(a => a.startsWith('--sprint='));
   if (!sprintArg) return null;
-  const value = parseInt(sprintArg.slice('--sprint='.length), 10);
-  return Number.isFinite(value) && value > 0 ? value : null;
+  return parseSprintNumber(sprintArg.slice('--sprint='.length));
 }
 
 function hasLocalSlopeContext(cwd: string, config: SlopeConfig): boolean {
@@ -225,14 +224,14 @@ function collectStringValues(value: unknown, out: string[] = []): string[] {
 function recommendationFromPlan(content: string): ReviewRecommendationContext {
   const filePatterns: string[] = [];
   const slopeMatch = content.match(/\*\*Slope:\*\*\s*(\d+)/);
-  const sprintMatch = content.match(/Sprint\s+(\d+)/);
+  const sprintMatch = content.match(/Sprint\s+(\d+(?:\.\d+)?)/);
   const fileMatches = content.matchAll(/`([^`]+\.[a-z]+)`/g);
   for (const m of fileMatches) filePatterns.push(m[1]);
 
   return {
     ticketCount: countTickets(content),
     slope: slopeMatch ? parseInt(slopeMatch[1], 10) : 0,
-    sprintNumber: sprintMatch ? parseInt(sprintMatch[1], 10) : 0,
+    sprintNumber: sprintMatch ? parseSprintNumber(sprintMatch[1]) ?? 0 : 0,
     filePatterns,
     hasNewInfra: /\b(new module|new package|new service|new infrastructure)\b/i.test(content),
   };
@@ -377,7 +376,7 @@ function findingsAddCommand(args: string[], cwd: string): void {
   // Determine sprint number
   let sprintNumber = 0;
   if (sprintArg) {
-    sprintNumber = parseInt(sprintArg.slice('--sprint='.length), 10);
+    sprintNumber = parseSprintNumber(sprintArg.slice('--sprint='.length)) ?? 0;
   } else {
     try {
       const config = loadConfig(cwd);
@@ -418,7 +417,7 @@ function findingsListCommand(args: string[], cwd: string): void {
   }
 
   if (sprintArg) {
-    const requestedSprint = parseInt(sprintArg.slice('--sprint='.length), 10);
+    const requestedSprint = parseSprintNumber(sprintArg.slice('--sprint='.length)) ?? 0;
     const sprintFindings = data.sprints[requestedSprint];
     if (!sprintFindings || sprintFindings.length === 0) {
       console.log(`No findings for Sprint ${requestedSprint}.`);
@@ -507,7 +506,7 @@ function amendCommand(args: string[], cwd: string): void {
   // Determine sprint number
   let sprintNumber: number;
   if (sprintArg) {
-    sprintNumber = parseInt(sprintArg.slice('--sprint='.length), 10);
+    sprintNumber = parseSprintNumber(sprintArg.slice('--sprint='.length)) ?? 0;
   } else {
     sprintNumber = detectLatestSprint(config, cwd);
     if (sprintNumber === 0) {
@@ -773,8 +772,8 @@ function deferCommand(args: string[], cwd: string): void {
   let category: string | undefined;
 
   for (const arg of args) {
-    if (arg.startsWith('--from=')) from = parseInt(arg.slice('--from='.length), 10);
-    else if (arg.startsWith('--to=')) to = parseInt(arg.slice('--to='.length), 10);
+    if (arg.startsWith('--from=')) from = parseSprintNumber(arg.slice('--from='.length)) ?? undefined;
+    else if (arg.startsWith('--to=')) to = parseSprintNumber(arg.slice('--to='.length)) ?? undefined;
     else if (arg.startsWith('--severity=')) severity = arg.slice('--severity='.length) as DeferredSeverity;
     else if (arg.startsWith('--description=')) description = arg.slice('--description='.length);
     else if (arg.startsWith('--category=')) category = arg.slice('--category='.length);
@@ -817,7 +816,7 @@ function deferredCommand(args: string[], cwd: string): void {
   let status: string | undefined;
 
   for (const arg of args) {
-    if (arg.startsWith('--sprint=')) sprint = parseInt(arg.slice('--sprint='.length), 10);
+    if (arg.startsWith('--sprint=')) sprint = parseSprintNumber(arg.slice('--sprint='.length)) ?? undefined;
     else if (arg.startsWith('--status=')) status = arg.slice('--status='.length);
   }
 

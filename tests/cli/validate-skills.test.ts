@@ -50,18 +50,18 @@ function writeRegistry(ids: string[]): void {
   writeFileSync(join(tmpDir, '.slope', 'skills.json'), JSON.stringify(registry, null, 2));
 }
 
-function writeScorecard(skillsUsed: string[]): string {
+function writeScorecard(skillsUsed: string[], sprintNumber = 1): string {
   const retrosDir = join(tmpDir, 'docs', 'retros');
   mkdirSync(retrosDir, { recursive: true });
   const card = buildScorecard({
-    sprint_number: 1,
+    sprint_number: sprintNumber,
     theme: 'Skill validation',
     par: 3,
     slope: 1,
     date: '2026-05-23',
     player: 'test',
     shots: [{
-      ticket_key: 'S1-1',
+      ticket_key: `S${sprintNumber}-1`,
       title: 'Test',
       club: 'wedge',
       result: 'in_the_hole',
@@ -72,9 +72,9 @@ function writeScorecard(skillsUsed: string[]): string {
     bunker_locations: ['none'],
     skills_used: skillsUsed,
   });
-  const path = join(retrosDir, 'sprint-1.json');
+  const path = join(retrosDir, `sprint-${sprintNumber}.json`);
   writeFileSync(path, JSON.stringify(card, null, 2));
-  return 'docs/retros/sprint-1.json';
+  return `docs/retros/sprint-${sprintNumber}.json`;
 }
 
 beforeEach(() => {
@@ -109,5 +109,12 @@ describe('slope validate --skills', () => {
 
     expect(() => validateCommand([path, '--skills'])).toThrow('process.exit(1)');
     expect(exitCode).toBe(1);
+  });
+
+  it('includes decimal inserted sprint scorecards during default validation', () => {
+    writeScorecard([], 114.5);
+
+    expect(() => validateCommand()).toThrow('process.exit(0)');
+    expect(exitCode).toBe(0);
   });
 });

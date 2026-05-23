@@ -94,6 +94,31 @@ export function formatSprintLabel(id: number): string {
   return `S${formatSprintNumber(id)}`;
 }
 
+/** Parse human-entered sprint ids such as "114", "114.5", or "S114.5". */
+export function parseSprintNumber(value: string | number): number | null {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) && value > 0 ? value : null;
+  }
+
+  const trimmed = value.trim();
+  const body = trimmed[0]?.toLowerCase() === 's' ? trimmed.slice(1) : trimmed;
+  if (!body || body === '.' || body.startsWith('.') || body.endsWith('.')) return null;
+
+  let seenDot = false;
+  for (const char of body) {
+    const code = char.charCodeAt(0);
+    if (code >= 48 && code <= 57) continue;
+    if (char === '.' && !seenDot) {
+      seenDot = true;
+      continue;
+    }
+    return null;
+  }
+
+  const parsed = Number(body);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
 export function compareSprintIds(a: number, b: number): number {
   return sprintOrderValue(a) - sprintOrderValue(b);
 }

@@ -177,7 +177,7 @@
         114,
         114.5
       ],
-      "status": "planned",
+      "status": "complete",
       "note": "Add repo-local skill registry, skill validation, scorecard skill fields, and skill-aware briefing for #431."
     }
   ],
@@ -2171,7 +2171,7 @@
       "par": 4,
       "slope": 3,
       "type": "feature + planning",
-      "status": "planned",
+      "status": "complete",
       "depends_on": [
         114
       ],

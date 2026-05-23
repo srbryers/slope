@@ -13,7 +13,7 @@ import {
   type GateName,
   type SprintPhase,
 } from '../sprint-state.js';
-import { WorkflowEngine, loadWorkflow, resolveVariables, validateWorkflow, loadConfig, loadScorecards, parseRoadmap, castRoadmapStructure } from '../../core/index.js';
+import { WorkflowEngine, loadWorkflow, resolveVariables, validateWorkflow, loadConfig, loadScorecards, parseRoadmap, castRoadmapStructure, formatSprintNumber, parseSprintNumber } from '../../core/index.js';
 import type { RoadmapSprint, WorkflowDefinition, WorkflowExecution } from '../../core/index.js';
 import { createHash } from 'node:crypto';
 
@@ -103,25 +103,25 @@ async function beginCommand(args: string[], cwd: string): Promise<void> {
     process.exit(1);
   }
 
-  const sprint = parseInt(sprintArg.split('=')[1], 10);
+  const sprint = parseSprintNumber(sprintArg.split('=')[1]);
   const ticket = ticketArg.split('=')[1];
-  if (!sprint || isNaN(sprint) || !ticket) {
-    console.error('Error: --sprint must be a positive integer; --ticket must be a non-empty key');
+  if (!sprint || !ticket) {
+    console.error('Error: --sprint must be a positive sprint id; --ticket must be a non-empty key');
     process.exit(1);
   }
 
   // Step 1: sprint state
   let state = loadSprintState(cwd);
   if (state && state.sprint === sprint) {
-    console.log(`Sprint ${sprint}: already started (phase: ${state.phase}).`);
+    console.log(`Sprint ${formatSprintNumber(sprint)}: already started (phase: ${state.phase}).`);
   } else if (state && state.sprint !== sprint) {
-    console.error(`Refusing to begin S${sprint} — sprint-state.json is for S${state.sprint}.`);
+    console.error(`Refusing to begin S${formatSprintNumber(sprint)} — sprint-state.json is for S${formatSprintNumber(state.sprint)}.`);
     console.error('Run `slope sprint reset` first if the previous sprint is done.');
     process.exit(1);
   } else {
     state = createSprintState(sprint, 'planning');
     saveSprintState(cwd, state);
-    console.log(`Sprint ${sprint}: started (phase: planning).`);
+    console.log(`Sprint ${formatSprintNumber(sprint)}: started (phase: planning).`);
   }
 
   // Step 2: claim
@@ -148,7 +148,7 @@ async function beginCommand(args: string[], cwd: string): Promise<void> {
       if (overlaps.length > 0) {
         console.error(`\nClaim blocked — overlap conflict(s) detected:`);
         for (const c of overlaps) console.error(`  [!!] ${c.reason}`);
-        console.error(`\nResolve conflicts or run \`slope claim --target=${ticket} --sprint=${sprint} --force\` to override.`);
+        console.error(`\nResolve conflicts or run \`slope claim --target=${ticket} --sprint=${formatSprintNumber(sprint)} --force\` to override.`);
         process.exit(1);
       }
       const claim = await store.claim({ sprint_number: sprint, player, target: ticket, scope: 'ticket' });
@@ -165,10 +165,10 @@ async function beginCommand(args: string[], cwd: string): Promise<void> {
   console.log('\n' + '─'.repeat(50));
   try {
     const { briefingCommand } = await import('./briefing.js');
-    await briefingCommand([`--sprint=${sprint}`]);
+    await briefingCommand([`--sprint=${formatSprintNumber(sprint)}`]);
   } catch (err) {
     console.error(`  Could not run briefing: ${(err as Error).message}`);
-    console.error(`  Sprint state was already created; retry with: slope briefing --sprint=${sprint}`);
+    console.error(`  Sprint state was already created; retry with: slope briefing --sprint=${formatSprintNumber(sprint)}`);
   }
 
   // Step 4: prep --lite
@@ -215,9 +215,9 @@ function startCommand(args: string[], cwd: string): void {
     process.exit(1);
   }
 
-  const sprint = parseInt(numberArg.slice('--number='.length), 10);
-  if (isNaN(sprint) || sprint <= 0) {
-    console.error('Error: --number must be a positive integer.');
+  const sprint = parseSprintNumber(numberArg.slice('--number='.length));
+  if (!sprint) {
+    console.error('Error: --number must be a positive sprint id, e.g. 114 or 114.5.');
     process.exit(1);
   }
 
@@ -233,16 +233,16 @@ function startCommand(args: string[], cwd: string): void {
   if (existing && existing.sprint === sprint) {
     if (phaseArg && existing.phase !== phase) {
       updateSprintPhase(cwd, phase);
-      console.log(`Sprint ${sprint} phase updated: ${phase}.`);
+      console.log(`Sprint ${formatSprintNumber(sprint)} phase updated: ${phase}.`);
       return;
     }
-    console.log(`Sprint ${sprint} state already exists (phase: ${existing.phase}).`);
+    console.log(`Sprint ${formatSprintNumber(sprint)} state already exists (phase: ${existing.phase}).`);
     return;
   }
 
   const state = createSprintState(sprint, phase);
   saveSprintState(cwd, state);
-  console.log(`Sprint ${sprint} started (phase: ${phase}). Use 'slope sprint gate <name>' to mark gates.`);
+  console.log(`Sprint ${formatSprintNumber(sprint)} started (phase: ${phase}). Use 'slope sprint gate <name>' to mark gates.`);
 }
 
 function phaseCommand(args: string[], cwd: string): void {
@@ -260,9 +260,9 @@ function phaseCommand(args: string[], cwd: string): void {
 
   updateSprintPhase(cwd, phaseInput);
   if (before.phase === phaseInput) {
-    console.log(`Sprint ${before.sprint} already in ${phaseInput} phase.`);
+    console.log(`Sprint ${formatSprintNumber(before.sprint)} already in ${phaseInput} phase.`);
   } else {
-    console.log(`Sprint ${before.sprint} phase updated: ${before.phase} -> ${phaseInput}.`);
+    console.log(`Sprint ${formatSprintNumber(before.sprint)} phase updated: ${before.phase} -> ${phaseInput}.`);
   }
 }
 
@@ -303,7 +303,7 @@ function statusCommand(cwd: string): void {
   }
 
   const complete = isSprintComplete(state);
-  console.log(`Sprint ${state.sprint} — phase: ${state.phase}${complete ? ' (all gates complete)' : ''}`);
+  console.log(`Sprint ${formatSprintNumber(state.sprint)} — phase: ${state.phase}${complete ? ' (all gates complete)' : ''}`);
   console.log(`Started: ${state.started_at}`);
   console.log(`Updated: ${state.updated_at}`);
   console.log('');

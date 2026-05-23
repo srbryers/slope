@@ -336,6 +336,16 @@ describe('slope sprint skip', () => {
 });
 
 describe('slope sprint phase', () => {
+  it('starts decimal inserted sprint state without truncating', async () => {
+    const output = await captureLog(() =>
+      sprintCommand(['start', '--number=114.5', '--phase=planning'])
+    );
+    const state = JSON.parse(readFileSync(join(tmpDir, '.slope', 'sprint-state.json'), 'utf8'));
+
+    expect(output).toContain('Sprint 114.5 started');
+    expect(state.sprint).toBe(114.5);
+  });
+
   it('updates an existing sprint state phase', async () => {
     await captureLog(() =>
       sprintCommand(['start', '--number=98', '--phase=planning'])

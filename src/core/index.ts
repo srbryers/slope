@@ -125,6 +125,7 @@ export {
   extractHazardIndex,
   computeNutritionTrend,
   hazardBriefing,
+  buildSkillBriefing,
   formatBriefing,
 } from './briefing.js';
 export type {
@@ -134,6 +135,9 @@ export type {
   BriefingFilter,
   HazardEntry,
   NutritionTrend,
+  SkillBriefingRecommendation,
+  SkillGapRecommendation,
+  SkillBriefingResult,
 } from './briefing.js';
 
 // Registry
@@ -172,6 +176,7 @@ export {
   formatStrategicContext,
   formatSprintLabel,
   formatSprintNumber,
+  parseSprintNumber,
   findNextPlannedSprint,
   isEncodedInsertedSprintId,
   isRoadmapSprintPending,

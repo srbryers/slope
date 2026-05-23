@@ -1,0 +1,140 @@
+{
+  "sprint_number": 114.5,
+  "player": "codex",
+  "theme": "Skill-Aware Briefing & Gap Detection",
+  "par": 4,
+  "slope": 3,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-05-23",
+  "shots": [
+    {
+      "ticket_key": "S114.5-1",
+      "title": "Add deterministic Recommended skills section to slope briefing (#431)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added the skill briefing result model, buildSkillBriefing helper, full briefing Recommended Skills section, and compact-mode Skills summary."
+    },
+    {
+      "ticket_key": "S114.5-2",
+      "title": "Match skills from sprint title, roadmap text, filters, hazards, and scorecard skill history (#431)",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Scored registered skills deterministically from current roadmap text, briefing filters, recent hazard language, terminology overlap, and scorecard skill history."
+    },
+    {
+      "ticket_key": "S114.5-3",
+      "title": "Surface possible skill gaps for repeated work with no registered skill (#431)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "Built CLI smoke testing showed one-off filter words such as skills and roadmap were too noisy as skill gaps."
+        }
+      ],
+      "notes": "Restricted gap detection to repeated common-issue evidence and recent scorecard skill_gaps_found entries, with a regression for one-off filters."
+    },
+    {
+      "ticket_key": "S114.5-4",
+      "title": "Document skill-aware planning flow and add briefing/validation regressions (#431)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "Full-suite testing caught a decimal sprint begin label compatibility regression from prerequisite sprint id plumbing."
+        }
+      ],
+      "notes": "Added briefing regressions, decimal sprint lifecycle regressions, scorecard/review artifacts, and final built CLI smoke coverage for S114.5."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 2,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "type": "feature",
+  "conditions": [],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Skill gaps need evidence, not just keyword presence.",
+      "outcome": "Gap detection now uses repeated common issues and scorecard skill_gaps_found entries instead of one-off briefing filters."
+    },
+    {
+      "type": "lessons",
+      "description": "Built CLI smoke tests remain important when tests shell through dist.",
+      "outcome": "Rebuilt before dist-backed tests and added final smoke checks for compact and full S114.5 briefing output."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "Validated targeted briefing and decimal sprint regressions, typecheck, build, built CLI smoke tests, and the full Vitest suite.",
+      "status": "healthy"
+    },
+    {
+      "category": "docs",
+      "description": "Recorded S114.5 scorecard, review notes, and roadmap status.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "This was the right second layer: the registry now affects planning without making the agent launcher magical.",
+    "advice_for_next_player": "Keep recommendations explainable. If the reason cannot point to roadmap, filters, hazards, or history, do not rank it highly.",
+    "what_surprised_you": "The useful UX catch was not ranking itself; it was suppressing false gap warnings from generic filter terms.",
+    "excited_about_next": "Briefing can now nudge agents toward the right local skill before the first edit."
+  },
+  "bunker_locations": [
+    "Briefing skill gaps should require repeated common-issue or scorecard skill_gaps_found evidence; filter words alone are too noisy.",
+    "Decimal sprint CLI tests that execute dist need pnpm build before rerunning.",
+    "Skill recommendation reasons should stay human-readable and tied to concrete briefing context."
+  ],
+  "yardage_book_updates": [
+    "slope briefing now loads config.skillsPath, defaulting to .slope/skills.json, and degrades quietly when no valid registry exists.",
+    "buildSkillBriefing ranks registered skills from current roadmap text, briefing filters, recent hazards, terminology overlap, and scorecard skill history.",
+    "The full briefing adds a Recommended Skills section before Hazards when recommendations or gaps exist.",
+    "Compact briefing includes a one-line Skills summary with the top three recommendation ids.",
+    "Skill gaps are sourced from repeated common issues and recent scorecard skill_gaps_found entries, not one-off filters."
+  ],
+  "course_management_notes": [
+    "Added buildSkillBriefing and exported skill briefing types from src/core/briefing.ts.",
+    "Wired slope briefing to load the local skill registry for full and compact output.",
+    "Added regressions for recommendation ranking, repeated unmatched skill gaps, filter noise suppression, and rendered briefing sections.",
+    "Preserved decimal sprint ids across lifecycle commands as prerequisite plumbing for S114.5.",
+    "pnpm typecheck passed.",
+    "pnpm build passed.",
+    "pnpm test passed: 214 test files and 3467 tests."
+  ],
+  "skills_used": [
+    "slope-sprint-workflow"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow"
+  ],
+  "skill_gaps_found": [
+    "A future hardening pass should cover older ancillary CLI commands that still parse sprint ids as integers outside the S114.5 lifecycle path."
+  ],
+  "slope_factors": [
+    "planning_flow",
+    "registry_integration",
+    "decimal_sprint_plumbing"
+  ]
+}

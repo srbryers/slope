@@ -1,4 +1,4 @@
-import { checkConflicts } from '../../core/index.js';
+import { checkConflicts, parseSprintNumber } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { inferSprintContext } from '../sprint-inference.js';
 import { resolveStore } from '../store.js';
@@ -34,7 +34,14 @@ Options:
 }
 
 function resolveSprint(flags: Record<string, string>, cwd: string): number {
-  if (flags.sprint) return parseInt(flags.sprint, 10);
+  if (flags.sprint) {
+    const sprint = parseSprintNumber(flags.sprint);
+    if (!sprint) {
+      console.error('Error: --sprint must be a positive sprint id, e.g. 114 or 114.5');
+      process.exit(1);
+    }
+    return sprint;
+  }
   const config = loadConfig(cwd);
   return inferSprintContext(cwd, config).sprint;
 }

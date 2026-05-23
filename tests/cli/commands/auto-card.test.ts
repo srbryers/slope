@@ -44,6 +44,15 @@ describe('matchSprintTicket (#352 helper)', () => {
     const cursor = { next: 3 }; // already past the last allowed key
     expect(matchSprintTicket('feat(S1): one too many', 1, allowedKeys, cursor)).toBeNull();
   });
+
+  it('matches decimal inserted sprint ticket keys and umbrella references', () => {
+    const decimalKeys = ['S114.5-1', 'S114.5-2'];
+    const cursor = { next: 0 };
+
+    expect(matchSprintTicket('feat(S114.5-1): recommend skills', 114.5, decimalKeys, cursor)).toBe('S114.5-1');
+    expect(matchSprintTicket('feat(S114.5): umbrella decimal', 114.5, decimalKeys, cursor)).toBe('S114.5-1');
+    expect(matchSprintTicket('feat(S114-1): previous sprint', 114.5, decimalKeys, cursor)).toBeNull();
+  });
 });
 
 function setupRepoWithRoadmap(): string {
@@ -196,4 +205,3 @@ describe('slope auto-card --dry-run roadmap filtering (#352)', () => {
     }
   });
 });
-
