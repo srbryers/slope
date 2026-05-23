@@ -115,7 +115,7 @@ async function beginCommand(args: string[], cwd: string): Promise<void> {
   if (state && state.sprint === sprint) {
     console.log(`Sprint ${formatSprintNumber(sprint)}: already started (phase: ${state.phase}).`);
   } else if (state && state.sprint !== sprint) {
-    console.error(`Refusing to begin Sprint ${formatSprintNumber(sprint)} — sprint-state.json is for Sprint ${formatSprintNumber(state.sprint)}.`);
+    console.error(`Refusing to begin S${formatSprintNumber(sprint)} — sprint-state.json is for S${formatSprintNumber(state.sprint)}.`);
     console.error('Run `slope sprint reset` first if the previous sprint is done.');
     process.exit(1);
   } else {
