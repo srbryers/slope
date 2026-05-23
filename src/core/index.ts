@@ -176,6 +176,7 @@ export {
   formatStrategicContext,
   formatSprintLabel,
   formatSprintNumber,
+  nextCanonicalSprintId,
   parseSprintNumber,
   findNextPlannedSprint,
   isEncodedInsertedSprintId,

@@ -184,4 +184,25 @@ describe('slope next', () => {
     expect(output).toContain('Next sprint: S30');
     expect(output).not.toContain('Next sprint: S1');
   });
+
+  it('falls back to the next canonical sprint after a decimal inserted scorecard', () => {
+    const cwd = makeRepo();
+    repos.push(cwd);
+    writeScorecard(cwd, 114.5);
+    const originalCwd = process.cwd();
+    const logs: string[] = [];
+    vi.spyOn(console, 'log').mockImplementation((msg = '') => logs.push(String(msg)));
+
+    try {
+      process.chdir(cwd);
+      nextCommand();
+    } finally {
+      process.chdir(originalCwd);
+    }
+
+    const output = logs.join('\n');
+    expect(output).toContain('Latest scorecard: S114.5');
+    expect(output).toContain('Next sprint: S115');
+    expect(output).not.toContain('Next sprint: S115.5');
+  });
 });

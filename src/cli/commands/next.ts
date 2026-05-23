@@ -1,5 +1,6 @@
 import { loadConfig } from '../config.js';
 import { inferSprintContext } from '../sprint-inference.js';
+import { formatSprintLabel, nextCanonicalSprintId } from '../../core/index.js';
 
 export function nextCommand(): void {
   const config = loadConfig();
@@ -18,8 +19,8 @@ export function nextCommand(): void {
     console.log(`  (set explicitly in .slope/config.json)`);
   } else if (context.source === 'roadmap') {
     console.log(`  (selected from pending roadmap sprint${context.roadmapSprint?.theme ? `: ${context.roadmapSprint.theme}` : ''})`);
-    if (context.latestScorecard > 0 && context.sprint !== context.latestScorecard + 1) {
-      console.log(`  (roadmap state overrides scorecard fallback to S${context.latestScorecard + 1})`);
+    if (context.latestScorecard > 0 && context.sprint !== nextCanonicalSprintId(context.latestScorecard)) {
+      console.log(`  (roadmap state overrides scorecard fallback to ${formatSprintLabel(nextCanonicalSprintId(context.latestScorecard))})`);
     }
   } else {
     console.log(`  (auto-detected from scorecards)`);

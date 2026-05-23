@@ -8,6 +8,7 @@ import {
   isEncodedInsertedSprintId,
   isRoadmapSprintPending,
   loadScorecards,
+  nextCanonicalSprintId,
   parseRoadmap,
   sprintOrderValue,
 } from '../core/index.js';
@@ -65,7 +66,7 @@ export function inferSprintContext(cwd: string = process.cwd(), config: SlopeCon
     })
     .sort((a, b) => compareSprintIds(a.id, b.id)) ?? [];
 
-  const scorecardNext = latestScorecard > 0 ? latestScorecard + 1 : 1;
+  const scorecardNext = latestScorecard > 0 ? nextCanonicalSprintId(latestScorecard) : 1;
   const pending = choosePendingSprint(pendingSprints, latestScorecard, scorecardNext);
 
   if (pending) {
