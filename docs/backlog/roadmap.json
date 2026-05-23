@@ -185,7 +185,7 @@
       "sprints": [
         115
       ],
-      "status": "planned",
+      "status": "complete",
       "note": "Close the remaining #431 acceptance gap and fix decimal sprint follow-on inference."
     }
   ],
@@ -2232,7 +2232,7 @@
       "par": 3,
       "slope": 2,
       "type": "fix + feature",
-      "status": "planned",
+      "status": "complete",
       "depends_on": [
         114.5
       ],

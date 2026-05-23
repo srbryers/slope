@@ -1,0 +1,129 @@
+{
+  "sprint_number": 115,
+  "player": "codex",
+  "theme": "Skill Awareness Closeout",
+  "par": 3,
+  "slope": 2,
+  "score": 3,
+  "score_label": "par",
+  "date": "2026-05-23",
+  "shots": [
+    {
+      "ticket_key": "S115-1",
+      "title": "Fix slope next fallback after decimal inserted sprint scorecards",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added nextCanonicalSprintId so scorecard fallbacks advance from inserted decimal sprints such as S114.5 to the canonical next sprint, S115."
+    },
+    {
+      "ticket_key": "S115-2",
+      "title": "Include claimed/changed file paths in skill-aware briefing recommendations",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Threaded active claims and changedFiles into buildSkillBriefing so Recommended Skills can cite changed file paths as an explainable ranking signal."
+    },
+    {
+      "ticket_key": "S115-3",
+      "title": "Record closeout and close #431",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "The first full-suite run exposed that the git analyzer commits-per-week fixture could exceed Vitest's default 5s timeout on a busy local machine."
+        }
+      ],
+      "notes": "Hardened the timing-sensitive git analyzer fixture, reran the full suite successfully, and recorded the S115 closeout artifacts."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 3,
+    "fairways_total": 3,
+    "greens_in_regulation": 3,
+    "greens_total": 3,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 1,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "type": "fix + feature",
+  "conditions": [],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Inserted decimal scorecards need canonical fallback math.",
+      "outcome": "nextCanonicalSprintId now centralizes sprint fallback behavior for integer, decimal, and encoded inserted sprint ids."
+    },
+    {
+      "type": "lessons",
+      "description": "Issue acceptance lists should be re-read before closure.",
+      "outcome": "The remaining #431 changed-files signal was added after comparing the implemented briefing flow against the original issue body."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "Focused regressions, typecheck, build, built CLI smoke checks, git analyzer fixture rerun, and full pnpm test suite passed.",
+      "status": "healthy"
+    },
+    {
+      "category": "docs",
+      "description": "Recorded S115 roadmap, scorecard, and review artifacts for #431 closeout.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Small, tidy, and useful: this was the final pass that made the skill workflow feel operational instead of merely documented.",
+    "advice_for_next_player": "When an issue spans multiple sprints, compare the latest implementation against the original issue wording before closing.",
+    "what_surprised_you": "The most valuable closeout catch was not another command; it was the missing file-path recommendation signal hidden in the acceptance text.",
+    "excited_about_next": "Skill-aware planning now has the hooks needed to recommend local discipline before edits begin."
+  },
+  "bunker_locations": [
+    "Next-sprint fallback must use canonical sprint math, not raw numeric +1 after inserted sprint ids.",
+    "Skill-aware briefing should include active claims and changed file paths before considering #431 complete.",
+    "Git fixture tests that create multiple real commits can need explicit timeout headroom in full-suite runs."
+  ],
+  "yardage_book_updates": [
+    "nextCanonicalSprintId owns fallback sprint math for integer, decimal inserted, and encoded inserted sprint ids.",
+    "resolveCurrentSprint, inferSprintFromScorecards, and slope next now share canonical next-sprint behavior.",
+    "buildSkillBriefing accepts claims and changedFiles, adds those paths to context tokens, and reports changed files as a recommendation reason.",
+    "Full and compact briefing paths pass active claims into skill-aware recommendations."
+  ],
+  "course_management_notes": [
+    "Added nextCanonicalSprintId coverage for integer, decimal inserted, and encoded inserted sprint ids.",
+    "Added slope next regression coverage proving S114.5 scorecards advance to S115 rather than S115.5.",
+    "Added skill briefing regression coverage for claimed and changed file path recommendation signals.",
+    "Hardened the git analyzer commits-per-week fixture timeout after an initial full-suite timing failure.",
+    "pnpm vitest run tests/core/briefing.test.ts tests/core/roadmap.test.ts tests/core/loader.test.ts tests/cli/sprint-inference.test.ts tests/cli/commands/next.test.ts passed: 159 tests.",
+    "pnpm vitest run tests/core/analyzers/git.test.ts passed: 24 tests.",
+    "pnpm typecheck passed.",
+    "pnpm build passed.",
+    "pnpm test passed: 214 test files and 3470 tests.",
+    "node dist/cli/index.js validate docs/retros/sprint-115.json --skills passed with no errors or warnings.",
+    "node dist/cli/index.js validate --skills passed, including S115 with no errors or warnings.",
+    "node dist/cli/index.js review recommend --sprint=115 required architect review and recommended ML-engineer review; local architect, code, and ML sanity reviews found no additional findings.",
+    "node dist/cli/index.js map --check passed: Overall CURRENT."
+  ],
+  "skills_used": [
+    "slope-sprint-workflow"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow"
+  ],
+  "skill_gaps_found": [],
+  "slope_factors": [
+    "skill_awareness_closeout",
+    "decimal_sprint_fallback",
+    "release_hardening"
+  ]
+}
