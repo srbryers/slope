@@ -53,11 +53,13 @@ describe('sprint id formatting', () => {
     expect(formatSprintLabel(95)).toBe('S95');
     expect(formatSprintLabel(100)).toBe('S100');
     expect(formatSprintLabel(101)).toBe('S101');
+    expect(formatSprintLabel(105)).toBe('S105');
     expect(formatSprintLabel(203)).toBe('S203');
   });
 
   it('sorts encoded inserted ids between surrounding canonical sprints', () => {
     expect(sprintOrderValue(435)).toBe(43.5);
+    expect(sprintOrderValue(105)).toBe(105);
     expect([44, 435, 43].sort((a, b) => sprintOrderValue(a) - sprintOrderValue(b))).toEqual([43, 435, 44]);
   });
 });
@@ -94,6 +96,15 @@ describe('validateRoadmap', () => {
     });
     const result = validateRoadmap(roadmap);
     expect(result.errors.some(e => e.message.includes('gap'))).toBe(false);
+  });
+
+  it('keeps canonical post-S100 ids ending in 5 valid', () => {
+    const roadmap = makeRoadmap({
+      sprints: [makeSprint(104), makeSprint(105), makeSprint(106)],
+      phases: [{ name: 'P1', sprints: [104, 105, 106] }],
+    });
+    const result = validateRoadmap(roadmap);
+    expect(result.errors).toEqual([]);
   });
 
   it('accepts encoded inserted sprint ids with decimal ticket prefixes', () => {

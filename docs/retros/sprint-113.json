@@ -1,0 +1,101 @@
+{
+  "sprint_number": 113,
+  "player": "codex",
+  "theme": "Skill Awareness Roadmap Planning",
+  "par": 3,
+  "slope": 1,
+  "score": 3,
+  "score_label": "par",
+  "date": "2026-05-23",
+  "shots": [
+    {
+      "ticket_key": "S113-1",
+      "title": "Triage #431 into phased skill registry roadmap work",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Reviewed issue #431, mapped the requested skill registry and skill-aware briefing work onto existing SLOPE architecture, and split the work into MVP registry and follow-on briefing/gap-detection phases."
+    },
+    {
+      "ticket_key": "S113-2",
+      "title": "Sync completed S101-S112 roadmap status from scorecards",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "Roadmap validation exposed that canonical S105 was still interpreted as legacy encoded S10.5."
+        }
+      ],
+      "notes": "Added concise roadmap records for completed S102-S112 work and synced S101 to complete from its scorecard. Fixed the roadmap ID helper so post-S100 sprint IDs ending in 5 remain canonical."
+    },
+    {
+      "ticket_key": "S113-3",
+      "title": "Validate roadmap continuity and record SLOPE closeout",
+      "club": "putter",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Validated JSON structure, roadmap continuity, targeted roadmap tests, typecheck, build, and the full Vitest suite."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 3,
+    "fairways_total": 3,
+    "greens_in_regulation": 3,
+    "greens_total": 3,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 1,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "type": "research",
+  "conditions": [],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Roadmap updates beyond S100 need canonical sprint ID regression coverage.",
+      "outcome": "Added coverage so S105 stays S105 while legacy encoded IDs such as 435 still format as S43.5."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "Validated roadmap JSON, roadmap CLI validation, targeted roadmap tests, typecheck, build, and full Vitest suite.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "A roadmap update turned into a useful little course repair: the plan for skills is clearer, and the roadmap can now safely cross S105.",
+    "advice_for_next_player": "Keep #431 Phase 1 deterministic: scan, list, validate, and record skills before adding smarter recommendations.",
+    "what_surprised_you": "The existing legacy half-sprint encoding collided with real post-S100 sprint numbers ending in 5.",
+    "excited_about_next": "S114 has a clean, scoped path for the skill registry MVP."
+  },
+  "bunker_locations": [
+    "Roadmap IDs ending in 5 after S100 must stay canonical; legacy encoded half-sprint support should not shadow real sprints like S105.",
+    "The roadmap can lag scorecards after ad hoc issue/release sprints; validation should be run after syncing planned work."
+  ],
+  "yardage_book_updates": [
+    "Use explicit decimals such as 114.5 for future inserted half-sprints instead of relying on encoded integer IDs beyond S100."
+  ],
+  "course_management_notes": [
+    "Added Phase 28 to sync completed S102-S113 issue, release, and maintenance work.",
+    "Added Phase 29 for #431 Agent Skill Awareness with S114 Skill Registry MVP and S114.5 Skill-Aware Briefing & Gap Detection.",
+    "Synced S101 status to complete from its scorecard.",
+    "Fixed roadmap sprint ID formatting so S105 and S115 remain canonical post-S100 IDs.",
+    "slope roadmap validate passes after build.",
+    "Full pnpm test passed: 211 test files and 3434 tests."
+  ],
+  "slope_factors": [
+    "roadmap",
+    "github_issue",
+    "validation"
+  ]
+}

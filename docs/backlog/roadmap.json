@@ -151,6 +151,34 @@
       ],
       "status": "complete",
       "note": "Close #382/#383 before Codex plugin work: suppress repeated explore guidance and make workflow per-ticket state advance sprint-state into implementing."
+    },
+    {
+      "name": "Phase 28 \u2014 Issue Recovery & Release Maintenance",
+      "sprints": [
+        102,
+        103,
+        104,
+        105,
+        106,
+        107,
+        108,
+        109,
+        110,
+        111,
+        112,
+        113
+      ],
+      "status": "complete",
+      "note": "Syncs the completed issue, release, and maintenance sprints that shipped after the original S101 roadmap tail."
+    },
+    {
+      "name": "Phase 29 \u2014 Agent Skill Awareness",
+      "sprints": [
+        114,
+        114.5
+      ],
+      "status": "planned",
+      "note": "Add repo-local skill registry, skill validation, scorecard skill fields, and skill-aware briefing for #431."
     }
   ],
   "sprints": [
@@ -1708,11 +1736,13 @@
       "par": 4,
       "slope": 3,
       "type": "bug fix + diagnostics",
-      "status": "planned",
+      "status": "complete",
+      "score": 1,
+      "score_label": "eagle",
       "depends_on": [
         100
       ],
-      "note": "Fix the guard underutilization exposed in Codex: file-aware guards fire on apply_patch but cannot resolve touched paths, hazard guidance is underfed by sparse common-issues data, and guard metrics collapse different silent outcomes into one bucket.",
+      "note": "Roadmap status synced after S101 shipped apply_patch path normalization from #396. Original diagnostics plan was partially superseded by adjacent issue sprints.",
       "tickets": [
         {
           "key": "S101-1",
@@ -1749,6 +1779,441 @@
           "github_issue": 398,
           "depends_on": [
             "S101-2"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 102,
+      "theme": "State Write Race and Claim Help Fixes",
+      "par": 4,
+      "slope": 2,
+      "type": "bug fix + reliability",
+      "status": "complete",
+      "score": 4,
+      "score_label": "par",
+      "depends_on": [
+        101
+      ],
+      "note": "Close #409/#410 by making claim help read-only and hardening SLOPE state writes against concurrent races.",
+      "tickets": [
+        {
+          "key": "S102-1",
+          "title": "Make slope claim --help read-only (#410)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 410
+        },
+        {
+          "key": "S102-2",
+          "title": "Harden SLOPE state writes against concurrent races (#409)",
+          "club": "long_iron",
+          "complexity": "moderate",
+          "github_issue": 409
+        }
+      ]
+    },
+    {
+      "id": 103,
+      "theme": "Review Help Read-Only Routing",
+      "par": 3,
+      "slope": 0,
+      "type": "bug fix",
+      "status": "complete",
+      "score": 1,
+      "score_label": "eagle",
+      "depends_on": [
+        102
+      ],
+      "note": "Close #412 by routing slope review --help before review generation side effects.",
+      "tickets": [
+        {
+          "key": "S103-1",
+          "title": "Route slope review --help before review generation (#412)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 412
+        }
+      ]
+    },
+    {
+      "id": 104,
+      "theme": "npm Trusted Publishing Repair",
+      "par": 3,
+      "slope": 1,
+      "type": "release + infra",
+      "status": "complete",
+      "score": 3,
+      "score_label": "par",
+      "depends_on": [
+        103
+      ],
+      "note": "Repo-side repair for #406: move npm publishing to trusted publishing and document the npm-side follow-up.",
+      "tickets": [
+        {
+          "key": "S104-1",
+          "title": "Move publish workflow to npm trusted publishing (#406)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 406
+        }
+      ]
+    },
+    {
+      "id": 105,
+      "theme": "Guard Metric Silent Reasons",
+      "par": 3,
+      "slope": 1,
+      "type": "diagnostics",
+      "status": "complete",
+      "score": 3,
+      "score_label": "par",
+      "depends_on": [
+        104
+      ],
+      "note": "Close the remaining guard diagnostics slice from #398 by recording actionable silent reasons.",
+      "tickets": [
+        {
+          "key": "S105-1",
+          "title": "Record actionable guard metric reasons (#398)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 398
+        }
+      ]
+    },
+    {
+      "id": 106,
+      "theme": "Scorecard Hazard Fallback",
+      "par": 4,
+      "slope": 1,
+      "type": "guard + analysis",
+      "status": "complete",
+      "score": 4,
+      "score_label": "par",
+      "depends_on": [
+        105
+      ],
+      "note": "Close #397 by feeding hazard guidance from scorecard history when common-issues data is sparse.",
+      "tickets": [
+        {
+          "key": "S106-1",
+          "title": "Feed hazard guard from scorecard hazard index (#397)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 397
+        }
+      ]
+    },
+    {
+      "id": 107,
+      "theme": "Codex Plugin Packaging",
+      "par": 4,
+      "slope": 2,
+      "type": "feature + packaging",
+      "status": "complete",
+      "score": 4,
+      "score_label": "par",
+      "depends_on": [
+        106
+      ],
+      "note": "Close #366 by packaging SLOPE's Codex integration as a Codex plugin bundle.",
+      "tickets": [
+        {
+          "key": "S107-1",
+          "title": "Package SLOPE's Codex integration as a Codex plugin (#366)",
+          "club": "long_iron",
+          "complexity": "moderate",
+          "github_issue": 366
+        }
+      ]
+    },
+    {
+      "id": 108,
+      "theme": "npm Publish Backfill Recovery",
+      "par": 3,
+      "slope": 1,
+      "type": "release + workflow",
+      "status": "complete",
+      "score": 3,
+      "score_label": "par",
+      "depends_on": [
+        107
+      ],
+      "note": "Add manual workflow dispatch support so failed npm release tags can be republished after npm-side trusted publisher fixes.",
+      "tickets": [
+        {
+          "key": "S108-1",
+          "title": "Add manual publish backfill path for failed npm release (#406)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 406
+        }
+      ]
+    },
+    {
+      "id": 109,
+      "theme": "GitHub Issue Batch Triage and Agent-DX Hardening",
+      "par": 5,
+      "slope": 4,
+      "type": "issue batch + dx",
+      "status": "complete",
+      "score": 5,
+      "score_label": "par",
+      "depends_on": [
+        108
+      ],
+      "note": "Issue batch covering #420-#426: active sprint inference, worktree state paths, SQLite diagnostics, MCP execute search boundaries, persistent worktrees, and stale workflow cleanup.",
+      "tickets": [
+        {
+          "key": "S109-1",
+          "title": "Ignore fully closed sprint state when inferring the active sprint (#420/#421)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 420
+        },
+        {
+          "key": "S109-2",
+          "title": "Honor configured doctor state paths in linked worktrees (#422)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 422
+        },
+        {
+          "key": "S109-3",
+          "title": "Diagnose native SQLite setup failures without blocking status commands (#425)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 425
+        },
+        {
+          "key": "S109-4",
+          "title": "Mark direct MCP tools as unavailable inside execute() search results (#424)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 424
+        },
+        {
+          "key": "S109-5",
+          "title": "Add a persistent worktree start command for isolated agent setup (#423)",
+          "club": "long_iron",
+          "complexity": "moderate",
+          "github_issue": 423
+        },
+        {
+          "key": "S109-6",
+          "title": "Add stale workflow cleanup for completed sprint executions (#426)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 426
+        }
+      ]
+    },
+    {
+      "id": 110,
+      "theme": "v1.55.14 Release Cycle Probe",
+      "par": 3,
+      "slope": 2,
+      "type": "release",
+      "status": "complete",
+      "score": 4,
+      "score_label": "bogey",
+      "depends_on": [
+        109
+      ],
+      "note": "Probe the v1.55.14 release path for #406 and record the npm-side trusted publisher blocker.",
+      "tickets": [
+        {
+          "key": "S110-1",
+          "title": "Bump v1.55.14 and run release validation for npm publish recovery (#406)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 406
+        }
+      ]
+    },
+    {
+      "id": 111,
+      "theme": "Trusted Publisher Release Rerun",
+      "par": 3,
+      "slope": 1,
+      "type": "release",
+      "status": "complete",
+      "score": 2,
+      "score_label": "birdie",
+      "depends_on": [
+        110
+      ],
+      "note": "Rerun the failed v1.55.14 publish workflow after npm trusted publisher configuration and close #406.",
+      "tickets": [
+        {
+          "key": "S111-1",
+          "title": "Rerun v1.55.14 publish after npm trusted publisher connection (#406)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 406
+        }
+      ]
+    },
+    {
+      "id": 112,
+      "theme": "GitHub Actions Node 24 Warning Cleanup",
+      "par": 3,
+      "slope": 1,
+      "type": "maintenance",
+      "status": "complete",
+      "score": 3,
+      "score_label": "par",
+      "depends_on": [
+        111
+      ],
+      "note": "Update GitHub workflow action pins to Node 24-capable majors and remove the stale setup-node input.",
+      "tickets": [
+        {
+          "key": "S112-1",
+          "title": "Update GitHub workflow actions to Node 24-capable major versions",
+          "club": "wedge",
+          "complexity": "small"
+        }
+      ]
+    },
+    {
+      "id": 113,
+      "theme": "Skill Awareness Roadmap Planning",
+      "par": 3,
+      "slope": 1,
+      "type": "planning",
+      "status": "complete",
+      "score": 3,
+      "score_label": "par",
+      "depends_on": [
+        112
+      ],
+      "note": "Update the roadmap for #431 and sync completed S102-S112 roadmap drift.",
+      "tickets": [
+        {
+          "key": "S113-1",
+          "title": "Triage #431 into phased skill registry roadmap work",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 431
+        },
+        {
+          "key": "S113-2",
+          "title": "Sync completed S101-S112 roadmap status from scorecards",
+          "club": "wedge",
+          "complexity": "small"
+        },
+        {
+          "key": "S113-3",
+          "title": "Validate roadmap continuity and record SLOPE closeout",
+          "club": "putter",
+          "complexity": "trivial"
+        }
+      ]
+    },
+    {
+      "id": 114,
+      "theme": "Skill Registry MVP",
+      "par": 5,
+      "slope": 3,
+      "type": "feature + agent-dx",
+      "status": "planned",
+      "depends_on": [
+        113
+      ],
+      "note": "Phase 1 for #431: make SLOPE aware of repo-local skills without turning SLOPE into a skill execution runtime.",
+      "tickets": [
+        {
+          "key": "S114-1",
+          "title": "Add skill registry config, types, and .slope/skills.json persistence (#431)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 431
+        },
+        {
+          "key": "S114-2",
+          "title": "Scan configured skill roots and parse SKILL.md plus agents/openai.yaml metadata (#431)",
+          "club": "long_iron",
+          "complexity": "multi-package",
+          "github_issue": 431,
+          "depends_on": [
+            "S114-1"
+          ]
+        },
+        {
+          "key": "S114-3",
+          "title": "Add slope skills scan/list/validate commands and command registry docs (#431)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 431,
+          "depends_on": [
+            "S114-1",
+            "S114-2"
+          ]
+        },
+        {
+          "key": "S114-4",
+          "title": "Add scorecard skill fields and validate --skills reference checks (#431)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 431,
+          "depends_on": [
+            "S114-1",
+            "S114-2"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 114.5,
+      "theme": "Skill-Aware Briefing & Gap Detection",
+      "par": 4,
+      "slope": 3,
+      "type": "feature + planning",
+      "status": "planned",
+      "depends_on": [
+        114
+      ],
+      "note": "Phase 2 for #431: recommend registered skills during planning and surface repeated work that should become a skill.",
+      "tickets": [
+        {
+          "key": "S114.5-1",
+          "title": "Add deterministic Recommended skills section to slope briefing (#431)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 431
+        },
+        {
+          "key": "S114.5-2",
+          "title": "Match skills from sprint title, roadmap text, filters, hazards, and scorecard skill history (#431)",
+          "club": "long_iron",
+          "complexity": "multi-package",
+          "github_issue": 431,
+          "depends_on": [
+            "S114.5-1"
+          ]
+        },
+        {
+          "key": "S114.5-3",
+          "title": "Surface possible skill gaps for repeated work with no registered skill (#431)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 431,
+          "depends_on": [
+            "S114.5-2"
+          ]
+        },
+        {
+          "key": "S114.5-4",
+          "title": "Document skill-aware planning flow and add briefing/validation regressions (#431)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 431,
+          "depends_on": [
+            "S114.5-1",
+            "S114.5-2",
+            "S114.5-3"
           ]
         }
       ]
