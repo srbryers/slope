@@ -84,6 +84,21 @@ describe('slope skills scan', () => {
   });
 });
 
+describe('slope skills help', () => {
+  it('prints top-level help without exiting non-zero (#443)', async () => {
+    const logged: string[] = [];
+    const spy = vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
+      logged.push(args.join(' '));
+    });
+
+    await skillsCommand(['--help']);
+    spy.mockRestore();
+
+    expect(exitCode).toBeUndefined();
+    expect(logged.join('\n')).toContain('slope skills');
+  });
+});
+
 describe('slope skills list', () => {
   it('prints registered skills', async () => {
     writeSkill();
