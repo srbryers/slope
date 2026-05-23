@@ -62,13 +62,13 @@ export interface RoadmapValidationResult {
   warnings: RoadmapValidationWarning[];
 }
 
-/** Return true for encoded inserted half-sprint ids like 435 => S43.5.
+/** Return true for legacy encoded inserted half-sprint ids like 435 => S43.5.
  *  Decimal roadmap ids such as 75.5 are already explicit and are left as-is.
- *  The encoding is intentionally limited to three-digit ids ending in 5 so
- *  ordinary ids like 95, 100, 101, and 203 stay canonical.
+ *  The encoding is intentionally limited to pre-S100-style three-digit ids
+ *  ending in 5 so ordinary post-S100 ids like 105 and 115 stay canonical.
  */
 export function isEncodedInsertedSprintId(id: number): boolean {
-  return Number.isInteger(id) && id >= 100 && id < 1000 && id % 10 === 5;
+  return Number.isInteger(id) && id >= 200 && id < 1000 && id % 10 === 5;
 }
 
 /** Numeric value used for ordering sprint ids. Encoded inserted ids sort
