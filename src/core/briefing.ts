@@ -274,6 +274,10 @@ export function buildSkillBriefing(opts: {
     ...(claims ?? []).map(c => c.target),
     ...(changedFiles ?? []),
   ].join(' '));
+  const requestedScorecard = currentSprint != null
+    ? scorecards.find(card => scorecardSprintNumber(card) === currentSprint)
+    : undefined;
+  const requestedSkillIds = collectRequestedScorecardSkillIds(requestedScorecard);
   const historicalSkillIds = collectScorecardSkillIds(scorecards);
 
   const contextTokens = new Set([
@@ -284,7 +288,7 @@ export function buildSkillBriefing(opts: {
   ]);
 
   const recommendations = registry.skills
-    .map(skill => scoreSkill(skill, { sprintText, filterText, hazardText, changedFilesText, contextTokens, historicalSkillIds }))
+    .map(skill => scoreSkill(skill, { sprintText, filterText, hazardText, changedFilesText, contextTokens, requestedSkillIds, historicalSkillIds }))
     .filter((rec): rec is SkillBriefingRecommendation => rec != null)
     .sort((a, b) => b.score - a.score || a.id.localeCompare(b.id))
     .slice(0, opts.maxRecommendations ?? 5);
@@ -294,6 +298,7 @@ export function buildSkillBriefing(opts: {
     commonIssues,
     filter,
     scorecards,
+    requestedScorecard,
     maxGaps: opts.maxGaps ?? 3,
   });
 
@@ -609,6 +614,7 @@ function scoreSkill(
     hazardText: string;
     changedFilesText: string;
     contextTokens: Set<string>;
+    requestedSkillIds: Set<string>;
     historicalSkillIds: Set<string>;
   },
 ): SkillBriefingRecommendation | null {
@@ -616,6 +622,11 @@ function scoreSkill(
   const matchedTerms = new Set<string>();
   const reasons: string[] = [];
   const phrases = skillMatchPhrases(skill);
+
+  if (context.requestedSkillIds.has(skill.id)) {
+    score += 20;
+    addReason(reasons, 'requested sprint scorecard');
+  }
 
   for (const phrase of phrases) {
     const normalized = normalizeSearchText(phrase);
@@ -677,6 +688,7 @@ function findSkillGaps(opts: {
   commonIssues: CommonIssuesFile;
   filter?: BriefingFilter;
   scorecards: GolfScorecard[];
+  requestedScorecard?: GolfScorecard;
   maxGaps: number;
 }): SkillGapRecommendation[] {
   const gaps: SkillGapRecommendation[] = [];
@@ -696,16 +708,21 @@ function findSkillGaps(opts: {
   }
 
   const seenGapTopics = new Set(gaps.map(g => normalizeSearchText(g.topic)));
-  for (const card of opts.scorecards.slice(-10)) {
+  const gapCards = uniqueScorecards([
+    ...(opts.requestedScorecard ? [opts.requestedScorecard] : []),
+    ...opts.scorecards.slice(-10),
+  ]);
+  for (const card of gapCards) {
     for (const gap of card.skill_gaps_found ?? []) {
       const normalized = normalizeSearchText(gap);
       if (!normalized || seenGapTopics.has(normalized)) continue;
       if (isCoveredBySkill(gap, opts.registry.skills)) continue;
       seenGapTopics.add(normalized);
+      const requested = opts.requestedScorecard && scorecardSprintNumber(card) === scorecardSprintNumber(opts.requestedScorecard);
       gaps.push({
         topic: gap,
-        reason: 'recorded in recent scorecard skill_gaps_found',
-        evidence: [`S${card.sprint_number}`],
+        reason: requested ? 'recorded in requested sprint skill_gaps_found' : 'recorded in recent scorecard skill_gaps_found',
+        evidence: [`S${scorecardSprintNumber(card)}`],
       });
       if (gaps.length >= opts.maxGaps) return gaps;
     }
@@ -746,6 +763,19 @@ function skillMatchPhrases(skill: SkillDefinition): string[] {
   ]);
 }
 
+function collectRequestedScorecardSkillIds(scorecard?: GolfScorecard): Set<string> {
+  const ids = new Set<string>();
+  if (!scorecard) return ids;
+  for (const id of [
+    ...(scorecard.skills_used ?? []),
+    ...(scorecard.skills_created ?? []),
+    ...(scorecard.skills_recommended ?? []),
+  ]) {
+    ids.add(id);
+  }
+  return ids;
+}
+
 function collectScorecardSkillIds(scorecards: GolfScorecard[]): Set<string> {
   const ids = new Set<string>();
   for (const card of scorecards) {
@@ -759,6 +789,22 @@ function collectScorecardSkillIds(scorecards: GolfScorecard[]): Set<string> {
     }
   }
   return ids;
+}
+
+function scorecardSprintNumber(card: GolfScorecard): number {
+  return card.sprint_number ?? (card as { sprint?: number }).sprint ?? 0;
+}
+
+function uniqueScorecards(cards: GolfScorecard[]): GolfScorecard[] {
+  const seen = new Set<number>();
+  const unique: GolfScorecard[] = [];
+  for (const card of cards) {
+    const sprint = scorecardSprintNumber(card);
+    if (seen.has(sprint)) continue;
+    seen.add(sprint);
+    unique.push(card);
+  }
+  return unique;
 }
 
 function collectStringValues(value: unknown, out: string[] = []): string[] {
