@@ -20,6 +20,7 @@ import {
 } from '../../core/index.js';
 import type { RoadmapDefinition, RoadmapSprint, RoadmapTicket, RoadmapClub, GolfScorecard } from '../../core/index.js';
 import { loadConfig } from '../config.js';
+import { buildRoadmapReality, formatRoadmapRealitySection } from '../pre-sprint-reality.js';
 
 // --- Helpers ---
 
@@ -344,6 +345,12 @@ function showSubcommand(flags: Record<string, string>, cwd: string): void {
 
   console.log('');
   console.log(formatRoadmapSummary(roadmap));
+
+  const realityLines = formatRoadmapRealitySection(buildRoadmapReality(cwd, roadmap));
+  if (realityLines.length > 0) {
+    console.log(realityLines.join('\n'));
+    console.log('');
+  }
 }
 
 const CLUB_TO_COMPLEXITY: Record<string, RoadmapTicket['complexity']> = {

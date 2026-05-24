@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { sprintCommand } from '../../src/cli/commands/sprint.js';
 import { createStore } from '../../src/store/index.js';
+import type { RoadmapDefinition } from '../../src/core/index.js';
 import { WorkflowEngine, loadWorkflow, resolveVariables } from '../../src/core/index.js';
 
 class ProcessExitError extends Error {
@@ -70,6 +71,28 @@ function writeScorecard(sprint: number): void {
     yardage_book_updates: [],
     course_management_notes: [],
   }));
+}
+
+function writeRoadmap(sprint: number, status = 'planned'): void {
+  const roadmap: RoadmapDefinition = {
+    name: 'Sprint Workflow Test Roadmap',
+    phases: [{ name: 'Phase 1', sprints: [sprint] }],
+    sprints: [{
+      id: sprint,
+      theme: `Sprint ${sprint}`,
+      par: 4,
+      slope: 2,
+      type: 'feature',
+      status,
+      tickets: [
+        { key: `S${sprint}-1`, title: 'Ticket 1', club: 'short_iron', complexity: 'standard' },
+        { key: `S${sprint}-2`, title: 'Ticket 2', club: 'wedge', complexity: 'small' },
+        { key: `S${sprint}-3`, title: 'Ticket 3', club: 'putter', complexity: 'trivial' },
+      ],
+    }],
+  };
+  mkdirSync(join(tmpDir, 'docs', 'backlog'), { recursive: true });
+  writeFileSync(join(tmpDir, 'docs', 'backlog', 'roadmap.json'), JSON.stringify(roadmap, null, 2));
 }
 
 describe('slope sprint run', () => {
@@ -336,6 +359,25 @@ describe('slope sprint skip', () => {
 });
 
 describe('slope sprint phase', () => {
+  it('blocks sprint start when roadmap reality says the sprint already has a scorecard', async () => {
+    writeRoadmap(98);
+    writeScorecard(98);
+
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((code) => { throw new ProcessExitError(code as number); });
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    let errors = '';
+    try {
+      await expect(sprintCommand(['start', '--number=98', '--phase=planning'])).rejects.toThrow(ProcessExitError);
+      errors = errSpy.mock.calls.map(c => c.join(' ')).join('\n');
+    } finally {
+      exitSpy.mockRestore();
+      errSpy.mockRestore();
+    }
+
+    expect(errors).toContain('Pre-sprint reality check failed for S98');
+    expect(errors).toContain('S98 has a scorecard');
+  });
+
   it('starts decimal inserted sprint state without truncating', async () => {
     const output = await captureLog(() =>
       sprintCommand(['start', '--number=114.5', '--phase=planning'])

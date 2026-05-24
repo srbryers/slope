@@ -13,7 +13,7 @@ import {
   type GateName,
   type SprintPhase,
 } from '../sprint-state.js';
-import { WorkflowEngine, loadWorkflow, resolveVariables, validateWorkflow, loadConfig, loadScorecards, parseRoadmap, castRoadmapStructure, formatSprintNumber, parseSprintNumber } from '../../core/index.js';
+import { WorkflowEngine, loadWorkflow, resolveVariables, validateWorkflow, loadConfig, loadScorecards, parseRoadmap, castRoadmapStructure, formatSprintLabel, formatSprintNumber, parseSprintNumber } from '../../core/index.js';
 import type { RoadmapSprint, WorkflowDefinition, WorkflowExecution } from '../../core/index.js';
 import { createHash } from 'node:crypto';
 
@@ -37,6 +37,14 @@ function getDefinition(exec: WorkflowExecution, cwd: string): { def: WorkflowDef
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, dirname, basename } from 'node:path';
 import { createStore } from '../../store/index.js';
+import {
+  blockingRoadmapIssuesForSprint,
+  collectSiblingWorktreeReality,
+  findWorktreeOverlaps,
+  formatWorktreeRealitySection,
+  loadRoadmapReality,
+  parseTouchedPaths,
+} from '../pre-sprint-reality.js';
 
 /**
  * Check completion_conditions for a step before allowing completion/skip.
@@ -208,7 +216,7 @@ async function beginCommand(args: string[], cwd: string): Promise<void> {
   console.log('');
 }
 
-function startCommand(args: string[], cwd: string): void {
+async function startCommand(args: string[], cwd: string): Promise<void> {
   const numberArg = args.find(a => a.startsWith('--number='));
   if (!numberArg) {
     console.error('Error: --number=N is required. Usage: slope sprint start --number=22');
@@ -228,6 +236,9 @@ function startCommand(args: string[], cwd: string): void {
     process.exit(1);
   }
   const phase = phaseInput as SprintPhase;
+  const force = args.includes('--force');
+  const touchesArg = args.find(a => a.startsWith('--touches='));
+  const touchedPaths = parseTouchedPaths(touchesArg?.slice('--touches='.length));
 
   const existing = loadSprintState(cwd);
   if (existing && existing.sprint === sprint) {
@@ -240,9 +251,65 @@ function startCommand(args: string[], cwd: string): void {
     return;
   }
 
+  const roadmapReality = loadRoadmapReality(cwd);
+  const blockingRoadmapIssues = blockingRoadmapIssuesForSprint(roadmapReality, sprint);
+  if (blockingRoadmapIssues.length > 0 && !force) {
+    console.error(`\nPre-sprint reality check failed for ${formatSprintLabel(sprint)}:`);
+    for (const issue of blockingRoadmapIssues) {
+      console.error(`  [${issue.type}] ${issue.message}`);
+    }
+    console.error('\nThis sprint appears to have already shipped or already has a scorecard. Reconcile the roadmap, or rerun with --force if this is intentional.');
+    process.exit(1);
+  }
+
+  const worktrees = collectSiblingWorktreeReality(cwd);
+  const worktreeLines = formatWorktreeRealitySection(worktrees, touchedPaths);
+  if (worktreeLines.length > 0) {
+    console.log('');
+    console.log(worktreeLines.join('\n'));
+    console.log('');
+  }
+
+  const overlaps = findWorktreeOverlaps(worktrees, touchedPaths);
+  if (overlaps.length > 0 && !force) {
+    console.error('Pre-sprint reality check failed: sibling worktree overlap detected.');
+    console.error('Resolve the overlap, choose a non-overlapping sprint, or rerun with --force if this is intentional.');
+    process.exit(1);
+  }
+
   const state = createSprintState(sprint, phase);
   saveSprintState(cwd, state);
+  const autoClaim = await autoClaimSprint(cwd, sprint);
   console.log(`Sprint ${formatSprintNumber(sprint)} started (phase: ${phase}). Use 'slope sprint gate <name>' to mark gates.`);
+  if (autoClaim) console.log(autoClaim);
+}
+
+async function autoClaimSprint(cwd: string, sprint: number): Promise<string | null> {
+  const { resolveStore } = await import('../store.js');
+  const player = process.env.USER || 'unknown';
+  const target = `sprint:${formatSprintLabel(sprint)}`;
+
+  try {
+    const store = await resolveStore(cwd);
+    try {
+      const existing = await store.list(sprint);
+      if (existing.some(c => c.player === player && c.target === target)) {
+        return `Claim: ${target} already held by ${player}.`;
+      }
+      const claim = await store.claim({
+        sprint_number: sprint,
+        player,
+        target,
+        scope: 'area',
+        notes: 'auto-claimed by slope sprint start',
+      });
+      return `Claim: ${claim.target} (${claim.scope}) auto-claimed for ${player}.`;
+    } finally {
+      store.close();
+    }
+  } catch {
+    return null;
+  }
 }
 
 function phaseCommand(args: string[], cwd: string): void {
@@ -893,7 +960,7 @@ export async function sprintCommand(args: string[]): Promise<void> {
 
   switch (sub) {
     case 'start':
-      startCommand(args.slice(1), cwd);
+      await startCommand(args.slice(1), cwd);
       break;
     case 'begin':
       await beginCommand(args.slice(1), cwd);
@@ -941,7 +1008,8 @@ export async function sprintCommand(args: string[]): Promise<void> {
 slope sprint — Sprint lifecycle management
 
 Legacy commands:
-  slope sprint start --number=N      Start sprint state tracking
+  slope sprint start --number=N [--phase=<phase>] [--touches=<paths>] [--force]
+                                      Start sprint state tracking with pre-sprint reality checks
   slope sprint begin --sprint=N --ticket=T  Bundled start + claim + briefing + prep (#311)
   slope sprint plan --sprint=N [--output=path]  Generate markdown sprint plan (#312)
   slope sprint phase <phase>       Update current sprint phase

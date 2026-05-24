@@ -7,6 +7,7 @@ import { loadScorecards } from '../loader.js';
 import { inferSprintContext } from '../sprint-inference.js';
 import { resolveStore } from '../store.js';
 import { resolveMetaphor } from '../metaphor.js';
+import { buildRoadmapReality, collectSiblingWorktreeReality, formatRoadmapRealitySection, formatWorktreeRealitySection } from '../pre-sprint-reality.js';
 
 export async function briefingCommand(args: string[]): Promise<void> {
   const config = loadConfig();
@@ -171,6 +172,22 @@ export async function briefingCommand(args: string[]): Promise<void> {
   const output = formatBriefing({ scorecards: effectiveScorecards, commonIssues: visibleIssues, lastSession, filter, includeTraining, claims, roadmap, currentSprint: sprintNumber, metaphor, role, recentEvents, skillRegistry });
   console.log('');
   console.log(output);
+
+  if (roadmap) {
+    const roadmapRealityLines = formatRoadmapRealitySection(buildRoadmapReality(cwd, roadmap));
+    if (roadmapRealityLines.length > 0) {
+      console.log('\u2500'.repeat(50));
+      for (const line of roadmapRealityLines) console.log(line);
+      console.log('');
+    }
+  }
+
+  const worktreeRealityLines = formatWorktreeRealitySection(collectSiblingWorktreeReality(cwd));
+  if (worktreeRealityLines.length > 0) {
+    console.log('\u2500'.repeat(50));
+    for (const line of worktreeRealityLines) console.log(line);
+    console.log('');
+  }
 
   // Deferred findings section (appended after main briefing)
   const deferred = loadDeferred(cwd);

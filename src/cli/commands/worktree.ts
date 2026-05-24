@@ -1,6 +1,7 @@
 // slope worktree — Manage persistent git worktrees
 // Usage:
 //   slope worktree start --branch=<name> [--base=<ref>] [--path=<path>] [--role=secondary] [--ide=<id>] [--target=<claim>]
+//   slope worktree status [--base=<ref>] [--touches=<paths>]
 //   slope worktree cleanup [--path=<path>] [--all] [--dry-run]
 
 import { execFileSync, execSync } from 'node:child_process';
@@ -13,6 +14,7 @@ import type { ClaimScope, SprintClaim } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { inferSprintContext } from '../sprint-inference.js';
 import { resolveStore } from '../store.js';
+import { collectSiblingWorktreeReality, formatWorktreeRealitySection, parseTouchedPaths } from '../pre-sprint-reality.js';
 
 interface WorktreeInfo {
   path: string;
@@ -402,6 +404,21 @@ async function cleanupCommand(args: string[]): Promise<void> {
   }
 }
 
+function statusCommand(args: string[]): void {
+  const { flags } = parseFlagArgs(args);
+  const cwd = process.cwd();
+  const touchedPaths = parseTouchedPaths(flags.touches);
+  const worktrees = collectSiblingWorktreeReality(cwd, flags.base);
+  const lines = formatWorktreeRealitySection(worktrees, touchedPaths);
+
+  if (lines.length === 0) {
+    console.log('No sibling worktrees found.');
+    return;
+  }
+
+  console.log(lines.join('\n'));
+}
+
 export async function worktreeCommand(args: string[]): Promise<void> {
   const sub = args[0];
 
@@ -413,12 +430,18 @@ export async function worktreeCommand(args: string[]): Promise<void> {
     return cleanupCommand(args.slice(1));
   }
 
+  if (sub === 'status' || sub === 'list') {
+    statusCommand(args.slice(1));
+    return;
+  }
+
   if (args.includes('--help') || args.includes('-h') || !sub) {
     console.log(`
 slope worktree — Manage git worktrees
 
 Usage:
   slope worktree start --branch=<name> [--base=<ref>] [--path=<path>] [--role=secondary] [--ide=<id>] [--target=<claim>]
+  slope worktree status [--base=<ref>] [--touches=<paths>]
   slope worktree cleanup [--path=<path>] [--all] [--dry-run]
 
 Options:
@@ -437,6 +460,10 @@ Options:
   --path=<path>  Target a specific worktree
   --all          Clean up all secondary worktrees
   --dry-run      Preview what would happen without making changes
+
+  status:
+    --base=<ref>       Base ref for ahead/behind and changed-file detection (default: origin/main, main, master, HEAD)
+    --touches=<paths>  Comma-separated paths to check for direct overlap
 
 For each worktree, cleanup will:
   1. Check if the branch's PR is merged (requires gh CLI)

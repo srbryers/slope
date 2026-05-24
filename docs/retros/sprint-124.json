@@ -1,0 +1,150 @@
+{
+  "sprint_number": 124,
+  "player": "codex",
+  "theme": "Pre-Sprint Reality Checks",
+  "par": 4,
+  "slope": 3,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-05-24",
+  "shots": [
+    {
+      "ticket_key": "S124-1",
+      "title": "Route roadmap validation drift warnings into briefing, roadmap show, and sprint start (#453)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added shared roadmap reality helpers and routed existing scorecard/shipped/phantom drift warnings into slope briefing, slope roadmap show, and slope sprint start. Sprint start now blocks already-scorecarded or already-shipped sprints unless --force is used."
+    },
+    {
+      "ticket_key": "S124-2",
+      "title": "Surface sibling worktree dirty/ahead/migration state before sprint selection (#452)",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "The new worktree status command surfaced an existing stale sibling worktree on feat/workflow-engine with overlapping src/cli files; it validated the feature and did not require changing that worktree."
+        }
+      ],
+      "notes": "Added sibling worktree reality collection with ahead/behind counts, dirty files, ahead files, migration detection, touched-path overlap detection, slope worktree status/list, and pre-sprint overlap blocking when --touches is supplied. Sprint start also auto-claims the sprint area for the current player when the store is available."
+    },
+    {
+      "ticket_key": "S124-3",
+      "title": "Add regression coverage for pre-sprint reality checks",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "The new worktree status regression caught that Git porcelain output was being trimmed before fixed-column parsing, turning src/api.ts into rc/api.ts; the parser now preserves leading status columns."
+        }
+      ],
+      "notes": "Added CLI regressions for roadmap show drift output, briefing drift output, sprint start blocking an already-scorecarded sprint, and worktree status overlap/migration output. Full pnpm test passed after the parser fix."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 3,
+    "fairways_total": 3,
+    "greens_in_regulation": 3,
+    "greens_total": 3,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 2,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "type": "enhancement",
+  "conditions": [
+    "Implemented with a known sibling worktree overlap surfaced by the new command after the branch was already in flight."
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Git porcelain status output must preserve leading columns until after status parsing.",
+      "outcome": "S124 changed the shared git helper to trim only trailing whitespace and parse status paths from the fixed-width porcelain columns."
+    },
+    {
+      "type": "lessons",
+      "description": "Pre-sprint checks are most useful when wired into both passive briefing surfaces and active start gates.",
+      "outcome": "Roadmap drift is visible in briefing and roadmap show, while sprint start blocks already-complete/scorecarded sprint selections."
+    },
+    {
+      "type": "lessons",
+      "description": "Sibling worktree conflict reporting should be actionable without being noisy.",
+      "outcome": "The worktree surface excludes ignored state/build paths, summarizes long file lists, and only blocks when explicit --touches overlap is detected."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "pnpm typecheck, focused Vitest coverage, pnpm build, full pnpm test, roadmap validation, and whitespace checks passed.",
+      "status": "healthy"
+    },
+    {
+      "category": "workflow",
+      "description": "slope worktree status now exposes the same sibling-worktree hazard class requested in #452.",
+      "status": "healthy"
+    },
+    {
+      "category": "concurrency",
+      "description": "A stale feat/workflow-engine sibling worktree still exists with overlapping src/cli changes and should be cleaned up separately if no longer needed.",
+      "status": "watch"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Useful in exactly the way this sprint wanted: the tooling now tells the player about stale reality before they step onto the wrong tee.",
+    "advice_for_next_player": "Use --touches on sprint start when you know the planned files; that is the difference between a heads-up and a hard overlap block.",
+    "what_surprised_you": "The regression test found a real porcelain parsing bug immediately, which made the new worktree surface sharper before it shipped.",
+    "excited_about_next": "The next sprint can trust briefing and sprint start to catch more of the drift that previously only appeared after a PR or release."
+  },
+  "bunker_locations": [
+    "Preserve Git porcelain leading columns until after path extraction.",
+    "A stale sibling worktree on feat/workflow-engine currently overlaps src/cli files.",
+    "Generated CODEBASE.md is ignored, so map refreshes are local verification rather than commit artifacts."
+  ],
+  "yardage_book_updates": [
+    "slope roadmap show now appends ROADMAP REALITY CHECKS for scorecard/shipped/phantom drift.",
+    "slope briefing now appends ROADMAP REALITY CHECKS and WORKTREE CONFLICT SURFACE sections when applicable.",
+    "slope sprint start blocks already-scorecarded or shipped sprint selections unless --force is supplied.",
+    "slope sprint start accepts --touches=path,to,dir to block direct overlap with dirty/ahead sibling worktree files.",
+    "slope sprint start best-effort auto-claims sprint:S<N> as an area claim when the SLOPE store is available.",
+    "slope worktree status and slope worktree list show sibling worktree ahead/behind, dirty files, ahead files, migrations, and touched-path overlap."
+  ],
+  "course_management_notes": [
+    "Created src/cli/pre-sprint-reality.ts for shared roadmap and sibling-worktree reality checks.",
+    "Updated briefing, roadmap show, sprint start, worktree status/list, CLI help, and command registry discovery.",
+    "Added regression tests in tests/cli/roadmap.test.ts, tests/cli/sprint-workflow.test.ts, tests/cli/commands/worktree.test.ts, and tests/cli/commands/briefing-reality.test.ts.",
+    "pnpm typecheck passed.",
+    "Focused Vitest run passed: 4 files, 55 tests.",
+    "pnpm build passed.",
+    "pnpm test passed: 215 passed test files, 1 skipped test file, 3485 passed tests, and 23 skipped tests.",
+    "node dist/cli/index.js roadmap validate passed with standing warnings plus the expected branch-local S124 complete-but-not-yet-shipped warning.",
+    "node dist/cli/index.js worktree status --touches=src/cli,docs/backlog surfaced feat/workflow-engine overlap, confirming the new status path.",
+    "node dist/cli/index.js map refreshed CODEBASE.md locally; CODEBASE.md remains gitignored.",
+    "git diff --check passed before the feature commit."
+  ],
+  "skills_used": [
+    "slope-sprint-workflow",
+    "slope-api-reference"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow",
+    "slope-performance-analysis"
+  ],
+  "skill_gaps_found": [],
+  "slope_factors": [
+    "roadmap_drift_gate",
+    "sibling_worktree_conflict_surface",
+    "git_porcelain_parsing",
+    "full_cli_regression_suite"
+  ]
+}
