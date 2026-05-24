@@ -344,6 +344,19 @@ describe('slope roadmap show', () => {
     const output = consoleOutput.join('\n');
     expect(output).toContain('| 3 | 9 | 11 |');
   });
+
+  it('surfaces roadmap reality drift from scorecards', () => {
+    writeRoadmap(tmpDir, makeRoadmapJson());
+    writeConfig(tmpDir, { scorecardDir: 'docs/retros', scorecardPattern: 'sprint-*.json', minSprint: 1 });
+    writeScorecard(tmpDir, 7);
+
+    roadmapCommand(['show']);
+
+    const output = consoleOutput.join('\n');
+    expect(output).toContain('ROADMAP REALITY CHECKS');
+    expect(output).toContain('S7 has a scorecard');
+    expect(output).toContain('expected "complete"');
+  });
 });
 
 function writeScorecard(dir: string, sprint: number, overrides: Record<string, unknown> = {}): void {

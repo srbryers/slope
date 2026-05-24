@@ -118,6 +118,8 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
       { name: 'start', desc: 'Start a new sprint', flags: [
         { flag: '--number=<N>', desc: 'Sprint number (required)' },
         { flag: '--phase=<phase>', desc: 'Initial phase (default: planning)' },
+        { flag: '--touches=<paths>', desc: 'Comma-separated paths to check against sibling worktrees' },
+        { flag: '--force', desc: 'Override pre-sprint reality-check blockers' },
       ]},
       { name: 'gate', desc: 'Mark a gate as complete', flags: [
         { flag: '<name>', desc: 'Gate name to complete' },
@@ -543,6 +545,10 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
   {
     cmd: 'worktree', desc: 'Manage git worktrees', category: 'tooling',
     subcommands: [
+      { name: 'status', desc: 'Show sibling worktree dirty/ahead/migration state', flags: [
+        { flag: '--base=<ref>', desc: 'Base ref for ahead/behind and changed-file detection' },
+        { flag: '--touches=<paths>', desc: 'Comma-separated paths to check for overlap' },
+      ]},
       { name: 'cleanup', desc: 'Clean up stale worktrees (remove, delete branch, delete remote)', flags: [
         { flag: '--path=<path>', desc: 'Target a specific worktree' },
         { flag: '--all', desc: 'Clean up all secondary worktrees' },

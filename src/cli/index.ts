@@ -529,7 +529,7 @@ Usage:
   slope stats export [--pretty]                      Export stats JSON for slope-web
   slope docs generate|changelog|check                Documentation manifest and changelog
   slope sprint start|gate|status|reset               Manage sprint lifecycle state
-  slope worktree start|cleanup [options]             Manage persistent worktrees
+  slope worktree start|status|cleanup [options]      Manage persistent worktrees
   slope loop status|config|run|continuous|...        Autonomous sprint execution loop
   slope doctor [--fix] [--dry-run]                   Check repo health and fix issues
   slope version                                      Show current version
