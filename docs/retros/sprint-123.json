@@ -1,0 +1,138 @@
+{
+  "sprint_number": 123,
+  "player": "codex",
+  "theme": "Hook CWD Minor Release",
+  "par": 3,
+  "slope": 1,
+  "score": 3,
+  "score_label": "par",
+  "date": "2026-05-24",
+  "shots": [
+    {
+      "ticket_key": "S123-1",
+      "title": "Bump @slope-dev/slope and bundled Codex plugin to v1.57.0",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added S123 and Phase 38 to the roadmap, then used scripts/version-bump.mjs to move package.json and the bundled Codex plugin manifest from 1.56.2 to 1.57.0."
+    },
+    {
+      "ticket_key": "S123-2",
+      "title": "Run release validation, publish v1.57.0, and verify npm",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "The local post-push guard reported no active sprint after pushes even though node dist/cli/index.js sprint status showed S123 active; release work continued after re-running briefing/status."
+        }
+      ],
+      "notes": "Merged PR #454, published GitHub release v1.57.0, watched the trusted-publisher npm workflow pass, verified npm latest is 1.57.0, and smoke-tested the installed package."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 2,
+    "fairways_total": 2,
+    "greens_in_regulation": 2,
+    "greens_total": 2,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 1,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "type": "release",
+  "conditions": [],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Release scorecards should wait for registry verification before claiming publish success.",
+      "outcome": "S123 recorded release completion only after npm latest returned 1.57.0 and an installed-package slope version smoke test passed."
+    },
+    {
+      "type": "lessons",
+      "description": "Minor release sprints should stay scoped to the already-merged fix.",
+      "outcome": "Newly open issues #452 and #453 were noted for the next implementation sprint instead of being mixed into the v1.57.0 release train."
+    },
+    {
+      "type": "lessons",
+      "description": "Keep build and test sequential when tests execute generated dist output.",
+      "outcome": "The release validation ran pnpm build, pnpm typecheck, and pnpm test sequentially, avoiding the S121 dist rewrite race."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "Build, typecheck, full pnpm test, SLOPE validation, roadmap validation, map check, whitespace check, PR CI, and release workflow tests passed.",
+      "status": "healthy"
+    },
+    {
+      "category": "release",
+      "description": "GitHub release v1.57.0 and npm trusted publishing completed successfully; npm latest now resolves to 1.57.0.",
+      "status": "healthy"
+    },
+    {
+      "category": "backlog",
+      "description": "Open issues #452 and #453 remain queued after the release.",
+      "status": "watch"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Smooth and deliberately narrow: the release train did exactly one thing and the trusted-publisher path stayed clean.",
+    "advice_for_next_player": "Treat fresh GitHub issues as next-sprint work during a release sprint unless they block the publish itself.",
+    "what_surprised_you": "The only wrinkle was the post-push active-sprint warning, which matched the kind of roadmap/workflow drift already showing up in the new issue batch.",
+    "excited_about_next": "The Codex worktree hook cwd fix is now available from npm, and the next sprint has two concrete agent-DX issues ready to triage."
+  },
+  "bunker_locations": [
+    "Release scorecards should wait for registry verification before claiming publish success.",
+    "Trusted publishing still needs an npm metadata check and installed-package smoke test after the GitHub workflow passes.",
+    "Post-push sprint-state warnings should be investigated separately from release flow when they do not block the publish."
+  ],
+  "yardage_book_updates": [
+    "Version bump path remains node scripts/version-bump.mjs <version>, updating package.json and templates/codex/plugins/slope/.codex-plugin/plugin.json together.",
+    "The v1.57.0 release path uses GitHub release publishing with npm trusted publisher OIDC.",
+    "npm exec --yes --package @slope-dev/slope@<version> -- slope version remains the installed-package smoke test.",
+    "Keep pnpm build, pnpm typecheck, and pnpm test sequential during release validation because CLI tests can load generated dist output."
+  ],
+  "course_management_notes": [
+    "Added Phase 38 and Sprint 123 to docs/backlog/roadmap.json as the Hook CWD Minor Release.",
+    "Bumped @slope-dev/slope and templates/codex/plugins/slope/.codex-plugin/plugin.json from 1.56.2 to 1.57.0.",
+    "pnpm build passed locally.",
+    "pnpm typecheck passed locally.",
+    "pnpm test passed locally: 214 passed test files, 1 skipped test file, 3481 passed tests, and 23 skipped tests.",
+    "node dist/cli/index.js validate --skills passed before release.",
+    "node dist/cli/index.js roadmap validate passed before release with standing warnings only plus the expected branch-local S123 warning.",
+    "node dist/cli/index.js map --check passed before release: Overall CURRENT.",
+    "node dist/cli/index.js version returned @slope-dev/slope v1.57.0.",
+    "git diff --check passed before release.",
+    "npm pack --dry-run passed for @slope-dev/slope@1.57.0 with 1018 files, package size 917.3 kB, and unpacked size 4.3 MB.",
+    "PR #454 merged on 2026-05-24 at commit a5b0b0ef57d03952502ecab53181630714e8f854.",
+    "GitHub release v1.57.0 published on 2026-05-24 at 00:55:50Z: https://github.com/srbryers/slope/releases/tag/v1.57.0.",
+    "Publish to npm workflow run 26347956500 passed in 2m50s.",
+    "npm view @slope-dev/slope version returned 1.57.0 and the latest dist-tag points to 1.57.0.",
+    "npm view @slope-dev/slope@1.57.0 recorded publish time 2026-05-24T00:58:40.952Z and integrity sha512-l51CpzZXHtzwwpJKBSWL6KFgC1MB6jRiJ77hLU12YQxpl6yCRu38HNQPazf7H8m54cXH04oM4IdGYal5MakqSA==.",
+    "npm exec --yes --package @slope-dev/slope@1.57.0 -- slope version returned @slope-dev/slope v1.57.0.",
+    "Open issues #452 and #453 remain for the next implementation sprint."
+  ],
+  "skills_used": [
+    "slope-sprint-workflow"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow",
+    "slope-performance-analysis"
+  ],
+  "skill_gaps_found": [],
+  "slope_factors": [
+    "minor_release",
+    "trusted_publisher_release",
+    "registry_verification",
+    "dist_cli_tests"
+  ]
+}
