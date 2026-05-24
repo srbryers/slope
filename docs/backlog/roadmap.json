@@ -243,6 +243,14 @@
       ],
       "status": "complete",
       "note": "Fixed GitHub issue #447 so tool hooks prefer the payload cwd in Codex worktrees before falling back to the launcher cwd."
+    },
+    {
+      "name": "Phase 38 \u2014 Hook CWD Minor Release",
+      "sprints": [
+        123
+      ],
+      "status": "planned",
+      "note": "Publish the S122 hook cwd guard correctness work as v1.57.0 using the trusted-publisher release flow."
     }
   ],
   "sprints": [
@@ -2549,6 +2557,35 @@
           "complexity": "small",
           "depends_on": [
             "S122-1"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 123,
+      "theme": "Hook CWD Minor Release",
+      "par": 3,
+      "slope": 1,
+      "type": "release",
+      "status": "planned",
+      "depends_on": [
+        122
+      ],
+      "note": "Release the S122 Codex worktree hook cwd guard fix as v1.57.0 and verify trusted publishing to npm.",
+      "tickets": [
+        {
+          "key": "S123-1",
+          "title": "Bump @slope-dev/slope and bundled Codex plugin to v1.57.0",
+          "club": "wedge",
+          "complexity": "small"
+        },
+        {
+          "key": "S123-2",
+          "title": "Run release validation, publish v1.57.0, and verify npm",
+          "club": "short_iron",
+          "complexity": "standard",
+          "depends_on": [
+            "S123-1"
           ]
         }
       ]
