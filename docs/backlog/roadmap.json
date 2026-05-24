@@ -235,6 +235,14 @@
       ],
       "status": "complete",
       "note": "Published the S119/S120 skill registry and validation fixes as v1.56.2 using the trusted-publisher release flow."
+    },
+    {
+      "name": "Phase 37 \u2014 Hook CWD Guard Correctness",
+      "sprints": [
+        122
+      ],
+      "status": "complete",
+      "note": "Fixed GitHub issue #447 so tool hooks prefer the payload cwd in Codex worktrees before falling back to the launcher cwd."
     }
   ],
   "sprints": [
@@ -2510,6 +2518,37 @@
           "complexity": "standard",
           "depends_on": [
             "S121-1"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 122,
+      "theme": "Hook CWD Guard Correctness",
+      "par": 3,
+      "slope": 1,
+      "type": "bugfix",
+      "status": "complete",
+      "score": 3,
+      "score_label": "par",
+      "depends_on": [
+        121
+      ],
+      "note": "Close GitHub issue #447 by making guard execution honor hook payload cwd in Codex worktrees.",
+      "tickets": [
+        {
+          "key": "S122-1",
+          "title": "Route guard execution through hook payload cwd with process cwd fallback",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S122-2",
+          "title": "Add regression coverage for branch-before-commit in Codex worktrees",
+          "club": "wedge",
+          "complexity": "small",
+          "depends_on": [
+            "S122-1"
           ]
         }
       ]

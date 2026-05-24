@@ -37,6 +37,23 @@ describe('branchBeforeCommitGuard', () => {
     const result = await branchBeforeCommitGuard(makeInput('git commit -m "feat: stuff"'), '/tmp/test');
     expect(result.decision).toBe('deny');
     expect(result.blockReason).toContain('feature branch');
+    expect(mockLoadConfig).toHaveBeenCalledWith('/tmp/test');
+  });
+
+  it('checks branch state and config from the effective guard cwd', async () => {
+    mockExecSync.mockReturnValue('release');
+    mockLoadConfig.mockReturnValue({
+      guidance: { protectedBranches: ['release'] },
+    } as ReturnType<typeof loadConfig>);
+
+    const result = await branchBeforeCommitGuard(makeInput('git commit -m "release: patch"'), '/tmp/worktree');
+
+    expect(mockExecSync).toHaveBeenCalledWith(
+      'git rev-parse --abbrev-ref HEAD 2>/dev/null',
+      { cwd: '/tmp/worktree', encoding: 'utf8' },
+    );
+    expect(mockLoadConfig).toHaveBeenCalledWith('/tmp/worktree');
+    expect(result.decision).toBe('deny');
   });
 
   it('denies git commit on master', async () => {

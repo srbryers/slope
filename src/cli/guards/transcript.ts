@@ -54,7 +54,7 @@ export async function transcriptGuard(input: HookInput, cwd: string): Promise<Gu
   // Skip if no session_id
   if (!input.session_id) return {};
 
-  const config = loadConfig();
+  const config = loadConfig(cwd);
   const transcriptsDir = join(cwd, config.transcriptsPath ?? '.slope/transcripts');
 
   const toolName = input.tool_name ?? 'unknown';

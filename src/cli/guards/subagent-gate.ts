@@ -42,7 +42,7 @@ function buildOrientation(cwd: string): string {
  * Subagent gate guard: fires PreToolUse on Agent.
  * Enforces model selection on Explore/Plan subagents.
  */
-export async function subagentGateGuard(input: HookInput, _cwd: string): Promise<GuardResult> {
+export async function subagentGateGuard(input: HookInput, cwd: string): Promise<GuardResult> {
   const toolInput = input.tool_input ?? {};
   const subagentType = toolInput.subagent_type as string | undefined;
   const model = toolInput.model as string | undefined;
@@ -54,7 +54,7 @@ export async function subagentGateGuard(input: HookInput, _cwd: string): Promise
   // Only gate Explore and Plan subagents
   if (subagentType !== 'Explore' && subagentType !== 'Plan') return {};
 
-  const config = loadConfig();
+  const config = loadConfig(cwd);
   const guidance = config.guidance ?? {};
   const allowedModels = guidance.subagentAllowModels ?? ['haiku'];
 
@@ -72,5 +72,5 @@ export async function subagentGateGuard(input: HookInput, _cwd: string): Promise
     };
   }
 
-  return { context: buildOrientation(_cwd) };
+  return { context: buildOrientation(cwd) };
 }
