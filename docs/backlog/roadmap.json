@@ -249,8 +249,8 @@
       "sprints": [
         123
       ],
-      "status": "planned",
-      "note": "Publish the S122 hook cwd guard correctness work as v1.57.0 using the trusted-publisher release flow."
+      "status": "complete",
+      "note": "Published the S122 hook cwd guard correctness work as v1.57.0 using the trusted-publisher release flow."
     }
   ],
   "sprints": [
@@ -2567,7 +2567,9 @@
       "par": 3,
       "slope": 1,
       "type": "release",
-      "status": "planned",
+      "status": "complete",
+      "score": 3,
+      "score_label": "par",
       "depends_on": [
         122
       ],
