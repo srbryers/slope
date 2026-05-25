@@ -276,9 +276,20 @@ describe('validateScorecard - basic fields', () => {
     expect(result.errors.some(e => e.code === 'INVALID_SCORE')).toBe(true);
   });
 
+  it('accepts missing score as a neutral par score for compatibility scorecards', () => {
+    const result = validateScorecard(makeCard({ score: undefined as any, score_label: undefined as any }));
+    expect(result.errors.filter(e => e.code === 'INVALID_SCORE')).toHaveLength(0);
+    expect(result.errors.filter(e => e.code === 'SCORE_LABEL_MISMATCH')).toHaveLength(0);
+  });
+
   it('fails for invalid date', () => {
     const result = validateScorecard(makeCard({ date: 'not-a-date' }));
     expect(result.errors.some(e => e.code === 'INVALID_DATE')).toBe(true);
+  });
+
+  it('accepts completed_on as a compatibility date fallback', () => {
+    const result = validateScorecard(makeCard({ date: undefined as any, completed_on: '2026-05-23' } as any));
+    expect(result.errors.filter(e => e.code === 'INVALID_DATE')).toHaveLength(0);
   });
 
   it('passes for valid basic fields', () => {

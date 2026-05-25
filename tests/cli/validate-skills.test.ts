@@ -77,6 +77,30 @@ function writeScorecard(skillsUsed: string[], sprintNumber = 1): string {
   return `docs/retros/sprint-${sprintNumber}.json`;
 }
 
+function writeNestedScorecard(sprintNumber: number): void {
+  const nestedDir = join(tmpDir, 'docs', 'retros', `s${sprintNumber}`);
+  mkdirSync(nestedDir, { recursive: true });
+  const card = buildScorecard({
+    sprint_number: sprintNumber,
+    theme: 'Nested validation',
+    par: 3,
+    slope: 1,
+    date: '2026-05-23',
+    player: 'test',
+    shots: [{
+      ticket_key: `S${sprintNumber}-1`,
+      title: 'Test',
+      club: 'wedge',
+      result: 'in_the_hole',
+      hazards: [],
+    }],
+    training: [{ type: 'lessons', description: 'test', outcome: 'ok' }],
+    nutrition: [{ category: 'hydration', description: 'test', status: 'healthy' }],
+    bunker_locations: ['none'],
+  });
+  writeFileSync(join(nestedDir, 'scorecard.json'), JSON.stringify(card, null, 2));
+}
+
 beforeEach(() => {
   tmpDir = mkdtempSync(join(tmpdir(), 'slope-validate-skills-'));
   writeConfig();
@@ -113,6 +137,13 @@ describe('slope validate --skills', () => {
 
   it('includes decimal inserted sprint scorecards during default validation', () => {
     writeScorecard([], 114.5);
+
+    expect(() => validateCommand()).toThrow('process.exit(0)');
+    expect(exitCode).toBe(0);
+  });
+
+  it('includes nested sN/scorecard.json scorecards during default validation', () => {
+    writeNestedScorecard(155);
 
     expect(() => validateCommand()).toThrow('process.exit(0)');
     expect(exitCode).toBe(0);
