@@ -1,6 +1,6 @@
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { isAbsolute, join } from 'node:path';
-import { DEFAULT_SKILLS_PATH, compareSprintIds, loadSkillRegistry, parseSprintNumber, skillIds, validateScorecard } from '../../core/index.js';
+import { DEFAULT_SKILLS_PATH, discoverScorecardFiles, loadSkillRegistry, skillIds, validateScorecard } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { updateGate } from '../sprint-state.js';
 
@@ -28,31 +28,7 @@ export function validateCommand(input?: string | string[]): void {
   if (path) {
     files.push(isAbsolute(path) ? path : join(cwd, path));
   } else {
-    // Validate all scorecards matching config
-    const dir = join(cwd, config.scorecardDir);
-    const patternParts = config.scorecardPattern.split('*');
-    const prefix = patternParts[0] ?? '';
-    const suffix = patternParts[1] ?? '';
-    const regex = new RegExp(`^${prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\d+(?:\\.\\d+)?)${suffix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`);
-
-    try {
-      const dirFiles = readdirSync(dir)
-        .filter((f: string) => {
-          const m = f.match(regex);
-          const sprint = m ? parseSprintNumber(m[1]) : null;
-          return sprint != null && sprint >= config.minSprint;
-        })
-        .sort((a, b) => {
-          const na = parseSprintNumber(a.match(regex)?.[1] ?? '0') ?? 0;
-          const nb = parseSprintNumber(b.match(regex)?.[1] ?? '0') ?? 0;
-          return compareSprintIds(na, nb);
-        });
-      for (const f of dirFiles) {
-        files.push(join(dir, f));
-      }
-    } catch {
-      // Directory doesn't exist
-    }
+    files.push(...discoverScorecardFiles(config, cwd));
   }
 
   if (files.length === 0) {

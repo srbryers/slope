@@ -50,7 +50,7 @@ function isValidISODate(s: string): boolean {
  * Accepts either `sprint_number` (TypeScript type) or `sprint` (retro JSON field name).
  */
 export function validateScorecard(
-  card: GolfScorecard & { sprint?: number },
+  card: GolfScorecard & { sprint?: number; completed_on?: string; started_on?: string },
   options: ScorecardValidationOptions = {},
 ): ScorecardValidationResult {
   const errors: ScorecardValidationError[] = [];
@@ -63,16 +63,20 @@ export function validateScorecard(
 
   // Normalize sprint field — retro JSONs use "sprint", TS type uses "sprint_number"
   const sprintNumber = card.sprint_number ?? card.sprint;
+  const validPar = [3, 4, 5].includes(card.par);
+  const hasExplicitScore = typeof card.score === 'number' && !Number.isNaN(card.score);
+  const effectiveScore = hasExplicitScore ? card.score : validPar ? card.par : undefined;
+  const effectiveDate = card.date ?? card.completed_on ?? card.started_on;
 
   // Rule 6: basic field validation
-  if (![3, 4, 5].includes(card.par)) {
+  if (!validPar) {
     errors.push({ code: 'INVALID_PAR', message: `par must be 3, 4, or 5 (got ${card.par})`, field: 'par' });
   }
-  if (typeof card.score !== 'number' || card.score <= 0) {
+  if (typeof effectiveScore !== 'number' || effectiveScore <= 0) {
     errors.push({ code: 'INVALID_SCORE', message: `score must be > 0 (got ${card.score})`, field: 'score' });
   }
-  if (!card.date || !isValidISODate(card.date)) {
-    errors.push({ code: 'INVALID_DATE', message: `date must be a valid ISO string (got "${card.date}")`, field: 'date' });
+  if (typeof effectiveDate !== 'string' || !isValidISODate(effectiveDate)) {
+    errors.push({ code: 'INVALID_DATE', message: `date must be a valid ISO string (got "${effectiveDate}")`, field: 'date' });
   }
   if (sprintNumber == null || typeof sprintNumber !== 'number' || sprintNumber <= 0) {
     errors.push({ code: 'MISSING_SPRINT', message: 'sprint_number (or sprint) is required and must be > 0', field: 'sprint_number' });
@@ -81,12 +85,12 @@ export function validateScorecard(
   validateSkillFields(card as unknown as Record<string, unknown>, errors, knownSkillIds);
 
   // Rule 1: score_label matches computeScoreLabel(score, par)
-  if (typeof card.score === 'number' && card.score > 0 && [3, 4, 5].includes(card.par)) {
-    const expected = computeScoreLabel(card.score, card.par);
-    if (card.score_label !== expected) {
+  if (typeof effectiveScore === 'number' && effectiveScore > 0 && validPar) {
+    const expected = computeScoreLabel(effectiveScore, card.par);
+    if (card.score_label != null && card.score_label !== expected) {
       errors.push({
         code: 'SCORE_LABEL_MISMATCH',
-        message: `score_label "${card.score_label}" doesn't match computed "${expected}" (score=${card.score}, par=${card.par})`,
+        message: `score_label "${card.score_label}" doesn't match computed "${expected}" (score=${effectiveScore}, par=${card.par})`,
         field: 'score_label',
       });
     }

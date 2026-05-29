@@ -864,6 +864,14 @@ describe('pushNudgeGuard', () => {
     expect(result).toEqual({});
   });
 
+  it('passes through git commit-tree plumbing commands', async () => {
+    const result = await pushNudgeGuard(
+      makeInput({ tool_input: { command: 'git commit-tree abc123 -p HEAD' } }),
+      tmpDir,
+    );
+    expect(result).toEqual({});
+  });
+
   it('passes through empty command', async () => {
     const result = await pushNudgeGuard(
       makeInput({ tool_input: {} }),

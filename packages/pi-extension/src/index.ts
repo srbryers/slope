@@ -82,6 +82,10 @@ function inSprintPhase(cwd: string): boolean {
   return phase === 'planning' || phase === 'implementing' || phase === 'scoring';
 }
 
+function isGitCommitCommand(command: string): boolean {
+  return /(?:^|[;&|]\s*)git\s+commit(?:\s|$)/.test(command);
+}
+
 function hasRecentPlan(ctx: { sessionManager: { getEntries: () => Array<{ role?: string; content?: string }> } }): boolean {
   const entries = ctx.sessionManager.getEntries();
   // Scan last 5 assistant messages for a structured plan.
@@ -493,7 +497,7 @@ export default function slopeExtension(pi: ExtensionAPI, _cwdOverride?: string):
     }
 
     // Commit discipline: warn on direct main/master commits
-    if (toolName === 'bash' && typeof inp.command === 'string' && /git\s+commit/.test(inp.command)) {
+    if (toolName === 'bash' && typeof inp.command === 'string' && isGitCommitCommand(inp.command)) {
       try {
         const branch = execSync('git rev-parse --abbrev-ref HEAD', { cwd: ctx.cwd, encoding: 'utf8' }).trim();
         if (branch === 'main' || branch === 'master') {

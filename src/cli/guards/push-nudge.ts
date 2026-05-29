@@ -3,6 +3,10 @@ import type { HookInput, GuardResult } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { headIsOnMain } from './git-utils.js';
 
+function isGitCommitCommand(command: string): boolean {
+  return /(?:^|[;&|]\s*)git\s+commit(?:\s|$)/.test(command);
+}
+
 /**
  * Push nudge guard: fires PostToolUse on Bash.
  * Nudges to push after git commit commands when unpushed count or time is high.
@@ -11,7 +15,7 @@ export async function pushNudgeGuard(input: HookInput, cwd: string): Promise<Gua
   const command = (input.tool_input?.command as string) ?? '';
 
   // Only fire after git commit commands
-  if (!command.includes('git commit')) return {};
+  if (!isGitCommitCommand(command)) return {};
 
   const config = loadConfig(cwd);
   const guidance = config.guidance ?? {};
