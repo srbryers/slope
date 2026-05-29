@@ -32,6 +32,11 @@
           "type": "rough",
           "severity": "minor",
           "description": "The remembered cwd regression exposed macOS /var versus /private/var path canonicalization drift; the remembered-cwd gate now compares real paths before deciding the hook cwd and launcher cwd refer to different directories."
+        },
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "Post-hole architecture review caught that transcript lines may include both a top-level session cwd and nested tool input.workdir; transcript parsing now prioritizes nested tool input fields before top-level cwd."
         }
       ],
       "notes": "Added transcript tool_use_id lookup for nested tool-call workdir/cwd fields, a best-effort per-session Codex workdir cache, and single staged non-main worktree inference for git commit commands when Codex omits exec workdir."
@@ -60,7 +65,7 @@
     "greens_total": 4,
     "putts": 0,
     "penalties": 0,
-    "hazards_hit": 2,
+    "hazards_hit": 3,
     "hazard_penalties": 0,
     "miss_directions": {
       "long": 0,
@@ -133,6 +138,7 @@
     "Committed guard recovery as 080c693: fix(S125-1): normalize Codex hook workdir.",
     "Committed doctor duplicate-hook diagnostics as 5258929: fix(S125-3): detect duplicate Codex hook installs.",
     "Focused Vitest run passed: tests/cli/commands/doctor.test.ts and tests/cli/commands/guard.test.ts, 38 tests.",
+    "Post-hole architecture review caught nested transcript input.workdir priority over top-level session cwd; added regression coverage and reran focused guard/doctor tests.",
     "pnpm exec tsc --noEmit passed.",
     "pnpm run build passed.",
     "pnpm test passed: 215 passed test files, 1 skipped test file, 3499 passed tests, and 23 skipped tests."

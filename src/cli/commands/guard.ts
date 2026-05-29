@@ -490,11 +490,17 @@ function findFirstWorkdir(value: unknown): string | null {
   if (!value || typeof value !== 'object') return null;
 
   const record = value as Record<string, unknown>;
-  for (const key of ['workdir', 'cwd']) {
-    const candidate = record[key];
-    if (typeof candidate === 'string' && candidate.trim().length > 0) return candidate.trim();
+  for (const key of ['input', 'tool_input', 'arguments', 'parameters']) {
+    const nested = findFirstWorkdir(record[key]);
+    if (nested) return nested;
   }
-  for (const child of Object.values(record)) {
+  const workdir = record.workdir;
+  if (typeof workdir === 'string' && workdir.trim().length > 0) return workdir.trim();
+  const cwd = record.cwd;
+  if (typeof cwd === 'string' && cwd.trim().length > 0) return cwd.trim();
+
+  for (const [key, child] of Object.entries(record)) {
+    if (['input', 'tool_input', 'arguments', 'parameters', 'workdir', 'cwd'].includes(key)) continue;
     const found = findFirstWorkdir(child);
     if (found) return found;
   }

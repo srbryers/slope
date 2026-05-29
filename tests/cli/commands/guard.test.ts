@@ -288,6 +288,7 @@ describe('guardCommand dispatcher path', () => {
       writeFileSync(transcriptPath, JSON.stringify({
         type: 'tool_call',
         id: 'toolu_123',
+        cwd,
         input: {
           command: 'git commit -m "feat: from transcript"',
           workdir: worktreeCwd,
