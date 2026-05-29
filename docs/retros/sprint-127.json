@@ -1,0 +1,141 @@
+{
+  "sprint_number": 127,
+  "player": "codex",
+  "theme": "Codex Runtime Patch Release",
+  "par": 3,
+  "slope": 1,
+  "score": 3,
+  "score_label": "par",
+  "date": "2026-05-29",
+  "shots": [
+    {
+      "ticket_key": "S127-1",
+      "title": "Bump @slope-dev/slope and bundled Codex plugin for the Codex runtime patch release",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "The pre-sprint touched-path gate correctly blocked on a stale feat/workflow-engine sibling worktree with an old package.json change; the release continued with --force after confirming this sprint was intentionally targeting current main."
+        }
+      ],
+      "notes": "Used scripts/version-bump.mjs to move package.json and the bundled Codex plugin manifest from 1.57.0 to 1.57.1, then validated the built CLI reported @slope-dev/slope v1.57.1."
+    },
+    {
+      "ticket_key": "S127-2",
+      "title": "Run release validation, publish the patch release, and verify npm",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Merged PR #464, published GitHub release v1.57.1, watched the trusted-publisher npm workflow pass, verified npm latest is 1.57.1, and smoke-tested the installed package."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 2,
+    "fairways_total": 2,
+    "greens_in_regulation": 2,
+    "greens_total": 2,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 1,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "type": "release",
+  "conditions": [
+    {
+      "type": "workflow",
+      "impact": "minor",
+      "description": "S127 started with a forced sibling-worktree overlap because the stale feat/workflow-engine worktree had an old package.json change and this release sprint intentionally touched package metadata on current main."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Release closeout must verify the registry, not just the GitHub workflow.",
+      "outcome": "S127 recorded completion only after npm latest returned 1.57.1 and an installed-package slope version smoke test passed."
+    },
+    {
+      "type": "lessons",
+      "description": "Pre-sprint touched-path blocking is useful even when the right answer is an intentional force.",
+      "outcome": "The package.json overlap was visible before the release branch changed anything, and the release scorecard now carries that known sibling-worktree hazard forward."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "Build, typecheck, full pnpm test, SLOPE validation, roadmap validation, map check, whitespace check, npm pack dry run, PR CI, and release workflow tests passed.",
+      "status": "healthy"
+    },
+    {
+      "category": "release",
+      "description": "GitHub release v1.57.1 and npm trusted publishing completed successfully; npm latest now resolves to 1.57.1.",
+      "status": "healthy"
+    },
+    {
+      "category": "concurrency",
+      "description": "The stale feat/workflow-engine sibling worktree still has a package.json overlap and remains isolated from this release.",
+      "status": "watch"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Steady and clean: the release machinery did exactly what it should, and the only wrinkle was a known stale-worktree warning before the bump.",
+    "advice_for_next_player": "For patch releases, keep the prepare PR thin, tag only after it merges, and close the sprint after npm metadata plus installed-package smoke tests pass.",
+    "what_surprised_you": "Nothing broke in the trusted-publisher path; the S125/S126 runtime fixes moved through cleanly once the release tag existed.",
+    "excited_about_next": "The Codex runtime recovery fixes are now available from npm, so the next roadmap pass can return to fresh issue triage or the next planned phase."
+  },
+  "bunker_locations": [
+    "A stale feat/workflow-engine sibling worktree overlaps package.json and should be cleaned up before a future release touches package metadata.",
+    "Local git tag fetch currently rejects v1.25.2 because the local tag would be clobbered; use GitHub release metadata for current release verification until old tag drift is cleaned up.",
+    "Release scorecards should wait for registry verification before claiming publish success."
+  ],
+  "yardage_book_updates": [
+    "Version bump path remains node scripts/version-bump.mjs <version>, updating package.json and templates/codex/plugins/slope/.codex-plugin/plugin.json together.",
+    "The v1.57.1 release path uses GitHub release publishing with npm trusted publisher OIDC.",
+    "npm exec --yes --package @slope-dev/slope@<version> -- slope version remains the installed-package smoke test.",
+    "Keep pnpm build, pnpm exec tsc --noEmit, and pnpm test sequential during release validation because CLI tests can load generated dist output."
+  ],
+  "course_management_notes": [
+    "Before release, npm latest and the GitHub release list both pointed at 1.57.0.",
+    "Created codex/s127-codex-runtime-patch-release from main and started S127 with --force after the touched-path gate surfaced stale feat/workflow-engine package.json overlap.",
+    "Bumped @slope-dev/slope and templates/codex/plugins/slope/.codex-plugin/plugin.json from 1.57.0 to 1.57.1.",
+    "Committed the version bump as bdb9b5c: chore(S127-1): bump release version to 1.57.1.",
+    "pnpm run build passed locally.",
+    "pnpm exec tsc --noEmit passed locally.",
+    "pnpm test passed locally: 216 passed test files, 1 skipped test file, 3503 passed tests, and 23 skipped tests.",
+    "node dist/cli/index.js validate --skills passed before release.",
+    "node dist/cli/index.js roadmap validate passed before release with standing warnings only.",
+    "node dist/cli/index.js map --check passed before release: Overall CURRENT.",
+    "node dist/cli/index.js version returned @slope-dev/slope v1.57.1.",
+    "git diff --check passed before release.",
+    "npm pack --dry-run passed for @slope-dev/slope@1.57.1 with 1026 files, package size 930.1 kB, and unpacked size 4.3 MB.",
+    "PR #464 merged on 2026-05-29 at commit 19684cefd8299eb3d9362ac20200d16e001c9ed0.",
+    "GitHub release v1.57.1 published on 2026-05-29: https://github.com/srbryers/slope/releases/tag/v1.57.1.",
+    "Publish to npm workflow run 26637574445 passed in 3m5s.",
+    "npm view @slope-dev/slope version returned 1.57.1 and the latest dist-tag points to 1.57.1.",
+    "npm view @slope-dev/slope@1.57.1 recorded publish time 2026-05-29T12:39:08.526Z, integrity sha512-cRQ6L8TRwEEKiYU6t5Tf+UCGfsTE2mbU3KjAGWBLdDtatd55eUj6wXUvDdNhi5pfOzrcFL5wwLqwIxehilrA0A==, and shasum 9c999233e0b150a1589d794ec58d85a413cb0f2a.",
+    "npm exec --yes --package @slope-dev/slope@1.57.1 -- slope version returned @slope-dev/slope v1.57.1."
+  ],
+  "skills_used": [
+    "slope-sprint-workflow",
+    "slope-performance-analysis"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow",
+    "slope-performance-analysis"
+  ],
+  "skill_gaps_found": [],
+  "slope_factors": [
+    "patch_release",
+    "trusted_publisher_release",
+    "registry_verification",
+    "sibling_worktree_overlap"
+  ]
+}
