@@ -2764,7 +2764,9 @@
       "par": 3,
       "slope": 1,
       "type": "release",
-      "status": "planned",
+      "status": "complete",
+      "score": 3,
+      "score_label": "par",
       "depends_on": [
         126
       ],
