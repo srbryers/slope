@@ -1,8 +1,8 @@
-import { describe, expect, it } from 'vitest';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { describe, expect, it, vi } from 'vitest';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { formatCliError } from '../../src/cli/error-reporter.js';
+import { formatCliError, reportCliError } from '../../src/cli/error-reporter.js';
 
 function makeTmpDir(): string {
   return mkdtempSync(join(tmpdir(), 'slope-error-reporter-'));
@@ -39,5 +39,40 @@ describe('formatCliError', () => {
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }
+  });
+
+  it('prints formatted recovery guidance before exiting', () => {
+    const cwd = makeTmpDir();
+    const originalCwd = process.cwd();
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {
+      throw new Error('process.exit');
+    }) as never);
+
+    try {
+      process.chdir(cwd);
+      writeFileSync(join(cwd, 'package-lock.json'), '{}\n');
+
+      expect(() => reportCliError(new Error('ERR_DLOPEN_FAILED: better_sqlite3.node'))).toThrow('process.exit');
+      expect(exitSpy).toHaveBeenCalledWith(1);
+      const output = errorSpy.mock.calls.map(call => call.join(' ')).join('\n');
+      expect(output).toContain('Error: ERR_DLOPEN_FAILED');
+      expect(output).toContain('Recovery:');
+      expect(output).toContain('npm ci');
+    } finally {
+      process.chdir(originalCwd);
+      errorSpy.mockRestore();
+      exitSpy.mockRestore();
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('routes common store-backed top-level CLI commands through the shared reporter', () => {
+    const indexSource = readFileSync(join(process.cwd(), 'src', 'cli', 'index.ts'), 'utf8');
+
+    for (const command of ['briefingCommand', 'claimCommand', 'statusCommand', 'autoCardCommand', 'sessionCommand', 'agentCommand']) {
+      expect(indexSource).toContain(`${command}(process.argv.slice(3)).catch(reportCliError);`);
+    }
+    expect(indexSource).not.toContain("console.error('Error:', err.message)");
   });
 });
