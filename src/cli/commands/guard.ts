@@ -1,5 +1,8 @@
-import { existsSync, readFileSync, appendFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, readFileSync, appendFileSync, mkdirSync, writeFileSync, statSync, realpathSync } from 'node:fs';
+import { execFileSync, execSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { tmpdir } from 'node:os';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { GUARD_DEFINITIONS, formatPreToolUseOutput, formatPostToolUseOutput, formatStopOutput, getAllGuardDefinitions, getCustomGuard, loadPluginGuards, detectAdapter } from '../../core/index.js';
 import type { HookInput, GuardResult, GuardName, AnyGuardDefinition } from '../../core/index.js';
 import { loadConfig } from '../config.js';
@@ -33,7 +36,6 @@ import { roadmapEditShippedGuard } from '../guards/roadmap-edit-shipped.js';
 import { postHoleEnforcementGuard } from '../guards/post-hole-enforcement.js';
 import { formatGuardDocs } from '../guards/docs.js';
 import { recordBaseline } from '../guards/git-utils.js';
-import { execSync } from 'node:child_process';
 import { isAdhocSession } from '../session-state.js';
 
 // Side-effect imports: ensure all adapters are registered for detectAdapter()
@@ -300,13 +302,341 @@ async function readStdin(): Promise<HookInput> {
   });
 }
 
-function normalizeHookInput(input: HookInput | null, fallbackCwd: string): HookInput {
-  return {
+type HookCwdSource = 'hook' | 'tool-workdir' | 'tool-path' | 'transcript' | 'remembered' | 'staged-worktree';
+
+interface HookCwdResolution {
+  cwd: string;
+  source: HookCwdSource;
+}
+
+export function normalizeHookInput(input: HookInput | null, fallbackCwd: string): HookInput {
+  const baseCwd = normalizeBaseCwd(input, fallbackCwd);
+  const resolved = resolveEffectiveHookCwd(input, baseCwd, fallbackCwd);
+  const normalized = {
     ...(input ?? {}),
     session_id: input?.session_id ?? '',
-    cwd: typeof input?.cwd === 'string' && input.cwd.length > 0 ? input.cwd : fallbackCwd,
+    cwd: resolved.cwd,
     hook_event_name: input?.hook_event_name ?? '',
   };
+
+  if (input && resolved.source !== 'hook') {
+    rememberCodexWorkdir(normalized, resolved);
+  }
+
+  return normalized;
+}
+
+function normalizeBaseCwd(input: HookInput | null, fallbackCwd: string): string {
+  const raw = typeof input?.cwd === 'string' && input.cwd.trim().length > 0
+    ? input.cwd.trim()
+    : fallbackCwd;
+  return normalizePath(raw, fallbackCwd);
+}
+
+function resolveEffectiveHookCwd(input: HookInput | null, baseCwd: string, fallbackCwd: string): HookCwdResolution {
+  if (!input) return { cwd: baseCwd, source: 'hook' };
+
+  const explicitWorkdir = extractToolInputWorkdir(input);
+  if (explicitWorkdir) {
+    return { cwd: normalizePath(explicitWorkdir, baseCwd), source: 'tool-workdir' };
+  }
+
+  const toolPathCwd = extractToolInputPathCwd(input, baseCwd);
+  if (toolPathCwd) {
+    return { cwd: toolPathCwd, source: 'tool-path' };
+  }
+
+  const transcriptCwd = extractTranscriptWorkdir(input, baseCwd);
+  if (transcriptCwd) {
+    return { cwd: transcriptCwd, source: 'transcript' };
+  }
+
+  const rememberedCwd = readRememberedCodexWorkdir(input, fallbackCwd);
+  if (rememberedCwd) {
+    return { cwd: rememberedCwd, source: 'remembered' };
+  }
+
+  const inferredWorktree = inferSingleStagedWorktree(input, baseCwd);
+  if (inferredWorktree) {
+    return { cwd: inferredWorktree, source: 'staged-worktree' };
+  }
+
+  return { cwd: baseCwd, source: 'hook' };
+}
+
+function normalizePath(rawPath: string, baseCwd: string): string {
+  const absolute = isAbsolute(rawPath) ? rawPath : resolve(baseCwd, rawPath);
+  return canonicalHookCwd(absolute);
+}
+
+function canonicalHookCwd(path: string): string {
+  const start = existingDirectory(path);
+  const slopeRoot = start ? findAncestorWithSlopeConfig(start) : null;
+  if (slopeRoot) return slopeRoot;
+
+  if (start) {
+    try {
+      return execFileSync('git', ['-C', start, 'rev-parse', '--show-toplevel'], {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+        timeout: 3000,
+      }).trim();
+    } catch { /* not a git repo */ }
+  }
+
+  return path;
+}
+
+function existingDirectory(path: string): string | null {
+  let current = path;
+  try {
+    if (!existsSync(current)) return null;
+    if (!statSync(current).isDirectory()) current = dirname(current);
+    return current;
+  } catch {
+    return null;
+  }
+}
+
+function findAncestorWithSlopeConfig(start: string): string | null {
+  let current = start;
+  while (true) {
+    if (existsSync(join(current, '.slope', 'config.json'))) return current;
+    const parent = dirname(current);
+    if (parent === current) return null;
+    current = parent;
+  }
+}
+
+function extractToolInputWorkdir(input: HookInput): string | null {
+  const toolInput = input.tool_input;
+  if (!toolInput || typeof toolInput !== 'object') return null;
+  for (const key of ['workdir', 'cwd']) {
+    const value = toolInput[key];
+    if (typeof value === 'string' && value.trim().length > 0) return value.trim();
+  }
+  return null;
+}
+
+function extractToolInputPathCwd(input: HookInput, baseCwd: string): string | null {
+  const toolInput = input.tool_input;
+  if (!toolInput || typeof toolInput !== 'object') return null;
+  for (const key of ['file_path', 'path']) {
+    const value = toolInput[key];
+    if (typeof value !== 'string' || value.trim().length === 0) continue;
+    const absolute = isAbsolute(value) ? value : resolve(baseCwd, value);
+    if (!existingDirectory(dirname(absolute))) continue;
+    return canonicalHookCwd(dirname(absolute));
+  }
+  return null;
+}
+
+function extractTranscriptWorkdir(input: HookInput, baseCwd: string): string | null {
+  const transcriptPath = typeof input.transcript_path === 'string' ? input.transcript_path.trim() : '';
+  const toolUseId = typeof input.tool_use_id === 'string' ? input.tool_use_id.trim() : '';
+  if (!transcriptPath || !toolUseId || !existsSync(transcriptPath)) return null;
+
+  try {
+    const lines = readFileSync(transcriptPath, 'utf8').split('\n').filter(Boolean);
+    for (const line of lines.reverse()) {
+      if (!line.includes(toolUseId)) continue;
+      const fromJson = parseTranscriptLineForWorkdir(line, toolUseId);
+      const rawWorkdir = fromJson ?? parseWorkdirFromLine(line);
+      if (rawWorkdir) return normalizePath(rawWorkdir, baseCwd);
+    }
+  } catch { /* transcript lookup is best-effort */ }
+
+  return null;
+}
+
+function parseTranscriptLineForWorkdir(line: string, toolUseId: string): string | null {
+  try {
+    return findWorkdirForToolUse(JSON.parse(line), toolUseId);
+  } catch {
+    return null;
+  }
+}
+
+function findWorkdirForToolUse(value: unknown, toolUseId: string): string | null {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = findWorkdirForToolUse(item, toolUseId);
+      if (found) return found;
+    }
+    return null;
+  }
+  if (!value || typeof value !== 'object') return null;
+
+  const record = value as Record<string, unknown>;
+  if (record.id === toolUseId || record.tool_use_id === toolUseId || record.call_id === toolUseId) {
+    return findFirstWorkdir(record);
+  }
+
+  for (const child of Object.values(record)) {
+    const found = findWorkdirForToolUse(child, toolUseId);
+    if (found) return found;
+  }
+  return null;
+}
+
+function findFirstWorkdir(value: unknown): string | null {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = findFirstWorkdir(item);
+      if (found) return found;
+    }
+    return null;
+  }
+  if (!value || typeof value !== 'object') return null;
+
+  const record = value as Record<string, unknown>;
+  for (const key of ['workdir', 'cwd']) {
+    const candidate = record[key];
+    if (typeof candidate === 'string' && candidate.trim().length > 0) return candidate.trim();
+  }
+  for (const child of Object.values(record)) {
+    const found = findFirstWorkdir(child);
+    if (found) return found;
+  }
+  return null;
+}
+
+function parseWorkdirFromLine(line: string): string | null {
+  const match = line.match(/"(?:workdir|cwd)"\s*:\s*"((?:\\"|[^"])*)"/);
+  if (!match) return null;
+  try {
+    return JSON.parse(`"${match[1]}"`) as string;
+  } catch {
+    return match[1];
+  }
+}
+
+function readRememberedCodexWorkdir(input: HookInput, fallbackCwd: string): string | null {
+  const sessionId = typeof input.session_id === 'string' ? input.session_id.trim() : '';
+  if (!sessionId) return null;
+  const hookCwd = typeof input.cwd === 'string' && input.cwd.trim().length > 0
+    ? normalizePath(input.cwd.trim(), fallbackCwd)
+    : normalizePath(fallbackCwd, fallbackCwd);
+  const launcherCwd = normalizePath(fallbackCwd, fallbackCwd);
+  if (!samePath(hookCwd, launcherCwd)) return null;
+
+  try {
+    const path = codexWorkdirStatePath(sessionId);
+    if (!existsSync(path)) return null;
+    const parsed = JSON.parse(readFileSync(path, 'utf8')) as { cwd?: unknown };
+    if (typeof parsed.cwd !== 'string' || parsed.cwd.trim().length === 0) return null;
+    const remembered = canonicalHookCwd(parsed.cwd.trim());
+    return existsSync(remembered) ? remembered : null;
+  } catch {
+    return null;
+  }
+}
+
+function samePath(left: string, right: string): boolean {
+  return comparisonPath(left) === comparisonPath(right);
+}
+
+function comparisonPath(path: string): string {
+  try {
+    return realpathSync(path);
+  } catch {
+    return resolve(path);
+  }
+}
+
+function rememberCodexWorkdir(input: HookInput, resolution: HookCwdResolution): void {
+  const sessionId = typeof input.session_id === 'string' ? input.session_id.trim() : '';
+  if (!sessionId || resolution.source === 'remembered') return;
+
+  try {
+    const path = codexWorkdirStatePath(sessionId);
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, JSON.stringify({
+      session_id: sessionId,
+      cwd: resolution.cwd,
+      source: resolution.source,
+      updated_at: new Date().toISOString(),
+    }, null, 2) + '\n');
+  } catch { /* best-effort recovery cache */ }
+}
+
+function codexWorkdirStatePath(sessionId: string): string {
+  const dir = process.env.SLOPE_CODEX_WORKDIR_STORE ?? join(tmpdir(), 'slope-codex-workdirs');
+  const key = createHash('sha256').update(sessionId).digest('hex').slice(0, 32);
+  return join(dir, `${key}.json`);
+}
+
+function inferSingleStagedWorktree(input: HookInput, baseCwd: string): string | null {
+  const command = getHookCommand(input);
+  if (!/git\s+commit(\s|$)/.test(command)) return null;
+
+  const entries = listWorktreeEntries(baseCwd);
+  const candidates = entries
+    .filter(entry => entry.path && entry.branch && !['main', 'master'].includes(entry.branch))
+    .filter(entry => hasStagedChanges(entry.path));
+
+  if (candidates.length !== 1) return null;
+  return canonicalHookCwd(candidates[0].path);
+}
+
+function getHookCommand(input: HookInput): string {
+  const toolInput = input.tool_input;
+  if (!toolInput || typeof toolInput !== 'object') return '';
+  for (const key of ['command', 'cmd', 'input']) {
+    const value = toolInput[key];
+    if (typeof value === 'string') return value;
+  }
+  return '';
+}
+
+interface WorktreeEntry {
+  path: string;
+  branch: string;
+}
+
+function listWorktreeEntries(cwd: string): WorktreeEntry[] {
+  try {
+    const raw = execFileSync('git', ['-C', cwd, 'worktree', 'list', '--porcelain'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+      timeout: 5000,
+    });
+    const entries: WorktreeEntry[] = [];
+    let currentPath = '';
+    let currentBranch = '';
+
+    const flush = () => {
+      if (currentPath) entries.push({ path: currentPath, branch: currentBranch });
+      currentPath = '';
+      currentBranch = '';
+    };
+
+    for (const line of raw.split('\n')) {
+      if (line.startsWith('worktree ')) {
+        flush();
+        currentPath = line.slice('worktree '.length).trim();
+      } else if (line.startsWith('branch ')) {
+        currentBranch = line.slice('branch '.length).replace(/^refs\/heads\//, '').trim();
+      }
+    }
+    flush();
+    return entries;
+  } catch {
+    return [];
+  }
+}
+
+function hasStagedChanges(cwd: string): boolean {
+  try {
+    const staged = execFileSync('git', ['-C', cwd, 'diff', '--cached', '--name-only'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+      timeout: 3000,
+    }).trim();
+    return staged.length > 0;
+  } catch {
+    return false;
+  }
 }
 
 function printUsage(): void {

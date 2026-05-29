@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { PassThrough } from 'node:stream';
@@ -20,6 +20,10 @@ function makeTmpDir(): string {
   const dir = join(tmpdir(), `slope-guard-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   mkdirSync(dir, { recursive: true });
   return dir;
+}
+
+function makeTmpPath(prefix: string): string {
+  return join(tmpdir(), `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`);
 }
 
 function writeMinimalSlopeConfig(cwd: string): void {
@@ -138,17 +142,25 @@ describe('slope guard recommend (S65-3)', () => {
 describe('guardCommand dispatcher path', () => {
   let cwd: string;
   let origCwd: string;
+  let originalCodexWorkdirStore: string | undefined;
 
   beforeEach(() => {
     cwd = makeTmpDir();
     origCwd = process.cwd();
+    originalCodexWorkdirStore = process.env.SLOPE_CODEX_WORKDIR_STORE;
     process.chdir(cwd);
     writeMinimalSlopeConfig(cwd);
+    process.env.SLOPE_CODEX_WORKDIR_STORE = join(cwd, '.slope', 'codex-workdirs');
     setSessionMode(cwd, 'test-session', 'adhoc');
   });
 
   afterEach(() => {
     process.chdir(origCwd);
+    if (originalCodexWorkdirStore === undefined) {
+      delete process.env.SLOPE_CODEX_WORKDIR_STORE;
+    } else {
+      process.env.SLOPE_CODEX_WORKDIR_STORE = originalCodexWorkdirStore;
+    }
     rmSync(cwd, { recursive: true, force: true });
     vi.restoreAllMocks();
   });
@@ -233,6 +245,147 @@ describe('guardCommand dispatcher path', () => {
       expect(worktreeMetrics).toContain('"decision":"silent"');
       expect(existsSync(join(cwd, '.slope', 'guard-metrics.jsonl'))).toBe(false);
     } finally {
+      rmSync(worktreeCwd, { recursive: true, force: true });
+    }
+  });
+
+  it('prefers Codex exec workdir over hook cwd when running branch-before-commit', async () => {
+    initGitRepo(cwd, 'main');
+    const worktreeCwd = makeTmpDir();
+
+    try {
+      writeMinimalSlopeConfig(worktreeCwd);
+      initGitRepo(worktreeCwd, 'feat/codex-workdir');
+
+      const output = await runGuardCommandWithInput(
+        ['branch-before-commit'],
+        makeHookInput(cwd, {
+          session_id: 'explicit-workdir-session',
+          tool_name: 'Bash',
+          tool_input: {
+            command: 'git commit -m "feat: keep worktree branch"',
+            workdir: worktreeCwd,
+          },
+        }),
+      );
+
+      expect(output).toBe('');
+      expect(readFileSync(join(worktreeCwd, '.slope', 'guard-metrics.jsonl'), 'utf8')).toContain('"guard":"branch-before-commit"');
+      expect(existsSync(join(cwd, '.slope', 'guard-metrics.jsonl'))).toBe(false);
+    } finally {
+      rmSync(worktreeCwd, { recursive: true, force: true });
+    }
+  });
+
+  it('recovers and remembers Codex exec workdir from transcript tool_use_id', async () => {
+    initGitRepo(cwd, 'main');
+    const worktreeCwd = makeTmpDir();
+
+    try {
+      writeMinimalSlopeConfig(worktreeCwd);
+      initGitRepo(worktreeCwd, 'feat/codex-transcript-workdir');
+      const transcriptPath = join(cwd, '.slope', 'codex-transcript.jsonl');
+      writeFileSync(transcriptPath, JSON.stringify({
+        type: 'tool_call',
+        id: 'toolu_123',
+        input: {
+          command: 'git commit -m "feat: from transcript"',
+          workdir: worktreeCwd,
+        },
+      }) + '\n');
+
+      const firstOutput = await runGuardCommandWithInput(
+        ['branch-before-commit'],
+        makeHookInput(cwd, {
+          session_id: 'remember-workdir-session',
+          tool_name: 'Bash',
+          tool_input: { command: 'git commit -m "feat: from transcript"' },
+          transcript_path: transcriptPath,
+          tool_use_id: 'toolu_123',
+        }),
+      );
+      expect(readdirSync(join(cwd, '.slope', 'codex-workdirs'))).toHaveLength(1);
+      const secondOutput = await runGuardCommandWithInput(
+        ['branch-before-commit'],
+        makeHookInput(cwd, {
+          session_id: 'remember-workdir-session',
+          tool_name: 'Bash',
+          tool_input: { command: 'git commit -m "feat: remembered"' },
+        }),
+      );
+
+      expect(firstOutput).toBe('');
+      expect(secondOutput).toBe('');
+      const metrics = readFileSync(join(worktreeCwd, '.slope', 'guard-metrics.jsonl'), 'utf8')
+        .trim()
+        .split('\n');
+      expect(metrics).toHaveLength(2);
+      expect(existsSync(join(cwd, '.slope', 'guard-metrics.jsonl'))).toBe(false);
+    } finally {
+      rmSync(worktreeCwd, { recursive: true, force: true });
+    }
+  });
+
+  it('infers the single staged non-main worktree when Codex omits exec workdir', async () => {
+    initGitRepo(cwd, 'main');
+    const worktreeCwd = makeTmpPath('slope-guard-inferred-worktree');
+
+    try {
+      execFileSync('git', ['worktree', 'add', '-q', '-b', 'feat/inferred-workdir', worktreeCwd], { cwd, stdio: 'ignore' });
+      writeMinimalSlopeConfig(worktreeCwd);
+      writeFileSync(join(worktreeCwd, 'feature.txt'), 'ready\n');
+      execFileSync('git', ['add', 'feature.txt'], { cwd: worktreeCwd, stdio: 'ignore' });
+
+      const output = await runGuardCommandWithInput(
+        ['branch-before-commit'],
+        makeHookInput(cwd, {
+          session_id: 'infer-workdir-session',
+          tool_name: 'Bash',
+          tool_input: { command: 'git commit -m "feat: inferred worktree"' },
+        }),
+      );
+
+      expect(output).toBe('');
+      expect(readFileSync(join(worktreeCwd, '.slope', 'guard-metrics.jsonl'), 'utf8')).toContain('"guard":"branch-before-commit"');
+      expect(existsSync(join(cwd, '.slope', 'guard-metrics.jsonl'))).toBe(false);
+    } finally {
+      try {
+        execFileSync('git', ['worktree', 'remove', '--force', worktreeCwd], { cwd, stdio: 'ignore' });
+      } catch { /* ignore */ }
+      rmSync(worktreeCwd, { recursive: true, force: true });
+    }
+  });
+
+  it('routes worktree-check through the edited file repository when hook cwd is another repo', async () => {
+    initGitRepo(cwd, 'main');
+    const worktreeCwd = makeTmpPath('slope-guard-edit-worktree');
+
+    try {
+      execFileSync('git', ['worktree', 'add', '-q', '-b', 'feat/edit-workdir', worktreeCwd], { cwd, stdio: 'ignore' });
+      writeMinimalSlopeConfig(worktreeCwd);
+      mkdirSync(join(worktreeCwd, 'src'), { recursive: true });
+      writeFileSync(join(worktreeCwd, 'src', 'foo.ts'), 'export const foo = 1;\n');
+
+      const output = await runGuardCommandWithInput(
+        ['worktree-check'],
+        makeHookInput(cwd, {
+          session_id: 'worktree-check-edit-session',
+          tool_name: 'Edit',
+          tool_input: {
+            file_path: join(worktreeCwd, 'src', 'foo.ts'),
+            old_string: '1',
+            new_string: '2',
+          },
+        }),
+      );
+
+      expect(output).toBe('');
+      expect(readFileSync(join(worktreeCwd, '.slope', 'guard-metrics.jsonl'), 'utf8')).toContain('"guard":"worktree-check"');
+      expect(existsSync(join(cwd, '.slope', 'guard-metrics.jsonl'))).toBe(false);
+    } finally {
+      try {
+        execFileSync('git', ['worktree', 'remove', '--force', worktreeCwd], { cwd, stdio: 'ignore' });
+      } catch { /* ignore */ }
       rmSync(worktreeCwd, { recursive: true, force: true });
     }
   });
