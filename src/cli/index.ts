@@ -75,6 +75,7 @@ import { orgCommand } from './commands/org.js';
 import { memoryCommand } from './commands/memory.js';
 import { phaseCommand } from './commands/phase.js';
 import { skillsCommand } from './commands/skills.js';
+import { reportCliError } from './error-reporter.js';
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -114,16 +115,10 @@ if (subcommand === '--version') {
 
 switch (subcommand) {
   case 'init':
-    initCommand(process.argv.slice(3)).catch(err => {
-      console.error('Error:', err.message);
-      process.exit(1);
-    });
+    initCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   case 'interview':
-    interviewCommand(process.argv.slice(3)).catch(err => {
-      console.error('Error:', err.message);
-      process.exit(1);
-    });
+    interviewCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   case 'card':
     cardCommand(process.argv.slice(3));
@@ -134,10 +129,7 @@ switch (subcommand) {
   case 'review': {
     const reviewArgs = process.argv.slice(3);
     if (shouldRouteToReviewState(reviewArgs)) {
-      reviewStateCommand(reviewArgs).catch(err => {
-        console.error('Error:', err.message);
-        process.exit(1);
-      });
+      reviewStateCommand(reviewArgs).catch(reportCliError);
     } else {
       const plainFlag = reviewArgs.includes('--plain');
       const metaphorArg = reviewArgs.find((a: string) => a.startsWith('--metaphor='));
@@ -148,10 +140,7 @@ switch (subcommand) {
     break;
   }
   case 'briefing':
-    briefingCommand(process.argv.slice(3)).catch(err => {
-      console.error('Error:', err.message);
-      process.exit(1);
-    });
+    briefingCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   case 'plan':
     planCommand(process.argv.slice(3));
@@ -160,308 +149,161 @@ switch (subcommand) {
     classifyCommand(process.argv.slice(3));
     break;
   case 'claim':
-    claimCommand(process.argv.slice(3)).catch(err => {
-      console.error('Error:', err.message);
-      process.exit(1);
-    });
+    claimCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   case 'release':
-    releaseCommand(process.argv.slice(3)).catch(err => {
-      console.error('Error:', err.message);
-      process.exit(1);
-    });
+    releaseCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   case 'status':
-    statusCommand(process.argv.slice(3)).catch(err => {
-      console.error('Error:', err.message);
-      process.exit(1);
-    });
+    statusCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   case 'tournament':
     tournamentCommand(process.argv.slice(3));
     break;
   case 'auto-card':
-    autoCardCommand(process.argv.slice(3)).catch(err => {
-      console.error('Error:', err.message);
-      process.exit(1);
-    });
+    autoCardCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   case 'hook':
-    hookCommand(process.argv.slice(3)).catch(err => {
-      console.error('Error:', err.message);
-      process.exit(1);
-    });
+    hookCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   case 'session':
-    sessionCommand(process.argv.slice(3)).catch(err => {
-      console.error('Error:', err.message);
-      process.exit(1);
-    });
+    sessionCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   case 'next':
     nextCommand();
     break;
   case 'agent':
-    agentCommand(process.argv.slice(3)).catch(err => {
-      console.error('Error:', err.message);
-      process.exit(1);
-    });
+    agentCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   case 'ticket':
-    ticketCommand(process.argv.slice(3)).catch(err => {
-      console.error('Error:', err.message);
-      process.exit(1);
-    });
+    ticketCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   case 'gate':
-    gateCommand(process.argv.slice(3)).catch(err => {
-      console.error('Error:', err.message);
-      process.exit(1);
-    });
+    gateCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   case 'commit-ready':
-    commitReadyCommand(process.argv.slice(3)).catch(err => {
-      console.error('Error:', err.message);
-      process.exit(1);
-    });
+    commitReadyCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   case 'pr':
-    prCommand(process.argv.slice(3)).catch(err => {
-      console.error('Error:', err.message);
-      process.exit(1);
-    });
+    prCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   case 'roadmap':
-    roadmapCommand(process.argv.slice(3)).catch(err => {
-      console.error('Error:', err.message);
-      process.exit(1);
-    });
+    roadmapCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   case 'retro':
-    retroCommand(process.argv.slice(3)).catch(err => {
-      console.error('Error:', err.message);
-      process.exit(1);
-    });
+    retroCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   case 'extract':
-    extractCommand(process.argv.slice(3)).catch(err => {
-      console.error('Error:', err.message);
-      process.exit(1);
-    });
+    extractCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   case 'distill':
-    distillCommand(process.argv.slice(3)).catch(err => {
-      console.error('Error:', err.message);
-      process.exit(1);
-    });
+    distillCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   case 'report':
-    reportCommand(process.argv.slice(3)).catch(err => {
-      console.error('Error:', err.message);
-      process.exit(1);
-    });
+    reportCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   case 'standup':
-    standupCommand(process.argv.slice(3)).catch(err => {
-      console.error('Error:', err.message);
-      process.exit(1);
-    });
+    standupCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   case 'escalate':
-    escalateCommand(process.argv.slice(3)).catch(err => {
-      console.error('Error:', err.message);
-      process.exit(1);
-    });
+    escalateCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   case 'guard': {
     const guardArgs = process.argv.slice(3);
     const guardSub = guardArgs[0];
     if (guardSub === 'list' || guardSub === 'status' || guardSub === 'enable' || guardSub === 'disable' || guardSub === 'docs' || guardSub === 'audit' || guardSub === 'recommend' || guardSub === 'metrics' || guardSub === 'check') {
-      guardManageCommand(guardArgs).catch(err => {
-        console.error('Error:', err.message);
-        process.exit(1);
-      });
+      guardManageCommand(guardArgs).catch(reportCliError);
     } else {
-      guardCommand(guardArgs).catch(err => {
-        console.error('Error:', err.message);
-        process.exit(1);
-      });
+      guardCommand(guardArgs).catch(reportCliError);
     }
     break;
   }
   case 'plugin':
-    pluginCommand(process.argv.slice(3)).catch(err => {
-      console.error('Error:', err.message);
-      process.exit(1);
-    });
+    pluginCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   case 'dashboard':
-    dashboardCommand(process.argv.slice(3)).catch(err => {
-      console.error('Error:', err.message);
-      process.exit(1);
-    });
+    dashboardCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   case 'map':
-    mapCommand(process.argv.slice(3)).catch(err => {
-      console.error('Error:', err.message);
-      process.exit(1);
-    });
+    mapCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   case 'flows':
-    flowsCommand(process.argv.slice(3)).catch(err => {
-      console.error('Error:', err.message);
-      process.exit(1);
-    });
+    flowsCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   case 'workflow':
-    workflowCommand(process.argv.slice(3)).catch(err => {
-      console.error('Error:', err.message);
-      process.exit(1);
-    });
+    workflowCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   case 'inspirations':
-    inspirationsCommand(process.argv.slice(3)).catch(err => {
-      console.error('Error:', err.message);
-      process.exit(1);
-    });
+    inspirationsCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   case 'analyze':
-    analyzeCommand(process.argv.slice(3)).catch(err => {
-      console.error('Error:', err.message);
-      process.exit(1);
-    });
+    analyzeCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   case 'vision':
-    visionCommand(process.argv.slice(3)).catch(err => {
-      console.error('Error:', err.message);
-      process.exit(1);
-    });
+    visionCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   case 'transcript':
-    transcriptCommand(process.argv.slice(3)).catch(err => {
-      console.error('Error:', err.message);
-      process.exit(1);
-    });
+    transcriptCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   case 'store':
-    storeCommand(process.argv.slice(3)).catch(err => {
-      console.error('Error:', err.message);
-      process.exit(1);
-    });
+    storeCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   case 'metaphor':
-    metaphorCommand(process.argv.slice(3)).catch(err => {
-      console.error('Error:', err.message);
-      process.exit(1);
-    });
+    metaphorCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   case 'initiative':
-    initiativeCommand(process.argv.slice(3)).catch(err => {
-      console.error('Error:', err.message);
-      process.exit(1);
-    });
+    initiativeCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   case 'index':
-    indexCommand(process.argv.slice(3)).catch(err => {
-      console.error('Error:', err.message);
-      process.exit(1);
-    });
+    indexCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   case 'context':
-    contextCommand(process.argv.slice(3)).catch(err => {
-      console.error('Error:', err.message);
-      process.exit(1);
-    });
+    contextCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   case 'prep':
-    prepCommand(process.argv.slice(3)).catch(err => {
-      console.error('Error:', err.message);
-      process.exit(1);
-    });
+    prepCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   case 'enrich':
-    enrichCommand(process.argv.slice(3)).catch(err => {
-      console.error('Error:', err.message);
-      process.exit(1);
-    });
+    enrichCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   case 'stats':
-    statsCommand(process.argv.slice(3)).catch(err => {
-      console.error('Error:', err.message);
-      process.exit(1);
-    });
+    statsCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   case 'docs':
-    docsCommand(process.argv.slice(3)).catch(err => {
-      console.error('Error:', err.message);
-      process.exit(1);
-    });
+    docsCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   case 'loop':
-    loopCommand(process.argv.slice(3)).catch(err => {
-      console.error('Error:', err.message);
-      process.exit(1);
-    });
+    loopCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   case 'sprint':
-    sprintCommand(process.argv.slice(3)).catch(err => {
-      console.error('Error:', err.message);
-      process.exit(1);
-    });
+    sprintCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   case 'phase':
-    phaseCommand(process.argv.slice(3)).catch(err => {
-      console.error('Error:', err.message);
-      process.exit(1);
-    });
+    phaseCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   case 'skills':
-    skillsCommand(process.argv.slice(3)).catch(err => {
-      console.error('Error:', err.message);
-      process.exit(1);
-    });
+    skillsCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   case 'doctor':
-    doctorCommand(process.argv.slice(3)).catch(err => {
-      console.error('Error:', err.message);
-      process.exit(1);
-    });
+    doctorCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   case 'version':
-    versionCommand(process.argv.slice(3)).catch(err => {
-      console.error('Error:', err.message);
-      process.exit(1);
-    });
+    versionCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   case 'help':
-    helpCommand(process.argv.slice(3)).catch(err => {
-      console.error('Error:', err.message);
-      process.exit(1);
-    });
+    helpCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   case 'quickstart':
-    quickstartCommand(process.argv.slice(3)).catch(err => {
-      console.error('Error:', err.message);
-      process.exit(1);
-    });
+    quickstartCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   case 'worktree':
-    worktreeCommand(process.argv.slice(3)).catch(err => {
-      console.error('Error:', err.message);
-      process.exit(1);
-    });
+    worktreeCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   case 'org':
-    orgCommand(process.argv.slice(3)).catch(err => {
-      console.error('Error:', err.message);
-      process.exit(1);
-    });
+    orgCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   case 'memory':
-    memoryCommand(process.argv.slice(3)).catch(err => {
-      console.error('Error:', err.message);
-      process.exit(1);
-    });
+    memoryCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   default:
     console.log(`

@@ -1,0 +1,134 @@
+{
+  "sprint_number": 126,
+  "player": "codex",
+  "theme": "Native Store Error Recovery Guidance",
+  "par": 4,
+  "slope": 2,
+  "score": 3,
+  "score_label": "birdie",
+  "date": "2026-05-29",
+  "shots": [
+    {
+      "ticket_key": "S126-1",
+      "title": "Extract shared CLI error reporter around native SQLite recovery helpers (#460)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added a shared CLI error reporter that formats normal errors consistently and appends the existing native SQLite store recovery suggestions when a better-sqlite3 binding/setup failure is detected."
+    },
+    {
+      "ticket_key": "S126-2",
+      "title": "Route duplicated top-level command catches through the shared reporter (#460)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Replaced the duplicated top-level async command catch blocks in the CLI entrypoint with reportCliError so store-backed commands no longer dump only the raw native binding stack."
+    },
+    {
+      "ticket_key": "S126-3",
+      "title": "Add native-binding failure regressions for common store-backed commands (#460)",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added focused formatter/reporter coverage plus a source-shape regression proving common store-backed top-level commands route through the shared reporter and do not reintroduce inline Error-only catches."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 3,
+    "fairways_total": 3,
+    "greens_in_regulation": 3,
+    "greens_total": 3,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "type": "bugfix",
+  "conditions": [
+    {
+      "type": "workflow",
+      "impact": "minor",
+      "description": "Implemented after PR #462 merged and main was synced."
+    },
+    {
+      "type": "release",
+      "impact": "minor",
+      "description": "Scoped to issue #460 so the follow-up release sprint can publish S125 and S126 together."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Native store recovery guidance belongs at the CLI error boundary, not only inside one store subcommand.",
+      "outcome": "Top-level commands now share reportCliError, which can enrich native SQLite setup failures without each command learning store-specific recovery logic."
+    },
+    {
+      "type": "lessons",
+      "description": "CLI entrypoints with process.exit side effects are easier to protect with formatting-unit tests plus narrow source-shape regressions.",
+      "outcome": "The tests cover formatCliError/reportCliError behavior directly and guard the common store-backed command registrations against drifting back to inline Error-only catches."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "Focused native reporter/store tests, typecheck, build, and full pnpm test passed.",
+      "status": "healthy"
+    },
+    {
+      "category": "workflow",
+      "description": "S126 closes issue #460 and clears the planned S127 patch release for the Codex runtime fixes.",
+      "status": "healthy"
+    },
+    {
+      "category": "concurrency",
+      "description": "The known untracked .codex/ state was left untouched.",
+      "status": "watch"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Clean and nicely bounded: the existing recovery copy was already good, it just needed to reach the callers where users actually hit the failure.",
+    "advice_for_next_player": "Keep specialized recovery hints behind shared error boundaries so new commands inherit them by default.",
+    "what_surprised_you": "The CLI entrypoint simplified substantially once the repeated catch blocks moved to one reporter.",
+    "excited_about_next": "S127 can be a straight patch release sprint for the S125/S126 Codex runtime fixes."
+  },
+  "bunker_locations": [
+    "Do not duplicate top-level command catch blocks that only print err.message; they can bypass richer recovery guidance.",
+    "Keep native SQLite setup detection behind storeRecoverySuggestions so the message-matching policy remains centralized.",
+    "Source-shape regressions around CLI registration should stay narrow and focused on high-value drift."
+  ],
+  "yardage_book_updates": [
+    "src/cli/error-reporter.ts now owns formatCliError and reportCliError for top-level CLI failures.",
+    "Common async command registrations in src/cli/index.ts now use .catch(reportCliError).",
+    "Native SQLite binding/setup failures now include the existing store recovery suggestions from top-level commands.",
+    "tests/cli/error-reporter.test.ts covers formatter output, process-exit reporting, and command registration drift."
+  ],
+  "course_management_notes": [
+    "Committed shared reporter and CLI catch routing as 223b980: fix(S126-1): report native SQLite recovery hints.",
+    "Committed routing regression coverage as a0fd02a: test(S126-3): cover native recovery reporter routing.",
+    "Focused Vitest run passed: tests/cli/error-reporter.test.ts and tests/cli/store.test.ts, 18 tests.",
+    "pnpm exec tsc --noEmit passed.",
+    "pnpm run build passed.",
+    "pnpm test passed: 216 passed test files, 1 skipped test file, 3503 passed tests, and 23 skipped tests."
+  ],
+  "skills_used": [
+    "slope-sprint-workflow"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow",
+    "slope-performance-analysis"
+  ],
+  "skill_gaps_found": [],
+  "slope_factors": [
+    "native_sqlite_recovery",
+    "shared_cli_error_boundary",
+    "top_level_command_routing",
+    "source_shape_regression"
+  ]
+}
