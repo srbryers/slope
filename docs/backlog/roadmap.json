@@ -2659,7 +2659,9 @@
       "par": 4,
       "slope": 4,
       "type": "bugfix",
-      "status": "planned",
+      "status": "complete",
+      "score": 4,
+      "score_label": "par",
       "depends_on": [
         124
       ],

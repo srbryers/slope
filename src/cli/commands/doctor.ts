@@ -491,7 +491,7 @@ function checkCodexHookScripts(hooksDir: string): DoctorCheck[] {
 function checkCodexHooks(cwd: string): DoctorCheck[] {
   const checks: DoctorCheck[] = [];
   const projectHooksPath = join(cwd, '.codex', 'hooks.json');
-  const userHooksPath = join(homedir(), '.codex', 'hooks.json');
+  const userHooksPath = join(resolveCodexHome(), 'hooks.json');
   const hasProjectSlopeHooks = existsSync(projectHooksPath) && fileHasSlopeHooks(projectHooksPath);
   const hasUserSlopeHooks = existsSync(userHooksPath) && fileHasSlopeHooks(userHooksPath);
 
@@ -505,12 +505,17 @@ function checkCodexHooks(cwd: string): DoctorCheck[] {
     checks.push({
       name: 'codex-hooks',
       status: 'warn',
-      message: 'SLOPE hooks found in both project .codex/hooks.json and ~/.codex/hooks.json — choose one runtime path to avoid duplicate firing',
+      message: `SLOPE hooks found in both ${projectHooksPath} and ${userHooksPath} — keep one active Codex runtime path to avoid duplicate firing`,
       fixable: false,
     });
   }
 
   return checks;
+}
+
+function resolveCodexHome(): string {
+  const override = process.env.SLOPE_CODEX_HOME ?? process.env.CODEX_HOME;
+  return override && override.trim().length > 0 ? resolve(override.trim()) : join(homedir(), '.codex');
 }
 
 function checkCodexRuntimeResolution(cwd: string): DoctorCheck[] {

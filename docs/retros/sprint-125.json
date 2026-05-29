@@ -1,0 +1,161 @@
+{
+  "sprint_number": 125,
+  "player": "codex",
+  "theme": "Codex Hook Effective Workdir Recovery",
+  "par": 4,
+  "slope": 4,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-05-29",
+  "shots": [
+    {
+      "ticket_key": "S125-1",
+      "title": "Normalize Codex Bash guard input to the effective exec workdir (#456/#459)",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "Initial file-path cwd recovery was too eager for non-existent edit targets and routed existing guard tests into a synthetic src/ directory; the recovery now requires the edited file parent to exist before it can override the hook cwd."
+        }
+      ],
+      "notes": "Centralized hook cwd normalization before config load, baseline recording, and guard dispatch. Codex hooks now prefer explicit tool_input.workdir/cwd, derive repository roots from existing edit file paths, canonicalize to SLOPE config or git roots, and preserve the hook cwd when no stronger signal exists."
+    },
+    {
+      "ticket_key": "S125-2",
+      "title": "Recover and remember exec workdir from Codex transcript/tool_use_id context (#459)",
+      "club": "driver",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "The remembered cwd regression exposed macOS /var versus /private/var path canonicalization drift; the remembered-cwd gate now compares real paths before deciding the hook cwd and launcher cwd refer to different directories."
+        },
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "Post-hole architecture review caught that transcript lines may include both a top-level session cwd and nested tool input.workdir; transcript parsing now prioritizes nested tool input fields before top-level cwd."
+        }
+      ],
+      "notes": "Added transcript tool_use_id lookup for nested tool-call workdir/cwd fields, a best-effort per-session Codex workdir cache, and single staged non-main worktree inference for git commit commands when Codex omits exec workdir."
+    },
+    {
+      "ticket_key": "S125-3",
+      "title": "Detect duplicate project-level and user-level Codex hook installs in doctor (#459)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Made Codex user hook discovery honor SLOPE_CODEX_HOME/CODEX_HOME and expanded the duplicate project/user warning to show the exact hook config paths so users can keep one active runtime path."
+    },
+    {
+      "ticket_key": "S125-4",
+      "title": "Add cross-repo/worktree regressions for branch-before-commit and worktree-check (#456/#459)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added command-level regressions covering explicit Codex workdir, transcript recovery plus remembered cwd reuse, single staged worktree inference, and worktree-check routing from an edited file path in another worktree."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 3,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "type": "bugfix",
+  "conditions": [
+    "Implemented after PR #458 merged and main was synced.",
+    "A stale feat/workflow-engine sibling worktree remains present but was not touched."
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Codex hook payload cwd is a session cwd, not necessarily the command cwd.",
+      "outcome": "Guard dispatch now resolves the effective cwd from tool inputs, transcript metadata, remembered session cwd, or staged worktree inference before any guard probes git."
+    },
+    {
+      "type": "lessons",
+      "description": "Path comparisons need realpath handling on macOS temp paths.",
+      "outcome": "Remembered Codex workdir recovery compares real paths so /var and /private/var do not block legitimate recovery."
+    },
+    {
+      "type": "lessons",
+      "description": "File-path based recovery should only override cwd when the path is concrete enough to locate a repo.",
+      "outcome": "Edit path recovery now requires an existing parent directory before canonicalizing to a SLOPE or git root."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "Focused guard/doctor tests, typecheck, build, and full pnpm test passed.",
+      "status": "healthy"
+    },
+    {
+      "category": "workflow",
+      "description": "S125 closes the effective-workdir half of the Codex runtime recovery phase; S126 remains the next planned bugfix sprint.",
+      "status": "healthy"
+    },
+    {
+      "category": "concurrency",
+      "description": "The known feat/workflow-engine sibling worktree is still dirty/ahead and should remain isolated from this PR.",
+      "status": "watch"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "A little fiddly, but in the productive way: every failing regression pointed straight at the real edge Codex users were feeling.",
+    "advice_for_next_player": "Keep cwd recovery centralized in guard input normalization; individual guards should not each learn a different version of Codex payload shape.",
+    "what_surprised_you": "The macOS /var realpath mismatch was invisible until the remembered-workdir regression reused the same session across two hook invocations.",
+    "excited_about_next": "S126 can focus cleanly on native store recovery guidance now that Codex hook routing has a safer cwd foundation."
+  },
+  "bunker_locations": [
+    "Codex hook stdin cwd can be a session root while the actual exec_command workdir is a different repository or worktree.",
+    "Do not route edit hooks by a file_path whose parent directory does not exist yet.",
+    "Compare canonical/real paths when using temp directories on macOS."
+  ],
+  "yardage_book_updates": [
+    "slope guard now normalizes hook cwd from tool_input.workdir/cwd before loading config or running guards.",
+    "slope guard can recover Codex exec workdir from transcript_path plus tool_use_id when workdir is omitted from hook stdin.",
+    "slope guard remembers recovered Codex workdir per session in a temp cache and can reuse it on later hook invocations from the same launcher cwd.",
+    "branch-before-commit can infer a single staged non-main worktree for git commit commands when Codex omits exec workdir.",
+    "worktree-check can route by existing edited file paths when hook cwd points at a different repo.",
+    "slope doctor now reports exact duplicate project/user Codex hook config paths and honors SLOPE_CODEX_HOME/CODEX_HOME."
+  ],
+  "course_management_notes": [
+    "Merged PR #458 before starting S125 and branched from updated main.",
+    "Committed guard recovery as 080c693: fix(S125-1): normalize Codex hook workdir.",
+    "Committed doctor duplicate-hook diagnostics as 5258929: fix(S125-3): detect duplicate Codex hook installs.",
+    "Focused Vitest run passed: tests/cli/commands/doctor.test.ts and tests/cli/commands/guard.test.ts, 38 tests.",
+    "Post-hole architecture review caught nested transcript input.workdir priority over top-level session cwd; added regression coverage and reran focused guard/doctor tests.",
+    "pnpm exec tsc --noEmit passed.",
+    "pnpm run build passed.",
+    "pnpm test passed: 215 passed test files, 1 skipped test file, 3499 passed tests, and 23 skipped tests."
+  ],
+  "skills_used": [
+    "slope-sprint-workflow",
+    "slope-api-reference"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow",
+    "slope-performance-analysis"
+  ],
+  "skill_gaps_found": [],
+  "slope_factors": [
+    "codex_payload_normalization",
+    "transcript_recovery",
+    "session_workdir_cache",
+    "cross_repo_worktree_regressions"
+  ]
+}

@@ -254,6 +254,45 @@ describe('doctor checks', () => {
       expect(codexCheck!.fixable).toBe(true);
     });
 
+    it('warns when SLOPE Codex hooks are installed at both project and user level', () => {
+      setupSlopeDir(cwd);
+      const previousCodexHome = process.env.SLOPE_CODEX_HOME;
+      const codexHome = join(cwd, '.test-codex-home');
+
+      try {
+        process.env.SLOPE_CODEX_HOME = codexHome;
+        mkdirSync(join(cwd, '.codex'), { recursive: true });
+        mkdirSync(codexHome, { recursive: true });
+        const hooksConfig = {
+          hooks: {
+            PreToolUse: [{
+              matcher: 'Bash',
+              hooks: [{ type: 'command', command: '"./.codex/hooks/slope-guard.sh" branch-before-commit' }],
+            }],
+          },
+        };
+        writeFileSync(join(cwd, '.codex', 'hooks.json'), JSON.stringify(hooksConfig));
+        writeFileSync(join(codexHome, 'hooks.json'), JSON.stringify(hooksConfig));
+
+        const checks = runDoctorChecks(cwd);
+        const duplicateCheck = checks.find(c =>
+          c.name === 'codex-hooks' &&
+          c.status === 'warn' &&
+          c.message.includes('keep one active Codex runtime path'),
+        );
+
+        expect(duplicateCheck).toBeDefined();
+        expect(duplicateCheck!.message).toContain(join(cwd, '.codex', 'hooks.json'));
+        expect(duplicateCheck!.message).toContain(join(codexHome, 'hooks.json'));
+      } finally {
+        if (previousCodexHome === undefined) {
+          delete process.env.SLOPE_CODEX_HOME;
+        } else {
+          process.env.SLOPE_CODEX_HOME = previousCodexHome;
+        }
+      }
+    });
+
     it('fixes Codex hooks.json root event shape', async () => {
       setupSlopeDir(cwd);
       mkdirSync(join(cwd, '.codex'), { recursive: true });
