@@ -2720,7 +2720,9 @@
       "par": 4,
       "slope": 2,
       "type": "bugfix",
-      "status": "planned",
+      "status": "complete",
+      "score": 3,
+      "score_label": "birdie",
       "depends_on": [
         125
       ],
