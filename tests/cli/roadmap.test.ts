@@ -129,6 +129,48 @@ describe('slope roadmap validate', () => {
     expect(output).toContain('S8-1');
   });
 
+  it('validates roadmap tickets that use id instead of key', async () => {
+    const roadmap = makeRoadmapJson({
+      sprints: [{
+        id: 7, theme: 'Id Only', par: 4, slope: 2, type: 'feature',
+        tickets: [
+          { id: 'S7-1', title: 'T1', club: 'short_iron', complexity: 'standard' },
+          { id: 'S7-2', title: 'T2', club: 'wedge', complexity: 'small', depends_on: ['S7-1'] },
+          { id: 'S7-3', title: 'T3', club: 'short_iron', complexity: 'standard' },
+        ],
+      } as unknown as RoadmapDefinition['sprints'][number]],
+      phases: [{ name: 'P1', sprints: [7] }],
+    });
+    writeRoadmap(tmpDir, roadmap);
+    const codes = mockExit();
+
+    await expect(roadmapCommand(['validate'])).rejects.toThrow('process.exit(0)');
+    expect(codes[0]).toBe(0);
+    expect(consoleOutput.join('\n')).toContain('Roadmap is valid');
+  });
+
+  it('reports missing roadmap ticket identifiers without throwing TypeError', async () => {
+    const roadmap = makeRoadmapJson({
+      sprints: [{
+        id: 7, theme: 'Missing Identifier', par: 4, slope: 2, type: 'feature',
+        tickets: [
+          { title: 'T1', club: 'short_iron', complexity: 'standard' },
+          { key: 'S7-2', title: 'T2', club: 'wedge', complexity: 'small' },
+          { key: 'S7-3', title: 'T3', club: 'short_iron', complexity: 'standard' },
+        ],
+      } as unknown as RoadmapDefinition['sprints'][number]],
+      phases: [{ name: 'P1', sprints: [7] }],
+    });
+    writeRoadmap(tmpDir, roadmap);
+    const codes = mockExit();
+
+    await expect(roadmapCommand(['validate'])).rejects.toThrow('process.exit(1)');
+    expect(codes[0]).toBe(1);
+    const output = consoleOutput.join('\n');
+    expect(output).toContain('missing key/id');
+    expect(output).not.toContain('startsWith');
+  });
+
   it('shows warnings for low ticket count', async () => {
     const roadmap = makeRoadmapJson({
       sprints: [{
