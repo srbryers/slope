@@ -1,0 +1,151 @@
+{
+  "sprint_number": 130,
+  "player": "codex",
+  "theme": "Sprint PR Closeout Enforcement",
+  "par": 4,
+  "slope": 3,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-05-31",
+  "shots": [
+    {
+      "ticket_key": "S130-1",
+      "title": "Define closeout policy inputs for scorecard, sprint review, branch push state, PR existence, and PR review state (#468)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Defined the closeout policy around scorecard presence, retrospective markdown presence, upstream push state, current-branch PR metadata, PR implementation review state, and branch-size thresholds."
+    },
+    {
+      "ticket_key": "S130-2",
+      "title": "Add PR status/closeout preflight reporting for current branch review readiness (#468)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "During closeout, the globally installed slope binary did not include the new pr status subcommand, so source-built validation had to use node dist/cli/index.js until the patch release ships."
+        }
+      ],
+      "notes": "Added slope pr status with closeout formatting, push and branch-size probes, PR metadata lookup, and reviewed/pending/missing PR review state resolution."
+    },
+    {
+      "ticket_key": "S130-3",
+      "title": "Warn from sprint retrospective review when PR review state is missing (#468)",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Sprint retrospective generation now warns that retrospective review is not the same as PR implementation review unless a matching PR review record is already complete."
+    },
+    {
+      "ticket_key": "S130-4",
+      "title": "Add branch-size guardrails and regressions for closeout/PR review discipline (#468)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "Round 1 review found the shared shell segment parser split only semicolon, newline, &&, and ||; single pipelines and background operators could bypass guard intent until fixed."
+        }
+      ],
+      "notes": "Added branch file/commit warning helpers and regressions. Review follow-up commit 2aa2283 tightened guard shell-segment parsing and added pipeline regressions for phase-boundary and worktree-check."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 2,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "type": "bugfix",
+  "conditions": [
+    {
+      "type": "pin_position",
+      "impact": "minor",
+      "description": "The sprint landed after PR creation, so closeout validation needed to distinguish local source-built behavior from the released global CLI."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Closeout commands must validate the full PR readiness path, not just generate retrospective notes.",
+      "outcome": "slope pr status now reports scorecard, sprint review, push state, PR existence, PR review state, and branch size in one preflight."
+    },
+    {
+      "type": "lessons",
+      "description": "Guard command allowlists need shell parser tests for all command separators.",
+      "outcome": "The review follow-up added pipeline coverage and parser handling for single | and background & separators."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "hydration",
+      "description": "pnpm run typecheck, pnpm test, pnpm run build, and slope roadmap validate passed after the review-found fix.",
+      "status": "healthy"
+    },
+    {
+      "category": "recovery",
+      "description": "Standard SLOPE review completed 2/2 rounds, and PR #469 GitHub checks passed.",
+      "status": "healthy"
+    },
+    {
+      "category": "stretching",
+      "description": "The source-built closeout status now verifies the PR review record, but the global binary will not expose the command until the patch release.",
+      "status": "needs_attention"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Useful but a little meta: the sprint added closeout guardrails, then immediately used them to catch missing closeout artifacts.",
+    "advice_for_next_player": "After opening a PR, run the source-built closeout status before calling the branch ready, and treat missing scorecard or retrospective markdown as real blockers.",
+    "what_surprised_you": "The auto-card dry run undercounted S130 because several commits were broad S130 or S130-review scopes rather than exact roadmap ticket keys.",
+    "excited_about_next": "Ship this with the S128/S129 guard recovery fixes so future PRs have a clearer closeout path."
+  },
+  "bunker_locations": [
+    "Auto-card commit heuristics can undercount multi-ticket closeout work when commits use broad S130 or S130-review scopes.",
+    "Local development validation can accidentally run the released global slope binary instead of the branch source; use node dist/cli/index.js for unreleased commands after building.",
+    "Guard shell command parsing must split all command separators used by shells, including single | and background &."
+  ],
+  "yardage_book_updates": [
+    "Use slope pr status --sprint=<N> after PR creation to check scorecard, retrospective review markdown, push state, PR existence, implementation review state, and branch size.",
+    "Use slope pr review --pr=<N> --sprint=<N> for implementation review; slope review <scorecard> is only the sprint retrospective.",
+    "For unreleased CLI changes in the SLOPE repo, run pnpm run build and then node dist/cli/index.js <command> to validate source-built behavior."
+  ],
+  "course_management_notes": [
+    "Draft PR #469 was opened from triage/open-issues-s128 to main and updated through commit 2aa2283.",
+    "slope pr review --pr=469 --sprint=130 generated the implementation review prompts and recorded PR review state as reviewed.",
+    "Standard review completed two rounds; Round 1 found and fixed a shared shell segment parser gap, and Round 2 found no further issues.",
+    "pnpm vitest run tests/cli/guards/phase-boundary.test.ts tests/cli/guards/worktree-check.test.ts passed after the parser fix: 41 tests.",
+    "pnpm run typecheck passed after the parser fix.",
+    "pnpm test passed after the parser fix: 219 test files passed, 1 skipped; 3530 tests passed, 25 skipped.",
+    "pnpm run build passed after the parser fix.",
+    "slope roadmap validate passed with standing roadmap warnings only.",
+    "GitHub checks for PR #469 passed after the review fix: ci, CodeQL, CodeRabbit, and GitGuardian."
+  ],
+  "skills_used": [
+    "slope-sprint-workflow",
+    "github:yeet"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow"
+  ],
+  "skill_gaps_found": [],
+  "slope_factors": [
+    "workflow_guard_hardening",
+    "github_cli_integration",
+    "source_built_cli_validation",
+    "review_followup_fix"
+  ]
+}

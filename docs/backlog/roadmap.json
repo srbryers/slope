@@ -2912,6 +2912,7 @@
       "depends_on": [
         129
       ],
+      "status": "complete",
       "note": "Close #468 by making sprint closeout distinguish retrospective review from PR implementation review, surfacing current-branch PR status, and warning on oversized branches before review fidelity collapses.",
       "tickets": [
         {
