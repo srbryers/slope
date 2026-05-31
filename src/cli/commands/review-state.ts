@@ -688,7 +688,13 @@ Run a structured review pass on the current sprint plan or PR. Pass
 \`--help\` after \`run\` for full options.`);
       break;
     default:
-      console.log(`Usage: slope review <subcommand> [options]
+      console.log(`Usage:
+  slope review [scorecard.json] [--plain] [--metaphor=<name>]
+  slope review <subcommand> [options]
+
+Retrospective:
+  Format sprint retrospective markdown from a scorecard. Defaults to the
+  latest scorecard when no scorecard path is provided.
 
 Subcommands:
   start       Start a review (auto-detects tier or use --rounds/--tier)
