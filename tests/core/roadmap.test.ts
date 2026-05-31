@@ -183,6 +183,56 @@ describe('validateRoadmap', () => {
     expect(result.errors.some(e => e.message.includes('S8-2') && e.message.includes('S7'))).toBe(true);
   });
 
+  it('accepts id as a ticket key alias', () => {
+    const roadmap = makeRoadmap({
+      sprints: [makeSprint(7, {
+        tickets: [
+          { ...makeTicket(7, 1), key: undefined, id: 'S7-1' },
+          { ...makeTicket(7, 2), key: undefined, id: 'S7-2', depends_on: ['S7-1'] },
+          { ...makeTicket(7, 3), key: undefined, id: 'S7-3' },
+        ] as unknown as RoadmapTicket[],
+      })],
+      phases: [{ name: 'P1', sprints: [7] }],
+    });
+    const result = validateRoadmap(roadmap);
+    expect(result.valid).toBe(true);
+    expect(result.errors).toEqual([]);
+  });
+
+  it('reports missing ticket id/key without throwing', () => {
+    const roadmap = makeRoadmap({
+      sprints: [makeSprint(7, {
+        tickets: [
+          { ...makeTicket(7, 1), key: undefined, id: undefined },
+          makeTicket(7, 2),
+          makeTicket(7, 3),
+        ] as unknown as RoadmapTicket[],
+      })],
+      phases: [{ name: 'P1', sprints: [7] }],
+    });
+
+    expect(() => validateRoadmap(roadmap)).not.toThrow();
+    const result = validateRoadmap(roadmap);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => e.message.includes('missing key/id'))).toBe(true);
+  });
+
+  it('normalizes id-only tickets to key when parsing', () => {
+    const parsed = parseRoadmap(makeRoadmap({
+      sprints: [makeSprint(7, {
+        tickets: [
+          { ...makeTicket(7, 1), key: undefined, id: 'S7-1' },
+          { ...makeTicket(7, 2), key: undefined, id: 'S7-2' },
+          { ...makeTicket(7, 3), key: undefined, id: 'S7-3' },
+        ] as unknown as RoadmapTicket[],
+      })],
+      phases: [{ name: 'P1', sprints: [7] }],
+    }));
+
+    expect(parsed.validation.valid).toBe(true);
+    expect(parsed.roadmap?.sprints[0].tickets.map(t => t.key)).toEqual(['S7-1', 'S7-2', 'S7-3']);
+  });
+
   it('detects missing intra-sprint ticket dependency', () => {
     const roadmap = makeRoadmap({
       sprints: [makeSprint(7, {

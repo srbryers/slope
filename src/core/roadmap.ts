@@ -9,6 +9,7 @@ export type RoadmapClub = 'driver' | 'long_iron' | 'short_iron' | 'wedge' | 'put
 /** A single ticket within a sprint */
 export interface RoadmapTicket {
   key: string;           // e.g., "S7-1"
+  id?: string;           // accepted alias for external roadmap inputs
   title: string;
   club: RoadmapClub;
   complexity: 'trivial' | 'small' | 'standard' | 'moderate';
@@ -140,6 +141,33 @@ export function isRoadmapSprintPending(sprint: RoadmapSprint): boolean {
   return status !== 'complete' && status !== 'superseded';
 }
 
+type RoadmapTicketInput = Partial<RoadmapTicket> & { id?: unknown; key?: unknown };
+
+export function getRoadmapTicketKey(ticket: RoadmapTicketInput): string | null {
+  const key = ticket.key;
+  if (typeof key === 'string' && key.trim()) return key.trim();
+
+  const id = ticket.id;
+  if (typeof id === 'string' && id.trim()) return id.trim();
+
+  return null;
+}
+
+function normalizeRoadmapTicket(ticket: RoadmapTicket): RoadmapTicket {
+  const key = getRoadmapTicketKey(ticket);
+  return key ? { ...ticket, key } : ticket;
+}
+
+function normalizeRoadmap(roadmap: RoadmapDefinition): RoadmapDefinition {
+  return {
+    ...roadmap,
+    sprints: roadmap.sprints.map(sprint => ({
+      ...sprint,
+      tickets: sprint.tickets.map(normalizeRoadmapTicket),
+    })),
+  };
+}
+
 /** Validate a roadmap definition for structural correctness.
  *  Optionally cross-check sprint status against scorecards and/or shipped
  *  sprint commits on main when provided. Caller is responsible for collecting
@@ -180,7 +208,11 @@ export function validateRoadmap(
   }
 
   // Build a set of all ticket keys across all sprints for cross-sprint dependency validation
-  const allTicketKeys = new Set(roadmap.sprints.flatMap(s => s.tickets.map(t => t.key)));
+  const allTicketKeys = new Set(
+    roadmap.sprints.flatMap(s =>
+      s.tickets.map(getRoadmapTicketKey).filter((key): key is string => key !== null),
+    ),
+  );
 
   for (const sprint of roadmap.sprints) {
     // Check: ticket count (3-4 per sprint)
@@ -202,25 +234,38 @@ export function validateRoadmap(
     // Check: ticket key format matches sprint
     for (const ticket of sprint.tickets) {
       const expected = `${formatSprintLabel(sprint.id)}-`;
-      if (!ticket.key.startsWith(expected)) {
+      const ticketKey = getRoadmapTicketKey(ticket);
+      if (!ticketKey) {
         errors.push({
           type: 'error',
           sprint: sprint.id,
-          ticket: ticket.key,
-          message: `Ticket ${ticket.key} does not match sprint ${formatSprintLabel(sprint.id)} (expected prefix ${expected})`,
+          message: `Ticket in ${formatSprintLabel(sprint.id)} is missing key/id`,
+        });
+        continue;
+      }
+
+      if (!ticketKey.startsWith(expected)) {
+        errors.push({
+          type: 'error',
+          sprint: sprint.id,
+          ticket: ticketKey,
+          message: `Ticket ${ticketKey} does not match sprint ${formatSprintLabel(sprint.id)} (expected prefix ${expected})`,
         });
       }
     }
 
     // Check: ticket dependencies exist (intra-sprint or cross-sprint)
     for (const ticket of sprint.tickets) {
+      const ticketKey = getRoadmapTicketKey(ticket);
+      if (!ticketKey) continue;
+
       for (const dep of ticket.depends_on ?? []) {
         if (!allTicketKeys.has(dep)) {
           errors.push({
             type: 'error',
             sprint: sprint.id,
-            ticket: ticket.key,
-            message: `Ticket ${ticket.key} depends on ${dep} which does not exist in the roadmap`,
+            ticket: ticketKey,
+            message: `Ticket ${ticketKey} depends on ${dep} which does not exist in the roadmap`,
           });
         }
       }
@@ -523,7 +568,7 @@ export function castRoadmapStructure(json: unknown): RoadmapDefinition | null {
   if (typeof obj.name !== 'string') return null;
   if (!Array.isArray(obj.sprints)) return null;
   if (!Array.isArray(obj.phases)) return null;
-  return obj as unknown as RoadmapDefinition;
+  return normalizeRoadmap(obj as unknown as RoadmapDefinition);
 }
 
 /** Parse and validate a roadmap from a JSON object */
@@ -555,7 +600,7 @@ export function parseRoadmap(json: unknown): { roadmap: RoadmapDefinition | null
     };
   }
 
-  const roadmap = obj as unknown as RoadmapDefinition;
+  const roadmap = normalizeRoadmap(obj as unknown as RoadmapDefinition);
   const validation = validateRoadmap(roadmap);
   return { roadmap: validation.valid ? roadmap : null, validation };
 }
