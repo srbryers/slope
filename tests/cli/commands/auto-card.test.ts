@@ -40,6 +40,13 @@ describe('matchSprintTicket (#352 helper)', () => {
     expect(matchSprintTicket('feat(S1): umbrella two', 1, allowedKeys, cursor)).toBe('S1-2');
   });
 
+  it('treats sprint review/follow-up scopes as sprint-owned closeout commits', () => {
+    const cursor = { next: 0 };
+    expect(matchSprintTicket('fix(S1-review): tighten shell parsing', 1, allowedKeys, cursor)).toBe('S1-1');
+    expect(matchSprintTicket('fix(S1-follow-up): address review', 1, allowedKeys, cursor)).toBe('S1-2');
+    expect(matchSprintTicket('fix(S2-review): other sprint review', 1, allowedKeys, cursor)).toBeNull();
+  });
+
   it('returns null once positional cursor exhausts the allowed keys', () => {
     const cursor = { next: 3 }; // already past the last allowed key
     expect(matchSprintTicket('feat(S1): one too many', 1, allowedKeys, cursor)).toBeNull();
@@ -142,6 +149,30 @@ describe('slope auto-card --dry-run roadmap filtering (#352)', () => {
       expect(combined).toMatch(/Filtered 1 commit/);
       expect(combined).toContain('chore: unrelated cleanup');
       expect(combined).toContain('--include-untracked');
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('warns when sprint-scoped commits do not cover every roadmap ticket', () => {
+    const cwd = setupRepoWithRoadmap();
+    try {
+      commitWith(cwd, 'feat(S1): broad implementation');
+      commitWith(cwd, 'fix(S1-review): review follow-up');
+
+      const combined = execSync(
+        `node ${SLOPE_BIN} auto-card --sprint=1 --dry-run 2>&1`,
+        { cwd, encoding: 'utf8', shell: '/bin/sh' },
+      );
+      const jsonStart = combined.indexOf('{');
+      expect(jsonStart).toBeGreaterThanOrEqual(0);
+      const card = JSON.parse(combined.slice(jsonStart).trim());
+      const keys = (card.shots as Array<{ ticket_key: string }>).map(s => s.ticket_key);
+
+      expect(keys).toEqual(['S1-1', 'S1-2']);
+      expect(combined).toContain('matched 2/3 S1 roadmap ticket');
+      expect(combined).toContain('may undercount multi-ticket closeout work');
+      expect(combined).toContain('S1-3');
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }

@@ -101,8 +101,30 @@ export function matchSprintTicket(
     return null;
   }
 
-  // 4. No reference to this sprint at all — drop
+  // 4. Sprint-scoped workflow follow-ups such as `S130-review` or
+  // `S130-follow-up` belong to the sprint, even though they are not roadmap
+  // ticket ids. Assign them positionally so they are not filtered as unrelated
+  // closeout commits (#471).
+  if (isSprintWorkflowScope(subject, sprintNumber)) {
+    while (positionalCursor.next < allowedKeys.length) {
+      return allowedKeys[positionalCursor.next++];
+    }
+    return null;
+  }
+
+  // 5. No reference to this sprint at all — drop
   return null;
+}
+
+function isSprintScopedSubject(subject: string, sprintNumber: number): boolean {
+  const sprintToken = escapeRegex(formatSprintNumber(sprintNumber));
+  return new RegExp(`[(\\s+]S${sprintToken}(?![-.\\d])`, 'i').test(subject)
+    || isSprintWorkflowScope(subject, sprintNumber);
+}
+
+function isSprintWorkflowScope(subject: string, sprintNumber: number): boolean {
+  const sprintToken = escapeRegex(formatSprintNumber(sprintNumber));
+  return new RegExp(`\\bS${sprintToken}[-_](?:review|follow[-_]?up|closeout)\\b`, 'i').test(subject);
 }
 
 function inferClub(filesChanged: number): ShotRecord['club'] {
@@ -188,6 +210,14 @@ export async function autoCardCommand(args: string[]): Promise<void> {
       }
       if (dropped.length > 5) console.error(`    ... and ${dropped.length - 5} more`);
       console.error(`  Use --include-untracked to keep them as synthetic shots.\n`);
+    }
+
+    const matchedKeySet = new Set(keptKeys);
+    const unmatchedKeys = allowedKeys.filter(key => !matchedKeySet.has(key));
+    if (unmatchedKeys.length > 0 && allCommits.some(c => isSprintScopedSubject(c.subject, sprintNumber))) {
+      console.error(`  Warning: matched ${matchedKeySet.size}/${allowedKeys.length} S${formatSprintNumber(sprintNumber)} roadmap ticket(s).`);
+      console.error(`  Sprint-scoped commits such as \`feat(S${formatSprintNumber(sprintNumber)})\` or \`fix(S${formatSprintNumber(sprintNumber)}-review)\` are assigned positionally and may undercount multi-ticket closeout work.`);
+      console.error(`  Review the generated scorecard manually; unmatched roadmap ticket(s): ${unmatchedKeys.join(', ')}.\n`);
     }
 
     if (kept.length === 0) {
