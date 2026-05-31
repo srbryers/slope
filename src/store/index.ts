@@ -10,7 +10,7 @@ import type { Database as DatabaseType } from 'better-sqlite3';
 import type { SprintClaim, GolfScorecard, SlopeEvent, EventType, WorkflowExecution, WorkflowStepResult, CompletedStep } from '../core/index.js';
 import type { CommonIssuesFile, StoreStats } from '../core/index.js';
 import { SlopeStoreError } from '../core/index.js';
-import type { SlopeStore, SlopeSession } from '../core/index.js';
+import type { SlopeStore, SlopeSession, SlopeSessionUpdate } from '../core/index.js';
 import type { EmbeddingStore, EmbeddingEntry, EmbeddingSearchResult, EmbeddingStats, IndexMeta } from '../core/embedding-store.js';
 
 function generateId(prefix: string): string {
@@ -372,6 +372,36 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
     this.db.prepare('DELETE FROM claims WHERE session_id = ?').run(sessionId);
     const result = this.db.prepare('DELETE FROM sessions WHERE session_id = ?').run(sessionId);
     return result.changes > 0;
+  }
+
+  async updateSession(sessionId: string, updates: SlopeSessionUpdate): Promise<SlopeSession> {
+    const row = this.db.prepare('SELECT * FROM sessions WHERE session_id = ?')
+      .get(sessionId) as Record<string, unknown> | undefined;
+    if (!row) {
+      throw new SlopeStoreError('NOT_FOUND', `Session "${sessionId}" not found`);
+    }
+
+    const current = rowToSession(row);
+    const lastHeartbeatAt = nowISO();
+    const next = mergeSessionUpdate(current, updates, lastHeartbeatAt);
+
+    this.db.prepare(`
+      UPDATE sessions
+      SET role = ?, ide = ?, worktree_path = ?, branch = ?, last_heartbeat_at = ?, metadata = ?, agent_role = ?, swarm_id = ?
+      WHERE session_id = ?
+    `).run(
+      next.role,
+      next.ide,
+      next.worktree_path ?? null,
+      next.branch ?? null,
+      next.last_heartbeat_at,
+      next.metadata ? JSON.stringify(next.metadata) : null,
+      next.agent_role ?? null,
+      next.swarm_id ?? null,
+      sessionId,
+    );
+
+    return next;
   }
 
   async getActiveSessions(): Promise<SlopeSession[]> {
@@ -909,6 +939,20 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
 }
 
 // --- Row mappers ---
+
+function mergeSessionUpdate(current: SlopeSession, updates: SlopeSessionUpdate, lastHeartbeatAt: string): SlopeSession {
+  return {
+    ...current,
+    ...dropUndefined(updates),
+    last_heartbeat_at: lastHeartbeatAt,
+  };
+}
+
+function dropUndefined<T extends object>(value: T): Partial<T> {
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).filter(([, entry]) => entry !== undefined),
+  ) as Partial<T>;
+}
 
 function rowToSession(row: Record<string, unknown>): SlopeSession {
   return {

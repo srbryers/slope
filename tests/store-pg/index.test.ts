@@ -74,6 +74,41 @@ describe.skipIf(!PG_URL)('PostgresSlopeStore', () => {
       expect(updated?.last_heartbeat_at).not.toBe(original);
     });
 
+    it('updates session metadata without deleting claims', async () => {
+      const id = `sess-update-${Date.now()}`;
+      const sprint = uniqueSprint();
+      const session = await store.registerSession({ session_id: id, role: 'primary', ide: 'vscode', branch: 'main' });
+      await store.claim({
+        sprint_number: sprint,
+        player: 'alice',
+        target: `S${sprint}-1`,
+        scope: 'ticket',
+        session_id: id,
+      });
+
+      await new Promise(r => setTimeout(r, 10));
+      const updated = await store.updateSession(id, {
+        role: 'secondary',
+        branch: 'fix/deadlock',
+        worktree_path: '/tmp/slope-worktree',
+      });
+
+      expect(updated.role).toBe('secondary');
+      expect(updated.ide).toBe('vscode');
+      expect(updated.branch).toBe('fix/deadlock');
+      expect(updated.worktree_path).toBe('/tmp/slope-worktree');
+      expect(updated.started_at).toBe(session.started_at);
+      expect(updated.last_heartbeat_at).not.toBe(session.last_heartbeat_at);
+
+      const claims = await store.getActiveClaims(sprint);
+      expect(claims).toHaveLength(1);
+    });
+
+    it('throws NOT_FOUND on session update for missing session', async () => {
+      await expect(store.updateSession('nonexistent-pg', { role: 'secondary' }))
+        .rejects.toThrow(SlopeStoreError);
+    });
+
     it('throws NOT_FOUND on heartbeat for missing session', async () => {
       await expect(store.updateHeartbeat('nonexistent-pg'))
         .rejects.toThrow(SlopeStoreError);

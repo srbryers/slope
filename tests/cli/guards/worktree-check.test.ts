@@ -34,6 +34,14 @@ const mockStore = {
     started_at: new Date().toISOString(),
     last_heartbeat_at: new Date().toISOString(),
   }),
+  updateSession: vi.fn().mockResolvedValue({
+    session_id: 'test-session',
+    role: 'secondary',
+    ide: 'claude-code',
+    worktree_path: '/tmp/test',
+    started_at: new Date().toISOString(),
+    last_heartbeat_at: new Date().toISOString(),
+  }),
   close: vi.fn(),
 } as unknown as SlopeStore;
 
@@ -88,6 +96,14 @@ describe('worktreeCheckGuard', () => {
       session_id: 'test-session',
       role: 'primary',
       ide: 'claude-code',
+      started_at: new Date().toISOString(),
+      last_heartbeat_at: new Date().toISOString(),
+    });
+    (mockStore.updateSession as ReturnType<typeof vi.fn>).mockResolvedValue({
+      session_id: 'test-session',
+      role: 'secondary',
+      ide: 'claude-code',
+      worktree_path: '/tmp/test',
       started_at: new Date().toISOString(),
       last_heartbeat_at: new Date().toISOString(),
     });
@@ -243,8 +259,23 @@ describe('worktreeCheckGuard', () => {
 
     const result = await worktreeCheckGuard(makeInput(), '/tmp/test');
     expect(result).toEqual({});
-    // Should not open the store at all
-    expect(mockResolveStore).not.toHaveBeenCalled();
+  });
+
+  it('reconciles current session metadata when already in a worktree', async () => {
+    sentinelFiles.add('/tmp/test/.slope/config.json');
+    mockExecFileSync
+      .mockReturnValueOnce('../../.git' as never) // git-common-dir != '.git'
+      .mockReturnValueOnce('/tmp/test' as never) // git rev-parse --show-toplevel
+      .mockReturnValueOnce('fix/deadlock' as never); // branch
+
+    const result = await worktreeCheckGuard(makeInput(), '/tmp/test');
+
+    expect(result).toEqual({});
+    expect(mockStore.updateSession).toHaveBeenCalledWith('test-session', {
+      role: 'secondary',
+      branch: 'fix/deadlock',
+      worktree_path: '/tmp/test',
+    });
   });
 
   it('silently passes on store resolve error (#263)', async () => {

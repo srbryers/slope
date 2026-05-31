@@ -28,6 +28,8 @@ export interface SlopeSession {
   swarm_id?: string;
 }
 
+export type SlopeSessionUpdate = Partial<Omit<SlopeSession, 'session_id' | 'started_at' | 'last_heartbeat_at'>>;
+
 export type StoreErrorCode = 'SESSION_CONFLICT' | 'CLAIM_EXISTS' | 'NOT_FOUND' | 'STORE_UNAVAILABLE' | 'EXTENSION_UNAVAILABLE';
 
 export class SlopeStoreError extends Error {
@@ -40,6 +42,7 @@ export class SlopeStoreError extends Error {
 export interface SlopeStore extends SprintRegistry {
   // Sessions
   registerSession(session: Omit<SlopeSession, 'started_at' | 'last_heartbeat_at'>): Promise<SlopeSession>;
+  updateSession(sessionId: string, updates: SlopeSessionUpdate): Promise<SlopeSession>;
   removeSession(sessionId: string): Promise<boolean>;
   getActiveSessions(): Promise<SlopeSession[]>;
   getSessionsBySwarm(swarmId: string): Promise<SlopeSession[]>;
