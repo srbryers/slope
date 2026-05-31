@@ -148,7 +148,9 @@ describe('reviewStateCommand', () => {
       try {
         await runCommand(['--help']);
         const helpText = log.mock.calls.map(c => c[0] as string).join('\n');
-        expect(helpText).toMatch(/Usage: slope review <subcommand>/);
+        expect(helpText).toMatch(/slope review \[scorecard\.json\]/);
+        expect(helpText).toMatch(/slope review <subcommand>/);
+        expect(helpText).toContain('Format sprint retrospective markdown');
         expect(helpText).toContain('start');
         expect(helpText).toContain('round');
         expect(helpText).toContain('findings');
