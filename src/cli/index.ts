@@ -340,7 +340,7 @@ Usage:
   slope hook add --level=full               Install all guidance hooks
   slope guard <name>                        Run a guard handler (reads stdin)
   slope guard list|enable|disable           Manage guard activation
-  slope session start|end|heartbeat|list    Manage live sessions
+  slope session start|end|heartbeat|prune|list Manage live sessions
   slope next                                Show next sprint number (auto-detect)
   slope extract --file=<path> [options]       Extract events into SLOPE store
   slope distill [--auto] [--dry-run]         Promote event patterns to common issues

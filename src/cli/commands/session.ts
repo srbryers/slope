@@ -29,6 +29,9 @@ export async function sessionCommand(args: string[]): Promise<void> {
     case 'heartbeat':
       await heartbeat(flags, cwd);
       break;
+    case 'prune':
+      await pruneSessions(flags, cwd);
+      break;
     case 'list':
       await listSessions(flags, cwd);
       break;
@@ -53,6 +56,7 @@ Usage:
   slope session start --swarm=<id> --agent-role=<role>   Join a swarm
   slope session end [--session-id=<id>]
   slope session heartbeat [--session-id=<id>]
+  slope session prune [--max-age-ms=600000]
   slope session list [--swarm=<id>]
 `);
       if (sub) process.exit(1);
@@ -180,6 +184,31 @@ async function heartbeat(flags: Record<string, string>, cwd: string): Promise<vo
   } finally {
     store.close();
   }
+}
+
+async function pruneSessions(flags: Record<string, string>, cwd: string): Promise<void> {
+  const maxAgeMs = parseMaxAgeMs(flags['max-age-ms']);
+  const store = await resolveStore(cwd);
+  try {
+    const removed = await store.cleanStaleSessions(maxAgeMs);
+    console.log(`\nStale session cleanup:`);
+    console.log(`  Max age: ${maxAgeMs}ms`);
+    console.log(`  Removed: ${removed} session${removed === 1 ? '' : 's'}`);
+    console.log('');
+  } finally {
+    store.close();
+  }
+}
+
+function parseMaxAgeMs(raw: string | undefined): number {
+  if (!raw) return STALE_SESSION_THRESHOLD_MS;
+
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value < 0 || !Number.isInteger(value)) {
+    console.error('Error: --max-age-ms must be a non-negative integer');
+    process.exit(1);
+  }
+  return value;
 }
 
 async function listSessions(flags: Record<string, string>, cwd: string): Promise<void> {
