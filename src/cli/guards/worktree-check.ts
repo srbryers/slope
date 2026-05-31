@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, writeFileSync, mkdirSync, unlinkSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createHash } from 'node:crypto';
 import type { HookInput, GuardResult } from '../../core/index.js';
@@ -57,7 +57,10 @@ export async function worktreeCheckGuard(input: HookInput, cwd: string): Promise
   }
 
   // If git-common-dir is not '.git', we're in a worktree (already isolated)
-  if (gitCommonDir !== '.git') return {};
+  if (gitCommonDir !== '.git') {
+    await reconcileWorktreeSession(input, cwd, sessionId);
+    return {};
+  }
 
   // Get current branch for session registration
   let branch: string;
@@ -119,7 +122,7 @@ export async function worktreeCheckGuard(input: HookInput, cwd: string): Promise
       // Do NOT write sentinel — denied sessions should re-check next invocation
       return {
         decision: 'deny',
-        blockReason: `BLOCKED: Another session is active in this directory:\n${sessionList}\n\nYou MUST use \`EnterWorktree\` to create an isolated working copy before proceeding. If this harness does not expose EnterWorktree, run \`slope worktree start --branch=<branch> --role=secondary --ide=<ide>\` from the primary checkout. Do not attempt implementation work until you are in a worktree.`,
+        blockReason: `BLOCKED: Another session is active in this directory:\n${sessionList}\n\nYou MUST use \`EnterWorktree\` to create an isolated working copy before proceeding. If this harness does not expose EnterWorktree, run \`slope worktree start --branch=<branch> --role=secondary --ide=<ide>\` from the primary checkout. If the listed session is stale, run \`slope session list\` and then \`slope session end --session-id=<id>\`. Do not attempt implementation work until you are in a worktree.`,
       };
     }
 
@@ -138,10 +141,121 @@ function isWorktreeRecoveryInput(input: HookInput): boolean {
   if (input.tool_name === 'EnterWorktree') return true;
 
   const command = extractCommandText(input);
+  if (command === 'EnterWorktree') return true;
+  const segments = splitShellSegments(command);
+  if (segments.length !== 1) return false;
 
-  return command === 'EnterWorktree'
-    || /^git\s+worktree\s+add(?:\s|$)/.test(command)
-    || /^git\s+-C\s+(?:"[^"]+"|'[^']+'|\S+)\s+worktree\s+add(?:\s|$)/.test(command);
+  const words = tokenizeShellWords(segments[0]);
+  return isGitWorktreeAdd(words) || isSlopeRecoveryCommand(words);
+}
+
+function isGitWorktreeAdd(words: string[]): boolean {
+  const start = skipCommandPrefix(words, 0);
+  if (words[start] !== 'git') return false;
+
+  if (words[start + 1] === 'worktree' && words[start + 2] === 'add') return true;
+  return words[start + 1] === '-C'
+    && !!words[start + 2]
+    && words[start + 3] === 'worktree'
+    && words[start + 4] === 'add';
+}
+
+function isSlopeRecoveryCommand(words: string[]): boolean {
+  const slopeIndex = findSlopeExecutableIndex(words);
+  if (slopeIndex < 0) return false;
+
+  const args = words.slice(slopeIndex + 1);
+  if (args[0] === 'worktree' && args[1] === 'start') return true;
+  if (args[0] !== 'session') return false;
+
+  return args[1] === 'end'
+    || args[1] === 'list'
+    || args[1] === 'prune'
+    || args[1] === 'dashboard';
+}
+
+function splitShellSegments(command: string): string[] {
+  const segments: string[] = [];
+  let current = '';
+  let quote: '"' | "'" | null = null;
+
+  for (let i = 0; i < command.length; i++) {
+    const char = command[i];
+    if (char === '\\' && quote !== "'") {
+      current += char;
+      if (i + 1 < command.length) current += command[++i];
+      continue;
+    }
+    if ((char === '"' || char === "'") && (!quote || quote === char)) {
+      quote = quote ? null : char;
+      current += char;
+      continue;
+    }
+    if (!quote && (char === ';' || char === '\n' || char === '&' || char === '|')) {
+      if (current.trim()) segments.push(current.trim());
+      current = '';
+      if ((char === '&' && command[i + 1] === '&') || (char === '|' && command[i + 1] === '|')) i++;
+      continue;
+    }
+    current += char;
+  }
+
+  if (current.trim()) segments.push(current.trim());
+  return segments;
+}
+
+function tokenizeShellWords(segment: string): string[] {
+  const words: string[] = [];
+  let current = '';
+  let quote: '"' | "'" | null = null;
+
+  for (let i = 0; i < segment.length; i++) {
+    const char = segment[i];
+    if (char === '\\' && quote !== "'") {
+      if (i + 1 < segment.length) current += segment[++i];
+      continue;
+    }
+    if ((char === '"' || char === "'") && (!quote || quote === char)) {
+      quote = quote ? null : char;
+      continue;
+    }
+    if (!quote && /\s/.test(char)) {
+      if (current) {
+        words.push(current);
+        current = '';
+      }
+      continue;
+    }
+    current += char;
+  }
+
+  if (current) words.push(current);
+  return words;
+}
+
+function findSlopeExecutableIndex(words: string[]): number {
+  const i = skipCommandPrefix(words, 0);
+
+  if (words[i] === 'slope') return i;
+  if ((words[i] === 'npx' || words[i] === 'bunx') && words[i + 1] === 'slope') return i + 1;
+  if (['pnpm', 'npm', 'yarn', 'bun'].includes(words[i])) {
+    if (words[i + 1] === 'exec' && words[i + 2] === 'slope') return i + 2;
+    if (words[i + 1] === 'slope') return i + 1;
+  }
+
+  return -1;
+}
+
+function skipCommandPrefix(words: string[], start: number): number {
+  let i = start;
+  if (words[i] === 'env') i++;
+  while (isEnvAssignment(words[i])) i++;
+  if (words[i] === 'command') i++;
+  return i;
+}
+
+function isEnvAssignment(word: string | undefined): boolean {
+  return !!word && /^[A-Za-z_][A-Za-z0-9_]*=/.test(word);
 }
 
 function gitRevParse(cwd: string, ...args: string[]): string {
@@ -150,6 +264,87 @@ function gitRevParse(cwd: string, ...args: string[]): string {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'ignore'],
   }).trim();
+}
+
+async function reconcileWorktreeSession(input: HookInput, cwd: string, sessionId: string): Promise<void> {
+  let store;
+  try {
+    const stateCwd = resolveSlopeStateCwd(cwd);
+    if (!stateCwd) return;
+    store = await resolveStore(stateCwd);
+
+    const worktreePath = gitRevParse(cwd, '--show-toplevel');
+    const branch = safeGitRevParse(cwd, '--abbrev-ref', 'HEAD') ?? 'unknown';
+
+    try {
+      await store.updateSession(sessionId, {
+        role: 'secondary',
+        branch,
+        worktree_path: worktreePath,
+      });
+    } catch (err) {
+      if (err instanceof SlopeStoreError && err.code === 'NOT_FOUND') {
+        await store.registerSession({
+          session_id: sessionId,
+          role: 'secondary',
+          ide: resolveIde(input),
+          branch,
+          worktree_path: worktreePath,
+        });
+      } else {
+        throw err;
+      }
+    }
+  } catch {
+    // Worktree sessions are already isolated; reconciliation is best-effort.
+  } finally {
+    try { store?.close(); } catch { /* ignore */ }
+  }
+}
+
+function resolveSlopeStateCwd(cwd: string): string | undefined {
+  if (existsSync(join(cwd, '.slope', 'config.json'))) return cwd;
+
+  for (const worktree of listGitWorktrees(cwd)) {
+    if (resolve(worktree) === resolve(cwd)) continue;
+    if (existsSync(join(worktree, '.slope', 'config.json'))) return worktree;
+  }
+
+  return undefined;
+}
+
+function listGitWorktrees(cwd: string): string[] {
+  try {
+    const raw = execFileSync('git', ['worktree', 'list', '--porcelain'], {
+      cwd,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    return raw
+      .split('\n')
+      .filter(line => line.startsWith('worktree '))
+      .map(line => line.slice('worktree '.length).trim())
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+function safeGitRevParse(cwd: string, ...args: string[]): string | undefined {
+  try {
+    return gitRevParse(cwd, ...args);
+  } catch {
+    return undefined;
+  }
+}
+
+function resolveIde(input: HookInput): string {
+  const metadata = input.tool_input ?? {};
+  for (const key of ['ide', 'agent', 'harness']) {
+    const value = metadata[key];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return process.env.SLOPE_IDE || 'unknown';
 }
 
 function resolveSessionId(input: HookInput, cwd: string): string {

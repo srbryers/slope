@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { sprintCompletionGuard } from '../../../src/cli/guards/sprint-completion.js';
+import { recordPrReviewComplete } from '../../../src/cli/pr-review-state.js';
 import { saveSprintState, createSprintState, loadSprintState } from '../../../src/cli/sprint-state.js';
 import type { HookInput } from '../../../src/core/index.js';
 
@@ -371,6 +372,30 @@ describe('sprint-completion guard', () => {
 
       const result = await sprintCompletionGuard(makePostToolUse('slope validate', 0), tmpDir);
       expect(result).toEqual({});
+    });
+  });
+
+  describe('PostToolUse sprint retrospective review completion', () => {
+    beforeEach(() => {
+      saveSprintState(tmpDir, createSprintState(22, 'scoring'));
+    });
+
+    it('warns that sprint retrospective review is not PR implementation review', async () => {
+      const result = await sprintCompletionGuard(makePostToolUse('slope review docs/retros/sprint-22.json', 0), tmpDir);
+
+      expect(result.context).toContain('Review generated');
+      expect(result.context).toContain('sprint retrospective review is not PR implementation review');
+      expect(result.context).toContain('slope pr status --sprint=22');
+      expect(result.context).toContain('slope pr review');
+    });
+
+    it('does not warn when PR implementation review is already recorded', async () => {
+      recordPrReviewComplete(tmpDir, { pr: 42, sprint: 22, reviewType: 'both' });
+
+      const result = await sprintCompletionGuard(makePostToolUse('slope review docs/retros/sprint-22.json', 0), tmpDir);
+
+      expect(result.context).toContain('Review generated');
+      expect(result.context).not.toContain('sprint retrospective review is not PR implementation review');
     });
   });
 });

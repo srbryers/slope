@@ -41,6 +41,8 @@ export interface SlopeConfig {
     mapStaleWarnAt?: number;
     mapStaleBlockAt?: number;
     requireSprintForImplementationWrites?: 'ask' | 'deny' | 'off';
+    prCommitWarnAt?: number;
+    prFileWarnAt?: number;
   };
   orchestration?: {
     escalation?: EscalationConfig;

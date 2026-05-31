@@ -267,8 +267,19 @@
         126,
         127
       ],
-      "status": "planned",
+      "status": "complete",
       "note": "Triage the open #456/#459/#460 issue batch into two focused repair sprints and one patch-release sprint: first fix Codex effective-workdir hook routing, then improve native SQLite recovery messaging, then publish the combined fixes."
+    },
+    {
+      "name": "Phase 41 \u2014 Roadmap Shape & Worktree Deadlock Recovery",
+      "sprints": [
+        128,
+        129,
+        130,
+        131
+      ],
+      "status": "planned",
+      "note": "Triage the open #466/#467/#468 issue batch into three focused repair sprints and one patch-release sprint: first repair roadmap ticket identifier parsing and phase-boundary guard matching, then fix worktree-check stale-session deadlocks, then enforce PR closeout discipline, then publish the combined fixes."
     }
   ],
   "sprints": [
@@ -2785,6 +2796,189 @@
           "complexity": "standard",
           "depends_on": [
             "S127-1"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 128,
+      "theme": "Roadmap Shape & Phase Boundary Recovery",
+      "par": 4,
+      "slope": 3,
+      "type": "bugfix + guard hardening",
+      "depends_on": [
+        127
+      ],
+      "note": "Close #466 by accepting id/key roadmap ticket identifiers, making validation report shape errors instead of throwing, and tightening phase-boundary guard matching/fail-safe behavior.",
+      "tickets": [
+        {
+          "key": "S128-1",
+          "title": "Normalize roadmap ticket identifiers from key/id and validate missing identifiers (#466)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 466
+        },
+        {
+          "key": "S128-2",
+          "title": "Route roadmap parse and validate callers through structured errors for id-only roadmaps (#466)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 466,
+          "depends_on": [
+            "S128-1"
+          ]
+        },
+        {
+          "key": "S128-3",
+          "title": "Make phase-boundary match actual slope subcommands and fail safe on roadmap parse errors (#466)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 466,
+          "depends_on": [
+            "S128-1"
+          ]
+        },
+        {
+          "key": "S128-4",
+          "title": "Add regressions for id-only roadmap tickets, missing ids, and command-body false positives (#466)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 466,
+          "depends_on": [
+            "S128-1",
+            "S128-2",
+            "S128-3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 129,
+      "theme": "Worktree Guard Deadlock Recovery",
+      "par": 4,
+      "slope": 4,
+      "type": "bugfix + guard hardening",
+      "depends_on": [
+        128
+      ],
+      "note": "Close #467 by making worktree-check recovery reachable, reconciling harness worktree entry with the session registry, and proving stale primary cleanup does not deadlock future sessions.",
+      "tickets": [
+        {
+          "key": "S129-1",
+          "title": "Reproduce stale-primary worktree-check deadlock with the SQLite session store (#467)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 467
+        },
+        {
+          "key": "S129-2",
+          "title": "Whitelist guard-safe slope worktree and session recovery commands through worktree-check (#467)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 467,
+          "depends_on": [
+            "S129-1"
+          ]
+        },
+        {
+          "key": "S129-3",
+          "title": "Reconcile EnterWorktree/worktree-start session registry metadata for secondary worktrees (#467)",
+          "club": "long_iron",
+          "complexity": "moderate",
+          "github_issue": 467,
+          "depends_on": [
+            "S129-1"
+          ]
+        },
+        {
+          "key": "S129-4",
+          "title": "Add stale-session cleanup/reset coverage and user-facing remediation docs (#467)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 467,
+          "depends_on": [
+            "S129-2",
+            "S129-3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 130,
+      "theme": "Sprint PR Closeout Enforcement",
+      "par": 4,
+      "slope": 3,
+      "type": "workflow + guard hardening",
+      "depends_on": [
+        129
+      ],
+      "status": "complete",
+      "note": "Close #468 by making sprint closeout distinguish retrospective review from PR implementation review, surfacing current-branch PR status, and warning on oversized branches before review fidelity collapses.",
+      "tickets": [
+        {
+          "key": "S130-1",
+          "title": "Define closeout policy inputs for scorecard, sprint review, branch push state, PR existence, and PR review state (#468)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 468
+        },
+        {
+          "key": "S130-2",
+          "title": "Add PR status/closeout preflight reporting for current branch review readiness (#468)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 468,
+          "depends_on": [
+            "S130-1"
+          ]
+        },
+        {
+          "key": "S130-3",
+          "title": "Warn from sprint retrospective review when PR review state is missing (#468)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 468,
+          "depends_on": [
+            "S130-1"
+          ]
+        },
+        {
+          "key": "S130-4",
+          "title": "Add branch-size guardrails and regressions for closeout/PR review discipline (#468)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 468,
+          "depends_on": [
+            "S130-2",
+            "S130-3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 131,
+      "theme": "Guard Recovery Patch Release",
+      "par": 3,
+      "slope": 1,
+      "type": "release",
+      "depends_on": [
+        130
+      ],
+      "note": "Publish the S128/S129/S130 roadmap parser, phase-boundary, worktree-check deadlock, and PR closeout enforcement fixes as the next patch release after validation and npm trusted-publisher verification.",
+      "tickets": [
+        {
+          "key": "S131-1",
+          "title": "Bump @slope-dev/slope and bundled Codex plugin for the guard recovery patch release",
+          "club": "wedge",
+          "complexity": "small"
+        },
+        {
+          "key": "S131-2",
+          "title": "Run release validation, publish the patch release, and verify npm",
+          "club": "short_iron",
+          "complexity": "standard",
+          "depends_on": [
+            "S131-1"
           ]
         }
       ]

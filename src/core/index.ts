@@ -146,7 +146,7 @@ export type { SprintRegistry } from './registry.js';
 
 // Store
 export { SlopeStoreError } from './store.js';
-export type { SlopeStore, SlopeSession, StoreErrorCode, StoreStats } from './store.js';
+export type { SlopeStore, SlopeSession, SlopeSessionUpdate, StoreErrorCode, StoreStats } from './store.js';
 
 // Store Health
 export { checkStoreHealth } from './store-health.js';

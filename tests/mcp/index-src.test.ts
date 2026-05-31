@@ -22,6 +22,12 @@ function createMockStore(): SlopeStore & { sessions: SlopeSession[]; claims: Spr
       sessions.push(session);
       return session;
     },
+    async updateSession(id, updates) {
+      const idx = sessions.findIndex(s => s.session_id === id);
+      if (idx === -1) throw new Error('not found');
+      sessions[idx] = { ...sessions[idx], ...updates, last_heartbeat_at: new Date().toISOString() };
+      return sessions[idx];
+    },
     async removeSession(id) {
       const idx = sessions.findIndex(s => s.session_id === id);
       if (idx === -1) return false;

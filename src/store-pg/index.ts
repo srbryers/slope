@@ -6,7 +6,7 @@ import type { SprintClaim, GolfScorecard, SlopeEvent, EventType, WorkflowExecuti
 import type { CommonIssuesFile } from '../core/briefing.js';
 import type { StoreStats } from '../core/store.js';
 import { SlopeStoreError } from '../core/store.js';
-import type { SlopeStore, SlopeSession } from '../core/store.js';
+import type { SlopeStore, SlopeSession, SlopeSessionUpdate } from '../core/store.js';
 // EmbeddingStore not implemented for PG — hasEmbeddingSupport() returns false.
 // Deferred to a future pgvector sprint.
 
@@ -367,6 +367,39 @@ export class PostgresSlopeStore implements SlopeStore {
       [sessionId, this.projectId],
     );
     return (result.rowCount ?? 0) > 0;
+  }
+
+  async updateSession(sessionId: string, updates: SlopeSessionUpdate): Promise<SlopeSession> {
+    const existing = await this.pool.query(
+      'SELECT * FROM sessions WHERE session_id = $1 AND project_id = $2',
+      [sessionId, this.projectId],
+    );
+    if (existing.rows.length === 0) {
+      throw new SlopeStoreError('NOT_FOUND', `Session "${sessionId}" not found`);
+    }
+
+    const current = rowToSession(existing.rows[0] as Record<string, unknown>);
+    const lastHeartbeatAt = nowISO();
+    const next = mergeSessionUpdate(current, updates, lastHeartbeatAt);
+
+    await this.pool.query(`
+      UPDATE sessions
+      SET role = $1, ide = $2, worktree_path = $3, branch = $4, last_heartbeat_at = $5, metadata = $6, agent_role = $7, swarm_id = $8
+      WHERE session_id = $9 AND project_id = $10
+    `, [
+      next.role,
+      next.ide,
+      next.worktree_path ?? null,
+      next.branch ?? null,
+      next.last_heartbeat_at,
+      next.metadata ? JSON.stringify(next.metadata) : null,
+      next.agent_role ?? null,
+      next.swarm_id ?? null,
+      sessionId,
+      this.projectId,
+    ]);
+
+    return next;
   }
 
   async getActiveSessions(): Promise<SlopeSession[]> {
@@ -825,6 +858,20 @@ export class PostgresSlopeStore implements SlopeStore {
 }
 
 // --- Row mappers ---
+
+function mergeSessionUpdate(current: SlopeSession, updates: SlopeSessionUpdate, lastHeartbeatAt: string): SlopeSession {
+  return {
+    ...current,
+    ...dropUndefined(updates),
+    last_heartbeat_at: lastHeartbeatAt,
+  };
+}
+
+function dropUndefined<T extends object>(value: T): Partial<T> {
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).filter(([, entry]) => entry !== undefined),
+  ) as Partial<T>;
+}
 
 function rowToSession(row: Record<string, unknown>): SlopeSession {
   return {

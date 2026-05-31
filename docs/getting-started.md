@@ -185,6 +185,20 @@ slope release --target=<ticket>          # Release a claim when done
 slope session end                       # End the session
 ```
 
+If a previous agent crashed and a worktree/session guard reports a stale active session, inspect and remove it before continuing:
+
+```bash
+slope session list
+slope session end --session-id=<id>      # Remove one known orphaned session
+slope session prune                      # Remove sessions past the stale threshold
+```
+
+For concurrent implementation work, create an isolated worktree from the primary checkout:
+
+```bash
+slope worktree start --branch=<branch> --role=secondary --ide=<ide>
+```
+
 ### Inserted Sub-Sprints
 
 Use a decimal sprint label when work is inserted between two existing sprints, for example `S43.5` between `S43` and `S44`.

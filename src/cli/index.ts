@@ -327,6 +327,7 @@ Usage:
   slope review findings add|list|clear      Manage implementation review findings
   slope review amend [--sprint=N]           Amend scorecard with review findings
   slope pr review [--pr=N] [--sprint=N]     Run post-PR review workflow
+  slope pr status [--sprint=N]              Check PR closeout readiness
   slope briefing [--sprint=N] [options]      Pre-round briefing
   slope plan --complexity=<level>           Pre-shot advisor (club + training + hazards)
   slope classify --scope=... ...            Classify a shot from execution trace
@@ -340,7 +341,7 @@ Usage:
   slope hook add --level=full               Install all guidance hooks
   slope guard <name>                        Run a guard handler (reads stdin)
   slope guard list|enable|disable           Manage guard activation
-  slope session start|end|heartbeat|list    Manage live sessions
+  slope session start|end|heartbeat|prune|list Manage live sessions
   slope next                                Show next sprint number (auto-detect)
   slope extract --file=<path> [options]       Extract events into SLOPE store
   slope distill [--auto] [--dry-run]         Promote event patterns to common issues

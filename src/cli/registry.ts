@@ -708,11 +708,19 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     ],
   },
   {
-    cmd: 'pr', desc: 'Pull request helpers (auto-close, finalize)', category: 'tooling',
+    cmd: 'pr', desc: 'Pull request helpers (auto-close, finalize, closeout)', category: 'tooling',
     subcommands: [
       { name: 'finalize', desc: 'Inject Closes #N for issue refs in commit messages (#321)', flags: [
         { flag: '--pr=<N>', desc: 'PR number (default: resolved from current branch)' },
         { flag: '--dry-run', desc: 'Print plan without modifying the PR body' },
+      ]},
+      { name: 'review', desc: 'Run post-PR implementation review workflow', flags: [
+        { flag: '--pr=<N>', desc: 'PR number (default: resolved from current branch)' },
+        { flag: '--sprint=<N>', desc: 'Sprint number for review context' },
+        { flag: '--type=<type>', desc: 'architect, code, or both' },
+      ]},
+      { name: 'status', desc: 'Check PR closeout readiness', flags: [
+        { flag: '--sprint=<N>', desc: 'Sprint number for scorecard/review checks' },
       ]},
       { name: 'issues', desc: 'Print extracted issue refs from the branch commits' },
     ],

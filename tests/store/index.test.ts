@@ -65,6 +65,41 @@ describe('Sessions', () => {
     expect(active[0].last_heartbeat_at).not.toBe(original);
   });
 
+  it('updates session metadata without deleting claims', async () => {
+    const session = await store.registerSession({ session_id: 'sess-update', role: 'primary', ide: 'vscode', branch: 'main' });
+    await store.claim({
+      sprint_number: 129,
+      player: 'alice',
+      target: 'S129-3',
+      scope: 'ticket',
+      session_id: 'sess-update',
+    });
+
+    await new Promise(r => setTimeout(r, 10));
+    const updated = await store.updateSession('sess-update', {
+      role: 'secondary',
+      branch: 'fix/deadlock',
+      worktree_path: '/tmp/slope-worktree',
+    });
+
+    expect(updated.role).toBe('secondary');
+    expect(updated.ide).toBe('vscode');
+    expect(updated.branch).toBe('fix/deadlock');
+    expect(updated.worktree_path).toBe('/tmp/slope-worktree');
+    expect(updated.started_at).toBe(session.started_at);
+    expect(updated.last_heartbeat_at).not.toBe(session.last_heartbeat_at);
+
+    const active = await store.getActiveSessions();
+    expect(active[0].role).toBe('secondary');
+    expect(active[0].worktree_path).toBe('/tmp/slope-worktree');
+    expect(await store.getActiveClaims()).toHaveLength(1);
+  });
+
+  it('throws NOT_FOUND on session update for missing session', async () => {
+    await expect(store.updateSession('nonexistent', { role: 'secondary' }))
+      .rejects.toThrow(SlopeStoreError);
+  });
+
   it('throws NOT_FOUND on heartbeat for missing session', async () => {
     await expect(store.updateHeartbeat('nonexistent'))
       .rejects.toThrow(SlopeStoreError);

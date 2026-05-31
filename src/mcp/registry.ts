@@ -1064,7 +1064,7 @@ interface TrainingPlanInput { handicap: HandicapCard; dispersion: DispersionRepo
 
 // ─── Roadmap ───
 type RoadmapClub = 'driver' | 'long_iron' | 'short_iron' | 'wedge' | 'putter';
-interface RoadmapTicket { key: string; title: string; club: RoadmapClub; complexity: 'trivial' | 'small' | 'standard' | 'moderate'; depends_on?: string[]; }
+interface RoadmapTicket { key: string; id?: string; title: string; club: RoadmapClub; complexity: 'trivial' | 'small' | 'standard' | 'moderate'; depends_on?: string[]; }
 interface RoadmapSprint { id: number; theme: string; par: 3 | 4 | 5; slope: number; type: string; tickets: RoadmapTicket[]; depends_on?: number[]; }
 interface RoadmapPhase { name: string; sprints: number[]; }
 interface RoadmapDefinition { name: string; description?: string; phases: RoadmapPhase[]; sprints: RoadmapSprint[]; }

@@ -5,6 +5,7 @@ import { detectLatestSprint, loadConfig, normalizeScorecard, recommendReviews } 
 import type { ReviewRecommendation } from '../../core/index.js';
 import { reviewRunCommand } from './review-run.js';
 import { recordPrReviewComplete } from '../pr-review-state.js';
+import { branchSizeWarnings, buildPrCloseoutStatus, closeoutPolicy, formatPrCloseoutStatus } from '../pr-closeout.js';
 
 /**
  * `slope pr ...` — agent-friendly PR helpers.
@@ -16,6 +17,7 @@ import { recordPrReviewComplete } from '../pr-review-state.js';
  *                                            parser would otherwise miss (#321).
  *   slope pr review [--pr=N] [--sprint=N]    Run the post-PR review workflow
  *                                            for any PR creation transport.
+ *   slope pr status [--sprint=N]             Check sprint + PR closeout readiness.
  *   slope pr issues [--pr=N]                 Print extracted issue refs (helper).
  *
  * Background: commits like `fix: ... (GH #297, #299)` or `… closes #314` mix
@@ -46,6 +48,7 @@ interface PrReviewPlan {
   hasNewInfra: boolean;
   recommendations: ReviewRecommendation[];
   reviewType: 'architect' | 'code' | 'both';
+  branchSizeWarnings: string[];
 }
 
 export async function prCommand(args: string[]): Promise<void> {
@@ -63,6 +66,11 @@ export async function prCommand(args: string[]): Promise<void> {
 
   if (sub === 'review') {
     await reviewSubcommand(args.slice(1));
+    return;
+  }
+
+  if (sub === 'status') {
+    await statusSubcommand(args.slice(1));
     return;
   }
 
@@ -86,6 +94,8 @@ Usage:
   slope pr review [--pr=N] [--sprint=N]    Run review recommendation + prompt generation
                                            after PR creation, regardless of whether the
                                            PR was created by gh, MCP, or another API.
+  slope pr status [--sprint=N]             Check scorecard, sprint review, push state,
+                                           PR existence, PR review, and branch size.
   slope pr issues [--pr=N]                 Print extracted issue refs from the branch's
                                            commit messages.
 
@@ -215,6 +225,7 @@ export async function planPrReview(opts: PrReviewOptions): Promise<PrReviewPlan 
   const { ticketCount, slope } = loadSprintReviewSignals(sprint);
   const changedFiles = changedFilesForPr(pr);
   const hasNewInfra = changedFiles.some(p => /(\.sql|migration|schema|infra|terraform|k8s|deploy)/i.test(p));
+  const policy = closeoutPolicy(process.cwd());
   const recommendations = recommendReviews({
     ticketCount,
     slope,
@@ -231,6 +242,7 @@ export async function planPrReview(opts: PrReviewOptions): Promise<PrReviewPlan 
     hasNewInfra,
     recommendations,
     reviewType: opts.type ?? defaultReviewType(recommendations),
+    branchSizeWarnings: branchSizeWarnings({ files: changedFiles.length }, policy),
   };
 }
 
@@ -439,6 +451,10 @@ async function reviewSubcommand(args: string[]): Promise<void> {
   console.log(`\nPR #${plan.pr} review workflow${plan.sprint ? ` for Sprint ${plan.sprint}` : ''}`);
   console.log(`Files changed: ${plan.changedFiles.length}`);
   console.log(`Signals: ${plan.ticketCount} ticket${plan.ticketCount !== 1 ? 's' : ''}, slope ${plan.slope}${plan.hasNewInfra ? ', infrastructure/schema paths' : ''}`);
+  if (plan.branchSizeWarnings.length > 0) {
+    console.log('\nBranch size warnings:\n');
+    for (const warning of plan.branchSizeWarnings) console.log(`  - ${warning}`);
+  }
   console.log('\nRecommended reviews:\n');
   console.log('  Type           Priority      Reason');
   console.log(formatReviewRecommendations(plan.recommendations));
@@ -451,6 +467,13 @@ async function reviewSubcommand(args: string[]): Promise<void> {
     branch: currentBranch(),
     reviewType: plan.reviewType,
   });
+}
+
+async function statusSubcommand(args: string[]): Promise<void> {
+  const opts = parseReviewFlags(args);
+  const status = buildPrCloseoutStatus(process.cwd(), { sprint: opts.sprint });
+  console.log(formatPrCloseoutStatus(status));
+  if (status.blockers.length > 0) process.exitCode = 1;
 }
 
 async function issuesSubcommand(args: string[]): Promise<void> {

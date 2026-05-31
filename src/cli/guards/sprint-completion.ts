@@ -3,6 +3,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { HookInput, GuardResult } from '../../core/index.js';
 import { loadConfig } from '../config.js';
+import { loadPrReviewState } from '../pr-review-state.js';
 import { loadSprintState, mutateSprintState, updateGate, isSprintComplete, pendingGates } from '../sprint-state.js';
 
 /**
@@ -253,10 +254,39 @@ function handleReviewCompletion(input: HookInput, cwd: string): GuardResult {
 
   const state = loadSprintState(cwd);
   if (!state) return {};
-  if (state.gates.review_md) return {}; // Already marked
 
-  updateGate(cwd, 'review_md', true);
-  return { context: 'SLOPE: Review generated — gate marked complete.' };
+  if (!state.gates.review_md) updateGate(cwd, 'review_md', true);
+  const lines = [state.gates.review_md
+    ? 'SLOPE: Review generated — gate was already complete.'
+    : 'SLOPE: Review generated — gate marked complete.'];
+  const prReviewWarning = missingPrReviewWarning(cwd, state.sprint);
+  if (prReviewWarning) lines.push('', prReviewWarning);
+  return { context: lines.join('\n') };
+}
+
+function missingPrReviewWarning(cwd: string, sprint: number): string | null {
+  const branch = currentBranch(cwd);
+  const reviews = loadPrReviewState(cwd).reviews;
+  const matching = reviews.filter(review =>
+    review.sprint === sprint
+    || (branch && review.branch === branch),
+  );
+
+  if (matching.some(review => review.status === 'reviewed')) return null;
+  const pending = matching.find(review => review.status === 'pending');
+  const target = pending ? `PR #${pending.pr}` : 'the current branch PR';
+  return [
+    'SLOPE PR closeout: sprint retrospective review is not PR implementation review.',
+    `Run \`slope pr status --sprint=${sprint}\` and \`slope pr review${pending ? ` --pr=${pending.pr}` : ''} --sprint=${sprint}\` before presenting ${target} as ready.`,
+  ].join(' ');
+}
+
+function currentBranch(cwd: string): string | undefined {
+  try {
+    return execSync('git branch --show-current', { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() || undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /** Detect `slope auto-card` completion → suggest validate next. */
