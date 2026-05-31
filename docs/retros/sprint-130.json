@@ -135,8 +135,7 @@
     "GitHub checks for PR #469 passed after the review fix: ci, CodeQL, CodeRabbit, and GitGuardian."
   ],
   "skills_used": [
-    "slope-sprint-workflow",
-    "github:yeet"
+    "slope-sprint-workflow"
   ],
   "skills_recommended": [
     "slope-sprint-workflow"
