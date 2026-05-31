@@ -275,10 +275,11 @@
       "sprints": [
         128,
         129,
-        130
+        130,
+        131
       ],
       "status": "planned",
-      "note": "Triage the open #466/#467 issue batch into two focused repair sprints and one patch-release sprint: first repair roadmap ticket identifier parsing and phase-boundary guard matching, then fix worktree-check stale-session deadlocks, then publish the combined fixes."
+      "note": "Triage the open #466/#467/#468 issue batch into three focused repair sprints and one patch-release sprint: first repair roadmap ticket identifier parsing and phase-boundary guard matching, then fix worktree-check stale-session deadlocks, then enforce PR closeout discipline, then publish the combined fixes."
     }
   ],
   "sprints": [
@@ -2904,28 +2905,79 @@
     },
     {
       "id": 130,
+      "theme": "Sprint PR Closeout Enforcement",
+      "par": 4,
+      "slope": 3,
+      "type": "workflow + guard hardening",
+      "depends_on": [
+        129
+      ],
+      "note": "Close #468 by making sprint closeout distinguish retrospective review from PR implementation review, surfacing current-branch PR status, and warning on oversized branches before review fidelity collapses.",
+      "tickets": [
+        {
+          "key": "S130-1",
+          "title": "Define closeout policy inputs for scorecard, sprint review, branch push state, PR existence, and PR review state (#468)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 468
+        },
+        {
+          "key": "S130-2",
+          "title": "Add PR status/closeout preflight reporting for current branch review readiness (#468)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 468,
+          "depends_on": [
+            "S130-1"
+          ]
+        },
+        {
+          "key": "S130-3",
+          "title": "Warn from sprint retrospective review when PR review state is missing (#468)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 468,
+          "depends_on": [
+            "S130-1"
+          ]
+        },
+        {
+          "key": "S130-4",
+          "title": "Add branch-size guardrails and regressions for closeout/PR review discipline (#468)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 468,
+          "depends_on": [
+            "S130-2",
+            "S130-3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 131,
       "theme": "Guard Recovery Patch Release",
       "par": 3,
       "slope": 1,
       "type": "release",
       "depends_on": [
-        129
+        130
       ],
-      "note": "Publish the S128/S129 roadmap parser, phase-boundary, and worktree-check deadlock fixes as the next patch release after validation and npm trusted-publisher verification.",
+      "note": "Publish the S128/S129/S130 roadmap parser, phase-boundary, worktree-check deadlock, and PR closeout enforcement fixes as the next patch release after validation and npm trusted-publisher verification.",
       "tickets": [
         {
-          "key": "S130-1",
+          "key": "S131-1",
           "title": "Bump @slope-dev/slope and bundled Codex plugin for the guard recovery patch release",
           "club": "wedge",
           "complexity": "small"
         },
         {
-          "key": "S130-2",
+          "key": "S131-2",
           "title": "Run release validation, publish the patch release, and verify npm",
           "club": "short_iron",
           "complexity": "standard",
           "depends_on": [
-            "S130-1"
+            "S131-1"
           ]
         }
       ]
