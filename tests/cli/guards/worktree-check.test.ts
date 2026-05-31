@@ -226,6 +226,23 @@ describe('worktreeCheckGuard', () => {
     expect(mockResolveStore).toHaveBeenCalled();
   });
 
+  it('does not allow piped recovery commands with extra work', async () => {
+    mockGitMainRepo();
+    (mockStore.getActiveSessions as ReturnType<typeof vi.fn>).mockResolvedValue([
+      makeSession({ session_id: 'test-session' }),
+      makeSession({ session_id: 'other-session' }),
+    ]);
+
+    const result = await worktreeCheckGuard({
+      ...makeInput(),
+      tool_name: 'Bash',
+      tool_input: { command: 'slope session list | pnpm test' },
+    }, '/tmp/test');
+
+    expect(result.decision).toBe('deny');
+    expect(mockResolveStore).toHaveBeenCalled();
+  });
+
   it('allows when other session has worktree_path (isolated)', async () => {
     mockExecFileSync
       .mockReturnValueOnce('.git' as never)

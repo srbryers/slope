@@ -79,6 +79,15 @@ describe('phaseBoundaryGuard', () => {
     expect(result.suggestion?.context).toContain('Sprint 2');
   });
 
+  it('matches slope invocations in pipeline segments', async () => {
+    writeRoadmap();
+
+    const result = await phaseBoundaryGuard(makeInput('printf ok | slope sprint start --sprint=2'), tmpDir);
+
+    expect(result.decision).toBe('deny');
+    expect(result.suggestion?.context).toContain('Sprint 2');
+  });
+
   it('does not match slope commands mentioned inside another command body', async () => {
     writeRoadmap();
 

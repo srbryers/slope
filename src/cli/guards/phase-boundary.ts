@@ -135,10 +135,10 @@ function splitShellSegments(command: string): string[] {
       current += char;
       continue;
     }
-    if (!quote && (char === ';' || char === '\n' || (char === '&' && command[i + 1] === '&') || (char === '|' && command[i + 1] === '|'))) {
+    if (!quote && (char === ';' || char === '\n' || char === '&' || char === '|')) {
       if (current.trim()) segments.push(current.trim());
       current = '';
-      if (char === '&' || char === '|') i++;
+      if ((char === '&' && command[i + 1] === '&') || (char === '|' && command[i + 1] === '|')) i++;
       continue;
     }
     current += char;
