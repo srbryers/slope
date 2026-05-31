@@ -119,7 +119,7 @@ export async function worktreeCheckGuard(input: HookInput, cwd: string): Promise
       // Do NOT write sentinel — denied sessions should re-check next invocation
       return {
         decision: 'deny',
-        blockReason: `BLOCKED: Another session is active in this directory:\n${sessionList}\n\nYou MUST use \`EnterWorktree\` to create an isolated working copy before proceeding. If this harness does not expose EnterWorktree, run \`slope worktree start --branch=<branch> --role=secondary --ide=<ide>\` from the primary checkout. Do not attempt implementation work until you are in a worktree.`,
+        blockReason: `BLOCKED: Another session is active in this directory:\n${sessionList}\n\nYou MUST use \`EnterWorktree\` to create an isolated working copy before proceeding. If this harness does not expose EnterWorktree, run \`slope worktree start --branch=<branch> --role=secondary --ide=<ide>\` from the primary checkout. If the listed session is stale, run \`slope session list\` and then \`slope session end --session-id=<id>\`. Do not attempt implementation work until you are in a worktree.`,
       };
     }
 
@@ -138,10 +138,121 @@ function isWorktreeRecoveryInput(input: HookInput): boolean {
   if (input.tool_name === 'EnterWorktree') return true;
 
   const command = extractCommandText(input);
+  if (command === 'EnterWorktree') return true;
+  const segments = splitShellSegments(command);
+  if (segments.length !== 1) return false;
 
-  return command === 'EnterWorktree'
-    || /^git\s+worktree\s+add(?:\s|$)/.test(command)
-    || /^git\s+-C\s+(?:"[^"]+"|'[^']+'|\S+)\s+worktree\s+add(?:\s|$)/.test(command);
+  const words = tokenizeShellWords(segments[0]);
+  return isGitWorktreeAdd(words) || isSlopeRecoveryCommand(words);
+}
+
+function isGitWorktreeAdd(words: string[]): boolean {
+  const start = skipCommandPrefix(words, 0);
+  if (words[start] !== 'git') return false;
+
+  if (words[start + 1] === 'worktree' && words[start + 2] === 'add') return true;
+  return words[start + 1] === '-C'
+    && !!words[start + 2]
+    && words[start + 3] === 'worktree'
+    && words[start + 4] === 'add';
+}
+
+function isSlopeRecoveryCommand(words: string[]): boolean {
+  const slopeIndex = findSlopeExecutableIndex(words);
+  if (slopeIndex < 0) return false;
+
+  const args = words.slice(slopeIndex + 1);
+  if (args[0] === 'worktree' && args[1] === 'start') return true;
+  if (args[0] !== 'session') return false;
+
+  return args[1] === 'end'
+    || args[1] === 'list'
+    || args[1] === 'prune'
+    || args[1] === 'dashboard';
+}
+
+function splitShellSegments(command: string): string[] {
+  const segments: string[] = [];
+  let current = '';
+  let quote: '"' | "'" | null = null;
+
+  for (let i = 0; i < command.length; i++) {
+    const char = command[i];
+    if (char === '\\' && quote !== "'") {
+      current += char;
+      if (i + 1 < command.length) current += command[++i];
+      continue;
+    }
+    if ((char === '"' || char === "'") && (!quote || quote === char)) {
+      quote = quote ? null : char;
+      current += char;
+      continue;
+    }
+    if (!quote && (char === ';' || char === '\n' || (char === '&' && command[i + 1] === '&') || (char === '|' && command[i + 1] === '|'))) {
+      if (current.trim()) segments.push(current.trim());
+      current = '';
+      if (char === '&' || char === '|') i++;
+      continue;
+    }
+    current += char;
+  }
+
+  if (current.trim()) segments.push(current.trim());
+  return segments;
+}
+
+function tokenizeShellWords(segment: string): string[] {
+  const words: string[] = [];
+  let current = '';
+  let quote: '"' | "'" | null = null;
+
+  for (let i = 0; i < segment.length; i++) {
+    const char = segment[i];
+    if (char === '\\' && quote !== "'") {
+      if (i + 1 < segment.length) current += segment[++i];
+      continue;
+    }
+    if ((char === '"' || char === "'") && (!quote || quote === char)) {
+      quote = quote ? null : char;
+      continue;
+    }
+    if (!quote && /\s/.test(char)) {
+      if (current) {
+        words.push(current);
+        current = '';
+      }
+      continue;
+    }
+    current += char;
+  }
+
+  if (current) words.push(current);
+  return words;
+}
+
+function findSlopeExecutableIndex(words: string[]): number {
+  const i = skipCommandPrefix(words, 0);
+
+  if (words[i] === 'slope') return i;
+  if ((words[i] === 'npx' || words[i] === 'bunx') && words[i + 1] === 'slope') return i + 1;
+  if (['pnpm', 'npm', 'yarn', 'bun'].includes(words[i])) {
+    if (words[i + 1] === 'exec' && words[i + 2] === 'slope') return i + 2;
+    if (words[i + 1] === 'slope') return i + 1;
+  }
+
+  return -1;
+}
+
+function skipCommandPrefix(words: string[], start: number): number {
+  let i = start;
+  if (words[i] === 'env') i++;
+  while (isEnvAssignment(words[i])) i++;
+  if (words[i] === 'command') i++;
+  return i;
+}
+
+function isEnvAssignment(word: string | undefined): boolean {
+  return !!word && /^[A-Za-z_][A-Za-z0-9_]*=/.test(word);
 }
 
 function gitRevParse(cwd: string, ...args: string[]): string {

@@ -154,6 +154,62 @@ describe('worktreeCheckGuard', () => {
     expect(mockResolveStore).not.toHaveBeenCalled();
   });
 
+  it('allows slope worktree start recovery commands', async () => {
+    const result = await worktreeCheckGuard({
+      ...makeInput(),
+      tool_name: 'Bash',
+      tool_input: { command: 'slope worktree start --branch=fix/deadlock --role=secondary --ide=codex' },
+    }, '/tmp/test');
+
+    expect(result).toEqual({});
+    expect(mockResolveStore).not.toHaveBeenCalled();
+  });
+
+  it('allows package-manager slope session recovery commands', async () => {
+    const result = await worktreeCheckGuard({
+      ...makeInput(),
+      tool_name: 'Bash',
+      tool_input: { command: 'pnpm exec slope session end --session-id=orphan-primary' },
+    }, '/tmp/test');
+
+    expect(result).toEqual({});
+    expect(mockResolveStore).not.toHaveBeenCalled();
+  });
+
+  it('does not allow slope recovery commands embedded in unrelated shell text', async () => {
+    mockGitMainRepo();
+    (mockStore.getActiveSessions as ReturnType<typeof vi.fn>).mockResolvedValue([
+      makeSession({ session_id: 'test-session' }),
+      makeSession({ session_id: 'other-session' }),
+    ]);
+
+    const result = await worktreeCheckGuard({
+      ...makeInput(),
+      tool_name: 'Bash',
+      tool_input: { command: 'gh issue create --body "try slope worktree start --branch=fix/deadlock"' },
+    }, '/tmp/test');
+
+    expect(result.decision).toBe('deny');
+    expect(mockResolveStore).toHaveBeenCalled();
+  });
+
+  it('does not allow chained recovery commands with extra work', async () => {
+    mockGitMainRepo();
+    (mockStore.getActiveSessions as ReturnType<typeof vi.fn>).mockResolvedValue([
+      makeSession({ session_id: 'test-session' }),
+      makeSession({ session_id: 'other-session' }),
+    ]);
+
+    const result = await worktreeCheckGuard({
+      ...makeInput(),
+      tool_name: 'Bash',
+      tool_input: { command: 'slope session end --session-id=orphan-primary && pnpm test' },
+    }, '/tmp/test');
+
+    expect(result.decision).toBe('deny');
+    expect(mockResolveStore).toHaveBeenCalled();
+  });
+
   it('allows when other session has worktree_path (isolated)', async () => {
     mockExecFileSync
       .mockReturnValueOnce('.git' as never)
