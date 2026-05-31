@@ -327,6 +327,7 @@ Usage:
   slope review findings add|list|clear      Manage implementation review findings
   slope review amend [--sprint=N]           Amend scorecard with review findings
   slope pr review [--pr=N] [--sprint=N]     Run post-PR review workflow
+  slope pr status [--sprint=N]              Check PR closeout readiness
   slope briefing [--sprint=N] [options]      Pre-round briefing
   slope plan --complexity=<level>           Pre-shot advisor (club + training + hazards)
   slope classify --scope=... ...            Classify a shot from execution trace

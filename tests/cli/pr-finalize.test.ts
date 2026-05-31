@@ -5,6 +5,7 @@ import {
   existingAutoCloseRefs,
   formatReviewRecommendations,
 } from '../../src/cli/commands/pr.js';
+import { branchSizeWarnings, formatPrCloseoutStatus } from '../../src/cli/pr-closeout.js';
 
 describe('extractIssueRefs (GH #321)', () => {
   it('extracts a single issue ref', () => {
@@ -85,5 +86,36 @@ describe('pr review workflow helpers (S94-5)', () => {
     expect(output).toContain('architect');
     expect(output).toContain('required');
     expect(output).toContain('Baseline code review');
+  });
+});
+
+describe('pr closeout status helpers (S130)', () => {
+  it('warns when branch size exceeds closeout thresholds', () => {
+    expect(branchSizeWarnings({ commits: 51, files: 101 }, { commitWarnAt: 50, fileWarnAt: 100 })).toEqual([
+      'Branch has 51 commits, above closeout warning threshold 50.',
+      'Branch changes 101 files, above closeout warning threshold 100.',
+    ]);
+  });
+
+  it('formats missing PR review as a closeout blocker', () => {
+    const output = formatPrCloseoutStatus({
+      sprint: 130,
+      branch: 'feat/closeout',
+      scorecardPath: '/repo/docs/retros/sprint-130.json',
+      scorecardExists: true,
+      sprintReviewPath: '/repo/docs/retros/sprint-130-review.md',
+      sprintReviewExists: true,
+      unpushedCommits: 0,
+      pr: { number: 468, state: 'OPEN', url: 'https://github.com/org/repo/pull/468' },
+      prReview: 'missing',
+      branchSize: { base: 'origin/main', commits: 4, files: 8 },
+      branchSizeWarnings: [],
+      blockers: ['No PR implementation review record found; run slope pr review.'],
+      warnings: [],
+    });
+
+    expect(output).toContain('PR closeout status');
+    expect(output).toContain('PR review:       missing');
+    expect(output).toContain('Not ready for PR closeout.');
   });
 });
