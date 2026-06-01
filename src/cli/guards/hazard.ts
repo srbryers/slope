@@ -129,9 +129,15 @@ export async function hazardGuard(input: HookInput, cwd: string): Promise<GuardR
 
     const fullContext = formatHazardContext(area, allWarnings);
 
-    // Session dedup: if this exact context was already injected, return compressed reference
+    // Duplicate hazard payloads add transcript noise on Edit/Write; record the
+    // dedup metric but do not inject another context block.
     const dedup = dedupGuardContext(cwd, input.session_id, 'hazard', fullContext);
-    if (dedup) return { context: dedup, metricReason: 'deduped' };
+    if (dedup) {
+      if (dedup.startsWith('SLOPE hazard: (same as prior warning')) {
+        return { metricReason: 'deduped' };
+      }
+      return { context: dedup, metricReason: 'deduped' };
+    }
 
     return { context: fullContext, metricReason: 'matched' };
   }
