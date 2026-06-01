@@ -38,8 +38,12 @@ function makePostToolUse(command: string, exitCode: number | string): HookInput 
 }
 
 function writeConfig(): void {
-  mkdirSync(join(tmpDir, '.slope'), { recursive: true });
-  writeFileSync(join(tmpDir, '.slope', 'config.json'), JSON.stringify({
+  writeConfigAt(tmpDir);
+}
+
+function writeConfigAt(cwd: string): void {
+  mkdirSync(join(cwd, '.slope'), { recursive: true });
+  writeFileSync(join(cwd, '.slope', 'config.json'), JSON.stringify({
     scorecardDir: 'docs/retros',
     scorecardPattern: 'sprint-*.json',
     minSprint: 1,
@@ -48,7 +52,11 @@ function writeConfig(): void {
 }
 
 function writeScorecard(sprint: number): void {
-  const dir = join(tmpDir, 'docs', 'retros');
+  writeScorecardAt(tmpDir, sprint);
+}
+
+function writeScorecardAt(cwd: string, sprint: number): void {
+  const dir = join(cwd, 'docs', 'retros');
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, `sprint-${sprint}.json`), JSON.stringify({ sprint_number: sprint, score: 4, par: 4 }));
 }
@@ -161,6 +169,42 @@ describe('sprint-completion guard', () => {
 
     it('does not block non-PR Bash commands', async () => {
       const result = await sprintCompletionGuard(makePreToolUse('git push -u origin main'), tmpDir);
+      expect(result).toEqual({});
+    });
+
+    it('does not block gh issue create when gh pr create appears only in quoted body text', async () => {
+      const result = await sprintCompletionGuard(
+        makePreToolUse('gh issue create --title "bug" --body "gh pr create is blocked by sprint-completion"'),
+        tmpDir,
+      );
+      expect(result).toEqual({});
+    });
+
+    it('uses the shell cd target as the sprint-state and scorecard cwd for gh pr create', async () => {
+      const worktreeDir = join(tmpDir, 'linked-worktree');
+      writeConfigAt(worktreeDir);
+
+      const staleMainState = createSprintState(160, 'implementing');
+      staleMainState.gates.tests = true;
+      staleMainState.gates.code_review = true;
+      staleMainState.gates.architect_review = true;
+      staleMainState.gates.scorecard = true;
+      staleMainState.gates.review_md = true;
+      saveSprintState(tmpDir, staleMainState);
+
+      const worktreeState = createSprintState(160, 'implementing');
+      worktreeState.gates.tests = true;
+      worktreeState.gates.code_review = true;
+      worktreeState.gates.architect_review = true;
+      worktreeState.gates.scorecard = true;
+      worktreeState.gates.review_md = true;
+      saveSprintState(worktreeDir, worktreeState);
+      writeScorecardAt(worktreeDir, 160);
+
+      const result = await sprintCompletionGuard(
+        makePreToolUse(`cd "${worktreeDir}" && gh pr create --title "S160"`),
+        tmpDir,
+      );
       expect(result).toEqual({});
     });
   });

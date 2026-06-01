@@ -1,6 +1,6 @@
 import { execSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { isAbsolute, join, resolve } from 'node:path';
 import type { HookInput, GuardResult } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { loadPrReviewState } from '../pr-review-state.js';
@@ -53,20 +53,21 @@ function checkStaleness(sprint: number, cwd: string): string | null {
 
 /** Block `gh pr create` when gates are incomplete or scorecard is missing. */
 function handlePreToolUse(input: HookInput, cwd: string): GuardResult {
-  const command = input.tool_input?.command as string | undefined;
-  if (!command || !command.includes('gh pr create')) return {};
+  const commandContext = prCreateCommandContext(input, cwd);
+  if (!commandContext) return {};
+  const guardCwd = commandContext.cwd;
 
-  const state = loadSprintState(cwd);
+  const state = loadSprintState(guardCwd);
   if (!state) return {};
   if (state.phase === 'complete') return {}; // Sprint fully complete — skip all checks
 
   // Check scorecard existence independently of gates
-  const scorecardMissing = !scorecardExists(state.sprint, cwd);
+  const scorecardMissing = !scorecardExists(state.sprint, guardCwd);
   const gatesComplete = isSprintComplete(state);
 
   if (gatesComplete && !scorecardMissing) return {};
 
-  const staleWarning = checkStaleness(state.sprint, cwd);
+  const staleWarning = checkStaleness(state.sprint, guardCwd);
   const lines: string[] = [];
 
   if (scorecardMissing) {
@@ -95,6 +96,167 @@ function handlePreToolUse(input: HookInput, cwd: string): GuardResult {
     decision: 'deny',
     blockReason: lines.join('\n'),
   };
+}
+
+function prCreateCommandContext(input: HookInput, cwd: string): { cwd: string } | null {
+  const command = commandText(input);
+  if (!command) return null;
+
+  let commandCwd = toolInputCwd(input, cwd);
+  for (const segment of splitShellSegments(command)) {
+    const words = tokenizeShellWords(segment);
+    if (words.length === 0) continue;
+
+    const cdTarget = cdCommandTarget(words);
+    if (cdTarget) {
+      commandCwd = resolveCommandCwd(commandCwd, cdTarget);
+      continue;
+    }
+
+    if (isGhPrCreateCommand(words)) return { cwd: commandCwd };
+  }
+
+  return null;
+}
+
+function commandText(input: HookInput): string {
+  const toolInput = input.tool_input;
+  if (!toolInput || typeof toolInput !== 'object') return '';
+  for (const key of ['command', 'cmd', 'input']) {
+    const value = toolInput[key];
+    if (typeof value === 'string') return value;
+  }
+  return '';
+}
+
+function toolInputCwd(input: HookInput, cwd: string): string {
+  const toolInput = input.tool_input;
+  if (!toolInput || typeof toolInput !== 'object') return cwd;
+  for (const key of ['workdir', 'cwd']) {
+    const value = toolInput[key];
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return resolveCommandCwd(cwd, value.trim());
+    }
+  }
+  return cwd;
+}
+
+function resolveCommandCwd(baseCwd: string, target: string): string {
+  return isAbsolute(target) ? target : resolve(baseCwd, target);
+}
+
+function cdCommandTarget(words: string[]): string | null {
+  const start = skipCommandPrefix(words, 0);
+  if (words[start] !== 'cd') return null;
+
+  let targetIndex = start + 1;
+  if (words[targetIndex] === '--') targetIndex++;
+  const target = words[targetIndex];
+  if (!target || target === '-') return null;
+  return target;
+}
+
+function isGhPrCreateCommand(words: string[]): boolean {
+  let i = skipCommandPrefix(words, 0);
+  if (words[i] !== 'gh') return false;
+  i++;
+
+  i = skipGhGlobalFlags(words, i);
+  return words[i] === 'pr' && words[i + 1] === 'create';
+}
+
+const GH_GLOBAL_FLAGS_WITH_VALUE = new Set([
+  '-R',
+  '--repo',
+  '--hostname',
+  '--config',
+]);
+
+function skipGhGlobalFlags(words: string[], start: number): number {
+  let i = start;
+  while (words[i]?.startsWith('-')) {
+    const flag = words[i];
+    if (flag === '--') return i + 1;
+    if (flag.includes('=')) {
+      i++;
+    } else if (GH_GLOBAL_FLAGS_WITH_VALUE.has(flag)) {
+      i += 2;
+    } else {
+      i++;
+    }
+  }
+  return i;
+}
+
+function splitShellSegments(command: string): string[] {
+  const segments: string[] = [];
+  let current = '';
+  let quote: '"' | "'" | null = null;
+
+  for (let i = 0; i < command.length; i++) {
+    const char = command[i];
+    if (char === '\\' && quote !== "'") {
+      current += char;
+      if (i + 1 < command.length) current += command[++i];
+      continue;
+    }
+    if ((char === '"' || char === "'") && (!quote || quote === char)) {
+      quote = quote ? null : char;
+      current += char;
+      continue;
+    }
+    if (!quote && (char === ';' || char === '\n' || char === '&' || char === '|')) {
+      if (current.trim()) segments.push(current.trim());
+      current = '';
+      if ((char === '&' && command[i + 1] === '&') || (char === '|' && command[i + 1] === '|')) i++;
+      continue;
+    }
+    current += char;
+  }
+
+  if (current.trim()) segments.push(current.trim());
+  return segments;
+}
+
+function tokenizeShellWords(segment: string): string[] {
+  const words: string[] = [];
+  let current = '';
+  let quote: '"' | "'" | null = null;
+
+  for (let i = 0; i < segment.length; i++) {
+    const char = segment[i];
+    if (char === '\\' && quote !== "'") {
+      if (i + 1 < segment.length) current += segment[++i];
+      continue;
+    }
+    if ((char === '"' || char === "'") && (!quote || quote === char)) {
+      quote = quote ? null : char;
+      continue;
+    }
+    if (!quote && /\s/.test(char)) {
+      if (current) {
+        words.push(current);
+        current = '';
+      }
+      continue;
+    }
+    current += char;
+  }
+
+  if (current) words.push(current);
+  return words;
+}
+
+function skipCommandPrefix(words: string[], start: number): number {
+  let i = start;
+  if (words[i] === 'env') i++;
+  while (isEnvAssignment(words[i])) i++;
+  if (words[i] === 'command') i++;
+  return i;
+}
+
+function isEnvAssignment(word: string | undefined): boolean {
+  return !!word && /^[A-Za-z_][A-Za-z0-9_]*=/.test(word);
 }
 
 /** Warn at session end when mid-sprint with incomplete gates or missing scorecard.

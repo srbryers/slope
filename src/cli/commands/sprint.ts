@@ -1019,6 +1019,11 @@ export async function sprintCommand(args: string[]): Promise<void> {
   const cwd = process.cwd();
   const sub = args[0];
 
+  if (!sub || sub === '--help' || sub === '-h') {
+    printSprintUsage();
+    return;
+  }
+
   switch (sub) {
     case 'start':
       await startCommand(args.slice(1), cwd);
@@ -1040,9 +1045,19 @@ export async function sprintCommand(args: string[]): Promise<void> {
     case 'status':
       await workflowStatusCommand(args.slice(1), cwd);
       break;
-    case 'reset':
+    case 'reset': {
+      const resetArgs = args.slice(1);
+      if (resetArgs.includes('--help') || resetArgs.includes('-h')) {
+        printSprintUsage();
+        break;
+      }
+      if (resetArgs.length > 0) {
+        printSprintUsage();
+        process.exit(1);
+      }
       resetCommand(cwd);
       break;
+    }
     case 'run':
       await runWorkflowCommand(args.slice(1), cwd);
       break;
@@ -1065,7 +1080,14 @@ export async function sprintCommand(args: string[]): Promise<void> {
       await validateSprintCommand(args.slice(1), cwd);
       break;
     default:
-      console.log(`
+      printSprintUsage();
+      process.exit(1);
+      break;
+  }
+}
+
+function printSprintUsage(): void {
+  console.log(`
 slope sprint — Sprint lifecycle management
 
 Legacy commands:
@@ -1086,7 +1108,4 @@ Workflow commands:
   slope sprint workflow cleanup --stale [--dry-run]         Pause stale completed/superseded executions
   slope sprint skip <id> --step=<s> --reason="..."          Skip a blocking step
 `);
-      if (sub) process.exit(1);
-      break;
-  }
 }
