@@ -3,6 +3,9 @@ import { join } from 'node:path';
 import { execSync } from 'node:child_process';
 import type { HookInput, GuardResult } from '../../core/index.js';
 
+const SAFE_WORKTREE_DIR = '.slope/worktrees';
+const CLAUDE_PROTECTED_WORKTREE_DIR = '.claude/worktrees';
+
 /**
  * Worktree-reuse guard: fires PreToolUse on EnterWorktree.
  * When the requested worktree name already exists, injects context
@@ -15,11 +18,13 @@ export async function worktreeReuseGuard(input: HookInput, cwd: string): Promise
 
   // Check if a worktree with this name already exists
   const projectDir = resolveProjectDir(cwd);
-  const worktreePath = join(projectDir, '.claude', 'worktrees', name);
+  const safeWorktreePath = join(projectDir, SAFE_WORKTREE_DIR, name);
+  const existing = findExistingWorktree(projectDir, name);
 
-  if (!existsSync(worktreePath)) return {};
+  if (!existing) return {};
 
   // Worktree exists — check its state
+  const { path: worktreePath, isClaudeProtected } = existing;
   let branch = 'unknown';
   let behind = 0;
   let baseBranch = 'main';
@@ -48,6 +53,25 @@ export async function worktreeReuseGuard(input: HookInput, cwd: string): Promise
     ? `\n\nThe worktree is ${behind} commit(s) behind origin/${baseBranch}. To sync:\n  cd "${worktreePath}" && git rebase origin/${baseBranch}`
     : '';
 
+  if (isClaudeProtected) {
+    const branchArg = branch === 'unknown' ? '<branch>' : branch;
+    return {
+      decision: 'deny',
+      blockReason: [
+        `SLOPE: Worktree "${name}" already exists under Claude Code's protected config tree: ${worktreePath} (branch: ${branch}).`,
+        '',
+        `Claude Code treats paths under .claude/ as self-configuration edits, so ordinary source edits there can prompt on every Edit/Write.`,
+        '',
+        `Prefer SLOPE worktrees outside .claude/:`,
+        `  slope worktree start --branch=${branchArg} --path="${join(SAFE_WORKTREE_DIR, name)}" --role=secondary --ide=claude-code`,
+        '',
+        `To relocate the existing worktree:`,
+        `  mkdir -p "${join(projectDir, SAFE_WORKTREE_DIR)}" && git worktree move "${worktreePath}" "${safeWorktreePath}"`,
+        syncHint,
+      ].join('\n'),
+    };
+  }
+
   return {
     decision: 'deny',
     blockReason: [
@@ -61,6 +85,14 @@ export async function worktreeReuseGuard(input: HookInput, cwd: string): Promise
       `  git worktree remove "${worktreePath}"`,
     ].join('\n'),
   };
+}
+
+function findExistingWorktree(projectDir: string, name: string): { path: string; isClaudeProtected: boolean } | null {
+  const candidates = [
+    { path: join(projectDir, SAFE_WORKTREE_DIR, name), isClaudeProtected: false },
+    { path: join(projectDir, CLAUDE_PROTECTED_WORKTREE_DIR, name), isClaudeProtected: true },
+  ];
+  return candidates.find(candidate => existsSync(candidate.path)) ?? null;
 }
 
 /** Resolve the project root (handles being inside a worktree) */
@@ -80,16 +112,18 @@ function resolveProjectDir(cwd: string): string {
 /** List existing persistent worktrees with status info */
 export function listWorktrees(cwd: string): Array<{ name: string; path: string; branch: string; behind: number }> {
   const projectDir = resolveProjectDir(cwd);
-  const worktreeDir = join(projectDir, '.claude', 'worktrees');
-  if (!existsSync(worktreeDir)) return [];
+  const worktreeDirs = [
+    join(projectDir, SAFE_WORKTREE_DIR),
+    join(projectDir, CLAUDE_PROTECTED_WORKTREE_DIR),
+  ].filter(path => existsSync(path));
 
-  const entries = readdirSync(worktreeDir).filter(name => {
-    const fullPath = join(worktreeDir, name);
-    return statSync(fullPath).isDirectory();
-  });
+  const entries = worktreeDirs.flatMap(worktreeDir =>
+    readdirSync(worktreeDir)
+      .filter(name => statSync(join(worktreeDir, name)).isDirectory())
+      .map(name => ({ name, fullPath: join(worktreeDir, name) })),
+  );
 
-  return entries.map(name => {
-    const fullPath = join(worktreeDir, name);
+  return entries.map(({ name, fullPath }) => {
     let branch = 'unknown';
     let behind = 0;
     try {

@@ -122,7 +122,7 @@ export async function worktreeCheckGuard(input: HookInput, cwd: string): Promise
       // Do NOT write sentinel — denied sessions should re-check next invocation
       return {
         decision: 'deny',
-        blockReason: `BLOCKED: Another session is active in this directory:\n${sessionList}\n\nYou MUST use \`EnterWorktree\` to create an isolated working copy before proceeding. If this harness does not expose EnterWorktree, run \`slope worktree start --branch=<branch> --role=secondary --ide=<ide>\` from the primary checkout. If the listed session is stale, run \`slope session list\` and then \`slope session end --session-id=<id>\`. Do not attempt implementation work until you are in a worktree.`,
+        blockReason: `BLOCKED: Another session is active in this directory:\n${sessionList}\n\nCreate an isolated working copy before proceeding:\n  slope worktree start --branch=<branch> --role=secondary --ide=<ide>\n\nSLOPE worktrees default to .slope/worktrees/<branch>, outside Claude Code's protected .claude/ tree. Avoid Claude Code's native .claude/worktrees/ default because ordinary source edits there can trigger self-configuration permission prompts. If the listed session is stale, run \`slope session list\` and then \`slope session end --session-id=<id>\`. Do not attempt implementation work until you are in a worktree.`,
       };
     }
 

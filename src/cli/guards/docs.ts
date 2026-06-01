@@ -129,7 +129,7 @@ export const GUARD_DOCS: Record<string, GuardDoc> = {
   'worktree-check': {
     purpose: 'Blocks concurrent sessions from operating in the same directory without worktree isolation. Prevents file conflicts between agents.',
     triggers: 'PreToolUse on Read, Glob, Grep, Edit, Write, Bash. Fires on most tool calls.',
-    behavior: 'Block — if another session is active in the same directory, denies the tool call and requires `EnterWorktree` for isolation.',
+    behavior: 'Block — if another session is active in the same directory, denies the tool call and points agents to `slope worktree start`, which defaults to `.slope/worktrees/` outside Claude Code\'s protected `.claude/` tree.',
     configuration: 'Disable: add "worktree-check" to guidance.disabled.',
     level: 'full',
   },
