@@ -206,6 +206,43 @@ describe('guardCommand dispatcher path', () => {
     });
   });
 
+  it('does not emit hook output for duplicate hazard context', async () => {
+    writeFileSync(join(cwd, '.slope', 'common-issues.json'), JSON.stringify({
+      recurring_patterns: [
+        {
+          id: 1,
+          title: 'Core issue',
+          category: 'testing',
+          sprints_hit: [8],
+          gotcha_refs: [],
+          description: 'Affects core package testing',
+          prevention: 'Run tests after editing core',
+        },
+      ],
+    }));
+
+    const input = makeHookInput(cwd, {
+      tool_input: { file_path: join(cwd, 'packages/core/src/foo.ts') },
+    });
+
+    const first = await runGuardCommandWithInput(['hazard'], input);
+    const firstParsed = JSON.parse(first);
+    expect(firstParsed.hookSpecificOutput.additionalContext).toContain('SLOPE hazards');
+
+    const second = await runGuardCommandWithInput(['hazard'], input);
+    expect(second).toBe('');
+
+    const metrics = readFileSync(join(cwd, '.slope', 'guard-metrics.jsonl'), 'utf8')
+      .trim()
+      .split('\n')
+      .map(line => JSON.parse(line));
+    expect(metrics.at(-1)).toMatchObject({
+      guard: 'hazard',
+      decision: 'silent',
+      reason: 'deduped',
+    });
+  });
+
   it('keeps claim-required effective when batched with suppressed write guards', async () => {
     const output = await runGuardCommandWithInput(
       ['__batch', 'workflow-step-gate', 'claim-required'],

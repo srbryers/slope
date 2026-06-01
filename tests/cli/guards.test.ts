@@ -342,7 +342,7 @@ describe('hazardGuard', () => {
     expect(result.blockReason).toBeUndefined();
   });
 
-  it('tags repeated hazard context as deduped for metrics', async () => {
+  it('silences repeated hazard context and tags it as deduped for metrics', async () => {
     mkdirSync(join(tmpDir, '.slope'), { recursive: true });
     writeFileSync(join(tmpDir, '.slope/common-issues.json'), JSON.stringify({
       recurring_patterns: [
@@ -363,7 +363,7 @@ describe('hazardGuard', () => {
     const second = await hazardGuard(input, tmpDir);
 
     expect(first.metricReason).toBe('matched');
-    expect(second.context).toContain('same as prior warning');
+    expect(second.context).toBeUndefined();
     expect(second.metricReason).toBe('deduped');
   });
 
