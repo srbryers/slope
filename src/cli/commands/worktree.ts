@@ -448,7 +448,7 @@ Options:
   start:
     --branch=<name>      New branch name for the worktree
     --base=<ref>         Base ref (default: origin default branch, main, or HEAD)
-    --path=<path>        Worktree path (default: .slope/worktrees/<branch>)
+    --path=<path>        Worktree path (default: .slope/worktrees/<branch>, outside Claude Code's protected .claude/ tree)
     --role=<role>        Session role: primary, secondary, observer (default: secondary)
     --ide=<id>           IDE/harness id (default: SLOPE_IDE or unknown)
     --target=<claim>     Optional ticket or area claim to register
