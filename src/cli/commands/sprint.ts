@@ -440,6 +440,65 @@ function getStore(cwd: string) {
   return createStore({ storePath: config.store_path ?? '.slope/slope.db', cwd });
 }
 
+function roadmapTicketKeysForSprint(cwd: string, sprintId: string | undefined): string[] {
+  if (!sprintId) return [];
+  const sprintNumber = parseSprintNumber(sprintId);
+  if (sprintNumber === null) return [];
+
+  const config = loadConfig(cwd);
+  if (!config.roadmapPath) return [];
+
+  const roadmapPath = join(cwd, config.roadmapPath);
+  if (!existsSync(roadmapPath)) return [];
+
+  try {
+    const raw = JSON.parse(readFileSync(roadmapPath, 'utf8'));
+    const parsed = parseRoadmap(raw);
+    const roadmap = parsed.roadmap ?? castRoadmapStructure(raw);
+    const sprint = roadmap?.sprints.find(s => s.id === sprintNumber);
+    return sprint?.tickets.map(t => t.key).filter(Boolean) ?? [];
+  } catch {
+    return [];
+  }
+}
+
+function applyWorkflowVariableDefaults(
+  def: WorkflowDefinition,
+  vars: Record<string, string>,
+  cwd: string,
+  sprintId: string | undefined,
+): void {
+  if (sprintId && !('sprint_id' in vars)) {
+    vars.sprint_id = sprintId;
+  }
+
+  const ticketsSpec = def.variables?.tickets;
+  if (ticketsSpec?.required && !('tickets' in vars)) {
+    const tickets = roadmapTicketKeysForSprint(cwd, sprintId);
+    if (tickets.length > 0) {
+      vars.tickets = tickets.join(',');
+    }
+  }
+}
+
+function positionalSprintArg(args: string[]): string | undefined {
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === '--var') {
+      i++;
+      continue;
+    }
+    if (!arg.startsWith('--')) return arg;
+  }
+  return undefined;
+}
+
+function sprintIdFromRunArgs(args: string[]): string | undefined {
+  const sprintFlag = args.find(a => a.startsWith('--sprint='));
+  if (sprintFlag) return sprintFlag.slice('--sprint='.length);
+  return positionalSprintArg(args);
+}
+
 const SPRINT_PHASE_ORDER: Record<SprintPhase, number> = {
   planning: 0,
   reviewing: 1,
@@ -492,7 +551,7 @@ function syncSprintStateWithWorkflow(cwd: string, sprintId: string | undefined, 
 }
 
 async function runWorkflowCommand(args: string[], cwd: string): Promise<void> {
-  const sprintArg = args.find(a => a.startsWith('--sprint=') || !a.startsWith('--'));
+  const explicitSprintId = sprintIdFromRunArgs(args);
   const workflowArg = args.find(a => a.startsWith('--workflow='));
   const varArgs: string[] = [];
   for (let i = 0; i < args.length; i++) {
@@ -509,12 +568,11 @@ async function runWorkflowCommand(args: string[], cwd: string): Promise<void> {
     process.exit(1);
   }
 
-  const sprintId = sprintArg?.startsWith('--') ? undefined : sprintArg;
   const workflowName = workflowArg.slice('--workflow='.length);
 
   // Parse variables
   const vars: Record<string, string> = {};
-  if (sprintId) vars.sprint_id = sprintId;
+  if (explicitSprintId) vars.sprint_id = explicitSprintId;
   for (const v of varArgs) {
     const kv = v.slice('--var='.length);
     const eq = kv.indexOf('=');
@@ -522,6 +580,7 @@ async function runWorkflowCommand(args: string[], cwd: string): Promise<void> {
       vars[kv.slice(0, eq)] = kv.slice(eq + 1);
     }
   }
+  const sprintId = explicitSprintId ?? vars.sprint_id;
 
 
   // Load and validate workflow
@@ -534,6 +593,8 @@ async function runWorkflowCommand(args: string[], cwd: string): Promise<void> {
     }
     process.exit(1);
   }
+
+  applyWorkflowVariableDefaults(def, vars, cwd, sprintId);
 
   // Resolve variables
   const resolved = resolveVariables(def, vars);
