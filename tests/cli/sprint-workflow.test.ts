@@ -95,6 +95,28 @@ function writeRoadmap(sprint: number, status = 'planned'): void {
   writeFileSync(join(tmpDir, 'docs', 'backlog', 'roadmap.json'), JSON.stringify(roadmap, null, 2));
 }
 
+function writeProjectWorkflow(name: string): void {
+  mkdirSync(join(tmpDir, '.slope', 'workflows'), { recursive: true });
+  writeFileSync(join(tmpDir, '.slope', 'workflows', `${name}.yaml`), `
+name: ${name}
+version: "1"
+variables:
+  sprint_id:
+    required: true
+    type: string
+  tickets:
+    required: true
+    type: array
+phases:
+  - id: per_ticket
+    repeat_for: tickets
+    steps:
+      - id: implement
+        type: agent_work
+        prompt: "Implement the ticket"
+`);
+}
+
 describe('slope sprint run', () => {
   it('starts a workflow execution', async () => {
     const output = await captureLog(() =>
@@ -127,6 +149,46 @@ describe('slope sprint run', () => {
     );
     expect(output).toContain('sprint-lightweight');
     expect(output).toContain('started');
+  });
+
+  it('persists execution under sprint_id when sprint is only passed via --var (#480)', async () => {
+    await captureLog(() =>
+      sprintCommand(['run', '--workflow=sprint-lightweight', '--var', 'sprint_id=S64', '--var', 'tickets=T1'])
+    );
+
+    const store = createStore({ storePath: '.slope/slope.db', cwd: tmpDir });
+    try {
+      const exec = await store.getExecutionBySprint('S64');
+      expect(exec).not.toBeNull();
+      expect(exec!.variables.sprint_id).toBe('S64');
+      expect(exec!.sprint_id).toBe('S64');
+    } finally {
+      store.close();
+    }
+
+    const output = await captureLog(() =>
+      sprintCommand(['status', 'S64'])
+    );
+    expect(output).toContain('Execution:');
+    expect(output).toContain('Sprint:    S64');
+  });
+
+  it('defaults required tickets from the roadmap when omitted (#480)', async () => {
+    writeRoadmap(64);
+    writeProjectWorkflow('ticket-default-test');
+
+    await captureLog(() =>
+      sprintCommand(['run', '--workflow=ticket-default-test', '--var', 'sprint_id=S64'])
+    );
+
+    const store = createStore({ storePath: '.slope/slope.db', cwd: tmpDir });
+    try {
+      const exec = await store.getExecutionBySprint('S64');
+      expect(exec).not.toBeNull();
+      expect(exec!.variables.tickets).toBe('S64-1,S64-2,S64-3');
+    } finally {
+      store.close();
+    }
   });
 
   it('syncs sprint-state to implementing when workflow starts in per_ticket', async () => {
