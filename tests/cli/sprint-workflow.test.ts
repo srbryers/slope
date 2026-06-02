@@ -488,6 +488,43 @@ describe('slope sprint (help)', () => {
     expect(output).toContain('slope sprint phase');
     expect(output).toContain('slope sprint resume');
     expect(output).toContain('slope sprint skip');
+    expect(output).toContain('slope sprint context');
+    expect(output).toContain('slope sprint validate');
     expect(output).toContain('--workflow');
+  });
+
+  it('prints reset help without clearing sprint state (#483)', async () => {
+    await captureLog(() =>
+      sprintCommand(['start', '--number=160', '--phase=implementing'])
+    );
+
+    const output = await captureLog(() =>
+      sprintCommand(['reset', '--help'])
+    );
+    const state = JSON.parse(readFileSync(join(tmpDir, '.slope', 'sprint-state.json'), 'utf8'));
+
+    expect(output).toContain('slope sprint reset');
+    expect(output).toContain('Clear sprint state');
+    expect(state.sprint).toBe(160);
+    expect(state.phase).toBe('implementing');
+  });
+
+  it('rejects unknown reset flags without clearing sprint state (#483)', async () => {
+    await captureLog(() =>
+      sprintCommand(['start', '--number=160', '--phase=implementing'])
+    );
+
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((code) => { throw new ProcessExitError(code as number); });
+    try {
+      await expect(captureLog(() =>
+        sprintCommand(['reset', '--bogus'])
+      )).rejects.toThrow(ProcessExitError);
+    } finally {
+      exitSpy.mockRestore();
+    }
+
+    const state = JSON.parse(readFileSync(join(tmpDir, '.slope', 'sprint-state.json'), 'utf8'));
+    expect(state.sprint).toBe(160);
+    expect(state.phase).toBe('implementing');
   });
 });

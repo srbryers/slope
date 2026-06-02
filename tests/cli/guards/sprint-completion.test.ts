@@ -1,12 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdirSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join, relative } from 'node:path';
 import { sprintCompletionGuard } from '../../../src/cli/guards/sprint-completion.js';
 import { recordPrReviewComplete } from '../../../src/cli/pr-review-state.js';
 import { saveSprintState, createSprintState, loadSprintState } from '../../../src/cli/sprint-state.js';
 import type { HookInput } from '../../../src/core/index.js';
 
 const tmpDir = join(import.meta.dirname ?? __dirname, '.tmp-sprint-completion-test');
+const cleanupDirs: string[] = [];
 
 function makePreToolUse(command: string): HookInput {
   return {
@@ -38,8 +40,12 @@ function makePostToolUse(command: string, exitCode: number | string): HookInput 
 }
 
 function writeConfig(): void {
-  mkdirSync(join(tmpDir, '.slope'), { recursive: true });
-  writeFileSync(join(tmpDir, '.slope', 'config.json'), JSON.stringify({
+  writeConfigAt(tmpDir);
+}
+
+function writeConfigAt(cwd: string): void {
+  mkdirSync(join(cwd, '.slope'), { recursive: true });
+  writeFileSync(join(cwd, '.slope', 'config.json'), JSON.stringify({
     scorecardDir: 'docs/retros',
     scorecardPattern: 'sprint-*.json',
     minSprint: 1,
@@ -48,13 +54,21 @@ function writeConfig(): void {
 }
 
 function writeScorecard(sprint: number): void {
-  const dir = join(tmpDir, 'docs', 'retros');
+  writeScorecardAt(tmpDir, sprint);
+}
+
+function writeScorecardAt(cwd: string, sprint: number): void {
+  const dir = join(cwd, 'docs', 'retros');
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, `sprint-${sprint}.json`), JSON.stringify({ sprint_number: sprint, score: 4, par: 4 }));
 }
 
 function writeRoadmap(sprints: Array<{ id: number; status?: string }>): void {
-  const dir = join(tmpDir, 'docs', 'backlog');
+  writeRoadmapAt(tmpDir, sprints);
+}
+
+function writeRoadmapAt(cwd: string, sprints: Array<{ id: number; status?: string }>): void {
+  const dir = join(cwd, 'docs', 'backlog');
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, 'roadmap.json'), JSON.stringify({
     name: 'Test',
@@ -73,6 +87,9 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  for (const dir of cleanupDirs.splice(0)) {
+    rmSync(dir, { recursive: true, force: true });
+  }
   rmSync(tmpDir, { recursive: true, force: true });
 });
 
@@ -163,6 +180,68 @@ describe('sprint-completion guard', () => {
       const result = await sprintCompletionGuard(makePreToolUse('git push -u origin main'), tmpDir);
       expect(result).toEqual({});
     });
+
+    it('does not block gh issue create when gh pr create appears only in quoted body text', async () => {
+      const result = await sprintCompletionGuard(
+        makePreToolUse('gh issue create --title "bug" --body "gh pr create is blocked by sprint-completion"'),
+        tmpDir,
+      );
+      expect(result).toEqual({});
+    });
+
+    it('uses the shell cd target as the sprint-state and scorecard cwd for gh pr create', async () => {
+      const worktreeDir = join(tmpDir, 'linked-worktree');
+      writeConfigAt(worktreeDir);
+
+      const staleMainState = createSprintState(160, 'implementing');
+      staleMainState.gates.tests = true;
+      staleMainState.gates.code_review = true;
+      staleMainState.gates.architect_review = true;
+      staleMainState.gates.scorecard = true;
+      staleMainState.gates.review_md = true;
+      saveSprintState(tmpDir, staleMainState);
+
+      const worktreeState = createSprintState(160, 'implementing');
+      worktreeState.gates.tests = true;
+      worktreeState.gates.code_review = true;
+      worktreeState.gates.architect_review = true;
+      worktreeState.gates.scorecard = true;
+      worktreeState.gates.review_md = true;
+      saveSprintState(worktreeDir, worktreeState);
+      writeScorecardAt(worktreeDir, 160);
+
+      const result = await sprintCompletionGuard(
+        makePreToolUse(`cd "${worktreeDir}" && gh pr create --title "S160"`),
+        tmpDir,
+      );
+      expect(result).toEqual({});
+    });
+
+    it('expands tilde shell cd targets before checking gh pr create state', async () => {
+      const homeWorktreeDir = mkdtempSync(join(homedir(), '.slope-pr-worktree-'));
+      cleanupDirs.push(homeWorktreeDir);
+      const homeRelativePath = relative(homedir(), homeWorktreeDir);
+      writeConfigAt(homeWorktreeDir);
+
+      const incorrectlyResolvedDir = join(tmpDir, '~', homeRelativePath);
+      writeConfigAt(incorrectlyResolvedDir);
+      saveSprintState(incorrectlyResolvedDir, createSprintState(161, 'implementing'));
+
+      const worktreeState = createSprintState(161, 'implementing');
+      worktreeState.gates.tests = true;
+      worktreeState.gates.code_review = true;
+      worktreeState.gates.architect_review = true;
+      worktreeState.gates.scorecard = true;
+      worktreeState.gates.review_md = true;
+      saveSprintState(homeWorktreeDir, worktreeState);
+      writeScorecardAt(homeWorktreeDir, 161);
+
+      const result = await sprintCompletionGuard(
+        makePreToolUse(`cd ~/${homeRelativePath} && gh pr create --title "S161"`),
+        tmpDir,
+      );
+      expect(result).toEqual({});
+    });
   });
 
   describe('Stop only blocks during implementing/scoring phases', () => {
@@ -205,6 +284,21 @@ describe('sprint-completion guard', () => {
     it('marks tests gate on vitest exit 0', async () => {
       const result = await sprintCompletionGuard(makePostToolUse('npx vitest', 0), tmpDir);
       expect(result.context).toContain('Tests passed');
+    });
+
+    it('uses the shell cd target as the sprint-state cwd when marking tests complete', async () => {
+      const worktreeDir = join(tmpDir, 'post-tool-worktree');
+      writeConfigAt(worktreeDir);
+      saveSprintState(worktreeDir, createSprintState(160, 'implementing'));
+
+      const result = await sprintCompletionGuard(
+        makePostToolUse(`cd "${worktreeDir}" && npx vitest`, 0),
+        tmpDir,
+      );
+
+      expect(result.context).toContain('Tests passed');
+      expect(loadSprintState(worktreeDir)!.gates.tests).toBe(true);
+      expect(loadSprintState(tmpDir)!.gates.tests).toBe(false);
     });
 
     it('does not mark gate on test failure (exit 1)', async () => {
@@ -332,6 +426,28 @@ describe('sprint-completion guard', () => {
 
       const roadmap = JSON.parse(readFileSync(join(tmpDir, 'docs', 'backlog', 'roadmap.json'), 'utf8'));
       expect(roadmap.sprints[0].status).toBe('complete');
+    });
+
+    it('uses the shell cd target as the cwd when slope validate updates roadmap', async () => {
+      const worktreeDir = join(tmpDir, 'validate-worktree');
+      writeConfigAt(worktreeDir);
+      saveSprintState(worktreeDir, createSprintState(160, 'implementing'));
+      writeRoadmapAt(worktreeDir, [{ id: 160, status: 'planned' }]);
+
+      saveSprintState(tmpDir, createSprintState(22, 'implementing'));
+      writeRoadmap([{ id: 22, status: 'planned' }]);
+
+      const result = await sprintCompletionGuard(
+        makePostToolUse(`cd "${worktreeDir}" && slope validate`, 0),
+        tmpDir,
+      );
+
+      expect(result.context).toContain('Sprint 160');
+
+      const worktreeRoadmap = JSON.parse(readFileSync(join(worktreeDir, 'docs', 'backlog', 'roadmap.json'), 'utf8'));
+      const launcherRoadmap = JSON.parse(readFileSync(join(tmpDir, 'docs', 'backlog', 'roadmap.json'), 'utf8'));
+      expect(worktreeRoadmap.sprints[0].status).toBe('complete');
+      expect(launcherRoadmap.sprints[0].status).toBe('planned');
     });
 
     it('does not update roadmap on slope validate failure', async () => {
