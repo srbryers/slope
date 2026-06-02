@@ -151,7 +151,7 @@ export function pendingPrReviews(cwd: string, sprint?: number): PrReviewRecord[]
 export function pendingPrCloseouts(cwd: string, sprint?: number): PrReviewRecord[] {
   return loadPrReviewState(cwd).reviews
     .filter(review => review.status === 'reviewed')
-    .filter(review => review.closeout_status !== 'settled')
+    .filter(review => review.closeout_status === 'pending')
     .filter(review => sprint == null || review.sprint == null || review.sprint === sprint)
     .sort((a, b) => b.pr - a.pr);
 }

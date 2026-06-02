@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
@@ -47,6 +47,21 @@ describe('pr review state', () => {
     expect(state.reviews[0].status).toBe('reviewed');
     expect(state.reviews[0].closeout_status).toBe('settled');
     expect(state.reviews[0].closeout_settled_at).toBeDefined();
+    expect(pendingPrCloseouts(cwd, 100)).toEqual([]);
+  });
+
+  it('does not treat legacy reviewed records without closeout status as pending closeouts', () => {
+    mkdirSync(join(cwd, '.slope'), { recursive: true });
+    writeFileSync(join(cwd, '.slope', 'pr-reviews.json'), JSON.stringify({
+      reviews: [{
+        pr: 41,
+        sprint: 100,
+        status: 'reviewed',
+        created_at: new Date().toISOString(),
+        reviewed_at: new Date().toISOString(),
+      }],
+    }));
+
     expect(pendingPrCloseouts(cwd, 100)).toEqual([]);
   });
 

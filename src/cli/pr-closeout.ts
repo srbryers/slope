@@ -142,7 +142,9 @@ export function buildPrCloseoutStatus(cwd: string, opts: { sprint?: number; pr?:
     if (status.reviewerBot === 'pending') {
       status.blockers.push(status.reviewerBotReason ?? 'Reviewer bot has not completed its PR review.');
     }
-    if (status.reviewerBot === 'unknown') status.blockers.push('Could not determine reviewer bot status from GitHub comments.');
+    if (status.reviewerBot === 'unknown') {
+      status.blockers.push(status.reviewerBotReason ?? 'Could not determine reviewer bot status from GitHub comments.');
+    }
     if (status.pr.reviewDecision === 'CHANGES_REQUESTED') status.blockers.push('PR has requested changes; address review feedback before closeout.');
     if (status.prReviewThreads === 'pending') {
       const count = status.unresolvedReviewThreads ?? 0;
@@ -343,16 +345,29 @@ function resolveReviewerBotStatus(pr: PrMetadata | null): { status: PrReviewerBo
     const blockedAt = latestTimestamp(comments
       .filter(isBlockedCodeRabbitComment)
       .map(comment => comment.updated_at ?? comment.created_at));
-    if (!blockedAt) return { status: 'settled' };
-
-    const completedAt = latestTimestamp(reviews
+    const processingAt = latestTimestamp(comments
+      .filter(isProcessingCodeRabbitComment)
+      .map(comment => comment.updated_at ?? comment.created_at));
+    const reviewedAt = latestTimestamp(reviews
       .filter(review => isCurrentCodeRabbitReview(review, pr.headRefOid))
       .map(review => review.submitted_at));
-    if (completedAt && completedAt > blockedAt) return { status: 'settled' };
 
-    return {
+    const latestNonSettledAt = Math.max(blockedAt ?? 0, processingAt ?? 0);
+    if (reviewedAt && reviewedAt > latestNonSettledAt) return { status: 'settled' };
+
+    if (processingAt && (!reviewedAt || processingAt >= reviewedAt)) return {
+      status: 'pending',
+      reason: 'CodeRabbit review is still in progress.',
+    };
+
+    if (blockedAt && (!reviewedAt || blockedAt >= reviewedAt)) return {
       status: 'pending',
       reason: 'CodeRabbit reported a review limit or credit block; retrigger reviewer bot review before closeout.',
+    };
+
+    return {
+      status: 'unknown',
+      reason: 'Could not confirm reviewer bot review for the current PR head.',
     };
   } catch {
     return { status: 'unknown' };
@@ -376,9 +391,17 @@ export function isBlockedCodeRabbitComment(comment: GitHubComment): boolean {
     || /more reviews will be available/i.test(body);
 }
 
+function isProcessingCodeRabbitComment(comment: GitHubComment): boolean {
+  if (!isCodeRabbitLogin(comment.user?.login)) return false;
+  const body = comment.body ?? '';
+  return /review in progress by coderabbit\.ai/i.test(body)
+    || /currently processing new changes/i.test(body);
+}
+
 function isCurrentCodeRabbitReview(review: GitHubReview, headRefOid: string | undefined): boolean {
   if (!isCodeRabbitLogin(review.user?.login)) return false;
-  return !headRefOid || review.commit_id === headRefOid;
+  if (!headRefOid) return false;
+  return review.commit_id === headRefOid;
 }
 
 function isCodeRabbitLogin(value: string | undefined): boolean {
