@@ -488,6 +488,8 @@ describe('slope sprint (help)', () => {
     expect(output).toContain('slope sprint phase');
     expect(output).toContain('slope sprint resume');
     expect(output).toContain('slope sprint skip');
+    expect(output).toContain('slope sprint context');
+    expect(output).toContain('slope sprint validate');
     expect(output).toContain('--workflow');
   });
 

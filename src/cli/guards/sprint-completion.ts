@@ -1,5 +1,6 @@
 import { execSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { isAbsolute, join, resolve } from 'node:path';
 import type { HookInput, GuardResult } from '../../core/index.js';
 import { loadConfig } from '../config.js';
@@ -98,10 +99,22 @@ function handlePreToolUse(input: HookInput, cwd: string): GuardResult {
   };
 }
 
-function prCreateCommandContext(input: HookInput, cwd: string): { cwd: string } | null {
-  const command = commandText(input);
-  if (!command) return null;
+interface ShellCommandSegment {
+  cwd: string;
+  segment: string;
+  words: string[];
+}
 
+function prCreateCommandContext(input: HookInput, cwd: string): { cwd: string } | null {
+  const segment = commandSegments(input, cwd).find(({ words }) => isGhPrCreateCommand(words));
+  return segment ? { cwd: segment.cwd } : null;
+}
+
+function commandSegments(input: HookInput, cwd: string): ShellCommandSegment[] {
+  const command = commandText(input);
+  if (!command) return [];
+
+  const segments: ShellCommandSegment[] = [];
   let commandCwd = toolInputCwd(input, cwd);
   for (const segment of splitShellSegments(command)) {
     const words = tokenizeShellWords(segment);
@@ -113,10 +126,10 @@ function prCreateCommandContext(input: HookInput, cwd: string): { cwd: string } 
       continue;
     }
 
-    if (isGhPrCreateCommand(words)) return { cwd: commandCwd };
+    segments.push({ cwd: commandCwd, segment, words });
   }
 
-  return null;
+  return segments;
 }
 
 function commandText(input: HookInput): string {
@@ -142,7 +155,14 @@ function toolInputCwd(input: HookInput, cwd: string): string {
 }
 
 function resolveCommandCwd(baseCwd: string, target: string): string {
-  return isAbsolute(target) ? target : resolve(baseCwd, target);
+  const expanded = expandHomePath(target);
+  return isAbsolute(expanded) ? expanded : resolve(baseCwd, expanded);
+}
+
+function expandHomePath(target: string): string {
+  if (target === '~') return homedir();
+  if (target.startsWith('~/')) return join(homedir(), target.slice(2));
+  return target;
 }
 
 function cdCommandTarget(words: string[]): string | null {
@@ -321,34 +341,41 @@ function scorecardExists(sprint: number, cwd: string): boolean {
 
 /** Auto-detect test pass, validate success, and PR merge from Bash output. */
 function handlePostToolUse(input: HookInput, cwd: string): GuardResult {
-  const command = input.tool_input?.command as string | undefined;
-  if (!command) return {};
+  const segments = commandSegments(input, cwd);
+  if (segments.length === 0) return {};
 
   // Detect PR merge → transition to scoring phase
-  if (/gh\s+pr\s+merge/.test(command)) {
-    return handlePrMerge(input, cwd);
+  const prMergeCommand = segments.find(({ segment }) => /gh\s+pr\s+merge/.test(segment));
+  if (prMergeCommand) {
+    return handlePrMerge(input, prMergeCommand.cwd);
   }
 
   // Detect slope validate success → auto-update roadmap
-  if (/\bslope\s+validate\b/.test(command)) {
-    return handleValidateSuccess(input, cwd);
+  const validateCommand = segments.find(({ segment }) => /\bslope\s+validate\b/.test(segment));
+  if (validateCommand) {
+    return handleValidateSuccess(input, validateCommand.cwd);
   }
 
   // Detect slope review completion → mark review_md gate
-  if (/\bslope\s+review\b/.test(command) && !/\bslope\s+review\s+(start|round|status|reset|recommend|findings|amend|defer|deferred|resolve)\b/.test(command)) {
-    return handleReviewCompletion(input, cwd);
+  const reviewCommand = segments.find(({ segment }) =>
+    /\bslope\s+review\b/.test(segment)
+    && !/\bslope\s+review\s+(start|round|status|reset|recommend|findings|amend|defer|deferred|resolve)\b/.test(segment),
+  );
+  if (reviewCommand) {
+    return handleReviewCompletion(input, reviewCommand.cwd);
   }
 
   // Detect slope auto-card completion → suggest validate next
-  if (/\bslope\s+auto-card\b/.test(command)) {
-    return handleAutoCardCompletion(input, cwd);
+  const autoCardCommand = segments.find(({ segment }) => /\bslope\s+auto-card\b/.test(segment));
+  if (autoCardCommand) {
+    return handleAutoCardCompletion(input, autoCardCommand.cwd);
   }
 
   // Check if command looks like a test runner
-  const isTestCommand = /\b(jest|vitest|bun\s+test|npx\s+jest|npx\s+vitest)\b/.test(command);
-  if (!isTestCommand) return {};
+  const testCommand = segments.find(({ segment }) => /\b(jest|vitest|bun\s+test|npx\s+jest|npx\s+vitest)\b/.test(segment));
+  if (!testCommand) return {};
 
-  const state = loadSprintState(cwd);
+  const state = loadSprintState(testCommand.cwd);
   if (!state) return {};
   if (state.gates.tests) return {}; // Already marked
 
@@ -358,7 +385,7 @@ function handlePostToolUse(input: HookInput, cwd: string): GuardResult {
 
   // If exit code is explicitly 0, or if stdout contains pass indicators without failures
   if (exitCode === 0 || exitCode === '0') {
-    updateGate(cwd, 'tests', true);
+    updateGate(testCommand.cwd, 'tests', true);
     return { context: 'SLOPE: Tests passed — gate marked complete.' };
   }
 

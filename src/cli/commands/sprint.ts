@@ -1105,6 +1105,8 @@ Workflow commands:
   slope sprint status [sprint_id]    Show workflow execution progress
   slope sprint resume <sprint_id>    Resume a paused workflow execution
   slope sprint pause <sprint_id>     Pause a running workflow execution
+  slope sprint context <sprint_id>   Show current workflow step and remaining work
+  slope sprint validate <sprint_id>  Validate workflow, plan, scorecard, and tests
   slope sprint workflow cleanup --stale [--dry-run]         Pause stale completed/superseded executions
   slope sprint skip <id> --step=<s> --reason="..."          Skip a blocking step
 `);
