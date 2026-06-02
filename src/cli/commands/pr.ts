@@ -4,8 +4,8 @@ import { join } from 'node:path';
 import { detectLatestSprint, loadConfig, normalizeScorecard, recommendReviews } from '../../core/index.js';
 import type { ReviewRecommendation } from '../../core/index.js';
 import { reviewRunCommand } from './review-run.js';
-import { recordPrReviewComplete } from '../pr-review-state.js';
-import { branchSizeWarnings, buildPrCloseoutStatus, closeoutPolicy, formatPrCloseoutStatus } from '../pr-closeout.js';
+import { recordPrCloseoutSettled, recordPrReviewComplete } from '../pr-review-state.js';
+import { branchSizeWarnings, buildPrCloseoutStatus, canSettlePrCloseout, closeoutPolicy, formatPrCloseoutStatus } from '../pr-closeout.js';
 
 /**
  * `slope pr ...` — agent-friendly PR helpers.
@@ -17,7 +17,7 @@ import { branchSizeWarnings, buildPrCloseoutStatus, closeoutPolicy, formatPrClos
  *                                            parser would otherwise miss (#321).
  *   slope pr review [--pr=N] [--sprint=N]    Run the post-PR review workflow
  *                                            for any PR creation transport.
- *   slope pr status [--sprint=N]             Check sprint + PR closeout readiness.
+ *   slope pr status [--pr=N] [--sprint=N]    Check sprint + PR closeout readiness.
  *   slope pr issues [--pr=N]                 Print extracted issue refs (helper).
  *
  * Background: commits like `fix: ... (GH #297, #299)` or `… closes #314` mix
@@ -94,8 +94,9 @@ Usage:
   slope pr review [--pr=N] [--sprint=N]    Run review recommendation + prompt generation
                                            after PR creation, regardless of whether the
                                            PR was created by gh, MCP, or another API.
-  slope pr status [--sprint=N]             Check scorecard, sprint review, push state,
-                                           PR existence, PR review, and branch size.
+  slope pr status [--pr=N] [--sprint=N]    Check scorecard, sprint review, push state,
+                                           PR existence, PR review, checks, review
+                                           threads, and branch size.
   slope pr issues [--pr=N]                 Print extracted issue refs from the branch's
                                            commit messages.
 
@@ -471,8 +472,16 @@ async function reviewSubcommand(args: string[]): Promise<void> {
 
 async function statusSubcommand(args: string[]): Promise<void> {
   const opts = parseReviewFlags(args);
-  const status = buildPrCloseoutStatus(process.cwd(), { sprint: opts.sprint });
+  const status = buildPrCloseoutStatus(process.cwd(), { pr: opts.pr, sprint: opts.sprint });
   console.log(formatPrCloseoutStatus(status));
+  if (canSettlePrCloseout(status) && status.closeoutSettlement !== 'settled' && status.pr) {
+    recordPrCloseoutSettled(process.cwd(), {
+      pr: status.pr.number,
+      sprint: status.sprint,
+      branch: status.branch,
+    });
+    console.log('\nPR closeout settlement recorded.');
+  }
   if (status.blockers.length > 0) process.exitCode = 1;
 }
 

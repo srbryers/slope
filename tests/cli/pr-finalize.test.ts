@@ -5,7 +5,7 @@ import {
   existingAutoCloseRefs,
   formatReviewRecommendations,
 } from '../../src/cli/commands/pr.js';
-import { branchSizeWarnings, formatPrCloseoutStatus } from '../../src/cli/pr-closeout.js';
+import { branchSizeWarnings, canSettlePrCloseout, formatPrCloseoutStatus } from '../../src/cli/pr-closeout.js';
 
 describe('extractIssueRefs (GH #321)', () => {
   it('extracts a single issue ref', () => {
@@ -108,6 +108,9 @@ describe('pr closeout status helpers (S130)', () => {
       unpushedCommits: 0,
       pr: { number: 468, state: 'OPEN', url: 'https://github.com/org/repo/pull/468' },
       prReview: 'missing',
+      prChecks: 'unknown',
+      prReviewThreads: 'unknown',
+      closeoutSettlement: 'missing',
       branchSize: { base: 'origin/main', commits: 4, files: 8 },
       branchSizeWarnings: [],
       blockers: ['No PR implementation review record found; run slope pr review.'],
@@ -116,6 +119,44 @@ describe('pr closeout status helpers (S130)', () => {
 
     expect(output).toContain('PR closeout status');
     expect(output).toContain('PR review:       missing');
+    expect(output).toContain('PR checks:       unknown');
+    expect(output).toContain('Review threads:  unknown');
+    expect(output).toContain('Closeout:        missing');
     expect(output).toContain('Not ready for PR closeout.');
+  });
+
+  it('requires checks and review threads to settle before closeout can settle', () => {
+    const status = {
+      sprint: 130,
+      branch: 'feat/closeout',
+      scorecardPath: '/repo/docs/retros/sprint-130.json',
+      scorecardExists: true,
+      sprintReviewPath: '/repo/docs/retros/sprint-130-review.md',
+      sprintReviewExists: true,
+      unpushedCommits: 0,
+      pr: { number: 468, state: 'OPEN', url: 'https://github.com/org/repo/pull/468' },
+      prReview: 'reviewed' as const,
+      prChecks: 'pending' as const,
+      prReviewThreads: 'settled' as const,
+      closeoutSettlement: 'pending' as const,
+      branchSize: { base: 'origin/main', commits: 4, files: 8 },
+      branchSizeWarnings: [],
+      blockers: ['PR checks are still pending; wait for GitHub checks to finish.'],
+      warnings: [],
+    };
+
+    expect(canSettlePrCloseout(status)).toBe(false);
+    expect(canSettlePrCloseout({
+      ...status,
+      prChecks: 'passing',
+      blockers: [],
+    })).toBe(true);
+    expect(canSettlePrCloseout({
+      ...status,
+      prChecks: 'passing',
+      prReviewThreads: 'pending',
+      unresolvedReviewThreads: 1,
+      blockers: ['1 unresolved PR review thread remains; address or resolve review feedback before closeout.'],
+    })).toBe(false);
   });
 });

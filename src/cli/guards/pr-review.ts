@@ -41,6 +41,7 @@ export async function prReviewGuard(input: HookInput, cwd: string): Promise<Guar
       `SLOPE PR Review: A pull request was just created (${prUrl}).`,
       ...(recLine ? [`Recommended reviews based on diff: ${recLine}.`] : []),
       `Run \`slope pr review --pr=${prNumber}\` to generate the transport-independent review workflow.`,
+      `Then run \`slope pr status --pr=${prNumber}\` after checks and review threads settle before presenting the PR as ready.`,
       `After review, capture findings with \`slope review findings add\`, then \`slope review amend\` to apply them to the scorecard.`,
       'Tip: also run `slope pr finalize` to add Closes #N for any issues referenced in commits.',
     ].join(' '),

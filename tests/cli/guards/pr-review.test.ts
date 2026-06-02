@@ -32,6 +32,7 @@ describe('prReviewGuard', () => {
     expect(result.suggestion).toBeUndefined();
     expect(result.context).toContain('pull/42');
     expect(result.context).toContain('slope pr review --pr=42');
+    expect(result.context).toContain('slope pr status --pr=42');
   });
 
   it('formats as PostToolUse additionalContext instead of a block decision', async () => {
@@ -113,6 +114,7 @@ describe('prReviewGuard', () => {
         pr: 42,
         sprint: 100,
         status: 'pending',
+        closeout_status: 'pending',
       });
     } finally {
       rmSync(cwd, { recursive: true, force: true });

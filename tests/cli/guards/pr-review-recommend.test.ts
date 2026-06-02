@@ -88,6 +88,7 @@ describe('prReviewGuard recommendations (GH #302)', () => {
       cwd,
     );
     expect(result.context).toContain('slope pr review --pr=42');
+    expect(result.context).toContain('slope pr status --pr=42');
   });
 });
 

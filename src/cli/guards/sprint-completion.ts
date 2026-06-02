@@ -461,6 +461,15 @@ function missingPrReviewWarning(cwd: string, sprint: number): string | null {
     || (branch && review.branch === branch),
   );
 
+  const closeoutPending = matching.find(review =>
+    review.status === 'reviewed' && review.closeout_status !== 'settled',
+  );
+  if (closeoutPending) {
+    return [
+      'SLOPE PR closeout: PR implementation review is recorded, but review/check settlement is still pending.',
+      `Run \`slope pr status --pr=${closeoutPending.pr} --sprint=${sprint}\` after checks and review threads settle before presenting PR #${closeoutPending.pr} as ready.`,
+    ].join(' ');
+  }
   if (matching.some(review => review.status === 'reviewed')) return null;
   const pending = matching.find(review => review.status === 'pending');
   const target = pending ? `PR #${pending.pr}` : 'the current branch PR';
