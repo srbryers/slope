@@ -5,7 +5,7 @@ import {
   existingAutoCloseRefs,
   formatReviewRecommendations,
 } from '../../src/cli/commands/pr.js';
-import { branchSizeWarnings, canSettlePrCloseout, formatPrCloseoutStatus } from '../../src/cli/pr-closeout.js';
+import { branchSizeWarnings, canSettlePrCloseout, formatPrCloseoutStatus, isBlockedCodeRabbitComment } from '../../src/cli/pr-closeout.js';
 
 describe('extractIssueRefs (GH #321)', () => {
   it('extracts a single issue ref', () => {
@@ -109,6 +109,7 @@ describe('pr closeout status helpers (S130)', () => {
       pr: { number: 468, state: 'OPEN', url: 'https://github.com/org/repo/pull/468' },
       prReview: 'missing',
       prChecks: 'unknown',
+      reviewerBot: 'unknown',
       prReviewThreads: 'unknown',
       closeoutSettlement: 'missing',
       branchSize: { base: 'origin/main', commits: 4, files: 8 },
@@ -120,6 +121,7 @@ describe('pr closeout status helpers (S130)', () => {
     expect(output).toContain('PR closeout status');
     expect(output).toContain('PR review:       missing');
     expect(output).toContain('PR checks:       unknown');
+    expect(output).toContain('Reviewer bot:    unknown');
     expect(output).toContain('Review threads:  unknown');
     expect(output).toContain('Closeout:        missing');
     expect(output).toContain('Not ready for PR closeout.');
@@ -137,6 +139,7 @@ describe('pr closeout status helpers (S130)', () => {
       pr: { number: 468, state: 'OPEN', url: 'https://github.com/org/repo/pull/468' },
       prReview: 'reviewed' as const,
       prChecks: 'pending' as const,
+      reviewerBot: 'settled' as const,
       prReviewThreads: 'settled' as const,
       closeoutSettlement: 'pending' as const,
       branchSize: { base: 'origin/main', commits: 4, files: 8 },
@@ -157,6 +160,54 @@ describe('pr closeout status helpers (S130)', () => {
       prReviewThreads: 'pending',
       unresolvedReviewThreads: 1,
       blockers: ['1 unresolved PR review thread remains; address or resolve review feedback before closeout.'],
+    })).toBe(false);
+    expect(canSettlePrCloseout({
+      ...status,
+      prChecks: 'passing',
+      reviewerBot: 'unknown',
+      blockers: ['Could not determine reviewer bot status from GitHub comments.'],
+    })).toBe(false);
+  });
+
+  it('blocks settlement when reviewer bot review is rate limited', () => {
+    const status = {
+      sprint: 130,
+      branch: 'feat/closeout',
+      scorecardPath: '/repo/docs/retros/sprint-130.json',
+      scorecardExists: true,
+      sprintReviewPath: '/repo/docs/retros/sprint-130-review.md',
+      sprintReviewExists: true,
+      unpushedCommits: 0,
+      pr: { number: 468, state: 'OPEN', url: 'https://github.com/org/repo/pull/468' },
+      prReview: 'reviewed' as const,
+      prChecks: 'passing' as const,
+      reviewerBot: 'pending' as const,
+      reviewerBotReason: 'CodeRabbit reported a review limit or credit block; retrigger reviewer bot review before closeout.',
+      prReviewThreads: 'settled' as const,
+      closeoutSettlement: 'pending' as const,
+      branchSize: { base: 'origin/main', commits: 4, files: 8 },
+      branchSizeWarnings: [],
+      blockers: ['CodeRabbit reported a review limit or credit block; retrigger reviewer bot review before closeout.'],
+      warnings: [],
+    };
+
+    expect(canSettlePrCloseout(status)).toBe(false);
+    expect(formatPrCloseoutStatus(status)).toContain('Reviewer bot:    pending (CodeRabbit reported');
+  });
+
+  it('detects CodeRabbit comments that mean no review actually ran', () => {
+    expect(isBlockedCodeRabbitComment({
+      user: { login: 'coderabbitai[bot]' },
+      body: "Review limit reached: we couldn't start this review because usage credits ran out.",
+    })).toBe(true);
+
+    expect(isBlockedCodeRabbitComment({
+      user: { login: 'coderabbitai[bot]' },
+      body: 'Walkthrough: implementation summary and recommendations.',
+    })).toBe(false);
+    expect(isBlockedCodeRabbitComment({
+      user: { login: 'github-actions[bot]' },
+      body: "Review limit reached: we couldn't start this review.",
     })).toBe(false);
   });
 });

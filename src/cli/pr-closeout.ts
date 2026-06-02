@@ -31,6 +31,7 @@ export interface PrMetadata {
 
 export type PrCheckStatus = 'unknown' | 'pending' | 'failing' | 'passing';
 export type PrReviewThreadStatus = 'unknown' | 'pending' | 'settled';
+export type PrReviewerBotStatus = 'unknown' | 'pending' | 'settled';
 export type PrCloseoutSettlementStatus = 'missing' | 'pending' | 'settled';
 
 export interface PrCloseoutStatus {
@@ -44,6 +45,8 @@ export interface PrCloseoutStatus {
   pr: PrMetadata | null;
   prReview: 'missing' | 'pending' | 'reviewed';
   prChecks: PrCheckStatus;
+  reviewerBot: PrReviewerBotStatus;
+  reviewerBotReason?: string;
   prReviewThreads: PrReviewThreadStatus;
   unresolvedReviewThreads?: number;
   closeoutSettlement: PrCloseoutSettlementStatus;
@@ -87,6 +90,7 @@ export function buildPrCloseoutStatus(cwd: string, opts: { sprint?: number; pr?:
   const prReview = resolvePrReviewStatus(cwd, { pr: pr?.number, sprint, branch });
   const closeoutSettlement = resolvePrCloseoutSettlement(cwd, { pr: pr?.number, sprint, branch });
   const prChecks = resolvePrChecks(pr);
+  const reviewerBot = resolveReviewerBotStatus(pr);
   const reviewThreads = resolvePrReviewThreads(pr);
 
   const scorecardPath = sprint
@@ -107,6 +111,8 @@ export function buildPrCloseoutStatus(cwd: string, opts: { sprint?: number; pr?:
     pr,
     prReview,
     prChecks,
+    reviewerBot: reviewerBot.status,
+    reviewerBotReason: reviewerBot.reason,
     prReviewThreads: reviewThreads.status,
     unresolvedReviewThreads: reviewThreads.unresolved,
     closeoutSettlement,
@@ -132,6 +138,10 @@ export function buildPrCloseoutStatus(cwd: string, opts: { sprint?: number; pr?:
     if (status.prChecks === 'pending') status.blockers.push('PR checks are still pending; wait for GitHub checks to finish.');
     if (status.prChecks === 'failing') status.blockers.push('PR checks are failing; fix failing checks before closeout.');
     if (status.prChecks === 'unknown') status.warnings.push('Could not determine PR check status from GitHub.');
+    if (status.reviewerBot === 'pending') {
+      status.blockers.push(status.reviewerBotReason ?? 'Reviewer bot has not completed its PR review.');
+    }
+    if (status.reviewerBot === 'unknown') status.blockers.push('Could not determine reviewer bot status from GitHub comments.');
     if (status.pr.reviewDecision === 'CHANGES_REQUESTED') status.blockers.push('PR has requested changes; address review feedback before closeout.');
     if (status.prReviewThreads === 'pending') {
       const count = status.unresolvedReviewThreads ?? 0;
@@ -148,6 +158,7 @@ export function canSettlePrCloseout(status: PrCloseoutStatus): boolean {
     status.pr
       && status.prReview === 'reviewed'
       && status.prChecks === 'passing'
+      && status.reviewerBot === 'settled'
       && status.prReviewThreads === 'settled'
       && status.pr.reviewDecision !== 'CHANGES_REQUESTED'
       && status.blockers.length === 0,
@@ -167,6 +178,7 @@ export function formatPrCloseoutStatus(status: PrCloseoutStatus): string {
     `PR:              ${status.pr ? `#${status.pr.number}${status.pr.state ? ` ${status.pr.state}` : ''}${status.pr.url ? ` ${status.pr.url}` : ''}` : 'missing'}`,
     `PR review:       ${status.prReview}`,
     `PR checks:       ${status.prChecks}`,
+    `Reviewer bot:    ${formatReviewerBotStatus(status)}`,
     `Review threads:  ${formatReviewThreadStatus(status)}`,
     `Review decision: ${status.pr?.reviewDecision ?? 'unknown'}`,
     `Closeout:        ${status.closeoutSettlement}`,
@@ -192,6 +204,11 @@ function formatReviewThreadStatus(status: PrCloseoutStatus): string {
   if (status.prReviewThreads !== 'pending') return status.prReviewThreads;
   const count = status.unresolvedReviewThreads ?? 0;
   return `${status.prReviewThreads} (${count} unresolved)`;
+}
+
+function formatReviewerBotStatus(status: PrCloseoutStatus): string {
+  if (status.reviewerBot !== 'pending' || !status.reviewerBotReason) return status.reviewerBot;
+  return `${status.reviewerBot} (${status.reviewerBotReason})`;
 }
 
 function formatBranchSize(size: BranchSize): string {
@@ -269,6 +286,101 @@ function resolvePrChecks(pr: PrMetadata | null): PrCheckStatus {
   if (hasFailing) return 'failing';
   if (hasPending) return 'pending';
   return 'passing';
+}
+
+interface GitHubComment {
+  body?: string;
+  created_at?: string;
+  user?: {
+    login?: string;
+  };
+}
+
+interface GitHubReview {
+  body?: string;
+  submitted_at?: string;
+  user?: {
+    login?: string;
+  };
+}
+
+function resolveReviewerBotStatus(pr: PrMetadata | null): { status: PrReviewerBotStatus; reason?: string } {
+  if (!pr?.url) return { status: 'unknown' };
+  const repo = parseGitHubRepo(pr.url);
+  if (!repo) return { status: 'unknown' };
+  if (!hasCodeRabbitSignal(pr)) return { status: 'settled' };
+
+  try {
+    const commentsRaw = execFileSync('gh', [
+      'api',
+      '--method',
+      'GET',
+      `repos/${repo.owner}/${repo.repo}/issues/${pr.number}/comments`,
+      '-F',
+      'per_page=100',
+    ], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    const reviewsRaw = execFileSync('gh', [
+      'api',
+      '--method',
+      'GET',
+      `repos/${repo.owner}/${repo.repo}/pulls/${pr.number}/reviews`,
+      '-F',
+      'per_page=100',
+    ], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    const comments = JSON.parse(commentsRaw) as GitHubComment[];
+    const reviews = JSON.parse(reviewsRaw) as GitHubReview[];
+    if (!Array.isArray(comments) || !Array.isArray(reviews)) return { status: 'unknown' };
+
+    const blockedAt = latestTimestamp(comments.filter(isBlockedCodeRabbitComment).map(comment => comment.created_at));
+    if (!blockedAt) return { status: 'settled' };
+
+    const completedAt = latestTimestamp(reviews
+      .filter(review => isCodeRabbitLogin(review.user?.login))
+      .map(review => review.submitted_at));
+    if (completedAt && completedAt > blockedAt) return { status: 'settled' };
+
+    return {
+      status: 'pending',
+      reason: 'CodeRabbit reported a review limit or credit block; retrigger reviewer bot review before closeout.',
+    };
+  } catch {
+    return { status: 'unknown' };
+  }
+}
+
+function hasCodeRabbitSignal(pr: PrMetadata): boolean {
+  const rollup = Array.isArray(pr.statusCheckRollup) ? pr.statusCheckRollup : [];
+  return rollup.some(item => {
+    const check = item as { name?: string; context?: string };
+    return isCodeRabbitLogin(check.name) || isCodeRabbitLogin(check.context);
+  });
+}
+
+export function isBlockedCodeRabbitComment(comment: GitHubComment): boolean {
+  if (!isCodeRabbitLogin(comment.user?.login)) return false;
+  const body = comment.body ?? '';
+  return /review limit reached/i.test(body)
+    || /couldn'?t start this review/i.test(body)
+    || /run out of usage credits/i.test(body)
+    || /more reviews will be available/i.test(body);
+}
+
+function isCodeRabbitLogin(value: string | undefined): boolean {
+  return Boolean(value && /coderabbit/i.test(value));
+}
+
+function latestTimestamp(values: Array<string | undefined>): number | undefined {
+  const timestamps = values
+    .map(value => value ? Date.parse(value) : Number.NaN)
+    .filter(value => Number.isFinite(value));
+  if (timestamps.length === 0) return undefined;
+  return Math.max(...timestamps);
 }
 
 function resolvePrReviewThreads(pr: PrMetadata | null): { status: PrReviewThreadStatus; unresolved?: number } {
