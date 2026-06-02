@@ -106,9 +106,9 @@ export const GUARD_DOCS: Record<string, GuardDoc> = {
     level: 'full',
   },
   'pr-review': {
-    purpose: 'Prompts for the review workflow after PR creation and records pending PR-review state.',
+    purpose: 'Prompts for the review and closeout-settlement workflow after PR creation.',
     triggers: 'PostToolUse on Bash. Fires after a shell command completes (checks for `gh pr create`).',
-    behavior: 'Advisory — if the command created a PR, records it as pending in `.slope/pr-reviews.json` and injects a reminder to run `slope pr review --pr=<N>`. The post-hole guard surfaces pending records before the session ends.',
+    behavior: 'Advisory — if the command created a PR, records it as pending in `.slope/pr-reviews.json` and injects reminders to run `slope pr review --pr=<N>` and `slope pr status --pr=<N>` after checks/review threads settle. The post-hole guard surfaces pending records before the session ends.',
     configuration: 'Disable: add "pr-review" to guidance.disabled.',
     level: 'full',
   },

@@ -720,6 +720,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
         { flag: '--type=<type>', desc: 'architect, code, or both' },
       ]},
       { name: 'status', desc: 'Check PR closeout readiness', flags: [
+        { flag: '--pr=<N>', desc: 'PR number (default: resolved from current branch)' },
         { flag: '--sprint=<N>', desc: 'Sprint number for scorecard/review checks' },
       ]},
       { name: 'issues', desc: 'Print extracted issue refs from the branch commits' },

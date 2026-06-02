@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import type { HookInput, GuardResult } from '../../core/index.js';
 import { findShippedSprintsOnMain } from '../../core/index.js';
 import { loadConfig } from '../config.js';
-import { pendingPrReviews } from '../pr-review-state.js';
+import { pendingPrCloseouts, pendingPrReviews } from '../pr-review-state.js';
 import type { PrReviewRecord } from '../pr-review-state.js';
 
 /**
@@ -87,11 +87,13 @@ export async function postHoleEnforcementGuard(_input: HookInput, cwd: string): 
   }
 
   const prReviewGaps = pendingPrReviews(cwd);
-  if (drifts.length === 0 && prReviewGaps.length === 0) return {};
+  const prCloseoutGaps = pendingPrCloseouts(cwd);
+  if (drifts.length === 0 && prReviewGaps.length === 0 && prCloseoutGaps.length === 0) return {};
 
   const sections: string[] = [];
   if (drifts.length > 0) sections.push(formatCloseoutDriftMessage(drifts));
   if (prReviewGaps.length > 0) sections.push(formatPendingPrReviewMessage(prReviewGaps));
+  if (prCloseoutGaps.length > 0) sections.push(formatPendingPrCloseoutMessage(prCloseoutGaps));
 
   const message = sections.join('\n\n');
 
@@ -140,6 +142,26 @@ function formatPendingPrReviewMessage(records: PrReviewRecord[]): string {
   lines.push(
     '',
     'Run the review command before presenting the PR as ready to merge.',
+  );
+  return lines.join('\n');
+}
+
+function formatPendingPrCloseoutMessage(records: PrReviewRecord[]): string {
+  const shown = records.slice(0, 5);
+  const remainder = records.length - shown.length;
+  const lines = [
+    `SLOPE PR closeout enforcement: ${records.length} reviewed PR${records.length === 1 ? '' : 's'} still need review/check settlement:`,
+    '',
+    ...shown.map(record => {
+      const sprintArg = record.sprint ? ` --sprint=${record.sprint}` : '';
+      const sprintLabel = record.sprint ? ` (S${record.sprint})` : '';
+      return `  • PR #${record.pr}${sprintLabel}: slope pr status --pr=${record.pr}${sprintArg}`;
+    }),
+  ];
+  if (remainder > 0) lines.push(`  …and ${remainder} more`);
+  lines.push(
+    '',
+    'Wait for GitHub checks and review threads to settle, address actionable feedback, then rerun the status command before presenting the PR as ready to merge.',
   );
   return lines.join('\n');
 }
