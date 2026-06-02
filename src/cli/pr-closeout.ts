@@ -354,6 +354,7 @@ function resolveReviewerBotStatus(pr: PrMetadata | null): { status: PrReviewerBo
 
     const latestNonSettledAt = Math.max(blockedAt ?? 0, processingAt ?? 0);
     if (reviewedAt && reviewedAt > latestNonSettledAt) return { status: 'settled' };
+    if (!blockedAt && !processingAt && hasSuccessfulCodeRabbitStatus(pr)) return { status: 'settled' };
 
     if (processingAt && (!reviewedAt || processingAt >= reviewedAt)) return {
       status: 'pending',
@@ -379,6 +380,23 @@ function hasCodeRabbitSignal(pr: PrMetadata): boolean {
   return rollup.some(item => {
     const check = item as { name?: string; context?: string };
     return isCodeRabbitLogin(check.name) || isCodeRabbitLogin(check.context);
+  });
+}
+
+export function hasSuccessfulCodeRabbitStatus(pr: Pick<PrMetadata, 'statusCheckRollup'>): boolean {
+  const rollup = Array.isArray(pr.statusCheckRollup) ? pr.statusCheckRollup : [];
+  return rollup.some(item => {
+    const check = item as {
+      __typename?: string;
+      name?: string;
+      context?: string;
+      status?: string;
+      conclusion?: string;
+      state?: string;
+    };
+    if (!isCodeRabbitLogin(check.name) && !isCodeRabbitLogin(check.context)) return false;
+    if (check.__typename === 'StatusContext') return check.state === 'SUCCESS';
+    return check.status === 'COMPLETED' && ['SUCCESS', 'SKIPPED', 'NEUTRAL'].includes(check.conclusion ?? '');
   });
 }
 

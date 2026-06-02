@@ -5,7 +5,7 @@ import {
   existingAutoCloseRefs,
   formatReviewRecommendations,
 } from '../../src/cli/commands/pr.js';
-import { branchSizeWarnings, canSettlePrCloseout, formatPrCloseoutStatus, isBlockedCodeRabbitComment } from '../../src/cli/pr-closeout.js';
+import { branchSizeWarnings, canSettlePrCloseout, formatPrCloseoutStatus, hasSuccessfulCodeRabbitStatus, isBlockedCodeRabbitComment } from '../../src/cli/pr-closeout.js';
 
 describe('extractIssueRefs (GH #321)', () => {
   it('extracts a single issue ref', () => {
@@ -208,6 +208,22 @@ describe('pr closeout status helpers (S130)', () => {
     expect(isBlockedCodeRabbitComment({
       user: { login: 'github-actions[bot]' },
       body: "Review limit reached: we couldn't start this review.",
+    })).toBe(false);
+  });
+
+  it('recognizes successful current-head CodeRabbit status contexts', () => {
+    expect(hasSuccessfulCodeRabbitStatus({
+      statusCheckRollup: [{ __typename: 'StatusContext', context: 'CodeRabbit', state: 'SUCCESS' }],
+    })).toBe(true);
+
+    expect(hasSuccessfulCodeRabbitStatus({
+      statusCheckRollup: [{ __typename: 'StatusContext', context: 'CodeRabbit', state: 'PENDING' }],
+    })).toBe(false);
+    expect(hasSuccessfulCodeRabbitStatus({
+      statusCheckRollup: [{ __typename: 'CheckRun', name: 'CodeRabbit', status: 'COMPLETED', conclusion: 'SUCCESS' }],
+    })).toBe(true);
+    expect(hasSuccessfulCodeRabbitStatus({
+      statusCheckRollup: [{ __typename: 'StatusContext', context: 'ci', state: 'SUCCESS' }],
     })).toBe(false);
   });
 });
