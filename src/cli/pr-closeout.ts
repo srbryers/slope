@@ -23,6 +23,7 @@ export interface PrMetadata {
   state?: string;
   baseRefName?: string;
   headRefName?: string;
+  headRefOid?: string;
   mergeStateStatus?: string;
   mergeable?: string;
   reviewDecision?: string;
@@ -239,7 +240,7 @@ function currentPr(prNumber?: number): PrMetadata | null {
       'view',
       ...(prNumber ? [String(prNumber)] : []),
       '--json',
-      'number,url,state,baseRefName,headRefName,mergeStateStatus,mergeable,reviewDecision,statusCheckRollup',
+      'number,url,state,baseRefName,headRefName,headRefOid,mergeStateStatus,mergeable,reviewDecision,statusCheckRollup',
     ];
     const raw = execFileSync('gh', args, {
       encoding: 'utf8',
@@ -291,6 +292,7 @@ function resolvePrChecks(pr: PrMetadata | null): PrCheckStatus {
 interface GitHubComment {
   body?: string;
   created_at?: string;
+  updated_at?: string;
   user?: {
     login?: string;
   };
@@ -298,6 +300,7 @@ interface GitHubComment {
 
 interface GitHubReview {
   body?: string;
+  commit_id?: string;
   submitted_at?: string;
   user?: {
     login?: string;
@@ -337,11 +340,13 @@ function resolveReviewerBotStatus(pr: PrMetadata | null): { status: PrReviewerBo
     const reviews = JSON.parse(reviewsRaw) as GitHubReview[];
     if (!Array.isArray(comments) || !Array.isArray(reviews)) return { status: 'unknown' };
 
-    const blockedAt = latestTimestamp(comments.filter(isBlockedCodeRabbitComment).map(comment => comment.created_at));
+    const blockedAt = latestTimestamp(comments
+      .filter(isBlockedCodeRabbitComment)
+      .map(comment => comment.updated_at ?? comment.created_at));
     if (!blockedAt) return { status: 'settled' };
 
     const completedAt = latestTimestamp(reviews
-      .filter(review => isCodeRabbitLogin(review.user?.login))
+      .filter(review => isCurrentCodeRabbitReview(review, pr.headRefOid))
       .map(review => review.submitted_at));
     if (completedAt && completedAt > blockedAt) return { status: 'settled' };
 
@@ -369,6 +374,11 @@ export function isBlockedCodeRabbitComment(comment: GitHubComment): boolean {
     || /couldn'?t start this review/i.test(body)
     || /run out of usage credits/i.test(body)
     || /more reviews will be available/i.test(body);
+}
+
+function isCurrentCodeRabbitReview(review: GitHubReview, headRefOid: string | undefined): boolean {
+  if (!isCodeRabbitLogin(review.user?.login)) return false;
+  return !headRefOid || review.commit_id === headRefOid;
 }
 
 function isCodeRabbitLogin(value: string | undefined): boolean {
