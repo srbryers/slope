@@ -117,4 +117,20 @@ describe('slope issue command', () => {
     expect(digest).toContain('## Request Approval To Fix');
     expect(digest).toContain('requested decision: approve fix, defer, or reject');
   });
+
+  it('writes scout JSON output without dumping the full payload to stdout', async () => {
+    writeCommonIssues(cwd);
+    const outputPath = join(cwd, '.slope', 'candidates.json');
+
+    const stdout = await captureLogs(() =>
+      issueCommand(['scout', '--source=.slope/common-issues.json', '--dry-run', '--output=.slope/candidates.json'])
+    );
+
+    expect(existsSync(outputPath)).toBe(true);
+    const payload = JSON.parse(readFileSync(outputPath, 'utf8'));
+    expect(payload.candidate_count).toBe(6);
+    expect(stdout).toContain('SLOPE Issue Scout');
+    expect(stdout).toContain('Candidate issues:');
+    expect(stdout).not.toContain('"candidates"');
+  });
 });

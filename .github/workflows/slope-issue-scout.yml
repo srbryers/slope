@@ -46,8 +46,7 @@ jobs:
             --source .slope/common-issues.json \
             --source .slope/transcripts \
             --dry-run \
-            --output .slope/issue-scout-candidates.json \
-            --json
+            --output .slope/issue-scout-candidates.json
 
       - name: Render daily approval digest
         run: |
@@ -69,8 +68,7 @@ jobs:
             --source .slope/transcripts \
             --create \
             --output .slope/issue-scout-created.json \
-            --state-path .slope/issue-scout-state.json \
-            --json
+            --state-path .slope/issue-scout-state.json
 
       - name: Email daily digest when configured
         env:

@@ -170,7 +170,7 @@ async function runScoutCommand(args: string[]): Promise<void> {
     writeJson(resolve(cwd, output), payload);
   }
 
-  if (json || output) {
+  if (json) {
     console.log(JSON.stringify(payload, null, 2));
     return;
   }
