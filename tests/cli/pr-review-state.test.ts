@@ -9,6 +9,7 @@ import {
   recordPrCloseoutSettled,
   recordPrReviewComplete,
   recordPrReviewPending,
+  recordPrReviewPromptsGenerated,
 } from '../../src/cli/pr-review-state.js';
 
 describe('pr review state', () => {
@@ -70,5 +71,17 @@ describe('pr review state', () => {
     recordPrReviewPending(cwd, { pr: 42, sprint: 100, branch: 'fix/test' });
 
     expect(loadPrReviewState(cwd).reviews[0].status).toBe('reviewed');
+  });
+
+  it('records generated review prompts without marking the PR reviewed', () => {
+    recordPrReviewPromptsGenerated(cwd, { pr: 42, sprint: 100, branch: 'fix/test', reviewType: 'both' });
+
+    const state = loadPrReviewState(cwd);
+    expect(state.reviews[0].status).toBe('pending');
+    expect(state.reviews[0].closeout_status).toBe('pending');
+    expect(state.reviews[0].prompts_generated_at).toBeDefined();
+    expect(state.reviews[0].review_type).toBe('both');
+    expect(pendingPrReviews(cwd, 100).map(review => review.pr)).toEqual([42]);
+    expect(pendingPrCloseouts(cwd, 100)).toEqual([]);
   });
 });

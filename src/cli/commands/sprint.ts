@@ -37,6 +37,7 @@ function getDefinition(exec: WorkflowExecution, cwd: string): { def: WorkflowDef
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, dirname, basename } from 'node:path';
 import { createStore } from '../../store/index.js';
+import { formatCliError } from '../error-reporter.js';
 import {
   blockingRoadmapIssuesForSprint,
   collectSiblingWorktreeReality,
@@ -633,9 +634,10 @@ async function runWorkflowCommand(args: string[], cwd: string): Promise<void> {
 
 async function workflowStatusCommand(args: string[], cwd: string): Promise<void> {
   const sprintArg = args.find(a => !a.startsWith('--'));
-  const store = getStore(cwd);
+  let store: ReturnType<typeof getStore> | null = null;
 
   try {
+    store = getStore(cwd);
     if (sprintArg) {
       const exec = await store.getExecutionBySprint(sprintArg);
       if (!exec) {
@@ -655,8 +657,13 @@ async function workflowStatusCommand(args: string[], cwd: string): Promise<void>
         printExecution(exec);
       }
     }
+  } catch (err) {
+    for (const line of formatCliError(err, cwd)) {
+      console.error(line);
+    }
+    process.exitCode = 1;
   } finally {
-    store.close();
+    store?.close();
   }
 }
 

@@ -55,6 +55,11 @@ export function storeRecoverySuggestions(message: string, cwd: string): string[]
   if (!isNativeSqliteSetupError(message)) return [];
 
   const suggestions: string[] = [];
+  suggestions.push(`Active Node: ${process.version} (NODE_MODULE_VERSION ${process.versions.modules ?? 'unknown'}).`);
+
+  const abi = nativeAbiDetails(message);
+  if (abi) suggestions.push(abi);
+
   const installCommand = detectInstallCommand(cwd);
   if (!existsSync(join(cwd, 'node_modules'))) {
     suggestions.push(`Install this worktree's dependencies first: ${installCommand}.`);
@@ -69,6 +74,12 @@ export function storeRecoverySuggestions(message: string, cwd: string): string[]
 
   suggestions.push('In fresh parallel worktrees, prefer the worktree-local SLOPE binary after dependencies are installed.');
   return suggestions;
+}
+
+function nativeAbiDetails(message: string): string | null {
+  const match = message.match(/NODE_MODULE_VERSION\s+(\d+).*?requires NODE_MODULE_VERSION\s+(\d+)/i);
+  if (!match) return null;
+  return `Native binding ABI mismatch: compiled NODE_MODULE_VERSION ${match[1]}, runtime requires NODE_MODULE_VERSION ${match[2]}.`;
 }
 
 export async function storeCommand(args: string[]): Promise<void> {

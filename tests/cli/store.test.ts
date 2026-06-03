@@ -139,6 +139,9 @@ describe('slope store status', () => {
     spy.mockRestore();
     const parsed = JSON.parse(logs.join('\n'));
     expect(parsed.error).toContain('NODE_MODULE_VERSION');
+    expect(parsed.recovery.join('\n')).toContain(`Active Node: ${process.version}`);
+    expect(parsed.recovery.join('\n')).toContain('compiled NODE_MODULE_VERSION 127');
+    expect(parsed.recovery.join('\n')).toContain('runtime requires NODE_MODULE_VERSION 141');
     expect(parsed.recovery).toContain('Install this worktree\'s dependencies first: pnpm install.');
     expect(parsed.recovery.join('\n')).toContain('package.json engines.node (>=22 <23)');
   });
