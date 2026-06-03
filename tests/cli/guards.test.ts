@@ -587,6 +587,29 @@ describe('scopeDriftGuard', () => {
     expect(result.context).toContain('src/core');
   });
 
+  it('treats sprint auto-claims as broad scope-drift coverage', async () => {
+    writeSprintState(10);
+    const { createStore } = await import('../../src/store/index.js');
+    const store = createStore({ storePath: '.slope/slope.db', cwd: tmpDir });
+    await store.claim({
+      sprint_number: 10,
+      player: 'test',
+      target: 'sprint:S10',
+      scope: 'area',
+    });
+    store.close();
+
+    const result = await scopeDriftGuard(
+      makeInput({
+        tool_name: 'apply_patch',
+        tool_input: { command: applyPatchCommand(join(tmpDir, 'src/cli/commands/version.ts')) },
+      }),
+      tmpDir,
+    );
+
+    expect(result).toEqual({});
+  });
+
   it('fails open when disk state is older than 24 hours', async () => {
     mkdirSync(join(tmpDir, '.slope/guard-state'), { recursive: true });
     (mockConfig as Record<string, unknown>).currentSprint = 10;

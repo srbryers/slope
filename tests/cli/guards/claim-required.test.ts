@@ -8,6 +8,7 @@ import {
   isImplementationWritePath,
 } from '../../../src/cli/guards/claim-required.js';
 import type { HookInput } from '../../../src/core/index.js';
+import { createStore } from '../../../src/store/index.js';
 
 function makeInput(cwd: string, filePath: string): HookInput {
   return {
@@ -116,6 +117,11 @@ describe('claimOverlapsPath', () => {
     it('handles target with trailing slash', () => {
       expect(claimOverlapsPath('area', 'src/core/', 'src/core/x.ts', 'src/core')).toBe(true);
       expect(claimOverlapsPath('area', 'src/core/', 'src/core-helpers/x.ts', 'src/core-helpers')).toBe(false);
+    });
+
+    it('treats sprint auto-claims as whole-sprint coverage', () => {
+      expect(claimOverlapsPath('area', 'sprint:S94', 'src/core/foo.ts', 'src/core')).toBe(true);
+      expect(claimOverlapsPath('area', 'sprint:S94', 'docs/retros/sprint-94.json', 'docs/retros')).toBe(true);
     });
   });
 
@@ -269,6 +275,28 @@ describe('claimRequiredGuard', () => {
 
       expect(result.decision).toBeUndefined();
       expect(result.context).toContain('No active sprint claim');
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('honors store-backed sprint auto-claims during implementing phase', async () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'slope-claim-required-'));
+    try {
+      writeConfig(cwd);
+      writeSprintState(cwd, 'implementing');
+      const store = createStore({ storePath: '.slope/slope.db', cwd });
+      await store.claim({
+        sprint_number: 94,
+        player: 'test',
+        target: 'sprint:S94',
+        scope: 'area',
+      });
+      store.close();
+
+      const result = await claimRequiredGuard(makeInput(cwd, join(cwd, 'src/foo.ts')), cwd);
+
+      expect(result).toEqual({});
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }

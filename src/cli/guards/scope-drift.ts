@@ -136,5 +136,6 @@ function resolveCurrentSprint(cwd: string, config: SlopeConfig): number | undefi
 
 function isWithinClaimedArea(relativePath: string, target: string): boolean {
   const normalizedTarget = target.replace(/\\/g, '/').replace(/\/$/, '');
+  if (/^sprint:S\d+(?:\.\d+)?$/i.test(normalizedTarget)) return true;
   return relativePath === normalizedTarget || relativePath.startsWith(`${normalizedTarget}/`);
 }
