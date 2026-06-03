@@ -167,6 +167,17 @@ export async function autoCardCommand(args: string[]): Promise<void> {
     process.exit(1);
   }
 
+  const cwd = process.cwd();
+  const roadmap = loadRoadmap(cwd);
+  const sprint = roadmap?.sprints.find(s => s.id === sprintNumber);
+  const includeUntracked = args.includes('--include-untracked');
+
+  if (!sprint && !includeUntracked && !hasExplicitScanBound(opts)) {
+    console.error(`  Roadmap has no S${formatSprintNumber(sprintNumber)} sprint definition, and the git scan is unbounded.`);
+    console.error('  Add --since=<date>, use --branch=<base>..<head>, or pass --include-untracked to accept legacy positional inference.\n');
+    process.exit(1);
+  }
+
   const allCommits = getCommits(opts.since, opts.branch);
 
   if (allCommits.length === 0) {
@@ -178,11 +189,6 @@ export async function autoCardCommand(args: string[]): Promise<void> {
   // (#352). Without this, every recent commit on HEAD becomes a shot — so a
   // sprint with 6 planned tickets gets inflated to S1-7…S1-N from setup
   // commits. Opt-out via --include-untracked for the legacy behavior.
-  const cwd = process.cwd();
-  const roadmap = loadRoadmap(cwd);
-  const sprint = roadmap?.sprints.find(s => s.id === sprintNumber);
-  const includeUntracked = args.includes('--include-untracked');
-
   let commits: CommitInfo[];
   let assignedKeys: (string | null)[];
 
@@ -233,7 +239,7 @@ export async function autoCardCommand(args: string[]): Promise<void> {
     assignedKeys = allCommits.map(() => null); // legacy positional inference
     if (!sprint && !includeUntracked) {
       // No roadmap entry for this sprint — surface a hint, but proceed.
-      console.error(`  Note: roadmap has no S${formatSprintNumber(sprintNumber)} sprint definition. Falling back to positional ticket keys; pass --include-untracked to silence this hint.\n`);
+      console.error(`  Note: roadmap has no S${formatSprintNumber(sprintNumber)} sprint definition. Using explicit scan bounds and falling back to positional ticket keys; pass --include-untracked to silence this hint.\n`);
     }
   }
 
@@ -366,6 +372,12 @@ export async function autoCardCommand(args: string[]): Promise<void> {
 
 function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function hasExplicitScanBound(opts: Record<string, string>): boolean {
+  if (opts.since?.trim()) return true;
+  const branch = opts.branch?.trim();
+  return Boolean(branch && branch !== 'HEAD');
 }
 
 /**
