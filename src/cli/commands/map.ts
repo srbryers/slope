@@ -761,6 +761,7 @@ export async function mapCommand(args: string[]): Promise<void> {
   const config = loadConfig(cwd);
   const outputPath = flags.output || join(cwd, 'CODEBASE.md');
   const isCheck = flags.check === 'true';
+  const force = flags.force === 'true';
 
   if (args.includes('--help') || args.includes('-h')) {
     printUsage();
@@ -803,6 +804,11 @@ export async function mapCommand(args: string[]): Promise<void> {
   const meta = gatherMetadata(cwd, config, identity);
 
   if (!identity.isSlopeSelf) {
+    if (meta.source_files === 0 && existsSync(outputPath) && !force && !isSlopeShapedMap(readFileSync(outputPath, 'utf8'))) {
+      console.log('\x1b[33mRefusing to overwrite existing CODEBASE.md with a zero-source map.\x1b[0m');
+      console.log('  No TypeScript source files were detected. Re-run with `slope map --force` if a docs-only map is intentional.\n');
+      process.exit(1);
+    }
     // Downstream project — always (re)generate from the generic template.
     // Surgical section updates would require the existing map to have the
     // right markers, and v1.55.1 wrote SLOPE-internal sections into other
@@ -849,6 +855,11 @@ export async function mapCommand(args: string[]): Promise<void> {
   console.log(`\nMap written to ${relative(cwd, outputPath)}\n`);
 }
 
+function isSlopeShapedMap(content: string): boolean {
+  return /^# SLOPE Codebase Map\b/m.test(content)
+    || content.includes('Sprint Lifecycle & Operational Performance Engine');
+}
+
 function printUsage(): void {
   console.log(`
 slope map — Generate/update the SLOPE codebase map
@@ -857,6 +868,7 @@ Usage:
   slope map                   Generate or update CODEBASE.md
   slope map --check           Check staleness (exit 1 if stale)
   slope map --output=<path>   Custom output path (default: CODEBASE.md)
+  slope map --force           Allow replacing an existing map when no source files are detected
 
 The codebase map provides a compact (~500 line) overview of the project
 for agent navigation. Auto-generated sections are updated in place;

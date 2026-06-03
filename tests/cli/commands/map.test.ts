@@ -1,11 +1,19 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { execSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 
 const REPO_ROOT = resolve(__dirname, '..', '..', '..');
 const SLOPE_BIN = resolve(REPO_ROOT, 'dist', 'cli', 'index.js');
+
+function runSlopeMap(cwd: string, args: string[] = [], options: { encoding?: BufferEncoding } = {}) {
+  return execFileSync(process.execPath, [SLOPE_BIN, 'map', ...args], {
+    cwd,
+    encoding: options.encoding,
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
+}
 
 function setupNonSlopeRepo(packageJson: Record<string, unknown>): string {
   const dir = mkdtempSync(join(tmpdir(), 'slope-map-'));
@@ -39,7 +47,7 @@ describe('slope map in a non-SLOPE repo (#351)', () => {
       description: 'Cooper validation app — Next.js + tRPC',
     });
     try {
-      execSync(`node ${SLOPE_BIN} map`, { cwd, stdio: ['pipe', 'pipe', 'pipe'] });
+      runSlopeMap(cwd);
       const md = readFileSync(join(cwd, 'CODEBASE.md'), 'utf8');
       expect(md).toContain('# @cooper/web Codebase Map');
       expect(md).toContain('Cooper validation app — Next.js + tRPC');
@@ -53,7 +61,7 @@ describe('slope map in a non-SLOPE repo (#351)', () => {
   it('omits SLOPE-internal sections (CLI commands, guards, MCP tools, API surface)', () => {
     const cwd = setupNonSlopeRepo({ name: '@cooper/web' });
     try {
-      execSync(`node ${SLOPE_BIN} map`, { cwd, stdio: ['pipe', 'pipe', 'pipe'] });
+      runSlopeMap(cwd);
       const md = readFileSync(join(cwd, 'CODEBASE.md'), 'utf8');
       expect(md).not.toContain('## CLI Commands');
       expect(md).not.toContain('## Guard Definitions');
@@ -83,7 +91,7 @@ describe('slope map in a non-SLOPE repo (#351)', () => {
       writeFileSync(join(cwd, 'apps', 'site', 'main.ts'), 'console.log("hi");');
       writeFileSync(join(cwd, 'apps', 'site', 'main.test.ts'), 'it("works", () => {});');
 
-      execSync(`node ${SLOPE_BIN} map`, { cwd, stdio: ['pipe', 'pipe', 'pipe'] });
+      runSlopeMap(cwd);
       const md = readFileSync(join(cwd, 'CODEBASE.md'), 'utf8');
 
       // Each workspace package gets a section with its package.json name
@@ -103,9 +111,33 @@ describe('slope map in a non-SLOPE repo (#351)', () => {
   it('falls back to "_No packages..." when neither workspaces nor src/ exist', () => {
     const cwd = setupNonSlopeRepo({ name: 'standalone-tool' });
     try {
-      execSync(`node ${SLOPE_BIN} map`, { cwd, stdio: ['pipe', 'pipe', 'pipe'] });
+      runSlopeMap(cwd);
       const md = readFileSync(join(cwd, 'CODEBASE.md'), 'utf8');
       expect(md).toContain('No packages, apps, or top-level src/ directory detected');
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('does not overwrite an existing map with zero-source output unless forced', () => {
+    const cwd = setupNonSlopeRepo({ name: 'docs-only-tool' });
+    try {
+      writeFileSync(join(cwd, 'CODEBASE.md'), '# Useful existing map\n\nKeep this.\n');
+
+      let output = '';
+      try {
+        runSlopeMap(cwd, [], { encoding: 'utf8' });
+      } catch (err) {
+        output = `${(err as { stdout?: Buffer | string }).stdout ?? ''}${(err as { stderr?: Buffer | string }).stderr ?? ''}`;
+      }
+
+      expect(output).toContain('Refusing to overwrite existing CODEBASE.md with a zero-source map');
+      expect(readFileSync(join(cwd, 'CODEBASE.md'), 'utf8')).toContain('Useful existing map');
+
+      runSlopeMap(cwd, ['--force']);
+      const forced = readFileSync(join(cwd, 'CODEBASE.md'), 'utf8');
+      expect(forced).toContain('# docs-only-tool Codebase Map');
+      expect(forced).toContain('No packages, apps, or top-level src/ directory detected');
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }
@@ -125,7 +157,7 @@ describe('slope map in a non-SLOPE repo (#351)', () => {
       execSync('git config user.name t', { cwd });
       execSync('git commit -q --allow-empty -m initial', { cwd });
 
-      execSync(`node ${SLOPE_BIN} map`, { cwd, stdio: ['pipe', 'pipe', 'pipe'] });
+      runSlopeMap(cwd);
       const md = readFileSync(join(cwd, 'CODEBASE.md'), 'utf8');
       // Directory basename is appended to "Codebase Map"
       expect(md).toMatch(/^# .+ Codebase Map/m);
@@ -142,7 +174,7 @@ describe('slope map in a non-SLOPE repo (#351)', () => {
       writeFileSync(join(cwd, 'CODEBASE.md'),
         '# SLOPE Codebase Map\n\nSprint Lifecycle & Operational Performance Engine\n');
 
-      execSync(`node ${SLOPE_BIN} map`, { cwd, stdio: ['pipe', 'pipe', 'pipe'] });
+      runSlopeMap(cwd);
       const md = readFileSync(join(cwd, 'CODEBASE.md'), 'utf8');
       expect(md).toContain('# @cooper/web Codebase Map');
       expect(md).not.toContain('# SLOPE Codebase Map');

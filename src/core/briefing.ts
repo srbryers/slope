@@ -92,6 +92,8 @@ export interface SkillBriefingResult {
 
 // --- Library functions ---
 
+const DEFAULT_BRIEFING_HAZARD_LIMIT = 12;
+
 /**
  * Filter common issues to only those relevant to the sprint's work.
  * Matches by category list and/or keyword search in title/description/prevention.
@@ -435,11 +437,23 @@ export function formatBriefing(opts: {
   }
 
   if (filteredBunkers.length > 0 || filteredShotHazards.length > 0) {
-    for (const h of filteredShotHazards) {
-      lines.push(`  [S${h.sprint}] ${h.type}: ${h.description}`);
+    const hazardLines = [
+      ...filteredShotHazards.map(h => ({
+        sprint: h.sprint,
+        line: `  [S${h.sprint}] ${h.type}: ${h.description}`,
+      })),
+      ...filteredBunkers.map(b => ({
+        sprint: b.sprint,
+        line: `  [S${b.sprint}] ${b.location}`,
+      })),
+    ].sort((a, b) => b.sprint - a.sprint);
+
+    for (const entry of hazardLines.slice(0, DEFAULT_BRIEFING_HAZARD_LIMIT)) {
+      lines.push(entry.line);
     }
-    for (const b of filteredBunkers) {
-      lines.push(`  [S${b.sprint}] ${b.location}`);
+    const omitted = hazardLines.length - DEFAULT_BRIEFING_HAZARD_LIMIT;
+    if (omitted > 0) {
+      lines.push(`  ... ${omitted} older hazard${omitted === 1 ? '' : 's'} omitted. Use --keywords=<term> or --categories=<category> to focus the briefing.`);
     }
   } else {
     lines.push('  No bunker locations recorded.');
