@@ -374,6 +374,27 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     ],
   },
   {
+    cmd: 'issue', desc: 'Detect and triage SLOPE-driven product issues', category: 'tooling',
+    subcommands: [
+      { name: 'scout', desc: 'Scan common issues/transcripts and propose GitHub issues', flags: [
+        { flag: '--source=<path>', desc: 'File or directory to scan (repeatable)' },
+        { flag: '--repo=<owner/repo>', desc: 'GitHub repository for dedupe/create' },
+        { flag: '--dry-run', desc: 'Print candidates without creating issues' },
+        { flag: '--create', desc: 'Create issues for non-duplicate candidates' },
+        { flag: '--comment-duplicates', desc: 'Comment on matched issues with fresh evidence' },
+        { flag: '--output=<path>', desc: 'Write JSON scout output' },
+        { flag: '--json', desc: 'Print machine-readable JSON' },
+      ]},
+      { name: 'triage', desc: 'Render daily approval digest for issue candidates', flags: [
+        { flag: '--source=<path>', desc: 'File or directory to scan (repeatable)' },
+        { flag: '--repo=<owner/repo>', desc: 'GitHub repository for dedupe context' },
+        { flag: '--daily-digest', desc: 'Render the daily approval digest' },
+        { flag: '--output=<path>', desc: 'Write markdown digest' },
+        { flag: '--json', desc: 'Print digest and candidates as JSON' },
+      ]},
+    ],
+  },
+  {
     cmd: 'metaphor', desc: 'Manage metaphor display themes', category: 'tooling',
     subcommands: [
       { name: 'list', desc: 'Show all available metaphors' },
