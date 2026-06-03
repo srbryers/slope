@@ -22,6 +22,7 @@ describe('formatCliError', () => {
 
       expect(lines[0]).toContain('Could not locate the bindings file');
       expect(lines).toContain('Recovery:');
+      expect(lines.join('\n')).toContain(`Active Node: ${process.version}`);
       expect(lines).toContain('  - Install this worktree\'s dependencies first: pnpm install.');
       expect(lines.join('\n')).toContain('package.json engines.node (>=22 <23)');
     } finally {
@@ -58,6 +59,7 @@ describe('formatCliError', () => {
       const output = errorSpy.mock.calls.map(call => call.join(' ')).join('\n');
       expect(output).toContain('Error: ERR_DLOPEN_FAILED');
       expect(output).toContain('Recovery:');
+      expect(output).toContain(`Active Node: ${process.version}`);
       expect(output).toContain('npm ci');
     } finally {
       process.chdir(originalCwd);

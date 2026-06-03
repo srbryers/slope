@@ -1,11 +1,16 @@
 import { describe, it, expect } from 'vitest';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import {
   defaultReviewType,
   extractIssueRefs,
   existingAutoCloseRefs,
   formatReviewRecommendations,
 } from '../../src/cli/commands/pr.js';
-import { branchSizeWarnings, canSettlePrCloseout, formatPrCloseoutStatus, hasSuccessfulCodeRabbitStatus, isBlockedCodeRabbitComment } from '../../src/cli/pr-closeout.js';
+import { branchSizeWarnings, buildPrCloseoutStatus, canSettlePrCloseout, formatPrCloseoutStatus, hasSuccessfulCodeRabbitStatus, isBlockedCodeRabbitComment } from '../../src/cli/pr-closeout.js';
+import { recordPrReviewPromptsGenerated } from '../../src/cli/pr-review-state.js';
+import { saveReviewState } from '../../src/cli/commands/review-state.js';
 
 describe('extractIssueRefs (GH #321)', () => {
   it('extracts a single issue ref', () => {
@@ -225,5 +230,31 @@ describe('pr closeout status helpers (S130)', () => {
     expect(hasSuccessfulCodeRabbitStatus({
       statusCheckRollup: [{ __typename: 'StatusContext', context: 'ci', state: 'SUCCESS' }],
     })).toBe(false);
+  });
+
+  it('treats prompt-only PR review state as pending until review rounds are complete', () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'slope-pr-closeout-rounds-'));
+    try {
+      mkdirSync(join(cwd, '.slope'), { recursive: true });
+      writeFileSync(join(cwd, '.slope', 'config.json'), JSON.stringify({
+        currentSprint: 130,
+        scorecardDir: 'docs/retros',
+        scorecardPattern: 'sprint-*.json',
+      }));
+      recordPrReviewPromptsGenerated(cwd, { pr: 468, sprint: 130, branch: 'feat/closeout', reviewType: 'both' });
+
+      expect(buildPrCloseoutStatus(cwd, { sprint: 130 }).prReview).toBe('pending');
+
+      saveReviewState(cwd, {
+        rounds_required: 2,
+        rounds_completed: 2,
+        tier: 'standard',
+        started_at: new Date().toISOString(),
+      });
+
+      expect(buildPrCloseoutStatus(cwd, { sprint: 130 }).prReview).toBe('reviewed');
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
   });
 });

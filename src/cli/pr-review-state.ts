@@ -10,6 +10,7 @@ export interface PrReviewRecord {
   status: 'pending' | 'reviewed';
   closeout_status?: 'pending' | 'settled';
   created_at: string;
+  prompts_generated_at?: string;
   reviewed_at?: string;
   closeout_settled_at?: string;
   review_type?: 'architect' | 'code' | 'both';
@@ -75,6 +76,37 @@ export function recordPrReviewPending(cwd: string, input: { pr: number; sprint?:
       status: 'pending',
       closeout_status: 'pending',
       created_at: now,
+    });
+  }
+
+  savePrReviewState(cwd, state);
+}
+
+export function recordPrReviewPromptsGenerated(
+  cwd: string,
+  input: { pr: number; sprint?: number; branch?: string; reviewType?: 'architect' | 'code' | 'both' },
+): void {
+  const state = loadPrReviewState(cwd);
+  const now = new Date().toISOString();
+  const existing = state.reviews.find(review => review.pr === input.pr);
+
+  if (existing) {
+    existing.sprint = input.sprint ?? existing.sprint;
+    existing.branch = input.branch ?? existing.branch;
+    existing.prompts_generated_at = now;
+    existing.review_type = input.reviewType ?? existing.review_type;
+    if (existing.status !== 'reviewed') existing.status = 'pending';
+    if (existing.closeout_status !== 'settled') existing.closeout_status = 'pending';
+  } else {
+    state.reviews.push({
+      pr: input.pr,
+      sprint: input.sprint,
+      branch: input.branch,
+      status: 'pending',
+      closeout_status: 'pending',
+      created_at: now,
+      prompts_generated_at: now,
+      review_type: input.reviewType,
     });
   }
 

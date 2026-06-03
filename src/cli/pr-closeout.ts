@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { detectLatestSprint } from '../core/index.js';
 import { loadConfig } from './config.js';
 import { loadPrReviewState } from './pr-review-state.js';
+import { loadReviewState } from './commands/review-state.js';
 import { isActiveSprintState, loadSprintState } from './sprint-state.js';
 
 export interface PrCloseoutPolicy {
@@ -546,8 +547,15 @@ function collectBranchSize(cwd: string, base: string | undefined): BranchSize {
 function resolvePrReviewStatus(cwd: string, input: { pr?: number; sprint?: number; branch?: string }): 'missing' | 'pending' | 'reviewed' {
   const matching = matchingPrReviews(cwd, input);
   if (matching.some(review => review.status === 'reviewed')) return 'reviewed';
-  if (matching.some(review => review.status === 'pending')) return 'pending';
+  if (matching.some(review => review.status === 'pending')) {
+    return completedReviewRounds(cwd) ? 'reviewed' : 'pending';
+  }
   return 'missing';
+}
+
+function completedReviewRounds(cwd: string): boolean {
+  const state = loadReviewState(cwd);
+  return Boolean(state && state.rounds_completed >= state.rounds_required);
 }
 
 function resolvePrCloseoutSettlement(cwd: string, input: { pr?: number; sprint?: number; branch?: string }): PrCloseoutSettlementStatus {

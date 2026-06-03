@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { detectLatestSprint, loadConfig, normalizeScorecard, recommendReviews } from '../../core/index.js';
 import type { ReviewRecommendation } from '../../core/index.js';
 import { reviewRunCommand } from './review-run.js';
-import { recordPrCloseoutSettled, recordPrReviewComplete } from '../pr-review-state.js';
+import { recordPrCloseoutSettled, recordPrReviewPromptsGenerated } from '../pr-review-state.js';
 import { branchSizeWarnings, buildPrCloseoutStatus, canSettlePrCloseout, closeoutPolicy, formatPrCloseoutStatus } from '../pr-closeout.js';
 
 /**
@@ -102,6 +102,9 @@ Usage:
 
 Defaults:
   --pr   Resolved from current branch via \`gh pr view --json number\`.
+
+State:
+  Prompt generation records PR review as pending. Complete review rounds before PR closeout.
 `);
 }
 
@@ -440,7 +443,7 @@ async function reviewSubcommand(args: string[]): Promise<void> {
   if (opts.json) {
     reviewArgs.push('--json');
     await reviewRunCommand(reviewArgs);
-    recordPrReviewComplete(process.cwd(), {
+    recordPrReviewPromptsGenerated(process.cwd(), {
       pr: plan.pr,
       sprint: plan.sprint,
       branch: currentBranch(),
@@ -462,7 +465,7 @@ async function reviewSubcommand(args: string[]): Promise<void> {
   console.log('\nReview prompts:\n');
 
   await reviewRunCommand(reviewArgs);
-  recordPrReviewComplete(process.cwd(), {
+  recordPrReviewPromptsGenerated(process.cwd(), {
     pr: plan.pr,
     sprint: plan.sprint,
     branch: currentBranch(),
