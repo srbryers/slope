@@ -138,20 +138,22 @@ export function clearAdapters(): void {
 
 /**
  * Shell preamble that resolves the `slope` binary at runtime.
- * Checks: project node_modules → global PATH → npx fallback.
+ * Checks: project node_modules → SLOPE dev dist → global PATH → npx fallback.
  * Defines a `slope()` shell function so all downstream `slope` calls just work.
  */
 export const SLOPE_BIN_PREAMBLE: string[] = [
-  '# Resolve slope binary: project node_modules → global PATH → npx fallback',
+  '# Resolve slope binary: project node_modules → SLOPE dev dist → global PATH → npx fallback',
   'SLOPE_PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"',
   'if [ -x "$SLOPE_PROJECT_DIR/node_modules/.bin/slope" ]; then',
-  '  _SLOPE_BIN="$SLOPE_PROJECT_DIR/node_modules/.bin/slope"',
+  '  slope() { "$SLOPE_PROJECT_DIR/node_modules/.bin/slope" "$@"; }',
+  'elif [ -f "$SLOPE_PROJECT_DIR/dist/cli/index.js" ] && [ -f "$SLOPE_PROJECT_DIR/package.json" ] && grep -q \'"name": "@slope-dev/slope"\' "$SLOPE_PROJECT_DIR/package.json"; then',
+  '  slope() { node "$SLOPE_PROJECT_DIR/dist/cli/index.js" "$@"; }',
   'elif command -v slope >/dev/null 2>&1; then',
   '  _SLOPE_BIN="$(command -v slope)"',
+  '  slope() { "$_SLOPE_BIN" "$@"; }',
   'else',
-  '  _SLOPE_BIN="npx --yes @slope-dev/slope"',
+  '  slope() { npx --yes @slope-dev/slope "$@"; }',
   'fi',
-  'slope() { "$_SLOPE_BIN" "$@"; }',
 ];
 
 const MANAGED_START = '# === SLOPE MANAGED (do not edit above this line) ===';

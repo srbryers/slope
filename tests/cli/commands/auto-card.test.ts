@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { execSync } from 'node:child_process';
+import { execSync, spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, existsSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -98,6 +98,19 @@ function commitWith(cwd: string, message: string) {
   execSync('git commit -q --allow-empty -m ' + JSON.stringify(message), { cwd });
 }
 
+function runAutoCard(cwd: string, args: string[]): { status: number; stdout: string; stderr: string } {
+  const result = spawnSync(process.execPath, [SLOPE_BIN, 'auto-card', ...args], {
+    cwd,
+    encoding: 'utf8',
+  });
+  if (result.error) throw result.error;
+  return {
+    status: result.status ?? 0,
+    stdout: result.stdout ?? '',
+    stderr: result.stderr ?? '',
+  };
+}
+
 describe('slope auto-card --dry-run roadmap filtering (#352)', () => {
   beforeAll(() => {
     if (!existsSync(SLOPE_BIN)) {
@@ -113,10 +126,9 @@ describe('slope auto-card --dry-run roadmap filtering (#352)', () => {
       commitWith(cwd, 'feat(S1-1): real ticket one');
       commitWith(cwd, 'feat(S1-2): real ticket two');
 
-      const out = execSync(`node ${SLOPE_BIN} auto-card --sprint=1 --dry-run`, {
-        cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'],
-      });
-      const card = JSON.parse(out.trim());
+      const result = runAutoCard(cwd, ['--sprint=1', '--dry-run']);
+      expect(result.status).toBe(0);
+      const card = JSON.parse(result.stdout.trim());
       const keys = (card.shots as Array<{ ticket_key: string }>).map(s => s.ticket_key);
 
       // Order is git-log order (newest first), but the SET must be exactly
@@ -139,16 +151,11 @@ describe('slope auto-card --dry-run roadmap filtering (#352)', () => {
       commitWith(cwd, 'chore: unrelated cleanup');
       commitWith(cwd, 'feat(S1-1): real ticket');
 
-      // Capture stderr by redirecting via a shell. execSync's `stderr` property
-      // on success is undefined, and the dry-run exits 0, so route stderr
-      // through stdout for inspection.
-      const combined = execSync(
-        `node ${SLOPE_BIN} auto-card --sprint=1 --dry-run 2>&1 1>/dev/null`,
-        { cwd, encoding: 'utf8', shell: '/bin/sh' },
-      );
-      expect(combined).toMatch(/Filtered 1 commit/);
-      expect(combined).toContain('chore: unrelated cleanup');
-      expect(combined).toContain('--include-untracked');
+      const result = runAutoCard(cwd, ['--sprint=1', '--dry-run']);
+      expect(result.status).toBe(0);
+      expect(result.stderr).toMatch(/Filtered 1 commit/);
+      expect(result.stderr).toContain('chore: unrelated cleanup');
+      expect(result.stderr).toContain('--include-untracked');
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }
@@ -160,10 +167,9 @@ describe('slope auto-card --dry-run roadmap filtering (#352)', () => {
       commitWith(cwd, 'feat(S1): broad implementation');
       commitWith(cwd, 'fix(S1-review): review follow-up');
 
-      const combined = execSync(
-        `node ${SLOPE_BIN} auto-card --sprint=1 --dry-run 2>&1`,
-        { cwd, encoding: 'utf8', shell: '/bin/sh' },
-      );
+      const result = runAutoCard(cwd, ['--sprint=1', '--dry-run']);
+      expect(result.status).toBe(0);
+      const combined = `${result.stderr}${result.stdout}`;
       const jsonStart = combined.indexOf('{');
       expect(jsonStart).toBeGreaterThanOrEqual(0);
       const card = JSON.parse(combined.slice(jsonStart).trim());
@@ -185,10 +191,9 @@ describe('slope auto-card --dry-run roadmap filtering (#352)', () => {
       commitWith(cwd, 'docs(SLOPE): refresh map');
       commitWith(cwd, 'feat(S1-1): real ticket');
 
-      const out = execSync(`node ${SLOPE_BIN} auto-card --sprint=1 --include-untracked --dry-run`, {
-        cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'],
-      });
-      const card = JSON.parse(out.trim());
+      const result = runAutoCard(cwd, ['--sprint=1', '--include-untracked', '--dry-run']);
+      expect(result.status).toBe(0);
+      const card = JSON.parse(result.stdout.trim());
       expect((card.shots as unknown[]).length).toBe(3);
     } finally {
       rmSync(cwd, { recursive: true, force: true });
@@ -201,34 +206,44 @@ describe('slope auto-card --dry-run roadmap filtering (#352)', () => {
       commitWith(cwd, 'chore(SLOPE): bootstrap');
       commitWith(cwd, 'docs: random');
 
-      let exitCode: number | null = null;
-      let stderr = '';
-      try {
-        execSync(`node ${SLOPE_BIN} auto-card --sprint=1 --dry-run`, {
-          cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'],
-        });
-      } catch (e) {
-        const err = e as { status?: number; stderr?: string };
-        exitCode = err.status ?? null;
-        stderr = err.stderr ?? '';
-      }
-      expect(exitCode).not.toBe(0);
-      expect(stderr).toMatch(/No commits .* reference S1 tickets/);
+      const result = runAutoCard(cwd, ['--sprint=1', '--dry-run']);
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toMatch(/No commits .* reference S1 tickets/);
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }
   });
 
-  it('falls back to legacy positional inference when sprint is not in roadmap', () => {
+  it('blocks no-roadmap default HEAD scans before falling back to positional inference', () => {
     const cwd = setupRepoWithRoadmap();
     try {
-      // Sprint 2 has no roadmap entry — fall back to old behavior
+      // Sprint 2 has no roadmap entry. The default HEAD scan can traverse
+      // unrelated history, so it must be bounded or explicitly opted in.
       commitWith(cwd, 'feat: anything');
 
-      const out = execSync(`node ${SLOPE_BIN} auto-card --sprint=2 --dry-run`, {
-        cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'],
-      });
-      const card = JSON.parse(out.trim());
+      const result = runAutoCard(cwd, ['--sprint=2', '--dry-run']);
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain('Roadmap has no S2 sprint definition');
+      expect(result.stderr).toContain('--since=<date>');
+      expect(result.stderr).toContain('--include-untracked');
+
+      const namedBranchResult = runAutoCard(cwd, ['--sprint=2', '--branch=main', '--dry-run']);
+      expect(namedBranchResult.status).not.toBe(0);
+      expect(namedBranchResult.stderr).toContain('git scan is unbounded');
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('allows no-roadmap positional inference when an explicit scan bound is provided', () => {
+    const cwd = setupRepoWithRoadmap();
+    try {
+      commitWith(cwd, 'feat: anything');
+
+      const result = runAutoCard(cwd, ['--sprint=2', '--since=1970-01-01', '--dry-run']);
+      expect(result.status).toBe(0);
+      expect(result.stderr).toContain('Using explicit scan bounds');
+      const card = JSON.parse(result.stdout.trim());
       expect(card.shots.length).toBe(1);
       expect(card.shots[0].ticket_key).toBe('S2-1'); // legacy positional
     } finally {

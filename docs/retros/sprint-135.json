@@ -1,0 +1,71 @@
+{
+  "sprint_number": 135,
+  "player": "sebastianbryers",
+  "theme": "SLOPE issue preflight stabilization",
+  "par": 4,
+  "slope": 0,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-06-03",
+  "shots": [
+    {
+      "ticket_key": "S135-1",
+      "title": "fix(#495): require range bounds for no-roadmap auto-card",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "2 files changed (Clean git signals but no CI confirmation — defaulting to green)"
+    },
+    {
+      "ticket_key": "S135-2",
+      "title": "fix(#494): read active claims from store-backed sprint state",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "6 files changed (Clean git signals but no CI confirmation — defaulting to green)"
+    },
+    {
+      "ticket_key": "S135-3",
+      "title": "fix(#495): require bounded auto-card scans without roadmap",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "2 files changed (Clean git signals but no CI confirmation — defaulting to green)"
+    },
+    {
+      "ticket_key": "S135-4",
+      "title": "fix(#496): prefer source-built slope in dev checkouts",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "5 files changed (Clean git signals but no CI confirmation — defaulting to green)"
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [],
+  "special_plays": [],
+  "bunker_locations": [],
+  "yardage_book_updates": [],
+  "course_management_notes": [],
+  "slope_factors": [],
+  "_auto_generated": true,
+  "_commits": 4,
+  "_ci_signal": null,
+  "_pr_signal": null,
+  "_note": "Auto-generated from git only (no CI). Shots default to green. Provide --test-output for better scoring."
+}

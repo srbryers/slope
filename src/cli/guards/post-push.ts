@@ -5,6 +5,7 @@ import { loadConfig, parseRoadmap } from '../../core/index.js';
 import { loadSprintState } from '../sprint-state.js';
 import { loadSessionState, updateSessionState } from '../session-state.js';
 import { isPhaseComplete } from '../phase-cleanup.js';
+import { resolveStore } from '../store.js';
 
 /**
  * Post-push guard: fires PostToolUse on Bash.
@@ -45,14 +46,7 @@ export async function postPushGuard(input: HookInput, cwd: string): Promise<Guar
 
   if (sprintState && sprintState.phase === 'implementing') {
     // Check how many claims remain
-    let remainingClaims = 0;
-    try {
-      const claimsPath = join(cwd, '.slope', 'claims.json');
-      if (existsSync(claimsPath)) {
-        const claims = JSON.parse(readFileSync(claimsPath, 'utf8'));
-        if (Array.isArray(claims)) remainingClaims = claims.length;
-      }
-    } catch { /* claims unavailable */ }
+    const remainingClaims = await countSprintClaims(cwd, sprintState.sprint);
 
     // Check pending gates
     const pendingGateCount = Object.values(sprintState.gates).filter(v => !v).length;
@@ -135,4 +129,16 @@ export async function postPushGuard(input: HookInput, cwd: string): Promise<Guar
   };
 
   return { suggestion };
+}
+
+async function countSprintClaims(cwd: string, sprintNumber: number): Promise<number> {
+  let store: Awaited<ReturnType<typeof resolveStore>> | null = null;
+  try {
+    store = await resolveStore(cwd);
+    return (await store.list(sprintNumber)).length;
+  } catch {
+    return 0;
+  } finally {
+    store?.close();
+  }
 }

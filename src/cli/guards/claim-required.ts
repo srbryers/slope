@@ -1,8 +1,7 @@
 import { execSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { dirname } from 'node:path';
 import { formatSprintLabel } from '../../core/index.js';
-import type { HookInput, GuardResult } from '../../core/index.js';
+import type { HookInput, GuardResult, SprintClaim } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { inferSprintContext } from '../sprint-inference.js';
 import { loadSprintState } from '../sprint-state.js';
@@ -101,18 +100,13 @@ export async function claimRequiredGuard(input: HookInput, cwd: string): Promise
     }
 
     // Active sprint in implementing phase — check for claims
-    try {
-      const claimsPath = join(cwd, '.slope', 'claims.json');
-      if (existsSync(claimsPath)) {
-        const claims = JSON.parse(readFileSync(claimsPath, 'utf8'));
-        if (Array.isArray(claims) && claims.length > 0) {
-          // Has claims — check for cross-session overlaps
-          const overlapWarning = await detectCrossSessionOverlap(input, cwd, sprintState.sprint);
-          if (overlapWarning) return { context: overlapWarning };
-          return {}; // No overlaps
-        }
-      }
-    } catch { /* claims unavailable */ }
+    const claims = await loadSprintClaims(cwd, sprintState.sprint);
+    if (claims.length > 0) {
+      // Has claims — check for cross-session overlaps
+      const overlapWarning = await detectCrossSessionOverlap(input, cwd, sprintState.sprint);
+      if (overlapWarning) return { context: overlapWarning };
+      return {}; // No overlaps
+    }
   } else if (!sprintState) {
     const relativePath = findImplementationWritePath(input, cwd);
     if (!relativePath || !isImplementationWritePath(relativePath)) return {};
@@ -250,6 +244,7 @@ export function claimOverlapsPath(
   fileArea: string,
 ): boolean {
   if (scope !== 'area') return relativePath === target;
+  if (isWholeSprintClaim(target)) return true;
   const areaPrefix = target.endsWith('/') ? target : `${target}/`;
   return (
     relativePath === target || relativePath.startsWith(areaPrefix) ||
@@ -297,4 +292,20 @@ async function detectCrossSessionOverlap(
   } catch { /* store unavailable — skip overlap check */ }
 
   return null;
+}
+
+async function loadSprintClaims(cwd: string, sprintNumber: number): Promise<SprintClaim[]> {
+  let store: Awaited<ReturnType<typeof resolveStore>> | null = null;
+  try {
+    store = await resolveStore(cwd);
+    return await store.list(sprintNumber);
+  } catch {
+    return [];
+  } finally {
+    store?.close();
+  }
+}
+
+function isWholeSprintClaim(target: string): boolean {
+  return /^sprint:S\d+(?:\.\d+)?$/i.test(target);
 }

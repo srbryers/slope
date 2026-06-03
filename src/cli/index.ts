@@ -76,11 +76,22 @@ import { memoryCommand } from './commands/memory.js';
 import { phaseCommand } from './commands/phase.js';
 import { skillsCommand } from './commands/skills.js';
 import { reportCliError } from './error-reporter.js';
+import { buildSourceCheckoutRuntimeWarning } from './source-runtime.js';
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const subcommand = process.argv[2];
+
+const sourceRuntimeWarning = buildSourceCheckoutRuntimeWarning({
+  cwd: process.cwd(),
+  cliEntryPath: fileURLToPath(import.meta.url),
+  args: process.argv.slice(2),
+});
+if (sourceRuntimeWarning) {
+  console.error(`${sourceRuntimeWarning}\n`);
+}
 
 // Handle --help and -h flags globally
 if (subcommand === '--help' || subcommand === '-h') {
