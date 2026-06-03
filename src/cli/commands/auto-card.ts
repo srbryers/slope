@@ -377,7 +377,7 @@ function escapeRegex(value: string): string {
 function hasExplicitScanBound(opts: Record<string, string>): boolean {
   if (opts.since?.trim()) return true;
   const branch = opts.branch?.trim();
-  return Boolean(branch && branch !== 'HEAD');
+  return Boolean(branch && branch !== 'HEAD' && branch.includes('..'));
 }
 
 /**

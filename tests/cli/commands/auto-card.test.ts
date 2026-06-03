@@ -226,6 +226,10 @@ describe('slope auto-card --dry-run roadmap filtering (#352)', () => {
       expect(result.stderr).toContain('Roadmap has no S2 sprint definition');
       expect(result.stderr).toContain('--since=<date>');
       expect(result.stderr).toContain('--include-untracked');
+
+      const namedBranchResult = runAutoCard(cwd, ['--sprint=2', '--branch=main', '--dry-run']);
+      expect(namedBranchResult.status).not.toBe(0);
+      expect(namedBranchResult.stderr).toContain('git scan is unbounded');
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }
