@@ -111,6 +111,30 @@ describe('slope map in a non-SLOPE repo (#351)', () => {
     }
   });
 
+  it('does not overwrite an existing map with zero-source output unless forced', () => {
+    const cwd = setupNonSlopeRepo({ name: 'docs-only-tool' });
+    try {
+      writeFileSync(join(cwd, 'CODEBASE.md'), '# Useful existing map\n\nKeep this.\n');
+
+      let output = '';
+      try {
+        execSync(`node ${SLOPE_BIN} map`, { cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
+      } catch (err) {
+        output = `${(err as { stdout?: Buffer | string }).stdout ?? ''}${(err as { stderr?: Buffer | string }).stderr ?? ''}`;
+      }
+
+      expect(output).toContain('Refusing to overwrite existing CODEBASE.md with a zero-source map');
+      expect(readFileSync(join(cwd, 'CODEBASE.md'), 'utf8')).toContain('Useful existing map');
+
+      execSync(`node ${SLOPE_BIN} map --force`, { cwd, stdio: ['pipe', 'pipe', 'pipe'] });
+      const forced = readFileSync(join(cwd, 'CODEBASE.md'), 'utf8');
+      expect(forced).toContain('# docs-only-tool Codebase Map');
+      expect(forced).toContain('No packages, apps, or top-level src/ directory detected');
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
   it('uses directory basename when package.json is missing entirely', () => {
     const cwd = mkdtempSync(join(tmpdir(), 'slope-map-bare-'));
     try {

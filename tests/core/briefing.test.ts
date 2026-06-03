@@ -404,6 +404,30 @@ describe('formatBriefing', () => {
     expect(output).toContain('No SLOPE-era scorecards yet');
   });
 
+  it('caps full hazard output and summarizes omitted older hazards', () => {
+    const scorecards = Array.from({ length: 15 }, (_, index) => {
+      const sprint = index + 1;
+      return makeCard({
+        sprint_number: sprint,
+        shots: [makeShot({
+          ticket_key: `S${sprint}-1`,
+          hazards: [{ type: 'rough', description: `hazard ${sprint}` }],
+        })],
+      });
+    });
+
+    const output = formatBriefing({
+      scorecards,
+      commonIssues: makeIssues([]),
+    });
+
+    expect(output).toContain('[S15] rough: hazard 15');
+    expect(output).toContain('[S4] rough: hazard 4');
+    expect(output).not.toContain('[S3] rough: hazard 3');
+    expect(output).toContain('3 older hazards omitted');
+    expect(output).toContain('--keywords=<term>');
+  });
+
   it('shows nutrition alerts for non-healthy categories', () => {
     const output = formatBriefing({
       scorecards: [makeCard({
