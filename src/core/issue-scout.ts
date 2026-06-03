@@ -253,10 +253,16 @@ function fallbackTitle(text: string): string {
 }
 
 function isMetadataLine(line: string): boolean {
-  return /^(?:\.?[a-z0-9_-]+\/)+[^ ]+\.(?:md|json|jsonl|txt|log)$/i.test(line)
-    || /^S\d+(?:\.\d+)?$/i.test(line)
-    || /^slope\s+[a-z][\w-]*/.test(line)
-    || /^\{/.test(line);
+  const lower = line.toLowerCase();
+  const pathLike = !line.includes(' ')
+    && lower.includes('/')
+    && ['.md', '.json', '.jsonl', '.txt', '.log'].some(ext => lower.endsWith(ext));
+  const sprintLike = lower.startsWith('s') && Number.isFinite(Number(lower.slice(1)));
+
+  return pathLike
+    || sprintLike
+    || line.startsWith('slope ')
+    || line.startsWith('{');
 }
 
 export function classifySlopeIssue(input: string | IssueScoutEvidence | IssueScoutEvidence[]): IssueScoutClassification {
