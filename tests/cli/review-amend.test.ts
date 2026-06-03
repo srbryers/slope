@@ -111,6 +111,35 @@ describe('review amend', () => {
     expect(logged).toContain('No review findings to amend');
   });
 
+  it('amends legacy ticket-style scorecards by normalizing tickets to shots', async () => {
+    mkdirSync(join(tmpDir, '.slope'), { recursive: true });
+    writeFileSync(join(tmpDir, '.slope/config.json'), JSON.stringify({ scorecardDir: 'docs/retros' }));
+    mkdirSync(join(tmpDir, 'docs/retros'), { recursive: true });
+    writeFileSync(join(tmpDir, 'docs/retros/sprint-197.json'), JSON.stringify({
+      sprint_number: 197,
+      theme: 'Legacy tickets',
+      par: 3,
+      slope: 2,
+      score: 3,
+      score_label: 'par',
+      date: '2026-06-03',
+      tickets: [
+        { id: 'S197-1', title: 'Ticket 1', approach: 'wedge', result: 'green', hazards: [] },
+      ],
+    }));
+    writeFileSync(join(tmpDir, '.slope/review-findings.json'), JSON.stringify({
+      sprint_number: 197,
+      findings: [{ review_type: 'architect', ticket_key: 'S197-1', severity: 'moderate', description: 'test', resolved: true }],
+    }));
+
+    await runCommand(['amend', '--sprint=197']);
+
+    const amended = JSON.parse(readFileSync(join(tmpDir, 'docs/retros/sprint-197.json'), 'utf8')) as GolfScorecard;
+    expect(amended.shots).toHaveLength(1);
+    expect(amended.shots[0].ticket_key).toBe('S197-1');
+    expect(amended.shots[0].hazards[0].description).toContain('[architect review] test');
+  });
+
   it('GH #292: errors clearly when scorecard has no shots array (sub-sprint parent stub)', async () => {
     // Repro: parent scorecard sprint-180.json with no `shots` field.
     // Was crashing as "Cannot read properties of undefined (reading 'map')".

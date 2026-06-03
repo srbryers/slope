@@ -564,6 +564,37 @@ describe('formatSprintReview legacy tickets field', () => {
     expect(output).toContain('| T1 | short_iron | green |');
   });
 
+  it('maps legacy miss direction results to canonical missed results', () => {
+    const card = {
+      ...makeCard({ shots: [] as ShotRecord[] }),
+      tickets: [
+        { id: 'S197-1', title: 'Overbuilt', approach: 'short_iron', result: 'long' },
+        { id: 'S197-2', title: 'Underscoped', approach: 'short_iron', result: 'short' },
+        { id: 'S197-3', title: 'Wrong path', approach: 'short_iron', result: 'left' },
+        { id: 'S197-4', title: 'Drift', approach: 'short_iron', result: 'right' },
+      ],
+    } as unknown as GolfScorecard;
+
+    const output = formatSprintReview(card, makeProjectStats());
+    expect(output).toContain('| S197-1 | short_iron | missed_long |');
+    expect(output).toContain('| S197-2 | short_iron | missed_short |');
+    expect(output).toContain('| S197-3 | short_iron | missed_left |');
+    expect(output).toContain('| S197-4 | short_iron | missed_right |');
+  });
+
+  it('plain mode also reads from legacy tickets', () => {
+    const card = {
+      ...makeCard({ shots: [] as ShotRecord[] }),
+      tickets: [
+        { id: 'S197-1', title: 'rock-coral A/B scene', approach: 'wedge', result: 'in_the_hole' },
+      ],
+    } as unknown as GolfScorecard;
+
+    const output = formatSprintReview(card, makeProjectStats(), undefined, 'plain');
+    expect(output).toContain('**Tickets:** 1 delivered');
+    expect(output).toContain('| S197-1 | Simple fix | Completed perfectly |');
+  });
+
   it('returns empty shots when neither shots nor tickets are populated', () => {
     const card = makeCard({ shots: [] as ShotRecord[] });
     const output = formatSprintReview(card, makeProjectStats());

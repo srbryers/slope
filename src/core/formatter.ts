@@ -2,7 +2,6 @@ import type {
   GolfScorecard,
   MissDirection,
   ShotResult,
-  ShotRecord,
   ClubSelection,
   ScoreLabel,
   ClubRecommendation,
@@ -10,6 +9,7 @@ import type {
 } from './types.js';
 import type { MetaphorDefinition } from './metaphor.js';
 import { normalizeStats } from './builder.js';
+import { normalizeScorecardShots } from './loader.js';
 
 // --- Input types ---
 
@@ -77,56 +77,6 @@ function safeBunkerLabel(b: unknown): string {
   return String(b);
 }
 
-/** Resolve shot records from a scorecard, accepting either the canonical
- *  `shots` field or a legacy `tickets` field. External-repo scorecards in
- *  the wild use `tickets` with `id`/`approach` keys; this remaps them to
- *  ShotRecord shape so the formatter doesn't render an empty table.
- *  See GH #298. */
-// Canonical enum members — used to validate legacy `tickets` field values
-// before casting. Out-of-enum strings fall back to safe defaults (no
-// silent acceptance of unknown values).
-const VALID_CLUBS = new Set<ShotRecord['club']>(['driver', 'long_iron', 'short_iron', 'wedge', 'putter']);
-const VALID_RESULTS = new Set<ShotRecord['result']>([
-  'in_the_hole', 'green', 'fairway',
-  'missed_long', 'missed_short', 'missed_left', 'missed_right',
-]);
-
-function normalizeShotsFromCard(card: GolfScorecard & { tickets?: unknown[] }): ShotRecord[] {
-  const canonical = card.shots;
-  if (Array.isArray(canonical) && canonical.length > 0) return canonical;
-
-  const legacy = card.tickets;
-  if (!Array.isArray(legacy) || legacy.length === 0) return canonical ?? [];
-
-  return legacy.map((t, i) => {
-    const obj = (t ?? {}) as Record<string, unknown>;
-    const ticketKey =
-      (typeof obj.ticket_key === 'string' && obj.ticket_key) ||
-      (typeof obj.id === 'string' && obj.id) ||
-      (typeof obj.key === 'string' && obj.key) ||
-      `T${i + 1}`;
-    const rawClub =
-      (typeof obj.club === 'string' && obj.club) ||
-      (typeof obj.approach === 'string' && obj.approach) ||
-      'short_iron';
-    const club: ShotRecord['club'] = VALID_CLUBS.has(rawClub as ShotRecord['club'])
-      ? (rawClub as ShotRecord['club'])
-      : 'short_iron';
-    const rawResult = typeof obj.result === 'string' ? obj.result : 'green';
-    const result: ShotRecord['result'] = VALID_RESULTS.has(rawResult as ShotRecord['result'])
-      ? (rawResult as ShotRecord['result'])
-      : 'green';
-    return {
-      ticket_key: ticketKey as string,
-      title: (typeof obj.title === 'string' && obj.title) || `Ticket ${ticketKey}`,
-      club,
-      result,
-      hazards: Array.isArray(obj.hazards) ? (obj.hazards as ShotRecord['hazards']) : [],
-      ...(typeof obj.notes === 'string' ? { notes: obj.notes } : {}),
-    };
-  });
-}
-
 // --- Formatter ---
 
 /**
@@ -150,7 +100,7 @@ export function formatSprintReview(
   // Accept legacy/alternate `tickets` field as an alias for `shots` so
   // scorecards from external repos that use the older naming still render
   // correctly (GH #298). Field-name remapping handles common variants.
-  const shots = normalizeShotsFromCard(card);
+  const shots = normalizeScorecardShots(card);
   const stats = normalizeStats(card.stats, shots.length);
   const conditions = card.conditions ?? [];
   const bunkerLocations = card.bunker_locations ?? [];
@@ -367,7 +317,7 @@ function formatPlainReview(
   deltas?: ProjectStatsDelta,
 ): string {
   const sprintNum = card.sprint_number ?? (card as any).sprint;
-  const shots = card.shots ?? [];
+  const shots = normalizeScorecardShots(card);
   const lines: string[] = [];
 
   lines.push(`## Sprint ${sprintNum}: ${card.theme}`);

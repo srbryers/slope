@@ -1,13 +1,27 @@
 import { readFileSync } from 'node:fs';
 import { isAbsolute, join } from 'node:path';
-import { DEFAULT_SKILLS_PATH, discoverScorecardFiles, loadSkillRegistry, skillIds, validateScorecard } from '../../core/index.js';
+import {
+  DEFAULT_SKILLS_PATH,
+  discoverScorecardFiles,
+  loadSkillRegistry,
+  parseSprintNumber,
+  skillIds,
+  sprintNumberFromScorecardFile,
+  validateScorecard,
+} from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { updateGate } from '../sprint-state.js';
 
 export function validateCommand(input?: string | string[]): void {
   const args = Array.isArray(input) ? input : input ? [input] : [];
   const validateSkills = args.includes('--skills');
-  const path = args.find(arg => !arg.startsWith('--'));
+  const sprintArgIndex = args.findIndex(arg => arg === '--sprint' || arg.startsWith('--sprint='));
+  const requestedSprint = parseRequestedSprint(args, sprintArgIndex);
+  const path = args.find((arg, index) => {
+    if (arg.startsWith('--')) return false;
+    if (sprintArgIndex >= 0 && args[sprintArgIndex] === '--sprint' && index === sprintArgIndex + 1) return false;
+    return true;
+  });
   const cwd = process.cwd();
   const config = loadConfig();
   const files: string[] = [];
@@ -28,10 +42,17 @@ export function validateCommand(input?: string | string[]): void {
   if (path) {
     files.push(isAbsolute(path) ? path : join(cwd, path));
   } else {
-    files.push(...discoverScorecardFiles(config, cwd));
+    const discovered = discoverScorecardFiles(config, cwd);
+    files.push(...(requestedSprint == null
+      ? discovered
+      : discovered.filter(file => sprintNumberFromScorecardFile(file, config) === requestedSprint)));
   }
 
   if (files.length === 0) {
+    if (requestedSprint != null) {
+      console.log(`\nNo scorecard found for Sprint ${requestedSprint}.\n`);
+      process.exit(1);
+    }
     console.log('\nNo scorecards found to validate.\n');
     process.exit(0);
   }
@@ -80,4 +101,18 @@ export function validateCommand(input?: string | string[]): void {
   }
 
   process.exit(allValid && registryAvailable ? 0 : 1);
+}
+
+function parseRequestedSprint(args: string[], sprintArgIndex: number): number | null {
+  if (sprintArgIndex < 0) return null;
+  const arg = args[sprintArgIndex];
+  const raw = arg.startsWith('--sprint=')
+    ? arg.slice('--sprint='.length)
+    : args[sprintArgIndex + 1];
+  const sprint = parseSprintNumber(raw ?? '');
+  if (sprint == null) {
+    console.error('Error: --sprint must be a valid sprint number.');
+    process.exit(1);
+  }
+  return sprint;
 }
