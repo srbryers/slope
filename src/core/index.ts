@@ -207,7 +207,15 @@ export { parseTestPlan, getTestPlanSummary, getAreasNeedingTest } from './test-p
 export type { TestPlanArea, TestPlanSection, TestPlanSummary, ParsedTestPlan } from './test-plan.js';
 
 // Loader
-export { loadScorecards, detectLatestSprint, resolveCurrentSprint, normalizeScorecard, discoverScorecardFiles } from './loader.js';
+export {
+  loadScorecards,
+  detectLatestSprint,
+  resolveCurrentSprint,
+  normalizeScorecard,
+  normalizeScorecardShots,
+  discoverScorecardFiles,
+  sprintNumberFromScorecardFile,
+} from './loader.js';
 
 // Metaphor
 export {

@@ -148,4 +148,20 @@ describe('slope validate --skills', () => {
     expect(() => validateCommand()).toThrow('process.exit(0)');
     expect(exitCode).toBe(0);
   });
+
+  it('validates only the requested sprint with --sprint=N', () => {
+    writeScorecard([], 348);
+    mkdirSync(join(tmpDir, 'docs', 'retros'), { recursive: true });
+    writeFileSync(join(tmpDir, 'docs', 'retros', 'sprint-349.json'), '{not-json');
+
+    expect(() => validateCommand(['--sprint=348'])).toThrow('process.exit(0)');
+    expect(exitCode).toBe(0);
+  });
+
+  it('fails when --sprint requests a missing scorecard', () => {
+    writeScorecard([], 348);
+
+    expect(() => validateCommand(['--sprint=349'])).toThrow('process.exit(1)');
+    expect(exitCode).toBe(1);
+  });
 });

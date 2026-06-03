@@ -134,8 +134,10 @@ switch (subcommand) {
       const plainFlag = reviewArgs.includes('--plain');
       const metaphorArg = reviewArgs.find((a: string) => a.startsWith('--metaphor='));
       const metaphorVal = metaphorArg?.slice('--metaphor='.length);
+      const outputArg = reviewArgs.find((a: string) => a.startsWith('--output='));
+      const outputPath = reviewArgs.includes('--stdout') ? null : outputArg?.slice('--output='.length);
       const path = reviewArgs.find((a: string) => !a.startsWith('--'));
-      reviewCommand(path, plainFlag ? 'plain' : undefined, metaphorVal);
+      reviewCommand(path, plainFlag ? 'plain' : undefined, metaphorVal, outputPath);
     }
     break;
   }

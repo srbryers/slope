@@ -1,12 +1,12 @@
-import { readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
-import { formatSprintReview, compareSprintIds, parseSprintNumber } from '../../core/index.js';
-import type { GolfScorecard, ProjectStats } from '../../core/index.js';
+import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { dirname, isAbsolute, join } from 'node:path';
+import { formatSprintReview, compareSprintIds, normalizeScorecard, parseSprintNumber } from '../../core/index.js';
+import type { GolfScorecard } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { resolveMetaphor } from '../metaphor.js';
 import { updateGate } from '../sprint-state.js';
 
-export function reviewCommand(path?: string, mode?: string, metaphorFlag?: string): void {
+export function reviewCommand(path?: string, mode?: string, metaphorFlag?: string, outputPath?: string | null): void {
   const config = loadConfig();
   const cwd = process.cwd();
   const metaphor = resolveMetaphor(metaphorFlag ? [`--metaphor=${metaphorFlag}`] : [], config.metaphor);
@@ -50,12 +50,21 @@ export function reviewCommand(path?: string, mode?: string, metaphorFlag?: strin
     process.exit(1);
   }
 
-  const card: GolfScorecard = { ...raw, sprint_number: raw.sprint_number ?? raw.sprint };
+  const card: GolfScorecard = normalizeScorecard(raw);
 
   const reviewMode = mode === 'plain' ? 'plain' : 'technical';
   const review = formatSprintReview(card, undefined, undefined, reviewMode, metaphor);
   console.log('');
   console.log(review);
+
+  if (outputPath !== null) {
+    const reviewPath = outputPath
+      ? isAbsolute(outputPath) ? outputPath : join(cwd, outputPath)
+      : join(cwd, config.scorecardDir, `sprint-${card.sprint_number}-review.md`);
+    mkdirSync(dirname(reviewPath), { recursive: true });
+    writeFileSync(reviewPath, review + '\n');
+    console.log(`\nReview written: ${reviewPath.replace(cwd + '/', '')}`);
+  }
 
   // Mark review_md gate complete
   updateGate(cwd, 'review_md', true);

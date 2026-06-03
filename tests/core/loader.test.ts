@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { loadScorecards, detectLatestSprint, discoverScorecardFiles } from '../../src/core/loader.js';
+import { loadScorecards, detectLatestSprint, discoverScorecardFiles, normalizeScorecard } from '../../src/core/loader.js';
 import type { SlopeConfig } from '../../src/core/config.js';
 
 const TMP = join(__dirname, '__loader_tmp__');
@@ -105,6 +105,26 @@ describe('loadScorecards — numeric sort', () => {
     const cards = loadScorecards(baseConfig, TMP);
     expect(cards[0].score).toBe(4);
     expect(cards[0].score_label).toBe('par');
+  });
+
+  it('normalizes stats totals from legacy tickets when shots are absent', () => {
+    const card = normalizeScorecard({
+      sprint_number: 197,
+      theme: 'Legacy tickets',
+      slope: 2,
+      date: '2026-06-03',
+      tickets: [
+        { id: 'S197-1', title: 'Ticket 1', approach: 'short_iron', result: 'green' },
+        { id: 'S197-2', title: 'Ticket 2', approach: 'short_iron', result: 'short' },
+      ],
+      stats: {},
+    });
+
+    expect(card.shots).toHaveLength(2);
+    expect(card.shots[1].result).toBe('missed_short');
+    expect(card.stats.fairways_total).toBe(2);
+    expect(card.stats.greens_total).toBe(2);
+    expect(card.stats.miss_directions.short).toBe(1);
   });
 
   it('loads and sorts decimal scorecard filenames for inserted sub-sprints', () => {
