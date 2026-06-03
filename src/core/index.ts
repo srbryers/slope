@@ -497,6 +497,29 @@ export type {
   FlowStalenessResult,
 } from './flows.js';
 
+// Issue Scout
+export {
+  classifySlopeIssue,
+  buildIssueCandidate,
+  buildIssueCandidates,
+  fingerprintCandidate,
+  dedupeCandidates,
+  formatIssueBody,
+  formatIssueScoutComment,
+  renderIssueScoutDigest,
+  parseIssueScoutState,
+  mergeIssueScoutState,
+} from './issue-scout.js';
+export type {
+  IssueScoutEvidence,
+  IssueScoutClassification,
+  IssueScoutCandidate,
+  IssueScoutDedupeResult,
+  ExistingIssue,
+  IssueScoutState,
+  IssueScoutStateRecord,
+} from './issue-scout.js';
+
 // Inspirations
 export {
   parseInspirations,

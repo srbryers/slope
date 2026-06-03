@@ -1,0 +1,132 @@
+{
+  "sprint_number": 136,
+  "player": "codex",
+  "theme": "SLOPE Issue Scout and Daily Triage Loop",
+  "par": 4,
+  "slope": 4,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-06-03",
+  "type": "feature",
+  "shots": [
+    {
+      "ticket_key": "S136-1",
+      "title": "Add core issue scout classification, de-dupe, body, digest, and fingerprint state helpers (#493)",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "Initial fallback classifier treated setup docs as issue candidates; built CLI smoke caught it and the fallback now requires problem signals."
+        }
+      ],
+      "notes": "Added typed pure functions for SLOPE-driven issue classification, stable fingerprints, GitHub issue de-dupe, issue/comment body rendering, approval digest rendering, and persisted fingerprint state."
+    },
+    {
+      "ticket_key": "S136-2",
+      "title": "Add issue scout and triage CLI commands with dry-run, create mode, and evidence ingestion (#493)",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "Broad scorecard/review scans created noisy historical candidates; scorecard JSON is now skipped and scheduled scans avoid docs/retros."
+        }
+      ],
+      "notes": "Added `slope issue scout` and `slope issue triage` with repeatable sources, JSON/human output, explicit create mode, duplicate handling, and source parsing for common issues, transcripts, JSONL, markdown, text, and logs."
+    },
+    {
+      "ticket_key": "S136-3",
+      "title": "Add scheduled GitHub Action and optional email digest for daily approval loop (#493)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added the daily/manual `SLOPE Issue Scout` workflow, dry-run artifacts, manual issue creation gate, upload artifacts, and optional Resend email helper controlled by repository secrets."
+    },
+    {
+      "ticket_key": "S136-4",
+      "title": "Document setup and cover scout classification, de-dupe, digest, and CLI behavior (#493)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added the issue scout guide plus focused core and CLI tests proving the Fathoms S341-S362 fixture recovers the six historical issue classes without duplicates."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 2,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "wind",
+      "impact": "minor",
+      "description": "S136 was not present in the roadmap tail, so review recommendation had no ticket-count context and the scorecard was written manually."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Scout sources need a tight evidence contract; scorecards and generated reviews are too noisy unless intentionally selected.",
+      "outcome": "The scheduled workflow scans committed docs/issues plus optional .slope evidence sources, while scorecard JSON is ignored by the source reader."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "Focused issue scout tests, typecheck, build, built CLI smokes, full test suite, and map check passed.",
+      "status": "healthy"
+    },
+    {
+      "category": "diet",
+      "description": "Core logic stays pure while GitHub CLI, filesystem, workflow, and email behavior live at the CLI/Action boundary.",
+      "status": "healthy"
+    },
+    {
+      "category": "recovery",
+      "description": "Commit and push discipline resumed before closeout after the guard flagged the long feature batch.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "A useful automation sprint with a good mid-flight correction: the scout was powerful enough to find real issues, then needed sharper source boundaries to avoid turning every retrospective into a candidate.",
+    "advice_for_next_player": "Keep scheduled scans conservative and make create mode manual. Dry-run plus digest artifacts should be the daily default until candidate quality is proven over time.",
+    "what_surprised_you": "The existing local .slope evidence immediately recovered the six Fathoms-derived issues and de-duped them against GitHub titles.",
+    "excited_about_next": "Use the daily approval digest to decide whether the remaining docs/issues post-implementation gate writeup needs a fresh GitHub issue or is already covered by shipped closeout work."
+  },
+  "bunker_locations": [
+    "Fallback issue classifiers need problem-signal gates so command examples and setup docs do not become product issue candidates.",
+    "Historical scorecards and generated review markdown are high-noise sources for issue scouting unless the user explicitly selects them."
+  ],
+  "yardage_book_updates": [
+    "New command: slope issue scout [--source=<path>]... [--repo=<owner/repo>] [--dry-run|--create] [--json]",
+    "New command: slope issue triage [--source=<path>]... [--repo=<owner/repo>] [--daily-digest] [--output=<path>]",
+    "Scheduled workflow: .github/workflows/slope-issue-scout.yml uploads candidate JSON and a daily approval digest; issue creation is manual_dispatch-only.",
+    "Optional email: .github/scripts/send-slope-digest.mjs sends the digest through Resend when RESEND_API_KEY, SLOPE_DIGEST_EMAIL_TO, and SLOPE_DIGEST_EMAIL_FROM are set."
+  ],
+  "course_management_notes": [
+    "Validation used pnpm vitest run tests/core/issue-scout.test.ts tests/cli/commands/issue.test.ts, pnpm typecheck, pnpm build, built CLI smokes, pnpm test, and node dist/cli/index.js map --check.",
+    "Built CLI smoke with --repo srbryers/slope de-duped the six Fathoms-derived classes to #485, #488, #489, #490, #491, and #492.",
+    "The only new candidate from the scheduled source set is the existing docs/issues post-implementation gate writeup, left for daily approval triage rather than bundled into #493."
+  ],
+  "slope_factors": [
+    "github_cli",
+    "scheduled_workflow",
+    "email_digest",
+    "classifier_dedupe"
+  ]
+}

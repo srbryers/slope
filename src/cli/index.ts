@@ -75,6 +75,7 @@ import { orgCommand } from './commands/org.js';
 import { memoryCommand } from './commands/memory.js';
 import { phaseCommand } from './commands/phase.js';
 import { skillsCommand } from './commands/skills.js';
+import { issueCommand } from './commands/issue.js';
 import { reportCliError } from './error-reporter.js';
 import { buildSourceCheckoutRuntimeWarning } from './source-runtime.js';
 
@@ -107,6 +108,7 @@ Usage:
   slope card --team                         Show per-player comparison table
   slope validate [path]                     Validate scorecard(s)
   slope skills scan|list|validate           Manage repo-local skill registry
+  slope issue scout|triage                  Detect and triage SLOPE-driven issues
   slope review [path] [--plain]             Format sprint review markdown
   slope briefing                            Pre-round briefing
   slope version                             Show current version
@@ -297,6 +299,9 @@ switch (subcommand) {
   case 'skills':
     skillsCommand(process.argv.slice(3)).catch(reportCliError);
     break;
+  case 'issue':
+    issueCommand(process.argv.slice(3)).catch(reportCliError);
+    break;
   case 'doctor':
     doctorCommand(process.argv.slice(3)).catch(reportCliError);
     break;
@@ -377,6 +382,7 @@ Usage:
   slope metaphor list|set|show              Manage metaphor display themes
   slope plugin list|validate                Manage custom plugins
   slope skills scan|list|validate           Manage repo-local skill registry
+  slope issue scout|triage                  Detect and triage SLOPE-driven issues
   slope initiative create|status|next|advance|review  Multi-sprint initiative orchestration
   slope index [--full|--status|--prune]               Semantic embedding index
   slope context "query" [options]                     Semantic context search

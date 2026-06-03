@@ -1,0 +1,94 @@
+name: SLOPE Issue Scout
+
+on:
+  schedule:
+    - cron: '17 13 * * *'
+  workflow_dispatch:
+    inputs:
+      create_issues:
+        description: 'Create GitHub issues for non-duplicate candidates'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  scout:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Scout SLOPE-driven issue candidates
+        run: |
+          node dist/cli/index.js issue scout \
+            --repo "${{ github.repository }}" \
+            --source docs/issues \
+            --source .slope/common-issues.json \
+            --source .slope/transcripts \
+            --dry-run \
+            --output .slope/issue-scout-candidates.json
+
+      - name: Render daily approval digest
+        run: |
+          node dist/cli/index.js issue triage \
+            --repo "${{ github.repository }}" \
+            --source docs/issues \
+            --source .slope/common-issues.json \
+            --source .slope/transcripts \
+            --daily-digest \
+            --output .slope/issue-scout-digest.md
+
+      - name: Create approved issue candidates
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.create_issues }}
+        run: |
+          node dist/cli/index.js issue scout \
+            --repo "${{ github.repository }}" \
+            --source docs/issues \
+            --source .slope/common-issues.json \
+            --source .slope/transcripts \
+            --create \
+            --output .slope/issue-scout-created.json \
+            --state-path .slope/issue-scout-state.json
+
+      - name: Email daily digest when configured
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          SLOPE_DIGEST_EMAIL_TO: ${{ secrets.SLOPE_DIGEST_EMAIL_TO }}
+          SLOPE_DIGEST_EMAIL_FROM: ${{ secrets.SLOPE_DIGEST_EMAIL_FROM }}
+        run: |
+          if [ -n "$RESEND_API_KEY" ] && [ -n "$SLOPE_DIGEST_EMAIL_TO" ] && [ -n "$SLOPE_DIGEST_EMAIL_FROM" ]; then
+            node .github/scripts/send-slope-digest.mjs .slope/issue-scout-digest.md
+          else
+            echo "Email digest skipped: RESEND_API_KEY, SLOPE_DIGEST_EMAIL_TO, and SLOPE_DIGEST_EMAIL_FROM are required."
+          fi
+
+      - name: Upload scout artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: slope-issue-scout
+          path: |
+            .slope/issue-scout-candidates.json
+            .slope/issue-scout-digest.md
+            .slope/issue-scout-created.json
+            .slope/issue-scout-state.json
+          if-no-files-found: ignore
