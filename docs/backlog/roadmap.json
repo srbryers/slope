@@ -3206,6 +3206,7 @@
       "depends_on": [
         136
       ],
+      "status": "complete",
       "note": "Add a SLOPE retro command/skill workflow that runs after PR merge, captures retrospective results, and persists durable learnings for future briefings and memory search.",
       "tickets": [
         {
@@ -3247,13 +3248,54 @@
       ]
     },
     {
+      "id": 137.5,
+      "theme": "Windows Test Suite Portability",
+      "par": 4,
+      "slope": 4,
+      "type": "bugfix + test hardening",
+      "depends_on": [
+        137
+      ],
+      "note": "Close #509 by making the full local test suite portable on Windows: normalize path expectations and gate POSIX executable-bit assertions.",
+      "tickets": [
+        {
+          "key": "S137.5-1",
+          "title": "Normalize analyzer, prep, loop, and worktree path expectations on Windows (#509)",
+          "club": "long_iron",
+          "complexity": "moderate",
+          "github_issue": 509
+        },
+        {
+          "key": "S137.5-2",
+          "title": "Gate adapter executable-bit assertions on platforms with POSIX chmod semantics (#509)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 509,
+          "depends_on": [
+            "S137.5-1"
+          ]
+        },
+        {
+          "key": "S137.5-3",
+          "title": "Run and document full-suite Windows validation for #509",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 509,
+          "depends_on": [
+            "S137.5-1",
+            "S137.5-2"
+          ]
+        }
+      ]
+    },
+    {
       "id": 138,
       "theme": "Destructive Help Safety",
       "par": 3,
       "slope": 2,
       "type": "bugfix",
       "depends_on": [
-        137
+        137.5
       ],
       "note": "Close #501 by making help flags short-circuit before destructive sprint reset behavior and by auditing similar subcommands.",
       "tickets": [

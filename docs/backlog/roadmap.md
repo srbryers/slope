@@ -165,4 +165,4 @@ Separate planning from execution into distinct agent roles with different models
 | Store | `packages/store-sqlite/`, `packages/store-pg/` |
 
 ### Machine-Readable Roadmap
-`docs/backlog/roadmap.json` — Consumed by `slope roadmap validate|review|status|show`. Covers completed S61-S136 catch-up, S137 post-merge retro/durable-memory tooling, and planned S138-S144 recovery work for open GitHub issues #499/#501/#502/#503/#505/#507.
+`docs/backlog/roadmap.json` — Consumed by `slope roadmap validate|review|status|show`. Covers completed S61-S136 catch-up, S137 post-merge retro/durable-memory tooling, S137.5 Windows test-suite portability for #509, and planned S138-S144 recovery work for open GitHub issues #499/#501/#502/#503/#505/#507.
