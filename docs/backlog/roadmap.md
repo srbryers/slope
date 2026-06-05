@@ -1,7 +1,7 @@
 # SLOPE Roadmap
 
-> 55 scorecards filed (S1-S58, with gaps). 10 numbered phases + 3 internal sprint groups.
-> Last updated: 2026-03-04 (v1.17.0)
+> 134 scorecards filed (S1-S136, with gaps). Canonical planning now lives in `docs/backlog/roadmap.json`.
+> Last updated: 2026-06-05 (v1.57.3 retro + issue triage)
 
 ## Phase Summary
 
@@ -165,4 +165,4 @@ Separate planning from execution into distinct agent roles with different models
 | Store | `packages/store-sqlite/`, `packages/store-pg/` |
 
 ### Machine-Readable Roadmap
-`docs/backlog/roadmap.json` — Consumed by `slope roadmap validate|review|status|show`. Covers S1-S47 (phases 0-9); Phase 10 and S48+ not yet added.
+`docs/backlog/roadmap.json` — Consumed by `slope roadmap validate|review|status|show`. Covers completed S61-S136 catch-up, S137 post-merge retro/durable-memory tooling, and planned S138-S144 recovery work for open GitHub issues #499/#501/#502/#503/#505/#507.

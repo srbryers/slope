@@ -1,6 +1,6 @@
 {
   "name": "SLOPE Development Roadmap",
-  "description": "Forward-looking roadmap from S61+. Phases 1-9 (S1-S47) are complete. S48-S60 were hardening, guard enforcement, and process sprints. This roadmap covers adoption, observability, guard maturity, multi-project, and loop evolution. S61-S64 reflect what actually shipped (themes diverged from original plan). Note: the actual S69 diverged from the planned Referee sprint \u2014 a carryover patch kit ran instead. The Referee work was rescheduled as S78. S75.5 (The Bug Clearing) added 2026-05-02 to clear accumulated CLI bugs from external repos.",
+  "description": "Forward-looking roadmap from S61+. Phases 1-9 (S1-S47) are complete. S48-S60 were hardening, guard enforcement, and process sprints. This roadmap covers adoption, observability, guard maturity, multi-project, loop evolution, and issue-driven recovery. S61-S64 reflect what actually shipped (themes diverged from original plan). Note: the actual S69 diverged from the planned Referee sprint \u2014 a carryover patch kit ran instead. The Referee work was rescheduled as S78. S75.5 (The Bug Clearing) added 2026-05-02 to clear accumulated CLI bugs from external repos. S132-S136 were backfilled from shipped scorecards on 2026-06-05; S137 adds post-merge retro tooling and durable memory, and S138-S144 triage open GitHub issues #499/#501/#502/#503/#505/#507 into focused recovery sprints.",
   "phases": [
     {
       "name": "Phase 10 \u2014 Adoption & Onboarding",
@@ -280,6 +280,33 @@
       ],
       "status": "planned",
       "note": "Triage the open #466/#467/#468 issue batch into three focused repair sprints and one patch-release sprint: first repair roadmap ticket identifier parsing and phase-boundary guard matching, then fix worktree-check stale-session deadlocks, then enforce PR closeout discipline, then publish the combined fixes."
+    },
+    {
+      "name": "Phase 42 \u2014 Closeout Corrections & Issue Scout",
+      "sprints": [
+        132,
+        133,
+        134,
+        135,
+        136
+      ],
+      "status": "complete",
+      "note": "Backfill shipped S132-S136 scorecards so roadmap status, review recommendation, and future sprint planning have the real current tail."
+    },
+    {
+      "name": "Phase 43 \u2014 Guard Deadlock & State Portability Recovery",
+      "sprints": [
+        137,
+        138,
+        139,
+        140,
+        141,
+        142,
+        143,
+        144
+      ],
+      "status": "planned",
+      "note": "Start with a retro command/skill sprint that captures post-PR-merge learning into durable memory, then triage open #499/#501/#502/#503/#505/#507 into focused recovery sprints: destructive-help safety, existing-worktree entry guidance, session-collision recovery, workflow state resync, non-TypeScript map guard safety, portable sprint resume, and a release."
     }
   ],
   "sprints": [
@@ -2982,6 +3009,568 @@
           "complexity": "standard",
           "depends_on": [
             "S131-1"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 132,
+      "theme": "Scorecard and Review Closeout Correctness",
+      "par": 3,
+      "slope": 0,
+      "type": "bugfix",
+      "status": "complete",
+      "score": 1,
+      "score_label": "eagle",
+      "depends_on": [
+        131
+      ],
+      "note": "Backfill shipped S132 closeout normalization work from docs/retros/sprint-132.json.",
+      "tickets": [
+        {
+          "key": "S132-1",
+          "title": "Normalize ticket scorecards and review artifacts",
+          "club": "driver",
+          "complexity": "risky"
+        }
+      ]
+    },
+    {
+      "id": 133,
+      "theme": "PR Review State and Runtime Health",
+      "par": 3,
+      "slope": 0,
+      "type": "bugfix",
+      "status": "complete",
+      "score": 1,
+      "score_label": "eagle",
+      "depends_on": [
+        132
+      ],
+      "note": "Backfill shipped S133 work from docs/retros/sprint-133.json.",
+      "tickets": [
+        {
+          "key": "S133-1",
+          "title": "Keep PR prompt state pending and surface ABI recovery",
+          "club": "driver",
+          "complexity": "risky"
+        }
+      ]
+    },
+    {
+      "id": 134,
+      "theme": "Warning Hygiene and Briefing/Map Safety",
+      "par": 3,
+      "slope": 0,
+      "type": "bugfix",
+      "status": "complete",
+      "score": 2,
+      "score_label": "birdie",
+      "depends_on": [
+        133
+      ],
+      "note": "Backfill shipped S134 warning hygiene and zero-source map safety work from docs/retros/sprint-134.json.",
+      "tickets": [
+        {
+          "key": "S134-1",
+          "title": "Cap briefing hazards and guard zero-source maps",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S134-2",
+          "title": "Avoid shell-built CLI invocations in map tests",
+          "club": "wedge",
+          "complexity": "small",
+          "depends_on": [
+            "S134-1"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 135,
+      "theme": "SLOPE Issue Preflight Stabilization",
+      "par": 4,
+      "slope": 0,
+      "type": "bugfix",
+      "status": "complete",
+      "score": 4,
+      "score_label": "par",
+      "depends_on": [
+        134
+      ],
+      "note": "Backfill shipped S135 issue preflight fixes from docs/retros/sprint-135.json.",
+      "tickets": [
+        {
+          "key": "S135-1",
+          "title": "Require range bounds for no-roadmap auto-card (#495)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 495
+        },
+        {
+          "key": "S135-2",
+          "title": "Read active claims from store-backed sprint state (#494)",
+          "club": "long_iron",
+          "complexity": "moderate",
+          "github_issue": 494,
+          "depends_on": [
+            "S135-1"
+          ]
+        },
+        {
+          "key": "S135-3",
+          "title": "Require bounded auto-card scans without roadmap (#495)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 495,
+          "depends_on": [
+            "S135-1"
+          ]
+        },
+        {
+          "key": "S135-4",
+          "title": "Prefer source-built slope in dev checkouts (#496)",
+          "club": "long_iron",
+          "complexity": "moderate",
+          "github_issue": 496,
+          "depends_on": [
+            "S135-2",
+            "S135-3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 136,
+      "theme": "SLOPE Issue Scout and Daily Triage Loop",
+      "par": 4,
+      "slope": 4,
+      "type": "feature",
+      "status": "complete",
+      "score": 4,
+      "score_label": "par",
+      "depends_on": [
+        135
+      ],
+      "note": "Backfill shipped S136 issue scout work from docs/retros/sprint-136.json.",
+      "tickets": [
+        {
+          "key": "S136-1",
+          "title": "Add core issue scout classification, de-dupe, body, digest, and fingerprint state helpers (#493)",
+          "club": "long_iron",
+          "complexity": "moderate",
+          "github_issue": 493
+        },
+        {
+          "key": "S136-2",
+          "title": "Add issue scout and triage CLI commands with dry-run, create mode, and evidence ingestion (#493)",
+          "club": "long_iron",
+          "complexity": "moderate",
+          "github_issue": 493,
+          "depends_on": [
+            "S136-1"
+          ]
+        },
+        {
+          "key": "S136-3",
+          "title": "Add scheduled GitHub Action and optional email digest for daily approval loop (#493)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 493,
+          "depends_on": [
+            "S136-2"
+          ]
+        },
+        {
+          "key": "S136-4",
+          "title": "Document setup and cover scout classification, de-dupe, digest, and CLI behavior (#493)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 493,
+          "depends_on": [
+            "S136-1",
+            "S136-2",
+            "S136-3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 137,
+      "theme": "Post-Merge Retro Skill and Durable Memory",
+      "par": 4,
+      "slope": 4,
+      "type": "feature + workflow",
+      "depends_on": [
+        136
+      ],
+      "note": "Add a SLOPE retro command/skill workflow that runs after PR merge, captures retrospective results, and persists durable learnings for future briefings and memory search.",
+      "tickets": [
+        {
+          "key": "S137-1",
+          "title": "Define the post-merge retro result model and durable memory contract",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S137-2",
+          "title": "Add retro command flow for post-PR-merge retros and persisted learnings",
+          "club": "long_iron",
+          "complexity": "moderate",
+          "depends_on": [
+            "S137-1"
+          ]
+        },
+        {
+          "key": "S137-3",
+          "title": "Add retro skill/template guidance for agents performing post-merge closeout",
+          "club": "short_iron",
+          "complexity": "standard",
+          "depends_on": [
+            "S137-1",
+            "S137-2"
+          ]
+        },
+        {
+          "key": "S137-4",
+          "title": "Cover retro persistence, idempotency, and briefing/memory integration",
+          "club": "wedge",
+          "complexity": "small",
+          "depends_on": [
+            "S137-1",
+            "S137-2",
+            "S137-3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 138,
+      "theme": "Destructive Help Safety",
+      "par": 3,
+      "slope": 2,
+      "type": "bugfix",
+      "depends_on": [
+        137
+      ],
+      "note": "Close #501 by making help flags short-circuit before destructive sprint reset behavior and by auditing similar subcommands.",
+      "tickets": [
+        {
+          "key": "S138-1",
+          "title": "Short-circuit sprint reset help before clearing state (#501)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 501
+        },
+        {
+          "key": "S138-2",
+          "title": "Audit destructive subcommands for help-before-action handling (#501)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 501,
+          "depends_on": [
+            "S138-1"
+          ]
+        },
+        {
+          "key": "S138-3",
+          "title": "Add CLI help safety regressions for destructive commands (#501)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 501,
+          "depends_on": [
+            "S138-1",
+            "S138-2"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 139,
+      "theme": "Existing Worktree Entry Guidance",
+      "par": 4,
+      "slope": 3,
+      "type": "guard hardening",
+      "depends_on": [
+        138
+      ],
+      "note": "Close #499 by preferring existing worktree entry guidance over redundant worktree creation and by making guard recovery allowlists robust to shell redirects.",
+      "tickets": [
+        {
+          "key": "S139-1",
+          "title": "Detect branch-matching existing worktrees before worktree-check guidance (#499)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 499
+        },
+        {
+          "key": "S139-2",
+          "title": "Surface Claude Code EnterWorktree guidance with non-Claude fallback (#499)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 499,
+          "depends_on": [
+            "S139-1"
+          ]
+        },
+        {
+          "key": "S139-3",
+          "title": "Re-evaluate session branch and mode after entering an existing worktree (#499)",
+          "club": "long_iron",
+          "complexity": "moderate",
+          "github_issue": 499,
+          "depends_on": [
+            "S139-1",
+            "S139-2"
+          ]
+        },
+        {
+          "key": "S139-4",
+          "title": "Normalize guard recovery command allowlists before redirects and pipes (#499)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 499,
+          "depends_on": [
+            "S139-1"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 140,
+      "theme": "Session Collision Guard Recovery",
+      "par": 4,
+      "slope": 4,
+      "type": "guard hardening",
+      "depends_on": [
+        139
+      ],
+      "note": "Close #502 by pruning stale never-heartbeated sessions, narrowing collision blocks to working-tree mutations, and adding an explicit stale-session recovery path.",
+      "tickets": [
+        {
+          "key": "S140-1",
+          "title": "Prune stale never-heartbeated sessions before collision checks (#502)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 502
+        },
+        {
+          "key": "S140-2",
+          "title": "Allow remote-only and read-only gh/git commands through session-collision guard (#502)",
+          "club": "long_iron",
+          "complexity": "moderate",
+          "github_issue": 502,
+          "depends_on": [
+            "S140-1"
+          ]
+        },
+        {
+          "key": "S140-3",
+          "title": "Expose guard-exempt stale-session clear path for collision recovery (#502)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 502,
+          "depends_on": [
+            "S140-1"
+          ]
+        },
+        {
+          "key": "S140-4",
+          "title": "Add session-collision guard regressions for stale sessions and remote commands (#502)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 502,
+          "depends_on": [
+            "S140-1",
+            "S140-2",
+            "S140-3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 141,
+      "theme": "Workflow State Resync",
+      "par": 5,
+      "slope": 4,
+      "type": "workflow + guard hardening",
+      "depends_on": [
+        140
+      ],
+      "note": "Close #503 by reconciling workflow executions and sprint-state with git/PR reality after out-of-band merges or resumed work.",
+      "tickets": [
+        {
+          "key": "S141-1",
+          "title": "Expire or close stale workflow executions by merged branch, newer sprint, or age (#503)",
+          "club": "long_iron",
+          "complexity": "moderate",
+          "github_issue": 503
+        },
+        {
+          "key": "S141-2",
+          "title": "Add workflow resync path that fast-forwards execution state from branch and commits (#503)",
+          "club": "driver",
+          "complexity": "risky",
+          "github_issue": 503,
+          "depends_on": [
+            "S141-1"
+          ]
+        },
+        {
+          "key": "S141-3",
+          "title": "Scope PR creation gate to branch-inferred sprint and rebind stale sprint-state (#503)",
+          "club": "long_iron",
+          "complexity": "moderate",
+          "github_issue": 503,
+          "depends_on": [
+            "S141-1"
+          ]
+        },
+        {
+          "key": "S141-4",
+          "title": "Add stale S65/S66 workflow and PR gate drift regressions (#503)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 503,
+          "depends_on": [
+            "S141-1",
+            "S141-2",
+            "S141-3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 142,
+      "theme": "Codebase Map Guard Non-TS Safety",
+      "par": 4,
+      "slope": 3,
+      "type": "guard hardening",
+      "depends_on": [
+        140
+      ],
+      "note": "Close #505 by making codebase-map staleness safe for curated non-TypeScript maps and worktree-aware baselines, and fix the Windows shell-redirection warning observed in map --check.",
+      "tickets": [
+        {
+          "key": "S142-1",
+          "title": "Warn instead of hard-blocking when slope map cannot refresh without overwriting curated maps (#505)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 505
+        },
+        {
+          "key": "S142-2",
+          "title": "Support metadata-only freshness refresh or broader source detection for non-TypeScript repos (#505)",
+          "club": "long_iron",
+          "complexity": "moderate",
+          "github_issue": 505,
+          "depends_on": [
+            "S142-1"
+          ]
+        },
+        {
+          "key": "S142-3",
+          "title": "Make map staleness baselines worktree-aware to avoid inflated commit counts (#505)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 505,
+          "depends_on": [
+            "S142-1"
+          ]
+        },
+        {
+          "key": "S142-4",
+          "title": "Add non-TypeScript curated map, worktree staleness, and Windows map --check regressions (#505)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 505,
+          "depends_on": [
+            "S142-1",
+            "S142-2",
+            "S142-3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 143,
+      "theme": "Portable Sprint Resume",
+      "par": 5,
+      "slope": 5,
+      "type": "workflow + state recovery",
+      "depends_on": [
+        141
+      ],
+      "note": "Close #507 by reconstructing in-flight sprint state from committed artifacts and current git context without syncing local DBs or locks.",
+      "tickets": [
+        {
+          "key": "S143-1",
+          "title": "Infer active sprint pointer from branch, roadmap, retros, and git history (#507)",
+          "club": "long_iron",
+          "complexity": "moderate",
+          "github_issue": 507
+        },
+        {
+          "key": "S143-2",
+          "title": "Add sprint resume command that reconstructs local sprint phase and ticket progress (#507)",
+          "club": "driver",
+          "complexity": "risky",
+          "github_issue": 507,
+          "depends_on": [
+            "S143-1"
+          ]
+        },
+        {
+          "key": "S143-3",
+          "title": "Add optional tracked active-sprint pointer without syncing runtime DB or locks (#507)",
+          "club": "long_iron",
+          "complexity": "moderate",
+          "github_issue": 507,
+          "depends_on": [
+            "S143-1"
+          ]
+        },
+        {
+          "key": "S143-4",
+          "title": "Document cross-machine resume and decide committed common-issues mirror behavior (#507)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 507,
+          "depends_on": [
+            "S143-1",
+            "S143-2",
+            "S143-3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 144,
+      "theme": "Guard Recovery and State Portability Release",
+      "par": 3,
+      "slope": 1,
+      "type": "release",
+      "depends_on": [
+        142,
+        143
+      ],
+      "note": "Publish the S137-S143 retro, help, guard recovery, map safety, workflow resync, and sprint resume fixes after validation.",
+      "tickets": [
+        {
+          "key": "S144-1",
+          "title": "Bump @slope-dev/slope and bundled Codex plugin for the guard recovery and state portability release",
+          "club": "wedge",
+          "complexity": "small"
+        },
+        {
+          "key": "S144-2",
+          "title": "Run release validation, publish, verify npm, and close linked issue references",
+          "club": "short_iron",
+          "complexity": "standard",
+          "depends_on": [
+            "S144-1"
           ]
         }
       ]
