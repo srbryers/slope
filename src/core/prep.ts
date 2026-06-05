@@ -150,6 +150,10 @@ function walkDir(dir: string): string[] {
   return results;
 }
 
+function toRepoPath(path: string): string {
+  return path.replace(/\\/g, '/');
+}
+
 /**
  * Find test files matching source file stems.
  */
@@ -159,7 +163,7 @@ export function collectTestFiles(primaryPaths: string[], cwd: string): string[] 
 
   const allTestFiles = walkDir(testsDir)
     .filter(f => f.endsWith('.test.ts') || f.endsWith('.test.js'))
-    .map(f => f.slice(cwd.length + 1)); // relative to cwd
+    .map(f => toRepoPath(f.slice(cwd.length + 1))); // relative to cwd
 
   const matched = new Set<string>();
 

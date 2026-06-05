@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { execSync, execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, copyFileSync, symlinkSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 
 vi.mock('node:child_process', () => ({
   execSync: vi.fn(),
@@ -72,10 +73,10 @@ describe('createWorktree', () => {
       { name: 'handoffs', isFile: () => false }, // directory, should be skipped
     ]);
     createWorktree('S-004', '/repo', mockLog);
-    expect(mkdirSync).toHaveBeenCalledWith('/repo/.slope-loop-worktree-S-004/.slope', { recursive: true });
-    expect(copyFileSync).toHaveBeenCalledWith('/repo/.slope/config.json', '/repo/.slope-loop-worktree-S-004/.slope/config.json');
-    expect(copyFileSync).toHaveBeenCalledWith('/repo/.slope/hooks.json', '/repo/.slope-loop-worktree-S-004/.slope/hooks.json');
-    expect(symlinkSync).toHaveBeenCalledWith('/repo/.slope/slope.db', '/repo/.slope-loop-worktree-S-004/.slope/slope.db');
+    expect(mkdirSync).toHaveBeenCalledWith(join('/repo', '.slope-loop-worktree-S-004', '.slope'), { recursive: true });
+    expect(copyFileSync).toHaveBeenCalledWith(join('/repo', '.slope', 'config.json'), join('/repo', '.slope-loop-worktree-S-004', '.slope', 'config.json'));
+    expect(copyFileSync).toHaveBeenCalledWith(join('/repo', '.slope', 'hooks.json'), join('/repo', '.slope-loop-worktree-S-004', '.slope', 'hooks.json'));
+    expect(symlinkSync).toHaveBeenCalledWith(join('/repo', '.slope', 'slope.db'), join('/repo', '.slope-loop-worktree-S-004', '.slope', 'slope.db'));
     expect(mockLog.info).toHaveBeenCalledWith('Mirrored .slope/ config into worktree');
   });
 

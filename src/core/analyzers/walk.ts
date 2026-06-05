@@ -11,6 +11,10 @@ export interface WalkEntry {
 
 const DEFAULT_SKIP = ['node_modules', 'dist', '.git', '.slope', '.next', '__pycache__', 'target', 'vendor'];
 
+function toRepoPath(path: string): string {
+  return path.replace(/\\/g, '/');
+}
+
 export function walkDir(root: string, opts?: {
   skip?: string[];
   maxDepth?: number;
@@ -30,7 +34,7 @@ export function walkDir(root: string, opts?: {
     for (const item of items) {
       if (skip.has(item.name)) continue;
       const fullPath = join(dir, item.name);
-      const relPath = relative(root, fullPath);
+      const relPath = toRepoPath(relative(root, fullPath));
       entries.push({ path: relPath, fullPath, isDirectory: item.isDirectory(), depth });
       if (item.isDirectory()) {
         recurse(fullPath, depth + 1);

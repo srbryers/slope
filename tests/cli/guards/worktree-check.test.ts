@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { join } from 'node:path';
 import { worktreeCheckGuard, resetWorktreeCheckState } from '../../../src/cli/guards/worktree-check.js';
 import type { HookInput } from '../../../src/core/index.js';
 import { STALE_SESSION_THRESHOLD_MS } from '../../../src/core/constants.js';
@@ -281,7 +282,7 @@ describe('worktreeCheckGuard', () => {
   });
 
   it('reconciles current session metadata when already in a worktree', async () => {
-    sentinelFiles.add('/tmp/test/.slope/config.json');
+    sentinelFiles.add(join('/tmp/test', '.slope', 'config.json'));
     mockExecFileSync
       .mockReturnValueOnce('../../.git' as never) // git-common-dir != '.git'
       .mockReturnValueOnce('/tmp/test' as never) // git rev-parse --show-toplevel

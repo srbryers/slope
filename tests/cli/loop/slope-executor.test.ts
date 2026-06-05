@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 
 import {
   slopeExecutor,
@@ -28,12 +28,12 @@ const mockLog: Logger = {
 describe('safePath', () => {
   it('resolves a valid relative path', () => {
     const result = safePath('src/foo.ts', '/repo');
-    expect(result).toBe('/repo/src/foo.ts');
+    expect(result).toBe(resolve('/repo', 'src/foo.ts'));
   });
 
   it('resolves nested paths', () => {
     const result = safePath('src/cli/loop/executor.ts', '/repo');
-    expect(result).toBe('/repo/src/cli/loop/executor.ts');
+    expect(result).toBe(resolve('/repo', 'src/cli/loop/executor.ts'));
   });
 
   it('blocks path traversal with ../', () => {
@@ -47,7 +47,11 @@ describe('safePath', () => {
   it('allows paths that resolve within cwd', () => {
     // src/../src/foo.ts resolves to /repo/src/foo.ts — still within cwd
     const result = safePath('src/../src/foo.ts', '/repo');
-    expect(result).toBe('/repo/src/foo.ts');
+    expect(result).toBe(resolve('/repo', 'src/foo.ts'));
+  });
+
+  it('blocks sibling paths with the same prefix', () => {
+    expect(() => safePath('../repo2/foo.ts', '/repo')).toThrow('Path traversal blocked');
   });
 });
 
@@ -231,8 +235,12 @@ describe('runTool', () => {
     });
 
     it('allows safe rm commands', () => {
-      writeFileSync(join(tmpDir, 'deleteme.txt'), 'bye');
-      const result = runTool('bash', { command: `rm ${join(tmpDir, 'deleteme.txt')}` }, tmpDir, mockLog);
+      const filePath = join(tmpDir, 'deleteme.txt');
+      writeFileSync(filePath, 'bye');
+      const command = process.platform === 'win32'
+        ? `del "${filePath}"`
+        : `rm ${filePath}`;
+      const result = runTool('bash', { command }, tmpDir, mockLog);
       expect(result.isError).toBe(false);
     });
   });

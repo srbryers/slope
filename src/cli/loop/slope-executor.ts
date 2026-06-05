@@ -12,7 +12,7 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import { execSync, execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { join, resolve, dirname } from 'node:path';
+import { join, resolve, dirname, relative, isAbsolute } from 'node:path';
 import type {
   ExecutorAdapter,
   ExecutionResult,
@@ -178,8 +178,10 @@ const SLOPE_TOOL_OUTPUT_CAP = 4000;
 // ── Path security ───────────────────────────────────
 
 export function safePath(relPath: string, cwd: string): string {
+  const root = resolve(cwd);
   const abs = resolve(cwd, relPath);
-  if (!abs.startsWith(resolve(cwd))) {
+  const rel = relative(root, abs);
+  if (rel.startsWith('..') || isAbsolute(rel)) {
     throw new Error(`Path traversal blocked: ${relPath}`);
   }
   return abs;
