@@ -35,7 +35,7 @@ describe('PiAdapter', () => {
 
   describe('hooksConfigPath', () => {
     it('returns .pi/extensions/slope/index.ts path', () => {
-      expect(adapter.hooksConfigPath('/tmp/test')).toBe('/tmp/test/.pi/extensions/slope/index.ts');
+      expect(adapter.hooksConfigPath('/tmp/test')).toBe(join('/tmp/test', '.pi', 'extensions', 'slope', 'index.ts'));
     });
   });
 

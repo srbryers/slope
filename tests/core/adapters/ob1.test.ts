@@ -265,7 +265,9 @@ describe('OB1Adapter', () => {
         const scriptPath = join(hooksDir, scriptFile);
         if (existsSync(scriptPath)) {
           const mode = statSync(scriptPath).mode;
-          expect(mode & 0o111, `${scriptFile} should be executable`).toBeGreaterThan(0);
+          if (process.platform !== 'win32') {
+            expect(mode & 0o111, `${scriptFile} should be executable`).toBeGreaterThan(0);
+          }
         }
       }
     });

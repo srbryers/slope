@@ -253,7 +253,7 @@ describe('CursorAdapter', () => {
 
   describe('hooksConfigPath', () => {
     it('returns .cursor/hooks.json', () => {
-      expect(adapter.hooksConfigPath('/tmp/test')).toBe('/tmp/test/.cursor/hooks.json');
+      expect(adapter.hooksConfigPath('/tmp/test')).toBe(join('/tmp/test', '.cursor', 'hooks.json'));
     });
   });
 
