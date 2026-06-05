@@ -2,7 +2,7 @@
 // can both import without a circular dependency.
 
 export type MemoryCategory = 'workflow' | 'style' | 'project' | 'hazard' | 'other';
-export type MemorySource = 'manual' | 'auto-guard' | 'auto-workflow';
+export type MemorySource = 'manual' | 'auto-guard' | 'auto-workflow' | 'auto-retro';
 
 export interface Memory {
   id: string;

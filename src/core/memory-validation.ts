@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto';
 import type { Memory, MemoryCategory, MemorySource } from './memory-types.js';
 
 const VALID_CATEGORIES: MemoryCategory[] = ['workflow', 'style', 'project', 'hazard', 'other'];
-const VALID_SOURCES: MemorySource[] = ['manual', 'auto-guard', 'auto-workflow'];
+const VALID_SOURCES: MemorySource[] = ['manual', 'auto-guard', 'auto-workflow', 'auto-retro'];
 
 function nowISO(): string {
   return new Date().toISOString();
