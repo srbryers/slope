@@ -480,7 +480,14 @@ async function postMergeSubcommand(args: string[]): Promise<void> {
   }
 
   const dryRunMemory: ReturnType<typeof persistRetroMemories> = { added: [], skipped: [] };
-  const memory = opts.dryRun ? dryRunMemory : persistRetroMemories(cwd, retro);
+  let memory: ReturnType<typeof persistRetroMemories>;
+  try {
+    memory = opts.dryRun ? dryRunMemory : persistRetroMemories(cwd, retro);
+  } catch (err) {
+    console.error(`\nError: ${(err as Error).message}\n`);
+    process.exit(1);
+    return;
+  }
   const record = buildSavedRetro(retro, memory);
   const path = postMergeOutputPath(cwd, retro);
 

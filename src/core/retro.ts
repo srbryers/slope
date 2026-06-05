@@ -176,7 +176,6 @@ export function persistRetroMemories(
       weight: plan.weight,
       source: 'auto-retro',
       sourceSessionId: plan.sourceSessionId,
-      allowSecrets: true,
     }));
   }
 

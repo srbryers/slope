@@ -129,6 +129,18 @@ describe('retro post-merge CLI', () => {
     expect(out.stdout).toContain('post-merge retro lessons');
   });
 
+  it('reports suspected secrets instead of persisting them', async () => {
+    const out = await captureLogs(() => retroCommand([
+      'post-merge',
+      '--sprint=137',
+      '--learning=Token value sk-abcdefghijklmnopqrstuvwxyz123456 should not persist',
+    ]));
+
+    expect(out.exitCode).toBe(1);
+    expect(out.stderr).toContain('secret pattern');
+    expect(searchMemories(cwd, { source: 'auto-retro' })).toHaveLength(0);
+  });
+
   it('requires a sprint number', async () => {
     const out = await captureLogs(() => retroCommand(['post-merge', '--summary=missing sprint']));
     expect(out.exitCode).toBe(1);

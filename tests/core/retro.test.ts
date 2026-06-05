@@ -72,4 +72,15 @@ describe('post-merge retro memory contract', () => {
     expect(memories).toHaveLength(1);
     expect(memories[0].source).toBe('auto-retro');
   });
+
+  it('blocks suspected secrets before persisting auto-retro memories', () => {
+    const cwd = createTempDir();
+    const retro = buildPostMergeRetro({
+      sprint: 137,
+      learnings: [{ text: 'Token value sk-abcdefghijklmnopqrstuvwxyz123456 should not persist' }],
+    });
+
+    expect(() => persistRetroMemories(cwd, retro)).toThrow(/secret pattern/i);
+    expect(searchMemories(cwd, { source: 'auto-retro' })).toHaveLength(0);
+  });
 });
