@@ -482,6 +482,17 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
         { flag: '--all-missing', desc: 'Backfill every shipped sprint without a scorecard' },
         { flag: '--dry-run', desc: 'Preview without writing' },
       ]},
+      { name: 'post-merge', desc: 'Capture post-PR-merge retro results and durable learnings', flags: [
+        { flag: '--sprint=<N>', desc: 'Sprint number' },
+        { flag: '--pr=<N>', desc: 'Merged pull request number' },
+        { flag: '--summary=<text>', desc: 'Retro summary' },
+        { flag: '--learning=<text>', desc: 'Repeatable durable learning; supports category[:weight]:text' },
+        { flag: '--hazard=<text>', desc: 'Repeatable hazard to persist as auto-retro memory' },
+        { flag: '--follow-up=<text>', desc: 'Repeatable follow-up to persist as workflow memory' },
+        { flag: '--outcome=<status>', desc: 'success, mixed, or follow_up' },
+        { flag: '--dry-run', desc: 'Preview without writing memories or retro record' },
+        { flag: '--json', desc: 'Output JSON payload' },
+      ]},
     ],
   },
   {
