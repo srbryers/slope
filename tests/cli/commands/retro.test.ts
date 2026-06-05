@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { mkdtempSync } from 'node:fs';
 import { retroCommand } from '../../../src/cli/commands/retro.js';
+import { memoryCommand } from '../../../src/cli/commands/memory.js';
 import { searchMemories } from '../../../src/core/memory.js';
 
 function createTempDir(): string {
@@ -113,6 +114,19 @@ describe('retro post-merge CLI', () => {
     expect(second.memory.skipped).toBe(2);
     expect(second.path).toContain('sprint-137.json');
     expect(searchMemories(cwd, { source: 'auto-retro' })).toHaveLength(2);
+  });
+
+  it('makes retro learnings visible through memory search', async () => {
+    await captureLogs(() => retroCommand([
+      'post-merge',
+      '--sprint=137',
+      '--summary=memory-search integration',
+      '--learning=Briefing should inherit post-merge retro lessons',
+    ]));
+
+    const out = await captureLogs(() => memoryCommand(['search', 'post-merge retro lessons']));
+    expect(out.stdout).toContain('Search Results');
+    expect(out.stdout).toContain('post-merge retro lessons');
   });
 
   it('requires a sprint number', async () => {
