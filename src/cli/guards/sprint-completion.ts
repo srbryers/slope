@@ -246,7 +246,13 @@ function tokenizeShellWords(segment: string): string[] {
   for (let i = 0; i < segment.length; i++) {
     const char = segment[i];
     if (char === '\\' && quote !== "'") {
-      if (i + 1 < segment.length) current += segment[++i];
+      const next = segment[i + 1];
+      if (next && isEscapedShellChar(next)) {
+        current += next;
+        i++;
+      } else {
+        current += char;
+      }
       continue;
     }
     if ((char === '"' || char === "'") && (!quote || quote === char)) {
@@ -265,6 +271,10 @@ function tokenizeShellWords(segment: string): string[] {
 
   if (current) words.push(current);
   return words;
+}
+
+function isEscapedShellChar(char: string): boolean {
+  return ['\\', '"', "'", ' ', '$', '`', '&', '|', ';', '\n', '\r'].includes(char);
 }
 
 function skipCommandPrefix(words: string[], start: number): number {

@@ -5,6 +5,10 @@ import { join, dirname, relative, resolve } from 'node:path';
 
 const SKIP_DIRS = new Set(['node_modules', 'dist', '.slope', '.git']);
 
+function toRepoPath(path: string): string {
+  return path.replace(/\\/g, '/');
+}
+
 /**
  * Parse import/export statements from TypeScript source content.
  * Extracts relative import paths, resolving them relative to the file's directory.
@@ -59,7 +63,7 @@ function resolveImport(specifier: string, fromDir: string, rootDir: string): str
     try {
       const stat = statSync(candidate);
       if (stat.isFile()) {
-        return relative(rootDir, candidate);
+        return toRepoPath(relative(rootDir, candidate));
       }
     } catch {
       // File doesn't exist, try next candidate
@@ -69,9 +73,9 @@ function resolveImport(specifier: string, fromDir: string, rootDir: string): str
   // Return the best-guess relative path even if file doesn't exist
   // (supports graph building even with missing files)
   if (specifier.endsWith('.js')) {
-    return relative(rootDir, absolutePath.replace(/\.js$/, '.ts'));
+    return toRepoPath(relative(rootDir, absolutePath.replace(/\.js$/, '.ts')));
   }
-  return relative(rootDir, absolutePath + '.ts');
+  return toRepoPath(relative(rootDir, absolutePath + '.ts'));
 }
 
 function buildCandidates(absolutePath: string): string[] {
@@ -118,7 +122,7 @@ function walkDir(dir: string, rootDir: string, graph: Map<string, string[]>): vo
     if (entry.isDirectory()) {
       walkDir(fullPath, rootDir, graph);
     } else if (entry.isFile() && entry.name.endsWith('.ts') && !entry.name.endsWith('.d.ts')) {
-      const relPath = relative(rootDir, fullPath);
+      const relPath = toRepoPath(relative(rootDir, fullPath));
       try {
         const content = readFileSync(fullPath, 'utf8');
         const imports = parseImports(content, fullPath, rootDir);

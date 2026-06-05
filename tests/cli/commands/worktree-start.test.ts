@@ -86,7 +86,7 @@ describe('slope worktree start', () => {
 
   it('passes worktree paths as process arguments instead of shell fragments', async () => {
     const markerPath = join(cwd, 'shell-injection-marker');
-    const worktreePath = join(cwd, '.slope', 'worktrees', `safe-$(touch ${markerPath})`);
+    const worktreePath = join(cwd, '.slope', 'worktrees', 'safe-$(touch shell-injection-marker)');
 
     await worktreeCommand([
       'start',

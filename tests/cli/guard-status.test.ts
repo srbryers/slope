@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { join } from 'node:path';
 import { isEventSupported, getHooksConfigPath, HARNESS_EVENT_SUPPORT } from '../../src/cli/commands/guard.js';
 import { ClaudeCodeAdapter } from '../../src/core/adapters/claude-code.js';
 import { CursorAdapter } from '../../src/core/adapters/cursor.js';
@@ -50,15 +51,15 @@ describe('isEventSupported', () => {
 
 describe('getHooksConfigPath', () => {
   it('returns .claude/settings.json for claude-code', () => {
-    expect(getHooksConfigPath('/proj', 'claude-code')).toBe('/proj/.claude/settings.json');
+    expect(getHooksConfigPath('/proj', 'claude-code')).toBe(join('/proj', '.claude', 'settings.json'));
   });
 
   it('returns .cursor/hooks.json for cursor', () => {
-    expect(getHooksConfigPath('/proj', 'cursor')).toBe('/proj/.cursor/hooks.json');
+    expect(getHooksConfigPath('/proj', 'cursor')).toBe(join('/proj', '.cursor', 'hooks.json'));
   });
 
   it('returns .windsurf/hooks.json for windsurf', () => {
-    expect(getHooksConfigPath('/proj', 'windsurf')).toBe('/proj/.windsurf/hooks.json');
+    expect(getHooksConfigPath('/proj', 'windsurf')).toBe(join('/proj', '.windsurf', 'hooks.json'));
   });
 
   it('returns null for unknown harness', () => {
@@ -109,15 +110,15 @@ describe('adapter.supportedEvents (replaces isEventSupported)', () => {
 
 describe('adapter.hooksConfigPath (replaces getHooksConfigPath)', () => {
   it('claude-code returns .claude/settings.json', () => {
-    expect(new ClaudeCodeAdapter().hooksConfigPath('/proj')).toBe('/proj/.claude/settings.json');
+    expect(new ClaudeCodeAdapter().hooksConfigPath('/proj')).toBe(join('/proj', '.claude', 'settings.json'));
   });
 
   it('cursor returns .cursor/hooks.json', () => {
-    expect(new CursorAdapter().hooksConfigPath('/proj')).toBe('/proj/.cursor/hooks.json');
+    expect(new CursorAdapter().hooksConfigPath('/proj')).toBe(join('/proj', '.cursor', 'hooks.json'));
   });
 
   it('windsurf returns .windsurf/hooks.json', () => {
-    expect(new WindsurfAdapter().hooksConfigPath('/proj')).toBe('/proj/.windsurf/hooks.json');
+    expect(new WindsurfAdapter().hooksConfigPath('/proj')).toBe(join('/proj', '.windsurf', 'hooks.json'));
   });
 
   it('generic returns null', () => {

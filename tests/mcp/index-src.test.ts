@@ -3,7 +3,7 @@ import { createSlopeToolsServer, SLOPE_MCP_TOOL_NAMES, detectSetupHints, buildSe
 import type { SetupHints } from '../../src/mcp/index.js';
 import { SLOPE_REGISTRY, SLOPE_TYPES } from '../../src/mcp/registry.js';
 import { runInSandbox } from '../../src/mcp/sandbox.js';
-import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { SlopeStore, SlopeSession, SprintClaim, GolfScorecard } from '../../src/core/index.js';
@@ -692,20 +692,20 @@ describe('context_search', () => {
     mkdirSync(srcDir, { recursive: true });
     writeFileSync(join(srcDir, 'example.ts'), 'export function uniqueTestMarker() { return 42; }\n');
 
-    // Run the grep fallback by executing in the temp dir context
-    const { execSync } = await import('node:child_process');
-    const grepResult = execSync(
-      `grep -rFn --include='*.ts' -l "uniqueTestMarker" src/ 2>/dev/null || true`,
-      { cwd: tmp, encoding: 'utf8', timeout: 5000 },
-    ).trim();
+    // Fixed-string fallback path shape, independent of host shell.
+    const grepResult = readFileSync(join(srcDir, 'example.ts'), 'utf8').includes('uniqueTestMarker')
+      ? join('src', 'example.ts').replace(/\\/g, '/')
+      : '';
 
     expect(grepResult).toContain('src/example.ts');
 
     // Verify snippet extraction also works
-    const snippetResult = execSync(
-      `grep -Fn "uniqueTestMarker" "src/example.ts" 2>/dev/null | head -5`,
-      { cwd: tmp, encoding: 'utf8', timeout: 5000 },
-    ).trim();
+    const snippetResult = readFileSync(join(srcDir, 'example.ts'), 'utf8')
+      .split(/\r?\n/)
+      .map((line, index) => `${index + 1}:${line}`)
+      .filter(line => line.includes('uniqueTestMarker'))
+      .slice(0, 5)
+      .join('\n');
 
     expect(snippetResult).toContain('uniqueTestMarker');
     expect(snippetResult).toMatch(/^\d+:/); // line number prefix

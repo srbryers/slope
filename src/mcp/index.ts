@@ -19,8 +19,8 @@
  *   npx @slope-dev/slope              # stdio transport
  *   import { createSlopeToolsServer }     # programmatic
  */
-import { existsSync, readFileSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { join, dirname, relative } from 'node:path';
 import { execSync } from 'node:child_process';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -36,6 +36,63 @@ import type { ClaimScope, FlowsFile, FlowDefinition } from '../core/index.js';
 
 /** Tool names exposed by this MCP server (for tests and tool discovery). */
 export const SLOPE_MCP_TOOL_NAMES = ['search', 'execute', 'context_search', 'session_status', 'acquire_claim', 'check_conflicts', 'store_status', 'testing_session_start', 'testing_session_finding', 'testing_session_end', 'testing_session_status', 'testing_plan_status', 'workflow_next', 'workflow_complete', 'workflow_status'] as const;
+
+function toRepoPath(path: string): string {
+  return path.replace(/\\/g, '/');
+}
+
+function grepFallbackContext(cwd: string, query: string, limit: number): ContextResult[] {
+  const srcDir = join(cwd, 'src');
+  if (!existsSync(srcDir)) return [];
+
+  const results: ContextResult[] = [];
+  const walk = (dir: string): void => {
+    if (results.length >= limit) return;
+    let entries;
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+
+    for (const entry of entries) {
+      if (results.length >= limit) return;
+      if (entry.name === 'node_modules' || entry.name === 'dist') continue;
+      const fullPath = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(fullPath);
+        continue;
+      }
+      if (!entry.isFile() || !entry.name.endsWith('.ts')) continue;
+
+      let content: string;
+      try {
+        content = readFileSync(fullPath, 'utf8');
+      } catch {
+        continue;
+      }
+      if (!content.includes(query)) continue;
+
+      const snippet = content
+        .split(/\r?\n/)
+        .map((line, index) => ({ line, index }))
+        .filter(({ line }) => line.includes(query))
+        .slice(0, 5)
+        .map(({ line, index }) => `${index + 1}:${line}`)
+        .join('\n');
+
+      results.push({
+        filePath: toRepoPath(relative(cwd, fullPath)),
+        chunkIndex: 0,
+        snippet,
+        score: 0,
+      });
+    }
+  };
+
+  walk(srcDir);
+  return results;
+}
 
 /** Detection results for hook/settings activation status. */
 export interface SetupHints {
@@ -250,42 +307,18 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
 
       // Grep fallback (fixed-string mode for safety — no regex interpretation)
       try {
-        const grepResult = execSync(
-          `grep -rFn --include='*.ts' -l ${JSON.stringify(query)} src/ 2>/dev/null || true`,
-          { cwd, encoding: 'utf8', timeout: 10000 },
-        ).trim();
+        const results = grepFallbackContext(cwd, query, limit);
 
         const fallbackNote = embeddingFailed
           ? '\n\nNote: Semantic search failed, showing grep results.'
           : '\n\nTip: Run `npx slope index` for semantic search (better results).';
 
-        if (!grepResult) {
+        if (results.length === 0) {
           return { content: [{ type: 'text' as const, text: `No files matching "${query}" found.` + fallbackNote }] };
         }
 
-        const files = grepResult.split('\n').filter(Boolean).slice(0, limit);
-
         if (outputFormat === 'paths') {
-          return { content: [{ type: 'text' as const, text: files.join('\n') + fallbackNote }] };
-        }
-
-        // Build snippet results from grep context
-        const results: ContextResult[] = [];
-        for (const file of files) {
-          try {
-            const lines = execSync(
-              `grep -Fn ${JSON.stringify(query)} ${JSON.stringify(file)} 2>/dev/null | head -5`,
-              { cwd, encoding: 'utf8', timeout: 5000 },
-            ).trim();
-            if (lines) {
-              results.push({
-                filePath: file,
-                chunkIndex: 0,
-                snippet: lines,
-                score: 0,
-              });
-            }
-          } catch { /* skip file */ }
+          return { content: [{ type: 'text' as const, text: results.map(r => r.filePath).join('\n') + fallbackNote }] };
         }
 
         const text = formatContextForAgent(results, outputFormat, cwd);

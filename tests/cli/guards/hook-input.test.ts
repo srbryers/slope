@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { resolve } from 'node:path';
 import {
   normalizeTouchedPath,
   parseApplyPatchTouchedPaths,
@@ -56,6 +57,6 @@ describe('hook input path helpers', () => {
   it('normalizes absolute and relative touched paths against cwd', () => {
     expect(normalizeTouchedPath('/repo/src/a.ts', '/repo')).toBe('src/a.ts');
     expect(normalizeTouchedPath('./src/a.ts', '/repo')).toBe('src/a.ts');
-    expect(toAbsoluteTouchedPath('src/a.ts', '/repo')).toBe('/repo/src/a.ts');
+    expect(toAbsoluteTouchedPath('src/a.ts', '/repo')).toBe(resolve('/repo', 'src/a.ts'));
   });
 });

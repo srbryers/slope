@@ -16,6 +16,10 @@ function exec(cmd: string, cwd: string): string {
   }
 }
 
+function toRepoPath(path: string): string {
+  return path.replace(/\\/g, '/');
+}
+
 interface ProjectIdentity {
   /** True when running inside the SLOPE source repo (package.json name === @slope-dev/slope).
    *  False for downstream projects that installed SLOPE — they need a generic project map
@@ -191,7 +195,7 @@ function generateGenericPackageInventory(cwd: string): string {
 
   for (const s of sections) {
     const { source, test } = countSourceFiles(s.root);
-    lines.push(`### \`${relative(cwd, s.root)}\``);
+    lines.push(`### \`${toRepoPath(relative(cwd, s.root))}\``);
     lines.push(`- Package: \`${s.name}\``);
     if (s.description) lines.push(`- ${s.description}`);
     lines.push(`- Source files: ${source} | Test files: ${test}`);

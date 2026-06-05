@@ -146,8 +146,8 @@ export function checkFlowStaleness(
 
   try {
     const output = execSync(
-      `git diff --name-only ${flow.last_verified_sha}..${currentSha} 2>/dev/null`,
-      { cwd, encoding: 'utf8', timeout: 10000 },
+      `git diff --name-only ${flow.last_verified_sha}..${currentSha}`,
+      { cwd, encoding: 'utf8', timeout: 10000, stdio: ['ignore', 'pipe', 'ignore'] },
     ).trim();
 
     if (!output) {

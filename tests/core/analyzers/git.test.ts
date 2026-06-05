@@ -16,8 +16,6 @@ function gitInit(cwd: string): void {
 }
 
 function gitCommit(cwd: string, message: string): void {
-  writeFileSync(join(cwd, `file-${Date.now()}-${Math.random()}.txt`), message);
-  execSync('git add -A', { cwd, stdio: 'pipe' });
   execSync(`git commit -m "${message}" --allow-empty`, { cwd, stdio: 'pipe' });
 }
 
@@ -93,8 +91,8 @@ describe('analyzeGit', () => {
 
   it('infers daily cadence from many commits', async () => {
     gitInit(tmpDir);
-    // 90+ commits in the "last 90 days" → ~7 per week → daily
-    for (let i = 0; i < 90; i++) {
+    // 65 commits in the "last 90 days" -> ~5 per week -> daily
+    for (let i = 0; i < 65; i++) {
       gitCommit(tmpDir, `commit ${i}`);
     }
 

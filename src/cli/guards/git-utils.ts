@@ -10,7 +10,7 @@ import { join } from 'node:path';
  */
 export function headIsOnMain(cwd: string): boolean {
   try {
-    execSync('git merge-base --is-ancestor HEAD origin/main 2>/dev/null', { cwd, encoding: 'utf8' });
+    execSync('git merge-base --is-ancestor HEAD origin/main', { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
     return true;
   } catch {
     return false;
@@ -35,7 +35,7 @@ export function recordBaseline(sessionId: string, cwd: string): boolean {
   if (existsSync(path)) return false;
 
   try {
-    const status = execSync('git status --porcelain 2>/dev/null', { cwd, encoding: 'utf8' }).trim();
+    const status = execSync('git status --porcelain', { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
     const dir = join(cwd, BASELINES_DIR);
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
     writeFileSync(path, status);
@@ -104,7 +104,7 @@ export function getActiveWorktrees(cwd: string): ActiveWorktree[] {
           // Check for unpushed commits
           let unpushed = 0;
           try {
-            const log = execSync(`git -C "${currentPath}" log --oneline @{u}..HEAD 2>/dev/null`, { encoding: 'utf8', timeout: 3000 }).trim();
+            const log = execSync(`git -C "${currentPath}" log --oneline @{u}..HEAD`, { encoding: 'utf8', timeout: 3000, stdio: ['ignore', 'pipe', 'ignore'] }).trim();
             unpushed = log ? log.split('\n').length : 0;
           } catch { /* no upstream or other error — count as 0 */ }
 

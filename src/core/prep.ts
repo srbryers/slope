@@ -2,7 +2,7 @@
 // Generates per-ticket execution plans for agent injection.
 
 import { readFileSync, existsSync, statSync, readdirSync } from 'node:fs';
-import { join, basename as pathBasename, extname } from 'node:path';
+import { isAbsolute, join, basename as pathBasename, extname } from 'node:path';
 import type { EmbeddingConfig } from './embedding.js';
 import type { EmbeddingStore } from './embedding-store.js';
 import type { GolfScorecard } from './types.js';
@@ -87,7 +87,7 @@ export function resolveTicket(
 ): TicketData | null {
   // Try roadmap first
   const rPath = roadmapPath
-    ? (roadmapPath.startsWith('/') ? roadmapPath : join(cwd, roadmapPath))
+    ? (isAbsolute(roadmapPath) ? roadmapPath : join(cwd, roadmapPath))
     : join(cwd, 'docs/backlog/roadmap.json');
 
   if (existsSync(rPath)) {
@@ -105,7 +105,7 @@ export function resolveTicket(
 
   // Try backlog
   const bPath = backlogPath
-    ? (backlogPath.startsWith('/') ? backlogPath : join(cwd, backlogPath))
+    ? (isAbsolute(backlogPath) ? backlogPath : join(cwd, backlogPath))
     : join(cwd, 'slope-loop/backlog.json');
 
   if (existsSync(bPath)) {

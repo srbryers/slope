@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { parseImports, buildImportGraph, blastRadius } from '../../src/core/imports.js';
 
 const tmpDir = join(import.meta.dirname ?? __dirname, '.tmp-imports-test');
@@ -15,8 +15,7 @@ afterEach(() => {
 
 function writeTs(relativePath: string, content: string): void {
   const fullPath = join(tmpDir, relativePath);
-  const dir = fullPath.substring(0, fullPath.lastIndexOf('/'));
-  mkdirSync(dir, { recursive: true });
+  mkdirSync(dirname(fullPath), { recursive: true });
   writeFileSync(fullPath, content);
 }
 

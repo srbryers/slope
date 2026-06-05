@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execSync } from 'node:child_process';
 
@@ -33,8 +33,7 @@ function gitInit(dir: string): void {
 
 function gitAdd(dir: string, file: string, content: string): void {
   const fullPath = join(dir, file);
-  const parent = fullPath.substring(0, fullPath.lastIndexOf('/'));
-  mkdirSync(parent, { recursive: true });
+  mkdirSync(dirname(fullPath), { recursive: true });
   writeFileSync(fullPath, content);
   execSync(`git add "${file}"`, { cwd: dir, stdio: 'ignore' });
 }

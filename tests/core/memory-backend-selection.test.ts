@@ -8,6 +8,7 @@ import {
   addMemory,
   loadMemories,
   searchMemories,
+  clearMemoryBackendCache,
 } from '../../src/core/memory.js';
 
 function setupRepo(opts: { withDb?: boolean } = {}): string {
@@ -25,6 +26,7 @@ describe('getMemoryBackend (GH #294 — backend selection)', () => {
   let cwd: string;
 
   afterEach(() => {
+    clearMemoryBackendCache();
     if (cwd) rmSync(cwd, { recursive: true, force: true });
     delete process.env.SLOPE_MEMORY_BACKEND;
   });

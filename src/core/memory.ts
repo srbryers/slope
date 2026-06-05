@@ -71,6 +71,10 @@ export class SecretDetectedError extends Error {
 const _backendCache = new Map<string, MemoryBackend>();
 
 export function clearMemoryBackendCache(): void {
+  for (const backend of _backendCache.values()) {
+    const close = (backend as { close?: () => void }).close;
+    if (typeof close === 'function') close.call(backend);
+  }
   _backendCache.clear();
 }
 

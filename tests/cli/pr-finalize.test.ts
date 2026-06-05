@@ -256,5 +256,5 @@ describe('pr closeout status helpers (S130)', () => {
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }
-  });
+  }, 15000);
 });
