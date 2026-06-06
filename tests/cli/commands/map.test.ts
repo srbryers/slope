@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { execFileSync, execSync } from 'node:child_process';
+import { execFileSync, execSync, spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -13,6 +13,29 @@ function runSlopeMap(cwd: string, args: string[] = [], options: { encoding?: Buf
     encoding: options.encoding,
     stdio: ['pipe', 'pipe', 'pipe'],
   });
+}
+
+function runSlopeCommand(cwd: string, args: string[]) {
+  return spawnSync(process.execPath, [SLOPE_BIN, ...args], {
+    cwd,
+    encoding: 'utf8',
+  });
+}
+
+function writeCurrentCodebaseMap(cwd: string): void {
+  const head = execSync('git rev-parse HEAD', { cwd, encoding: 'utf8' }).trim();
+  writeFileSync(join(cwd, 'CODEBASE.md'), [
+    '---',
+    `generated_at: "${new Date().toISOString()}"`,
+    `git_sha: "${head}"`,
+    'sprint: 0',
+    'source_files: 0',
+    'test_files: 0',
+    'flows: 0',
+    '---',
+    '# Current map',
+    '',
+  ].join('\n'));
 }
 
 function setupNonSlopeRepo(packageJson: Record<string, unknown>): string {
@@ -189,6 +212,25 @@ describe('slope map in a non-SLOPE repo (#351)', () => {
       const output = runSlopeMap(cwd, ['--check'], { encoding: 'utf8' }) as string;
       expect(output).toContain('Git distance: 0 commits behind');
       expect(output).toContain('Overall: CURRENT');
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('does not leak Windows stderr from staleness git distance (#512)', () => {
+    const cwd = setupNonSlopeRepo({ name: 'stderr-clean-tool' });
+    try {
+      writeCurrentCodebaseMap(cwd);
+
+      const mapCheck = runSlopeCommand(cwd, ['map', '--check']);
+      expect(mapCheck.status).toBe(0);
+      expect(mapCheck.stdout).toContain('Overall: CURRENT');
+      expect(mapCheck.stderr).not.toContain('The system cannot find the path specified');
+
+      const commitReady = runSlopeCommand(cwd, ['commit-ready', '--json']);
+      expect(commitReady.status).toBe(0);
+      expect(() => JSON.parse(commitReady.stdout)).not.toThrow();
+      expect(commitReady.stderr).not.toContain('The system cannot find the path specified');
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }

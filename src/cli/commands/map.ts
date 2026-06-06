@@ -10,7 +10,12 @@ import { SLOPE_REGISTRY } from '../../mcp/registry.js';
 
 function exec(cmd: string, cwd: string): string {
   try {
-    return execSync(cmd, { cwd, encoding: 'utf8', timeout: 10000 }).trim();
+    return execSync(cmd, {
+      cwd,
+      encoding: 'utf8',
+      timeout: 10000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
   } catch {
     return '';
   }
@@ -790,7 +795,7 @@ export function runStalenessCheck(cwd: string, config: SlopeConfig, mapContent: 
 function gitDistanceSinceMapSha(cwd: string, mapSha: string): number {
   const sha = mapSha.trim();
   if (!/^[0-9a-fA-F]{4,64}$/.test(sha)) return 0;
-  const raw = exec(`git rev-list --count --ancestry-path ${sha}..HEAD 2>/dev/null`, cwd);
+  const raw = exec(`git rev-list --count --ancestry-path ${sha}..HEAD`, cwd);
   const parsed = parseInt(raw || '0', 10);
   return Number.isFinite(parsed) ? parsed : 0;
 }
