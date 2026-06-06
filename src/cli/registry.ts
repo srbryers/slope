@@ -113,6 +113,16 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
   },
   { cmd: 'next', desc: 'Show next sprint number (auto-detect)', category: 'lifecycle' },
   {
+    cmd: 'resume', desc: 'Portable sprint resume from tracked artifacts', category: 'lifecycle',
+    flags: [
+      { flag: '--from=<path>', desc: 'Resume pointer path (default: docs/backlog/.sprint-active.json)' },
+      { flag: '--sprint=<N>', desc: 'Explicit sprint number when no pointer exists' },
+      { flag: '--phase=<phase>', desc: 'Local sprint phase to recreate (default: implementing)' },
+      { flag: '--force', desc: 'Resume despite unsafe pointer checks' },
+      { flag: '--dry-run', desc: 'Preview local state without writing .slope files' },
+    ],
+  },
+  {
     cmd: 'sprint', desc: 'Manage sprint lifecycle state and gates', category: 'lifecycle',
     subcommands: [
       { name: 'start', desc: 'Start a new sprint', flags: [
@@ -125,6 +135,15 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
         { flag: '<name>', desc: 'Gate name to complete' },
       ]},
       { name: 'status', desc: 'Show current sprint state and gates' },
+      { name: 'resume', desc: 'Resume workflow execution or recreate portable sprint state', flags: [
+        { flag: '<sprint_id>', desc: 'Workflow execution sprint ID for legacy workflow resume' },
+        { flag: '--portable', desc: 'Reconstruct local sprint state from tracked artifacts' },
+        { flag: '--from=<path>', desc: 'Resume pointer path (default: docs/backlog/.sprint-active.json)' },
+        { flag: '--write-pointer', desc: 'Write tracked resume pointer from current local state' },
+        { flag: '--output=<path>', desc: 'Pointer output path for --write-pointer' },
+        { flag: '--force', desc: 'Resume despite unsafe pointer checks' },
+        { flag: '--dry-run', desc: 'Preview local state without writing .slope files' },
+      ]},
       { name: 'reset', desc: 'Reset sprint state' },
     ],
   },

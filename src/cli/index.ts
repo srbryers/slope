@@ -66,6 +66,7 @@ import { statsCommand } from './commands/stats.js';
 import { loopCommand } from './commands/loop.js';
 import { interviewCommand } from './commands/interview.js';
 import { sprintCommand } from './commands/sprint.js';
+import { resumeCommand } from './commands/resume.js';
 import { doctorCommand } from './commands/doctor.js';
 import { versionCommand } from './commands/version.js';
 import { helpCommand } from './commands/help.js';
@@ -113,6 +114,7 @@ Usage:
   slope briefing                            Pre-round briefing
   slope version                             Show current version
   slope doctor                              Check repo health
+  slope resume [--from=path] [--force]      Portable sprint resume from tracked artifacts
 
 For full command list, run: slope
 `);
@@ -292,6 +294,9 @@ switch (subcommand) {
     break;
   case 'sprint':
     sprintCommand(process.argv.slice(3)).catch(reportCliError);
+    break;
+  case 'resume':
+    resumeCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   case 'phase':
     phaseCommand(process.argv.slice(3)).catch(reportCliError);
