@@ -24,21 +24,27 @@ function resolveSprint(flags: Record<string, string>, cwd: string): number | nul
 export async function statusCommand(args: string[]): Promise<void> {
   const flags = parseArgs(args);
   const cwd = process.cwd();
-  const store = await resolveStore(cwd);
+  const swarmId = flags.swarm;
 
-  try {
-    const swarmId = flags.swarm;
-
-    if (swarmId) {
-      await showSwarmStatus(store, swarmId);
-    } else {
-      const sprintNumber = resolveSprint(flags, cwd);
-      if (!sprintNumber) {
-        console.error('Error: --sprint must be a positive sprint id, e.g. 114 or 114.5');
-        process.exit(1);
-      }
-      await showSprintStatus(store, sprintNumber);
+  if (!swarmId) {
+    const sprintNumber = resolveSprint(flags, cwd);
+    if (!sprintNumber) {
+      console.error('Error: --sprint must be a positive sprint id, e.g. 114 or 114.5');
+      process.exit(1);
     }
+
+    const store = await resolveStore(cwd);
+    try {
+      await showSprintStatus(store, sprintNumber);
+    } finally {
+      store.close();
+    }
+    return;
+  }
+
+  const store = await resolveStore(cwd);
+  try {
+    await showSwarmStatus(store, swarmId);
   } finally {
     store.close();
   }
