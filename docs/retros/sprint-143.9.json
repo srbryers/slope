@@ -1,0 +1,139 @@
+{
+  "sprint_number": 143.9,
+  "player": "codex",
+  "theme": "Node Exec Redirection Portability Audit",
+  "par": 4,
+  "slope": 2,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-06-06",
+  "type": "windows portability",
+  "skills_used": [
+    "slope-sprint-workflow",
+    "slope-api-reference"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow"
+  ],
+  "shots": [
+    {
+      "ticket_key": "S143.9-1",
+      "title": "Audit Node execSync callers that embed Unix stderr redirection (#514)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Audited production `src/cli`, `src/mcp`, and `src/core` call sites for Node-executed `2>/dev/null` usage, excluding generated POSIX shell templates."
+    },
+    {
+      "ticket_key": "S143.9-2",
+      "title": "Replace Windows-unsafe Node command redirection with portable helpers (#514)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Added shared child-process stdio constants and moved git/npm stderr suppression into child-process options across guards, commands, MCP worktree cleanup, and lightweight repo detection."
+    },
+    {
+      "ticket_key": "S143.9-3",
+      "title": "Add regression coverage for a formerly noisy guard or command path (#514)",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [],
+      "notes": "Updated branch-before-commit guard expectations and added a production-source regression that fails if Node-executed code reintroduces POSIX `/dev/null` redirection."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 3,
+    "fairways_total": 3,
+    "greens_in_regulation": 3,
+    "greens_total": 3,
+    "putts": 1,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "wind",
+      "impact": "minor",
+      "description": "Generated adapter and harness shell templates still contain POSIX redirection by design; the new regression excludes those files while scanning Node-executed production source."
+    },
+    {
+      "type": "wind",
+      "impact": "minor",
+      "description": "`CODEBASE.md` is intentionally ignored in this repo, so `slope map` refreshed the local map but produced no tracked map commit."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Node commands that need quiet stderr should use child-process `stdio` options instead of shell redirection.",
+      "outcome": "Windows no longer attempts to resolve `/dev/null` for the audited production command paths."
+    },
+    {
+      "type": "lessons",
+      "description": "A source-level portability regression is useful when a bug spans many small command probes.",
+      "outcome": "The test suite now fails fast if production Node-executed source reintroduces `2>/dev/null` outside generated shell templates."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "`corepack pnpm vitest run tests/cli/portable-exec-redirection.test.ts tests/cli/guards/branch-before-commit.test.ts tests/cli/guards/worktree-merge.test.ts tests/cli/guards/worktree-self-remove.test.ts tests/cli/guards/worktree-reuse.test.ts` passed: 33 tests.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`corepack pnpm typecheck` and `corepack pnpm prepare` passed.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`corepack pnpm test` passed on Windows: 230 test files passed, 1 skipped; 3628 tests passed, 25 skipped.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "Branch-built `slope guard branch-before-commit` smoke produced empty stderr for a formerly noisy git branch probe.",
+      "status": "healthy"
+    },
+    {
+      "category": "docs",
+      "description": "`slope map --check` reported current after local map refresh.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "A broad but well-contained cleanup. The audit had enough call sites to be risky, but each replacement kept the same try/catch behavior.",
+    "advice_for_next_player": "Generated shell snippets are a different category from Node-executed commands; keep that distinction explicit during portability audits.",
+    "what_surprised_you": "A tiny shared stdio constant was enough to make the change readable across commands, guards, MCP, and core detection.",
+    "excited_about_next": "With stderr portability cleaned up, S143.95 can focus on the atomic-write contention flake without this noise in the background."
+  },
+  "bunker_locations": [
+    "Mixing generated POSIX shell templates with Node-executed command strings can lead to over-broad mechanical rewrites.",
+    "Source-level grep regressions need explicit allowlists for generated shell templates."
+  ],
+  "yardage_book_updates": [
+    "`src/core/process.ts` now centralizes quiet child-process stdio constants.",
+    "Production Node-executed `src/cli`, `src/mcp`, and non-template `src/core` sources no longer contain `2>/dev/null`.",
+    "`tests/cli/portable-exec-redirection.test.ts` prevents reintroducing POSIX `/dev/null` redirection in Node-executed production source."
+  ],
+  "course_management_notes": [
+    "Implementation commit: fbcedfe.",
+    "Issue #514 should close when the PR containing S143.9 merges.",
+    "`CODEBASE.md` is listed in `.gitignore`; the local map was refreshed but remains untracked.",
+    "S143.95 remains planned for #515 before the release sprint."
+  ],
+  "slope_factors": [
+    "windows_stderr",
+    "node_exec",
+    "guards",
+    "mcp"
+  ]
+}

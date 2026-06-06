@@ -3737,6 +3737,9 @@
       "par": 4,
       "slope": 2,
       "type": "windows portability",
+      "status": "complete",
+      "score": 4,
+      "score_label": "par",
       "depends_on": [
         143.8
       ],
