@@ -170,7 +170,7 @@ function isRemoteOrReadOnlyCommandInput(input: HookInput): boolean {
   const words = tokenizeShellWords(segments[0]);
   const start = skipCommandPrefix(words, 0);
   if (words[start] === 'gh') return isAllowedGhCommand(words.slice(start + 1));
-  if (words[start] === 'git') return isAllowedGitCommand(words.slice(start + 1));
+  if (words[start] === 'git') return isAllowedGitCommand(normalizeGitArgs(words.slice(start + 1)));
   return false;
 }
 
@@ -183,16 +183,36 @@ function isAllowedGhCommand(args: string[]): boolean {
 
 function isAllowedGitCommand(args: string[]): boolean {
   const sub = args[0];
-  if (['status', 'log', 'diff', 'show', 'rev-parse', 'fetch', 'ls-remote', 'remote'].includes(sub ?? '')) {
+  if (['status', 'log', 'diff', 'show', 'rev-parse', 'fetch', 'ls-remote'].includes(sub ?? '')) {
     return true;
   }
   if (sub === 'branch') {
     return args.length === 1
-      || args.includes('--show-current')
-      || args.includes('-vv')
-      || args.includes('-v');
+      || args.length === 2 && ['--show-current', '-v', '-vv'].includes(args[1] ?? '');
+  }
+  if (sub === 'remote') {
+    return args.length === 1
+      || args.length === 2 && ['-v', '--verbose'].includes(args[1] ?? '')
+      || ['get-url', 'show'].includes(args[1] ?? '');
   }
   return false;
+}
+
+function normalizeGitArgs(args: string[]): string[] {
+  const normalized = [...args];
+  for (let i = 0; i < normalized.length;) {
+    const arg = normalized[i];
+    if (arg === '-C' || arg === '-c') {
+      normalized.splice(i, 2);
+      continue;
+    }
+    if (arg?.startsWith('--git-dir=') || arg?.startsWith('--work-tree=')) {
+      normalized.splice(i, 1);
+      continue;
+    }
+    break;
+  }
+  return normalized;
 }
 
 function isStaleSession(session: SlopeSession, now: number): boolean {

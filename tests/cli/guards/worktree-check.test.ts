@@ -229,6 +229,17 @@ describe('worktreeCheckGuard', () => {
     expect(mockResolveStore).not.toHaveBeenCalled();
   });
 
+  it('allows read-only git commands with safe global options during a collision (#502)', async () => {
+    const result = await worktreeCheckGuard({
+      ...makeInput(),
+      tool_name: 'Bash',
+      tool_input: { command: 'git -C /repo status --short' },
+    }, '/tmp/test');
+
+    expect(result).toEqual({});
+    expect(mockResolveStore).not.toHaveBeenCalled();
+  });
+
   it('does not allow slope recovery commands embedded in unrelated shell text', async () => {
     mockGitMainRepo();
     (mockStore.getActiveSessions as ReturnType<typeof vi.fn>).mockResolvedValue([
@@ -257,6 +268,40 @@ describe('worktreeCheckGuard', () => {
       ...makeInput(),
       tool_name: 'Bash',
       tool_input: { command: 'git checkout -b feature' },
+    }, '/tmp/test');
+
+    expect(result.decision).toBe('deny');
+    expect(mockResolveStore).toHaveBeenCalled();
+  });
+
+  it('still blocks git branch mutations with display flags during a collision (#502)', async () => {
+    mockGitMainRepo();
+    (mockStore.getActiveSessions as ReturnType<typeof vi.fn>).mockResolvedValue([
+      makeSession({ session_id: 'test-session' }),
+      makeSession({ session_id: 'other-session' }),
+    ]);
+
+    const result = await worktreeCheckGuard({
+      ...makeInput(),
+      tool_name: 'Bash',
+      tool_input: { command: 'git branch -D feature -v' },
+    }, '/tmp/test');
+
+    expect(result.decision).toBe('deny');
+    expect(mockResolveStore).toHaveBeenCalled();
+  });
+
+  it('still blocks git remote config mutations during a collision (#502)', async () => {
+    mockGitMainRepo();
+    (mockStore.getActiveSessions as ReturnType<typeof vi.fn>).mockResolvedValue([
+      makeSession({ session_id: 'test-session' }),
+      makeSession({ session_id: 'other-session' }),
+    ]);
+
+    const result = await worktreeCheckGuard({
+      ...makeInput(),
+      tool_name: 'Bash',
+      tool_input: { command: 'git remote set-url origin git@example.com:slope.git' },
     }, '/tmp/test');
 
     expect(result.decision).toBe('deny');
