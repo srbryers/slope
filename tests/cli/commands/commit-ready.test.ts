@@ -125,6 +125,51 @@ describe('collectCommitReady (GH #314)', () => {
     expect(cm?.suggestion).toContain('slope map');
   });
 
+  it('does not use historical CODEBASE commits for ignored current maps (#510)', async () => {
+    cwd = setupRepo({ branch: 'feat/test', withRoadmap: true });
+    writeFileSync(join(cwd, 'CODEBASE.md'), [
+      '---',
+      'generated_at: "2026-06-01T00:00:00.000Z"',
+      'git_sha: "0000"',
+      'sprint: 0',
+      'source_files: 0',
+      'test_files: 0',
+      'flows: 0',
+      '---',
+      '# Historical map',
+      '',
+    ].join('\n'));
+    execSync('git add docs/backlog/roadmap.json CODEBASE.md && git commit -q -m "track map"', { cwd });
+
+    writeFileSync(join(cwd, '.gitignore'), 'CODEBASE.md\n');
+    execSync('git add .gitignore && git rm -q --cached CODEBASE.md && git commit -q -m "ignore map"', { cwd });
+    for (let i = 0; i < 35; i++) {
+      writeFileSync(join(cwd, `commit-${i}.txt`), `${i}\n`);
+      execSync(`git add commit-${i}.txt && git commit -q -m "commit ${i}"`, { cwd });
+    }
+
+    const head = execSync('git rev-parse HEAD', { cwd, encoding: 'utf8' }).trim();
+    writeFileSync(join(cwd, 'CODEBASE.md'), [
+      '---',
+      'generated_at: "2026-06-06T00:00:00.000Z"',
+      `git_sha: "${head}"`,
+      'sprint: 0',
+      'source_files: 0',
+      'test_files: 0',
+      'flows: 0',
+      '---',
+      '# Current ignored map',
+      '',
+    ].join('\n'));
+    writeFileSync(join(cwd, 'changed.txt'), 'edit');
+
+    const r = await collectCommitReady(cwd);
+    const cm = r.checks.find(c => c.name === 'codebase-map');
+    expect(cm?.ok).toBe(true);
+    expect(cm?.reason).toContain('map check current');
+    expect(cm?.reason).not.toContain('stale');
+  });
+
   it('reports pending gates from sprint state', async () => {
     cwd = setupRepo({ branch: 'feat/test', withRoadmap: true, withSprintState: true, withCodebaseMap: true, modifiedFile: true });
     const r = await collectCommitReady(cwd);
