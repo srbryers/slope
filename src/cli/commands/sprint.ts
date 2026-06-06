@@ -13,8 +13,8 @@ import {
   type GateName,
   type SprintPhase,
 } from '../sprint-state.js';
-import { WorkflowEngine, loadWorkflow, resolveVariables, validateWorkflow, loadConfig, loadScorecards, parseRoadmap, castRoadmapStructure, formatSprintLabel, formatSprintNumber, parseSprintNumber } from '../../core/index.js';
-import type { RoadmapSprint, WorkflowDefinition, WorkflowExecution } from '../../core/index.js';
+import { WorkflowEngine, loadWorkflow, resolveVariables, validateWorkflow, loadConfig, parseRoadmap, castRoadmapStructure, formatSprintLabel, formatSprintNumber, parseSprintNumber } from '../../core/index.js';
+import type { WorkflowDefinition, WorkflowExecution } from '../../core/index.js';
 import { createHash } from 'node:crypto';
 
 /** Get workflow definition from execution snapshot (preferred) or disk (fallback for old executions) */
@@ -46,6 +46,7 @@ import {
   loadRoadmapReality,
   parseTouchedPaths,
 } from '../pre-sprint-reality.js';
+import { findStaleWorkflowExecutions, reconcileWorkflowExecutions } from '../workflow-resync.js';
 
 /**
  * Check completion_conditions for a step before allowing completion/skip.
@@ -667,61 +668,35 @@ async function workflowStatusCommand(args: string[], cwd: string): Promise<void>
   }
 }
 
-interface StaleWorkflowExecution {
-  exec: WorkflowExecution;
-  reason: string;
-}
-
-function completedRoadmapSprintIds(cwd: string, config: ReturnType<typeof loadConfig>): Set<number> {
-  if (!config.roadmapPath) return new Set();
-  const roadmapPath = join(cwd, config.roadmapPath);
-  if (!existsSync(roadmapPath)) return new Set();
-  try {
-    const raw = JSON.parse(readFileSync(roadmapPath, 'utf8'));
-    const parsed = parseRoadmap(raw);
-    const roadmap = parsed.roadmap ?? castRoadmapStructure(raw);
-    if (!roadmap) return new Set();
-    return new Set(
-      roadmap.sprints
-        .filter(sprint => {
-          const status = (sprint as RoadmapSprint & { status?: string }).status;
-          return status === 'complete' || status === 'superseded';
-        })
-        .map(sprint => sprint.id),
-    );
-  } catch {
-    return new Set();
-  }
-}
-
-async function findStaleWorkflowExecutions(cwd: string, store: ReturnType<typeof createStore>): Promise<StaleWorkflowExecution[]> {
-  const config = loadConfig(cwd);
-  const scorecardSprintIds = new Set(loadScorecards(config, cwd).map(card => card.sprint_number));
-  const roadmapDoneIds = completedRoadmapSprintIds(cwd, config);
-  const running = await store.listExecutions({ status: 'running' });
-  const stale: StaleWorkflowExecution[] = [];
-
-  for (const exec of running) {
-    const sprint = sprintNumberFromId(exec.sprint_id);
-    if (sprint === null) continue;
-    const reasons: string[] = [];
-    if (scorecardSprintIds.has(sprint)) reasons.push('scorecard exists');
-    if (roadmapDoneIds.has(sprint)) reasons.push('roadmap complete/superseded');
-    if (reasons.length > 0) {
-      stale.push({ exec, reason: reasons.join(', ') });
-    }
-  }
-
-  return stale;
-}
-
 async function workflowCleanupCommand(args: string[], cwd: string): Promise<void> {
   const action = args[0];
   const dryRun = args.includes('--dry-run');
   const staleOnly = args.includes('--stale');
+  const resync = action === 'resync';
+
+  if (resync) {
+    const store = getStore(cwd);
+    try {
+      const result = await reconcileWorkflowExecutions(cwd, store);
+      for (const { exec, reason } of result.paused) {
+        console.log(`Paused ${exec.sprint_id ?? exec.id} (${exec.workflow_name}) at ${exec.current_phase}/${exec.current_step} — ${reason}`);
+      }
+      for (const item of result.fastForwarded) {
+        console.log(`Fast-forwarded ${item.exec.sprint_id ?? item.exec.id} (${item.exec.workflow_name}) to ${item.phase}/${item.step} — ${item.reason}`);
+      }
+      if (result.paused.length === 0 && result.fastForwarded.length === 0) {
+        console.log('Workflow state already matches git/roadmap reality.');
+      } else {
+        console.log(`\nResynced workflow state: ${result.paused.length} paused, ${result.fastForwarded.length} fast-forwarded.`);
+      }
+    } finally {
+      store.close();
+    }
+    return;
+  }
 
   if (action !== 'cleanup' || !staleOnly) {
-    console.error('Usage: slope sprint workflow cleanup --stale [--dry-run]');
+    console.error('Usage: slope sprint workflow cleanup --stale [--dry-run]\n       slope sprint workflow resync');
     process.exit(1);
   }
 
@@ -1115,6 +1090,7 @@ Workflow commands:
   slope sprint context <sprint_id>   Show current workflow step and remaining work
   slope sprint validate <sprint_id>  Validate workflow, plan, scorecard, and tests
   slope sprint workflow cleanup --stale [--dry-run]         Pause stale completed/superseded executions
+  slope sprint workflow resync       Reconcile workflow executions with git/roadmap reality
   slope sprint skip <id> --step=<s> --reason="..."          Skip a blocking step
 `);
 }

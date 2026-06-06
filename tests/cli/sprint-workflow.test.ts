@@ -2,10 +2,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { execFileSync } from 'node:child_process';
 import { sprintCommand } from '../../src/cli/commands/sprint.js';
 import { createStore } from '../../src/store/index.js';
 import type { RoadmapDefinition } from '../../src/core/index.js';
 import { WorkflowEngine, loadWorkflow, resolveVariables } from '../../src/core/index.js';
+import { findStaleWorkflowExecutions } from '../../src/cli/workflow-resync.js';
 
 class ProcessExitError extends Error {
   constructor(public code: number | undefined) { super(`process.exit(${code})`); }
@@ -115,6 +117,19 @@ phases:
         type: agent_work
         prompt: "Implement the ticket"
 `);
+}
+
+function initGitForSprint(sprint: number): void {
+  execFileSync('git', ['init'], { cwd: tmpDir, stdio: 'ignore' });
+  execFileSync('git', ['config', 'user.email', 'test@example.com'], { cwd: tmpDir });
+  execFileSync('git', ['config', 'user.name', 'Test User'], { cwd: tmpDir });
+  writeFileSync(join(tmpDir, 'README.md'), 'initial\n');
+  execFileSync('git', ['add', 'README.md'], { cwd: tmpDir });
+  execFileSync('git', ['commit', '-m', 'chore: initial'], { cwd: tmpDir, stdio: 'ignore' });
+  execFileSync('git', ['checkout', '-b', `feat/sprint-${sprint}`], { cwd: tmpDir, stdio: 'ignore' });
+  writeFileSync(join(tmpDir, 'feature.txt'), `S${sprint}\n`);
+  execFileSync('git', ['add', 'feature.txt'], { cwd: tmpDir });
+  execFileSync('git', ['commit', '-m', `fix(S${sprint}-1): existing sprint work`], { cwd: tmpDir, stdio: 'ignore' });
 }
 
 describe('slope sprint run', () => {
@@ -284,6 +299,84 @@ describe('slope sprint workflow cleanup', () => {
     } finally {
       store.close();
     }
+  });
+
+  it('pauses older running executions when a newer sprint execution exists (#503)', async () => {
+    await startWorkflow('S65');
+    await startWorkflow('S66');
+
+    const output = await captureLog(() =>
+      sprintCommand(['workflow', 'cleanup', '--stale'])
+    );
+
+    expect(output).toContain('Paused S65');
+    expect(output).toContain('newer running sprint S66 exists');
+
+    const store = createStore({ storePath: '.slope/slope.db', cwd: tmpDir });
+    try {
+      expect(await store.getExecutionBySprint('S65')).toMatchObject({ status: 'paused' });
+      expect(await store.getExecutionBySprint('S66')).toMatchObject({ status: 'running' });
+    } finally {
+      store.close();
+    }
+  });
+
+  it('detects aged running executions as stale (#503)', async () => {
+    const old = new Date('2026-01-01T00:00:00Z').toISOString();
+    const store = {
+      listExecutions: async () => [{
+        id: 'wf-old',
+        workflow_name: 'sprint-lightweight',
+        sprint_id: 'S65',
+        current_phase: 'pre_hole',
+        current_step: 'verify_previous',
+        status: 'running' as const,
+        variables: {},
+        completed_steps: [],
+        started_at: old,
+        updated_at: old,
+      }],
+    };
+
+    const stale = await findStaleWorkflowExecutions(tmpDir, store, {
+      now: new Date('2026-01-10T00:00:00Z'),
+      staleAgeMs: 7 * 24 * 60 * 60 * 1000,
+      branchSprint: null,
+    });
+
+    expect(stale).toHaveLength(1);
+    expect(stale[0].reason).toContain('older than 7 days');
+  });
+
+  it('resync fast-forwards a branch sprint execution when commits already exist (#503)', async () => {
+    initGitForSprint(66);
+    const execId = await startWorkflow('S66', 'sprint-standard');
+
+    const store = createStore({ storePath: '.slope/slope.db', cwd: tmpDir });
+    try {
+      await store.updateExecutionState(execId, 'pre_hole', 'verify_previous');
+    } finally {
+      store.close();
+    }
+
+    const output = await captureLog(() =>
+      sprintCommand(['workflow', 'resync'])
+    );
+
+    expect(output).toContain('Fast-forwarded S66');
+    expect(output).toContain('per_ticket/implement');
+
+    const updatedStore = createStore({ storePath: '.slope/slope.db', cwd: tmpDir });
+    try {
+      const exec = await updatedStore.getExecutionBySprint('S66');
+      expect(exec).toMatchObject({ current_phase: 'per_ticket', current_step: 'implement' });
+    } finally {
+      updatedStore.close();
+    }
+
+    const state = JSON.parse(readFileSync(join(tmpDir, '.slope', 'sprint-state.json'), 'utf8'));
+    expect(state.sprint).toBe(66);
+    expect(state.phase).toBe('implementing');
   });
 });
 

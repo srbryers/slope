@@ -6,6 +6,7 @@ import type { HookInput, GuardResult } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { loadPrReviewState } from '../pr-review-state.js';
 import { loadSprintState, mutateSprintState, updateGate, isSprintComplete, pendingGates } from '../sprint-state.js';
+import { reconcileSprintStateForBranch } from '../workflow-resync.js';
 
 /**
  * Sprint-completion guard: enforces post-implementation gates.
@@ -58,6 +59,7 @@ function handlePreToolUse(input: HookInput, cwd: string): GuardResult {
   if (!commandContext) return {};
   const guardCwd = commandContext.cwd;
 
+  const rebind = reconcileSprintStateForBranch(guardCwd);
   const state = loadSprintState(guardCwd);
   if (!state) return {};
   if (state.phase === 'complete') return {}; // Sprint fully complete — skip all checks
@@ -93,6 +95,12 @@ function handlePreToolUse(input: HookInput, cwd: string): GuardResult {
   }
 
   if (staleWarning) lines.push('', staleWarning);
+  if (rebind?.rebound) {
+    lines.push(
+      '',
+      `SLOPE sprint-completion: rebound stale sprint-state from Sprint ${rebind.previousSprint} to Sprint ${rebind.sprint} because ${rebind.reason}.`,
+    );
+  }
   return {
     decision: 'deny',
     blockReason: lines.join('\n'),
