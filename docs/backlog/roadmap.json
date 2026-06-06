@@ -1,6 +1,6 @@
 {
   "name": "SLOPE Development Roadmap",
-  "description": "Forward-looking roadmap from S61+. Phases 1-9 (S1-S47) are complete. S48-S60 were hardening, guard enforcement, and process sprints. This roadmap covers adoption, observability, guard maturity, multi-project, loop evolution, and issue-driven recovery. S61-S64 reflect what actually shipped (themes diverged from original plan). Note: the actual S69 diverged from the planned Referee sprint \u2014 a carryover patch kit ran instead. The Referee work was rescheduled as S78. S75.5 (The Bug Clearing) added 2026-05-02 to clear accumulated CLI bugs from external repos. S132-S136 were backfilled from shipped scorecards on 2026-06-05; S137 adds post-merge retro tooling and durable memory, S137.5 addresses Windows suite portability for #509, and S138-S144 triage open GitHub issues #499/#501/#502/#503/#505/#507/#510/#511 into focused recovery sprints.",
+  "description": "Forward-looking roadmap from S61+. Phases 1-9 (S1-S47) are complete. S48-S60 were hardening, guard enforcement, and process sprints. This roadmap covers adoption, observability, guard maturity, multi-project, loop evolution, and issue-driven recovery. S61-S64 reflect what actually shipped (themes diverged from original plan). Note: the actual S69 diverged from the planned Referee sprint \u2014 a carryover patch kit ran instead. The Referee work was rescheduled as S78. S75.5 (The Bug Clearing) added 2026-05-02 to clear accumulated CLI bugs from external repos. S132-S136 were backfilled from shipped scorecards on 2026-06-05; S137 adds post-merge retro tooling and durable memory, S137.5 addresses Windows suite portability for #509, and S138-S144 triage open GitHub issues #499/#501/#502/#503/#505/#507/#510/#511/#512 into focused recovery sprints.",
   "phases": [
     {
       "name": "Phase 10 \u2014 Adoption & Onboarding",
@@ -305,10 +305,11 @@
         143,
         143.5,
         143.6,
+        143.7,
         144
       ],
       "status": "planned",
-      "note": "Start with a retro command/skill sprint that captures post-PR-merge learning into durable memory, then triage open #499/#501/#502/#503/#505/#507/#510/#511 into focused recovery sprints: destructive-help safety, existing-worktree entry guidance, session-collision recovery, workflow state resync, non-TypeScript map guard safety, portable sprint resume, commit-ready map freshness alignment, decimal sprint status parsing, and a release."
+      "note": "Start with a retro command/skill sprint that captures post-PR-merge learning into durable memory, then triage open #499/#501/#502/#503/#505/#507/#510/#511/#512 into focused recovery sprints: destructive-help safety, existing-worktree entry guidance, session-collision recovery, workflow state resync, non-TypeScript map guard safety, portable sprint resume, commit-ready map freshness alignment, decimal sprint status parsing, Windows-safe map staleness checks, and a release."
     }
   ],
   "sprints": [
@@ -3659,6 +3660,36 @@
       ]
     },
     {
+      "id": 143.7,
+      "theme": "Windows-Safe Map Staleness Checks",
+      "par": 3,
+      "slope": 1,
+      "type": "cli bugfix",
+      "depends_on": [
+        143.6
+      ],
+      "note": "Close #512 by removing Unix-only stderr redirection from the map staleness git path used by `slope map --check` and `slope commit-ready --json`.",
+      "tickets": [
+        {
+          "key": "S143.7-1",
+          "title": "Replace Unix stderr redirection in map staleness git helper (#512)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 512
+        },
+        {
+          "key": "S143.7-2",
+          "title": "Add map --check and commit-ready stderr regressions (#512)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 512,
+          "depends_on": [
+            "S143.7-1"
+          ]
+        }
+      ]
+    },
+    {
       "id": 144,
       "theme": "Guard Recovery and State Portability Release",
       "par": 3,
@@ -3668,9 +3699,10 @@
         142,
         143,
         143.5,
-        143.6
+        143.6,
+        143.7
       ],
-      "note": "Publish the S137-S143.6 plus S137.5 retro, help, guard recovery, map safety, workflow resync, Windows portability, sprint resume, commit-ready map freshness, and decimal sprint status fixes after validation.",
+      "note": "Publish the S137-S143.7 plus S137.5 retro, help, guard recovery, map safety, workflow resync, Windows portability, sprint resume, commit-ready map freshness, decimal sprint status, and map stderr fixes after validation.",
       "tickets": [
         {
           "key": "S144-1",
