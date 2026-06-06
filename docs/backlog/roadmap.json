@@ -3635,10 +3635,13 @@
       "par": 3,
       "slope": 1,
       "type": "cli bugfix",
+      "status": "complete",
+      "score": 3,
+      "score_label": "par",
       "depends_on": [
         143.5
       ],
-      "note": "Close #511 by preserving decimal sprint ids in `slope status --sprint=N` instead of truncating with parseInt.",
+      "note": "Close #511 by preserving decimal sprint ids in `slope status --sprint=N` instead of truncating with parseInt; #512 discovered during smoke validation is triaged into S143.7.",
       "tickets": [
         {
           "key": "S143.6-1",
