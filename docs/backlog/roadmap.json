@@ -1,6 +1,6 @@
 {
   "name": "SLOPE Development Roadmap",
-  "description": "Forward-looking roadmap from S61+. Phases 1-9 (S1-S47) are complete. S48-S60 were hardening, guard enforcement, and process sprints. This roadmap covers adoption, observability, guard maturity, multi-project, loop evolution, and issue-driven recovery. S61-S64 reflect what actually shipped (themes diverged from original plan). Note: the actual S69 diverged from the planned Referee sprint \u2014 a carryover patch kit ran instead. The Referee work was rescheduled as S78. S75.5 (The Bug Clearing) added 2026-05-02 to clear accumulated CLI bugs from external repos. S132-S136 were backfilled from shipped scorecards on 2026-06-05; S137 adds post-merge retro tooling and durable memory, S137.5 addresses Windows suite portability for #509, and S138-S144 triage open GitHub issues #499/#501/#502/#503/#505/#507/#510/#511/#512 into focused recovery sprints.",
+  "description": "Forward-looking roadmap from S61+. Phases 1-9 (S1-S47) are complete. S48-S60 were hardening, guard enforcement, and process sprints. This roadmap covers adoption, observability, guard maturity, multi-project, loop evolution, and issue-driven recovery. S61-S64 reflect what actually shipped (themes diverged from original plan). Note: the actual S69 diverged from the planned Referee sprint \u2014 a carryover patch kit ran instead. The Referee work was rescheduled as S78. S75.5 (The Bug Clearing) added 2026-05-02 to clear accumulated CLI bugs from external repos. S132-S136 were backfilled from shipped scorecards on 2026-06-05; S137 adds post-merge retro tooling and durable memory, S137.5 addresses Windows suite portability for #509, and S138-S144 triage open GitHub issues #499/#501/#502/#503/#505/#507/#510/#511/#512/#513/#514 into focused recovery sprints.",
   "phases": [
     {
       "name": "Phase 10 \u2014 Adoption & Onboarding",
@@ -306,10 +306,12 @@
         143.5,
         143.6,
         143.7,
+        143.8,
+        143.9,
         144
       ],
       "status": "planned",
-      "note": "Start with a retro command/skill sprint that captures post-PR-merge learning into durable memory, then triage open #499/#501/#502/#503/#505/#507/#510/#511/#512 into focused recovery sprints: destructive-help safety, existing-worktree entry guidance, session-collision recovery, workflow state resync, non-TypeScript map guard safety, portable sprint resume, commit-ready map freshness alignment, decimal sprint status parsing, Windows-safe map staleness checks, and a release."
+      "note": "Start with a retro command/skill sprint that captures post-PR-merge learning into durable memory, then triage open #499/#501/#502/#503/#505/#507/#510/#511/#512/#513/#514 into focused recovery sprints: destructive-help safety, existing-worktree entry guidance, session-collision recovery, workflow state resync, non-TypeScript map guard safety, portable sprint resume, commit-ready map freshness alignment, decimal sprint status parsing, Windows-safe map staleness checks, decimal sprint currency formatting, Node exec redirection audit, and a release."
     }
   ],
   "sprints": [
@@ -3693,6 +3695,76 @@
       ]
     },
     {
+      "id": 143.8,
+      "theme": "Decimal Sprint Currency Formatting",
+      "par": 3,
+      "slope": 1,
+      "type": "cli polish",
+      "depends_on": [
+        143.7
+      ],
+      "note": "Close #513 by formatting decimal sprint currency deltas without floating-point artifacts in `slope map --check`.",
+      "tickets": [
+        {
+          "key": "S143.8-1",
+          "title": "Format decimal sprint currency deltas without floating-point noise (#513)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 513
+        },
+        {
+          "key": "S143.8-2",
+          "title": "Add decimal sprint currency map-check regression (#513)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 513,
+          "depends_on": [
+            "S143.8-1"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 143.9,
+      "theme": "Node Exec Redirection Portability Audit",
+      "par": 4,
+      "slope": 2,
+      "type": "windows portability",
+      "depends_on": [
+        143.8
+      ],
+      "note": "Close #514 by auditing Node-executed command strings for Unix-only stderr redirection and replacing them with portable child-process handling.",
+      "tickets": [
+        {
+          "key": "S143.9-1",
+          "title": "Audit Node execSync callers that embed Unix stderr redirection (#514)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 514
+        },
+        {
+          "key": "S143.9-2",
+          "title": "Replace Windows-unsafe Node command redirection with portable helpers (#514)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 514,
+          "depends_on": [
+            "S143.9-1"
+          ]
+        },
+        {
+          "key": "S143.9-3",
+          "title": "Add regression coverage for a formerly noisy guard or command path (#514)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 514,
+          "depends_on": [
+            "S143.9-2"
+          ]
+        }
+      ]
+    },
+    {
       "id": 144,
       "theme": "Guard Recovery and State Portability Release",
       "par": 3,
@@ -3703,9 +3775,11 @@
         143,
         143.5,
         143.6,
-        143.7
+        143.7,
+        143.8,
+        143.9
       ],
-      "note": "Publish the S137-S143.7 plus S137.5 retro, help, guard recovery, map safety, workflow resync, Windows portability, sprint resume, commit-ready map freshness, decimal sprint status, and map stderr fixes after validation.",
+      "note": "Publish the S137-S143.9 plus S137.5 retro, help, guard recovery, map safety, workflow resync, Windows portability, sprint resume, commit-ready map freshness, decimal sprint status, map stderr, decimal currency, and Node exec redirection fixes after validation.",
       "tickets": [
         {
           "key": "S144-1",
