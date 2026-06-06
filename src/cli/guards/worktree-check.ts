@@ -45,6 +45,7 @@ export function resetWorktreeCheckState(sessionId = ''): void {
  */
 export async function worktreeCheckGuard(input: HookInput, cwd: string): Promise<GuardResult> {
   if (isWorktreeRecoveryInput(input)) return {};
+  if (isRemoteOrReadOnlyCommandInput(input)) return {};
 
   // Use a stable ID; hook payloads can omit session_id, and a fresh random
   // value on every invocation makes one session look like many sessions.
@@ -117,7 +118,9 @@ export async function worktreeCheckGuard(input: HookInput, cwd: string): Promise
     // Swarm members are excluded — they coordinate via claims, not worktrees.
     if (!active) active = await store.getActiveSessions();
     const others = active.filter(s => s.session_id !== sessionId);
+    const now = Date.now();
     const conflicting = others.filter(s =>
+      !isStaleSession(s, now) &&
       !s.worktree_path &&
       !(currentSwarmId && s.swarm_id === currentSwarmId),
     );
@@ -130,7 +133,7 @@ export async function worktreeCheckGuard(input: HookInput, cwd: string): Promise
       // Do NOT write sentinel — denied sessions should re-check next invocation
       return {
         decision: 'deny',
-        blockReason: `BLOCKED: Another session is active in this directory:\n${sessionList}${existingWorktreeGuidance}\n\nCreate an isolated working copy before proceeding:\n  slope worktree start --branch=<branch> --role=secondary --ide=<ide>\n\nSLOPE worktrees default to .slope/worktrees/<branch>, outside Claude Code's protected .claude/ tree. Avoid Claude Code's native .claude/worktrees/ default because ordinary source edits there can trigger self-configuration permission prompts. If the listed session is stale, run \`slope session list\` and then \`slope session end --session-id=<id>\`. Do not attempt implementation work until you are in a worktree.`,
+        blockReason: `BLOCKED: Another session is active in this directory:\n${sessionList}${existingWorktreeGuidance}\n\nCreate an isolated working copy before proceeding:\n  slope worktree start --branch=<branch> --role=secondary --ide=<ide>\n\nSLOPE worktrees default to .slope/worktrees/<branch>, outside Claude Code's protected .claude/ tree. Avoid Claude Code's native .claude/worktrees/ default because ordinary source edits there can trigger self-configuration permission prompts. If the listed session is stale, run \`slope session list\`, then \`slope session prune\` or \`slope session end --session-id=<id>\`. Do not attempt implementation work until you are in a worktree.`,
       };
     }
 
@@ -155,6 +158,46 @@ function isWorktreeRecoveryInput(input: HookInput): boolean {
 
   const words = tokenizeShellWords(segments[0]);
   return isGitWorktreeAdd(words) || isSlopeRecoveryCommand(words);
+}
+
+function isRemoteOrReadOnlyCommandInput(input: HookInput): boolean {
+  if (input.tool_name !== 'Bash') return false;
+
+  const command = extractCommandText(input);
+  const segments = splitShellSegments(command);
+  if (segments.length !== 1) return false;
+
+  const words = tokenizeShellWords(segments[0]);
+  const start = skipCommandPrefix(words, 0);
+  if (words[start] === 'gh') return isAllowedGhCommand(words.slice(start + 1));
+  if (words[start] === 'git') return isAllowedGitCommand(words.slice(start + 1));
+  return false;
+}
+
+function isAllowedGhCommand(args: string[]): boolean {
+  if (args[0] === 'pr') {
+    return ['view', 'checks', 'status', 'list', 'merge'].includes(args[1] ?? '');
+  }
+  return false;
+}
+
+function isAllowedGitCommand(args: string[]): boolean {
+  const sub = args[0];
+  if (['status', 'log', 'diff', 'show', 'rev-parse', 'fetch', 'ls-remote', 'remote'].includes(sub ?? '')) {
+    return true;
+  }
+  if (sub === 'branch') {
+    return args.length === 1
+      || args.includes('--show-current')
+      || args.includes('-vv')
+      || args.includes('-v');
+  }
+  return false;
+}
+
+function isStaleSession(session: SlopeSession, now: number): boolean {
+  const heartbeat = Date.parse(session.last_heartbeat_at);
+  return Number.isFinite(heartbeat) && now - heartbeat > STALE_SESSION_THRESHOLD_MS;
 }
 
 function isGitWorktreeAdd(words: string[]): boolean {

@@ -127,6 +127,7 @@ describe('worktreeCheckGuard', () => {
     expect(result.blockReason).toContain('slope worktree start');
     expect(result.blockReason).toContain('.slope/worktrees/<branch>');
     expect(result.blockReason).toContain("Avoid Claude Code's native .claude/worktrees/");
+    expect(result.blockReason).toContain('slope session prune');
   });
 
   it('allows EnterWorktree recovery even when another session exists', async () => {
@@ -206,6 +207,28 @@ describe('worktreeCheckGuard', () => {
     expect(mockResolveStore).not.toHaveBeenCalled();
   });
 
+  it('allows remote-only gh pr merge during a collision (#502)', async () => {
+    const result = await worktreeCheckGuard({
+      ...makeInput(),
+      tool_name: 'Bash',
+      tool_input: { command: 'gh pr merge 508 --squash' },
+    }, '/tmp/test');
+
+    expect(result).toEqual({});
+    expect(mockResolveStore).not.toHaveBeenCalled();
+  });
+
+  it('allows read-only git commands during a collision (#502)', async () => {
+    const result = await worktreeCheckGuard({
+      ...makeInput(),
+      tool_name: 'Bash',
+      tool_input: { command: 'git status --short' },
+    }, '/tmp/test');
+
+    expect(result).toEqual({});
+    expect(mockResolveStore).not.toHaveBeenCalled();
+  });
+
   it('does not allow slope recovery commands embedded in unrelated shell text', async () => {
     mockGitMainRepo();
     (mockStore.getActiveSessions as ReturnType<typeof vi.fn>).mockResolvedValue([
@@ -217,6 +240,23 @@ describe('worktreeCheckGuard', () => {
       ...makeInput(),
       tool_name: 'Bash',
       tool_input: { command: 'gh issue create --body "try slope worktree start --branch=fix/deadlock"' },
+    }, '/tmp/test');
+
+    expect(result.decision).toBe('deny');
+    expect(mockResolveStore).toHaveBeenCalled();
+  });
+
+  it('still blocks working-tree-mutating git commands during a collision (#502)', async () => {
+    mockGitMainRepo();
+    (mockStore.getActiveSessions as ReturnType<typeof vi.fn>).mockResolvedValue([
+      makeSession({ session_id: 'test-session' }),
+      makeSession({ session_id: 'other-session' }),
+    ]);
+
+    const result = await worktreeCheckGuard({
+      ...makeInput(),
+      tool_name: 'Bash',
+      tool_input: { command: 'git checkout -b feature' },
     }, '/tmp/test');
 
     expect(result.decision).toBe('deny');
@@ -386,6 +426,26 @@ describe('worktreeCheckGuard', () => {
 
     await worktreeCheckGuard(makeInput(), '/tmp/test');
     expect(mockStore.cleanStaleSessions).toHaveBeenCalledWith(STALE_SESSION_THRESHOLD_MS);
+  });
+
+  it('ignores stale never-heartbeated sessions returned by the store (#502)', async () => {
+    mockExecFileSync
+      .mockReturnValueOnce('.git' as never)
+      .mockReturnValueOnce('main' as never);
+
+    const staleAt = new Date(Date.now() - STALE_SESSION_THRESHOLD_MS - 1000).toISOString();
+    (mockStore.getActiveSessions as ReturnType<typeof vi.fn>).mockResolvedValue([
+      makeSession({ session_id: 'test-session' }),
+      makeSession({
+        session_id: 'stale-session',
+        started_at: staleAt,
+        last_heartbeat_at: staleAt,
+      }),
+    ]);
+
+    const result = await worktreeCheckGuard(makeInput(), '/tmp/test');
+
+    expect(result).toEqual({});
   });
 
   it('handles SESSION_CONFLICT on register (session already exists)', async () => {
