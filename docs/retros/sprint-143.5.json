@@ -1,0 +1,121 @@
+{
+  "sprint_number": 143.5,
+  "player": "codex",
+  "theme": "Commit-Ready Map Freshness Alignment",
+  "par": 3,
+  "slope": 2,
+  "score": 3,
+  "score_label": "par",
+  "date": "2026-06-06",
+  "type": "guard hardening",
+  "skills_used": [
+    "slope-sprint-workflow"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow"
+  ],
+  "shots": [
+    {
+      "ticket_key": "S143.5-1",
+      "title": "Align commit-ready CODEBASE freshness with map --check semantics (#510)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "`slope commit-ready` now reuses `runStalenessCheck` from the map command and only warns when map-check semantics mark the map stale."
+    },
+    {
+      "ticket_key": "S143.5-2",
+      "title": "Add historically tracked ignored CODEBASE regression for commit-ready (#510)",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "The first full-suite run timed out the new regression because it created 35 commits under suite contention. The test was tightened to use the old env threshold path and only three commits."
+        }
+      ],
+      "notes": "Added regression coverage for a CODEBASE.md that was historically tracked, later ignored/untracked, and locally regenerated with current frontmatter."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 2,
+    "fairways_total": 2,
+    "greens_in_regulation": 2,
+    "greens_total": 2,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 1,
+    "hazard_penalties": 0.5,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "wind",
+      "impact": "minor",
+      "description": "The Windows full suite continues to emit known temp-repo stderr, CRLF, and path warnings, but all tests passed after the focused regression was tightened."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Guard-adjacent commands should share the same freshness model as the command they recommend.",
+      "outcome": "`commit-ready` now uses map-check semantics instead of old git last-touch history, so `slope map` can actually clear the warning it recommends."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "`corepack pnpm vitest run tests/cli/commands/commit-ready.test.ts tests/cli/commands/map.test.ts` passed: 17 tests.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`corepack pnpm typecheck` and `corepack pnpm test` passed on Windows: 229 test files passed, 1 skipped; 3623 tests passed, 25 skipped.",
+      "status": "healthy"
+    },
+    {
+      "category": "docs",
+      "description": "`slope roadmap validate` passed with existing historical roadmap warnings.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`node dist/cli/index.js commit-ready` and `node dist/cli/index.js map --check` agree that CODEBASE.md is current.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Small but important. The defect was exactly the kind of recovery-command mismatch this phase is supposed to flush out.",
+    "advice_for_next_player": "When two commands describe the same state, prefer one shared computation over parallel heuristics.",
+    "what_surprised_you": "A test that passed focused could still time out in the full suite because it made too many real git commits.",
+    "excited_about_next": "The release sprint can now proceed with the map freshness warning cleared in branch-built CLI output."
+  },
+  "bunker_locations": [
+    "Historically tracked but currently ignored files can still have git log history; do not treat that history as current-file freshness.",
+    "Full-suite contention can expose fixture cost hidden by focused test runs.",
+    "`slope status --sprint=143.5` currently displays S143 claims, suggesting decimal sprint parsing in the course-status command needs follow-up."
+  ],
+  "yardage_book_updates": [
+    "`src/cli/commands/commit-ready.ts` now uses `runStalenessCheck` for CODEBASE.md freshness.",
+    "Commit-ready warns only when map-check semantics return a stale result; warn-only map-check output remains commit-ready OK.",
+    "`tests/cli/commands/commit-ready.test.ts` covers historically tracked, ignored, regenerated CODEBASE.md maps."
+  ],
+  "course_management_notes": [
+    "Implementation commit: 1d4b6f7.",
+    "Regression-speed commit: b2f2db9.",
+    "Validation passed: focused S143.5 tests, `corepack pnpm typecheck`, `corepack pnpm test`, `slope roadmap validate`, and branch-built `commit-ready`/`map --check` smoke checks.",
+    "Issue #510 should close when the PR containing S143.5 merges."
+  ],
+  "slope_factors": [
+    "commit_ready",
+    "map_freshness",
+    "ignored_artifacts"
+  ]
+}

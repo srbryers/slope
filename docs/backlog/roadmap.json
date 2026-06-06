@@ -3602,6 +3602,7 @@
       "par": 3,
       "slope": 2,
       "type": "guard hardening",
+      "status": "complete",
       "depends_on": [
         143
       ],
