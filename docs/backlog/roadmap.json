@@ -3670,10 +3670,13 @@
       "par": 3,
       "slope": 1,
       "type": "cli bugfix",
+      "status": "complete",
+      "score": 3,
+      "score_label": "par",
       "depends_on": [
         143.6
       ],
-      "note": "Close #512 by removing Unix-only stderr redirection from the map staleness git path used by `slope map --check` and `slope commit-ready --json`.",
+      "note": "Close #512 by removing Unix-only stderr redirection from the map staleness git path used by `slope map --check` and `slope commit-ready --json`; #513/#514 discovered during validation are triaged into S143.8/S143.9.",
       "tickets": [
         {
           "key": "S143.7-1",

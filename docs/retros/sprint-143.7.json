@@ -1,0 +1,120 @@
+{
+  "sprint_number": 143.7,
+  "player": "codex",
+  "theme": "Windows-Safe Map Staleness Checks",
+  "par": 3,
+  "slope": 1,
+  "score": 3,
+  "score_label": "par",
+  "date": "2026-06-06",
+  "type": "cli bugfix",
+  "skills_used": [
+    "slope-sprint-workflow",
+    "slope-api-reference"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow"
+  ],
+  "shots": [
+    {
+      "ticket_key": "S143.7-1",
+      "title": "Replace Unix stderr redirection in map staleness git helper (#512)",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [],
+      "notes": "The map command's git helper now suppresses stderr through child-process stdio options and no longer shells through `2>/dev/null` for staleness distance."
+    },
+    {
+      "ticket_key": "S143.7-2",
+      "title": "Add map --check and commit-ready stderr regressions (#512)",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [],
+      "notes": "Added a spawned CLI regression proving `map --check` and `commit-ready --json` do not leak the Windows path message from the map staleness path."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 2,
+    "fairways_total": 2,
+    "greens_in_regulation": 2,
+    "greens_total": 2,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "wind",
+      "impact": "minor",
+      "description": "Full Windows validation passed, but broader test output still contains path noise from other Node exec redirections; raised as #514 and triaged into S143.9."
+    },
+    {
+      "type": "wind",
+      "impact": "minor",
+      "description": "`slope map --check` exposed decimal sprint delta floating-point noise (`+0.5999999999999943`); raised as #513 and triaged into S143.8."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Node-executed commands should suppress stderr via child-process options, not shell redirection.",
+      "outcome": "The map staleness path is now portable on Windows while preserving the ancestry-path git distance behavior."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "`corepack pnpm vitest run tests/cli/commands/map.test.ts tests/cli/commands/commit-ready.test.ts` passed: 18 tests.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`corepack pnpm typecheck`, `corepack pnpm prepare`, and `corepack pnpm test` passed on Windows: 229 test files passed, 1 skipped; 3626 tests passed, 25 skipped.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "Branch-built `node dist/cli/index.js map --check` and `commit-ready --json` produced empty stderr for the #512 path.",
+      "status": "healthy"
+    },
+    {
+      "category": "docs",
+      "description": "`slope roadmap validate` passed with existing historical roadmap warnings after S143.8/S143.9 triage.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "A good cleanup shot. The exact stderr leak is gone, and the regression now watches both commands that exposed it.",
+    "advice_for_next_player": "Treat Unix shell redirects inside Node command strings as a portability smell unless the command is only emitted into a POSIX script.",
+    "what_surprised_you": "Fixing the map path made the broader redirection pattern easier to see across the suite.",
+    "excited_about_next": "S143.8 can smooth the decimal sprint output, and S143.9 can quiet the broader Windows exec family before release."
+  },
+  "bunker_locations": [
+    "Unix shell redirection like `2>/dev/null` leaks Windows stderr when executed through Node on Windows.",
+    "Decimal sprint subtraction can print raw floating-point artifacts if not formatted."
+  ],
+  "yardage_book_updates": [
+    "`src/cli/commands/map.ts` now suppresses stderr in its local exec helper via `stdio: ['ignore', 'pipe', 'ignore']`.",
+    "`gitDistanceSinceMapSha` no longer appends `2>/dev/null`.",
+    "`tests/cli/commands/map.test.ts` covers stderr cleanliness for `map --check` and `commit-ready --json`."
+  ],
+  "course_management_notes": [
+    "Implementation commit: 657da0c.",
+    "Follow-up triage commit for #513/#514: 085d104.",
+    "Issue #512 should close when the PR containing S143.7 merges.",
+    "Issues #513 and #514 are triaged into S143.8 and S143.9 before the release sprint."
+  ],
+  "slope_factors": [
+    "windows_stderr",
+    "map_staleness",
+    "commit_ready"
+  ]
+}
