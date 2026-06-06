@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { execSync } from 'node:child_process';
-import { loadConfig, loadScorecards, detectLatestSprint, GUARD_DEFINITIONS, loadFlows, checkFlowStaleness } from '../../core/index.js';
+import { loadConfig, loadScorecards, detectLatestSprint, formatSprintNumber, GUARD_DEFINITIONS, loadFlows, checkFlowStaleness, parseSprintNumber } from '../../core/index.js';
 import type { SlopeConfig } from '../../core/index.js';
 import { CLI_COMMAND_REGISTRY } from '../registry.js';
 import { SLOPE_REGISTRY } from '../../mcp/registry.js';
@@ -757,15 +757,18 @@ export function runStalenessCheck(cwd: string, config: SlopeConfig, mapContent: 
   }
 
   // 3. Sprint currency
-  const mapSprint = parseInt(meta.sprint || '0', 10);
+  const mapSprint = parseSprintNumber(meta.sprint || '0') ?? 0;
   const currentSprint = detectLatestSprint(config, cwd);
   const sprintDelta = currentSprint - mapSprint;
+  const currentSprintLabel = formatSprintNumber(currentSprint);
+  const mapSprintLabel = formatSprintNumber(mapSprint);
+  const sprintDeltaLabel = formatSprintNumber(Number(sprintDelta.toFixed(6)));
   if (sprintDelta > 3) {
-    results.push({ label: 'Sprint currency', status: 'stale', message: `Sprint ${currentSprint} (map says ${mapSprint}, +${sprintDelta} behind)` });
+    results.push({ label: 'Sprint currency', status: 'stale', message: `Sprint ${currentSprintLabel} (map says ${mapSprintLabel}, +${sprintDeltaLabel} behind)` });
   } else if (sprintDelta > 0) {
-    results.push({ label: 'Sprint currency', status: 'warn', message: `Sprint ${currentSprint} (map says ${mapSprint}, +${sprintDelta})` });
+    results.push({ label: 'Sprint currency', status: 'warn', message: `Sprint ${currentSprintLabel} (map says ${mapSprintLabel}, +${sprintDeltaLabel})` });
   } else {
-    results.push({ label: 'Sprint currency', status: 'ok', message: `Sprint ${currentSprint} — current` });
+    results.push({ label: 'Sprint currency', status: 'ok', message: `Sprint ${currentSprintLabel} — current` });
   }
 
   // 4. Dead file references

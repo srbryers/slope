@@ -236,6 +236,38 @@ describe('slope map in a non-SLOPE repo (#351)', () => {
     }
   });
 
+  it('formats decimal sprint currency deltas without floating-point noise (#513)', () => {
+    const cwd = setupNonSlopeRepo({ name: 'decimal-sprint-tool' });
+    try {
+      const head = execSync('git rev-parse HEAD', { cwd, encoding: 'utf8' }).trim();
+      writeFileSync(join(cwd, 'CODEBASE.md'), [
+        '---',
+        `generated_at: "${new Date().toISOString()}"`,
+        `git_sha: "${head}"`,
+        'sprint: 143',
+        'source_files: 0',
+        'test_files: 0',
+        'flows: 0',
+        '---',
+        '# Current map',
+        '',
+      ].join('\n'));
+      writeFileSync(join(cwd, 'docs', 'retros', 'sprint-143.6.json'), JSON.stringify({
+        sprint_number: 143.6,
+        par: 3,
+        score: 3,
+        shots: [],
+      }));
+
+      const output = runSlopeMap(cwd, ['--check'], { encoding: 'utf8' }) as string;
+
+      expect(output).toContain('Sprint currency: Sprint 143.6 (map says 143, +0.6)');
+      expect(output).not.toContain('0.599999');
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
   it('uses directory basename when package.json is missing entirely', () => {
     const cwd = mkdtempSync(join(tmpdir(), 'slope-map-bare-'));
     try {
