@@ -1,6 +1,7 @@
 import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { QUIET_STDIO } from '../../core/process.js';
 import type { HookInput, GuardResult } from '../../core/index.js';
 
 /**
@@ -29,10 +30,11 @@ export async function versionCheckGuard(input: HookInput, cwd: string): Promise<
   // Get published version from npm
   let publishedVersion: string;
   try {
-    publishedVersion = execSync('npm view @slope-dev/slope version 2>/dev/null', {
+    publishedVersion = execSync('npm view @slope-dev/slope version', {
       cwd,
       encoding: 'utf8',
       timeout: 10000,
+      stdio: QUIET_STDIO,
     }).trim();
   } catch {
     // Package not published yet or npm unreachable — allow

@@ -1,4 +1,5 @@
 import { execSync } from 'node:child_process';
+import { QUIET_STDIO } from '../../core/process.js';
 import type { HookInput, GuardResult } from '../../core/index.js';
 
 /**
@@ -17,8 +18,8 @@ export async function worktreeMergeGuard(input: HookInput, cwd: string): Promise
 
   // Check if we're in a worktree (not the main working tree)
   try {
-    const listOutput = execSync('git rev-parse --git-common-dir 2>/dev/null', { cwd, encoding: 'utf8' }).trim();
-    const gitDir = execSync('git rev-parse --git-dir 2>/dev/null', { cwd, encoding: 'utf8' }).trim();
+    const listOutput = execSync('git rev-parse --git-common-dir', { cwd, encoding: 'utf8', stdio: QUIET_STDIO }).trim();
+    const gitDir = execSync('git rev-parse --git-dir', { cwd, encoding: 'utf8', stdio: QUIET_STDIO }).trim();
     // In the main working tree, git-dir === git-common-dir (both are .git)
     // In a worktree, git-dir is .git/worktrees/<name> while common-dir is .git
     if (gitDir === listOutput || gitDir === '.git') return {};

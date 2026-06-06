@@ -2,6 +2,7 @@ import { execSync } from 'node:child_process';
 import { writeFileSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { buildScorecard, buildAgentBreakdowns, computeSlope, parseTestOutput, classifyShotFromSignals, buildGhCommand, parsePRJson, mergePRChecksWithCI, parseRoadmap, formatSprintNumber, parseSprintNumber } from '../../core/index.js';
+import { QUIET_STDIO } from '../../core/process.js';
 import type { ShotRecord, CISignal, PRSignal, ShotResult, AgentBreakdown, RoadmapDefinition } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { resolveStore } from '../store.js';
@@ -420,8 +421,15 @@ async function buildSwarmAgents(
 
       for (const [branch, agent] of branchToSession) {
         // Check if this commit is reachable from this branch
-        const isAncestor = git(`merge-base --is-ancestor ${commit.hash} ${branch} 2>/dev/null && echo yes || echo no`);
-        if (isAncestor === 'yes') {
+        const isAncestor = (() => {
+          try {
+            execSync(`git merge-base --is-ancestor ${commit.hash} ${branch}`, { encoding: 'utf8', stdio: QUIET_STDIO });
+            return true;
+          } catch {
+            return false;
+          }
+        })();
+        if (isAncestor) {
           const key = agent.session_id;
           if (!agentShots.has(key)) {
             agentShots.set(key, { ...agent, shots: [] });

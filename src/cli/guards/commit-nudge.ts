@@ -1,4 +1,5 @@
 import { execSync } from 'node:child_process';
+import { QUIET_STDIO } from '../../core/process.js';
 import type { HookInput, GuardResult } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { headIsOnMain } from './git-utils.js';
@@ -17,17 +18,17 @@ export async function commitNudgeGuard(input: HookInput, cwd: string): Promise<G
 
   // Check time since last commit
   try {
-    const lastCommitTime = execSync('git log -1 --format=%ct 2>/dev/null', { cwd, encoding: 'utf8' }).trim();
+    const lastCommitTime = execSync('git log -1 --format=%ct', { cwd, encoding: 'utf8', stdio: QUIET_STDIO }).trim();
     if (lastCommitTime) {
       const minutesSinceCommit = (Date.now() / 1000 - parseInt(lastCommitTime, 10)) / 60;
 
       // Check for uncommitted changes (excluding gitignored files)
-      const status = execSync('git status --porcelain 2>/dev/null', { cwd, encoding: 'utf8' }).trim();
+      const status = execSync('git status --porcelain', { cwd, encoding: 'utf8', stdio: QUIET_STDIO }).trim();
       let hasChanges = status.length > 0;
       if (hasChanges) {
         const paths = status.split('\n').filter(Boolean).map(l => l.slice(3));
         try {
-          const ignored = execSync(`git check-ignore ${paths.map(p => `'${p}'`).join(' ')} 2>/dev/null`, { cwd, encoding: 'utf8' }).trim();
+          const ignored = execSync(`git check-ignore ${paths.map(p => `'${p}'`).join(' ')}`, { cwd, encoding: 'utf8', stdio: QUIET_STDIO }).trim();
           const ignoredSet = new Set(ignored.split('\n').filter(Boolean));
           hasChanges = paths.some(p => !ignoredSet.has(p));
         } catch { /* check-ignore exits 1 when no files are ignored — all files are real changes */ }
@@ -42,12 +43,12 @@ export async function commitNudgeGuard(input: HookInput, cwd: string): Promise<G
   // Check time since last push (skip if HEAD is at origin/main — tracking branch may be stale)
   if (!headIsOnMain(cwd)) {
     try {
-      const unpushed = execSync('git log @{u}..HEAD --oneline 2>/dev/null', { cwd, encoding: 'utf8' }).trim();
+      const unpushed = execSync('git log @{u}..HEAD --oneline', { cwd, encoding: 'utf8', stdio: QUIET_STDIO }).trim();
       if (unpushed) {
         const lines = unpushed.split('\n').filter(Boolean);
         if (lines.length > 0) {
           // Get age of oldest unpushed commit
-          const oldestUnpushedTime = execSync('git log @{u}..HEAD --format=%ct --reverse 2>/dev/null', { cwd, encoding: 'utf8' }).trim().split('\n')[0];
+          const oldestUnpushedTime = execSync('git log @{u}..HEAD --format=%ct --reverse', { cwd, encoding: 'utf8', stdio: QUIET_STDIO }).trim().split('\n')[0];
           if (oldestUnpushedTime) {
             const minutesSincePush = (Date.now() / 1000 - parseInt(oldestUnpushedTime, 10)) / 60;
             if (minutesSincePush >= pushInterval) {

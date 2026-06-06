@@ -1,4 +1,5 @@
 import { execSync } from 'node:child_process';
+import { QUIET_STDIO } from '../../core/process.js';
 import type { HookInput, GuardResult } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { headIsOnMain } from './git-utils.js';
@@ -26,7 +27,7 @@ export async function pushNudgeGuard(input: HookInput, cwd: string): Promise<Gua
 
   // Check if on main/master — always nudge (should push or switch branch)
   try {
-    const branch = execSync('git rev-parse --abbrev-ref HEAD 2>/dev/null', { cwd, encoding: 'utf8' }).trim();
+    const branch = execSync('git rev-parse --abbrev-ref HEAD', { cwd, encoding: 'utf8', stdio: QUIET_STDIO }).trim();
     if (branch === 'main' || branch === 'master') {
       nudges.push(`Committing directly on ${branch} — consider pushing or switching to a feature branch.`);
     }
@@ -35,7 +36,7 @@ export async function pushNudgeGuard(input: HookInput, cwd: string): Promise<Gua
   // Check unpushed commit count (skip if HEAD is at origin/main — tracking branch may be stale)
   if (!headIsOnMain(cwd)) {
     try {
-      const unpushed = execSync('git log @{u}..HEAD --oneline 2>/dev/null', { cwd, encoding: 'utf8' }).trim();
+      const unpushed = execSync('git log @{u}..HEAD --oneline', { cwd, encoding: 'utf8', stdio: QUIET_STDIO }).trim();
       if (unpushed) {
         const count = unpushed.split('\n').filter(Boolean).length;
         if (count >= pushCommitThreshold) {
@@ -46,7 +47,7 @@ export async function pushNudgeGuard(input: HookInput, cwd: string): Promise<Gua
 
     // Check time since oldest unpushed commit
     try {
-      const oldest = execSync('git log @{u}..HEAD --format=%ct --reverse 2>/dev/null', { cwd, encoding: 'utf8' }).trim().split('\n')[0];
+      const oldest = execSync('git log @{u}..HEAD --format=%ct --reverse', { cwd, encoding: 'utf8', stdio: QUIET_STDIO }).trim().split('\n')[0];
       if (oldest) {
         const minutesSince = (Date.now() / 1000 - parseInt(oldest, 10)) / 60;
         if (minutesSince >= pushInterval) {

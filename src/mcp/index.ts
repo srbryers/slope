@@ -25,6 +25,7 @@ import { execSync } from 'node:child_process';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
+import { IGNORE_STDIO, QUIET_STDIO } from '../core/process.js';
 import { SLOPE_REGISTRY, SLOPE_TYPES } from './registry.js';
 import type { FunctionRegistryEntry } from './registry.js';
 import { runInSandbox } from './sandbox.js';
@@ -449,10 +450,10 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
               try {
                 // Check if branch is merged and no active session references it
                 const wtPath = join(worktreeDir, entry);
-                execSync(`git worktree remove ${JSON.stringify(wtPath)} --force 2>/dev/null`, { cwd: projectRoot, timeout: 10000 });
+                execSync(`git worktree remove ${JSON.stringify(wtPath)} --force`, { cwd: projectRoot, timeout: 10000, stdio: IGNORE_STDIO });
               } catch { /* best-effort cleanup */ }
             }
-            execSync('git worktree prune 2>/dev/null', { cwd: projectRoot, timeout: 5000 });
+            execSync('git worktree prune', { cwd: projectRoot, timeout: 5000, stdio: IGNORE_STDIO });
           }
         } catch { /* best-effort cleanup */ }
 
@@ -468,10 +469,10 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
           // Get the default branch (main or master)
           let baseBranch = 'main';
           try {
-            baseBranch = execSync('git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null', { cwd: projectRoot, encoding: 'utf8', timeout: 5000 }).trim().replace('refs/remotes/origin/', '');
+            baseBranch = execSync('git symbolic-ref refs/remotes/origin/HEAD', { cwd: projectRoot, encoding: 'utf8', timeout: 5000, stdio: QUIET_STDIO }).trim().replace('refs/remotes/origin/', '');
           } catch {
             try {
-              execSync('git rev-parse --verify origin/main 2>/dev/null', { cwd: projectRoot, timeout: 5000 });
+              execSync('git rev-parse --verify origin/main', { cwd: projectRoot, timeout: 5000, stdio: IGNORE_STDIO });
             } catch {
               baseBranch = 'master';
             }
@@ -499,7 +500,7 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
         // Detect current branch for session record
         let currentBranch: string | undefined;
         try {
-          currentBranch = execSync('git rev-parse --abbrev-ref HEAD 2>/dev/null', { cwd: projectRoot, encoding: 'utf8', timeout: 5000 }).trim();
+          currentBranch = execSync('git rev-parse --abbrev-ref HEAD', { cwd: projectRoot, encoding: 'utf8', timeout: 5000, stdio: QUIET_STDIO }).trim();
         } catch { /* not in git repo */ }
 
         // Create session in store
@@ -685,11 +686,11 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
         let cleanupStatus = 'skipped';
         if (!skip_cleanup && result.worktree_path) {
           try {
-            execSync(`git worktree remove ${JSON.stringify(result.worktree_path)} --force 2>/dev/null`, { cwd: projectRoot, timeout: 15000 });
+            execSync(`git worktree remove ${JSON.stringify(result.worktree_path)} --force`, { cwd: projectRoot, timeout: 15000, stdio: IGNORE_STDIO });
             if (result.branch_name) {
-              execSync(`git branch -d ${JSON.stringify(result.branch_name)} 2>/dev/null`, { cwd: projectRoot, timeout: 5000 });
+              execSync(`git branch -d ${JSON.stringify(result.branch_name)}`, { cwd: projectRoot, timeout: 5000, stdio: IGNORE_STDIO });
             }
-            execSync('git worktree prune 2>/dev/null', { cwd: projectRoot, timeout: 5000 });
+            execSync('git worktree prune', { cwd: projectRoot, timeout: 5000, stdio: IGNORE_STDIO });
             cleanupStatus = 'success';
           } catch {
             cleanupStatus = 'failed — manual cleanup may be needed';
@@ -1037,7 +1038,7 @@ function handleMapQuery(query?: string): string {
     if (gitShaMatch) {
       try {
         const distance = parseInt(
-          execSync(`git rev-list --count ${gitShaMatch[1]}..HEAD 2>/dev/null`, { cwd, encoding: 'utf8' }).trim() || '0',
+          execSync(`git rev-list --count ${gitShaMatch[1]}..HEAD`, { cwd, encoding: 'utf8', stdio: QUIET_STDIO }).trim() || '0',
           10,
         );
         if (distance > 50) {
@@ -1100,7 +1101,7 @@ function handleFlowsQuery(query?: string): string {
   // Get current git SHA for staleness check
   let currentSha = '';
   try {
-    currentSha = execSync('git rev-parse HEAD 2>/dev/null', { cwd, encoding: 'utf8', timeout: 5000 }).trim();
+    currentSha = execSync('git rev-parse HEAD', { cwd, encoding: 'utf8', timeout: 5000, stdio: QUIET_STDIO }).trim();
   } catch { /* not in git repo */ }
 
   // Filter flows by query

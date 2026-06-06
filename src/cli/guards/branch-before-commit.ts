@@ -1,4 +1,5 @@
 import { execSync } from 'node:child_process';
+import { QUIET_STDIO } from '../../core/process.js';
 import type { HookInput, GuardResult } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 
@@ -31,7 +32,7 @@ export async function branchBeforeCommitGuard(input: HookInput, cwd: string): Pr
   // Check current branch
   let branch: string;
   try {
-    branch = execSync('git rev-parse --abbrev-ref HEAD 2>/dev/null', { cwd, encoding: 'utf8' }).trim();
+    branch = execSync('git rev-parse --abbrev-ref HEAD', { cwd, encoding: 'utf8', stdio: QUIET_STDIO }).trim();
   } catch {
     // Not a git repo or detached HEAD — allow
     return {};

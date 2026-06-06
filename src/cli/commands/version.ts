@@ -2,6 +2,7 @@ import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
+import { QUIET_STDIO } from '../../core/process.js';
 
 /**
  * slope version bump [<version>] [--dry-run]
@@ -133,7 +134,9 @@ async function versionBump(args: string[]): Promise<void> {
   } catch (err) {
     // Clean up on failure — switch back to main so user isn't stranded
     console.error(`\n  Release failed: ${(err as Error).message}`);
-    try { run('git checkout main 2>/dev/null || git checkout -', cwd); } catch { /* best effort */ }
+    try { run('git checkout main', cwd); } catch {
+      try { run('git checkout -', cwd); } catch { /* best effort */ }
+    }
     console.error(`\n  Recovery steps:`);
     console.error(`    git checkout main`);
     if (prCreated) {
@@ -172,14 +175,14 @@ function syncToMain(cwd: string): void {
   // Check if HEAD has local-only commits that aren't on origin/main
   // merge-base --is-ancestor HEAD origin/main → exits 0 if HEAD is at or behind main
   try {
-    execSync('git merge-base --is-ancestor HEAD origin/main 2>/dev/null', { cwd, encoding: 'utf8' });
+    execSync('git merge-base --is-ancestor HEAD origin/main', { cwd, encoding: 'utf8', stdio: QUIET_STDIO });
   } catch {
     // HEAD is ahead of origin/main — check if it's a squash-merge divergence or real work
     // If origin/main is an ancestor of HEAD, there are local-only commits
     try {
-      execSync('git merge-base --is-ancestor origin/main HEAD 2>/dev/null', { cwd, encoding: 'utf8' });
+      execSync('git merge-base --is-ancestor origin/main HEAD', { cwd, encoding: 'utf8', stdio: QUIET_STDIO });
       // origin/main IS ancestor of HEAD — there are unpushed commits
-      const unpushed = execSync('git log origin/main..HEAD --oneline 2>/dev/null', { cwd, encoding: 'utf8' }).trim();
+      const unpushed = execSync('git log origin/main..HEAD --oneline', { cwd, encoding: 'utf8', stdio: QUIET_STDIO }).trim();
       throw new Error(
         `Cannot sync to main — ${unpushed.split('\n').length} unpushed commit(s) would be lost:\n${unpushed}\n` +
         'Push or stash these commits first, or use `git reset --hard origin/main` manually if they are stale.'

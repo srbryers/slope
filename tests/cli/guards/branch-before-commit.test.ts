@@ -49,8 +49,8 @@ describe('branchBeforeCommitGuard', () => {
     const result = await branchBeforeCommitGuard(makeInput('git commit -m "release: patch"'), '/tmp/worktree');
 
     expect(mockExecSync).toHaveBeenCalledWith(
-      'git rev-parse --abbrev-ref HEAD 2>/dev/null',
-      { cwd: '/tmp/worktree', encoding: 'utf8' },
+      'git rev-parse --abbrev-ref HEAD',
+      { cwd: '/tmp/worktree', encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
     );
     expect(mockLoadConfig).toHaveBeenCalledWith('/tmp/worktree');
     expect(result.decision).toBe('deny');
