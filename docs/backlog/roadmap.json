@@ -3704,10 +3704,13 @@
       "par": 3,
       "slope": 1,
       "type": "cli polish",
+      "status": "complete",
+      "score": 3,
+      "score_label": "par",
       "depends_on": [
         143.7
       ],
-      "note": "Close #513 by formatting decimal sprint currency deltas without floating-point artifacts in `slope map --check`.",
+      "note": "Close #513 by formatting decimal sprint currency deltas without floating-point artifacts in `slope map --check`; #515 discovered during full-suite validation is triaged into S143.95.",
       "tickets": [
         {
           "key": "S143.8-1",
