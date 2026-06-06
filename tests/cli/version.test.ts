@@ -45,6 +45,14 @@ describe('versionCommand', () => {
     expect(output).not.toContain('v1.5.0');
   });
 
+  it('prints nested bump help without entering release automation (#501)', async () => {
+    await versionCommand(['bump', '--help']);
+    const output = consoleSpy.mock.calls.map(c => c[0]).join('\n');
+
+    expect(output).toContain('slope version bump');
+    expect(output).toContain('Bump version');
+  });
+
   it('bump rejects version strings with trailing content (shell injection)', async () => {
     // "1.2.3; echo pwned" should NOT match the anchored regex /^\d+\.\d+\.\d+$/
     // So the command should auto-bump to 1.6.0 instead

@@ -15,18 +15,19 @@ import { dirname, join, resolve } from 'node:path';
  */
 export async function versionCommand(args: string[]): Promise<void> {
   const sub = args[0];
+  const help = sub === '--help' || sub === '-h' || args.includes('--help') || args.includes('-h');
 
-  if (sub === 'bump') {
+  if (!help && sub === 'bump') {
     await versionBump(args.slice(1));
     return;
   }
 
-  if (sub === 'recommend') {
+  if (!help && sub === 'recommend') {
     await versionRecommend(process.cwd());
     return;
   }
 
-  if (sub === '--help' || sub === '-h') {
+  if (help) {
     console.log(`
 slope version                                              Show current version
 slope version bump [<version>] [--patch|--major] [--dry-run]  Bump version, create PR, merge

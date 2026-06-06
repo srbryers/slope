@@ -493,7 +493,7 @@ describe('slope sprint (help)', () => {
     expect(output).toContain('--workflow');
   });
 
-  it('prints reset help without clearing sprint state (#483)', async () => {
+  it('prints reset help without clearing sprint state (#501)', async () => {
     await captureLog(() =>
       sprintCommand(['start', '--number=160', '--phase=implementing'])
     );
@@ -509,7 +509,7 @@ describe('slope sprint (help)', () => {
     expect(state.phase).toBe('implementing');
   });
 
-  it('rejects unknown reset flags without clearing sprint state (#483)', async () => {
+  it('rejects unknown reset flags without clearing sprint state (#501)', async () => {
     await captureLog(() =>
       sprintCommand(['start', '--number=160', '--phase=implementing'])
     );

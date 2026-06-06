@@ -43,6 +43,54 @@ describe('slope session command', () => {
     expect(logs.join('\n')).toContain('slope session prune');
   });
 
+  it('prints nested start help without registering a session (#501)', async () => {
+    const logs: string[] = [];
+    const log = vi.spyOn(console, 'log').mockImplementation((...args) => { logs.push(args.join(' ')); });
+
+    await sessionCommand(['start', '--help']);
+
+    log.mockRestore();
+    expect(logs.join('\n')).toContain('slope session start');
+
+    const after = createStore();
+    try {
+      expect(await after.getActiveSessions()).toHaveLength(0);
+    } finally {
+      after.close();
+    }
+  });
+
+  it('prints nested prune help without pruning stale sessions (#501)', async () => {
+    const store = createStore();
+    try {
+      await store.registerSession({
+        session_id: 'stale-help-session',
+        role: 'primary',
+        ide: 'codex',
+        branch: 'main',
+      });
+    } finally {
+      store.close();
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 20));
+
+    const logs: string[] = [];
+    const log = vi.spyOn(console, 'log').mockImplementation((...args) => { logs.push(args.join(' ')); });
+
+    await sessionCommand(['prune', '--max-age-ms=1', '--help']);
+
+    log.mockRestore();
+    expect(logs.join('\n')).toContain('slope session prune');
+
+    const after = createStore();
+    try {
+      expect(await after.getActiveSessions()).toHaveLength(1);
+    } finally {
+      after.close();
+    }
+  });
+
   it('prunes stale sessions and their claims with a custom max age', async () => {
     const store = createStore();
     try {

@@ -421,21 +421,22 @@ function statusCommand(args: string[]): void {
 
 export async function worktreeCommand(args: string[]): Promise<void> {
   const sub = args[0];
+  const help = args.includes('--help') || args.includes('-h');
 
-  if (sub === 'start') {
+  if (!help && sub === 'start') {
     return startCommand(args.slice(1));
   }
 
-  if (sub === 'cleanup') {
+  if (!help && sub === 'cleanup') {
     return cleanupCommand(args.slice(1));
   }
 
-  if (sub === 'status' || sub === 'list') {
+  if (!help && (sub === 'status' || sub === 'list')) {
     statusCommand(args.slice(1));
     return;
   }
 
-  if (args.includes('--help') || args.includes('-h') || !sub) {
+  if (help || !sub) {
     console.log(`
 slope worktree — Manage git worktrees
 

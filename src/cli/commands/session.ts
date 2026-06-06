@@ -14,10 +14,29 @@ function parseArgs(args: string[]): Record<string, string> {
   return result;
 }
 
+function printSessionHelp(): void {
+  console.log(`
+slope session â€” Manage live agent/IDE sessions
+
+Usage:
+  slope session start [--role=primary] [--ide=claude-code] [--branch=<b>]
+  slope session start --swarm=<id> --agent-role=<role>   Join a swarm
+  slope session end [--session-id=<id>]
+  slope session heartbeat [--session-id=<id>]
+  slope session prune [--max-age-ms=600000]
+  slope session list [--swarm=<id>]
+`);
+}
+
 export async function sessionCommand(args: string[]): Promise<void> {
   const sub = args[0];
   const flags = parseArgs(args.slice(1));
   const cwd = process.cwd();
+
+  if (!sub || sub === '--help' || sub === '-h' || args.includes('--help') || args.includes('-h')) {
+    printSessionHelp();
+    return;
+  }
 
   switch (sub) {
     case 'start':
