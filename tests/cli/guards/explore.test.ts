@@ -5,6 +5,7 @@ import type { HookInput } from '../../../src/core/index.js';
 
 // Mock child_process before importing the guard
 let mockExecSyncReturn: string | Error = '0\n';
+let lastGitRevListCommand = '';
 
 vi.mock('node:child_process', async (importOriginal) => {
   const orig = await importOriginal() as Record<string, unknown>;
@@ -13,6 +14,7 @@ vi.mock('node:child_process', async (importOriginal) => {
     execSync: (...args: unknown[]) => {
       const cmd = args[0] as string;
       if (cmd.includes('git rev-list')) {
+        lastGitRevListCommand = cmd;
         if (mockExecSyncReturn instanceof Error) throw mockExecSyncReturn;
         return mockExecSyncReturn;
       }
@@ -66,6 +68,7 @@ beforeEach(() => {
     minSprint: 1,
   }));
   mockExecSyncReturn = '0\n';
+  lastGitRevListCommand = '';
 });
 
 afterEach(() => {
@@ -125,6 +128,15 @@ describe('explore guard — tiered staleness', () => {
     const result = await exploreGuard(makeInput('Write'), tmpDir);
     expect(result.decision).toBe('deny');
     expect(result.blockReason).toContain('50 commits stale');
+  });
+
+  it('uses ancestry-path distance so sibling worktree baselines do not block (#505)', async () => {
+    mockExecSyncReturn = '0\n';
+    writeCodebaseMap('abc123');
+    const result = await exploreGuard(makeInput('Edit'), tmpDir);
+    expect(lastGitRevListCommand).toContain('--ancestry-path');
+    expect(result.decision).toBeUndefined();
+    expect(result.context).toContain('CODEBASE.md');
   });
 
   it('warns but does not block Read when map is in block range', async () => {

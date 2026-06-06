@@ -246,8 +246,11 @@ function checkMapStaleness(
     const gitShaMatch = metaMatch[1].match(/git_sha:\s*"?([^"\n]+)"?/);
     if (!gitShaMatch) return { level: 'current', distance: 0 };
 
+    const sha = gitShaMatch[1].trim();
+    if (!/^[0-9a-fA-F]{4,64}$/.test(sha)) return { level: 'current', distance: 0 };
+
     const distance = parseInt(
-      execSync(`git rev-list --count ${gitShaMatch[1]}..HEAD 2>/dev/null`, { cwd, encoding: 'utf8', timeout: 5000 }).trim() || '0',
+      execSync(`git rev-list --count --ancestry-path ${sha}..HEAD 2>/dev/null`, { cwd, encoding: 'utf8', timeout: 5000 }).trim() || '0',
       10,
     );
 
