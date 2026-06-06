@@ -3548,6 +3548,7 @@
       "par": 5,
       "slope": 5,
       "type": "workflow + state recovery",
+      "status": "complete",
       "depends_on": [
         141
       ],
