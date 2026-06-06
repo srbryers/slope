@@ -1,6 +1,6 @@
 {
   "name": "SLOPE Development Roadmap",
-  "description": "Forward-looking roadmap from S61+. Phases 1-9 (S1-S47) are complete. S48-S60 were hardening, guard enforcement, and process sprints. This roadmap covers adoption, observability, guard maturity, multi-project, loop evolution, and issue-driven recovery. S61-S64 reflect what actually shipped (themes diverged from original plan). Note: the actual S69 diverged from the planned Referee sprint \u2014 a carryover patch kit ran instead. The Referee work was rescheduled as S78. S75.5 (The Bug Clearing) added 2026-05-02 to clear accumulated CLI bugs from external repos. S132-S136 were backfilled from shipped scorecards on 2026-06-05; S137 adds post-merge retro tooling and durable memory, and S138-S144 triage open GitHub issues #499/#501/#502/#503/#505/#507 into focused recovery sprints.",
+  "description": "Forward-looking roadmap from S61+. Phases 1-9 (S1-S47) are complete. S48-S60 were hardening, guard enforcement, and process sprints. This roadmap covers adoption, observability, guard maturity, multi-project, loop evolution, and issue-driven recovery. S61-S64 reflect what actually shipped (themes diverged from original plan). Note: the actual S69 diverged from the planned Referee sprint \u2014 a carryover patch kit ran instead. The Referee work was rescheduled as S78. S75.5 (The Bug Clearing) added 2026-05-02 to clear accumulated CLI bugs from external repos. S132-S136 were backfilled from shipped scorecards on 2026-06-05; S137 adds post-merge retro tooling and durable memory, S137.5 addresses Windows suite portability for #509, and S138-S144 triage open GitHub issues #499/#501/#502/#503/#505/#507 into focused recovery sprints.",
   "phases": [
     {
       "name": "Phase 10 \u2014 Adoption & Onboarding",
@@ -3599,7 +3599,7 @@
         142,
         143
       ],
-      "note": "Publish the S137-S143 retro, help, guard recovery, map safety, workflow resync, and sprint resume fixes after validation.",
+      "note": "Publish the S137-S143 plus S137.5 retro, help, guard recovery, map safety, workflow resync, Windows portability, and sprint resume fixes after validation.",
       "tickets": [
         {
           "key": "S144-1",
