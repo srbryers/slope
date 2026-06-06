@@ -1,0 +1,139 @@
+{
+  "sprint_number": 140,
+  "player": "codex",
+  "theme": "Session Collision Guard Recovery",
+  "par": 4,
+  "slope": 4,
+  "score": 5,
+  "score_label": "bogey",
+  "date": "2026-06-06",
+  "type": "guard hardening",
+  "skills_used": [
+    "slope-sprint-workflow",
+    "slope-api-reference"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow"
+  ],
+  "shots": [
+    {
+      "ticket_key": "S140-1",
+      "title": "Prune stale never-heartbeated sessions before collision checks (#502)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Collision checks now filter sessions whose heartbeat is older than `STALE_SESSION_THRESHOLD_MS`, even if the store returns them after pruning."
+    },
+    {
+      "ticket_key": "S140-2",
+      "title": "Allow remote-only and read-only gh/git commands through session-collision guard (#502)",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "moderate",
+          "description": "Security review found the first git allowlist was too broad for `git branch` and `git remote`; a follow-up commit narrowed those subcommands and added regressions."
+        }
+      ],
+      "notes": "The guard now bypasses collision state for single-segment `gh pr view/checks/status/list/merge` and safe git status/log/diff/show/rev-parse/fetch/ls-remote/branch/remote forms."
+    },
+    {
+      "ticket_key": "S140-3",
+      "title": "Expose guard-exempt stale-session clear path for collision recovery (#502)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Collision denial text now points stale-session recovery at `slope session prune` as well as targeted `slope session end --session-id=<id>`."
+    },
+    {
+      "ticket_key": "S140-4",
+      "title": "Add session-collision guard regressions for stale sessions and remote commands (#502)",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [],
+      "notes": "Added regressions for stale returned sessions, remote gh PR merge, read-only git commands, `git -C` status, blocked git checkout, blocked branch deletion, and blocked remote config mutation."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 1,
+    "hazards_hit": 1,
+    "hazard_penalties": 1,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "wind",
+      "impact": "minor",
+      "description": "The Windows full suite still emits legacy temp-repo stderr noise, but all tests passed."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Guard allowlists must be exact when a subcommand can both read and mutate state.",
+      "outcome": "`git branch` and `git remote` now allow only narrow read-safe forms instead of broad subcommand matches."
+    },
+    {
+      "type": "lessons",
+      "description": "Collision recovery can be local-state strict while allowing remote PR completion.",
+      "outcome": "`gh pr merge` no longer requires clearing unrelated local sessions, while chained commands still fall through to the normal collision guard."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "`corepack pnpm vitest run tests/cli/guards/worktree-check.test.ts tests/cli/guards/worktree-check-integration.test.ts` passed: 48 tests.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`corepack pnpm typecheck`, `corepack pnpm prepare`, and `corepack pnpm test` passed on Windows: 228 test files passed, 1 skipped; 3610 tests passed, 25 skipped.",
+      "status": "healthy"
+    },
+    {
+      "category": "docs",
+      "description": "`slope roadmap validate` passed with existing historical roadmap warnings.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Useful and a little sharp-edged. The core fix was small, but the security review caught why broad command allowlists are a trap.",
+    "advice_for_next_player": "When exempting commands from a guard, classify by the exact safe form, not just the top-level subcommand.",
+    "what_surprised_you": "`git branch -D feature -v` could have passed an `includes('-v')` check even though it mutates refs.",
+    "excited_about_next": "S141 can build on a less obstructive collision guard and focus on workflow state resync."
+  },
+  "bunker_locations": [
+    "Do not allow a whole git subcommand family when some forms mutate local refs or config.",
+    "If a guard bypass exits before opening the store, tests should assert the store was not touched.",
+    "Review-required guard changes deserve a hostile pass over allowed command shapes before closeout."
+  ],
+  "yardage_book_updates": [
+    "worktree-check now filters stale returned sessions by heartbeat age during collision detection.",
+    "worktree-check now allows single-segment remote/read-only gh/git commands before session-collision lookup.",
+    "worktree-check denial text now recommends `slope session prune` for stale collision recovery.",
+    "git branch and git remote collision bypasses are exact-form allowlists, not broad subcommand allowlists."
+  ],
+  "course_management_notes": [
+    "Implementation commit: d628fc9.",
+    "Security-review correction commit: 6b5e746.",
+    "Validation passed: focused guard tests, `corepack pnpm typecheck`, `corepack pnpm prepare`, `corepack pnpm test`, and `slope roadmap validate`.",
+    "Issue #502 should close when the PR containing S140 merges."
+  ],
+  "slope_factors": [
+    "session_collision",
+    "guard_recovery",
+    "command_allowlist"
+  ]
+}
