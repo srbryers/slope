@@ -195,6 +195,17 @@ describe('worktreeCheckGuard', () => {
     expect(mockResolveStore).not.toHaveBeenCalled();
   });
 
+  it('allows slope recovery commands with stderr redirects (#499)', async () => {
+    const result = await worktreeCheckGuard({
+      ...makeInput(),
+      tool_name: 'Bash',
+      tool_input: { command: 'slope session end --session-id=orphan-primary 2>&1' },
+    }, '/tmp/test');
+
+    expect(result).toEqual({});
+    expect(mockResolveStore).not.toHaveBeenCalled();
+  });
+
   it('does not allow slope recovery commands embedded in unrelated shell text', async () => {
     mockGitMainRepo();
     (mockStore.getActiveSessions as ReturnType<typeof vi.fn>).mockResolvedValue([
@@ -210,6 +221,36 @@ describe('worktreeCheckGuard', () => {
 
     expect(result.decision).toBe('deny');
     expect(mockResolveStore).toHaveBeenCalled();
+  });
+
+  it('surfaces EnterWorktree guidance for existing matching worktrees (#499)', async () => {
+    const porcelainOutput = [
+      'worktree /repo',
+      'HEAD abc123',
+      'branch refs/heads/main',
+      '',
+      'worktree /repo/.slope/worktrees/existing-feature',
+      'HEAD def456',
+      'branch refs/heads/feat/existing-feature',
+      '',
+    ].join('\n');
+    mockExecFileSync
+      .mockReturnValueOnce('.git' as never)
+      .mockReturnValueOnce('main' as never)
+      .mockReturnValueOnce(porcelainOutput as never);
+
+    (mockStore.getActiveSessions as ReturnType<typeof vi.fn>).mockResolvedValue([
+      makeSession({ session_id: 'test-session' }),
+      makeSession({ session_id: 'other-session', branch: 'feat/existing-feature' }),
+    ]);
+
+    const result = await worktreeCheckGuard(makeInput(), '/repo');
+
+    expect(result.decision).toBe('deny');
+    expect(result.blockReason).toContain('Existing matching worktree detected');
+    expect(result.blockReason).toContain('/repo/.slope/worktrees/existing-feature');
+    expect(result.blockReason).toContain('EnterWorktree');
+    expect(result.blockReason).toContain('re-evaluate the session branch and mode');
   });
 
   it('does not allow chained recovery commands with extra work', async () => {

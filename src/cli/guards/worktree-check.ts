@@ -1,14 +1,21 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, writeFileSync, mkdirSync, unlinkSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { isAbsolute, join, relative, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createHash } from 'node:crypto';
 import type { HookInput, GuardResult } from '../../core/index.js';
 import { STALE_SESSION_THRESHOLD_MS } from '../../core/constants.js';
 import { SlopeStoreError } from '../../core/store.js';
+import type { SlopeSession } from '../../core/store.js';
 import { resolveStore } from '../store.js';
 
 const COMMAND_TEXT_KEYS = ['command', 'cmd', 'input'] as const;
+const FILE_PATH_KEYS = ['file_path', 'path'] as const;
+
+interface GitWorktreeInfo {
+  path: string;
+  branch?: string;
+}
 
 /** Get the sentinel file path for a session (persists across process invocations) */
 function sentinelPath(sessionId: string): string {
@@ -119,10 +126,11 @@ export async function worktreeCheckGuard(input: HookInput, cwd: string): Promise
       const sessionList = conflicting
         .map(s => `  - ${s.session_id} [${s.role}] ${s.ide} (branch: ${s.branch ?? '-'})`)
         .join('\n');
+      const existingWorktreeGuidance = formatExistingWorktreeGuidance(cwd, input, conflicting, branch);
       // Do NOT write sentinel — denied sessions should re-check next invocation
       return {
         decision: 'deny',
-        blockReason: `BLOCKED: Another session is active in this directory:\n${sessionList}\n\nCreate an isolated working copy before proceeding:\n  slope worktree start --branch=<branch> --role=secondary --ide=<ide>\n\nSLOPE worktrees default to .slope/worktrees/<branch>, outside Claude Code's protected .claude/ tree. Avoid Claude Code's native .claude/worktrees/ default because ordinary source edits there can trigger self-configuration permission prompts. If the listed session is stale, run \`slope session list\` and then \`slope session end --session-id=<id>\`. Do not attempt implementation work until you are in a worktree.`,
+        blockReason: `BLOCKED: Another session is active in this directory:\n${sessionList}${existingWorktreeGuidance}\n\nCreate an isolated working copy before proceeding:\n  slope worktree start --branch=<branch> --role=secondary --ide=<ide>\n\nSLOPE worktrees default to .slope/worktrees/<branch>, outside Claude Code's protected .claude/ tree. Avoid Claude Code's native .claude/worktrees/ default because ordinary source edits there can trigger self-configuration permission prompts. If the listed session is stale, run \`slope session list\` and then \`slope session end --session-id=<id>\`. Do not attempt implementation work until you are in a worktree.`,
       };
     }
 
@@ -188,6 +196,10 @@ function splitShellSegments(command: string): string[] {
     }
     if ((char === '"' || char === "'") && (!quote || quote === char)) {
       quote = quote ? null : char;
+      current += char;
+      continue;
+    }
+    if (!quote && char === '&' && command[i - 1] === '>') {
       current += char;
       continue;
     }
@@ -266,6 +278,65 @@ function gitRevParse(cwd: string, ...args: string[]): string {
   }).trim();
 }
 
+function formatExistingWorktreeGuidance(
+  cwd: string,
+  input: HookInput,
+  conflicting: SlopeSession[],
+  currentBranch: string,
+): string {
+  const worktrees = listGitWorktreeInfo(cwd)
+    .filter(wt => resolve(wt.path) !== resolve(cwd));
+  if (worktrees.length === 0) return '';
+
+  const filePath = extractFilePath(input);
+  const branchHints = new Set(
+    [currentBranch, ...conflicting.map(s => s.branch)]
+      .filter((branch): branch is string => !!branch && branch !== 'unknown' && branch !== '-'),
+  );
+
+  const matched = worktrees.filter(wt =>
+    (filePath && pathContains(wt.path, filePath))
+    || (wt.branch && branchHints.has(wt.branch)),
+  );
+  const suggested = matched.length > 0 ? matched : worktrees.slice(0, 3);
+  const heading = matched.length > 0
+    ? 'Existing matching worktree detected:'
+    : 'Existing git worktree(s) detected:';
+  const lines = suggested.map(wt => {
+    const branch = wt.branch ? ` (branch: ${wt.branch})` : '';
+    return `  - ${wt.path}${branch}`;
+  });
+  const firstPath = suggested[0]?.path ?? '<path>';
+
+  return [
+    '',
+    '',
+    heading,
+    ...lines,
+    '',
+    'Prefer entering the existing worktree instead of creating another one:',
+    `  Claude Code/Codex: use the EnterWorktree tool with path: ${firstPath}`,
+    `  Other harnesses: cd "${firstPath}" and relaunch the session there.`,
+    'SLOPE will re-evaluate the session branch and mode after entering the worktree.',
+  ].join('\n');
+}
+
+function extractFilePath(input: HookInput): string | undefined {
+  const toolInput = input.tool_input ?? {};
+  for (const key of FILE_PATH_KEYS) {
+    const value = toolInput[key];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return undefined;
+}
+
+function pathContains(root: string, filePath: string): boolean {
+  const absoluteFile = isAbsolute(filePath) ? filePath : resolve(filePath);
+  const absoluteRoot = resolve(root);
+  const rel = relative(absoluteRoot, absoluteFile);
+  return rel === '' || (!!rel && !rel.startsWith('..') && !isAbsolute(rel));
+}
+
 async function reconcileWorktreeSession(input: HookInput, cwd: string, sessionId: string): Promise<void> {
   let store;
   try {
@@ -314,17 +385,31 @@ function resolveSlopeStateCwd(cwd: string): string | undefined {
 }
 
 function listGitWorktrees(cwd: string): string[] {
+  return listGitWorktreeInfo(cwd).map(wt => wt.path);
+}
+
+function listGitWorktreeInfo(cwd: string): GitWorktreeInfo[] {
   try {
     const raw = execFileSync('git', ['worktree', 'list', '--porcelain'], {
       cwd,
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
     });
-    return raw
-      .split('\n')
-      .filter(line => line.startsWith('worktree '))
-      .map(line => line.slice('worktree '.length).trim())
-      .filter(Boolean);
+    const worktrees: GitWorktreeInfo[] = [];
+    let current: GitWorktreeInfo | null = null;
+    for (const line of raw.split('\n')) {
+      if (line.startsWith('worktree ')) {
+        if (current) worktrees.push(current);
+        current = { path: line.slice('worktree '.length).trim() };
+      } else if (current && line.startsWith('branch ')) {
+        current.branch = line.slice('branch '.length).replace(/^refs\/heads\//, '').trim();
+      } else if (line === '' && current) {
+        worktrees.push(current);
+        current = null;
+      }
+    }
+    if (current) worktrees.push(current);
+    return worktrees.filter(wt => wt.path);
   } catch {
     return [];
   }
