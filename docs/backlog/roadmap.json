@@ -3442,6 +3442,7 @@
       "par": 5,
       "slope": 4,
       "type": "workflow + guard hardening",
+      "status": "complete",
       "depends_on": [
         140
       ],
