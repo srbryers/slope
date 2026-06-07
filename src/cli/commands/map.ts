@@ -134,23 +134,22 @@ interface MapMetadata {
   flows: number;
 }
 
+function countMapMetadataFiles(cwd: string, identity: ProjectIdentity): { source: number; test: number } {
+  // SLOPE itself has a known split layout; downstream projects may have
+  // multiple source roots, so count from the repository root for them.
+  if (identity.isSlopeSelf) {
+    return {
+      source: countSourceFiles(join(cwd, 'src')).source,
+      test: countSourceFiles(join(cwd, 'tests')).test,
+    };
+  }
+  return countSourceFiles(cwd);
+}
+
 function gatherMetadata(cwd: string, config: SlopeConfig, identity: ProjectIdentity): MapMetadata {
   const gitSha = exec('git rev-parse HEAD', cwd);
   const latestSprint = detectLatestSprint(config, cwd);
-
-  // SLOPE itself: count under src/ and tests/ (its own layout). Other repos
-  // may not have those dirs at all — count from the repo root, walking past
-  // node_modules/dist/.git as before. (#351)
-  let source = 0;
-  let testFiles = 0;
-  if (identity.isSlopeSelf) {
-    source = countSourceFiles(join(cwd, 'src')).source;
-    testFiles = countSourceFiles(join(cwd, 'tests')).test;
-  } else {
-    const counts = countSourceFiles(cwd);
-    source = counts.source;
-    testFiles = counts.test;
-  }
+  const counts = countMapMetadataFiles(cwd, identity);
 
   // CLI commands + guards are SLOPE's own registries — only meaningful when
   // mapping SLOPE itself. Report 0 for downstream projects so the metadata
@@ -167,8 +166,8 @@ function gatherMetadata(cwd: string, config: SlopeConfig, identity: ProjectIdent
     generated_at: new Date().toISOString(),
     git_sha: gitSha,
     sprint: latestSprint,
-    source_files: source,
-    test_files: testFiles,
+    source_files: counts.source,
+    test_files: counts.test,
     cli_commands: cliCommands,
     guards: guardsCount,
     flows: flowCount,
@@ -725,9 +724,7 @@ export function runStalenessCheck(cwd: string, config: SlopeConfig, mapContent: 
   const results: CheckResult[] = [];
   const meta = parseMapMetadata(mapContent);
   const identity = readProjectIdentity(cwd);
-  const { source: currentSource } = identity.isSlopeSelf
-    ? countSourceFiles(join(cwd, 'src'))
-    : countSourceFiles(cwd);
+  const { source: currentSource } = countMapMetadataFiles(cwd, identity);
 
   // 1. Source file count drift
   const mapFiles = parseInt(meta.source_files || '0', 10);

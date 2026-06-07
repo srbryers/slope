@@ -163,6 +163,28 @@ describe('slope map in a non-SLOPE repo (#351)', () => {
     }
   });
 
+  it('uses generator source counts for staleness checks in multi-root repos (#520)', () => {
+    const cwd = setupNonSlopeRepo({ name: 'multi-root-tool' });
+    try {
+      mkdirSync(join(cwd, 'src'), { recursive: true });
+      mkdirSync(join(cwd, 'worker'), { recursive: true });
+      writeFileSync(join(cwd, 'src', 'App.tsx'), 'export const App = () => null;\n');
+      writeFileSync(join(cwd, 'worker', 'index.ts'), 'export default {};\n');
+      writeFileSync(join(cwd, 'worker', 'index.test.ts'), 'it("works", () => {});\n');
+
+      runSlopeMap(cwd);
+      const md = readFileSync(join(cwd, 'CODEBASE.md'), 'utf8');
+      expect(md).toContain('source_files: 2');
+      expect(md).toContain('test_files: 1');
+
+      const output = runSlopeMap(cwd, ['--check'], { encoding: 'utf8' }) as string;
+      expect(output).toContain('Source files: 2 (map says 2)');
+      expect(output).toContain('Overall: CURRENT');
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
   it('refreshes metadata without overwriting an existing curated zero-source map (#505)', () => {
     const cwd = setupNonSlopeRepo({ name: 'docs-only-tool' });
     try {

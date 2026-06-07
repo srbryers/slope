@@ -158,6 +158,13 @@ describe('extractSprintReferences', () => {
     expect(extractSprintReferences(['fix(S101-2): normalize apply_patch paths'])).toEqual(new Set([101]));
   });
 
+  it('does not treat sprint range endpoints as shipped sprint refs', () => {
+    expect(extractSprintReferences([
+      'docs(roadmap): extend roadmap with Phases 10-12 (S64-S80) (#176)',
+      'Block-based CMS - design spike + Phase 13 (S85\u2013S90) (#188)',
+    ])).toEqual(new Set());
+  });
+
   it('does not match S75 inside S75.5', () => {
     expect(extractSprintReferences(['feat(S75.5): The Bug Clearing'])).toEqual(new Set());
   });
