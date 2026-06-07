@@ -1,6 +1,6 @@
 {
   "name": "SLOPE Development Roadmap",
-  "description": "Forward-looking roadmap from S61+. Phases 1-9 (S1-S47) are complete. S48-S60 were hardening, guard enforcement, and process sprints. This roadmap covers adoption, observability, guard maturity, multi-project, loop evolution, and issue-driven recovery. S61-S64 reflect what actually shipped (themes diverged from original plan). Note: the actual S69 diverged from the planned Referee sprint \u2014 a carryover patch kit ran instead. The Referee work was rescheduled as S78. S75.5 (The Bug Clearing) added 2026-05-02 to clear accumulated CLI bugs from external repos. S132-S136 were backfilled from shipped scorecards on 2026-06-05; S137 adds post-merge retro tooling and durable memory, S137.5 addresses Windows suite portability for #509, and S138-S144 triage open GitHub issues #499/#501/#502/#503/#505/#507/#510/#511/#512/#513/#514/#515 into focused recovery sprints.",
+  "description": "Forward-looking roadmap from S61+. Phases 1-9 (S1-S47) are complete. S48-S60 were hardening, guard enforcement, and process sprints. This roadmap covers adoption, observability, guard maturity, multi-project, loop evolution, and issue-driven recovery. S61-S64 reflect what actually shipped (themes diverged from original plan). Note: the actual S69 diverged from the planned Referee sprint \u2014 a carryover patch kit ran instead. The Referee work was rescheduled as S78. S75.5 (The Bug Clearing) added 2026-05-02 to clear accumulated CLI bugs from external repos. S132-S136 were backfilled from shipped scorecards on 2026-06-05; S137 adds post-merge retro tooling and durable memory, S137.5 addresses Windows suite portability for #509, and S138-S144 triage open GitHub issues #499/#501/#502/#503/#505/#507/#510/#511/#512/#513/#514/#515/#516 into focused recovery sprints.",
   "phases": [
     {
       "name": "Phase 10 \u2014 Adoption & Onboarding",
@@ -3818,6 +3818,36 @@
       ]
     },
     {
+      "id": 143.97,
+      "theme": "Git Analyzer Cadence Fixture Stability",
+      "par": 3,
+      "slope": 1,
+      "type": "test reliability",
+      "depends_on": [
+        143.95
+      ],
+      "note": "Close #516 by making the git analyzer daily-cadence regression deterministic under Windows full-suite load before the release sprint closes.",
+      "tickets": [
+        {
+          "key": "S143.97-1",
+          "title": "Replace slow daily-cadence git fixture setup with a deterministic fast history builder (#516)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 516
+        },
+        {
+          "key": "S143.97-2",
+          "title": "Rerun focused analyzer and release-gate full-suite validation (#516)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 516,
+          "depends_on": [
+            "S143.97-1"
+          ]
+        }
+      ]
+    },
+    {
       "id": 144,
       "theme": "Guard Recovery and State Portability Release",
       "par": 3,
@@ -3831,9 +3861,10 @@
         143.7,
         143.8,
         143.9,
-        143.95
+        143.95,
+        143.97
       ],
-      "note": "Publish the S137-S143.95 plus S137.5 retro, help, guard recovery, map safety, workflow resync, Windows portability, sprint resume, commit-ready map freshness, decimal sprint status, map stderr, decimal currency, Node exec redirection, and atomic-write reliability fixes after validation.",
+      "note": "Publish the S137-S143.97 plus S137.5 retro, help, guard recovery, map safety, workflow resync, Windows portability, sprint resume, commit-ready map freshness, decimal sprint status, map stderr, decimal currency, Node exec redirection, atomic-write reliability, and git analyzer fixture stability fixes after validation.",
       "tickets": [
         {
           "key": "S144-1",

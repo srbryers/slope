@@ -17,8 +17,15 @@ Guard Recovery and State Portability Release
 
 ## Dependencies
 
-- S142 (pending)
-- S143 (pending)
+- S142
+- S143
+- S143.5
+- S143.6
+- S143.7
+- S143.8
+- S143.9
+- S143.95
+- S143.97
 
 ## Recommended order
 
