@@ -157,6 +157,25 @@ describe('workflowStepGateGuard', () => {
     expect(result.blockReason).toBeUndefined();
   });
 
+  it('prefers current sprint over a stale execution from the same session (#531)', async () => {
+    writeConfig();
+    saveSprintState(TMP, createSprintState(531, 'implementing'));
+    writeWorkflow('current-wf', 'agent_work');
+    writeWorkflow('stale-session-wf', 'command');
+    const store = new SqliteSlopeStore(join(TMP, '.slope/slope.db'));
+    await createRunningExecution(store, 'current-wf', 'phase1', 'step1', { sprintId: 'S531' });
+    await waitForTimestampTick();
+    await createRunningExecution(store, 'stale-session-wf', 'phase1', 'step1', {
+      sprintId: 'S85',
+      sessionId: 'test-session',
+    });
+    store.close();
+
+    const result = await workflowStepGateGuard(makeInput(), TMP);
+    expect(result.decision).toBeUndefined();
+    expect(result.blockReason).toBeUndefined();
+  });
+
   it('fails open when multiple executions cannot be disambiguated (#531)', async () => {
     writeConfig();
     writeWorkflow('command-wf', 'command');

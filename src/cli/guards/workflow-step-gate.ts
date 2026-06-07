@@ -73,15 +73,23 @@ function selectWorkflowExecution(
   cwd: string,
   config: SlopeConfig,
 ): WorkflowExecution | null {
+  const sprintLabels = sprintLabelsForContext(cwd, config);
   const sessionId = input.session_id?.trim();
+  if (sessionId && sprintLabels.length > 0) {
+    const bySessionAndSprint = active.find(exec =>
+      exec.session_id === sessionId && sprintLabels.some(label => sprintIdsMatch(exec.sprint_id, label)),
+    );
+    if (bySessionAndSprint) return bySessionAndSprint;
+  }
+
+  for (const label of sprintLabels) {
+    const bySprint = active.find(exec => sprintIdsMatch(exec.sprint_id, label));
+    if (bySprint) return bySprint;
+  }
+
   if (sessionId) {
     const bySession = active.find(exec => exec.session_id === sessionId);
     if (bySession) return bySession;
-  }
-
-  for (const label of sprintLabelsForContext(cwd, config)) {
-    const bySprint = active.find(exec => sprintIdsMatch(exec.sprint_id, label));
-    if (bySprint) return bySprint;
   }
 
   return active.length === 1 ? active[0] : null;
