@@ -1,7 +1,7 @@
 # SLOPE Roadmap
 
-> 55 scorecards filed (S1-S58, with gaps). 10 numbered phases + 3 internal sprint groups.
-> Last updated: 2026-03-04 (v1.17.0)
+> 134 scorecards filed (S1-S136, with gaps). Canonical planning now lives in `docs/backlog/roadmap.json`.
+> Last updated: 2026-06-07 (v1.58.0 recovery release triage)
 
 ## Phase Summary
 
@@ -165,4 +165,4 @@ Separate planning from execution into distinct agent roles with different models
 | Store | `packages/store-sqlite/`, `packages/store-pg/` |
 
 ### Machine-Readable Roadmap
-`docs/backlog/roadmap.json` — Consumed by `slope roadmap validate|review|status|show`. Covers S1-S47 (phases 0-9); Phase 10 and S48+ not yet added.
+`docs/backlog/roadmap.json` - Consumed by `slope roadmap validate|review|status|show`. Covers completed S61-S136 catch-up, S137 post-merge retro/durable-memory tooling, S137.5 Windows test-suite portability for #509, completed S138 destructive-help safety for #501, completed S139 existing-worktree recovery for #499, completed S140 session-collision recovery for #502, completed S141 workflow state resync for #503, completed S142 codebase-map non-TS safety for #505, completed S143 portable sprint resume for #507, completed S143.5 commit-ready map freshness alignment for #510, completed S143.6 decimal sprint status parsing for #511, completed S143.7 Windows-safe map staleness checks for #512, completed S143.8 decimal sprint currency formatting for #513, completed S143.9 Node exec redirection portability audit for #514, completed S143.95 atomic-write lock contention hardening for #515, completed S143.97 git analyzer fixture stability for #516, completed S143.98 npm bin metadata release cleanliness for #517, completed S143.99 CodeQL release-gate hardening for #518, and completed S144 recovery release readiness work.

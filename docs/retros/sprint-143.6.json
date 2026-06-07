@@ -1,0 +1,126 @@
+{
+  "sprint_number": 143.6,
+  "player": "codex",
+  "theme": "Decimal Sprint Status Parsing",
+  "par": 3,
+  "slope": 1,
+  "score": 3,
+  "score_label": "par",
+  "date": "2026-06-06",
+  "type": "cli bugfix",
+  "skills_used": [
+    "slope-sprint-workflow",
+    "slope-api-reference"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow"
+  ],
+  "shots": [
+    {
+      "ticket_key": "S143.6-1",
+      "title": "Parse decimal sprint overrides in status command (#511)",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [],
+      "notes": "`slope status` now uses the shared `parseSprintNumber` parser instead of truncating decimal sprint ids with `parseInt`."
+    },
+    {
+      "ticket_key": "S143.6-2",
+      "title": "Add decimal and invalid sprint status regressions (#511)",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [],
+      "notes": "Added regressions for `--sprint=143.5` preserving the decimal label and malformed sprint values exiting with the shared sprint-id guidance."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 2,
+    "fairways_total": 2,
+    "greens_in_regulation": 2,
+    "greens_total": 2,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "wind",
+      "impact": "minor",
+      "description": "The Windows full suite continues to emit known temp-repo stderr, CRLF, and path warnings, but all tests passed."
+    },
+    {
+      "type": "wind",
+      "impact": "minor",
+      "description": "`slope map --check` and `slope commit-ready --json` leaked `The system cannot find the path specified.` to stderr from Unix-style git redirection; raised as #512 and triaged into S143.7."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Every CLI surface that accepts sprint ids should use the shared parser.",
+      "outcome": "`status --sprint=143.5` now displays S143.6/S143.5-style decimal sprint contexts instead of silently truncating to S143."
+    },
+    {
+      "type": "lessons",
+      "description": "Validate malformed flags before opening command-specific stores when possible.",
+      "outcome": "The status command now resolves and rejects invalid sprint flags before opening the SLOPE store."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "`corepack pnpm vitest run tests/cli/commands/status.test.ts` passed: 4 tests.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`corepack pnpm typecheck`, `corepack pnpm prepare`, and `corepack pnpm test` passed on Windows: 229 test files passed, 1 skipped; 3625 tests passed, 25 skipped.",
+      "status": "healthy"
+    },
+    {
+      "category": "docs",
+      "description": "`slope roadmap validate` passed with existing historical roadmap warnings.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`node dist/cli/index.js status --sprint=143.6` displayed S143.6 claims, and `status --sprint=143.nope` exited with the expected invalid-sprint guidance.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Small and satisfying. The issue was a direct parser mismatch, and the shared parser snapped the command back into line.",
+    "advice_for_next_player": "When adding decimal sprint support, grep for `parseInt` on sprint flags and replace it with `parseSprintNumber` unless there is a proven integer-only contract.",
+    "what_surprised_you": "The runtime smoke surfaced an unrelated Windows stderr leak in the map staleness path, which commit-ready inherits.",
+    "excited_about_next": "S143.7 can clear the stderr leak so release validation is quieter and JSON callers get clean command streams."
+  },
+  "bunker_locations": [
+    "`parseInt` silently truncates decimal sprint ids; sprint CLI flags should use `parseSprintNumber`.",
+    "Unix shell redirection like `2>/dev/null` leaks Windows stderr under `cmd.exe`; prefer child-process stdio options."
+  ],
+  "yardage_book_updates": [
+    "`src/cli/commands/status.ts` now imports and uses `parseSprintNumber`.",
+    "`statusCommand` rejects invalid sprint flags before opening the SLOPE store.",
+    "`tests/cli/commands/status.test.ts` covers decimal sprint overrides and invalid sprint guidance."
+  ],
+  "course_management_notes": [
+    "Implementation commit: d26e349.",
+    "Review-polish commit: 80a8c43.",
+    "Follow-up triage commit for #512: bb3ccef.",
+    "Issue #511 should close when the PR containing S143.6 merges.",
+    "Issue #512 is triaged into S143.7 before the release sprint."
+  ],
+  "slope_factors": [
+    "decimal_sprints",
+    "cli_parsing",
+    "windows_stderr"
+  ]
+}

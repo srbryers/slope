@@ -1217,6 +1217,42 @@ describe('buildSkillBriefing', () => {
     expect(result.recommendations[0].score).toBeGreaterThan(0);
   });
 
+  it('recommends slope-retro for post-merge retro sprint context', () => {
+    const registry = makeSkillRegistry();
+    registry.skills.push({
+      ...makeSkill('slope-retro', 'Run post-merge retros and persist durable learnings into memory.'),
+      triggers: ['retro', 'post-merge', 'post merge', 'memory'],
+      tags: ['retrospective'],
+    });
+    const roadmap = {
+      name: 'Test Roadmap',
+      phases: [{ name: 'P1', sprints: [137] }],
+      sprints: [{
+        id: 137,
+        theme: 'Post-Merge Retro Skill and Durable Memory',
+        par: 4 as const,
+        slope: 4,
+        type: 'feature',
+        tickets: [
+          { key: 'S137-3', title: 'Add retro skill template guidance for agents performing post-merge closeout', club: 'short_iron' as const, complexity: 'standard' as const },
+        ],
+      }],
+    };
+
+    const result = buildSkillBriefing({
+      registry,
+      scorecards: [],
+      commonIssues: makeIssues([]),
+      filter: { keywords: ['post-merge', 'retro'] },
+      roadmap,
+      currentSprint: 137,
+    });
+
+    const retroRec = result.recommendations.find(r => r.id === 'slope-retro');
+    expect(retroRec).toBeDefined();
+    expect(retroRec?.reason).toContain('sprint text');
+  });
+
   it('recommends registered skills from claimed and changed file paths', () => {
     const result = buildSkillBriefing({
       registry: makeSkillRegistry(),

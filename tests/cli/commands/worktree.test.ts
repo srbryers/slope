@@ -93,6 +93,22 @@ describe('slope worktree cleanup', () => {
     expect(console.log).toHaveBeenCalledWith(expect.stringContaining('cleanup'));
   });
 
+  it('prints nested start help without running git or registering state (#501)', async () => {
+    await worktreeCommand(['start', '--branch=codex/help-safety', '--help']);
+
+    expect(console.log).toHaveBeenCalledWith(expect.stringContaining('slope worktree'));
+    expect(mockExecSync).not.toHaveBeenCalled();
+    expect(mockExecFileSync).not.toHaveBeenCalled();
+  });
+
+  it('prints nested cleanup help without removing worktrees (#501)', async () => {
+    await worktreeCommand(['cleanup', '--all', '--help']);
+
+    expect(console.log).toHaveBeenCalledWith(expect.stringContaining('slope worktree'));
+    expect(mockExecSync).not.toHaveBeenCalled();
+    expect(mockExecFileSync).not.toHaveBeenCalled();
+  });
+
   it('surfaces sibling worktree status and touched-path overlap', async () => {
     const porcelainOutput = [
       'worktree /repo',

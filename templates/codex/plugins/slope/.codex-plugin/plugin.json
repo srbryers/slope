@@ -1,6 +1,6 @@
 {
   "name": "slope",
-  "version": "1.57.3",
+  "version": "1.58.0",
   "description": "SLOPE sprint tracking, guard hooks, and Codex workflow skills.",
   "author": {
     "name": "SLOPE",
@@ -22,7 +22,7 @@
   "interface": {
     "displayName": "SLOPE",
     "shortDescription": "Sprint tracking, guard hooks, and workflow skills for Codex.",
-    "longDescription": "Packages SLOPE's Codex-facing adapter boundary: guard hook metadata, a dispatcher over the SLOPE CLI, MCP server metadata, and skills for sprint setup, closeout, and guard-warning handling. Runtime guard execution uses user or project hooks.json shims until Codex plugin_hooks is stable.",
+    "longDescription": "Packages SLOPE's Codex-facing adapter boundary: guard hook metadata, a dispatcher over the SLOPE CLI, MCP server metadata, and skills for sprint setup, closeout, post-merge retros, and guard-warning handling. Runtime guard execution uses user or project hooks.json shims until Codex plugin_hooks is stable.",
     "developerName": "SLOPE",
     "category": "Productivity",
     "capabilities": [
@@ -36,7 +36,8 @@
     "defaultPrompt": [
       "Set up SLOPE for this repo from Codex.",
       "Start or inspect the current SLOPE sprint.",
-      "Close out the sprint with validation and review."
+      "Close out the sprint with validation and review.",
+      "Run a post-merge retro and save durable learnings."
     ],
     "brandColor": "#2F6F5E"
   }

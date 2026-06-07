@@ -5,6 +5,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, basename } from 'node:path';
 import { execSync } from 'node:child_process';
 import { hasMetaphor } from './metaphor.js';
+import { QUIET_STDIO } from './process.js';
 import type { InitInput } from './interview.js';
 
 export interface DetectedInfo {
@@ -54,10 +55,11 @@ export function runLightweightDetection(cwd: string): DetectedInfo {
 
   // 2. Read git remote for repoUrl
   try {
-    const raw = execSync('git remote get-url origin 2>/dev/null', {
+    const raw = execSync('git remote get-url origin', {
       cwd,
       encoding: 'utf8',
       timeout: 2000,
+      stdio: QUIET_STDIO,
     }).trim();
     // Convert SSH to HTTPS if needed
     if (raw.startsWith('https://github.com/')) {

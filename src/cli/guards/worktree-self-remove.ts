@@ -1,5 +1,6 @@
 import { execSync } from 'node:child_process';
 import { resolve } from 'node:path';
+import { QUIET_STDIO } from '../../core/process.js';
 import type { HookInput, GuardResult } from '../../core/index.js';
 
 /**
@@ -16,8 +17,8 @@ export async function worktreeSelfRemoveGuard(input: HookInput, cwd: string): Pr
   // Check if we're in a worktree (not the main working tree)
   let inWorktree = false;
   try {
-    const commonDir = execSync('git rev-parse --git-common-dir 2>/dev/null', { cwd, encoding: 'utf8' }).trim();
-    const gitDir = execSync('git rev-parse --git-dir 2>/dev/null', { cwd, encoding: 'utf8' }).trim();
+    const commonDir = execSync('git rev-parse --git-common-dir', { cwd, encoding: 'utf8', stdio: QUIET_STDIO }).trim();
+    const gitDir = execSync('git rev-parse --git-dir', { cwd, encoding: 'utf8', stdio: QUIET_STDIO }).trim();
     // In the main working tree, git-dir === git-common-dir (both are .git)
     // In a worktree, git-dir is .git/worktrees/<name> while common-dir is .git
     inWorktree = gitDir !== commonDir && gitDir !== '.git';

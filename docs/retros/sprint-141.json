@@ -1,0 +1,138 @@
+{
+  "sprint_number": 141,
+  "player": "codex",
+  "theme": "Workflow State Resync",
+  "par": 5,
+  "slope": 4,
+  "score": 5,
+  "score_label": "par",
+  "date": "2026-06-06",
+  "type": "workflow + guard hardening",
+  "skills_used": [
+    "slope-sprint-workflow",
+    "slope-api-reference"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow"
+  ],
+  "shots": [
+    {
+      "ticket_key": "S141-1",
+      "title": "Expire or close stale workflow executions by merged branch, newer sprint, or age (#503)",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Extracted workflow reconciliation into `src/cli/workflow-resync.ts` and extended stale execution detection to scorecards, complete/superseded roadmap entries, newer branch/running sprint evidence, and age."
+    },
+    {
+      "ticket_key": "S141-2",
+      "title": "Add workflow resync path that fast-forwards execution state from branch and commits (#503)",
+      "club": "driver",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "minor",
+          "description": "Architect review caught that newer-running-sprint stale detection was too broad for edit-time guard reconciliation; the guard now disables that reason while explicit cleanup keeps it."
+        }
+      ],
+      "notes": "Added `slope sprint workflow resync` and guard-side reconciliation that can fast-forward a branch sprint to the per-ticket agent-work step when matching sprint commits already exist."
+    },
+    {
+      "ticket_key": "S141-3",
+      "title": "Scope PR creation gate to branch-inferred sprint and rebind stale sprint-state (#503)",
+      "club": "long_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "The PR creation guard now rebinds stale sprint-state to the branch-inferred sprint before checking scorecard and gates, so an S66 PR is not blocked by stale S65 state."
+    },
+    {
+      "ticket_key": "S141-4",
+      "title": "Add stale S65/S66 workflow and PR gate drift regressions (#503)",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added regressions for newer-sprint cleanup, aged executions, branch-commit workflow fast-forward, workflow-step-gate auto-resync, and PR-gate sprint-state rebind."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 1,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "wind",
+      "impact": "minor",
+      "description": "The Windows full suite continues to emit known temp-repo stderr noise, but all tests passed."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Cleanup commands can be more assertive than edit-time guards.",
+      "outcome": "Newer running sprint detection is enabled for explicit cleanup/resync but disabled for workflow-step-gate reconciliation."
+    },
+    {
+      "type": "lessons",
+      "description": "Workflow state should reconcile before guards enforce it.",
+      "outcome": "The workflow-step gate now pauses stale executions and fast-forwards proven branch-local work before deciding whether to block edits."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "`corepack pnpm vitest run tests/cli/sprint-workflow.test.ts tests/cli/guards/workflow-step-gate.test.ts tests/cli/guards/sprint-completion.test.ts` passed: 78 tests.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`corepack pnpm typecheck`, `corepack pnpm prepare`, and `corepack pnpm test` passed on Windows: 228 test files passed, 1 skipped; 3615 tests passed, 25 skipped.",
+      "status": "healthy"
+    },
+    {
+      "category": "docs",
+      "description": "`slope roadmap validate` passed with existing historical roadmap warnings.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Substantial but steady. The underlying issue was not one guard being wrong; it was multiple guards trusting stale local state without first reconciling reality.",
+    "advice_for_next_player": "When a guard consumes durable workflow state, give it a conservative reconciliation pass before enforcement.",
+    "what_surprised_you": "The explicit cleanup heuristic was too strong for edit-time use until it became configurable.",
+    "excited_about_next": "S142 can focus on codebase-map safety with a clearer pattern for conservative guard reconciliation."
+  },
+  "bunker_locations": [
+    "Do not use newer-running-sprint evidence inside edit guards unless the current branch also supports it.",
+    "Fast-forwarding workflow state should also synchronize sprint-state so guards agree on the lifecycle phase.",
+    "PR creation gates should infer branch sprint before enforcing gates from persisted sprint-state."
+  ],
+  "yardage_book_updates": [
+    "`src/cli/workflow-resync.ts` centralizes workflow execution staleness, branch sprint inference, workflow fast-forwarding, and sprint-state rebinding.",
+    "`slope sprint workflow resync` reconciles stale and branch-drifted workflow executions.",
+    "`workflow-step-gate` now reconciles executions before blocking edits on non-agent-work steps.",
+    "`sprint-completion` now rebinds stale sprint-state to the branch-inferred sprint before PR gate checks."
+  ],
+  "course_management_notes": [
+    "Implementation commit: 458309a.",
+    "Validation passed: focused S141 tests, `corepack pnpm typecheck`, `corepack pnpm prepare`, `corepack pnpm test`, and `slope roadmap validate`.",
+    "Issue #503 should close when the PR containing S141 merges."
+  ],
+  "slope_factors": [
+    "workflow_state",
+    "guard_reconciliation",
+    "sprint_state"
+  ]
+}

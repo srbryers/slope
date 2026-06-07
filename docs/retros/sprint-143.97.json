@@ -1,0 +1,119 @@
+{
+  "sprint_number": 143.97,
+  "player": "codex",
+  "theme": "Git Analyzer Cadence Fixture Stability",
+  "par": 3,
+  "slope": 1,
+  "score": 3,
+  "score_label": "par",
+  "date": "2026-06-07",
+  "type": "test reliability",
+  "skills_used": [
+    "slope-sprint-workflow",
+    "slope-api-reference"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow"
+  ],
+  "shots": [
+    {
+      "ticket_key": "S143.97-1",
+      "title": "Replace slow daily-cadence git fixture setup with a deterministic fast history builder (#516)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Raised #516 from the S144 release-gate timeout and replaced the daily-cadence fixture's 65 index-based `git commit` calls with a faster `commit-tree`/`update-ref` history builder."
+    },
+    {
+      "ticket_key": "S143.97-2",
+      "title": "Rerun focused analyzer and release-gate full-suite validation (#516)",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [],
+      "notes": "Focused analyzer, paired analyzer+MCP stress, typecheck, and full-suite release validation all passed after the fixture hardening."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 2,
+    "fairways_total": 2,
+    "greens_in_regulation": 2,
+    "greens_total": 2,
+    "putts": 1,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "wind",
+      "impact": "minor",
+      "description": "The issue was discovered during S144 release validation rather than during S143.97 planning, so S144 was temporarily paused while #516 was raised and fixed."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Git analyzer fixtures that synthesize many commits can become full-suite release hazards on Windows even when focused reruns pass.",
+      "outcome": "The daily-cadence regression now preserves the 65-commit signal while avoiding 65 slow worktree/index commits."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "`corepack pnpm vitest run tests/core/analyzers/git.test.ts` passed: 24 tests.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`corepack pnpm vitest run tests/core/analyzers/git.test.ts tests/mcp/index-src.test.ts` passed: 85 tests.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`corepack pnpm typecheck` passed.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`corepack pnpm test` passed: 231 test files passed, 1 skipped; 3629 tests passed, 25 skipped.",
+      "status": "healthy"
+    },
+    {
+      "category": "docs",
+      "description": "`slope map --check` reported current and `slope roadmap validate` passed with only historical warnings.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "A useful interruption. The release gate was telling us the test fixture itself needed hardening, not just another rerun.",
+    "advice_for_next_player": "When a synthetic git-history test needs many commits, build the graph cheaply with git plumbing instead of repeatedly committing through the worktree and index.",
+    "what_surprised_you": "The focused test passed but still sat close enough to the timeout budget that full-suite contention could tip it over.",
+    "excited_about_next": "S144 can now resume with a cleaner full-suite gate instead of carrying a known release flake."
+  },
+  "bunker_locations": [
+    "Full-suite pressure can expose timing hazards in tests that are merely slow in focused mode.",
+    "Repeated `git commit` fixture setup is expensive on Windows and should be avoided for large synthetic histories."
+  ],
+  "yardage_book_updates": [
+    "`tests/core/analyzers/git.test.ts` now uses `git commit-tree` plus `git update-ref` to build the 65-commit daily-cadence fixture.",
+    "Issue #516 is triaged into S143.97 and should close when this PR merges."
+  ],
+  "course_management_notes": [
+    "Triage commit: ea2af74.",
+    "Implementation commit: 30b1632.",
+    "Issue #516 should close when the PR containing S143.97 merges.",
+    "Return to S144 release validation after S143.97 closeout."
+  ],
+  "slope_factors": [
+    "test_reliability",
+    "windows_full_suite",
+    "git_fixture_performance"
+  ]
+}

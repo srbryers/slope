@@ -13,8 +13,8 @@ import {
   type GateName,
   type SprintPhase,
 } from '../sprint-state.js';
-import { WorkflowEngine, loadWorkflow, resolveVariables, validateWorkflow, loadConfig, loadScorecards, parseRoadmap, castRoadmapStructure, formatSprintLabel, formatSprintNumber, parseSprintNumber } from '../../core/index.js';
-import type { RoadmapSprint, WorkflowDefinition, WorkflowExecution } from '../../core/index.js';
+import { WorkflowEngine, loadWorkflow, resolveVariables, validateWorkflow, loadConfig, parseRoadmap, castRoadmapStructure, formatSprintLabel, formatSprintNumber, parseSprintNumber } from '../../core/index.js';
+import type { WorkflowDefinition, WorkflowExecution } from '../../core/index.js';
 import { createHash } from 'node:crypto';
 
 /** Get workflow definition from execution snapshot (preferred) or disk (fallback for old executions) */
@@ -35,9 +35,16 @@ function getDefinition(exec: WorkflowExecution, cwd: string): { def: WorkflowDef
   return { def: loadWorkflow(exec.workflow_name, cwd), drifted: false };
 }
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { join, dirname, basename } from 'node:path';
+import { join, dirname, basename, isAbsolute } from 'node:path';
 import { createStore } from '../../store/index.js';
 import { formatCliError } from '../error-reporter.js';
+import {
+  buildSprintResumePointer,
+  planPortableSprintResume,
+  writeSprintResumePointer,
+  type PortableResumePlan,
+  type SprintResumeClaimPointer,
+} from '../sprint-resume.js';
 import {
   blockingRoadmapIssuesForSprint,
   collectSiblingWorktreeReality,
@@ -46,6 +53,7 @@ import {
   loadRoadmapReality,
   parseTouchedPaths,
 } from '../pre-sprint-reality.js';
+import { findStaleWorkflowExecutions, reconcileWorkflowExecutions } from '../workflow-resync.js';
 
 /**
  * Check completion_conditions for a step before allowing completion/skip.
@@ -667,61 +675,35 @@ async function workflowStatusCommand(args: string[], cwd: string): Promise<void>
   }
 }
 
-interface StaleWorkflowExecution {
-  exec: WorkflowExecution;
-  reason: string;
-}
-
-function completedRoadmapSprintIds(cwd: string, config: ReturnType<typeof loadConfig>): Set<number> {
-  if (!config.roadmapPath) return new Set();
-  const roadmapPath = join(cwd, config.roadmapPath);
-  if (!existsSync(roadmapPath)) return new Set();
-  try {
-    const raw = JSON.parse(readFileSync(roadmapPath, 'utf8'));
-    const parsed = parseRoadmap(raw);
-    const roadmap = parsed.roadmap ?? castRoadmapStructure(raw);
-    if (!roadmap) return new Set();
-    return new Set(
-      roadmap.sprints
-        .filter(sprint => {
-          const status = (sprint as RoadmapSprint & { status?: string }).status;
-          return status === 'complete' || status === 'superseded';
-        })
-        .map(sprint => sprint.id),
-    );
-  } catch {
-    return new Set();
-  }
-}
-
-async function findStaleWorkflowExecutions(cwd: string, store: ReturnType<typeof createStore>): Promise<StaleWorkflowExecution[]> {
-  const config = loadConfig(cwd);
-  const scorecardSprintIds = new Set(loadScorecards(config, cwd).map(card => card.sprint_number));
-  const roadmapDoneIds = completedRoadmapSprintIds(cwd, config);
-  const running = await store.listExecutions({ status: 'running' });
-  const stale: StaleWorkflowExecution[] = [];
-
-  for (const exec of running) {
-    const sprint = sprintNumberFromId(exec.sprint_id);
-    if (sprint === null) continue;
-    const reasons: string[] = [];
-    if (scorecardSprintIds.has(sprint)) reasons.push('scorecard exists');
-    if (roadmapDoneIds.has(sprint)) reasons.push('roadmap complete/superseded');
-    if (reasons.length > 0) {
-      stale.push({ exec, reason: reasons.join(', ') });
-    }
-  }
-
-  return stale;
-}
-
 async function workflowCleanupCommand(args: string[], cwd: string): Promise<void> {
   const action = args[0];
   const dryRun = args.includes('--dry-run');
   const staleOnly = args.includes('--stale');
+  const resync = action === 'resync';
+
+  if (resync) {
+    const store = getStore(cwd);
+    try {
+      const result = await reconcileWorkflowExecutions(cwd, store);
+      for (const { exec, reason } of result.paused) {
+        console.log(`Paused ${exec.sprint_id ?? exec.id} (${exec.workflow_name}) at ${exec.current_phase}/${exec.current_step} — ${reason}`);
+      }
+      for (const item of result.fastForwarded) {
+        console.log(`Fast-forwarded ${item.exec.sprint_id ?? item.exec.id} (${item.exec.workflow_name}) to ${item.phase}/${item.step} — ${item.reason}`);
+      }
+      if (result.paused.length === 0 && result.fastForwarded.length === 0) {
+        console.log('Workflow state already matches git/roadmap reality.');
+      } else {
+        console.log(`\nResynced workflow state: ${result.paused.length} paused, ${result.fastForwarded.length} fast-forwarded.`);
+      }
+    } finally {
+      store.close();
+    }
+    return;
+  }
 
   if (action !== 'cleanup' || !staleOnly) {
-    console.error('Usage: slope sprint workflow cleanup --stale [--dry-run]');
+    console.error('Usage: slope sprint workflow cleanup --stale [--dry-run]\n       slope sprint workflow resync');
     process.exit(1);
   }
 
@@ -763,7 +745,198 @@ function printExecution(exec: { id: string; workflow_name: string; sprint_id?: s
   console.log('');
 }
 
+interface PortableResumeFlags {
+  portable: boolean;
+  writePointer: boolean;
+  force: boolean;
+  dryRun: boolean;
+  sprint?: number;
+  phase?: SprintPhase;
+  from?: string;
+  output?: string;
+  invalidSprint?: string;
+  invalidPhase?: string;
+}
+
+function shouldUsePortableResume(args: string[]): boolean {
+  return args.includes('--portable')
+    || args.includes('--write-pointer')
+    || args.includes('--dry-run')
+    || args.some(a => a.startsWith('--from=') || a.startsWith('--sprint=') || a.startsWith('--phase=') || a.startsWith('--output='));
+}
+
+function parsePortableResumeFlags(args: string[]): PortableResumeFlags {
+  const flags: PortableResumeFlags = {
+    portable: args.includes('--portable'),
+    writePointer: args.includes('--write-pointer'),
+    force: args.includes('--force'),
+    dryRun: args.includes('--dry-run'),
+  };
+
+  for (const arg of args) {
+    if (arg.startsWith('--sprint=')) {
+      const raw = arg.slice('--sprint='.length);
+      const sprint = parseSprintNumber(raw);
+      if (sprint) flags.sprint = sprint;
+      else flags.invalidSprint = raw;
+    } else if (arg.startsWith('--phase=')) {
+      const phase = arg.slice('--phase='.length);
+      if (isSprintPhase(phase)) flags.phase = phase;
+      else flags.invalidPhase = phase;
+    } else if (arg.startsWith('--from=')) {
+      flags.from = arg.slice('--from='.length);
+    } else if (arg.startsWith('--output=')) {
+      flags.output = arg.slice('--output='.length);
+    }
+  }
+  return flags;
+}
+
+async function portableResumeCommand(args: string[], cwd: string): Promise<void> {
+  const flags = parsePortableResumeFlags(args);
+  const config = loadConfig(cwd);
+  if (flags.invalidSprint) {
+    console.error(`Error: invalid sprint "${flags.invalidSprint}". Use --sprint=N, e.g. --sprint=177.`);
+    process.exit(1);
+    return;
+  }
+  if (flags.invalidPhase) {
+    console.error(`Error: invalid phase "${flags.invalidPhase}". Valid phases: ${SPRINT_PHASES.join(', ')}`);
+    process.exit(1);
+    return;
+  }
+
+  if (flags.writePointer) {
+    const current = loadSprintState(cwd);
+    const sprint = flags.sprint ?? current?.sprint;
+    if (!sprint) {
+      console.error('Usage: slope sprint resume --write-pointer --sprint=N [--phase=<phase>] [--output=path]');
+      process.exit(1);
+      return;
+    }
+    const phase = flags.phase ?? current?.phase ?? 'implementing';
+    const resumeClaims = await collectResumeClaimPointers(cwd, sprint);
+    const pointer = buildSprintResumePointer(cwd, config, { sprint, phase, resumeClaims });
+    const outputPath = flags.output ? (isAbsolute(flags.output) ? flags.output : join(cwd, flags.output)) : undefined;
+    const written = writeSprintResumePointer(cwd, pointer, outputPath);
+    console.log(`Sprint resume pointer written: ${written}`);
+    console.log(`  Sprint: ${formatSprintLabel(sprint)} (${phase})`);
+    console.log(`  Resume claims: ${resumeClaims.length}`);
+    console.log('  Local runtime state excluded: slope.db, session locks, guard metrics, baselines');
+    return;
+  }
+
+  const plan = planPortableSprintResume(cwd, config, {
+    sprint: flags.sprint,
+    phase: flags.phase,
+    from: flags.from,
+    force: flags.force,
+  });
+
+  printPortableResumePlan(plan);
+
+  if (plan.unsafe.length > 0 && !flags.force) {
+    console.error('\nPortable resume refused. Rerun with --force after reviewing the unsafe condition(s).');
+    process.exit(1);
+    return;
+  }
+
+  const existing = loadSprintState(cwd);
+  if (existing && existing.sprint !== plan.sprint && !flags.force) {
+    console.error(`\nPortable resume refused. Local sprint-state is ${formatSprintLabel(existing.sprint)}, but resume target is ${formatSprintLabel(plan.sprint)}.`);
+    console.error('Run `slope sprint reset` or rerun with --force if replacing local state is intentional.');
+    process.exit(1);
+    return;
+  }
+
+  if (flags.dryRun) {
+    console.log('\nDry run: local sprint-state and claims were not changed.');
+    return;
+  }
+
+  saveSprintState(cwd, createSprintState(plan.sprint, plan.phase));
+  const restoredClaims = await restoreResumeClaims(cwd, plan);
+  console.log(`\nPortable sprint resume complete: ${formatSprintLabel(plan.sprint)} (${plan.phase}).`);
+  console.log(`  Fresh local sprint-state written to .slope/sprint-state.json`);
+  console.log(`  Resume claims restored: ${restoredClaims}`);
+  console.log('  Local DB/locks/metrics were not imported from another machine.');
+}
+
+function printPortableResumePlan(plan: PortableResumePlan): void {
+  console.log('\nPortable sprint resume plan');
+  console.log('='.repeat(32));
+  console.log(`  Sprint: ${formatSprintLabel(plan.sprint)}`);
+  console.log(`  Phase:  ${plan.phase}`);
+  console.log(`  Source: ${plan.source}${plan.pointerPath ? ` (${plan.pointerPath})` : ''}`);
+  if (plan.currentBranch) console.log(`  Branch: ${plan.currentBranch}`);
+  if (plan.headCommit) console.log(`  HEAD:   ${plan.headCommit.slice(0, 12)}`);
+  const evidence = Object.entries(plan.evidence);
+  if (evidence.length > 0) {
+    console.log('  Evidence:');
+    for (const [label, value] of evidence) {
+      console.log(`    - ${label}: ${value}`);
+    }
+  }
+  if (plan.resumeClaims.length > 0) {
+    console.log('  Resume claims:');
+    for (const claim of plan.resumeClaims) {
+      console.log(`    - ${claim.id} (${claim.scope ?? 'ticket'}, ${claim.state})${claim.last_evidence ? ` via ${claim.last_evidence}` : ''}`);
+    }
+  }
+  if (plan.unsafe.length > 0) {
+    console.log('  Unsafe conditions:');
+    for (const item of plan.unsafe) console.log(`    - ${item}`);
+  }
+}
+
+async function collectResumeClaimPointers(cwd: string, sprint: number): Promise<SprintResumeClaimPointer[]> {
+  const { resolveStore } = await import('../store.js');
+  const store = await resolveStore(cwd);
+  try {
+    const claims = await store.list(sprint);
+    return claims.map(claim => ({
+      id: claim.target,
+      state: 'in_progress',
+      scope: claim.scope,
+      last_evidence: claim.notes,
+    }));
+  } finally {
+    store.close();
+  }
+}
+
+async function restoreResumeClaims(cwd: string, plan: PortableResumePlan): Promise<number> {
+  const claims = plan.resumeClaims.filter(claim => claim.state !== 'done');
+  if (claims.length === 0) return 0;
+  const { resolveStore } = await import('../store.js');
+  const store = await resolveStore(cwd);
+  const player = process.env.USER || 'unknown';
+  let restored = 0;
+  try {
+    const existing = await store.list(plan.sprint);
+    for (const claim of claims) {
+      if (existing.some(c => c.target === claim.id && c.player === player)) continue;
+      await store.claim({
+        sprint_number: plan.sprint,
+        player,
+        target: claim.id,
+        scope: claim.scope ?? 'ticket',
+        notes: claim.last_evidence ? `portable resume: ${claim.last_evidence}` : 'portable resume',
+      });
+      restored++;
+    }
+  } finally {
+    store.close();
+  }
+  return restored;
+}
+
 async function resumeCommand(args: string[], cwd: string): Promise<void> {
+  if (shouldUsePortableResume(args)) {
+    await portableResumeCommand(args, cwd);
+    return;
+  }
+
   const sprintArg = args.find(a => !a.startsWith('--'));
   if (!sprintArg) {
     console.error('Usage: slope sprint resume <sprint_id>');
@@ -1105,6 +1278,10 @@ Legacy commands:
   slope sprint phase <phase>       Update current sprint phase
   slope sprint gate <name>           Mark a gate as complete
   slope sprint status                Show sprint state and gates
+  slope sprint resume --portable [--from=path] [--force] [--dry-run]
+                                      Reconstruct local sprint state from tracked artifacts
+  slope sprint resume --write-pointer [--output=path]
+                                      Write tracked resume pointer without syncing DB/locks
   slope sprint reset                 Clear sprint state
 
 Workflow commands:
@@ -1115,6 +1292,7 @@ Workflow commands:
   slope sprint context <sprint_id>   Show current workflow step and remaining work
   slope sprint validate <sprint_id>  Validate workflow, plan, scorecard, and tests
   slope sprint workflow cleanup --stale [--dry-run]         Pause stale completed/superseded executions
+  slope sprint workflow resync       Reconcile workflow executions with git/roadmap reality
   slope sprint skip <id> --step=<s> --reason="..."          Skip a blocking step
 `);
 }

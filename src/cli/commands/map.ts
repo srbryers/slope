@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { execSync } from 'node:child_process';
-import { loadConfig, loadScorecards, detectLatestSprint, GUARD_DEFINITIONS, loadFlows, checkFlowStaleness } from '../../core/index.js';
+import { loadConfig, loadScorecards, detectLatestSprint, formatSprintNumber, GUARD_DEFINITIONS, loadFlows, checkFlowStaleness, parseSprintNumber } from '../../core/index.js';
 import type { SlopeConfig } from '../../core/index.js';
 import { CLI_COMMAND_REGISTRY } from '../registry.js';
 import { SLOPE_REGISTRY } from '../../mcp/registry.js';
@@ -10,10 +10,47 @@ import { SLOPE_REGISTRY } from '../../mcp/registry.js';
 
 function exec(cmd: string, cwd: string): string {
   try {
-    return execSync(cmd, { cwd, encoding: 'utf8', timeout: 10000 }).trim();
+    return execSync(cmd, {
+      cwd,
+      encoding: 'utf8',
+      timeout: 10000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
   } catch {
     return '';
   }
+}
+
+function toRepoPath(path: string): string {
+  return path.replace(/\\/g, '/');
+}
+
+const SOURCE_EXTENSIONS = new Set([
+  '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs',
+  '.py', '.cs', '.java', '.go', '.rs', '.rb', '.php',
+  '.swift', '.kt', '.kts', '.c', '.cc', '.cpp', '.h', '.hpp',
+]);
+
+const SKIP_SOURCE_DIRS = new Set([
+  '.git', '.slope', '.venv', 'venv', 'node_modules', 'dist',
+  'build', 'coverage', '__pycache__', 'bin', 'obj', 'library', 'temp',
+]);
+
+function sourceExtension(name: string): string | null {
+  const lower = name.toLowerCase();
+  if (lower.endsWith('.d.ts')) return '.ts';
+  for (const ext of SOURCE_EXTENSIONS) {
+    if (lower.endsWith(ext)) return ext;
+  }
+  return null;
+}
+
+function isTestSource(name: string, fullPath: string): boolean {
+  const lowerName = name.toLowerCase();
+  const repoPath = toRepoPath(fullPath).toLowerCase();
+  return /\.(test|spec)\.[^.]+$/.test(lowerName)
+    || /_test\.[^.]+$/.test(lowerName)
+    || /(^|\/)(__tests__|tests?|specs?)(\/|$)/.test(repoPath);
 }
 
 interface ProjectIdentity {
@@ -66,12 +103,12 @@ function countSourceFiles(root: string): { source: number; test: number } {
   function walk(dir: string): void {
     if (!existsSync(dir)) return;
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
-      if (entry.name === 'node_modules' || entry.name === 'dist' || entry.name === '.git') continue;
+      if (SKIP_SOURCE_DIRS.has(entry.name.toLowerCase())) continue;
       const full = join(dir, entry.name);
       if (entry.isDirectory()) {
         walk(full);
-      } else if (entry.name.endsWith('.ts') || entry.name.endsWith('.tsx')) {
-        if (entry.name.endsWith('.test.ts') || entry.name.endsWith('.spec.ts')) {
+      } else if (sourceExtension(entry.name)) {
+        if (isTestSource(entry.name, full)) {
           test++;
         } else {
           source++;
@@ -185,13 +222,19 @@ function generateGenericPackageInventory(cwd: string): string {
     sections.push({ kind: 'src', name: 'src/', description: '', root: join(cwd, 'src') });
   }
 
+  const rootCounts = countSourceFiles(cwd);
+  if (sections.length === 0 && (rootCounts.source > 0 || rootCounts.test > 0)) {
+    sections.push({ kind: 'repo', name: 'Repository root', description: '', root: cwd });
+  }
+
   if (sections.length === 0) {
     return '\n_No packages, apps, or top-level src/ directory detected. The map can still track flows, sprint history, and gotchas._\n';
   }
 
   for (const s of sections) {
     const { source, test } = countSourceFiles(s.root);
-    lines.push(`### \`${relative(cwd, s.root)}\``);
+    const repoPath = toRepoPath(relative(cwd, s.root)) || '.';
+    lines.push(`### \`${repoPath}\``);
     lines.push(`- Package: \`${s.name}\``);
     if (s.description) lines.push(`- ${s.description}`);
     lines.push(`- Source files: ${source} | Test files: ${test}`);
@@ -681,7 +724,10 @@ export function parseMapMetadata(content: string): Record<string, string> {
 export function runStalenessCheck(cwd: string, config: SlopeConfig, mapContent: string): CheckResult[] {
   const results: CheckResult[] = [];
   const meta = parseMapMetadata(mapContent);
-  const { source: currentSource } = countSourceFiles(join(cwd, 'src'));
+  const identity = readProjectIdentity(cwd);
+  const { source: currentSource } = identity.isSlopeSelf
+    ? countSourceFiles(join(cwd, 'src'))
+    : countSourceFiles(cwd);
 
   // 1. Source file count drift
   const mapFiles = parseInt(meta.source_files || '0', 10);
@@ -700,7 +746,7 @@ export function runStalenessCheck(cwd: string, config: SlopeConfig, mapContent: 
   // 2. Git distance
   const mapSha = meta.git_sha || '';
   if (mapSha) {
-    const distance = parseInt(exec(`git rev-list --count ${mapSha}..HEAD 2>/dev/null`, cwd) || '0', 10);
+    const distance = gitDistanceSinceMapSha(cwd, mapSha);
     if (distance > 50) {
       results.push({ label: 'Git distance', status: 'stale', message: `${distance} commits behind (threshold: 50)` });
     } else if (distance > 30) {
@@ -711,15 +757,18 @@ export function runStalenessCheck(cwd: string, config: SlopeConfig, mapContent: 
   }
 
   // 3. Sprint currency
-  const mapSprint = parseInt(meta.sprint || '0', 10);
+  const mapSprint = parseSprintNumber(meta.sprint || '0') ?? 0;
   const currentSprint = detectLatestSprint(config, cwd);
   const sprintDelta = currentSprint - mapSprint;
+  const currentSprintLabel = formatSprintNumber(currentSprint);
+  const mapSprintLabel = formatSprintNumber(mapSprint);
+  const sprintDeltaLabel = formatSprintNumber(Number(sprintDelta.toFixed(6)));
   if (sprintDelta > 3) {
-    results.push({ label: 'Sprint currency', status: 'stale', message: `Sprint ${currentSprint} (map says ${mapSprint}, +${sprintDelta} behind)` });
+    results.push({ label: 'Sprint currency', status: 'stale', message: `Sprint ${currentSprintLabel} (map says ${mapSprintLabel}, +${sprintDeltaLabel} behind)` });
   } else if (sprintDelta > 0) {
-    results.push({ label: 'Sprint currency', status: 'warn', message: `Sprint ${currentSprint} (map says ${mapSprint}, +${sprintDelta})` });
+    results.push({ label: 'Sprint currency', status: 'warn', message: `Sprint ${currentSprintLabel} (map says ${mapSprintLabel}, +${sprintDeltaLabel})` });
   } else {
-    results.push({ label: 'Sprint currency', status: 'ok', message: `Sprint ${currentSprint} — current` });
+    results.push({ label: 'Sprint currency', status: 'ok', message: `Sprint ${currentSprintLabel} — current` });
   }
 
   // 4. Dead file references
@@ -745,6 +794,54 @@ export function runStalenessCheck(cwd: string, config: SlopeConfig, mapContent: 
 }
 
 // ── Main Command ────────────────────────────────────────────────
+
+function gitDistanceSinceMapSha(cwd: string, mapSha: string): number {
+  const sha = mapSha.trim();
+  if (!/^[0-9a-fA-F]{4,64}$/.test(sha)) return 0;
+  const raw = exec(`git rev-list --count --ancestry-path ${sha}..HEAD`, cwd);
+  const parsed = parseInt(raw || '0', 10);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function formatMetadataBlock(meta: MapMetadata): string {
+  return [
+    '---',
+    `generated_at: "${meta.generated_at}"`,
+    `git_sha: "${meta.git_sha}"`,
+    `sprint: ${meta.sprint}`,
+    `source_files: ${meta.source_files}`,
+    `test_files: ${meta.test_files}`,
+    `cli_commands: ${meta.cli_commands}`,
+    `guards: ${meta.guards}`,
+    `flows: ${meta.flows}`,
+    '---',
+  ].join('\n');
+}
+
+function updateOrInsertMetadataBlock(content: string, meta: MapMetadata): string {
+  if (/^---\n[\s\S]*?\n---/m.test(content)) {
+    return updateMetadataBlock(content, meta);
+  }
+  return `${formatMetadataBlock(meta)}\n\n${content}`;
+}
+
+function hasAutoGeneratedSections(content: string): boolean {
+  return content.includes('<!-- AUTO-GENERATED: START packages -->')
+    || content.includes('<!-- AUTO-GENERATED: START flows -->')
+    || content.includes('<!-- AUTO-GENERATED: START tests -->')
+    || content.includes('<!-- AUTO-GENERATED: START history -->')
+    || content.includes('<!-- AUTO-GENERATED: START gotchas -->');
+}
+
+function updateGenericMapSections(content: string, cwd: string, config: SlopeConfig, meta: MapMetadata): string {
+  let updated = updateOrInsertMetadataBlock(content, meta);
+  updated = replaceAutoSection(updated, 'packages', generateGenericPackageInventory(cwd));
+  updated = replaceAutoSection(updated, 'flows', generateFlowsSummary(cwd, config));
+  updated = replaceAutoSection(updated, 'tests', generateTestInventory(cwd));
+  updated = replaceAutoSection(updated, 'history', generateSprintHistory(cwd, config));
+  updated = replaceAutoSection(updated, 'gotchas', generateKnownGotchas(cwd, config));
+  return updated;
+}
 
 function parseArgs(args: string[]): Record<string, string> {
   const result: Record<string, string> = {};
@@ -804,18 +901,24 @@ export async function mapCommand(args: string[]): Promise<void> {
   const meta = gatherMetadata(cwd, config, identity);
 
   if (!identity.isSlopeSelf) {
-    if (meta.source_files === 0 && existsSync(outputPath) && !force && !isSlopeShapedMap(readFileSync(outputPath, 'utf8'))) {
-      console.log('\x1b[33mRefusing to overwrite existing CODEBASE.md with a zero-source map.\x1b[0m');
-      console.log('  No TypeScript source files were detected. Re-run with `slope map --force` if a docs-only map is intentional.\n');
-      process.exit(1);
+    const existingContent = existsSync(outputPath) ? readFileSync(outputPath, 'utf8') : null;
+    // Downstream project: preserve existing curated maps unless the caller
+    // explicitly forces replacement or the file is an old SLOPE-shaped map.
+    if (existingContent && !force && !isSlopeShapedMap(existingContent)) {
+      const content = hasAutoGeneratedSections(existingContent)
+        ? updateGenericMapSections(existingContent, cwd, config, meta)
+        : updateOrInsertMetadataBlock(existingContent, meta);
+      writeFileSync(outputPath, content, 'utf8');
+      if (hasAutoGeneratedSections(existingContent)) {
+        console.log(`  Updated project map sections for \`${identity.title}\``);
+      } else {
+        console.log('  Refreshed CODEBASE.md metadata and preserved existing manual content');
+      }
+    } else {
+      const content = generateGenericMap(cwd, config, meta, identity);
+      writeFileSync(outputPath, content, 'utf8');
+      console.log(`  Generated project map for \`${identity.title}\``);
     }
-    // Downstream project — always (re)generate from the generic template.
-    // Surgical section updates would require the existing map to have the
-    // right markers, and v1.55.1 wrote SLOPE-internal sections into other
-    // repos' CODEBASE.md. Regenerating once corrects that. (#351)
-    const content = generateGenericMap(cwd, config, meta, identity);
-    writeFileSync(outputPath, content, 'utf8');
-    console.log(`  Generated project map for \`${identity.title}\``);
   } else if (existsSync(outputPath)) {
     // SLOPE-self update — replace auto-generated sections only, preserving
     // any manual content between markers.
@@ -868,7 +971,7 @@ Usage:
   slope map                   Generate or update CODEBASE.md
   slope map --check           Check staleness (exit 1 if stale)
   slope map --output=<path>   Custom output path (default: CODEBASE.md)
-  slope map --force           Allow replacing an existing map when no source files are detected
+  slope map --force           Replace an existing downstream map instead of preserving manual content
 
 The codebase map provides a compact (~500 line) overview of the project
 for agent navigation. Auto-generated sections are updated in place;

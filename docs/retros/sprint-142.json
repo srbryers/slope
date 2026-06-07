@@ -1,0 +1,143 @@
+{
+  "sprint_number": 142,
+  "player": "codex",
+  "theme": "Codebase Map Guard Non-TS Safety",
+  "par": 4,
+  "slope": 3,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-06-06",
+  "type": "guard hardening",
+  "skills_used": [
+    "slope-sprint-workflow"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow"
+  ],
+  "shots": [
+    {
+      "ticket_key": "S142-1",
+      "title": "Warn instead of hard-blocking when slope map cannot refresh without overwriting curated maps (#505)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Removed the deadlock path by making downstream `slope map` preserve existing curated maps and refresh metadata instead of failing or forcing an overwrite."
+    },
+    {
+      "ticket_key": "S142-2",
+      "title": "Support metadata-only freshness refresh or broader source detection for non-TypeScript repos (#505)",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Broadened source/test counting beyond TS/TSX to include Python, C#, JS, Java, Go, Rust, Ruby, PHP, Swift, Kotlin, and C/C++ while skipping generated, dependency, runtime, and `.slope` directories."
+    },
+    {
+      "ticket_key": "S142-3",
+      "title": "Make map staleness baselines worktree-aware to avoid inflated commit counts (#505)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Changed map staleness distance to use `git rev-list --count --ancestry-path`, so sibling worktree or harness base SHAs do not inflate guard blocking counts."
+    },
+    {
+      "ticket_key": "S142-4",
+      "title": "Add non-TypeScript curated map, worktree staleness, and Windows map --check regressions (#505)",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "Parallelized four `slope claim` writes despite the S138 no-parallel-state-write lesson. The claims completed cleanly, but the process hazard was recorded for discipline."
+        }
+      ],
+      "notes": "Added regressions for Python/Unity-style source detection, metadata-only curated map refresh, sibling-branch `map --check`, and explore-guard ancestry-path staleness."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 1,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "wind",
+      "impact": "minor",
+      "description": "The Windows full suite continues to emit known temp-repo stderr and CRLF warnings, but all tests passed."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Guard recovery commands should preserve user-authored navigation artifacts by default.",
+      "outcome": "Downstream `slope map` now updates metadata or generated sections without replacing curated `CODEBASE.md` content unless `--force` is explicit."
+    },
+    {
+      "type": "lessons",
+      "description": "Raw commit distance is the wrong abstraction for worktree-derived guard blocking.",
+      "outcome": "Both `slope map --check` and the explore guard use ancestry-path distance, avoiding sibling-base inflation while preserving normal ancestor staleness."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "`corepack pnpm vitest run tests/cli/commands/map.test.ts tests/cli/guards/explore.test.ts` passed: 21 tests.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`corepack pnpm vitest run tests/cli/commands/commit-ready.test.ts tests/cli/guards.test.ts` passed: 73 tests.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`corepack pnpm typecheck`, `corepack pnpm prepare`, and `corepack pnpm test` passed on Windows: 228 test files passed, 1 skipped; 3618 tests passed, 25 skipped.",
+      "status": "healthy"
+    },
+    {
+      "category": "docs",
+      "description": "`slope roadmap validate` passed with existing historical roadmap warnings.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Precise and satisfying. The fix landed once the problem was treated as preservation plus staleness math, not merely a threshold tweak.",
+    "advice_for_next_player": "When a guard suggests a command as the recovery path, test that the command can actually clear the guard without damaging user-authored artifacts.",
+    "what_surprised_you": "Broadening source detection would have made the old overwrite path more dangerous, so metadata preservation had to come first.",
+    "excited_about_next": "S143 can apply the same recovery-path mindset to portable sprint resume."
+  },
+  "bunker_locations": [
+    "Do not parallelize SLOPE commands that write sprint or claim state, even when each command targets a different file.",
+    "Broader source detection can make an existing overwrite path more dangerous unless preservation semantics are updated first.",
+    "Guard staleness checks in worktrees should prefer ancestry-path evidence over raw commit reachability."
+  ],
+  "yardage_book_updates": [
+    "`slope map` now preserves existing downstream non-SLOPE-shaped `CODEBASE.md` files by refreshing metadata or marker-delimited generated sections.",
+    "`slope map --force` remains the explicit replacement path for downstream maps.",
+    "`countSourceFiles` now recognizes non-TypeScript languages and skips dependency, generated, runtime, and `.slope` directories.",
+    "`slope map --check` and `exploreGuard` use ancestry-path git distance to avoid sibling worktree base inflation."
+  ],
+  "course_management_notes": [
+    "Implementation commit: a49079a.",
+    "Validation passed: focused S142 tests, adjacent guard/commit-ready tests, `corepack pnpm typecheck`, `corepack pnpm prepare`, `corepack pnpm test`, and `slope roadmap validate`.",
+    "Issue #505 should close when the PR containing S142 merges."
+  ],
+  "slope_factors": [
+    "guard_deadlock",
+    "map_preservation",
+    "worktree_staleness",
+    "non_ts_source_detection"
+  ]
+}

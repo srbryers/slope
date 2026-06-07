@@ -92,7 +92,7 @@ describe('doctor checks', () => {
       try {
         const checks = runDoctorChecks(linked);
 
-        expect(checks.find(c => c.name === 'worktree-state')?.message).toContain(cwd);
+        expect(checks.find(c => c.name === 'worktree-state')?.message.replace(/\\/g, '/')).toContain(cwd.replace(/\\/g, '/'));
         expect(checks.find(c => c.name === 'config')).toMatchObject({ status: 'ok' });
         expect(checks.find(c => c.name === 'store')).toMatchObject({ status: 'ok' });
         expect(checks.find(c => c.name === 'common-issues')).toMatchObject({ status: 'ok' });

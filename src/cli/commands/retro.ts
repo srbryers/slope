@@ -1,9 +1,10 @@
 /**
  * `slope retro` — Retrospective scorecard utilities.
  *
- * Currently exposes one subcommand:
+ * Currently exposes two subcommands:
  *   slope retro backfill --sprint=N         Generate a scorecard from git
  *   slope retro backfill --all-missing      Backfill all shipped-but-missing
+ *   slope retro post-merge --sprint=N       Capture post-merge learnings
  *
  * Closes the tooling part of GH #318. The data backfill for S70 + S74-S83
  * shipped earlier in S86-4 (one-shot script); this command makes the
@@ -11,16 +12,58 @@
  */
 
 import { execSync } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { findShippedSprintsOnMain, parseRoadmap, castRoadmapStructure } from '../../core/index.js';
-import type { RoadmapDefinition, RoadmapSprint } from '../../core/index.js';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import {
+  findShippedSprintsOnMain,
+  parseRoadmap,
+  castRoadmapStructure,
+  buildPostMergeRetro,
+  buildRetroMemoryPlans,
+  persistRetroMemories,
+} from '../../core/index.js';
+import type {
+  MemoryCategory,
+  PostMergeRetroResult,
+  RetroLearningInput,
+  RetroOutcome,
+  RoadmapDefinition,
+  RoadmapSprint,
+} from '../../core/index.js';
 import { loadConfig } from '../config.js';
 
 interface BackfillOptions {
   sprint?: number;
   allMissing?: boolean;
   dryRun?: boolean;
+}
+
+interface ParsedArgs {
+  flags: Map<string, string[]>;
+  positionals: string[];
+}
+
+interface PostMergeOptions {
+  sprint?: number;
+  pr?: number;
+  outcome?: RetroOutcome;
+  mergedAt?: string;
+  summary?: string;
+  learnings: RetroLearningInput[];
+  hazards: string[];
+  followUps: string[];
+  sourceSessionId?: string;
+  dryRun?: boolean;
+  json?: boolean;
+}
+
+interface SavedPostMergeRetro {
+  retro: PostMergeRetroResult;
+  memory: {
+    added: string[];
+    skipped: number;
+    planned: number;
+  };
 }
 
 export async function retroCommand(args: string[]): Promise<void> {
@@ -33,6 +76,11 @@ export async function retroCommand(args: string[]): Promise<void> {
 
   if (sub === 'backfill') {
     await backfillSubcommand(args.slice(1));
+    return;
+  }
+
+  if (sub === 'post-merge') {
+    await postMergeSubcommand(args.slice(1));
     return;
   }
 
@@ -50,8 +98,13 @@ Usage:
                                                  history for sprint N.
   slope retro backfill --all-missing [--dry-run] Backfill every shipped sprint
                                                  that has no scorecard.
+  slope retro post-merge --sprint=N [--pr=N]    Capture a post-PR-merge retro,
+    [--summary=TEXT] [--learning=TEXT]...       persist learnings to memory,
+    [--hazard=TEXT]... [--follow-up=TEXT]...    and save the retro record.
+    [--outcome=success|mixed|follow_up] [--json] [--dry-run]
 
 Output: docs/retros/sprint-N.json with _backfilled:true marker.
+Post-merge output: .slope/retros/post-merge/sprint-N[-pr-M].json.
 
 Limitations:
   - Lossy: original CI/PR signals are not recoverable from commit log.
@@ -68,6 +121,123 @@ function parseFlags(args: string[]): BackfillOptions {
     else if (a === '--dry-run') opts.dryRun = true;
   }
   return opts;
+}
+
+const VALUE_FLAGS = new Set([
+  'sprint',
+  'pr',
+  'outcome',
+  'merged-at',
+  'summary',
+  'learning',
+  'hazard',
+  'follow-up',
+  'session-id',
+]);
+
+const VALID_OUTCOMES: RetroOutcome[] = ['success', 'mixed', 'follow_up'];
+const VALID_MEMORY_CATEGORIES: MemoryCategory[] = ['workflow', 'style', 'project', 'hazard', 'other'];
+
+function parseArgs(args: string[]): ParsedArgs {
+  const flags = new Map<string, string[]>();
+  const positionals: string[] = [];
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (!arg.startsWith('--')) {
+      positionals.push(arg);
+      continue;
+    }
+
+    const eq = arg.indexOf('=');
+    let name: string;
+    let value: string;
+    if (eq >= 0) {
+      name = arg.slice(2, eq);
+      value = arg.slice(eq + 1);
+    } else {
+      name = arg.slice(2);
+      const next = args[i + 1];
+      if (VALUE_FLAGS.has(name) && next && !next.startsWith('--')) {
+        value = next;
+        i++;
+      } else {
+        value = 'true';
+      }
+    }
+
+    const existing = flags.get(name) ?? [];
+    existing.push(value);
+    flags.set(name, existing);
+  }
+
+  return { flags, positionals };
+}
+
+function firstFlag(flags: Map<string, string[]>, name: string): string | undefined {
+  return flags.get(name)?.at(-1);
+}
+
+function allFlags(flags: Map<string, string[]>, name: string): string[] {
+  return flags.get(name) ?? [];
+}
+
+function positiveInteger(value: string | undefined, label: string): number | undefined {
+  if (value === undefined) return undefined;
+  const parsed = parseInt(value, 10);
+  if (!Number.isInteger(parsed) || parsed <= 0 || String(parsed) !== value.trim()) {
+    throw new TypeError(`${label} must be a positive integer.`);
+  }
+  return parsed;
+}
+
+function normalizeOutcome(value: string | undefined): RetroOutcome | undefined {
+  if (!value) return undefined;
+  const normalized = value.replace('-', '_');
+  if (VALID_OUTCOMES.includes(normalized as RetroOutcome)) return normalized as RetroOutcome;
+  throw new TypeError('--outcome must be one of: success, mixed, follow_up.');
+}
+
+function parseLearningSpec(value: string): RetroLearningInput {
+  const trimmed = value.trim();
+  const match = trimmed.match(/^([a-z_]+)(?::(\d+))?:(.+)$/);
+  if (!match) return { text: trimmed };
+
+  const [, rawCategory, rawWeight, text] = match;
+  if (!VALID_MEMORY_CATEGORIES.includes(rawCategory as MemoryCategory)) {
+    return { text: trimmed };
+  }
+
+  return {
+    text,
+    category: rawCategory as MemoryCategory,
+    ...(rawWeight ? { weight: parseInt(rawWeight, 10) } : {}),
+  };
+}
+
+function parsePostMergeOptions(args: string[]): PostMergeOptions {
+  const parsed = parseArgs(args);
+  const { flags } = parsed;
+  const sprint = positiveInteger(firstFlag(flags, 'sprint'), '--sprint');
+  const pr = positiveInteger(firstFlag(flags, 'pr'), '--pr');
+  const outcome = normalizeOutcome(firstFlag(flags, 'outcome'));
+  const mergedAt = firstFlag(flags, 'merged-at');
+  const summary = firstFlag(flags, 'summary') ?? (parsed.positionals.length > 0 ? parsed.positionals.join(' ') : undefined);
+  const sourceSessionId = firstFlag(flags, 'session-id');
+
+  return {
+    ...(sprint !== undefined ? { sprint } : {}),
+    ...(pr !== undefined ? { pr } : {}),
+    ...(outcome ? { outcome } : {}),
+    ...(mergedAt ? { mergedAt } : {}),
+    ...(summary ? { summary } : {}),
+    learnings: allFlags(flags, 'learning').map(parseLearningSpec),
+    hazards: allFlags(flags, 'hazard'),
+    followUps: allFlags(flags, 'follow-up'),
+    ...(sourceSessionId ? { sourceSessionId } : {}),
+    dryRun: flags.has('dry-run'),
+    json: flags.has('json'),
+  };
 }
 
 function git(cmd: string, cwd: string): string {
@@ -214,6 +384,140 @@ function extractThemeFromCommits(commits: SprintCommit[], sprintId: number): str
   const subj = commits[commits.length - 1].subject;
   const m = subj.match(/^(?:feat|fix|chore)\([^)]*\):\s*(.+)$/);
   return m ? m[1] : `Sprint ${sprintId}`;
+}
+
+function printPostMergeHelp(): void {
+  console.log(`
+slope retro post-merge - Capture post-PR-merge learnings
+
+Usage:
+  slope retro post-merge --sprint=N [--pr=N] [--summary=TEXT]
+  slope retro post-merge --sprint=N "summary text"
+
+Flags:
+  --learning=TEXT             Durable learning. Repeatable.
+  --learning=project:8:TEXT   Optional category/weight prefix.
+  --hazard=TEXT               Hazard to persist as auto-retro memory. Repeatable.
+  --follow-up=TEXT            Follow-up to persist as workflow memory. Repeatable.
+  --outcome=success|mixed|follow_up
+  --merged-at=ISO_DATE
+  --session-id=ID
+  --dry-run
+  --json
+
+Writes:
+  .slope/retros/post-merge/sprint-N[-pr-M].json
+  .slope/memories.json or .slope/slope.db memories with source auto-retro
+`);
+}
+
+function postMergeOutputPath(cwd: string, retro: PostMergeRetroResult): string {
+  const prSuffix = retro.pr ? `-pr-${retro.pr}` : '';
+  return join(cwd, '.slope', 'retros', 'post-merge', `sprint-${retro.sprint}${prSuffix}.json`);
+}
+
+function writePostMergeRetro(cwd: string, record: SavedPostMergeRetro): string {
+  const path = postMergeOutputPath(cwd, record.retro);
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, JSON.stringify(record, null, 2) + '\n');
+  return path;
+}
+
+function buildSavedRetro(
+  retro: PostMergeRetroResult,
+  memory: ReturnType<typeof persistRetroMemories>,
+): SavedPostMergeRetro {
+  return {
+    retro,
+    memory: {
+      added: memory.added.map(m => m.id),
+      skipped: memory.skipped.length,
+      planned: buildRetroMemoryPlans(retro).length,
+    },
+  };
+}
+
+async function postMergeSubcommand(args: string[]): Promise<void> {
+  if (args[0] === '--help' || args[0] === '-h') {
+    printPostMergeHelp();
+    return;
+  }
+
+  let opts: PostMergeOptions;
+  try {
+    opts = parsePostMergeOptions(args);
+  } catch (err) {
+    console.error(`\nError: ${(err as Error).message}\n`);
+    printPostMergeHelp();
+    process.exit(1);
+    return;
+  }
+
+  if (!opts.sprint) {
+    console.error('\nUsage: slope retro post-merge --sprint=N [--pr=N] [--summary=TEXT] [--learning=TEXT]...\n');
+    process.exit(1);
+    return;
+  }
+
+  const cwd = process.cwd();
+  let retro: PostMergeRetroResult;
+  try {
+    retro = buildPostMergeRetro({
+      sprint: opts.sprint,
+      ...(opts.pr !== undefined ? { pr: opts.pr } : {}),
+      ...(opts.outcome ? { outcome: opts.outcome } : {}),
+      ...(opts.mergedAt ? { mergedAt: opts.mergedAt } : {}),
+      ...(opts.summary ? { summary: opts.summary } : {}),
+      learnings: opts.learnings,
+      hazards: opts.hazards,
+      followUps: opts.followUps,
+      ...(opts.sourceSessionId ? { sourceSessionId: opts.sourceSessionId } : {}),
+    });
+  } catch (err) {
+    console.error(`\nError: ${(err as Error).message}\n`);
+    process.exit(1);
+    return;
+  }
+
+  const dryRunMemory: ReturnType<typeof persistRetroMemories> = { added: [], skipped: [] };
+  let memory: ReturnType<typeof persistRetroMemories>;
+  try {
+    memory = opts.dryRun ? dryRunMemory : persistRetroMemories(cwd, retro);
+  } catch (err) {
+    console.error(`\nError: ${(err as Error).message}\n`);
+    process.exit(1);
+    return;
+  }
+  const record = buildSavedRetro(retro, memory);
+  const path = postMergeOutputPath(cwd, retro);
+
+  if (!opts.dryRun) {
+    writePostMergeRetro(cwd, record);
+  }
+
+  const payload = {
+    path,
+    dryRun: opts.dryRun === true,
+    ...record,
+  };
+
+  if (opts.json) {
+    console.log(JSON.stringify(payload, null, 2));
+    return;
+  }
+
+  const target = retro.pr ? `S${retro.sprint} PR #${retro.pr}` : `S${retro.sprint}`;
+  if (opts.dryRun) {
+    console.log(`\n${target}: [dry-run] would write ${path}`);
+  } else {
+    console.log(`\n${target}: wrote ${path}`);
+  }
+  console.log(`  Outcome: ${retro.outcome}`);
+  console.log(`  Memories: ${record.memory.added.length} added, ${record.memory.skipped} skipped, ${record.memory.planned} planned`);
+  if (retro.followUps.length > 0) {
+    console.log(`  Follow-ups: ${retro.followUps.length}`);
+  }
+  console.log('');
 }
 
 async function backfillSubcommand(args: string[]): Promise<void> {

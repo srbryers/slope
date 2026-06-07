@@ -14,6 +14,7 @@ import { basename, dirname, join } from 'node:path';
 const DEFAULT_LOCK_TIMEOUT_MS = 5000;
 const DEFAULT_LOCK_RETRY_MS = 10;
 const DEFAULT_STALE_LOCK_MS = 60000;
+const WINDOWS_TRANSIENT_LOCK_ERRORS = new Set(['EPERM', 'EACCES']);
 
 export interface FileLockOptions {
   timeoutMs?: number;
@@ -67,6 +68,11 @@ function removeStaleLock(lockPath: string, staleMs: number): void {
   }
 }
 
+function isRetryableLockOpenError(error: NodeJS.ErrnoException): boolean {
+  if (error.code === 'EEXIST') return true;
+  return process.platform === 'win32' && WINDOWS_TRANSIENT_LOCK_ERRORS.has(error.code ?? '');
+}
+
 export function withFileLockSync<T>(
   filePath: string,
   callback: () => T,
@@ -80,17 +86,20 @@ export function withFileLockSync<T>(
   const staleMs = options.staleMs ?? DEFAULT_STALE_LOCK_MS;
   const deadline = Date.now() + timeoutMs;
   let fd: number | null = null;
+  let lastAcquisitionError: NodeJS.ErrnoException | null = null;
 
   while (fd === null) {
     try {
       fd = openSync(lockPath, 'wx');
     } catch (error) {
-      const code = (error as NodeJS.ErrnoException).code;
-      if (code !== 'EEXIST') throw error;
+      const lockError = error as NodeJS.ErrnoException;
+      if (!isRetryableLockOpenError(lockError)) throw error;
 
+      lastAcquisitionError = lockError;
       removeStaleLock(lockPath, staleMs);
       if (Date.now() >= deadline) {
-        throw new Error(`Timed out waiting for file lock: ${lockPath}`);
+        const detail = lastAcquisitionError.code ? ` Last error: ${lastAcquisitionError.code}.` : '';
+        throw new Error(`Timed out waiting for file lock: ${lockPath}.${detail}`);
       }
       sleepSync(retryMs);
     }

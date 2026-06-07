@@ -1,4 +1,4 @@
-import { checkConflicts, findShippedSprintsOnMain, formatSprintLabel } from '../../core/index.js';
+import { checkConflicts, findShippedSprintsOnMain, formatSprintLabel, parseSprintNumber } from '../../core/index.js';
 import type { SprintClaim, SlopeSession } from '../../core/index.js';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -15,8 +15,8 @@ function parseArgs(args: string[]): Record<string, string> {
   return result;
 }
 
-function resolveSprint(flags: Record<string, string>, cwd: string): number {
-  if (flags.sprint) return parseInt(flags.sprint, 10);
+function resolveSprint(flags: Record<string, string>, cwd: string): number | null {
+  if (flags.sprint) return parseSprintNumber(flags.sprint);
   const config = loadConfig(cwd);
   return inferSprintContext(cwd, config).sprint;
 }
@@ -24,17 +24,27 @@ function resolveSprint(flags: Record<string, string>, cwd: string): number {
 export async function statusCommand(args: string[]): Promise<void> {
   const flags = parseArgs(args);
   const cwd = process.cwd();
-  const store = await resolveStore(cwd);
+  const swarmId = flags.swarm;
 
-  try {
-    const swarmId = flags.swarm;
-
-    if (swarmId) {
-      await showSwarmStatus(store, swarmId);
-    } else {
-      const sprintNumber = resolveSprint(flags, cwd);
-      await showSprintStatus(store, sprintNumber);
+  if (!swarmId) {
+    const sprintNumber = resolveSprint(flags, cwd);
+    if (!sprintNumber) {
+      console.error('Error: --sprint must be a positive sprint id, e.g. 114 or 114.5');
+      process.exit(1);
     }
+
+    const store = await resolveStore(cwd);
+    try {
+      await showSprintStatus(store, sprintNumber);
+    } finally {
+      store.close();
+    }
+    return;
+  }
+
+  const store = await resolveStore(cwd);
+  try {
+    await showSwarmStatus(store, swarmId);
   } finally {
     store.close();
   }

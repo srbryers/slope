@@ -118,7 +118,7 @@ describe('ClaudeCodeAdapter', () => {
 
   describe('hooksConfigPath', () => {
     it('returns .claude/settings.json', () => {
-      expect(adapter.hooksConfigPath('/tmp/test')).toBe('/tmp/test/.claude/settings.json');
+      expect(adapter.hooksConfigPath('/tmp/test')).toBe(join('/tmp/test', '.claude', 'settings.json'));
     });
   });
 

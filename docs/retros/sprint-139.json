@@ -1,0 +1,137 @@
+{
+  "sprint_number": 139,
+  "player": "codex",
+  "theme": "Existing Worktree Entry Guidance",
+  "par": 4,
+  "slope": 3,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-06-06",
+  "type": "guard hardening",
+  "skills_used": [
+    "slope-sprint-workflow"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow"
+  ],
+  "shots": [
+    {
+      "ticket_key": "S139-1",
+      "title": "Detect branch-matching existing worktrees before worktree-check guidance (#499)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Added branch-aware parsing for `git worktree list --porcelain` and matching by active/conflicting branch or edited file path."
+    },
+    {
+      "ticket_key": "S139-2",
+      "title": "Surface Claude Code EnterWorktree guidance with non-Claude fallback (#499)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "The worktree-check denial now tells agents to enter an existing matching worktree with EnterWorktree when available, with `cd` + relaunch fallback for other harnesses."
+    },
+    {
+      "ticket_key": "S139-3",
+      "title": "Re-evaluate session branch and mode after entering an existing worktree (#499)",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "The reconciliation behavior was already present from prior work; S139 verified it and surfaced it explicitly in guidance rather than duplicating code."
+        }
+      ],
+      "notes": "Confirmed existing SQLite integration coverage for a denied main-checkout session entering a worktree; guidance now states SLOPE will re-evaluate branch and mode after entry."
+    },
+    {
+      "ticket_key": "S139-4",
+      "title": "Normalize guard recovery command allowlists before redirects and pipes (#499)",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [],
+      "notes": "Adjusted shell splitting so `2>&1` is treated as redirection rather than an `&` command separator; recovery commands with stderr redirects now stay guard-exempt."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 1,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "wind",
+      "impact": "minor",
+      "description": "The Windows full suite continues to emit legacy temp-repo stderr noise, but all tests passed."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Recovery guards should prefer reuse before creation.",
+      "outcome": "When an existing worktree is visible, the guard now tells agents how to enter it instead of only suggesting `slope worktree start`."
+    },
+    {
+      "type": "lessons",
+      "description": "Shell allowlists need to understand redirection syntax.",
+      "outcome": "`2>&1` no longer turns a safe recovery command into a blocked multi-command segment."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "`corepack pnpm vitest run tests/cli/guards/worktree-check.test.ts tests/cli/guards/worktree-check-integration.test.ts tests/cli/guards/worktree-reuse.test.ts` passed: 43 tests.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`corepack pnpm typecheck`, `corepack pnpm prepare`, and `corepack pnpm test` passed on Windows: 228 test files passed, 1 skipped; 3603 tests passed, 25 skipped.",
+      "status": "healthy"
+    },
+    {
+      "category": "docs",
+      "description": "`slope roadmap validate` passed with existing historical roadmap warnings.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Clean and clarifying. The guard already knew how to reconcile after worktree entry; it simply did not tell the agent to use that path when a matching worktree existed.",
+    "advice_for_next_player": "When a guard blocks, its first recovery option should be the least duplicative action that restores correct state.",
+    "what_surprised_you": "The redirect failure came from treating the ampersand inside `2>&1` as a command separator.",
+    "excited_about_next": "S140 can narrow session-collision blocking with a clearer recovery-command parsing baseline."
+  },
+  "bunker_locations": [
+    "Do not suggest creating a new worktree before checking whether a relevant one already exists.",
+    "Shell splitters must distinguish redirection operators like `2>&1` from command chaining.",
+    "When reusing already-implemented behavior, add coverage or guidance rather than reimplementing it."
+  ],
+  "yardage_book_updates": [
+    "worktree-check now parses branch names from `git worktree list --porcelain`.",
+    "worktree-check denial text now includes existing-worktree entry guidance with EnterWorktree and non-Claude fallback.",
+    "worktree-check continues to reconcile session role, branch, and worktree path after entering a worktree.",
+    "worktree-check recovery allowlist now accepts stderr redirection on safe recovery commands."
+  ],
+  "course_management_notes": [
+    "Implementation commit: 0684ff4.",
+    "Validation passed: focused guard tests, `corepack pnpm typecheck`, `corepack pnpm prepare`, `corepack pnpm test`, and `slope roadmap validate`.",
+    "Issue #499 should close when the PR containing S139 merges."
+  ],
+  "slope_factors": [
+    "guard_recovery",
+    "worktree_reuse",
+    "shell_parsing"
+  ]
+}

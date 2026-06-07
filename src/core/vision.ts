@@ -1,6 +1,6 @@
 // SLOPE — Vision Document: project intent and direction
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
-import { join, dirname, resolve } from 'node:path';
+import { join, dirname, resolve, relative, isAbsolute as pathIsAbsolute } from 'node:path';
 import type { VisionDocument } from './analyzers/types.js';
 
 const DEFAULT_VISION_PATH = '.slope/vision.json';
@@ -83,12 +83,12 @@ export function renderVisionMarkdown(vision: VisionDocument): string {
 export function writeVisionMarkdown(vision: VisionDocument, mdPath: string, cwd?: string): string {
   const root = cwd ?? process.cwd();
   const allowAbsolute = process.env.SLOPE_VISION_MD_ALLOW_ABS === '1';
-  const isAbsolute = mdPath.startsWith('/');
-  const abs = isAbsolute ? mdPath : resolve(root, mdPath);
+  const abs = pathIsAbsolute(mdPath) ? resolve(mdPath) : resolve(root, mdPath);
 
   // Containment check — refuse paths outside the project root.
-  const rootResolved = resolve(root) + '/';
-  if (!allowAbsolute && !abs.startsWith(rootResolved)) {
+  const rootResolved = resolve(root);
+  const rel = relative(rootResolved, abs);
+  if (!allowAbsolute && rel && (rel.startsWith('..') || pathIsAbsolute(rel))) {
     throw new Error(
       `writeVisionMarkdown: refusing to write outside project root (${root}). ` +
       `Path "${mdPath}" resolves to "${abs}". Set SLOPE_VISION_MD_ALLOW_ABS=1 to override.`,

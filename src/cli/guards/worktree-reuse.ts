@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { execSync } from 'node:child_process';
+import { QUIET_STDIO } from '../../core/process.js';
 import type { HookInput, GuardResult } from '../../core/index.js';
 
 const SAFE_WORKTREE_DIR = '.slope/worktrees';
@@ -128,7 +129,7 @@ export function listWorktrees(cwd: string): Array<{ name: string; path: string; 
     let behind = 0;
     try {
       branch = execSync('git rev-parse --abbrev-ref HEAD', { cwd: fullPath, encoding: 'utf8' }).trim();
-      const count = execSync('git rev-list HEAD..origin/main --count 2>/dev/null', { cwd: fullPath, encoding: 'utf8' }).trim();
+      const count = execSync('git rev-list HEAD..origin/main --count', { cwd: fullPath, encoding: 'utf8', stdio: QUIET_STDIO }).trim();
       behind = parseInt(count, 10) || 0;
     } catch { /* not a valid git worktree */ }
     return { name, path: fullPath, branch, behind };

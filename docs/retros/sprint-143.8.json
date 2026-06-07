@@ -1,0 +1,124 @@
+{
+  "sprint_number": 143.8,
+  "player": "codex",
+  "theme": "Decimal Sprint Currency Formatting",
+  "par": 3,
+  "slope": 1,
+  "score": 3,
+  "score_label": "par",
+  "date": "2026-06-06",
+  "type": "cli polish",
+  "skills_used": [
+    "slope-sprint-workflow",
+    "slope-api-reference"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow"
+  ],
+  "shots": [
+    {
+      "ticket_key": "S143.8-1",
+      "title": "Format decimal sprint currency deltas without floating-point noise (#513)",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [],
+      "notes": "`slope map --check` now parses decimal current sprint ids and formats sprint currency labels/deltas through shared roadmap sprint formatting helpers."
+    },
+    {
+      "ticket_key": "S143.8-2",
+      "title": "Add decimal sprint currency map-check regression (#513)",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [],
+      "notes": "Added a map-check regression proving a 143.6 current sprint compared with a 143 map sprint prints `+0.6` and never the raw JavaScript floating-point artifact."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 2,
+    "fairways_total": 2,
+    "greens_in_regulation": 2,
+    "greens_total": 2,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "wind",
+      "impact": "minor",
+      "description": "The first full-suite run exposed a Windows EPERM flake in the atomic-write lock test; raised as #515 and triaged into S143.95."
+    },
+    {
+      "type": "wind",
+      "impact": "minor",
+      "description": "The full suite still emits unrelated Windows path noise from broader Node command redirection, already captured by #514 and planned for S143.9."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Decimal sprint ids should be parsed and formatted through shared roadmap helpers whenever user-visible sprint labels or deltas are emitted.",
+      "outcome": "Map staleness output now reports clean sprint currency deltas for inserted decimal sprints."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "`corepack pnpm vitest run tests/cli/commands/map.test.ts` passed: 11 tests.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`corepack pnpm typecheck` and `corepack pnpm prepare` passed.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "Branch-built `node dist/cli/index.js map --check` printed a clean decimal sprint currency delta without floating-point noise.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`corepack pnpm test` passed on rerun after #515 was triaged: 229 test files passed, 1 skipped; 3627 tests passed, 25 skipped.",
+      "status": "healthy"
+    },
+    {
+      "category": "docs",
+      "description": "#515 was filed and triaged into S143.95 before S143.8 closeout.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "A precise formatting cleanup: small code surface, high confidence, and a useful regression at the CLI boundary.",
+    "advice_for_next_player": "When decimal sprint ids appear in arithmetic, format the resulting number before printing it.",
+    "what_surprised_you": "The atomic lock flake surfaced only under full-suite contention, not the focused rerun.",
+    "excited_about_next": "S143.9 can finish the Windows stderr cleanup, then S143.95 can harden the lock path exposed during validation."
+  },
+  "bunker_locations": [
+    "Raw decimal subtraction can expose JavaScript floating-point artifacts in CLI output.",
+    "Atomic file-lock tests can hit transient Windows EPERM under full-suite contention."
+  ],
+  "yardage_book_updates": [
+    "`src/cli/commands/map.ts` now uses shared sprint parse/format helpers for map sprint currency output.",
+    "`tests/cli/commands/map.test.ts` covers clean decimal sprint currency output for `map --check`."
+  ],
+  "course_management_notes": [
+    "Implementation commit: ff84991.",
+    "Follow-up triage commit for #515: b64ebc9.",
+    "Issue #513 should close when the PR containing S143.8 merges.",
+    "Issue #515 is triaged into S143.95 before the release sprint."
+  ],
+  "slope_factors": [
+    "decimal_sprints",
+    "map_staleness",
+    "windows_validation"
+  ]
+}

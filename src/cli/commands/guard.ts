@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { GUARD_DEFINITIONS, formatPreToolUseOutput, formatPostToolUseOutput, formatStopOutput, getAllGuardDefinitions, getCustomGuard, loadPluginGuards, detectAdapter } from '../../core/index.js';
+import { QUIET_STDIO } from '../../core/process.js';
 import type { HookInput, GuardResult, GuardName, AnyGuardDefinition } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { exploreGuard } from '../guards/explore.js';
@@ -859,7 +860,7 @@ export async function guardManageCommand(args: string[]): Promise<void> {
       // 4. Unpushed commits
       try {
         const { execSync } = await import('node:child_process');
-        const log = execSync('git log --oneline @{u}..HEAD 2>/dev/null', { cwd, encoding: 'utf8', timeout: 5000 }).trim();
+        const log = execSync('git log --oneline @{u}..HEAD', { cwd, encoding: 'utf8', timeout: 5000, stdio: QUIET_STDIO }).trim();
         if (log) {
           checks.push({ name: 'unpushed', passed: false, message: `${log.split('\n').length} commit(s) unpushed` });
         } else {

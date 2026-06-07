@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, relative } from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { sprintCompletionGuard } from '../../../src/cli/guards/sprint-completion.js';
 import { recordPrCloseoutSettled, recordPrReviewComplete } from '../../../src/cli/pr-review-state.js';
 import { saveSprintState, createSprintState, loadSprintState } from '../../../src/cli/sprint-state.js';
@@ -79,6 +80,16 @@ function writeRoadmapAt(cwd: string, sprints: Array<{ id: number; status?: strin
       status: s.status ?? 'planned',
     })),
   }));
+}
+
+function initGitBranch(branch: string): void {
+  execFileSync('git', ['init'], { cwd: tmpDir, stdio: 'ignore' });
+  execFileSync('git', ['config', 'user.email', 'test@example.com'], { cwd: tmpDir });
+  execFileSync('git', ['config', 'user.name', 'Test User'], { cwd: tmpDir });
+  writeFileSync(join(tmpDir, 'README.md'), 'initial\n');
+  execFileSync('git', ['add', 'README.md'], { cwd: tmpDir });
+  execFileSync('git', ['commit', '-m', 'chore: initial'], { cwd: tmpDir, stdio: 'ignore' });
+  execFileSync('git', ['checkout', '-b', branch], { cwd: tmpDir, stdio: 'ignore' });
 }
 
 beforeEach(() => {
@@ -187,6 +198,23 @@ describe('sprint-completion guard', () => {
         tmpDir,
       );
       expect(result).toEqual({});
+    });
+
+    it('rebinds stale sprint-state to the branch sprint before PR gate checks (#503)', async () => {
+      initGitBranch('feat/sprint-66-schedule-cms');
+      saveSprintState(tmpDir, createSprintState(65, 'implementing'));
+      writeScorecard(66);
+
+      const result = await sprintCompletionGuard(makePreToolUse('gh pr create --title "S66"'), tmpDir);
+
+      expect(result.decision).toBe('deny');
+      expect(result.blockReason).toContain('Sprint 66');
+      expect(result.blockReason).not.toContain('Sprint 65 has incomplete gates');
+      expect(result.blockReason).toContain('rebound stale sprint-state from Sprint 65 to Sprint 66');
+
+      const state = loadSprintState(tmpDir)!;
+      expect(state.sprint).toBe(66);
+      expect(state.phase).toBe('scoring');
     });
 
     it('uses the shell cd target as the sprint-state and scorecard cwd for gh pr create', async () => {
@@ -386,6 +414,28 @@ describe('sprint-completion guard', () => {
       state.gates.review_md = true;
       saveSprintState(tmpDir, state);
       writeScorecard(22);
+
+      const result = await sprintCompletionGuard(makePreToolUse('gh pr create --title "t"'), tmpDir);
+      expect(result).toEqual({});
+    });
+
+    it('allows PR when a custom scorecard pattern has multiple wildcards', async () => {
+      writeFileSync(join(tmpDir, '.slope', 'config.json'), JSON.stringify({
+        scorecardDir: 'docs/retros',
+        scorecardPattern: 'sprint-*-S*.json',
+        minSprint: 1,
+        roadmapPath: 'docs/backlog/roadmap.json',
+      }));
+      const state = createSprintState(22, 'implementing');
+      state.gates.tests = true;
+      state.gates.code_review = true;
+      state.gates.architect_review = true;
+      state.gates.scorecard = true;
+      state.gates.review_md = true;
+      saveSprintState(tmpDir, state);
+      const dir = join(tmpDir, 'docs', 'retros');
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, 'sprint-22-S22.json'), JSON.stringify({ sprint_number: 22, score: 4, par: 4 }));
 
       const result = await sprintCompletionGuard(makePreToolUse('gh pr create --title "t"'), tmpDir);
       expect(result).toEqual({});

@@ -55,7 +55,7 @@ describe('CodexAdapter', () => {
 
   describe('hooksConfigPath', () => {
     it('returns .codex/hooks.json path', () => {
-      expect(adapter.hooksConfigPath('/tmp/test')).toBe('/tmp/test/.codex/hooks.json');
+      expect(adapter.hooksConfigPath('/tmp/test')).toBe(join('/tmp/test', '.codex', 'hooks.json'));
     });
   });
 
@@ -206,7 +206,9 @@ describe('CodexAdapter', () => {
 
       expect(existsSync(join(tmpDir, '.codex', 'hooks', 'slope-guard.sh'))).toBe(true);
       expect(existsSync(join(tmpDir, '.codex', 'hooks.json'))).toBe(true);
-      expect(statSync(join(tmpDir, '.codex', 'hooks', 'slope-guard.sh')).mode & 0o111).toBeTruthy();
+      if (process.platform !== 'win32') {
+        expect(statSync(join(tmpDir, '.codex', 'hooks', 'slope-guard.sh')).mode & 0o111).toBeTruthy();
+      }
 
       const config = JSON.parse(readFileSync(join(tmpDir, '.codex', 'hooks.json'), 'utf8'));
       expect(config.hooks.PreToolUse).toBeDefined();

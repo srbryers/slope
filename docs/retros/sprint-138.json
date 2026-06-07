@@ -1,0 +1,128 @@
+{
+  "sprint_number": 138,
+  "player": "codex",
+  "theme": "Destructive Help Safety",
+  "par": 3,
+  "slope": 2,
+  "score": 3,
+  "score_label": "par",
+  "date": "2026-06-06",
+  "type": "bugfix",
+  "skills_used": [
+    "slope-sprint-workflow"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow"
+  ],
+  "shots": [
+    {
+      "ticket_key": "S138-1",
+      "title": "Short-circuit sprint reset help before clearing state (#501)",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Verified the existing sprint reset handler returns help before resetCommand and retagged the regression coverage to #501."
+    },
+    {
+      "ticket_key": "S138-2",
+      "title": "Audit destructive subcommands for help-before-action handling (#501)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "The audit found sibling nested-help hazards in session, worktree, and version release commands; all stayed within #501's requested destructive command audit."
+        }
+      ],
+      "notes": "Moved session help ahead of store-backed actions, guarded worktree start/cleanup/status dispatch with a help flag, and prevented version bump from entering release automation on nested help."
+    },
+    {
+      "ticket_key": "S138-3",
+      "title": "Add CLI help safety regressions for destructive commands (#501)",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [],
+      "notes": "Added regressions proving session start help does not register sessions, session prune help does not prune stale sessions, worktree start/cleanup help does not run git, version bump help does not enter release automation, and sprint reset help preserves state."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 3,
+    "fairways_total": 3,
+    "greens_in_regulation": 3,
+    "greens_total": 3,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 1,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "wind",
+      "impact": "minor",
+      "description": "The Windows full test suite still emits legacy temp-repo stderr noise, but it passed and did not affect S138 validation."
+    },
+    {
+      "type": "wind",
+      "impact": "minor",
+      "description": "Parallelizing `slope sprint gate` writes produced confusing intermediate gate messages; final state was intact, but SLOPE state mutations should be run sequentially."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Nested help must be routed before subcommand dispatch when the subcommand can mutate state.",
+      "outcome": "Session, worktree, and version commands now check help before store, git, or release side effects."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "`corepack pnpm vitest run tests/cli/sprint-workflow.test.ts tests/cli/commands/session.test.ts tests/cli/commands/worktree.test.ts tests/cli/version.test.ts` passed: 43 tests.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`corepack pnpm typecheck`, `corepack pnpm prepare`, and `corepack pnpm test` passed on Windows: 228 test files passed, 1 skipped; 3601 tests passed, 25 skipped.",
+      "status": "healthy"
+    },
+    {
+      "category": "docs",
+      "description": "`slope roadmap validate` passed with existing historical roadmap warnings.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Tight and trust-restoring. The original reset path was already repaired, and the audit turned up the real value: similar nested help hazards in adjacent stateful commands.",
+    "advice_for_next_player": "For every stateful CLI family, route `--help` before resolving stores, checking git worktrees, invoking release automation, or parsing action flags.",
+    "what_surprised_you": "The broadest risk was not `sprint reset` anymore; it was `session start --help`, `session prune --help`, and `worktree cleanup --all --help` slipping through subcommand dispatch.",
+    "excited_about_next": "S139 can build on a cleaner trust baseline for guard recovery guidance."
+  },
+  "bunker_locations": [
+    "Nested help flags must bypass mutating subcommand handlers, even when action flags are present.",
+    "Destructive command audits should include release automation, worktree cleanup, and session cleanup paths, not just obvious reset commands.",
+    "Do not parallelize SLOPE commands that write the same sprint-state file."
+  ],
+  "yardage_book_updates": [
+    "Session command help is now read-only for nested subcommands including start and prune.",
+    "Worktree command help is now read-only for nested start, cleanup, status, and list dispatch.",
+    "Version bump help no longer enters release automation.",
+    "Sprint reset, session, worktree, and version destructive-help regressions are covered by CLI tests and built CLI smoke."
+  ],
+  "course_management_notes": [
+    "Validation passed: `corepack pnpm typecheck`, `corepack pnpm prepare`, `corepack pnpm test`, `slope roadmap validate`, and compiled CLI smoke.",
+    "Issue #501 should close when the PR containing S138 merges."
+  ],
+  "slope_factors": [
+    "cli_help_safety",
+    "destructive_command_audit",
+    "guard_trust"
+  ]
+}

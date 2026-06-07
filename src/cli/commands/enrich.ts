@@ -2,7 +2,7 @@
 // Usage: slope enrich [backlog-path] [--output=path] [--with-plans] [--top=5]
 
 import { existsSync, writeFileSync, mkdirSync, renameSync } from 'node:fs';
-import { join } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 import { loadConfig } from '../../core/config.js';
 import { hasEmbeddingSupport } from '../../core/embedding-store.js';
 import { loadScorecards } from '../../core/loader.js';
@@ -49,7 +49,7 @@ export async function enrichCommand(args: string[]): Promise<void> {
   const flags = parseArgs(args);
 
   const backlogPath = flags.backlogPath
-    ? (flags.backlogPath.startsWith('/') ? flags.backlogPath : join(cwd, flags.backlogPath))
+    ? (isAbsolute(flags.backlogPath) ? flags.backlogPath : join(cwd, flags.backlogPath))
     : join(cwd, 'slope-loop/backlog.json');
 
   if (!existsSync(backlogPath)) {
@@ -58,7 +58,7 @@ export async function enrichCommand(args: string[]): Promise<void> {
   }
 
   const outputPath = flags.output
-    ? (flags.output.startsWith('/') ? flags.output : join(cwd, flags.output))
+    ? (isAbsolute(flags.output) ? flags.output : join(cwd, flags.output))
     : backlogPath;
 
   // Embedding config
@@ -76,7 +76,7 @@ export async function enrichCommand(args: string[]): Promise<void> {
   };
 
   const storePath = config.store_path ?? '.slope/slope.db';
-  const store = new SqliteSlopeStore(`${cwd}/${storePath}`);
+  const store = new SqliteSlopeStore(isAbsolute(storePath) ? storePath : join(cwd, storePath));
 
   try {
     if (!hasEmbeddingSupport(store)) {

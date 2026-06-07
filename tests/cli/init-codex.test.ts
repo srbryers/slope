@@ -71,6 +71,7 @@ describe('slope init --codex (GH #309)', () => {
       const hooksPath = join(pluginRoot, 'hooks.json');
       const dispatcherPath = join(pluginRoot, 'hooks', 'slope-guard.sh');
       const skillPath = join(pluginRoot, 'skills', 'slope-sprint', 'SKILL.md');
+      const retroSkillPath = join(pluginRoot, 'skills', 'slope-retro', 'SKILL.md');
 
       expect(existsSync(manifestPath)).toBe(true);
       expect(existsSync(marketplacePath)).toBe(true);
@@ -78,6 +79,8 @@ describe('slope init --codex (GH #309)', () => {
       expect(existsSync(hooksPath)).toBe(true);
       expect(existsSync(dispatcherPath)).toBe(true);
       expect(existsSync(skillPath)).toBe(true);
+      expect(existsSync(retroSkillPath)).toBe(true);
+      expect(readFileSync(retroSkillPath, 'utf8')).toContain('slope retro post-merge');
 
       const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
       const marketplace = JSON.parse(readFileSync(marketplacePath, 'utf8'));

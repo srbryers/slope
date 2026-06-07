@@ -1,0 +1,143 @@
+{
+  "sprint_number": 137.5,
+  "player": "codex",
+  "theme": "Windows Test Suite Portability",
+  "par": 4,
+  "slope": 4,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-06-05",
+  "type": "bugfix + test hardening",
+  "skills_used": [
+    "slope-sprint-workflow"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow"
+  ],
+  "shots": [
+    {
+      "ticket_key": "S137.5-1",
+      "title": "Normalize analyzer, prep, loop, and worktree path expectations on Windows (#509)",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "Initial full-suite work uncovered both test-only path separator assumptions and product containment checks that used string prefixes instead of native path semantics."
+        }
+      ],
+      "notes": "Normalized repository-facing paths to POSIX where SLOPE stores logical repo paths, switched test expectations to native path helpers, and tightened safe path containment using resolved relative paths."
+    },
+    {
+      "ticket_key": "S137.5-2",
+      "title": "Gate adapter executable-bit assertions on platforms with POSIX chmod semantics (#509)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Updated adapter tests to use native hook paths and to skip POSIX executable-bit assertions on Windows while preserving chmod coverage on POSIX platforms."
+    },
+    {
+      "ticket_key": "S137.5-3",
+      "title": "Run and document full-suite Windows validation for #509",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "Full-suite reruns exposed additional POSIX assumptions in fixture directory creation, git stderr redirection, absolute path detection, and process-heavy timing fixtures."
+        }
+      ],
+      "notes": "Removed POSIX shell redirections from affected git probes, added Node-based MCP grep fallback behavior, fixed Windows absolute path handling, closed SQLite handles before temp cleanup, and widened or reduced process-heavy fixture timing."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 3,
+    "fairways_total": 3,
+    "greens_in_regulation": 3,
+    "greens_total": 3,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 2,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "wind",
+      "impact": "minor",
+      "description": "The Windows full suite still prints legacy stderr noise from negative git/temp-repo probes, but it no longer fails."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Repository paths and filesystem paths are different contracts.",
+      "outcome": "Repo-facing APIs normalize to POSIX paths, while tests that assert local filesystem paths use native `join`, `resolve`, `dirname`, and `isAbsolute`."
+    },
+    {
+      "type": "lessons",
+      "description": "Suppressing command stderr should use child-process options instead of shell redirection.",
+      "outcome": "Affected git probes now use `stdio: ['ignore', 'pipe', 'ignore']`, avoiding Windows `2>/dev/null` failures."
+    },
+    {
+      "type": "lessons",
+      "description": "Windows process spawning is slow enough that large synthetic git fixtures need timing margin.",
+      "outcome": "The git cadence fixture now uses empty commits and fewer commits while preserving the daily-cadence threshold; the PR closeout status helper test has an explicit timeout."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "`corepack pnpm test` passed on Windows: 228 test files passed, 1 skipped; 3596 tests passed, 25 skipped.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`corepack pnpm typecheck`, `corepack pnpm prepare`, and targeted portability suites passed.",
+      "status": "healthy"
+    },
+    {
+      "category": "docs",
+      "description": "Roadmap S137.5 is marked complete and this scorecard records #509 validation evidence.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "A practical recovery pass: lots of small Windows edge cases, but each one pointed to a clearer contract between repo paths, filesystem paths, shell behavior, and platform semantics.",
+    "advice_for_next_player": "When adding tests that create files, never derive parents by slicing on `/`; use `dirname`. When hiding command stderr, use `stdio` instead of shell redirection.",
+    "what_surprised_you": "The final failures were not product logic at all; they were fixture cost and status-helper timing under Windows process spawning.",
+    "excited_about_next": "The S137 retro PR can now carry a green Windows full-suite recovery instead of leaving #509 as an external caveat."
+  },
+  "bunker_locations": [
+    "Do not use string prefix checks for path containment; resolve and compare relative paths.",
+    "Do not assume `/` when computing local filesystem parent directories in tests.",
+    "Use `isAbsolute` for CLI input paths; Windows drive-letter paths are absolute too.",
+    "Gate POSIX executable-bit assertions on `process.platform !== 'win32'`.",
+    "Use child-process `stdio` options rather than `2>/dev/null` when suppressing git output."
+  ],
+  "yardage_book_updates": [
+    "Analyzer, prep, import graph, map inventory, MCP fallback, and vision markdown now normalize repo paths consistently.",
+    "Adapter chmod assertions remain active on POSIX and are skipped on Windows.",
+    "SQLite memory backend cache cleanup closes cached backends before Windows temp directory removal.",
+    "Windows full suite passes locally with `corepack pnpm test`."
+  ],
+  "course_management_notes": [
+    "Committed fixes: 97a8a26, 4187789, fccf989.",
+    "Validation passed: `corepack pnpm prepare`, `corepack pnpm typecheck`, `corepack pnpm test`, and `slope roadmap validate`.",
+    "Issue #509 should be closed by this recovery commit once the PR is merged."
+  ],
+  "slope_factors": [
+    "windows_portability",
+    "path_normalization",
+    "test_hardening",
+    "shell_portability"
+  ]
+}

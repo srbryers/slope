@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, writeFileSync, rmSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { workflowStepGateGuard } from '../../../src/cli/guards/workflow-step-gate.js';
 import { SqliteSlopeStore } from '../../../src/store/index.js';
 import type { HookInput } from '../../../src/core/index.js';
@@ -49,6 +50,19 @@ function writeWorkflow(name: string, stepType: string): void {
 async function createRunningExecution(store: SqliteSlopeStore, workflow: string, phase: string, step: string): Promise<void> {
   const exec = await store.startExecution({ workflow_name: workflow, sprint_id: 'S77' });
   await store.updateExecutionState(exec.id, phase, step);
+}
+
+function initGitForSprint(sprint: number): void {
+  execFileSync('git', ['init'], { cwd: TMP, stdio: 'ignore' });
+  execFileSync('git', ['config', 'user.email', 'test@example.com'], { cwd: TMP });
+  execFileSync('git', ['config', 'user.name', 'Test User'], { cwd: TMP });
+  writeFileSync(join(TMP, 'README.md'), 'initial\n');
+  execFileSync('git', ['add', 'README.md'], { cwd: TMP });
+  execFileSync('git', ['commit', '-m', 'chore: initial'], { cwd: TMP, stdio: 'ignore' });
+  execFileSync('git', ['checkout', '-b', `feat/sprint-${sprint}`], { cwd: TMP, stdio: 'ignore' });
+  writeFileSync(join(TMP, 'feature.txt'), `S${sprint}\n`);
+  execFileSync('git', ['add', 'feature.txt'], { cwd: TMP });
+  execFileSync('git', ['commit', '-m', `fix(S${sprint}-1): existing sprint work`], { cwd: TMP, stdio: 'ignore' });
 }
 
 describe('workflowStepGateGuard', () => {
@@ -111,6 +125,29 @@ describe('workflowStepGateGuard', () => {
     const result = await workflowStepGateGuard(makeInput(), TMP);
     expect(result.decision).toBe('deny');
     expect(result.blockReason).toContain('validation');
+  });
+
+  it('fast-forwards a branch sprint execution before blocking edits (#503)', async () => {
+    writeConfig();
+    initGitForSprint(66);
+    const store = new SqliteSlopeStore(join(TMP, '.slope/slope.db'));
+    const exec = await store.startExecution({ workflow_name: 'sprint-standard', sprint_id: 'S66' });
+    await store.updateExecutionState(exec.id, 'pre_hole', 'verify_previous');
+    store.close();
+
+    const result = await workflowStepGateGuard(makeInput(), TMP);
+    expect(result.decision).toBeUndefined();
+    expect(result.context).toContain('fast-forwarded S66');
+
+    const updated = new SqliteSlopeStore(join(TMP, '.slope/slope.db'));
+    try {
+      await expect(updated.getExecutionBySprint('S66')).resolves.toMatchObject({
+        current_phase: 'per_ticket',
+        current_step: 'implement',
+      });
+    } finally {
+      updated.close();
+    }
   });
 
   it('allows when workflow definition not found', async () => {

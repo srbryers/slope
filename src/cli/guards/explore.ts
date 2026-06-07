@@ -2,6 +2,7 @@ import { existsSync, readFileSync, readdirSync, unlinkSync, statSync, mkdirSync,
 import { join } from 'node:path';
 import { execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { QUIET_STDIO } from '../../core/process.js';
 import type { HookInput, GuardResult } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { loadSessionState, updateSessionState } from '../session-state.js';
@@ -130,7 +131,7 @@ function exploreContextKey(cwd: string, input: HookInput, context: string): stri
 
 function currentBranch(cwd: string): string {
   try {
-    return execSync('git rev-parse --abbrev-ref HEAD 2>/dev/null', { cwd, encoding: 'utf8', timeout: 2000 }).trim() || 'unknown';
+    return execSync('git rev-parse --abbrev-ref HEAD', { cwd, encoding: 'utf8', timeout: 2000, stdio: QUIET_STDIO }).trim() || 'unknown';
   } catch {
     return 'unknown';
   }
@@ -246,8 +247,11 @@ function checkMapStaleness(
     const gitShaMatch = metaMatch[1].match(/git_sha:\s*"?([^"\n]+)"?/);
     if (!gitShaMatch) return { level: 'current', distance: 0 };
 
+    const sha = gitShaMatch[1].trim();
+    if (!/^[0-9a-fA-F]{4,64}$/.test(sha)) return { level: 'current', distance: 0 };
+
     const distance = parseInt(
-      execSync(`git rev-list --count ${gitShaMatch[1]}..HEAD 2>/dev/null`, { cwd, encoding: 'utf8', timeout: 5000 }).trim() || '0',
+      execSync(`git rev-list --count --ancestry-path ${sha}..HEAD`, { cwd, encoding: 'utf8', timeout: 5000, stdio: QUIET_STDIO }).trim() || '0',
       10,
     );
 

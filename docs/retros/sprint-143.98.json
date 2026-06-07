@@ -1,0 +1,119 @@
+{
+  "sprint_number": 143.98,
+  "player": "codex",
+  "theme": "npm Bin Metadata Release Cleanliness",
+  "par": 3,
+  "slope": 1,
+  "score": 3,
+  "score_label": "par",
+  "date": "2026-06-07",
+  "type": "release reliability",
+  "skills_used": [
+    "slope-sprint-workflow",
+    "slope-api-reference"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow"
+  ],
+  "shots": [
+    {
+      "ticket_key": "S143.98-1",
+      "title": "Normalize npm package bin paths to avoid publish auto-correction (#517)",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [],
+      "notes": "Normalized the root package `bin` targets from `./dist/...` to `dist/...` and added a package metadata regression to keep the publish warning from returning."
+    },
+    {
+      "ticket_key": "S143.98-2",
+      "title": "Rerun npm publish dry-run and release packaging checks (#517)",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [],
+      "notes": "`npm.cmd publish --dry-run --access public` now reports `@slope-dev/slope@1.58.0` without auto-correction warnings; package dry-run and built CLI version checks passed."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 2,
+    "fairways_total": 2,
+    "greens_in_regulation": 2,
+    "greens_total": 2,
+    "putts": 1,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "wind",
+      "impact": "minor",
+      "description": "`npm pkg fix --dry-run` normalized package metadata in the worktree despite the dry-run flag, so the resulting diff was inspected before commit."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Release dry-runs should be treated as signal, not noise, when npm says it auto-corrected package metadata.",
+      "outcome": "The package now publishes cleanly in dry-run mode and has regression coverage for the normalized bin paths."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "`corepack pnpm vitest run tests/cli/package-metadata.test.ts tests/cli/version.test.ts` passed: 5 tests.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`corepack pnpm typecheck` passed.",
+      "status": "healthy"
+    },
+    {
+      "category": "release",
+      "description": "`npm.cmd publish --dry-run --access public` passed without npm bin auto-correction warnings.",
+      "status": "healthy"
+    },
+    {
+      "category": "release",
+      "description": "`npm.cmd pack --dry-run --json` produced `@slope-dev/slope@1.58.0` with 1063 files.",
+      "status": "healthy"
+    },
+    {
+      "category": "docs",
+      "description": "`slope map --check` reported current and `slope roadmap validate` passed with only historical warnings.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "A small but worthwhile release-polish shot. The warning was easy to ignore, and that is exactly why it deserved a sprint.",
+    "advice_for_next_player": "If npm says it corrected publish metadata, make the correction explicit in source and add a regression.",
+    "what_surprised_you": "`npm pkg fix --dry-run` still changed the worktree, so inspect after diagnostic npm commands.",
+    "excited_about_next": "S144 can resume with package metadata clean enough for trusted publishing."
+  },
+  "bunker_locations": [
+    "npm publish dry-run warnings can indicate source metadata drift even when the command exits 0.",
+    "`npm pkg fix --dry-run` may still leave a worktree diff."
+  ],
+  "yardage_book_updates": [
+    "`package.json` bin targets now use `dist/cli/index.js` and `dist/mcp/index.js` without leading `./`.",
+    "`tests/cli/package-metadata.test.ts` guards the npm bin metadata shape."
+  ],
+  "course_management_notes": [
+    "Triage commit: 93ca5f0.",
+    "Implementation commit: 2f79335.",
+    "Issue #517 should close when the PR containing S143.98 merges.",
+    "Return to S144 final release validation after S143.98 closeout."
+  ],
+  "slope_factors": [
+    "release_reliability",
+    "npm_metadata",
+    "package_bin"
+  ]
+}

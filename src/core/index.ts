@@ -482,6 +482,23 @@ export {
 } from './review.js';
 export type { RecommendReviewsInput, AmendResult } from './review.js';
 
+// Retro
+export {
+  normalizeRetroLearning,
+  buildPostMergeRetro,
+  buildRetroMemoryPlans,
+  persistRetroMemories,
+} from './retro.js';
+export type {
+  RetroOutcome,
+  RetroLearningInput,
+  RetroLearning,
+  PostMergeRetroInput,
+  PostMergeRetroResult,
+  RetroMemoryPlan,
+  PersistRetroMemoriesResult,
+} from './retro.js';
+
 // Flows
 export {
   parseFlows,

@@ -158,9 +158,9 @@ describe('loadScorecards — numeric sort', () => {
     writeNestedCard(retrosDir, 's104', 104);
 
     const files = discoverScorecardFiles(baseConfig, TMP);
-    expect(files.map(f => f.replace(TMP, ''))).toEqual([
-      '/retros/sprint-103.json',
-      '/retros/s104/scorecard.json',
+    expect(files).toEqual([
+      join(TMP, 'retros', 'sprint-103.json'),
+      join(TMP, 'retros', 's104', 'scorecard.json'),
     ]);
   });
 });

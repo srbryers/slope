@@ -1,0 +1,145 @@
+{
+  "sprint_number": 143,
+  "player": "codex",
+  "theme": "Portable Sprint Resume",
+  "par": 5,
+  "slope": 5,
+  "score": 5,
+  "score_label": "par",
+  "date": "2026-06-06",
+  "type": "workflow + state recovery",
+  "skills_used": [
+    "slope-sprint-workflow"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow"
+  ],
+  "shots": [
+    {
+      "ticket_key": "S143-1",
+      "title": "Infer active sprint pointer from branch, roadmap, retros, and git history (#507)",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Added portable sprint inference from explicit flags, tracked pointer, branch name, recent git history, pending roadmap sprint, and latest scorecard fallback."
+    },
+    {
+      "ticket_key": "S143-2",
+      "title": "Add sprint resume command that reconstructs local sprint phase and ticket progress (#507)",
+      "club": "driver",
+      "result": "green",
+      "hazards": [],
+      "notes": "Added `slope sprint resume --portable` and top-level `slope resume` to recreate fresh local sprint-state and restore claim pointers without importing runtime DB, locks, metrics, or baselines."
+    },
+    {
+      "ticket_key": "S143-3",
+      "title": "Add optional tracked active-sprint pointer without syncing runtime DB or locks (#507)",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Added `slope sprint resume --write-pointer` for `docs/backlog/.sprint-active.json`, including source branch, source commit, evidence, claim pointers, local-only exclusions, and unsafe resume rules."
+    },
+    {
+      "ticket_key": "S143-4",
+      "title": "Document cross-machine resume and decide committed common-issues mirror behavior (#507)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "During closeout, three `slope sprint gate` writes were accidentally run in parallel. Final state remained correct after sequential verification, but this repeated the S142 process hazard."
+        }
+      ],
+      "notes": "Added `docs/backlog/sprint-resume.md` with the cross-machine resume flow and an explicit decision not to commit `.slope/common-issues.json` as an automatic mirror."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 1,
+    "hazard_penalties": 0.5,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "wind",
+      "impact": "minor",
+      "description": "The Windows full suite continues to emit known temp-repo stderr, CRLF, and path warnings, but all tests passed."
+    },
+    {
+      "type": "wind",
+      "impact": "minor",
+      "description": "`slope commit-ready` reported `CODEBASE.md` stale even after `slope map --check` reported CURRENT; this is being raised as a follow-up SLOPE issue."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Portable sprint recovery should restore durable intent, not machine-local runtime internals.",
+      "outcome": "The resume pointer carries sprint, phase, evidence, and claim pointers while excluding local DBs, locks, metrics, and baselines."
+    },
+    {
+      "type": "lessons",
+      "description": "Unsafe resume checks should be explicit and printable.",
+      "outcome": "Portable resume prints branch, HEAD, evidence, and unsafe conditions before writing local state, and requires `--force` for branch, commit, evidence, or local-state conflicts."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "`corepack pnpm vitest run tests/cli/sprint-resume.test.ts tests/cli/sprint-workflow.test.ts tests/cli/sprint-inference.test.ts tests/cli/sprint-state.test.ts tests/cli/registry.test.ts tests/cli/init-summary.test.ts` passed: 81 tests.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`corepack pnpm typecheck`, `corepack pnpm prepare`, and `corepack pnpm test` passed on Windows: 229 test files passed, 1 skipped; 3622 tests passed, 25 skipped.",
+      "status": "healthy"
+    },
+    {
+      "category": "docs",
+      "description": "`slope roadmap validate` passed with existing historical roadmap warnings.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Strong and needed. This closes a real portability gap by separating durable sprint intent from local operational state.",
+    "advice_for_next_player": "When `.slope/` is intentionally ignored, give agents a tracked handoff pointer with explicit safety checks instead of trying to sync the ignored runtime directory.",
+    "what_surprised_you": "`commit-ready` and `map --check` disagreed about codebase-map freshness after the S142 map fix, which is exactly the kind of SLOPE-self issue this phase should capture.",
+    "excited_about_next": "S144 can publish the recovery phase with portable resume included and the remaining SLOPE defect triaged."
+  },
+  "bunker_locations": [
+    "Do not parallelize SLOPE commands that mutate sprint-state or claim/gate state.",
+    "`commit-ready` and `slope map --check` can currently disagree about `CODEBASE.md` freshness when the map is ignored or not tracked.",
+    "Portable recovery should refuse divergent branch or missing-evidence pointers unless force is explicit."
+  ],
+  "yardage_book_updates": [
+    "`src/cli/sprint-resume.ts` centralizes portable resume pointer loading, inference, safety validation, and evidence collection.",
+    "`slope sprint resume --portable` reconstructs local sprint-state and claim pointers from tracked artifacts.",
+    "`slope sprint resume --write-pointer` writes `docs/backlog/.sprint-active.json` without syncing runtime DB, locks, metrics, or baselines.",
+    "`slope resume` is a top-level portable resume alias.",
+    "`docs/backlog/sprint-resume.md` documents cross-machine resume and keeps common-issues ranking local-only by default."
+  ],
+  "course_management_notes": [
+    "Implementation commit: bd66add.",
+    "Documentation commit: 771eab6.",
+    "Validation passed: focused S143 tests, `corepack pnpm typecheck`, `corepack pnpm prepare`, `corepack pnpm test`, `slope roadmap validate`, and top-level resume dry-run smoke check.",
+    "Issue #507 should close when the PR containing S143 merges."
+  ],
+  "slope_factors": [
+    "portable_resume",
+    "state_recovery",
+    "tracked_pointer",
+    "local_runtime_isolation"
+  ]
+}

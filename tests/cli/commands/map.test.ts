@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { execFileSync, execSync } from 'node:child_process';
+import { execFileSync, execSync, spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -13,6 +13,29 @@ function runSlopeMap(cwd: string, args: string[] = [], options: { encoding?: Buf
     encoding: options.encoding,
     stdio: ['pipe', 'pipe', 'pipe'],
   });
+}
+
+function runSlopeCommand(cwd: string, args: string[]) {
+  return spawnSync(process.execPath, [SLOPE_BIN, ...args], {
+    cwd,
+    encoding: 'utf8',
+  });
+}
+
+function writeCurrentCodebaseMap(cwd: string): void {
+  const head = execSync('git rev-parse HEAD', { cwd, encoding: 'utf8' }).trim();
+  writeFileSync(join(cwd, 'CODEBASE.md'), [
+    '---',
+    `generated_at: "${new Date().toISOString()}"`,
+    `git_sha: "${head}"`,
+    'sprint: 0',
+    'source_files: 0',
+    'test_files: 0',
+    'flows: 0',
+    '---',
+    '# Current map',
+    '',
+  ].join('\n'));
 }
 
 function setupNonSlopeRepo(packageJson: Record<string, unknown>): string {
@@ -119,25 +142,127 @@ describe('slope map in a non-SLOPE repo (#351)', () => {
     }
   });
 
-  it('does not overwrite an existing map with zero-source output unless forced', () => {
+  it('inventories non-TypeScript source files from repository roots (#505)', () => {
+    const cwd = setupNonSlopeRepo({ name: 'python-unity-tool' });
+    try {
+      mkdirSync(join(cwd, 'Assets', 'Scripts'), { recursive: true });
+      mkdirSync(join(cwd, 'Assets', 'Tests'), { recursive: true });
+      writeFileSync(join(cwd, 'main.py'), 'print("hi")\n');
+      writeFileSync(join(cwd, 'Assets', 'Scripts', 'Player.cs'), 'public class Player {}\n');
+      writeFileSync(join(cwd, 'Assets', 'Tests', 'PlayerTest.cs'), 'public class PlayerTest {}\n');
+
+      runSlopeMap(cwd);
+      const md = readFileSync(join(cwd, 'CODEBASE.md'), 'utf8');
+      expect(md).toContain('source_files: 2');
+      expect(md).toContain('test_files: 1');
+      expect(md).toContain('### `.`');
+      expect(md).toContain('Source files: 2 | Test files: 1');
+      expect(md).not.toContain('No packages, apps, or top-level src/ directory detected');
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('refreshes metadata without overwriting an existing curated zero-source map (#505)', () => {
     const cwd = setupNonSlopeRepo({ name: 'docs-only-tool' });
     try {
       writeFileSync(join(cwd, 'CODEBASE.md'), '# Useful existing map\n\nKeep this.\n');
 
-      let output = '';
-      try {
-        runSlopeMap(cwd, [], { encoding: 'utf8' });
-      } catch (err) {
-        output = `${(err as { stdout?: Buffer | string }).stdout ?? ''}${(err as { stderr?: Buffer | string }).stderr ?? ''}`;
-      }
-
-      expect(output).toContain('Refusing to overwrite existing CODEBASE.md with a zero-source map');
-      expect(readFileSync(join(cwd, 'CODEBASE.md'), 'utf8')).toContain('Useful existing map');
+      const output = runSlopeMap(cwd, [], { encoding: 'utf8' }) as string;
+      const refreshed = readFileSync(join(cwd, 'CODEBASE.md'), 'utf8');
+      expect(output).toContain('preserved existing manual content');
+      expect(refreshed).toContain('git_sha:');
+      expect(refreshed).toContain('source_files: 0');
+      expect(refreshed).toContain('Useful existing map');
 
       runSlopeMap(cwd, ['--force']);
       const forced = readFileSync(join(cwd, 'CODEBASE.md'), 'utf8');
       expect(forced).toContain('# docs-only-tool Codebase Map');
       expect(forced).toContain('No packages, apps, or top-level src/ directory detected');
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('uses an ancestry-path git distance so sibling worktree bases do not inflate --check (#505)', () => {
+    const cwd = setupNonSlopeRepo({ name: 'worktree-map-tool' });
+    try {
+      const initialSha = execSync('git rev-parse HEAD', { cwd, encoding: 'utf8' }).trim();
+      execSync('git checkout -q -b map-source', { cwd });
+      writeFileSync(join(cwd, 'map-source.txt'), 'map source\n');
+      execSync('git add map-source.txt && git commit -q -m "map source"', { cwd });
+      const siblingMapSha = execSync('git rev-parse HEAD', { cwd, encoding: 'utf8' }).trim();
+
+      execSync(`git checkout -q -b worktree-branch ${initialSha}`, { cwd });
+      writeFileSync(join(cwd, 'branch.txt'), 'branch work\n');
+      execSync('git add branch.txt && git commit -q -m "branch work"', { cwd });
+      writeFileSync(join(cwd, 'CODEBASE.md'), [
+        '---',
+        `generated_at: "${new Date().toISOString()}"`,
+        `git_sha: "${siblingMapSha}"`,
+        'sprint: 0',
+        'source_files: 0',
+        'test_files: 0',
+        'flows: 0',
+        '---',
+        '# Curated map',
+        '',
+      ].join('\n'));
+
+      const output = runSlopeMap(cwd, ['--check'], { encoding: 'utf8' }) as string;
+      expect(output).toContain('Git distance: 0 commits behind');
+      expect(output).toContain('Overall: CURRENT');
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('does not leak Windows stderr from staleness git distance (#512)', () => {
+    const cwd = setupNonSlopeRepo({ name: 'stderr-clean-tool' });
+    try {
+      writeCurrentCodebaseMap(cwd);
+
+      const mapCheck = runSlopeCommand(cwd, ['map', '--check']);
+      expect(mapCheck.status).toBe(0);
+      expect(mapCheck.stdout).toContain('Overall: CURRENT');
+      expect(mapCheck.stderr).not.toContain('The system cannot find the path specified');
+
+      const commitReady = runSlopeCommand(cwd, ['commit-ready', '--json']);
+      expect(commitReady.status).toBe(0);
+      expect(() => JSON.parse(commitReady.stdout)).not.toThrow();
+      expect(commitReady.stderr).not.toContain('The system cannot find the path specified');
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('formats decimal sprint currency deltas without floating-point noise (#513)', () => {
+    const cwd = setupNonSlopeRepo({ name: 'decimal-sprint-tool' });
+    try {
+      const head = execSync('git rev-parse HEAD', { cwd, encoding: 'utf8' }).trim();
+      writeFileSync(join(cwd, 'CODEBASE.md'), [
+        '---',
+        `generated_at: "${new Date().toISOString()}"`,
+        `git_sha: "${head}"`,
+        'sprint: 143',
+        'source_files: 0',
+        'test_files: 0',
+        'flows: 0',
+        '---',
+        '# Current map',
+        '',
+      ].join('\n'));
+      writeFileSync(join(cwd, 'docs', 'retros', 'sprint-143.6.json'), JSON.stringify({
+        sprint_number: 143.6,
+        par: 3,
+        score: 3,
+        shots: [],
+      }));
+
+      const output = runSlopeMap(cwd, ['--check'], { encoding: 'utf8' }) as string;
+
+      expect(output).toContain('Sprint currency: Sprint 143.6 (map says 143, +0.6)');
+      expect(output).not.toContain('0.599999');
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }

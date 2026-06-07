@@ -13,7 +13,7 @@ import { resetWorktreeCheckState } from './worktree-check.js';
  */
 function resolveGitDir(cwd: string): string {
   try {
-    const toplevel = execSync('git rev-parse --show-toplevel 2>/dev/null', { cwd, encoding: 'utf8' }).trim();
+    const toplevel = execSync('git rev-parse --show-toplevel', { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
     if (toplevel) return toplevel;
   } catch { /* not a git repo */ }
   return cwd;
@@ -26,7 +26,7 @@ function resolveGitDir(cwd: string): string {
  */
 function isMainCheckout(cwd: string): boolean {
   try {
-    const commonDir = execSync('git rev-parse --git-common-dir 2>/dev/null', { cwd, encoding: 'utf8' }).trim();
+    const commonDir = execSync('git rev-parse --git-common-dir', { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
     return commonDir === '.git';
   } catch { return true; }
 }
@@ -36,7 +36,7 @@ function isMainCheckout(cwd: string): boolean {
  */
 function hasOtherWorktrees(cwd: string): boolean {
   try {
-    const output = execSync('git worktree list --porcelain 2>/dev/null', { cwd, encoding: 'utf8' });
+    const output = execSync('git worktree list --porcelain', { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
     const worktrees = output.split('\n\n').filter(Boolean);
     return worktrees.length > 1;
   } catch { return false; }
@@ -64,10 +64,12 @@ export async function stopCheckGuard(_input: HookInput, cwd: string): Promise<Gu
 
   // If the autonomous loop is running, dirty state belongs to it — warn instead of blocking
   let loopRunning = false;
-  try {
-    const psOut = execSync("pgrep -f 'bash.*slope-loop/(run|continuous|parallel)\\.sh'", { cwd: gitDir, encoding: 'utf8' }).trim();
-    loopRunning = psOut.length > 0;
-  } catch { /* no matching process */ }
+  if (process.platform !== 'win32') {
+    try {
+      const psOut = execSync("pgrep -f 'bash.*slope-loop/(run|continuous|parallel)\\.sh'", { cwd: gitDir, encoding: 'utf8' }).trim();
+      loopRunning = psOut.length > 0;
+    } catch { /* no matching process */ }
+  }
 
   // Only downgrade dirty-state blocks when we're in the main checkout and other worktrees exist.
   // Worktree sessions own their own dirty state — no downgrade for them.
@@ -79,7 +81,7 @@ export async function stopCheckGuard(_input: HookInput, cwd: string): Promise<Gu
 
   // Check for uncommitted changes (excluding gitignored files)
   try {
-    const status = execSync('git status --porcelain 2>/dev/null', { cwd: gitDir, encoding: 'utf8' }).trim();
+    const status = execSync('git status --porcelain', { cwd: gitDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
     if (status.length > 0) {
       const lines = status.split('\n').filter(Boolean);
 
@@ -101,7 +103,7 @@ export async function stopCheckGuard(_input: HookInput, cwd: string): Promise<Gu
       const ignoredSet = new Set<string>();
       if (allPaths.length > 0) {
         try {
-          const ignored = execSync(`git check-ignore ${allPaths.map(p => `'${p}'`).join(' ')} 2>/dev/null`, { cwd: gitDir, encoding: 'utf8' }).trim();
+          const ignored = execSync(`git check-ignore ${allPaths.map(p => `'${p}'`).join(' ')}`, { cwd: gitDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
           for (const p of ignored.split('\n').filter(Boolean)) {
             ignoredSet.add(p);
           }
@@ -134,12 +136,12 @@ export async function stopCheckGuard(_input: HookInput, cwd: string): Promise<Gu
   // in worktrees (#255: git log @{u}..HEAD traverses merged branch history)
   if (!headIsOnMain(gitDir)) {
     try {
-      const branch = execSync('git rev-parse --abbrev-ref HEAD 2>/dev/null', { cwd: gitDir, encoding: 'utf8' }).trim();
+      const branch = execSync('git rev-parse --abbrev-ref HEAD', { cwd: gitDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
       const remoteRef = `origin/${branch}`;
       // Verify remote ref exists before comparing
-      const hasRemote = (() => { try { execSync(`git rev-parse --verify ${remoteRef} 2>/dev/null`, { cwd: gitDir, encoding: 'utf8' }); return true; } catch { return false; } })();
+      const hasRemote = (() => { try { execSync(`git rev-parse --verify ${remoteRef}`, { cwd: gitDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }); return true; } catch { return false; } })();
       if (hasRemote) {
-        const unpushed = execSync(`git rev-list ${remoteRef}..HEAD --first-parent --count 2>/dev/null`, { cwd: gitDir, encoding: 'utf8' }).trim();
+        const unpushed = execSync(`git rev-list ${remoteRef}..HEAD --first-parent --count`, { cwd: gitDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
         const count = parseInt(unpushed, 10) || 0;
         if (count > 0) {
           blockingIssues.push(`${count} unpushed commit${count === 1 ? '' : 's'}`);

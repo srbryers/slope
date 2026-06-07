@@ -255,7 +255,7 @@ describe('WindsurfAdapter', () => {
 
   describe('hooksConfigPath', () => {
     it('returns .windsurf/hooks.json', () => {
-      expect(adapter.hooksConfigPath('/tmp/test')).toBe('/tmp/test/.windsurf/hooks.json');
+      expect(adapter.hooksConfigPath('/tmp/test')).toBe(join('/tmp/test', '.windsurf', 'hooks.json'));
     });
   });
 

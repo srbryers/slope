@@ -9,6 +9,7 @@ import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { checkConflicts } from '../../core/index.js';
+import { QUIET_STDIO } from '../../core/process.js';
 import { STALE_SESSION_THRESHOLD_MS } from '../../core/constants.js';
 import type { ClaimScope, SprintClaim } from '../../core/index.js';
 import { loadConfig } from '../config.js';
@@ -105,8 +106,8 @@ function listWorktrees(cwd: string): WorktreeInfo[] {
 /** Check if we're currently inside a worktree */
 function isInsideWorktree(cwd: string): boolean {
   try {
-    const commonDir = execSync('git rev-parse --git-common-dir 2>/dev/null', { cwd, encoding: 'utf8' }).trim();
-    const gitDir = execSync('git rev-parse --git-dir 2>/dev/null', { cwd, encoding: 'utf8' }).trim();
+    const commonDir = execSync('git rev-parse --git-common-dir', { cwd, encoding: 'utf8', stdio: QUIET_STDIO }).trim();
+    const gitDir = execSync('git rev-parse --git-dir', { cwd, encoding: 'utf8', stdio: QUIET_STDIO }).trim();
     return gitDir !== commonDir && gitDir !== '.git';
   } catch {
     return false;
@@ -421,21 +422,22 @@ function statusCommand(args: string[]): void {
 
 export async function worktreeCommand(args: string[]): Promise<void> {
   const sub = args[0];
+  const help = args.includes('--help') || args.includes('-h');
 
-  if (sub === 'start') {
+  if (!help && sub === 'start') {
     return startCommand(args.slice(1));
   }
 
-  if (sub === 'cleanup') {
+  if (!help && sub === 'cleanup') {
     return cleanupCommand(args.slice(1));
   }
 
-  if (sub === 'status' || sub === 'list') {
+  if (!help && (sub === 'status' || sub === 'list')) {
     statusCommand(args.slice(1));
     return;
   }
 
-  if (args.includes('--help') || args.includes('-h') || !sub) {
+  if (help || !sub) {
     console.log(`
 slope worktree — Manage git worktrees
 

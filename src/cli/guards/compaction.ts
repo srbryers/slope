@@ -1,6 +1,7 @@
 import { execSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { QUIET_STDIO } from '../../core/process.js';
 import type { HookInput, GuardResult } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { resolveStore } from '../store.js';
@@ -45,15 +46,15 @@ export async function compactionGuard(input: HookInput, cwd: string): Promise<Gu
 
   // Gather git state
   try {
-    const branch = execSync('git rev-parse --abbrev-ref HEAD 2>/dev/null', { cwd, encoding: 'utf8' }).trim();
+    const branch = execSync('git rev-parse --abbrev-ref HEAD', { cwd, encoding: 'utf8', stdio: QUIET_STDIO }).trim();
 
-    const statusOut = execSync('git status --porcelain 2>/dev/null', { cwd, encoding: 'utf8' }).trim();
+    const statusOut = execSync('git status --porcelain', { cwd, encoding: 'utf8', stdio: QUIET_STDIO }).trim();
     let uncommitted = statusOut ? statusOut.split('\n').filter(Boolean).length : 0;
     // Filter out gitignored files (e.g. .slope/, .env)
     if (uncommitted > 0) {
       const paths = statusOut.split('\n').filter(Boolean).map(l => l.slice(3));
       try {
-        const ignored = execSync(`git check-ignore ${paths.map(p => `'${p}'`).join(' ')} 2>/dev/null`, { cwd, encoding: 'utf8' }).trim();
+        const ignored = execSync(`git check-ignore ${paths.map(p => `'${p}'`).join(' ')}`, { cwd, encoding: 'utf8', stdio: QUIET_STDIO }).trim();
         const ignoredCount = ignored.split('\n').filter(Boolean).length;
         uncommitted -= ignoredCount;
       } catch { /* check-ignore exits 1 when no files are ignored */ }
@@ -61,11 +62,11 @@ export async function compactionGuard(input: HookInput, cwd: string): Promise<Gu
 
     let unpushed = 0;
     try {
-      const unpushedOut = execSync('git log @{u}..HEAD --oneline 2>/dev/null', { cwd, encoding: 'utf8' }).trim();
+      const unpushedOut = execSync('git log @{u}..HEAD --oneline', { cwd, encoding: 'utf8', stdio: QUIET_STDIO }).trim();
       unpushed = unpushedOut ? unpushedOut.split('\n').filter(Boolean).length : 0;
     } catch { /* no upstream */ }
 
-    const logOut = execSync('git log -5 --oneline 2>/dev/null', { cwd, encoding: 'utf8' }).trim();
+    const logOut = execSync('git log -5 --oneline', { cwd, encoding: 'utf8', stdio: QUIET_STDIO }).trim();
     const recentCommits = logOut ? logOut.split('\n').filter(Boolean) : [];
 
     handoff.git = { branch, uncommitted, unpushed, recent_commits: recentCommits };

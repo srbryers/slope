@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { execSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 import { analyzeGit, extractSprintArtifactReferences, extractSprintReferences, findShippedSprintsOnMain } from '../../../src/core/analyzers/git.js';
 
 function makeTmpDir(): string {
@@ -16,9 +16,32 @@ function gitInit(cwd: string): void {
 }
 
 function gitCommit(cwd: string, message: string): void {
-  writeFileSync(join(cwd, `file-${Date.now()}-${Math.random()}.txt`), message);
-  execSync('git add -A', { cwd, stdio: 'pipe' });
   execSync(`git commit -m "${message}" --allow-empty`, { cwd, stdio: 'pipe' });
+}
+
+function gitOutput(cwd: string, args: string[], input?: string): string {
+  return execFileSync('git', args, {
+    cwd,
+    encoding: 'utf8',
+    input,
+    stdio: ['pipe', 'pipe', 'pipe'],
+  }).trim();
+}
+
+function gitFastEmptyHistory(cwd: string, count: number): void {
+  execFileSync('git', ['symbolic-ref', 'HEAD', 'refs/heads/main'], { cwd, stdio: 'pipe' });
+  const tree = gitOutput(cwd, ['mktree'], '');
+  let parent: string | null = null;
+
+  for (let i = 0; i < count; i++) {
+    const args = ['commit-tree', tree, '-m', `commit ${i}`];
+    if (parent) args.push('-p', parent);
+    parent = gitOutput(cwd, args);
+  }
+
+  if (parent) {
+    execFileSync('git', ['update-ref', 'refs/heads/main', parent], { cwd, stdio: 'pipe' });
+  }
 }
 
 function gitCommitFile(cwd: string, file: string, content: string, message: string): void {
@@ -93,10 +116,8 @@ describe('analyzeGit', () => {
 
   it('infers daily cadence from many commits', async () => {
     gitInit(tmpDir);
-    // 90+ commits in the "last 90 days" → ~7 per week → daily
-    for (let i = 0; i < 90; i++) {
-      gitCommit(tmpDir, `commit ${i}`);
-    }
+    // 65 commits in the "last 90 days" -> ~5 per week -> daily
+    gitFastEmptyHistory(tmpDir, 65);
 
     const result = await analyzeGit(tmpDir);
     expect(result.inferredCadence).toBe('daily');

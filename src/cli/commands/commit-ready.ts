@@ -5,6 +5,7 @@ import { parseRoadmap } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { loadSprintState, pendingGates } from '../sprint-state.js';
 import { resolveStore } from '../store.js';
+import { runStalenessCheck } from './map.js';
 
 /**
  * `slope commit-ready` — pre-commit checklist for agents (#314).
@@ -206,18 +207,6 @@ function checkRoadmap(cwd: string): CommitReadyCheck {
   }
 }
 
-/** Default commits-since-last-touch threshold before the codebase map is
- *  considered stale. Configurable via SLOPE_CODEBASE_STALE_AT env var so
- *  fast-moving repos can shorten and infrequent ones can lengthen. */
-function codebaseStaleThreshold(): number {
-  const raw = process.env.SLOPE_CODEBASE_STALE_AT;
-  if (raw && /^\d+$/.test(raw)) {
-    const n = parseInt(raw, 10);
-    if (n > 0) return n;
-  }
-  return 30;
-}
-
 function checkCodebaseMap(cwd: string): CommitReadyCheck {
   const mapPath = join(cwd, 'CODEBASE.md');
   if (!existsSync(mapPath)) {
@@ -230,34 +219,31 @@ function checkCodebaseMap(cwd: string): CommitReadyCheck {
     };
   }
 
-  // Resolve the last-touch timestamp explicitly (don't embed `$()` in another
-  // git command — that depends on shell substitution which behaves
-  // differently across platforms and silently returns empty for untracked
-  // files, causing --since="" to list ALL commits and trigger a false
-  // positive). When CODEBASE.md is untracked, we can't compute staleness
-  // — fall back to existence-only check rather than spam warnings.
-  const lastTouch = git('log -1 --format=%cI -- CODEBASE.md', cwd);
-  if (!lastTouch) {
+  try {
+    const config = loadConfig(cwd);
+    const mapContent = readFileSync(mapPath, 'utf8');
+    const results = runStalenessCheck(cwd, config, mapContent);
+    const stale = results.filter(result => result.status === 'stale');
+    if (stale.length > 0) {
+      return {
+        name: 'codebase-map',
+        ok: false,
+        severity: 'warn',
+        reason: `CODEBASE.md is stale: ${stale.map(result => `${result.label}: ${result.message}`).join('; ')}`,
+        suggestion: 'slope map',
+      };
+    }
+    const warnings = results.filter(result => result.status === 'warn');
     return {
       name: 'codebase-map',
       ok: true,
       severity: 'info',
-      reason: 'Present (untracked — staleness unknown)',
+      reason: warnings.length > 0 ? `Present (map check current; ${warnings.length} warning(s))` : 'Present (map check current)',
     };
+  } catch {
+    return { name: 'codebase-map', ok: true, severity: 'info', reason: 'Present (staleness unknown)' };
   }
-  const sinceLastTouch = git(`log --since=${JSON.stringify(lastTouch)} --oneline`, cwd);
-  const commitsSince = sinceLastTouch ? sinceLastTouch.split('\n').length : 0;
-  const threshold = codebaseStaleThreshold();
-  if (commitsSince > threshold) {
-    return {
-      name: 'codebase-map',
-      ok: false,
-      severity: 'warn',
-      reason: `CODEBASE.md is ${commitsSince} commits stale (threshold ${threshold}; override via SLOPE_CODEBASE_STALE_AT)`,
-      suggestion: 'slope map',
-    };
-  }
-  return { name: 'codebase-map', ok: true, severity: 'info', reason: 'Present' };
+
 }
 
 function checkPendingGates(cwd: string): CommitReadyCheck {

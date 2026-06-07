@@ -2,7 +2,7 @@
 // Generates per-ticket execution plans for agent injection.
 
 import { readFileSync, existsSync, statSync, readdirSync } from 'node:fs';
-import { join, basename as pathBasename, extname } from 'node:path';
+import { isAbsolute, join, basename as pathBasename, extname } from 'node:path';
 import type { EmbeddingConfig } from './embedding.js';
 import type { EmbeddingStore } from './embedding-store.js';
 import type { GolfScorecard } from './types.js';
@@ -87,7 +87,7 @@ export function resolveTicket(
 ): TicketData | null {
   // Try roadmap first
   const rPath = roadmapPath
-    ? (roadmapPath.startsWith('/') ? roadmapPath : join(cwd, roadmapPath))
+    ? (isAbsolute(roadmapPath) ? roadmapPath : join(cwd, roadmapPath))
     : join(cwd, 'docs/backlog/roadmap.json');
 
   if (existsSync(rPath)) {
@@ -105,7 +105,7 @@ export function resolveTicket(
 
   // Try backlog
   const bPath = backlogPath
-    ? (backlogPath.startsWith('/') ? backlogPath : join(cwd, backlogPath))
+    ? (isAbsolute(backlogPath) ? backlogPath : join(cwd, backlogPath))
     : join(cwd, 'slope-loop/backlog.json');
 
   if (existsSync(bPath)) {
@@ -150,6 +150,10 @@ function walkDir(dir: string): string[] {
   return results;
 }
 
+function toRepoPath(path: string): string {
+  return path.replace(/\\/g, '/');
+}
+
 /**
  * Find test files matching source file stems.
  */
@@ -159,7 +163,7 @@ export function collectTestFiles(primaryPaths: string[], cwd: string): string[] 
 
   const allTestFiles = walkDir(testsDir)
     .filter(f => f.endsWith('.test.ts') || f.endsWith('.test.js'))
-    .map(f => f.slice(cwd.length + 1)); // relative to cwd
+    .map(f => toRepoPath(f.slice(cwd.length + 1))); // relative to cwd
 
   const matched = new Set<string>();
 

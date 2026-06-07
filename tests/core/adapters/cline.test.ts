@@ -231,7 +231,9 @@ describe('ClineAdapter', () => {
         const scriptPath = join(hooksDir, event);
         if (existsSync(scriptPath)) {
           const mode = statSync(scriptPath).mode;
-          expect(mode & 0o111, `${event} should be executable`).toBeGreaterThan(0);
+          if (process.platform !== 'win32') {
+            expect(mode & 0o111, `${event} should be executable`).toBeGreaterThan(0);
+          }
         }
       }
     });
