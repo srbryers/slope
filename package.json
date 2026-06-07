@@ -29,8 +29,8 @@
     ]
   },
   "bin": {
-    "slope": "./dist/cli/index.js",
-    "mcp-slope-tools": "./dist/mcp/index.js"
+    "slope": "dist/cli/index.js",
+    "mcp-slope-tools": "dist/mcp/index.js"
   },
   "files": [
     "dist",
