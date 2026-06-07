@@ -4,8 +4,8 @@
   "theme": "Roadmap Hygiene Patch Release",
   "par": 5,
   "slope": 2,
-  "score": 5,
-  "score_label": "par",
+  "score": 6,
+  "score_label": "bogey",
   "date": "2026-06-07",
   "type": "release + bugfix",
   "skills_used": [
@@ -60,20 +60,34 @@
       "ticket_key": "S146.1-5",
       "title": "Validate release readiness and publish v1.58.1 through GitHub Release",
       "club": "wedge",
-      "result": "in_the_hole",
+      "result": "green",
       "hazards": [],
-      "notes": "Validated release readiness locally with build, typecheck, full test suite, version smoke, roadmap/docs/map checks, and review findings clean. npm publish remains the post-merge GitHub Release workflow step."
+      "notes": "Validated release readiness locally with build, typecheck, full test suite, version smoke, roadmap/docs/map checks, and review findings clean. PR checks then exposed a CodeQL alert in the new staging helper before merge."
+    },
+    {
+      "ticket_key": "S146.1-6",
+      "title": "Replace version-bump git staging shell quoting with argv execution (#528)",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "moderate",
+          "description": "GitHub Advanced Security flagged the new version-bump staging helper because it built a shell command and escaped quotes without escaping backslashes."
+        }
+      ],
+      "notes": "Raised #528, replaced shell-quoted git add staging with execFileSync argv-form execution, and reran focused version tests, typecheck, and build before pushing the CI fix."
     }
   ],
   "stats": {
-    "fairways_hit": 5,
-    "fairways_total": 5,
-    "greens_in_regulation": 5,
-    "greens_total": 5,
+    "fairways_hit": 6,
+    "fairways_total": 6,
+    "greens_in_regulation": 6,
+    "greens_total": 6,
     "putts": 0,
-    "penalties": 0,
-    "hazards_hit": 1,
-    "hazard_penalties": 0,
+    "penalties": 1,
+    "hazards_hit": 2,
+    "hazard_penalties": 1,
     "miss_directions": {
       "long": 0,
       "short": 0,
@@ -84,8 +98,8 @@
   "conditions": [
     {
       "type": "rough",
-      "impact": "minor",
-      "description": "The release readiness gate found one SLOPE-local issue (#526) before PR creation; it was fixed and folded into the release sprint."
+      "impact": "moderate",
+      "description": "The release readiness gates found two SLOPE-local issues (#526 before PR creation and #528 from CodeQL after PR creation); both were fixed and folded into the release sprint."
     },
     {
       "type": "pin_position",
@@ -109,6 +123,11 @@
       "type": "lessons",
       "description": "Guard tests should not create fixture repositories inside the active repository when branch or sprint state affects behavior.",
       "outcome": "The guard suites now use OS temp fixture roots so local active sprint state cannot leak into regression tests."
+    },
+    {
+      "type": "lessons",
+      "description": "Release automation should pass git path arguments by argv instead of custom shell quoting.",
+      "outcome": "Version-bump staging now uses execFileSync with `['add', ...paths]`, eliminating the CodeQL escaping alert."
     }
   ],
   "nutrition": [
@@ -128,6 +147,11 @@
       "status": "healthy"
     },
     {
+      "category": "testing",
+      "description": "After fixing #528, `corepack pnpm vitest run tests/cli/version.test.ts`, `corepack pnpm typecheck`, and `corepack pnpm build` passed.",
+      "status": "healthy"
+    },
+    {
       "category": "docs",
       "description": "`node dist/cli/index.js roadmap validate`, `roadmap status`, `docs generate`, `docs check`, and `map --check` passed during release readiness validation.",
       "status": "healthy"
@@ -139,7 +163,7 @@
     }
   ],
   "nineteenth_hole": {
-    "how_did_it_feel": "A small release round with useful pressure: the release gate did exactly what it should and flushed out one local SLOPE issue before the package left the clubhouse.",
+    "how_did_it_feel": "A small release round with useful pressure: the release gates did exactly what they should and flushed out two local SLOPE issues before the package left the clubhouse.",
     "advice_for_next_player": "When cutting a patch release, verify the generated package and plugin versions, then let GitHub Release drive the npm publish path after CI is green.",
     "what_surprised_you": "The full suite failure was not a release bug; it was a fixture isolation issue exposed by running tests from an active decimal sprint branch.",
     "excited_about_next": "S147 can now start from a clean roadmap and a fresh patch release instead of carrying release hygiene debt."
@@ -147,21 +171,24 @@
   "bunker_locations": [
     "A version bump wrapper can silently under-stage files if the script it delegates to changes additional manifests.",
     "Roadmap current-sprint logic must prefer explicitly active inserted sprints before later planned sprint ids.",
-    "Guard regression fixtures should live outside the active repository when branch name or sprint state changes behavior."
+    "Guard regression fixtures should live outside the active repository when branch name or sprint state changes behavior.",
+    "Release automation should avoid custom shell quoting for staged paths; argv-form git execution is simpler and safer."
   ],
   "yardage_book_updates": [
     "src/cli/commands/version.ts now exposes shared version-bump staging paths and stages the bundled plugin manifest when it exists.",
     "src/cli/commands/roadmap.ts now resolves current roadmap work with active inserted sprint support and decimal sprint formatting.",
     "src/cli/guards/sprint-completion.ts now uses decimal-aware branch sprint inference.",
-    "tests/cli/guards/* guard fixture roots now use OS temp directories to avoid inheriting parent repo state."
+    "tests/cli/guards/* guard fixture roots now use OS temp directories to avoid inheriting parent repo state.",
+    "src/cli/commands/version.ts now stages version-bump files through execFileSync argument arrays instead of shell-quoted paths."
   ],
   "course_management_notes": [
     "Created GitHub issue #524 for release bump staging drift.",
     "Created GitHub issue #525 for stale roadmap current-sprint selection with inserted active sprints.",
     "Created GitHub issue #526 for guard tests inheriting parent repo branch and active sprint state.",
-    "Release commits: 415bc4e, 6def39b, 1128c3e, and 224df13.",
-    "Review recommendation: architect required, code optional; manual architect/code review found no findings.",
-    "The release PR should include `Closes #524`, `Closes #525`, and `Closes #526`.",
+    "Created GitHub issue #528 for the CodeQL alert on shell-quoted version-bump staging.",
+    "Initial release commits included 415bc4e, 6def39b, 1128c3e, and 224df13; the CodeQL #528 fix was added after PR release validation.",
+    "Review recommendation: architect required, code optional; manual architect/code review found no findings before PR, and CodeQL caught #528 during PR release validation.",
+    "The release PR should include `Closes #524`, `Closes #525`, `Closes #526`, and `Closes #528`.",
     "After merge, create GitHub Release `v1.58.1`, watch the publish workflow, and verify npm reports @slope-dev/slope 1.58.1."
   ],
   "slope_factors": [

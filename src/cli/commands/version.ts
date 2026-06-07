@@ -1,4 +1,4 @@
-import { execSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
@@ -79,13 +79,14 @@ export function getVersionBumpStagePaths(cwd: string): string[] {
   return VERSION_BUMP_STAGE_PATHS.filter(path => existsSync(join(cwd, path)));
 }
 
-function quoteShellArg(value: string): string {
-  return `"${value.replace(/"/g, '\\"')}"`;
-}
-
 function stageVersionBumpChanges(cwd: string): void {
   const paths = getVersionBumpStagePaths(cwd);
-  run(`git add ${paths.map(quoteShellArg).join(' ')}`, cwd);
+  if (paths.length === 0) {
+    throw new Error('No version bump paths found to stage.');
+  }
+  // Use argv-form execution here so release automation never hand-quotes paths
+  // into a shell command.
+  execFileSync('git', ['add', ...paths], { cwd, stdio: QUIET_STDIO });
 }
 
 async function versionBump(args: string[]): Promise<void> {
