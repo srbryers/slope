@@ -1,6 +1,6 @@
 {
   "name": "SLOPE Development Roadmap",
-  "description": "Forward-looking roadmap from S61+. Phases 1-9 (S1-S47) are complete. S48-S60 were hardening, guard enforcement, and process sprints. This roadmap covers adoption, observability, guard maturity, multi-project, loop evolution, and issue-driven recovery. S61-S64 reflect what actually shipped (themes diverged from original plan). Note: the actual S69 diverged from the planned Referee sprint \u2014 a carryover patch kit ran instead. The Referee work was rescheduled as S78. S75.5 (The Bug Clearing) added 2026-05-02 to clear accumulated CLI bugs from external repos. S132-S136 were backfilled from shipped scorecards on 2026-06-05; S137 adds post-merge retro tooling and durable memory, S137.5 addresses Windows suite portability for #509, S138-S144 triage open GitHub issues #499/#501/#502/#503/#505/#507/#510/#511/#512/#513/#514/#515/#516/#517/#518 into focused recovery sprints, and S145 closed validation-signal regressions #519/#520.",
+  "description": "Forward-looking roadmap from S61+. Phases 1-9 (S1-S47) are complete. S48-S60 were hardening, guard enforcement, and process sprints. This roadmap covers adoption, observability, guard maturity, multi-project, loop evolution, and issue-driven recovery. S61-S64 reflect what actually shipped (themes diverged from original plan). Note: the actual S69 diverged from the planned Referee sprint \u2014 a carryover patch kit ran instead. The Referee work was rescheduled as S78. S75.5 (The Bug Clearing) added 2026-05-02 to clear accumulated CLI bugs from external repos. S132-S136 were backfilled from shipped scorecards on 2026-06-05; S137 adds post-merge retro tooling and durable memory, S137.5 addresses Windows suite portability for #509, S138-S144 triage open GitHub issues #499/#501/#502/#503/#505/#507/#510/#511/#512/#513/#514/#515/#516/#517/#518 into focused recovery sprints, S145 closed validation-signal regressions #519/#520, and S146 cleaned stale roadmap state plus decimal sprint shipped-artifact warnings (#522).",
   "phases": [
     {
       "name": "Phase 10 \u2014 Adoption & Onboarding",
@@ -278,8 +278,8 @@
         130,
         131
       ],
-      "status": "planned",
-      "note": "Triage the open #466/#467/#468 issue batch into three focused repair sprints and one patch-release sprint: first repair roadmap ticket identifier parsing and phase-boundary guard matching, then fix worktree-check stale-session deadlocks, then enforce PR closeout discipline, then publish the combined fixes."
+      "status": "complete",
+      "note": "The #466/#467/#468 issue batch was completed through the S130/S131 recovery and release work. S128/S129 remained stale planned entries without standalone scorecards and were marked superseded in S146."
     },
     {
       "name": "Phase 42 \u2014 Closeout Corrections & Issue Scout",
@@ -311,7 +311,7 @@
         143.95,
         144
       ],
-      "status": "planned",
+      "status": "complete",
       "note": "Start with a retro command/skill sprint that captures post-PR-merge learning into durable memory, then triage open #499/#501/#502/#503/#505/#507/#510/#511/#512/#513/#514/#515 into focused recovery sprints: destructive-help safety, existing-worktree entry guidance, session-collision recovery, workflow state resync, non-TypeScript map guard safety, portable sprint resume, commit-ready map freshness alignment, decimal sprint status parsing, Windows-safe map staleness checks, decimal sprint currency formatting, Node exec redirection audit, atomic-write lock contention hardening, and a release."
     },
     {
@@ -321,6 +321,22 @@
       ],
       "status": "complete",
       "note": "Close #519/#520 by making roadmap shipped-commit detection ignore sprint-range endpoints and making `slope map --check` use the same file-counting logic as `slope map`."
+    },
+    {
+      "name": "Phase 45 \u2014 Roadmap Hygiene",
+      "sprints": [
+        146
+      ],
+      "status": "complete",
+      "note": "Clean stale roadmap state after the recovery train, fix decimal sprint shipped-artifact detection (#522), and restore a concrete next sprint target."
+    },
+    {
+      "name": "Phase 46 \u2014 Handoff Continuity",
+      "sprints": [
+        147
+      ],
+      "status": "planned",
+      "note": "Make cross-session handoffs first-class and low-friction after the roadmap hygiene sprint."
     }
   ],
   "sprints": [
@@ -2847,10 +2863,11 @@
       "par": 4,
       "slope": 3,
       "type": "bugfix + guard hardening",
+      "status": "superseded",
       "depends_on": [
         127
       ],
-      "note": "Close #466 by accepting id/key roadmap ticket identifiers, making validation report shape errors instead of throwing, and tightening phase-boundary guard matching/fail-safe behavior.",
+      "note": "#466 was closed as completed through the later S130/S131 recovery train; this standalone S128 entry had no scorecard and was marked superseded during S146 roadmap hygiene.",
       "tickets": [
         {
           "key": "S128-1",
@@ -2899,10 +2916,11 @@
       "par": 4,
       "slope": 4,
       "type": "bugfix + guard hardening",
+      "status": "superseded",
       "depends_on": [
         128
       ],
-      "note": "Close #467 by making worktree-check recovery reachable, reconciling harness worktree entry with the session registry, and proving stale primary cleanup does not deadlock future sessions.",
+      "note": "#467 was closed as completed through the later S130/S131 recovery train; this standalone S129 entry had no scorecard and was marked superseded during S146 roadmap hygiene.",
       "tickets": [
         {
           "key": "S129-1",
@@ -4011,6 +4029,90 @@
           "depends_on": [
             "S145-1",
             "S145-2"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 146,
+      "theme": "Roadmap Hygiene and Decimal Artifact Reality Checks",
+      "par": 4,
+      "slope": 2,
+      "type": "roadmap hygiene + bugfix",
+      "status": "complete",
+      "score": 4,
+      "score_label": "par",
+      "depends_on": [
+        145
+      ],
+      "note": "Clean stale roadmap state after S145, mark obsolete S128/S129 entries terminal, fix decimal sprint artifact shipped detection (#522), and make the next planned sprint explicit.",
+      "tickets": [
+        {
+          "key": "S146-1",
+          "title": "Mark obsolete S128/S129 roadmap entries terminal and Phase 41/43 complete",
+          "club": "wedge",
+          "complexity": "small"
+        },
+        {
+          "key": "S146-2",
+          "title": "Recognize decimal sprint scorecard and review artifacts as shipped commits (#522)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 522
+        },
+        {
+          "key": "S146-3",
+          "title": "Restore explicit next sprint target and validate roadmap freshness",
+          "club": "wedge",
+          "complexity": "small",
+          "depends_on": [
+            "S146-1",
+            "S146-2"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 147,
+      "theme": "Handoff and Cross-Session Continuity",
+      "par": 4,
+      "slope": 3,
+      "type": "feature",
+      "status": "planned",
+      "depends_on": [
+        146
+      ],
+      "note": "Make handoffs first-class and low-friction: briefing should surface the latest durable handoff, agent next-md should merge durable human state with auto-derived state, and hazards should have a one-line path into common issues.",
+      "tickets": [
+        {
+          "key": "S147-1",
+          "title": "Briefing surfaces latest durable handoff as a resume block",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S147-2",
+          "title": "agent next-md merges durable human handoff state with auto-derived state",
+          "club": "long_iron",
+          "complexity": "moderate",
+          "depends_on": [
+            "S147-1"
+          ]
+        },
+        {
+          "key": "S147-3",
+          "title": "Add slope hazard add one-liner that writes to common issues",
+          "club": "wedge",
+          "complexity": "small"
+        },
+        {
+          "key": "S147-4",
+          "title": "Add PreCompact and session-end nudges to update durable handoff state",
+          "club": "wedge",
+          "complexity": "small",
+          "depends_on": [
+            "S147-1",
+            "S147-2"
           ]
         }
       ]

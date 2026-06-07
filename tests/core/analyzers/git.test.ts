@@ -192,6 +192,14 @@ describe('extractSprintArtifactReferences', () => {
       'docs/backlog/roadmap.json',
     ])).toEqual(new Set([99, 100]));
   });
+
+  it('extracts inserted decimal sprint ids from scorecard and review artifact paths', () => {
+    expect(extractSprintArtifactReferences([
+      'docs/retros/sprint-143.5.json',
+      'docs/retros/sprint-143.95-review.md',
+      'docs/retros/sprint-144.json',
+    ])).toEqual(new Set([143.5, 143.95, 144]));
+  });
 });
 
 describe('findShippedSprintsOnMain', () => {
@@ -238,6 +246,18 @@ describe('findShippedSprintsOnMain', () => {
     );
 
     expect(findShippedSprintsOnMain(tmpDir, 'HEAD')).toEqual(new Set([99]));
+  });
+
+  it('detects inserted decimal sprints from scorecard artifacts in squash merge commits', () => {
+    gitInit(tmpDir);
+    gitCommitFile(
+      tmpDir,
+      'docs/retros/sprint-143.5.json',
+      JSON.stringify({ sprint_number: 143.5 }),
+      'Fix decimal sprint status parsing (#511)',
+    );
+
+    expect(findShippedSprintsOnMain(tmpDir, 'HEAD')).toEqual(new Set([143.5]));
   });
 
   it('does not mark sprint scoping commits as shipped work', () => {

@@ -39,14 +39,15 @@ export function extractSprintReferences(commitSubjects: string[]): Set<number> {
 
 /** Extract sprint IDs from shipped sprint artifact paths in git log output.
  *  This catches normal GitHub squash merges whose subject is PR-oriented
- *  (`Fix thing (#123)`) while the commit itself adds `docs/retros/sprint-N.json`.
+ *  (`Fix thing (#123)`) while the commit itself adds `docs/retros/sprint-N.json`
+ *  or an inserted sprint artifact such as `docs/retros/sprint-143.5.json`.
  */
 export function extractSprintArtifactReferences(logLines: string[]): Set<number> {
   const result = new Set<number>();
-  const re = /^docs\/retros\/sprint-(\d+)(?:\.json|-review\.md)$/i;
+  const re = /^docs\/retros\/sprint-(\d+(?:\.\d+)?)(?:\.json|-review\.md)$/i;
   for (const line of logLines) {
     const m = line.trim().match(re);
-    if (m) result.add(parseInt(m[1], 10));
+    if (m) result.add(parseFloat(m[1]));
   }
   return result;
 }
