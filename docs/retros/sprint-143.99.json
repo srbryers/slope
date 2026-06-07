@@ -1,0 +1,149 @@
+{
+  "sprint_number": 143.99,
+  "player": "codex",
+  "theme": "CodeQL Release Gate Hardening",
+  "par": 3,
+  "slope": 1,
+  "score": 3,
+  "score_label": "par",
+  "date": "2026-06-07",
+  "type": "security",
+  "skills_used": [
+    "slope-sprint-workflow",
+    "slope-api-reference",
+    "github:gh-fix-ci"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow"
+  ],
+  "skill_gaps_found": [],
+  "shots": [
+    {
+      "ticket_key": "S143.99-1",
+      "title": "Clear CodeQL wildcard replacement alert in workflow resync scorecard lookup (#518)",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [],
+      "notes": "Replaced first-only scorecard pattern substitution with all-wildcard replacement in workflow resync and the sibling sprint-completion guard; added regressions for multi-wildcard scorecard patterns."
+    },
+    {
+      "ticket_key": "S143.99-2",
+      "title": "Replace CodeQL-flagged git shell commands with argument-array process calls (#518)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Changed flow staleness and MCP testing worktree cleanup to use `execFileSync` argument arrays for git diff, worktree removal, branch deletion, and worktree pruning."
+    },
+    {
+      "ticket_key": "S143.99-3",
+      "title": "Rerun focused tests and PR check validation for CodeQL release gate (#518)",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Focused tests, build, typecheck, full suite, map, roadmap, and PR #508 checks passed after the fix; CodeQL aggregate now reports success at head eb4815174038ce14b0d4a569d38ef010f3799079."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 3,
+    "fairways_total": 3,
+    "greens_in_regulation": 3,
+    "greens_total": 3,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "wind",
+      "impact": "minor",
+      "description": "The normal CI job passed before the aggregate GitHub Advanced Security CodeQL check failed, so release validation had to inspect both Actions jobs and external check-run annotations."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Release-gate status should include aggregate security checks, not only workflow job conclusions.",
+      "outcome": "S143.99 inspected the CodeQL check-run annotations, fixed each changed-code alert, and waited for the PR checks to turn green."
+    },
+    {
+      "type": "lessons",
+      "description": "Git commands that consume runtime paths or refs should use argument arrays.",
+      "outcome": "The changed code now avoids shell interpolation for the CodeQL-flagged git paths."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "`corepack pnpm vitest run tests/cli/sprint-workflow.test.ts tests/cli/guards/sprint-completion.test.ts tests/core/flows.test.ts tests/mcp/index-src.test.ts` passed: 157 tests.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`corepack pnpm build` passed.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`corepack pnpm typecheck` passed.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`corepack pnpm test` passed: 232 test files passed, 1 skipped; 3632 tests passed, 25 skipped.",
+      "status": "healthy"
+    },
+    {
+      "category": "release",
+      "description": "PR #508 checks passed at eb4815174038ce14b0d4a569d38ef010f3799079: ci, CodeQL, Analyze (actions), Analyze (javascript-typescript), and GitGuardian.",
+      "status": "healthy"
+    },
+    {
+      "category": "docs",
+      "description": "`node dist/cli/index.js map --check` and `node dist/cli/index.js roadmap validate` passed with only standing historical roadmap warnings.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "A sharp little release-gate catch: the code was working, but CodeQL was right to demand safer command construction.",
+    "advice_for_next_player": "When a PR check line is an aggregate security check, fetch its annotations directly before assuming the underlying Actions jobs tell the whole story.",
+    "what_surprised_you": "The aggregate CodeQL check failed even though both named CodeQL workflow jobs were otherwise healthy.",
+    "excited_about_next": "S144 can now use checks-passing release readiness without carrying a hidden CodeQL failure."
+  },
+  "bunker_locations": [
+    "Aggregate security checks can fail independently of GitHub Actions job conclusions.",
+    "First-only wildcard replacement in scorecard patterns is a portability bug when custom patterns contain more than one wildcard.",
+    "Git commands that take branch names, refs, or paths should use `execFileSync` argument arrays instead of shell strings."
+  ],
+  "yardage_book_updates": [
+    "`scorecardPattern` wildcard substitution in workflow resync and sprint-completion now replaces every wildcard.",
+    "`checkFlowStaleness` now uses `execFileSync('git', ['diff', '--name-only', '<range>'])`.",
+    "MCP testing worktree cleanup now uses argument-array git calls for worktree removal, branch deletion, and pruning."
+  ],
+  "course_management_notes": [
+    "Issue #518 was raised from PR #508 CodeQL check-run 79963836673.",
+    "Triage commit: a8eb3e4.",
+    "Implementation commit: eb48151.",
+    "Focused regression tests passed: 157 tests.",
+    "corepack pnpm build passed.",
+    "corepack pnpm typecheck passed.",
+    "corepack pnpm test passed: 232 test files passed, 1 skipped; 3632 tests passed, 25 skipped.",
+    "node dist/cli/index.js map --check reported current.",
+    "node dist/cli/index.js roadmap validate passed with standing historical warnings only.",
+    "PR #508 checks passed at eb4815174038ce14b0d4a569d38ef010f3799079: ci, CodeQL, Analyze (actions), Analyze (javascript-typescript), and GitGuardian.",
+    "Issue #518 should close when PR #508 merges."
+  ],
+  "slope_factors": [
+    "codeql_release_gate",
+    "security_check",
+    "shell_command_construction",
+    "scorecard_pattern"
+  ]
+}

@@ -3889,6 +3889,9 @@
       "par": 3,
       "slope": 1,
       "type": "security",
+      "status": "complete",
+      "score": 3,
+      "score_label": "par",
       "depends_on": [
         143.98
       ],
@@ -3955,7 +3958,7 @@
         },
         {
           "key": "S144-2",
-          "title": "Run release validation, publish, verify npm, and close linked issue references",
+          "title": "Run release validation, verify checks, and close linked issue references",
           "club": "short_iron",
           "complexity": "standard",
           "depends_on": [

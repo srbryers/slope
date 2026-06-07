@@ -13,7 +13,7 @@ Guard Recovery and State Portability Release
 | Key | Title | Club | Complexity | Depends on |
 |---|---|---|---|---|
 | S144-1 | Bump @slope-dev/slope and bundled Codex plugin for the guard recovery and state portability release | wedge | small | — |
-| S144-2 | Run release validation, publish, verify npm, and close linked issue references | short_iron | standard | S144-1 |
+| S144-2 | Run release validation, verify checks, and close linked issue references | short_iron | standard | S144-1 |
 
 ## Dependencies
 
@@ -27,6 +27,7 @@ Guard Recovery and State Portability Release
 - S143.95
 - S143.97
 - S143.98
+- S143.99
 
 ## Recommended order
 
