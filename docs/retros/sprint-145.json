@@ -1,0 +1,142 @@
+{
+  "sprint_number": 145,
+  "player": "codex",
+  "theme": "Validation Signal Repair",
+  "par": 4,
+  "slope": 2,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-06-07",
+  "type": "bugfix",
+  "skills_used": [
+    "slope-sprint-workflow",
+    "github"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow",
+    "slope-performance-analysis"
+  ],
+  "skill_gaps_found": [],
+  "shots": [
+    {
+      "ticket_key": "S145-1",
+      "title": "Make shipped-commit detection ignore sprint-range endpoints while preserving ticket refs (#519)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added a sprint-range endpoint guard around extractSprintReferences so S64-S80 and S85-S90 roadmap references no longer mark either endpoint shipped, while S78-1 style implementation tickets still count."
+    },
+    {
+      "ticket_key": "S145-2",
+      "title": "Make map staleness source counts reuse generator file-discovery rules (#520)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Extracted the map metadata file-count helper and reused it in runStalenessCheck, so non-SLOPE multi-root repos count src/, worker/, and other source roots the same way during generation and checking."
+    },
+    {
+      "ticket_key": "S145-3",
+      "title": "Validate roadmap and map regressions, then close issue references",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Focused analyzer and map tests passed, build and typecheck passed, the full suite passed, and SLOPE roadmap/map/docs checks passed with only standing historical warnings."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 3,
+    "fairways_total": 3,
+    "greens_in_regulation": 3,
+    "greens_total": 3,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "rough",
+      "impact": "minor",
+      "description": "S145 had to distinguish implementation ticket references from roadmap range references without weakening legitimate shipped-commit detection."
+    },
+    {
+      "type": "wind",
+      "impact": "minor",
+      "description": "Map CLI tests execute the built dist command, so the focused regression needed a rebuild before the test run."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Roadmap validation should treat sprint ranges as planning references, not evidence that a sprint shipped.",
+      "outcome": "extractSprintReferences now skips S<n>-S<m> and S<n>-S<m> style range endpoints while preserving nonzero ticket refs."
+    },
+    {
+      "type": "lessons",
+      "description": "Map generation and staleness checks must share file discovery policy.",
+      "outcome": "S145 extracted countMapMetadataFiles and uses it for both map metadata and map --check source drift."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "`corepack pnpm vitest run tests/core/analyzers/git.test.ts` passed: 25 tests.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`corepack pnpm vitest run tests/cli/commands/map.test.ts` passed: 12 tests.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`corepack pnpm build` and `corepack pnpm typecheck` passed.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`corepack pnpm test` passed: 232 test files passed, 1 skipped; 3634 tests passed, 25 skipped.",
+      "status": "healthy"
+    },
+    {
+      "category": "docs",
+      "description": "`node dist/cli/index.js roadmap validate`, `node dist/cli/index.js map --check`, and `node dist/cli/index.js docs check` passed with only standing historical roadmap warnings.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Tidy and well-bounded: two real external-repo false positives, both fixed with small shared-logic changes.",
+    "advice_for_next_player": "When a validator compares current reality to generated metadata, make both sides call the same helper. When parsing sprint IDs, decide whether the surrounding token proves shipped work or just mentions planning context.",
+    "what_surprised_you": "The old recovery branch had a future S145 concept, but it was not present on main; this PR keeps the issue repair as the next mainline sprint.",
+    "excited_about_next": "SLOPE validation signals should be less noisy for downstream repos with roadmap ranges and multi-root TypeScript layouts."
+  },
+  "bunker_locations": [
+    "Sprint ID parsing should distinguish roadmap range references from shipped ticket references.",
+    "Map staleness checks should reuse generator file-count helpers instead of independently choosing source roots."
+  ],
+  "yardage_book_updates": [
+    "`extractSprintReferences` now skips sprint range endpoints (`S64-S80`, `S85-S90`) and still accepts implementation ticket refs like `S78-1`.",
+    "`slope map --check` now reuses the same source/test count helper as `slope map`, preventing immediate stale reports in non-SLOPE multi-root repos."
+  ],
+  "course_management_notes": [
+    "GitHub issues #519 and #520 were open after the v1.58.0 release closeout and were triaged into S145.",
+    "Triage commit: f56d7a4.",
+    "Shipped-commit parser fix commit: 894d61f.",
+    "Map staleness parity fix commit: 12614a4.",
+    "Review recommendation: architect required, code optional; no review findings were found in the scoped diff.",
+    "The PR should include close references for #519 and #520 so the issues close on merge."
+  ],
+  "slope_factors": [
+    "external_repo_validation",
+    "map_staleness",
+    "roadmap_validation",
+    "parser_edge_case"
+  ]
+}
