@@ -52,7 +52,7 @@ export interface PersistRetroMemoriesResult {
 }
 
 function assertSprint(value: number): void {
-  if (!Number.isInteger(value) || value <= 0) {
+  if (!Number.isFinite(value) || value <= 0) {
     throw new TypeError(`Invalid sprint number: ${value}`);
   }
 }
