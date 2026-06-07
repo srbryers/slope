@@ -10,11 +10,18 @@ function git(cmd: string, cwd: string): string {
   }
 }
 
+function isSprintRangeEndpoint(line: string, matchStart: number, matchEnd: number): boolean {
+  const before = line.slice(0, matchStart);
+  const after = line.slice(matchEnd);
+  return /S\d+\s*[-\u2013\u2014]\s*$/.test(before) || /^\s*[-\u2013\u2014]\s*S\d+\b/.test(after);
+}
+
 /** Extract shipped sprint IDs referenced in commit subjects.
  *  Matches `S\d+` not followed by another digit or a dot — so `S75.5` does
  *  NOT count as a reference to S75, and `S70+S71` correctly yields {70, 71}.
  *  Ticket zero (`S101-0`) is reserved for sprint scoping/planning commits and
- *  does not mean implementation for that sprint has shipped.
+ *  does not mean implementation for that sprint has shipped. Sprint ranges
+ *  (`S64-S80`, `S85–S90`) are roadmap references, not shipped commits.
  *  Pure function — separated from git I/O for testability.
  */
 export function extractSprintReferences(commitSubjects: string[]): Set<number> {
@@ -23,6 +30,7 @@ export function extractSprintReferences(commitSubjects: string[]): Set<number> {
   for (const line of commitSubjects) {
     let m: RegExpExecArray | null;
     while ((m = re.exec(line)) !== null) {
+      if (isSprintRangeEndpoint(line, m.index, re.lastIndex)) continue;
       result.add(parseInt(m[1], 10));
     }
   }
