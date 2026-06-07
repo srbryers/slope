@@ -7,7 +7,7 @@ import { formatSprintNumber } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { loadPrReviewState } from '../pr-review-state.js';
 import { loadSprintState, mutateSprintState, updateGate, isSprintComplete, pendingGates } from '../sprint-state.js';
-import { currentBranch, inferSprintFromBranch, reconcileSprintStateForBranch } from '../workflow-resync.js';
+import { inferSprintFromBranch, reconcileSprintStateForBranch } from '../workflow-resync.js';
 
 /**
  * Sprint-completion guard: enforces post-implementation gates.
