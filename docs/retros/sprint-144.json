@@ -1,0 +1,157 @@
+{
+  "sprint_number": 144,
+  "player": "codex",
+  "theme": "Guard Recovery and State Portability Release",
+  "par": 3,
+  "slope": 1,
+  "score": 3,
+  "score_label": "par",
+  "date": "2026-06-07",
+  "type": "release",
+  "skills_used": [
+    "slope-sprint-workflow",
+    "slope-api-reference"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow",
+    "slope-performance-analysis"
+  ],
+  "skill_gaps_found": [],
+  "shots": [
+    {
+      "ticket_key": "S144-1",
+      "title": "Bump @slope-dev/slope and bundled Codex plugin for the guard recovery and state portability release",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Used scripts/version-bump.mjs to move the root package and bundled Codex plugin manifest to 1.58.0; the built CLI reports @slope-dev/slope v1.58.0."
+    },
+    {
+      "ticket_key": "S144-2",
+      "title": "Run release validation, publish, verify npm, and close linked issue references",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Release validation is green for PR #508: build, full test suite, typecheck, docs manifest, map check, npm publish dry-run, and GitHub CI all passed. Actual npm publication is deferred until the PR merges and GitHub release v1.58.0 triggers trusted publishing."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 2,
+    "fairways_total": 2,
+    "greens_in_regulation": 2,
+    "greens_total": 2,
+    "putts": 1,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "wind",
+      "impact": "minor",
+      "description": "S144 release validation exposed #516 and #517 before closeout; both were raised, triaged, fixed, validated, and added to PR #508 before the release-readiness gate completed."
+    },
+    {
+      "type": "pin_position",
+      "impact": "minor",
+      "description": "Trusted publishing is a post-merge GitHub release path, so npm latest remains 1.57.3 until PR #508 merges and v1.58.0 is released."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Release scorecards should distinguish release readiness from registry publication.",
+      "outcome": "S144 records npm publish dry-run and CI as healthy while leaving npm latest verification for the trusted-publishing follow-up after merge."
+    },
+    {
+      "type": "lessons",
+      "description": "Release-gate failures should become focused SLOPE issues before the train proceeds.",
+      "outcome": "#516 and #517 were raised, triaged into S143.97 and S143.98, fixed, and included in the closing PR before S144 resumed."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "`corepack pnpm build` passed.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`corepack pnpm test` passed: 232 test files passed, 1 skipped; 3630 tests passed, 25 skipped.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`corepack pnpm typecheck` passed.",
+      "status": "healthy"
+    },
+    {
+      "category": "docs",
+      "description": "`node dist/cli/index.js map --check`, `docs generate --pretty`, `docs check`, and `roadmap validate` passed with only standing historical roadmap warnings.",
+      "status": "healthy"
+    },
+    {
+      "category": "release",
+      "description": "`npm.cmd publish --dry-run --access public` passed for @slope-dev/slope@1.58.0 without npm auto-correction warnings.",
+      "status": "healthy"
+    },
+    {
+      "category": "release",
+      "description": "GitHub CI for PR #508 head fda04aacc73f17ed9b87065c3442314de8750e8f completed successfully.",
+      "status": "healthy"
+    },
+    {
+      "category": "release",
+      "description": "`npm view @slope-dev/slope version --registry https://registry.npmjs.org` still returns 1.57.3; publish verification remains pending until merge and GitHub release v1.58.0.",
+      "status": "needs_attention"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Disciplined, with the release gate doing real work instead of just rubber-stamping the train.",
+    "advice_for_next_player": "Do not mark a release sprint fully published until npm latest advances and an installed-package smoke test passes.",
+    "what_surprised_you": "The final release gate found two legitimate SLOPE issues after the version bump, and both were small enough to repair before closeout.",
+    "excited_about_next": "PR #508 can move from release-ready to published by merging, creating GitHub release v1.58.0, watching trusted publishing, and verifying npm latest."
+  },
+  "bunker_locations": [
+    "Release scorecards should wait for registry verification before claiming publish success.",
+    "Full-suite release gates can expose Windows timing hazards that focused tests miss.",
+    "npm publish dry-run warnings can indicate source metadata drift even when the command exits 0.",
+    "Trusted-publishing release trains need a clear handoff from PR readiness to post-merge release execution."
+  ],
+  "yardage_book_updates": [
+    "Version bump path remains `node scripts/version-bump.mjs <version>`, updating package.json and templates/codex/plugins/slope/.codex-plugin/plugin.json together.",
+    "For v1.58.0, direct npm publish was not run; use the GitHub release trusted-publishing workflow after PR #508 merges.",
+    "Release readiness checks now include a clean `npm.cmd publish --dry-run --access public` with no npm package metadata auto-correction warnings.",
+    "Open SLOPE issues #516 and #517 are included in PR #508 close references alongside the earlier recovery issues."
+  ],
+  "course_management_notes": [
+    "Version bump commit: e7039ea.",
+    "S143.97 was inserted from #516 after full-suite release validation timed out in tests/core/analyzers/git.test.ts; closeout commit b95cd94.",
+    "S143.98 was inserted from #517 after npm publish dry-run reported bin metadata auto-correction; closeout commit fda04aa.",
+    "PR #508 body includes close references for #499, #501, #502, #503, #505, #507, #509, #510, #511, #512, #513, #514, #515, #516, and #517.",
+    "corepack pnpm build passed.",
+    "corepack pnpm test passed: 232 test files passed, 1 skipped; 3630 tests passed, 25 skipped.",
+    "corepack pnpm typecheck passed.",
+    "node dist/cli/index.js map --check reported current at Sprint 143.98.",
+    "node dist/cli/index.js docs generate --pretty wrote the ignored docs manifest for @slope-dev/slope@1.58.0.",
+    "node dist/cli/index.js docs check passed.",
+    "npm.cmd publish --dry-run --access public passed for @slope-dev/slope@1.58.0 without auto-correction warnings.",
+    "npm view @slope-dev/slope version returned 1.57.3 before merge/release.",
+    "PR #508 is draft, mergeable, and has successful CI at fda04aacc73f17ed9b87065c3442314de8750e8f.",
+    "Release follow-up: mark PR #508 ready, merge it, create GitHub release v1.58.0, watch the Publish to npm workflow, verify npm latest is 1.58.0, and run an installed-package slope version smoke test."
+  ],
+  "slope_factors": [
+    "minor_release",
+    "trusted_publisher_release",
+    "registry_verification",
+    "release_gate_recovery",
+    "windows_validation"
+  ]
+}
