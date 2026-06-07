@@ -2,7 +2,7 @@
 
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 
 /** A single step in a user flow */
 export interface FlowStep {
@@ -145,8 +145,9 @@ export function checkFlowStaleness(
   }
 
   try {
-    const output = execSync(
-      `git diff --name-only ${flow.last_verified_sha}..${currentSha}`,
+    const output = execFileSync(
+      'git',
+      ['diff', '--name-only', `${flow.last_verified_sha}..${currentSha}`],
       { cwd, encoding: 'utf8', timeout: 10000, stdio: ['ignore', 'pipe', 'ignore'] },
     ).trim();
 

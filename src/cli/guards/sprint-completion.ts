@@ -352,7 +352,7 @@ function handleStop(cwd: string): GuardResult {
 /** Check if a scorecard file exists for the given sprint. */
 function scorecardExists(sprint: number, cwd: string): boolean {
   const config = loadConfig(cwd);
-  const pattern = config.scorecardPattern.replace('*', String(sprint));
+  const pattern = config.scorecardPattern.replaceAll('*', String(sprint));
   const scorecardPath = join(cwd, config.scorecardDir, pattern);
   return existsSync(scorecardPath);
 }

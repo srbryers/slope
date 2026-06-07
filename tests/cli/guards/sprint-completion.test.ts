@@ -419,6 +419,28 @@ describe('sprint-completion guard', () => {
       expect(result).toEqual({});
     });
 
+    it('allows PR when a custom scorecard pattern has multiple wildcards', async () => {
+      writeFileSync(join(tmpDir, '.slope', 'config.json'), JSON.stringify({
+        scorecardDir: 'docs/retros',
+        scorecardPattern: 'sprint-*-S*.json',
+        minSprint: 1,
+        roadmapPath: 'docs/backlog/roadmap.json',
+      }));
+      const state = createSprintState(22, 'implementing');
+      state.gates.tests = true;
+      state.gates.code_review = true;
+      state.gates.architect_review = true;
+      state.gates.scorecard = true;
+      state.gates.review_md = true;
+      saveSprintState(tmpDir, state);
+      const dir = join(tmpDir, 'docs', 'retros');
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, 'sprint-22-S22.json'), JSON.stringify({ sprint_number: 22, score: 4, par: 4 }));
+
+      const result = await sprintCompletionGuard(makePreToolUse('gh pr create --title "t"'), tmpDir);
+      expect(result).toEqual({});
+    });
+
     it('advises on Stop when scorecard is missing during implementing phase', async () => {
       const state = createSprintState(22, 'implementing');
       state.gates.tests = true;

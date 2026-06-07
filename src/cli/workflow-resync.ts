@@ -63,7 +63,7 @@ export function sprintNumberFromId(sprintId: string | undefined): number | null 
 
 export function scorecardExistsForSprint(cwd: string, sprint: number): boolean {
   const config = loadConfig(cwd);
-  const pattern = config.scorecardPattern.replace('*', formatSprintNumber(sprint));
+  const pattern = config.scorecardPattern.replaceAll('*', formatSprintNumber(sprint));
   return existsSync(join(cwd, config.scorecardDir, pattern));
 }
 

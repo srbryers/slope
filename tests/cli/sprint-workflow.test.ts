@@ -7,7 +7,7 @@ import { sprintCommand } from '../../src/cli/commands/sprint.js';
 import { createStore } from '../../src/store/index.js';
 import type { RoadmapDefinition } from '../../src/core/index.js';
 import { WorkflowEngine, loadWorkflow, resolveVariables } from '../../src/core/index.js';
-import { findStaleWorkflowExecutions } from '../../src/cli/workflow-resync.js';
+import { findStaleWorkflowExecutions, scorecardExistsForSprint } from '../../src/cli/workflow-resync.js';
 
 class ProcessExitError extends Error {
   constructor(public code: number | undefined) { super(`process.exit(${code})`); }
@@ -619,5 +619,19 @@ describe('slope sprint (help)', () => {
     const state = JSON.parse(readFileSync(join(tmpDir, '.slope', 'sprint-state.json'), 'utf8'));
     expect(state.sprint).toBe(160);
     expect(state.phase).toBe('implementing');
+  });
+});
+
+describe('workflow resync scorecard lookup', () => {
+  it('replaces every wildcard in the configured scorecard pattern', () => {
+    writeFileSync(join(tmpDir, '.slope', 'config.json'), JSON.stringify({
+      scorecardDir: 'docs/retros',
+      scorecardPattern: 'sprint-*-S*.json',
+      minSprint: 1,
+    }));
+    mkdirSync(join(tmpDir, 'docs', 'retros'), { recursive: true });
+    writeFileSync(join(tmpDir, 'docs', 'retros', 'sprint-143.99-S143.99.json'), '{}');
+
+    expect(scorecardExistsForSprint(tmpDir, 143.99)).toBe(true);
   });
 });

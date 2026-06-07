@@ -21,7 +21,7 @@
  */
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, dirname, relative } from 'node:path';
-import { execSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
@@ -450,10 +450,10 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
               try {
                 // Check if branch is merged and no active session references it
                 const wtPath = join(worktreeDir, entry);
-                execSync(`git worktree remove ${JSON.stringify(wtPath)} --force`, { cwd: projectRoot, timeout: 10000, stdio: IGNORE_STDIO });
+                execFileSync('git', ['worktree', 'remove', wtPath, '--force'], { cwd: projectRoot, timeout: 10000, stdio: IGNORE_STDIO });
               } catch { /* best-effort cleanup */ }
             }
-            execSync('git worktree prune', { cwd: projectRoot, timeout: 5000, stdio: IGNORE_STDIO });
+            execFileSync('git', ['worktree', 'prune'], { cwd: projectRoot, timeout: 5000, stdio: IGNORE_STDIO });
           }
         } catch { /* best-effort cleanup */ }
 
@@ -686,11 +686,11 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
         let cleanupStatus = 'skipped';
         if (!skip_cleanup && result.worktree_path) {
           try {
-            execSync(`git worktree remove ${JSON.stringify(result.worktree_path)} --force`, { cwd: projectRoot, timeout: 15000, stdio: IGNORE_STDIO });
+            execFileSync('git', ['worktree', 'remove', result.worktree_path, '--force'], { cwd: projectRoot, timeout: 15000, stdio: IGNORE_STDIO });
             if (result.branch_name) {
-              execSync(`git branch -d ${JSON.stringify(result.branch_name)}`, { cwd: projectRoot, timeout: 5000, stdio: IGNORE_STDIO });
+              execFileSync('git', ['branch', '-d', result.branch_name], { cwd: projectRoot, timeout: 5000, stdio: IGNORE_STDIO });
             }
-            execSync('git worktree prune', { cwd: projectRoot, timeout: 5000, stdio: IGNORE_STDIO });
+            execFileSync('git', ['worktree', 'prune'], { cwd: projectRoot, timeout: 5000, stdio: IGNORE_STDIO });
             cleanupStatus = 'success';
           } catch {
             cleanupStatus = 'failed — manual cleanup may be needed';
