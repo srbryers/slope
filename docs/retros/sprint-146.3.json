@@ -1,0 +1,118 @@
+{
+  "sprint_number": 146.3,
+  "player": "codex",
+  "theme": "Workflow Step Gate Execution Scoping",
+  "par": 3,
+  "slope": 1,
+  "score": 3,
+  "score_label": "par",
+  "date": "2026-06-07",
+  "type": "bugfix + patch release",
+  "skills_used": [
+    "slope-sprint-workflow",
+    "github"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow"
+  ],
+  "skill_gaps_found": [],
+  "shots": [
+    {
+      "ticket_key": "S146.3-1",
+      "title": "Scope workflow-step-gate to session/current sprint and fail open on ambiguous executions (#531)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Replaced active[0] workflow selection with deterministic scoping: match the hook session first, then branch/current sprint, then preserve single-active-execution behavior, and fail open with context when multiple executions cannot be disambiguated."
+    },
+    {
+      "ticket_key": "S146.3-2",
+      "title": "Bump package and bundled plugin manifest to 1.58.3 for the workflow gate fix",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Ran scripts/version-bump.mjs 1.58.3 so package.json and templates/codex/plugins/slope/.codex-plugin/plugin.json moved together, then verified the built CLI reports @slope-dev/slope v1.58.3."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 2,
+    "fairways_total": 2,
+    "greens_in_regulation": 2,
+    "greens_total": 2,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "pin_position",
+      "impact": "minor",
+      "description": "Issue #531 appeared after the patch-release loop because long-lived workflow executions from older sprints could still coexist with the active sprint execution."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Workflow guards that inspect durable running executions must scope by session or sprint before applying blocking policy.",
+      "outcome": "workflow-step-gate now blocks only a relevant non-agent_work execution and allows edits when multiple running executions are ambiguous."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "`corepack pnpm vitest run tests/cli/guards/workflow-step-gate.test.ts` passed: 12 tests.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`corepack pnpm typecheck`, `corepack pnpm test`, and `corepack pnpm build` passed; full suite reported 232 test files passed, 1 skipped, 3645 tests passed, and 25 skipped.",
+      "status": "healthy"
+    },
+    {
+      "category": "docs",
+      "description": "`node dist/cli/index.js roadmap validate`, `map --check`, `docs generate`, and `docs check` passed after the 1.58.3 build.",
+      "status": "healthy"
+    },
+    {
+      "category": "release",
+      "description": "`node dist/cli/index.js version` reports @slope-dev/slope v1.58.3; after merge, create GitHub Release `v1.58.3` and verify npm latest updates through the GitHub Release workflow.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "A precise follow-up: the bug was small, but it sat right on SLOPE's own ability to enforce discipline without blocking the wrong work.",
+    "advice_for_next_player": "Whenever a guard reads a global running-execution list, add a multi-execution regression before trusting ordering.",
+    "what_surprised_you": "The existing resync logic already handled some stale branch cases, but active sprint-state and session scoping still needed to be explicit.",
+    "excited_about_next": "The release loop can now continue without unrelated workflow history turning into a global edit lock."
+  },
+  "bunker_locations": [
+    "Workflow guards that inspect running executions must not choose active[0] when multiple sessions or sprints can be running."
+  ],
+  "yardage_book_updates": [
+    "src/cli/guards/workflow-step-gate.ts now selects a running workflow execution by session, branch/current sprint, or single-active fallback.",
+    "tests/cli/guards/workflow-step-gate.test.ts covers current-sprint selection, session selection, and ambiguous multi-execution fail-open behavior.",
+    "package.json and templates/codex/plugins/slope/.codex-plugin/plugin.json are bumped to 1.58.3."
+  ],
+  "course_management_notes": [
+    "GitHub issue #531 is closed by the S146.3 PR.",
+    "Roadmap commit: af214a3.",
+    "Implementation commit: bf24e22.",
+    "Selector-priority follow-up commit: 74a1288.",
+    "Version bump commit: 7cf7b5b.",
+    "After merge, create GitHub Release `v1.58.3` and verify npm latest updates."
+  ],
+  "slope_factors": [
+    "workflow_guard",
+    "multiple_running_executions",
+    "session_scope",
+    "patch_release"
+  ]
+}

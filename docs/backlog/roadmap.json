@@ -330,7 +330,7 @@
         146.2,
         146.3
       ],
-      "status": "active",
+      "status": "complete",
       "note": "Clean stale roadmap state after the recovery train, fix decimal sprint shipped-artifact detection (#522), cut the v1.58.1 patch release, repair release-bump staging/status/test-isolation issues (#524/#525/#526/#528), close the decimal post-merge retro gap (#529), and scope workflow-step-gate to the relevant execution (#531)."
     },
     {
@@ -4185,7 +4185,9 @@
       "par": 3,
       "slope": 1,
       "type": "bugfix + patch release",
-      "status": "active",
+      "status": "complete",
+      "score": 3,
+      "score_label": "par",
       "depends_on": [
         146.2
       ],
