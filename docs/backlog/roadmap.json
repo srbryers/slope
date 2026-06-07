@@ -3823,6 +3823,9 @@
       "par": 3,
       "slope": 1,
       "type": "test reliability",
+      "status": "complete",
+      "score": 3,
+      "score_label": "par",
       "depends_on": [
         143.95
       ],
