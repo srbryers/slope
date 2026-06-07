@@ -1,6 +1,6 @@
 {
   "name": "SLOPE Development Roadmap",
-  "description": "Forward-looking roadmap from S61+. Phases 1-9 (S1-S47) are complete. S48-S60 were hardening, guard enforcement, and process sprints. This roadmap covers adoption, observability, guard maturity, multi-project, loop evolution, and issue-driven recovery. S61-S64 reflect what actually shipped (themes diverged from original plan). Note: the actual S69 diverged from the planned Referee sprint \u2014 a carryover patch kit ran instead. The Referee work was rescheduled as S78. S75.5 (The Bug Clearing) added 2026-05-02 to clear accumulated CLI bugs from external repos. S132-S136 were backfilled from shipped scorecards on 2026-06-05; S137 adds post-merge retro tooling and durable memory, S137.5 addresses Windows suite portability for #509, S138-S144 triage open GitHub issues #499/#501/#502/#503/#505/#507/#510/#511/#512/#513/#514/#515/#516/#517/#518 into focused recovery sprints, S145 closed validation-signal regressions #519/#520, S146 cleaned stale roadmap state plus decimal sprint shipped-artifact warnings (#522), S146.1 cut the v1.58.1 patch release while repairing release-bump staging (#524/#528), active inserted sprint status (#525), and guard test isolation (#526), and S146.2 closes the decimal post-merge retro gap (#529).",
+  "description": "Forward-looking roadmap from S61+. Phases 1-9 (S1-S47) are complete. S48-S60 were hardening, guard enforcement, and process sprints. This roadmap covers adoption, observability, guard maturity, multi-project, loop evolution, and issue-driven recovery. S61-S64 reflect what actually shipped (themes diverged from original plan). Note: the actual S69 diverged from the planned Referee sprint \u2014 a carryover patch kit ran instead. The Referee work was rescheduled as S78. S75.5 (The Bug Clearing) added 2026-05-02 to clear accumulated CLI bugs from external repos. S132-S136 were backfilled from shipped scorecards on 2026-06-05; S137 adds post-merge retro tooling and durable memory, S137.5 addresses Windows suite portability for #509, S138-S144 triage open GitHub issues #499/#501/#502/#503/#505/#507/#510/#511/#512/#513/#514/#515/#516/#517/#518 into focused recovery sprints, S145 closed validation-signal regressions #519/#520, S146 cleaned stale roadmap state plus decimal sprint shipped-artifact warnings (#522), S146.1 cut the v1.58.1 patch release while repairing release-bump staging (#524/#528), active inserted sprint status (#525), and guard test isolation (#526), S146.2 closes the decimal post-merge retro gap (#529), and S146.3 scopes workflow-step-gate to the relevant execution (#531).",
   "phases": [
     {
       "name": "Phase 10 \u2014 Adoption & Onboarding",
@@ -327,10 +327,11 @@
       "sprints": [
         146,
         146.1,
-        146.2
+        146.2,
+        146.3
       ],
-      "status": "complete",
-      "note": "Clean stale roadmap state after the recovery train, fix decimal sprint shipped-artifact detection (#522), cut the v1.58.1 patch release, repair release-bump staging/status/test-isolation issues (#524/#525/#526/#528), and close the decimal post-merge retro gap (#529)."
+      "status": "active",
+      "note": "Clean stale roadmap state after the recovery train, fix decimal sprint shipped-artifact detection (#522), cut the v1.58.1 patch release, repair release-bump staging/status/test-isolation issues (#524/#525/#526/#528), close the decimal post-merge retro gap (#529), and scope workflow-step-gate to the relevant execution (#531)."
     },
     {
       "name": "Phase 46 \u2014 Handoff Continuity",
@@ -4179,6 +4180,36 @@
       ]
     },
     {
+      "id": 146.3,
+      "theme": "Workflow Step Gate Execution Scoping",
+      "par": 3,
+      "slope": 1,
+      "type": "bugfix + patch release",
+      "status": "active",
+      "depends_on": [
+        146.2
+      ],
+      "note": "Close #531 by making workflow-step-gate choose the execution relevant to the current session or sprint, then publish the 1.58.3 patch.",
+      "tickets": [
+        {
+          "key": "S146.3-1",
+          "title": "Scope workflow-step-gate to session/current sprint and fail open on ambiguous executions (#531)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 531
+        },
+        {
+          "key": "S146.3-2",
+          "title": "Bump package and bundled plugin manifest to 1.58.3 for the workflow gate fix",
+          "club": "wedge",
+          "complexity": "small",
+          "depends_on": [
+            "S146.3-1"
+          ]
+        }
+      ]
+    },
+    {
       "id": 147,
       "theme": "Handoff and Cross-Session Continuity",
       "par": 4,
@@ -4186,7 +4217,7 @@
       "type": "feature",
       "status": "planned",
       "depends_on": [
-        146.2
+        146.3
       ],
       "note": "Make handoffs first-class and low-friction: briefing should surface the latest durable handoff, agent next-md should merge durable human state with auto-derived state, and hazards should have a one-line path into common issues.",
       "tickets": [
