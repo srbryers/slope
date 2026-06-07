@@ -1,0 +1,111 @@
+{
+  "sprint_number": 146.2,
+  "player": "codex",
+  "theme": "Decimal Post-Merge Retro Support",
+  "par": 3,
+  "slope": 1,
+  "score": 3,
+  "score_label": "par",
+  "date": "2026-06-07",
+  "type": "bugfix + patch release",
+  "skills_used": [
+    "slope-sprint-workflow",
+    "github"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow"
+  ],
+  "skill_gaps_found": [],
+  "shots": [
+    {
+      "ticket_key": "S146.2-1",
+      "title": "Accept decimal sprint ids in retro post-merge and durable retro memory (#529)",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Replaced the post-merge retro sprint parser with the shared decimal sprint parser, relaxed the core retro sprint assertion to allow finite positive decimal ids, and added CLI/core regressions for S146.1-style post-merge retros."
+    },
+    {
+      "ticket_key": "S146.2-2",
+      "title": "Bump package and bundled plugin manifest to 1.58.2 for the retro fix",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Ran scripts/version-bump.mjs 1.58.2 and verified the built CLI reports @slope-dev/slope v1.58.2 before preparing the follow-up release."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 2,
+    "fairways_total": 2,
+    "greens_in_regulation": 2,
+    "greens_total": 2,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "pin_position",
+      "impact": "minor",
+      "description": "S146.2 was inserted after the v1.58.1 release because the post-merge retro/memory gate itself exposed the decimal sprint gap."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Every post-hole and post-merge routine must share the same sprint-id parsing model as roadmap and scorecards.",
+      "outcome": "`slope retro post-merge --sprint=146.1` now preserves decimal sprint ids in output paths, records, and durable memory text."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "`corepack pnpm vitest run tests/cli/commands/retro.test.ts tests/core/retro.test.ts` passed: 12 tests.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`corepack pnpm typecheck` and `corepack pnpm build` passed.",
+      "status": "healthy"
+    },
+    {
+      "category": "release",
+      "description": "`node dist/cli/index.js retro post-merge --sprint=146.1 ... --dry-run --json` passed, and `node dist/cli/index.js version` reports @slope-dev/slope v1.58.2.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "A tidy repair on the exact edge that release discipline touched: small code change, high trust value.",
+    "advice_for_next_player": "When adding decimal sprint support, grep for integer-only parser helpers in the adjacent lifecycle command, not just the main roadmap command.",
+    "what_surprised_you": "The retro core builder also enforced integer sprints, so the CLI parser fix alone would not have been enough.",
+    "excited_about_next": "The S146.1 post-merge retro can now be captured with the real sprint id before S147 starts."
+  },
+  "bunker_locations": [
+    "Post-merge retro sprint parsing must stay aligned with roadmap, scorecard, validation, and branch-inference decimal sprint support."
+  ],
+  "yardage_book_updates": [
+    "src/cli/commands/retro.ts now uses parseSprintNumber for post-merge --sprint.",
+    "src/core/retro.ts now accepts finite positive decimal sprint ids.",
+    "tests/cli/commands/retro.test.ts and tests/core/retro.test.ts cover decimal post-merge retro memory behavior."
+  ],
+  "course_management_notes": [
+    "Created GitHub issue #529 for the decimal post-merge retro failure.",
+    "Implementation commit: 7695b6d.",
+    "Version bump commit: 4427317.",
+    "The PR should include `Closes #529`; after merge, create GitHub Release `v1.58.2` and verify npm latest updates."
+  ],
+  "slope_factors": [
+    "decimal_sprint_ids",
+    "post_merge_retro",
+    "durable_memory",
+    "patch_release"
+  ]
+}

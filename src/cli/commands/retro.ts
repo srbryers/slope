@@ -21,6 +21,7 @@ import {
   buildPostMergeRetro,
   buildRetroMemoryPlans,
   persistRetroMemories,
+  parseSprintNumber,
 } from '../../core/index.js';
 import type {
   MemoryCategory,
@@ -191,6 +192,15 @@ function positiveInteger(value: string | undefined, label: string): number | und
   return parsed;
 }
 
+function positiveSprintNumber(value: string | undefined, label: string): number | undefined {
+  if (value === undefined) return undefined;
+  const parsed = parseSprintNumber(value);
+  if (parsed === null) {
+    throw new TypeError(`${label} must be a positive sprint id, e.g. 137 or 146.1.`);
+  }
+  return parsed;
+}
+
 function normalizeOutcome(value: string | undefined): RetroOutcome | undefined {
   if (!value) return undefined;
   const normalized = value.replace('-', '_');
@@ -218,7 +228,7 @@ function parseLearningSpec(value: string): RetroLearningInput {
 function parsePostMergeOptions(args: string[]): PostMergeOptions {
   const parsed = parseArgs(args);
   const { flags } = parsed;
-  const sprint = positiveInteger(firstFlag(flags, 'sprint'), '--sprint');
+  const sprint = positiveSprintNumber(firstFlag(flags, 'sprint'), '--sprint');
   const pr = positiveInteger(firstFlag(flags, 'pr'), '--pr');
   const outcome = normalizeOutcome(firstFlag(flags, 'outcome'));
   const mergedAt = firstFlag(flags, 'merged-at');

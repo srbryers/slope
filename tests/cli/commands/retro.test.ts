@@ -82,6 +82,27 @@ describe('retro post-merge CLI', () => {
     expect(memories.some(m => m.category === 'hazard' && m.text.includes('help flags'))).toBe(true);
   });
 
+  it('accepts decimal sprint ids for inserted release-sprint retros (#529)', async () => {
+    const out = await captureLogs(() => retroCommand([
+      'post-merge',
+      '--sprint=146.1',
+      '--pr=527',
+      '--summary=release shipped',
+      '--learning=project:8:Decimal release sprints need retro memory support',
+    ]));
+
+    const path = join(cwd, '.slope', 'retros', 'post-merge', 'sprint-146.1-pr-527.json');
+    expect(out.stdout).toContain('S146.1 PR #527: wrote');
+    expect(existsSync(path)).toBe(true);
+
+    const record = JSON.parse(readFileSync(path, 'utf8'));
+    expect(record.retro.sprint).toBe(146.1);
+    expect(record.retro.pr).toBe(527);
+
+    const memories = searchMemories(cwd, { source: 'auto-retro' });
+    expect(memories.some(m => m.text.includes('S146.1 PR #527 retro learning'))).toBe(true);
+  });
+
   it('supports dry-run without writing memories or a retro record', async () => {
     const out = await captureLogs(() => retroCommand([
       'post-merge',

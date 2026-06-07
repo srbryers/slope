@@ -36,6 +36,18 @@ describe('post-merge retro memory contract', () => {
     expect(retro.followUps).toEqual(['add CLI command']);
   });
 
+  it('accepts decimal sprint ids for inserted sprint retros (#529)', () => {
+    const retro = buildPostMergeRetro({
+      sprint: 146.1,
+      pr: 527,
+      summary: 'release shipped',
+      learnings: [{ text: 'Decimal sprint retros should persist' }],
+    });
+
+    expect(retro.sprint).toBe(146.1);
+    expect(buildRetroMemoryPlans(retro)[0].text).toContain('S146.1 PR #527');
+  });
+
   it('turns retro results into durable memory plans', () => {
     const retro = buildPostMergeRetro({
       sprint: 137,
