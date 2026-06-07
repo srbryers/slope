@@ -5,12 +5,16 @@ import {
   validateRoadmap,
   castRoadmapStructure,
   findShippedSprintsOnMain,
+  compareSprintIds,
   computeCriticalPath,
   findParallelOpportunities,
+  formatSprintLabel,
   formatRoadmapSummary,
   formatStrategicContext,
+  isRoadmapSprintPending,
   loadScorecards,
   loadVision,
+  parseSprintNumber,
   analyzeBacklog,
   mergeBacklogs,
   runAnalyzers,
@@ -87,22 +91,45 @@ function loadRoadmapFile(flags: Record<string, string>, cwd: string): RoadmapDef
   return roadmap;
 }
 
-function resolveSprint(flags: Record<string, string>, cwd: string): number {
+function resolveSprint(
+  flags: Record<string, string>,
+  cwd: string,
+  roadmap?: RoadmapDefinition,
+  scorecards: GolfScorecard[] = [],
+): number {
   if (flags.sprint) {
-    const parsed = parseInt(flags.sprint, 10);
-    if (isNaN(parsed) || parsed < 1) {
+    const parsed = parseSprintNumber(flags.sprint);
+    if (parsed == null) {
       console.error(`\nInvalid sprint number: ${flags.sprint}\n`);
       process.exit(1);
     }
     return parsed;
   }
+
+  const completedSprints = new Set(scorecards.map(s => s.sprint_number));
+  const roadmapCurrent = resolveRoadmapCurrentSprint(roadmap, completedSprints);
+  if (roadmapCurrent != null) return roadmapCurrent;
+
   const config = loadConfig(cwd);
   if (config.currentSprint && config.currentSprint > 0) return config.currentSprint;
-  const scorecards = loadScorecards(config, cwd);
   if (scorecards.length === 0) return 1;
   const sprintNumbers = scorecards.map(s => s.sprint_number).filter(n => typeof n === 'number' && n > 0);
   if (sprintNumbers.length === 0) return 1;
   return Math.max(...sprintNumbers) + 1;
+}
+
+function resolveRoadmapCurrentSprint(
+  roadmap: RoadmapDefinition | undefined,
+  completedSprints: Set<number>,
+): number | null {
+  const candidates = roadmap?.sprints
+    .filter(sprint => isRoadmapSprintPending(sprint) && !completedSprints.has(sprint.id))
+    .sort((a, b) => compareSprintIds(a.id, b.id)) ?? [];
+
+  if (candidates.length === 0) return null;
+
+  const active = candidates.find(sprint => getRoadmapStatus(sprint) === 'active');
+  return (active ?? candidates[0]).id;
 }
 
 // --- Subcommands ---
@@ -278,12 +305,12 @@ function statusSubcommand(flags: Record<string, string>, cwd: string): void {
 
   const config = loadConfig(cwd);
   const scorecards = loadScorecards(config, cwd);
-  const currentSprint = resolveSprint(flags, cwd);
+  const currentSprint = resolveSprint(flags, cwd, roadmap, scorecards);
   const completedSprints = new Set(scorecards.map(s => s.sprint_number));
 
   console.log(`\n# Roadmap Status — ${roadmap.name}`);
   console.log('\u2550'.repeat(40));
-  console.log(`\nCurrent sprint: S${currentSprint}`);
+  console.log(`\nCurrent sprint: ${formatSprintLabel(currentSprint)}`);
   console.log('');
 
   for (const phase of roadmap.phases || []) {
@@ -319,13 +346,13 @@ function statusSubcommand(flags: Record<string, string>, cwd: string): void {
       } else if (isCurrent) {
         status = '\u25B6 active';
       } else if (isBlocked) {
-        status = `\u2718 blocked by ${blockedBy.map(d => `S${d}`).join(', ')}`;
+        status = `\u2718 blocked by ${blockedBy.map(formatSprintLabel).join(', ')}`;
       } else {
         status = '\u25CB pending';
       }
 
       const theme = sprint.theme || 'Untitled Sprint';
-      console.log(`  S${sprint.id} ${theme.padEnd(30)} ${status}`);
+      console.log(`  ${formatSprintLabel(sprint.id)} ${theme.padEnd(30)} ${status}`);
     }
     console.log('');
   }

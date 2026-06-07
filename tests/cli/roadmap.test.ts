@@ -319,6 +319,56 @@ describe('slope roadmap status', () => {
     expect(output).toContain('active');
   });
 
+  it('selects an active inserted sprint before a later planned sprint (#525)', () => {
+    const roadmap = makeRoadmapJson({
+      phases: [{ name: 'Phase 1', sprints: [146, 146.1, 147] }],
+      sprints: [
+        {
+          id: 146, theme: 'Done', par: 4, slope: 2, type: 'fix', status: 'complete',
+          tickets: [
+            { key: 'S146-1', title: 'T1', club: 'wedge', complexity: 'small' },
+            { key: 'S146-2', title: 'T2', club: 'wedge', complexity: 'small' },
+            { key: 'S146-3', title: 'T3', club: 'wedge', complexity: 'small' },
+          ],
+        } as RoadmapDefinition['sprints'][number],
+        {
+          id: 146.1, theme: 'Inserted Release', par: 4, slope: 2, type: 'release', status: 'active',
+          depends_on: [146],
+          tickets: [
+            { key: 'S146.1-1', title: 'T1', club: 'short_iron', complexity: 'standard' },
+            { key: 'S146.1-2', title: 'T2', club: 'short_iron', complexity: 'standard' },
+            { key: 'S146.1-3', title: 'T3', club: 'wedge', complexity: 'small' },
+          ],
+        } as RoadmapDefinition['sprints'][number],
+        {
+          id: 147, theme: 'Later', par: 4, slope: 2, type: 'feature', status: 'planned',
+          depends_on: [146.1],
+          tickets: [
+            { key: 'S147-1', title: 'T1', club: 'short_iron', complexity: 'standard' },
+            { key: 'S147-2', title: 'T2', club: 'short_iron', complexity: 'standard' },
+            { key: 'S147-3', title: 'T3', club: 'wedge', complexity: 'small' },
+          ],
+        } as RoadmapDefinition['sprints'][number],
+      ],
+    });
+    writeRoadmap(tmpDir, roadmap);
+    writeConfig(tmpDir, { scorecardDir: 'docs/retros', scorecardPattern: 'sprint-*.json', minSprint: 1 });
+    mkdirSync(join(tmpDir, 'docs', 'retros'), { recursive: true });
+    writeFileSync(join(tmpDir, 'docs', 'retros', 'sprint-146.json'), JSON.stringify({
+      sprint_number: 146, par: 4, score: 4, slope: 2, type: 'fix',
+      theme: 'Done', shots: [],
+    }));
+
+    roadmapCommand(['status']);
+
+    const output = consoleOutput.join('\n');
+    expect(output).toContain('Current sprint: S146.1');
+    expect(output).toContain('S146.1 Inserted Release');
+    expect(output).toContain('\u25B6 active');
+    expect(output).toContain('S147 Later');
+    expect(output).toContain('blocked by S146.1');
+  });
+
   it('treats superseded sprints as terminal progress', () => {
     const roadmap = makeRoadmapJson({
       phases: [{ name: 'Phase 1', sprints: [7, 8, 9] }],

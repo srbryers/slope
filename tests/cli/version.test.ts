@@ -1,9 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { execSync } from 'node:child_process';
-import { versionCommand } from '../../src/cli/commands/version.js';
+import { getVersionBumpStagePaths, versionCommand } from '../../src/cli/commands/version.js';
 
 let tmpDir: string;
 let originalCwd: string;
@@ -67,5 +66,22 @@ describe('versionCommand', () => {
     // Verify the regex rejects injection attempts
     expect(/^\d+\.\d+\.\d+$/.test('1.2.3; echo pwned')).toBe(false);
     expect(/^\d+\.\d+\.\d+$/.test('1.2.3')).toBe(true);
+  });
+
+  it('stages the bundled Codex plugin manifest when the version script updates it (#524)', () => {
+    const manifestDir = join(tmpDir, 'templates', 'codex', 'plugins', 'slope', '.codex-plugin');
+    writeFileSync(join(tmpDir, 'package.json'), JSON.stringify({ name: '@slope-dev/slope', version: '1.5.0' }, null, 2));
+    mkdirSync(manifestDir, { recursive: true });
+    writeFileSync(join(manifestDir, 'plugin.json'), JSON.stringify({ name: 'slope', version: '1.5.1' }, null, 2));
+
+    expect(getVersionBumpStagePaths(tmpDir)).toEqual([
+      'package.json',
+      'templates/codex/plugins/slope/.codex-plugin/plugin.json',
+    ]);
+    expect(readFileSync(join(manifestDir, 'plugin.json'), 'utf8')).toContain('"version": "1.5.1"');
+  });
+
+  it('stages only package.json when no bundled Codex plugin manifest exists', () => {
+    expect(getVersionBumpStagePaths(tmpDir)).toEqual(['package.json']);
   });
 });

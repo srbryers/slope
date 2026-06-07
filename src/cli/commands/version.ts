@@ -1,5 +1,5 @@
 import { execSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 import { QUIET_STDIO } from '../../core/process.js';
@@ -70,6 +70,24 @@ function getInstalledVersion(): string | null {
   }
 }
 
+const VERSION_BUMP_STAGE_PATHS = [
+  'package.json',
+  'templates/codex/plugins/slope/.codex-plugin/plugin.json',
+] as const;
+
+export function getVersionBumpStagePaths(cwd: string): string[] {
+  return VERSION_BUMP_STAGE_PATHS.filter(path => existsSync(join(cwd, path)));
+}
+
+function quoteShellArg(value: string): string {
+  return `"${value.replace(/"/g, '\\"')}"`;
+}
+
+function stageVersionBumpChanges(cwd: string): void {
+  const paths = getVersionBumpStagePaths(cwd);
+  run(`git add ${paths.map(quoteShellArg).join(' ')}`, cwd);
+}
+
 async function versionBump(args: string[]): Promise<void> {
   const cwd = process.cwd();
   const dryRun = args.includes('--dry-run');
@@ -115,7 +133,7 @@ async function versionBump(args: string[]): Promise<void> {
   run(`node scripts/version-bump.mjs ${targetVersion}`, cwd);
 
   // 4. Commit and push (stage all changes from version-bump, not just root package.json)
-  run('git add package.json', cwd);
+  stageVersionBumpChanges(cwd);
   run(`git commit -m "chore: bump version to ${targetVersion}" -m "Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"`, cwd);
   run(`git push -u origin ${branch}`, cwd);
 

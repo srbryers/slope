@@ -1,7 +1,7 @@
 # SLOPE Roadmap
 
 > 134 scorecards filed (S1-S136, with gaps). Canonical planning now lives in `docs/backlog/roadmap.json`.
-> Last updated: 2026-06-07 (v1.58.0 recovery release triage)
+> Last updated: 2026-06-07 (v1.58.1 patch release triage)
 
 ## Phase Summary
 
