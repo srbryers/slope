@@ -1,0 +1,138 @@
+{
+  "sprint_number": 146,
+  "player": "codex",
+  "theme": "Roadmap Hygiene and Decimal Artifact Reality Checks",
+  "par": 4,
+  "slope": 2,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-06-07",
+  "type": "roadmap hygiene + bugfix",
+  "skills_used": [
+    "slope-sprint-workflow",
+    "github"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow",
+    "slope-performance-analysis"
+  ],
+  "skill_gaps_found": [],
+  "shots": [
+    {
+      "ticket_key": "S146-1",
+      "title": "Mark obsolete S128/S129 roadmap entries terminal and Phase 41/43 complete",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Confirmed #466/#467/#468 are closed as completed on GitHub, marked the standalone S128/S129 roadmap entries superseded because they had no scorecards, and moved Phase 41 and Phase 43 to complete."
+    },
+    {
+      "ticket_key": "S146-2",
+      "title": "Recognize decimal sprint scorecard and review artifacts as shipped commits (#522)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Raised #522, extended extractSprintArtifactReferences to parse decimal sprint artifact paths, and added regressions for decimal scorecard/review artifacts and squash-merge detection."
+    },
+    {
+      "ticket_key": "S146-3",
+      "title": "Restore explicit next sprint target and validate roadmap freshness",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added S147 as the next planned handoff-continuity sprint, verified roadmap status no longer points at stale Phase 41 work, and ran roadmap/docs/map validation."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 3,
+    "fairways_total": 3,
+    "greens_in_regulation": 3,
+    "greens_total": 3,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "rough",
+      "impact": "minor",
+      "description": "S128/S129 had closed GitHub issues but no standalone scorecards, so marking them complete would have created phantom-sprint warnings."
+    },
+    {
+      "type": "pin_position",
+      "impact": "minor",
+      "description": "Decimal sprint subject parsing intentionally stays conservative; only scorecard/review artifact paths count as shipped decimal sprint evidence."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Roadmap terminal state should distinguish completed scorecard-backed sprints from superseded planning entries.",
+      "outcome": "S128/S129 are now terminal without creating phantom scorecards, and Phase 41 no longer appears as pending/blocked."
+    },
+    {
+      "type": "lessons",
+      "description": "Shipped-artifact detection must support the same decimal sprint IDs that roadmap and scorecard loaders support.",
+      "outcome": "Decimal scorecard/review artifacts now remove false no-shipped-commit warnings for inserted sprints."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "`corepack pnpm vitest run tests/core/analyzers/git.test.ts` passed: 27 tests.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`corepack pnpm build` and `corepack pnpm typecheck` passed.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`corepack pnpm test` passed: 232 test files passed, 1 skipped; 3636 tests passed, 25 skipped.",
+      "status": "healthy"
+    },
+    {
+      "category": "docs",
+      "description": "`node dist/cli/index.js roadmap validate`, `roadmap status`, `docs check`, and `map --check` passed before scorecard closeout; roadmap validate now reports only standing ticket-count warnings.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Like cleaning a whiteboard that had accumulated a few stale sticky notes: small, but the next player will see the course clearly.",
+    "advice_for_next_player": "When roadmap status looks stale, check whether the issue is data state, shipped-evidence detection, or the absence of a concrete next sprint.",
+    "what_surprised_you": "The decimal warning was not a roadmap data problem at all; it was a shipped-artifact parser gap.",
+    "excited_about_next": "S147 is now ready as the handoff-continuity sprint instead of an inferred empty placeholder."
+  },
+  "bunker_locations": [
+    "Superseded roadmap entries should become terminal without requiring fake scorecards.",
+    "Decimal sprint support has to be consistent across roadmap IDs, scorecard files, and shipped artifact detection."
+  ],
+  "yardage_book_updates": [
+    "`extractSprintArtifactReferences` now accepts `docs/retros/sprint-N.M.json` and `docs/retros/sprint-N.M-review.md`.",
+    "Use `status: superseded` for obsolete planned sprint entries that were absorbed into later scored work.",
+    "After closing a roadmap tail sprint, define the next planned sprint explicitly so status does not infer an empty placeholder."
+  ],
+  "course_management_notes": [
+    "Created GitHub issue #522 for the decimal sprint artifact shipped-detection bug.",
+    "Roadmap triage commit: 7c21e9a.",
+    "Decimal artifact implementation commit: fc681ab.",
+    "GitHub issues #466, #467, and #468 were already closed as completed before S146; S128/S129 were stale roadmap entries rather than live work.",
+    "Review recommendation: architect required, code optional; no review findings were recorded.",
+    "The PR should include `Closes #522` so the raised validator issue closes on merge."
+  ],
+  "slope_factors": [
+    "roadmap_hygiene",
+    "decimal_sprint_ids",
+    "github_issue_reconciliation",
+    "next_sprint_planning"
+  ]
+}
