@@ -1,10 +1,11 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import type { HookInput, GuardResult } from '../../core/index.js';
-import { loadWorkflow } from '../../core/index.js';
+import type { HookInput, GuardResult, SlopeConfig, WorkflowExecution } from '../../core/index.js';
+import { formatSprintLabel, loadWorkflow, parseSprintNumber } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { SqliteSlopeStore } from '../../store/index.js';
-import { reconcileWorkflowExecutions } from '../workflow-resync.js';
+import { inferSprintContext } from '../sprint-inference.js';
+import { inferSprintFromBranch, reconcileWorkflowExecutions } from '../workflow-resync.js';
 
 /**
  * Workflow-step-gate guard: fires PreToolUse on Edit/Write.
@@ -26,7 +27,14 @@ export async function workflowStepGateGuard(input: HookInput, cwd: string): Prom
     const active = await store.listExecutions({ status: 'running' });
     if (active.length === 0) return resyncContext(resync);
 
-    const exec = active[0];
+    const exec = selectWorkflowExecution(active, input, cwd, config);
+    if (!exec) {
+      return withAdditionalContext(
+        resyncContext(resync),
+        'SLOPE workflow-step-gate: multiple running workflow executions; no session, branch, or sprint match, so edits are allowed.',
+      );
+    }
+
     if (!exec.current_phase || !exec.current_step) return resyncContext(resync);
 
     // Load the workflow definition to find the step's type
@@ -59,6 +67,53 @@ export async function workflowStepGateGuard(input: HookInput, cwd: string): Prom
   }
 }
 
+function selectWorkflowExecution(
+  active: WorkflowExecution[],
+  input: HookInput,
+  cwd: string,
+  config: SlopeConfig,
+): WorkflowExecution | null {
+  const sessionId = input.session_id?.trim();
+  if (sessionId) {
+    const bySession = active.find(exec => exec.session_id === sessionId);
+    if (bySession) return bySession;
+  }
+
+  for (const label of sprintLabelsForContext(cwd, config)) {
+    const bySprint = active.find(exec => sprintIdsMatch(exec.sprint_id, label));
+    if (bySprint) return bySprint;
+  }
+
+  return active.length === 1 ? active[0] : null;
+}
+
+function sprintLabelsForContext(cwd: string, config: SlopeConfig): string[] {
+  const labels = new Set<string>();
+  const branchSprint = inferSprintFromBranch(cwd);
+  if (branchSprint !== null) labels.add(formatSprintLabel(branchSprint));
+
+  try {
+    const inferred = inferSprintContext(cwd, config);
+    if (inferred.source !== 'initial') labels.add(inferred.label);
+  } catch {
+    // Sprint inference is advisory for this guard; ambiguity should fail open.
+  }
+
+  return [...labels];
+}
+
+function sprintIdsMatch(left: string | undefined, right: string): boolean {
+  const normalizedLeft = normalizeSprintLabel(left);
+  const normalizedRight = normalizeSprintLabel(right);
+  return normalizedLeft !== null && normalizedRight !== null && normalizedLeft === normalizedRight;
+}
+
+function normalizeSprintLabel(value: string | undefined): string | null {
+  if (!value) return null;
+  const parsed = parseSprintNumber(value);
+  return parsed === null ? value.trim().toUpperCase() : formatSprintLabel(parsed).toUpperCase();
+}
+
 function resyncContext(result: Awaited<ReturnType<typeof reconcileWorkflowExecutions>>): GuardResult {
   const lines: string[] = [];
   if (result.paused.length > 0) lines.push(`SLOPE workflow-step-gate: paused ${result.paused.length} stale workflow execution(s).`);
@@ -68,4 +123,11 @@ function resyncContext(result: Awaited<ReturnType<typeof reconcileWorkflowExecut
     ));
   }
   return lines.length > 0 ? { context: lines.join('\n') } : {};
+}
+
+function withAdditionalContext(result: GuardResult, context: string): GuardResult {
+  return {
+    ...result,
+    context: [result.context, context].filter(Boolean).join('\n'),
+  };
 }

@@ -6,10 +6,11 @@ import { execFileSync } from 'node:child_process';
 import { workflowStepGateGuard } from '../../../src/cli/guards/workflow-step-gate.js';
 import { SqliteSlopeStore } from '../../../src/store/index.js';
 import type { HookInput } from '../../../src/core/index.js';
+import { createSprintState, saveSprintState } from '../../../src/cli/sprint-state.js';
 
 let TMP: string;
 
-function makeInput(): HookInput {
+function makeInput(overrides: Partial<HookInput> = {}): HookInput {
   return {
     session_id: 'test-session',
     cwd: TMP,
@@ -17,6 +18,7 @@ function makeInput(): HookInput {
     tool_name: 'Edit',
     tool_input: { file_path: '/foo/bar.ts' },
     tool_response: {},
+    ...overrides,
   };
 }
 
@@ -48,9 +50,23 @@ function writeWorkflow(name: string, stepType: string): void {
   ].join('\n'));
 }
 
-async function createRunningExecution(store: SqliteSlopeStore, workflow: string, phase: string, step: string): Promise<void> {
-  const exec = await store.startExecution({ workflow_name: workflow, sprint_id: 'S77' });
+async function createRunningExecution(
+  store: SqliteSlopeStore,
+  workflow: string,
+  phase: string,
+  step: string,
+  options: { sprintId?: string; sessionId?: string } = {},
+): Promise<void> {
+  const exec = await store.startExecution({
+    workflow_name: workflow,
+    sprint_id: options.sprintId ?? 'S77',
+    session_id: options.sessionId,
+  });
   await store.updateExecutionState(exec.id, phase, step);
+}
+
+function waitForTimestampTick(): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, 5));
 }
 
 function initGitForSprint(sprint: number): void {
@@ -102,6 +118,58 @@ describe('workflowStepGateGuard', () => {
 
     const result = await workflowStepGateGuard(makeInput(), TMP);
     expect(result).toEqual({});
+  });
+
+  it('uses current sprint execution instead of unrelated active[0] (#531)', async () => {
+    writeConfig();
+    saveSprintState(TMP, createSprintState(531, 'implementing'));
+    writeWorkflow('current-wf', 'agent_work');
+    writeWorkflow('unrelated-wf', 'command');
+    const store = new SqliteSlopeStore(join(TMP, '.slope/slope.db'));
+    await createRunningExecution(store, 'current-wf', 'phase1', 'step1', { sprintId: 'S531' });
+    await waitForTimestampTick();
+    await createRunningExecution(store, 'unrelated-wf', 'phase1', 'step1', { sprintId: 'S85' });
+    store.close();
+
+    const result = await workflowStepGateGuard(makeInput(), TMP);
+    expect(result.decision).toBeUndefined();
+    expect(result.blockReason).toBeUndefined();
+  });
+
+  it('uses matching session execution instead of unrelated active[0] (#531)', async () => {
+    writeConfig();
+    writeWorkflow('session-wf', 'agent_work');
+    writeWorkflow('unrelated-wf', 'command');
+    const store = new SqliteSlopeStore(join(TMP, '.slope/slope.db'));
+    await createRunningExecution(store, 'session-wf', 'phase1', 'step1', {
+      sprintId: 'S77',
+      sessionId: 'test-session',
+    });
+    await waitForTimestampTick();
+    await createRunningExecution(store, 'unrelated-wf', 'phase1', 'step1', {
+      sprintId: 'S85',
+      sessionId: 'other-session',
+    });
+    store.close();
+
+    const result = await workflowStepGateGuard(makeInput(), TMP);
+    expect(result.decision).toBeUndefined();
+    expect(result.blockReason).toBeUndefined();
+  });
+
+  it('fails open when multiple executions cannot be disambiguated (#531)', async () => {
+    writeConfig();
+    writeWorkflow('command-wf', 'command');
+    writeWorkflow('validation-wf', 'validation');
+    const store = new SqliteSlopeStore(join(TMP, '.slope/slope.db'));
+    await createRunningExecution(store, 'command-wf', 'phase1', 'step1', { sprintId: 'S77' });
+    await waitForTimestampTick();
+    await createRunningExecution(store, 'validation-wf', 'phase1', 'step1', { sprintId: 'S85' });
+    store.close();
+
+    const result = await workflowStepGateGuard(makeInput(), TMP);
+    expect(result.decision).toBeUndefined();
+    expect(result.context).toContain('multiple running workflow executions');
   });
 
   it('blocks file edit on command step', async () => {
