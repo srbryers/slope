@@ -1,12 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdirSync, writeFileSync, rmSync, existsSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync, rmSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { workflowStepGateGuard } from '../../../src/cli/guards/workflow-step-gate.js';
 import { SqliteSlopeStore } from '../../../src/store/index.js';
 import type { HookInput } from '../../../src/core/index.js';
 
-const TMP = join(import.meta.dirname ?? __dirname, '..', '..', '..', '.test-tmp-step-gate');
+let TMP: string;
 
 function makeInput(): HookInput {
   return {
@@ -67,6 +68,7 @@ function initGitForSprint(sprint: number): void {
 
 describe('workflowStepGateGuard', () => {
   beforeEach(() => {
+    TMP = mkdtempSync(join(tmpdir(), 'slope-step-gate-'));
     mkdirSync(TMP, { recursive: true });
   });
 

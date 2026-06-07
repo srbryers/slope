@@ -1,6 +1,6 @@
 {
   "name": "SLOPE Development Roadmap",
-  "description": "Forward-looking roadmap from S61+. Phases 1-9 (S1-S47) are complete. S48-S60 were hardening, guard enforcement, and process sprints. This roadmap covers adoption, observability, guard maturity, multi-project, loop evolution, and issue-driven recovery. S61-S64 reflect what actually shipped (themes diverged from original plan). Note: the actual S69 diverged from the planned Referee sprint \u2014 a carryover patch kit ran instead. The Referee work was rescheduled as S78. S75.5 (The Bug Clearing) added 2026-05-02 to clear accumulated CLI bugs from external repos. S132-S136 were backfilled from shipped scorecards on 2026-06-05; S137 adds post-merge retro tooling and durable memory, S137.5 addresses Windows suite portability for #509, S138-S144 triage open GitHub issues #499/#501/#502/#503/#505/#507/#510/#511/#512/#513/#514/#515/#516/#517/#518 into focused recovery sprints, S145 closed validation-signal regressions #519/#520, S146 cleaned stale roadmap state plus decimal sprint shipped-artifact warnings (#522), and S146.1 cuts the v1.58.1 patch release while repairing release-bump staging (#524).",
+  "description": "Forward-looking roadmap from S61+. Phases 1-9 (S1-S47) are complete. S48-S60 were hardening, guard enforcement, and process sprints. This roadmap covers adoption, observability, guard maturity, multi-project, loop evolution, and issue-driven recovery. S61-S64 reflect what actually shipped (themes diverged from original plan). Note: the actual S69 diverged from the planned Referee sprint \u2014 a carryover patch kit ran instead. The Referee work was rescheduled as S78. S75.5 (The Bug Clearing) added 2026-05-02 to clear accumulated CLI bugs from external repos. S132-S136 were backfilled from shipped scorecards on 2026-06-05; S137 adds post-merge retro tooling and durable memory, S137.5 addresses Windows suite portability for #509, S138-S144 triage open GitHub issues #499/#501/#502/#503/#505/#507/#510/#511/#512/#513/#514/#515/#516/#517/#518 into focused recovery sprints, S145 closed validation-signal regressions #519/#520, S146 cleaned stale roadmap state plus decimal sprint shipped-artifact warnings (#522), and S146.1 cuts the v1.58.1 patch release while repairing release-bump staging (#524), active inserted sprint status (#525), and guard test isolation (#526).",
   "phases": [
     {
       "name": "Phase 10 \u2014 Adoption & Onboarding",
@@ -329,7 +329,7 @@
         146.1
       ],
       "status": "active",
-      "note": "Clean stale roadmap state after the recovery train, fix decimal sprint shipped-artifact detection (#522), cut the v1.58.1 patch release, and repair release-bump staging (#524)."
+      "note": "Clean stale roadmap state after the recovery train, fix decimal sprint shipped-artifact detection (#522), cut the v1.58.1 patch release, and repair release-bump staging/status/test-isolation issues (#524/#525/#526)."
     },
     {
       "name": "Phase 46 \u2014 Handoff Continuity",
@@ -4076,14 +4076,14 @@
     {
       "id": 146.1,
       "theme": "Roadmap Hygiene Patch Release",
-      "par": 4,
+      "par": 5,
       "slope": 2,
       "type": "release + bugfix",
       "status": "active",
       "depends_on": [
         146
       ],
-      "note": "Cut v1.58.1 after S146, fix the version bump staging issue (#524), and verify the CI-backed GitHub Release to npm path.",
+      "note": "Cut v1.58.1 after S146, fix release-path issues #524/#525/#526, and verify the CI-backed GitHub Release to npm path.",
       "tickets": [
         {
           "key": "S146.1-1",
@@ -4114,11 +4114,21 @@
         },
         {
           "key": "S146.1-4",
+          "title": "Isolate guard tests from parent repo branch and active sprint state (#526)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 526,
+          "depends_on": [
+            "S146.1-3"
+          ]
+        },
+        {
+          "key": "S146.1-5",
           "title": "Validate release readiness and publish v1.58.1 through GitHub Release",
           "club": "wedge",
           "complexity": "small",
           "depends_on": [
-            "S146.1-3"
+            "S146.1-4"
           ]
         }
       ]

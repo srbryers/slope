@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
-import { homedir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { sprintCompletionGuard } from '../../../src/cli/guards/sprint-completion.js';
@@ -8,7 +8,7 @@ import { recordPrCloseoutSettled, recordPrReviewComplete } from '../../../src/cl
 import { saveSprintState, createSprintState, loadSprintState } from '../../../src/cli/sprint-state.js';
 import type { HookInput } from '../../../src/core/index.js';
 
-const tmpDir = join(import.meta.dirname ?? __dirname, '.tmp-sprint-completion-test');
+let tmpDir: string;
 const cleanupDirs: string[] = [];
 
 function makePreToolUse(command: string): HookInput {
@@ -93,6 +93,7 @@ function initGitBranch(branch: string): void {
 }
 
 beforeEach(() => {
+  tmpDir = mkdtempSync(join(tmpdir(), 'slope-sprint-completion-'));
   mkdirSync(tmpDir, { recursive: true });
   writeConfig();
 });

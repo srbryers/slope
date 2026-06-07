@@ -3,10 +3,11 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { isAbsolute, join, resolve } from 'node:path';
 import type { HookInput, GuardResult } from '../../core/index.js';
+import { formatSprintNumber } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { loadPrReviewState } from '../pr-review-state.js';
 import { loadSprintState, mutateSprintState, updateGate, isSprintComplete, pendingGates } from '../sprint-state.js';
-import { reconcileSprintStateForBranch } from '../workflow-resync.js';
+import { currentBranch, inferSprintFromBranch, reconcileSprintStateForBranch } from '../workflow-resync.js';
 
 /**
  * Sprint-completion guard: enforces post-implementation gates.
@@ -37,13 +38,11 @@ export async function sprintCompletionGuard(input: HookInput, cwd: string): Prom
 /** Check if sprint-state matches the current branch. Returns a warning string or null. */
 function checkStaleness(sprint: number, cwd: string): string | null {
   try {
-    const branch = execSync('git rev-parse --abbrev-ref HEAD', { cwd, encoding: 'utf8' }).trim();
-    // Match patterns like S22, s22, sprint-22, worktree-s22-*
-    const branchMatch = branch.match(/(?:^|[-/])s(?:print-?)?(\d+)/i);
-    if (branchMatch) {
-      const branchSprint = parseInt(branchMatch[1], 10);
-      if (branchSprint !== sprint) {
-        return `Warning: sprint-state is for Sprint ${sprint} but branch "${branch}" suggests Sprint ${branchSprint}. Run \`slope sprint reset\` if stale.`;
+    const branch = currentBranch(cwd);
+    if (branch) {
+      const branchSprint = inferSprintFromBranch(cwd);
+      if (branchSprint !== null && branchSprint !== sprint) {
+        return `Warning: sprint-state is for Sprint ${formatSprintNumber(sprint)} but branch "${branch}" suggests Sprint ${formatSprintNumber(branchSprint)}. Run \`slope sprint reset\` if stale.`;
       }
     }
     // No sprint number in branch name — can't verify, don't warn
