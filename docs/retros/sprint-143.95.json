@@ -1,0 +1,139 @@
+{
+  "sprint_number": 143.95,
+  "player": "codex",
+  "theme": "Atomic Write Lock Contention Hardening",
+  "par": 4,
+  "slope": 2,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-06-07",
+  "type": "windows reliability",
+  "skills_used": [
+    "slope-sprint-workflow",
+    "slope-api-reference"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow"
+  ],
+  "shots": [
+    {
+      "ticket_key": "S143.95-1",
+      "title": "Reproduce or characterize Windows EPERM lock-open contention (#515)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Confirmed #515 was a Windows full-suite lock acquisition failure: focused atomic-write tests passed, but the original full-suite evidence showed `EPERM` opening the `.lock` file."
+    },
+    {
+      "ticket_key": "S143.95-2",
+      "title": "Harden withFileLockSync lock acquisition for transient EPERM (#515)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "`withFileLockSync` now treats Windows `EPERM`/`EACCES` during lock open as transient acquisition states, retrying within the existing timeout while preserving timeout diagnostics."
+    },
+    {
+      "ticket_key": "S143.95-3",
+      "title": "Stabilize atomic-write concurrency regression under full-suite load (#515)",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [],
+      "notes": "Added a Windows EPERM lock-open regression and stress-reran the focused atomic-write suite before the full-suite gate."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 3,
+    "fairways_total": 3,
+    "greens_in_regulation": 3,
+    "greens_total": 3,
+    "putts": 1,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "wind",
+      "impact": "minor",
+      "description": "The first full-suite run exposed a one-off `auto-card --include-untracked` status failure, but the focused auto-card suite, the auto-card+doctor pairing, and the next full-suite run all passed."
+    },
+    {
+      "type": "wind",
+      "impact": "minor",
+      "description": "`CODEBASE.md` is ignored in this repo; `slope map --check` confirmed the local map is current after the new test file count."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Windows lock acquisition can report transient `EPERM`/`EACCES` instead of only `EEXIST` when another process is racing lock creation/removal.",
+      "outcome": "The file-lock loop now retries those Windows acquisition errors under the same timeout as existing lock contention."
+    },
+    {
+      "type": "lessons",
+      "description": "Intermittent full-suite failures should be rerun at the focused, neighboring, and full-suite levels before becoming new roadmap work.",
+      "outcome": "The unrelated auto-card signal was recorded as validation wind rather than promoted into a new sprint from a non-repeatable failure."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "`corepack pnpm vitest run tests/cli/atomic-write.test.ts tests/cli/atomic-write-lock.test.ts` passed: 5 tests.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "The focused atomic-write suite passed 5 additional stress reruns.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`corepack pnpm typecheck` and `corepack pnpm prepare` passed.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`corepack pnpm test` passed on rerun: 231 test files passed, 1 skipped; 3629 tests passed, 25 skipped.",
+      "status": "healthy"
+    },
+    {
+      "category": "docs",
+      "description": "`slope map --check` reported current.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "A careful reliability shot. The fix is small, but the validation loop mattered because the bug only appeared under full-suite pressure.",
+    "advice_for_next_player": "Keep transient Windows lock errors inside the same bounded acquisition loop; do not turn them into silent success or unbounded waiting.",
+    "what_surprised_you": "The atomic flake stayed gone, while an unrelated auto-card status blip appeared once and then refused to repeat.",
+    "excited_about_next": "The recovery phase is now ready for the release sprint with the noisy Windows reliability items cleaned up."
+  },
+  "bunker_locations": [
+    "Windows file lock creation can surface `EPERM` or `EACCES` for lock-open races.",
+    "Full-suite-only failures need focused and neighboring reruns before becoming new roadmap work."
+  ],
+  "yardage_book_updates": [
+    "`src/cli/atomic-write.ts` retries Windows `EPERM`/`EACCES` lock-open errors within the existing timeout loop.",
+    "`tests/cli/atomic-write-lock.test.ts` covers transient Windows `EPERM` during lock acquisition.",
+    "`tests/cli/atomic-write.test.ts` continued to pass under repeated concurrent-process stress."
+  ],
+  "course_management_notes": [
+    "Implementation commit: 5b33781.",
+    "Issue #515 should close when the PR containing S143.95 merges.",
+    "A first full-suite auto-card blip did not reproduce in focused, paired, or full-suite reruns.",
+    "S144 release remains the next planned sprint."
+  ],
+  "slope_factors": [
+    "windows_reliability",
+    "atomic_write",
+    "file_locking",
+    "full_suite_contention"
+  ]
+}

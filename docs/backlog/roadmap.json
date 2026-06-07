@@ -3780,6 +3780,9 @@
       "par": 4,
       "slope": 2,
       "type": "windows reliability",
+      "status": "complete",
+      "score": 4,
+      "score_label": "par",
       "depends_on": [
         143.9
       ],
