@@ -1,6 +1,6 @@
 {
   "name": "SLOPE Development Roadmap",
-  "description": "Forward-looking roadmap from S61+. Phases 1-9 (S1-S47) are complete. S48-S60 were hardening, guard enforcement, and process sprints. This roadmap covers adoption, observability, guard maturity, multi-project, loop evolution, and issue-driven recovery. S61-S64 reflect what actually shipped (themes diverged from original plan). Note: the actual S69 diverged from the planned Referee sprint \u2014 a carryover patch kit ran instead. The Referee work was rescheduled as S78. S75.5 (The Bug Clearing) added 2026-05-02 to clear accumulated CLI bugs from external repos. S132-S136 were backfilled from shipped scorecards on 2026-06-05; S137 adds post-merge retro tooling and durable memory, S137.5 addresses Windows suite portability for #509, and S138-S144 triage open GitHub issues #499/#501/#502/#503/#505/#507/#510/#511/#512/#513/#514/#515/#516/#517 into focused recovery sprints.",
+  "description": "Forward-looking roadmap from S61+. Phases 1-9 (S1-S47) are complete. S48-S60 were hardening, guard enforcement, and process sprints. This roadmap covers adoption, observability, guard maturity, multi-project, loop evolution, and issue-driven recovery. S61-S64 reflect what actually shipped (themes diverged from original plan). Note: the actual S69 diverged from the planned Referee sprint \u2014 a carryover patch kit ran instead. The Referee work was rescheduled as S78. S75.5 (The Bug Clearing) added 2026-05-02 to clear accumulated CLI bugs from external repos. S132-S136 were backfilled from shipped scorecards on 2026-06-05; S137 adds post-merge retro tooling and durable memory, S137.5 addresses Windows suite portability for #509, and S138-S144 triage open GitHub issues #499/#501/#502/#503/#505/#507/#510/#511/#512/#513/#514/#515/#516/#517/#518 into focused recovery sprints.",
   "phases": [
     {
       "name": "Phase 10 \u2014 Adoption & Onboarding",
@@ -3884,6 +3884,46 @@
       ]
     },
     {
+      "id": 143.99,
+      "theme": "CodeQL Release Gate Hardening",
+      "par": 3,
+      "slope": 1,
+      "type": "security",
+      "depends_on": [
+        143.98
+      ],
+      "note": "Close #518 by clearing the CodeQL release-gate alerts for wildcard replacement and shell-command construction before S144 release readiness.",
+      "tickets": [
+        {
+          "key": "S143.99-1",
+          "title": "Clear CodeQL wildcard replacement alert in workflow resync scorecard lookup (#518)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 518
+        },
+        {
+          "key": "S143.99-2",
+          "title": "Replace CodeQL-flagged git shell commands with argument-array process calls (#518)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 518,
+          "depends_on": [
+            "S143.99-1"
+          ]
+        },
+        {
+          "key": "S143.99-3",
+          "title": "Rerun focused tests and PR check validation for CodeQL release gate (#518)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 518,
+          "depends_on": [
+            "S143.99-2"
+          ]
+        }
+      ]
+    },
+    {
       "id": 144,
       "theme": "Guard Recovery and State Portability Release",
       "par": 3,
@@ -3902,9 +3942,10 @@
         143.9,
         143.95,
         143.97,
-        143.98
+        143.98,
+        143.99
       ],
-      "note": "Publish the S137-S143.98 plus S137.5 retro, help, guard recovery, map safety, workflow resync, Windows portability, sprint resume, commit-ready map freshness, decimal sprint status, map stderr, decimal currency, Node exec redirection, atomic-write reliability, git analyzer fixture stability, and npm bin metadata release-cleanliness fixes after validation.",
+      "note": "Prepare the S137-S143.99 plus S137.5 retro, help, guard recovery, map safety, workflow resync, Windows portability, sprint resume, commit-ready map freshness, decimal sprint status, map stderr, decimal currency, Node exec redirection, atomic-write reliability, git analyzer fixture stability, npm bin metadata release-cleanliness, and CodeQL gate fixes for release after the version bump and CI checks pass.",
       "tickets": [
         {
           "key": "S144-1",
