@@ -344,10 +344,13 @@
     {
       "name": "Phase 47 \u2014 Human Operating Surface Simplification",
       "sprints": [
-        148
+        148,
+        149,
+        150,
+        151
       ],
       "status": "planned",
-      "note": "Plan the higher-level SLOPE operating surface so humans see a small, memorable cockpit while agents and skills orchestrate the deeper CLI/MCP execution framework."
+      "note": "Plan and implement the higher-level SLOPE operating surface so humans see a small, memorable cockpit while agents and skills orchestrate the deeper CLI/MCP execution framework."
     }
   ],
   "sprints": [
@@ -4308,6 +4311,148 @@
           "depends_on": [
             "S148-2",
             "S148-3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 149,
+      "theme": "Roadmap Signal Repair and Bounded Planning View",
+      "par": 4,
+      "slope": 2,
+      "type": "bugfix + product surface",
+      "status": "planned",
+      "depends_on": [
+        148
+      ],
+      "note": "Fix the S147 shipped-reference false positive from #539, then make roadmap status default to a compact planning view with full history behind explicit flags.",
+      "tickets": [
+        {
+          "key": "S149-1",
+          "title": "Fix roadmap shipped-sprint detection for issue-fix keys like S147-533 (#539)",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S149-2",
+          "title": "Make roadmap status default to current, blockers, next ready, and 1-3 upcoming sprints",
+          "club": "short_iron",
+          "complexity": "standard",
+          "depends_on": [
+            "S149-1"
+          ]
+        },
+        {
+          "key": "S149-3",
+          "title": "Add full/history flags and bounded-output regression tests for roadmap status",
+          "club": "short_iron",
+          "complexity": "standard",
+          "depends_on": [
+            "S149-2"
+          ]
+        },
+        {
+          "key": "S149-4",
+          "title": "Update roadmap help and docs for the compact planning view contract",
+          "club": "wedge",
+          "complexity": "small",
+          "depends_on": [
+            "S149-3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 150,
+      "theme": "Command Audience Metadata and Default Help",
+      "par": 4,
+      "slope": 2,
+      "type": "cli product surface",
+      "status": "planned",
+      "depends_on": [
+        149
+      ],
+      "note": "Encode human, agent, advanced, and internal command audiences in the registry and make default help teach the human cockpit rather than the whole implementation framework.",
+      "tickets": [
+        {
+          "key": "S150-1",
+          "title": "Add audience metadata to every CLI command registry entry",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S150-2",
+          "title": "Make default help show the compact human cockpit",
+          "club": "short_iron",
+          "complexity": "standard",
+          "depends_on": [
+            "S150-1"
+          ]
+        },
+        {
+          "key": "S150-3",
+          "title": "Add an explicit full-command escape hatch for the complete registry",
+          "club": "wedge",
+          "complexity": "small",
+          "depends_on": [
+            "S150-2"
+          ]
+        },
+        {
+          "key": "S150-4",
+          "title": "Add registry/help tests that keep default help bounded",
+          "club": "short_iron",
+          "complexity": "standard",
+          "depends_on": [
+            "S150-3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 151,
+      "theme": "Skill-First Human Cockpit Implementation",
+      "par": 4,
+      "slope": 3,
+      "type": "workflow + cli surface",
+      "status": "planned",
+      "depends_on": [
+        150
+      ],
+      "note": "Implement the high-level cockpit entries and update repo skills so common human asks route through outcome-oriented workflows rather than exposed CLI plumbing.",
+      "tickets": [
+        {
+          "key": "S151-1",
+          "title": "Implement a compact slope now current-state cockpit",
+          "club": "long_iron",
+          "complexity": "moderate"
+        },
+        {
+          "key": "S151-2",
+          "title": "Implement a start or sprint-begin entry that coordinates briefing, sprint state, and claim guidance",
+          "club": "long_iron",
+          "complexity": "moderate",
+          "depends_on": [
+            "S151-1"
+          ]
+        },
+        {
+          "key": "S151-3",
+          "title": "Update skills so release, PR review, issue triage, retro, and sprint execution hide CLI plumbing",
+          "club": "short_iron",
+          "complexity": "standard",
+          "depends_on": [
+            "S151-1"
+          ]
+        },
+        {
+          "key": "S151-4",
+          "title": "Add end-to-end tests or transcript fixtures for cockpit workflows",
+          "club": "short_iron",
+          "complexity": "standard",
+          "depends_on": [
+            "S151-2",
+            "S151-3"
           ]
         }
       ]
