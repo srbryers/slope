@@ -69,7 +69,7 @@ import { sprintCommand } from './commands/sprint.js';
 import { resumeCommand } from './commands/resume.js';
 import { doctorCommand } from './commands/doctor.js';
 import { versionCommand } from './commands/version.js';
-import { helpCommand } from './commands/help.js';
+import { helpCommand, printDefaultHelp } from './commands/help.js';
 import { quickstartCommand } from './commands/quickstart.js';
 import { worktreeCommand } from './commands/worktree.js';
 import { orgCommand } from './commands/org.js';
@@ -97,27 +97,7 @@ if (sourceRuntimeWarning) {
 
 // Handle --help and -h flags globally
 if (subcommand === '--help' || subcommand === '-h') {
-  console.log(`
-SLOPE CLI — Sprint Lifecycle & Operational Performance Engine
-
-Usage:
-  slope init [--claude-code|--cursor|--codex|--opencode|--generic|--all]  Initialize .slope/ directory
-  slope init --team                         Enable multi-developer team mode
-  slope init --with-example                 Also seed docs/retros/sprint-1.json with an example
-  slope card                                Show handicap card
-  slope card --player=<name>                Show handicap for a specific player
-  slope card --team                         Show per-player comparison table
-  slope validate [path]                     Validate scorecard(s)
-  slope skills scan|list|validate           Manage repo-local skill registry
-  slope issue scout|triage                  Detect and triage SLOPE-driven issues
-  slope review [path] [--plain]             Format sprint review markdown
-  slope briefing                            Pre-round briefing
-  slope version                             Show current version
-  slope doctor                              Check repo health
-  slope resume [--from=path] [--force]      Portable sprint resume from tracked artifacts
-
-For full command list, run: slope
-`);
+  printDefaultHelp();
   process.exit(0);
 }
 
@@ -329,108 +309,11 @@ switch (subcommand) {
     memoryCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   default:
-    console.log(`
-SLOPE CLI — Sprint Lifecycle & Operational Performance Engine
-
-Usage:
-  slope init [--claude-code|--cursor|--codex|--opencode|--generic|--all]  Initialize .slope/ directory
-  slope init --team                         Enable multi-developer team mode
-  slope init --with-example                 Also seed docs/retros/sprint-1.json with an example
-  slope card                                Show handicap card
-  slope card --player=<name>                Show handicap for a specific player
-  slope card --team                         Show per-player comparison table
-  slope validate [path]                     Validate scorecard(s)
-  slope validate [path] --skills            Validate scorecard skill references
-  slope review [path] [--plain]             Format sprint review markdown
-  slope review start [--rounds=N|--tier=T]  Start plan review lifecycle
-  slope review round                        Record a completed review round
-  slope review status                       Show current review state
-  slope review reset                        Clear review state
-  slope review recommend                    Recommend review types for current sprint
-  slope review findings add|list|clear      Manage implementation review findings
-  slope review amend [--sprint=N]           Amend scorecard with review findings
-  slope pr review [--pr=N] [--sprint=N]     Run post-PR review workflow
-  slope pr status [--sprint=N]              Check PR closeout readiness
-  slope briefing [--sprint=N] [options]      Pre-round briefing
-  slope plan --complexity=<level>           Pre-shot advisor (club + training + hazards)
-  slope classify --scope=... ...            Classify a shot from execution trace
-  slope claim --target=<t> [--force]        Claim a ticket or area for the sprint
-  slope release --id=<id>                   Release a claim by ID
-  slope release --target=<t> [--player=<p>] Release a claim by target
-  slope status [--sprint=N]                 Show sprint course status + conflicts
-  slope tournament --id=<id> --sprints=N..M Build tournament review from sprints
-  slope auto-card --sprint=<N> [options]    Generate scorecard from git + CI signals
-  slope hook add|remove|list|show            Manage lifecycle hooks
-  slope hook add --level=full               Install all guidance hooks
-  slope guard <name>                        Run a guard handler (reads stdin)
-  slope guard list|enable|disable           Manage guard activation
-  slope session start|end|heartbeat|prune|list Manage live sessions
-  slope next                                Show next sprint number (auto-detect)
-  slope extract --file=<path> [options]       Extract events into SLOPE store
-  slope distill [--auto] [--dry-run]         Promote event patterns to common issues
-  slope standup [--session=<id>] [--json]     Generate standup report from session
-  slope standup --ingest=<path> [--role=<id>] Ingest another agent's standup
-  slope report --html [--output=<path>]      Generate HTML performance report
-  slope dashboard [--port=N] [--no-open]    Live local performance dashboard
-  slope dashboard --player=<name>          Filter dashboard to a single player
-  slope roadmap validate|review|status|show  Strategic planning tools
-  slope map [--check] [--output=<path>]     Generate/update codebase map
-  slope flows init|list|check               Manage user flow definitions
-  slope inspirations add|list|link          Track external OSS inspiration sources
-  slope analyze [--json] [--analyzers=...]  Scan repo and generate profile
-  slope vision [--json]                     Display project vision document
-  slope store status [--json]                Store diagnostics (type, schema, stats)
-  slope store migrate status                Show schema version and migration status
-  slope store backup [--output=<path>]      Back up the store
-  slope store restore --from=<path>         Restore from a backup
-  slope transcript list|show|stats          View session transcript data
-  slope metaphor list|set|show              Manage metaphor display themes
-  slope plugin list|validate                Manage custom plugins
-  slope skills scan|list|validate           Manage repo-local skill registry
-  slope issue scout|triage                  Detect and triage SLOPE-driven issues
-  slope initiative create|status|next|advance|review  Multi-sprint initiative orchestration
-  slope index [--full|--status|--prune]               Semantic embedding index
-  slope context "query" [options]                     Semantic context search
-  slope prep <ticket-id> [--json] [--top=5]          Generate execution plan for a ticket
-  slope enrich [backlog-path] [--output=<path>]      Batch-enrich backlog with file context
-  slope stats export [--pretty]                      Export stats JSON for slope-web
-  slope docs generate|changelog|check                Documentation manifest and changelog
-  slope sprint start|gate|status|reset               Manage sprint lifecycle state
-  slope worktree start|status|cleanup [options]      Manage persistent worktrees
-  slope loop status|config|run|continuous|...        Autonomous sprint execution loop
-  slope doctor [--fix] [--dry-run]                   Check repo health and fix issues
-  slope version                                      Show current version
-  slope version bump [<version>] [--dry-run]         Bump version, create PR, merge
-
-Examples:
-  slope init                                Create .slope/ with config + example scorecard
-  slope init --cursor                       Also install Cursor IDE rules
-  slope init --cursor                       Also add SLOPE MCP server to .cursor/mcp.json
-  slope init --claude-code                  Also install Claude Code rules + hooks
-  slope init --codex                        Also install Codex CLI hooks + AGENTS.md guidance
-  slope init --opencode                     Also install OpenCode AGENTS.md + MCP config
-  slope init --team                          Enable multi-developer mode
-  slope card                                Show handicap across all scorecards
-  slope card --player=alice                 Show handicap for alice only
-  slope card --team                         Compare all players side-by-side
-  slope validate docs/retros/sprint-1.json  Validate a specific scorecard
-  slope validate                            Validate all scorecards
-  slope review                              Review the latest scorecard
-  slope review --plain                      Non-technical sprint review
-  slope briefing                            Full briefing (top 10 recent gotchas)
-  slope briefing --categories=testing       Filter by category
-  slope briefing --keywords=migration       Filter by keyword
-  slope plan --complexity=medium            Club recommendation for medium ticket
-  slope plan --complexity=large --areas=db  Include hazard warnings for db area
-  slope classify --scope="a.ts" --modified="a.ts" --tests=pass --reverts=0
-  slope briefing --sprint=2                 Briefing for sprint 2
-  slope claim --target=S2-1 --sprint=2      Claim ticket S2-1 for sprint 2
-  slope claim --target=packages/cli --scope=area  Claim an area
-  slope claim --target=S2-1 --force         Claim even if overlap conflict exists
-  slope status --sprint=2                   Show all claims for sprint 2
-  slope release --target=S2-1               Release your claim on S2-1
-  slope dashboard                           Start live dashboard on port 3000
-  slope dashboard --port=8080 --no-open     Custom port, no browser auto-open
-`);
-    process.exit(subcommand ? 1 : 0);
+    if (!subcommand) {
+      printDefaultHelp();
+      process.exit(0);
+    }
+    console.error(`Unknown command: "${subcommand}"`);
+    console.error('Run `slope help` for the human surface or `slope help --all` for all commands.');
+    process.exit(1);
 }

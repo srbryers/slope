@@ -20,6 +20,33 @@ describe('CLI_COMMAND_REGISTRY', () => {
     }
   });
 
+  it('every entry has valid audience metadata', () => {
+    const validAudiences = ['human', 'agent', 'advanced', 'internal'];
+    for (const entry of CLI_COMMAND_REGISTRY) {
+      expect(validAudiences).toContain(entry.audience);
+    }
+  });
+
+  it('keeps the human command surface intentional and bounded', () => {
+    const humanCommands = CLI_COMMAND_REGISTRY
+      .filter(entry => entry.audience === 'human')
+      .map(entry => entry.cmd)
+      .sort();
+
+    expect(humanCommands).toEqual([
+      'briefing',
+      'card',
+      'doctor',
+      'help',
+      'init',
+      'quickstart',
+      'review',
+      'roadmap',
+      'status',
+      'vision',
+    ]);
+  });
+
   it('every entry has non-empty cmd and desc', () => {
     for (const entry of CLI_COMMAND_REGISTRY) {
       expect(entry.cmd.length).toBeGreaterThan(0);

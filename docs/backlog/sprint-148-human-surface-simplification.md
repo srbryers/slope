@@ -237,6 +237,20 @@ S149 turns the roadmap case study into the active command contract:
   completed historical phases and the full critical path stay out of the
   human-facing status surface.
 
+## S150 Implementation Note
+
+S150 turns the audience taxonomy into executable CLI metadata and help behavior:
+
+- Every top-level registry command now has an `audience` of `human`, `agent`,
+  `advanced`, or `internal`.
+- `slope help`, `slope --help`, and bare `slope` default to a bounded human
+  command surface instead of the full implementation registry.
+- `slope help --all` is the explicit escape hatch for the full registry and
+  prints audience labels so humans can see which commands are primarily for
+  skills, agents, maintainers, or internal plumbing.
+- Regression tests keep audience metadata complete and keep default help from
+  reintroducing agent/internal commands into the human surface.
+
 ## Implementation Backlog
 
 ### S149 - Roadmap Signal Repair and Bounded Planning View

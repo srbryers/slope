@@ -1,25 +1,31 @@
 import { CLI_COMMAND_REGISTRY, CLI_INTERNAL_MODULES } from '../registry.js';
-import type { CliCommandMeta } from '../registry.js';
+import type { CliCommandAudience, CliCommandMeta } from '../registry.js';
 
 /**
- * slope help [command] — Show detailed per-command usage from the registry.
+ * slope help [command] - Show human help, full registry, or command details.
  */
 export async function helpCommand(args: string[]): Promise<void> {
   if (args.includes('--help') || args.includes('-h')) {
     console.log(`
-slope help — Command reference
+slope help - Command reference
 
 Usage:
-  slope help              Show all commands grouped by category
+  slope help              Show the bounded human command surface
   slope help <command>    Show detailed usage for a command
+  slope help --all        Show all commands grouped by category
 `);
     return;
   }
 
-  const commandName = args[0];
+  if (args.includes('--all')) {
+    printAllCommandHelp();
+    return;
+  }
+
+  const commandName = args.find(arg => !arg.startsWith('-'));
 
   if (!commandName) {
-    printCategoryList();
+    printDefaultHelp();
     return;
   }
 
@@ -32,7 +38,45 @@ Usage:
   printCommandDetail(meta);
 }
 
-function printCategoryList(): void {
+const HUMAN_HELP_ORDER = [
+  'briefing',
+  'review',
+  'doctor',
+  'card',
+  'status',
+  'roadmap',
+  'vision',
+  'quickstart',
+  'init',
+] as const;
+
+const AUDIENCE_LABELS: Record<CliCommandAudience, string> = {
+  human: 'human',
+  agent: 'agent',
+  advanced: 'advanced',
+  internal: 'internal',
+};
+
+export function printDefaultHelp(): void {
+  const byName = new Map(CLI_COMMAND_REGISTRY.map(cmd => [cmd.cmd, cmd]));
+  console.log('\nSLOPE - Human Command Surface\n');
+  console.log('Daily work:');
+  for (const name of HUMAN_HELP_ORDER.slice(0, 6)) {
+    const cmd = byName.get(name);
+    if (cmd) printCommandRow(cmd, 4);
+  }
+
+  console.log('\nSetup and direction:');
+  for (const name of HUMAN_HELP_ORDER.slice(6)) {
+    const cmd = byName.get(name);
+    if (cmd) printCommandRow(cmd, 4);
+  }
+
+  console.log('\nAgents and skills use the rest of the CLI as execution primitives.');
+  console.log('Run `slope help <command>` for details, or `slope help --all` for the full registry.\n');
+}
+
+export function printAllCommandHelp(): void {
   const categories: Record<string, CliCommandMeta[]> = {};
   for (const cmd of CLI_COMMAND_REGISTRY) {
     if ((CLI_INTERNAL_MODULES as readonly string[]).includes(cmd.cmd)) continue;
@@ -41,7 +85,7 @@ function printCategoryList(): void {
     categories[cat].push(cmd);
   }
 
-  console.log('\nSLOPE CLI — Command Reference\n');
+  console.log('\nSLOPE CLI - Full Command Reference\n');
 
   const categoryOrder = ['lifecycle', 'scoring', 'analysis', 'planning', 'tooling'] as const;
   const categoryLabels: Record<string, string> = {
@@ -58,19 +102,19 @@ function printCategoryList(): void {
 
     console.log(`  ${categoryLabels[cat]}:`);
     for (const cmd of cmds) {
-      const name = cmd.cmd === 'index-cmd' ? 'index' : cmd.cmd;
-      console.log(`    ${name.padEnd(18)} ${cmd.desc}`);
+      printCommandRow(cmd, 4, true);
     }
     console.log('');
   }
 
-  console.log('Run `slope help <command>` for detailed usage.\n');
+  console.log('Run `slope help` for the bounded human surface, or `slope help <command>` for detailed usage.\n');
 }
 
 function printCommandDetail(meta: CliCommandMeta): void {
   const displayName = meta.cmd === 'index-cmd' ? 'index' : meta.cmd;
-  console.log(`\nslope ${displayName} — ${meta.desc}\n`);
+  console.log(`\nslope ${displayName} - ${meta.desc}\n`);
   console.log(`  Category: ${meta.category}\n`);
+  console.log(`  Audience: ${AUDIENCE_LABELS[meta.audience]}\n`);
 
   if (meta.subcommands && meta.subcommands.length > 0) {
     console.log('  Subcommands:\n');
@@ -95,6 +139,13 @@ function printCommandDetail(meta: CliCommandMeta): void {
   }
 }
 
+function printCommandRow(cmd: CliCommandMeta, indent: number, includeAudience = false): void {
+  const name = cmd.cmd === 'index-cmd' ? 'index' : cmd.cmd;
+  const prefix = ' '.repeat(indent);
+  const audience = includeAudience ? ` [${AUDIENCE_LABELS[cmd.audience]}]` : '';
+  console.log(`${prefix}${name.padEnd(14)} ${cmd.desc}${audience}`);
+}
+
 function suggestClosest(input: string): void {
   const names = CLI_COMMAND_REGISTRY
     .filter(c => !(CLI_INTERNAL_MODULES as readonly string[]).includes(c.cmd))
@@ -107,6 +158,6 @@ function suggestClosest(input: string): void {
   if (matches.length > 0) {
     console.error(`Did you mean: ${matches.join(', ')}?`);
   }
-  console.error(`\nRun \`slope help\` to see all commands.`);
+  console.error(`\nRun \`slope help\` for the human surface or \`slope help --all\` for all commands.`);
   process.exit(1);
 }

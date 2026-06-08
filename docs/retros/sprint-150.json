@@ -1,0 +1,144 @@
+{
+  "sprint_number": 150,
+  "player": "codex",
+  "theme": "Command Audience Metadata and Default Help",
+  "par": 4,
+  "slope": 2,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-06-08",
+  "type": "cli product surface",
+  "skills_used": [
+    "slope-sprint-workflow"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow"
+  ],
+  "skill_gaps_found": [],
+  "shots": [
+    {
+      "ticket_key": "S150-1",
+      "title": "Add audience metadata to every CLI command registry entry",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added `audience` metadata to every top-level CLI registry command and covered it with registry tests for valid values plus the intentional bounded human command set."
+    },
+    {
+      "ticket_key": "S150-2",
+      "title": "Make default help show the compact human cockpit",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "`slope help`, `slope --help`, and bare `slope` now render a compact human command surface focused on daily work, setup, and direction instead of dumping every implementation command."
+    },
+    {
+      "ticket_key": "S150-3",
+      "title": "Add an explicit full-command escape hatch for the complete registry",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "`slope help --all` now prints the full command registry with audience labels, and `slope help <command>` shows the command audience in detail output."
+    },
+    {
+      "ticket_key": "S150-4",
+      "title": "Add registry/help tests that keep default help bounded",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added help and registry regressions that keep audience metadata complete, default help under budget, and agent/internal commands out of the human surface."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "pin_position",
+      "impact": "minor",
+      "description": "S150 intentionally changed the user-facing default help surface, so compiled CLI smokes were required in addition to unit tests."
+    },
+    {
+      "type": "wind",
+      "impact": "minor",
+      "description": "The docs manifest is generated into ignored `.slope/docs.json`; `docs generate` was still required locally before `docs check` could pass against the new command registry checksum."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Help output needs a registry-owned audience model, not a separate hand-maintained allowlist.",
+      "outcome": "The command registry now stores audience metadata and tests enforce the bounded human command set."
+    },
+    {
+      "type": "lessons",
+      "description": "A full-detail escape hatch makes it safer to shrink default output without removing power-user capability.",
+      "outcome": "`slope help --all` preserves the complete command reference with audience labels."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "`corepack pnpm vitest run tests/cli/registry.test.ts tests/cli/commands/help.test.ts` passed: 12 tests.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`corepack pnpm typecheck`, `corepack pnpm build`, and `corepack pnpm test` passed; full suite result was 233 passed test files, 3662 passed tests, with the existing Postgres suite skipped.",
+      "status": "healthy"
+    },
+    {
+      "category": "cli",
+      "description": "Compiled CLI smokes confirmed compact `help`, compact `--help`, compact bare `slope`, full `help --all`, and concise unknown-command guidance.",
+      "status": "healthy"
+    },
+    {
+      "category": "docs",
+      "description": "`node dist/cli/index.js docs generate --pretty`, `node dist/cli/index.js docs check`, and `node dist/cli/index.js map --check` passed.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Clean and clarifying. The CLI still has all its machinery, but the front door finally behaves like it knows a human is standing there.",
+    "advice_for_next_player": "S151 can now build `now` and `start` on top of audience metadata rather than reopening the whole command-list debate.",
+    "what_surprised_you": "The no-argument CLI path still carried an enormous legacy help template, so default help needed both `help.ts` and `index.ts` to converge.",
+    "excited_about_next": "The human cockpit implementation can now be a layer over explicit registry intent instead of a pile of special cases."
+  },
+  "bunker_locations": [
+    "Default help surfaces must not silently drift back toward full internal command dumps.",
+    "Command audience metadata should remain the source of truth for human, agent, advanced, and internal command exposure.",
+    "The older planned S147 lane remains a roadmap disposition question before the default roadmap navigator can be treated as purely next-phase."
+  ],
+  "yardage_book_updates": [
+    "src/cli/registry.ts now records `audience` on every top-level command.",
+    "src/cli/commands/help.ts now renders compact default help, command detail audiences, and full registry output behind `--all`.",
+    "src/cli/index.ts now routes global help, bare CLI, and unknown-command guidance through the bounded human surface.",
+    "README.md and docs/backlog/sprint-148-human-surface-simplification.md document the S150 help contract."
+  ],
+  "course_management_notes": [
+    "No open GitHub issues were present at S150 start.",
+    "S150 unblocks S151, the skill-first human cockpit implementation sprint.",
+    "S147 remains a separate older planned handoff-continuity lane and should be explicitly run, rescheduled, or superseded."
+  ],
+  "slope_factors": [
+    "cli_surface",
+    "command_registry",
+    "human_output_budget",
+    "documentation_manifest",
+    "help_contract"
+  ]
+}
