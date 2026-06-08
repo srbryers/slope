@@ -4325,11 +4325,11 @@
       "depends_on": [
         148
       ],
-      "note": "Fix the S147 shipped-reference false positive from #539, then make roadmap status default to a compact planning view with full history behind explicit flags.",
+      "note": "Fix shipped-reference and scorecard-drift noise from #539 and #541, then make roadmap status default to a compact planning view with full history behind explicit flags.",
       "tickets": [
         {
           "key": "S149-1",
-          "title": "Fix roadmap shipped-sprint detection for issue-fix keys like S147-533 (#539)",
+          "title": "Fix roadmap/status shipped-reference noise from issue-fix and historical imported sprint keys (#539, #541)",
           "club": "short_iron",
           "complexity": "standard"
         },

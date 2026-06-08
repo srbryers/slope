@@ -132,6 +132,7 @@
   ],
   "course_management_notes": [
     "GitHub issue #539 was opened for the S147 shipped-reference false positive.",
+    "GitHub issue #541 was opened for historical imported sprint refs surfacing as missing scorecards in status closeout.",
     "Draft PR #540 carries the S148 planning lane.",
     "S147 remains a separate planned handoff-continuity sprint rather than a blocker for the human-surface lane."
   ],
