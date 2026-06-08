@@ -16,6 +16,8 @@ export interface CliSubcommand {
   flags?: CliFlag[];
 }
 
+export type CliCommandAudience = 'human' | 'agent' | 'advanced' | 'internal';
+
 export interface CliCommandMeta {
   /** Command name as invoked: e.g. "init", "auto-card" */
   cmd: string;
@@ -23,6 +25,8 @@ export interface CliCommandMeta {
   desc: string;
   /** Functional category */
   category: 'lifecycle' | 'scoring' | 'analysis' | 'tooling' | 'planning';
+  /** Primary audience for the top-level command surface */
+  audience: CliCommandAudience;
   /** Subcommands, if any */
   subcommands?: CliSubcommand[];
   /** Top-level flags (when no subcommands, or shared across subcommands) */
@@ -35,32 +39,32 @@ export const CLI_INTERNAL_MODULES = ['phase', 'review-state', 'review-run', 'spr
 export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
   // ── Lifecycle ──────────────────────────────────────────────────
   {
-    cmd: 'init', desc: 'Initialize .slope/ directory', category: 'lifecycle',
+    cmd: 'init', desc: 'Initialize .slope/ directory', category: 'lifecycle', audience: 'human',
     flags: [
       { flag: '--metaphor=<id>', desc: 'Set metaphor theme (golf, gaming, dnd, etc.)' },
       { flag: '--interactive', desc: 'Rich interactive setup wizard' },
     ],
   },
   {
-    cmd: 'interview', desc: 'Run project interview (human or agent JSON mode)', category: 'lifecycle',
+    cmd: 'interview', desc: 'Run project interview (human or agent JSON mode)', category: 'lifecycle', audience: 'advanced',
     flags: [
       { flag: '--agent', desc: 'JSON I/O mode for agent harnesses' },
       { flag: '--force', desc: 'Re-interview even if project already initialized' },
     ],
   },
   {
-    cmd: 'help', desc: 'Show detailed per-command usage', category: 'lifecycle',
+    cmd: 'help', desc: 'Show detailed per-command usage', category: 'lifecycle', audience: 'human',
     flags: [{ flag: '<command>', desc: 'Command name to show details for' }],
   },
   {
-    cmd: 'quickstart', desc: 'Interactive tutorial for new users', category: 'lifecycle',
+    cmd: 'quickstart', desc: 'Interactive tutorial for new users', category: 'lifecycle', audience: 'human',
   },
   {
-    cmd: 'doctor', desc: 'Check repo health and auto-fix issues', category: 'lifecycle',
+    cmd: 'doctor', desc: 'Check repo health and auto-fix issues', category: 'lifecycle', audience: 'human',
     flags: [{ flag: '--fix', desc: 'Auto-fix detected issues' }],
   },
   {
-    cmd: 'version', desc: 'Show version or bump with automated PR workflow', category: 'lifecycle',
+    cmd: 'version', desc: 'Show version or bump with automated PR workflow', category: 'lifecycle', audience: 'advanced',
     subcommands: [
       { name: 'bump', desc: 'Bump version with automated PR workflow', flags: [
         { flag: '<version>', desc: 'Explicit version (e.g. 1.28.0)' },
@@ -72,7 +76,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     ],
   },
   {
-    cmd: 'session', desc: 'Manage live sessions', category: 'lifecycle',
+    cmd: 'session', desc: 'Manage live sessions', category: 'lifecycle', audience: 'agent',
     subcommands: [
       { name: 'start', desc: 'Start a new session', flags: [
         { flag: '--role=<role>', desc: 'Session role (primary, secondary, observer)' },
@@ -93,7 +97,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     ],
   },
   {
-    cmd: 'claim', desc: 'Claim a ticket or area for the sprint', category: 'lifecycle',
+    cmd: 'claim', desc: 'Claim a ticket or area for the sprint', category: 'lifecycle', audience: 'agent',
     flags: [
       { flag: '--target=<path>', desc: 'File or directory to claim' },
       { flag: '--ticket=<key>', desc: 'Ticket key (e.g. S48-1)' },
@@ -101,19 +105,19 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     ],
   },
   {
-    cmd: 'release', desc: 'Release a claim by ID or target', category: 'lifecycle',
+    cmd: 'release', desc: 'Release a claim by ID or target', category: 'lifecycle', audience: 'agent',
     flags: [
       { flag: '--id=<id>', desc: 'Claim ID to release' },
       { flag: '--target=<path>', desc: 'Release claim by target path' },
     ],
   },
   {
-    cmd: 'status', desc: 'Show sprint course status and conflicts', category: 'lifecycle',
+    cmd: 'status', desc: 'Show sprint course status and conflicts', category: 'lifecycle', audience: 'human',
     flags: [{ flag: '--json', desc: 'Output as JSON' }],
   },
-  { cmd: 'next', desc: 'Show next sprint number (auto-detect)', category: 'lifecycle' },
+  { cmd: 'next', desc: 'Show next sprint number (auto-detect)', category: 'lifecycle', audience: 'advanced' },
   {
-    cmd: 'resume', desc: 'Portable sprint resume from tracked artifacts', category: 'lifecycle',
+    cmd: 'resume', desc: 'Portable sprint resume from tracked artifacts', category: 'lifecycle', audience: 'agent',
     flags: [
       { flag: '--from=<path>', desc: 'Resume pointer path (default: docs/backlog/.sprint-active.json)' },
       { flag: '--sprint=<N>', desc: 'Explicit sprint number when no pointer exists' },
@@ -123,7 +127,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     ],
   },
   {
-    cmd: 'sprint', desc: 'Manage sprint lifecycle state and gates', category: 'lifecycle',
+    cmd: 'sprint', desc: 'Manage sprint lifecycle state and gates', category: 'lifecycle', audience: 'agent',
     subcommands: [
       { name: 'start', desc: 'Start a new sprint', flags: [
         { flag: '--number=<N>', desc: 'Sprint number (required)' },
@@ -150,7 +154,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
 
   // ── Scoring ────────────────────────────────────────────────────
   {
-    cmd: 'card', desc: 'Display handicap card', category: 'scoring',
+    cmd: 'card', desc: 'Display handicap card', category: 'scoring', audience: 'human',
     flags: [
       { flag: '--metaphor=<id>', desc: 'Display theme override' },
       { flag: '--player=<name>', desc: 'Filter to a specific player' },
@@ -159,14 +163,14 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     ],
   },
   {
-    cmd: 'validate', desc: 'Validate scorecard(s)', category: 'scoring',
+    cmd: 'validate', desc: 'Validate scorecard(s)', category: 'scoring', audience: 'agent',
     flags: [
       { flag: '<path>', desc: 'Scorecard JSON file to validate' },
       { flag: '--skills', desc: 'Check scorecard skill references against .slope/skills.json' },
     ],
   },
   {
-    cmd: 'review', desc: 'Format sprint review or manage review state', category: 'scoring',
+    cmd: 'review', desc: 'Format sprint review or manage review state', category: 'scoring', audience: 'human',
     subcommands: [
       { name: 'start', desc: 'Start a plan review', flags: [
         { flag: '--tier=<tier>', desc: 'Review tier (skip, light, standard, deep)' },
@@ -194,7 +198,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     ],
   },
   {
-    cmd: 'auto-card', desc: 'Generate scorecard from git + CI signals', category: 'scoring',
+    cmd: 'auto-card', desc: 'Generate scorecard from git + CI signals', category: 'scoring', audience: 'agent',
     flags: [
       { flag: '--sprint=<N>', desc: 'Sprint number (required)' },
       { flag: '--since=<date>', desc: 'Start date for git log' },
@@ -208,7 +212,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     ],
   },
   {
-    cmd: 'classify', desc: 'Classify a shot from execution trace', category: 'scoring',
+    cmd: 'classify', desc: 'Classify a shot from execution trace', category: 'scoring', audience: 'agent',
     flags: [
       { flag: '--scope=<files>', desc: 'Comma-separated file scope' },
       { flag: '--modified=<files>', desc: 'Comma-separated modified files' },
@@ -218,7 +222,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     ],
   },
   {
-    cmd: 'tournament', desc: 'Build tournament review from sprints', category: 'scoring',
+    cmd: 'tournament', desc: 'Build tournament review from sprints', category: 'scoring', audience: 'advanced',
     flags: [
       { flag: '--id=<id>', desc: 'Tournament identifier' },
       { flag: '--name=<name>', desc: 'Tournament display name' },
@@ -229,7 +233,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
 
   // ── Analysis ───────────────────────────────────────────────────
   {
-    cmd: 'briefing', desc: 'Pre-round briefing with hazards and nutrition', category: 'analysis',
+    cmd: 'briefing', desc: 'Pre-round briefing with hazards and nutrition', category: 'analysis', audience: 'human',
     flags: [
       { flag: '--categories=<list>', desc: 'Filter by issue categories (comma-separated)' },
       { flag: '--keywords=<list>', desc: 'Filter by keywords (comma-separated)' },
@@ -242,7 +246,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     ],
   },
   {
-    cmd: 'plan', desc: 'Pre-shot advisor (club + training + hazards)', category: 'analysis',
+    cmd: 'plan', desc: 'Pre-shot advisor (club + training + hazards)', category: 'analysis', audience: 'agent',
     flags: [
       { flag: '--complexity=<level>', desc: 'Complexity (trivial, small, medium, large)' },
       { flag: '--slope-factors=<list>', desc: 'Comma-separated slope factors' },
@@ -251,14 +255,14 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     ],
   },
   {
-    cmd: 'report', desc: 'Generate HTML performance report', category: 'analysis',
+    cmd: 'report', desc: 'Generate HTML performance report', category: 'analysis', audience: 'advanced',
     flags: [
       { flag: '--html', desc: 'Generate HTML report' },
       { flag: '--output=<path>', desc: 'Output file path' },
     ],
   },
   {
-    cmd: 'dashboard', desc: 'Live local performance dashboard', category: 'analysis',
+    cmd: 'dashboard', desc: 'Live local performance dashboard', category: 'analysis', audience: 'advanced',
     flags: [
       { flag: '--port=<N>', desc: 'HTTP port (default: 3000)' },
       { flag: '--no-open', desc: 'Don\'t auto-open browser' },
@@ -268,7 +272,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     ],
   },
   {
-    cmd: 'standup', desc: 'Generate or ingest standup report', category: 'analysis',
+    cmd: 'standup', desc: 'Generate or ingest standup report', category: 'analysis', audience: 'agent',
     flags: [
       { flag: '--session=<id>', desc: 'Session ID for standup generation' },
       { flag: '--role=<id>', desc: 'Agent role filter' },
@@ -279,7 +283,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     ],
   },
   {
-    cmd: 'analyze', desc: 'Scan repo and generate profile', category: 'analysis',
+    cmd: 'analyze', desc: 'Scan repo and generate profile', category: 'analysis', audience: 'advanced',
     flags: [
       { flag: '--analyzers=<list>', desc: 'Run specific analyzers (comma-separated: stack, git, etc.)' },
       { flag: '--json', desc: 'Output full profile as JSON' },
@@ -288,7 +292,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
 
   // ── Tooling ────────────────────────────────────────────────────
   {
-    cmd: 'hook', desc: 'Manage lifecycle hooks', category: 'tooling',
+    cmd: 'hook', desc: 'Manage lifecycle hooks', category: 'tooling', audience: 'internal',
     subcommands: [
       { name: 'add', desc: 'Install guard hooks', flags: [
         { flag: '--level=<level>', desc: 'Hook level (full, scoring)' },
@@ -301,7 +305,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     ],
   },
   {
-    cmd: 'guard', desc: 'Run guard handler or manage guard activation', category: 'tooling',
+    cmd: 'guard', desc: 'Run guard handler or manage guard activation', category: 'tooling', audience: 'internal',
     subcommands: [
       { name: '<name>', desc: 'Run a guard (reads hook JSON from stdin)' },
       { name: 'list', desc: 'Show all available guards' },
@@ -319,7 +323,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     ],
   },
   {
-    cmd: 'extract', desc: 'Extract events into SLOPE store', category: 'tooling',
+    cmd: 'extract', desc: 'Extract events into SLOPE store', category: 'tooling', audience: 'internal',
     flags: [
       { flag: '--file=<path>', desc: 'Event file to extract' },
       { flag: '--session-id=<id>', desc: 'Session ID to tag events' },
@@ -327,7 +331,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     ],
   },
   {
-    cmd: 'distill', desc: 'Promote event patterns to common issues', category: 'tooling',
+    cmd: 'distill', desc: 'Promote event patterns to common issues', category: 'tooling', audience: 'agent',
     flags: [
       { flag: '--auto', desc: 'Auto-promote patterns above threshold' },
       { flag: '--dry-run', desc: 'Preview without writing' },
@@ -336,14 +340,14 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     ],
   },
   {
-    cmd: 'map', desc: 'Generate/update codebase map', category: 'tooling',
+    cmd: 'map', desc: 'Generate/update codebase map', category: 'tooling', audience: 'agent',
     flags: [
       { flag: '--check', desc: 'Check staleness (exit 1 if stale)' },
       { flag: '--output=<path>', desc: 'Custom output path (default: CODEBASE.md)' },
     ],
   },
   {
-    cmd: 'workflow', desc: 'Manage workflow definitions', category: 'tooling',
+    cmd: 'workflow', desc: 'Manage workflow definitions', category: 'tooling', audience: 'internal',
     subcommands: [
       { name: 'validate', desc: 'Parse and validate a workflow definition' },
       { name: 'list', desc: 'List all available workflows (project + built-in)' },
@@ -351,7 +355,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     ],
   },
   {
-    cmd: 'flows', desc: 'Manage user flow definitions', category: 'tooling',
+    cmd: 'flows', desc: 'Manage user flow definitions', category: 'tooling', audience: 'advanced',
     subcommands: [
       { name: 'init', desc: 'Create .slope/flows.json with example template' },
       { name: 'list', desc: 'List all flows with staleness indicators' },
@@ -359,7 +363,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     ],
   },
   {
-    cmd: 'inspirations', desc: 'Track external OSS inspiration sources', category: 'tooling',
+    cmd: 'inspirations', desc: 'Track external OSS inspiration sources', category: 'tooling', audience: 'advanced',
     subcommands: [
       { name: 'add', desc: 'Add an inspiration source', flags: [
         { flag: '--url=<url>', desc: 'Source URL (required)' },
@@ -377,7 +381,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     ],
   },
   {
-    cmd: 'skills', desc: 'Manage repo-local Agent Skills registry', category: 'tooling',
+    cmd: 'skills', desc: 'Manage repo-local Agent Skills registry', category: 'tooling', audience: 'advanced',
     subcommands: [
       { name: 'scan', desc: 'Scan configured skill roots into .slope/skills.json', flags: [
         { flag: '--root=<path>', desc: 'Skill root to scan (repeatable or comma-separated)' },
@@ -393,7 +397,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     ],
   },
   {
-    cmd: 'issue', desc: 'Detect and triage SLOPE-driven product issues', category: 'tooling',
+    cmd: 'issue', desc: 'Detect and triage SLOPE-driven product issues', category: 'tooling', audience: 'agent',
     subcommands: [
       { name: 'scout', desc: 'Scan common issues/transcripts and propose GitHub issues', flags: [
         { flag: '--source=<path>', desc: 'File or directory to scan (repeatable)' },
@@ -414,7 +418,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     ],
   },
   {
-    cmd: 'metaphor', desc: 'Manage metaphor display themes', category: 'tooling',
+    cmd: 'metaphor', desc: 'Manage metaphor display themes', category: 'tooling', audience: 'advanced',
     subcommands: [
       { name: 'list', desc: 'Show all available metaphors' },
       { name: 'set', desc: 'Set the active metaphor', flags: [
@@ -426,7 +430,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     ],
   },
   {
-    cmd: 'plugin', desc: 'Manage custom plugins', category: 'tooling',
+    cmd: 'plugin', desc: 'Manage custom plugins', category: 'tooling', audience: 'advanced',
     subcommands: [
       { name: 'list', desc: 'Show all plugins (built-in + custom)' },
       { name: 'validate', desc: 'Validate a plugin file', flags: [
@@ -435,7 +439,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     ],
   },
   {
-    cmd: 'store', desc: 'Store diagnostics and management', category: 'tooling',
+    cmd: 'store', desc: 'Store diagnostics and management', category: 'tooling', audience: 'internal',
     subcommands: [
       { name: 'status', desc: 'Show store type, schema version, and stats', flags: [
         { flag: '--json', desc: 'Output as JSON' },
@@ -446,7 +450,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     ],
   },
   {
-    cmd: 'escalate', desc: 'Escalate issues based on severity triggers', category: 'tooling',
+    cmd: 'escalate', desc: 'Escalate issues based on severity triggers', category: 'tooling', audience: 'agent',
     flags: [
       { flag: '--reason=<text>', desc: 'Manual escalation reason' },
       { flag: '--session-id=<id>', desc: 'Session ID context' },
@@ -455,7 +459,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     ],
   },
   {
-    cmd: 'transcript', desc: 'View session transcript data', category: 'tooling',
+    cmd: 'transcript', desc: 'View session transcript data', category: 'tooling', audience: 'internal',
     subcommands: [
       { name: 'list', desc: 'List available transcripts' },
       { name: 'show', desc: 'Show turn-by-turn summary', flags: [
@@ -469,7 +473,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
 
   // ── Planning ───────────────────────────────────────────────────
   {
-    cmd: 'roadmap', desc: 'Strategic planning and roadmap tools', category: 'planning',
+    cmd: 'roadmap', desc: 'Strategic planning and roadmap tools', category: 'planning', audience: 'human',
     subcommands: [
       { name: 'validate', desc: 'Schema + dependency graph checks', flags: [
         { flag: '--path=<file>', desc: 'Roadmap file path' },
@@ -494,7 +498,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     ],
   },
   {
-    cmd: 'retro', desc: 'Retrospective scorecard utilities', category: 'planning',
+    cmd: 'retro', desc: 'Retrospective scorecard utilities', category: 'planning', audience: 'agent',
     subcommands: [
       { name: 'backfill', desc: 'Generate scorecard from git history (#318)', flags: [
         { flag: '--sprint=<N>', desc: 'Sprint number (or use --all-missing)' },
@@ -515,7 +519,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     ],
   },
   {
-    cmd: 'vision', desc: 'Display project vision document', category: 'planning',
+    cmd: 'vision', desc: 'Display project vision document', category: 'planning', audience: 'human',
     subcommands: [
       { name: 'create', desc: 'Create a new vision document', flags: [
         { flag: '--purpose=<text>', desc: 'Project purpose' },
@@ -529,7 +533,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     flags: [{ flag: '--json', desc: 'Output as JSON' }],
   },
   {
-    cmd: 'initiative', desc: 'Multi-sprint initiative orchestration', category: 'planning',
+    cmd: 'initiative', desc: 'Multi-sprint initiative orchestration', category: 'planning', audience: 'advanced',
     subcommands: [
       { name: 'create', desc: 'Create a new initiative' },
       { name: 'status', desc: 'Show current initiative state' },
@@ -547,7 +551,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
 
   // ── Loop ─────────────────────────────────────────────
   {
-    cmd: 'loop', desc: 'Autonomous sprint execution loop', category: 'tooling',
+    cmd: 'loop', desc: 'Autonomous sprint execution loop', category: 'tooling', audience: 'advanced',
     subcommands: [
       { name: 'run', desc: 'Single sprint execution', flags: [
         { flag: '--sprint=<ID>', desc: 'Sprint ID to execute' },
@@ -594,7 +598,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
   },
 
   {
-    cmd: 'worktree', desc: 'Manage git worktrees', category: 'tooling',
+    cmd: 'worktree', desc: 'Manage git worktrees', category: 'tooling', audience: 'agent',
     subcommands: [
       { name: 'status', desc: 'Show sibling worktree dirty/ahead/migration state', flags: [
         { flag: '--base=<ref>', desc: 'Base ref for ahead/behind and changed-file detection' },
@@ -610,7 +614,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
 
   // ── Indexing ──────────────────────────────────────────────────────
   {
-    cmd: 'index-cmd', desc: 'Semantic embedding index management', category: 'tooling',
+    cmd: 'index-cmd', desc: 'Semantic embedding index management', category: 'tooling', audience: 'internal',
     flags: [
       { flag: '--full', desc: 'Full reindex (drop + rebuild)' },
       { flag: '--status', desc: 'Show index stats' },
@@ -619,7 +623,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     ],
   },
   {
-    cmd: 'context', desc: 'Semantic context search for agents', category: 'tooling',
+    cmd: 'context', desc: 'Semantic context search for agents', category: 'tooling', audience: 'agent',
     flags: [
       { flag: '<query>', desc: 'Free-text semantic search query' },
       { flag: '--ticket=<key>', desc: 'Use ticket title as query' },
@@ -629,7 +633,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     ],
   },
   {
-    cmd: 'prep', desc: 'Generate execution plan for a ticket', category: 'tooling',
+    cmd: 'prep', desc: 'Generate execution plan for a ticket', category: 'tooling', audience: 'agent',
     flags: [
       { flag: '<ticket-id>', desc: 'Ticket ID to prepare' },
       { flag: '--json', desc: 'Output as JSON' },
@@ -638,7 +642,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     ],
   },
   {
-    cmd: 'enrich', desc: 'Batch-enrich backlog with file context', category: 'tooling',
+    cmd: 'enrich', desc: 'Batch-enrich backlog with file context', category: 'tooling', audience: 'agent',
     flags: [
       { flag: '<backlog-path>', desc: 'Path to backlog file' },
       { flag: '--output=<path>', desc: 'Output path for enriched backlog' },
@@ -647,7 +651,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     ],
   },
   {
-    cmd: 'stats', desc: 'Export stats JSON for slope-web live dashboard', category: 'tooling',
+    cmd: 'stats', desc: 'Export stats JSON for slope-web live dashboard', category: 'tooling', audience: 'internal',
     subcommands: [
       { name: 'export', desc: 'Compute SlopeStats JSON from local scorecards + registries', flags: [
         { flag: '--pretty', desc: 'Pretty-print JSON output' },
@@ -656,7 +660,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     ],
   },
   {
-    cmd: 'docs', desc: 'Generate documentation manifest and changelog', category: 'tooling',
+    cmd: 'docs', desc: 'Generate documentation manifest and changelog', category: 'tooling', audience: 'agent',
     subcommands: [
       { name: 'generate', desc: 'Build manifest JSON from registries + git history', flags: [
         { flag: '--output=<path>', desc: 'Write manifest to path (default: .slope/docs.json)' },
@@ -680,7 +684,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     ],
   },
   {
-    cmd: 'org', desc: 'Multi-repo aggregation and org-level metrics', category: 'analysis',
+    cmd: 'org', desc: 'Multi-repo aggregation and org-level metrics', category: 'analysis', audience: 'advanced',
     subcommands: [
       { name: 'init', desc: 'Create .slope/org.json template' },
       { name: 'status', desc: 'Show all repos with handicaps and sprint counts', flags: [
@@ -692,7 +696,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     ],
   },
   {
-    cmd: 'memory', desc: 'Cross-session memory management', category: 'analysis',
+    cmd: 'memory', desc: 'Cross-session memory management', category: 'analysis', audience: 'advanced',
     subcommands: [
       { name: 'add', desc: 'Add a memory', flags: [
         { flag: '--category=<cat>', desc: 'Category: workflow, style, project, hazard, other' },
@@ -713,7 +717,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     ],
   },
   {
-    cmd: 'agent', desc: 'Machine-readable operational primitives for AI agents', category: 'tooling',
+    cmd: 'agent', desc: 'Machine-readable operational primitives for AI agents', category: 'tooling', audience: 'agent',
     subcommands: [
       { name: 'status', desc: 'Show current state (human or JSON)', flags: [
         { flag: '--json', desc: 'Emit AgentStatus JSON' },
@@ -724,7 +728,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     ],
   },
   {
-    cmd: 'ticket', desc: 'Per-ticket lifecycle commands', category: 'lifecycle',
+    cmd: 'ticket', desc: 'Per-ticket lifecycle commands', category: 'lifecycle', audience: 'agent',
     subcommands: [
       { name: 'done', desc: 'Mark ticket complete; release claim', flags: [
         { flag: '<key>', desc: 'Ticket key (e.g. S1-1)' },
@@ -734,14 +738,14 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     ],
   },
   {
-    cmd: 'commit-ready', desc: 'Pre-commit checklist for agents', category: 'tooling',
+    cmd: 'commit-ready', desc: 'Pre-commit checklist for agents', category: 'tooling', audience: 'agent',
     flags: [
       { flag: '--json', desc: 'Emit CommitReadyResult JSON' },
       { flag: '--strict', desc: 'Exit non-zero when blockers exist' },
     ],
   },
   {
-    cmd: 'gate', desc: 'Initiative review gate aliases (agent-friendly)', category: 'tooling',
+    cmd: 'gate', desc: 'Initiative review gate aliases (agent-friendly)', category: 'tooling', audience: 'agent',
     subcommands: [
       { name: 'status', desc: 'Pending plan/pr gates per sprint', flags: [
         { flag: '--json', desc: 'Emit pending list as JSON' },
@@ -759,7 +763,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     ],
   },
   {
-    cmd: 'pr', desc: 'Pull request helpers (auto-close, finalize, closeout)', category: 'tooling',
+    cmd: 'pr', desc: 'Pull request helpers (auto-close, finalize, closeout)', category: 'tooling', audience: 'agent',
     subcommands: [
       { name: 'finalize', desc: 'Inject Closes #N for issue refs in commit messages (#321)', flags: [
         { flag: '--pr=<N>', desc: 'PR number (default: resolved from current branch)' },
