@@ -261,6 +261,18 @@ execute({ code: 'return computeHandicapCard(loadScorecards())' })
 
 All commands use `npx slope` when installed locally.
 
+Default help is intentionally small:
+
+| Command | Description |
+|---------|-------------|
+| `npx slope help` | Human command surface for daily work, setup, and direction |
+| `npx slope help <command>` | Detailed usage for one command |
+| `npx slope help --all` | Full command registry with audience labels |
+
+Commands are classified as `human`, `agent`, `advanced`, or `internal`.
+Humans should usually start with the default help surface; skills and agents
+orchestrate the rest of the CLI as execution primitives.
+
 ### Setup
 
 | Command | Description |
