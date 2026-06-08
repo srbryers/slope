@@ -370,6 +370,26 @@ describe('slope roadmap status', () => {
     expect(output).toContain('slope roadmap status --full');
   });
 
+  it('recommends next ready work when an explicit completed sprint is shown', () => {
+    const roadmap = makeRoadmapJson({
+      sprints: [
+        { ...makeRoadmapJson().sprints[0], status: 'complete' } as RoadmapDefinition['sprints'][number],
+        { ...makeRoadmapJson().sprints[1], status: 'planned' } as RoadmapDefinition['sprints'][number],
+        { ...makeRoadmapJson().sprints[2], status: 'planned' } as RoadmapDefinition['sprints'][number],
+      ],
+    });
+    writeRoadmap(tmpDir, roadmap);
+    writeConfig(tmpDir);
+
+    roadmapCommand(['status', '--sprint=7']);
+
+    const output = consoleOutput.join('\n');
+    expect(output).toContain('Current: S7 Foundation');
+    expect(output).toContain('S7 Foundation - \u2713 completed');
+    expect(output).toContain('Start S8: Platform');
+    expect(output).not.toContain('Work S7-1');
+  });
+
   it('marks completed sprints from scorecards', () => {
     writeRoadmap(tmpDir, makeRoadmapJson());
     writeConfig(tmpDir, { currentSprint: 8, scorecardDir: 'docs/retros', scorecardPattern: 'sprint-*.json', minSprint: 1 });

@@ -437,6 +437,7 @@ function printCompactRoadmapStatus(
   const currentLabel = current
     ? `${formatSprintLabel(current.id)} ${current.theme || 'Untitled Sprint'}`
     : `${formatSprintLabel(currentSprint)} (not found in roadmap)`;
+  const currentIsPending = current ? isRoadmapSprintPending(current) : false;
   const currentPhase = phaseForSprint(roadmap, currentSprint);
   const pendingAfterCurrent = sortedRoadmapSprints(roadmap)
     .filter(s => isRoadmapSprintPending(s) && s.id !== currentSprint && compareSprintIds(s.id, currentSprint) > 0);
@@ -493,7 +494,7 @@ function printCompactRoadmapStatus(
   console.log('\nRecommended next action:');
   if (realityLines.some(line => line.includes('[error]'))) {
     console.log('  Resolve the first roadmap reality error before advancing the lane.');
-  } else if (current?.tickets?.length) {
+  } else if (currentIsPending && current?.tickets?.length) {
     const first = current.tickets[0];
     console.log(`  Work ${first.key}: ${first.title}`);
   } else if (nextReady) {
