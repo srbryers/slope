@@ -1,0 +1,161 @@
+{
+  "sprint_number": 152,
+  "player": "codex",
+  "theme": "v1.59.0 Release Cycle",
+  "par": 3,
+  "slope": 1,
+  "score": 3,
+  "score_label": "par",
+  "date": "2026-06-08",
+  "type": "release",
+  "skills_used": [
+    "slope-sprint-workflow",
+    "github"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow"
+  ],
+  "skill_gaps_found": [],
+  "shots": [
+    {
+      "ticket_key": "S152-1",
+      "title": "Bump package and bundled Codex plugin manifest to 1.59.0",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "`slope version recommend` undercalled the release as patch because squash commit subjects hid feature-level human-surface work; #550 was raised and triaged into S153."
+        }
+      ],
+      "notes": "Used `node scripts/version-bump.mjs 1.59.0` to update package.json and the bundled Codex plugin manifest together."
+    },
+    {
+      "ticket_key": "S152-2",
+      "title": "Open and merge release PR #549 after CI passes",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Opened PR #549, watched ci, CodeQL, Analyze (actions), Analyze (javascript-typescript), and GitGuardian pass, then squash-merged the release bump to main."
+    },
+    {
+      "ticket_key": "S152-3",
+      "title": "Publish GitHub release v1.59.0 and verify npm latest",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Created GitHub release v1.59.0, watched Publish to npm run 27173837982 pass, and verified `npm view @slope-dev/slope version --registry https://registry.npmjs.org` returned 1.59.0."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 3,
+    "fairways_total": 3,
+    "greens_in_regulation": 3,
+    "greens_total": 3,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 1,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "pin_position",
+      "impact": "none",
+      "description": "npm publication is handled by the GitHub Release to npm trusted-publishing workflow; no direct local `npm publish` command belongs in the release sprint."
+    },
+    {
+      "type": "rough",
+      "impact": "minor",
+      "description": "The release recommendation tool only saw squash commit subjects and therefore recommended patch despite feature-level shipped user surface."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Release version recommendations need durable SLOPE context, not only unreleased commit subjects.",
+      "outcome": "#550 was opened and triaged into S153 so the recommender can account for roadmap, sprint, or PR evidence when squash merges hide feature-level work."
+    },
+    {
+      "type": "lessons",
+      "description": "The release cycle should verify the GitHub/npm integration instead of trying to publish locally.",
+      "outcome": "PR #549 CI passed, GitHub release v1.59.0 triggered Publish to npm, and npm latest now reports 1.59.0."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "`corepack pnpm typecheck` passed locally before PR creation.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`corepack pnpm build` passed locally before PR creation.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`corepack pnpm test` passed locally: 235 files passed, 1 skipped; 3667 tests passed, 25 skipped.",
+      "status": "healthy"
+    },
+    {
+      "category": "docs",
+      "description": "`node dist/cli/index.js roadmap validate` passed with only existing historical ticket-count warnings before the release bump PR.",
+      "status": "healthy"
+    },
+    {
+      "category": "docs",
+      "description": "`node dist/cli/index.js map --check` reported the codebase map current before the release bump PR.",
+      "status": "healthy"
+    },
+    {
+      "category": "release",
+      "description": "PR #549 checks passed: ci, CodeQL, Analyze (actions), Analyze (javascript-typescript), and GitGuardian.",
+      "status": "healthy"
+    },
+    {
+      "category": "release",
+      "description": "Publish to npm run 27173837982 completed successfully and npm registry latest is 1.59.0.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Clean and pleasantly boring in the important places: version bump, CI, release workflow, and registry verification all lined up.",
+    "advice_for_next_player": "Trust the GitHub Release trusted-publishing path for publication, but double-check semver intent when squash commits hide the shape of shipped work.",
+    "what_surprised_you": "The release recommender could undercall a minor release even though the roadmap and sprint history made the user-facing change clear.",
+    "excited_about_next": "S153 can make the release assistant smarter so the next version bump needs less human override."
+  },
+  "bunker_locations": [
+    "`slope version recommend` can undercall semver when it only inspects squash commit subjects.",
+    "Release scorecards should record the GitHub release workflow run and npm registry verification as the publication proof.",
+    "Post-release roadmap closeout must update phase status when all member sprints are complete."
+  ],
+  "yardage_book_updates": [
+    "v1.59.0 release PR: #549.",
+    "v1.59.0 GitHub release: https://github.com/srbryers/slope/releases/tag/v1.59.0.",
+    "Publish to npm workflow run: https://github.com/srbryers/slope/actions/runs/27173837982.",
+    "npm registry latest verified as 1.59.0.",
+    "#550 is triaged into S153 for semver recommendation evidence hardening."
+  ],
+  "course_management_notes": [
+    "Version bump commit on release branch: ac4de72.",
+    "Merged release commit on main: 006f777.",
+    "No direct local `npm publish` was run; publication used the GitHub release/npm trusted-publishing integration.",
+    "Phase 47 roadmap status was corrected from planned to complete during post-release closeout.",
+    "Phase 48 was added for S152 release memory and S153 #550 follow-up planning."
+  ],
+  "slope_factors": [
+    "minor_release",
+    "trusted_publisher_release",
+    "registry_verification",
+    "semver_recommendation_gap",
+    "roadmap_closeout"
+  ]
+}
