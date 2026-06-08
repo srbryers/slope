@@ -19,29 +19,41 @@ function gitCommit(cwd: string, message: string): void {
   execSync(`git commit -m "${message}" --allow-empty`, { cwd, stdio: 'pipe' });
 }
 
-function gitOutput(cwd: string, args: string[], input?: string): string {
-  return execFileSync('git', args, {
-    cwd,
-    encoding: 'utf8',
-    input,
-    stdio: ['pipe', 'pipe', 'pipe'],
-  }).trim();
-}
-
-function gitFastEmptyHistory(cwd: string, count: number): void {
+function gitFastHistory(cwd: string, count: number): void {
   execFileSync('git', ['symbolic-ref', 'HEAD', 'refs/heads/main'], { cwd, stdio: 'pipe' });
-  const tree = gitOutput(cwd, ['mktree'], '');
-  let parent: string | null = null;
+  if (count <= 0) {
+    return;
+  }
+
+  const timestamp = Math.floor(Date.now() / 1000);
+  const lines = [
+    'blob',
+    'mark :1',
+    'data 1',
+    'x',
+  ];
 
   for (let i = 0; i < count; i++) {
-    const args = ['commit-tree', tree, '-m', `commit ${i}`];
-    if (parent) args.push('-p', parent);
-    parent = gitOutput(cwd, args);
+    const mark = i + 2;
+    const message = `commit ${i}`;
+    lines.push(
+      'commit refs/heads/main',
+      `mark :${mark}`,
+      `committer Test User <test@test.com> ${timestamp} +0000`,
+      `data ${Buffer.byteLength(message, 'utf8')}`,
+      message,
+    );
+    if (i > 0) {
+      lines.push(`from :${mark - 1}`);
+    }
+    lines.push('M 100644 :1 file.txt');
   }
 
-  if (parent) {
-    execFileSync('git', ['update-ref', 'refs/heads/main', parent], { cwd, stdio: 'pipe' });
-  }
+  execFileSync('git', ['fast-import', '--quiet'], {
+    cwd,
+    input: `${lines.join('\n')}\n`,
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
 }
 
 function gitCommitFile(cwd: string, file: string, content: string, message: string): void {
@@ -117,11 +129,11 @@ describe('analyzeGit', () => {
   it('infers daily cadence from many commits', async () => {
     gitInit(tmpDir);
     // 65 commits in the "last 90 days" -> ~5 per week -> daily
-    gitFastEmptyHistory(tmpDir, 65);
+    gitFastHistory(tmpDir, 65);
 
     const result = await analyzeGit(tmpDir);
     expect(result.inferredCadence).toBe('daily');
-  }, 15000);
+  });
 
   it('infers sporadic cadence from few commits', async () => {
     gitInit(tmpDir);
