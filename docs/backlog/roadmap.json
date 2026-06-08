@@ -340,6 +340,14 @@
       ],
       "status": "planned",
       "note": "Make cross-session handoffs first-class and low-friction after the roadmap hygiene sprint."
+    },
+    {
+      "name": "Phase 47 \u2014 Human Operating Surface Simplification",
+      "sprints": [
+        148
+      ],
+      "status": "planned",
+      "note": "Plan the higher-level SLOPE operating surface so humans see a small, memorable cockpit while agents and skills orchestrate the deeper CLI/MCP execution framework."
     }
   ],
   "sprints": [
@@ -4252,6 +4260,54 @@
           "depends_on": [
             "S147-1",
             "S147-2"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 148,
+      "theme": "Human Operating Surface Simplification",
+      "par": 4,
+      "slope": 3,
+      "type": "planning + product architecture",
+      "status": "planned",
+      "depends_on": [
+        147
+      ],
+      "note": "Plan a calmer human-facing SLOPE surface: classify CLI commands by audience, define a small outcome-oriented command set, make skills the agent orchestration layer over CLI/MCP primitives, and fold roadmap verbosity into the broader surface simplification strategy.",
+      "tickets": [
+        {
+          "key": "S148-1",
+          "title": "Define human, agent, and internal command audiences with promotion/demotion rules",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S148-2",
+          "title": "Design the small human command cockpit and default help surface",
+          "club": "short_iron",
+          "complexity": "standard",
+          "depends_on": [
+            "S148-1"
+          ]
+        },
+        {
+          "key": "S148-3",
+          "title": "Design skill-first agent workflows that hide CLI plumbing behind outcome commands",
+          "club": "long_iron",
+          "complexity": "moderate",
+          "depends_on": [
+            "S148-1"
+          ]
+        },
+        {
+          "key": "S148-4",
+          "title": "Design bounded roadmap planning views as one case study of the new surface model",
+          "club": "short_iron",
+          "complexity": "standard",
+          "depends_on": [
+            "S148-2",
+            "S148-3"
           ]
         }
       ]
