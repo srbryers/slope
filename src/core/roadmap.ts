@@ -161,9 +161,9 @@ function normalizeRoadmapTicket(ticket: RoadmapTicket): RoadmapTicket {
 function normalizeRoadmap(roadmap: RoadmapDefinition): RoadmapDefinition {
   return {
     ...roadmap,
-    sprints: roadmap.sprints.map(sprint => ({
+    sprints: (roadmap.sprints ?? []).map(sprint => ({
       ...sprint,
-      tickets: sprint.tickets.map(normalizeRoadmapTicket),
+      tickets: (sprint.tickets ?? []).map(normalizeRoadmapTicket),
     })),
   };
 }

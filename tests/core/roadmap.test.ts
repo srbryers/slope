@@ -4,6 +4,7 @@ import {
   computeCriticalPath,
   findParallelOpportunities,
   parseRoadmap,
+  castRoadmapStructure,
   formatRoadmapSummary,
   formatStrategicContext,
   formatSprintLabel,
@@ -408,6 +409,42 @@ describe('parseRoadmap', () => {
     const { roadmap, validation } = parseRoadmap(json);
     expect(roadmap).not.toBeNull();
     expect(validation.valid).toBe(true);
+  });
+
+  it('defaults missing sprint tickets to an empty array when parsing', () => {
+    const json = {
+      name: 'Test',
+      phases: [{ name: 'P1', sprints: [7] }],
+      sprints: [{
+        id: 7,
+        theme: 'Ticketless',
+        par: 4,
+        slope: 2,
+        type: 'feature',
+      }],
+    };
+
+    const { roadmap, validation } = parseRoadmap(json);
+
+    expect(roadmap?.sprints[0].tickets).toEqual([]);
+    expect(validation.valid).toBe(true);
+    expect(validation.warnings.some(w => w.message.includes('0 tickets'))).toBe(true);
+  });
+
+  it('defaults missing sprint tickets to an empty array when structurally casting', () => {
+    const roadmap = castRoadmapStructure({
+      name: 'Test',
+      phases: [{ name: 'P1', sprints: [7] }],
+      sprints: [{
+        id: 7,
+        theme: 'Ticketless',
+        par: 4,
+        slope: 2,
+        type: 'feature',
+      }],
+    });
+
+    expect(roadmap?.sprints[0].tickets).toEqual([]);
   });
 
   it('rejects non-object input', () => {
