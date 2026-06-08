@@ -320,6 +320,56 @@ describe('slope roadmap status', () => {
     expect(output).toContain('blocked');
   });
 
+  it('keeps default status bounded and hides completed history', () => {
+    const ticket = (prefix: string, n: number) => ({
+      key: `${prefix}-${n}`,
+      title: `T${n}`,
+      club: 'short_iron' as const,
+      complexity: 'standard' as const,
+    });
+    const sprint = (id: number, status?: string): RoadmapDefinition['sprints'][number] => ({
+      id,
+      theme: `Sprint ${id}`,
+      par: 4,
+      slope: 2,
+      type: 'feature',
+      ...(status ? { status } : {}),
+      ...(id > 1 ? { depends_on: [id - 1] } : {}),
+      tickets: [ticket(`S${id}`, 1), ticket(`S${id}`, 2), ticket(`S${id}`, 3)],
+    });
+    const roadmap = makeRoadmapJson({
+      phases: [
+        { name: 'Old Completed Phase', sprints: [1, 2, 3, 4] },
+        { name: 'Current Phase', sprints: [5, 6, 7, 8, 9] },
+      ],
+      sprints: [
+        sprint(1, 'complete'),
+        sprint(2, 'complete'),
+        sprint(3, 'complete'),
+        sprint(4, 'complete'),
+        sprint(5, 'planned'),
+        sprint(6, 'planned'),
+        sprint(7, 'planned'),
+        sprint(8, 'planned'),
+        sprint(9, 'planned'),
+      ],
+    });
+    writeRoadmap(tmpDir, roadmap);
+    writeConfig(tmpDir);
+
+    roadmapCommand(['status']);
+
+    const output = consoleOutput.join('\n');
+    expect(output).toContain('Current: S5 Sprint 5');
+    expect(output).toContain('Current Phase');
+    expect(output).not.toContain('Old Completed Phase');
+    expect(output).toContain('S6 Sprint 6');
+    expect(output).toContain('S7 Sprint 7');
+    expect(output).toContain('S8 Sprint 8');
+    expect(output).not.toContain('S9 Sprint 9');
+    expect(output).toContain('slope roadmap status --full');
+  });
+
   it('marks completed sprints from scorecards', () => {
     writeRoadmap(tmpDir, makeRoadmapJson());
     writeConfig(tmpDir, { currentSprint: 8, scorecardDir: 'docs/retros', scorecardPattern: 'sprint-*.json', minSprint: 1 });
@@ -383,11 +433,12 @@ describe('slope roadmap status', () => {
     roadmapCommand(['status']);
 
     const output = consoleOutput.join('\n');
-    expect(output).toContain('Current sprint: S146.1');
+    expect(output).toContain('Current: S146.1 Inserted Release');
     expect(output).toContain('S146.1 Inserted Release');
     expect(output).toContain('\u25B6 active');
     expect(output).toContain('S147 Later');
     expect(output).toContain('blocked by S146.1');
+    expect(output).toContain('For the full roadmap history');
   });
 
   it('treats superseded sprints as terminal progress', () => {
@@ -402,7 +453,7 @@ describe('slope roadmap status', () => {
     writeRoadmap(tmpDir, roadmap);
     writeConfig(tmpDir, { currentSprint: 9 });
 
-    roadmapCommand(['status']);
+    roadmapCommand(['status', '--full']);
 
     const output = consoleOutput.join('\n');
     expect(output).toContain('Phase 1 (2/3)');
@@ -420,7 +471,8 @@ describe('slope roadmap status', () => {
     roadmapCommand(['status']);
 
     const output = consoleOutput.join('\n');
-    expect(output).toContain('Current Context');
+    expect(output).toContain('Current:');
+    expect(output).toContain('Active sprint');
     expect(output).toContain('Phase 1');
   });
 
