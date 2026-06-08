@@ -292,6 +292,17 @@ Tickets:
   sprint execution explicitly hide CLI plumbing from humans.
 - `S151-4`: Add end-to-end tests or transcript fixtures for the cockpit flows.
 
+S151 Implementation Note:
+
+- `slope now` is the compact current-state cockpit: current sprint, phase,
+  sprint state, claims, next action, and the `slope start --ticket=...` move.
+- `slope start` is the human start-of-work entry. Without a ticket it starts or
+  refreshes sprint state and prints a compact briefing; with a ticket it routes
+  to the bundled sprint begin flow for claim, briefing, prep, and gates.
+- Repo skill guidance now maps human asks like release, PR review, issue
+  triage, sprint execution, and retro capture to outcome-oriented workflows
+  while leaving raw CLI plumbing as agent primitives.
+
 ## Non-Goals Reaffirmed
 
 - Do not remove existing commands in this phase.

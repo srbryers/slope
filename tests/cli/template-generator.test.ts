@@ -18,7 +18,10 @@ describe('generateProjectContext', () => {
     const content = generateProjectContext(golf);
     expect(content).toContain('SLOPE Project');
     expect(content).toContain('handicap card');
+    expect(content).toContain('slope now');
+    expect(content).toContain('slope start [--ticket=KEY]');
     expect(content).toContain('pre-round briefing');
+    expect(content).toContain('Human Surface');
     expect(content).toContain('Pre-Hole');
     expect(content).toContain('Per-Shot');
     expect(content).toContain('Post-Hole');
@@ -39,6 +42,8 @@ describe('generateSprintChecklist', () => {
   it('golf output matches golf terminology', () => {
     const content = generateSprintChecklist(golf);
     expect(content).toContain('Pre-Hole Routine (Sprint Start)');
+    expect(content).toContain('Run `slope now`');
+    expect(content).toContain('Run `slope start` or `slope start --ticket=KEY`');
     expect(content).toContain('Pre-Shot Routine (Per-Ticket, Before Code)');
     expect(content).toContain('Post-Shot Routine (Per-Ticket, After Completion)');
     expect(content).toContain('Post-Hole Routine (Sprint Completion)');
@@ -141,6 +146,8 @@ describe('generateAgentsMd', () => {
     expect(content).toContain('SLOPE Project');
     expect(content).toContain('opencode.json');
     expect(content).toContain('handicap card');
+    expect(content).toContain('slope now');
+    expect(content).toContain('Human Surface');
     expect(content).toContain('Commit Discipline');
     expect(content).toContain('Driver: risky');
   });
@@ -160,6 +167,8 @@ describe('generateCursorrules', () => {
     expect(content).toContain('SLOPE Project');
     expect(content).toContain('.cursor/mcp.json');
     expect(content).toContain('handicap card');
+    expect(content).toContain('slope now');
+    expect(content).toContain('Human Surface');
     expect(content).toContain('Pre-Hole');
     expect(content).toContain('Post-Hole');
     expect(content).toContain('Driver: risky');
@@ -181,6 +190,8 @@ describe('generateCursorrules', () => {
 describe('generateGenericChecklist', () => {
   it('golf output contains SLOPE commands', () => {
     const content = generateGenericChecklist(golf);
+    expect(content).toContain('slope now');
+    expect(content).toContain('slope start');
     expect(content).toContain('slope briefing');
     expect(content).toContain('slope validate');
     expect(content).toContain('slope review');

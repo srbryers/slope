@@ -265,6 +265,8 @@ Default help is intentionally small:
 
 | Command | Description |
 |---------|-------------|
+| `npx slope now` | Compact current-state cockpit: current sprint, state, claims, next action |
+| `npx slope start [--ticket=KEY]` | Start or begin work without exposing sprint/claim plumbing |
 | `npx slope help` | Human command surface for daily work, setup, and direction |
 | `npx slope help <command>` | Detailed usage for one command |
 | `npx slope help --all` | Full command registry with audience labels |
@@ -297,6 +299,8 @@ orchestrate the rest of the CLI as execution primitives.
 
 | Command | Description |
 |---------|-------------|
+| `npx slope now` | Compact current-state cockpit |
+| `npx slope start [--ticket=KEY]` | Start sprint state or begin a ticket with briefing, claim, prep, and next gates |
 | `npx slope briefing` | Pre-sprint hazard index, nutrition alerts, filtered gotchas |
 | `npx slope plan --complexity=<level>` | Club recommendation + training plan |
 | `npx slope next` | Show next sprint number |
