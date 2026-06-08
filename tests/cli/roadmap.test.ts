@@ -171,6 +171,27 @@ describe('slope roadmap validate', () => {
     expect(output).not.toContain('startsWith');
   });
 
+  it('validates a sprint with no tickets array without throwing TypeError', async () => {
+    const roadmap = makeRoadmapJson({
+      sprints: [{
+        id: 7,
+        theme: 'Ticketless',
+        par: 4,
+        slope: 2,
+        type: 'feature',
+      } as unknown as RoadmapDefinition['sprints'][number]],
+      phases: [{ name: 'P1', sprints: [7] }],
+    });
+    writeRoadmap(tmpDir, roadmap);
+    const codes = mockExit();
+
+    await expect(roadmapCommand(['validate'])).rejects.toThrow('process.exit(0)');
+    expect(codes[0]).toBe(0);
+    const output = consoleOutput.join('\n');
+    expect(output).toContain('0 tickets');
+    expect(output).not.toContain('Cannot read properties of undefined');
+  });
+
   it('shows warnings for low ticket count', async () => {
     const roadmap = makeRoadmapJson({
       sprints: [{
