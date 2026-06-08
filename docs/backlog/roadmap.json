@@ -4468,7 +4468,7 @@
       "depends_on": [
         151
       ],
-      "note": "Close #544 and #546 by making git-heavy fixtures deterministic under Windows/local CPU contention before the next release-validation loop depends on the full suite.",
+      "note": "Close #544, #546, and #547 by making git-heavy fixtures and the Vitest timeout budget deterministic under Windows/local CPU contention before the next release-validation loop depends on the full suite.",
       "tickets": [
         {
           "key": "S151.1-1",
@@ -4492,6 +4492,15 @@
           "complexity": "standard",
           "depends_on": [
             "S151.1-2"
+          ]
+        },
+        {
+          "key": "S151.1-4",
+          "title": "Set a project-level Vitest timeout for git-backed integration tests (#547)",
+          "club": "wedge",
+          "complexity": "small",
+          "depends_on": [
+            "S151.1-3"
           ]
         }
       ]
