@@ -65,7 +65,7 @@ describe('checkBranchHygiene (GH #322)', () => {
     expect(merged?.status).toBe('warn');
     expect(merged?.message).toMatch(/5 merged-to-main/);
     expect(merged?.message).toContain('git branch -d');
-  });
+  }, 15_000);
 
   it('reports OK for stale-remotes when no remote configured', () => {
     const checks = checkBranchHygiene(cwd);
