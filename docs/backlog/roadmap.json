@@ -4461,10 +4461,10 @@
     {
       "id": 151.1,
       "theme": "Windows Git Fixture Timeout Hardening",
-      "par": 3,
+      "par": 4,
       "slope": 2,
       "type": "test hardening",
-      "status": "planned",
+      "status": "complete",
       "depends_on": [
         151
       ],
