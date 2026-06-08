@@ -1,0 +1,162 @@
+{
+  "sprint_number": 151.1,
+  "player": "codex",
+  "theme": "Windows Git Fixture Timeout Hardening",
+  "par": 4,
+  "slope": 2,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-06-08",
+  "type": "test hardening",
+  "skills_used": [
+    "slope-sprint-workflow",
+    "github"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow"
+  ],
+  "skill_gaps_found": [],
+  "shots": [
+    {
+      "ticket_key": "S151.1-1",
+      "title": "Remove wall-clock sensitivity from the git analyzer daily-cadence fixture (#544)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Replaced the 65-process commit-tree history fixture with one git fast-import stream and removed the special 15s timeout from the daily-cadence test."
+    },
+    {
+      "ticket_key": "S151.1-2",
+      "title": "Validate focused git analyzer and full-suite behavior for #544",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "The first full-suite validation surfaced a second Windows/local-load timeout in the stop-check post-squash fixture."
+        }
+      ],
+      "notes": "Focused git analyzer validation passed; the full suite exposed #546, which was raised and triaged into S151.1 before continuing."
+    },
+    {
+      "ticket_key": "S151.1-3",
+      "title": "Remove wall-clock sensitivity from the stop-check post-squash fixture (#546)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "After the stop-check fixture was hardened, full-suite contention showed the broader project-level 5s Vitest timeout was still too low for git-backed integration tests."
+        }
+      ],
+      "notes": "Replaced the temp bare remote and push choreography with direct remote-tracking refs that preserve the stale origin/feature false-positive scenario."
+    },
+    {
+      "ticket_key": "S151.1-4",
+      "title": "Set a project-level Vitest timeout for git-backed integration tests (#547)",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added a 15s project-level Vitest timeout so Windows/full-suite git integration tests are not judged against the stock 5s unit-test budget."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 2,
+    "hazard_penalties": 1,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "rough",
+      "impact": "minor",
+      "description": "Full-suite Windows/local CPU contention made real-git fixture process startup the dominant timing cost."
+    },
+    {
+      "type": "wind",
+      "impact": "minor",
+      "description": "S151.1 began as a two-ticket analyzer fix and expanded to four tickets as validation exposed #546 and #547."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "When validation uncovers another same-class failure, raise and triage it immediately instead of burying it in the test log.",
+      "outcome": "#546 and #547 were created during the sprint, added to the roadmap, fixed, and validated before closeout."
+    },
+    {
+      "type": "lessons",
+      "description": "Fast git fixtures should simulate the needed refs or history directly instead of replaying remote workflows when the behavior under test does not require transport.",
+      "outcome": "The analyzer uses fast-import history, and the stop-check guard uses direct remote-tracking refs for the post-squash state."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "`corepack pnpm vitest run tests/core/analyzers/git.test.ts tests/cli/guards/stop-check.test.ts --pool=forks --poolOptions.forks.singleFork --reporter=verbose` passed: 36 tests.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`corepack pnpm vitest run tests/cli/docs.test.ts tests/cli/commands/commit-ready.test.ts tests/cli/guards/stop-check.test.ts --reporter=verbose` passed: 32 tests.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`corepack pnpm test` passed after the fixes: 235 files passed, 1 skipped, 3667 tests passed, 25 skipped.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`corepack pnpm typecheck` and `corepack pnpm build` passed.",
+      "status": "healthy"
+    },
+    {
+      "category": "docs",
+      "description": "`node dist/cli/index.js roadmap validate` passed with only existing historical ticket-count warnings.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "A small fix became a useful little stress test of the SLOPE loop. The suite kept showing us the next brittle timing assumption, and the loop held.",
+    "advice_for_next_player": "Treat git-backed tests as integration tests in both fixture design and timeout budgets. Make the fixture cheap first, then give the suite a realistic ceiling.",
+    "what_surprised_you": "Even after removing expensive fixture choreography, full-suite Windows contention could push otherwise reasonable git tests past Vitest's stock 5s timeout.",
+    "excited_about_next": "Release validation now has a cleaner path: the local full suite is green again, and the surfaced failures are all tracked and closed by the same PR."
+  },
+  "bunker_locations": [
+    "Git history fixtures with many subprocesses are fragile on Windows under full-suite contention.",
+    "Post-squash remote-tracking states can be modeled with refs/remotes/origin/* without creating a temp bare remote.",
+    "The project-level Vitest timeout must account for git-backed integration tests, not just pure unit tests."
+  ],
+  "yardage_book_updates": [
+    "tests/core/analyzers/git.test.ts now builds the daily-cadence history with one fast-import stream.",
+    "tests/cli/guards/stop-check.test.ts now simulates the post-squash remote-tracking state without a bare remote or pushes.",
+    "vitest.config.ts now sets a 15s testTimeout for Windows/full-suite git integration tests.",
+    "docs/backlog/roadmap.json records #544, #546, and #547 in S151.1 and marks the sprint complete."
+  ],
+  "course_management_notes": [
+    "Closed the original #544 analyzer timeout by removing the high-process-count fixture path.",
+    "Raised #546 for the stop-check post-squash fixture timeout and fixed it in S151.1.",
+    "Raised #547 for the broader Vitest default-timeout mismatch and fixed it in S151.1.",
+    "No review findings were recorded after code and architect review of the branch diff."
+  ],
+  "slope_factors": [
+    "windows_git_process_startup",
+    "full_suite_contention",
+    "test_fixture_hardening",
+    "validation_loop"
+  ]
+}

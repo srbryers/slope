@@ -61,25 +61,23 @@ describe('stop-check guard', () => {
 
   describe('post-squash-merge scenario', () => {
     it('does not false-positive when HEAD is at origin/main', async () => {
-      // Simulate a remote by creating a bare repo and pushing
-      const bareDir = mkdtempSync(join(tmpdir(), 'slope-bare-'));
-      execSync('git init --bare', { cwd: bareDir });
-      git(`remote add origin ${bareDir}`);
-      git('push -u origin main');
+      git('update-ref refs/remotes/origin/main HEAD');
 
-      // Create a branch, make a commit, push it
+      // Create a feature branch whose stale remote-tracking ref would look
+      // unpushed if the guard did not first recognize HEAD at origin/main.
       git('checkout -b feature');
       writeFileSync(join(tmpDir, 'feature.txt'), 'feat');
       git('add .');
       git('commit -m "feature"');
-      git('push -u origin feature');
+      git('update-ref refs/remotes/origin/feature HEAD');
 
-      // Simulate squash-merge: apply changes to main on remote
+      // Simulate squash-merge: apply equivalent changes to main, then move
+      // origin/main to that squash commit without invoking a temp remote.
       git('checkout main');
       writeFileSync(join(tmpDir, 'feature.txt'), 'feat');
       git('add .');
       git('commit -m "feat: feature (#1)"');
-      git('push origin main');
+      git('update-ref refs/remotes/origin/main HEAD');
 
       // Now switch back to feature branch and reset to origin/main
       // (this is what happens in a worktree after squash merge)
@@ -90,8 +88,6 @@ describe('stop-check guard', () => {
       // The guard should NOT block
       const result = await stopCheckGuard(makeStop(), tmpDir);
       expect(result.blockReason).toBeUndefined();
-
-      rmSync(bareDir, { recursive: true, force: true });
     });
   });
 
