@@ -4273,9 +4273,9 @@
       "par": 4,
       "slope": 3,
       "type": "planning + product architecture",
-      "status": "planned",
+      "status": "complete",
       "depends_on": [
-        147
+        146.3
       ],
       "note": "Plan a calmer human-facing SLOPE surface: classify CLI commands by audience, define a small outcome-oriented command set, make skills the agent orchestration layer over CLI/MCP primitives, and fold roadmap verbosity into the broader surface simplification strategy.",
       "tickets": [
