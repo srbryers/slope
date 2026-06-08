@@ -1,0 +1,156 @@
+{
+  "sprint_number": 151,
+  "player": "codex",
+  "theme": "Skill-First Human Cockpit Implementation",
+  "par": 4,
+  "slope": 3,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-06-08",
+  "type": "workflow + cli surface",
+  "skills_used": [
+    "slope-sprint-workflow"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow"
+  ],
+  "skill_gaps_found": [],
+  "shots": [
+    {
+      "ticket_key": "S151-1",
+      "title": "Implement a compact slope now current-state cockpit",
+      "club": "long_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added `slope now` as a compact human cockpit that reports current sprint, roadmap phase, sprint state, active claims, next ticket, and the next `slope start --ticket=...` move. JSON output is available for agents."
+    },
+    {
+      "ticket_key": "S151-2",
+      "title": "Implement a start or sprint-begin entry that coordinates briefing, sprint state, and claim guidance",
+      "club": "long_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added top-level `slope start`; without a ticket it starts or refreshes sprint state and prints compact briefing, while `--ticket=KEY` delegates to the existing bundled sprint begin flow for claim, briefing, prep, and gates."
+    },
+    {
+      "ticket_key": "S151-3",
+      "title": "Update skills so release, PR review, issue triage, retro, and sprint execution hide CLI plumbing",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "The first pass edited ignored local `.agents/` skill files; durable project guidance had to move into tracked README, backlog notes, and generated agent templates."
+        }
+      ],
+      "notes": "Updated README, the Phase 47 backlog note, generated CLAUDE/AGENTS/Cursor templates, and template tests so human asks map to outcome-oriented workflows while agents keep using raw CLI primitives internally."
+    },
+    {
+      "ticket_key": "S151-4",
+      "title": "Add end-to-end tests or transcript fixtures for cockpit workflows",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Added command-level tests for `slope now`, `slope start`, help/registry guardrails, and generated template guidance. A focused test caught the accidental removal of `slope briefing` from generic checklist guidance before commit."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 1,
+    "hazard_penalties": 0.5,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "rough",
+      "impact": "minor",
+      "description": "S151 changed command registry metadata, so docs manifest generation was required before `docs check` could pass."
+    },
+    {
+      "type": "wind",
+      "impact": "minor",
+      "description": "CODEBASE.md is ignored in this repository; `slope map` refreshed local map state and `map --check` passed with the new command/file counts."
+    },
+    {
+      "type": "rough",
+      "impact": "minor",
+      "description": "Roadmap closeout initially changed the Phase 47 status instead of the S151 sprint status; `roadmap validate` caught it before commit."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "A human cockpit command should summarize what to do next, not reveal the whole lifecycle state machine.",
+      "outcome": "`slope now` and `slope start` sit on top of roadmap, sprint-state, briefing, claim, and prep primitives."
+    },
+    {
+      "type": "lessons",
+      "description": "Local `.agents/` skills are ignored; durable generated guidance belongs in tracked template source.",
+      "outcome": "The template generator now emits cockpit-first project guidance for CLAUDE.md, AGENTS.md, Cursor/Windsurf rules, and generic checklists."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "`corepack pnpm vitest run tests/cli/template-generator.test.ts tests/cli/commands/now.test.ts tests/cli/commands/start.test.ts tests/cli/commands/help.test.ts tests/cli/registry.test.ts` passed: 36 tests.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`corepack pnpm typecheck` and `corepack pnpm build` passed before closeout.",
+      "status": "healthy"
+    },
+    {
+      "category": "cli",
+      "description": "Compiled CLI smokes passed for `slope now`, `slope now --json`, `slope start --help`, and bounded `slope help`.",
+      "status": "healthy"
+    },
+    {
+      "category": "docs",
+      "description": "`node dist/cli/index.js docs generate --pretty`, `docs check`, `roadmap validate`, and `map --check` passed with expected historical roadmap warnings.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "A clean surface pass with one useful trap: the human cockpit is tiny, but making it durable means touching the generated guidance, not just the local skill copy.",
+    "advice_for_next_player": "Keep `slope now` as the front door. If the next phase adds more human workflows, build them as aliases over proven primitives instead of exposing more command inventory.",
+    "what_surprised_you": "The repo's live `.agents/` skill files are intentionally ignored, so template source is the real shipped skill-guidance surface.",
+    "excited_about_next": "The Phase 47 human surface lane is now almost done; the next work can decide whether to ship tracked official skills or keep skills as generated/local artifacts."
+  },
+  "bunker_locations": [
+    "Human-facing commands should not leak claim/session/gate plumbing unless the user explicitly asks for it.",
+    "Generated agent templates must be updated when human workflow guidance changes; ignored local skill edits are not enough.",
+    "Generic workflow guidance should keep `slope briefing` available as deeper context even when `slope now` and `slope start` become the front door.",
+    "Roadmap JSON edits need exact sprint-level context because phase and sprint entries both carry `status` fields."
+  ],
+  "yardage_book_updates": [
+    "src/cli/commands/now.ts now implements the compact current-state cockpit.",
+    "src/cli/commands/start.ts now implements the human start-of-work entry and delegates ticket starts to sprint begin.",
+    "src/cli/template-generator.ts now emits cockpit-first guidance for generated project contexts.",
+    "README.md and docs/backlog/sprint-148-human-surface-simplification.md document the S151 contract."
+  ],
+  "course_management_notes": [
+    "S151 completes the planned skill-first human cockpit sprint.",
+    "The command registry now contains 61 commands, with `now` and `start` added to the bounded human surface.",
+    "No new GitHub issue was raised; the ignored `.agents/` discovery was resolved within S151 by updating tracked template source."
+  ],
+  "slope_factors": [
+    "cli_surface",
+    "workflow_alias",
+    "generated_agent_guidance",
+    "human_output_budget",
+    "documentation_manifest"
+  ]
+}
