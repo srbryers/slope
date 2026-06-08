@@ -25,6 +25,8 @@ describe('slope help', () => {
 
     const output = consoleOutput.join('\n');
     expect(output).toContain('SLOPE - Human Command Surface');
+    expect(output).toContain('now');
+    expect(output).toContain('start');
     expect(output).toContain('briefing');
     expect(output).toContain('review');
     expect(output).toContain('doctor');

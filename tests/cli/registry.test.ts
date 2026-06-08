@@ -39,9 +39,11 @@ describe('CLI_COMMAND_REGISTRY', () => {
       'doctor',
       'help',
       'init',
+      'now',
       'quickstart',
       'review',
       'roadmap',
+      'start',
       'status',
       'vision',
     ]);

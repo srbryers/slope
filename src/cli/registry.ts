@@ -57,6 +57,20 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     flags: [{ flag: '<command>', desc: 'Command name to show details for' }],
   },
   {
+    cmd: 'now', desc: 'Compact current-state cockpit', category: 'lifecycle', audience: 'human',
+    flags: [
+      { flag: '--sprint=<N>', desc: 'Override inferred current sprint' },
+      { flag: '--json', desc: 'Output as JSON' },
+    ],
+  },
+  {
+    cmd: 'start', desc: 'Human start-of-work cockpit', category: 'lifecycle', audience: 'human',
+    flags: [
+      { flag: '--sprint=<N>', desc: 'Override inferred current sprint' },
+      { flag: '--ticket=<key>', desc: 'Claim and begin a ticket' },
+    ],
+  },
+  {
     cmd: 'quickstart', desc: 'Interactive tutorial for new users', category: 'lifecycle', audience: 'human',
   },
   {
@@ -134,6 +148,10 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
         { flag: '--phase=<phase>', desc: 'Initial phase (default: planning)' },
         { flag: '--touches=<paths>', desc: 'Comma-separated paths to check against sibling worktrees' },
         { flag: '--force', desc: 'Override pre-sprint reality-check blockers' },
+      ]},
+      { name: 'begin', desc: 'Bundled start + claim + briefing + prep flow', flags: [
+        { flag: '--sprint=<N>', desc: 'Sprint number (required)' },
+        { flag: '--ticket=<key>', desc: 'Ticket key to claim and prep' },
       ]},
       { name: 'gate', desc: 'Mark a gate as complete', flags: [
         { flag: '<name>', desc: 'Gate name to complete' },

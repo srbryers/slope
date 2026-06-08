@@ -39,6 +39,8 @@ Usage:
 }
 
 const HUMAN_HELP_ORDER = [
+  'now',
+  'start',
   'briefing',
   'review',
   'doctor',
@@ -61,13 +63,13 @@ export function printDefaultHelp(): void {
   const byName = new Map(CLI_COMMAND_REGISTRY.map(cmd => [cmd.cmd, cmd]));
   console.log('\nSLOPE - Human Command Surface\n');
   console.log('Daily work:');
-  for (const name of HUMAN_HELP_ORDER.slice(0, 6)) {
+  for (const name of HUMAN_HELP_ORDER.slice(0, 8)) {
     const cmd = byName.get(name);
     if (cmd) printCommandRow(cmd, 4);
   }
 
   console.log('\nSetup and direction:');
-  for (const name of HUMAN_HELP_ORDER.slice(6)) {
+  for (const name of HUMAN_HELP_ORDER.slice(8)) {
     const cmd = byName.get(name);
     if (cmd) printCommandRow(cmd, 4);
   }
