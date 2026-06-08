@@ -16,6 +16,8 @@ function isSprintRangeEndpoint(line: string, matchStart: number, matchEnd: numbe
   return /S\d+\s*[-\u2013\u2014]\s*$/.test(before) || /^\s*[-\u2013\u2014]\s*S\d+\b/.test(after);
 }
 
+const MAX_SHIPPED_TICKET_SUFFIX = 99;
+
 /** Extract shipped sprint IDs referenced in commit subjects.
  *  Matches `S\d+` not followed by another digit or a dot — so `S75.5` does
  *  NOT count as a reference to S75, and `S70+S71` correctly yields {70, 71}.
@@ -26,11 +28,17 @@ function isSprintRangeEndpoint(line: string, matchStart: number, matchEnd: numbe
  */
 export function extractSprintReferences(commitSubjects: string[]): Set<number> {
   const result = new Set<number>();
-  const re = /\bS(\d+)(?!(?:[\d.]|-0\b))/g;
+  const re = /\bS(\d+)(?:-(\d+))?(?![\d.])/g;
   for (const line of commitSubjects) {
     let m: RegExpExecArray | null;
     while ((m = re.exec(line)) !== null) {
       if (isSprintRangeEndpoint(line, m.index, re.lastIndex)) continue;
+      const ticketSuffix = m[2] == null ? null : parseInt(m[2], 10);
+      if (ticketSuffix === 0) continue;
+      // SLOPE ticket keys are small ordinal suffixes (S149-1, S149-2).
+      // Large suffixes are usually GitHub/product issue keys, e.g. S147-533,
+      // and should not imply that roadmap sprint S147 shipped.
+      if (ticketSuffix != null && ticketSuffix > MAX_SHIPPED_TICKET_SUFFIX) continue;
       result.add(parseInt(m[1], 10));
     }
   }

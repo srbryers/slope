@@ -39,6 +39,7 @@ function parseArgs(args: string[]): Record<string, string> {
 
 const DEFAULT_ROADMAP_PATH = 'docs/backlog/roadmap.json';
 const TERMINAL_ROADMAP_STATUSES = new Set(['complete', 'superseded']);
+const DEFAULT_UPCOMING_LIMIT = 3;
 
 function getRoadmapStatus(sprint: RoadmapSprint): string | undefined {
   return (sprint as RoadmapSprint & { status?: string }).status;
@@ -46,6 +47,54 @@ function getRoadmapStatus(sprint: RoadmapSprint): string | undefined {
 
 function isTerminalRoadmapSprint(sprint: RoadmapSprint, completedSprints: Set<number>): boolean {
   return completedSprints.has(sprint.id) || TERMINAL_ROADMAP_STATUSES.has(getRoadmapStatus(sprint) ?? '');
+}
+
+function blockedByForSprint(
+  roadmap: RoadmapDefinition,
+  sprint: RoadmapSprint,
+  completedSprints: Set<number>,
+): number[] {
+  return (sprint.depends_on ?? []).filter(dep => {
+    const dependency = roadmap.sprints.find(s => s.id === dep);
+    return dependency ? !isTerminalRoadmapSprint(dependency, completedSprints) : !completedSprints.has(dep);
+  });
+}
+
+function statusLabelForSprint(
+  roadmap: RoadmapDefinition,
+  sprint: RoadmapSprint,
+  currentSprint: number,
+  completedSprints: Set<number>,
+): string {
+  const explicitStatus = getRoadmapStatus(sprint);
+  const isCompleted = completedSprints.has(sprint.id) || explicitStatus === 'complete';
+  const isSuperseded = explicitStatus === 'superseded';
+  const isCurrent = sprint.id === currentSprint;
+  const blockedBy = blockedByForSprint(roadmap, sprint, completedSprints);
+
+  if (isSuperseded) return '\u21B7 superseded';
+  if (isCompleted) return '\u2713 completed';
+  if (isCurrent) return '\u25B6 active';
+  if (blockedBy.length > 0) return `\u2718 blocked by ${blockedBy.map(formatSprintLabel).join(', ')}`;
+  return '\u25CB pending';
+}
+
+function phaseForSprint(roadmap: RoadmapDefinition, sprintId: number): { name: string; sprints: number[] } | undefined {
+  return roadmap.phases.find(phase => phase.sprints?.includes(sprintId));
+}
+
+function formatPhaseProgress(
+  roadmap: RoadmapDefinition,
+  phase: { name: string; sprints: number[] },
+  completedSprints: Set<number>,
+): string {
+  const phaseSprints = roadmap.sprints.filter(s => phase.sprints.includes(s.id));
+  const completed = phaseSprints.filter(s => isTerminalRoadmapSprint(s, completedSprints)).length;
+  return `${phase.name || 'Unnamed Phase'} (${completed}/${phaseSprints.length})`;
+}
+
+function sortedRoadmapSprints(roadmap: RoadmapDefinition): RoadmapSprint[] {
+  return [...roadmap.sprints].sort((a, b) => compareSprintIds(a.id, b.id));
 }
 
 function resolveRoadmapPath(flags: Record<string, string>, cwd: string): string {
@@ -308,6 +357,18 @@ function statusSubcommand(flags: Record<string, string>, cwd: string): void {
   const currentSprint = resolveSprint(flags, cwd, roadmap, scorecards);
   const completedSprints = new Set(scorecards.map(s => s.sprint_number));
 
+  if (flags.full === 'true' || flags.history === 'true') {
+    printFullRoadmapStatus(roadmap, currentSprint, completedSprints);
+  } else {
+    printCompactRoadmapStatus(roadmap, currentSprint, completedSprints, cwd);
+  }
+}
+
+function printFullRoadmapStatus(
+  roadmap: RoadmapDefinition,
+  currentSprint: number,
+  completedSprints: Set<number>,
+): void {
   console.log(`\n# Roadmap Status — ${roadmap.name}`);
   console.log('\u2550'.repeat(40));
   console.log(`\nCurrent sprint: ${formatSprintLabel(currentSprint)}`);
@@ -364,6 +425,85 @@ function statusSubcommand(flags: Record<string, string>, cwd: string): void {
     console.log(context.split('\n').map(l => `  ${l}`).join('\n'));
     console.log('');
   }
+}
+
+function printCompactRoadmapStatus(
+  roadmap: RoadmapDefinition,
+  currentSprint: number,
+  completedSprints: Set<number>,
+  cwd: string,
+): void {
+  const current = roadmap.sprints.find(s => s.id === currentSprint);
+  const currentLabel = current
+    ? `${formatSprintLabel(current.id)} ${current.theme || 'Untitled Sprint'}`
+    : `${formatSprintLabel(currentSprint)} (not found in roadmap)`;
+  const currentIsPending = current ? isRoadmapSprintPending(current) : false;
+  const currentPhase = phaseForSprint(roadmap, currentSprint);
+  const pendingAfterCurrent = sortedRoadmapSprints(roadmap)
+    .filter(s => isRoadmapSprintPending(s) && s.id !== currentSprint && compareSprintIds(s.id, currentSprint) > 0);
+  const nextReady = pendingAfterCurrent.find(s => blockedByForSprint(roadmap, s, completedSprints).length === 0);
+  const upcoming = pendingAfterCurrent.slice(0, DEFAULT_UPCOMING_LIMIT);
+  const realityLines = formatRoadmapRealitySection(buildRoadmapReality(cwd, roadmap), undefined, 5).slice(1);
+
+  console.log(`\n# Roadmap Status - ${roadmap.name}`);
+  console.log('\u2550'.repeat(40));
+  console.log(`\nCurrent: ${currentLabel}`);
+  if (currentPhase) console.log(`Phase: ${formatPhaseProgress(roadmap, currentPhase, completedSprints)}`);
+
+  console.log('\nReality checks:');
+  if (realityLines.length === 0) {
+    console.log('  None');
+  } else {
+    for (const line of realityLines) console.log(`  ${line.trim()}`);
+  }
+
+  console.log('\nActive sprint:');
+  if (!current) {
+    console.log(`  ${formatSprintLabel(currentSprint)} is not defined in the roadmap.`);
+  } else {
+    console.log(`  ${formatSprintLabel(current.id)} ${current.theme || 'Untitled Sprint'} - ${statusLabelForSprint(roadmap, current, currentSprint, completedSprints)}`);
+    if ((current.depends_on ?? []).length > 0) {
+      const deps = current.depends_on!.map(dep => {
+        const sprint = roadmap.sprints.find(s => s.id === dep);
+        if (!sprint) return `${formatSprintLabel(dep)} missing`;
+        return `${formatSprintLabel(dep)} ${statusLabelForSprint(roadmap, sprint, currentSprint, completedSprints).replace(/^[^\w]+ /, '')}`;
+      });
+      console.log(`  Dependencies: ${deps.join(', ')}`);
+    }
+    for (const ticket of current.tickets ?? []) {
+      console.log(`  - ${ticket.key}: ${ticket.title}`);
+    }
+  }
+
+  console.log('\nNext ready:');
+  if (nextReady) {
+    console.log(`  ${formatSprintLabel(nextReady.id)} ${nextReady.theme || 'Untitled Sprint'} - ${statusLabelForSprint(roadmap, nextReady, currentSprint, completedSprints)}`);
+  } else {
+    console.log('  None yet');
+  }
+
+  console.log(`\nUpcoming (${upcoming.length}/${Math.min(DEFAULT_UPCOMING_LIMIT, pendingAfterCurrent.length)}):`);
+  if (upcoming.length === 0) {
+    console.log('  None');
+  } else {
+    for (const sprint of upcoming) {
+      console.log(`  ${formatSprintLabel(sprint.id)} ${sprint.theme || 'Untitled Sprint'} - ${statusLabelForSprint(roadmap, sprint, currentSprint, completedSprints)}`);
+    }
+  }
+
+  console.log('\nRecommended next action:');
+  if (realityLines.some(line => line.includes('[error]'))) {
+    console.log('  Resolve the first roadmap reality error before advancing the lane.');
+  } else if (currentIsPending && current?.tickets?.length) {
+    const first = current.tickets[0];
+    console.log(`  Work ${first.key}: ${first.title}`);
+  } else if (nextReady) {
+    console.log(`  Start ${formatSprintLabel(nextReady.id)}: ${nextReady.theme || 'Untitled Sprint'}`);
+  } else {
+    console.log('  No roadmap action is currently ready.');
+  }
+
+  console.log('\nFor the full roadmap history, run: slope roadmap status --full\n');
 }
 
 function showSubcommand(flags: Record<string, string>, cwd: string): void {
@@ -596,7 +736,7 @@ slope roadmap — Strategic planning tools
 Usage:
   slope roadmap validate [--path=<file>]     Schema + dependency graph checks
   slope roadmap review [--path=<file>]       Automated architect review
-  slope roadmap status [--path=<file>] [--sprint=N]  Current progress
+  slope roadmap status [--path=<file>] [--sprint=N] [--full]  Compact current progress
   slope roadmap show [--path=<file>]         Render summary (critical path, parallel tracks)
   slope roadmap sync [--path=<file>] [--dry-run]     Sync scorecards into roadmap
   slope roadmap generate [--path=<file>] [--dry-run] Generate from vision + concrete backlog signals
@@ -604,6 +744,7 @@ Usage:
 Options:
   --path=<file>    Path to roadmap JSON (default: docs/backlog/roadmap.json)
   --sprint=N       Override current sprint number (for status)
+  --full           Show full roadmap history for status
   --dry-run        Show what would change without writing (for sync and generate)
 
 Generate requires concrete backlog signals from source TODO/FIXME/HACK comments

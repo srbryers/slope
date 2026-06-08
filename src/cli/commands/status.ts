@@ -1,6 +1,6 @@
-import { checkConflicts, findShippedSprintsOnMain, formatSprintLabel, parseSprintNumber } from '../../core/index.js';
+import { checkConflicts, findShippedSprintsOnMain, formatSprintLabel, parseRoadmap, parseSprintNumber } from '../../core/index.js';
 import type { SprintClaim, SlopeSession } from '../../core/index.js';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { loadConfig } from '../config.js';
 import { inferSprintContext } from '../sprint-inference.js';
@@ -105,20 +105,35 @@ async function showSprintStatus(store: { list: (n: number) => Promise<SprintClai
 
 /** Detect shipped sprints with no scorecard on disk. Used by status to
  *  surface the "post-hole skipped" pattern (#318). */
-function computeScorecardDrift(cwd: string): { missing: number[] } {
+export function computeScorecardDrift(cwd: string): { missing: number[] } {
   try {
     const config = loadConfig(cwd);
     const retroDir = join(cwd, config.scorecardDir);
     const pattern = config.scorecardPattern;
     const shipped = findShippedSprintsOnMain(cwd);
+    const roadmapIds = loadRoadmapSprintIds(cwd, config.roadmapPath);
     const missing: number[] = [];
     for (const id of [...shipped].sort((a, b) => a - b)) {
+      if (roadmapIds && !roadmapIds.has(id)) continue;
       const scorecardPath = join(retroDir, pattern.replaceAll('*', String(id)));
       if (!existsSync(scorecardPath)) missing.push(id);
     }
     return { missing };
   } catch {
     return { missing: [] };
+  }
+}
+
+function loadRoadmapSprintIds(cwd: string, roadmapPath: string): Set<number> | null {
+  try {
+    const path = join(cwd, roadmapPath);
+    if (!existsSync(path)) return null;
+    const parsed = parseRoadmap(JSON.parse(readFileSync(path, 'utf8')));
+    const roadmap = parsed.roadmap;
+    if (!roadmap) return null;
+    return new Set(roadmap.sprints.map(s => s.id));
+  } catch {
+    return null;
   }
 }
 

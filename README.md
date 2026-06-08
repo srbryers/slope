@@ -288,6 +288,8 @@ All commands use `npx slope` when installed locally.
 | `npx slope briefing` | Pre-sprint hazard index, nutrition alerts, filtered gotchas |
 | `npx slope plan --complexity=<level>` | Club recommendation + training plan |
 | `npx slope next` | Show next sprint number |
+| `npx slope roadmap status [--sprint=N]` | Compact current roadmap state: active work, blockers, next ready, upcoming |
+| `npx slope roadmap status --full` | Full historical roadmap status |
 | `npx slope roadmap validate` | Validate roadmap dependencies and sprint status |
 
 ### Review & Findings

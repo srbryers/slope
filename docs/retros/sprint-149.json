@@ -1,0 +1,151 @@
+{
+  "sprint_number": 149,
+  "player": "codex",
+  "theme": "Roadmap Signal Repair and Bounded Planning View",
+  "par": 4,
+  "slope": 2,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-06-08",
+  "type": "bugfix + product surface",
+  "skills_used": [
+    "slope-sprint-workflow",
+    "github"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow",
+    "github"
+  ],
+  "skill_gaps_found": [],
+  "shots": [
+    {
+      "ticket_key": "S149-1",
+      "title": "Fix roadmap/status shipped-reference noise from issue-fix and historical imported sprint keys (#539, #541)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Filtered shipped sprint references so issue-style keys such as S147-533 no longer count as shipped roadmap sprint evidence, while real sprint and ticket refs remain valid. Scorecard drift now filters shipped refs through roadmap sprint ids so historical imported keys such as S194 stay out of current status."
+    },
+    {
+      "ticket_key": "S149-2",
+      "title": "Make roadmap status default to current, blockers, next ready, and 1-3 upcoming sprints",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Changed the default roadmap status command to a compact planning view with current sprint, phase progress, reality checks, active tickets, next-ready work, capped upcoming work, and one recommended next action."
+    },
+    {
+      "ticket_key": "S149-3",
+      "title": "Add full/history flags and bounded-output regression tests for roadmap status",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Preserved the historical roadmap output behind --full/--history and added long-history regression coverage that keeps completed phases and the full critical path out of the default view."
+    },
+    {
+      "ticket_key": "S149-4",
+      "title": "Update roadmap help and docs for the compact planning view contract",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Updated CLI help, README planning commands, and the S148 human surface design note so the compact default and --full escape hatch are documented together."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "rough",
+      "impact": "minor",
+      "description": "The sprint started with open validation/status noise from #539 and #541 that made roadmap reality checks stale even after S148 merged."
+    },
+    {
+      "type": "wind",
+      "impact": "minor",
+      "description": "The roadmap status command needed a calmer human default while preserving the full historical audit view for agents and maintainers."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Shipped-reference parsing should distinguish sprint/ticket ids from issue-fix ids before those refs become validation facts.",
+      "outcome": "S149 caps shipped ticket suffixes at normal roadmap ticket ranges and ignores issue-sized suffixes like S147-533."
+    },
+    {
+      "type": "lessons",
+      "description": "Human planning commands need output budgets and an explicit detail escape hatch.",
+      "outcome": "Roadmap status now defaults to a bounded planning view and keeps the full history behind --full/--history."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "`corepack pnpm vitest run tests/core/analyzers/git.test.ts tests/cli/commands/status.test.ts tests/cli/roadmap.test.ts` passed: 63 tests.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`corepack pnpm typecheck`, `corepack pnpm build`, and `corepack pnpm test` passed; full suite result was 232 passed test files, 3655 passed tests, with the existing Postgres suite skipped.",
+      "status": "healthy"
+    },
+    {
+      "category": "validation",
+      "description": "`node dist/cli/index.js roadmap validate` passed with standing ticket-count warnings only, and the S147/#539 false positive no longer appears.",
+      "status": "healthy"
+    },
+    {
+      "category": "cli",
+      "description": "Compiled CLI smokes confirmed compact `roadmap status --sprint=149`, full `roadmap status --sprint=149 --full`, and clean `status --sprint=149` claim reporting.",
+      "status": "healthy"
+    },
+    {
+      "category": "docs",
+      "description": "`node dist/cli/index.js docs check`, `node dist/cli/index.js map --check`, and `git diff --check` passed; the map is current for sprint 149.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Very satisfying: the roadmap is finally acting more like a cockpit and less like a filing cabinet with a megaphone.",
+    "advice_for_next_player": "S150 can build on the same audience-boundary pattern: small human defaults, explicit full-detail escape hatches, and tests that enforce the output budget.",
+    "what_surprised_you": "The status drift bug was not only a parser issue; status also needed to treat the roadmap as the authoritative current sprint universe.",
+    "excited_about_next": "The command audience metadata sprint now has a working example of how to make a powerful command feel human-sized."
+  },
+  "bunker_locations": [
+    "Issue-fix keys with large suffixes should not count as shipped roadmap tickets.",
+    "Historical imported sprint keys should not appear in closeout drift when those sprint ids are not present in the current roadmap.",
+    "Roadmap status defaults must stay bounded even as the historical roadmap grows."
+  ],
+  "yardage_book_updates": [
+    "src/core/analyzers/git.ts now ignores issue-sized sprint suffixes while preserving real sprint/ticket shipped refs.",
+    "src/cli/commands/status.ts now filters missing-scorecard shipped refs to roadmap sprint ids when roadmap data is available.",
+    "src/cli/commands/roadmap.ts now uses a compact default status view and exposes full history through --full/--history.",
+    "README.md and docs/backlog/sprint-148-human-surface-simplification.md document the compact roadmap status contract."
+  ],
+  "course_management_notes": [
+    "GitHub issue #539 was reopened before implementation because main still reproduced the shipped-reference false positive after S148 merged.",
+    "The PR should close #539 and #541 after CI passes and the branch is merged.",
+    "S150 is now unblocked by S149 in roadmap state, with S151 still dependent on S150."
+  ],
+  "slope_factors": [
+    "roadmap_validation",
+    "status_drift",
+    "cli_surface",
+    "human_output_budget",
+    "scorecard_closeout"
+  ]
+}
