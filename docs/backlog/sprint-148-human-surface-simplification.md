@@ -224,6 +224,19 @@ Acceptance tests:
 - Default line count stays under a fixed budget.
 - Regression fixtures include S148-like long-history roadmap data.
 
+## S149 Implementation Note
+
+S149 turns the roadmap case study into the active command contract:
+
+- `slope roadmap status` defaults to a compact planning view centered on the
+  current sprint, phase progress, roadmap reality checks, blockers,
+  next-ready work, up to three upcoming sprints, and one recommended action.
+- `slope roadmap status --full` preserves the historical phase-by-phase view
+  for agents, maintainers, and audits that need the complete roadmap.
+- The default command is covered by a long-history regression fixture so
+  completed historical phases and the full critical path stay out of the
+  human-facing status surface.
+
 ## Implementation Backlog
 
 ### S149 - Roadmap Signal Repair and Bounded Planning View
