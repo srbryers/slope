@@ -4460,7 +4460,7 @@
     },
     {
       "id": 151.1,
-      "theme": "Windows Git Analyzer Timeout Hardening",
+      "theme": "Windows Git Fixture Timeout Hardening",
       "par": 3,
       "slope": 2,
       "type": "test hardening",
@@ -4468,7 +4468,7 @@
       "depends_on": [
         151
       ],
-      "note": "Close #544 by making the git analyzer daily-cadence regression deterministic under Windows/local CPU contention before the next release-validation loop depends on the full suite.",
+      "note": "Close #544 and #546 by making git-heavy fixtures deterministic under Windows/local CPU contention before the next release-validation loop depends on the full suite.",
       "tickets": [
         {
           "key": "S151.1-1",
@@ -4483,6 +4483,15 @@
           "complexity": "small",
           "depends_on": [
             "S151.1-1"
+          ]
+        },
+        {
+          "key": "S151.1-3",
+          "title": "Remove wall-clock sensitivity from the stop-check post-squash fixture (#546)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "depends_on": [
+            "S151.1-2"
           ]
         }
       ]
