@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { statusCommand } from '../../../src/cli/commands/status.js';
+import { execSync } from 'node:child_process';
+import { computeScorecardDrift, statusCommand } from '../../../src/cli/commands/status.js';
 import { createSprintState, saveSprintState } from '../../../src/cli/sprint-state.js';
 
 let tmpDir: string;
@@ -34,6 +35,18 @@ async function captureLog(fn: () => Promise<void>): Promise<string> {
     vi.restoreAllMocks();
   }
   return logs.join('\n');
+}
+
+function gitInit(dir: string): void {
+  execSync('git init -q', { cwd: dir });
+  execSync('git config user.email test@test', { cwd: dir });
+  execSync('git config user.name test', { cwd: dir });
+}
+
+function gitCommit(dir: string, message: string): void {
+  writeFileSync(join(dir, `commit-${Date.now()}-${Math.random()}.txt`), message);
+  execSync('git add -A', { cwd: dir });
+  execSync('git commit -q -m "' + message.replaceAll('"', '\\"') + '"', { cwd: dir });
 }
 
 describe('slope status', () => {
@@ -73,5 +86,33 @@ describe('slope status', () => {
 
     const output = consoleErrorSpy.mock.calls.map(call => String(call[0])).join('\n');
     expect(output).toContain('Error: --sprint must be a positive sprint id, e.g. 114 or 114.5');
+  });
+
+  it('filters scorecard drift to sprint ids present in the roadmap', () => {
+    gitInit(tmpDir);
+    mkdirSync(join(tmpDir, 'docs', 'backlog'), { recursive: true });
+    writeFileSync(join(tmpDir, 'docs', 'backlog', 'roadmap.json'), JSON.stringify({
+      name: 'Test Roadmap',
+      phases: [{ name: 'Current', sprints: [7] }],
+      sprints: [
+        {
+          id: 7,
+          theme: 'Current',
+          par: 4,
+          slope: 2,
+          type: 'feature',
+          tickets: [
+            { key: 'S7-1', title: 'T1', club: 'short_iron', complexity: 'standard' },
+            { key: 'S7-2', title: 'T2', club: 'short_iron', complexity: 'standard' },
+            { key: 'S7-3', title: 'T3', club: 'wedge', complexity: 'small' },
+          ],
+        },
+      ],
+    }));
+
+    gitCommit(tmpDir, 'feat(S194-5): historical import-era work');
+    gitCommit(tmpDir, 'feat(S7): current roadmap work');
+
+    expect(computeScorecardDrift(tmpDir).missing).toEqual([7]);
   });
 });
