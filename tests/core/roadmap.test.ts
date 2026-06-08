@@ -158,6 +158,19 @@ describe('validateRoadmap', () => {
     expect(result.errors).toEqual([]);
   });
 
+  it('treats sparse sprint ids >=200 ending in 5 with canonical ticket prefixes as canonical', () => {
+    // Regression: sparse long-lived roadmaps may legitimately omit immediate
+    // neighbours. S205-* ticket keys still prove this is canonical S205, not
+    // legacy encoded S20.5.
+    const roadmap = makeRoadmap({
+      sprints: [makeSprint(205), makeSprint(207)],
+      phases: [{ name: 'P1', sprints: [205, 207] }],
+    });
+    const result = validateRoadmap(roadmap);
+    expect(result.errors).toEqual([]);
+    expect(result.warnings.some(w => w.message.includes('S205') && w.message.includes('S207'))).toBe(true);
+  });
+
   it('detects duplicate sprint IDs', () => {
     const roadmap = makeRoadmap({
       sprints: [makeSprint(7), makeSprint(7)],
@@ -646,18 +659,19 @@ describe('validateRoadmap with shipped sprint IDs', () => {
     expect(result.warnings.filter(w => w.message.includes('shipped commits'))).toHaveLength(0);
   });
 
-  it('does not force "complete" on skipped/cancelled-absorbed sprints mentioned in commits', () => {
+  it('does not force "complete" on terminal non-complete sprints mentioned in commits', () => {
     // Regression: roadmap-bookkeeping commits ("feat: add S7 sprint") make a
-    // sprint look shipped, but skipped / cancelled-absorbed are valid terminal
-    // states and must not be flagged as "expected complete".
+    // sprint look shipped, but superseded / skipped / cancelled-absorbed are
+    // valid terminal states and must not be flagged as "expected complete".
     const roadmap = makeRoadmap({
       sprints: [
+        { ...makeSprint(6), status: 'superseded' } as any,
         { ...makeSprint(7), status: 'skipped' } as any,
         { ...makeSprint(8), status: 'cancelled-absorbed', depends_on: [7] } as any,
         { ...makeSprint(9), status: 'complete', depends_on: [8] } as any,
       ],
     });
-    const result = validateRoadmap(roadmap, undefined, new Set([7, 8]));
+    const result = validateRoadmap(roadmap, undefined, new Set([6, 7, 8]));
     expect(result.errors.filter(e => e.message.includes('shipped commits'))).toHaveLength(0);
   });
 

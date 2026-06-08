@@ -182,17 +182,30 @@ export function validateRoadmap(
   const warnings: RoadmapValidationWarning[] = [];
   const sprintIds = new Set(roadmap.sprints.map(s => s.id));
 
+  const sprintById = new Map(roadmap.sprints.map(sprint => [sprint.id, sprint]));
+
   // Context-aware encoding guard. The pure helper isEncodedInsertedSprintId
   // treats every 3-digit id >=200 ending in 5 as a legacy half-sprint
   // (435 => S43.5). That is ambiguous against ordinary sprint numbers
-  // (S205..S995 also end in 5). Within a roadmap we have context: an id is a
-  // real canonical sprint — not an inserted half-sprint — when it sits next to
-  // integer neighbours (S204/S206 present). Only decode as a half-sprint when
-  // no such neighbours exist (the genuine 43/435/44 insertion case). This keeps
-  // the context-free helpers' default behaviour for callers without a roadmap
-  // while preventing real S205..S995 sprints from being mis-sorted/mis-labelled.
-  const decodesAsHalf = (id: number): boolean =>
-    isEncodedInsertedSprintId(id) && !sprintIds.has(id - 1) && !sprintIds.has(id + 1);
+  // (S205..S995 also end in 5). Within a roadmap we have context: ticket
+  // prefixes are the strongest signal, immediate canonical neighbours
+  // (S204/S206) indicate a real canonical sprint, and base sprint neighbours
+  // (S43/S44) indicate the genuine legacy S43.5 insertion case.
+  const decodesAsHalf = (id: number): boolean => {
+    if (!isEncodedInsertedSprintId(id)) return false;
+
+    const sprint = sprintById.get(id);
+    const canonicalPrefix = `S${id}-`;
+    const encodedPrefix = `${formatSprintLabel(id)}-`;
+    const ticketKeys = sprint?.tickets.map(getRoadmapTicketKey).filter((key): key is string => key !== null) ?? [];
+
+    if (ticketKeys.some(key => key.startsWith(canonicalPrefix))) return false;
+    if (ticketKeys.some(key => key.startsWith(encodedPrefix))) return true;
+    if (sprintIds.has(id - 1) || sprintIds.has(id + 1)) return false;
+
+    const base = Math.floor(id / 10);
+    return sprintIds.has(base) || sprintIds.has(base + 1);
+  };
   const orderOf = (id: number): number => (decodesAsHalf(id) ? sprintOrderValue(id) : id);
   const labelOf = (id: number): string => (decodesAsHalf(id) ? formatSprintLabel(id) : `S${id}`);
 
@@ -364,7 +377,7 @@ export function validateRoadmap(
     // *mentioned* in commit subjects (e.g. "feat: add S72 sprint" — roadmap
     // bookkeeping, not a feature ship). Treat those terminal-but-not-complete
     // statuses as final rather than demanding "complete".
-    const TERMINAL_NOT_COMPLETE = new Set(['skipped', 'cancelled', 'cancelled-absorbed', 'absorbed']);
+    const TERMINAL_NOT_COMPLETE = new Set(['superseded', 'skipped', 'cancelled', 'cancelled-absorbed', 'absorbed']);
     for (const sprint of roadmap.sprints) {
       const status = (sprint as RoadmapSprint & { status?: string }).status;
       const isShipped = shippedSprintIds.has(sprint.id);
