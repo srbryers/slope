@@ -347,7 +347,8 @@
         148,
         149,
         150,
-        151
+        151,
+        151.1
       ],
       "status": "planned",
       "note": "Plan and implement the higher-level SLOPE operating surface so humans see a small, memorable cockpit while agents and skills orchestrate the deeper CLI/MCP execution framework."
@@ -4453,6 +4454,35 @@
           "depends_on": [
             "S151-2",
             "S151-3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 151.1,
+      "theme": "Windows Git Analyzer Timeout Hardening",
+      "par": 3,
+      "slope": 2,
+      "type": "test hardening",
+      "status": "planned",
+      "depends_on": [
+        151
+      ],
+      "note": "Close #544 by making the git analyzer daily-cadence regression deterministic under Windows/local CPU contention before the next release-validation loop depends on the full suite.",
+      "tickets": [
+        {
+          "key": "S151.1-1",
+          "title": "Remove wall-clock sensitivity from the git analyzer daily-cadence fixture (#544)",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S151.1-2",
+          "title": "Validate focused git analyzer and full-suite behavior for #544",
+          "club": "wedge",
+          "complexity": "small",
+          "depends_on": [
+            "S151.1-1"
           ]
         }
       ]

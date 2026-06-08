@@ -303,6 +303,18 @@ S151 Implementation Note:
   triage, sprint execution, and retro capture to outcome-oriented workflows
   while leaving raw CLI plumbing as agent primitives.
 
+### S151.1 - Windows Git Analyzer Timeout Hardening
+
+Purpose: repair the validation issue raised as #544 during S151 closeout, where
+the git analyzer daily-cadence fixture exceeded hard-coded Windows timeouts
+under local CPU contention.
+
+Tickets:
+
+- `S151.1-1`: Remove wall-clock sensitivity from the git analyzer
+  daily-cadence fixture.
+- `S151.1-2`: Validate focused git analyzer and full-suite behavior for #544.
+
 ## Non-Goals Reaffirmed
 
 - Do not remove existing commands in this phase.

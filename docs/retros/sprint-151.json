@@ -121,6 +121,11 @@
       "category": "docs",
       "description": "`node dist/cli/index.js docs generate --pretty`, `docs check`, `roadmap validate`, and `map --check` passed with expected historical roadmap warnings.",
       "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "Full local `corepack pnpm test` did not complete under Windows CPU contention; focused investigation isolated existing git analyzer timeout issue #544 and triaged it to S151.1.",
+      "status": "warning"
     }
   ],
   "nineteenth_hole": {
@@ -144,7 +149,8 @@
   "course_management_notes": [
     "S151 completes the planned skill-first human cockpit sprint.",
     "The command registry now contains 61 commands, with `now` and `start` added to the bounded human surface.",
-    "No new GitHub issue was raised; the ignored `.agents/` discovery was resolved within S151 by updating tracked template source."
+    "Raised #544 from full-suite validation timeout in `tests/core/analyzers/git.test.ts` and triaged it into S151.1.",
+    "The ignored `.agents/` discovery was resolved within S151 by updating tracked template source."
   ],
   "slope_factors": [
     "cli_surface",
