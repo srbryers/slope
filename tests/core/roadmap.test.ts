@@ -96,14 +96,16 @@ describe('validateRoadmap', () => {
     expect(result.errors[0].message).toContain('no sprints');
   });
 
-  it('detects sprint numbering gaps', () => {
+  it('reports sprint numbering gaps as warnings, not errors', () => {
     const roadmap = makeRoadmap({
       sprints: [makeSprint(7), makeSprint(9)],
       phases: [{ name: 'P1', sprints: [7, 9] }],
     });
     const result = validateRoadmap(roadmap);
-    expect(result.valid).toBe(false);
-    expect(result.errors.some(e => e.message.includes('gap'))).toBe(true);
+    // Long-lived roadmaps legitimately skip numbers (absorbed/cancelled/
+    // renumbered sprints), so a gap is informational, not a hard error.
+    expect(result.warnings.some(w => w.message.includes('gap'))).toBe(true);
+    expect(result.errors.some(e => e.message.includes('gap'))).toBe(false);
   });
 
   it('allows inserted decimal sprint ids between canonical sprints', () => {
@@ -141,6 +143,32 @@ describe('validateRoadmap', () => {
     });
     const result = validateRoadmap(roadmap);
     expect(result.errors).toEqual([]);
+  });
+
+  it('treats sprint ids >=200 ending in 5 with integer neighbours as canonical', () => {
+    // Regression: 205/355 must not be decoded as S20.5/S35.5 — the legacy
+    // half-sprint encoding (435 => S43.5) is ambiguous against real sprint
+    // numbers. With S204/S206 present, 205 is a real sprint, so there is no
+    // numbering gap and its S205-* ticket keys match (not "S20.5-").
+    const roadmap = makeRoadmap({
+      sprints: [makeSprint(204), makeSprint(205), makeSprint(206)],
+      phases: [{ name: 'P1', sprints: [204, 205, 206] }],
+    });
+    const result = validateRoadmap(roadmap);
+    expect(result.errors).toEqual([]);
+  });
+
+  it('treats sparse sprint ids >=200 ending in 5 with canonical ticket prefixes as canonical', () => {
+    // Regression: sparse long-lived roadmaps may legitimately omit immediate
+    // neighbours. S205-* ticket keys still prove this is canonical S205, not
+    // legacy encoded S20.5.
+    const roadmap = makeRoadmap({
+      sprints: [makeSprint(205), makeSprint(207)],
+      phases: [{ name: 'P1', sprints: [205, 207] }],
+    });
+    const result = validateRoadmap(roadmap);
+    expect(result.errors).toEqual([]);
+    expect(result.warnings.some(w => w.message.includes('S205') && w.message.includes('S207'))).toBe(true);
   });
 
   it('detects duplicate sprint IDs', () => {
@@ -629,6 +657,22 @@ describe('validateRoadmap with shipped sprint IDs', () => {
     const result = validateRoadmap(roadmap);
     expect(result.errors.filter(e => e.message.includes('shipped commits'))).toHaveLength(0);
     expect(result.warnings.filter(w => w.message.includes('shipped commits'))).toHaveLength(0);
+  });
+
+  it('does not force "complete" on terminal non-complete sprints mentioned in commits', () => {
+    // Regression: roadmap-bookkeeping commits ("feat: add S7 sprint") make a
+    // sprint look shipped, but superseded / skipped / cancelled-absorbed are
+    // valid terminal states and must not be flagged as "expected complete".
+    const roadmap = makeRoadmap({
+      sprints: [
+        { ...makeSprint(6), status: 'superseded' } as any,
+        { ...makeSprint(7), status: 'skipped' } as any,
+        { ...makeSprint(8), status: 'cancelled-absorbed', depends_on: [7] } as any,
+        { ...makeSprint(9), status: 'complete', depends_on: [8] } as any,
+      ],
+    });
+    const result = validateRoadmap(roadmap, undefined, new Set([6, 7, 8]));
+    expect(result.errors.filter(e => e.message.includes('shipped commits'))).toHaveLength(0);
   });
 
   it('runs alongside scorecard cross-check independently', () => {
