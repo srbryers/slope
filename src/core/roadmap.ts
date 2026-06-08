@@ -209,8 +209,13 @@ export function validateRoadmap(
     const current = orderOf(sortedIds[i]);
     const allowedInsertedStep = current > prev && current <= Math.floor(prev) + 1;
     if (!allowedInsertedStep && current !== prev + 1) {
-      errors.push({
-        type: 'error',
+      // A long-lived roadmap legitimately skips numbers as sprints are
+      // absorbed, cancelled, or renumbered, so a numbering discontinuity is
+      // informational rather than a structural error. Genuinely-structural
+      // problems (duplicate ids, dangling deps, cycles, bad par, ticket/phase
+      // mismatches) remain hard errors below.
+      warnings.push({
+        type: 'warning',
         message: `Sprint numbering gap: ${labelOf(sortedIds[i - 1])} → ${labelOf(sortedIds[i])}`,
       });
     }

@@ -96,14 +96,16 @@ describe('validateRoadmap', () => {
     expect(result.errors[0].message).toContain('no sprints');
   });
 
-  it('detects sprint numbering gaps', () => {
+  it('reports sprint numbering gaps as warnings, not errors', () => {
     const roadmap = makeRoadmap({
       sprints: [makeSprint(7), makeSprint(9)],
       phases: [{ name: 'P1', sprints: [7, 9] }],
     });
     const result = validateRoadmap(roadmap);
-    expect(result.valid).toBe(false);
-    expect(result.errors.some(e => e.message.includes('gap'))).toBe(true);
+    // Long-lived roadmaps legitimately skip numbers (absorbed/cancelled/
+    // renumbered sprints), so a gap is informational, not a hard error.
+    expect(result.warnings.some(w => w.message.includes('gap'))).toBe(true);
+    expect(result.errors.some(e => e.message.includes('gap'))).toBe(false);
   });
 
   it('allows inserted decimal sprint ids between canonical sprints', () => {
