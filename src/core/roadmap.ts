@@ -182,6 +182,20 @@ export function validateRoadmap(
   const warnings: RoadmapValidationWarning[] = [];
   const sprintIds = new Set(roadmap.sprints.map(s => s.id));
 
+  // Context-aware encoding guard. The pure helper isEncodedInsertedSprintId
+  // treats every 3-digit id >=200 ending in 5 as a legacy half-sprint
+  // (435 => S43.5). That is ambiguous against ordinary sprint numbers
+  // (S205..S995 also end in 5). Within a roadmap we have context: an id is a
+  // real canonical sprint — not an inserted half-sprint — when it sits next to
+  // integer neighbours (S204/S206 present). Only decode as a half-sprint when
+  // no such neighbours exist (the genuine 43/435/44 insertion case). This keeps
+  // the context-free helpers' default behaviour for callers without a roadmap
+  // while preventing real S205..S995 sprints from being mis-sorted/mis-labelled.
+  const decodesAsHalf = (id: number): boolean =>
+    isEncodedInsertedSprintId(id) && !sprintIds.has(id - 1) && !sprintIds.has(id + 1);
+  const orderOf = (id: number): number => (decodesAsHalf(id) ? sprintOrderValue(id) : id);
+  const labelOf = (id: number): string => (decodesAsHalf(id) ? formatSprintLabel(id) : `S${id}`);
+
   // Check: at least one sprint
   if (roadmap.sprints.length === 0) {
     errors.push({ type: 'error', message: 'Roadmap has no sprints' });
@@ -189,15 +203,15 @@ export function validateRoadmap(
   }
 
   // Check: sprint numbering continuity
-  const sortedIds = [...sprintIds].sort(compareSprintIds);
+  const sortedIds = [...sprintIds].sort((a, b) => orderOf(a) - orderOf(b));
   for (let i = 1; i < sortedIds.length; i++) {
-    const prev = sprintOrderValue(sortedIds[i - 1]);
-    const current = sprintOrderValue(sortedIds[i]);
+    const prev = orderOf(sortedIds[i - 1]);
+    const current = orderOf(sortedIds[i]);
     const allowedInsertedStep = current > prev && current <= Math.floor(prev) + 1;
     if (!allowedInsertedStep && current !== prev + 1) {
       errors.push({
         type: 'error',
-        message: `Sprint numbering gap: ${formatSprintLabel(sortedIds[i - 1])} → ${formatSprintLabel(sortedIds[i])}`,
+        message: `Sprint numbering gap: ${labelOf(sortedIds[i - 1])} → ${labelOf(sortedIds[i])}`,
       });
     }
   }
@@ -220,26 +234,26 @@ export function validateRoadmap(
       warnings.push({
         type: 'warning',
         sprint: sprint.id,
-        message: `${formatSprintLabel(sprint.id)} has ${sprint.tickets.length} tickets (recommended 3-4)`,
+        message: `${labelOf(sprint.id)} has ${sprint.tickets.length} tickets (recommended 3-4)`,
       });
     }
     if (sprint.tickets.length > 4) {
       warnings.push({
         type: 'warning',
         sprint: sprint.id,
-        message: `${formatSprintLabel(sprint.id)} has ${sprint.tickets.length} tickets (recommended 3-4)`,
+        message: `${labelOf(sprint.id)} has ${sprint.tickets.length} tickets (recommended 3-4)`,
       });
     }
 
     // Check: ticket key format matches sprint
     for (const ticket of sprint.tickets) {
-      const expected = `${formatSprintLabel(sprint.id)}-`;
+      const expected = `${labelOf(sprint.id)}-`;
       const ticketKey = getRoadmapTicketKey(ticket);
       if (!ticketKey) {
         errors.push({
           type: 'error',
           sprint: sprint.id,
-          message: `Ticket in ${formatSprintLabel(sprint.id)} is missing key/id`,
+          message: `Ticket in ${labelOf(sprint.id)} is missing key/id`,
         });
         continue;
       }
@@ -249,7 +263,7 @@ export function validateRoadmap(
           type: 'error',
           sprint: sprint.id,
           ticket: ticketKey,
-          message: `Ticket ${ticketKey} does not match sprint ${formatSprintLabel(sprint.id)} (expected prefix ${expected})`,
+          message: `Ticket ${ticketKey} does not match sprint ${labelOf(sprint.id)} (expected prefix ${expected})`,
         });
       }
     }
@@ -277,7 +291,7 @@ export function validateRoadmap(
         errors.push({
           type: 'error',
           sprint: sprint.id,
-          message: `${formatSprintLabel(sprint.id)} depends on ${formatSprintLabel(dep)} which does not exist in the roadmap`,
+          message: `${labelOf(sprint.id)} depends on ${labelOf(dep)} which does not exist in the roadmap`,
         });
       }
     }
@@ -287,7 +301,7 @@ export function validateRoadmap(
       errors.push({
         type: 'error',
         sprint: sprint.id,
-        message: `${formatSprintLabel(sprint.id)} has invalid par ${sprint.par} (must be 3, 4, or 5)`,
+        message: `${labelOf(sprint.id)} has invalid par ${sprint.par} (must be 3, 4, or 5)`,
       });
     }
   }
@@ -297,7 +311,7 @@ export function validateRoadmap(
   if (cycle) {
     errors.push({
       type: 'error',
-      message: `Dependency cycle detected: ${cycle.map(formatSprintLabel).join(' → ')}`,
+      message: `Dependency cycle detected: ${cycle.map(labelOf).join(' → ')}`,
     });
   }
 
@@ -307,7 +321,7 @@ export function validateRoadmap(
       if (!sprintIds.has(sid)) {
         errors.push({
           type: 'error',
-          message: `Phase "${phase.name}" references ${formatSprintLabel(sid)} which does not exist`,
+          message: `Phase "${phase.name}" references ${labelOf(sid)} which does not exist`,
         });
       }
     }
@@ -325,7 +339,7 @@ export function validateRoadmap(
         warnings.push({
           type: 'warning',
           sprint: sprint.id,
-          message: `${formatSprintLabel(sprint.id)} has a scorecard but roadmap status is "${status ?? 'planned'}" — expected "complete"`,
+          message: `${labelOf(sprint.id)} has a scorecard but roadmap status is "${status ?? 'planned'}" — expected "complete"`,
         });
       }
 
@@ -333,7 +347,7 @@ export function validateRoadmap(
         warnings.push({
           type: 'warning',
           sprint: sprint.id,
-          message: `${formatSprintLabel(sprint.id)} is marked "complete" in roadmap but no scorecard exists (phantom sprint)`,
+          message: `${labelOf(sprint.id)} is marked "complete" in roadmap but no scorecard exists (phantom sprint)`,
         });
       }
     }
@@ -341,15 +355,20 @@ export function validateRoadmap(
 
   // Cross-validate sprint status against shipped commits on main when provided
   if (shippedSprintIds) {
+    // A sprint can legitimately be skipped or cancelled/absorbed yet still be
+    // *mentioned* in commit subjects (e.g. "feat: add S72 sprint" — roadmap
+    // bookkeeping, not a feature ship). Treat those terminal-but-not-complete
+    // statuses as final rather than demanding "complete".
+    const TERMINAL_NOT_COMPLETE = new Set(['skipped', 'cancelled', 'cancelled-absorbed', 'absorbed']);
     for (const sprint of roadmap.sprints) {
       const status = (sprint as RoadmapSprint & { status?: string }).status;
       const isShipped = shippedSprintIds.has(sprint.id);
 
-      if (isShipped && status !== 'complete') {
+      if (isShipped && status !== 'complete' && !TERMINAL_NOT_COMPLETE.has(status ?? '')) {
         errors.push({
           type: 'error',
           sprint: sprint.id,
-          message: `${formatSprintLabel(sprint.id)} has shipped commits on main but status is "${status ?? 'planned'}" — expected "complete"`,
+          message: `${labelOf(sprint.id)} has shipped commits on main but status is "${status ?? 'planned'}" — expected "complete"`,
         });
       }
 
@@ -357,7 +376,7 @@ export function validateRoadmap(
         warnings.push({
           type: 'warning',
           sprint: sprint.id,
-          message: `${formatSprintLabel(sprint.id)} is marked "complete" but no shipped commits found on main`,
+          message: `${labelOf(sprint.id)} is marked "complete" but no shipped commits found on main`,
         });
       }
     }
