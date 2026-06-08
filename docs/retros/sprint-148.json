@@ -1,0 +1,145 @@
+{
+  "sprint_number": 148,
+  "player": "codex",
+  "theme": "Human Operating Surface Simplification",
+  "par": 4,
+  "slope": 3,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-06-08",
+  "type": "planning + product architecture",
+  "skills_used": [
+    "slope-sprint-workflow",
+    "github"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow",
+    "github"
+  ],
+  "skill_gaps_found": [],
+  "shots": [
+    {
+      "ticket_key": "S148-1",
+      "title": "Define human, agent, and internal command audiences with promotion/demotion rules",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Classified every top-level command registry entry into human, agent, advanced, or internal audiences and wrote promotion/demotion rules for the future surface model."
+    },
+    {
+      "ticket_key": "S148-2",
+      "title": "Design the small human command cockpit and default help surface",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Defined the proposed human cockpit around now, start, briefing, review, doctor, card, and help --all, with output budgets and backing primitives."
+    },
+    {
+      "ticket_key": "S148-3",
+      "title": "Design skill-first agent workflows that hide CLI plumbing behind outcome commands",
+      "club": "long_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Mapped common human asks to skill-first workflows and identified the hidden CLI/MCP primitives each skill may orchestrate without teaching the whole command list to humans."
+    },
+    {
+      "ticket_key": "S148-4",
+      "title": "Design bounded roadmap planning views as one case study of the new surface model",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        "roadmap_validation_false_positive"
+      ],
+      "notes": "Specified a bounded roadmap status contract and added S149-S151 as the implementation runway. Raised #539 for the S147 shipped-reference false positive instead of hiding it in this planning sprint."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 1,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "rough",
+      "impact": "minor",
+      "description": "The planning sprint exposed that roadmap validation can mistake issue-fix keys such as S147-533 for shipped roadmap sprint evidence."
+    },
+    {
+      "type": "wind",
+      "impact": "minor",
+      "description": "Current roadmap status output prints almost the entire historical roadmap and critical path, which made the product-surface problem concrete."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "A human-facing SLOPE command must be bounded, decision-oriented, and safe to run without prior protocol context.",
+      "outcome": "S148 defines audience rules and a seven-entry cockpit to keep the remembered surface small."
+    },
+    {
+      "type": "lessons",
+      "description": "Roadmap verbosity is a symptom of a broader audience-boundary issue, not the whole problem.",
+      "outcome": "S148 keeps roadmap status as a case study while routing implementation into S149-S151."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "docs",
+      "description": "Created docs/backlog/sprint-148-human-surface-simplification.md with taxonomy, cockpit, skill workflow contract, roadmap case study, and implementation backlog.",
+      "status": "healthy"
+    },
+    {
+      "category": "planning",
+      "description": "Updated docs/backlog/roadmap.json with S149-S151 as the Phase 47 implementation lane.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "Roadmap JSON parsing passed and roadmap validation showed only the known S147/#539 error before S148 closeout status was applied.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "Scorecard validation, map --check, git diff --check, and GitHub CI should remain the closeout gates for this planning PR.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Clarifying. The command list is not bad because it is large; it is bad because humans and agents are being asked to stand in the same doorway.",
+    "advice_for_next_player": "Fix the roadmap signal first, then make audience metadata enforceable in the registry before adding new cockpit aliases.",
+    "what_surprised_you": "The roadmap status command produced the exact failure mode the sprint was trying to name: too much true information, too little decision shape.",
+    "excited_about_next": "SLOPE can keep its rich execution machinery while giving humans a much calmer surface."
+  },
+  "bunker_locations": [
+    "Roadmap validation should not treat issue-fix keys like S147-533 as shipped evidence for roadmap sprint S147.",
+    "Human-facing commands need explicit output budgets or they drift toward full internal state dumps."
+  ],
+  "yardage_book_updates": [
+    "docs/backlog/sprint-148-human-surface-simplification.md defines the audience taxonomy, proposed cockpit, skill-first workflow contract, roadmap default-output spec, and S149-S151 implementation backlog.",
+    "docs/backlog/roadmap.json now extends Phase 47 through S151 and makes S149 responsible for #539 plus bounded roadmap status."
+  ],
+  "course_management_notes": [
+    "GitHub issue #539 was opened for the S147 shipped-reference false positive.",
+    "GitHub issue #541 was opened for historical imported sprint refs surfacing as missing scorecards in status closeout.",
+    "Draft PR #540 carries the S148 planning lane.",
+    "S147 remains a separate planned handoff-continuity sprint rather than a blocker for the human-surface lane."
+  ],
+  "slope_factors": [
+    "planning",
+    "cli_surface",
+    "skill_orchestration",
+    "roadmap_validation"
+  ]
+}
