@@ -71,6 +71,8 @@ import { doctorCommand } from './commands/doctor.js';
 import { versionCommand } from './commands/version.js';
 import { helpCommand, printDefaultHelp } from './commands/help.js';
 import { quickstartCommand } from './commands/quickstart.js';
+import { nowCommand } from './commands/now.js';
+import { startCommand } from './commands/start.js';
 import { worktreeCommand } from './commands/worktree.js';
 import { orgCommand } from './commands/org.js';
 import { memoryCommand } from './commands/memory.js';
@@ -298,6 +300,12 @@ switch (subcommand) {
     break;
   case 'quickstart':
     quickstartCommand(process.argv.slice(3)).catch(reportCliError);
+    break;
+  case 'now':
+    nowCommand(process.argv.slice(3)).catch(reportCliError);
+    break;
+  case 'start':
+    startCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   case 'worktree':
     worktreeCommand(process.argv.slice(3)).catch(reportCliError);

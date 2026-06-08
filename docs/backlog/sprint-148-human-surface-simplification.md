@@ -292,6 +292,29 @@ Tickets:
   sprint execution explicitly hide CLI plumbing from humans.
 - `S151-4`: Add end-to-end tests or transcript fixtures for the cockpit flows.
 
+S151 Implementation Note:
+
+- `slope now` is the compact current-state cockpit: current sprint, phase,
+  sprint state, claims, next action, and the `slope start --ticket=...` move.
+- `slope start` is the human start-of-work entry. Without a ticket it starts or
+  refreshes sprint state and prints a compact briefing; with a ticket it routes
+  to the bundled sprint begin flow for claim, briefing, prep, and gates.
+- Repo skill guidance now maps human asks like release, PR review, issue
+  triage, sprint execution, and retro capture to outcome-oriented workflows
+  while leaving raw CLI plumbing as agent primitives.
+
+### S151.1 - Windows Git Analyzer Timeout Hardening
+
+Purpose: repair the validation issue raised as #544 during S151 closeout, where
+the git analyzer daily-cadence fixture exceeded hard-coded Windows timeouts
+under local CPU contention.
+
+Tickets:
+
+- `S151.1-1`: Remove wall-clock sensitivity from the git analyzer
+  daily-cadence fixture.
+- `S151.1-2`: Validate focused git analyzer and full-suite behavior for #544.
+
 ## Non-Goals Reaffirmed
 
 - Do not remove existing commands in this phase.

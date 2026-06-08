@@ -28,6 +28,8 @@ export function generateProjectContext(m: MetaphorDefinition): string {
 This project uses the SLOPE framework for sprint tracking.
 
 ## Commands
+- \`slope now\` — compact current-state cockpit
+- \`slope start [--ticket=KEY]\` — human start-of-work entry
 - \`slope card\` — view ${r.handicapCard.toLowerCase()}
 - \`slope validate\` — validate ${r.scorecard.toLowerCase()}s
 - \`slope review\` — generate sprint review
@@ -39,9 +41,14 @@ A SLOPE MCP server is configured in \`.mcp.json\`. Two tools:
 - \`execute\` — run JS with full SLOPE API in sandbox
 
 ## Sprint Workflow
-- **Pre-${r.sprint}:** \`slope briefing\` for handicap, hazards, gotchas
+- **Pre-${r.sprint}:** \`slope now\`, then \`slope start\` or \`slope start --ticket=KEY\`
 - **Per-${r.ticket}:** classify each ticket with approach + result + hazards
 - **Post-${r.sprint}:** \`slope validate\` ${r.scorecard.toLowerCase()}, \`slope review\`, update common-issues
+
+## Human Surface
+Humans ask for outcomes; agents use CLI primitives internally. Map release,
+PR review, issue triage, retro, and sprint execution requests to the relevant
+workflow without requiring humans to memorize claim/session/gate commands.
 
 See .claude/rules/ for detailed checklists.
 
@@ -81,12 +88,14 @@ Before starting a new phase or project:
 
 Before writing any code in a new sprint:
 
-1. **Run \`slope briefing\`** — Single command that outputs handicap snapshot, hazard index, nutrition alerts, filtered gotchas, and session continuity
+1. **Run \`slope now\`** — Compact cockpit with current sprint, state, claims, and next action
+2. **Run \`slope start\` or \`slope start --ticket=KEY\`** — Human entry point for sprint state, briefing, claim guidance, and prep
+3. **Run \`slope briefing\` when deeper context is needed** — Outputs handicap snapshot, hazard index, nutrition alerts, filtered gotchas, and session continuity
    - Use \`--categories=testing,api\` or \`--keywords=migration\` to filter for the sprint's work area
-2. **Verify previous ${r.scorecard.toLowerCase()} exists** — If the last sprint's ${r.scorecard.toLowerCase()} wasn't created, create it now
-3. **Branch hygiene check** — \`git branch -a\` to confirm no stale branches remain
-4. **Gap analysis** (if touching API or schema) — Read relevant docs and compare against implementation before writing code
-5. **Set ${r.onTarget.toLowerCase()} and slope** — ${r.onTarget} from ticket count (1-2=3, 3-4=4, 5+=5), slope from complexity factors
+4. **Verify previous ${r.scorecard.toLowerCase()} exists** — If the last sprint's ${r.scorecard.toLowerCase()} wasn't created, create it now
+5. **Branch hygiene check** — \`git branch -a\` to confirm no stale branches remain
+6. **Gap analysis** (if touching API or schema) — Read relevant docs and compare against implementation before writing code
+7. **Set ${r.onTarget.toLowerCase()} and slope** — ${r.onTarget} from ticket count (1-2=3, 3-4=4, 5+=5), slope from complexity factors
 
 ## Pre-${r.ticket} Routine (Per-Ticket, Before Code)
 
@@ -300,6 +309,8 @@ export function generateAgentsMd(m: MetaphorDefinition): string {
 This project uses the SLOPE framework for sprint tracking.
 
 ## Commands
+- \`slope now\` — compact current-state cockpit
+- \`slope start [--ticket=KEY]\` — human start-of-work entry
 - \`slope card\` — view ${r.handicapCard.toLowerCase()}
 - \`slope validate\` — validate ${r.scorecard.toLowerCase()}s
 - \`slope review\` — generate sprint review
@@ -311,9 +322,14 @@ A SLOPE MCP server is configured in \`opencode.json\`. Two tools:
 - \`execute\` — run JS with full SLOPE API in sandbox
 
 ## Sprint Workflow
-- **Pre-${r.sprint}:** \`slope briefing\` for handicap, hazards, gotchas
+- **Pre-${r.sprint}:** \`slope now\`, then \`slope start\` or \`slope start --ticket=KEY\`
 - **Per-${r.ticket}:** classify each ticket with approach + result + hazards
 - **Post-${r.sprint}:** \`slope validate\` ${r.scorecard.toLowerCase()}, \`slope review\`, update common-issues
+
+## Human Surface
+Humans ask for outcomes; agents use CLI primitives internally. Map release,
+PR review, issue triage, retro, and sprint execution requests to the relevant
+workflow without requiring humans to memorize claim/session/gate commands.
 
 ## Approach Complexity
 - ${clubs.driver}: risky/new territory
@@ -556,6 +572,8 @@ export function generateCursorrules(m: MetaphorDefinition, harness: 'cursor' | '
 This project uses the SLOPE framework for sprint tracking.
 
 ## Commands
+- \`slope now\` — compact current-state cockpit
+- \`slope start [--ticket=KEY]\` — human start-of-work entry
 - \`slope card\` — view ${r.handicapCard.toLowerCase()}
 - \`slope validate\` — validate ${r.scorecard.toLowerCase()}s
 - \`slope review\` — generate sprint review
@@ -567,9 +585,14 @@ A SLOPE MCP server is configured in \`${mcpPath}\`. Two tools:
 - \`execute\` — run JS with full SLOPE API in sandbox
 
 ## Sprint Workflow
-- **Pre-${r.sprint}:** \`slope briefing\` for handicap, hazards, gotchas
+- **Pre-${r.sprint}:** \`slope now\`, then \`slope start\` or \`slope start --ticket=KEY\`
 - **Per-${r.ticket}:** classify each ticket with approach + result + hazards
 - **Post-${r.sprint}:** \`slope validate\` ${r.scorecard.toLowerCase()}, \`slope review\`, update common-issues
+
+## Human Surface
+Humans ask for outcomes; agents use CLI primitives internally. Map release,
+PR review, issue triage, retro, and sprint execution requests to the relevant
+workflow without requiring humans to memorize claim/session/gate commands.
 
 ## Approach Complexity
 - ${clubs.driver}: risky/new territory
@@ -605,9 +628,11 @@ export function generateGenericChecklist(m: MetaphorDefinition): string {
 4. Run \`slope roadmap show\` — view dependency graph
 
 ## Pre-${r.sprint} (Sprint Start)
-1. Run \`slope briefing\` — handicap, hazards, gotchas, session continuity
-2. Verify previous ${r.scorecard.toLowerCase()} exists
-3. Set ${r.onTarget.toLowerCase()} (1-2 tickets=3, 3-4=4, 5+=5) and slope factors
+1. Run \`slope now\` — current sprint, state, claims, next action
+2. Run \`slope start\` or \`slope start --ticket=KEY\` — sprint state, briefing, claim guidance, prep
+3. Run \`slope briefing\` when deeper hazard context is needed
+4. Verify previous ${r.scorecard.toLowerCase()} exists
+5. Set ${r.onTarget.toLowerCase()} (1-2 tickets=3, 3-4=4, 5+=5) and slope factors
 
 ## Per-Ticket
 - **Before:** Select approach (${clubs.driver}/${clubs.long_iron}/${clubs.short_iron}/${clubs.wedge}/${clubs.putter}), scan hazards
