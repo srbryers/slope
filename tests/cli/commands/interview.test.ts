@@ -59,6 +59,33 @@ describe('slope interview CLI', () => {
     expect(last.filesCreated).toBeDefined();
   });
 
+  it('roadmap interview alias reaches agent JSON mode', () => {
+    const result = execSync(
+      `node "${join(process.cwd(), 'dist/cli/index.js')}" roadmap interview --agent`,
+      {
+        cwd,
+        encoding: 'utf8',
+        input: JSON.stringify({ id: 'project-name', value: 'RoadmapProject' }) + '\n' +
+               JSON.stringify({ id: 'metaphor', value: 'golf' }) + '\n' +
+               JSON.stringify({ id: 'repo-url', value: '' }) + '\n' +
+               JSON.stringify({ id: 'sprint-number', value: '1' }) + '\n' +
+               JSON.stringify({ id: 'platforms', value: [] }) + '\n' +
+               JSON.stringify({ id: 'team-members', value: '' }) + '\n' +
+               JSON.stringify({ id: 'vision', value: 'Plan the product roadmap' }) + '\n' +
+               JSON.stringify({ id: 'deep-analysis', value: false }) + '\n',
+      }
+    );
+
+    const lines = result.trim().split('\n');
+    const first = JSON.parse(lines[0]);
+    expect(first.type).toBe('question');
+    expect(first.id).toBe('project-name');
+
+    const last = JSON.parse(lines[lines.length - 1]);
+    expect(last.type).toBe('complete');
+    expect(last.filesCreated).toContain(join(cwd, 'docs', 'backlog', 'roadmap.json'));
+  });
+
   it('agent mode rejects invalid JSON input', () => {
     const result = execSync(
       `node "${join(process.cwd(), 'dist/cli/index.js')}" interview --agent`,

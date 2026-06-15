@@ -25,6 +25,7 @@ import {
 import type { RoadmapDefinition, RoadmapSprint, RoadmapTicket, RoadmapClub, GolfScorecard } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { buildRoadmapReality, formatRoadmapRealitySection } from '../pre-sprint-reality.js';
+import { interviewCommand } from './interview.js';
 
 // --- Helpers ---
 
@@ -729,11 +730,15 @@ export async function roadmapCommand(args: string[]): Promise<void> {
     case 'generate':
       await generateSubcommand(flags, cwd);
       break;
+    case 'interview':
+      await interviewCommand(args.slice(1));
+      break;
     default:
       console.log(`
 slope roadmap — Strategic planning tools
 
 Usage:
+  slope roadmap interview [--agent] [--force]       Run project interview for planning input
   slope roadmap validate [--path=<file>]     Schema + dependency graph checks
   slope roadmap review [--path=<file>]       Automated architect review
   slope roadmap status [--path=<file>] [--sprint=N] [--full]  Compact current progress
@@ -746,6 +751,10 @@ Options:
   --sprint=N       Override current sprint number (for status)
   --full           Show full roadmap history for status
   --dry-run        Show what would change without writing (for sync and generate)
+
+Interview delegates to \`slope interview\`. Use \`--agent\` for JSON I/O, or
+\`slope vision create/update\` plus \`slope roadmap generate\` when you already
+have planning answers.
 
 Generate requires concrete backlog signals from source TODO/FIXME/HACK comments
 or synced issue data. It fails instead of creating placeholder planning tickets
