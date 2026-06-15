@@ -491,8 +491,12 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
 
   // ── Planning ───────────────────────────────────────────────────
   {
-    cmd: 'roadmap', desc: 'Strategic planning and roadmap tools', category: 'planning', audience: 'human',
+    cmd: 'roadmap', desc: 'Strategic planning, interview handoff, and roadmap tools', category: 'planning', audience: 'human',
     subcommands: [
+      { name: 'interview', desc: 'Run project interview for planning input (alias of slope interview)', flags: [
+        { flag: '--agent', desc: 'JSON I/O mode for agent harnesses' },
+        { flag: '--force', desc: 'Re-interview even if project already initialized' },
+      ]},
       { name: 'validate', desc: 'Schema + dependency graph checks', flags: [
         { flag: '--path=<file>', desc: 'Roadmap file path' },
       ]},
@@ -510,8 +514,9 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
         { flag: '--path=<file>', desc: 'Roadmap file path' },
         { flag: '--dry-run', desc: 'Preview without writing' },
       ]},
-      { name: 'generate', desc: 'Generate from vision + backlog analysis', flags: [
+      { name: 'generate', desc: 'Generate from vision + backlog analysis after slope vision create/update', flags: [
         { flag: '--path=<file>', desc: 'Output roadmap file path' },
+        { flag: '--dry-run', desc: 'Preview without writing' },
       ]},
     ],
   },
