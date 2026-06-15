@@ -693,6 +693,10 @@ describe('slope roadmap (no subcommand)', () => {
 
     const output = consoleOutput.join('\n');
     expect(output).toContain('slope roadmap');
+    expect(output).toContain('slope roadmap interview');
+    expect(output).toContain('Interview delegates to `slope interview`');
+    expect(output).toContain('slope vision create/update');
+    expect(output).toContain('slope roadmap generate');
     expect(output).toContain('validate');
     expect(output).toContain('review');
     expect(output).toContain('status');
