@@ -34,11 +34,13 @@ This project uses the SLOPE framework for sprint tracking.
 - \`slope validate\` — validate ${r.scorecard.toLowerCase()}s
 - \`slope review\` — generate sprint review
 - \`slope briefing\` — ${r.briefing.toLowerCase()}
+- \`slope roadmap interview\` — collect planning input when roadmap direction is unclear
 
 ## MCP Tools
 A SLOPE MCP server is configured in \`.mcp.json\`. Two tools:
 - \`search\` — discover API functions, types, constants
 - \`execute\` — run JS with full SLOPE API in sandbox
+- \`search({ module: 'init' })\` — discover roadmap interview questions and submit helpers
 
 ## Sprint Workflow
 - **Pre-${r.sprint}:** \`slope now\`, then \`slope start\` or \`slope start --ticket=KEY\`
@@ -78,11 +80,12 @@ The SLOPE framework organizes sprint work into a hierarchy of routines${m.id ===
 Before starting a new phase or project:
 
 1. **Define the vision** — What does the end state look like? Document in a vision doc
-2. **Build the roadmap** — Create \`docs/backlog/roadmap.json\` with sprints, dependencies, and phases
-3. **Run \`slope roadmap validate\`** — Check for structural issues, dependency cycles, numbering gaps
-4. **Run \`slope roadmap review\`** — Automated architect review: scope balance, critical path, bottlenecks
-5. **Identify the critical path** — Run \`slope roadmap show\` to see the dependency graph and parallel tracks
-6. **Plan parallel tracks** — If sprints can run concurrently, plan for multi-agent execution
+2. **Run \`slope roadmap interview\` when direction is unclear** — Use \`--agent\` for JSON-mode agent harnesses
+3. **Build the roadmap** — Create \`docs/backlog/roadmap.json\` with sprints, dependencies, and phases
+4. **Run \`slope roadmap validate\`** — Check for structural issues, dependency cycles, numbering gaps
+5. **Run \`slope roadmap review\`** — Automated architect review: scope balance, critical path, bottlenecks
+6. **Identify the critical path** — Run \`slope roadmap show\` to see the dependency graph and parallel tracks
+7. **Plan parallel tracks** — If sprints can run concurrently, plan for multi-agent execution
 
 ## Pre-${r.sprint} Routine (Sprint Start)
 
@@ -315,11 +318,13 @@ This project uses the SLOPE framework for sprint tracking.
 - \`slope validate\` — validate ${r.scorecard.toLowerCase()}s
 - \`slope review\` — generate sprint review
 - \`slope briefing\` — ${r.briefing.toLowerCase()}
+- \`slope roadmap interview\` — collect planning input when roadmap direction is unclear
 
 ## MCP Tools
 A SLOPE MCP server is configured in \`opencode.json\`. Two tools:
 - \`search\` — discover API functions, types, constants
 - \`execute\` — run JS with full SLOPE API in sandbox
+- \`search({ module: 'init' })\` — discover roadmap interview questions and submit helpers
 
 ## Sprint Workflow
 - **Pre-${r.sprint}:** \`slope now\`, then \`slope start\` or \`slope start --ticket=KEY\`
@@ -441,10 +446,11 @@ The SLOPE framework organizes sprint work into a hierarchy of routines${m.id ===
 
 Before starting a new phase or project:
 
-1. **Build the roadmap** — Create \`docs/backlog/roadmap.json\` with sprints, dependencies, and phases
-2. **Run \`slope roadmap validate\`** — Check for dependency cycles, numbering gaps
-3. **Run \`slope roadmap review\`** — Scope balance, critical path, bottlenecks
-4. **Run \`slope roadmap show\`** — Dependency graph and parallel tracks
+1. **Run \`slope roadmap interview\` when direction is unclear** — Use \`--agent\` for JSON-mode agent harnesses
+2. **Build the roadmap** — Create \`docs/backlog/roadmap.json\` with sprints, dependencies, and phases
+3. **Run \`slope roadmap validate\`** — Check for dependency cycles, numbering gaps
+4. **Run \`slope roadmap review\`** — Scope balance, critical path, bottlenecks
+5. **Run \`slope roadmap show\`** — Dependency graph and parallel tracks
 
 ## Pre-${r.sprint} Routine (Sprint Start)
 
@@ -578,11 +584,13 @@ This project uses the SLOPE framework for sprint tracking.
 - \`slope validate\` — validate ${r.scorecard.toLowerCase()}s
 - \`slope review\` — generate sprint review
 - \`slope briefing\` — ${r.briefing.toLowerCase()}
+- \`slope roadmap interview\` — collect planning input when roadmap direction is unclear
 
 ## MCP Tools
 A SLOPE MCP server is configured in \`${mcpPath}\`. Two tools:
 - \`search\` — discover API functions, types, constants
 - \`execute\` — run JS with full SLOPE API in sandbox
+- \`search({ module: 'init' })\` — discover roadmap interview questions and submit helpers
 
 ## Sprint Workflow
 - **Pre-${r.sprint}:** \`slope now\`, then \`slope start\` or \`slope start --ticket=KEY\`
@@ -622,10 +630,11 @@ export function generateGenericChecklist(m: MetaphorDefinition): string {
   return `# SLOPE Sprint Checklist
 
 ## Pre-Tournament (Course Strategy)
-1. Build roadmap in \`docs/backlog/roadmap.json\`
-2. Run \`slope roadmap validate\` — check dependencies and structure
-3. Run \`slope roadmap review\` — scope balance, critical path, bottlenecks
-4. Run \`slope roadmap show\` — view dependency graph
+1. Run \`slope roadmap interview\` when planning direction is unclear
+2. Build roadmap in \`docs/backlog/roadmap.json\`
+3. Run \`slope roadmap validate\` — check dependencies and structure
+4. Run \`slope roadmap review\` — scope balance, critical path, bottlenecks
+5. Run \`slope roadmap show\` — view dependency graph
 
 ## Pre-${r.sprint} (Sprint Start)
 1. Run \`slope now\` — current sprint, state, claims, next action

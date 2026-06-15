@@ -150,6 +150,11 @@ export class GenericAdapter implements HarnessAdapter {
         '{ "action": "allow" | "deny" | "context", "message": "...", "reason": "..." }',
         '```',
         '',
+        '## Roadmap Planning',
+        '',
+        'If an agent or user asks for a roadmap interview, run `slope roadmap interview`.',
+        'Agent harnesses can use `slope roadmap interview --agent` or MCP `search({ module: "init" })`.',
+        '',
         'See `guards-manifest.json` for the full list of guards and their hook events.',
         '',
       ].join('\n');

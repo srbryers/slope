@@ -167,6 +167,15 @@ Runs repo analysis (stack detection, file structure, testing framework, git hist
 
 ## Common Workflows
 
+### Planning a Roadmap
+
+```bash
+slope roadmap interview              # Guided project interview for planning input
+slope roadmap interview --agent      # JSON mode for agent harnesses
+slope vision create                  # Persist purpose and priorities
+slope roadmap generate --dry-run     # Preview generated roadmap from vision + backlog signals
+```
+
 ### Before a Sprint
 
 ```bash

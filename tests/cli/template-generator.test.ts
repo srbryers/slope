@@ -20,6 +20,8 @@ describe('generateProjectContext', () => {
     expect(content).toContain('handicap card');
     expect(content).toContain('slope now');
     expect(content).toContain('slope start [--ticket=KEY]');
+    expect(content).toContain('slope roadmap interview');
+    expect(content).toContain("search({ module: 'init' })");
     expect(content).toContain('pre-round briefing');
     expect(content).toContain('Human Surface');
     expect(content).toContain('Pre-Hole');
@@ -44,6 +46,7 @@ describe('generateSprintChecklist', () => {
     expect(content).toContain('Pre-Hole Routine (Sprint Start)');
     expect(content).toContain('Run `slope now`');
     expect(content).toContain('Run `slope start` or `slope start --ticket=KEY`');
+    expect(content).toContain('Run `slope roadmap interview` when direction is unclear');
     expect(content).toContain('Pre-Shot Routine (Per-Ticket, Before Code)');
     expect(content).toContain('Post-Shot Routine (Per-Ticket, After Completion)');
     expect(content).toContain('Post-Hole Routine (Sprint Completion)');
@@ -147,6 +150,8 @@ describe('generateAgentsMd', () => {
     expect(content).toContain('opencode.json');
     expect(content).toContain('handicap card');
     expect(content).toContain('slope now');
+    expect(content).toContain('slope roadmap interview');
+    expect(content).toContain("search({ module: 'init' })");
     expect(content).toContain('Human Surface');
     expect(content).toContain('Commit Discipline');
     expect(content).toContain('Driver: risky');
@@ -168,6 +173,8 @@ describe('generateCursorrules', () => {
     expect(content).toContain('.cursor/mcp.json');
     expect(content).toContain('handicap card');
     expect(content).toContain('slope now');
+    expect(content).toContain('slope roadmap interview');
+    expect(content).toContain("search({ module: 'init' })");
     expect(content).toContain('Human Surface');
     expect(content).toContain('Pre-Hole');
     expect(content).toContain('Post-Hole');
@@ -193,6 +200,7 @@ describe('generateGenericChecklist', () => {
     expect(content).toContain('slope now');
     expect(content).toContain('slope start');
     expect(content).toContain('slope briefing');
+    expect(content).toContain('slope roadmap interview');
     expect(content).toContain('slope validate');
     expect(content).toContain('slope review');
     expect(content).toContain('slope card');

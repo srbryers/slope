@@ -68,6 +68,16 @@ describe('slope help', () => {
     expect(output).toContain('--target=<path>');
   });
 
+  it('shows roadmap interview and vision-generation breadcrumbs', async () => {
+    await helpCommand(['roadmap']);
+
+    const output = consoleOutput.join('\n');
+    expect(output).toContain('slope roadmap interview');
+    expect(output).toContain('alias of slope interview');
+    expect(output).toContain('slope vision create/update');
+    expect(output).toContain('--dry-run');
+  });
+
   it('teaches the --all escape hatch in help usage', async () => {
     await helpCommand(['--help']);
 

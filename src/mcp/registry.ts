@@ -853,14 +853,14 @@ export const SLOPE_REGISTRY: FunctionRegistryEntry[] = [
   {
     name: 'getInitQuestions',
     module: 'init',
-    description: 'Get interview steps for slope init with smart defaults pre-filled. See also: submitInitAnswers().',
+    description: 'Get roadmap interview/init steps with smart defaults pre-filled. Use when an agent needs a roadmap interview. See also: submitInitAnswers().',
     signature: 'getInitQuestions(): { steps: InterviewStep[], context: InterviewContext }',
     example: 'return getInitQuestions();',
   },
   {
     name: 'submitInitAnswers',
     module: 'init',
-    description: 'Run slope init with provided answers. See also: getInitQuestions().',
+    description: 'Submit roadmap interview/init answers and run slope init. See also: getInitQuestions().',
     signature: 'submitInitAnswers(answers: Record<string, unknown>, providers?: string[]): Promise<InitFromAnswersResult>',
     example: 'return await submitInitAnswers({ "project-name": "my-app", "metaphor": "gaming" }, ["claude-code"]);',
   },

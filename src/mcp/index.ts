@@ -1182,6 +1182,7 @@ function handleInitQuery(): string {
 
   sections.push('# SLOPE Init — Agent API\n');
   sections.push('Use `getInitQuestions()` and `submitInitAnswers()` to drive `slope init` programmatically.\n');
+  sections.push('For roadmap planning interviews, collect the same answers here or run `slope roadmap interview --agent` from the CLI.\n');
 
   sections.push('## Workflow\n');
   sections.push('1. Call `getInitQuestions()` to get interview steps with smart defaults');

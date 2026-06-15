@@ -131,7 +131,7 @@ export default function slopePlugin(ctx: OpenCodeContext): void {
 
   // ── Slash Commands ────────────────────────────────
 
-  ctx.registerCommand('slope', 'Run any SLOPE CLI command', async (args: string) => {
+  ctx.registerCommand('slope', 'Run any SLOPE CLI command; use "roadmap interview --agent" for planning interviews', async (args: string) => {
     return slopeCmd(args || 'briefing --compact', cwd);
   });
 

@@ -1,0 +1,164 @@
+{
+  "sprint_number": 152.1,
+  "player": "codex",
+  "theme": "Roadmap Interview Discoverability and Harness Routing",
+  "par": 4,
+  "slope": 2,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-06-15",
+  "type": "bugfix + dx",
+  "skills_used": [
+    "slope-sprint-workflow"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow"
+  ],
+  "skill_gaps_found": [],
+  "shots": [
+    {
+      "ticket_key": "S152.1-1",
+      "title": "Add a `slope roadmap interview` alias or guided handoff to the existing interview/vision flow",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added `slope roadmap interview` as an alias that delegates to the existing interview command, including --agent JSON-mode coverage that writes the roadmap artifacts."
+    },
+    {
+      "ticket_key": "S152.1-2",
+      "title": "Cross-reference `slope interview`, `slope vision`, and `slope roadmap generate` in roadmap help and command metadata",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Updated roadmap help, registry metadata, README, and getting-started docs so roadmap planning points at the interview, vision, and generate flows."
+    },
+    {
+      "ticket_key": "S152.1-3",
+      "title": "Verify interview discovery paths for supported harness surfaces: CLI, MCP init helpers, Pi extension, Codex/OpenCode adapter docs, and generic adapter guidance",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Surfaced roadmap interview guidance through MCP init search descriptions, Pi onboarding/planning messages, Codex/OpenCode templates, generated adapter docs, and the generic adapter README."
+    },
+    {
+      "ticket_key": "S152.1-4",
+      "title": "Add regression coverage for roadmap interview alias/help plus agent and Pi discovery flows",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added regression coverage for roadmap help discovery, CLI alias execution, MCP init search discoverability, Pi tool guidance, OpenCode slash-command description, and generated harness docs."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "wind",
+      "impact": "minor",
+      "description": "The sprint was triggered by an agent-discoverability miss: roadmap tooling existed, but supported harnesses did not make the interview flow obvious from roadmap-planning language."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "When an existing command is the right answer, add an alias and discovery breadcrumbs at the user phrase boundary instead of duplicating the workflow.",
+      "outcome": "`slope roadmap interview` now routes to `slope interview`, while docs and harness prompts explain the existing vision/generate path."
+    },
+    {
+      "type": "lessons",
+      "description": "Discovery bugs need harness-level assertions, not just CLI help assertions.",
+      "outcome": "Coverage now spans CLI help/registry, MCP init search, Pi onboarding, OpenCode command text, Codex templates, and generic adapter output."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "`pnpm vitest run tests/cli/commands/interview.test.ts` passed: 5 tests.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`pnpm vitest run tests/cli/commands/help.test.ts tests/cli/registry.test.ts` passed: 13 tests.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`pnpm vitest run tests/cli/template-generator.test.ts tests/mcp/init-api.test.ts tests/packages/pi-extension.test.ts tests/packages/opencode-plugin.test.ts tests/core/adapters/generic.test.ts` passed: 107 tests.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`pnpm vitest run tests/cli/commands/interview.test.ts tests/cli/commands/help.test.ts tests/cli/registry.test.ts tests/cli/roadmap.test.ts tests/cli/template-generator.test.ts tests/mcp/init-api.test.ts tests/packages/pi-extension.test.ts tests/packages/opencode-plugin.test.ts tests/core/adapters/generic.test.ts` passed: 156 tests.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`pnpm test` passed: 235 files, 3670 tests, 25 skipped.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`pnpm build` passed.",
+      "status": "healthy"
+    },
+    {
+      "category": "docs",
+      "description": "`node dist/cli/index.js help roadmap` showed the new `slope roadmap interview` alias and planning breadcrumbs.",
+      "status": "healthy"
+    },
+    {
+      "category": "docs",
+      "description": "`node dist/cli/index.js validate docs/retros/sprint-152.1.json` passed with no errors or warnings.",
+      "status": "healthy"
+    },
+    {
+      "category": "docs",
+      "description": "`node dist/cli/index.js roadmap validate --path=docs/backlog/roadmap.json` passed with existing historical ticket-count warnings and the expected branch-not-on-main warning for S152.1 until merge.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "A satisfying discoverability fix: the system already had the interview, but the doors into it were too easy for agents to miss.",
+    "advice_for_next_player": "When a user asks for a high-level workflow, search command aliases, help metadata, MCP descriptions, and harness templates together; agents learn from all of those surfaces.",
+    "what_surprised_you": "The fix was less about new capability and more about vocabulary. Adding `roadmap interview` made the existing flow line up with how people naturally ask for it.",
+    "excited_about_next": "S153 can now start after a cleaner planning surface, with the roadmap interview no longer hiding behind setup/init language."
+  },
+  "bunker_locations": [
+    "Roadmap planning language can drift away from the original `slope interview` and MCP init naming.",
+    "Harness prompt templates can silently lag CLI capabilities unless regression tests assert generated guidance.",
+    "Pi and OpenCode surfaces need explicit planning-language breadcrumbs because users may never inspect full CLI help."
+  ],
+  "yardage_book_updates": [
+    "src/cli/commands/roadmap.ts now accepts `slope roadmap interview` and documents the alias.",
+    "src/cli/registry.ts and help tests now advertise roadmap interview and the vision/generate path.",
+    "src/mcp/registry.ts and src/mcp/index.ts make roadmap interview language discover MCP init helpers.",
+    "packages/pi-extension/src/index.ts and packages/opencode-plugin/src/index.ts surface planning-interview guidance in harness UX.",
+    "src/cli/template-generator.ts, Codex skill templates, docs, and adapter README output now mention the roadmap interview flow."
+  ],
+  "course_management_notes": [
+    "The issue was a supported-surface discoverability bug, not a missing interview engine.",
+    "The alias deliberately delegates to the existing interview command so behavior stays single-sourced.",
+    "Regression coverage is spread across execution, help metadata, MCP search, Pi, OpenCode, Codex template, and generic adapter output."
+  ],
+  "slope_factors": [
+    "roadmap_planning_vocabulary",
+    "harness_discoverability",
+    "mcp_init_naming",
+    "agent_help_surface"
+  ]
+}
