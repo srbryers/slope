@@ -55,3 +55,7 @@ codex debug prompt-input 'global hooks only parse smoke'
 Then run a harmless command in a SLOPE repo and confirm `.slope/guard-metrics.jsonl` receives a fresh entry.
 
 To register the project-local plugin bundle as a Codex marketplace source, run `codex plugin marketplace add .codex` from the repository root.
+
+## Roadmap Planning
+
+For planning intake, use `slope roadmap interview` in human mode or `slope roadmap interview --agent` in JSON mode. MCP-driven Codex sessions can discover the same flow with `search({ module: "init" })`, then call `getInitQuestions()` and `submitInitAnswers()`.

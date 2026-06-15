@@ -24,6 +24,10 @@ Use this when the user wants SLOPE available from an agent harness.
 4. Run `bash -n .codex/hooks/slope-guard.sh` or `bash -n ~/.codex/hooks/slope-guard.sh`.
 5. Restart Codex and review `/hooks` after hook changes.
 
+## Planning Discovery
+
+When the user asks for a roadmap interview, run `slope roadmap interview` or `slope roadmap interview --agent`. If using MCP directly, call `search({ module: "init" })` to discover `getInitQuestions()` and `submitInitAnswers()`.
+
 ## Explain
 
 Tell the user that the Codex plugin bundle groups SLOPE skills, MCP metadata, and future plugin-hook metadata under a named SLOPE integration. Active guard enforcement still uses the stable Codex hooks.json shim while Codex `plugin_hooks` is under development.

@@ -67,6 +67,8 @@ describe('OpenCode Plugin', () => {
       expect(commands).toContain('slope');
       expect(commands).toContain('sprint');
       expect(commands).toContain('guard-check');
+      const slopeCommand = mockCtx.registerCommand.mock.calls.find((c: unknown[]) => c[0] === 'slope');
+      expect(slopeCommand?.[1]).toContain('roadmap interview --agent');
     });
 
     it('session.created injects briefing', async () => {

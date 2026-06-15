@@ -107,6 +107,7 @@ describe('registry entries', () => {
     expect(entry!.module).toBe('init');
     expect(entry!.signature).toContain('InterviewStep');
     expect(entry!.signature).toContain('InterviewContext');
+    expect(entry!.description).toContain('roadmap interview');
   });
 
   it('submitInitAnswers entry has correct module and signature', () => {
@@ -114,5 +115,16 @@ describe('registry entries', () => {
     expect(entry).toBeDefined();
     expect(entry!.module).toBe('init');
     expect(entry!.signature).toContain('InitFromAnswersResult');
+    expect(entry!.description).toContain('roadmap interview');
+  });
+
+  it('roadmap interview search terms discover init helpers', () => {
+    const q = 'roadmap interview';
+    const matches = SLOPE_REGISTRY.filter((e) =>
+      e.name.toLowerCase().includes(q) || e.description.toLowerCase().includes(q),
+    ).map((e) => e.name);
+
+    expect(matches).toContain('getInitQuestions');
+    expect(matches).toContain('submitInitAnswers');
   });
 });

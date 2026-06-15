@@ -12,6 +12,7 @@ Use these commands from the repository root.
 1. Run `slope sprint status`.
 2. If no sprint is active, run `slope next` and `slope briefing --sprint=<next>`.
 3. If a sprint is active, run `slope briefing --sprint=<active>` before editing.
+4. If the user asks for a roadmap interview or planning input, run `slope roadmap interview` or `slope roadmap interview --agent`; MCP agents can also search `module: "init"`.
 
 ## Start Or Claim
 

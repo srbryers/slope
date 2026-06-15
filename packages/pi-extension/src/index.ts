@@ -649,7 +649,7 @@ export default function slopeExtension(pi: ExtensionAPI, _cwdOverride?: string):
 
   pi.on('session_start', async (_event, ctx) => {
     briefingInjected = false;
-    ctx.ui.notify('SLOPE loaded — use /slope, /sprint, /slope-settings, or ask for slope_* tools', 'info');
+    ctx.ui.notify('SLOPE loaded - use /slope, /sprint, /slope-settings, slope_interview, or other slope_* tools', 'info');
   });
 
   if (isSkillEnabled(settings, 'briefing')) {
@@ -674,7 +674,7 @@ export default function slopeExtension(pi: ExtensionAPI, _cwdOverride?: string):
               'This project has SLOPE initialized, but no sprint is active yet. Please help get things set up:\n\n' +
               '1. **Understand the project**: Read README.md, package.json, and explore key source files to understand what\'s been built.\n' +
               '2. **Index the codebase**: Run `slope map` to generate CODEBASE.md for architectural context.\n' +
-              '3. **Interview the user**: Ask 2–3 quick questions about the project goals, team size, and current priorities.\n' +
+              '3. **Interview the user**: Run the `slope_interview` tool, or use `slope roadmap interview --agent` from the CLI.\n' +
               '4. **Start Sprint 1**: Once you have context, suggest creating a sprint plan with `slope sprint start` or by editing docs/backlog/roadmap.json.\n\n' +
               'Session mode: adhoc (sprint-workflow guards are silenced until a sprint begins).\n' +
               'Use /slope or the slope_* tools anytime for SLOPE commands.',
@@ -716,8 +716,9 @@ export default function slopeExtension(pi: ExtensionAPI, _cwdOverride?: string):
             'The project is initialized and ready for sprint planning.\n\n' +
             'Suggested next steps:\n' +
             '1. Review docs/backlog/roadmap.json and refine the starter sprint\n' +
-            '2. Run `slope sprint start --number=1` to activate Sprint 1\n' +
-            '3. Use `slope sprint run S1 --workflow=sprint-standard` to begin execution\n\n' +
+            '2. If planning inputs are missing, run `slope_interview` or `slope roadmap interview --agent`\n' +
+            '3. Run `slope sprint start --number=1` to activate Sprint 1\n' +
+            '4. Use `slope sprint run S1 --workflow=sprint-standard` to begin execution\n\n' +
             'Session mode: planning (workflow guards are relaxed).',
           display: true,
         },

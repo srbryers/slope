@@ -131,6 +131,8 @@ describe('GenericAdapter', () => {
       const readme = readFileSync(join(hooksDir, 'README.md'), 'utf8');
       expect(readme).toContain('slope-guard.sh');
       expect(readme).toContain('PreToolUse');
+      expect(readme).toContain('slope roadmap interview');
+      expect(readme).toContain('search({ module: "init" })');
     });
 
     it('does not overwrite existing dispatcher', () => {

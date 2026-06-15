@@ -134,6 +134,10 @@ describe('Pi Extension', () => {
         expect.stringContaining('SLOPE loaded'),
         'info',
       );
+      expect(ctx.ui.notify).toHaveBeenCalledWith(
+        expect.stringContaining('slope_interview'),
+        'info',
+      );
     });
 
     it('before_agent_start injects onboarding message for fresh project', async () => {
@@ -145,6 +149,8 @@ describe('Pi Extension', () => {
       const result = await handler({}, makeCtx(tmpDir));
       expect(result?.message.content).toContain('🎯 SLOPE Onboarding');
       expect(result?.message.content).toContain('slope map');
+      expect(result?.message.content).toContain('slope_interview');
+      expect(result?.message.content).toContain('slope roadmap interview --agent');
 
       // Second call should return nothing (dedup)
       const result2 = await handler({}, makeCtx(tmpDir));
@@ -256,6 +262,7 @@ describe('Pi Extension', () => {
 
       const result = await handler({}, makeCtx(tmpDir));
       expect(result?.message.content).toContain('Planning Phase');
+      expect(result?.message.content).toContain('slope_interview');
       expect(result?.message.content).toContain('sprint start');
     });
   });
