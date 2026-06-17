@@ -41,6 +41,8 @@ It also writes `.codex/.agents/plugins/marketplace.json` so `.codex/` can be use
 
 This bundle is the named SLOPE adapter boundary for Codex. It packages SLOPE skills, MCP server metadata, hook metadata, local marketplace metadata, and a dispatcher script over the SLOPE CLI. Keep using project or user `hooks.json` shims as the active guard runtime path until Codex `plugin_hooks` is stable.
 
+The plugin manifest intentionally declares only supported Codex plugin fields. It includes `skills` and `mcpServers`, but does not declare `hooks`; `hooks.json` remains metadata-only until Codex plugin hook loading is stable and validator-supported.
+
 `slope init --codex` updates SLOPE-owned plugin metadata on repeated runs. Existing non-SLOPE plugin manifests are left alone.
 
 ## Verification

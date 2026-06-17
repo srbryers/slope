@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 
 const REPO_ROOT = resolve(__dirname, '..', '..');
 const SLOPE_BIN = resolve(REPO_ROOT, 'dist', 'cli', 'index.js');
+const STRICT_SEMVER = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-.]+)?(?:\+[0-9A-Za-z-.]+)?$/;
 
 function runSlopeInit(cwd: string, args: string[] = ['--codex']): string {
   return execFileSync(process.execPath, [SLOPE_BIN, 'init', ...args], {
@@ -15,11 +16,57 @@ function runSlopeInit(cwd: string, args: string[] = ['--codex']): string {
   });
 }
 
+function readJson(filePath: string): any {
+  return JSON.parse(readFileSync(filePath, 'utf8'));
+}
+
+function expectNonEmptyString(value: unknown): void {
+  expect(typeof value).toBe('string');
+  expect((value as string).length).toBeGreaterThan(0);
+}
+
+function expectValidCodexPluginBundle(pluginRoot: string): { manifest: any; mcp: any } {
+  const manifestPath = join(pluginRoot, '.codex-plugin', 'plugin.json');
+  const manifest = readJson(manifestPath);
+  expect(manifest.name).toBe('slope');
+  expect(manifest.version).toMatch(STRICT_SEMVER);
+  expectNonEmptyString(manifest.description);
+  expectNonEmptyString(manifest.author?.name);
+  expect(Object.prototype.hasOwnProperty.call(manifest, 'hooks')).toBe(false);
+  expect(manifest.skills).toBe('./skills/');
+  expect(manifest.mcpServers).toBe('./.mcp.json');
+  expect(existsSync(join(pluginRoot, manifest.skills))).toBe(true);
+  expect(existsSync(join(pluginRoot, manifest.mcpServers))).toBe(true);
+
+  const iface = manifest.interface;
+  expectNonEmptyString(iface?.displayName);
+  expectNonEmptyString(iface?.shortDescription);
+  expectNonEmptyString(iface?.longDescription);
+  expectNonEmptyString(iface?.developerName);
+  expectNonEmptyString(iface?.category);
+  expect(Array.isArray(iface?.capabilities)).toBe(true);
+  expect(iface.capabilities.length).toBeGreaterThan(0);
+  expect(Array.isArray(iface?.defaultPrompt)).toBe(true);
+  expect(iface.defaultPrompt.length).toBeLessThanOrEqual(3);
+  for (const prompt of iface.defaultPrompt) {
+    expectNonEmptyString(prompt);
+    expect(prompt.length).toBeLessThanOrEqual(128);
+  }
+
+  const mcp = readJson(join(pluginRoot, manifest.mcpServers));
+  expect(mcp.mcpServers.slope).toEqual({ command: 'slope', args: ['mcp'] });
+  return { manifest, mcp };
+}
+
 describe('slope init --codex (GH #309)', () => {
   beforeAll(() => {
     if (!existsSync(SLOPE_BIN)) {
       throw new Error(`dist not built — run \`pnpm build\` first. Expected ${SLOPE_BIN}`);
     }
+  });
+
+  it('keeps the bundled Codex plugin template validator-compatible', () => {
+    expectValidCodexPluginBundle(join(REPO_ROOT, 'templates', 'codex', 'plugins', 'slope'));
   });
 
   it('creates AGENTS.md with project context (#340)', () => {
@@ -80,18 +127,21 @@ describe('slope init --codex (GH #309)', () => {
       expect(existsSync(dispatcherPath)).toBe(true);
       expect(existsSync(skillPath)).toBe(true);
       expect(existsSync(retroSkillPath)).toBe(true);
+      expect(readFileSync(dispatcherPath, 'utf8')).not.toContain('\r\n');
+      expect(readFileSync(dispatcherPath, 'utf8')).toContain('exec npx --yes @slope-dev/slope guard "$@"');
       expect(readFileSync(retroSkillPath, 'utf8')).toContain('slope retro post-merge');
 
-      const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
-      const marketplace = JSON.parse(readFileSync(marketplacePath, 'utf8'));
-      const mcp = JSON.parse(readFileSync(mcpPath, 'utf8'));
-      const hooks = JSON.parse(readFileSync(hooksPath, 'utf8'));
+      const { manifest, mcp } = expectValidCodexPluginBundle(pluginRoot);
+      const marketplace = readJson(marketplacePath);
+      const hooks = readJson(hooksPath);
       const pkg = JSON.parse(readFileSync(join(REPO_ROOT, 'package.json'), 'utf8'));
       expect(manifest.name).toBe('slope');
       expect(manifest.version).toBe(pkg.version);
       expect(manifest.skills).toBe('./skills/');
-      expect(manifest.hooks).toBe('./hooks.json');
+      expect(Object.prototype.hasOwnProperty.call(manifest, 'hooks')).toBe(false);
       expect(manifest.mcpServers).toBe('./.mcp.json');
+      expect(marketplace.name).toBe('slope-local');
+      expect(marketplace.interface.displayName).toBe('SLOPE Local');
       expect(marketplace.plugins).toContainEqual({
         name: 'slope',
         source: { source: 'local', path: './plugins/slope' },
@@ -135,6 +185,14 @@ describe('slope init --codex (GH #309)', () => {
         name: 'slope',
         version: '0.0.1',
         hooks: './old-hooks.json',
+        interface: {
+          defaultPrompt: [
+            'Set up SLOPE for this repo from Codex.',
+            'Start or inspect the current SLOPE sprint.',
+            'Close out the sprint with validation and review.',
+            'Run a post-merge retro and save durable learnings.',
+          ],
+        },
       }, null, 2) + '\n');
 
       runSlopeInit(cwd);
@@ -148,8 +206,9 @@ describe('slope init --codex (GH #309)', () => {
 
       expect(manifest.version).toBe(pkg.version);
       expect(manifest.skills).toBe('./skills/');
-      expect(manifest.hooks).toBe('./hooks.json');
+      expect(Object.prototype.hasOwnProperty.call(manifest, 'hooks')).toBe(false);
       expect(manifest.mcpServers).toBe('./.mcp.json');
+      expect(manifest.interface.defaultPrompt).toHaveLength(3);
       expect(commands).toContain('"./hooks/slope-guard.sh" claim-required');
       expect(commands).toContain('"./hooks/slope-guard.sh" pr-review');
     } finally {

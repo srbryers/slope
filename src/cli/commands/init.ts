@@ -5,7 +5,7 @@ import { execSync } from 'node:child_process';
 import { createConfig } from '../config.js';
 import { saveHooksConfig } from '../hooks-config.js';
 import { resolveMetaphor } from '../metaphor.js';
-import { detectPackageManager, createVision, analyzeStack, SLOPE_BIN_PREAMBLE, writeOrUpdateManagedScript, GUARD_DEFINITIONS } from '../../core/index.js';
+import { detectPackageManager, createVision, analyzeStack, SLOPE_BIN_PREAMBLE, writeOrUpdateManagedScript, GUARD_DEFINITIONS, normalizeShellScriptLineEndings } from '../../core/index.js';
 import type { StackProfile } from '../../core/analyzers/types.js';
 import type { MetaphorDefinition } from '../../core/index.js';
 import {
@@ -564,16 +564,31 @@ function copyCodexPluginTemplate(srcDir: string, destDir: string, relativeDir = 
       copied += result.copied;
       updated += result.updated;
     } else if (!existsSync(dest)) {
-      cpSync(src, dest);
-      if (relativePath === join('hooks', 'slope-guard.sh')) chmodSync(dest, 0o755);
+      copyCodexPluginFile(src, dest, relativePath);
       copied++;
-    } else if (isManagedCodexPluginFile(relativePath, dest) && readFileSync(src, 'utf8') !== readFileSync(dest, 'utf8')) {
-      cpSync(src, dest, { force: true });
-      if (relativePath === join('hooks', 'slope-guard.sh')) chmodSync(dest, 0o755);
+    } else if (isManagedCodexPluginFile(relativePath, dest) && codexPluginFileChanged(src, dest, relativePath)) {
+      copyCodexPluginFile(src, dest, relativePath);
       updated++;
     }
   }
   return { copied, updated };
+}
+
+function copyCodexPluginFile(src: string, dest: string, relativePath: string): void {
+  if (relativePath.replace(/\\/g, '/').endsWith('.sh')) {
+    writeFileSync(dest, normalizeShellScriptLineEndings(readFileSync(src, 'utf8')), { mode: 0o755 });
+    return;
+  }
+  cpSync(src, dest, { force: true });
+}
+
+function codexPluginFileChanged(src: string, dest: string, relativePath: string): boolean {
+  const srcContent = readFileSync(src, 'utf8');
+  const destContent = readFileSync(dest, 'utf8');
+  if (relativePath.replace(/\\/g, '/').endsWith('.sh')) {
+    return normalizeShellScriptLineEndings(srcContent) !== normalizeShellScriptLineEndings(destContent);
+  }
+  return srcContent !== destContent;
 }
 
 function isManagedCodexPluginFile(relativePath: string, destPath: string): boolean {
@@ -679,12 +694,22 @@ function syncCodexPluginManifest(pluginRoot: string): boolean {
     const version = getSlopePackageVersion();
     if (version) manifest.version = version;
     manifest.skills = './skills/';
-    manifest.hooks = './hooks.json';
+    delete manifest.hooks;
     manifest.mcpServers = './.mcp.json';
+    normalizeCodexPluginDefaultPrompts(manifest);
     return writeJsonIfChanged(manifestPath, manifest);
   } catch {
     return false;
   }
+}
+
+function normalizeCodexPluginDefaultPrompts(manifest: Record<string, unknown>): void {
+  if (!isRecord(manifest.interface)) return;
+  const prompts = manifest.interface.defaultPrompt;
+  if (!Array.isArray(prompts)) return;
+  manifest.interface.defaultPrompt = prompts
+    .filter((prompt): prompt is string => typeof prompt === 'string')
+    .slice(0, 3);
 }
 
 function writeJsonIfChanged(filePath: string, value: unknown): boolean {
@@ -954,7 +979,7 @@ const PROVIDER_NEXT_STEPS: Partial<Record<InitProvider, string[]>> = {
   codex: [
     'Add SLOPE MCP server to .codex/config.toml: [mcp.slope] command="slope" args=["mcp"]',
     'Guards installed to .codex/hooks.json',
-    'Plugin bundle installed to .codex/plugins/slope with skills, MCP metadata, marketplace metadata, and future plugin_hooks metadata',
+    'Plugin bundle installed to .codex/plugins/slope with skills, MCP metadata, marketplace metadata, and metadata-only hook definitions',
     'Track docs/vision.md and docs/backlog/roadmap.json as source of truth (.slope/ stays local)',
     'Branch discipline: branch-before-commit guard blocks direct main commits — use feat/<desc>',
     'First sprint: slope vision create, slope roadmap validate, slope sprint begin --sprint=1 --ticket=S1-1',

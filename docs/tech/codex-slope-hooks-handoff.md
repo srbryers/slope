@@ -1,7 +1,7 @@
 # Codex SLOPE Hooks Handoff
 
 **Date:** 2026-05-16
-**Status:** Global Codex hooks are active locally; SLOPE plugin runtime hooks remain blocked by Codex plugin hook discovery. SLOPE now ships a named Codex plugin bundle for skills, MCP metadata, local marketplace metadata, and future plugin hook metadata.
+**Status:** Global Codex hooks are active locally; SLOPE plugin runtime hooks remain blocked by Codex plugin hook discovery. SLOPE now ships a named Codex plugin bundle for skills, MCP metadata, local marketplace metadata, and metadata-only future plugin hook definitions.
 
 ## Current Local State
 
@@ -39,8 +39,9 @@ In `/Users/sebastianbryers/Development/slope`:
 1. `src/core/adapters/codex.ts` installs project or user-level hook shims.
 2. `slope init --codex` generates a Codex plugin bundle for SLOPE with:
    - `.codex-plugin/plugin.json`
+   - a validator-compatible manifest that declares `skills` and `mcpServers`, not `hooks`
    - packaged guard dispatcher script
-   - bundled hook metadata for future plugin-hook support
+   - bundled metadata-only hook definitions for future plugin-hook support
    - `skills/` workflow guidance
    - `.mcp.json` server metadata
    - `.codex/.agents/plugins/marketplace.json` local marketplace metadata

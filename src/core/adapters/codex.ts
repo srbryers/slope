@@ -7,7 +7,7 @@ import { existsSync, writeFileSync, readFileSync, mkdirSync, chmodSync } from 'n
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { HarnessAdapter, HarnessInstallOptions, ToolNameMap } from '../harness.js';
-import { registerAdapter, resolveToolMatcher } from '../harness.js';
+import { normalizeShellScriptLineEndings, registerAdapter, resolveToolMatcher } from '../harness.js';
 import type { GuardResult, AnyGuardDefinition, PreToolUseOutput, PostToolUseOutput, StopOutput, Suggestion } from '../guard.js';
 
 type CodexHookHandler = { type: string; command: string; timeout?: number; statusMessage?: string };
@@ -201,13 +201,13 @@ function writeCodexGuardDispatcher(scriptPath: string, userLevel: boolean): void
         'elif command -v slope >/dev/null 2>&1; then',
         '  SLOPE_BIN="$(command -v slope)"',
         'else',
-        '  SLOPE_BIN="npx --yes @slope-dev/slope"',
+        '  exec npx --yes @slope-dev/slope guard "$@"',
         'fi',
         '',
         'cd "$SLOPE_PROJECT_DIR"',
         'exec "$SLOPE_BIN" guard "$@"',
       ];
-  const script = [
+  const script = normalizeShellScriptLineEndings([
     '#!/usr/bin/env bash',
     '# SLOPE Codex guard dispatcher.',
     '',
@@ -217,10 +217,10 @@ function writeCodexGuardDispatcher(scriptPath: string, userLevel: boolean): void
     ...body,
     MANAGED_END,
     '',
-  ].join('\n');
+  ].join('\n'));
 
   if (existsSync(scriptPath)) {
-    const existing = readFileSync(scriptPath, 'utf8');
+    const existing = normalizeShellScriptLineEndings(readFileSync(scriptPath, 'utf8'));
     const startIdx = existing.indexOf(MANAGED_START);
     const endIdx = existing.indexOf(MANAGED_END);
     if (startIdx !== -1 && endIdx !== -1) {
