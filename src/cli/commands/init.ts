@@ -5,7 +5,7 @@ import { execSync } from 'node:child_process';
 import { createConfig } from '../config.js';
 import { saveHooksConfig } from '../hooks-config.js';
 import { resolveMetaphor } from '../metaphor.js';
-import { detectPackageManager, createVision, analyzeStack, SLOPE_BIN_PREAMBLE, writeOrUpdateManagedScript, GUARD_DEFINITIONS } from '../../core/index.js';
+import { detectPackageManager, createVision, analyzeStack, SLOPE_BIN_PREAMBLE, writeOrUpdateManagedScript, GUARD_DEFINITIONS, normalizeShellScriptLineEndings } from '../../core/index.js';
 import type { StackProfile } from '../../core/analyzers/types.js';
 import type { MetaphorDefinition } from '../../core/index.js';
 import {
@@ -564,16 +564,31 @@ function copyCodexPluginTemplate(srcDir: string, destDir: string, relativeDir = 
       copied += result.copied;
       updated += result.updated;
     } else if (!existsSync(dest)) {
-      cpSync(src, dest);
-      if (relativePath === join('hooks', 'slope-guard.sh')) chmodSync(dest, 0o755);
+      copyCodexPluginFile(src, dest, relativePath);
       copied++;
-    } else if (isManagedCodexPluginFile(relativePath, dest) && readFileSync(src, 'utf8') !== readFileSync(dest, 'utf8')) {
-      cpSync(src, dest, { force: true });
-      if (relativePath === join('hooks', 'slope-guard.sh')) chmodSync(dest, 0o755);
+    } else if (isManagedCodexPluginFile(relativePath, dest) && codexPluginFileChanged(src, dest, relativePath)) {
+      copyCodexPluginFile(src, dest, relativePath);
       updated++;
     }
   }
   return { copied, updated };
+}
+
+function copyCodexPluginFile(src: string, dest: string, relativePath: string): void {
+  if (relativePath.replace(/\\/g, '/').endsWith('.sh')) {
+    writeFileSync(dest, normalizeShellScriptLineEndings(readFileSync(src, 'utf8')), { mode: 0o755 });
+    return;
+  }
+  cpSync(src, dest, { force: true });
+}
+
+function codexPluginFileChanged(src: string, dest: string, relativePath: string): boolean {
+  const srcContent = readFileSync(src, 'utf8');
+  const destContent = readFileSync(dest, 'utf8');
+  if (relativePath.replace(/\\/g, '/').endsWith('.sh')) {
+    return normalizeShellScriptLineEndings(srcContent) !== normalizeShellScriptLineEndings(destContent);
+  }
+  return srcContent !== destContent;
 }
 
 function isManagedCodexPluginFile(relativePath: string, destPath: string): boolean {

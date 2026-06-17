@@ -310,6 +310,7 @@ export {
   clearAdapters,
   resolveToolMatcher,
   SLOPE_BIN_PREAMBLE,
+  normalizeShellScriptLineEndings,
   writeOrUpdateManagedScript,
 } from './harness.js';
 export type {

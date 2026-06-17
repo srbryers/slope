@@ -17,7 +17,7 @@ elif [ -f "$SLOPE_PROJECT_DIR/dist/cli/index.js" ] && [ -f "$SLOPE_PROJECT_DIR/p
 elif command -v slope >/dev/null 2>&1; then
   SLOPE_BIN="$(command -v slope)"
 else
-  SLOPE_BIN="npx --yes @slope-dev/slope"
+  exec npx --yes @slope-dev/slope guard "$@"
 fi
 
 cd "$SLOPE_PROJECT_DIR"

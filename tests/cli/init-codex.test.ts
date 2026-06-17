@@ -127,6 +127,8 @@ describe('slope init --codex (GH #309)', () => {
       expect(existsSync(dispatcherPath)).toBe(true);
       expect(existsSync(skillPath)).toBe(true);
       expect(existsSync(retroSkillPath)).toBe(true);
+      expect(readFileSync(dispatcherPath, 'utf8')).not.toContain('\r\n');
+      expect(readFileSync(dispatcherPath, 'utf8')).toContain('exec npx --yes @slope-dev/slope guard "$@"');
       expect(readFileSync(retroSkillPath, 'utf8')).toContain('slope retro post-merge');
 
       const { manifest, mcp } = expectValidCodexPluginBundle(pluginRoot);

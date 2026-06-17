@@ -159,6 +159,10 @@ export const SLOPE_BIN_PREAMBLE: string[] = [
 const MANAGED_START = '# === SLOPE MANAGED (do not edit above this line) ===';
 const MANAGED_END = '# === SLOPE END ===';
 
+export function normalizeShellScriptLineEndings(content: string): string {
+  return content.replace(/\r\n?/g, '\n');
+}
+
 /**
  * Write or update a SLOPE-managed shell script.
  * - New file: writes `fullScript` as-is.
@@ -171,12 +175,15 @@ const MANAGED_END = '# === SLOPE END ===';
  * @returns 'created' | 'updated' | 'unchanged'
  */
 export function writeOrUpdateManagedScript(filePath: string, fullScript: string): 'created' | 'updated' | 'unchanged' {
+  const normalizedScript = normalizeShellScriptLineEndings(fullScript);
+
   if (!existsSync(filePath)) {
-    writeFileSync(filePath, fullScript, { mode: 0o755 });
+    writeFileSync(filePath, normalizedScript, { mode: 0o755 });
     return 'created';
   }
 
-  const existing = readFileSync(filePath, 'utf8');
+  const existingRaw = readFileSync(filePath, 'utf8');
+  const existing = normalizeShellScriptLineEndings(existingRaw);
   const startIdx = existing.indexOf(MANAGED_START);
   const endIdx = existing.indexOf(MANAGED_END);
   if (startIdx === -1 || endIdx === -1) {
@@ -185,14 +192,20 @@ export function writeOrUpdateManagedScript(filePath: string, fullScript: string)
   }
 
   // Extract managed body from the new full script
-  const newStartIdx = fullScript.indexOf(MANAGED_START);
-  const newEndIdx = fullScript.indexOf(MANAGED_END);
+  const newStartIdx = normalizedScript.indexOf(MANAGED_START);
+  const newEndIdx = normalizedScript.indexOf(MANAGED_END);
   if (newStartIdx === -1 || newEndIdx === -1) return 'unchanged';
 
-  const newManaged = fullScript.slice(newStartIdx + MANAGED_START.length, newEndIdx);
+  const newManaged = normalizedScript.slice(newStartIdx + MANAGED_START.length, newEndIdx);
   const oldManaged = existing.slice(startIdx + MANAGED_START.length, endIdx);
 
-  if (newManaged === oldManaged) return 'unchanged';
+  if (newManaged === oldManaged) {
+    if (existingRaw !== existing) {
+      writeFileSync(filePath, existing, { mode: 0o755 });
+      return 'updated';
+    }
+    return 'unchanged';
+  }
 
   // Preserve header + user content, replace only the managed section
   const header = existing.slice(0, startIdx + MANAGED_START.length);

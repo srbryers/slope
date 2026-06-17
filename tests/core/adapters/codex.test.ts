@@ -212,7 +212,32 @@ describe('CodexAdapter', () => {
 
       const config = JSON.parse(readFileSync(join(tmpDir, '.codex', 'hooks.json'), 'utf8'));
       expect(config.hooks.PreToolUse).toBeDefined();
-      expect(readFileSync(join(tmpDir, '.codex', 'hooks', 'slope-guard.sh'), 'utf8')).toContain('#!/usr/bin/env bash');
+      const script = readFileSync(join(tmpDir, '.codex', 'hooks', 'slope-guard.sh'), 'utf8');
+      expect(script).toContain('#!/usr/bin/env bash');
+      expect(script).toContain('exec npx --yes @slope-dev/slope guard "$@"');
+      expect(script).not.toContain('SLOPE_BIN="npx --yes @slope-dev/slope"');
+      expect(script).not.toContain('\r\n');
+    });
+
+    it('normalizes CRLF in existing generated dispatchers on reinstall', () => {
+      const tmpDir = mkdtempSync(join(tmpdir(), 'slope-codex-install-'));
+      const hooksDir = join(tmpDir, '.codex', 'hooks');
+      mkdirSync(hooksDir, { recursive: true });
+      const scriptPath = join(hooksDir, 'slope-guard.sh');
+      writeFileSync(scriptPath, [
+        '#!/usr/bin/env bash',
+        '# SLOPE Codex guard dispatcher.',
+        '',
+        '# === SLOPE MANAGED (do not edit above this line) ===',
+        'slope guard "$@"',
+        '# === SLOPE END ===',
+        '',
+      ].join('\r\n'));
+
+      const guards = GUARD_DEFINITIONS.filter(g => g.name === 'hazard');
+      adapter.installGuards(tmpDir, guards);
+
+      expect(readFileSync(scriptPath, 'utf8')).not.toContain('\r\n');
     });
 
     it('can install Codex guards to the user-level hooks directory', () => {

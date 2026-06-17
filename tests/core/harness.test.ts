@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { mkdtempSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
@@ -12,6 +12,7 @@ import {
   CLAUDE_CODE_TOOLS,
   TOOL_CATEGORIES,
   ADAPTER_PRIORITY,
+  writeOrUpdateManagedScript,
 } from '../../src/core/harness.js';
 import type { HarnessAdapter, ToolNameMap, ToolCategory } from '../../src/core/harness.js';
 import type { GuardResult } from '../../src/core/guard.js';
@@ -81,6 +82,44 @@ describe('harness adapter registry', () => {
     clearAdapters();
     expect(listAdapters()).toEqual([]);
     expect(getAdapter('claude-code')).toBeUndefined();
+  });
+});
+
+describe('writeOrUpdateManagedScript', () => {
+  it('writes new managed shell scripts with LF line endings', () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), 'slope-managed-script-'));
+    const scriptPath = join(tmpDir, 'slope-guard.sh');
+    const script = [
+      '#!/usr/bin/env bash',
+      '# === SLOPE MANAGED (do not edit above this line) ===',
+      'slope guard "$@"',
+      '# === SLOPE END ===',
+      '',
+    ].join('\r\n');
+
+    const result = writeOrUpdateManagedScript(scriptPath, script);
+
+    expect(result).toBe('created');
+    expect(existsSync(scriptPath)).toBe(true);
+    expect(readFileSync(scriptPath, 'utf8')).not.toContain('\r\n');
+  });
+
+  it('normalizes CRLF in existing managed shell scripts even when content is current', () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), 'slope-managed-script-'));
+    const scriptPath = join(tmpDir, 'slope-guard.sh');
+    const script = [
+      '#!/usr/bin/env bash',
+      '# === SLOPE MANAGED (do not edit above this line) ===',
+      'slope guard "$@"',
+      '# === SLOPE END ===',
+      '',
+    ].join('\n');
+    writeFileSync(scriptPath, script.replace(/\n/g, '\r\n'));
+
+    const result = writeOrUpdateManagedScript(scriptPath, script);
+
+    expect(result).toBe('updated');
+    expect(readFileSync(scriptPath, 'utf8')).toBe(script);
   });
 });
 
