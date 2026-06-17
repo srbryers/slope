@@ -30,4 +30,4 @@ When the user asks for a roadmap interview, run `slope roadmap interview` or `sl
 
 ## Explain
 
-Tell the user that the Codex plugin bundle groups SLOPE skills, MCP metadata, and future plugin-hook metadata under a named SLOPE integration. Active guard enforcement still uses the stable Codex hooks.json shim while Codex `plugin_hooks` is under development.
+Tell the user that the Codex plugin bundle exposes SLOPE skills and MCP metadata under a named SLOPE integration. The bundle also includes metadata-only hook definitions for future Codex plugin-hook support, but the plugin manifest intentionally does not declare `hooks` because current Codex plugin validation rejects that field. Active guard enforcement uses the stable Codex hooks.json shim installed by `slope init --codex` while Codex `plugin_hooks` is under development.

@@ -17,16 +17,15 @@
     "hooks"
   ],
   "skills": "./skills/",
-  "hooks": "./hooks.json",
   "mcpServers": "./.mcp.json",
   "interface": {
     "displayName": "SLOPE",
-    "shortDescription": "Sprint tracking, guard hooks, and workflow skills for Codex.",
-    "longDescription": "Packages SLOPE's Codex-facing adapter boundary: guard hook metadata, a dispatcher over the SLOPE CLI, MCP server metadata, and skills for sprint setup, closeout, post-merge retros, and guard-warning handling. Runtime guard execution uses user or project hooks.json shims until Codex plugin_hooks is stable.",
+    "shortDescription": "Sprint tracking, guard shims, and workflow skills for Codex.",
+    "longDescription": "Packages SLOPE's Codex-facing adapter boundary: skills for sprint setup, closeout, post-merge retros, MCP server metadata, and metadata-only hook definitions for future Codex plugin hook support. Runtime guard execution uses user or project hooks.json shims until Codex plugin_hooks is stable.",
     "developerName": "SLOPE",
     "category": "Productivity",
     "capabilities": [
-      "Hooks",
+      "Guard Shims",
       "Skills",
       "MCP"
     ],
@@ -34,10 +33,9 @@
     "privacyPolicyURL": "https://github.com/srbryers/slope",
     "termsOfServiceURL": "https://github.com/srbryers/slope",
     "defaultPrompt": [
-      "Set up SLOPE for this repo from Codex.",
-      "Start or inspect the current SLOPE sprint.",
-      "Close out the sprint with validation and review.",
-      "Run a post-merge retro and save durable learnings."
+      "Set up SLOPE for this repo.",
+      "Start or inspect the current sprint.",
+      "Close out this sprint with review."
     ],
     "brandColor": "#2F6F5E"
   }
