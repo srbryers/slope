@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { execFileSync } from 'node:child_process';
 import { getVersionBumpStagePaths, versionCommand } from '../../src/cli/commands/version.js';
 
 let tmpDir: string;
@@ -23,6 +24,31 @@ afterEach(() => {
   rmSync(tmpDir, { recursive: true, force: true });
   vi.restoreAllMocks();
 });
+
+function git(args: string[]): string {
+  return execFileSync('git', args, { cwd: tmpDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+}
+
+function gitInit(): void {
+  git(['init']);
+  git(['config', 'user.email', 'test@test.com']);
+  git(['config', 'user.name', 'Test User']);
+}
+
+function gitCommit(message: string): void {
+  git(['add', '-A']);
+  git(['commit', '-m', message]);
+}
+
+function writeJson(path: string, data: unknown): void {
+  const fullPath = join(tmpDir, path);
+  mkdirSync(dirname(fullPath), { recursive: true });
+  writeFileSync(fullPath, JSON.stringify(data, null, 2));
+}
+
+function output(): string {
+  return consoleSpy.mock.calls.map(c => c[0]).join('\n');
+}
 
 describe('versionCommand', () => {
   // GH #300: default version output must read from the installed slope
@@ -83,5 +109,118 @@ describe('versionCommand', () => {
 
   it('stages only package.json when no bundled Codex plugin manifest exists', () => {
     expect(getVersionBumpStagePaths(tmpDir)).toEqual(['package.json']);
+  });
+
+  it('raises recommendation to minor from shipped SLOPE scorecard evidence when squash subjects hide feature work (#550)', async () => {
+    gitInit();
+    gitCommit('chore: initial release');
+    git(['tag', 'v1.0.0']);
+
+    writeJson('docs/backlog/roadmap.json', {
+      name: 'Test Roadmap',
+      phases: [{ name: 'Phase 1', sprints: [42] }],
+      sprints: [{
+        id: 42,
+        theme: 'Human Cockpit',
+        par: 4,
+        slope: 2,
+        type: 'cli product surface',
+        status: 'complete',
+        tickets: [{
+          key: 'S42-1',
+          title: 'Implement a compact user-facing command cockpit',
+          club: 'short_iron',
+          complexity: 'standard',
+        }],
+      }],
+    });
+    writeJson('docs/retros/sprint-42.json', {
+      sprint_number: 42,
+      theme: 'Human Cockpit',
+      type: 'cli product surface',
+      shots: [{
+        ticket_key: 'S42-1',
+        title: 'Implement a compact user-facing command cockpit',
+        notes: 'Shipped new human-facing CLI behavior.',
+      }],
+      slope_factors: ['cli_surface'],
+    });
+    gitCommit('Human cockpit shipped (#1)');
+
+    await versionCommand(['recommend']);
+    const text = output();
+
+    expect(text).toContain('Conventional commit tier: patch');
+    expect(text).toContain('SLOPE release evidence: minor');
+    expect(text).toContain('S42 Human Cockpit');
+    expect(text).toContain('Recommended: minor (1.5.0');
+    expect(text).toContain('Recommendation raised above commit-subject tier');
+  });
+
+  it('does not raise recommendation from planned roadmap feature work without shipped evidence', async () => {
+    gitInit();
+    gitCommit('chore: initial release');
+    git(['tag', 'v1.0.0']);
+
+    writeJson('docs/backlog/roadmap.json', {
+      name: 'Test Roadmap',
+      phases: [{ name: 'Phase 1', sprints: [43] }],
+      sprints: [{
+        id: 43,
+        theme: 'Future Human Cockpit',
+        par: 4,
+        slope: 2,
+        type: 'cli product surface',
+        status: 'planned',
+        tickets: [{
+          key: 'S43-1',
+          title: 'Plan a future user-facing command cockpit',
+          club: 'short_iron',
+          complexity: 'standard',
+        }],
+      }],
+    });
+    gitCommit('docs(roadmap): plan S43');
+
+    await versionCommand(['recommend']);
+    const text = output();
+
+    expect(text).toContain('Conventional commit tier: patch');
+    expect(text).toContain('SLOPE release evidence: none found');
+    expect(text).toContain('Recommended: patch (1.5.0');
+    expect(text).not.toContain('SLOPE release evidence: minor');
+  });
+
+  it('raises recommendation from completed roadmap metadata when scorecard evidence is absent', async () => {
+    gitInit();
+    gitCommit('chore: initial release');
+    git(['tag', 'v1.0.0']);
+
+    writeJson('docs/backlog/roadmap.json', {
+      name: 'Test Roadmap',
+      phases: [{ name: 'Phase 1', sprints: [44] }],
+      sprints: [{
+        id: 44,
+        theme: 'Command Cockpit',
+        par: 4,
+        slope: 2,
+        type: 'cli product surface',
+        status: 'complete',
+        tickets: [{
+          key: 'S44-1',
+          title: 'Ship a compact user-facing command cockpit',
+          club: 'short_iron',
+          complexity: 'standard',
+        }],
+      }],
+    });
+    gitCommit('docs(roadmap): close S44');
+
+    await versionCommand(['recommend']);
+    const text = output();
+
+    expect(text).toContain('SLOPE release evidence: minor');
+    expect(text).toContain('S44 Command Cockpit (roadmap: cli product surface)');
+    expect(text).toContain('Recommended: minor (1.5.0');
   });
 });
