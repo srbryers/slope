@@ -360,7 +360,7 @@
         152.1,
         153
       ],
-      "status": "planned",
+      "status": "complete",
       "note": "Close out the v1.59.0 release memory, repair roadmap interview discoverability across harness surfaces, and triage the semver recommendation gap discovered during release verification."
     },
     {
@@ -4623,7 +4623,9 @@
       "par": 3,
       "slope": 2,
       "type": "bugfix",
-      "status": "planned",
+      "status": "complete",
+      "score": 3,
+      "score_label": "par",
       "depends_on": [
         152.1
       ],

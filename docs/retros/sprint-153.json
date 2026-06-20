@@ -1,0 +1,146 @@
+{
+  "sprint_number": 153,
+  "player": "codex",
+  "theme": "Semver Recommendation Evidence Hardening",
+  "par": 3,
+  "slope": 2,
+  "score": 3,
+  "score_label": "par",
+  "date": "2026-06-20",
+  "type": "bugfix + release workflow",
+  "skills_used": [
+    "slope-sprint-workflow",
+    "slope-sprint"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow",
+    "slope-sprint"
+  ],
+  "skill_gaps_found": [],
+  "shots": [
+    {
+      "ticket_key": "S153-1",
+      "title": "Add durable roadmap or PR evidence to version recommendation for squash-merged feature work (#550)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added SLOPE release-evidence collection for unreleased changelog entries by reading sprint references, commit subjects, changed scorecard paths, completed roadmap metadata, and scorecards."
+    },
+    {
+      "ticket_key": "S153-2",
+      "title": "Explain semver evidence and ambiguity in version recommend output (#550)",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "`slope version recommend` now reports the conventional-commit tier, any durable SLOPE release evidence used, and when evidence raises the recommendation above the commit-subject tier."
+    },
+    {
+      "ticket_key": "S153-3",
+      "title": "Add regression coverage for squash-merge semver undercall prevention (#550)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added git-backed regression coverage for hidden feature-level scorecard evidence, planned roadmap work that must not promote, and completed roadmap metadata without a scorecard."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 3,
+    "fairways_total": 3,
+    "greens_in_regulation": 3,
+    "greens_total": 3,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "wind",
+      "impact": "minor",
+      "description": "The v1.59.0 release cycle exposed that squash-merged feature work can lose conventional-commit signals even when SLOPE roadmap and scorecard evidence is durable."
+    },
+    {
+      "type": "rough",
+      "impact": "minor",
+      "description": "The release smoke initially over-included old unreleased changes until local tags were fetched, reinforcing that version validation should begin with fresh tags."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Durable SLOPE evidence should raise semver only when work is actually shipped.",
+      "outcome": "The classifier ignores planned roadmap entries unless the sprint is complete or a scorecard exists, and plain bugfix/test/release/planning metadata remains patch-level."
+    },
+    {
+      "type": "lessons",
+      "description": "Release recommendation tests need both undercall prevention and over-promotion guardrails.",
+      "outcome": "Regression coverage now includes shipped feature evidence, planned feature evidence with no shipment, and completed roadmap metadata without a scorecard."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "`pnpm test tests/cli/version.test.ts tests/cli/commands/version.test.ts` passed: 2 files, 11 tests.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`pnpm typecheck` passed.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`pnpm build` passed.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`pnpm test` passed: 235 files, 3677 tests, 25 skipped.",
+      "status": "healthy"
+    },
+    {
+      "category": "validation",
+      "description": "`git fetch origin --tags` followed by `node dist/cli/index.js version recommend` reported the current unreleased S153 work as patch-level before closeout artifacts, confirming no stale-tag overcount.",
+      "status": "healthy"
+    },
+    {
+      "category": "validation",
+      "description": "`node dist/cli/index.js validate docs/retros/sprint-153.json` passed with no errors or warnings.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "A small but satisfying release-tooling repair: the command can now see the sprint evidence that humans were already using during release judgment.",
+    "advice_for_next_player": "Fetch tags before release recommendation smokes, then compare conventional-commit output against scorecard and roadmap evidence before picking a semver level.",
+    "what_surprised_you": "The important part was not just finding feature words; it was refusing to count planned roadmap work as shipped evidence.",
+    "excited_about_next": "The issue-driven recovery train can now move into roadmap/status integrity with release recommendation no longer blind to shipped SLOPE context."
+  },
+  "bunker_locations": [
+    "Squash commit subjects can hide feature-level work from semver recommendation.",
+    "Planned roadmap entries must not count as shipped release evidence.",
+    "Stale local tags can make version recommendation smokes over-include older release trains."
+  ],
+  "yardage_book_updates": [
+    "src/cli/commands/version.ts now collects sprint references from changelog descriptions, scopes, commit subjects, and changed scorecard paths.",
+    "src/cli/commands/version.ts now reads roadmap and scorecard metadata to surface durable SLOPE release evidence in `version recommend`.",
+    "tests/cli/version.test.ts now covers hidden feature evidence, planned-work guardrails, and completed-roadmap fallback evidence."
+  ],
+  "course_management_notes": [
+    "No code-review or architect-review findings were recorded for S153.",
+    "S153 remains a bugfix + release workflow sprint, so its own closeout evidence should not promote unrelated feature-level release guidance.",
+    "The PR should close GitHub issue #550 after CI passes and the branch is merged."
+  ],
+  "slope_factors": [
+    "semver_inference",
+    "release_evidence",
+    "squash_merge",
+    "cli_output"
+  ]
+}
