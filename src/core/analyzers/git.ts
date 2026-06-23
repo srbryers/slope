@@ -60,6 +60,53 @@ export function extractSprintArtifactReferences(logLines: string[]): Set<number>
   return result;
 }
 
+interface GitSprintCommit {
+  subject: string;
+  files: string[];
+}
+
+function parseSprintLog(raw: string): GitSprintCommit[] {
+  return raw
+    .split('\x1e')
+    .map(block => block.trim())
+    .filter(Boolean)
+    .map(block => {
+      const [subject = '', ...files] = block
+        .split(/\r?\n/)
+        .map(line => line.trim())
+        .filter(Boolean);
+      return { subject, files };
+    });
+}
+
+function isSlopeMetadataPath(file: string): boolean {
+  const normalized = file.replace(/\\/g, '/');
+  return normalized === 'docs/backlog/roadmap.json'
+    || /^docs\/retros\/sprint-\d+(?:\.\d+)?(?:\.json|-review\.md)$/i.test(normalized)
+    || /^\.slope\/retros\/post-merge\/sprint-\d+(?:\.\d+)?(?:-pr-\d+)?\.json$/i.test(normalized);
+}
+
+function isSlopeMetadataOnlyCommit(files: string[]): boolean {
+  return files.length > 0 && files.every(isSlopeMetadataPath);
+}
+
+function extractShippedSprintReferences(commits: GitSprintCommit[]): Set<number> {
+  const result = new Set<number>();
+
+  for (const commit of commits) {
+    const artifactRefs = extractSprintArtifactReferences(commit.files);
+    const subjectRefs = isSlopeMetadataOnlyCommit(commit.files)
+      ? new Set<number>()
+      : extractSprintReferences([commit.subject]);
+
+    for (const ref of unionSets(artifactRefs, subjectRefs)) {
+      result.add(ref);
+    }
+  }
+
+  return result;
+}
+
 function unionSets<T>(...sets: Set<T>[]): Set<T> {
   const result = new Set<T>();
   for (const set of sets) {
@@ -93,14 +140,8 @@ export function findShippedSprintsOnMain(cwd: string, ref?: string): Set<number>
     // Cap at 1000 commits — plenty for sprint references (a project would
     // need to ship hundreds of sprints to exhaust this) and avoids slowing
     // session-end Stop hooks on deep-history repos.
-    const subjects = git(`log ${r} --format=%s -n 1000`, cwd);
-    const files = git(`log ${r} --name-only --format= -n 1000`, cwd);
-    if (subjects || files) {
-      return unionSets(
-        extractSprintReferences(subjects ? subjects.split('\n') : []),
-        extractSprintArtifactReferences(files ? files.split('\n') : []),
-      );
-    }
+    const log = git(`log ${r} --format=%x1e%s --name-only -n 1000`, cwd);
+    if (log) return extractShippedSprintReferences(parseSprintLog(log));
   }
   return new Set();
 }
