@@ -572,6 +572,24 @@ describe('slope sprint phase', () => {
   });
 });
 
+describe('slope sprint status', () => {
+  it('shows derived closeout state and next action when all gates are complete (#567)', async () => {
+    await captureLog(() =>
+      sprintCommand(['start', '--number=16', '--phase=planning'])
+    );
+
+    for (const gate of ['tests', 'code_review', 'architect_review', 'scorecard', 'review_md']) {
+      await captureLog(() => sprintCommand(['gate', gate]));
+    }
+
+    const output = await captureLog(() => sprintCommand(['status']));
+
+    expect(output).toContain('status: ready_for_pr (phase: planning, all gates complete)');
+    expect(output).toContain('Next: create PR for this branch');
+    expect(output).not.toContain('Remaining:');
+  });
+});
+
 describe('slope sprint (help)', () => {
   it('shows help with workflow commands listed', async () => {
     const output = await captureLog(() =>

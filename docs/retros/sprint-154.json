@@ -1,0 +1,160 @@
+{
+  "sprint_number": 154,
+  "player": "codex",
+  "theme": "Roadmap Reality and Sprint Status Integrity",
+  "par": 4,
+  "slope": 3,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-06-23",
+  "type": "bugfix + workflow",
+  "skills_used": [
+    "slope-sprint-workflow",
+    "slope-sprint"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow",
+    "slope-sprint"
+  ],
+  "skill_gaps_found": [],
+  "shots": [
+    {
+      "ticket_key": "S154-1",
+      "title": "Preserve ticket dependencies during roadmap sync and refuse broad destructive rewrites (#568)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Roadmap sync now marks scorecard-backed sprints complete and merges scorecard-derived ticket fields into existing tickets so metadata such as depends_on and github_issue survives."
+    },
+    {
+      "ticket_key": "S154-2",
+      "title": "Correct shipped-sprint attribution so post-merge housekeeping commits do not ship the next planned sprint (#563, #568)",
+      "club": "long_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Shipped-sprint detection now parses git history per commit and ignores subject sprint refs when a commit only touches SLOPE metadata, while still counting scorecard artifacts as shipped evidence."
+    },
+    {
+      "ticket_key": "S154-3",
+      "title": "Derive closeout-ready sprint status when all gates are complete instead of leaving phase planning active (#567)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "`slope sprint status` now reports derived status ready_for_pr when all gates are complete, keeps the stored phase as context, and prints the PR/retro next action."
+    },
+    {
+      "ticket_key": "S154-4",
+      "title": "Add regression fixtures for roadmap sync, shipped attribution, and all-gates-complete status (#568, #563, #567)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Regression coverage now spans roadmap sync metadata preservation, metadata-only shipped attribution, and complete-gates sprint status output."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "rough",
+      "impact": "minor",
+      "description": "Roadmap ticket metadata lives outside the narrow scorecard-derived fields, so sync needed to update durable execution data without wiping manually-authored dependency and GitHub issue context."
+    },
+    {
+      "type": "wind",
+      "impact": "minor",
+      "description": "Post-merge housekeeping commits can mention the next planned sprint in their subject while only shipping prior-sprint SLOPE artifacts."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Roadmap sync should treat scorecards as shipment evidence without treating them as the whole sprint definition.",
+      "outcome": "The sync path refreshes scorecard-owned fields, sets scorecard-backed sprints complete, and preserves per-ticket metadata."
+    },
+    {
+      "type": "lessons",
+      "description": "Shipped-sprint attribution needs commit-level file context, not a repo-wide union of subjects and paths.",
+      "outcome": "Metadata-only post-merge commits no longer ship the next planned sprint just because their subject names it."
+    },
+    {
+      "type": "lessons",
+      "description": "Lifecycle output should report derived readiness when gates make the stored phase misleading.",
+      "outcome": "Complete sprint gates now surface ready_for_pr and the concrete PR/retro next action."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "`pnpm test tests/cli/roadmap.test.ts tests/core/analyzers/git.test.ts tests/cli/sprint-workflow.test.ts` passed: 3 files, 92 tests.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`pnpm typecheck` passed.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`pnpm build` passed.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`pnpm test` passed: 235 files, 3680 tests, 25 skipped.",
+      "status": "healthy"
+    },
+    {
+      "category": "validation",
+      "description": "`git diff --check origin/main...HEAD` passed.",
+      "status": "healthy"
+    },
+    {
+      "category": "validation",
+      "description": "`node dist/cli/index.js roadmap validate --path=docs/backlog/roadmap.json` passed with only existing historical ticket-count warnings.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "A tidy trust-recovery sprint: three small user-facing inconsistencies all came from durable state being interpreted too broadly or too narrowly.",
+    "advice_for_next_player": "When adding SLOPE automation around roadmap state, keep scorecard evidence, manually-authored roadmap metadata, and post-merge artifacts as separate signals until the command has enough context to merge them safely.",
+    "what_surprised_you": "The status wording bug was not a state-machine failure; it was an output contract failure where all gates were done but the display still centered the stale stored phase.",
+    "excited_about_next": "S155 can build on this by making review-gate provenance just as explicit as sprint shipment and closeout readiness are now."
+  },
+  "bunker_locations": [
+    "Scorecard sync can accidentally strip roadmap-only ticket metadata if it replaces tickets wholesale.",
+    "Post-merge housekeeping commit subjects can mention a planned sprint without shipping that sprint.",
+    "Stored sprint phase alone can be misleading after all closeout gates pass."
+  ],
+  "yardage_book_updates": [
+    "src/cli/commands/roadmap.ts now merges scorecard-derived ticket fields into existing ticket objects and marks scorecard-backed sprints complete.",
+    "src/core/analyzers/git.ts now parses shipped-sprint history per commit and suppresses subject refs for SLOPE metadata-only commits.",
+    "src/cli/commands/sprint.ts now shows ready_for_pr when all gates are complete and prints the PR/retro next action.",
+    "Regression coverage was added in tests/cli/roadmap.test.ts, tests/core/analyzers/git.test.ts, and tests/cli/sprint-workflow.test.ts."
+  ],
+  "course_management_notes": [
+    "Required architect review and optional code review found no issues.",
+    "The PR should close GitHub issues #568, #563, and #567 after CI passes and the branch is merged.",
+    "Phase 49 remains planned because S155-S158 are still open."
+  ],
+  "slope_factors": [
+    "roadmap_sync",
+    "git_history_attribution",
+    "sprint_status_output",
+    "regression_coverage"
+  ]
+}
