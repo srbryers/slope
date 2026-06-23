@@ -623,6 +623,43 @@ describe('slope roadmap sync', () => {
     expect(s8.depends_on).toEqual([7]);
   });
 
+  it('marks scorecard-backed sprints complete and preserves per-ticket metadata (#568)', () => {
+    const roadmap = makeRoadmapJson({
+      sprints: makeRoadmapJson().sprints.map(sprint => sprint.id === 8
+        ? {
+          ...sprint,
+          status: 'planned',
+          tickets: [
+            { ...sprint.tickets[0], github_issue: 568 } as RoadmapDefinition['sprints'][number]['tickets'][number],
+            { ...sprint.tickets[1], depends_on: ['S8-1'], github_issue: 568 } as RoadmapDefinition['sprints'][number]['tickets'][number],
+            { ...sprint.tickets[2], depends_on: ['S8-2'] },
+          ],
+        } as RoadmapDefinition['sprints'][number]
+        : sprint),
+    });
+    writeRoadmap(tmpDir, roadmap);
+    writeConfig(tmpDir, { scorecardDir: 'docs/retros', scorecardPattern: 'sprint-*.json', minSprint: 1 });
+    writeScorecard(tmpDir, 8, {
+      theme: 'Updated Platform',
+      shots: [
+        { ticket_key: 'S8-1', title: 'Synced T1', club: 'short_iron', result: 'green', hazards: [] },
+        { ticket_key: 'S8-2', title: 'Synced T2', club: 'wedge', result: 'green', hazards: [] },
+        { ticket_key: 'S8-3', title: 'Synced T3', club: 'putter', result: 'green', hazards: [] },
+      ],
+    });
+
+    roadmapCommand(['sync']);
+
+    const result = JSON.parse(readFileSync(join(tmpDir, 'docs', 'backlog', 'roadmap.json'), 'utf8'));
+    const s8 = result.sprints.find((s: { id: number }) => s.id === 8);
+    expect(s8.status).toBe('complete');
+    expect(s8.tickets[0].title).toBe('Synced T1');
+    expect(s8.tickets[0].github_issue).toBe(568);
+    expect(s8.tickets[1].depends_on).toEqual(['S8-1']);
+    expect(s8.tickets[1].github_issue).toBe(568);
+    expect(s8.tickets[2].depends_on).toEqual(['S8-2']);
+  });
+
   it('maps club to complexity correctly', () => {
     const roadmap = makeRoadmapJson();
     writeRoadmap(tmpDir, roadmap);
