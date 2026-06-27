@@ -2,6 +2,7 @@ import { execSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseRoadmap } from '../../core/index.js';
+import { resolveActor } from '../actor.js';
 import { loadConfig } from '../config.js';
 import { loadSprintState, pendingGates } from '../sprint-state.js';
 import { resolveStore } from '../store.js';
@@ -148,7 +149,8 @@ async function checkActiveClaim(cwd: string, sprintNumber: number | null): Promi
   }
   try {
     const store = await resolveStore(cwd);
-    const player = process.env.USER || 'unknown';
+    const actor = resolveActor(cwd);
+    const player = actor.name;
     const claims = await store.list(sprintNumber);
     store.close();
     const own = claims.filter(c => c.player === player);

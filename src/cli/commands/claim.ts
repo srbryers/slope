@@ -1,4 +1,5 @@
 import { checkConflicts, parseSprintNumber } from '../../core/index.js';
+import { resolveActor } from '../actor.js';
 import { loadConfig } from '../config.js';
 import { inferSprintContext } from '../sprint-inference.js';
 import { resolveStore } from '../store.js';
@@ -64,7 +65,8 @@ export async function claimCommand(args: string[]): Promise<void> {
   }
 
   const scope: ClaimScope = (flags.scope as ClaimScope) || 'ticket';
-  const player = flags.player || process.env.USER || 'unknown';
+  const actor = resolveActor(cwd, { explicitActor: flags.player });
+  const player = actor.name;
   const sprintNumber = resolveSprint(flags, cwd);
 
   // Preflight conflict check: build a temporary claim and test against existing claims

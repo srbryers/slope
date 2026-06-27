@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { formatSprintLabel, parseRoadmap } from '../../core/index.js';
 import type { RoadmapDefinition } from '../../core/index.js';
+import { resolveActor } from '../actor.js';
 import { loadConfig } from '../config.js';
 import { isInsideGitWorkTree } from '../git-preflight.js';
 import { loadSprintState } from '../sprint-state.js';
@@ -102,7 +103,8 @@ async function doneSubcommand(args: string[]): Promise<void> {
   }
 
   // 2. Find the player's active claim
-  const player = process.env.USER || 'unknown';
+  const actor = resolveActor(cwd);
+  const player = actor.name;
   const store = await resolveStore(cwd);
   let releasedId: string | null = null;
   try {

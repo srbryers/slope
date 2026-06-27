@@ -24,6 +24,7 @@ import {
 import { WorkflowEngine, loadWorkflow, resolveVariables, validateWorkflow, loadConfig, parseRoadmap, castRoadmapStructure, formatSprintLabel, formatSprintNumber, parseSprintNumber } from '../../core/index.js';
 import type { WorkflowDefinition, WorkflowExecution } from '../../core/index.js';
 import { createHash } from 'node:crypto';
+import { resolveActor } from '../actor.js';
 
 /** Get workflow definition from execution snapshot (preferred) or disk (fallback for old executions) */
 function getDefinition(exec: WorkflowExecution, cwd: string): { def: WorkflowDefinition; drifted: boolean } {
@@ -283,7 +284,8 @@ async function beginCommand(args: string[], cwd: string): Promise<void> {
   // Step 2: claim
   const { resolveStore } = await import('../store.js');
   const { checkConflicts } = await import('../../core/index.js');
-  const player = process.env.USER || 'unknown';
+  const actor = resolveActor(cwd);
+  const player = actor.name;
   const store = await resolveStore(cwd);
   try {
     const existing = await store.list(sprint);
@@ -434,7 +436,8 @@ async function startCommand(args: string[], cwd: string): Promise<void> {
 
 async function autoClaimSprint(cwd: string, sprint: number): Promise<string | null> {
   const { resolveStore } = await import('../store.js');
-  const player = process.env.USER || 'unknown';
+  const actor = resolveActor(cwd);
+  const player = actor.name;
   const target = `sprint:${formatSprintLabel(sprint)}`;
 
   try {
@@ -1123,7 +1126,8 @@ async function restoreResumeClaims(cwd: string, plan: PortableResumePlan): Promi
   if (claims.length === 0) return 0;
   const { resolveStore } = await import('../store.js');
   const store = await resolveStore(cwd);
-  const player = process.env.USER || 'unknown';
+  const actor = resolveActor(cwd);
+  const player = actor.name;
   let restored = 0;
   try {
     const existing = await store.list(plan.sprint);
