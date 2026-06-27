@@ -4869,7 +4869,9 @@
       "par": 4,
       "slope": 2,
       "type": "bugfix + agent-dx",
-      "status": "planned",
+      "status": "complete",
+      "score": 4,
+      "score_label": "par",
       "depends_on": [
         217
       ],
