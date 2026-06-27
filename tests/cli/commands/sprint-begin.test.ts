@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { execSync } from 'node:child_process';
+import { execSync, spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -34,6 +34,18 @@ function setupRepo(): string {
     }],
   }));
   return dir;
+}
+
+function envWithoutActor(): NodeJS.ProcessEnv {
+  const env = { ...process.env };
+  for (const key of Object.keys(env)) {
+    if (['SLOPE_ACTOR', 'SLOPE_PLAYER', 'USER', 'USERNAME'].includes(key.toUpperCase())) {
+      delete env[key];
+    }
+  }
+  env.USER = 'unknown';
+  env.USERNAME = 'unknown';
+  return env;
 }
 
 describe('slope sprint begin (GH #311)', () => {
@@ -115,6 +127,41 @@ describe('slope sprint begin (GH #311)', () => {
       }
       expect(exitCode).not.toBe(0);
       expect(stderr).toMatch(/sprint=N|ticket=KEY/);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('honors --actor override and prints the identity source', () => {
+    const cwd = setupRepo();
+    try {
+      const out = execSync(`node ${SLOPE_BIN} sprint begin --sprint=1 --ticket=S1-1 --actor=codex-reviewer`, {
+        cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'],
+      });
+
+      expect(out).toContain('player codex-reviewer, actor source: override');
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('prints fallback actor source when no identity source exists', () => {
+    const cwd = setupRepo();
+    try {
+      const result = spawnSync(process.execPath, [
+        SLOPE_BIN,
+        'sprint',
+        'begin',
+        '--sprint=1',
+        '--ticket=S1-1',
+      ], {
+        cwd,
+        encoding: 'utf8',
+        env: envWithoutActor(),
+      });
+
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('player unknown, actor source: fallback (unknown)');
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }

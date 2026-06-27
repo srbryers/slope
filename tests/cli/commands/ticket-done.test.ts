@@ -103,6 +103,7 @@ describe('slope ticket done (GH #316)', () => {
       });
       expect(out).toContain('Ticket S1-1: done.');
       expect(out).toContain('Sprint:  S1');
+      expect(out).toContain('Actor source:');
       expect(out).toMatch(/Commit:\s+[0-9a-f]{40}/);
       expect(out).toContain('Claim:   released');
     } finally {
@@ -117,6 +118,25 @@ describe('slope ticket done (GH #316)', () => {
         cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'],
       });
       expect(out).toContain('Commit:  deadbeef');
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('honors --actor override for claim lookup', () => {
+    const cwd = setupRepoWithClaim();
+    try {
+      execSync(`node ${SLOPE_BIN} claim --sprint=1 --target=S1-2 --actor=codex`, {
+        cwd, stdio: ['pipe', 'pipe', 'pipe'],
+      });
+      const out = execSync(`node ${SLOPE_BIN} ticket done S1-2 --actor=codex`, {
+        cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'],
+      });
+
+      expect(out).toContain('Ticket S1-2: done.');
+      expect(out).toContain('Player:  codex');
+      expect(out).toContain('Actor source: override');
+      expect(out).toContain('Claim:   released');
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }

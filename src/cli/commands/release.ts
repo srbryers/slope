@@ -1,6 +1,6 @@
 import { loadConfig } from '../config.js';
 import { loadScorecards } from '../loader.js';
-import { resolveActor } from '../actor.js';
+import { formatActorSource, resolveActor } from '../actor.js';
 import { resolveStore } from '../store.js';
 
 function parseArgs(args: string[]): Record<string, string> {
@@ -42,7 +42,7 @@ export async function releaseCommand(args: string[]): Promise<void> {
 
   // Release by target + player lookup
   if (flags.target) {
-    const actor = resolveActor(cwd, { explicitActor: flags.player });
+    const actor = resolveActor(cwd, { explicitActor: flags.actor || flags.player });
     const player = actor.name;
     const sprints = resolveSprintRange(flags, cwd);
 
@@ -53,6 +53,7 @@ export async function releaseCommand(args: string[]): Promise<void> {
         const released = await store.release(match.id);
         if (released) {
           console.log(`\nClaim ${match.id} (${match.target} by ${match.player}, sprint ${match.sprint_number}) released.\n`);
+          console.log(`Actor source: ${formatActorSource(actor)}\n`);
           return;
         }
       }

@@ -118,6 +118,8 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     flags: [
       { flag: '--target=<path>', desc: 'File or directory to claim' },
       { flag: '--ticket=<key>', desc: 'Ticket key (e.g. S48-1)' },
+      { flag: '--actor=<name>', desc: 'Actor override for audit trail identity' },
+      { flag: '--player=<name>', desc: 'Legacy alias for --actor' },
       { flag: '--force', desc: 'Override conflicting claims' },
     ],
   },
@@ -126,6 +128,8 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     flags: [
       { flag: '--id=<id>', desc: 'Claim ID to release' },
       { flag: '--target=<path>', desc: 'Release claim by target path' },
+      { flag: '--actor=<name>', desc: 'Actor override for target release lookup' },
+      { flag: '--player=<name>', desc: 'Legacy alias for --actor' },
     ],
   },
   {
@@ -150,11 +154,13 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
         { flag: '--number=<N>', desc: 'Sprint number (required)' },
         { flag: '--phase=<phase>', desc: 'Initial phase (default: planning)' },
         { flag: '--touches=<paths>', desc: 'Comma-separated paths to check against sibling worktrees' },
+        { flag: '--actor=<name>', desc: 'Actor override for sprint auto-claim' },
         { flag: '--force', desc: 'Override pre-sprint reality-check blockers' },
       ]},
       { name: 'begin', desc: 'Bundled start + claim + briefing + prep flow', flags: [
         { flag: '--sprint=<N>', desc: 'Sprint number (required)' },
         { flag: '--ticket=<key>', desc: 'Ticket key to claim and prep' },
+        { flag: '--actor=<name>', desc: 'Actor override for audit trail identity' },
       ]},
       { name: 'gate', desc: 'Mark a gate as complete', flags: [
         { flag: '<name>', desc: 'Gate name to complete' },
@@ -766,6 +772,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
         { flag: '<key>', desc: 'Ticket key (e.g. S1-1)' },
         { flag: '--commit=<sha>', desc: 'Attach a specific commit SHA (default: HEAD)' },
         { flag: '--notes=<text>', desc: 'Attach completion notes' },
+        { flag: '--actor=<name>', desc: 'Actor override for claim lookup' },
       ]},
     ],
   },

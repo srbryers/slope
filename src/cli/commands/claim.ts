@@ -1,5 +1,5 @@
 import { checkConflicts, parseSprintNumber } from '../../core/index.js';
-import { resolveActor } from '../actor.js';
+import { formatActorSource, resolveActor } from '../actor.js';
 import { loadConfig } from '../config.js';
 import { inferSprintContext } from '../sprint-inference.js';
 import { resolveStore } from '../store.js';
@@ -27,7 +27,8 @@ Options:
   --target=<target>      Ticket, file path, or area to claim
   --scope=<scope>        Claim scope: ticket or area (default: ticket)
   --sprint=<number>      Sprint number (default: inferred from context)
-  --player=<name>        Player name (default: USER env var)
+  --actor=<name>         Actor override for audit trail identity
+  --player=<name>        Legacy alias for --actor
   --notes=<text>         Optional claim notes
   --force                Override overlap conflicts
   --help, -h             Show this help
@@ -65,7 +66,7 @@ export async function claimCommand(args: string[]): Promise<void> {
   }
 
   const scope: ClaimScope = (flags.scope as ClaimScope) || 'ticket';
-  const actor = resolveActor(cwd, { explicitActor: flags.player });
+  const actor = resolveActor(cwd, { explicitActor: flags.actor || flags.player });
   const player = actor.name;
   const sprintNumber = resolveSprint(flags, cwd);
 
@@ -118,6 +119,7 @@ export async function claimCommand(args: string[]): Promise<void> {
   console.log(`  ID:     ${claim.id}`);
   console.log(`  Sprint: ${claim.sprint_number}`);
   console.log(`  Player: ${claim.player}`);
+  console.log(`  Actor source: ${formatActorSource(actor)}`);
   console.log(`  Target: ${claim.target} (${claim.scope})`);
   if (claim.notes) console.log(`  Notes:  ${claim.notes}`);
 

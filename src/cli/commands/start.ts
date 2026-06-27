@@ -32,7 +32,7 @@ slope start - Human start-of-work cockpit
 
 Usage:
   slope start [--sprint=N] [--allow-no-git]
-  slope start --ticket=KEY [--sprint=N] [--allow-no-git]
+  slope start --ticket=KEY [--sprint=N] [--actor=<name>] [--allow-no-git]
 
 Without --ticket, starts or refreshes sprint state and prints a compact briefing.
 With --ticket, runs the bundled begin flow: sprint state, claim, briefing, prep, and next gates.
@@ -57,11 +57,21 @@ export async function startCommand(args: string[]): Promise<void> {
   const ticket = flags.ticket;
 
   if (ticket) {
-    await sprintCommand(['begin', `--sprint=${sprintText}`, `--ticket=${ticket}`]);
+    await sprintCommand([
+      'begin',
+      `--sprint=${sprintText}`,
+      `--ticket=${ticket}`,
+      ...(flags.actor ? [`--actor=${flags.actor}`] : []),
+    ]);
     return;
   }
 
-  await sprintCommand(['start', `--number=${sprintText}`, '--phase=implementing']);
+  await sprintCommand([
+    'start',
+    `--number=${sprintText}`,
+    '--phase=implementing',
+    ...(flags.actor ? [`--actor=${flags.actor}`] : []),
+  ]);
   console.log('\nBriefing');
   console.log('='.repeat(32));
   await briefingCommand([`--sprint=${sprintText}`, '--compact']);

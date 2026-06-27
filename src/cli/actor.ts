@@ -97,3 +97,7 @@ export function resolveActor(cwd: string = process.cwd(), options: ResolveActorO
 
   return { name: 'unknown', source: 'fallback', isFallback: true };
 }
+
+export function formatActorSource(actor: ResolvedActor): string {
+  return actor.isFallback ? 'fallback (unknown)' : actor.source;
+}

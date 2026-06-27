@@ -24,7 +24,7 @@ import {
 import { WorkflowEngine, loadWorkflow, resolveVariables, validateWorkflow, loadConfig, parseRoadmap, castRoadmapStructure, formatSprintLabel, formatSprintNumber, parseSprintNumber } from '../../core/index.js';
 import type { WorkflowDefinition, WorkflowExecution } from '../../core/index.js';
 import { createHash } from 'node:crypto';
-import { resolveActor } from '../actor.js';
+import { formatActorSource, resolveActor } from '../actor.js';
 
 /** Get workflow definition from execution snapshot (preferred) or disk (fallback for old executions) */
 function getDefinition(exec: WorkflowExecution, cwd: string): { def: WorkflowDefinition; drifted: boolean } {
@@ -120,6 +120,22 @@ function optionValue(args: string[], index: number, flag: string): { value: stri
   if (arg.startsWith(`${flag}=`)) return { value: arg.slice(flag.length + 1), next: index };
   if (arg === flag) return { value: args[index + 1] ?? null, next: index + 1 };
   return null;
+}
+
+function findOptionValue(args: string[], flag: string): string | undefined {
+  for (let i = 0; i < args.length; i++) {
+    const value = optionValue(args, i, flag);
+    if (value) return value.value ?? undefined;
+  }
+  return undefined;
+}
+
+function actorOverride(args: string[]): string | undefined {
+  for (const flag of ['--actor', '--player']) {
+    const value = findOptionValue(args, flag);
+    if (value && !value.startsWith('--')) return value;
+  }
+  return undefined;
 }
 
 function parseGateOptions(args: string[]): ParsedGateOptions {
@@ -255,7 +271,7 @@ async function beginCommand(args: string[], cwd: string): Promise<void> {
   const sprintArg = args.find(a => a.startsWith('--sprint='));
   const ticketArg = args.find(a => a.startsWith('--ticket='));
   if (!sprintArg || !ticketArg) {
-    console.error('\nUsage: slope sprint begin --sprint=N --ticket=KEY');
+    console.error('\nUsage: slope sprint begin --sprint=N --ticket=KEY [--actor=<name>]');
     console.error('Bundles: sprint start + claim + briefing + prep --lite\n');
     process.exit(1);
   }
@@ -284,14 +300,14 @@ async function beginCommand(args: string[], cwd: string): Promise<void> {
   // Step 2: claim
   const { resolveStore } = await import('../store.js');
   const { checkConflicts } = await import('../../core/index.js');
-  const actor = resolveActor(cwd);
+  const actor = resolveActor(cwd, { explicitActor: actorOverride(args) });
   const player = actor.name;
   const store = await resolveStore(cwd);
   try {
     const existing = await store.list(sprint);
     const ownClaim = existing.find(c => c.target === ticket && c.player === player);
     if (ownClaim) {
-      console.log(`Ticket ${ticket}: already claimed by ${player}.`);
+      console.log(`Ticket ${ticket}: already claimed by ${player} (actor source: ${formatActorSource(actor)}).`);
     } else {
       // Detect overlap conflicts via core check
       const tempClaim = {
@@ -310,7 +326,7 @@ async function beginCommand(args: string[], cwd: string): Promise<void> {
         process.exit(1);
       }
       const claim = await store.claim({ sprint_number: sprint, player, target: ticket, scope: 'ticket' });
-      console.log(`Ticket ${ticket}: claimed (id ${claim.id.slice(0, 8)}, player ${player}).`);
+      console.log(`Ticket ${ticket}: claimed (id ${claim.id.slice(0, 8)}, player ${player}, actor source: ${formatActorSource(actor)}).`);
     }
   } finally {
     store.close();
@@ -429,14 +445,14 @@ async function startCommand(args: string[], cwd: string): Promise<void> {
 
   const state = createSprintState(sprint, phase);
   saveSprintState(cwd, state);
-  const autoClaim = await autoClaimSprint(cwd, sprint);
+  const autoClaim = await autoClaimSprint(cwd, sprint, actorOverride(args));
   console.log(`Sprint ${formatSprintNumber(sprint)} started (phase: ${phase}). Use 'slope sprint gate <name>' to mark gates; review gates require evidence options.`);
   if (autoClaim) console.log(autoClaim);
 }
 
-async function autoClaimSprint(cwd: string, sprint: number): Promise<string | null> {
+async function autoClaimSprint(cwd: string, sprint: number, explicitActor?: string): Promise<string | null> {
   const { resolveStore } = await import('../store.js');
-  const actor = resolveActor(cwd);
+  const actor = resolveActor(cwd, { explicitActor });
   const player = actor.name;
   const target = `sprint:${formatSprintLabel(sprint)}`;
 
@@ -445,7 +461,7 @@ async function autoClaimSprint(cwd: string, sprint: number): Promise<string | nu
     try {
       const existing = await store.list(sprint);
       if (existing.some(c => c.player === player && c.target === target)) {
-        return `Claim: ${target} already held by ${player}.`;
+        return `Claim: ${target} already held by ${player} (actor source: ${formatActorSource(actor)}).`;
       }
       const claim = await store.claim({
         sprint_number: sprint,
@@ -454,7 +470,7 @@ async function autoClaimSprint(cwd: string, sprint: number): Promise<string | nu
         scope: 'area',
         notes: 'auto-claimed by slope sprint start',
       });
-      return `Claim: ${claim.target} (${claim.scope}) auto-claimed for ${player}.`;
+      return `Claim: ${claim.target} (${claim.scope}) auto-claimed for ${player} (actor source: ${formatActorSource(actor)}).`;
     } finally {
       store.close();
     }
@@ -1488,9 +1504,9 @@ function printSprintUsage(): void {
 slope sprint — Sprint lifecycle management
 
 Legacy commands:
-  slope sprint start --number=N [--phase=<phase>] [--touches=<paths>] [--force]
+  slope sprint start --number=N [--phase=<phase>] [--touches=<paths>] [--actor=<name>] [--force]
                                       Start sprint state tracking with pre-sprint reality checks
-  slope sprint begin --sprint=N --ticket=T  Bundled start + claim + briefing + prep (#311)
+  slope sprint begin --sprint=N --ticket=T [--actor=<name>]  Bundled start + claim + briefing + prep (#311)
   slope sprint plan --sprint=N [--output=path]  Generate markdown sprint plan (#312)
   slope sprint phase <phase>       Update current sprint phase
   slope sprint gate <name> [review evidence options]

@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { formatSprintLabel, parseRoadmap } from '../../core/index.js';
 import type { RoadmapDefinition } from '../../core/index.js';
-import { resolveActor } from '../actor.js';
+import { formatActorSource, resolveActor } from '../actor.js';
 import { loadConfig } from '../config.js';
 import { isInsideGitWorkTree } from '../git-preflight.js';
 import { loadSprintState } from '../sprint-state.js';
@@ -42,12 +42,14 @@ Usage:
   slope ticket done <key>                    Mark ticket complete; release claim
   slope ticket done <key> --commit=<sha>     Attach a specific commit SHA
   slope ticket done <key> --notes="..."      Attach completion notes
+  slope ticket done <key> --actor=<name>     Override actor identity for claim lookup
 `);
 }
 
 interface DoneFlags {
   commit?: string;
   notes?: string;
+  actor?: string;
 }
 
 interface CommitResolution {
@@ -60,6 +62,8 @@ function parseFlags(args: string[]): DoneFlags {
   for (const a of args) {
     if (a.startsWith('--commit=')) flags.commit = a.slice('--commit='.length);
     else if (a.startsWith('--notes=')) flags.notes = a.slice('--notes='.length);
+    else if (a.startsWith('--actor=')) flags.actor = a.slice('--actor='.length);
+    else if (a.startsWith('--player=')) flags.actor = a.slice('--player='.length);
   }
   return flags;
 }
@@ -67,7 +71,7 @@ function parseFlags(args: string[]): DoneFlags {
 async function doneSubcommand(args: string[]): Promise<void> {
   const ticketKey = args.find(a => !a.startsWith('--'));
   if (!ticketKey) {
-    console.error('\nUsage: slope ticket done <key> [--commit=<sha>] [--notes="..."]\n');
+    console.error('\nUsage: slope ticket done <key> [--commit=<sha>] [--notes="..."] [--actor=<name>]\n');
     process.exit(1);
   }
   const flags = parseFlags(args);
@@ -103,7 +107,7 @@ async function doneSubcommand(args: string[]): Promise<void> {
   }
 
   // 2. Find the player's active claim
-  const actor = resolveActor(cwd);
+  const actor = resolveActor(cwd, { explicitActor: flags.actor });
   const player = actor.name;
   const store = await resolveStore(cwd);
   let releasedId: string | null = null;
@@ -146,6 +150,7 @@ async function doneSubcommand(args: string[]): Promise<void> {
     console.log(`\nTicket ${ticketKey}: done.`);
     console.log(`  Sprint:  ${formatSprintLabel(sprintNumber)}`);
     console.log(`  Player:  ${player}`);
+    console.log(`  Actor source: ${formatActorSource(actor)}`);
     if (sha) console.log(`  Commit:  ${sha}`);
     if (commit.missingGitWorkTree) {
       console.warn('Warning: no git repository detected; commit SHA was not attached. Run `git init -b main` before future completions or pass `--commit=<sha>` explicitly.');
