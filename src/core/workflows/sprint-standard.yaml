@@ -98,6 +98,12 @@ phases:
         command: slope review
         checkpoint: exit_code_0
 
+      - id: codification_sweep
+        type: agent_input
+        prompt: "Sweep for recurring workarounds before closeout. If you routed around structural friction that will recur, log it with `slope review findings add --type=workaround --recurs --cost=s|m|l --description=\"...\"`."
+        required_fields:
+          - codification_candidates_logged_or_none
+
       - id: update_map
         type: command
         command: slope map

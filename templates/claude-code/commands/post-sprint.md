@@ -50,6 +50,7 @@ Run `slope review` to generate the sprint review markdown. Share the output with
 If any new recurring patterns were encountered during this sprint:
 - Check `.slope/common-issues.json` for existing patterns
 - Add new patterns or update `sprints_hit` arrays for existing ones
+- Sweep for recurring workarounds that were routed around in-flow. Log structural ones with `slope review findings add --type=workaround --recurs --cost=s|m|l --description="..."`.
 
 ### 6. Roadmap status (auto-updated)
 
@@ -64,4 +65,5 @@ Ask the user if they'd like to create a PR. If yes, create one with the sprint r
 - Always run `slope validate` after creating the scorecard — never skip this
 - The scorecard must match the actual work done (commits), not the plan
 - Record hazards honestly — they feed the handicap system and improve future guidance
+- Log recurring workaround/codification candidates; one-offs can stay out of the ledger
 - If the sprint had review findings, run `slope review amend` after adding findings

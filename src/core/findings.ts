@@ -63,3 +63,45 @@ export function formatCodificationMetadata(finding: ReviewFinding): string {
   const cost: CodificationCost | undefined = finding.cost;
   return `codification=${status}${cost ? ` cost=${cost}` : ''}`;
 }
+
+export function collectOpenCodificationCandidates(data: FindingsFile | null): Array<{
+  sprint: number;
+  index: number;
+  finding: ReviewFinding;
+}> {
+  if (!data) return [];
+
+  const candidates: Array<{ sprint: number; index: number; finding: ReviewFinding }> = [];
+  for (const sprint of Object.keys(data.sprints).map(Number).sort((a, b) => a - b)) {
+    const findings = data.sprints[sprint] ?? [];
+    for (const [index, finding] of findings.entries()) {
+      if (isOpenCodificationCandidate(finding)) {
+        candidates.push({ sprint, index, finding });
+      }
+    }
+  }
+  return candidates;
+}
+
+export function formatCodificationCandidatesForBriefing(data: FindingsFile | null): string[] {
+  const candidates = collectOpenCodificationCandidates(data);
+  if (candidates.length === 0) return [];
+
+  const structural = candidates.filter(({ finding }) => isCodificationCandidate(finding)).length;
+  const lines = [`CODIFICATION CANDIDATES: ${candidates.length} open (${structural} structural)`];
+
+  for (const { sprint, index, finding } of candidates.slice(0, 5)) {
+    const id = displayFindingId(finding, sprint, index);
+    const severity = finding.severity.toUpperCase();
+    const cost = finding.cost ? ` cost=${finding.cost}` : '';
+    const codifyNow = finding.cost === 's' ? ' [codify now]' : '';
+    lines.push(`  - ${id} S${sprint} [${severity}${cost}]: ${finding.description}${codifyNow}`);
+  }
+
+  const omitted = candidates.length - 5;
+  if (omitted > 0) {
+    lines.push(`  ... ${omitted} more open candidate${omitted === 1 ? '' : 's'} omitted`);
+  }
+
+  return lines;
+}

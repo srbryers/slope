@@ -1,6 +1,6 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { DEFAULT_SKILLS_PATH, buildSkillBriefing, formatBriefing, parseRoadmap, castRoadmapStructure, getRole, hasRole, loadCustomRoles, filterScorecardsByPlayer, filterHazardsByVisibility, formatDeferredForBriefing, loadDeferred, computeHandicapCard, formatStrategicContext, loadSkillRegistry, parseSprintNumber } from '../../core/index.js';
+import { DEFAULT_SKILLS_PATH, buildSkillBriefing, formatBriefing, parseRoadmap, castRoadmapStructure, getRole, hasRole, loadCustomRoles, filterScorecardsByPlayer, filterHazardsByVisibility, formatDeferredForBriefing, loadDeferred, computeHandicapCard, formatStrategicContext, loadSkillRegistry, parseSprintNumber, loadFindings, formatCodificationCandidatesForBriefing, collectOpenCodificationCandidates } from '../../core/index.js';
 import type { CommonIssuesFile, SessionEntry, SprintClaim, RoadmapDefinition, SlopeEvent, RoleDefinition } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { loadScorecards } from '../loader.js';
@@ -158,10 +158,12 @@ export async function briefingCommand(args: string[]): Promise<void> {
       claims,
     });
     const skillSummary = skillBriefing.recommendations.map(r => r.id).slice(0, 3).join(', ');
+    const openCodificationCandidates = collectOpenCodificationCandidates(loadFindings(cwd));
 
     console.log(`\nSLOPE BRIEFING (compact) — S${sprintNumber}`);
     console.log(`Handicap: ${hcp} | Fairways: ${fwy}% | GIR: ${gir}% | Scorecards: ${effectiveScorecards.length}`);
     console.log(`Hazards: ${hazardCount}${topHazards ? ` — top: ${topHazards}` : ''}`);
+    if (openCodificationCandidates.length > 0) console.log(`Codification candidates: ${openCodificationCandidates.length} open`);
     if (skillSummary) console.log(`Skills: ${skillSummary}`);
     console.log(`Claims: ${claimList}${ctxLine}`);
     console.log(`\nRun \`slope briefing\` (without --compact) for full details.\n`);
@@ -195,6 +197,15 @@ export async function briefingCommand(args: string[]): Promise<void> {
   if (deferredLines.length > 0) {
     console.log('\u2500'.repeat(50));
     for (const line of deferredLines) {
+      console.log(line);
+    }
+    console.log('');
+  }
+
+  const codificationLines = formatCodificationCandidatesForBriefing(loadFindings(cwd));
+  if (codificationLines.length > 0) {
+    console.log('\u2500'.repeat(50));
+    for (const line of codificationLines) {
       console.log(line);
     }
     console.log('');

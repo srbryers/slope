@@ -88,4 +88,80 @@ describe('slope briefing reality checks', () => {
     expect(output).toContain('S7 has a scorecard');
     expect(output).toContain('expected "complete"');
   });
+
+  it('surfaces open codification candidates from review findings', async () => {
+    mkdirSync(join(tmpDir, '.slope'), { recursive: true });
+    writeFileSync(join(tmpDir, '.slope', 'review-findings.json'), JSON.stringify({
+      sprints: {
+        3: [
+          {
+            id: '12345678-1234-1234-1234-123456789abc',
+            review_type: 'workaround',
+            ticket_key: 'workaround',
+            severity: 'major',
+            description: 'Local gallery server was pinned to sprint path',
+            resolved: false,
+            recurs: true,
+            cost: 's',
+            codification_status: 'open',
+          },
+          {
+            id: '87654321-1234-1234-1234-123456789abc',
+            review_type: 'workaround',
+            ticket_key: 'workaround',
+            severity: 'minor',
+            description: 'Already codified workaround',
+            resolved: true,
+            recurs: true,
+            cost: 'm',
+            codification_status: 'paid_down',
+          },
+        ],
+      },
+    }, null, 2));
+
+    const logs: string[] = [];
+    vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
+      logs.push(args.map(String).join(' '));
+    });
+
+    await briefingCommand(['--sprint=7']);
+
+    const output = logs.join('\n');
+    expect(output).toContain('CODIFICATION CANDIDATES: 1 open (1 structural)');
+    expect(output).toContain('12345678 S3 [MAJOR cost=s]');
+    expect(output).toContain('[codify now]');
+    expect(output).not.toContain('Already codified workaround');
+  });
+
+  it('includes codification candidate counts in compact briefing', async () => {
+    mkdirSync(join(tmpDir, '.slope'), { recursive: true });
+    writeFileSync(join(tmpDir, '.slope', 'review-findings.json'), JSON.stringify({
+      sprints: {
+        3: [
+          {
+            id: '12345678-1234-1234-1234-123456789abc',
+            review_type: 'workaround',
+            ticket_key: 'workaround',
+            severity: 'major',
+            description: 'Local gallery server was pinned to sprint path',
+            resolved: false,
+            recurs: true,
+            cost: 's',
+            codification_status: 'open',
+          },
+        ],
+      },
+    }, null, 2));
+
+    const logs: string[] = [];
+    vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
+      logs.push(args.map(String).join(' '));
+    });
+
+    await briefingCommand(['--sprint=7', '--compact']);
+
+    const output = logs.join('\n');
+    expect(output).toContain('Codification candidates: 1 open');
+  });
 });

@@ -66,8 +66,10 @@ export {
 // Review findings
 export {
   FINDINGS_FILE,
+  collectOpenCodificationCandidates,
   createFindingId,
   displayFindingId,
+  formatCodificationCandidatesForBriefing,
   formatCodificationMetadata,
   isCodificationCandidate,
   isOpenCodificationCandidate,
