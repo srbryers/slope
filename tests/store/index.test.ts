@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { SqliteSlopeStore, createStore, LATEST_SCHEMA_VERSION, configureSqliteJournalMode } from '../../src/store/index.js';
+import { SqliteSlopeStore, createStore, LATEST_SCHEMA_VERSION, configureSqliteJournalMode, createSqliteStoreUnavailableError } from '../../src/store/index.js';
 import { SlopeStoreError, checkConflicts } from '../../src/core/index.js';
 import type { GolfScorecard } from '../../src/core/index.js';
 
@@ -70,6 +70,18 @@ describe('SQLite journal mode', () => {
 
     expect(() => configureSqliteJournalMode(db, { SLOPE_JOURNAL_MODE: 'wal;drop table claims' }))
       .toThrow('SLOPE_JOURNAL_MODE');
+  });
+
+  it('prefixes SQLite store failures with resolved path and journal recovery guidance (#553)', () => {
+    const dbPath = join(tmpDir, '.slope', 'slope.db');
+
+    const err = createSqliteStoreUnavailableError(dbPath, new Error('disk I/O error'));
+
+    expect(err.code).toBe('STORE_UNAVAILABLE');
+    expect(err.message).toContain(dbPath);
+    expect(err.message).toContain('disk I/O error');
+    expect(err.message).toContain('SLOPE_JOURNAL_MODE=TRUNCATE');
+    expect(err.message).toContain('WSL2 /mnt/c');
   });
 });
 

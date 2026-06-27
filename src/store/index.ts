@@ -1,9 +1,8 @@
 // SLOPE — SQLite Storage Adapter
 // Implements SlopeStore + EmbeddingStore backed by better-sqlite3 with WAL mode.
 
-import { join } from 'node:path';
 import { mkdirSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { createRequire } from 'node:module';
 import type DatabaseConstructor from 'better-sqlite3';
 import type { Database as DatabaseType } from 'better-sqlite3';
@@ -69,6 +68,16 @@ function setAndVerifyJournalMode(db: JournalModeDatabase, mode: JournalMode): Jo
 function verifyJournalModeWritable(db: JournalModeDatabase): void {
   db.prepare('CREATE TABLE IF NOT EXISTS __slope_journal_mode_check (id INTEGER PRIMARY KEY)').run();
   db.prepare('DROP TABLE IF EXISTS __slope_journal_mode_check').run();
+}
+
+export function createSqliteStoreUnavailableError(dbPath: string, err: unknown): SlopeStoreError {
+  const resolvedPath = resolve(dbPath);
+  const detail = err instanceof Error ? err.message : String(err);
+  return new SlopeStoreError('STORE_UNAVAILABLE', [
+    `SQLite store unavailable at ${resolvedPath}: ${detail}`,
+    `If this store is on WSL2 /mnt/c, DrvFs, 9p, or a network filesystem, WAL may be unsupported.`,
+    `Retry with ${JOURNAL_MODE_ENV}=TRUNCATE or move config store_path to a local filesystem.`,
+  ].join('\n'));
 }
 
 /** Sequential schema migrations — each runs exactly once */
@@ -270,11 +279,22 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
   constructor(dbPath: string) {
     mkdirSync(dirname(dbPath), { recursive: true });
     const Database = loadDatabaseConstructor();
-    this.db = new Database(dbPath);
-    configureSqliteJournalMode(this.db);
-    this.db.pragma('foreign_keys = ON');
-    this.ensureVecLoaded();
-    this.migrate();
+    let db: DatabaseType | null = null;
+    try {
+      db = new Database(dbPath);
+      configureSqliteJournalMode(db);
+      db.pragma('foreign_keys = ON');
+      this.db = db;
+      this.ensureVecLoaded();
+      this.migrate();
+    } catch (err) {
+      try {
+        db?.close();
+      } catch {
+        // Ignore close failures while surfacing the original store-open error.
+      }
+      throw createSqliteStoreUnavailableError(dbPath, err);
+    }
   }
 
   /** Lazy-load sqlite-vec extension. Non-fatal if unavailable — embedding methods will throw. */
