@@ -76,10 +76,14 @@ function writeScorecard(sprint: number): void {
 }
 
 function writeRoadmap(sprint: number, status = 'planned'): void {
+  writeRoadmapSprints([{ sprint, status }]);
+}
+
+function writeRoadmapSprints(entries: Array<{ sprint: number; status: string }>): void {
   const roadmap: RoadmapDefinition = {
     name: 'Sprint Workflow Test Roadmap',
-    phases: [{ name: 'Phase 1', sprints: [sprint] }],
-    sprints: [{
+    phases: [{ name: 'Phase 1', sprints: entries.map(entry => entry.sprint) }],
+    sprints: entries.map(({ sprint, status }) => ({
       id: sprint,
       theme: `Sprint ${sprint}`,
       par: 4,
@@ -91,7 +95,7 @@ function writeRoadmap(sprint: number, status = 'planned'): void {
         { key: `S${sprint}-2`, title: 'Ticket 2', club: 'wedge', complexity: 'small' },
         { key: `S${sprint}-3`, title: 'Ticket 3', club: 'putter', complexity: 'trivial' },
       ],
-    }],
+    })),
   };
   mkdirSync(join(tmpDir, 'docs', 'backlog'), { recursive: true });
   writeFileSync(join(tmpDir, 'docs', 'backlog', 'roadmap.json'), JSON.stringify(roadmap, null, 2));
@@ -349,6 +353,43 @@ describe('slope sprint workflow cleanup', () => {
     const updatedStore = createStore({ storePath: '.slope/slope.db', cwd: tmpDir });
     try {
       await expect(updatedStore.getExecution(execId!)).resolves.toMatchObject({ status: 'paused' });
+    } finally {
+      updatedStore.close();
+    }
+  });
+
+  it('pauses every scorecarded roadmap-complete abandoned execution in one cleanup pass (#572)', async () => {
+    const abandoned = [23, 64, 90];
+    const store = createStore({ storePath: '.slope/slope.db', cwd: tmpDir });
+    try {
+      for (const sprint of abandoned) {
+        writeScorecard(sprint);
+        const exec = await store.startExecution({
+          workflow_name: 'sprint-standard',
+          sprint_id: `S${sprint}`,
+          variables: { sprint_id: `S${sprint}`, tickets: 'T1,T2' },
+        });
+        await store.updateExecutionState(exec.id, 'post_hole', 'validate_scorecard');
+      }
+    } finally {
+      store.close();
+    }
+    writeRoadmapSprints(abandoned.map(sprint => ({ sprint, status: 'complete' })));
+
+    const output = await captureLog(() =>
+      sprintCommand(['workflow', 'cleanup', '--stale'])
+    );
+
+    expect(output).toContain('Paused S23');
+    expect(output).toContain('Paused S64');
+    expect(output).toContain('Paused S90');
+    expect(output).toContain('3 stale workflow execution(s) paused');
+
+    const updatedStore = createStore({ storePath: '.slope/slope.db', cwd: tmpDir });
+    try {
+      for (const sprint of abandoned) {
+        await expect(updatedStore.getExecutionBySprint(`S${sprint}`)).resolves.toMatchObject({ status: 'paused' });
+      }
     } finally {
       updatedStore.close();
     }
