@@ -43,6 +43,8 @@ export type {
   PRSignal,
   HazardSeverity,
   ReviewType,
+  CodificationCost,
+  CodificationStatus,
   ReviewFinding,
   ReviewRecommendation,
   CompletedStep,
@@ -60,6 +62,20 @@ export {
   HAZARD_SEVERITY_PENALTIES,
   REVIEW_TYPE_HAZARD_MAP,
 } from './constants.js';
+
+// Review findings
+export {
+  FINDINGS_FILE,
+  createFindingId,
+  displayFindingId,
+  formatCodificationMetadata,
+  isCodificationCandidate,
+  isOpenCodificationCandidate,
+  loadFindings,
+  matchesFindingId,
+  saveFindings,
+} from './findings.js';
+export type { FindingsFile } from './findings.js';
 
 // Handicap
 export {

@@ -309,6 +309,49 @@ describe('review findings add', () => {
     expect(data!.sprints[33][0].resolved).toBe(true);
   });
 
+  it('records recurring workaround findings as open codification candidates', async () => {
+    mkdirSync(join(tmpDir, '.slope'), { recursive: true });
+
+    await runCommand([
+      'findings', 'add',
+      '--type=workaround',
+      '--severity=major',
+      '--description=Gallery server was pinned to sprint-specific path',
+      '--sprint=221',
+      '--recurs',
+      '--cost=s',
+    ]);
+
+    const data = loadFindings(tmpDir);
+    const finding = data!.sprints[221][0];
+    expect(finding.id).toMatch(/[0-9a-f-]{36}/);
+    expect(finding.review_type).toBe('workaround');
+    expect(finding.ticket_key).toBe('workaround');
+    expect(finding.recurs).toBe(true);
+    expect(finding.cost).toBe('s');
+    expect(finding.codification_status).toBe('open');
+    expect(finding.resolved).toBe(false);
+  });
+
+  it('rejects workaround findings without recurrence metadata', async () => {
+    await expect(runCommand([
+      'findings', 'add',
+      '--type=workaround',
+      '--description=One-off manual detour',
+      '--sprint=221',
+    ])).rejects.toThrow('process.exit(1)');
+  });
+
+  it('requires cost for recurring codification candidates', async () => {
+    await expect(runCommand([
+      'findings', 'add',
+      '--type=workaround',
+      '--description=Recurring manual detour',
+      '--sprint=221',
+      '--recurs',
+    ])).rejects.toThrow('process.exit(1)');
+  });
+
   it('allows adding findings for a different sprint (multi-sprint)', async () => {
     mkdirSync(join(tmpDir, '.slope'), { recursive: true });
     const existing: FindingsFile = {
@@ -419,6 +462,37 @@ describe('review findings list', () => {
     spy.mockRestore();
 
     expect(logged).toContain('No findings for Sprint 99');
+  });
+
+  it('shows codification metadata for recurring workaround findings', async () => {
+    mkdirSync(join(tmpDir, '.slope'), { recursive: true });
+    const data: FindingsFile = {
+      sprints: {
+        221: [
+          {
+            id: '12345678-1234-1234-1234-123456789abc',
+            review_type: 'workaround',
+            ticket_key: 'workaround',
+            severity: 'major',
+            description: 'Gallery server path was sprint-pinned',
+            resolved: false,
+            recurs: true,
+            cost: 's',
+            codification_status: 'open',
+          },
+        ],
+      },
+    };
+    writeFileSync(join(tmpDir, '.slope/review-findings.json'), JSON.stringify(data));
+
+    const spy = vi.spyOn(console, 'log');
+    await runCommand(['findings', 'list', '--sprint=221']);
+    const logged = spy.mock.calls.map(c => c[0]).join('\n');
+    spy.mockRestore();
+
+    expect(logged).toContain('12345678');
+    expect(logged).toContain('workaround');
+    expect(logged).toContain('codification=open cost=s');
   });
 });
 

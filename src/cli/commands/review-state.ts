@@ -1,12 +1,22 @@
 import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import type { ReviewFinding, ReviewType, HazardSeverity } from '../../core/types.js';
+import type { CodificationCost, ReviewFinding, ReviewType, HazardSeverity } from '../../core/types.js';
 import { recommendReviews, amendScorecardWithFindings } from '../../core/review.js';
 import { loadConfig, detectLatestSprint, normalizeScorecard, parseSprintNumber } from '../../core/index.js';
 import { createDeferred, listDeferred, resolveDeferred } from '../../core/deferred.js';
 import type { DeferredSeverity } from '../../core/deferred.js';
 import { HAZARD_SEVERITY_PENALTIES } from '../../core/constants.js';
 import type { GolfScorecard } from '../../core/types.js';
+import {
+  FINDINGS_FILE,
+  createFindingId,
+  displayFindingId,
+  formatCodificationMetadata,
+  loadFindings,
+  saveFindings,
+} from '../../core/findings.js';
+export { loadFindings } from '../../core/findings.js';
+export type { FindingsFile } from '../../core/findings.js';
 import type { RoadmapSprint, SlopeConfig } from '../../core/index.js';
 import { findPlanContent, countTickets, countPackageRefs } from '../guards/plan-analysis.js';
 import { inferSprintContext, loadRoadmapForInference } from '../sprint-inference.js';
@@ -156,36 +166,6 @@ function resetCommand(cwd: string): void {
     unlinkSync(statePath);
   }
   console.log('Review state cleared.');
-}
-
-// --- Findings File Management ---
-
-const FINDINGS_FILE = '.slope/review-findings.json';
-
-export interface FindingsFile {
-  sprints: Record<number, ReviewFinding[]>;
-}
-
-export function loadFindings(cwd: string): FindingsFile | null {
-  const filePath = join(cwd, FINDINGS_FILE);
-  if (!existsSync(filePath)) return null;
-  try {
-    const raw = JSON.parse(readFileSync(filePath, 'utf8')) as { sprint_number?: number; findings?: ReviewFinding[]; sprints?: Record<number, ReviewFinding[]> };
-    // Migrate legacy single-sprint format
-    if (raw.sprints) return { sprints: raw.sprints };
-    if (raw.sprint_number != null && raw.findings) {
-      return { sprints: { [raw.sprint_number]: raw.findings } };
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-function saveFindings(cwd: string, data: FindingsFile): void {
-  const dir = join(cwd, '.slope');
-  mkdirSync(dir, { recursive: true });
-  writeFileSync(join(cwd, FINDINGS_FILE), JSON.stringify(data, null, 2) + '\n');
 }
 
 // --- Review Recommend ---
@@ -377,8 +357,9 @@ function recommendCommand(args: string[], cwd: string): void {
 
 // --- Findings Subcommands ---
 
-const VALID_REVIEW_TYPES: ReviewType[] = ['architect', 'code', 'ml-engineer', 'security', 'ux'];
+const VALID_REVIEW_TYPES: ReviewType[] = ['architect', 'code', 'ml-engineer', 'security', 'ux', 'workaround'];
 const VALID_SEVERITIES: HazardSeverity[] = ['minor', 'moderate', 'major', 'critical'];
+const VALID_CODIFICATION_COSTS: CodificationCost[] = ['s', 'm', 'l'];
 
 function findingsAddCommand(args: string[], cwd: string): void {
   const typeArg = args.find(a => a.startsWith('--type='));
@@ -387,16 +368,45 @@ function findingsAddCommand(args: string[], cwd: string): void {
   const descArg = args.find(a => a.startsWith('--description='));
   const sprintArg = args.find(a => a.startsWith('--sprint='));
   const resolvedArg = args.includes('--resolved');
+  const recursArg = args.includes('--recurs');
+  const costArg = args.find(a => a.startsWith('--cost='));
 
-  if (!typeArg || !ticketArg || !descArg) {
-    console.error('Error: --type, --ticket, and --description are required.');
+  if (!typeArg || !descArg) {
+    console.error('Error: --type and --description are required; --ticket is required except for --type=workaround.');
     console.error('Usage: slope review findings add --type=architect --ticket=S34-1 --severity=moderate --description="..."');
+    console.error('Usage: slope review findings add --type=workaround --recurs --cost=s --description="..."');
     process.exit(1);
   }
 
   const reviewType = typeArg.slice('--type='.length) as ReviewType;
   if (!VALID_REVIEW_TYPES.includes(reviewType)) {
     console.error(`Error: Invalid review type "${reviewType}". Use: ${VALID_REVIEW_TYPES.join(', ')}`);
+    process.exit(1);
+  }
+
+  if (!ticketArg && reviewType !== 'workaround') {
+    console.error('Error: --ticket is required unless --type=workaround.');
+    process.exit(1);
+  }
+
+  const cost = costArg ? costArg.slice('--cost='.length) as CodificationCost : undefined;
+  if (cost && !VALID_CODIFICATION_COSTS.includes(cost)) {
+    console.error(`Error: Invalid codification cost "${cost}". Use: ${VALID_CODIFICATION_COSTS.join(', ')}`);
+    process.exit(1);
+  }
+
+  if (reviewType === 'workaround' && !recursArg) {
+    console.error('Error: workaround findings must include --recurs so one-off workarounds are not logged as codification debt.');
+    process.exit(1);
+  }
+
+  if (recursArg && !cost) {
+    console.error('Error: recurring workaround findings require --cost=s|m|l.');
+    process.exit(1);
+  }
+
+  if (cost && !recursArg) {
+    console.error('Error: --cost requires --recurs.');
     process.exit(1);
   }
 
@@ -408,7 +418,7 @@ function findingsAddCommand(args: string[], cwd: string): void {
     process.exit(1);
   }
 
-  const ticketKey = ticketArg.slice('--ticket='.length);
+  const ticketKey = ticketArg ? ticketArg.slice('--ticket='.length) : 'workaround';
   const description = descArg.slice('--description='.length);
 
   // Determine sprint number
@@ -423,11 +433,15 @@ function findingsAddCommand(args: string[], cwd: string): void {
   }
 
   const finding: ReviewFinding = {
+    id: createFindingId(),
     review_type: reviewType,
     ticket_key: ticketKey,
     severity,
     description,
     resolved: resolvedArg,
+    recurs: recursArg || undefined,
+    cost,
+    codification_status: recursArg ? 'open' : undefined,
   };
 
   const existing = loadFindings(cwd);
@@ -443,6 +457,9 @@ function findingsAddCommand(args: string[], cwd: string): void {
   }
 
   console.log(`Finding added: [${reviewType}] ${ticketKey} — ${description} (${severity})`);
+  console.log(`  ID: ${finding.id}`);
+  const codification = formatCodificationMetadata(finding);
+  if (codification) console.log(`  ${codification}`);
 }
 
 function findingsListCommand(args: string[], cwd: string): void {
@@ -462,12 +479,14 @@ function findingsListCommand(args: string[], cwd: string): void {
       return;
     }
     console.log(`Sprint ${requestedSprint} findings (${sprintFindings.length} total):\n`);
-    console.log('  Ticket  Type           Severity   Description');
-    for (const f of sprintFindings) {
+    console.log('  ID       Ticket  Type           Severity   Description');
+    for (const [index, f] of sprintFindings.entries()) {
+      const id = displayFindingId(f, requestedSprint, index).padEnd(8);
       const ticket = f.ticket_key.padEnd(7);
       const type = f.review_type.padEnd(14);
       const severity = f.severity.padEnd(10);
-      console.log(`  ${ticket} ${type} ${severity} ${f.description}`);
+      const meta = formatCodificationMetadata(f);
+      console.log(`  ${id} ${ticket} ${type} ${severity} ${f.description}${meta ? ` (${meta})` : ''}`);
     }
   } else {
     // Show all findings grouped by sprint
@@ -475,12 +494,14 @@ function findingsListCommand(args: string[], cwd: string): void {
     for (const sprint of sprintKeys) {
       const sprintFindings = data.sprints[sprint];
       console.log(`Sprint ${sprint} findings (${sprintFindings.length}):\n`);
-      console.log('  Ticket  Type           Severity   Description');
-      for (const f of sprintFindings) {
+      console.log('  ID       Ticket  Type           Severity   Description');
+      for (const [index, f] of sprintFindings.entries()) {
+        const id = displayFindingId(f, sprint, index).padEnd(8);
         const ticket = f.ticket_key.padEnd(7);
         const type = f.review_type.padEnd(14);
         const severity = f.severity.padEnd(10);
-        console.log(`  ${ticket} ${type} ${severity} ${f.description}`);
+        const meta = formatCodificationMetadata(f);
+        console.log(`  ${id} ${ticket} ${type} ${severity} ${f.description}${meta ? ` (${meta})` : ''}`);
       }
       console.log('');
     }
@@ -503,7 +524,7 @@ function findingsCommand(args: string[], cwd: string): void {
     console.log(`Usage: slope review findings <subcommand> [options]
 
 Subcommands:
-  add    Add a review finding
+  add    Add a review finding; workaround candidates use --recurs --cost=s|m|l
   list   List recorded findings
   clear  Clear all findings
 
@@ -692,7 +713,7 @@ scorecard, or plan metadata.`);
       console.log(`Usage: slope review findings <add|list|clear> [options]
 
 Subcommands:
-  add    Record a review finding (--type, --ticket, --severity, --description)
+  add    Record a review finding (--type, --ticket, --severity, --description; workaround uses --recurs --cost=s|m|l)
   list   List recorded findings (optionally --sprint=N)
   clear  Clear all findings`);
       break;

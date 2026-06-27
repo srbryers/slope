@@ -212,7 +212,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
       { name: 'reset', desc: 'Reset review state' },
       { name: 'recommend', desc: 'Check which review types apply to the sprint' },
       { name: 'findings', desc: 'Manage review findings', flags: [
-        { flag: 'add', desc: 'Add a finding (--type, --ticket, --severity, --description)' },
+        { flag: 'add', desc: 'Add a finding (--type, --ticket, --severity, --description; workaround supports --recurs --cost=s|m|l)' },
         { flag: 'list', desc: 'List recorded findings' },
         { flag: 'clear', desc: 'Clear all findings' },
       ]},

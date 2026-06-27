@@ -395,15 +395,27 @@ export interface SlopeEvent {
 // --- Review Types (Implementation Review Integration) ---
 
 /** Types of implementation reviews that can be run on a sprint */
-export type ReviewType = 'architect' | 'code' | 'ml-engineer' | 'security' | 'ux';
+export type ReviewType = 'architect' | 'code' | 'ml-engineer' | 'security' | 'ux' | 'workaround';
+
+/** Estimated effort to codify a recurring workaround */
+export type CodificationCost = 's' | 'm' | 'l';
+
+/** Lifecycle state for a recurring workaround that should be codified */
+export type CodificationStatus = 'open' | 'paid_down' | 'wontfix';
 
 /** A finding from an implementation review */
 export interface ReviewFinding {
+  id?: string;
   review_type: ReviewType;
   ticket_key: string;
   severity: HazardSeverity;
   description: string;
   resolved: boolean;
+  recurs?: boolean;
+  cost?: CodificationCost;
+  codification_status?: CodificationStatus;
+  codified_at?: string;
+  resolved_at?: string;
 }
 
 /** A recommendation to run a specific review type */

@@ -47,6 +47,7 @@ export const REVIEW_TYPE_HAZARD_MAP: Record<ReviewType, HazardType> = {
   'ml-engineer': 'rough',
   security: 'water',
   ux: 'trees',
+  workaround: 'rough',
 };
 
 /** Stale session cleanup threshold (10 minutes in ms) */
