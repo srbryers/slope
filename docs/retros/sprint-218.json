@@ -1,0 +1,151 @@
+{
+  "sprint_number": 218,
+  "player": "codex",
+  "theme": "Store and Project Bootstrap Portability",
+  "par": 4,
+  "slope": 3,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-06-27",
+  "type": "bugfix",
+  "skills_used": [
+    "slope-sprint-workflow",
+    "github"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow"
+  ],
+  "skill_gaps_found": [],
+  "shots": [
+    {
+      "ticket_key": "S218-1",
+      "title": "Add SQLite journal-mode fallback and override for WSL2 DrvFs and network filesystems (#553)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "SQLite store setup now verifies WAL with a real write and falls back to TRUNCATE when WAL is unsupported, while SLOPE_JOURNAL_MODE can explicitly select supported journal modes."
+    },
+    {
+      "ticket_key": "S218-2",
+      "title": "Prefix store I/O failures with resolved store path and journal-mode recovery guidance (#553)",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "SQLite open/setup failures now surface a SlopeStoreError with the resolved store path, original I/O detail, and WSL2/network filesystem recovery guidance."
+    },
+    {
+      "ticket_key": "S218-3",
+      "title": "Require git repository or explicit degraded no-git mode in init/interview/start paths (#558)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "init, interview, and start now require a git work tree unless --allow-no-git/--no-git is explicit, and ticket completion no longer emits raw git fatal output outside repositories."
+    },
+    {
+      "ticket_key": "S218-4",
+      "title": "Reject or materialize the custom metaphor sentinel before interview writes config (#557)",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "The unmaterialized custom metaphor sentinel is no longer offered as an interview option, is rejected if submitted manually, and is defensively skipped by answer transformation."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "wind",
+      "impact": "minor",
+      "description": "The sprint crossed store portability, bootstrap preflight behavior, and interview metaphor validation, so verification needed both focused regressions and full CLI/core sweeps."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "SQLite journal setup needs an operational probe, not only a PRAGMA round trip.",
+      "outcome": "The store writes and deletes a probe row after selecting WAL, then falls back to TRUNCATE when the write fails."
+    },
+    {
+      "type": "lessons",
+      "description": "Bootstrap commands that depend on commit evidence need an explicit git preflight.",
+      "outcome": "init, interview, and start now fail with SLOPE-owned recovery text unless degraded no-git mode is explicitly requested."
+    },
+    {
+      "type": "lessons",
+      "description": "Selector sentinel values must be materialized before config persistence or rejected before writes.",
+      "outcome": "The custom metaphor placeholder is rejected centrally and cannot reach .slope/config.json as a saved metaphor id."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "hydration",
+      "description": "`./node_modules/.bin/vitest.cmd run tests/store tests/cli/store.test.ts` passed: 4 files passed, 1 skipped, 88 passed tests and 25 skipped PG tests.",
+      "status": "healthy"
+    },
+    {
+      "category": "diet",
+      "description": "`./node_modules/.bin/vitest.cmd run tests/cli` passed: 126 files, 1455 tests.",
+      "status": "healthy"
+    },
+    {
+      "category": "recovery",
+      "description": "`./node_modules/.bin/vitest.cmd run tests/core` passed: 95 files, 1954 tests.",
+      "status": "healthy"
+    },
+    {
+      "category": "supplements",
+      "description": "`./node_modules/.bin/tsc.cmd --noEmit` and `./node_modules/.bin/tsc.cmd` passed. `pnpm run build` remains blocked in this environment by pnpm ignored-build approval, so the local compiler binary was used for verification.",
+      "status": "healthy"
+    },
+    {
+      "category": "stretching",
+      "description": "`node dist/cli/index.js review recommend` required architect review and suggested optional code review; scoped code and architecture review found no findings.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "The sprint was straightforward once each issue was treated as a portability contract rather than a one-off failure.",
+    "advice_for_next_player": "When onboarding or bootstrap state can degrade, make the degraded mode explicit and keep the happy path tied to durable evidence.",
+    "what_surprised_you": "The custom metaphor sentinel had multiple permissive paths: step options, answer validation, input validation, and answer transformation all needed the same rule.",
+    "excited_about_next": "S219 can build on cleaner bootstrap assumptions while review provenance work gets its own focused sprint."
+  },
+  "bunker_locations": [
+    "SQLite WAL can appear accepted by PRAGMA while still failing on the first write on DrvFs, 9p, or network filesystems.",
+    "No-git projects need an explicit degraded mode because roadmap and ticket completion rely on commit-backed evidence.",
+    "Metaphor selector sentinels should never share the same storage path as registered metaphor ids."
+  ],
+  "yardage_book_updates": [
+    "src/store/index.ts now configures SQLite journal mode through a verified WAL probe, TRUNCATE fallback, and SLOPE_JOURNAL_MODE override.",
+    "src/store/index.ts now wraps SQLite setup failures with resolved path and filesystem-specific recovery guidance.",
+    "src/cli/git-preflight.ts centralizes git work tree checks for init, interview, and start.",
+    "src/cli/commands/ticket.ts now suppresses raw git fatal output and warns when a no-git completion cannot attach HEAD.",
+    "src/core/interview-metaphor.ts centralizes interview metaphor validation so the custom sentinel is rejected before config writes."
+  ],
+  "course_management_notes": [
+    "GitHub issues #553, #558, and #557 are addressed by commits 2d5acb4, 5131f01, 281055a, and bbd3f54.",
+    "The sprint intentionally leaves unrelated dirty hook and slope-loop files untouched.",
+    "Roadmap validation will still warn that S216-S218 are not on main until this branch is merged."
+  ],
+  "slope_factors": [
+    "sqlite_portability",
+    "bootstrap_git_preflight",
+    "interview_validation",
+    "windows_filesystem_recovery",
+    "issue_recovery_train"
+  ]
+}
