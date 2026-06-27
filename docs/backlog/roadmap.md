@@ -1,6 +1,6 @@
 # SLOPE Roadmap
 
-> 165 scorecards filed. Canonical planning now lives in `docs/backlog/roadmap.json`.
+> 166 scorecards filed. Canonical planning now lives in `docs/backlog/roadmap.json`.
 > Last updated: 2026-06-27 (open GitHub issue recovery triage)
 
 ## Phase Summary
@@ -32,8 +32,8 @@ Open GitHub issues triaged into the canonical roadmap: #552, #553, #556, #557, #
 - **S147:** Superseded as a stale handoff-continuity lane; reopen as concrete issue-backed work if still needed.
 - **S153:** Marked complete for #550 after shipped semver recommendation hardening; no scorecard exists, so roadmap validation keeps a warning.
 - **S216:** Complete for #573; roadmap validation now separates shipped implementation evidence from docs-only planning references.
-- **S217:** Stale workflow cleanup and guard misfire recovery for #572. Next action: S217-1.
-- **S218:** Store/bootstrap portability for #553, #557, and #558.
+- **S217:** Complete for #572; stale workflow cleanup and guard recovery now pause abandoned executions or fail open with diagnostics.
+- **S218:** Store/bootstrap portability for #553, #557, and #558. Next action: S218-1.
 - **S219:** Independent review provenance and reviewer-agent defaults for #561 and #562.
 - **S220:** Agent claimant identity and retro learning-prefix parsing for #565 and #566.
 - **S221:** Workaround/codification candidate ledger and scope-based sprint terminology for #552 and #556.

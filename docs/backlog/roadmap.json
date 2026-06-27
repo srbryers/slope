@@ -4711,7 +4711,9 @@
       "par": 4,
       "slope": 3,
       "type": "bugfix + guard hardening",
-      "status": "planned",
+      "status": "complete",
+      "score": 4,
+      "score_label": "par",
       "depends_on": [
         216
       ],
