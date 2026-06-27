@@ -17,6 +17,7 @@ Run the complete pre-sprint routine: verify prior sprint hygiene, get briefing, 
 
 - If a number was provided as an argument, use it
 - Otherwise, run `slope next` to auto-detect the next sprint number
+- Treat the sprint number as the current SLOPE work unit. It may be a time-boxed interval or a scope-based agent milestone.
 
 ### 2. Verify prior sprint scorecard
 

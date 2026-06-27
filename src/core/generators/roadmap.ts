@@ -90,7 +90,7 @@ function fromMilestones(
 
   return {
     name: `${profile.stack.primaryLanguage} Project`,
-    description: 'Auto-generated roadmap from GitHub milestones',
+    description: 'Auto-generated roadmap from GitHub milestones. Sprints are scope-based work units unless your team chooses to run them as calendar time boxes.',
     phases,
     sprints,
   };
@@ -147,7 +147,7 @@ function fromLabels(
 
   return {
     name: `${profile.stack.primaryLanguage} Project`,
-    description: 'Auto-generated roadmap from GitHub issue labels',
+    description: 'Auto-generated roadmap from GitHub issue labels. Sprints are scope-based work units unless your team chooses to run them as calendar time boxes.',
     phases,
     sprints,
   };
@@ -200,7 +200,7 @@ function fromLocalTodos(
 
   return {
     name: `${profile.stack.primaryLanguage} Project`,
-    description: 'Auto-generated roadmap from local backlog',
+    description: 'Auto-generated roadmap from local backlog. Sprints are scope-based work units unless your team chooses to run them as calendar time boxes.',
     phases: [{ name: 'Phase 1 — Setup', sprints: [1] }],
     sprints,
   };

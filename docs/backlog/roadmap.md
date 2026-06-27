@@ -3,6 +3,8 @@
 > 166 scorecards filed. Canonical planning now lives in `docs/backlog/roadmap.json`.
 > Last updated: 2026-06-27 (open GitHub issue recovery triage)
 
+Roadmap sprints are SLOPE work units: they may be time-boxed intervals, but this roadmap uses scope-based agent milestones with explicit tickets, acceptance checks, validation gates, dependencies, and artifacts.
+
 ## Phase Summary
 
 | # | Phase | Sprints | Status | Key Deliverable |

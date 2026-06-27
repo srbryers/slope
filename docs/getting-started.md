@@ -33,6 +33,8 @@ That's it. SLOPE creates a `.slope/` directory with config, a SQLite store, an e
 
 SLOPE uses a scoring system (golf by default — [other metaphors available](#metaphors)) to quantify sprint execution:
 
+In SLOPE, a **sprint** is the scored unit of work. It can be a calendar time-box for a human team, or a scope-based agent work unit defined by tickets, acceptance checks, validation gates, and artifacts.
+
 ### Par
 
 Par is the expected baseline, determined by ticket count:

@@ -2,6 +2,8 @@
 
 This tutorial walks you through a complete sprint cycle — from setup to scoring to reviewing performance. By the end, you'll have a scorecard, a handicap card, and a workflow you can repeat for every sprint.
 
+In SLOPE, a sprint can be a time-boxed interval or a scope-based work unit. For agent-executed work, plan around tickets, acceptance checks, validation commands, review gates, and artifacts rather than elapsed calendar time.
+
 ## Prerequisites
 
 - Node.js 18+

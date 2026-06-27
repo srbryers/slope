@@ -47,6 +47,15 @@ describe('generateInterviewSteps', () => {
     expect(sprintStep?.default).toBe('1');
   });
 
+  it('clarifies that sprints can be time-boxed or scope-based work units', () => {
+    const steps = generateInterviewSteps(makeCtx());
+    const sprintStep = steps.find((s) => s.id === 'sprint-number');
+    expect(sprintStep?.description).toContain('time-boxed');
+    expect(sprintStep?.description).toContain('scope-based agent milestone');
+    expect(sprintStep?.description).toContain('acceptance checks');
+    expect(sprintStep?.description).toContain('validation gates');
+  });
+
   it('shows detected platforms as defaults', () => {
     const steps = generateInterviewSteps(makeCtx({ detectedPlatforms: ['claude-code', 'cursor'] }));
     const platStep = steps.find((s) => s.id === 'platforms');

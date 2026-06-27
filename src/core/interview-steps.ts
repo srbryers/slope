@@ -89,7 +89,7 @@ export function generateInterviewSteps(ctx: InterviewContext): InterviewStep[] {
     id: 'sprint-number',
     question: 'What sprint number are you starting?',
     type: 'text',
-    description: 'The current or next sprint number.',
+    description: 'The current or next SLOPE work unit. A sprint can be a time-boxed interval or a scope-based agent milestone with tickets, acceptance checks, validation gates, and artifacts.',
     default: defaultSprint,
     required: false,
     validate: (v) => {
