@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdirSync, rmSync, existsSync } from 'node:fs';
+import { mkdirSync, rmSync, existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   loadSprintState,
@@ -9,10 +9,28 @@ import {
   isSprintComplete,
   pendingGates,
   createSprintState,
+  createDefaultReviewGates,
   clearSprintState,
 } from '../../src/cli/sprint-state.js';
 
 const tmpDir = join(import.meta.dirname ?? __dirname, '.tmp-sprint-state-test');
+
+function writeRawSprintState(state: unknown): void {
+  const dir = join(tmpDir, '.slope');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'sprint-state.json'), JSON.stringify(state));
+}
+
+function legacySprintState(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    sprint: 22,
+    phase: 'implementing',
+    gates: { tests: false, code_review: false, architect_review: false, scorecard: false, review_md: false },
+    started_at: '2026-01-01T00:00:00Z',
+    updated_at: '2026-01-01T00:00:00Z',
+    ...overrides,
+  };
+}
 
 beforeEach(() => {
   mkdirSync(tmpDir, { recursive: true });
@@ -30,7 +48,6 @@ describe('loadSprintState', () => {
   it('returns null for malformed JSON', () => {
     const dir = join(tmpDir, '.slope');
     mkdirSync(dir, { recursive: true });
-    const { writeFileSync } = require('node:fs');
     writeFileSync(join(dir, 'sprint-state.json'), 'not json');
     expect(loadSprintState(tmpDir)).toBeNull();
   });
@@ -38,37 +55,66 @@ describe('loadSprintState', () => {
   it('returns null for invalid shape', () => {
     const dir = join(tmpDir, '.slope');
     mkdirSync(dir, { recursive: true });
-    const { writeFileSync } = require('node:fs');
     writeFileSync(join(dir, 'sprint-state.json'), JSON.stringify({ foo: 'bar' }));
     expect(loadSprintState(tmpDir)).toBeNull();
   });
 
   it('returns null when gate keys are missing', () => {
-    const dir = join(tmpDir, '.slope');
-    mkdirSync(dir, { recursive: true });
-    const { writeFileSync } = require('node:fs');
-    writeFileSync(join(dir, 'sprint-state.json'), JSON.stringify({
-      sprint: 22,
-      phase: 'implementing',
+    writeRawSprintState(legacySprintState({
       gates: { tests: true }, // missing 4 other keys
-      started_at: '2026-01-01T00:00:00Z',
-      updated_at: '2026-01-01T00:00:00Z',
     }));
     expect(loadSprintState(tmpDir)).toBeNull();
   });
 
   it('returns null when gate value is not boolean', () => {
-    const dir = join(tmpDir, '.slope');
-    mkdirSync(dir, { recursive: true });
-    const { writeFileSync } = require('node:fs');
-    writeFileSync(join(dir, 'sprint-state.json'), JSON.stringify({
-      sprint: 22,
-      phase: 'implementing',
+    writeRawSprintState(legacySprintState({
       gates: { tests: 'yes', code_review: false, architect_review: false, scorecard: false, review_md: false },
-      started_at: '2026-01-01T00:00:00Z',
-      updated_at: '2026-01-01T00:00:00Z',
     }));
     expect(loadSprintState(tmpDir)).toBeNull();
+  });
+
+  it('loads legacy state without review gate provenance as pending', () => {
+    writeRawSprintState(legacySprintState());
+
+    const loaded = loadSprintState(tmpDir);
+
+    expect(loaded).not.toBeNull();
+    expect(loaded!.review_gates).toEqual(createDefaultReviewGates());
+  });
+
+  it('normalizes partial or invalid review gate provenance', () => {
+    writeRawSprintState(legacySprintState({
+      review_gates: {
+        code_review: {
+          provenance: 'independent_review',
+          evidence: ['agent:code-review', 17],
+          reviewer: 'code-reviewer',
+          notes: 'Looks good.',
+          updated_at: '2026-01-02T00:00:00Z',
+        },
+        architect_review: {
+          provenance: 'unknown',
+          evidence: ['manual note', false],
+          reviewer: 42,
+          notes: true,
+          updated_at: null,
+        },
+      },
+    }));
+
+    const loaded = loadSprintState(tmpDir);
+
+    expect(loaded!.review_gates.code_review).toEqual({
+      provenance: 'independent_review',
+      evidence: ['agent:code-review'],
+      reviewer: 'code-reviewer',
+      notes: 'Looks good.',
+      updated_at: '2026-01-02T00:00:00Z',
+    });
+    expect(loaded!.review_gates.architect_review).toEqual({
+      provenance: 'pending',
+      evidence: ['manual note'],
+    });
   });
 });
 
@@ -87,6 +133,7 @@ describe('saveSprintState', () => {
     expect(loaded!.sprint).toBe(22);
     expect(loaded!.phase).toBe('implementing');
     expect(loaded!.gates.tests).toBe(false);
+    expect(loaded!.review_gates.code_review.provenance).toBe('pending');
   });
 
   it('round-trips decimal inserted sprint ids', () => {
@@ -110,6 +157,56 @@ describe('updateGate', () => {
     // Should not throw
     updateGate(tmpDir, 'tests', true);
     expect(loadSprintState(tmpDir)).toBeNull();
+  });
+
+  it('records legacy review gate completion as self-review provenance', () => {
+    saveSprintState(tmpDir, createSprintState(22));
+
+    updateGate(tmpDir, 'code_review', true);
+
+    const state = loadSprintState(tmpDir)!;
+    expect(state.gates.code_review).toBe(true);
+    expect(state.review_gates.code_review).toMatchObject({
+      provenance: 'self_review',
+      evidence: ['slope sprint gate code_review'],
+      notes: expect.stringContaining('legacy sprint gate command'),
+      updated_at: expect.any(String),
+    });
+  });
+
+  it('preserves existing independent review provenance when marking complete', () => {
+    const state = createSprintState(22);
+    state.review_gates.code_review = {
+      provenance: 'independent_review',
+      evidence: ['agent:code-reviewer'],
+      reviewer: 'code-reviewer',
+      notes: 'No blocking findings.',
+      updated_at: '2026-01-02T00:00:00Z',
+    };
+    saveSprintState(tmpDir, state);
+
+    updateGate(tmpDir, 'code_review', true);
+
+    const loaded = loadSprintState(tmpDir)!;
+    expect(loaded.gates.code_review).toBe(true);
+    expect(loaded.review_gates.code_review).toEqual(state.review_gates.code_review);
+  });
+
+  it('resets review gate provenance when marking incomplete', () => {
+    saveSprintState(tmpDir, createSprintState(22));
+    updateGate(tmpDir, 'architect_review', true);
+
+    updateGate(tmpDir, 'architect_review', false);
+
+    const state = loadSprintState(tmpDir)!;
+    expect(state.gates.architect_review).toBe(false);
+    expect(state.review_gates.architect_review).toEqual({ provenance: 'pending', evidence: [] });
+  });
+});
+
+describe('createSprintState', () => {
+  it('initializes review gates as pending', () => {
+    expect(createSprintState(22).review_gates).toEqual(createDefaultReviewGates());
   });
 });
 
