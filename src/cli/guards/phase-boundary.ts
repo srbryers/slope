@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { HookInput, GuardResult, Suggestion } from '../../core/index.js';
-import { castRoadmapStructure, loadConfig, parseRoadmap } from '../../core/index.js';
+import { castRoadmapStructure, loadConfig, parseRoadmap, parseSprintNumber } from '../../core/index.js';
 import { isPhaseComplete, pendingPhaseGates } from '../phase-cleanup.js';
 
 /** Extract phase number from name like "Phase 7 — Helmsman 3D". Falls back to array index + 1. */
@@ -21,15 +21,9 @@ export async function phaseBoundaryGuard(input: HookInput, cwd: string): Promise
   // Match actual slope sprint-start, sprint-run, or claim invocations.
   if (!slopeArgs) return {};
 
-  // Parse target sprint number from command args
-  const argText = slopeArgs.join(' ');
-  const sprintMatch = argText.match(/--sprint[=\s]+(\d+)/i) ??
-    argText.match(/\bS(\d+)\b/i) ??
-    argText.match(/--target[=\s]+S?(\d+)/i);
-
   // If we can't determine the target sprint, allow (don't block blindly)
-  if (!sprintMatch) return {};
-  const targetSprint = parseInt(sprintMatch[1], 10);
+  const targetSprint = targetSprintFromSlopeArgs(slopeArgs);
+  if (targetSprint === null) return {};
 
   // Load roadmap to determine phase mapping
   const config = loadConfig(cwd);
@@ -112,10 +106,56 @@ function extractRelevantSlopeArgs(command: string): string[] | null {
 
     const args = words.slice(slopeIndex + 1);
     if (args[0] === 'sprint' && (args[1] === 'start' || args[1] === 'run')) return args;
+    if (args[0] === 'start') return args;
     if (args[0] === 'claim') return args;
   }
 
   return null;
+}
+
+function targetSprintFromSlopeArgs(args: string[]): number | null {
+  if (args[0] === 'sprint' && (args[1] === 'start' || args[1] === 'run')) {
+    return targetSprintFromValues(args.slice(2), ['--sprint', '--target', '--ticket'], true);
+  }
+  if (args[0] === 'start') {
+    return targetSprintFromValues(args.slice(1), ['--sprint', '--target', '--ticket'], true);
+  }
+  if (args[0] === 'claim') {
+    return targetSprintFromValues(args.slice(1), ['--target', '--ticket', '--sprint'], true);
+  }
+  return null;
+}
+
+function targetSprintFromValues(args: string[], flags: string[], allowPositional: boolean): number | null {
+  for (const flag of flags) {
+    const value = flagValue(args, flag);
+    const sprint = sprintFromValue(value);
+    if (sprint !== null) return sprint;
+  }
+
+  if (!allowPositional) return null;
+  for (const arg of args) {
+    if (arg.startsWith('-')) continue;
+    const sprint = sprintFromValue(arg);
+    if (sprint !== null) return sprint;
+  }
+  return null;
+}
+
+function flagValue(args: string[], flag: string): string | undefined {
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === flag) return args[i + 1];
+    if (arg.startsWith(`${flag}=`)) return arg.slice(flag.length + 1);
+  }
+  return undefined;
+}
+
+function sprintFromValue(value: string | undefined): number | null {
+  if (!value) return null;
+  const normalized = value.trim();
+  const ticketMatch = normalized.match(/^S?(\d+(?:\.\d+)?)(?:-\d+)?$/i);
+  return parseSprintNumber(ticketMatch?.[1] ?? normalized);
 }
 
 function splitShellSegments(command: string): string[] {

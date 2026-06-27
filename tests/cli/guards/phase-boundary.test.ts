@@ -79,6 +79,15 @@ describe('phaseBoundaryGuard', () => {
     expect(result.suggestion?.context).toContain('Sprint 2');
   });
 
+  it('matches front-door slope start invocations', async () => {
+    writeRoadmap();
+
+    const result = await phaseBoundaryGuard(makeInput('slope start --ticket=S2-1'), tmpDir);
+
+    expect(result.decision).toBe('deny');
+    expect(result.suggestion?.context).toContain('Sprint 2');
+  });
+
   it('matches slope invocations in pipeline segments', async () => {
     writeRoadmap();
 
@@ -93,6 +102,17 @@ describe('phaseBoundaryGuard', () => {
 
     const result = await phaseBoundaryGuard(
       makeInput('gh issue create --title bug --body "mentions slope sprint start --sprint=2 and slope claim --target=S2-1"'),
+      tmpDir,
+    );
+
+    expect(result).toEqual({});
+  });
+
+  it('ignores narrative sprint mentions on relevant slope commands without target flags', async () => {
+    writeRoadmap();
+
+    const result = await phaseBoundaryGuard(
+      makeInput('slope claim --notes "mentions S2 from an abandoned execution but does not target it"'),
       tmpDir,
     );
 
