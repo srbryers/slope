@@ -1,0 +1,153 @@
+{
+  "sprint_number": 221,
+  "player": "codex",
+  "theme": "Codification Candidate Ledger and Sprint Model Clarity",
+  "par": 4,
+  "slope": 3,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-06-27",
+  "type": "feature + documentation",
+  "skills_used": [
+    "slope-sprint-workflow",
+    "github"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow",
+    "github"
+  ],
+  "skill_gaps_found": [],
+  "shots": [
+    {
+      "ticket_key": "S221-1",
+      "title": "Extend findings with recurring workaround/codification candidate metadata (#552)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Review findings now support workaround entries with stable IDs, required recurrence and cost metadata, open codification status, shared helpers, help metadata, and focused CLI coverage."
+    },
+    {
+      "ticket_key": "S221-2",
+      "title": "Surface codification candidates in briefing and sprint-close learning prompts (#552)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "Closeout integration coverage initially skipped the new codification_sweep workflow step; the full workflow test caught the mismatch before gates were marked."
+        }
+      ],
+      "notes": "Briefing now summarizes open codification candidates and low-cost codify-now items, while sprint closeout prompts explicitly ask agents to log recurring workarounds."
+    },
+    {
+      "ticket_key": "S221-3",
+      "title": "Add resolve/ledger behavior for paid-down codification candidates (#552)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Findings resolve now marks codification candidates as paid_down or wontfix, records resolution timestamps, and supports codification-status filtering in the ledger."
+    },
+    {
+      "ticket_key": "S221-4",
+      "title": "Clarify scope-based versus time-boxed sprint language in interview, roadmap, and docs (#556)",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Interview prompts, generated roadmap language, getting-started docs, framework docs, tutorials, backlog docs, and start-sprint templates now describe SLOPE sprints as time-boxed or scope-based work units."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 1,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "wind",
+      "impact": "moderate",
+      "description": "The sprint touched the shared review findings schema, briefing output, workflow definition, CLI help, generated roadmap copy, docs, and templates."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Recurring workarounds should live in the findings ledger instead of a parallel ad hoc system.",
+      "outcome": "Workaround findings now carry recurrence, codification cost, status, and stable IDs through add, list, briefing, and resolve paths."
+    },
+    {
+      "type": "lessons",
+      "description": "Workflow definition changes need end-to-end workflow test updates.",
+      "outcome": "The sprint-standard integration test now completes the codification_sweep step before update_map."
+    },
+    {
+      "type": "lessons",
+      "description": "SLOPE sprint copy should not imply calendar-only cadence.",
+      "outcome": "User-facing setup, roadmap, and tutorial language now describes sprints as time-boxed or scope-based agent work units."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "hydration",
+      "description": "`./node_modules/.bin/tsc.cmd --noEmit` passed.",
+      "status": "healthy"
+    },
+    {
+      "category": "diet",
+      "description": "Focused findings, amend, review, help, briefing, interview, generator, and workflow integration suites passed while implementing the tickets.",
+      "status": "healthy"
+    },
+    {
+      "category": "recovery",
+      "description": "`./node_modules/.bin/vitest.cmd run tests/cli tests/core` passed: 224 files, 3451 tests.",
+      "status": "healthy"
+    },
+    {
+      "category": "stretching",
+      "description": "`node dist/cli/index.js roadmap validate` passed with only pre-existing warnings.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "This was a product-shaping sprint: small CLI primitives, but a meaningful shift from invisible workarounds to visible codification candidates.",
+    "advice_for_next_player": "When adding a workflow step, update both the prompts and the workflow execution tests in the same pass.",
+    "what_surprised_you": "The recurring workaround feature fit cleanly into the existing review findings surface once codification metadata was kept optional and narrow.",
+    "excited_about_next": "S222 can publish the recovery train with #552 and #556 closed into a release-ready package."
+  },
+  "bunker_locations": [
+    "New workflow steps must be reflected in workflow integration tests before closeout.",
+    "Codification candidate metadata should stay constrained to recurring workaround findings until another finding type has a concrete need.",
+    "Sprint terminology in generated docs should keep time-boxed and scope-based work units equally visible."
+  ],
+  "yardage_book_updates": [
+    "src/core/findings.ts now owns review finding persistence helpers, codification candidate checks, and briefing formatting.",
+    "src/cli/commands/review-state.ts now supports workaround findings, required recurrence/cost metadata, codification-status filtering, and paid_down/wontfix resolution.",
+    "src/cli/commands/briefing.ts now surfaces open codification candidates in full and compact briefing output.",
+    "src/core/workflows/sprint-standard.yaml now includes a codification_sweep closeout prompt.",
+    "src/core/interview-steps.ts, src/core/generators/roadmap.ts, src/core/generators/first-sprint.ts, docs, and templates now clarify scope-based sprint language."
+  ],
+  "course_management_notes": [
+    "GitHub issues #552 and #556 are addressed by commits 4d0c24d, 361b7a9, 5a7fa2f, a1786ba, and caf328d.",
+    "The sprint intentionally leaves unrelated dirty hook and slope-loop files untouched.",
+    "Closeout review gates are recorded as self_review because no independent reviewer or PR review evidence was run locally."
+  ],
+  "slope_factors": [
+    "review_findings_schema",
+    "codification_candidate_ledger",
+    "briefing_output",
+    "workflow_closeout_prompt",
+    "roadmap_and_docs_language"
+  ]
+}
