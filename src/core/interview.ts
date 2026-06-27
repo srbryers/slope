@@ -6,8 +6,8 @@ import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createConfig } from './config.js';
 import type { SlopeConfig } from './config.js';
-import { hasMetaphor } from './metaphor.js';
 import { validateInterviewAnswers, answersToInitInput } from './interview-engine.js';
+import { validateInterviewMetaphorId } from './interview-metaphor.js';
 
 /** Core input — what initFromInterview() actually needs */
 export interface InitInput {
@@ -40,11 +40,9 @@ export function validateInitInput(input: InitInput): string[] {
     errors.push('projectName is required and must be non-empty');
   }
 
-  if (input.metaphor !== undefined && input.metaphor !== 'custom') {
-    // Import side-effects of metaphors happen at module load in the caller
-    if (!hasMetaphor(input.metaphor)) {
-      errors.push(`Unknown metaphor "${input.metaphor}". Use listMetaphors() to see available options.`);
-    }
+  if (input.metaphor !== undefined) {
+    const metaphorError = validateInterviewMetaphorId(input.metaphor);
+    if (metaphorError) errors.push(metaphorError);
   }
 
   if (input.repoUrl !== undefined) {

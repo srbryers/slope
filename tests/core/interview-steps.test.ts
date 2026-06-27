@@ -62,7 +62,7 @@ describe('generateInterviewSteps', () => {
     expect(urlStep?.default).toBe('https://github.com/acme/app');
   });
 
-  it('includes all built-in metaphors plus custom option', () => {
+  it('includes built-in metaphors without the unmaterialized custom sentinel', () => {
     const steps = generateInterviewSteps(makeCtx());
     const metaphorStep = steps.find((s) => s.id === 'metaphor');
     expect(metaphorStep?.type).toBe('select');
@@ -70,7 +70,8 @@ describe('generateInterviewSteps', () => {
     expect(values).toContain('golf');
     expect(values).toContain('gaming');
     expect(values).toContain('dnd');
-    expect(values).toContain('custom');
+    expect(values).not.toContain('custom');
+    expect(metaphorStep?.validate?.('custom')).toContain('creation placeholder');
   });
 
   it('deep-analysis step is conditional on _mode !== agent', () => {

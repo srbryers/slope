@@ -54,9 +54,9 @@ describe('validateInitInput', () => {
     expect(errors.some(e => e.includes('Unknown metaphor'))).toBe(true);
   });
 
-  it('accepts "custom" as a metaphor value (deferred generation)', () => {
+  it('rejects "custom" as a metaphor creation placeholder', () => {
     const errors = validateInitInput({ projectName: 'app', metaphor: 'custom' });
-    expect(errors).toEqual([]);
+    expect(errors.some(e => e.includes('creation placeholder'))).toBe(true);
   });
 
   it('rejects invalid repoUrl', () => {
@@ -179,6 +179,12 @@ describe('initFromInterview', () => {
   it('throws on invalid input', async () => {
     await expect(initFromInterview(tmpDir, { projectName: '' }))
       .rejects.toThrow('Invalid init input');
+  });
+
+  it('does not write config when metaphor is the custom sentinel', async () => {
+    await expect(initFromInterview(tmpDir, { projectName: 'App', metaphor: 'custom' }))
+      .rejects.toThrow('creation placeholder');
+    expect(existsSync(join(tmpDir, '.slope', 'config.json'))).toBe(false);
   });
 
   it('does not overwrite existing files', async () => {

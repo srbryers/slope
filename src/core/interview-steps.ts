@@ -2,6 +2,7 @@
 // Structured representation of init questions for CLI and agent consumption.
 
 import type { InterviewContext } from './interview-engine.js';
+import { validateInterviewMetaphorId } from './interview-metaphor.js';
 import { listMetaphors } from './metaphor.js';
 import { buildAllPreviews } from './metaphor-preview.js';
 
@@ -175,11 +176,6 @@ function buildMetaphorStep(): InterviewStep {
       hint: '(custom)',
       preview: previewMap.get(m.id),
     })),
-    {
-      value: 'custom',
-      label: 'Custom',
-      description: 'Describe a theme and your AI agent will generate it',
-    },
   ];
 
   return {
@@ -189,5 +185,6 @@ function buildMetaphorStep(): InterviewStep {
     description: 'Metaphors change display terms (e.g., "sprint" becomes "hole" in golf, "quest" in gaming). Internal types are unaffected.',
     options,
     default: 'golf',
+    validate: (v) => validateInterviewMetaphorId(String(v ?? '').trim()),
   };
 }

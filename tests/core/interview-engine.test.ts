@@ -103,6 +103,19 @@ describe('validateInterviewAnswers', () => {
     });
     expect(errors.some((e) => e.field === 'sprint-number')).toBe(true);
   });
+
+  it('rejects custom metaphor sentinel before config generation', () => {
+    const errors = validateInterviewAnswers({
+      'project-name': 'app',
+      'metaphor': 'custom',
+    });
+    expect(errors).toEqual([
+      expect.objectContaining({
+        field: 'metaphor',
+        message: expect.stringContaining('creation placeholder'),
+      }),
+    ]);
+  });
 });
 
 describe('answersToInitInput', () => {
@@ -140,6 +153,14 @@ describe('answersToInitInput', () => {
     expect(input.teamMembers).toBeUndefined();
     expect(input.vision).toBeUndefined();
   });
+
+  it('does not map custom metaphor sentinel into InitInput', () => {
+    const input = answersToInitInput({
+      'project-name': 'app',
+      'metaphor': 'custom',
+    });
+    expect(input.metaphor).toBeUndefined();
+  });
 });
 
 describe('initFromAnswers', () => {
@@ -161,6 +182,22 @@ describe('initFromAnswers', () => {
     expect(result.success).toBe(false);
     if (!result.success) {
       expect(result.errors.some((e) => e.field === 'project-name')).toBe(true);
+    }
+  });
+
+  it('returns structured error for custom metaphor sentinel without writing config', async () => {
+    const result = await initFromAnswers(tmpDir, {
+      'project-name': 'App',
+      'metaphor': 'custom',
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.errors).toEqual([
+        expect.objectContaining({
+          field: 'metaphor',
+          message: expect.stringContaining('creation placeholder'),
+        }),
+      ]);
     }
   });
 });

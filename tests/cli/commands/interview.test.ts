@@ -122,6 +122,24 @@ describe('slope interview CLI', () => {
     expect(second.errors[0].message).toContain('required');
   });
 
+  it('agent mode rejects custom metaphor sentinel without writing config', () => {
+    const result = execSync(
+      `node "${join(process.cwd(), 'dist/cli/index.js')}" interview --agent`,
+      {
+        cwd,
+        encoding: 'utf8',
+        input: JSON.stringify({ id: 'project-name', value: 'CustomProject' }) + '\n' +
+               JSON.stringify({ id: 'metaphor', value: 'custom' }) + '\n',
+      },
+    );
+
+    const last = JSON.parse(result.trim().split('\n').pop()!);
+    expect(last.type).toBe('error');
+    expect(last.errors[0].field).toBe('metaphor');
+    expect(last.errors[0].message).toContain('creation placeholder');
+    expect(existsSync(join(cwd, '.slope', 'config.json'))).toBe(false);
+  });
+
   it('blocks re-interview without --force when config exists', () => {
     writeFileSync(join(cwd, '.slope', 'config.json'), JSON.stringify({ version: '1' }));
 
