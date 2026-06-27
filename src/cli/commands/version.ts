@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 import { QUIET_STDIO } from '../../core/process.js';
+import type { ChangelogChange, RoadmapDefinition, RoadmapSprint } from '../../core/index.js';
 
 /**
  * slope version bump [<version>] [--dry-run]
@@ -243,6 +244,175 @@ function bumpMajor(version: string): string {
   return parts.join('.');
 }
 
+type VersionTier = 'patch' | 'minor' | 'major';
+type EvidenceSource = 'roadmap' | 'scorecard';
+
+export interface VersionReleaseEvidence {
+  source: EvidenceSource;
+  sprint: number;
+  theme: string;
+  tier: VersionTier;
+  reason: string;
+}
+
+const TIER_RANK: Record<VersionTier, number> = { patch: 0, minor: 1, major: 2 };
+const SPRINT_REF_RE = /\bS(\d+(?:\.\d+)?)(?:-\d+)?\b/g;
+const SCORECARD_PATH_RE = /(?:^|[/\\])docs[/\\]retros[/\\]sprint-(\d+(?:\.\d+)?)\.json$/;
+const GIT_HASH_RE = /^[a-f0-9]{7,40}$/i;
+const FEATURE_EVIDENCE_RE = /\b(feature|product surface|cli surface|human surface|user-facing|new command|cockpit|onboarding|plugin|adapter)\b/i;
+const BREAKING_EVIDENCE_RE = /\bbreaking\b/i;
+const PATCH_ONLY_TYPE_RE = /\b(bugfix|fix|planning|test|release|docs|documentation|chore)\b/i;
+
+function maxTier(a: VersionTier, b: VersionTier): VersionTier {
+  return TIER_RANK[b] > TIER_RANK[a] ? b : a;
+}
+
+function sprintFileId(sprint: number): string {
+  return Number.isInteger(sprint) ? String(sprint) : String(sprint);
+}
+
+function readJsonFile<T>(path: string): T | null {
+  if (!existsSync(path)) return null;
+  try {
+    return JSON.parse(readFileSync(path, 'utf8')) as T;
+  } catch {
+    return null;
+  }
+}
+
+function loadRoadmapSprints(cwd: string): Map<number, RoadmapSprint & { status?: string; note?: string }> {
+  const roadmap = readJsonFile<RoadmapDefinition>(join(cwd, 'docs', 'backlog', 'roadmap.json'));
+  const sprints = new Map<number, RoadmapSprint & { status?: string; note?: string }>();
+  for (const sprint of roadmap?.sprints ?? []) {
+    sprints.set(sprint.id, sprint as RoadmapSprint & { status?: string; note?: string });
+  }
+  return sprints;
+}
+
+function extractSprintIdsFromText(text: string | undefined): Set<number> {
+  const ids = new Set<number>();
+  if (!text) return ids;
+
+  for (const match of text.matchAll(SPRINT_REF_RE)) {
+    const id = Number(match[1]);
+    if (Number.isFinite(id)) ids.add(id);
+  }
+
+  return ids;
+}
+
+function gitOutput(cwd: string, args: string[]): string {
+  try {
+    return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: QUIET_STDIO }).trim();
+  } catch {
+    return '';
+  }
+}
+
+function commitSubject(cwd: string, hash: string): string {
+  if (!GIT_HASH_RE.test(hash)) return '';
+  return gitOutput(cwd, ['show', '-s', '--format=%s', hash]);
+}
+
+function commitChangedFiles(cwd: string, hash: string): string[] {
+  if (!GIT_HASH_RE.test(hash)) return [];
+  const raw = gitOutput(cwd, ['diff-tree', '--no-commit-id', '--name-only', '-r', hash]);
+  return raw ? raw.split('\n').map(line => line.trim()).filter(Boolean) : [];
+}
+
+function evidenceTierFromTypedText(type: string, text: string): VersionTier | null {
+  const combined = `${type} ${text}`;
+  if (BREAKING_EVIDENCE_RE.test(combined)) return 'major';
+  if (FEATURE_EVIDENCE_RE.test(type)) return 'minor';
+  if (PATCH_ONLY_TYPE_RE.test(type)) return null;
+  if (FEATURE_EVIDENCE_RE.test(combined)) return 'minor';
+  return null;
+}
+
+function scorecardEvidenceText(scorecard: Record<string, unknown> | null): string {
+  if (!scorecard) return '';
+  const shots = Array.isArray(scorecard.shots)
+    ? scorecard.shots
+      .map(shot => typeof shot === 'object' && shot ? (shot as { title?: unknown; notes?: unknown }) : null)
+      .filter(Boolean)
+      .map(shot => String(shot!.title ?? ''))
+      .join(' ')
+    : '';
+  const factors = Array.isArray(scorecard.slope_factors) ? scorecard.slope_factors.join(' ') : '';
+  return [
+    scorecard.theme,
+    shots,
+    factors,
+  ].map(value => String(value ?? '')).join(' ');
+}
+
+function roadmapEvidenceText(sprint: (RoadmapSprint & { note?: string }) | undefined): string {
+  if (!sprint) return '';
+  const tickets = (sprint.tickets ?? []).map(ticket => ticket.title).join(' ');
+  return [sprint.theme, sprint.type, sprint.note, tickets].map(value => String(value ?? '')).join(' ');
+}
+
+function releaseEvidenceForSprint(
+  cwd: string,
+  sprintId: number,
+  roadmapSprints: Map<number, RoadmapSprint & { status?: string; note?: string }>,
+): VersionReleaseEvidence | null {
+  const roadmapSprint = roadmapSprints.get(sprintId);
+  const scorecard = readJsonFile<Record<string, unknown>>(join(cwd, 'docs', 'retros', `sprint-${sprintFileId(sprintId)}.json`));
+  const shipped = roadmapSprint?.status === 'complete' || Boolean(scorecard);
+  if (!shipped) return null;
+
+  const scorecardType = String(scorecard?.type ?? '');
+  const roadmapType = String(roadmapSprint?.type ?? '');
+  const scorecardTier = evidenceTierFromTypedText(scorecardType, scorecardEvidenceText(scorecard));
+  const roadmapTier = evidenceTierFromTypedText(roadmapType, roadmapEvidenceText(roadmapSprint));
+  const tier = scorecardTier && roadmapTier ? maxTier(scorecardTier, roadmapTier) : scorecardTier ?? roadmapTier;
+  if (!tier) return null;
+
+  const source: EvidenceSource = scorecard ? 'scorecard' : 'roadmap';
+  const theme = String(scorecard?.theme ?? roadmapSprint?.theme ?? `Sprint ${sprintFileId(sprintId)}`);
+  const type = String(scorecard?.type ?? roadmapSprint?.type ?? 'unknown type');
+
+  return {
+    source,
+    sprint: sprintId,
+    theme,
+    tier,
+    reason: type,
+  };
+}
+
+export function collectSlopeReleaseEvidence(
+  cwd: string,
+  changes: Pick<ChangelogChange, 'hash' | 'description' | 'scope'>[],
+): VersionReleaseEvidence[] {
+  const roadmapSprints = loadRoadmapSprints(cwd);
+  const sprintIds = new Set<number>();
+
+  for (const change of changes) {
+    for (const id of extractSprintIdsFromText(change.description)) sprintIds.add(id);
+    for (const id of extractSprintIdsFromText(change.scope)) sprintIds.add(id);
+
+    if (!change.hash) continue;
+    for (const id of extractSprintIdsFromText(commitSubject(cwd, change.hash))) sprintIds.add(id);
+
+    for (const file of commitChangedFiles(cwd, change.hash)) {
+      const scorecardMatch = file.match(SCORECARD_PATH_RE);
+      if (!scorecardMatch) continue;
+      const id = Number(scorecardMatch[1]);
+      if (Number.isFinite(id)) sprintIds.add(id);
+    }
+  }
+
+  const evidence = new Map<number, VersionReleaseEvidence>();
+  for (const sprintId of [...sprintIds].sort((a, b) => a - b)) {
+    const item = releaseEvidenceForSprint(cwd, sprintId, roadmapSprints);
+    if (item) evidence.set(sprintId, item);
+  }
+
+  return [...evidence.values()];
+}
+
 async function versionRecommend(cwd: string): Promise<void> {
   const { parseChangelog } = await import('./docs.js');
 
@@ -262,10 +432,17 @@ async function versionRecommend(cwd: string): Promise<void> {
     else counts.other++;
   }
 
-  let tier: string;
-  if (counts.breaking > 0) tier = 'major';
-  else if (counts.feat > 0) tier = 'minor';
-  else tier = 'patch';
+  let conventionalTier: VersionTier;
+  if (counts.breaking > 0) conventionalTier = 'major';
+  else if (counts.feat > 0) conventionalTier = 'minor';
+  else conventionalTier = 'patch';
+
+  const evidence = collectSlopeReleaseEvidence(cwd, unreleased.changes);
+  const evidenceTier = evidence.reduce<VersionTier>(
+    (current, item) => maxTier(current, item.tier),
+    'patch',
+  );
+  const tier = maxTier(conventionalTier, evidenceTier);
 
   const currentVersion = getCurrentVersion(cwd);
   const nextVersion = tier === 'major' ? bumpMajor(currentVersion)
@@ -274,7 +451,20 @@ async function versionRecommend(cwd: string): Promise<void> {
 
   console.log(`\nUnreleased changes since v${currentVersion}: ${unreleased.changes.length}`);
   console.log(`  feat: ${counts.feat}, fix: ${counts.fix}, docs: ${counts.docs}, chore: ${counts.chore}, breaking: ${counts.breaking}`);
+  console.log(`  Conventional commit tier: ${conventionalTier}`);
+  if (evidence.length > 0) {
+    console.log(`  SLOPE release evidence: ${evidenceTier}`);
+    for (const item of evidence) {
+      console.log(`    - S${sprintFileId(item.sprint)} ${item.theme} (${item.source}: ${item.reason})`);
+    }
+  } else if (counts.feat === 0 && (counts.other > 0 || counts.docs > 0 || counts.chore > 0)) {
+    console.log('  SLOPE release evidence: none found for shipped feature-level roadmap or scorecard work');
+  }
   console.log(`\n  Recommended: ${tier} (${currentVersion} → ${nextVersion})\n`);
+
+  if (TIER_RANK[tier] > TIER_RANK[conventionalTier]) {
+    console.log('  Recommendation raised above commit-subject tier by durable SLOPE evidence.\n');
+  }
 
   if (counts.feat > 0) {
     console.log('  Includes new features — check release-policy.md for slope-web content review guidance.\n');

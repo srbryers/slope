@@ -64,6 +64,16 @@ function gitCommitFile(cwd: string, file: string, content: string, message: stri
   execSync(`git commit -m "${message}"`, { cwd, stdio: 'pipe' });
 }
 
+function gitCommitFiles(cwd: string, files: Array<[string, string]>, message: string): void {
+  for (const [file, content] of files) {
+    const fullPath = join(cwd, file);
+    mkdirSync(dirname(fullPath), { recursive: true });
+    writeFileSync(fullPath, content);
+  }
+  execSync('git add -A', { cwd, stdio: 'pipe' });
+  execSync(`git commit -m "${message}"`, { cwd, stdio: 'pipe' });
+}
+
 describe('analyzeGit', () => {
   let tmpDir: string;
 
@@ -300,6 +310,22 @@ describe('findShippedSprintsOnMain', () => {
     );
 
     expect(findShippedSprintsOnMain(tmpDir, 'HEAD')).toEqual(new Set([143.5]));
+  });
+
+  it('does not attribute SLOPE-only post-merge metadata commits to next planned sprint refs (#563)', () => {
+    gitInit(tmpDir);
+    gitCommitFiles(
+      tmpDir,
+      [
+        ['.slope/retros/post-merge/sprint-12-pr-3.json', '{}'],
+        ['docs/backlog/roadmap.json', '{"name":"Test"}'],
+        ['docs/retros/sprint-12.json', JSON.stringify({ sprint_number: 12 })],
+        ['docs/retros/sprint-12-review.md', '# S12 review\n'],
+      ],
+      'docs(S13): post-merge housekeeping',
+    );
+
+    expect(findShippedSprintsOnMain(tmpDir, 'HEAD')).toEqual(new Set([12]));
   });
 
   it('does not mark sprint scoping commits as shipped work', () => {

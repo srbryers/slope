@@ -598,7 +598,9 @@ function statusCommand(cwd: string): void {
   }
 
   const complete = isSprintComplete(state);
-  console.log(`Sprint ${formatSprintNumber(state.sprint)} — phase: ${state.phase}${complete ? ' (all gates complete)' : ''}`);
+  const derivedStatus = complete ? 'ready_for_pr' : state.phase;
+  const phaseContext = complete ? ` (phase: ${state.phase}, all gates complete)` : ` (phase: ${state.phase})`;
+  console.log(`Sprint ${formatSprintNumber(state.sprint)} - status: ${derivedStatus}${phaseContext}`);
   console.log(`Started: ${state.started_at}`);
   console.log(`Updated: ${state.updated_at}`);
   console.log('');
@@ -624,6 +626,8 @@ function statusCommand(cwd: string): void {
       return pendingLabels[index] ?? gate;
     });
     console.log(`\nRemaining: ${pending.join(', ')}`);
+  } else {
+    console.log('\nNext: create PR for this branch; after merge, run post-merge retro.');
   }
 }
 
