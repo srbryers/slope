@@ -494,6 +494,139 @@ describe('review findings list', () => {
     expect(logged).toContain('workaround');
     expect(logged).toContain('codification=open cost=s');
   });
+
+  it('filters codification findings by ledger status', async () => {
+    mkdirSync(join(tmpDir, '.slope'), { recursive: true });
+    const data: FindingsFile = {
+      sprints: {
+        221: [
+          {
+            id: '12345678-1234-1234-1234-123456789abc',
+            review_type: 'workaround',
+            ticket_key: 'workaround',
+            severity: 'major',
+            description: 'Open candidate',
+            resolved: false,
+            recurs: true,
+            cost: 's',
+            codification_status: 'open',
+          },
+          {
+            id: '87654321-1234-1234-1234-123456789abc',
+            review_type: 'workaround',
+            ticket_key: 'workaround',
+            severity: 'minor',
+            description: 'Paid candidate',
+            resolved: true,
+            recurs: true,
+            cost: 'm',
+            codification_status: 'paid_down',
+          },
+        ],
+      },
+    };
+    writeFileSync(join(tmpDir, '.slope/review-findings.json'), JSON.stringify(data));
+
+    const spy = vi.spyOn(console, 'log');
+    await runCommand(['findings', 'list', '--codification-status=paid_down']);
+    const logged = spy.mock.calls.map(c => c[0]).join('\n');
+    spy.mockRestore();
+
+    expect(logged).toContain('Paid candidate');
+    expect(logged).toContain('codification=paid_down cost=m');
+    expect(logged).not.toContain('Open candidate');
+  });
+});
+
+// --- findings resolve ---
+
+describe('review findings resolve', () => {
+  it('marks a codification candidate paid down by id prefix', async () => {
+    mkdirSync(join(tmpDir, '.slope'), { recursive: true });
+    const data: FindingsFile = {
+      sprints: {
+        221: [
+          {
+            id: '12345678-1234-1234-1234-123456789abc',
+            review_type: 'workaround',
+            ticket_key: 'workaround',
+            severity: 'major',
+            description: 'Gallery server path was sprint-pinned',
+            resolved: false,
+            recurs: true,
+            cost: 's',
+            codification_status: 'open',
+          },
+        ],
+      },
+    };
+    writeFileSync(join(tmpDir, '.slope/review-findings.json'), JSON.stringify(data));
+
+    const spy = vi.spyOn(console, 'log');
+    await runCommand(['findings', 'resolve', '12345678']);
+    const logged = spy.mock.calls.map(c => c[0]).join('\n');
+    spy.mockRestore();
+
+    const loaded = loadFindings(tmpDir)!;
+    const finding = loaded.sprints[221][0];
+    expect(finding.resolved).toBe(true);
+    expect(finding.codification_status).toBe('paid_down');
+    expect(finding.codified_at).toMatch(/\d{4}-\d{2}-\d{2}T/);
+    expect(finding.resolved_at).toMatch(/\d{4}-\d{2}-\d{2}T/);
+    expect(logged).toContain('Codification candidate paid_down: 12345678');
+  });
+
+  it('can mark a codification candidate wontfix', async () => {
+    mkdirSync(join(tmpDir, '.slope'), { recursive: true });
+    const data: FindingsFile = {
+      sprints: {
+        221: [
+          {
+            id: '12345678-1234-1234-1234-123456789abc',
+            review_type: 'workaround',
+            ticket_key: 'workaround',
+            severity: 'minor',
+            description: 'Low value candidate',
+            resolved: false,
+            recurs: true,
+            cost: 'l',
+            codification_status: 'open',
+          },
+        ],
+      },
+    };
+    writeFileSync(join(tmpDir, '.slope/review-findings.json'), JSON.stringify(data));
+
+    await runCommand(['findings', 'resolve', '12345678', '--status=wontfix']);
+
+    const finding = loadFindings(tmpDir)!.sprints[221][0];
+    expect(finding.resolved).toBe(true);
+    expect(finding.codification_status).toBe('wontfix');
+    expect(finding.codified_at).toBeUndefined();
+    expect(finding.resolved_at).toMatch(/\d{4}-\d{2}-\d{2}T/);
+  });
+
+  it('rejects resolving non-codification findings', async () => {
+    mkdirSync(join(tmpDir, '.slope'), { recursive: true });
+    const data: FindingsFile = {
+      sprints: {
+        221: [
+          {
+            id: '12345678-1234-1234-1234-123456789abc',
+            review_type: 'code',
+            ticket_key: 'S221-1',
+            severity: 'minor',
+            description: 'Code finding',
+            resolved: false,
+          },
+        ],
+      },
+    };
+    writeFileSync(join(tmpDir, '.slope/review-findings.json'), JSON.stringify(data));
+
+    await expect(runCommand(['findings', 'resolve', '12345678']))
+      .rejects.toThrow('process.exit(1)');
+  });
 });
 
 // --- findings clear ---

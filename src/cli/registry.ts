@@ -213,7 +213,8 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
       { name: 'recommend', desc: 'Check which review types apply to the sprint' },
       { name: 'findings', desc: 'Manage review findings', flags: [
         { flag: 'add', desc: 'Add a finding (--type, --ticket, --severity, --description; workaround supports --recurs --cost=s|m|l)' },
-        { flag: 'list', desc: 'List recorded findings' },
+        { flag: 'list', desc: 'List recorded findings; filter codification ledger with --codification-status=open|paid_down|wontfix' },
+        { flag: 'resolve', desc: 'Mark a codification candidate paid_down or wontfix by id' },
         { flag: 'clear', desc: 'Clear all findings' },
       ]},
       { name: 'amend', desc: 'Inject review findings as hazards into scorecard' },
