@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import type { SlopeConfig } from '../core/index.js';
+import type { SlopeConfig, SprintConflict } from '../core/index.js';
 import { loadConfig } from './config.js';
 
 export type ActorSource =
@@ -15,6 +15,7 @@ export type ActorSource =
 
 export interface ResolvedActor {
   name: string;
+  displayName: string;
   source: ActorSource;
   isFallback: boolean;
 }
@@ -71,33 +72,99 @@ function gitUserName(cwd: string): string | null {
   }
 }
 
+function environmentActorDisplayName(source: ActorSource): string {
+  return `environment actor (${source})`;
+}
+
+function resolvedActor(name: string, source: ActorSource): ResolvedActor {
+  return {
+    name,
+    displayName: source.startsWith('env:') ? environmentActorDisplayName(source) : name,
+    source,
+    isFallback: false,
+  };
+}
+
 export function resolveActor(cwd: string = process.cwd(), options: ResolveActorOptions = {}): ResolvedActor {
   const env = options.env ?? process.env;
   const config = options.config ?? loadConfig(cwd);
-  const candidates: Array<{ name: string | null; source: ActorSource }> = [
-    { name: clean(options.explicitActor), source: 'override' },
-    { name: clean(env.SLOPE_ACTOR), source: 'env:SLOPE_ACTOR' },
-    { name: clean(env.SLOPE_PLAYER), source: 'env:SLOPE_PLAYER' },
-  ];
+
+  const explicitActor = clean(options.explicitActor);
+  if (explicitActor) return resolvedActor(explicitActor, 'override');
+
+  const slopeActor = clean(env.SLOPE_ACTOR);
+  if (slopeActor) return {
+    name: slopeActor,
+    displayName: environmentActorDisplayName('env:SLOPE_ACTOR'),
+    source: 'env:SLOPE_ACTOR',
+    isFallback: false,
+  };
+
+  const slopePlayer = clean(env.SLOPE_PLAYER);
+  if (slopePlayer) return {
+    name: slopePlayer,
+    displayName: environmentActorDisplayName('env:SLOPE_PLAYER'),
+    source: 'env:SLOPE_PLAYER',
+    isFallback: false,
+  };
 
   const configured = teamActor(config);
-  if (configured) candidates.push(configured);
+  if (configured) return resolvedActor(configured.name, configured.source);
 
-  candidates.push(
-    { name: clean(env.USER), source: 'env:USER' },
-    { name: clean(env.USERNAME), source: 'env:USERNAME' },
-    { name: gitUserName(cwd), source: 'git:user.name' },
-  );
+  const user = clean(env.USER);
+  if (user) return {
+    name: user,
+    displayName: environmentActorDisplayName('env:USER'),
+    source: 'env:USER',
+    isFallback: false,
+  };
 
-  for (const candidate of candidates) {
-    if (candidate.name) {
-      return { name: candidate.name, source: candidate.source, isFallback: false };
-    }
+  const username = clean(env.USERNAME);
+  if (username) return {
+    name: username,
+    displayName: environmentActorDisplayName('env:USERNAME'),
+    source: 'env:USERNAME',
+    isFallback: false,
+  };
+
+  const gitName = gitUserName(cwd);
+  if (gitName) {
+    return resolvedActor(gitName, 'git:user.name');
   }
 
-  return { name: 'unknown', source: 'fallback', isFallback: true };
+  return { name: 'unknown', displayName: 'unknown', source: 'fallback', isFallback: true };
+}
+
+export function formatActorName(actor: ResolvedActor): string {
+  return actor.displayName;
 }
 
 export function formatActorSource(actor: ResolvedActor): string {
   return actor.isFallback ? 'fallback (unknown)' : actor.source;
+}
+
+export function formatConflictSummary(conflict: SprintConflict): string {
+  const [a, b] = conflict.claims;
+  if (!a || !b) return 'Claim conflict detected';
+
+  if (conflict.severity === 'overlap') {
+    if (a.target === b.target) {
+      return `Target "${a.target}" is already claimed by another player`;
+    }
+    return `Claim overlap between "${a.target}" and "${b.target}"`;
+  }
+
+  if (a.scope === 'area' && b.scope === 'area') {
+    const parent = a.target.length <= b.target.length ? a.target : b.target;
+    const child = a.target.length <= b.target.length ? b.target : a.target;
+    return `Area "${child}" is within area "${parent}"`;
+  }
+
+  if (a.scope !== b.scope) {
+    const areaClaim = a.scope === 'area' ? a : b;
+    const ticketClaim = a.scope === 'area' ? b : a;
+    return `Ticket "${ticketClaim.target}" falls within area "${areaClaim.target}"`;
+  }
+
+  return `Adjacent claim targets "${a.target}" and "${b.target}"`;
 }

@@ -27,13 +27,42 @@ interface ConventionalCommitSubject {
   description: string;
 }
 
+function isCommitType(value: string): boolean {
+  if (value.length === 0) return false;
+  for (let i = 0; i < value.length; i++) {
+    const code = value.charCodeAt(i);
+    const isLower = code >= 97 && code <= 122;
+    const isUpper = code >= 65 && code <= 90;
+    if (!isLower && !isUpper) return false;
+  }
+  return true;
+}
+
 function parseConventionalCommitSubject(line: string): ConventionalCommitSubject | null {
-  const match = line.match(/^([a-z]+)(?:\(([^)]+)\))?!?:\s*(.*)$/i);
-  if (!match) return null;
+  const colon = line.indexOf(':');
+  if (colon <= 0) return null;
+
+  const rawHeader = line.slice(0, colon);
+  const header = rawHeader.endsWith('!') ? rawHeader.slice(0, -1) : rawHeader;
+  const description = line.slice(colon + 1).trimStart();
+  const scopeStart = header.indexOf('(');
+  if (scopeStart === -1) {
+    if (!isCommitType(header)) return null;
+    return {
+      type: header.toLowerCase(),
+      description,
+    };
+  }
+
+  if (!header.endsWith(')')) return null;
+  const type = header.slice(0, scopeStart);
+  const scope = header.slice(scopeStart + 1, -1);
+  if (!isCommitType(type) || scope.length === 0 || scope.includes(')')) return null;
+
   return {
-    type: match[1].toLowerCase(),
-    scope: match[2]?.toLowerCase(),
-    description: match[3] ?? '',
+    type: type.toLowerCase(),
+    scope: scope.toLowerCase(),
+    description,
   };
 }
 

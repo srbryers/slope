@@ -3,7 +3,7 @@ import { execSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { resolveActor } from '../../src/cli/actor.js';
+import { formatActorName, resolveActor } from '../../src/cli/actor.js';
 import type { SlopeConfig } from '../../src/core/index.js';
 
 const baseConfig = {
@@ -32,7 +32,17 @@ describe('resolveActor', () => {
       env: { SLOPE_ACTOR: 'env-agent' },
     });
 
-    expect(actor).toEqual({ name: 'codex', source: 'override', isFallback: false });
+    expect(actor).toEqual({ name: 'codex', displayName: 'codex', source: 'override', isFallback: false });
+  });
+
+  it('redacts environment-derived actor names for display', () => {
+    const actor = resolveActor(process.cwd(), {
+      config: baseConfig,
+      env: { SLOPE_ACTOR: 'secret-agent' },
+    });
+
+    expect(actor.name).toBe('secret-agent');
+    expect(formatActorName(actor)).toBe('environment actor (env:SLOPE_ACTOR)');
   });
 
   it('uses configured default team player with display name', () => {
@@ -49,6 +59,7 @@ describe('resolveActor', () => {
 
     expect(actor).toEqual({
       name: 'sbry:Sebastian Bryers',
+      displayName: 'sbry:Sebastian Bryers',
       source: 'config:team.defaultPlayer',
       isFallback: false,
     });
@@ -65,7 +76,7 @@ describe('resolveActor', () => {
         env: {},
       });
 
-      expect(actor).toEqual({ name: 'Git User', source: 'git:user.name', isFallback: false });
+      expect(actor).toEqual({ name: 'Git User', displayName: 'Git User', source: 'git:user.name', isFallback: false });
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }
@@ -76,7 +87,7 @@ describe('resolveActor', () => {
     try {
       const actor = resolveActor(cwd, { config: baseConfig, env: {} });
 
-      expect(actor).toEqual({ name: 'unknown', source: 'fallback', isFallback: true });
+      expect(actor).toEqual({ name: 'unknown', displayName: 'unknown', source: 'fallback', isFallback: true });
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }

@@ -24,7 +24,7 @@ import {
 import { WorkflowEngine, loadWorkflow, resolveVariables, validateWorkflow, loadConfig, parseRoadmap, castRoadmapStructure, formatSprintLabel, formatSprintNumber, parseSprintNumber } from '../../core/index.js';
 import type { WorkflowDefinition, WorkflowExecution } from '../../core/index.js';
 import { createHash } from 'node:crypto';
-import { formatActorSource, resolveActor } from '../actor.js';
+import { formatActorName, formatActorSource, formatConflictSummary, resolveActor } from '../actor.js';
 
 /** Get workflow definition from execution snapshot (preferred) or disk (fallback for old executions) */
 function getDefinition(exec: WorkflowExecution, cwd: string): { def: WorkflowDefinition; drifted: boolean } {
@@ -302,12 +302,13 @@ async function beginCommand(args: string[], cwd: string): Promise<void> {
   const { checkConflicts } = await import('../../core/index.js');
   const actor = resolveActor(cwd, { explicitActor: actorOverride(args) });
   const player = actor.name;
+  const playerDisplay = formatActorName(actor);
   const store = await resolveStore(cwd);
   try {
     const existing = await store.list(sprint);
     const ownClaim = existing.find(c => c.target === ticket && c.player === player);
     if (ownClaim) {
-      console.log(`Ticket ${ticket}: already claimed by ${player} (actor source: ${formatActorSource(actor)}).`);
+      console.log(`Ticket ${ticket}: already claimed by ${playerDisplay} (actor source: ${formatActorSource(actor)}).`);
     } else {
       // Detect overlap conflicts via core check
       const tempClaim = {
@@ -321,12 +322,12 @@ async function beginCommand(args: string[], cwd: string): Promise<void> {
       const overlaps = checkConflicts([...existing, tempClaim]).filter(c => c.severity === 'overlap');
       if (overlaps.length > 0) {
         console.error(`\nClaim blocked — overlap conflict(s) detected:`);
-        for (const c of overlaps) console.error(`  [!!] ${c.reason}`);
+        for (const c of overlaps) console.error(`  [!!] ${formatConflictSummary(c)}`);
         console.error(`\nResolve conflicts or run \`slope claim --target=${ticket} --sprint=${formatSprintNumber(sprint)} --force\` to override.`);
         process.exit(1);
       }
       const claim = await store.claim({ sprint_number: sprint, player, target: ticket, scope: 'ticket' });
-      console.log(`Ticket ${ticket}: claimed (id ${claim.id.slice(0, 8)}, player ${player}, actor source: ${formatActorSource(actor)}).`);
+      console.log(`Ticket ${ticket}: claimed (id ${claim.id.slice(0, 8)}, player ${playerDisplay}, actor source: ${formatActorSource(actor)}).`);
     }
   } finally {
     store.close();
@@ -454,6 +455,7 @@ async function autoClaimSprint(cwd: string, sprint: number, explicitActor?: stri
   const { resolveStore } = await import('../store.js');
   const actor = resolveActor(cwd, { explicitActor });
   const player = actor.name;
+  const playerDisplay = formatActorName(actor);
   const target = `sprint:${formatSprintLabel(sprint)}`;
 
   try {
@@ -461,7 +463,7 @@ async function autoClaimSprint(cwd: string, sprint: number, explicitActor?: stri
     try {
       const existing = await store.list(sprint);
       if (existing.some(c => c.player === player && c.target === target)) {
-        return `Claim: ${target} already held by ${player} (actor source: ${formatActorSource(actor)}).`;
+        return `Claim: ${target} already held by ${playerDisplay} (actor source: ${formatActorSource(actor)}).`;
       }
       const claim = await store.claim({
         sprint_number: sprint,
@@ -470,7 +472,7 @@ async function autoClaimSprint(cwd: string, sprint: number, explicitActor?: stri
         scope: 'area',
         notes: 'auto-claimed by slope sprint start',
       });
-      return `Claim: ${claim.target} (${claim.scope}) auto-claimed for ${player} (actor source: ${formatActorSource(actor)}).`;
+      return `Claim: ${claim.target} (${claim.scope}) auto-claimed for ${playerDisplay} (actor source: ${formatActorSource(actor)}).`;
     } finally {
       store.close();
     }

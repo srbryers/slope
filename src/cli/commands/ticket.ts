@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { formatSprintLabel, parseRoadmap } from '../../core/index.js';
 import type { RoadmapDefinition } from '../../core/index.js';
-import { formatActorSource, resolveActor } from '../actor.js';
+import { formatActorName, formatActorSource, resolveActor } from '../actor.js';
 import { loadConfig } from '../config.js';
 import { isInsideGitWorkTree } from '../git-preflight.js';
 import { loadSprintState } from '../sprint-state.js';
@@ -109,13 +109,14 @@ async function doneSubcommand(args: string[]): Promise<void> {
   // 2. Find the player's active claim
   const actor = resolveActor(cwd, { explicitActor: flags.actor });
   const player = actor.name;
+  const playerDisplay = formatActorName(actor);
   const store = await resolveStore(cwd);
   let releasedId: string | null = null;
   try {
     const existing = await store.list(sprintNumber);
     const ownClaim = existing.find(c => c.target === ticketKey && c.player === player);
     if (!ownClaim) {
-      console.error(`No active claim for ${ticketKey} by ${player} on ${formatSprintLabel(sprintNumber)}.`);
+      console.error(`No active claim for ${ticketKey} by ${playerDisplay} on ${formatSprintLabel(sprintNumber)}.`);
       console.error('Run `slope claim --target=' + ticketKey + ' --sprint=' + sprintNumber + '` first.');
       process.exit(1);
     }
@@ -149,7 +150,7 @@ async function doneSubcommand(args: string[]): Promise<void> {
 
     console.log(`\nTicket ${ticketKey}: done.`);
     console.log(`  Sprint:  ${formatSprintLabel(sprintNumber)}`);
-    console.log(`  Player:  ${player}`);
+    console.log(`  Player:  ${playerDisplay}`);
     console.log(`  Actor source: ${formatActorSource(actor)}`);
     if (sha) console.log(`  Commit:  ${sha}`);
     if (commit.missingGitWorkTree) {
