@@ -191,6 +191,23 @@ describe('workflowStepGateGuard', () => {
     expect(result.context).toContain('multiple running workflow executions');
   });
 
+  it('fails open when a single validation execution does not match current sprint context (#572)', async () => {
+    writeConfig();
+    saveSprintState(TMP, createSprintState(217, 'implementing'));
+    writeWorkflow('stale-validation-wf', 'validation');
+    const store = new SqliteSlopeStore(join(TMP, '.slope/slope.db'));
+    await createRunningExecution(store, 'stale-validation-wf', 'phase1', 'step1', { sprintId: 'S23' });
+    store.close();
+
+    const result = await workflowStepGateGuard(makeInput(), TMP);
+
+    expect(result.decision).toBeUndefined();
+    expect(result.blockReason).toBeUndefined();
+    expect(result.context).toContain('does not match the current sprint/session context');
+    expect(result.context).toContain('S23');
+    expect(result.context).toContain('cleanup --stale');
+  });
+
   it('blocks file edit on command step', async () => {
     writeConfig();
     writeWorkflow('test-wf', 'command');
@@ -214,6 +231,7 @@ describe('workflowStepGateGuard', () => {
     const result = await workflowStepGateGuard(makeInput(), TMP);
     expect(result.decision).toBe('deny');
     expect(result.blockReason).toContain('validation');
+    expect(result.blockReason).toContain('cleanup --stale');
   });
 
   it('fast-forwards a branch sprint execution before blocking edits (#503)', async () => {
