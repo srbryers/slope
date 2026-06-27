@@ -3,7 +3,13 @@ import { join } from 'node:path';
 import type { HookInput, GuardResult, Suggestion } from '../../core/index.js';
 import { loadConfig, parseRoadmap, castRoadmapStructure, formatStrategicContext } from '../../core/index.js';
 import { inferSprintContext } from '../sprint-inference.js';
-import { isActiveSprintState, loadSprintState } from '../sprint-state.js';
+import {
+  isActiveSprintState,
+  isReviewGateName,
+  isReviewGateSatisfied,
+  loadSprintState,
+  type SprintState,
+} from '../sprint-state.js';
 import { loadSessionState, updateSessionState, setSessionMode, syncSessionModeWithSprintState } from '../session-state.js';
 
 /**
@@ -36,7 +42,7 @@ export async function sessionBriefingGuard(input: HookInput, cwd: string): Promi
   if (hasActiveSprint) {
     setSessionMode(cwd, sessionId, 'sprint');
     const gateStatus = Object.entries(sprintState.gates)
-      .map(([name, done]) => `${done ? '[x]' : '[ ]'} ${name}`)
+      .map(([name, done]) => formatBriefingGateStatus(sprintState, name, done))
       .join('  ');
     lines.push(`Sprint: S${sprintState.sprint}  Phase: ${sprintState.phase}  Gates: ${gateStatus}`);
 
@@ -130,4 +136,24 @@ export async function sessionBriefingGuard(input: HookInput, cwd: string): Promi
   };
 
   return { suggestion };
+}
+
+function formatBriefingGateStatus(state: SprintState, name: string, done: boolean): string {
+  if (!isReviewGateName(name)) {
+    return `${done ? '[x]' : '[ ]'} ${name}`;
+  }
+
+  const satisfied = isReviewGateSatisfied(state, name);
+  const marker = satisfied ? '[x]' : done ? '[!]' : '[ ]';
+  const review = state.review_gates[name];
+  let label = 'pending';
+  if (satisfied) {
+    label = review.provenance === 'self_review' || review.provenance === 'manual_override'
+      ? `${review.provenance}(weaker)`
+      : review.provenance;
+  } else if (done) {
+    label = 'review_evidence_missing';
+  }
+
+  return `${marker} ${name}:${label}`;
 }

@@ -265,11 +265,15 @@ export function isSprintComplete(state: SprintState): boolean {
   });
 }
 
+/** Return machine-readable names of incomplete gates. */
+export function pendingGateNames(state: SprintState): GateName[] {
+  return ALL_GATES
+    .filter(g => state.gates[g] !== true || (isReviewGateName(g) && !isReviewGateSatisfied(state, g)));
+}
+
 /** Return human-readable list of incomplete gates. */
 export function pendingGates(state: SprintState): string[] {
-  return ALL_GATES
-    .filter(g => state.gates[g] !== true || (isReviewGateName(g) && !isReviewGateSatisfied(state, g)))
-    .map(g => GATE_LABELS[g]);
+  return pendingGateNames(state).map(g => GATE_LABELS[g]);
 }
 
 /** Create a fresh sprint state with all gates false. */

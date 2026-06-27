@@ -242,6 +242,29 @@ describe('agent status (GH #310)', () => {
     expect(status.recommendedCommands).toContain('slope review');
   });
 
+  it('keeps review gates pending when sprint-state booleans lack evidence', async () => {
+    writeVision(cwd);
+    writeRoadmap(cwd, [
+      { id: 8, theme: 'B', par: 4, slope: 1, type: 'feature', tickets: [
+        { key: 'S8-1', title: 't1', club: 'wedge', complexity: 'small' },
+        { key: 'S8-2', title: 't2', club: 'wedge', complexity: 'small' },
+        { key: 'S8-3', title: 't3', club: 'wedge', complexity: 'small' },
+      ] },
+    ]);
+    writeSprintState(cwd, {
+      sprint: 8,
+      phase: 'scoring',
+      gates: { tests: true, code_review: true, architect_review: true, scorecard: false, review_md: false },
+      started_at: '2026-05-07T00:00:00Z',
+      updated_at: '2026-05-07T00:00:00Z',
+    });
+
+    const status = await collectAgentStatus(cwd);
+
+    expect(status.requiredGates).toEqual(['code_review', 'architect_review', 'scorecard', 'review_md']);
+    expect(status.recommendedCommands).toContain('slope auto-card --sprint=8');
+  });
+
   it('renders agent markdown with sprint, claim, and recommended commands (#315)', () => {
     const status: AgentStatus = {
       _version: 1,

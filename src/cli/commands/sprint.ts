@@ -7,6 +7,8 @@ import {
   updateSprintPhase,
   clearSprintState,
   isSprintComplete,
+  isReviewGateSatisfied,
+  pendingGateNames,
   pendingGates,
   isSprintPhase,
   isReviewGateName,
@@ -14,7 +16,10 @@ import {
   SPRINT_PHASES,
   type GateName,
   type ReviewGateCompletionInput,
+  type ReviewGateName,
+  type ReviewGateState,
   type SprintPhase,
+  type SprintState,
 } from '../sprint-state.js';
 import { WorkflowEngine, loadWorkflow, resolveVariables, validateWorkflow, loadConfig, parseRoadmap, castRoadmapStructure, formatSprintLabel, formatSprintNumber, parseSprintNumber } from '../../core/index.js';
 import type { WorkflowDefinition, WorkflowExecution } from '../../core/index.js';
@@ -225,6 +230,12 @@ function printGateUsage(gateName?: GateName): void {
   console.error(`  slope sprint gate ${gate} --pr-review=<url-or-id>`);
   console.error(`  slope sprint gate ${gate} --self-review --reason="why self-review is acceptable"`);
   console.error(`  slope sprint gate ${gate} --override="manual override reason"`);
+  console.error('');
+  console.error('Review provenance modes:');
+  console.error('  independent_review: requires --reviewer and --evidence');
+  console.error('  pr_review: records external PR review evidence from --pr-review');
+  console.error('  self_review (weaker): requires --self-review and --reason');
+  console.error('  manual_override (weaker): requires --override');
   console.error('');
 }
 
@@ -528,6 +539,38 @@ function gateCommand(args: string[], cwd: string): void {
   }
 }
 
+function formatReviewEvidence(review: ReviewGateState): string {
+  return review.evidence.length > 0 ? review.evidence.join(', ') : '(missing)';
+}
+
+function formatReviewGateStatus(state: SprintState, gate: ReviewGateName): string {
+  const review = state.review_gates[gate];
+  if (!state.gates[gate] || review.provenance === 'pending') {
+    return 'pending review evidence';
+  }
+
+  const validation = validateReviewGateCompletion({
+    provenance: review.provenance,
+    evidence: review.evidence,
+    reviewer: review.reviewer,
+    notes: review.notes,
+  });
+  if (validation) {
+    return `invalid ${review.provenance}: ${validation}`;
+  }
+
+  switch (review.provenance) {
+    case 'independent_review':
+      return `independent_review; reviewer=${review.reviewer}; evidence=${formatReviewEvidence(review)}`;
+    case 'pr_review':
+      return `pr_review; evidence=${formatReviewEvidence(review)}`;
+    case 'self_review':
+      return `self_review (weaker); reason=${review.notes}`;
+    case 'manual_override':
+      return `manual_override (weaker); reason=${review.notes}`;
+  }
+}
+
 function statusCommand(cwd: string): void {
   const state = loadSprintState(cwd);
   if (!state) {
@@ -542,12 +585,25 @@ function statusCommand(cwd: string): void {
   console.log('');
   console.log('Gates:');
   for (const [gate, done] of Object.entries(state.gates)) {
-    const marker = done ? '[x]' : '[ ]';
-    console.log(`  ${marker} ${gate}`);
+    if (isReviewGateName(gate)) {
+      const satisfied = isReviewGateSatisfied(state, gate);
+      const marker = satisfied ? '[x]' : done ? '[!]' : '[ ]';
+      console.log(`  ${marker} ${gate} (${formatReviewGateStatus(state, gate)})`);
+    } else {
+      const marker = done ? '[x]' : '[ ]';
+      console.log(`  ${marker} ${gate}`);
+    }
   }
 
   if (!complete) {
-    const pending = pendingGates(state);
+    const pendingNames = pendingGateNames(state);
+    const pendingLabels = pendingGates(state);
+    const pending = pendingNames.map((gate, index) => {
+      if (isReviewGateName(gate) && state.gates[gate]) {
+        return `${gate} (review evidence incomplete)`;
+      }
+      return pendingLabels[index] ?? gate;
+    });
     console.log(`\nRemaining: ${pending.join(', ')}`);
   }
 }
@@ -1435,6 +1491,8 @@ Legacy commands:
   slope sprint phase <phase>       Update current sprint phase
   slope sprint gate <name> [review evidence options]
                                       Mark a gate as complete
+                                      Review gates require independent evidence, PR review evidence,
+                                      or explicit weaker-mode self_review/manual_override provenance
   slope sprint status                Show sprint state and gates
   slope sprint resume --portable [--from=path] [--force] [--dry-run]
                                       Reconstruct local sprint state from tracked artifacts

@@ -8,7 +8,7 @@ import {
 import type { RoadmapDefinition, RoadmapSprint } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { inferSprintContext } from '../sprint-inference.js';
-import { loadSprintState } from '../sprint-state.js';
+import { loadSprintState, pendingGateNames } from '../sprint-state.js';
 import { resolveStore } from '../store.js';
 
 /**
@@ -213,9 +213,7 @@ export async function collectAgentStatus(cwd: string): Promise<AgentStatus> {
   // Required gates (pending)
   const requiredGates: string[] = [];
   if (sprintState) {
-    for (const [gate, done] of Object.entries(sprintState.gates)) {
-      if (!done) requiredGates.push(gate);
-    }
+    requiredGates.push(...pendingGateNames(sprintState));
   }
 
   // Recommend commands based on combined state

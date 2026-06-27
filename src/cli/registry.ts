@@ -158,6 +158,11 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
       ]},
       { name: 'gate', desc: 'Mark a gate as complete', flags: [
         { flag: '<name>', desc: 'Gate name to complete' },
+        { flag: '--reviewer=<id>', desc: 'Independent reviewer id/name for code_review and architect_review' },
+        { flag: '--evidence=<path-or-url>', desc: 'Independent review transcript or output evidence' },
+        { flag: '--pr-review=<url-or-id>', desc: 'External PR review evidence' },
+        { flag: '--self-review --reason=<text>', desc: 'Explicit weaker self-review provenance' },
+        { flag: '--override=<reason>', desc: 'Explicit weaker manual override provenance' },
       ]},
       { name: 'status', desc: 'Show current sprint state and gates' },
       { name: 'resume', desc: 'Resume workflow execution or recreate portable sprint state', flags: [

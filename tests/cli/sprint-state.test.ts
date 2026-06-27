@@ -7,6 +7,7 @@ import {
   updateGate,
   isActiveSprintState,
   isSprintComplete,
+  pendingGateNames,
   pendingGates,
   createSprintState,
   createDefaultReviewGates,
@@ -328,6 +329,17 @@ describe('pendingGates', () => {
     expect(pending).toHaveLength(3);
     expect(pending).not.toContain('Tests passing');
     expect(pending).not.toContain('Scorecard validated');
+  });
+
+  it('keeps review gates pending when booleans are true without valid provenance', () => {
+    const state = createSprintState(22);
+    state.gates.tests = true;
+    state.gates.code_review = true;
+    state.gates.architect_review = true;
+
+    expect(pendingGateNames(state)).toEqual(['code_review', 'architect_review', 'scorecard', 'review_md']);
+    expect(pendingGates(state)).toContain('Code review');
+    expect(pendingGates(state)).toContain('Architect review');
   });
 });
 
