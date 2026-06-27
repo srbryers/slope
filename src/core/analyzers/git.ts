@@ -17,6 +17,12 @@ function isSprintRangeEndpoint(line: string, matchStart: number, matchEnd: numbe
 }
 
 const MAX_SHIPPED_TICKET_SUFFIX = 99;
+const IMPLEMENTATION_COMMIT_TYPES = new Set(['feat', 'fix', 'refactor', 'perf', 'test']);
+
+function hasImplementationCommitType(line: string): boolean {
+  const match = line.match(/^([a-z]+)(?:\([^)]+\))?!?:/i);
+  return match ? IMPLEMENTATION_COMMIT_TYPES.has(match[1].toLowerCase()) : false;
+}
 
 /** Extract shipped sprint IDs referenced in commit subjects.
  *  Matches `S\d+` not followed by another digit or a dot — so `S75.5` does
@@ -30,6 +36,7 @@ export function extractSprintReferences(commitSubjects: string[]): Set<number> {
   const result = new Set<number>();
   const re = /\bS(\d+)(?:-(\d+))?(?![\d.])/g;
   for (const line of commitSubjects) {
+    const hasImplementationSignal = hasImplementationCommitType(line);
     let m: RegExpExecArray | null;
     while ((m = re.exec(line)) !== null) {
       if (isSprintRangeEndpoint(line, m.index, re.lastIndex)) continue;
@@ -39,6 +46,7 @@ export function extractSprintReferences(commitSubjects: string[]): Set<number> {
       // Large suffixes are usually GitHub/product issue keys, e.g. S147-533,
       // and should not imply that roadmap sprint S147 shipped.
       if (ticketSuffix != null && ticketSuffix > MAX_SHIPPED_TICKET_SUFFIX) continue;
+      if (ticketSuffix == null && !hasImplementationSignal) continue;
       result.add(parseInt(m[1], 10));
     }
   }
