@@ -26,6 +26,51 @@ function loadDatabaseConstructor(): typeof DatabaseConstructor {
   return esmRequire('better-sqlite3') as typeof DatabaseConstructor;
 }
 
+type JournalMode = 'WAL' | 'TRUNCATE' | 'DELETE' | 'PERSIST' | 'MEMORY' | 'OFF';
+
+interface JournalModeDatabase {
+  pragma(sql: string, options?: { simple?: boolean }): unknown;
+  prepare(sql: string): { run(): unknown };
+}
+
+const JOURNAL_MODE_ENV = 'SLOPE_JOURNAL_MODE';
+const VALID_JOURNAL_MODES = new Set<JournalMode>(['WAL', 'TRUNCATE', 'DELETE', 'PERSIST', 'MEMORY', 'OFF']);
+
+export function configureSqliteJournalMode(
+  db: JournalModeDatabase,
+  env: Record<string, string | undefined> = process.env as Record<string, string | undefined>,
+): JournalMode {
+  const override = normalizeJournalMode(env[JOURNAL_MODE_ENV]);
+  if (env[JOURNAL_MODE_ENV] && !override) {
+    throw new Error(`${JOURNAL_MODE_ENV} must be one of: ${[...VALID_JOURNAL_MODES].join(', ')}`);
+  }
+  if (override) return setAndVerifyJournalMode(db, override);
+
+  try {
+    return setAndVerifyJournalMode(db, 'WAL');
+  } catch {
+    return setAndVerifyJournalMode(db, 'TRUNCATE');
+  }
+}
+
+function normalizeJournalMode(value: string | undefined): JournalMode | null {
+  const normalized = value?.trim().toUpperCase();
+  if (!normalized) return null;
+  return VALID_JOURNAL_MODES.has(normalized as JournalMode) ? normalized as JournalMode : null;
+}
+
+function setAndVerifyJournalMode(db: JournalModeDatabase, mode: JournalMode): JournalMode {
+  const applied = db.pragma(`journal_mode = ${mode}`, { simple: true });
+  verifyJournalModeWritable(db);
+  const appliedMode = normalizeJournalMode(String(applied));
+  return appliedMode ?? mode;
+}
+
+function verifyJournalModeWritable(db: JournalModeDatabase): void {
+  db.prepare('CREATE TABLE IF NOT EXISTS __slope_journal_mode_check (id INTEGER PRIMARY KEY)').run();
+  db.prepare('DROP TABLE IF EXISTS __slope_journal_mode_check').run();
+}
+
 /** Sequential schema migrations — each runs exactly once */
 const MIGRATIONS: Array<{ version: number; sql: string }> = [
   {
@@ -226,7 +271,7 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
     mkdirSync(dirname(dbPath), { recursive: true });
     const Database = loadDatabaseConstructor();
     this.db = new Database(dbPath);
-    this.db.pragma('journal_mode = WAL');
+    configureSqliteJournalMode(this.db);
     this.db.pragma('foreign_keys = ON');
     this.ensureVecLoaded();
     this.migrate();

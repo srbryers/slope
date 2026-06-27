@@ -2,12 +2,38 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { SqliteSlopeStore, createStore, LATEST_SCHEMA_VERSION } from '../../src/store/index.js';
+import { SqliteSlopeStore, createStore, LATEST_SCHEMA_VERSION, configureSqliteJournalMode } from '../../src/store/index.js';
 import { SlopeStoreError, checkConflicts } from '../../src/core/index.js';
 import type { GolfScorecard } from '../../src/core/index.js';
 
 let store: SqliteSlopeStore;
 let tmpDir: string;
+
+class FakeJournalDb {
+  mode = '';
+  pragmas: string[] = [];
+  statements: string[] = [];
+
+  constructor(private readonly failWalWrites = false) {}
+
+  pragma(sql: string): string {
+    this.pragmas.push(sql);
+    const match = sql.match(/journal_mode\s*=\s*(\w+)/i);
+    if (match) this.mode = match[1].toUpperCase();
+    return this.mode.toLowerCase();
+  }
+
+  prepare(sql: string): { run: () => void } {
+    return {
+      run: () => {
+        this.statements.push(sql);
+        if (this.failWalWrites && this.mode === 'WAL') {
+          throw new Error('disk I/O error');
+        }
+      },
+    };
+  }
+}
 
 beforeEach(() => {
   tmpDir = mkdtempSync(join(tmpdir(), 'slope-test-'));
@@ -17,6 +43,34 @@ beforeEach(() => {
 afterEach(() => {
   store.close();
   rmSync(tmpDir, { recursive: true, force: true });
+});
+
+describe('SQLite journal mode', () => {
+  it('falls back to TRUNCATE when WAL accepts the pragma but fails writes (#553)', () => {
+    const db = new FakeJournalDb(true);
+
+    const mode = configureSqliteJournalMode(db);
+
+    expect(mode).toBe('TRUNCATE');
+    expect(db.pragmas).toEqual(['journal_mode = WAL', 'journal_mode = TRUNCATE']);
+    expect(db.statements).toContain('CREATE TABLE IF NOT EXISTS __slope_journal_mode_check (id INTEGER PRIMARY KEY)');
+  });
+
+  it('honors SLOPE_JOURNAL_MODE override without trying WAL first (#553)', () => {
+    const db = new FakeJournalDb(true);
+
+    const mode = configureSqliteJournalMode(db, { SLOPE_JOURNAL_MODE: 'delete' });
+
+    expect(mode).toBe('DELETE');
+    expect(db.pragmas).toEqual(['journal_mode = DELETE']);
+  });
+
+  it('rejects invalid SLOPE_JOURNAL_MODE values', () => {
+    const db = new FakeJournalDb();
+
+    expect(() => configureSqliteJournalMode(db, { SLOPE_JOURNAL_MODE: 'wal;drop table claims' }))
+      .toThrow('SLOPE_JOURNAL_MODE');
+  });
 });
 
 describe('Sessions', () => {
