@@ -188,6 +188,14 @@ describe('extractSprintReferences', () => {
     ])).toEqual(new Set([107]));
   });
 
+  it('does not treat roadmap planning subjects as shipped sprint refs', () => {
+    expect(extractSprintReferences([
+      'feat(roadmap): reslot registry-purchase to S106',
+      'fix(planning): add S107 recovery lane',
+      'fix(roadmap): tighten shipped detection for S108',
+    ])).toEqual(new Set([108]));
+  });
+
   it('does not treat issue-sized ticket suffixes as shipped sprint refs', () => {
     expect(extractSprintReferences(['fix(S147-533): tolerate roadmap sprints without tickets'])).toEqual(new Set());
   });

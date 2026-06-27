@@ -18,10 +18,35 @@ function isSprintRangeEndpoint(line: string, matchStart: number, matchEnd: numbe
 
 const MAX_SHIPPED_TICKET_SUFFIX = 99;
 const IMPLEMENTATION_COMMIT_TYPES = new Set(['feat', 'fix', 'refactor', 'perf', 'test']);
+const PLANNING_REFERENCE_SCOPES = new Set(['roadmap', 'plan', 'planning']);
+const PLANNING_REFERENCE_RE = /\b(plan|planned|planning|reslot|scope|scoping|spike|triage|lane)\b/i;
+
+interface ConventionalCommitSubject {
+  type: string;
+  scope?: string;
+  description: string;
+}
+
+function parseConventionalCommitSubject(line: string): ConventionalCommitSubject | null {
+  const match = line.match(/^([a-z]+)(?:\(([^)]+)\))?!?:\s*(.*)$/i);
+  if (!match) return null;
+  return {
+    type: match[1].toLowerCase(),
+    scope: match[2]?.toLowerCase(),
+    description: match[3] ?? '',
+  };
+}
+
+function isPlanningOnlyBareReference(subject: ConventionalCommitSubject): boolean {
+  return subject.scope != null
+    && PLANNING_REFERENCE_SCOPES.has(subject.scope)
+    && PLANNING_REFERENCE_RE.test(subject.description);
+}
 
 function hasImplementationCommitType(line: string): boolean {
-  const match = line.match(/^([a-z]+)(?:\([^)]+\))?!?:/i);
-  return match ? IMPLEMENTATION_COMMIT_TYPES.has(match[1].toLowerCase()) : false;
+  const subject = parseConventionalCommitSubject(line);
+  if (!subject) return false;
+  return IMPLEMENTATION_COMMIT_TYPES.has(subject.type) && !isPlanningOnlyBareReference(subject);
 }
 
 /** Extract shipped sprint IDs referenced in commit subjects.
