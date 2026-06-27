@@ -10,6 +10,7 @@ export type SprintPhase = typeof SPRINT_PHASES[number];
 export type GateName = 'tests' | 'code_review' | 'architect_review' | 'scorecard' | 'review_md';
 export type ReviewGateName = Extract<GateName, 'code_review' | 'architect_review'>;
 export type ReviewGateProvenance = 'pending' | 'self_review' | 'independent_review' | 'manual_override' | 'pr_review';
+export type ReviewGateCompletionProvenance = Exclude<ReviewGateProvenance, 'pending'>;
 
 export interface ReviewGateState {
   provenance: ReviewGateProvenance;
@@ -17,6 +18,17 @@ export interface ReviewGateState {
   reviewer?: string;
   notes?: string;
   updated_at?: string;
+}
+
+export interface ReviewGateCompletionInput {
+  provenance: ReviewGateCompletionProvenance;
+  evidence?: string[];
+  reviewer?: string;
+  notes?: string;
+}
+
+export interface UpdateGateOptions {
+  review?: ReviewGateCompletionInput;
 }
 
 /** Human-readable labels for gates */
@@ -42,6 +54,13 @@ const SPRINT_STATE_FILE = '.slope/sprint-state.json';
 
 const ALL_GATES: GateName[] = ['tests', 'code_review', 'architect_review', 'scorecard', 'review_md'];
 const REVIEW_GATES: ReviewGateName[] = ['code_review', 'architect_review'];
+const REVIEW_GATE_PROVENANCES: readonly ReviewGateProvenance[] = [
+  'pending',
+  'self_review',
+  'independent_review',
+  'manual_override',
+  'pr_review',
+];
 
 /** Validate a user-provided sprint lifecycle phase. */
 export function isSprintPhase(value: string): value is SprintPhase {
@@ -67,7 +86,7 @@ function normalizeReviewGateState(raw: unknown): ReviewGateState {
   if (!raw || typeof raw !== 'object') return createDefaultReviewGateState();
   const obj = raw as Partial<ReviewGateState>;
   const provenance = typeof obj.provenance === 'string' &&
-    ['pending', 'self_review', 'independent_review', 'manual_override', 'pr_review'].includes(obj.provenance)
+    REVIEW_GATE_PROVENANCES.includes(obj.provenance as ReviewGateProvenance)
     ? obj.provenance as ReviewGateProvenance
     : 'pending';
   return {
@@ -87,6 +106,62 @@ function normalizeReviewGates(raw: unknown): Record<ReviewGateName, ReviewGateSt
     reviewGates[gate] = normalizeReviewGateState(obj[gate]);
   }
   return reviewGates;
+}
+
+function cleanEvidence(evidence: string[] | undefined): string[] {
+  return (evidence ?? []).map(item => item.trim()).filter(Boolean);
+}
+
+export function validateReviewGateCompletion(input: ReviewGateCompletionInput | undefined): string | null {
+  if (!input) {
+    return 'review gate requires explicit independent-review evidence, PR review evidence, or weaker-mode override';
+  }
+
+  const evidence = cleanEvidence(input.evidence);
+  const reviewer = input.reviewer?.trim();
+  const notes = input.notes?.trim();
+
+  switch (input.provenance) {
+    case 'independent_review':
+      if (!reviewer) return 'independent review gates require --reviewer=<agent-or-person>';
+      if (evidence.length === 0) return 'independent review gates require --evidence=<transcript-or-output>';
+      return null;
+    case 'pr_review':
+      if (evidence.length === 0) return 'PR review gates require --pr-review=<url-or-id>';
+      return null;
+    case 'self_review':
+      if (!notes) return 'self-review gates require --reason=<why-self-review-is-acceptable>';
+      return null;
+    case 'manual_override':
+      if (!notes) return 'manual review overrides require --override=<reason>';
+      return null;
+  }
+}
+
+function createReviewGateCompletionState(input: ReviewGateCompletionInput | undefined): ReviewGateState | null {
+  if (validateReviewGateCompletion(input)) return null;
+  if (!input) return null;
+  const reviewer = input.reviewer?.trim();
+  const notes = input.notes?.trim();
+  return {
+    provenance: input.provenance,
+    evidence: cleanEvidence(input.evidence),
+    ...(reviewer ? { reviewer } : {}),
+    ...(notes ? { notes } : {}),
+    updated_at: new Date().toISOString(),
+  };
+}
+
+export function isReviewGateSatisfied(state: SprintState, gate: ReviewGateName): boolean {
+  if (!state.gates[gate]) return false;
+  const review = state.review_gates?.[gate];
+  if (!review || review.provenance === 'pending') return false;
+  return validateReviewGateCompletion({
+    provenance: review.provenance,
+    evidence: review.evidence,
+    reviewer: review.reviewer,
+    notes: review.notes,
+  }) === null;
 }
 
 /** Load sprint state from .slope/sprint-state.json. Returns null if missing or malformed. */
@@ -147,28 +222,31 @@ export function mutateSprintState(cwd: string, mutator: (state: SprintState) => 
   });
 }
 
-/** Update a single gate and save. */
-export function updateGate(cwd: string, gate: GateName, value: boolean): void {
-  mutateSprintState(cwd, state => {
-    state.gates[gate] = value;
+/** Update a single gate and save. Returns false when a review gate lacks required provenance. */
+export function updateGate(cwd: string, gate: GateName, value: boolean, options: UpdateGateOptions = {}): boolean {
+  let updated = false;
+  const state = mutateSprintState(cwd, current => {
     if (isReviewGateName(gate)) {
-      state.review_gates ??= createDefaultReviewGates();
+      current.review_gates ??= createDefaultReviewGates();
       if (!value) {
-        state.review_gates[gate] = createDefaultReviewGateState();
+        current.gates[gate] = false;
+        current.review_gates[gate] = createDefaultReviewGateState();
+        updated = true;
+        return true;
       } else {
-        const current = state.review_gates[gate] ?? createDefaultReviewGateState();
-        if (current.provenance === 'pending') {
-          state.review_gates[gate] = {
-            provenance: 'self_review',
-            evidence: [`slope sprint gate ${gate}`],
-            notes: 'Marked complete through the legacy sprint gate command without independent reviewer evidence.',
-            updated_at: new Date().toISOString(),
-          };
-        }
+        const review = createReviewGateCompletionState(options.review);
+        if (!review) return false;
+        current.gates[gate] = true;
+        current.review_gates[gate] = review;
+        updated = true;
+        return true;
       }
     }
+    current.gates[gate] = value;
+    updated = true;
     return true;
   });
+  return Boolean(state && updated);
 }
 
 /** Update the current sprint lifecycle phase. */
@@ -181,13 +259,16 @@ export function updateSprintPhase(cwd: string, phase: SprintPhase): SprintState 
 
 /** Check if all gates are true. */
 export function isSprintComplete(state: SprintState): boolean {
-  return ALL_GATES.every(g => state.gates[g] === true);
+  return ALL_GATES.every(g => {
+    if (state.gates[g] !== true) return false;
+    return !isReviewGateName(g) || isReviewGateSatisfied(state, g);
+  });
 }
 
 /** Return human-readable list of incomplete gates. */
 export function pendingGates(state: SprintState): string[] {
   return ALL_GATES
-    .filter(g => !state.gates[g])
+    .filter(g => state.gates[g] !== true || (isReviewGateName(g) && !isReviewGateSatisfied(state, g)))
     .map(g => GATE_LABELS[g]);
 }
 

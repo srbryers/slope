@@ -313,7 +313,11 @@ function recommendCommands(state: {
         cmds.push(`slope claim ${state.nextTicket}`);
       } else if (state.requiredGates.length > 0) {
         for (const g of state.requiredGates.slice(0, 2)) {
-          cmds.push(`slope sprint gate ${g}`);
+          if (g === 'code_review' || g === 'architect_review') {
+            cmds.push(`slope sprint gate ${g} --reviewer=<id> --evidence=<path-or-url>`);
+          } else {
+            cmds.push(`slope sprint gate ${g}`);
+          }
         }
       }
       break;

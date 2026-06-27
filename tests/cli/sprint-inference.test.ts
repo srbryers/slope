@@ -47,6 +47,16 @@ describe('inferSprintContext', () => {
     state.gates.architect_review = true;
     state.gates.scorecard = true;
     state.gates.review_md = true;
+    state.review_gates.code_review = {
+      provenance: 'independent_review',
+      evidence: ['agent:code-reviewer-output'],
+      reviewer: 'code-reviewer',
+    };
+    state.review_gates.architect_review = {
+      provenance: 'independent_review',
+      evidence: ['agent:architect-reviewer-output'],
+      reviewer: 'architect-reviewer',
+    };
     saveSprintState(tmpDir, state);
 
     const context = inferSprintContext(tmpDir);

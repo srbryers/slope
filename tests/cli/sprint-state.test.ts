@@ -32,6 +32,19 @@ function legacySprintState(overrides: Record<string, unknown> = {}): Record<stri
   };
 }
 
+function satisfyReviewGates(state: ReturnType<typeof createSprintState>): void {
+  state.review_gates.code_review = {
+    provenance: 'independent_review',
+    evidence: ['agent:code-reviewer-output'],
+    reviewer: 'code-reviewer',
+  };
+  state.review_gates.architect_review = {
+    provenance: 'independent_review',
+    evidence: ['agent:architect-reviewer-output'],
+    reviewer: 'architect-reviewer',
+  };
+}
+
 beforeEach(() => {
   mkdirSync(tmpDir, { recursive: true });
 });
@@ -159,42 +172,70 @@ describe('updateGate', () => {
     expect(loadSprintState(tmpDir)).toBeNull();
   });
 
-  it('records legacy review gate completion as self-review provenance', () => {
+  it('does not pass a review gate without explicit provenance', () => {
     saveSprintState(tmpDir, createSprintState(22));
 
-    updateGate(tmpDir, 'code_review', true);
+    const result = updateGate(tmpDir, 'code_review', true);
 
     const state = loadSprintState(tmpDir)!;
+    expect(result).toBe(false);
+    expect(state.gates.code_review).toBe(false);
+    expect(state.review_gates.code_review).toEqual({ provenance: 'pending', evidence: [] });
+  });
+
+  it('records explicit self-review provenance as a weaker-mode override', () => {
+    saveSprintState(tmpDir, createSprintState(22));
+
+    const result = updateGate(tmpDir, 'code_review', true, {
+      review: {
+        provenance: 'self_review',
+        notes: 'Low-risk docs-only follow-up; independent review not required.',
+      },
+    });
+
+    const state = loadSprintState(tmpDir)!;
+    expect(result).toBe(true);
     expect(state.gates.code_review).toBe(true);
     expect(state.review_gates.code_review).toMatchObject({
       provenance: 'self_review',
-      evidence: ['slope sprint gate code_review'],
-      notes: expect.stringContaining('legacy sprint gate command'),
+      evidence: [],
+      notes: 'Low-risk docs-only follow-up; independent review not required.',
       updated_at: expect.any(String),
     });
   });
 
-  it('preserves existing independent review provenance when marking complete', () => {
-    const state = createSprintState(22);
-    state.review_gates.code_review = {
+  it('records independent review provenance when evidence is provided', () => {
+    saveSprintState(tmpDir, createSprintState(22));
+
+    const result = updateGate(tmpDir, 'code_review', true, {
+      review: {
+        provenance: 'independent_review',
+        evidence: ['agent:code-reviewer'],
+        reviewer: 'code-reviewer',
+        notes: 'No blocking findings.',
+      },
+    });
+
+    const loaded = loadSprintState(tmpDir)!;
+    expect(result).toBe(true);
+    expect(loaded.gates.code_review).toBe(true);
+    expect(loaded.review_gates.code_review).toMatchObject({
       provenance: 'independent_review',
       evidence: ['agent:code-reviewer'],
       reviewer: 'code-reviewer',
       notes: 'No blocking findings.',
-      updated_at: '2026-01-02T00:00:00Z',
-    };
-    saveSprintState(tmpDir, state);
-
-    updateGate(tmpDir, 'code_review', true);
-
-    const loaded = loadSprintState(tmpDir)!;
-    expect(loaded.gates.code_review).toBe(true);
-    expect(loaded.review_gates.code_review).toEqual(state.review_gates.code_review);
+      updated_at: expect.any(String),
+    });
   });
 
   it('resets review gate provenance when marking incomplete', () => {
     saveSprintState(tmpDir, createSprintState(22));
-    updateGate(tmpDir, 'architect_review', true);
+    updateGate(tmpDir, 'architect_review', true, {
+      review: {
+        provenance: 'self_review',
+        notes: 'Temporary manual self-review before reset.',
+      },
+    });
 
     updateGate(tmpDir, 'architect_review', false);
 
@@ -216,13 +257,24 @@ describe('isSprintComplete', () => {
     expect(isSprintComplete(state)).toBe(false);
   });
 
-  it('returns true when all gates are true', () => {
+  it('returns false when review booleans are true without provenance', () => {
     const state = createSprintState(22);
     state.gates.tests = true;
     state.gates.code_review = true;
     state.gates.architect_review = true;
     state.gates.scorecard = true;
     state.gates.review_md = true;
+    expect(isSprintComplete(state)).toBe(false);
+  });
+
+  it('returns true when all gates and review provenance are complete', () => {
+    const state = createSprintState(22);
+    state.gates.tests = true;
+    state.gates.code_review = true;
+    state.gates.architect_review = true;
+    state.gates.scorecard = true;
+    state.gates.review_md = true;
+    satisfyReviewGates(state);
     expect(isSprintComplete(state)).toBe(true);
   });
 });
@@ -235,6 +287,7 @@ describe('isActiveSprintState', () => {
     state.gates.architect_review = true;
     state.gates.scorecard = true;
     state.gates.review_md = true;
+    satisfyReviewGates(state);
 
     expect(isActiveSprintState(state)).toBe(false);
   });
@@ -263,6 +316,7 @@ describe('pendingGates', () => {
     state.gates.architect_review = true;
     state.gates.scorecard = true;
     state.gates.review_md = true;
+    satisfyReviewGates(state);
     expect(pendingGates(state)).toHaveLength(0);
   });
 

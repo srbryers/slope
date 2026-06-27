@@ -9,8 +9,11 @@ import {
   isSprintComplete,
   pendingGates,
   isSprintPhase,
+  isReviewGateName,
+  validateReviewGateCompletion,
   SPRINT_PHASES,
   type GateName,
+  type ReviewGateCompletionInput,
   type SprintPhase,
 } from '../sprint-state.js';
 import { WorkflowEngine, loadWorkflow, resolveVariables, validateWorkflow, loadConfig, parseRoadmap, castRoadmapStructure, formatSprintLabel, formatSprintNumber, parseSprintNumber } from '../../core/index.js';
@@ -99,6 +102,131 @@ function checkCompletionConditions(
 }
 
 const VALID_GATES: GateName[] = ['tests', 'code_review', 'architect_review', 'scorecard', 'review_md'];
+
+interface ParsedGateOptions {
+  review?: ReviewGateCompletionInput;
+  errors: string[];
+  help: boolean;
+}
+
+function optionValue(args: string[], index: number, flag: string): { value: string | null; next: number } | null {
+  const arg = args[index];
+  if (arg.startsWith(`${flag}=`)) return { value: arg.slice(flag.length + 1), next: index };
+  if (arg === flag) return { value: args[index + 1] ?? null, next: index + 1 };
+  return null;
+}
+
+function parseGateOptions(args: string[]): ParsedGateOptions {
+  const errors: string[] = [];
+  const evidence: string[] = [];
+  let reviewer: string | undefined;
+  let prReview: string | undefined;
+  let selfReview = false;
+  let notes: string | undefined;
+  let reason: string | undefined;
+  let overrideReason: string | undefined;
+  let help = false;
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === '--help' || arg === '-h') {
+      help = true;
+      continue;
+    }
+
+    const evidenceValue = optionValue(args, i, '--evidence');
+    if (evidenceValue) {
+      if (!evidenceValue.value || evidenceValue.value.startsWith('--')) errors.push('--evidence requires a value');
+      else evidence.push(evidenceValue.value);
+      i = evidenceValue.next;
+      continue;
+    }
+
+    const reviewerValue = optionValue(args, i, '--reviewer');
+    if (reviewerValue) {
+      if (!reviewerValue.value || reviewerValue.value.startsWith('--')) errors.push('--reviewer requires a value');
+      else reviewer = reviewerValue.value;
+      i = reviewerValue.next;
+      continue;
+    }
+
+    const prReviewValue = optionValue(args, i, '--pr-review');
+    if (prReviewValue) {
+      if (!prReviewValue.value || prReviewValue.value.startsWith('--')) errors.push('--pr-review requires a value');
+      else prReview = prReviewValue.value;
+      i = prReviewValue.next;
+      continue;
+    }
+
+    if (arg === '--self-review') {
+      selfReview = true;
+      continue;
+    }
+
+    const reasonValue = optionValue(args, i, '--reason');
+    if (reasonValue) {
+      if (!reasonValue.value || reasonValue.value.startsWith('--')) errors.push('--reason requires a value');
+      else reason = reasonValue.value;
+      i = reasonValue.next;
+      continue;
+    }
+
+    const notesValue = optionValue(args, i, '--notes');
+    if (notesValue) {
+      if (!notesValue.value || notesValue.value.startsWith('--')) errors.push('--notes requires a value');
+      else notes = notesValue.value;
+      i = notesValue.next;
+      continue;
+    }
+
+    const overrideValue = optionValue(args, i, '--override') ?? optionValue(args, i, '--manual-override');
+    if (overrideValue) {
+      if (!overrideValue.value || overrideValue.value.startsWith('--')) errors.push('--override requires a value');
+      else overrideReason = overrideValue.value;
+      i = overrideValue.next;
+      continue;
+    }
+
+    errors.push(`Unknown gate option: ${arg}`);
+  }
+
+  const hasPrReview = Boolean(prReview);
+  const hasSelfReview = selfReview;
+  const hasOverride = Boolean(overrideReason);
+  const hasIndependent = !hasPrReview && !hasSelfReview && !hasOverride && (Boolean(reviewer) || evidence.length > 0);
+  const modeCount = [hasPrReview, hasSelfReview, hasOverride, hasIndependent].filter(Boolean).length;
+
+  if (modeCount > 1) {
+    errors.push('Use only one review provenance mode: --reviewer/--evidence, --pr-review, --self-review, or --override.');
+  }
+
+  let review: ReviewGateCompletionInput | undefined;
+  if (modeCount === 1) {
+    if (hasPrReview) {
+      review = { provenance: 'pr_review', evidence: [prReview!, ...evidence], reviewer, notes: notes ?? reason };
+    } else if (hasSelfReview) {
+      review = { provenance: 'self_review', evidence, reviewer, notes: reason ?? notes };
+    } else if (hasOverride) {
+      review = { provenance: 'manual_override', evidence, reviewer, notes: overrideReason };
+    } else {
+      review = { provenance: 'independent_review', evidence, reviewer, notes: notes ?? reason };
+    }
+  }
+
+  return { review, errors, help };
+}
+
+function printGateUsage(gateName?: GateName): void {
+  const gate = gateName && isReviewGateName(gateName) ? gateName : 'code_review';
+  console.error('');
+  console.error('Usage:');
+  console.error('  slope sprint gate <name>');
+  console.error(`  slope sprint gate ${gate} --reviewer=<agent-or-person> --evidence=<transcript-or-output>`);
+  console.error(`  slope sprint gate ${gate} --pr-review=<url-or-id>`);
+  console.error(`  slope sprint gate ${gate} --self-review --reason="why self-review is acceptable"`);
+  console.error(`  slope sprint gate ${gate} --override="manual override reason"`);
+  console.error('');
+}
 
 /**
  * `slope sprint begin --sprint=N --ticket=T` — bundled start-of-work flow.
@@ -289,7 +417,7 @@ async function startCommand(args: string[], cwd: string): Promise<void> {
   const state = createSprintState(sprint, phase);
   saveSprintState(cwd, state);
   const autoClaim = await autoClaimSprint(cwd, sprint);
-  console.log(`Sprint ${formatSprintNumber(sprint)} started (phase: ${phase}). Use 'slope sprint gate <name>' to mark gates.`);
+  console.log(`Sprint ${formatSprintNumber(sprint)} started (phase: ${phase}). Use 'slope sprint gate <name>' to mark gates; review gates require evidence options.`);
   if (autoClaim) console.log(autoClaim);
 }
 
@@ -346,7 +474,31 @@ function gateCommand(args: string[], cwd: string): void {
   const gateName = args[0] as GateName | undefined;
   if (!gateName || !VALID_GATES.includes(gateName)) {
     console.error(`Error: gate name required. Valid gates: ${VALID_GATES.join(', ')}`);
+    printGateUsage();
     process.exit(1);
+  }
+
+  const options = parseGateOptions(args.slice(1));
+  if (options.help) {
+    printGateUsage(gateName);
+    return;
+  }
+  if (options.errors.length > 0) {
+    for (const error of options.errors) console.error(`Error: ${error}`);
+    printGateUsage(gateName);
+    process.exit(1);
+  }
+  if (!isReviewGateName(gateName) && options.review) {
+    console.error('Error: review evidence options only apply to code_review and architect_review gates.');
+    process.exit(1);
+  }
+  if (isReviewGateName(gateName)) {
+    const validation = validateReviewGateCompletion(options.review);
+    if (validation) {
+      console.error(`Error: ${validation}.`);
+      printGateUsage(gateName);
+      process.exit(1);
+    }
   }
 
   const state = loadSprintState(cwd);
@@ -355,19 +507,24 @@ function gateCommand(args: string[], cwd: string): void {
     process.exit(1);
   }
 
-  if (state.gates[gateName]) {
+  if (state.gates[gateName] && (!isReviewGateName(gateName) || !options.review)) {
     console.log(`Gate '${gateName}' is already complete.`);
     return;
   }
 
-  updateGate(cwd, gateName, true);
+  const changed = updateGate(cwd, gateName, true, { review: options.review });
+  if (!changed) {
+    console.error(`Error: could not update gate '${gateName}'.`);
+    process.exit(1);
+  }
   const updated = loadSprintState(cwd)!;
   const remaining = pendingGates(updated);
+  const provenance = isReviewGateName(gateName) ? ` (${updated.review_gates[gateName].provenance})` : '';
 
   if (remaining.length === 0) {
-    console.log(`Gate '${gateName}' marked complete. All gates done — ready for PR!`);
+    console.log(`Gate '${gateName}' marked complete${provenance}. All gates done - ready for PR!`);
   } else {
-    console.log(`Gate '${gateName}' marked complete. Remaining: ${remaining.join(', ')}`);
+    console.log(`Gate '${gateName}' marked complete${provenance}. Remaining: ${remaining.join(', ')}`);
   }
 }
 
@@ -1276,7 +1433,8 @@ Legacy commands:
   slope sprint begin --sprint=N --ticket=T  Bundled start + claim + briefing + prep (#311)
   slope sprint plan --sprint=N [--output=path]  Generate markdown sprint plan (#312)
   slope sprint phase <phase>       Update current sprint phase
-  slope sprint gate <name>           Mark a gate as complete
+  slope sprint gate <name> [review evidence options]
+                                      Mark a gate as complete
   slope sprint status                Show sprint state and gates
   slope sprint resume --portable [--from=path] [--force] [--dry-run]
                                       Reconstruct local sprint state from tracked artifacts

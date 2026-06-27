@@ -161,11 +161,16 @@ describe('withFileLockSync', () => {
     }, null, 2) + '\n');
 
     const sprintJobs = ['tests', 'code_review', 'architect_review', 'scorecard', 'review_md']
-      .map(gate => runNode(`
+      .map(gate => {
+        const options = gate === 'code_review' || gate === 'architect_review'
+          ? `, { review: { provenance: 'independent_review', reviewer: '${gate}-reviewer', evidence: ['agent:${gate}'] } }`
+          : '';
+        return runNode(`
         import { updateGate } from ${JSON.stringify(sprintUrl)};
         await new Promise(resolve => setTimeout(resolve, Math.floor(Math.random() * 8)));
-        updateGate(${JSON.stringify(tmpDir)}, ${JSON.stringify(gate)}, true);
-      `));
+        updateGate(${JSON.stringify(tmpDir)}, ${JSON.stringify(gate)}, true${options});
+      `);
+      });
 
     const sessionFields = [
       ['briefing_session_id', 'session-briefing'],

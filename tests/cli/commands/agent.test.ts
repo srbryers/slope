@@ -42,6 +42,21 @@ function writeSprintState(cwd: string, state: object) {
   writeFileSync(join(cwd, '.slope', 'sprint-state.json'), JSON.stringify(state));
 }
 
+function reviewGatesJson(): object {
+  return {
+    code_review: {
+      provenance: 'independent_review',
+      evidence: ['agent:code-reviewer-output'],
+      reviewer: 'code-reviewer',
+    },
+    architect_review: {
+      provenance: 'independent_review',
+      evidence: ['agent:architect-reviewer-output'],
+      reviewer: 'architect-reviewer',
+    },
+  };
+}
+
 describe('agent status (GH #310)', () => {
   let cwd: string;
 
@@ -215,6 +230,7 @@ describe('agent status (GH #310)', () => {
       sprint: 8,
       phase: 'scoring',
       gates: { tests: true, code_review: true, architect_review: true, scorecard: false, review_md: false },
+      review_gates: reviewGatesJson(),
       started_at: '2026-05-07T00:00:00Z',
       updated_at: '2026-05-07T00:00:00Z',
     });
@@ -372,6 +388,7 @@ describe('agent status (GH #310)', () => {
       sprint: 1,
       phase: 'implementing',
       gates: { tests: true, code_review: true, architect_review: true, scorecard: false, review_md: false },
+      review_gates: reviewGatesJson(),
       started_at: '2026-05-07T00:00:00Z',
       updated_at: '2026-05-07T00:00:00Z',
     });
