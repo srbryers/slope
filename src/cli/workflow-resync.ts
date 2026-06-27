@@ -5,6 +5,7 @@ import { loadConfig } from './config.js';
 import { createSprintState, loadSprintState, mutateSprintState, saveSprintState, type SprintPhase } from './sprint-state.js';
 import {
   castRoadmapStructure,
+  formatSprintLabel,
   formatSprintNumber,
   loadScorecards,
   loadWorkflow,
@@ -61,6 +62,29 @@ export function sprintNumberFromId(sprintId: string | undefined): number | null 
   return parseSprintNumber(normalized) ?? null;
 }
 
+export function sprintNumberForExecution(exec: Pick<WorkflowExecution, 'sprint_id' | 'variables'>): number | null {
+  for (const candidate of sprintIdCandidates(exec)) {
+    const sprint = sprintNumberFromId(candidate);
+    if (sprint !== null) return sprint;
+  }
+  return null;
+}
+
+export function sprintLabelForExecution(exec: Pick<WorkflowExecution, 'id' | 'sprint_id' | 'variables'>): string {
+  const sprint = sprintNumberForExecution(exec);
+  return sprint === null ? (exec.sprint_id ?? exec.id) : formatSprintLabel(sprint);
+}
+
+function sprintIdCandidates(exec: Pick<WorkflowExecution, 'sprint_id' | 'variables'>): string[] {
+  const candidates = [
+    exec.sprint_id,
+    exec.variables?.sprint_id,
+    exec.variables?.sprint,
+    exec.variables?.sprintId,
+  ];
+  return candidates.filter((value): value is string => typeof value === 'string' && value.trim().length > 0);
+}
+
 export function scorecardExistsForSprint(cwd: string, sprint: number): boolean {
   const config = loadConfig(cwd);
   const pattern = config.scorecardPattern.replaceAll('*', formatSprintNumber(sprint));
@@ -99,7 +123,7 @@ export async function findStaleWorkflowExecutions(
   const roadmapDoneIds = completedRoadmapSprintIds(cwd, config);
   const running = await store.listExecutions({ status: 'running' });
   const runningSprints = running
-    .map(exec => sprintNumberFromId(exec.sprint_id))
+    .map(exec => sprintNumberForExecution(exec))
     .filter((sprint): sprint is number => sprint !== null);
   const newestRunningSprint = runningSprints.length > 0 ? Math.max(...runningSprints) : null;
   const branchSprint = options.branchSprint === undefined ? inferSprintFromBranch(cwd) : options.branchSprint;
@@ -109,7 +133,7 @@ export async function findStaleWorkflowExecutions(
   const stale: StaleWorkflowExecution[] = [];
 
   for (const exec of running) {
-    const sprint = sprintNumberFromId(exec.sprint_id);
+    const sprint = sprintNumberForExecution(exec);
     if (sprint === null) continue;
     const reasons: string[] = [];
     if (scorecardSprintIds.has(sprint)) reasons.push('scorecard exists');
@@ -169,7 +193,7 @@ export function reconcileSprintStateForBranch(cwd: string): SprintStateRebindRes
 }
 
 function workflowFastForwardTarget(cwd: string, exec: WorkflowExecution): { phase: string; step: string; reason: string } | null {
-  const sprint = sprintNumberFromId(exec.sprint_id);
+  const sprint = sprintNumberForExecution(exec);
   if (sprint === null) return null;
   const branchSprint = inferSprintFromBranch(cwd);
   if (branchSprint !== sprint) return null;

@@ -321,6 +321,39 @@ describe('slope sprint workflow cleanup', () => {
     }
   });
 
+  it('pauses abandoned running executions when sprint id only exists in workflow variables (#572)', async () => {
+    writeScorecard(23);
+    writeRoadmap(23, 'complete');
+
+    const store = createStore({ storePath: '.slope/slope.db', cwd: tmpDir });
+    let execId: string;
+    try {
+      const exec = await store.startExecution({
+        workflow_name: 'sprint-standard',
+        variables: { sprint_id: 'S23', tickets: 'T1,T2' },
+      });
+      execId = exec.id;
+      await store.updateExecutionState(execId, 'post_hole', 'validate_scorecard');
+    } finally {
+      store.close();
+    }
+
+    const output = await captureLog(() =>
+      sprintCommand(['workflow', 'cleanup', '--stale'])
+    );
+
+    expect(output).toContain('Paused S23');
+    expect(output).toContain('scorecard exists');
+    expect(output).toContain('roadmap complete/superseded');
+
+    const updatedStore = createStore({ storePath: '.slope/slope.db', cwd: tmpDir });
+    try {
+      await expect(updatedStore.getExecution(execId!)).resolves.toMatchObject({ status: 'paused' });
+    } finally {
+      updatedStore.close();
+    }
+  });
+
   it('detects aged running executions as stale (#503)', async () => {
     const old = new Date('2026-01-01T00:00:00Z').toISOString();
     const store = {

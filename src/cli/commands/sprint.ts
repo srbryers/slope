@@ -53,7 +53,7 @@ import {
   loadRoadmapReality,
   parseTouchedPaths,
 } from '../pre-sprint-reality.js';
-import { findStaleWorkflowExecutions, reconcileWorkflowExecutions } from '../workflow-resync.js';
+import { findStaleWorkflowExecutions, reconcileWorkflowExecutions, sprintLabelForExecution } from '../workflow-resync.js';
 
 /**
  * Check completion_conditions for a step before allowing completion/skip.
@@ -686,10 +686,10 @@ async function workflowCleanupCommand(args: string[], cwd: string): Promise<void
     try {
       const result = await reconcileWorkflowExecutions(cwd, store);
       for (const { exec, reason } of result.paused) {
-        console.log(`Paused ${exec.sprint_id ?? exec.id} (${exec.workflow_name}) at ${exec.current_phase}/${exec.current_step} — ${reason}`);
+        console.log(`Paused ${sprintLabelForExecution(exec)} (${exec.workflow_name}) at ${exec.current_phase}/${exec.current_step} — ${reason}`);
       }
       for (const item of result.fastForwarded) {
-        console.log(`Fast-forwarded ${item.exec.sprint_id ?? item.exec.id} (${item.exec.workflow_name}) to ${item.phase}/${item.step} — ${item.reason}`);
+        console.log(`Fast-forwarded ${sprintLabelForExecution(item.exec)} (${item.exec.workflow_name}) to ${item.phase}/${item.step} — ${item.reason}`);
       }
       if (result.paused.length === 0 && result.fastForwarded.length === 0) {
         console.log('Workflow state already matches git/roadmap reality.');
@@ -717,7 +717,7 @@ async function workflowCleanupCommand(args: string[], cwd: string): Promise<void
 
     const engine = new WorkflowEngine();
     for (const { exec, reason } of stale) {
-      const label = exec.sprint_id ?? exec.id;
+      const label = sprintLabelForExecution(exec);
       if (dryRun) {
         console.log(`[dry-run] Would pause ${label} (${exec.workflow_name}) at ${exec.current_phase}/${exec.current_step} — ${reason}`);
       } else {
