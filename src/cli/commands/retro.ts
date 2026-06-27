@@ -138,6 +138,9 @@ const VALUE_FLAGS = new Set([
 
 const VALID_OUTCOMES: RetroOutcome[] = ['success', 'mixed', 'follow_up'];
 const VALID_MEMORY_CATEGORIES: MemoryCategory[] = ['workflow', 'style', 'project', 'hazard', 'other'];
+const MEMORY_CATEGORY_ALIASES: Record<string, MemoryCategory> = {
+  process: 'workflow',
+};
 
 function parseArgs(args: string[]): ParsedArgs {
   const flags = new Map<string, string[]>();
@@ -210,18 +213,32 @@ function normalizeOutcome(value: string | undefined): RetroOutcome | undefined {
 
 function parseLearningSpec(value: string): RetroLearningInput {
   const trimmed = value.trim();
-  const match = trimmed.match(/^([a-z_]+)(?::(\d+))?:(.+)$/);
+  const match = trimmed.match(/^([a-z][a-z_-]*)(?::([^:]+))?:(.+)$/);
   if (!match) return { text: trimmed };
 
   const [, rawCategory, rawWeight, text] = match;
-  if (!VALID_MEMORY_CATEGORIES.includes(rawCategory as MemoryCategory)) {
-    return { text: trimmed };
+  const category = VALID_MEMORY_CATEGORIES.includes(rawCategory as MemoryCategory)
+    ? rawCategory as MemoryCategory
+    : MEMORY_CATEGORY_ALIASES[rawCategory];
+  if (!category) {
+    const aliases = Object.entries(MEMORY_CATEGORY_ALIASES)
+      .map(([alias, target]) => `${alias}->${target}`)
+      .join(', ');
+    throw new TypeError(`Unsupported --learning category prefix "${rawCategory}". Use: ${VALID_MEMORY_CATEGORIES.join(', ')}${aliases ? `; aliases: ${aliases}` : ''}.`);
+  }
+
+  let weight: number | undefined;
+  if (rawWeight !== undefined) {
+    weight = parseInt(rawWeight, 10);
+    if (!Number.isInteger(weight) || String(weight) !== rawWeight.trim() || weight < 1 || weight > 10) {
+      throw new TypeError('--learning weight prefix must be an integer from 1 to 10.');
+    }
   }
 
   return {
-    text,
-    category: rawCategory as MemoryCategory,
-    ...(rawWeight ? { weight: parseInt(rawWeight, 10) } : {}),
+    text: text.trim(),
+    category,
+    ...(weight !== undefined ? { weight } : {}),
   };
 }
 
