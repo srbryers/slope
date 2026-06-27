@@ -1,6 +1,6 @@
 # SLOPE Roadmap
 
-> 164 scorecards filed. Canonical planning now lives in `docs/backlog/roadmap.json`.
+> 165 scorecards filed. Canonical planning now lives in `docs/backlog/roadmap.json`.
 > Last updated: 2026-06-27 (open GitHub issue recovery triage)
 
 ## Phase Summary
@@ -21,7 +21,7 @@
 | 8 | Metaphor Studio | S41-S42 | **Complete** | Visual metaphor builder, interactive onboarding interview |
 | 9 | Self-Development Loop | S43-S58 | **Complete** | Autonomous sprint execution, `slope loop` CLI |
 | 10 | Loop Quality | — | **Active** | Prompt engineering, context budgets, parallelism |
-| 49 | Open Issue Recovery Train | S216-S222 | **Planned** | Roadmap signal repair, workflow guard recovery, platform/bootstrap fixes, review provenance, audit metadata, codification, release |
+| 49 | Open Issue Recovery Train | S216-S222 | **Active** | Roadmap signal repair, workflow guard recovery, platform/bootstrap fixes, review provenance, audit metadata, codification, release |
 
 ---
 
@@ -31,8 +31,8 @@ Open GitHub issues triaged into the canonical roadmap: #552, #553, #556, #557, #
 
 - **S147:** Superseded as a stale handoff-continuity lane; reopen as concrete issue-backed work if still needed.
 - **S153:** Marked complete for #550 after shipped semver recommendation hardening; no scorecard exists, so roadmap validation keeps a warning.
-- **S216:** Roadmap shipped-signal correctness for #573. Next action: S216-1.
-- **S217:** Stale workflow cleanup and guard misfire recovery for #572.
+- **S216:** Complete for #573; roadmap validation now separates shipped implementation evidence from docs-only planning references.
+- **S217:** Stale workflow cleanup and guard misfire recovery for #572. Next action: S217-1.
 - **S218:** Store/bootstrap portability for #553, #557, and #558.
 - **S219:** Independent review provenance and reviewer-agent defaults for #561 and #562.
 - **S220:** Agent claimant identity and retro learning-prefix parsing for #565 and #566.

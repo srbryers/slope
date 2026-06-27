@@ -1,0 +1,137 @@
+{
+  "sprint_number": 216,
+  "player": "codex",
+  "theme": "Roadmap Shipped-Signal Correctness",
+  "par": 3,
+  "slope": 2,
+  "score": 4,
+  "score_label": "bogey",
+  "date": "2026-06-27",
+  "type": "bugfix + roadmap hygiene",
+  "skills_used": [
+    "slope-sprint-workflow",
+    "github"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow"
+  ],
+  "skill_gaps_found": [],
+  "shots": [
+    {
+      "ticket_key": "S216-1",
+      "title": "Require ticket-key or implementation-shaped evidence before a sprint counts as shipped (#573)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "moderate",
+          "description": "The first pnpm verification path removed node_modules and hit better-sqlite3 native build approval in a noninteractive shell; repaired by reinstalling dependencies, approving builds, and rebuilding native bindings."
+        }
+      ],
+      "notes": "Bare sprint references now count as shipped evidence only when the commit subject has an implementation-shaped conventional type; nonzero ticket keys still count directly."
+    },
+    {
+      "ticket_key": "S216-2",
+      "title": "Ignore docs and planning-only sprint mentions without losing true shipped detections (#573)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Roadmap and planning scoped bare sprint references are ignored when the subject is clearly reslotting, scoping, or triaging future work, while real implementation subjects still count."
+    },
+    {
+      "ticket_key": "S216-3",
+      "title": "Add roadmap validate regressions for docs-only references and real ticket-key commits (#573)",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added git-backed roadmap validate regressions proving docs-only planned references do not trigger shipped-sprint errors and real ticket-key commits still do."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 3,
+    "fairways_total": 3,
+    "greens_in_regulation": 3,
+    "greens_total": 3,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 1,
+    "hazard_penalties": 1,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "wind",
+      "impact": "minor",
+      "description": "Issue #573 exposed a signal-integrity bug: roadmap validation was treating docs and planning references as shipped sprint evidence."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Bare sprint references in git history need evidence before they can be treated as shipped work.",
+      "outcome": "extractSprintReferences now requires implementation-shaped commit subjects for bare sprint refs, while preserving direct ticket-key detection."
+    },
+    {
+      "type": "lessons",
+      "description": "Planning and roadmap commits often mention future sprint numbers by design.",
+      "outcome": "roadmap/planning scoped reslotting, scoping, spike, and triage subjects no longer create false shipped-sprint validation errors."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "`./node_modules/.bin/vitest.cmd run tests/core/analyzers/git.test.ts` passed after the shipped-reference detector changes.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`./node_modules/.bin/vitest.cmd run tests/cli/roadmap.test.ts tests/core/analyzers/git.test.ts` passed: 2 files, 65 tests.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`./node_modules/.bin/tsc.cmd --noEmit` passed.",
+      "status": "healthy"
+    },
+    {
+      "category": "process",
+      "description": "`pnpm install --frozen-lockfile` initially hit native build approval friction after node_modules was removed; `pnpm approve-builds --all` restored the better-sqlite3 binding and generated pnpm-workspace.yaml was removed.",
+      "status": "rough"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "A narrow but important signal repair: the roadmap was reading planning breadcrumbs as shipped reality.",
+    "advice_for_next_player": "When a validator consumes git history, separate exact ticket evidence from broad narrative mentions before making roadmap state decisions.",
+    "what_surprised_you": "The false positives came from useful planning commits, not bad data; the detector needed context instead of a broader regex.",
+    "excited_about_next": "S217 can now tackle stale workflow cleanup without roadmap validation confusing recovery planning with completed implementation."
+  },
+  "bunker_locations": [
+    "Docs-only and roadmap-planning commits can mention sprint numbers without shipping sprint work.",
+    "Bare sprint references need implementation-shaped subjects; ticket keys remain the stronger evidence.",
+    "pnpm 11 build approval can block native dependencies in noninteractive repair paths after node_modules is removed."
+  ],
+  "yardage_book_updates": [
+    "src/core/analyzers/git.ts now filters bare sprint references through implementation-shaped conventional commit subjects.",
+    "src/core/analyzers/git.ts suppresses roadmap/planning scoped reslotting and scoping references without suppressing true implementation subjects.",
+    "tests/core/analyzers/git.test.ts covers ticket-key retention, docs-only bare sprint rejection, implementation-shaped bare sprint refs, and planning-only subjects.",
+    "tests/cli/roadmap.test.ts covers git-backed roadmap validate behavior for planned sprint mentions and real ticket-key commits."
+  ],
+  "course_management_notes": [
+    "GitHub issue #573 is addressed by commits a2974a2, cd346c7, and 67208cd.",
+    "The sprint intentionally leaves unrelated dirty hook and slope-loop files untouched.",
+    "S216 closed the roadmap shipped-signal false positive before Phase 49 continues into workflow runtime recovery."
+  ],
+  "slope_factors": [
+    "git_history_detection",
+    "roadmap_validation",
+    "planning_reference_filtering",
+    "issue_573"
+  ]
+}

@@ -374,7 +374,7 @@
         221,
         222
       ],
-      "status": "planned",
+      "status": "active",
       "note": "Triages the 2026-06-27 open GitHub issue set into focused recovery sprints: roadmap shipped-signal correctness (#573), stale workflow cleanup and guard misfires (#572), store/bootstrap portability (#553/#557/#558), independent review provenance (#561/#562), audit trail and retro parsing (#565/#566), codification candidate tracking plus sprint terminology (#552/#556), and a recovery release."
     }
   ],
@@ -4667,7 +4667,9 @@
       "par": 3,
       "slope": 2,
       "type": "bugfix + roadmap hygiene",
-      "status": "planned",
+      "status": "complete",
+      "score": 4,
+      "score_label": "bogey",
       "depends_on": [
         153
       ],
