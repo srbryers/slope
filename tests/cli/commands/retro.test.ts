@@ -54,6 +54,15 @@ describe('retro post-merge CLI', () => {
     rmSync(cwd, { recursive: true, force: true });
   });
 
+  it('documents the accepted learning prefix syntax in post-merge help', async () => {
+    const out = await captureLogs(() => retroCommand(['post-merge', '--help']));
+
+    expect(out.stdout).toContain('Categories: workflow, style, project, hazard, other');
+    expect(out.stdout).toContain('Alias: process -> workflow');
+    expect(out.stdout).toContain('Weight: 1-10');
+    expect(out.stdout).toContain('Unsupported category prefixes are rejected');
+  });
+
   it('writes a post-merge retro record and persists durable memories', async () => {
     const out = await captureLogs(() => retroCommand([
       'post-merge',

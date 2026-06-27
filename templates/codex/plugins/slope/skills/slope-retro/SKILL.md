@@ -20,7 +20,7 @@ Use this after the PR is merged, or when the user asks to preserve lessons from 
 2. Persist the retro:
    `slope retro post-merge --sprint=<N> --pr=<PR> --summary="<summary>" --learning="<learning>" --hazard="<hazard>" --follow-up="<follow-up>"`
 3. Repeat `--learning`, `--hazard`, and `--follow-up` as needed.
-4. Use `--learning=project:8:<text>` or another `category[:weight]:text` prefix when the memory category matters.
+4. Use `--learning=project:8:<text>` or another supported `category[:weight]:text` prefix when the memory category matters. Supported categories are `workflow`, `style`, `project`, `hazard`, and `other`; `process` is accepted as an alias for `workflow`; weight must be 1-10.
 
 ## Verify
 

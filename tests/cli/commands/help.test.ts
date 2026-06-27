@@ -78,6 +78,14 @@ describe('slope help', () => {
     expect(output).toContain('--dry-run');
   });
 
+  it('shows precise retro learning prefix syntax in command detail', async () => {
+    await helpCommand(['retro']);
+
+    const output = consoleOutput.join('\n');
+    expect(output).toContain('workflow|style|project|hazard|other[:1-10]:text');
+    expect(output).toContain('process->workflow alias');
+  });
+
   it('teaches the --all escape hatch in help usage', async () => {
     await helpCommand(['--help']);
 

@@ -103,6 +103,8 @@ Usage:
     [--summary=TEXT] [--learning=TEXT]...       persist learnings to memory,
     [--hazard=TEXT]... [--follow-up=TEXT]...    and save the retro record.
     [--outcome=success|mixed|follow_up] [--json] [--dry-run]
+    Learning prefixes: category[:weight]:TEXT where category is workflow,
+    style, project, hazard, or other; process aliases to workflow; weight is 1-10.
 
 Output: docs/retros/sprint-N.json with _backfilled:true marker.
 Post-merge output: .slope/retros/post-merge/sprint-N[-pr-M].json.
@@ -424,6 +426,9 @@ Usage:
 Flags:
   --learning=TEXT             Durable learning. Repeatable.
   --learning=project:8:TEXT   Optional category/weight prefix.
+                              Categories: workflow, style, project, hazard, other.
+                              Alias: process -> workflow. Weight: 1-10.
+                              Unsupported category prefixes are rejected.
   --hazard=TEXT               Hazard to persist as auto-retro memory. Repeatable.
   --follow-up=TEXT            Follow-up to persist as workflow memory. Repeatable.
   --outcome=success|mixed|follow_up
