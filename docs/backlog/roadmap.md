@@ -1,7 +1,7 @@
 # SLOPE Roadmap
 
-> 134 scorecards filed (S1-S136, with gaps). Canonical planning now lives in `docs/backlog/roadmap.json`.
-> Last updated: 2026-06-07 (v1.58.1 patch release triage)
+> 164 scorecards filed. Canonical planning now lives in `docs/backlog/roadmap.json`.
+> Last updated: 2026-06-27 (open GitHub issue recovery triage)
 
 ## Phase Summary
 
@@ -21,6 +21,23 @@
 | 8 | Metaphor Studio | S41-S42 | **Complete** | Visual metaphor builder, interactive onboarding interview |
 | 9 | Self-Development Loop | S43-S58 | **Complete** | Autonomous sprint execution, `slope loop` CLI |
 | 10 | Loop Quality | — | **Active** | Prompt engineering, context budgets, parallelism |
+| 49 | Open Issue Recovery Train | S216-S222 | **Planned** | Roadmap signal repair, workflow guard recovery, platform/bootstrap fixes, review provenance, audit metadata, codification, release |
+
+---
+
+## Current Planning Tail (2026-06-27)
+
+Open GitHub issues triaged into the canonical roadmap: #552, #553, #556, #557, #558, #561, #562, #565, #566, #572, #573.
+
+- **S147:** Superseded as a stale handoff-continuity lane; reopen as concrete issue-backed work if still needed.
+- **S153:** Marked complete for #550 after shipped semver recommendation hardening; no scorecard exists, so roadmap validation keeps a warning.
+- **S216:** Roadmap shipped-signal correctness for #573. Next action: S216-1.
+- **S217:** Stale workflow cleanup and guard misfire recovery for #572.
+- **S218:** Store/bootstrap portability for #553, #557, and #558.
+- **S219:** Independent review provenance and reviewer-agent defaults for #561 and #562.
+- **S220:** Agent claimant identity and retro learning-prefix parsing for #565 and #566.
+- **S221:** Workaround/codification candidate ledger and scope-based sprint terminology for #552 and #556.
+- **S222:** Recovery release and roadmap closeout for the S216-S221 train.
 
 ---
 
@@ -165,4 +182,4 @@ Separate planning from execution into distinct agent roles with different models
 | Store | `packages/store-sqlite/`, `packages/store-pg/` |
 
 ### Machine-Readable Roadmap
-`docs/backlog/roadmap.json` - Consumed by `slope roadmap validate|review|status|show`. Covers completed S61-S136 catch-up, S137 post-merge retro/durable-memory tooling, S137.5 Windows test-suite portability for #509, completed S138 destructive-help safety for #501, completed S139 existing-worktree recovery for #499, completed S140 session-collision recovery for #502, completed S141 workflow state resync for #503, completed S142 codebase-map non-TS safety for #505, completed S143 portable sprint resume for #507, completed S143.5 commit-ready map freshness alignment for #510, completed S143.6 decimal sprint status parsing for #511, completed S143.7 Windows-safe map staleness checks for #512, completed S143.8 decimal sprint currency formatting for #513, completed S143.9 Node exec redirection portability audit for #514, completed S143.95 atomic-write lock contention hardening for #515, completed S143.97 git analyzer fixture stability for #516, completed S143.98 npm bin metadata release cleanliness for #517, completed S143.99 CodeQL release-gate hardening for #518, completed S144 recovery release readiness work, completed S145 validation-signal repair for #519/#520, completed S146 roadmap hygiene and decimal-artifact shipped detection for #522, completed S146.1 v1.58.1 patch-release readiness for #524/#525/#526/#528, completed S146.2 decimal post-merge retro support for #529, and planned S147 handoff continuity work.
+`docs/backlog/roadmap.json` - Consumed by `slope roadmap validate|review|status|show`. It is the canonical plan. The current tail marks S147 superseded, S153 complete for #550, and plans S216-S222 as the open-issue recovery train for #552/#553/#556/#557/#558/#561/#562/#565/#566/#572/#573.

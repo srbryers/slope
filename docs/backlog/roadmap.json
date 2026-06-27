@@ -1,6 +1,6 @@
 {
   "name": "SLOPE Development Roadmap",
-  "description": "Forward-looking roadmap from S61+. Phases 1-9 (S1-S47) are complete. S48-S60 were hardening, guard enforcement, and process sprints. This roadmap covers adoption, observability, guard maturity, multi-project, loop evolution, and issue-driven recovery. S61-S64 reflect what actually shipped (themes diverged from original plan). Note: the actual S69 diverged from the planned Referee sprint \u2014 a carryover patch kit ran instead. The Referee work was rescheduled as S78. S75.5 (The Bug Clearing) added 2026-05-02 to clear accumulated CLI bugs from external repos. S132-S136 were backfilled from shipped scorecards on 2026-06-05; S137 adds post-merge retro tooling and durable memory, S137.5 addresses Windows suite portability for #509, S138-S144 triage open GitHub issues #499/#501/#502/#503/#505/#507/#510/#511/#512/#513/#514/#515/#516/#517/#518 into focused recovery sprints, S145 closed validation-signal regressions #519/#520, S146 cleaned stale roadmap state plus decimal sprint shipped-artifact warnings (#522), S146.1 cut the v1.58.1 patch release while repairing release-bump staging (#524/#528), active inserted sprint status (#525), and guard test isolation (#526), S146.2 closes the decimal post-merge retro gap (#529), S146.3 scopes workflow-step-gate to the relevant execution (#531), S148-S151.1 completed the human operating surface simplification and Windows git fixture hardening, S152 published v1.59.0, S152.1 tracks roadmap interview discoverability across supported harness surfaces, and S153 tracks semver recommendation hardening for #550.",
+  "description": "Forward-looking roadmap from S61+. Phases 1-9 (S1-S47) are complete. S48-S60 were hardening, guard enforcement, and process sprints. This roadmap covers adoption, observability, guard maturity, multi-project, loop evolution, and issue-driven recovery. S61-S64 reflect what actually shipped (themes diverged from original plan). Note: the actual S69 diverged from the planned Referee sprint \u2014 a carryover patch kit ran instead. The Referee work was rescheduled as S78. S75.5 (The Bug Clearing) added 2026-05-02 to clear accumulated CLI bugs from external repos. S132-S136 were backfilled from shipped scorecards on 2026-06-05; S137 adds post-merge retro tooling and durable memory, S137.5 addresses Windows suite portability for #509, S138-S144 triage open GitHub issues #499/#501/#502/#503/#505/#507/#510/#511/#512/#513/#514/#515/#516/#517/#518 into focused recovery sprints, S145 closed validation-signal regressions #519/#520, S146 cleaned stale roadmap state plus decimal sprint shipped-artifact warnings (#522), S146.1 cut the v1.58.1 patch release while repairing release-bump staging (#524/#528), active inserted sprint status (#525), and guard test isolation (#526), S146.2 closes the decimal post-merge retro gap (#529), S146.3 scopes workflow-step-gate to the relevant execution (#531), S148-S151.1 completed the human operating surface simplification and Windows git fixture hardening, S152 published v1.59.0, S152.1 completed roadmap interview discoverability across supported harness surfaces, S153 closed semver recommendation hardening for #550, S147 was superseded as a stale handoff-continuity lane, and S216-S222 triage open GitHub issues #552/#553/#556/#557/#558/#561/#562/#565/#566/#572/#573 into the next recovery train.",
   "phases": [
     {
       "name": "Phase 10 \u2014 Adoption & Onboarding",
@@ -338,8 +338,8 @@
       "sprints": [
         147
       ],
-      "status": "planned",
-      "note": "Make cross-session handoffs first-class and low-friction after the roadmap hygiene sprint."
+      "status": "superseded",
+      "note": "Superseded as a stale speculative lane after S148-S153 shipped ahead of it; handoff-continuity work should return only as concrete reopened issues."
     },
     {
       "name": "Phase 47 \u2014 Human Operating Surface Simplification",
@@ -360,8 +360,22 @@
         152.1,
         153
       ],
+      "status": "complete",
+      "note": "Closed out the v1.59.0 release memory, repaired roadmap interview discoverability across harness surfaces, and completed the semver recommendation gap from #550."
+    },
+    {
+      "name": "Phase 49 \u2014 Open Issue Recovery Train",
+      "sprints": [
+        216,
+        217,
+        218,
+        219,
+        220,
+        221,
+        222
+      ],
       "status": "planned",
-      "note": "Close out the v1.59.0 release memory, repair roadmap interview discoverability across harness surfaces, and triage the semver recommendation gap discovered during release verification."
+      "note": "Triages the 2026-06-27 open GitHub issue set into focused recovery sprints: roadmap shipped-signal correctness (#573), stale workflow cleanup and guard misfires (#572), store/bootstrap portability (#553/#557/#558), independent review provenance (#561/#562), audit trail and retro parsing (#565/#566), codification candidate tracking plus sprint terminology (#552/#556), and a recovery release."
     }
   ],
   "sprints": [
@@ -4239,11 +4253,11 @@
       "par": 4,
       "slope": 3,
       "type": "feature",
-      "status": "planned",
+      "status": "superseded",
       "depends_on": [
         146.3
       ],
-      "note": "Make handoffs first-class and low-friction: briefing should surface the latest durable handoff, agent next-md should merge durable human state with auto-derived state, and hazards should have a one-line path into common issues.",
+      "note": "Superseded after S148-S153 shipped the human operating surface ahead of this stale lane. Reopen as a concrete issue if durable handoff work is still needed after the current recovery train.",
       "tickets": [
         {
           "key": "S147-1",
@@ -4611,11 +4625,11 @@
       "par": 3,
       "slope": 2,
       "type": "bugfix",
-      "status": "planned",
+      "status": "complete",
       "depends_on": [
         152.1
       ],
-      "note": "Close #550 by making `slope version recommend` account for durable SLOPE release evidence when squash-merge subjects hide feature-level work.",
+      "note": "Closed #550 by making `slope version recommend` account for durable SLOPE release evidence when squash-merge subjects hide feature-level work.",
       "tickets": [
         {
           "key": "S153-1",
@@ -4643,6 +4657,338 @@
           "depends_on": [
             "S153-1",
             "S153-2"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 216,
+      "theme": "Roadmap Shipped-Signal Correctness",
+      "par": 3,
+      "slope": 2,
+      "type": "bugfix + roadmap hygiene",
+      "status": "planned",
+      "depends_on": [
+        153
+      ],
+      "note": "Close #573 before more planning work: roadmap validation must distinguish real shipped sprint work from docs-only planning references.",
+      "tickets": [
+        {
+          "key": "S216-1",
+          "title": "Require ticket-key or implementation-shaped evidence before a sprint counts as shipped (#573)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 573
+        },
+        {
+          "key": "S216-2",
+          "title": "Ignore docs and planning-only sprint mentions without losing true shipped detections (#573)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 573,
+          "depends_on": [
+            "S216-1"
+          ]
+        },
+        {
+          "key": "S216-3",
+          "title": "Add roadmap validate regressions for docs-only references and real ticket-key commits (#573)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 573,
+          "depends_on": [
+            "S216-1",
+            "S216-2"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 217,
+      "theme": "Workflow Runtime Cleanup and Guard Scope Recovery",
+      "par": 4,
+      "slope": 3,
+      "type": "bugfix + guard hardening",
+      "status": "planned",
+      "depends_on": [
+        216
+      ],
+      "note": "Close #572 by clearing abandoned running workflow executions and preventing stale executions from blocking unrelated Bash/Edit work.",
+      "tickets": [
+        {
+          "key": "S217-1",
+          "title": "Teach cleanup --stale to pause abandoned running executions with complete scorecard and roadmap evidence (#572)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 572
+        },
+        {
+          "key": "S217-2",
+          "title": "Scope phase-boundary guard away from unrelated Bash commands and abandoned executions (#572)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 572,
+          "depends_on": [
+            "S217-1"
+          ]
+        },
+        {
+          "key": "S217-3",
+          "title": "Make workflow-step-gate recover or fail open with diagnostics for stale validation steps (#572)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 572,
+          "depends_on": [
+            "S217-1"
+          ]
+        },
+        {
+          "key": "S217-4",
+          "title": "Add store-backed regression coverage for cleanup and guard misfire paths (#572)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 572,
+          "depends_on": [
+            "S217-2",
+            "S217-3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 218,
+      "theme": "Store and Project Bootstrap Portability",
+      "par": 4,
+      "slope": 3,
+      "type": "platform + onboarding bugfix",
+      "status": "planned",
+      "depends_on": [
+        217
+      ],
+      "note": "Close the portability/bootstrap defects that break new or Windows-adjacent SLOPE projects: SQLite WAL on WSL2 mounts, no-git project modes, and invalid custom metaphor config.",
+      "tickets": [
+        {
+          "key": "S218-1",
+          "title": "Add SQLite journal-mode fallback and override for WSL2 DrvFs and network filesystems (#553)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 553
+        },
+        {
+          "key": "S218-2",
+          "title": "Prefix store I/O failures with resolved store path and journal-mode recovery guidance (#553)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 553,
+          "depends_on": [
+            "S218-1"
+          ]
+        },
+        {
+          "key": "S218-3",
+          "title": "Require git repository or explicit degraded no-git mode in init/interview/start paths (#558)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 558
+        },
+        {
+          "key": "S218-4",
+          "title": "Reject or materialize the custom metaphor sentinel before interview writes config (#557)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 557,
+          "depends_on": [
+            "S218-3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 219,
+      "theme": "Independent Review Provenance",
+      "par": 4,
+      "slope": 3,
+      "type": "workflow + review gates",
+      "status": "planned",
+      "depends_on": [
+        217
+      ],
+      "note": "Close #561/#562 by making review gate evidence explicit and making purpose-built reviewer agents the default Codex path for high-value gates.",
+      "tickets": [
+        {
+          "key": "S219-1",
+          "title": "Split self-authored review notes from independent review evidence in gate state (#561)",
+          "club": "long_iron",
+          "complexity": "moderate",
+          "github_issue": 561
+        },
+        {
+          "key": "S219-2",
+          "title": "Require reviewer provenance, PR review URL, or explicit weaker-mode override before review gates pass (#561)",
+          "club": "long_iron",
+          "complexity": "moderate",
+          "github_issue": 561,
+          "depends_on": [
+            "S219-1"
+          ]
+        },
+        {
+          "key": "S219-3",
+          "title": "Prompt Codex to create purpose-built reviewer agents from sprint hazards and artifacts (#562)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 562,
+          "depends_on": [
+            "S219-1"
+          ]
+        },
+        {
+          "key": "S219-4",
+          "title": "Add status/help/tests that make self-review visibly distinct from independent review (#561, #562)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 561,
+          "depends_on": [
+            "S219-2",
+            "S219-3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 220,
+      "theme": "Agent Audit Trail and Retro Parsing Repair",
+      "par": 4,
+      "slope": 2,
+      "type": "bugfix + agent-dx",
+      "status": "planned",
+      "depends_on": [
+        217
+      ],
+      "note": "Close #565/#566 by repairing two audit-trail weak spots: unknown ticket claimants and silently unparsed retro learning prefixes.",
+      "tickets": [
+        {
+          "key": "S220-1",
+          "title": "Resolve useful actor identity for sprint begin and ticket claims in Codex workflows (#566)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 566
+        },
+        {
+          "key": "S220-2",
+          "title": "Add actor override, identity-source output, and no-identity fallback tests (#566)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 566,
+          "depends_on": [
+            "S220-1"
+          ]
+        },
+        {
+          "key": "S220-3",
+          "title": "Parse or reject retro category and weight prefixes without persisting noisy text (#565)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 565
+        },
+        {
+          "key": "S220-4",
+          "title": "Align retro docs/help and regression tests with the accepted learning prefix syntax (#565)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 565,
+          "depends_on": [
+            "S220-3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 221,
+      "theme": "Codification Candidate Ledger and Sprint Model Clarity",
+      "par": 4,
+      "slope": 3,
+      "type": "feature + documentation",
+      "status": "planned",
+      "depends_on": [
+        219
+      ],
+      "note": "Close #552/#556 by making recurring workarounds first-class findings and clarifying that SLOPE sprints can be scope-based work units.",
+      "tickets": [
+        {
+          "key": "S221-1",
+          "title": "Extend findings with recurring workaround/codification candidate metadata (#552)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 552
+        },
+        {
+          "key": "S221-2",
+          "title": "Surface codification candidates in briefing and sprint-close learning prompts (#552)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 552,
+          "depends_on": [
+            "S221-1"
+          ]
+        },
+        {
+          "key": "S221-3",
+          "title": "Add resolve/ledger behavior for paid-down codification candidates (#552)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 552,
+          "depends_on": [
+            "S221-1",
+            "S221-2"
+          ]
+        },
+        {
+          "key": "S221-4",
+          "title": "Clarify scope-based versus time-boxed sprint language in interview, roadmap, and docs (#556)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 556
+        }
+      ]
+    },
+    {
+      "id": 222,
+      "theme": "Open Issue Recovery Release",
+      "par": 3,
+      "slope": 1,
+      "type": "release",
+      "status": "planned",
+      "depends_on": [
+        218,
+        219,
+        220,
+        221
+      ],
+      "note": "Publish the S216-S221 recovery train and refresh roadmap status for the next planning lane.",
+      "tickets": [
+        {
+          "key": "S222-1",
+          "title": "Run roadmap validation, targeted issue regressions, and full release-readiness checks",
+          "club": "wedge",
+          "complexity": "small"
+        },
+        {
+          "key": "S222-2",
+          "title": "Bump package and bundled plugin manifest according to version recommendation",
+          "club": "wedge",
+          "complexity": "small",
+          "depends_on": [
+            "S222-1"
+          ]
+        },
+        {
+          "key": "S222-3",
+          "title": "Publish the recovery release and update roadmap next-lane status",
+          "club": "short_iron",
+          "complexity": "standard",
+          "depends_on": [
+            "S222-2"
           ]
         }
       ]
