@@ -4,6 +4,7 @@ import { recommendReviews } from '../../core/review.js';
 import type { ReviewRecommendation } from '../../core/index.js';
 import { recordPrReviewPending } from '../pr-review-state.js';
 import { isActiveSprintState, loadSprintState } from '../sprint-state.js';
+import { buildReviewerAgentSpecs, formatReviewerAgentSummary } from '../reviewer-agents.js';
 
 /**
  * PR review guard: fires PostToolUse on Bash.
@@ -32,14 +33,20 @@ export async function prReviewGuard(input: HookInput, cwd: string): Promise<Guar
 
   recordPendingReview(cwd, parseInt(prNumber, 10));
 
-  const recs = computeRecommendations(cwd);
+  const recommendationContext = computeRecommendationContext(cwd);
+  const recs = recommendationContext.recommendations;
   const recLine = formatRecommendations(recs);
+  const reviewerLine = formatReviewerAgentSummary(buildReviewerAgentSpecs(recs, {
+    filePatterns: recommendationContext.filePatterns,
+    artifacts: recommendationContext.filePatterns,
+  }));
 
   return {
     metricReason: 'matched',
     context: [
       `SLOPE PR Review: A pull request was just created (${prUrl}).`,
       ...(recLine ? [`Recommended reviews based on diff: ${recLine}.`] : []),
+      ...(reviewerLine ? [reviewerLine] : []),
       `Run \`slope pr review --pr=${prNumber}\` to generate the transport-independent review workflow.`,
       `Then run \`slope pr status --pr=${prNumber}\` after checks and review threads settle before presenting the PR as ready.`,
       `After review, capture findings with \`slope review findings add\`, then \`slope review amend\` to apply them to the scorecard.`,
@@ -65,21 +72,33 @@ function recordPendingReview(cwd: string, pr: number): void {
 
 /** Inspect the current branch's diff and call recommendReviews(). Best-effort
  *  — returns [] if git is unavailable or the diff can't be read. */
-function computeRecommendations(cwd: string): ReviewRecommendation[] {
+interface ReviewRecommendationComputation {
+  recommendations: ReviewRecommendation[];
+  filePatterns: string[];
+}
+
+function computeRecommendationContext(cwd: string): ReviewRecommendationComputation {
   try {
     const base = inferBaseRef(cwd) ?? 'origin/main';
     const filesRaw = execSync(`git diff ${base}...HEAD --name-only`, { cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
     const filePatterns = filesRaw ? filesRaw.split('\n').filter(Boolean) : [];
     const ticketCount = inferTicketCount(cwd, base);
-    return recommendReviews({
-      ticketCount,
-      slope: 1,
+    return {
       filePatterns,
-      hasNewInfra: filePatterns.some(p => /(\.sql|migration|schema|infra|terraform|k8s|deploy)/i.test(p)),
-    });
+      recommendations: recommendReviews({
+        ticketCount,
+        slope: 1,
+        filePatterns,
+        hasNewInfra: filePatterns.some(p => /(\.sql|migration|schema|infra|terraform|k8s|deploy)/i.test(p)),
+      }),
+    };
   } catch {
-    return [];
+    return { recommendations: [], filePatterns: [] };
   }
+}
+
+function computeRecommendations(cwd: string): ReviewRecommendation[] {
+  return computeRecommendationContext(cwd).recommendations;
 }
 
 function refExists(cwd: string, ref: string): boolean {
@@ -131,4 +150,4 @@ function formatRecommendations(recs: ReviewRecommendation[]): string {
 }
 
 // Exported for tests
-export const _internals = { computeRecommendations, formatRecommendations, inferTicketCount };
+export const _internals = { computeRecommendations, computeRecommendationContext, formatRecommendations, inferTicketCount };

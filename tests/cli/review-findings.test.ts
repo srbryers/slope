@@ -129,6 +129,9 @@ describe('review recommend', () => {
     expect(logged).toContain('required');
     expect(logged).toContain('code');
     expect(logged).toContain('optional');
+    expect(logged).toContain('Purpose-built reviewer agents');
+    expect(logged).toContain('Gate evidence must include: agent id/name, lane, verdict');
+    expect(logged).toContain('slope sprint gate architect_review --reviewer=');
   });
 
   it('counts tickets from slope sprint plan table output', async () => {

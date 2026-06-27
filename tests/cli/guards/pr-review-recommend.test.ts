@@ -89,6 +89,9 @@ describe('prReviewGuard recommendations (GH #302)', () => {
     );
     expect(result.context).toContain('slope pr review --pr=42');
     expect(result.context).toContain('slope pr status --pr=42');
+    expect(result.context).toContain('Create purpose-built reviewer agents');
+    expect(result.context).toContain('security/risk-boundary reviewer');
+    expect(result.context).toContain('agent id/name, lane, verdict');
   });
 });
 

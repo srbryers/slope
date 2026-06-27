@@ -11,6 +11,7 @@ import type { RoadmapSprint, SlopeConfig } from '../../core/index.js';
 import { findPlanContent, countTickets, countPackageRefs } from '../guards/plan-analysis.js';
 import { inferSprintContext, loadRoadmapForInference } from '../sprint-inference.js';
 import { isActiveSprintState, loadSprintState } from '../sprint-state.js';
+import { buildReviewerAgentSpecs, formatReviewerAgentGuidance } from '../reviewer-agents.js';
 
 export interface ReviewState {
   rounds_required: number;
@@ -195,6 +196,9 @@ interface ReviewRecommendationContext {
   filePatterns: string[];
   sprintNumber: number;
   hasNewInfra: boolean;
+  theme?: string;
+  artifacts?: string[];
+  hazards?: string[];
 }
 
 function parseSprintArg(args: string[]): number | null {
@@ -221,10 +225,18 @@ function collectStringValues(value: unknown, out: string[] = []): string[] {
   return out;
 }
 
+function extractHazardLines(values: string[]): string[] {
+  return values
+    .map(value => value.replace(/\s+/g, ' ').trim())
+    .filter(value => /\b(hazard|risk|gotcha|warning|failure|safety|security|boundary|review gate)\b/i.test(value))
+    .slice(0, 8);
+}
+
 function recommendationFromPlan(content: string): ReviewRecommendationContext {
   const filePatterns: string[] = [];
   const slopeMatch = content.match(/\*\*Slope:\*\*\s*(\d+)/);
   const sprintMatch = content.match(/Sprint\s+(\d+(?:\.\d+)?)/);
+  const titleMatch = content.match(/^#\s+(.+)$/m);
   const fileMatches = content.matchAll(/`([^`]+\.[a-z]+)`/g);
   for (const m of fileMatches) filePatterns.push(m[1]);
 
@@ -233,6 +245,9 @@ function recommendationFromPlan(content: string): ReviewRecommendationContext {
     slope: slopeMatch ? parseInt(slopeMatch[1], 10) : 0,
     sprintNumber: sprintMatch ? parseSprintNumber(sprintMatch[1]) ?? 0 : 0,
     filePatterns,
+    theme: titleMatch?.[1],
+    artifacts: filePatterns,
+    hazards: extractHazardLines(content.split('\n')),
     hasNewInfra: /\b(new module|new package|new service|new infrastructure)\b/i.test(content),
   };
 }
@@ -245,17 +260,24 @@ function recommendationFromRoadmapSprint(sprint: RoadmapSprint): ReviewRecommend
     slope: sprint.slope ?? 0,
     sprintNumber: sprint.id,
     filePatterns,
+    theme: sprint.theme,
+    artifacts: filePatterns.length > 0 ? filePatterns : sprint.tickets?.map(ticket => `${ticket.key}: ${ticket.title}`),
+    hazards: extractHazardLines(stringValues),
     hasNewInfra: /\b(new module|new package|new service|new infrastructure)\b/i.test(stringValues.join('\n')),
   };
 }
 
 function recommendationFromScorecard(card: GolfScorecard): ReviewRecommendationContext {
   const stringValues = collectStringValues(card);
+  const filePatterns = stringValues.filter(value => /[/.]/.test(value));
   return {
     ticketCount: card.shots?.length ?? 0,
     slope: card.slope ?? 0,
     sprintNumber: card.sprint_number,
-    filePatterns: stringValues.filter(value => /[/.]/.test(value)),
+    filePatterns,
+    theme: card.theme,
+    artifacts: filePatterns,
+    hazards: extractHazardLines(stringValues),
     hasNewInfra: /\b(new module|new package|new service|new infrastructure)\b/i.test(stringValues.join('\n')),
   };
 }
@@ -285,6 +307,8 @@ function inferRecommendationContext(args: string[], cwd: string): ReviewRecommen
       slope: 0,
       filePatterns: [],
       sprintNumber: explicitSprint,
+      artifacts: [],
+      hazards: [],
       hasNewInfra: false,
     };
   }
@@ -307,6 +331,8 @@ function inferRecommendationContext(args: string[], cwd: string): ReviewRecommen
       slope: 0,
       filePatterns: [],
       sprintNumber: inferred.sprint,
+      artifacts: [],
+      hazards: [],
       hasNewInfra: false,
     };
   }
@@ -319,6 +345,8 @@ function inferRecommendationContext(args: string[], cwd: string): ReviewRecommen
     slope: 0,
     filePatterns: [],
     sprintNumber: 0,
+    artifacts: [],
+    hazards: [],
     hasNewInfra: false,
   };
 }
@@ -335,6 +363,16 @@ function recommendCommand(args: string[], cwd: string): void {
     const priority = rec.priority.padEnd(13);
     console.log(`  ${type} ${priority} ${rec.reason}`);
   }
+
+  const reviewerAgents = buildReviewerAgentSpecs(recs, {
+    sprintNumber: context.sprintNumber > 0 ? context.sprintNumber : undefined,
+    theme: context.theme,
+    filePatterns: context.filePatterns,
+    artifacts: context.artifacts,
+    hazards: context.hazards,
+  });
+  const guidance = formatReviewerAgentGuidance(reviewerAgents);
+  if (guidance) console.log(`\n${guidance}`);
 }
 
 // --- Findings Subcommands ---
