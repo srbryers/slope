@@ -752,7 +752,7 @@ export async function roadmapCommand(args: string[]): Promise<void> {
 slope roadmap — Strategic planning tools
 
 Usage:
-  slope roadmap interview [--agent] [--force]       Run project interview for planning input
+  slope roadmap interview [--agent] [--force] [--allow-no-git]  Run project interview for planning input
   slope roadmap validate [--path=<file>]     Schema + dependency graph checks
   slope roadmap review [--path=<file>]       Automated architect review
   slope roadmap status [--path=<file>] [--sprint=N] [--full]  Compact current progress
@@ -769,6 +769,8 @@ Options:
 Interview delegates to \`slope interview\`. Use \`--agent\` for JSON I/O, or
 \`slope vision create/update\` plus \`slope roadmap generate\` when you already
 have planning answers.
+Use \`--allow-no-git\` only for degraded projects where commit-backed completion
+evidence is unavailable.
 
 Generate requires concrete backlog signals from source TODO/FIXME/HACK comments
 or synced issue data. It fails instead of creating placeholder planning tickets

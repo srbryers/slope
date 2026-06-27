@@ -110,6 +110,8 @@ describe('generateFirstSprint', () => {
     expect(result.roadmap.phases[0].sprints).toContain(1);
     expect(result.roadmap.sprints).toHaveLength(1);
     expect(result.roadmap.sprints[0].id).toBe(1);
+    expect(result.roadmap.description).toContain('scope-based work units');
+    expect(result.roadmap.description).toContain('calendar time boxes');
   });
 
   it('ticket keys follow S1-N format', () => {

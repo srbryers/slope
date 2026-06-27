@@ -24,6 +24,7 @@ describe('slope interview CLI', () => {
 
   beforeEach(() => {
     cwd = createTempDir();
+    execSync('git init -q', { cwd });
     mkdirSync(join(cwd, '.slope'), { recursive: true });
     mkdirSync(join(cwd, 'docs', 'retros'), { recursive: true });
   });
@@ -121,6 +122,24 @@ describe('slope interview CLI', () => {
     expect(second.errors[0].message).toContain('required');
   });
 
+  it('agent mode rejects custom metaphor sentinel without writing config', () => {
+    const result = execSync(
+      `node "${join(process.cwd(), 'dist/cli/index.js')}" interview --agent`,
+      {
+        cwd,
+        encoding: 'utf8',
+        input: JSON.stringify({ id: 'project-name', value: 'CustomProject' }) + '\n' +
+               JSON.stringify({ id: 'metaphor', value: 'custom' }) + '\n',
+      },
+    );
+
+    const last = JSON.parse(result.trim().split('\n').pop()!);
+    expect(last.type).toBe('error');
+    expect(last.errors[0].field).toBe('metaphor');
+    expect(last.errors[0].message).toContain('creation placeholder');
+    expect(existsSync(join(cwd, '.slope', 'config.json'))).toBe(false);
+  });
+
   it('blocks re-interview without --force when config exists', () => {
     writeFileSync(join(cwd, '.slope', 'config.json'), JSON.stringify({ version: '1' }));
 
@@ -134,5 +153,38 @@ describe('slope interview CLI', () => {
         }
       );
     }).toThrow();
+  });
+
+  it('requires git unless degraded no-git mode is explicit', () => {
+    const noGitCwd = createTempDir();
+    try {
+      expect(() => {
+        execSync(
+          `node "${join(process.cwd(), 'dist/cli/index.js')}" interview --agent`,
+          { cwd: noGitCwd, encoding: 'utf8', input: '\n', stdio: ['pipe', 'pipe', 'pipe'] },
+        );
+      }).toThrow(/must run inside a git work tree/);
+
+      const result = execSync(
+        `node "${join(process.cwd(), 'dist/cli/index.js')}" interview --agent --allow-no-git`,
+        {
+          cwd: noGitCwd,
+          encoding: 'utf8',
+          input: JSON.stringify({ id: 'project-name', value: 'NoGitProject' }) + '\n' +
+                 JSON.stringify({ id: 'metaphor', value: 'golf' }) + '\n' +
+                 JSON.stringify({ id: 'repo-url', value: '' }) + '\n' +
+                 JSON.stringify({ id: 'sprint-number', value: '1' }) + '\n' +
+                 JSON.stringify({ id: 'platforms', value: [] }) + '\n' +
+                 JSON.stringify({ id: 'team-members', value: '' }) + '\n' +
+                 JSON.stringify({ id: 'vision', value: '' }) + '\n' +
+                 JSON.stringify({ id: 'deep-analysis', value: false }) + '\n',
+          stdio: ['pipe', 'pipe', 'pipe'],
+        },
+      );
+      expect(JSON.parse(result.trim().split('\n')[0]).type).toBe('question');
+      expect(JSON.parse(result.trim().split('\n').pop()!).type).toBe('complete');
+    } finally {
+      rmSync(noGitCwd, { recursive: true, force: true });
+    }
   });
 });

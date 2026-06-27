@@ -14,6 +14,8 @@ Golf provides the ideal metaphor for sprint scoring because:
 
 ## Core Concepts
 
+In SLOPE, a **sprint** is the scored unit of work. Teams may treat it as a time-boxed planning interval, but agent-heavy workflows often use scope-based work units or milestone slices with explicit tickets, acceptance criteria, validation commands, and artifacts.
+
 ### Par System
 
 Par is the expected baseline for a sprint, determined by ticket count:

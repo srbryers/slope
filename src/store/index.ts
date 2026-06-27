@@ -1,9 +1,8 @@
 // SLOPE — SQLite Storage Adapter
 // Implements SlopeStore + EmbeddingStore backed by better-sqlite3 with WAL mode.
 
-import { join } from 'node:path';
 import { mkdirSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { createRequire } from 'node:module';
 import type DatabaseConstructor from 'better-sqlite3';
 import type { Database as DatabaseType } from 'better-sqlite3';
@@ -24,6 +23,61 @@ function nowISO(): string {
 function loadDatabaseConstructor(): typeof DatabaseConstructor {
   const esmRequire = createRequire(import.meta.url);
   return esmRequire('better-sqlite3') as typeof DatabaseConstructor;
+}
+
+type JournalMode = 'WAL' | 'TRUNCATE' | 'DELETE' | 'PERSIST' | 'MEMORY' | 'OFF';
+
+interface JournalModeDatabase {
+  pragma(sql: string, options?: { simple?: boolean }): unknown;
+  prepare(sql: string): { run(): unknown };
+}
+
+const JOURNAL_MODE_ENV = 'SLOPE_JOURNAL_MODE';
+const VALID_JOURNAL_MODES = new Set<JournalMode>(['WAL', 'TRUNCATE', 'DELETE', 'PERSIST', 'MEMORY', 'OFF']);
+
+export function configureSqliteJournalMode(
+  db: JournalModeDatabase,
+  env: Record<string, string | undefined> = process.env as Record<string, string | undefined>,
+): JournalMode {
+  const override = normalizeJournalMode(env[JOURNAL_MODE_ENV]);
+  if (env[JOURNAL_MODE_ENV] && !override) {
+    throw new Error(`${JOURNAL_MODE_ENV} must be one of: ${[...VALID_JOURNAL_MODES].join(', ')}`);
+  }
+  if (override) return setAndVerifyJournalMode(db, override);
+
+  try {
+    return setAndVerifyJournalMode(db, 'WAL');
+  } catch {
+    return setAndVerifyJournalMode(db, 'TRUNCATE');
+  }
+}
+
+function normalizeJournalMode(value: string | undefined): JournalMode | null {
+  const normalized = value?.trim().toUpperCase();
+  if (!normalized) return null;
+  return VALID_JOURNAL_MODES.has(normalized as JournalMode) ? normalized as JournalMode : null;
+}
+
+function setAndVerifyJournalMode(db: JournalModeDatabase, mode: JournalMode): JournalMode {
+  const applied = db.pragma(`journal_mode = ${mode}`, { simple: true });
+  verifyJournalModeWritable(db);
+  const appliedMode = normalizeJournalMode(String(applied));
+  return appliedMode ?? mode;
+}
+
+function verifyJournalModeWritable(db: JournalModeDatabase): void {
+  db.prepare('CREATE TABLE IF NOT EXISTS __slope_journal_mode_check (id INTEGER PRIMARY KEY)').run();
+  db.prepare('DROP TABLE IF EXISTS __slope_journal_mode_check').run();
+}
+
+export function createSqliteStoreUnavailableError(dbPath: string, err: unknown): SlopeStoreError {
+  const resolvedPath = resolve(dbPath);
+  const detail = err instanceof Error ? err.message : String(err);
+  return new SlopeStoreError('STORE_UNAVAILABLE', [
+    `SQLite store unavailable at ${resolvedPath}: ${detail}`,
+    `If this store is on WSL2 /mnt/c, DrvFs, 9p, or a network filesystem, WAL may be unsupported.`,
+    `Retry with ${JOURNAL_MODE_ENV}=TRUNCATE or move config store_path to a local filesystem.`,
+  ].join('\n'));
 }
 
 /** Sequential schema migrations — each runs exactly once */
@@ -225,11 +279,22 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
   constructor(dbPath: string) {
     mkdirSync(dirname(dbPath), { recursive: true });
     const Database = loadDatabaseConstructor();
-    this.db = new Database(dbPath);
-    this.db.pragma('journal_mode = WAL');
-    this.db.pragma('foreign_keys = ON');
-    this.ensureVecLoaded();
-    this.migrate();
+    let db: DatabaseType | null = null;
+    try {
+      db = new Database(dbPath);
+      configureSqliteJournalMode(db);
+      db.pragma('foreign_keys = ON');
+      this.db = db;
+      this.ensureVecLoaded();
+      this.migrate();
+    } catch (err) {
+      try {
+        db?.close();
+      } catch {
+        // Ignore close failures while surfacing the original store-open error.
+      }
+      throw createSqliteStoreUnavailableError(dbPath, err);
+    }
   }
 
   /** Lazy-load sqlite-vec extension. Non-fatal if unavailable — embedding methods will throw. */

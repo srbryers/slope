@@ -1,11 +1,19 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { execSync } from 'node:child_process';
+import { execFileSync, execSync, spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 
 const REPO_ROOT = resolve(__dirname, '..', '..', '..');
 const SLOPE_BIN = resolve(REPO_ROOT, 'dist', 'cli', 'index.js');
+
+function runSlope(cwd: string, args: string[]): string {
+  return execFileSync(process.execPath, [SLOPE_BIN, ...args], {
+    cwd,
+    encoding: 'utf8',
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
+}
 
 function setupRepoWithClaim(): string {
   const dir = mkdtempSync(join(tmpdir(), 'slope-done-'));
@@ -40,9 +48,7 @@ function setupRepoWithClaim(): string {
   execSync('git commit -q --allow-empty -m init', { cwd: dir });
 
   // Create sprint state + claim via `sprint begin`
-  execSync(`node ${SLOPE_BIN} sprint begin --sprint=1 --ticket=S1-1`, {
-    cwd: dir, stdio: ['pipe', 'pipe', 'pipe'],
-  });
+  runSlope(dir, ['sprint', 'begin', '--sprint=1', '--ticket=S1-1']);
   return dir;
 }
 
@@ -76,9 +82,13 @@ function setupInsertedRepoWithClaim(): string {
   execSync('git config user.email t@t', { cwd: dir });
   execSync('git config user.name t', { cwd: dir });
   execSync('git commit -q --allow-empty -m init', { cwd: dir });
-  execSync(`node ${SLOPE_BIN} claim --sprint=435 --target=S43.5-1`, {
-    cwd: dir, stdio: ['pipe', 'pipe', 'pipe'],
-  });
+  runSlope(dir, ['claim', '--sprint=435', '--target=S43.5-1']);
+  return dir;
+}
+
+function setupNoGitRepoWithClaim(): string {
+  const dir = setupRepoWithClaim();
+  rmSync(join(dir, '.git'), { recursive: true, force: true });
   return dir;
 }
 
@@ -92,11 +102,10 @@ describe('slope ticket done (GH #316)', () => {
   it('releases the active claim and prints commit SHA from HEAD', () => {
     const cwd = setupRepoWithClaim();
     try {
-      const out = execSync(`node ${SLOPE_BIN} ticket done S1-1`, {
-        cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'],
-      });
+      const out = runSlope(cwd, ['ticket', 'done', 'S1-1']);
       expect(out).toContain('Ticket S1-1: done.');
       expect(out).toContain('Sprint:  S1');
+      expect(out).toContain('Actor source:');
       expect(out).toMatch(/Commit:\s+[0-9a-f]{40}/);
       expect(out).toContain('Claim:   released');
     } finally {
@@ -107,10 +116,23 @@ describe('slope ticket done (GH #316)', () => {
   it('honors --commit flag instead of HEAD', () => {
     const cwd = setupRepoWithClaim();
     try {
-      const out = execSync(`node ${SLOPE_BIN} ticket done S1-1 --commit=deadbeef`, {
-        cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'],
-      });
+      const out = runSlope(cwd, ['ticket', 'done', 'S1-1', '--commit=deadbeef']);
       expect(out).toContain('Commit:  deadbeef');
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('honors --actor override for claim lookup', () => {
+    const cwd = setupRepoWithClaim();
+    try {
+      runSlope(cwd, ['claim', '--sprint=1', '--target=S1-2', '--actor=codex']);
+      const out = runSlope(cwd, ['ticket', 'done', 'S1-2', '--actor=codex']);
+
+      expect(out).toContain('Ticket S1-2: done.');
+      expect(out).toContain('Player:  codex');
+      expect(out).toContain('Actor source: override');
+      expect(out).toContain('Claim:   released');
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }
@@ -119,9 +141,7 @@ describe('slope ticket done (GH #316)', () => {
   it('records --notes flag in output', () => {
     const cwd = setupRepoWithClaim();
     try {
-      const out = execSync(`node ${SLOPE_BIN} ticket done S1-1 --notes="all green"`, {
-        cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'],
-      });
+      const out = runSlope(cwd, ['ticket', 'done', 'S1-1', '--notes=all green']);
       expect(out).toContain('Notes:   all green');
     } finally {
       rmSync(cwd, { recursive: true, force: true });
@@ -131,12 +151,29 @@ describe('slope ticket done (GH #316)', () => {
   it('resolves inserted roadmap ticket labels to the encoded sprint id', () => {
     const cwd = setupInsertedRepoWithClaim();
     try {
-      const out = execSync(`node ${SLOPE_BIN} ticket done S43.5-1`, {
-        cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'],
-      });
+      const out = runSlope(cwd, ['ticket', 'done', 'S43.5-1']);
       expect(out).toContain('Ticket S43.5-1: done.');
       expect(out).toContain('Sprint:  S43.5');
       expect(out).toContain('Claim:   released');
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('warns without raw git fatal output when completing a ticket outside git', () => {
+    const cwd = setupNoGitRepoWithClaim();
+    try {
+      const result = spawnSync(process.execPath, [SLOPE_BIN, 'ticket', 'done', 'S1-1'], {
+        cwd,
+        encoding: 'utf8',
+      });
+
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('Ticket S1-1: done.');
+      expect(result.stdout).not.toContain('Commit:');
+      expect(result.stderr).toContain('Warning: no git repository detected');
+      expect(result.stdout).not.toContain('fatal: not a git repository');
+      expect(result.stderr).not.toContain('fatal: not a git repository');
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }
@@ -146,12 +183,12 @@ describe('slope ticket done (GH #316)', () => {
     const cwd = setupRepoWithClaim();
     try {
       // Release once first
-      execSync(`node ${SLOPE_BIN} ticket done S1-1`, { cwd, stdio: ['pipe', 'pipe', 'pipe'] });
+      runSlope(cwd, ['ticket', 'done', 'S1-1']);
       // Try to mark done again — no claim
       let exitCode = 0;
       let stderr = '';
       try {
-        execSync(`node ${SLOPE_BIN} ticket done S1-1`, { cwd, stdio: ['pipe', 'pipe', 'pipe'] });
+        runSlope(cwd, ['ticket', 'done', 'S1-1']);
       } catch (err: unknown) {
         const e = err as { status?: number; stderr?: Buffer | string };
         exitCode = e.status ?? 0;
@@ -170,7 +207,7 @@ describe('slope ticket done (GH #316)', () => {
       let exitCode = 0;
       let stderr = '';
       try {
-        execSync(`node ${SLOPE_BIN} ticket done`, { cwd, stdio: ['pipe', 'pipe', 'pipe'] });
+        runSlope(cwd, ['ticket', 'done']);
       } catch (err: unknown) {
         const e = err as { status?: number; stderr?: Buffer | string };
         exitCode = e.status ?? 0;

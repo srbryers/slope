@@ -76,10 +76,14 @@ function writeScorecard(sprint: number): void {
 }
 
 function writeRoadmap(sprint: number, status = 'planned'): void {
+  writeRoadmapSprints([{ sprint, status }]);
+}
+
+function writeRoadmapSprints(entries: Array<{ sprint: number; status: string }>): void {
   const roadmap: RoadmapDefinition = {
     name: 'Sprint Workflow Test Roadmap',
-    phases: [{ name: 'Phase 1', sprints: [sprint] }],
-    sprints: [{
+    phases: [{ name: 'Phase 1', sprints: entries.map(entry => entry.sprint) }],
+    sprints: entries.map(({ sprint, status }) => ({
       id: sprint,
       theme: `Sprint ${sprint}`,
       par: 4,
@@ -91,7 +95,7 @@ function writeRoadmap(sprint: number, status = 'planned'): void {
         { key: `S${sprint}-2`, title: 'Ticket 2', club: 'wedge', complexity: 'small' },
         { key: `S${sprint}-3`, title: 'Ticket 3', club: 'putter', complexity: 'trivial' },
       ],
-    }],
+    })),
   };
   mkdirSync(join(tmpDir, 'docs', 'backlog'), { recursive: true });
   writeFileSync(join(tmpDir, 'docs', 'backlog', 'roadmap.json'), JSON.stringify(roadmap, null, 2));
@@ -318,6 +322,76 @@ describe('slope sprint workflow cleanup', () => {
       expect(await store.getExecutionBySprint('S66')).toMatchObject({ status: 'running' });
     } finally {
       store.close();
+    }
+  });
+
+  it('pauses abandoned running executions when sprint id only exists in workflow variables (#572)', async () => {
+    writeScorecard(23);
+    writeRoadmap(23, 'complete');
+
+    const store = createStore({ storePath: '.slope/slope.db', cwd: tmpDir });
+    let execId: string;
+    try {
+      const exec = await store.startExecution({
+        workflow_name: 'sprint-standard',
+        variables: { sprint_id: 'S23', tickets: 'T1,T2' },
+      });
+      execId = exec.id;
+      await store.updateExecutionState(execId, 'post_hole', 'validate_scorecard');
+    } finally {
+      store.close();
+    }
+
+    const output = await captureLog(() =>
+      sprintCommand(['workflow', 'cleanup', '--stale'])
+    );
+
+    expect(output).toContain('Paused S23');
+    expect(output).toContain('scorecard exists');
+    expect(output).toContain('roadmap complete/superseded');
+
+    const updatedStore = createStore({ storePath: '.slope/slope.db', cwd: tmpDir });
+    try {
+      await expect(updatedStore.getExecution(execId!)).resolves.toMatchObject({ status: 'paused' });
+    } finally {
+      updatedStore.close();
+    }
+  });
+
+  it('pauses every scorecarded roadmap-complete abandoned execution in one cleanup pass (#572)', async () => {
+    const abandoned = [23, 64, 90];
+    const store = createStore({ storePath: '.slope/slope.db', cwd: tmpDir });
+    try {
+      for (const sprint of abandoned) {
+        writeScorecard(sprint);
+        const exec = await store.startExecution({
+          workflow_name: 'sprint-standard',
+          sprint_id: `S${sprint}`,
+          variables: { sprint_id: `S${sprint}`, tickets: 'T1,T2' },
+        });
+        await store.updateExecutionState(exec.id, 'post_hole', 'validate_scorecard');
+      }
+    } finally {
+      store.close();
+    }
+    writeRoadmapSprints(abandoned.map(sprint => ({ sprint, status: 'complete' })));
+
+    const output = await captureLog(() =>
+      sprintCommand(['workflow', 'cleanup', '--stale'])
+    );
+
+    expect(output).toContain('Paused S23');
+    expect(output).toContain('Paused S64');
+    expect(output).toContain('Paused S90');
+    expect(output).toContain('3 stale workflow execution(s) paused');
+
+    const updatedStore = createStore({ storePath: '.slope/slope.db', cwd: tmpDir });
+    try {
+      for (const sprint of abandoned) {
+        await expect(updatedStore.getExecutionBySprint(`S${sprint}`)).resolves.toMatchObject({ status: 'paused' });
+      }
+    } finally {
+      updatedStore.close();
     }
   });
 
@@ -578,9 +652,21 @@ describe('slope sprint status', () => {
       sprintCommand(['start', '--number=16', '--phase=planning'])
     );
 
-    for (const gate of ['tests', 'code_review', 'architect_review', 'scorecard', 'review_md']) {
-      await captureLog(() => sprintCommand(['gate', gate]));
-    }
+    await captureLog(() => sprintCommand(['gate', 'tests']));
+    await captureLog(() => sprintCommand([
+      'gate',
+      'code_review',
+      '--self-review',
+      '--reason=status derivation regression test',
+    ]));
+    await captureLog(() => sprintCommand([
+      'gate',
+      'architect_review',
+      '--self-review',
+      '--reason=status derivation regression test',
+    ]));
+    await captureLog(() => sprintCommand(['gate', 'scorecard']));
+    await captureLog(() => sprintCommand(['gate', 'review_md']));
 
     const output = await captureLog(() => sprintCommand(['status']));
 

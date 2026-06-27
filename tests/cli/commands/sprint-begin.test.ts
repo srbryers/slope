@@ -1,11 +1,19 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { execSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 
 const REPO_ROOT = resolve(__dirname, '..', '..', '..');
 const SLOPE_BIN = resolve(REPO_ROOT, 'dist', 'cli', 'index.js');
+
+function runSlope(cwd: string, args: string[]): string {
+  return execFileSync(process.execPath, [SLOPE_BIN, ...args], {
+    cwd,
+    encoding: 'utf8',
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
+}
 
 function setupRepo(): string {
   const dir = mkdtempSync(join(tmpdir(), 'slope-begin-'));
@@ -36,6 +44,18 @@ function setupRepo(): string {
   return dir;
 }
 
+function envWithoutActor(): NodeJS.ProcessEnv {
+  const env = { ...process.env };
+  for (const key of Object.keys(env)) {
+    if (['SLOPE_ACTOR', 'SLOPE_PLAYER', 'USER', 'USERNAME'].includes(key.toUpperCase())) {
+      delete env[key];
+    }
+  }
+  env.USER = 'unknown';
+  env.USERNAME = 'unknown';
+  return env;
+}
+
 describe('slope sprint begin (GH #311)', () => {
   beforeAll(() => {
     if (!existsSync(SLOPE_BIN)) {
@@ -46,9 +66,7 @@ describe('slope sprint begin (GH #311)', () => {
   it('starts sprint state, claims ticket, prints briefing/prep/next on first run', () => {
     const cwd = setupRepo();
     try {
-      const out = execSync(`node ${SLOPE_BIN} sprint begin --sprint=1 --ticket=S1-1`, {
-        cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'],
-      });
+      const out = runSlope(cwd, ['sprint', 'begin', '--sprint=1', '--ticket=S1-1']);
       expect(out).toContain('Sprint 1: started (phase: planning)');
       expect(out).toContain('Ticket S1-1: claimed');
       expect(out).toContain('PREP: S1-1');
@@ -65,10 +83,8 @@ describe('slope sprint begin (GH #311)', () => {
   it('is idempotent — running twice does not re-create state or re-claim', () => {
     const cwd = setupRepo();
     try {
-      execSync(`node ${SLOPE_BIN} sprint begin --sprint=1 --ticket=S1-1`, { cwd, stdio: ['pipe', 'pipe', 'pipe'] });
-      const out2 = execSync(`node ${SLOPE_BIN} sprint begin --sprint=1 --ticket=S1-1`, {
-        cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'],
-      });
+      runSlope(cwd, ['sprint', 'begin', '--sprint=1', '--ticket=S1-1']);
+      const out2 = runSlope(cwd, ['sprint', 'begin', '--sprint=1', '--ticket=S1-1']);
       expect(out2).toContain('already started');
       expect(out2).toContain('already claimed');
     } finally {
@@ -79,14 +95,12 @@ describe('slope sprint begin (GH #311)', () => {
   it('refuses to begin a different sprint when state exists for another', () => {
     const cwd = setupRepo();
     try {
-      execSync(`node ${SLOPE_BIN} sprint begin --sprint=1 --ticket=S1-1`, { cwd, stdio: ['pipe', 'pipe', 'pipe'] });
+      runSlope(cwd, ['sprint', 'begin', '--sprint=1', '--ticket=S1-1']);
 
       let stderr = '';
       let exitCode = 0;
       try {
-        execSync(`node ${SLOPE_BIN} sprint begin --sprint=2 --ticket=S2-1`, {
-          cwd, stdio: ['pipe', 'pipe', 'pipe'],
-        });
+        runSlope(cwd, ['sprint', 'begin', '--sprint=2', '--ticket=S2-1']);
       } catch (err: unknown) {
         const e = err as { status?: number; stderr?: Buffer | string };
         exitCode = e.status ?? 0;
@@ -107,7 +121,7 @@ describe('slope sprint begin (GH #311)', () => {
       let exitCode = 0;
       let stderr = '';
       try {
-        execSync(`node ${SLOPE_BIN} sprint begin`, { cwd, stdio: ['pipe', 'pipe', 'pipe'] });
+        runSlope(cwd, ['sprint', 'begin']);
       } catch (err: unknown) {
         const e = err as { status?: number; stderr?: Buffer | string };
         exitCode = e.status ?? 0;
@@ -115,6 +129,39 @@ describe('slope sprint begin (GH #311)', () => {
       }
       expect(exitCode).not.toBe(0);
       expect(stderr).toMatch(/sprint=N|ticket=KEY/);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('honors --actor override and prints the identity source', () => {
+    const cwd = setupRepo();
+    try {
+      const out = runSlope(cwd, ['sprint', 'begin', '--sprint=1', '--ticket=S1-1', '--actor=codex-reviewer']);
+
+      expect(out).toContain('player codex-reviewer, actor source: override');
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('prints fallback actor source when no identity source exists', () => {
+    const cwd = setupRepo();
+    try {
+      const result = spawnSync(process.execPath, [
+        SLOPE_BIN,
+        'sprint',
+        'begin',
+        '--sprint=1',
+        '--ticket=S1-1',
+      ], {
+        cwd,
+        encoding: 'utf8',
+        env: envWithoutActor(),
+      });
+
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('player unknown, actor source: fallback (unknown)');
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }

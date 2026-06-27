@@ -42,6 +42,7 @@ describe('slope claim help is read-only (GH #410)', () => {
     const output = consoleLogSpy.mock.calls.map(call => String(call[0])).join('\n');
     expect(output).toContain('slope claim --target=<target>');
     expect(output).toContain('--scope=<scope>');
+    expect(output).toContain('--actor=<name>');
     expect(output).toContain('--force');
     expect(output).toContain('--help, -h');
     expect(resolveStoreMock).not.toHaveBeenCalled();

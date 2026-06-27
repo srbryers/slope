@@ -91,6 +91,16 @@ describe('sessionBriefingGuard', () => {
     state.gates.architect_review = true;
     state.gates.scorecard = true;
     state.gates.review_md = true;
+    state.review_gates.code_review = {
+      provenance: 'independent_review',
+      evidence: ['agent:code-reviewer-output'],
+      reviewer: 'code-reviewer',
+    };
+    state.review_gates.architect_review = {
+      provenance: 'independent_review',
+      evidence: ['agent:architect-reviewer-output'],
+      reviewer: 'architect-reviewer',
+    };
     saveSprintState(tmpDir, state);
 
     const result = await sessionBriefingGuard(makeInput(), tmpDir);
@@ -99,5 +109,25 @@ describe('sessionBriefingGuard', () => {
     expect(context).toContain('No active sprint');
     expect(context).toContain('S30: Current work');
     expect(context).not.toContain('S1: Historical');
+  });
+
+  it('surfaces weaker self-review provenance in active sprint briefing gates', async () => {
+    const state = createSprintState(74, 'implementing');
+    state.gates.tests = true;
+    state.gates.code_review = true;
+    state.review_gates.code_review = {
+      provenance: 'self_review',
+      evidence: [],
+      notes: 'Local-only docs change.',
+      updated_at: '2026-06-27T00:00:00Z',
+    };
+    state.gates.architect_review = true;
+    saveSprintState(tmpDir, state);
+
+    const result = await sessionBriefingGuard(makeInput(), tmpDir);
+
+    const context = result.suggestion?.context ?? '';
+    expect(context).toContain('[x] code_review:self_review(weaker)');
+    expect(context).toContain('[!] architect_review:review_evidence_missing');
   });
 });

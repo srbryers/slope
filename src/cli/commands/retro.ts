@@ -103,6 +103,8 @@ Usage:
     [--summary=TEXT] [--learning=TEXT]...       persist learnings to memory,
     [--hazard=TEXT]... [--follow-up=TEXT]...    and save the retro record.
     [--outcome=success|mixed|follow_up] [--json] [--dry-run]
+    Learning prefixes: category[:weight]:TEXT where category is workflow,
+    style, project, hazard, or other; process aliases to workflow; weight is 1-10.
 
 Output: docs/retros/sprint-N.json with _backfilled:true marker.
 Post-merge output: .slope/retros/post-merge/sprint-N[-pr-M].json.
@@ -138,6 +140,9 @@ const VALUE_FLAGS = new Set([
 
 const VALID_OUTCOMES: RetroOutcome[] = ['success', 'mixed', 'follow_up'];
 const VALID_MEMORY_CATEGORIES: MemoryCategory[] = ['workflow', 'style', 'project', 'hazard', 'other'];
+const MEMORY_CATEGORY_ALIASES: Record<string, MemoryCategory> = {
+  process: 'workflow',
+};
 
 function parseArgs(args: string[]): ParsedArgs {
   const flags = new Map<string, string[]>();
@@ -210,18 +215,32 @@ function normalizeOutcome(value: string | undefined): RetroOutcome | undefined {
 
 function parseLearningSpec(value: string): RetroLearningInput {
   const trimmed = value.trim();
-  const match = trimmed.match(/^([a-z_]+)(?::(\d+))?:(.+)$/);
+  const match = trimmed.match(/^([a-z][a-z_-]*)(?::([^:]+))?:(.+)$/);
   if (!match) return { text: trimmed };
 
   const [, rawCategory, rawWeight, text] = match;
-  if (!VALID_MEMORY_CATEGORIES.includes(rawCategory as MemoryCategory)) {
-    return { text: trimmed };
+  const category = VALID_MEMORY_CATEGORIES.includes(rawCategory as MemoryCategory)
+    ? rawCategory as MemoryCategory
+    : MEMORY_CATEGORY_ALIASES[rawCategory];
+  if (!category) {
+    const aliases = Object.entries(MEMORY_CATEGORY_ALIASES)
+      .map(([alias, target]) => `${alias}->${target}`)
+      .join(', ');
+    throw new TypeError(`Unsupported --learning category prefix "${rawCategory}". Use: ${VALID_MEMORY_CATEGORIES.join(', ')}${aliases ? `; aliases: ${aliases}` : ''}.`);
+  }
+
+  let weight: number | undefined;
+  if (rawWeight !== undefined) {
+    weight = parseInt(rawWeight, 10);
+    if (!Number.isInteger(weight) || String(weight) !== rawWeight.trim() || weight < 1 || weight > 10) {
+      throw new TypeError('--learning weight prefix must be an integer from 1 to 10.');
+    }
   }
 
   return {
-    text,
-    category: rawCategory as MemoryCategory,
-    ...(rawWeight ? { weight: parseInt(rawWeight, 10) } : {}),
+    text: text.trim(),
+    category,
+    ...(weight !== undefined ? { weight } : {}),
   };
 }
 
@@ -407,6 +426,9 @@ Usage:
 Flags:
   --learning=TEXT             Durable learning. Repeatable.
   --learning=project:8:TEXT   Optional category/weight prefix.
+                              Categories: workflow, style, project, hazard, other.
+                              Alias: process -> workflow. Weight: 1-10.
+                              Unsupported category prefixes are rejected.
   --hazard=TEXT               Hazard to persist as auto-retro memory. Repeatable.
   --follow-up=TEXT            Follow-up to persist as workflow memory. Repeatable.
   --outcome=success|mixed|follow_up

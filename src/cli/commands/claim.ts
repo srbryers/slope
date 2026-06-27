@@ -1,4 +1,5 @@
 import { checkConflicts, parseSprintNumber } from '../../core/index.js';
+import { formatActorName, formatActorSource, formatConflictSummary, resolveActor } from '../actor.js';
 import { loadConfig } from '../config.js';
 import { inferSprintContext } from '../sprint-inference.js';
 import { resolveStore } from '../store.js';
@@ -26,7 +27,8 @@ Options:
   --target=<target>      Ticket, file path, or area to claim
   --scope=<scope>        Claim scope: ticket or area (default: ticket)
   --sprint=<number>      Sprint number (default: inferred from context)
-  --player=<name>        Player name (default: USER env var)
+  --actor=<name>         Actor override for audit trail identity
+  --player=<name>        Legacy alias for --actor
   --notes=<text>         Optional claim notes
   --force                Override overlap conflicts
   --help, -h             Show this help
@@ -64,7 +66,8 @@ export async function claimCommand(args: string[]): Promise<void> {
   }
 
   const scope: ClaimScope = (flags.scope as ClaimScope) || 'ticket';
-  const player = flags.player || process.env.USER || 'unknown';
+  const actor = resolveActor(cwd, { explicitActor: flags.actor || flags.player });
+  const player = actor.name;
   const sprintNumber = resolveSprint(flags, cwd);
 
   // Preflight conflict check: build a temporary claim and test against existing claims
@@ -87,7 +90,7 @@ export async function claimCommand(args: string[]): Promise<void> {
   if (overlaps.length > 0 && !force) {
     console.error(`\nClaim blocked — overlap conflict(s) detected:`);
     for (const c of overlaps) {
-      console.error(`  [!!] ${c.reason}`);
+      console.error(`  [!!] ${formatConflictSummary(c)}`);
     }
     console.error(`\nUse --force to override.`);
     process.exit(1);
@@ -107,7 +110,7 @@ export async function claimCommand(args: string[]): Promise<void> {
     console.log(`\nClaim registered (forced override):`);
     console.log(`  Warning: ${overlaps.length} overlap conflict(s) overridden:`);
     for (const c of overlaps) {
-      console.log(`    [!!] ${c.reason}`);
+      console.log(`    [!!] ${formatConflictSummary(c)}`);
     }
   } else {
     console.log(`\nClaim registered:`);
@@ -115,7 +118,8 @@ export async function claimCommand(args: string[]): Promise<void> {
 
   console.log(`  ID:     ${claim.id}`);
   console.log(`  Sprint: ${claim.sprint_number}`);
-  console.log(`  Player: ${claim.player}`);
+  console.log(`  Player: ${formatActorName(actor)}`);
+  console.log(`  Actor source: ${formatActorSource(actor)}`);
   console.log(`  Target: ${claim.target} (${claim.scope})`);
   if (claim.notes) console.log(`  Notes:  ${claim.notes}`);
 
@@ -130,7 +134,7 @@ export async function claimCommand(args: string[]): Promise<void> {
   if (adjacents.length > 0) {
     console.log(`\n  Note: ${adjacents.length} adjacent conflict(s):`);
     for (const c of adjacents) {
-      console.log(`    [~] ${c.reason}`);
+      console.log(`    [~] ${formatConflictSummary(c)}`);
     }
   }
 

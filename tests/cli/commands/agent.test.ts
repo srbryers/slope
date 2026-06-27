@@ -42,6 +42,21 @@ function writeSprintState(cwd: string, state: object) {
   writeFileSync(join(cwd, '.slope', 'sprint-state.json'), JSON.stringify(state));
 }
 
+function reviewGatesJson(): object {
+  return {
+    code_review: {
+      provenance: 'independent_review',
+      evidence: ['agent:code-reviewer-output'],
+      reviewer: 'code-reviewer',
+    },
+    architect_review: {
+      provenance: 'independent_review',
+      evidence: ['agent:architect-reviewer-output'],
+      reviewer: 'architect-reviewer',
+    },
+  };
+}
+
 describe('agent status (GH #310)', () => {
   let cwd: string;
 
@@ -215,6 +230,7 @@ describe('agent status (GH #310)', () => {
       sprint: 8,
       phase: 'scoring',
       gates: { tests: true, code_review: true, architect_review: true, scorecard: false, review_md: false },
+      review_gates: reviewGatesJson(),
       started_at: '2026-05-07T00:00:00Z',
       updated_at: '2026-05-07T00:00:00Z',
     });
@@ -224,6 +240,29 @@ describe('agent status (GH #310)', () => {
     expect(status.requiredGates).toEqual(['scorecard', 'review_md']);
     expect(status.recommendedCommands).toContain('slope auto-card --sprint=8');
     expect(status.recommendedCommands).toContain('slope review');
+  });
+
+  it('keeps review gates pending when sprint-state booleans lack evidence', async () => {
+    writeVision(cwd);
+    writeRoadmap(cwd, [
+      { id: 8, theme: 'B', par: 4, slope: 1, type: 'feature', tickets: [
+        { key: 'S8-1', title: 't1', club: 'wedge', complexity: 'small' },
+        { key: 'S8-2', title: 't2', club: 'wedge', complexity: 'small' },
+        { key: 'S8-3', title: 't3', club: 'wedge', complexity: 'small' },
+      ] },
+    ]);
+    writeSprintState(cwd, {
+      sprint: 8,
+      phase: 'scoring',
+      gates: { tests: true, code_review: true, architect_review: true, scorecard: false, review_md: false },
+      started_at: '2026-05-07T00:00:00Z',
+      updated_at: '2026-05-07T00:00:00Z',
+    });
+
+    const status = await collectAgentStatus(cwd);
+
+    expect(status.requiredGates).toEqual(['code_review', 'architect_review', 'scorecard', 'review_md']);
+    expect(status.recommendedCommands).toContain('slope auto-card --sprint=8');
   });
 
   it('renders agent markdown with sprint, claim, and recommended commands (#315)', () => {
@@ -372,6 +411,7 @@ describe('agent status (GH #310)', () => {
       sprint: 1,
       phase: 'implementing',
       gates: { tests: true, code_review: true, architect_review: true, scorecard: false, review_md: false },
+      review_gates: reviewGatesJson(),
       started_at: '2026-05-07T00:00:00Z',
       updated_at: '2026-05-07T00:00:00Z',
     });

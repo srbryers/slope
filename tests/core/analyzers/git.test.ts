@@ -180,6 +180,32 @@ describe('extractSprintReferences', () => {
     expect(extractSprintReferences(['fix(S101-2): normalize apply_patch paths'])).toEqual(new Set([101]));
   });
 
+  it('treats nonzero ticket refs as shipped even in non-implementation subjects', () => {
+    expect(extractSprintReferences(['docs(S101-2): record implementation notes'])).toEqual(new Set([101]));
+  });
+
+  it('does not treat docs-only bare sprint mentions as shipped sprint refs', () => {
+    expect(extractSprintReferences([
+      'docs(platform): multi-tenant product architecture spike - S106 context (#287)',
+      'docs(roadmap): reslot registry-purchase to S106, mark S105 as the admin audit (#284)',
+    ])).toEqual(new Set());
+  });
+
+  it('requires implementation-shaped subjects for bare sprint refs', () => {
+    expect(extractSprintReferences([
+      'chore(release): prepare S106 follow-up',
+      'refactor(roadmap): tighten shipped checks for S107',
+    ])).toEqual(new Set([107]));
+  });
+
+  it('does not treat roadmap planning subjects as shipped sprint refs', () => {
+    expect(extractSprintReferences([
+      'feat(roadmap): reslot registry-purchase to S106',
+      'fix(planning): add S107 recovery lane',
+      'fix(roadmap): tighten shipped detection for S108',
+    ])).toEqual(new Set([108]));
+  });
+
   it('does not treat issue-sized ticket suffixes as shipped sprint refs', () => {
     expect(extractSprintReferences(['fix(S147-533): tolerate roadmap sprints without tickets'])).toEqual(new Set());
   });

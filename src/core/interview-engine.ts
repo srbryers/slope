@@ -4,9 +4,9 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, basename } from 'node:path';
 import { execSync } from 'node:child_process';
-import { hasMetaphor } from './metaphor.js';
 import { QUIET_STDIO } from './process.js';
 import type { InitInput } from './interview.js';
+import { shouldPersistInterviewMetaphor, validateInterviewMetaphorId } from './interview-metaphor.js';
 
 export interface DetectedInfo {
   projectName?: string;
@@ -156,8 +156,9 @@ export function validateInterviewAnswers(
 
   // metaphor validation (if provided)
   const metaphor = String(answers['metaphor'] ?? '').trim();
-  if (metaphor && metaphor !== 'custom' && !hasMetaphor(metaphor)) {
-    errors.push({ field: 'metaphor', message: `Unknown metaphor "${metaphor}". Use listMetaphors() to see available options.` });
+  const metaphorError = validateInterviewMetaphorId(metaphor);
+  if (metaphorError) {
+    errors.push({ field: 'metaphor', message: metaphorError });
   }
 
   // repo-url validation (if provided)
@@ -193,7 +194,7 @@ export function answersToInitInput(answers: Record<string, unknown>): InitInput 
   if (repoUrl) input.repoUrl = repoUrl;
 
   const metaphor = String(answers['metaphor'] ?? '').trim();
-  if (metaphor) input.metaphor = metaphor;
+  if (shouldPersistInterviewMetaphor(metaphor)) input.metaphor = metaphor;
 
   const sprintStr = String(answers['sprint-number'] ?? '').trim();
   if (sprintStr) {

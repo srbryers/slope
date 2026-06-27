@@ -10,6 +10,7 @@ import type { InterviewStep, StepOption } from '../../core/interview-steps.js';
 import type { MetaphorPreview } from '../../core/metaphor-preview.js';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { formatNoGitModeWarning, requireGitWorkTreeOrExplicitNoGit } from '../git-preflight.js';
 
 // Ensure built-in metaphors are registered
 import '../../core/metaphors/index.js';
@@ -272,6 +273,10 @@ async function* readStdinLines(): AsyncGenerator<string> {
 export async function interviewCommand(args: string[]): Promise<void> {
   const cwd = process.cwd();
   const isAgent = args.includes('--agent');
+  const gitPreflight = requireGitWorkTreeOrExplicitNoGit('interview', args, cwd);
+  if (gitPreflight.degradedNoGitMode) {
+    console.warn(formatNoGitModeWarning('interview'));
+  }
 
   // Guard: if .slope/config.json already exists, warn but allow --force
   const configPath = join(cwd, '.slope', 'config.json');

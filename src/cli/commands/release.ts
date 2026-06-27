@@ -1,5 +1,6 @@
 import { loadConfig } from '../config.js';
 import { loadScorecards } from '../loader.js';
+import { formatActorName, formatActorSource, resolveActor } from '../actor.js';
 import { resolveStore } from '../store.js';
 
 function parseArgs(args: string[]): Record<string, string> {
@@ -41,7 +42,9 @@ export async function releaseCommand(args: string[]): Promise<void> {
 
   // Release by target + player lookup
   if (flags.target) {
-    const player = flags.player || process.env.USER || 'unknown';
+    const actor = resolveActor(cwd, { explicitActor: flags.actor || flags.player });
+    const player = actor.name;
+    const playerDisplay = formatActorName(actor);
     const sprints = resolveSprintRange(flags, cwd);
 
     for (const sprint of sprints) {
@@ -50,13 +53,14 @@ export async function releaseCommand(args: string[]): Promise<void> {
       if (match) {
         const released = await store.release(match.id);
         if (released) {
-          console.log(`\nClaim ${match.id} (${match.target} by ${match.player}, sprint ${match.sprint_number}) released.\n`);
+          console.log(`\nClaim ${match.id} (${match.target} by ${playerDisplay}, sprint ${match.sprint_number}) released.\n`);
+          console.log(`Actor source: ${formatActorSource(actor)}\n`);
           return;
         }
       }
     }
 
-    console.error(`\nNo claim found for target "${flags.target}" by player "${player}".\n`);
+    console.error(`\nNo claim found for target "${flags.target}" by player "${playerDisplay}".\n`);
     process.exit(1);
     return;
   }

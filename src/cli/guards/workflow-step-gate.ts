@@ -5,7 +5,7 @@ import { formatSprintLabel, loadWorkflow, parseSprintNumber } from '../../core/i
 import { loadConfig } from '../config.js';
 import { SqliteSlopeStore } from '../../store/index.js';
 import { inferSprintContext } from '../sprint-inference.js';
-import { inferSprintFromBranch, reconcileWorkflowExecutions } from '../workflow-resync.js';
+import { inferSprintFromBranch, reconcileWorkflowExecutions, sprintLabelForExecution } from '../workflow-resync.js';
 
 /**
  * Workflow-step-gate guard: fires PreToolUse on Edit/Write.
@@ -31,7 +31,7 @@ export async function workflowStepGateGuard(input: HookInput, cwd: string): Prom
     if (!exec) {
       return withAdditionalContext(
         resyncContext(resync),
-        'SLOPE workflow-step-gate: multiple running workflow executions; no session, branch, or sprint match, so edits are allowed.',
+        noMatchingExecutionContext(active),
       );
     }
 
@@ -57,6 +57,7 @@ export async function workflowStepGateGuard(input: HookInput, cwd: string): Prom
         `SLOPE workflow-step-gate: Current step "${exec.current_step}" (phase: ${exec.current_phase}) is type "${stepType}", not "agent_work".`,
         `File edits are only allowed during agent_work steps.`,
         `Complete the current ${stepType} step first via \`slope sprint run\` or workflow MCP tools.`,
+        `If this execution is abandoned, run \`slope sprint workflow resync\` or \`slope sprint workflow cleanup --stale\`.`,
       ].join('\n'),
     };
   } catch {
@@ -77,21 +78,22 @@ function selectWorkflowExecution(
   const sessionId = input.session_id?.trim();
   if (sessionId && sprintLabels.length > 0) {
     const bySessionAndSprint = active.find(exec =>
-      exec.session_id === sessionId && sprintLabels.some(label => sprintIdsMatch(exec.sprint_id, label)),
+      exec.session_id === sessionId && sprintLabels.some(label => executionMatchesSprint(exec, label)),
     );
     if (bySessionAndSprint) return bySessionAndSprint;
   }
 
   for (const label of sprintLabels) {
-    const bySprint = active.find(exec => sprintIdsMatch(exec.sprint_id, label));
+    const bySprint = active.find(exec => executionMatchesSprint(exec, label));
     if (bySprint) return bySprint;
   }
 
-  if (sessionId) {
+  if (sessionId && sprintLabels.length === 0) {
     const bySession = active.find(exec => exec.session_id === sessionId);
     if (bySession) return bySession;
   }
 
+  if (sprintLabels.length > 0) return null;
   return active.length === 1 ? active[0] : null;
 }
 
@@ -110,6 +112,10 @@ function sprintLabelsForContext(cwd: string, config: SlopeConfig): string[] {
   return [...labels];
 }
 
+function executionMatchesSprint(exec: WorkflowExecution, label: string): boolean {
+  return sprintIdsMatch(sprintLabelForExecution(exec), label);
+}
+
 function sprintIdsMatch(left: string | undefined, right: string): boolean {
   const normalizedLeft = normalizeSprintLabel(left);
   const normalizedRight = normalizeSprintLabel(right);
@@ -122,12 +128,27 @@ function normalizeSprintLabel(value: string | undefined): string | null {
   return parsed === null ? value.trim().toUpperCase() : formatSprintLabel(parsed).toUpperCase();
 }
 
+function noMatchingExecutionContext(active: WorkflowExecution[]): string {
+  if (active.length === 1) {
+    const exec = active[0];
+    return [
+      `SLOPE workflow-step-gate: running workflow execution ${sprintLabelForExecution(exec)} (${exec.workflow_name}) does not match the current sprint/session context, so edits are allowed.`,
+      'Run `slope sprint workflow resync` or `slope sprint workflow cleanup --stale` if the execution is abandoned.',
+    ].join('\n');
+  }
+
+  return [
+    'SLOPE workflow-step-gate: multiple running workflow executions; no session, branch, or sprint match, so edits are allowed.',
+    'Run `slope sprint workflow resync` or `slope sprint workflow cleanup --stale` if any execution is abandoned.',
+  ].join('\n');
+}
+
 function resyncContext(result: Awaited<ReturnType<typeof reconcileWorkflowExecutions>>): GuardResult {
   const lines: string[] = [];
   if (result.paused.length > 0) lines.push(`SLOPE workflow-step-gate: paused ${result.paused.length} stale workflow execution(s).`);
   if (result.fastForwarded.length > 0) {
     lines.push(...result.fastForwarded.map(item =>
-      `SLOPE workflow-step-gate: fast-forwarded ${item.exec.sprint_id ?? item.exec.id} to ${item.phase}/${item.step}.`,
+      `SLOPE workflow-step-gate: fast-forwarded ${sprintLabelForExecution(item.exec)} to ${item.phase}/${item.step}.`,
     ));
   }
   return lines.length > 0 ? { context: lines.join('\n') } : {};

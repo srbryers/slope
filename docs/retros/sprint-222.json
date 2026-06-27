@@ -1,0 +1,149 @@
+{
+  "sprint_number": 222,
+  "player": "codex",
+  "theme": "Open Issue Recovery Release",
+  "par": 3,
+  "slope": 1,
+  "score": 4,
+  "score_label": "bogey",
+  "date": "2026-06-27",
+  "type": "release",
+  "skills_used": [
+    "slope-sprint-workflow",
+    "github"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow",
+    "github"
+  ],
+  "skill_gaps_found": [],
+  "shots": [
+    {
+      "ticket_key": "S222-1",
+      "title": "Run roadmap validation, targeted issue regressions, and full release-readiness checks",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Release-readiness baseline passed: roadmap validation, targeted S216-S221 regressions, typecheck, full Vitest, build, map check, version recommendation, and pre-bump package dry-run signal."
+    },
+    {
+      "ticket_key": "S222-2",
+      "title": "Bump package and bundled plugin manifest according to version recommendation",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Root package and bundled Codex plugin manifest were bumped to 1.60.0, the built CLI reported v1.60.0, and npm dry-run passed for the unpublished version."
+    },
+    {
+      "ticket_key": "S222-3",
+      "title": "Publish the recovery release and update roadmap next-lane status",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "moderate",
+          "description": "The release branch was five commits behind main and reused an old merged PR branch name, so publication required a fresh release worktree, a new branch, and a roadmap merge that preserved S153/S154 while adding S216-S222."
+        },
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "pnpm 11 generated a local allowBuilds workspace file during npm dry-run; the dry-run passed after local approval and the generated file was removed from the release diff."
+        }
+      ],
+      "notes": "The release branch codex/recovery-release-v1.60.0 is pushed with mainline S153/S154 integrated, S155-S158 marked superseded by the executed S216-S222 train, and v1.60.0 package dry-run verified."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 3,
+    "fairways_total": 3,
+    "greens_in_regulation": 3,
+    "greens_total": 3,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 2,
+    "hazard_penalties": 1,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "wind",
+      "impact": "moderate",
+      "description": "The release branch had to reconcile the executed S216-S222 recovery train with mainline S153/S154 and the already-published v1.59.2 baseline."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Release branches should be rebased or merged from main before the final version bump.",
+      "outcome": "S222 used a fresh release worktree and branch to isolate the merge from unrelated dirty files in the original checkout."
+    },
+    {
+      "type": "lessons",
+      "description": "Roadmap recovery lanes can collide when main advances during a long issue train.",
+      "outcome": "The merged roadmap keeps S154 as shipped, marks S155-S158 superseded, and makes S216-S222 the executed Phase 49 recovery train."
+    },
+    {
+      "type": "lessons",
+      "description": "pnpm 11 build approval state can affect npm dry-run in fresh worktrees.",
+      "outcome": "The release dry-run used local allowBuilds approval for native build scripts and removed the generated workspace file from version control."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "Pre-merge targeted S216-S221 regressions passed: 26 files, 340 tests.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "Merged release branch focused suite passed: 10 files, 216 tests.",
+      "status": "healthy"
+    },
+    {
+      "category": "recovery",
+      "description": "Merged release branch full Vitest passed: 238 files, 3746 tests, with store-pg skipped by configuration.",
+      "status": "healthy"
+    },
+    {
+      "category": "release",
+      "description": "Merged release branch passed typecheck, build, roadmap validate, map --check, version smoke, and npm publish --dry-run --access public for @slope-dev/slope@1.60.0.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "The release gate did its job: the feature train was ready, but mainline drift had to be made explicit before publishing.",
+    "advice_for_next_player": "Cut the release branch from current main, then replay or merge the recovery train before the final dry-run.",
+    "what_surprised_you": "The roadmap conflict was mostly planning metadata, not implementation code; a structured JSON merge was safer than hand-splicing markers.",
+    "excited_about_next": "After the PR merges, the GitHub Release workflow can publish v1.60.0 through trusted publishing and verify npm latest."
+  },
+  "bunker_locations": [
+    "Do not reuse an old merged PR branch name for a release train; create a fresh release branch before PR publication.",
+    "When main already has a planned issue lane, merge the executed lane by marking stale planned sprints superseded instead of deleting their planning context.",
+    "Fresh pnpm 11 worktrees may need local allowBuilds approval before npm publish dry-run can run lifecycle builds."
+  ],
+  "yardage_book_updates": [
+    "package.json and templates/codex/plugins/slope/.codex-plugin/plugin.json now carry version 1.60.0.",
+    "docs/backlog/roadmap.json now merges mainline S154 with the executed S216-S222 train and marks S155-S158 superseded.",
+    "tests/cli/sprint-workflow.test.ts now aligns the all-gates-complete status regression with review-gate provenance requirements.",
+    "The release branch codex/recovery-release-v1.60.0 is pushed for PR publication."
+  ],
+  "course_management_notes": [
+    "S222 release-readiness evidence includes targeted regressions, full suite, typecheck, build, roadmap validation, map check, version smoke, npm registry latest check, and npm dry-run.",
+    "npm latest reported 1.59.2 before release; v1.60.0 is the next publish target.",
+    "No direct local npm publish was run; publication should happen through the GitHub Release to npm trusted-publishing workflow after merge."
+  ],
+  "slope_factors": [
+    "release_branch_merge",
+    "roadmap_reconciliation",
+    "version_bump",
+    "trusted_publisher_release",
+    "pnpm_build_approval"
+  ]
+}

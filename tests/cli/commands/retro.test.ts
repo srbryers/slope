@@ -54,6 +54,15 @@ describe('retro post-merge CLI', () => {
     rmSync(cwd, { recursive: true, force: true });
   });
 
+  it('documents the accepted learning prefix syntax in post-merge help', async () => {
+    const out = await captureLogs(() => retroCommand(['post-merge', '--help']));
+
+    expect(out.stdout).toContain('Categories: workflow, style, project, hazard, other');
+    expect(out.stdout).toContain('Alias: process -> workflow');
+    expect(out.stdout).toContain('Weight: 1-10');
+    expect(out.stdout).toContain('Unsupported category prefixes are rejected');
+  });
+
   it('writes a post-merge retro record and persists durable memories', async () => {
     const out = await captureLogs(() => retroCommand([
       'post-merge',
@@ -80,6 +89,44 @@ describe('retro post-merge CLI', () => {
     expect(memories).toHaveLength(4);
     expect(memories.some(m => m.category === 'project' && m.weight === 8 && m.text.includes('auto-retro'))).toBe(true);
     expect(memories.some(m => m.category === 'hazard' && m.text.includes('help flags'))).toBe(true);
+  });
+
+  it('parses non-project category and weight prefixes without persisting prefix text', async () => {
+    await captureLogs(() => retroCommand([
+      'post-merge',
+      '--sprint=137',
+      '--pr=512',
+      '--learning=process:6:Custom reviewer agents should stay lane-specific',
+    ]));
+
+    const path = join(cwd, '.slope', 'retros', 'post-merge', 'sprint-137-pr-512.json');
+    const record = JSON.parse(readFileSync(path, 'utf8'));
+    expect(record.retro.learnings).toContainEqual({
+      text: 'Custom reviewer agents should stay lane-specific',
+      category: 'workflow',
+      weight: 6,
+    });
+
+    const memories = searchMemories(cwd, { source: 'auto-retro' });
+    expect(memories.some(m =>
+      m.category === 'workflow' &&
+      m.weight === 6 &&
+      m.text.includes('Custom reviewer agents should stay lane-specific') &&
+      !m.text.includes('process:6:')
+    )).toBe(true);
+  });
+
+  it('rejects unsupported learning category prefixes instead of persisting noisy text', async () => {
+    const out = await captureLogs(() => retroCommand([
+      'post-merge',
+      '--sprint=137',
+      '--learning=unknown:6:Do not persist this prefix',
+    ]));
+
+    expect(out.exitCode).toBe(1);
+    expect(out.stderr).toContain('Unsupported --learning category prefix "unknown"');
+    expect(out.stderr).toContain('workflow, style, project, hazard, other');
+    expect(searchMemories(cwd, { source: 'auto-retro' })).toHaveLength(0);
   });
 
   it('accepts decimal sprint ids for inserted release-sprint retros (#529)', async () => {

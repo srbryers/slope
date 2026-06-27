@@ -18,8 +18,9 @@
 ## Post-Hole (Sprint End)
 1. Build scorecard JSON, run `slope validate`
 2. Update common-issues with new patterns
-3. Run `slope review` for markdown output
-4. Run `slope card` for handicap trends
+3. Log recurring workaround/codification candidates with `slope review findings add --type=workaround --recurs --cost=s|m|l --description="..."`
+4. Run `slope review` for markdown output
+5. Run `slope card` for handicap trends
 
 ## Commit Discipline
 - Commit after each file, feature, migration, or bug fix

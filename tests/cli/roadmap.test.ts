@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { execFileSync } from 'node:child_process';
 import type { RoadmapDefinition } from '../../src/core/index.js';
 
 let tmpDir: string;
@@ -59,6 +60,16 @@ function writeConfig(dir: string, config: Record<string, unknown> = {}): void {
   writeFileSync(join(dir, '.slope', 'config.json'), JSON.stringify(config, null, 2));
 }
 
+function gitInit(dir: string): void {
+  execFileSync('git', ['init', '-q'], { cwd: dir, stdio: 'ignore' });
+  execFileSync('git', ['config', 'user.email', 'test@test.com'], { cwd: dir, stdio: 'ignore' });
+  execFileSync('git', ['config', 'user.name', 'Test User'], { cwd: dir, stdio: 'ignore' });
+}
+
+function gitCommit(dir: string, message: string): void {
+  execFileSync('git', ['commit', '--allow-empty', '-m', message], { cwd: dir, stdio: 'ignore' });
+}
+
 beforeEach(() => {
   tmpDir = mkdtempSync(join(tmpdir(), 'slope-roadmap-'));
   originalCwd = process.cwd();
@@ -105,6 +116,33 @@ describe('slope roadmap validate', () => {
     expect(output).toContain('Roadmap is valid');
     expect(output).toContain('Sprints: 3');
     expect(output).toContain('Tickets: 9');
+  });
+
+  it('does not flag planned sprints from docs-only git references', async () => {
+    writeRoadmap(tmpDir, makeRoadmapJson());
+    gitInit(tmpDir);
+    gitCommit(tmpDir, 'docs(platform): multi-tenant product architecture spike - S8 context (#287)');
+    gitCommit(tmpDir, 'docs(roadmap): reslot registry-purchase to S8, mark S7 as the admin audit (#284)');
+    const codes = mockExit();
+
+    await expect(roadmapCommand(['validate'])).rejects.toThrow('process.exit(0)');
+    expect(codes[0]).toBe(0);
+    const output = consoleOutput.join('\n');
+    expect(output).toContain('Roadmap is valid');
+    expect(output).not.toContain('shipped commits');
+  });
+
+  it('still flags planned sprints from real ticket-key commits', async () => {
+    writeRoadmap(tmpDir, makeRoadmapJson());
+    gitInit(tmpDir);
+    gitCommit(tmpDir, 'fix(S8-1): implement platform ticket');
+    const codes = mockExit();
+
+    await expect(roadmapCommand(['validate'])).rejects.toThrow('process.exit(1)');
+    expect(codes[0]).toBe(1);
+    const output = consoleOutput.join('\n');
+    expect(output).toContain('[S8]');
+    expect(output).toContain('shipped commits');
   });
 
   it('reports errors for invalid roadmap', async () => {

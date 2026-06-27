@@ -10,6 +10,8 @@
 
 import { execSync } from 'node:child_process';
 import { loadConfig, detectLatestSprint } from '../../core/index.js';
+import type { ReviewRecommendation } from '../../core/index.js';
+import { buildReviewerAgentSpecs, type ReviewerAgentSpec } from '../reviewer-agents.js';
 
 export interface ReviewPrompt {
   type: 'architect' | 'code';
@@ -19,6 +21,7 @@ export interface ReviewPrompt {
     sprint?: number;
     changed_files: string[];
     diff_lines: number;
+    reviewer_agent?: Pick<ReviewerAgentSpec, 'id' | 'name' | 'lane' | 'evidence' | 'focus'>;
   };
 }
 
@@ -35,11 +38,21 @@ function getPrDiff(prNumber?: number): { diff: string; files: string[]; prNum: n
   }
 }
 
-function buildArchitectPrompt(diff: string, files: string[], sprint?: number): string {
+function reviewerAgentIntro(spec?: ReviewerAgentSpec): string[] {
+  if (!spec) return [];
+  return [
+    '## Purpose-built Reviewer Agent',
+    spec.prompt,
+    '',
+  ];
+}
+
+function buildArchitectPrompt(diff: string, files: string[], sprint?: number, reviewer?: ReviewerAgentSpec): string {
   return [
     'You are performing an ARCHITECT REVIEW of a pull request.',
     'You have a clean context — no prior implementation knowledge.',
     '',
+    ...reviewerAgentIntro(reviewer),
     '## Review Criteria',
     '1. Does the design match codebase patterns? Check for duplication of existing infrastructure.',
     '2. Are dependencies correct and ordering optimal?',
@@ -64,11 +77,12 @@ function buildArchitectPrompt(diff: string, files: string[], sprint?: number): s
   ].join('\n');
 }
 
-function buildCodePrompt(diff: string, files: string[], sprint?: number): string {
+function buildCodePrompt(diff: string, files: string[], sprint?: number, reviewer?: ReviewerAgentSpec): string {
   return [
     'You are performing a CODE REVIEW of a pull request.',
     'You have a clean context — no prior implementation knowledge.',
     '',
+    ...reviewerAgentIntro(reviewer),
     '## Review Criteria',
     '1. Correctness: Does the code do what it claims? Edge cases?',
     '2. Error handling: Are errors caught and handled appropriately?',
@@ -125,20 +139,35 @@ export async function reviewRunCommand(args: string[]): Promise<void> {
 
   const diffLines = pr.diff.split('\n').length;
   const prompts: ReviewPrompt[] = [];
+  const recommendations: ReviewRecommendation[] = [];
+  if (reviewType === 'architect' || reviewType === 'both') {
+    recommendations.push({ review_type: 'architect', priority: 'required', reason: 'PR architect review requested' });
+  }
+  if (reviewType === 'code' || reviewType === 'both') {
+    recommendations.push({ review_type: 'code', priority: 'optional', reason: 'PR code review requested' });
+  }
+  const reviewerAgents = buildReviewerAgentSpecs(recommendations, {
+    sprintNumber: sprint,
+    filePatterns: pr.files,
+    artifacts: pr.files,
+  });
+  const reviewerByLane = new Map(reviewerAgents.map(spec => [spec.lane, spec]));
 
   if (reviewType === 'architect' || reviewType === 'both') {
+    const reviewer = reviewerByLane.get('architect');
     prompts.push({
       type: 'architect',
-      prompt: buildArchitectPrompt(pr.diff, pr.files, sprint),
-      context: { pr_number: pr.prNum, sprint, changed_files: pr.files, diff_lines: diffLines },
+      prompt: buildArchitectPrompt(pr.diff, pr.files, sprint, reviewer),
+      context: { pr_number: pr.prNum, sprint, changed_files: pr.files, diff_lines: diffLines, reviewer_agent: reviewer },
     });
   }
 
   if (reviewType === 'code' || reviewType === 'both') {
+    const reviewer = reviewerByLane.get('code');
     prompts.push({
       type: 'code',
-      prompt: buildCodePrompt(pr.diff, pr.files, sprint),
-      context: { pr_number: pr.prNum, sprint, changed_files: pr.files, diff_lines: diffLines },
+      prompt: buildCodePrompt(pr.diff, pr.files, sprint, reviewer),
+      context: { pr_number: pr.prNum, sprint, changed_files: pr.files, diff_lines: diffLines, reviewer_agent: reviewer },
     });
   }
 
@@ -153,12 +182,15 @@ export async function reviewRunCommand(args: string[]): Promise<void> {
 
   for (const p of prompts) {
     console.log(`--- ${p.type.toUpperCase()} REVIEW PROMPT ---`);
-    console.log('Use this with Claude Code\'s Agent tool (model: "haiku") for an isolated review:\n');
+    if (p.context.reviewer_agent) {
+      console.log(`Suggested reviewer agent: ${p.context.reviewer_agent.name} (${p.context.reviewer_agent.id})`);
+    }
+    console.log('Use this with Codex or Claude Code Agent tool for an isolated review:\n');
     console.log(p.prompt);
     console.log('');
   }
 
-  console.log('To run both reviews as subagents, use:');
+  console.log('To run both reviews as purpose-built subagents, use:');
   console.log('  slope review run --json | # pass to Agent tool prompts');
   console.log('');
 }

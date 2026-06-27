@@ -70,6 +70,7 @@ describe('Full workflow execution E2E', () => {
     expect(next.step!.id).toBe('validate_scorecard');
     await engine.complete(exec.id, 'validate_scorecard', { exit_code: 0 }, resolved, store);
     await engine.complete(exec.id, 'review', { exit_code: 0 }, resolved, store);
+    await engine.complete(exec.id, 'codification_sweep', { output: { codification_candidates_logged_or_none: 'none' } }, resolved, store);
     const result = await engine.complete(exec.id, 'update_map', { exit_code: 0 }, resolved, store);
 
     expect(result.is_complete).toBe(true);
@@ -77,7 +78,7 @@ describe('Full workflow execution E2E', () => {
     // Verify final state
     const final = await store.getExecution(exec.id);
     expect(final!.status).toBe('completed');
-    expect(final!.completed_steps.length).toBe(14); // 2 + 3 (plan_review) + 3*2 + 3
+    expect(final!.completed_steps.length).toBe(15); // 2 + 3 (plan_review) + 3*2 + 4
   });
 });
 

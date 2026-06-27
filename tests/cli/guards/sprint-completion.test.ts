@@ -82,6 +82,19 @@ function writeRoadmapAt(cwd: string, sprints: Array<{ id: number; status?: strin
   }));
 }
 
+function satisfyReviewGates(state: ReturnType<typeof createSprintState>): void {
+  state.review_gates.code_review = {
+    provenance: 'independent_review',
+    evidence: ['agent:code-reviewer-output'],
+    reviewer: 'code-reviewer',
+  };
+  state.review_gates.architect_review = {
+    provenance: 'independent_review',
+    evidence: ['agent:architect-reviewer-output'],
+    reviewer: 'architect-reviewer',
+  };
+}
+
 function initGitBranch(branch: string): void {
   execFileSync('git', ['init'], { cwd: tmpDir, stdio: 'ignore' });
   execFileSync('git', ['config', 'user.email', 'test@example.com'], { cwd: tmpDir });
@@ -131,6 +144,7 @@ describe('sprint-completion guard', () => {
       state.gates.architect_review = true;
       state.gates.scorecard = true;
       state.gates.review_md = true;
+      satisfyReviewGates(state);
       saveSprintState(tmpDir, state);
       writeScorecard(22); // scorecard must exist too
     });
@@ -228,6 +242,7 @@ describe('sprint-completion guard', () => {
       staleMainState.gates.architect_review = true;
       staleMainState.gates.scorecard = true;
       staleMainState.gates.review_md = true;
+      satisfyReviewGates(staleMainState);
       saveSprintState(tmpDir, staleMainState);
 
       const worktreeState = createSprintState(160, 'implementing');
@@ -236,6 +251,7 @@ describe('sprint-completion guard', () => {
       worktreeState.gates.architect_review = true;
       worktreeState.gates.scorecard = true;
       worktreeState.gates.review_md = true;
+      satisfyReviewGates(worktreeState);
       saveSprintState(worktreeDir, worktreeState);
       writeScorecardAt(worktreeDir, 160);
 
@@ -262,6 +278,7 @@ describe('sprint-completion guard', () => {
       worktreeState.gates.architect_review = true;
       worktreeState.gates.scorecard = true;
       worktreeState.gates.review_md = true;
+      satisfyReviewGates(worktreeState);
       saveSprintState(homeWorktreeDir, worktreeState);
       writeScorecardAt(homeWorktreeDir, 161);
 
@@ -397,6 +414,7 @@ describe('sprint-completion guard', () => {
       state.gates.architect_review = true;
       state.gates.scorecard = true;
       state.gates.review_md = true;
+      satisfyReviewGates(state);
       saveSprintState(tmpDir, state);
       // No scorecard file written
 
@@ -413,6 +431,7 @@ describe('sprint-completion guard', () => {
       state.gates.architect_review = true;
       state.gates.scorecard = true;
       state.gates.review_md = true;
+      satisfyReviewGates(state);
       saveSprintState(tmpDir, state);
       writeScorecard(22);
 
@@ -433,6 +452,7 @@ describe('sprint-completion guard', () => {
       state.gates.architect_review = true;
       state.gates.scorecard = true;
       state.gates.review_md = true;
+      satisfyReviewGates(state);
       saveSprintState(tmpDir, state);
       const dir = join(tmpDir, 'docs', 'retros');
       mkdirSync(dir, { recursive: true });
@@ -449,6 +469,7 @@ describe('sprint-completion guard', () => {
       state.gates.architect_review = true;
       state.gates.scorecard = true;
       state.gates.review_md = true;
+      satisfyReviewGates(state);
       saveSprintState(tmpDir, state);
       // No scorecard file
 

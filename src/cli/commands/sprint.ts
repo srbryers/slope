@@ -7,15 +7,24 @@ import {
   updateSprintPhase,
   clearSprintState,
   isSprintComplete,
+  isReviewGateSatisfied,
+  pendingGateNames,
   pendingGates,
   isSprintPhase,
+  isReviewGateName,
+  validateReviewGateCompletion,
   SPRINT_PHASES,
   type GateName,
+  type ReviewGateCompletionInput,
+  type ReviewGateName,
+  type ReviewGateState,
   type SprintPhase,
+  type SprintState,
 } from '../sprint-state.js';
 import { WorkflowEngine, loadWorkflow, resolveVariables, validateWorkflow, loadConfig, parseRoadmap, castRoadmapStructure, formatSprintLabel, formatSprintNumber, parseSprintNumber } from '../../core/index.js';
 import type { WorkflowDefinition, WorkflowExecution } from '../../core/index.js';
 import { createHash } from 'node:crypto';
+import { formatActorName, formatActorSource, formatConflictSummary, resolveActor } from '../actor.js';
 
 /** Get workflow definition from execution snapshot (preferred) or disk (fallback for old executions) */
 function getDefinition(exec: WorkflowExecution, cwd: string): { def: WorkflowDefinition; drifted: boolean } {
@@ -53,7 +62,7 @@ import {
   loadRoadmapReality,
   parseTouchedPaths,
 } from '../pre-sprint-reality.js';
-import { findStaleWorkflowExecutions, reconcileWorkflowExecutions } from '../workflow-resync.js';
+import { findStaleWorkflowExecutions, reconcileWorkflowExecutions, sprintLabelForExecution } from '../workflow-resync.js';
 
 /**
  * Check completion_conditions for a step before allowing completion/skip.
@@ -100,6 +109,153 @@ function checkCompletionConditions(
 
 const VALID_GATES: GateName[] = ['tests', 'code_review', 'architect_review', 'scorecard', 'review_md'];
 
+interface ParsedGateOptions {
+  review?: ReviewGateCompletionInput;
+  errors: string[];
+  help: boolean;
+}
+
+function optionValue(args: string[], index: number, flag: string): { value: string | null; next: number } | null {
+  const arg = args[index];
+  if (arg.startsWith(`${flag}=`)) return { value: arg.slice(flag.length + 1), next: index };
+  if (arg === flag) return { value: args[index + 1] ?? null, next: index + 1 };
+  return null;
+}
+
+function findOptionValue(args: string[], flag: string): string | undefined {
+  for (let i = 0; i < args.length; i++) {
+    const value = optionValue(args, i, flag);
+    if (value) return value.value ?? undefined;
+  }
+  return undefined;
+}
+
+function actorOverride(args: string[]): string | undefined {
+  for (const flag of ['--actor', '--player']) {
+    const value = findOptionValue(args, flag);
+    if (value && !value.startsWith('--')) return value;
+  }
+  return undefined;
+}
+
+function parseGateOptions(args: string[]): ParsedGateOptions {
+  const errors: string[] = [];
+  const evidence: string[] = [];
+  let reviewer: string | undefined;
+  let prReview: string | undefined;
+  let selfReview = false;
+  let notes: string | undefined;
+  let reason: string | undefined;
+  let overrideReason: string | undefined;
+  let help = false;
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === '--help' || arg === '-h') {
+      help = true;
+      continue;
+    }
+
+    const evidenceValue = optionValue(args, i, '--evidence');
+    if (evidenceValue) {
+      if (!evidenceValue.value || evidenceValue.value.startsWith('--')) errors.push('--evidence requires a value');
+      else evidence.push(evidenceValue.value);
+      i = evidenceValue.next;
+      continue;
+    }
+
+    const reviewerValue = optionValue(args, i, '--reviewer');
+    if (reviewerValue) {
+      if (!reviewerValue.value || reviewerValue.value.startsWith('--')) errors.push('--reviewer requires a value');
+      else reviewer = reviewerValue.value;
+      i = reviewerValue.next;
+      continue;
+    }
+
+    const prReviewValue = optionValue(args, i, '--pr-review');
+    if (prReviewValue) {
+      if (!prReviewValue.value || prReviewValue.value.startsWith('--')) errors.push('--pr-review requires a value');
+      else prReview = prReviewValue.value;
+      i = prReviewValue.next;
+      continue;
+    }
+
+    if (arg === '--self-review') {
+      selfReview = true;
+      continue;
+    }
+
+    const reasonValue = optionValue(args, i, '--reason');
+    if (reasonValue) {
+      if (!reasonValue.value || reasonValue.value.startsWith('--')) errors.push('--reason requires a value');
+      else reason = reasonValue.value;
+      i = reasonValue.next;
+      continue;
+    }
+
+    const notesValue = optionValue(args, i, '--notes');
+    if (notesValue) {
+      if (!notesValue.value || notesValue.value.startsWith('--')) errors.push('--notes requires a value');
+      else notes = notesValue.value;
+      i = notesValue.next;
+      continue;
+    }
+
+    const overrideValue = optionValue(args, i, '--override') ?? optionValue(args, i, '--manual-override');
+    if (overrideValue) {
+      if (!overrideValue.value || overrideValue.value.startsWith('--')) errors.push('--override requires a value');
+      else overrideReason = overrideValue.value;
+      i = overrideValue.next;
+      continue;
+    }
+
+    errors.push(`Unknown gate option: ${arg}`);
+  }
+
+  const hasPrReview = Boolean(prReview);
+  const hasSelfReview = selfReview;
+  const hasOverride = Boolean(overrideReason);
+  const hasIndependent = !hasPrReview && !hasSelfReview && !hasOverride && (Boolean(reviewer) || evidence.length > 0);
+  const modeCount = [hasPrReview, hasSelfReview, hasOverride, hasIndependent].filter(Boolean).length;
+
+  if (modeCount > 1) {
+    errors.push('Use only one review provenance mode: --reviewer/--evidence, --pr-review, --self-review, or --override.');
+  }
+
+  let review: ReviewGateCompletionInput | undefined;
+  if (modeCount === 1) {
+    if (hasPrReview) {
+      review = { provenance: 'pr_review', evidence: [prReview!, ...evidence], reviewer, notes: notes ?? reason };
+    } else if (hasSelfReview) {
+      review = { provenance: 'self_review', evidence, reviewer, notes: reason ?? notes };
+    } else if (hasOverride) {
+      review = { provenance: 'manual_override', evidence, reviewer, notes: overrideReason };
+    } else {
+      review = { provenance: 'independent_review', evidence, reviewer, notes: notes ?? reason };
+    }
+  }
+
+  return { review, errors, help };
+}
+
+function printGateUsage(gateName?: GateName): void {
+  const gate = gateName && isReviewGateName(gateName) ? gateName : 'code_review';
+  console.error('');
+  console.error('Usage:');
+  console.error('  slope sprint gate <name>');
+  console.error(`  slope sprint gate ${gate} --reviewer=<agent-or-person> --evidence=<transcript-or-output>`);
+  console.error(`  slope sprint gate ${gate} --pr-review=<url-or-id>`);
+  console.error(`  slope sprint gate ${gate} --self-review --reason="why self-review is acceptable"`);
+  console.error(`  slope sprint gate ${gate} --override="manual override reason"`);
+  console.error('');
+  console.error('Review provenance modes:');
+  console.error('  independent_review: requires --reviewer and --evidence');
+  console.error('  pr_review: records external PR review evidence from --pr-review');
+  console.error('  self_review (weaker): requires --self-review and --reason');
+  console.error('  manual_override (weaker): requires --override');
+  console.error('');
+}
+
 /**
  * `slope sprint begin --sprint=N --ticket=T` — bundled start-of-work flow.
  *
@@ -115,7 +271,7 @@ async function beginCommand(args: string[], cwd: string): Promise<void> {
   const sprintArg = args.find(a => a.startsWith('--sprint='));
   const ticketArg = args.find(a => a.startsWith('--ticket='));
   if (!sprintArg || !ticketArg) {
-    console.error('\nUsage: slope sprint begin --sprint=N --ticket=KEY');
+    console.error('\nUsage: slope sprint begin --sprint=N --ticket=KEY [--actor=<name>]');
     console.error('Bundles: sprint start + claim + briefing + prep --lite\n');
     process.exit(1);
   }
@@ -144,13 +300,15 @@ async function beginCommand(args: string[], cwd: string): Promise<void> {
   // Step 2: claim
   const { resolveStore } = await import('../store.js');
   const { checkConflicts } = await import('../../core/index.js');
-  const player = process.env.USER || 'unknown';
+  const actor = resolveActor(cwd, { explicitActor: actorOverride(args) });
+  const player = actor.name;
+  const playerDisplay = formatActorName(actor);
   const store = await resolveStore(cwd);
   try {
     const existing = await store.list(sprint);
     const ownClaim = existing.find(c => c.target === ticket && c.player === player);
     if (ownClaim) {
-      console.log(`Ticket ${ticket}: already claimed by ${player}.`);
+      console.log(`Ticket ${ticket}: already claimed by ${playerDisplay} (actor source: ${formatActorSource(actor)}).`);
     } else {
       // Detect overlap conflicts via core check
       const tempClaim = {
@@ -164,12 +322,12 @@ async function beginCommand(args: string[], cwd: string): Promise<void> {
       const overlaps = checkConflicts([...existing, tempClaim]).filter(c => c.severity === 'overlap');
       if (overlaps.length > 0) {
         console.error(`\nClaim blocked — overlap conflict(s) detected:`);
-        for (const c of overlaps) console.error(`  [!!] ${c.reason}`);
+        for (const c of overlaps) console.error(`  [!!] ${formatConflictSummary(c)}`);
         console.error(`\nResolve conflicts or run \`slope claim --target=${ticket} --sprint=${formatSprintNumber(sprint)} --force\` to override.`);
         process.exit(1);
       }
       const claim = await store.claim({ sprint_number: sprint, player, target: ticket, scope: 'ticket' });
-      console.log(`Ticket ${ticket}: claimed (id ${claim.id.slice(0, 8)}, player ${player}).`);
+      console.log(`Ticket ${ticket}: claimed (id ${claim.id.slice(0, 8)}, player ${playerDisplay}, actor source: ${formatActorSource(actor)}).`);
     }
   } finally {
     store.close();
@@ -288,14 +446,16 @@ async function startCommand(args: string[], cwd: string): Promise<void> {
 
   const state = createSprintState(sprint, phase);
   saveSprintState(cwd, state);
-  const autoClaim = await autoClaimSprint(cwd, sprint);
-  console.log(`Sprint ${formatSprintNumber(sprint)} started (phase: ${phase}). Use 'slope sprint gate <name>' to mark gates.`);
+  const autoClaim = await autoClaimSprint(cwd, sprint, actorOverride(args));
+  console.log(`Sprint ${formatSprintNumber(sprint)} started (phase: ${phase}). Use 'slope sprint gate <name>' to mark gates; review gates require evidence options.`);
   if (autoClaim) console.log(autoClaim);
 }
 
-async function autoClaimSprint(cwd: string, sprint: number): Promise<string | null> {
+async function autoClaimSprint(cwd: string, sprint: number, explicitActor?: string): Promise<string | null> {
   const { resolveStore } = await import('../store.js');
-  const player = process.env.USER || 'unknown';
+  const actor = resolveActor(cwd, { explicitActor });
+  const player = actor.name;
+  const playerDisplay = formatActorName(actor);
   const target = `sprint:${formatSprintLabel(sprint)}`;
 
   try {
@@ -303,7 +463,7 @@ async function autoClaimSprint(cwd: string, sprint: number): Promise<string | nu
     try {
       const existing = await store.list(sprint);
       if (existing.some(c => c.player === player && c.target === target)) {
-        return `Claim: ${target} already held by ${player}.`;
+        return `Claim: ${target} already held by ${playerDisplay} (actor source: ${formatActorSource(actor)}).`;
       }
       const claim = await store.claim({
         sprint_number: sprint,
@@ -312,7 +472,7 @@ async function autoClaimSprint(cwd: string, sprint: number): Promise<string | nu
         scope: 'area',
         notes: 'auto-claimed by slope sprint start',
       });
-      return `Claim: ${claim.target} (${claim.scope}) auto-claimed for ${player}.`;
+      return `Claim: ${claim.target} (${claim.scope}) auto-claimed for ${playerDisplay} (actor source: ${formatActorSource(actor)}).`;
     } finally {
       store.close();
     }
@@ -346,7 +506,31 @@ function gateCommand(args: string[], cwd: string): void {
   const gateName = args[0] as GateName | undefined;
   if (!gateName || !VALID_GATES.includes(gateName)) {
     console.error(`Error: gate name required. Valid gates: ${VALID_GATES.join(', ')}`);
+    printGateUsage();
     process.exit(1);
+  }
+
+  const options = parseGateOptions(args.slice(1));
+  if (options.help) {
+    printGateUsage(gateName);
+    return;
+  }
+  if (options.errors.length > 0) {
+    for (const error of options.errors) console.error(`Error: ${error}`);
+    printGateUsage(gateName);
+    process.exit(1);
+  }
+  if (!isReviewGateName(gateName) && options.review) {
+    console.error('Error: review evidence options only apply to code_review and architect_review gates.');
+    process.exit(1);
+  }
+  if (isReviewGateName(gateName)) {
+    const validation = validateReviewGateCompletion(options.review);
+    if (validation) {
+      console.error(`Error: ${validation}.`);
+      printGateUsage(gateName);
+      process.exit(1);
+    }
   }
 
   const state = loadSprintState(cwd);
@@ -355,19 +539,56 @@ function gateCommand(args: string[], cwd: string): void {
     process.exit(1);
   }
 
-  if (state.gates[gateName]) {
+  if (state.gates[gateName] && (!isReviewGateName(gateName) || !options.review)) {
     console.log(`Gate '${gateName}' is already complete.`);
     return;
   }
 
-  updateGate(cwd, gateName, true);
+  const changed = updateGate(cwd, gateName, true, { review: options.review });
+  if (!changed) {
+    console.error(`Error: could not update gate '${gateName}'.`);
+    process.exit(1);
+  }
   const updated = loadSprintState(cwd)!;
   const remaining = pendingGates(updated);
+  const provenance = isReviewGateName(gateName) ? ` (${updated.review_gates[gateName].provenance})` : '';
 
   if (remaining.length === 0) {
-    console.log(`Gate '${gateName}' marked complete. All gates done — ready for PR!`);
+    console.log(`Gate '${gateName}' marked complete${provenance}. All gates done - ready for PR!`);
   } else {
-    console.log(`Gate '${gateName}' marked complete. Remaining: ${remaining.join(', ')}`);
+    console.log(`Gate '${gateName}' marked complete${provenance}. Remaining: ${remaining.join(', ')}`);
+  }
+}
+
+function formatReviewEvidence(review: ReviewGateState): string {
+  return review.evidence.length > 0 ? review.evidence.join(', ') : '(missing)';
+}
+
+function formatReviewGateStatus(state: SprintState, gate: ReviewGateName): string {
+  const review = state.review_gates[gate];
+  if (!state.gates[gate] || review.provenance === 'pending') {
+    return 'pending review evidence';
+  }
+
+  const validation = validateReviewGateCompletion({
+    provenance: review.provenance,
+    evidence: review.evidence,
+    reviewer: review.reviewer,
+    notes: review.notes,
+  });
+  if (validation) {
+    return `invalid ${review.provenance}: ${validation}`;
+  }
+
+  switch (review.provenance) {
+    case 'independent_review':
+      return `independent_review; reviewer=${review.reviewer}; evidence=${formatReviewEvidence(review)}`;
+    case 'pr_review':
+      return `pr_review; evidence=${formatReviewEvidence(review)}`;
+    case 'self_review':
+      return `self_review (weaker); reason=${review.notes}`;
+    case 'manual_override':
+      return `manual_override (weaker); reason=${review.notes}`;
   }
 }
 
@@ -387,12 +608,25 @@ function statusCommand(cwd: string): void {
   console.log('');
   console.log('Gates:');
   for (const [gate, done] of Object.entries(state.gates)) {
-    const marker = done ? '[x]' : '[ ]';
-    console.log(`  ${marker} ${gate}`);
+    if (isReviewGateName(gate)) {
+      const satisfied = isReviewGateSatisfied(state, gate);
+      const marker = satisfied ? '[x]' : done ? '[!]' : '[ ]';
+      console.log(`  ${marker} ${gate} (${formatReviewGateStatus(state, gate)})`);
+    } else {
+      const marker = done ? '[x]' : '[ ]';
+      console.log(`  ${marker} ${gate}`);
+    }
   }
 
   if (!complete) {
-    const pending = pendingGates(state);
+    const pendingNames = pendingGateNames(state);
+    const pendingLabels = pendingGates(state);
+    const pending = pendingNames.map((gate, index) => {
+      if (isReviewGateName(gate) && state.gates[gate]) {
+        return `${gate} (review evidence incomplete)`;
+      }
+      return pendingLabels[index] ?? gate;
+    });
     console.log(`\nRemaining: ${pending.join(', ')}`);
   } else {
     console.log('\nNext: create PR for this branch; after merge, run post-merge retro.');
@@ -690,10 +924,10 @@ async function workflowCleanupCommand(args: string[], cwd: string): Promise<void
     try {
       const result = await reconcileWorkflowExecutions(cwd, store);
       for (const { exec, reason } of result.paused) {
-        console.log(`Paused ${exec.sprint_id ?? exec.id} (${exec.workflow_name}) at ${exec.current_phase}/${exec.current_step} — ${reason}`);
+        console.log(`Paused ${sprintLabelForExecution(exec)} (${exec.workflow_name}) at ${exec.current_phase}/${exec.current_step} — ${reason}`);
       }
       for (const item of result.fastForwarded) {
-        console.log(`Fast-forwarded ${item.exec.sprint_id ?? item.exec.id} (${item.exec.workflow_name}) to ${item.phase}/${item.step} — ${item.reason}`);
+        console.log(`Fast-forwarded ${sprintLabelForExecution(item.exec)} (${item.exec.workflow_name}) to ${item.phase}/${item.step} — ${item.reason}`);
       }
       if (result.paused.length === 0 && result.fastForwarded.length === 0) {
         console.log('Workflow state already matches git/roadmap reality.');
@@ -721,7 +955,7 @@ async function workflowCleanupCommand(args: string[], cwd: string): Promise<void
 
     const engine = new WorkflowEngine();
     for (const { exec, reason } of stale) {
-      const label = exec.sprint_id ?? exec.id;
+      const label = sprintLabelForExecution(exec);
       if (dryRun) {
         console.log(`[dry-run] Would pause ${label} (${exec.workflow_name}) at ${exec.current_phase}/${exec.current_step} — ${reason}`);
       } else {
@@ -914,7 +1148,8 @@ async function restoreResumeClaims(cwd: string, plan: PortableResumePlan): Promi
   if (claims.length === 0) return 0;
   const { resolveStore } = await import('../store.js');
   const store = await resolveStore(cwd);
-  const player = process.env.USER || 'unknown';
+  const actor = resolveActor(cwd);
+  const player = actor.name;
   let restored = 0;
   try {
     const existing = await store.list(plan.sprint);
@@ -1275,12 +1510,15 @@ function printSprintUsage(): void {
 slope sprint — Sprint lifecycle management
 
 Legacy commands:
-  slope sprint start --number=N [--phase=<phase>] [--touches=<paths>] [--force]
+  slope sprint start --number=N [--phase=<phase>] [--touches=<paths>] [--actor=<name>] [--force]
                                       Start sprint state tracking with pre-sprint reality checks
-  slope sprint begin --sprint=N --ticket=T  Bundled start + claim + briefing + prep (#311)
+  slope sprint begin --sprint=N --ticket=T [--actor=<name>]  Bundled start + claim + briefing + prep (#311)
   slope sprint plan --sprint=N [--output=path]  Generate markdown sprint plan (#312)
   slope sprint phase <phase>       Update current sprint phase
-  slope sprint gate <name>           Mark a gate as complete
+  slope sprint gate <name> [review evidence options]
+                                      Mark a gate as complete
+                                      Review gates require independent evidence, PR review evidence,
+                                      or explicit weaker-mode self_review/manual_override provenance
   slope sprint status                Show sprint state and gates
   slope sprint resume --portable [--from=path] [--force] [--dry-run]
                                       Reconstruct local sprint state from tracked artifacts

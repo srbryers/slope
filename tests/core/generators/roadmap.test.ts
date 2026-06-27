@@ -93,6 +93,8 @@ describe('generateRoadmap', () => {
     expect(result.sprints).toHaveLength(2);
     expect(result.sprints[0].tickets).toHaveLength(2);
     expect(result.sprints[1].tickets).toHaveLength(1);
+    expect(result.description).toContain('scope-based work units');
+    expect(result.description).toContain('calendar time boxes');
   });
 
   it('falls back to label-based grouping when no milestones', () => {
@@ -108,6 +110,7 @@ describe('generateRoadmap', () => {
 
     expect(result.sprints.length).toBeGreaterThanOrEqual(1);
     expect(result.description).toContain('labels');
+    expect(result.description).toContain('scope-based work units');
   });
 
   it('falls back to local TODOs when no remote data', () => {
@@ -119,6 +122,7 @@ describe('generateRoadmap', () => {
     expect(result.sprints[0].theme).toBe('Local Backlog Cleanup');
     expect(result.sprints[0].tickets.length).toBeGreaterThanOrEqual(1);
     expect(result.description).toContain('local');
+    expect(result.description).toContain('scope-based work units');
   });
 
   it('generates generic starter when no data at all', () => {

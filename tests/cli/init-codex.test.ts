@@ -9,6 +9,7 @@ const SLOPE_BIN = resolve(REPO_ROOT, 'dist', 'cli', 'index.js');
 const STRICT_SEMVER = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-.]+)?(?:\+[0-9A-Za-z-.]+)?$/;
 
 function runSlopeInit(cwd: string, args: string[] = ['--codex']): string {
+  execFileSync('git', ['init', '-q'], { cwd });
   return execFileSync(process.execPath, [SLOPE_BIN, 'init', ...args], {
     cwd,
     encoding: 'utf8',

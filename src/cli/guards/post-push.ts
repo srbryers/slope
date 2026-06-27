@@ -79,7 +79,13 @@ export async function postPushGuard(input: HookInput, cwd: string): Promise<Guar
     options = pending.map(g => ({
       id: `gate-${g}`,
       label: `Complete ${g}`,
-      command: g === 'scorecard' ? 'slope validate' : g === 'review_md' ? 'slope review' : `slope sprint gate ${g}`,
+      command: g === 'scorecard'
+        ? 'slope validate'
+        : g === 'review_md'
+          ? 'slope review'
+          : (g === 'code_review' || g === 'architect_review')
+              ? `slope sprint gate ${g} --reviewer=<id> --evidence=<path-or-url>`
+              : `slope sprint gate ${g}`,
     }));
   } else {
     contextText = 'No active sprint. Run `slope briefing` or start a new sprint.';

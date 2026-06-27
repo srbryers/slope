@@ -56,13 +56,54 @@ async function createRunningExecution(
   phase: string,
   step: string,
   options: { sprintId?: string; sessionId?: string } = {},
-): Promise<void> {
+): Promise<string> {
   const exec = await store.startExecution({
     workflow_name: workflow,
     sprint_id: options.sprintId ?? 'S77',
     session_id: options.sessionId,
   });
   await store.updateExecutionState(exec.id, phase, step);
+  return exec.id;
+}
+
+function writeScorecard(sprint: number): void {
+  mkdirSync(join(TMP, 'docs', 'retros'), { recursive: true });
+  writeFileSync(join(TMP, 'docs', 'retros', `sprint-${sprint}.json`), JSON.stringify({
+    sprint_number: sprint,
+    theme: `Sprint ${sprint}`,
+    par: 4,
+    slope: 1,
+    score: 4,
+    score_label: 'par',
+    shots: [],
+    stats: { fairways_hit: 0, fairways_total: 0, greens_in_regulation: 0, greens_total: 0, putts: 0, penalties: 0, hazards_hit: 0, hazard_penalties: 0, miss_directions: { long: 0, short: 0, left: 0, right: 0 } },
+    conditions: [],
+    special_plays: [],
+    bunker_locations: [],
+    yardage_book_updates: [],
+    course_management_notes: [],
+  }));
+}
+
+function writeRoadmap(sprints: Array<{ id: number; status: string }>): void {
+  mkdirSync(join(TMP, 'docs', 'backlog'), { recursive: true });
+  writeFileSync(join(TMP, 'docs', 'backlog', 'roadmap.json'), JSON.stringify({
+    name: 'Workflow Step Gate Test Roadmap',
+    phases: [{ name: 'Phase 1', sprints: sprints.map(sprint => sprint.id) }],
+    sprints: sprints.map(({ id, status }) => ({
+      id,
+      theme: `Sprint ${id}`,
+      par: 4,
+      slope: 1,
+      type: 'bugfix',
+      status,
+      tickets: [
+        { key: `S${id}-1`, title: 'Ticket 1', club: 'short_iron', complexity: 'standard' },
+        { key: `S${id}-2`, title: 'Ticket 2', club: 'wedge', complexity: 'small' },
+        { key: `S${id}-3`, title: 'Ticket 3', club: 'putter', complexity: 'trivial' },
+      ],
+    })),
+  }, null, 2));
 }
 
 function waitForTimestampTick(): Promise<void> {
@@ -191,6 +232,55 @@ describe('workflowStepGateGuard', () => {
     expect(result.context).toContain('multiple running workflow executions');
   });
 
+  it('fails open when a single validation execution does not match current sprint context (#572)', async () => {
+    writeConfig();
+    saveSprintState(TMP, createSprintState(217, 'implementing'));
+    writeWorkflow('stale-validation-wf', 'validation');
+    const store = new SqliteSlopeStore(join(TMP, '.slope/slope.db'));
+    await createRunningExecution(store, 'stale-validation-wf', 'phase1', 'step1', { sprintId: 'S23' });
+    store.close();
+
+    const result = await workflowStepGateGuard(makeInput(), TMP);
+
+    expect(result.decision).toBeUndefined();
+    expect(result.blockReason).toBeUndefined();
+    expect(result.context).toContain('does not match the current sprint/session context');
+    expect(result.context).toContain('S23');
+    expect(result.context).toContain('cleanup --stale');
+  });
+
+  it('pauses scorecarded roadmap-complete validation executions before they can block edits (#572)', async () => {
+    writeConfig({
+      roadmapPath: 'docs/backlog/roadmap.json',
+      scorecardDir: 'docs/retros',
+      scorecardPattern: 'sprint-*.json',
+    });
+    saveSprintState(TMP, createSprintState(217, 'implementing'));
+    writeWorkflow('stale-validation-wf', 'validation');
+    writeScorecard(23);
+    writeRoadmap([
+      { id: 23, status: 'complete' },
+      { id: 217, status: 'planned' },
+    ]);
+
+    const store = new SqliteSlopeStore(join(TMP, '.slope/slope.db'));
+    const execId = await createRunningExecution(store, 'stale-validation-wf', 'phase1', 'step1', { sprintId: 'S23' });
+    store.close();
+
+    const result = await workflowStepGateGuard(makeInput(), TMP);
+
+    expect(result.decision).toBeUndefined();
+    expect(result.blockReason).toBeUndefined();
+    expect(result.context).toContain('paused 1 stale workflow execution');
+
+    const updated = new SqliteSlopeStore(join(TMP, '.slope/slope.db'));
+    try {
+      await expect(updated.getExecution(execId)).resolves.toMatchObject({ status: 'paused' });
+    } finally {
+      updated.close();
+    }
+  });
+
   it('blocks file edit on command step', async () => {
     writeConfig();
     writeWorkflow('test-wf', 'command');
@@ -214,6 +304,7 @@ describe('workflowStepGateGuard', () => {
     const result = await workflowStepGateGuard(makeInput(), TMP);
     expect(result.decision).toBe('deny');
     expect(result.blockReason).toContain('validation');
+    expect(result.blockReason).toContain('cleanup --stale');
   });
 
   it('fast-forwards a branch sprint execution before blocking edits (#503)', async () => {

@@ -1,9 +1,9 @@
 {
   "name": "SLOPE Development Roadmap",
-  "description": "Forward-looking roadmap from S61+. Phases 1-9 (S1-S47) are complete. S48-S60 were hardening, guard enforcement, and process sprints. This roadmap covers adoption, observability, guard maturity, multi-project, loop evolution, and issue-driven recovery. S61-S64 reflect what actually shipped (themes diverged from original plan). Note: the actual S69 diverged from the planned Referee sprint \u2014 a carryover patch kit ran instead. The Referee work was rescheduled as S78. S75.5 (The Bug Clearing) added 2026-05-02 to clear accumulated CLI bugs from external repos. S132-S136 were backfilled from shipped scorecards on 2026-06-05; S137 adds post-merge retro tooling and durable memory, S137.5 addresses Windows suite portability for #509, S138-S144 triage open GitHub issues #499/#501/#502/#503/#505/#507/#510/#511/#512/#513/#514/#515/#516/#517/#518 into focused recovery sprints, S145 closed validation-signal regressions #519/#520, S146 cleaned stale roadmap state plus decimal sprint shipped-artifact warnings (#522), S146.1 cut the v1.58.1 patch release while repairing release-bump staging (#524/#528), active inserted sprint status (#525), and guard test isolation (#526), S146.2 closes the decimal post-merge retro gap (#529), S146.3 scopes workflow-step-gate to the relevant execution (#531), S147 was superseded by later human operating surface work, S148-S151.1 completed the human operating surface simplification and Windows git fixture hardening, S152 published v1.59.0, S152.1 tracks roadmap interview discoverability across supported harness surfaces, S153 tracks semver recommendation hardening for #550, and S154-S158 triage open GitHub issues #552/#553/#556/#557/#558/#561/#562/#563/#565/#566/#567/#568 into focused recovery sprints.",
+  "description": "Forward-looking roadmap from S61+. Phases 1-9 (S1-S47) are complete. S48-S60 were hardening, guard enforcement, and process sprints. This roadmap covers adoption, observability, guard maturity, multi-project, loop evolution, and issue-driven recovery. S61-S64 reflect what actually shipped (themes diverged from original plan). Note: the actual S69 diverged from the planned Referee sprint — a carryover patch kit ran instead. The Referee work was rescheduled as S78. S75.5 (The Bug Clearing) added 2026-05-02 to clear accumulated CLI bugs from external repos. S132-S136 were backfilled from shipped scorecards on 2026-06-05; S137 adds post-merge retro tooling and durable memory, S137.5 addresses Windows suite portability for #509, S138-S144 triage open GitHub issues #499/#501/#502/#503/#505/#507/#510/#511/#512/#513/#514/#515/#516/#517/#518 into focused recovery sprints, S145 closed validation-signal regressions #519/#520, S146 cleaned stale roadmap state plus decimal sprint shipped-artifact warnings (#522), S146.1 cut the v1.58.1 patch release while repairing release-bump staging (#524/#528), active inserted sprint status (#525), and guard test isolation (#526), S146.2 closes the decimal post-merge retro gap (#529), S146.3 scopes workflow-step-gate to the relevant execution (#531), S147 was superseded by later human operating surface work, S148-S151.1 completed the human operating surface simplification and Windows git fixture hardening, S152 published v1.59.0, S152.1 completed roadmap interview discoverability across supported harness surfaces, S153 closed semver recommendation hardening for #550, S154 shipped roadmap/status integrity for #563/#567/#568, and S216-S222 execute the open-issue recovery train for #552/#553/#556/#557/#558/#561/#562/#565/#566/#572/#573 plus the v1.60.0 release.",
   "phases": [
     {
-      "name": "Phase 10 \u2014 Adoption & Onboarding",
+      "name": "Phase 10 — Adoption & Onboarding",
       "sprints": [
         61,
         62,
@@ -13,7 +13,7 @@
       "status": "complete"
     },
     {
-      "name": "Phase 11 \u2014 Repair & Observability",
+      "name": "Phase 11 — Repair & Observability",
       "sprints": [
         65,
         66,
@@ -22,18 +22,18 @@
       "status": "complete"
     },
     {
-      "name": "Phase 12 \u2014 Guard Maturity",
+      "name": "Phase 12 — Guard Maturity",
       "sprints": [
         68,
         69,
         78,
         80
       ],
-      "note": "S69 diverged \u2014 patch kit ran instead of The Referee. The Referee was rescheduled and now sits at S78 (renumbered after S73 Caddy's Notes was inserted). S80 added 2026-04-30 to address GH issues #290/#291 (sprint hygiene \u2014 read-side surfacing + post-hole command).",
+      "note": "S69 diverged — patch kit ran instead of The Referee. The Referee was rescheduled and now sits at S78 (renumbered after S73 Caddy's Notes was inserted). S80 added 2026-04-30 to address GH issues #290/#291 (sprint hygiene — read-side surfacing + post-hole command).",
       "status": "complete"
     },
     {
-      "name": "Phase 13 \u2014 Multi-Project & Teams",
+      "name": "Phase 13 — Multi-Project & Teams",
       "sprints": [
         70,
         72
@@ -41,14 +41,14 @@
       "status": "complete"
     },
     {
-      "name": "Phase 14 \u2014 Agent Memory & Context",
+      "name": "Phase 14 — Agent Memory & Context",
       "sprints": [
         73
       ],
       "status": "complete"
     },
     {
-      "name": "Phase 15 \u2014 Loop Evolution",
+      "name": "Phase 15 — Loop Evolution",
       "sprints": [
         74,
         75,
@@ -57,7 +57,7 @@
       ]
     },
     {
-      "name": "Phase 16 \u2014 Assessment & Wrap-up",
+      "name": "Phase 16 — Assessment & Wrap-up",
       "sprints": [
         77,
         79,
@@ -70,7 +70,7 @@
       "status": "complete"
     },
     {
-      "name": "Phase 18 \u2014 Drift Detection & Bug Clearing",
+      "name": "Phase 18 — Drift Detection & Bug Clearing",
       "sprints": [
         86,
         87
@@ -79,7 +79,7 @@
       "note": "Builds the drift-detection scaffolding (S86) the project lacked during S70-S84, and clears accumulated CLI bugs from external users (S87, supersedes S75.5)."
     },
     {
-      "name": "Phase 19 \u2014 Agent Developer Experience",
+      "name": "Phase 19 — Agent Developer Experience",
       "sprints": [
         88,
         89
@@ -88,16 +88,16 @@
       "note": "Machine-readable state + bundled workflow commands. Foundation for agent-driven SLOPE usage filed as #309-316."
     },
     {
-      "name": "Phase 20 \u2014 Architecture & Automation",
+      "name": "Phase 20 — Architecture & Automation",
       "sprints": [
         90,
         91
       ],
       "status": "complete",
-      "note": "Memory\u2194store reunification (architectural debt from PR #293) + automation hooks for PR/issue/branch hygiene."
+      "note": "Memory↔store reunification (architectural debt from PR #293) + automation hooks for PR/issue/branch hygiene."
     },
     {
-      "name": "Phase 21 \u2014 Backlog Cleanup",
+      "name": "Phase 21 — Backlog Cleanup",
       "sprints": [
         92
       ],
@@ -105,7 +105,7 @@
       "note": "Closed the 3 remaining backlog items (#307, #318, #323) from the Phase 18-20 sweep. Shipped in v1.55.0."
     },
     {
-      "name": "Phase 22 \u2014 Codex Hook Recovery",
+      "name": "Phase 22 — Codex Hook Recovery",
       "sprints": [
         93
       ],
@@ -113,7 +113,7 @@
       "note": "Recover Codex hook support after validating current Codex CLI hook docs and local 0.130 behavior."
     },
     {
-      "name": "Phase 23 \u2014 Guard Enforcement Hardening",
+      "name": "Phase 23 — Guard Enforcement Hardening",
       "sprints": [
         94
       ],
@@ -121,7 +121,7 @@
       "note": "Closed the remaining enforcement/diagnostic gaps exposed by #368: full dispatcher coverage, Codex matcher coverage, stale runtime detection, configurable strictness for implementation writes outside sprint state, and transport-independent PR review handoff. Shipped in v1.55.6."
     },
     {
-      "name": "Phase 24 \u2014 Sprint State Inference",
+      "name": "Phase 24 — Sprint State Inference",
       "sprints": [
         95
       ],
@@ -129,7 +129,7 @@
       "note": "Resolve #364 by making roadmap-inserted sub-sprints and missing active state explicit in next/status/briefing and guard guidance."
     },
     {
-      "name": "Phase 25 \u2014 Vision & Roadmap Generation Repair",
+      "name": "Phase 25 — Vision & Roadmap Generation Repair",
       "sprints": [
         96
       ],
@@ -137,7 +137,7 @@
       "note": "Close #376/#377 by preserving natural-language vision priorities and making roadmap generation refuse shallow placeholder output when backlog analysis yields no concrete work."
     },
     {
-      "name": "Phase 26 \u2014 Review Recommendation Repair",
+      "name": "Phase 26 — Review Recommendation Repair",
       "sprints": [
         97
       ],
@@ -145,7 +145,7 @@
       "note": "Fix the follow-up found during S96: review recommendation should understand table-form sprint plans generated by slope sprint plan before Codex plugin work resumes."
     },
     {
-      "name": "Phase 27 \u2014 Guard Noise & Workflow Phase Repair",
+      "name": "Phase 27 — Guard Noise & Workflow Phase Repair",
       "sprints": [
         98
       ],
@@ -153,7 +153,7 @@
       "note": "Close #382/#383 before Codex plugin work: suppress repeated explore guidance and make workflow per-ticket state advance sprint-state into implementing."
     },
     {
-      "name": "Phase 28 \u2014 Issue Recovery & Release Maintenance",
+      "name": "Phase 28 — Issue Recovery & Release Maintenance",
       "sprints": [
         102,
         103,
@@ -172,7 +172,7 @@
       "note": "Syncs the completed issue, release, and maintenance sprints that shipped after the original S101 roadmap tail."
     },
     {
-      "name": "Phase 29 \u2014 Agent Skill Awareness",
+      "name": "Phase 29 — Agent Skill Awareness",
       "sprints": [
         114,
         114.5
@@ -181,7 +181,7 @@
       "note": "Add repo-local skill registry, skill validation, scorecard skill fields, and skill-aware briefing for #431."
     },
     {
-      "name": "Phase 30 \u2014 Skill Awareness Closeout",
+      "name": "Phase 30 — Skill Awareness Closeout",
       "sprints": [
         115
       ],
@@ -189,7 +189,7 @@
       "note": "Close the remaining #431 acceptance gap and fix decimal sprint follow-on inference."
     },
     {
-      "name": "Phase 31 \u2014 Skill Awareness Release",
+      "name": "Phase 31 — Skill Awareness Release",
       "sprints": [
         116
       ],
@@ -197,7 +197,7 @@
       "note": "Published the skill registry and skill-aware briefing work as v1.56.0, including roadmap cleanup for superseded S75.5 status."
     },
     {
-      "name": "Phase 32 \u2014 Worktree Guard Hardening",
+      "name": "Phase 32 — Worktree Guard Hardening",
       "sprints": [
         117
       ],
@@ -205,7 +205,7 @@
       "note": "Used the SLOPE-generated local backlog to harden the worktree-check guard against recurring multi-session and payload-shape hazards."
     },
     {
-      "name": "Phase 33 \u2014 Guard Hardening Release",
+      "name": "Phase 33 — Guard Hardening Release",
       "sprints": [
         118
       ],
@@ -213,7 +213,7 @@
       "note": "Published the S117 worktree-check guard hardening as v1.56.1 and verified the trusted-publisher npm release."
     },
     {
-      "name": "Phase 34 \u2014 Skill Registry Follow-ups",
+      "name": "Phase 34 — Skill Registry Follow-ups",
       "sprints": [
         119
       ],
@@ -221,7 +221,7 @@
       "note": "Closed the new GitHub issue batch for skills validation, scanning, help behavior, and sprint-specific briefing recommendations."
     },
     {
-      "name": "Phase 35 \u2014 Historical Scorecard Validation Cleanup",
+      "name": "Phase 35 — Historical Scorecard Validation Cleanup",
       "sprints": [
         120
       ],
@@ -229,7 +229,7 @@
       "note": "Cleared the repo-wide validate --skills failure caused by legacy scorecards that predate explicit greens_total stats."
     },
     {
-      "name": "Phase 36 \u2014 Skill Registry Patch Release",
+      "name": "Phase 36 — Skill Registry Patch Release",
       "sprints": [
         121
       ],
@@ -237,7 +237,7 @@
       "note": "Published the S119/S120 skill registry and validation fixes as v1.56.2 using the trusted-publisher release flow."
     },
     {
-      "name": "Phase 37 \u2014 Hook CWD Guard Correctness",
+      "name": "Phase 37 — Hook CWD Guard Correctness",
       "sprints": [
         122
       ],
@@ -245,7 +245,7 @@
       "note": "Fixed GitHub issue #447 so tool hooks prefer the payload cwd in Codex worktrees before falling back to the launcher cwd."
     },
     {
-      "name": "Phase 38 \u2014 Hook CWD Minor Release",
+      "name": "Phase 38 — Hook CWD Minor Release",
       "sprints": [
         123
       ],
@@ -253,7 +253,7 @@
       "note": "Published the S122 hook cwd guard correctness work as v1.57.0 using the trusted-publisher release flow."
     },
     {
-      "name": "Phase 39 \u2014 Pre-Sprint Reality Checks",
+      "name": "Phase 39 — Pre-Sprint Reality Checks",
       "sprints": [
         124
       ],
@@ -261,7 +261,7 @@
       "note": "Close #452 and #453 by surfacing roadmap drift and sibling worktree conflict signals before agents commit to a sprint."
     },
     {
-      "name": "Phase 40 \u2014 Codex Runtime Recovery",
+      "name": "Phase 40 — Codex Runtime Recovery",
       "sprints": [
         125,
         126,
@@ -271,7 +271,7 @@
       "note": "Triage the open #456/#459/#460 issue batch into two focused repair sprints and one patch-release sprint: first fix Codex effective-workdir hook routing, then improve native SQLite recovery messaging, then publish the combined fixes."
     },
     {
-      "name": "Phase 41 \u2014 Roadmap Shape & Worktree Deadlock Recovery",
+      "name": "Phase 41 — Roadmap Shape & Worktree Deadlock Recovery",
       "sprints": [
         128,
         129,
@@ -282,7 +282,7 @@
       "note": "The #466/#467/#468 issue batch was completed through the S130/S131 recovery and release work. S128/S129 remained stale planned entries without standalone scorecards and were marked superseded in S146."
     },
     {
-      "name": "Phase 42 \u2014 Closeout Corrections & Issue Scout",
+      "name": "Phase 42 — Closeout Corrections & Issue Scout",
       "sprints": [
         132,
         133,
@@ -294,7 +294,7 @@
       "note": "Backfill shipped S132-S136 scorecards so roadmap status, review recommendation, and future sprint planning have the real current tail."
     },
     {
-      "name": "Phase 43 \u2014 Guard Deadlock & State Portability Recovery",
+      "name": "Phase 43 — Guard Deadlock & State Portability Recovery",
       "sprints": [
         137,
         138,
@@ -315,7 +315,7 @@
       "note": "Start with a retro command/skill sprint that captures post-PR-merge learning into durable memory, then triage open #499/#501/#502/#503/#505/#507/#510/#511/#512/#513/#514/#515 into focused recovery sprints: destructive-help safety, existing-worktree entry guidance, session-collision recovery, workflow state resync, non-TypeScript map guard safety, portable sprint resume, commit-ready map freshness alignment, decimal sprint status parsing, Windows-safe map staleness checks, decimal sprint currency formatting, Node exec redirection audit, atomic-write lock contention hardening, and a release."
     },
     {
-      "name": "Phase 44 \u2014 Validation Signal Repair",
+      "name": "Phase 44 — Validation Signal Repair",
       "sprints": [
         145
       ],
@@ -323,7 +323,7 @@
       "note": "Close #519/#520 by making roadmap shipped-commit detection ignore sprint-range endpoints and making `slope map --check` use the same file-counting logic as `slope map`."
     },
     {
-      "name": "Phase 45 \u2014 Roadmap Hygiene",
+      "name": "Phase 45 — Roadmap Hygiene",
       "sprints": [
         146,
         146.1,
@@ -334,7 +334,7 @@
       "note": "Clean stale roadmap state after the recovery train, fix decimal sprint shipped-artifact detection (#522), cut the v1.58.1 patch release, repair release-bump staging/status/test-isolation issues (#524/#525/#526/#528), close the decimal post-merge retro gap (#529), and scope workflow-step-gate to the relevant execution (#531)."
     },
     {
-      "name": "Phase 46 \u2014 Handoff Continuity",
+      "name": "Phase 46 — Handoff Continuity",
       "sprints": [
         147
       ],
@@ -342,7 +342,7 @@
       "note": "S147 remained a stale planned handoff-continuity entry after S148-S151.1 shipped the broader human operating surface. It is closed as superseded rather than complete because no standalone S147 scorecard shipped."
     },
     {
-      "name": "Phase 47 \u2014 Human Operating Surface Simplification",
+      "name": "Phase 47 — Human Operating Surface Simplification",
       "sprints": [
         148,
         149,
@@ -354,32 +354,39 @@
       "note": "Plan and implement the higher-level SLOPE operating surface so humans see a small, memorable cockpit while agents and skills orchestrate the deeper CLI/MCP execution framework."
     },
     {
-      "name": "Phase 48 \u2014 Release Tooling Follow-up",
+      "name": "Phase 48 — Release Tooling Follow-up",
       "sprints": [
         152,
         152.1,
         153
       ],
       "status": "complete",
-      "note": "Close out the v1.59.0 release memory, repair roadmap interview discoverability across harness surfaces, and triage the semver recommendation gap discovered during release verification."
+      "note": "Closed out the v1.59.0 release memory, repaired roadmap interview discoverability across supported harness surfaces, and completed semver recommendation hardening for #550."
     },
     {
-      "name": "Phase 49 \u2014 Issue-Driven Trust Recovery",
+      "name": "Phase 49 — Issue-Driven Trust Recovery",
       "sprints": [
         154,
         155,
         156,
         157,
-        158
+        158,
+        216,
+        217,
+        218,
+        219,
+        220,
+        221,
+        222
       ],
-      "status": "planned",
-      "note": "Turn the June 2026 issue triage into focused recovery sprints: roadmap/status correctness, review-gate provenance, Codex onboarding reliability, store/retro portability, and first-class workaround codification."
+      "status": "complete",
+      "note": "S154 shipped roadmap/status integrity. The planned S155-S158 issue lane was superseded by the executed S216-S222 recovery train covering shipped-signal correctness, workflow cleanup, store/bootstrap portability, review provenance, audit trails, retro parsing, workaround codification, sprint terminology, and the v1.60.0 release."
     }
   ],
   "sprints": [
     {
       "id": 61,
-      "theme": "The Terminal Caddy \u2014 OB1 Adapter",
+      "theme": "The Terminal Caddy — OB1 Adapter",
       "par": 3,
       "slope": 1,
       "type": "feature",
@@ -409,7 +416,7 @@
     },
     {
       "id": 62,
-      "theme": "The Welcome Mat v2 + Templates \u2014 Streamlined First-Run Experience",
+      "theme": "The Welcome Mat v2 + Templates — Streamlined First-Run Experience",
       "par": 5,
       "slope": 1,
       "type": "dx",
@@ -419,7 +426,7 @@
       "tickets": [
         {
           "key": "S62-0",
-          "title": "Sprint & ticket templates \u2014 standard templates for sprint plans and tickets",
+          "title": "Sprint & ticket templates — standard templates for sprint plans and tickets",
           "club": "short_iron",
           "complexity": "standard"
         },
@@ -437,13 +444,13 @@
         },
         {
           "key": "S62-3",
-          "title": "slope init --migrate \u2014 upgrade config from older SLOPE versions",
+          "title": "slope init --migrate — upgrade config from older SLOPE versions",
           "club": "wedge",
           "complexity": "small"
         },
         {
           "key": "S62-4",
-          "title": "Post-init validation \u2014 run doctor checks after init to confirm setup",
+          "title": "Post-init validation — run doctor checks after init to confirm setup",
           "club": "putter",
           "complexity": "trivial"
         }
@@ -451,7 +458,7 @@
     },
     {
       "id": 63,
-      "theme": "The Handbook + Template Integration \u2014 CLI Help & Documentation Polish",
+      "theme": "The Handbook + Template Integration — CLI Help & Documentation Polish",
       "par": 5,
       "slope": 1,
       "type": "docs + dx",
@@ -461,19 +468,19 @@
       "tickets": [
         {
           "key": "S63-1",
-          "title": "slope help <command> \u2014 detailed usage, examples, and flags for each command",
+          "title": "slope help <command> — detailed usage, examples, and flags for each command",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
           "key": "S63-2",
-          "title": "slope quickstart \u2014 interactive tutorial for new users",
+          "title": "slope quickstart — interactive tutorial for new users",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
           "key": "S63-3",
-          "title": "Guard documentation \u2014 explain each guard's purpose, triggers, and config",
+          "title": "Guard documentation — explain each guard's purpose, triggers, and config",
           "club": "wedge",
           "complexity": "small"
         },
@@ -491,7 +498,7 @@
         },
         {
           "key": "S63-6",
-          "title": "slope plan --sprint=N \u2014 show full ticket specs from roadmap",
+          "title": "slope plan --sprint=N — show full ticket specs from roadmap",
           "club": "short_iron",
           "complexity": "standard"
         }
@@ -527,7 +534,7 @@
         },
         {
           "key": "S64-4",
-          "title": "slope prep --lite \u2014 hazards + similar tickets without embedding index",
+          "title": "slope prep --lite — hazards + similar tickets without embedding index",
           "club": "wedge",
           "complexity": "small"
         },
@@ -541,7 +548,7 @@
     },
     {
       "id": 65,
-      "theme": "The Doctor \u2014 Repo Health Checks & Repair",
+      "theme": "The Doctor — Repo Health Checks & Repair",
       "par": 4,
       "slope": 1,
       "type": "feature + dx",
@@ -551,25 +558,25 @@
       "tickets": [
         {
           "key": "S65-1",
-          "title": "slope doctor command \u2014 check .gitignore, config, hooks, guards",
+          "title": "slope doctor command — check .gitignore, config, hooks, guards",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
           "key": "S65-2",
-          "title": "slope init --repair \u2014 fix missing/outdated config in existing repos",
+          "title": "slope init --repair — fix missing/outdated config in existing repos",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
           "key": "S65-3",
-          "title": "slope doctor --fix \u2014 auto-repair common issues (gitignore, hooks, guards)",
+          "title": "slope doctor --fix — auto-repair common issues (gitignore, hooks, guards)",
           "club": "wedge",
           "complexity": "small"
         },
         {
           "key": "S65-4",
-          "title": "Guard installation audit \u2014 detect missing guards and suggest additions",
+          "title": "Guard installation audit — detect missing guards and suggest additions",
           "club": "wedge",
           "complexity": "small"
         }
@@ -577,7 +584,7 @@
     },
     {
       "id": 66,
-      "theme": "The Scorekeeper \u2014 Sprint Analytics Dashboard",
+      "theme": "The Scorekeeper — Sprint Analytics Dashboard",
       "par": 4,
       "slope": 2,
       "type": "feature",
@@ -587,25 +594,25 @@
       "tickets": [
         {
           "key": "S66-1",
-          "title": "Handicap trend API \u2014 time-series data for handicap, GIR, fairway hit",
+          "title": "Handicap trend API — time-series data for handicap, GIR, fairway hit",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
           "key": "S66-2",
-          "title": "Guard effectiveness metrics \u2014 track block/allow ratios per guard",
+          "title": "Guard effectiveness metrics — track block/allow ratios per guard",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
           "key": "S66-3",
-          "title": "Sprint velocity tracking \u2014 tickets/sprint, score trends, par accuracy",
+          "title": "Sprint velocity tracking — tickets/sprint, score trends, par accuracy",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
           "key": "S66-4",
-          "title": "Dashboard widgets for new metrics \u2014 guard stats, velocity, trend charts",
+          "title": "Dashboard widgets for new metrics — guard stats, velocity, trend charts",
           "club": "long_iron",
           "complexity": "moderate"
         }
@@ -616,7 +623,7 @@
     },
     {
       "id": 67,
-      "theme": "The Auditor \u2014 Cost & Token Tracking",
+      "theme": "The Auditor — Cost & Token Tracking",
       "par": 3,
       "slope": 2,
       "type": "feature",
@@ -626,19 +633,19 @@
       "tickets": [
         {
           "key": "S67-1",
-          "title": "Token usage tracking per sprint \u2014 estimate from transcript data",
+          "title": "Token usage tracking per sprint — estimate from transcript data",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
           "key": "S67-2",
-          "title": "Cost estimation \u2014 model-aware pricing for tracked token usage",
+          "title": "Cost estimation — model-aware pricing for tracked token usage",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
           "key": "S67-3",
-          "title": "slope cost \u2014 CLI report of token/cost trends across sprints",
+          "title": "slope cost — CLI report of token/cost trends across sprints",
           "club": "wedge",
           "complexity": "small"
         }
@@ -646,7 +653,7 @@
     },
     {
       "id": 68,
-      "theme": "The Fence \u2014 Guard Testing Framework",
+      "theme": "The Fence — Guard Testing Framework",
       "par": 4,
       "slope": 2,
       "type": "infrastructure",
@@ -656,25 +663,25 @@
       "tickets": [
         {
           "key": "S68-1",
-          "title": "Guard test harness \u2014 simulate PreToolUse/PostToolUse/Stop with fixtures",
+          "title": "Guard test harness — simulate PreToolUse/PostToolUse/Stop with fixtures",
           "club": "long_iron",
           "complexity": "moderate"
         },
         {
           "key": "S68-2",
-          "title": "Guard snapshot testing \u2014 verify guard output stability across changes",
+          "title": "Guard snapshot testing — verify guard output stability across changes",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
           "key": "S68-3",
-          "title": "Custom guard validation \u2014 check custom guards for common errors",
+          "title": "Custom guard validation — check custom guards for common errors",
           "club": "wedge",
           "complexity": "small"
         },
         {
           "key": "S68-4",
-          "title": "Guard dry-run mode \u2014 show what guards would fire without blocking",
+          "title": "Guard dry-run mode — show what guards would fire without blocking",
           "club": "wedge",
           "complexity": "small"
         }
@@ -682,7 +689,7 @@
     },
     {
       "id": 69,
-      "theme": "The Patch Kit \u2014 S68 Carryover Fixes",
+      "theme": "The Patch Kit — S68 Carryover Fixes",
       "par": 3,
       "slope": 2,
       "type": "bug fix + hardening",
@@ -693,7 +700,7 @@
       "tickets": [
         {
           "key": "S69-1",
-          "title": "Fix review amend crash \u2014 hole_stats \u2192 stats normalization",
+          "title": "Fix review amend crash — hole_stats → stats normalization",
           "club": "wedge",
           "complexity": "small"
         },
@@ -719,32 +726,32 @@
     },
     {
       "id": 70,
-      "theme": "The Replay \u2014 Session Insights & Debugging",
+      "theme": "The Replay — Session Insights & Debugging",
       "par": 4,
       "slope": 2,
       "type": "feature",
       "tickets": [
         {
           "key": "S70-1",
-          "title": "Enhanced transcript viewer \u2014 filter by tool, show timing, highlight errors",
+          "title": "Enhanced transcript viewer — filter by tool, show timing, highlight errors",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
           "key": "S70-2",
-          "title": "Session replay summary \u2014 auto-generate narrative of what happened",
+          "title": "Session replay summary — auto-generate narrative of what happened",
           "club": "long_iron",
           "complexity": "moderate"
         },
         {
           "key": "S70-3",
-          "title": "Compaction event tracking \u2014 log what was lost and recovered",
+          "title": "Compaction event tracking — log what was lost and recovered",
           "club": "wedge",
           "complexity": "small"
         },
         {
           "key": "S70-4",
-          "title": "Guard fire log \u2014 persistent record of every guard decision per session",
+          "title": "Guard fire log — persistent record of every guard decision per session",
           "club": "wedge",
           "complexity": "small"
         }
@@ -756,14 +763,14 @@
     },
     {
       "id": 71,
-      "theme": "The Intake Desk \u2014 Agent-Native Project Interview",
+      "theme": "The Intake Desk — Agent-Native Project Interview",
       "par": 5,
       "slope": 2,
       "type": "feature + dx",
       "tickets": [
         {
           "key": "S71-1",
-          "title": "Interview state machine refactor \u2014 extract UI-agnostic state machine from interview-steps.ts",
+          "title": "Interview state machine refactor — extract UI-agnostic state machine from interview-steps.ts",
           "club": "long_iron",
           "complexity": "moderate"
         },
@@ -781,13 +788,13 @@
         },
         {
           "key": "S71-4",
-          "title": "Auto-transition fresh \u2192 active after interview completion",
+          "title": "Auto-transition fresh → active after interview completion",
           "club": "wedge",
           "complexity": "small"
         },
         {
           "key": "S71-5",
-          "title": "Test coverage for state machine, CLI JSON mode, Pi tool, and fresh\u2192active flow",
+          "title": "Test coverage for state machine, CLI JSON mode, Pi tool, and fresh→active flow",
           "club": "wedge",
           "complexity": "small"
         }
@@ -796,32 +803,32 @@
     },
     {
       "id": 72,
-      "theme": "The Clubhouse Network \u2014 Multi-Repo Aggregation",
+      "theme": "The Clubhouse Network — Multi-Repo Aggregation",
       "par": 4,
       "slope": 3,
       "type": "architecture",
       "tickets": [
         {
           "key": "S72-1",
-          "title": "Cross-repo scorecard collection \u2014 aggregate from multiple .slope/ directories",
+          "title": "Cross-repo scorecard collection — aggregate from multiple .slope/ directories",
           "club": "long_iron",
           "complexity": "moderate"
         },
         {
           "key": "S72-2",
-          "title": "Org-level handicap card \u2014 compute combined stats across repos",
+          "title": "Org-level handicap card — compute combined stats across repos",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
           "key": "S72-3",
-          "title": "slope org status \u2014 show all repos, their handicaps, and active sprints",
+          "title": "slope org status — show all repos, their handicaps, and active sprints",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
           "key": "S72-4",
-          "title": "Cross-repo common-issues \u2014 promote patterns that appear in multiple repos",
+          "title": "Cross-repo common-issues — promote patterns that appear in multiple repos",
           "club": "wedge",
           "complexity": "small"
         }
@@ -830,26 +837,26 @@
     },
     {
       "id": 73,
-      "theme": "The Caddy's Notes \u2014 Cross-Session Memory System",
+      "theme": "The Caddy's Notes — Cross-Session Memory System",
       "par": 5,
       "slope": 2,
       "type": "feature",
       "tickets": [
         {
           "key": "S73-1",
-          "title": "Memory storage core \u2014 .slope/memories.json schema, CRUD, search API",
+          "title": "Memory storage core — .slope/memories.json schema, CRUD, search API",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
           "key": "S73-2",
-          "title": "Memory CLI \u2014 slope memory add/list/remove/edit/search/import/export",
+          "title": "Memory CLI — slope memory add/list/remove/edit/search/import/export",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
           "key": "S73-3",
-          "title": "Pi extension memory integration \u2014 session-start load, briefing injection, /slope-memory command",
+          "title": "Pi extension memory integration — session-start load, briefing injection, /slope-memory command",
           "club": "short_iron",
           "complexity": "standard"
         },
@@ -861,7 +868,7 @@
         },
         {
           "key": "S73-5",
-          "title": "Test coverage \u2014 unit, CLI, Pi extension, auto-memory tests",
+          "title": "Test coverage — unit, CLI, Pi extension, auto-memory tests",
           "club": "wedge",
           "complexity": "small"
         }
@@ -870,32 +877,32 @@
     },
     {
       "id": 74,
-      "theme": "The Foursome v2 \u2014 Multi-Agent Session Coordination",
+      "theme": "The Foursome v2 — Multi-Agent Session Coordination",
       "par": 4,
       "slope": 3,
       "type": "feature",
       "tickets": [
         {
           "key": "S74-1",
-          "title": "Session conflict detection across worktrees \u2014 real-time claim overlap alerts",
+          "title": "Session conflict detection across worktrees — real-time claim overlap alerts",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
           "key": "S74-2",
-          "title": "Agent handoff protocol \u2014 structured session transfer between agents",
+          "title": "Agent handoff protocol — structured session transfer between agents",
           "club": "long_iron",
           "complexity": "moderate"
         },
         {
           "key": "S74-3",
-          "title": "Parallel sprint orchestration \u2014 coordinate multiple agents on independent tickets",
+          "title": "Parallel sprint orchestration — coordinate multiple agents on independent tickets",
           "club": "long_iron",
           "complexity": "moderate"
         },
         {
           "key": "S74-4",
-          "title": "Agent session dashboard \u2014 live view of all active agent sessions",
+          "title": "Agent session dashboard — live view of all active agent sessions",
           "club": "short_iron",
           "complexity": "standard"
         }
@@ -907,32 +914,32 @@
     },
     {
       "id": 75,
-      "theme": "The Autopilot v2 \u2014 Smart Model Routing",
+      "theme": "The Autopilot v2 — Smart Model Routing",
       "par": 4,
       "slope": 2,
       "type": "feature",
       "tickets": [
         {
           "key": "S75-1",
-          "title": "Model success rate tracking \u2014 per-club, per-ticket-type success data",
+          "title": "Model success rate tracking — per-club, per-ticket-type success data",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
           "key": "S75-2",
-          "title": "Adaptive model selection \u2014 use historical data to pick optimal model per ticket",
+          "title": "Adaptive model selection — use historical data to pick optimal model per ticket",
           "club": "long_iron",
           "complexity": "moderate"
         },
         {
           "key": "S75-3",
-          "title": "Model cost-performance tradeoff \u2014 factor cost into routing decisions",
+          "title": "Model cost-performance tradeoff — factor cost into routing decisions",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
           "key": "S75-4",
-          "title": "slope loop config recommend \u2014 suggest optimal model config from data",
+          "title": "slope loop config recommend — suggest optimal model config from data",
           "club": "wedge",
           "complexity": "small"
         }
@@ -944,7 +951,7 @@
     },
     {
       "id": 75.5,
-      "theme": "The Bug Clearing \u2014 CLI Bug Fixes",
+      "theme": "The Bug Clearing — CLI Bug Fixes",
       "par": 3,
       "slope": 1,
       "type": "bug fix",
@@ -958,13 +965,13 @@
         },
         {
           "key": "S75.5-2",
-          "title": "Fix review findings stale state \u2014 namespace by sprint (GH #297)",
+          "title": "Fix review findings stale state — namespace by sprint (GH #297)",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
           "key": "S75.5-3",
-          "title": "Fix review tickets display \u2014 schema field mismatch (GH #298)",
+          "title": "Fix review tickets display — schema field mismatch (GH #298)",
           "club": "short_iron",
           "complexity": "standard"
         },
@@ -980,32 +987,32 @@
     },
     {
       "id": 76,
-      "theme": "The Assembly Line \u2014 Batch Sprint Execution",
+      "theme": "The Assembly Line — Batch Sprint Execution",
       "par": 4,
       "slope": 3,
       "type": "feature",
       "tickets": [
         {
           "key": "S76-1",
-          "title": "Dependency-aware sprint scheduling \u2014 respect depends_on in continuous mode",
+          "title": "Dependency-aware sprint scheduling — respect depends_on in continuous mode",
           "club": "long_iron",
           "complexity": "moderate"
         },
         {
           "key": "S76-2",
-          "title": "Parallel worktree management \u2014 auto-create/cleanup worktrees for parallel sprints",
+          "title": "Parallel worktree management — auto-create/cleanup worktrees for parallel sprints",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
           "key": "S76-3",
-          "title": "Sprint failure recovery \u2014 auto-retry with different strategy on failure",
+          "title": "Sprint failure recovery — auto-retry with different strategy on failure",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
           "key": "S76-4",
-          "title": "Batch execution report \u2014 summary of all sprints run in a batch",
+          "title": "Batch execution report — summary of all sprints run in a batch",
           "club": "wedge",
           "complexity": "small"
         }
@@ -1017,14 +1024,14 @@
     },
     {
       "id": 77,
-      "theme": "The Convergence \u2014 Loop Self-Improvement",
+      "theme": "The Convergence — Loop Self-Improvement",
       "par": 3,
       "slope": 3,
       "type": "architecture",
       "tickets": [
         {
           "key": "S77-1",
-          "title": "Backlog quality scoring \u2014 rate backlog tickets by likelihood of clean execution",
+          "title": "Backlog quality scoring — rate backlog tickets by likelihood of clean execution",
           "club": "short_iron",
           "complexity": "standard"
         },
@@ -1036,7 +1043,7 @@
         },
         {
           "key": "S77-3",
-          "title": "Convergence metrics \u2014 track handicap improvement rate, predict plateau",
+          "title": "Convergence metrics — track handicap improvement rate, predict plateau",
           "club": "short_iron",
           "complexity": "standard"
         }
@@ -1049,7 +1056,7 @@
     },
     {
       "id": 78,
-      "theme": "The Referee \u2014 Advisory-to-Mechanical Guard Conversion",
+      "theme": "The Referee — Advisory-to-Mechanical Guard Conversion",
       "par": 4,
       "slope": 2,
       "type": "hardening",
@@ -1057,7 +1064,7 @@
       "tickets": [
         {
           "key": "S78-1",
-          "title": "Audit all advisory guards \u2014 identify which return context-only with no disk state",
+          "title": "Audit all advisory guards — identify which return context-only with no disk state",
           "club": "wedge",
           "complexity": "small"
         },
@@ -1075,19 +1082,19 @@
         },
         {
           "key": "S78-4",
-          "title": "Guard enforcement report \u2014 slope doctor check for advisory vs mechanical guards",
+          "title": "Guard enforcement report — slope doctor check for advisory vs mechanical guards",
           "club": "wedge",
           "complexity": "small"
         },
         {
           "key": "S78-5",
-          "title": "Post-hole enforcement guard \u2014 stop hook fails session-end on roadmap/scorecard drift (GH #291)",
+          "title": "Post-hole enforcement guard — stop hook fails session-end on roadmap/scorecard drift (GH #291)",
           "club": "long_iron",
           "complexity": "moderate"
         },
         {
           "key": "S78-6",
-          "title": "Extend slope validate to detect scorecard\u2194roadmap drift (GH #291)",
+          "title": "Extend slope validate to detect scorecard↔roadmap drift (GH #291)",
           "club": "short_iron",
           "complexity": "standard"
         }
@@ -1095,12 +1102,12 @@
       "depends_on": [
         68
       ],
-      "note_addendum": "S78-5 and S78-6 added 2026-04-30 to address GH #291 \u2014 converts the advisory \"update roadmap\" rule in the Post-Hole Routine into a mechanical guard + validator. Fits S78's advisory-to-mechanical thesis.",
+      "note_addendum": "S78-5 and S78-6 added 2026-04-30 to address GH #291 — converts the advisory \"update roadmap\" rule in the Post-Hole Routine into a mechanical guard + validator. Fits S78's advisory-to-mechanical thesis.",
       "status": "complete"
     },
     {
       "id": 79,
-      "theme": "The 19th Hole \u2014 Workflow Engine Assessment & Phase Wrap-up",
+      "theme": "The 19th Hole — Workflow Engine Assessment & Phase Wrap-up",
       "par": 4,
       "slope": 2,
       "type": "assessment + hardening",
@@ -1108,25 +1115,25 @@
       "tickets": [
         {
           "key": "S79-1",
-          "title": "Workflow engine test coverage audit \u2014 identify gaps vs S67/S68 test suite",
+          "title": "Workflow engine test coverage audit — identify gaps vs S67/S68 test suite",
           "club": "wedge",
           "complexity": "small"
         },
         {
           "key": "S79-2",
-          "title": "Workflow engine E2E smoke test \u2014 full sprint lifecycle via CLI against real store",
+          "title": "Workflow engine E2E smoke test — full sprint lifecycle via CLI against real store",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
           "key": "S79-3",
-          "title": "Phase retrospective \u2014 assess shipped state vs original vision, document gaps for next roadmap",
+          "title": "Phase retrospective — assess shipped state vs original vision, document gaps for next roadmap",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
           "key": "S79-4",
-          "title": "CODEBASE.md and docs alignment check \u2014 ensure map reflects all shipped features",
+          "title": "CODEBASE.md and docs alignment check — ensure map reflects all shipped features",
           "club": "wedge",
           "complexity": "small"
         }
@@ -1140,7 +1147,7 @@
     },
     {
       "id": 80,
-      "theme": "The Course Marshal \u2014 Sprint Hygiene Surfacing",
+      "theme": "The Course Marshal — Sprint Hygiene Surfacing",
       "par": 4,
       "slope": 1,
       "type": "feature + dx",
@@ -1148,25 +1155,25 @@
       "tickets": [
         {
           "key": "S80-1",
-          "title": "slope briefing surfaces next planned sprint (dependency-resolved) \u2014 GH #290",
+          "title": "slope briefing surfaces next planned sprint (dependency-resolved) — GH #290",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
           "key": "S80-2",
-          "title": "Fix slope status next-sprint heuristic \u2014 read next-planned from roadmap, not max(complete_id)+1 \u2014 GH #290",
+          "title": "Fix slope status next-sprint heuristic — read next-planned from roadmap, not max(complete_id)+1 — GH #290",
           "club": "wedge",
           "complexity": "small"
         },
         {
           "key": "S80-3",
-          "title": "slope post-hole command \u2014 flip latest scorecard to complete, scaffold next sprint, single commit \u2014 GH #291",
+          "title": "slope post-hole command — flip latest scorecard to complete, scaffold next sprint, single commit — GH #291",
           "club": "short_iron",
           "complexity": "standard"
         },
         {
           "key": "S80-4",
-          "title": "Test coverage \u2014 briefing next-sprint selection, status heuristic, post-hole command roundtrip",
+          "title": "Test coverage — briefing next-sprint selection, status heuristic, post-hole command roundtrip",
           "club": "wedge",
           "complexity": "small"
         }
@@ -1176,47 +1183,47 @@
     },
     {
       "id": 81,
-      "theme": "Universal Adapter \u2014 Codex CLI, OpenCode, cross-agent support",
+      "theme": "Universal Adapter — Codex CLI, OpenCode, cross-agent support",
       "par": 4,
       "slope": 1,
       "type": "feature",
       "status": "complete",
-      "note": "stub added during roadmap reconcile \u2014 sprint shipped without an in-roadmap plan entry",
+      "note": "stub added during roadmap reconcile — sprint shipped without an in-roadmap plan entry",
       "tickets": []
     },
     {
       "id": 82,
-      "theme": "Testing Polish \u2014 Pi/OpenCode integration tests + essential guard tier",
+      "theme": "Testing Polish — Pi/OpenCode integration tests + essential guard tier",
       "par": 4,
       "slope": 1,
       "type": "test + dx",
       "status": "complete",
-      "note": "stub added during roadmap reconcile \u2014 sprint shipped without an in-roadmap plan entry",
+      "note": "stub added during roadmap reconcile — sprint shipped without an in-roadmap plan entry",
       "tickets": []
     },
     {
       "id": 83,
-      "theme": "Native Pi Adapter \u2014 HarnessAdapter + init + tests",
+      "theme": "Native Pi Adapter — HarnessAdapter + init + tests",
       "par": 4,
       "slope": 1,
       "type": "feature",
       "status": "complete",
-      "note": "stub added during roadmap reconcile \u2014 sprint shipped without an in-roadmap plan entry",
+      "note": "stub added during roadmap reconcile — sprint shipped without an in-roadmap plan entry",
       "tickets": []
     },
     {
       "id": 84,
-      "theme": "Pi Extension \u2014 local planner+executor harness",
+      "theme": "Pi Extension — local planner+executor harness",
       "par": 4,
       "slope": 1,
       "type": "feature",
       "status": "complete",
-      "note": "stub added during roadmap reconcile \u2014 sprint shipped without an in-roadmap plan entry",
+      "note": "stub added during roadmap reconcile — sprint shipped without an in-roadmap plan entry",
       "tickets": []
     },
     {
       "id": 85,
-      "theme": "TBD \u2014 current sprint",
+      "theme": "TBD — current sprint",
       "par": 4,
       "slope": 1,
       "type": "tbd",
@@ -1226,7 +1233,7 @@
     },
     {
       "id": 86,
-      "theme": "The Marshal \u2014 Drift Detection",
+      "theme": "The Marshal — Drift Detection",
       "par": 5,
       "slope": 2,
       "type": "feature + guard",
@@ -1238,7 +1245,7 @@
       "tickets": [
         {
           "key": "S86-1",
-          "title": "slope roadmap validate \u2014 detect status drift against git log (#319)",
+          "title": "slope roadmap validate — detect status drift against git log (#319)",
           "club": "short_iron",
           "complexity": "standard",
           "github_issue": 319
@@ -1252,7 +1259,7 @@
         },
         {
           "key": "S86-3",
-          "title": "Post-hole enforcement hook \u2014 fail session-end on roadmap/scorecard drift (#291)",
+          "title": "Post-hole enforcement hook — fail session-end on roadmap/scorecard drift (#291)",
           "club": "short_iron",
           "complexity": "standard",
           "github_issue": 291,
@@ -1281,7 +1288,7 @@
     },
     {
       "id": 87,
-      "theme": "The Bug Clearing v2 \u2014 CLI fixes for external repos",
+      "theme": "The Bug Clearing v2 — CLI fixes for external repos",
       "par": 4,
       "slope": 1,
       "type": "bug fix",
@@ -1291,7 +1298,7 @@
       "tickets": [
         {
           "key": "S87-1",
-          "title": "slope version returns 'vunknown' \u2014 read from installed package, not cwd (#300)",
+          "title": "slope version returns 'vunknown' — read from installed package, not cwd (#300)",
           "club": "wedge",
           "complexity": "small",
           "github_issue": 300
@@ -1321,17 +1328,17 @@
     },
     {
       "id": 88,
-      "theme": "The Compass \u2014 Agent State & Status",
+      "theme": "The Compass — Agent State & Status",
       "par": 4,
       "slope": 1,
       "type": "feature + dx",
       "status": "complete",
       "depends_on": [],
-      "note": "Foundation primitives for the agent-DX batch (#309-316). #310 is the keystone \u2014 once status is machine-readable, downstream commands compose.",
+      "note": "Foundation primitives for the agent-DX batch (#309-316). #310 is the keystone — once status is machine-readable, downstream commands compose.",
       "tickets": [
         {
           "key": "S88-1",
-          "title": "slope agent status \u2014 machine-readable next-step output (#310)",
+          "title": "slope agent status — machine-readable next-step output (#310)",
           "club": "short_iron",
           "complexity": "standard",
           "github_issue": 310
@@ -1348,14 +1355,14 @@
         },
         {
           "key": "S88-3",
-          "title": "slope sprint begin \u2014 bundle start, claim, briefing, and prep (#311)",
+          "title": "slope sprint begin — bundle start, claim, briefing, and prep (#311)",
           "club": "short_iron",
           "complexity": "standard",
           "github_issue": 311
         },
         {
           "key": "S88-4",
-          "title": "slope ticket done \u2014 close claim and update sprint state (#316)",
+          "title": "slope ticket done — close claim and update sprint state (#316)",
           "club": "short_iron",
           "complexity": "standard",
           "github_issue": 316
@@ -1364,7 +1371,7 @@
     },
     {
       "id": 89,
-      "theme": "The Toolkit \u2014 Agent Workflow Commands",
+      "theme": "The Toolkit — Agent Workflow Commands",
       "par": 4,
       "slope": 1,
       "type": "feature + dx",
@@ -1376,7 +1383,7 @@
       "tickets": [
         {
           "key": "S89-1",
-          "title": "slope sprint plan \u2014 generate implementation plan file (#312)",
+          "title": "slope sprint plan — generate implementation plan file (#312)",
           "club": "short_iron",
           "complexity": "standard",
           "github_issue": 312
@@ -1390,7 +1397,7 @@
         },
         {
           "key": "S89-3",
-          "title": "slope commit-ready \u2014 pre-commit agent checks (#314)",
+          "title": "slope commit-ready — pre-commit agent checks (#314)",
           "club": "short_iron",
           "complexity": "standard",
           "github_issue": 314
@@ -1406,7 +1413,7 @@
     },
     {
       "id": 90,
-      "theme": "The Vault \u2014 Memory \u2194 Store Reunification",
+      "theme": "The Vault — Memory ↔ Store Reunification",
       "par": 4,
       "slope": 2,
       "type": "refactor + architecture",
@@ -1455,7 +1462,7 @@
     },
     {
       "id": 91,
-      "theme": "The Pit Crew \u2014 Automation Hooks",
+      "theme": "The Pit Crew — Automation Hooks",
       "par": 4,
       "slope": 1,
       "type": "feature + automation",
@@ -1465,14 +1472,14 @@
       "tickets": [
         {
           "key": "S91-1",
-          "title": "PostPRCreate hook \u2014 auto-trigger review-loop recommendation (#302)",
+          "title": "PostPRCreate hook — auto-trigger review-loop recommendation (#302)",
           "club": "short_iron",
           "complexity": "standard",
           "github_issue": 302
         },
         {
           "key": "S91-2",
-          "title": "Auto-close GH issues from fix commits \u2014 convention or hook (#321)",
+          "title": "Auto-close GH issues from fix commits — convention or hook (#321)",
           "club": "short_iron",
           "complexity": "standard",
           "github_issue": 321
@@ -1486,7 +1493,7 @@
         },
         {
           "key": "S91-4",
-          "title": "vision create \u2014 tracked Markdown output (#305)",
+          "title": "vision create — tracked Markdown output (#305)",
           "club": "wedge",
           "complexity": "small",
           "github_issue": 305
@@ -1495,7 +1502,7 @@
     },
     {
       "id": 92,
-      "theme": "Backlog Cleanup \u2014 empty the queue",
+      "theme": "Backlog Cleanup — empty the queue",
       "par": 3,
       "slope": 1,
       "type": "bug fix + dx",
@@ -1527,7 +1534,7 @@
     },
     {
       "id": 93,
-      "theme": "Codex Hook Recovery \u2014 make SLOPE hooks actually load",
+      "theme": "Codex Hook Recovery — make SLOPE hooks actually load",
       "par": 4,
       "slope": 2,
       "type": "bug fix + dx",
@@ -1575,7 +1582,7 @@
     },
     {
       "id": 94,
-      "theme": "Guard Enforcement Hardening \u2014 make workflow-control guards provable",
+      "theme": "Guard Enforcement Hardening — make workflow-control guards provable",
       "par": 4,
       "slope": 2,
       "type": "hardening + dx",
@@ -1629,7 +1636,7 @@
     },
     {
       "id": 95,
-      "theme": "Inserted Sprint Recovery \u2014 make next/status respect sub-sprints",
+      "theme": "Inserted Sprint Recovery — make next/status respect sub-sprints",
       "par": 4,
       "slope": 2,
       "type": "bug fix + dx",
@@ -4722,11 +4729,11 @@
       "par": 4,
       "slope": 3,
       "type": "workflow + agent-dx",
-      "status": "planned",
+      "status": "superseded",
       "depends_on": [
         154
       ],
-      "note": "Close #561 and #562 by requiring durable evidence that reviewers actually ran before gates pass, then prompting Codex toward purpose-built reviewer agents when review gates are pending.",
+      "note": "Superseded by S219, which shipped review gate provenance and purpose-built reviewer-agent guidance for #561/#562.",
       "tickets": [
         {
           "key": "S155-1",
@@ -4775,11 +4782,11 @@
       "par": 4,
       "slope": 2,
       "type": "bugfix + documentation",
-      "status": "planned",
+      "status": "superseded",
       "depends_on": [
         155
       ],
-      "note": "Close #566, #557, #558, and #556 by tightening first-run and Codex workflow guidance around actor identity, custom metaphor config, git/no-git setup, and scope-based sprint language.",
+      "note": "Superseded by S218, S220, and S221, which shipped Codex identity, custom metaphor validation, git/no-git setup, and scope-based sprint language for #556/#557/#558/#566.",
       "tickets": [
         {
           "key": "S156-1",
@@ -4821,11 +4828,11 @@
       "par": 4,
       "slope": 3,
       "type": "bugfix + portability",
-      "status": "planned",
+      "status": "superseded",
       "depends_on": [
         156
       ],
-      "note": "Close #553 and #565 by making the SQLite store tolerate WSL2 Windows-drive filesystems and by preventing malformed retro learning prefixes from being persisted as text.",
+      "note": "Superseded by S218 and S220, which shipped store portability and retro-learning prefix integrity for #553/#565.",
       "tickets": [
         {
           "key": "S157-1",
@@ -4871,11 +4878,11 @@
       "par": 4,
       "slope": 3,
       "type": "feature + workflow",
-      "status": "planned",
+      "status": "superseded",
       "depends_on": [
         157
       ],
-      "note": "Close #552 by turning workaround/codification candidates into first-class findings that can flow from retros and reviews into briefings, distillation, and follow-up work.",
+      "note": "Superseded by S221, which shipped recurring workaround findings, codification candidate briefing, and paid-down ledger behavior for #552.",
       "tickets": [
         {
           "key": "S158-1",
@@ -4914,6 +4921,352 @@
           "depends_on": [
             "S158-2",
             "S158-3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 216,
+      "theme": "Roadmap Shipped-Signal Correctness",
+      "par": 3,
+      "slope": 2,
+      "type": "bugfix + roadmap hygiene",
+      "status": "complete",
+      "score": 4,
+      "score_label": "bogey",
+      "depends_on": [
+        154
+      ],
+      "note": "Close #573 before more planning work: roadmap validation must distinguish real shipped sprint work from docs-only planning references.",
+      "tickets": [
+        {
+          "key": "S216-1",
+          "title": "Require ticket-key or implementation-shaped evidence before a sprint counts as shipped (#573)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 573
+        },
+        {
+          "key": "S216-2",
+          "title": "Ignore docs and planning-only sprint mentions without losing true shipped detections (#573)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 573,
+          "depends_on": [
+            "S216-1"
+          ]
+        },
+        {
+          "key": "S216-3",
+          "title": "Add roadmap validate regressions for docs-only references and real ticket-key commits (#573)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 573,
+          "depends_on": [
+            "S216-1",
+            "S216-2"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 217,
+      "theme": "Workflow Runtime Cleanup and Guard Scope Recovery",
+      "par": 4,
+      "slope": 3,
+      "type": "bugfix + guard hardening",
+      "status": "complete",
+      "score": 4,
+      "score_label": "par",
+      "depends_on": [
+        216
+      ],
+      "note": "Close #572 by clearing abandoned running workflow executions and preventing stale executions from blocking unrelated Bash/Edit work.",
+      "tickets": [
+        {
+          "key": "S217-1",
+          "title": "Teach cleanup --stale to pause abandoned running executions with complete scorecard and roadmap evidence (#572)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 572
+        },
+        {
+          "key": "S217-2",
+          "title": "Scope phase-boundary guard away from unrelated Bash commands and abandoned executions (#572)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 572,
+          "depends_on": [
+            "S217-1"
+          ]
+        },
+        {
+          "key": "S217-3",
+          "title": "Make workflow-step-gate recover or fail open with diagnostics for stale validation steps (#572)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 572,
+          "depends_on": [
+            "S217-1"
+          ]
+        },
+        {
+          "key": "S217-4",
+          "title": "Add store-backed regression coverage for cleanup and guard misfire paths (#572)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 572,
+          "depends_on": [
+            "S217-2",
+            "S217-3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 218,
+      "theme": "Store and Project Bootstrap Portability",
+      "par": 4,
+      "slope": 3,
+      "type": "platform + onboarding bugfix",
+      "status": "complete",
+      "score": 4,
+      "score_label": "par",
+      "depends_on": [
+        217
+      ],
+      "note": "Close the portability/bootstrap defects that break new or Windows-adjacent SLOPE projects: SQLite WAL on WSL2 mounts, no-git project modes, and invalid custom metaphor config.",
+      "tickets": [
+        {
+          "key": "S218-1",
+          "title": "Add SQLite journal-mode fallback and override for WSL2 DrvFs and network filesystems (#553)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 553
+        },
+        {
+          "key": "S218-2",
+          "title": "Prefix store I/O failures with resolved store path and journal-mode recovery guidance (#553)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 553,
+          "depends_on": [
+            "S218-1"
+          ]
+        },
+        {
+          "key": "S218-3",
+          "title": "Require git repository or explicit degraded no-git mode in init/interview/start paths (#558)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 558
+        },
+        {
+          "key": "S218-4",
+          "title": "Reject or materialize the custom metaphor sentinel before interview writes config (#557)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 557,
+          "depends_on": [
+            "S218-3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 219,
+      "theme": "Independent Review Provenance",
+      "par": 4,
+      "slope": 3,
+      "type": "workflow + review gates",
+      "status": "complete",
+      "score": 4,
+      "score_label": "par",
+      "depends_on": [
+        217
+      ],
+      "note": "Close #561/#562 by making review gate evidence explicit and making purpose-built reviewer agents the default Codex path for high-value gates.",
+      "tickets": [
+        {
+          "key": "S219-1",
+          "title": "Split self-authored review notes from independent review evidence in gate state (#561)",
+          "club": "long_iron",
+          "complexity": "moderate",
+          "github_issue": 561
+        },
+        {
+          "key": "S219-2",
+          "title": "Require reviewer provenance, PR review URL, or explicit weaker-mode override before review gates pass (#561)",
+          "club": "long_iron",
+          "complexity": "moderate",
+          "github_issue": 561,
+          "depends_on": [
+            "S219-1"
+          ]
+        },
+        {
+          "key": "S219-3",
+          "title": "Prompt Codex to create purpose-built reviewer agents from sprint hazards and artifacts (#562)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 562,
+          "depends_on": [
+            "S219-1"
+          ]
+        },
+        {
+          "key": "S219-4",
+          "title": "Add status/help/tests that make self-review visibly distinct from independent review (#561, #562)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 561,
+          "depends_on": [
+            "S219-2",
+            "S219-3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 220,
+      "theme": "Agent Audit Trail and Retro Parsing Repair",
+      "par": 4,
+      "slope": 2,
+      "type": "bugfix + agent-dx",
+      "status": "complete",
+      "score": 4,
+      "score_label": "par",
+      "depends_on": [
+        217
+      ],
+      "note": "Close #565/#566 by repairing two audit-trail weak spots: unknown ticket claimants and silently unparsed retro learning prefixes.",
+      "tickets": [
+        {
+          "key": "S220-1",
+          "title": "Resolve useful actor identity for sprint begin and ticket claims in Codex workflows (#566)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 566
+        },
+        {
+          "key": "S220-2",
+          "title": "Add actor override, identity-source output, and no-identity fallback tests (#566)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 566,
+          "depends_on": [
+            "S220-1"
+          ]
+        },
+        {
+          "key": "S220-3",
+          "title": "Parse or reject retro category and weight prefixes without persisting noisy text (#565)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 565
+        },
+        {
+          "key": "S220-4",
+          "title": "Align retro docs/help and regression tests with the accepted learning prefix syntax (#565)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 565,
+          "depends_on": [
+            "S220-3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 221,
+      "theme": "Codification Candidate Ledger and Sprint Model Clarity",
+      "par": 4,
+      "slope": 3,
+      "type": "feature + documentation",
+      "status": "complete",
+      "score": 4,
+      "score_label": "par",
+      "depends_on": [
+        219
+      ],
+      "note": "Close #552/#556 by making recurring workarounds first-class findings and clarifying that SLOPE sprints can be scope-based work units.",
+      "tickets": [
+        {
+          "key": "S221-1",
+          "title": "Extend findings with recurring workaround/codification candidate metadata (#552)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 552
+        },
+        {
+          "key": "S221-2",
+          "title": "Surface codification candidates in briefing and sprint-close learning prompts (#552)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 552,
+          "depends_on": [
+            "S221-1"
+          ]
+        },
+        {
+          "key": "S221-3",
+          "title": "Add resolve/ledger behavior for paid-down codification candidates (#552)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 552,
+          "depends_on": [
+            "S221-1",
+            "S221-2"
+          ]
+        },
+        {
+          "key": "S221-4",
+          "title": "Clarify scope-based versus time-boxed sprint language in interview, roadmap, and docs (#556)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 556
+        }
+      ]
+    },
+    {
+      "id": 222,
+      "theme": "Open Issue Recovery Release",
+      "par": 3,
+      "slope": 1,
+      "type": "release",
+      "status": "complete",
+      "score": 4,
+      "score_label": "bogey",
+      "depends_on": [
+        218,
+        219,
+        220,
+        221
+      ],
+      "note": "Publish the S216-S221 recovery train and refresh roadmap status for the next planning lane.",
+      "tickets": [
+        {
+          "key": "S222-1",
+          "title": "Run roadmap validation, targeted issue regressions, and full release-readiness checks",
+          "club": "wedge",
+          "complexity": "small"
+        },
+        {
+          "key": "S222-2",
+          "title": "Bump package and bundled plugin manifest according to version recommendation",
+          "club": "wedge",
+          "complexity": "small",
+          "depends_on": [
+            "S222-1"
+          ]
+        },
+        {
+          "key": "S222-3",
+          "title": "Publish the recovery release and update roadmap next-lane status",
+          "club": "short_iron",
+          "complexity": "standard",
+          "depends_on": [
+            "S222-2"
           ]
         }
       ]

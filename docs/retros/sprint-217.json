@@ -1,0 +1,136 @@
+{
+  "sprint_number": 217,
+  "player": "codex",
+  "theme": "Workflow Runtime Cleanup and Guard Scope Recovery",
+  "par": 4,
+  "slope": 3,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-06-27",
+  "type": "bugfix + guard hardening",
+  "skills_used": [
+    "slope-sprint-workflow",
+    "github"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow"
+  ],
+  "skill_gaps_found": [],
+  "shots": [
+    {
+      "ticket_key": "S217-1",
+      "title": "Teach cleanup --stale to pause abandoned running executions with complete scorecard and roadmap evidence (#572)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Workflow cleanup now derives sprint identity from both the persisted sprint_id column and workflow variables, so older or partially populated running executions can still be paused and labeled by sprint."
+    },
+    {
+      "ticket_key": "S217-2",
+      "title": "Scope phase-boundary guard away from unrelated Bash commands and abandoned executions (#572)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Phase-boundary now extracts target sprint only from explicit start/run/claim flags or positional ticket IDs, ignores narrative sprint mentions, and covers the front-door `slope start --ticket` command."
+    },
+    {
+      "ticket_key": "S217-3",
+      "title": "Make workflow-step-gate recover or fail open with diagnostics for stale validation steps (#572)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "workflow-step-gate now fails open when the only running execution does not match current sprint or session context, and true validation-step blocks include cleanup/resync recovery commands."
+    },
+    {
+      "ticket_key": "S217-4",
+      "title": "Add store-backed regression coverage for cleanup and guard misfire paths (#572)",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added SQLite-backed regressions proving cleanup pauses all scorecarded roadmap-complete abandoned executions in one pass and workflow-step-gate pauses stale validation executions before they can block edits."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "wind",
+      "impact": "minor",
+      "description": "Issue #572 crossed cleanup and guard behavior: abandoned durable workflow executions could survive in the store and then surface as unrelated Bash/Edit blocking."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Workflow execution sprint identity should be read from all durable sources, not only the newest dedicated column.",
+      "outcome": "cleanup/resync now uses a shared sprint extraction helper that falls back to workflow variables before deciding an execution is unidentifiable."
+    },
+    {
+      "type": "lessons",
+      "description": "Guard selection should require relevance when current sprint context is known.",
+      "outcome": "workflow-step-gate no longer lets a lone stale validation execution override current sprint/session context; it fails open with explicit recovery commands."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "`./node_modules/.bin/vitest.cmd run tests/cli/sprint-workflow.test.ts tests/cli/guards/workflow-step-gate.test.ts tests/cli/guards/phase-boundary.test.ts` passed: 3 files, 53 tests.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "`./node_modules/.bin/tsc.cmd --noEmit` passed.",
+      "status": "healthy"
+    },
+    {
+      "category": "review",
+      "description": "Code review and required architect review found no blockers; the shared recovery logic stays centralized in workflow-resync and the guards fail open when context is ambiguous or stale.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "A clean recovery sprint: the failure mode was frustrating, but the fix became straightforward once stale store state and guard selection were treated as one workflow problem.",
+    "advice_for_next_player": "When a guard blocks routine work, first ask whether the selected durable execution actually belongs to the current sprint or session.",
+    "what_surprised_you": "The single-active fallback was riskier than the multiple-execution case because ambiguity already failed open, while one stale validation execution looked authoritative.",
+    "excited_about_next": "S218 can move into store/bootstrap portability with the workflow guard path less likely to trap recovery work."
+  },
+  "bunker_locations": [
+    "Older workflow execution rows may preserve sprint identity only in variables.sprint_id.",
+    "A lone stale validation execution can be more dangerous than multiple stale executions if guard selection treats it as authoritative.",
+    "Phase-boundary target parsing should read explicit command targets, not arbitrary narrative sprint mentions."
+  ],
+  "yardage_book_updates": [
+    "src/cli/workflow-resync.ts now derives sprint labels from sprint_id or workflow variables and reuses that for cleanup/resync.",
+    "src/cli/commands/sprint.ts now prints recovered sprint labels for cleanup and resync output.",
+    "src/cli/guards/phase-boundary.ts now parses target sprint from explicit start/run/claim targets and includes front-door `slope start --ticket`.",
+    "src/cli/guards/workflow-step-gate.ts now fails open on stale nonmatching executions and includes cleanup/resync diagnostics on true blocks.",
+    "tests/cli/sprint-workflow.test.ts, tests/cli/guards/phase-boundary.test.ts, and tests/cli/guards/workflow-step-gate.test.ts cover the #572 cleanup and guard misfire paths."
+  ],
+  "course_management_notes": [
+    "GitHub issue #572 is addressed by commits 4f91649, aa1f41b, 43d810a, and 640acb1.",
+    "The sprint intentionally leaves unrelated dirty hook and slope-loop files untouched.",
+    "Roadmap validation will still warn that S217 is not on main until this branch is merged."
+  ],
+  "slope_factors": [
+    "workflow_cleanup",
+    "workflow_step_gate",
+    "phase_boundary",
+    "stale_execution_recovery",
+    "issue_572"
+  ]
+}

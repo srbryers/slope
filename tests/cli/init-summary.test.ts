@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { execSync } from 'node:child_process';
 import { mkdtempSync, rmSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -34,6 +35,7 @@ beforeEach(() => {
   tmpDir = mkdtempSync(join(tmpdir(), 'slope-init-summary-'));
   originalCwd = process.cwd();
   process.chdir(tmpDir);
+  execSync('git init -q', { cwd: tmpDir });
   consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
@@ -217,6 +219,20 @@ describe('initCommand prints summary', () => {
     const output = consoleSpy.mock.calls.map(c => c[0]).join('\n');
     expect(output).toContain('SLOPE initialized successfully');
     expect(output).toContain('slope briefing');
+  });
+
+  it('requires git unless degraded no-git mode is explicit', async () => {
+    const noGitDir = mkdtempSync(join(tmpdir(), 'slope-init-no-git-'));
+    try {
+      process.chdir(noGitDir);
+      await expect(initCommand([])).rejects.toThrow('must run inside a git work tree');
+
+      await initCommand(['--allow-no-git']);
+      expect(existsSync(join(noGitDir, '.slope', 'config.json'))).toBe(true);
+    } finally {
+      process.chdir(tmpDir);
+      rmSync(noGitDir, { recursive: true, force: true });
+    }
   });
 
   it('prints summary after --all init', async () => {

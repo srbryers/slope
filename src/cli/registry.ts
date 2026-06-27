@@ -43,6 +43,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     flags: [
       { flag: '--metaphor=<id>', desc: 'Set metaphor theme (golf, gaming, dnd, etc.)' },
       { flag: '--interactive', desc: 'Rich interactive setup wizard' },
+      { flag: '--allow-no-git', desc: 'Explicit degraded mode without commit-backed completion evidence' },
     ],
   },
   {
@@ -50,6 +51,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     flags: [
       { flag: '--agent', desc: 'JSON I/O mode for agent harnesses' },
       { flag: '--force', desc: 'Re-interview even if project already initialized' },
+      { flag: '--allow-no-git', desc: 'Explicit degraded mode without commit-backed completion evidence' },
     ],
   },
   {
@@ -68,6 +70,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     flags: [
       { flag: '--sprint=<N>', desc: 'Override inferred current sprint' },
       { flag: '--ticket=<key>', desc: 'Claim and begin a ticket' },
+      { flag: '--allow-no-git', desc: 'Explicit degraded mode without commit-backed completion evidence' },
     ],
   },
   {
@@ -115,6 +118,8 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     flags: [
       { flag: '--target=<path>', desc: 'File or directory to claim' },
       { flag: '--ticket=<key>', desc: 'Ticket key (e.g. S48-1)' },
+      { flag: '--actor=<name>', desc: 'Actor override for audit trail identity' },
+      { flag: '--player=<name>', desc: 'Legacy alias for --actor' },
       { flag: '--force', desc: 'Override conflicting claims' },
     ],
   },
@@ -123,6 +128,8 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     flags: [
       { flag: '--id=<id>', desc: 'Claim ID to release' },
       { flag: '--target=<path>', desc: 'Release claim by target path' },
+      { flag: '--actor=<name>', desc: 'Actor override for target release lookup' },
+      { flag: '--player=<name>', desc: 'Legacy alias for --actor' },
     ],
   },
   {
@@ -147,14 +154,21 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
         { flag: '--number=<N>', desc: 'Sprint number (required)' },
         { flag: '--phase=<phase>', desc: 'Initial phase (default: planning)' },
         { flag: '--touches=<paths>', desc: 'Comma-separated paths to check against sibling worktrees' },
+        { flag: '--actor=<name>', desc: 'Actor override for sprint auto-claim' },
         { flag: '--force', desc: 'Override pre-sprint reality-check blockers' },
       ]},
       { name: 'begin', desc: 'Bundled start + claim + briefing + prep flow', flags: [
         { flag: '--sprint=<N>', desc: 'Sprint number (required)' },
         { flag: '--ticket=<key>', desc: 'Ticket key to claim and prep' },
+        { flag: '--actor=<name>', desc: 'Actor override for audit trail identity' },
       ]},
       { name: 'gate', desc: 'Mark a gate as complete', flags: [
         { flag: '<name>', desc: 'Gate name to complete' },
+        { flag: '--reviewer=<id>', desc: 'Independent reviewer id/name for code_review and architect_review' },
+        { flag: '--evidence=<path-or-url>', desc: 'Independent review transcript or output evidence' },
+        { flag: '--pr-review=<url-or-id>', desc: 'External PR review evidence' },
+        { flag: '--self-review --reason=<text>', desc: 'Explicit weaker self-review provenance' },
+        { flag: '--override=<reason>', desc: 'Explicit weaker manual override provenance' },
       ]},
       { name: 'status', desc: 'Show current sprint state and gates' },
       { name: 'resume', desc: 'Resume workflow execution or recreate portable sprint state', flags: [
@@ -198,8 +212,9 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
       { name: 'reset', desc: 'Reset review state' },
       { name: 'recommend', desc: 'Check which review types apply to the sprint' },
       { name: 'findings', desc: 'Manage review findings', flags: [
-        { flag: 'add', desc: 'Add a finding (--type, --ticket, --severity, --description)' },
-        { flag: 'list', desc: 'List recorded findings' },
+        { flag: 'add', desc: 'Add a finding (--type, --ticket, --severity, --description; workaround supports --recurs --cost=s|m|l)' },
+        { flag: 'list', desc: 'List recorded findings; filter codification ledger with --codification-status=open|paid_down|wontfix' },
+        { flag: 'resolve', desc: 'Mark a codification candidate paid_down or wontfix by id' },
         { flag: 'clear', desc: 'Clear all findings' },
       ]},
       { name: 'amend', desc: 'Inject review findings as hazards into scorecard' },
@@ -496,6 +511,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
       { name: 'interview', desc: 'Run project interview for planning input (alias of slope interview)', flags: [
         { flag: '--agent', desc: 'JSON I/O mode for agent harnesses' },
         { flag: '--force', desc: 'Re-interview even if project already initialized' },
+        { flag: '--allow-no-git', desc: 'Explicit degraded mode without commit-backed completion evidence' },
       ]},
       { name: 'validate', desc: 'Schema + dependency graph checks', flags: [
         { flag: '--path=<file>', desc: 'Roadmap file path' },
@@ -532,7 +548,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
         { flag: '--sprint=<N>', desc: 'Sprint number' },
         { flag: '--pr=<N>', desc: 'Merged pull request number' },
         { flag: '--summary=<text>', desc: 'Retro summary' },
-        { flag: '--learning=<text>', desc: 'Repeatable durable learning; supports category[:weight]:text' },
+        { flag: '--learning=<text>', desc: 'Repeatable durable learning; supports workflow|style|project|hazard|other[:1-10]:text and process->workflow alias' },
         { flag: '--hazard=<text>', desc: 'Repeatable hazard to persist as auto-retro memory' },
         { flag: '--follow-up=<text>', desc: 'Repeatable follow-up to persist as workflow memory' },
         { flag: '--outcome=<status>', desc: 'success, mixed, or follow_up' },
@@ -757,6 +773,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
         { flag: '<key>', desc: 'Ticket key (e.g. S1-1)' },
         { flag: '--commit=<sha>', desc: 'Attach a specific commit SHA (default: HEAD)' },
         { flag: '--notes=<text>', desc: 'Attach completion notes' },
+        { flag: '--actor=<name>', desc: 'Actor override for claim lookup' },
       ]},
     ],
   },

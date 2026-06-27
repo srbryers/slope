@@ -91,6 +91,9 @@ function handlePreToolUse(input: HookInput, cwd: string): GuardResult {
       '',
       'Complete these gates before creating the PR.',
     );
+    if (pending.some(g => g === 'Code review' || g === 'Architect review')) {
+      lines.push('', ...reviewGateEvidenceInstructions());
+    }
   }
 
   if (staleWarning) lines.push('', staleWarning);
@@ -333,8 +336,11 @@ function handleStop(cwd: string): GuardResult {
       '',
       'Complete these before ending the session:',
       '  - `slope sprint gate tests` — mark tests passing',
-      '  - `slope sprint gate code_review` — mark code review done',
-      '  - `slope sprint gate architect_review` — mark architect review done',
+      '  - `slope sprint gate code_review --reviewer=<id> --evidence=<path-or-url>` - record independent code review',
+      '  - `slope sprint gate architect_review --reviewer=<id> --evidence=<path-or-url>` - record independent architect review',
+      '  - `slope sprint gate code_review --pr-review=<url-or-id>` - record PR review evidence',
+      '  - `slope sprint gate code_review --self-review --reason="..."` - explicit weaker self-review',
+      '  - `slope sprint gate code_review --override="manual override reason"` - explicit manual override',
       '  - `slope validate` — validates scorecard (auto-marks gate)',
       '  - `slope review` — generates review markdown (auto-marks gate)',
       '',
@@ -346,6 +352,17 @@ function handleStop(cwd: string): GuardResult {
   // Advisory context, not a hard block — ad-hoc sessions shouldn't be trapped
   // by sprint state left from a previous session.
   return { context: lines.join('\n') };
+}
+
+function reviewGateEvidenceInstructions(): string[] {
+  return [
+    'Review gates require explicit provenance:',
+    '  - `slope sprint gate code_review --reviewer=<id> --evidence=<path-or-url>`',
+    '  - `slope sprint gate architect_review --reviewer=<id> --evidence=<path-or-url>`',
+    '  - `slope sprint gate code_review --pr-review=<url-or-id>`',
+    '  - `slope sprint gate code_review --self-review --reason="..."`',
+    '  - `slope sprint gate code_review --override="manual override reason"`',
+  ];
 }
 
 /** Check if a scorecard file exists for the given sprint. */

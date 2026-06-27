@@ -17,6 +17,66 @@ function isSprintRangeEndpoint(line: string, matchStart: number, matchEnd: numbe
 }
 
 const MAX_SHIPPED_TICKET_SUFFIX = 99;
+const IMPLEMENTATION_COMMIT_TYPES = new Set(['feat', 'fix', 'refactor', 'perf', 'test']);
+const PLANNING_REFERENCE_SCOPES = new Set(['roadmap', 'plan', 'planning']);
+const PLANNING_REFERENCE_RE = /\b(plan|planned|planning|reslot|scope|scoping|spike|triage|lane)\b/i;
+
+interface ConventionalCommitSubject {
+  type: string;
+  scope?: string;
+  description: string;
+}
+
+function isCommitType(value: string): boolean {
+  if (value.length === 0) return false;
+  for (let i = 0; i < value.length; i++) {
+    const code = value.charCodeAt(i);
+    const isLower = code >= 97 && code <= 122;
+    const isUpper = code >= 65 && code <= 90;
+    if (!isLower && !isUpper) return false;
+  }
+  return true;
+}
+
+function parseConventionalCommitSubject(line: string): ConventionalCommitSubject | null {
+  const colon = line.indexOf(':');
+  if (colon <= 0) return null;
+
+  const rawHeader = line.slice(0, colon);
+  const header = rawHeader.endsWith('!') ? rawHeader.slice(0, -1) : rawHeader;
+  const description = line.slice(colon + 1).trimStart();
+  const scopeStart = header.indexOf('(');
+  if (scopeStart === -1) {
+    if (!isCommitType(header)) return null;
+    return {
+      type: header.toLowerCase(),
+      description,
+    };
+  }
+
+  if (!header.endsWith(')')) return null;
+  const type = header.slice(0, scopeStart);
+  const scope = header.slice(scopeStart + 1, -1);
+  if (!isCommitType(type) || scope.length === 0 || scope.includes(')')) return null;
+
+  return {
+    type: type.toLowerCase(),
+    scope: scope.toLowerCase(),
+    description,
+  };
+}
+
+function isPlanningOnlyBareReference(subject: ConventionalCommitSubject): boolean {
+  return subject.scope != null
+    && PLANNING_REFERENCE_SCOPES.has(subject.scope)
+    && PLANNING_REFERENCE_RE.test(subject.description);
+}
+
+function hasImplementationCommitType(line: string): boolean {
+  const subject = parseConventionalCommitSubject(line);
+  if (!subject) return false;
+  return IMPLEMENTATION_COMMIT_TYPES.has(subject.type) && !isPlanningOnlyBareReference(subject);
+}
 
 /** Extract shipped sprint IDs referenced in commit subjects.
  *  Matches `S\d+` not followed by another digit or a dot — so `S75.5` does
@@ -30,6 +90,7 @@ export function extractSprintReferences(commitSubjects: string[]): Set<number> {
   const result = new Set<number>();
   const re = /\bS(\d+)(?:-(\d+))?(?![\d.])/g;
   for (const line of commitSubjects) {
+    const hasImplementationSignal = hasImplementationCommitType(line);
     let m: RegExpExecArray | null;
     while ((m = re.exec(line)) !== null) {
       if (isSprintRangeEndpoint(line, m.index, re.lastIndex)) continue;
@@ -39,6 +100,7 @@ export function extractSprintReferences(commitSubjects: string[]): Set<number> {
       // Large suffixes are usually GitHub/product issue keys, e.g. S147-533,
       // and should not imply that roadmap sprint S147 shipped.
       if (ticketSuffix != null && ticketSuffix > MAX_SHIPPED_TICKET_SUFFIX) continue;
+      if (ticketSuffix == null && !hasImplementationSignal) continue;
       result.add(parseInt(m[1], 10));
     }
   }

@@ -1,9 +1,11 @@
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { formatSprintLabel, parseRoadmap } from '../../core/index.js';
 import type { RoadmapDefinition } from '../../core/index.js';
+import { formatActorName, formatActorSource, resolveActor } from '../actor.js';
 import { loadConfig } from '../config.js';
+import { isInsideGitWorkTree } from '../git-preflight.js';
 import { loadSprintState } from '../sprint-state.js';
 import { resolveStore } from '../store.js';
 
@@ -40,12 +42,19 @@ Usage:
   slope ticket done <key>                    Mark ticket complete; release claim
   slope ticket done <key> --commit=<sha>     Attach a specific commit SHA
   slope ticket done <key> --notes="..."      Attach completion notes
+  slope ticket done <key> --actor=<name>     Override actor identity for claim lookup
 `);
 }
 
 interface DoneFlags {
   commit?: string;
   notes?: string;
+  actor?: string;
+}
+
+interface CommitResolution {
+  sha: string | null;
+  missingGitWorkTree: boolean;
 }
 
 function parseFlags(args: string[]): DoneFlags {
@@ -53,6 +62,8 @@ function parseFlags(args: string[]): DoneFlags {
   for (const a of args) {
     if (a.startsWith('--commit=')) flags.commit = a.slice('--commit='.length);
     else if (a.startsWith('--notes=')) flags.notes = a.slice('--notes='.length);
+    else if (a.startsWith('--actor=')) flags.actor = a.slice('--actor='.length);
+    else if (a.startsWith('--player=')) flags.actor = a.slice('--player='.length);
   }
   return flags;
 }
@@ -60,7 +71,7 @@ function parseFlags(args: string[]): DoneFlags {
 async function doneSubcommand(args: string[]): Promise<void> {
   const ticketKey = args.find(a => !a.startsWith('--'));
   if (!ticketKey) {
-    console.error('\nUsage: slope ticket done <key> [--commit=<sha>] [--notes="..."]\n');
+    console.error('\nUsage: slope ticket done <key> [--commit=<sha>] [--notes="..."] [--actor=<name>]\n');
     process.exit(1);
   }
   const flags = parseFlags(args);
@@ -96,20 +107,23 @@ async function doneSubcommand(args: string[]): Promise<void> {
   }
 
   // 2. Find the player's active claim
-  const player = process.env.USER || 'unknown';
+  const actor = resolveActor(cwd, { explicitActor: flags.actor });
+  const player = actor.name;
+  const playerDisplay = formatActorName(actor);
   const store = await resolveStore(cwd);
   let releasedId: string | null = null;
   try {
     const existing = await store.list(sprintNumber);
     const ownClaim = existing.find(c => c.target === ticketKey && c.player === player);
     if (!ownClaim) {
-      console.error(`No active claim for ${ticketKey} by ${player} on ${formatSprintLabel(sprintNumber)}.`);
+      console.error(`No active claim for ${ticketKey} by ${playerDisplay} on ${formatSprintLabel(sprintNumber)}.`);
       console.error('Run `slope claim --target=' + ticketKey + ' --sprint=' + sprintNumber + '` first.');
       process.exit(1);
     }
 
     // 3. Resolve commit SHA — explicit flag wins, fall back to HEAD
-    const sha = resolveCommitSha(flags.commit, cwd);
+    const commit = resolveCommitSha(flags.commit, cwd);
+    const sha = commit.sha;
 
     // 4. Record a 'decision' event for traceability (best-effort)
     try {
@@ -136,8 +150,12 @@ async function doneSubcommand(args: string[]): Promise<void> {
 
     console.log(`\nTicket ${ticketKey}: done.`);
     console.log(`  Sprint:  ${formatSprintLabel(sprintNumber)}`);
-    console.log(`  Player:  ${player}`);
+    console.log(`  Player:  ${playerDisplay}`);
+    console.log(`  Actor source: ${formatActorSource(actor)}`);
     if (sha) console.log(`  Commit:  ${sha}`);
+    if (commit.missingGitWorkTree) {
+      console.warn('Warning: no git repository detected; commit SHA was not attached. Run `git init -b main` before future completions or pass `--commit=<sha>` explicitly.');
+    }
     if (flags.notes) console.log(`  Notes:   ${flags.notes}`);
     if (releasedId) console.log(`  Claim:   released (id ${releasedId.slice(0, 8)})`);
     else console.log(`  Claim:   could not release (id ${ownClaim.id.slice(0, 8)} — already gone?)`);
@@ -173,11 +191,19 @@ function loadRoadmap(cwd: string): RoadmapDefinition | null {
   }
 }
 
-function resolveCommitSha(explicit: string | undefined, cwd: string): string | null {
-  if (explicit) return explicit;
+function resolveCommitSha(explicit: string | undefined, cwd: string): CommitResolution {
+  if (explicit) return { sha: explicit, missingGitWorkTree: false };
+  if (!isInsideGitWorkTree(cwd)) {
+    return { sha: null, missingGitWorkTree: true };
+  }
   try {
-    return execSync('git rev-parse HEAD', { cwd, encoding: 'utf8' }).trim();
+    const sha = execFileSync('git', ['rev-parse', 'HEAD'], {
+      cwd,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+    return { sha, missingGitWorkTree: false };
   } catch {
-    return null;
+    return { sha: null, missingGitWorkTree: false };
   }
 }

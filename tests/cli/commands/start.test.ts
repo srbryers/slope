@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { execSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -29,6 +30,7 @@ beforeEach(() => {
   tmpDir = mkdtempSync(join(tmpdir(), 'slope-start-'));
   originalCwd = process.cwd();
   process.chdir(tmpDir);
+  execSync('git init -q', { cwd: tmpDir });
   writeConfig();
   vi.clearAllMocks();
   vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -59,5 +61,21 @@ describe('slope start', () => {
     await startCommand(['--sprint=151.5', '--ticket=S151.5-1']);
 
     expect(sprintCommand).toHaveBeenCalledWith(['begin', '--sprint=151.5', '--ticket=S151.5-1']);
+  });
+
+  it('requires git unless degraded no-git mode is explicit', async () => {
+    const noGitDir = mkdtempSync(join(tmpdir(), 'slope-start-no-git-'));
+    try {
+      process.chdir(noGitDir);
+      await expect(startCommand([])).rejects.toThrow('must run inside a git work tree');
+
+      mkdirSync(join(noGitDir, '.slope'), { recursive: true });
+      writeFileSync(join(noGitDir, '.slope', 'config.json'), JSON.stringify({ currentSprint: 151 }, null, 2));
+      await startCommand(['--allow-no-git']);
+      expect(sprintCommand).toHaveBeenCalledWith(['start', '--number=151', '--phase=implementing']);
+    } finally {
+      process.chdir(tmpDir);
+      rmSync(noGitDir, { recursive: true, force: true });
+    }
   });
 });
