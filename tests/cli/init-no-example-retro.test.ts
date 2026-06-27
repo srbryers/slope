@@ -7,6 +7,10 @@ import { tmpdir } from 'node:os';
 const REPO_ROOT = resolve(__dirname, '..', '..');
 const SLOPE_BIN = resolve(REPO_ROOT, 'dist', 'cli', 'index.js');
 
+function initGit(cwd: string): void {
+  execSync('git init -q', { cwd });
+}
+
 describe('slope init example scorecard (GH #306)', () => {
   beforeAll(() => {
     if (!existsSync(SLOPE_BIN)) {
@@ -17,6 +21,7 @@ describe('slope init example scorecard (GH #306)', () => {
   it('does not create docs/retros/sprint-1.json by default', () => {
     const cwd = mkdtempSync(join(tmpdir(), 'slope-init-default-'));
     try {
+      initGit(cwd);
       execSync(`node ${SLOPE_BIN} init`, { cwd, stdio: ['pipe', 'pipe', 'pipe'] });
       expect(existsSync(join(cwd, 'docs', 'retros', 'sprint-1.json'))).toBe(false);
     } finally {
@@ -27,6 +32,7 @@ describe('slope init example scorecard (GH #306)', () => {
   it('creates docs/retros/sprint-1.json when --with-example is passed', () => {
     const cwd = mkdtempSync(join(tmpdir(), 'slope-init-with-example-'));
     try {
+      initGit(cwd);
       execSync(`node ${SLOPE_BIN} init --with-example`, { cwd, stdio: ['pipe', 'pipe', 'pipe'] });
       expect(existsSync(join(cwd, 'docs', 'retros', 'sprint-1.json'))).toBe(true);
     } finally {
@@ -37,6 +43,7 @@ describe('slope init example scorecard (GH #306)', () => {
   it('still creates docs/retros/ directory itself', () => {
     const cwd = mkdtempSync(join(tmpdir(), 'slope-init-retros-dir-'));
     try {
+      initGit(cwd);
       execSync(`node ${SLOPE_BIN} init`, { cwd, stdio: ['pipe', 'pipe', 'pipe'] });
       expect(existsSync(join(cwd, 'docs', 'retros'))).toBe(true);
     } finally {

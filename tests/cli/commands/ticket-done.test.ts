@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { execSync } from 'node:child_process';
+import { execSync, spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -82,6 +82,12 @@ function setupInsertedRepoWithClaim(): string {
   return dir;
 }
 
+function setupNoGitRepoWithClaim(): string {
+  const dir = setupRepoWithClaim();
+  rmSync(join(dir, '.git'), { recursive: true, force: true });
+  return dir;
+}
+
 describe('slope ticket done (GH #316)', () => {
   beforeAll(() => {
     if (!existsSync(SLOPE_BIN)) {
@@ -137,6 +143,25 @@ describe('slope ticket done (GH #316)', () => {
       expect(out).toContain('Ticket S43.5-1: done.');
       expect(out).toContain('Sprint:  S43.5');
       expect(out).toContain('Claim:   released');
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('warns without raw git fatal output when completing a ticket outside git', () => {
+    const cwd = setupNoGitRepoWithClaim();
+    try {
+      const result = spawnSync(process.execPath, [SLOPE_BIN, 'ticket', 'done', 'S1-1'], {
+        cwd,
+        encoding: 'utf8',
+      });
+
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('Ticket S1-1: done.');
+      expect(result.stdout).not.toContain('Commit:');
+      expect(result.stderr).toContain('Warning: no git repository detected');
+      expect(result.stdout).not.toContain('fatal: not a git repository');
+      expect(result.stderr).not.toContain('fatal: not a git repository');
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }

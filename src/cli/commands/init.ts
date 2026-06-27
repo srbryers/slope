@@ -3,6 +3,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
 import { createConfig } from '../config.js';
+import { formatNoGitModeWarning, requireGitWorkTreeOrExplicitNoGit } from '../git-preflight.js';
 import { saveHooksConfig } from '../hooks-config.js';
 import { resolveMetaphor } from '../metaphor.js';
 import { detectPackageManager, createVision, analyzeStack, SLOPE_BIN_PREAMBLE, writeOrUpdateManagedScript, GUARD_DEFINITIONS, normalizeShellScriptLineEndings } from '../../core/index.js';
@@ -1111,6 +1112,7 @@ Options:
   --metaphor=<id>         Set metaphor theme, e.g. golf or gaming
   --auto-install          Add @slope-dev/slope as a dev dependency when possible
   --migrate               Upgrade an existing .slope/config.json in place
+  --allow-no-git, --no-git  Explicitly initialize without git-backed completion evidence
 
 Examples:
   slope init --codex
@@ -1150,6 +1152,11 @@ export async function initCommand(args: string[]): Promise<void> {
   if (args.includes('--help') || args.includes('-h')) {
     printInitHelp();
     return;
+  }
+
+  const gitPreflight = requireGitWorkTreeOrExplicitNoGit('init', args, cwd);
+  if (gitPreflight.degradedNoGitMode) {
+    console.warn(formatNoGitModeWarning('init'));
   }
 
   // Interactive mode: prompt for project details, then exit

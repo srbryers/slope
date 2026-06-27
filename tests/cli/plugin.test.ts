@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { execSync } from 'node:child_process';
 import { mkdtempSync, rmSync, existsSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -40,6 +41,7 @@ beforeEach(() => {
   tmpDir = mkdtempSync(join(tmpdir(), 'slope-plugin-test-'));
   originalCwd = process.cwd();
   process.chdir(tmpDir);
+  execSync('git init -q', { cwd: tmpDir });
   output = [];
   console.log = (...args: unknown[]) => { output.push(args.join(' ')); };
   console.error = (...args: unknown[]) => { output.push(args.join(' ')); };

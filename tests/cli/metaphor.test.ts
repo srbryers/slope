@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { execSync } from 'node:child_process';
 import { mkdtempSync, rmSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -10,6 +11,7 @@ beforeEach(() => {
   tmpDir = mkdtempSync(join(tmpdir(), 'slope-metaphor-'));
   originalCwd = process.cwd();
   process.chdir(tmpDir);
+  execSync('git init -q', { cwd: tmpDir });
 });
 
 afterEach(() => {

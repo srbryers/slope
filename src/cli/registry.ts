@@ -43,6 +43,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     flags: [
       { flag: '--metaphor=<id>', desc: 'Set metaphor theme (golf, gaming, dnd, etc.)' },
       { flag: '--interactive', desc: 'Rich interactive setup wizard' },
+      { flag: '--allow-no-git', desc: 'Explicit degraded mode without commit-backed completion evidence' },
     ],
   },
   {
@@ -50,6 +51,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     flags: [
       { flag: '--agent', desc: 'JSON I/O mode for agent harnesses' },
       { flag: '--force', desc: 'Re-interview even if project already initialized' },
+      { flag: '--allow-no-git', desc: 'Explicit degraded mode without commit-backed completion evidence' },
     ],
   },
   {
@@ -68,6 +70,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     flags: [
       { flag: '--sprint=<N>', desc: 'Override inferred current sprint' },
       { flag: '--ticket=<key>', desc: 'Claim and begin a ticket' },
+      { flag: '--allow-no-git', desc: 'Explicit degraded mode without commit-backed completion evidence' },
     ],
   },
   {
@@ -496,6 +499,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
       { name: 'interview', desc: 'Run project interview for planning input (alias of slope interview)', flags: [
         { flag: '--agent', desc: 'JSON I/O mode for agent harnesses' },
         { flag: '--force', desc: 'Re-interview even if project already initialized' },
+        { flag: '--allow-no-git', desc: 'Explicit degraded mode without commit-backed completion evidence' },
       ]},
       { name: 'validate', desc: 'Schema + dependency graph checks', flags: [
         { flag: '--path=<file>', desc: 'Roadmap file path' },
