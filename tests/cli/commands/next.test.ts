@@ -79,6 +79,40 @@ function writeSupersededRoadmap(cwd: string): void {
   }));
 }
 
+function writeSkippedPlannedRoadmap(cwd: string): void {
+  writeFileSync(join(cwd, 'docs', 'backlog', 'roadmap.json'), JSON.stringify({
+    name: 'Test',
+    phases: [{ name: 'P1', sprints: [107, 108, 109, 110, 111] }],
+    sprints: [
+      { id: 107, theme: 'Done 107', par: 4, slope: 1, type: 'feature', status: 'complete', tickets: [
+        { key: 'S107-1', title: 'done', club: 'wedge', complexity: 'small' },
+        { key: 'S107-2', title: 'done', club: 'wedge', complexity: 'small' },
+        { key: 'S107-3', title: 'done', club: 'wedge', complexity: 'small' },
+      ] },
+      { id: 108, theme: 'Done 108', par: 4, slope: 1, type: 'feature', status: 'complete', tickets: [
+        { key: 'S108-1', title: 'done', club: 'wedge', complexity: 'small' },
+        { key: 'S108-2', title: 'done', club: 'wedge', complexity: 'small' },
+        { key: 'S108-3', title: 'done', club: 'wedge', complexity: 'small' },
+      ] },
+      { id: 109, theme: 'Skipped planned work', par: 4, slope: 1, type: 'feature', status: 'planned', tickets: [
+        { key: 'S109-1', title: 'skipped', club: 'wedge', complexity: 'small' },
+        { key: 'S109-2', title: 'skipped', club: 'wedge', complexity: 'small' },
+        { key: 'S109-3', title: 'skipped', club: 'wedge', complexity: 'small' },
+      ] },
+      { id: 110, theme: 'Done 110', par: 4, slope: 1, type: 'feature', status: 'complete', tickets: [
+        { key: 'S110-1', title: 'done', club: 'wedge', complexity: 'small' },
+        { key: 'S110-2', title: 'done', club: 'wedge', complexity: 'small' },
+        { key: 'S110-3', title: 'done', club: 'wedge', complexity: 'small' },
+      ] },
+      { id: 111, theme: 'Done 111', par: 4, slope: 1, type: 'feature', status: 'complete', tickets: [
+        { key: 'S111-1', title: 'done', club: 'wedge', complexity: 'small' },
+        { key: 'S111-2', title: 'done', club: 'wedge', complexity: 'small' },
+        { key: 'S111-3', title: 'done', club: 'wedge', complexity: 'small' },
+      ] },
+    ],
+  }));
+}
+
 function writeLinearRoadmap(cwd: string): void {
   writeFileSync(join(cwd, 'docs', 'backlog', 'roadmap.json'), JSON.stringify({
     name: 'Test',
@@ -168,6 +202,30 @@ describe('slope next', () => {
     expect(output).toContain('Latest scorecard: S95');
     expect(output).toContain('Next sprint: S96');
     expect(output).not.toContain('S75.5');
+  });
+
+  it('prefers the earliest skipped planned roadmap sprint over scorecard+1 fallback', () => {
+    const cwd = makeRepo();
+    repos.push(cwd);
+    for (const sprint of [107, 108, 110, 111]) writeScorecard(cwd, sprint);
+    writeSkippedPlannedRoadmap(cwd);
+    const originalCwd = process.cwd();
+    const logs: string[] = [];
+    vi.spyOn(console, 'log').mockImplementation((msg = '') => logs.push(String(msg)));
+
+    try {
+      process.chdir(cwd);
+      nextCommand();
+    } finally {
+      process.chdir(originalCwd);
+    }
+
+    const output = logs.join('\n');
+    expect(output).toContain('Latest scorecard: S111');
+    expect(output).toContain('Next sprint: S109');
+    expect(output).toContain('selected from pending roadmap sprint: Skipped planned work');
+    expect(output).toContain('roadmap state overrides scorecard fallback to S112');
+    expect(output).toContain('slope briefing --sprint=109');
   });
 
   it('does not let fully gated scoring sprint-state reset next sprint output', () => {
