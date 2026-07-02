@@ -198,6 +198,30 @@ describe('claimRequiredGuard', () => {
     }
   });
 
+  it('ignores direct implementation-looking paths outside the project root', async () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'slope-claim-required-'));
+    try {
+      writeConfig(cwd);
+      const outsidePath = join(tmpdir(), 'slope-outside-settings.json');
+      const result = await claimRequiredGuard(makeInput(cwd, outsidePath), cwd);
+      expect(result).toEqual({});
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('ignores apply_patch implementation-looking paths outside the project root', async () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'slope-claim-required-'));
+    try {
+      writeConfig(cwd);
+      const outsidePath = join(tmpdir(), 'slope-outside-package.json');
+      const result = await claimRequiredGuard(makeApplyPatchInput(cwd, outsidePath), cwd);
+      expect(result).toEqual({});
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
   it('includes pending inserted sprint context when no sprint state is active', async () => {
     const cwd = mkdtempSync(join(tmpdir(), 'slope-claim-required-'));
     try {

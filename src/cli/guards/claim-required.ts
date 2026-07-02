@@ -1,5 +1,5 @@
 import { execSync } from 'node:child_process';
-import { dirname } from 'node:path';
+import { dirname, isAbsolute, relative, resolve } from 'node:path';
 import { formatSprintLabel } from '../../core/index.js';
 import type { HookInput, GuardResult, SprintClaim } from '../../core/index.js';
 import { loadConfig } from '../config.js';
@@ -7,7 +7,7 @@ import { inferSprintContext } from '../sprint-inference.js';
 import { loadSprintState } from '../sprint-state.js';
 import { loadSessionState, updateSessionState } from '../session-state.js';
 import { resolveStore } from '../store.js';
-import { normalizeTouchedPath, resolveTouchedPaths } from './hook-input.js';
+import { normalizeTouchedPath, resolveTouchedPaths, toAbsoluteTouchedPath } from './hook-input.js';
 
 const IMPLEMENTATION_DIRS = [
   'app/',
@@ -211,10 +211,18 @@ function implementationWritePolicyResult(policy: ImplementationWritePolicy, line
 
 function findImplementationWritePath(input: HookInput, cwd: string): string | null {
   for (const touchedPath of resolveTouchedPaths(input)) {
+    if (!isTouchedPathInsideRoot(touchedPath, cwd)) continue;
     const relativePath = normalizeTouchedPath(touchedPath, cwd);
     if (relativePath && isImplementationWritePath(relativePath)) return relativePath;
   }
   return null;
+}
+
+function isTouchedPathInsideRoot(touchedPath: string, cwd: string): boolean {
+  const root = resolve(cwd);
+  const absolutePath = toAbsoluteTouchedPath(touchedPath, cwd);
+  const rel = relative(root, absolutePath);
+  return rel !== '' && !rel.startsWith('..') && !isAbsolute(rel);
 }
 
 export function isImplementationWritePath(relativePath: string): boolean {
