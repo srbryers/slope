@@ -111,6 +111,18 @@ describe('slope next', () => {
     for (const repo of repos.splice(0)) rmSync(repo, { recursive: true, force: true });
   });
 
+  it('prints help instead of running next when --help is passed', () => {
+    const logs: string[] = [];
+    vi.spyOn(console, 'log').mockImplementation((msg = '') => logs.push(String(msg)));
+
+    nextCommand(['--help']);
+
+    const output = logs.join('\n');
+    expect(output).toContain('slope next [--help]');
+    expect(output).toContain('Selection order:');
+    expect(output).not.toContain('Quick start:');
+  });
+
   it('prefers a pending inserted roadmap sprint over scorecard+1 fallback', () => {
     const cwd = makeRepo();
     repos.push(cwd);
@@ -132,6 +144,8 @@ describe('slope next', () => {
     expect(output).toContain('Next sprint: S43.5');
     expect(output).toContain('roadmap state overrides scorecard fallback to S100');
     expect(output).toContain('slope briefing --sprint=435');
+    expect(output).toMatch(/slope auto-card --sprint=435 --since="\d{4}-\d{2}-\d{2}"/);
+    expect(output).not.toContain('date -d yesterday');
   });
 
   it('ignores superseded roadmap sprints when selecting the next sprint', () => {

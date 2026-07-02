@@ -169,7 +169,7 @@ switch (subcommand) {
     sessionCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   case 'next':
-    nextCommand();
+    nextCommand(process.argv.slice(3));
     break;
   case 'agent':
     agentCommand(process.argv.slice(3)).catch(reportCliError);
