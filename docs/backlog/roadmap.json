@@ -387,7 +387,7 @@
       "sprints": [
         223
       ],
-      "status": "active",
+      "status": "complete",
       "note": "Triage the next open GitHub issues after v1.60.0: guard scoping noise outside the project root (#575) and slope next help/date portability polish plus roadmap-selection regression coverage (#576)."
     }
   ],
@@ -5285,7 +5285,7 @@
       "par": 4,
       "slope": 2,
       "type": "bugfix + agent-dx",
-      "status": "planned",
+      "status": "complete",
       "depends_on": [
         222
       ],
