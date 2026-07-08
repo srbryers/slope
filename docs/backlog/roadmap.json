@@ -1,6 +1,6 @@
 {
   "name": "SLOPE Development Roadmap",
-  "description": "Forward-looking roadmap from S61+. Phases 1-9 (S1-S47) are complete. S48-S60 were hardening, guard enforcement, and process sprints. This roadmap covers adoption, observability, guard maturity, multi-project, loop evolution, and issue-driven recovery. S61-S64 reflect what actually shipped (themes diverged from original plan). Note: the actual S69 diverged from the planned Referee sprint — a carryover patch kit ran instead. The Referee work was rescheduled as S78. S75.5 (The Bug Clearing) added 2026-05-02 to clear accumulated CLI bugs from external repos. S132-S136 were backfilled from shipped scorecards on 2026-06-05; S137 adds post-merge retro tooling and durable memory, S137.5 addresses Windows suite portability for #509, S138-S144 triage open GitHub issues #499/#501/#502/#503/#505/#507/#510/#511/#512/#513/#514/#515/#516/#517/#518 into focused recovery sprints, S145 closed validation-signal regressions #519/#520, S146 cleaned stale roadmap state plus decimal sprint shipped-artifact warnings (#522), S146.1 cut the v1.58.1 patch release while repairing release-bump staging (#524/#528), active inserted sprint status (#525), and guard test isolation (#526), S146.2 closes the decimal post-merge retro gap (#529), S146.3 scopes workflow-step-gate to the relevant execution (#531), S147 was superseded by later human operating surface work, S148-S151.1 completed the human operating surface simplification and Windows git fixture hardening, S152 published v1.59.0, S152.1 completed roadmap interview discoverability across supported harness surfaces, S153 closed semver recommendation hardening for #550, S154 shipped roadmap/status integrity for #563/#567/#568, and S216-S222 execute the open-issue recovery train for #552/#553/#556/#557/#558/#561/#562/#565/#566/#572/#573 plus the v1.60.0 release.",
+  "description": "Forward-looking roadmap from S61+. Phases 1-9 (S1-S47) are complete. S48-S60 were hardening, guard enforcement, and process sprints. This roadmap covers adoption, observability, guard maturity, multi-project, loop evolution, and issue-driven recovery. S61-S64 reflect what actually shipped (themes diverged from original plan). Note: the actual S69 diverged from the planned Referee sprint — a carryover patch kit ran instead. The Referee work was rescheduled as S78. S75.5 (The Bug Clearing) added 2026-05-02 to clear accumulated CLI bugs from external repos. S132-S136 were backfilled from shipped scorecards on 2026-06-05; S137 adds post-merge retro tooling and durable memory, S137.5 addresses Windows suite portability for #509, S138-S144 triage open GitHub issues #499/#501/#502/#503/#505/#507/#510/#511/#512/#513/#514/#515/#516/#517/#518 into focused recovery sprints, S145 closed validation-signal regressions #519/#520, S146 cleaned stale roadmap state plus decimal sprint shipped-artifact warnings (#522), S146.1 cut the v1.58.1 patch release while repairing release-bump staging (#524/#528), active inserted sprint status (#525), and guard test isolation (#526), S146.2 closes the decimal post-merge retro gap (#529), S146.3 scopes workflow-step-gate to the relevant execution (#531), S147 was superseded by later human operating surface work, S148-S151.1 completed the human operating surface simplification and Windows git fixture hardening, S152 published v1.59.0, S152.1 completed roadmap interview discoverability across supported harness surfaces, S153 closed semver recommendation hardening for #550, S154 shipped roadmap/status integrity for #563/#567/#568, S216-S222 execute the open-issue recovery train for #552/#553/#556/#557/#558/#561/#562/#565/#566/#572/#573 plus the v1.60.0 release, S223 closes #575/#576, and S224/S226/S227 plan the July 2026 review, workflow, MCP, roadmap, and review-output recovery batch for #578/#579/#580/#581/#582/#583.",
   "phases": [
     {
       "name": "Phase 10 — Adoption & Onboarding",
@@ -389,6 +389,16 @@
       ],
       "status": "complete",
       "note": "Triage the next open GitHub issues after v1.60.0: guard scoping noise outside the project root (#575) and slope next help/date portability polish plus roadmap-selection regression coverage (#576)."
+    },
+    {
+      "name": "Phase 51 — Review and Workflow Trust Recovery",
+      "sprints": [
+        224,
+        226,
+        227
+      ],
+      "status": "planned",
+      "note": "Triage the July 2026 open-issue batch: review-gate downgrade honesty (#578), guard advisory wording and phase-boundary diagnostics (#579), roadmap shipped-commit false positives (#580), sprint-standard workflow loop determinism (#581), MCP scorecard builder schema contract (#582), and review output safety (#583). S225 is intentionally skipped because the legacy encoded-inserted sprint format renders 225 as S22.5."
     }
   ],
   "sprints": [
@@ -5313,6 +5323,150 @@
           "github_issue": 576,
           "depends_on": [
             "S223-2"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 224,
+      "theme": "Review Gate and Guard Advisory Honesty",
+      "par": 4,
+      "slope": 2,
+      "type": "bugfix + agent-dx",
+      "status": "planned",
+      "depends_on": [
+        223
+      ],
+      "note": "Close #578/#579 by making required review downgrades explicit and making non-blocking guard advisories read like advisory context rather than hard permission gates.",
+      "tickets": [
+        {
+          "key": "S224-1",
+          "title": "Reword non-blocking guard advisories as explicit advisory context (#579)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 579
+        },
+        {
+          "key": "S224-2",
+          "title": "Clarify that SLOPE claims do not control host permission prompts (#579)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 579,
+          "depends_on": [
+            "S224-1"
+          ]
+        },
+        {
+          "key": "S224-3",
+          "title": "Require an explicit waiver path for required-review self-review downgrades (#578)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 578
+        },
+        {
+          "key": "S224-4",
+          "title": "Surface required-review next actions in sprint status, slope now, and PR guidance (#578)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 578,
+          "depends_on": [
+            "S224-3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 226,
+      "theme": "Workflow Runtime and MCP Scorecard Contract",
+      "par": 4,
+      "slope": 3,
+      "type": "bugfix + workflow + mcp",
+      "status": "planned",
+      "depends_on": [
+        224
+      ],
+      "note": "Close #581/#582 by making sprint-standard ticket looping deterministic and aligning MCP scorecard builder output with validate/review scorecard schema and scoring conventions.",
+      "tickets": [
+        {
+          "key": "S226-1",
+          "title": "Make sprint-standard tickets variable requirements deterministic (#581)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 581
+        },
+        {
+          "key": "S226-2",
+          "title": "Preserve per-ticket loop sizing when tickets=N is provided (#581)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 581,
+          "depends_on": [
+            "S226-1"
+          ]
+        },
+        {
+          "key": "S226-3",
+          "title": "Emit validate/review-compatible scorecard schema from MCP buildScorecard (#582)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 582
+        },
+        {
+          "key": "S226-4",
+          "title": "Align builder hazard and score defaults with project scorecard conventions (#582)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 582,
+          "depends_on": [
+            "S226-3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 227,
+      "theme": "Roadmap and Review Output Safety",
+      "par": 4,
+      "slope": 2,
+      "type": "bugfix + planning + review",
+      "status": "planned",
+      "depends_on": [
+        226
+      ],
+      "note": "Close #580/#583 by avoiding planning-commit false positives in roadmap validation and making slope review output selection and side effects explicit.",
+      "tickets": [
+        {
+          "key": "S227-1",
+          "title": "Ignore docs/planning-only commits for shipped-sprint detection (#580)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 580
+        },
+        {
+          "key": "S227-2",
+          "title": "Add roadmap validate regression coverage for planned sprints with planning commits (#580)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 580,
+          "depends_on": [
+            "S227-1"
+          ]
+        },
+        {
+          "key": "S227-3",
+          "title": "Require an explicit scorecard or fail loudly when review sees multiple scorecards (#583)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 583
+        },
+        {
+          "key": "S227-4",
+          "title": "Scope review output side effects to the explicit scorecard and move footer text to stderr (#583)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 583,
+          "depends_on": [
+            "S227-3"
           ]
         }
       ]
