@@ -7,7 +7,7 @@ phase:
     - 230
     - 231
     - 232
-  status: active
+  status: complete
   note: "Turn the large-project findings from Fathoms into reusable SLOPE architecture: bounded roadmap context, modular source federation, replan-aware briefing hazards, auditable sprint rollover, and a final dogfood migration of SLOPE's own roadmap sources (#584/#585/#586)."
 sprints:
   - id: 228
@@ -164,7 +164,7 @@ sprints:
     par: 4
     slope: 3
     type: migration + documentation
-    status: active
+    status: complete
     depends_on:
       - 229
       - 230
