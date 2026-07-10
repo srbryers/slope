@@ -286,7 +286,7 @@ export class WorkflowEngine {
     for (const phase of def.phases) {
       if (phase.repeat_for) {
         // Expand the repeat_for phase
-        const items = this.getRepeatItems(phase.repeat_for, execution.variables);
+        const items = this.getRepeatItems(phase.repeat_for, execution.variables, execution.sprint_id);
         for (let itemIdx = 0; itemIdx < items.length; itemIdx++) {
           const item = items[itemIdx];
           for (const step of phase.steps) {
@@ -351,9 +351,30 @@ export class WorkflowEngine {
    * Get the items to iterate over for a repeat_for phase.
    * Looks up the variable name and splits comma-separated values or parses JSON array.
    */
-  private getRepeatItems(variableName: string, variables: Record<string, string>): string[] {
+  private getRepeatItems(
+    variableName: string,
+    variables: Record<string, string>,
+    sprintId?: string,
+  ): string[] {
     const value = variables[variableName];
     if (!value) return [];
+
+    // Agent-facing sprint commands have historically invited `tickets=N` as a
+    // ticket-count shorthand. Treat it as N iterations instead of one literal
+    // ticket named "N". Other repeat variables keep ordinary scalar behavior.
+    if (variableName === 'tickets' && /^\d+$/.test(value.trim())) {
+      const count = Number(value.trim());
+      if (count > 1000) {
+        throw new Error(`Variable "tickets" count ${count} exceeds the maximum of 1000`);
+      }
+      const rawPrefix = sprintId ?? variables.sprint_id;
+      const prefix = rawPrefix
+        ? rawPrefix.toUpperCase().startsWith('S') ? rawPrefix : `S${rawPrefix}`
+        : null;
+      return Array.from({ length: count }, (_, index) =>
+        prefix ? `${prefix}-${index + 1}` : `ticket-${index + 1}`,
+      );
+    }
 
     // Try JSON array first
     try {

@@ -274,6 +274,26 @@ describe('WorkflowEngine', () => {
       expect(next.total_items).toBe(3);
     });
 
+    it('treats tickets=N as N iterations instead of one literal ticket (#581)', async () => {
+      const exec = await engine.start(REPEAT_WORKFLOW, store, {
+        sprint_id: 'S122',
+        variables: { sprint_id: 'S122', tickets: '3' },
+      });
+
+      await engine.complete(exec.id, 'setup', {}, REPEAT_WORKFLOW, store);
+      for (const expected of ['S122-1', 'S122-2', 'S122-3']) {
+        const next = await engine.next(exec.id, REPEAT_WORKFLOW, store);
+        expect(next.current_item).toBe(expected);
+        expect(next.total_items).toBe(3);
+        await engine.complete(exec.id, 'plan', {}, REPEAT_WORKFLOW, store);
+        await engine.complete(exec.id, 'code', {}, REPEAT_WORKFLOW, store);
+      }
+
+      const next = await engine.next(exec.id, REPEAT_WORKFLOW, store);
+      expect(next.phase).toBe('post');
+      expect(next.step?.id).toBe('review');
+    });
+
     it('completes after all items processed', async () => {
       const exec = await engine.start(REPEAT_WORKFLOW, store, {
         variables: { tickets: 'T1' },
