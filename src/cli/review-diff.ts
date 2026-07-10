@@ -286,8 +286,10 @@ export function matchesReviewScope(
 function countChangedPatchLines(patch: string): number {
   let count = 0;
   for (const line of patch.split('\n')) {
-    if ((line.startsWith('+') && !line.startsWith('+++'))
-      || (line.startsWith('-') && !line.startsWith('---'))) {
+    // GitHub's per-file REST patch begins at a hunk header and does not
+    // contain unified-diff file headers, so even `+++content` is an authored
+    // addition and must count toward metadata coverage.
+    if (line.startsWith('+') || line.startsWith('-')) {
       count += 1;
     }
   }

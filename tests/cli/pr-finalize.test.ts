@@ -106,6 +106,21 @@ describe('pr review workflow helpers (S94-5)', () => {
       json: true,
     });
   });
+
+  it.each([
+    [['--pr=0'], '--pr must be a positive integer'],
+    [['--pr=nope'], '--pr must be a positive integer'],
+    [['--sprint=0'], '--sprint must be a positive sprint number'],
+    [['--sprint=nope'], '--sprint must be a positive sprint number'],
+    [['--type=security'], '--type must be architect, code, or both'],
+    [['--path='], '--path requires a non-empty glob'],
+    [['--exclude-path=   '], '--exclude-path requires a non-empty glob'],
+    [['--max-diff-bytes=0'], '--max-diff-bytes must be a positive integer'],
+    [['--max-diff-bytes=NaN'], '--max-diff-bytes must be a positive integer'],
+    [['--max-diff-bytes=4194305'], '--max-diff-bytes cannot exceed'],
+  ])('rejects invalid review scope flags instead of silently falling back: %j', (args, message) => {
+    expect(() => parsePrReviewFlags(args)).toThrow(message);
+  });
 });
 
 describe('pr closeout status helpers (S130)', () => {

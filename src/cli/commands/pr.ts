@@ -1,9 +1,10 @@
 import { execSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { detectLatestSprint, loadConfig, normalizeScorecard, recommendReviews } from '../../core/index.js';
+import { detectLatestSprint, loadConfig, normalizeScorecard, parseSprintNumber, recommendReviews } from '../../core/index.js';
 import type { ReviewRecommendation } from '../../core/index.js';
 import { reviewRunCommand } from './review-run.js';
+import { MAX_REVIEW_DIFF_BYTES } from '../review-diff.js';
 import { recordPrCloseoutSettled, recordPrReviewPromptsGenerated } from '../pr-review-state.js';
 import { branchSizeWarnings, buildPrCloseoutStatus, canSettlePrCloseout, closeoutPolicy, formatPrCloseoutStatus } from '../pr-closeout.js';
 
@@ -32,7 +33,7 @@ interface FinalizeOptions {
   dryRun?: boolean;
 }
 
-interface PrReviewOptions {
+export interface PrReviewOptions {
   pr?: number;
   sprint?: number;
   type?: 'architect' | 'code' | 'both';
@@ -151,19 +152,39 @@ function parseFlags(args: string[]): FinalizeOptions {
 export function parsePrReviewFlags(args: string[]): PrReviewOptions {
   const opts: PrReviewOptions = { paths: [], excludePaths: [] };
   for (const a of args) {
-    if (a.startsWith('--pr=')) opts.pr = parseInt(a.slice('--pr='.length), 10);
-    else if (a.startsWith('--sprint=')) opts.sprint = parseInt(a.slice('--sprint='.length), 10);
-    else if (a.startsWith('--type=')) {
+    if (a.startsWith('--pr=')) {
+      const value = Number(a.slice('--pr='.length));
+      if (!Number.isSafeInteger(value) || value <= 0) throw new Error('--pr must be a positive integer.');
+      opts.pr = value;
+    } else if (a.startsWith('--sprint=')) {
+      const value = parseSprintNumber(a.slice('--sprint='.length));
+      if (value == null || value <= 0) throw new Error('--sprint must be a positive sprint number.');
+      opts.sprint = value;
+    } else if (a.startsWith('--type=')) {
       const type = a.slice('--type='.length);
-      if (type === 'architect' || type === 'code' || type === 'both') opts.type = type;
+      if (type !== 'architect' && type !== 'code' && type !== 'both') {
+        throw new Error('--type must be architect, code, or both.');
+      }
+      opts.type = type;
     } else if (a === '--json') {
       opts.json = true;
     } else if (a.startsWith('--path=')) {
-      opts.paths?.push(a.slice('--path='.length));
+      const value = a.slice('--path='.length).trim();
+      if (!value) throw new Error('--path requires a non-empty glob.');
+      opts.paths?.push(value);
     } else if (a.startsWith('--exclude-path=')) {
-      opts.excludePaths?.push(a.slice('--exclude-path='.length));
+      const value = a.slice('--exclude-path='.length).trim();
+      if (!value) throw new Error('--exclude-path requires a non-empty glob.');
+      opts.excludePaths?.push(value);
     } else if (a.startsWith('--max-diff-bytes=')) {
-      opts.maxDiffBytes = Number(a.slice('--max-diff-bytes='.length));
+      const value = Number(a.slice('--max-diff-bytes='.length));
+      if (!Number.isSafeInteger(value) || value <= 0) throw new Error('--max-diff-bytes must be a positive integer.');
+      if (value > MAX_REVIEW_DIFF_BYTES) {
+        throw new Error(`--max-diff-bytes cannot exceed ${MAX_REVIEW_DIFF_BYTES}.`);
+      }
+      opts.maxDiffBytes = value;
+    } else {
+      throw new Error(`Unknown pr review option: ${a}`);
     }
   }
   return opts;

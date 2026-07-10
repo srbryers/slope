@@ -178,6 +178,20 @@ describe('review path scope and patch coverage', () => {
     expect(warnings).toContain('local prompt budget');
   });
 
+  it('counts authored lines beginning with triple markers as patch changes', async () => {
+    const { runner } = fakeRunner([[
+      pullFile('src/markers.ts', {
+        additions: 1,
+        deletions: 1,
+        changes: 2,
+        patch: '@@ -1 +1 @@\n---authored deletion\n+++authored addition',
+      }),
+    ]]);
+    const review = await collectReviewDiff('.', 590, { include: [], exclude: [], maxDiffBytes: 1024 }, runner);
+    expect(review.files[0].providerPatchState).toBe('complete');
+    expect(review.files[0].providerChangedLines).toBe(2);
+  });
+
   it('shares a small prompt budget across available patches', async () => {
     const { runner } = fakeRunner([[
       pullFile('src/one.ts', { patch: `@@\n+${'a'.repeat(100)}` }),

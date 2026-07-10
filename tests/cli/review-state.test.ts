@@ -143,6 +143,20 @@ describe('reviewStateCommand', () => {
       }
     });
 
+    it('documents bounded and repeatable path scope for review run', async () => {
+      const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+      try {
+        await runCommand(['run', '--help']);
+        const helpText = log.mock.calls.map(c => c[0] as string).join('\n');
+        expect(helpText).toContain('--path=GLOB');
+        expect(helpText).toContain('--exclude-path=GLOB');
+        expect(helpText).toContain('--max-diff-bytes=N');
+        expect(helpText).toContain('provider-partial');
+      } finally {
+        log.mockRestore();
+      }
+    });
+
     it('prints top-level help for `slope review --help` (no subcommand)', async () => {
       const log = vi.spyOn(console, 'log').mockImplementation(() => {});
       try {
