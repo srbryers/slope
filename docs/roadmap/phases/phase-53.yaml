@@ -1,0 +1,149 @@
+version: "1"
+phase:
+  name: Phase 53 — Post-Federation Adoption Hardening
+  description: Close the first real-project gaps exposed after v1.61.0 by making roadmap federation cross-platform, large reviews bounded and diagnosable, and monolith migration transactional.
+  sprints:
+    - 233
+    - 234
+    - 235
+    - 236
+  status: active
+  note: "Issue-driven recovery for #591, #590, and #589. Prioritize the Windows federation unblocker, then review scale, then migration planning/apply safety."
+sprints:
+  - id: 233
+    theme: Cross-Platform Roadmap Projection Fidelity
+    par: 4
+    slope: 2
+    type: bugfix + cross-platform compatibility
+    status: active
+    depends_on:
+      - 232
+    note: "Fix #591 without weakening semantic projection-drift detection."
+    tickets:
+      - key: S233-1
+        title: Define checkout-EOL-safe projection comparison without hiding semantic drift (#591)
+        club: long_iron
+        complexity: moderate
+        github_issue: 591
+      - key: S233-2
+        title: Normalize generated projection bytes at the comparison and write boundary across CRLF checkouts (#591)
+        club: short_iron
+        complexity: standard
+        github_issue: 591
+        depends_on:
+          - S233-1
+      - key: S233-3
+        title: Add Windows autocrlf and true semantic-drift regression fixtures (#591)
+        club: wedge
+        complexity: small
+        github_issue: 591
+        depends_on:
+          - S233-2
+  - id: 234
+    theme: Bounded Large-PR Review Runner
+    par: 4
+    slope: 3
+    type: feature + review reliability
+    status: planned
+    depends_on:
+      - 232
+    note: "Fix #590 by separating lookup failures from bounded diff retrieval and provider truncation."
+    tickets:
+      - key: S234-1
+        title: Classify gh lookup, authentication, timeout, exit, and buffer failures with bounded diagnostics (#590)
+        club: long_iron
+        complexity: moderate
+        github_issue: 590
+      - key: S234-2
+        title: Retrieve large PR metadata and diffs without the prior exec buffer ceiling (#590)
+        club: long_iron
+        complexity: moderate
+        github_issue: 590
+        depends_on:
+          - S234-1
+      - key: S234-3
+        title: Add explicit include and exclude path filters for bounded review scope (#590)
+        club: short_iron
+        complexity: standard
+        github_issue: 590
+        depends_on:
+          - S234-2
+      - key: S234-4
+        title: Cover oversized diffs, filtered prompts, and provider-truncation messaging (#590)
+        club: wedge
+        complexity: small
+        github_issue: 590
+        depends_on:
+          - S234-3
+  - id: 235
+    theme: Safe Roadmap Migration Planner
+    par: 4
+    slope: 4
+    type: feature + migration architecture
+    status: planned
+    depends_on:
+      - 232
+    note: "Plan #589 repairs explicitly before any filesystem write."
+    tickets:
+      - key: S235-1
+        title: Define roadmap migrate dry-run, repair-plan, audit, and mapping contracts (#589)
+        club: driver
+        complexity: moderate
+        github_issue: 589
+      - key: S235-2
+        title: Analyze orphan and duplicate ownership, legacy shapes, and non-core top-level fields (#589)
+        club: long_iron
+        complexity: moderate
+        github_issue: 589
+        depends_on:
+          - S235-1
+      - key: S235-3
+        title: Require explicit ownership mappings for ambiguous repairs and audit bounded normalizations (#589)
+        club: long_iron
+        complexity: moderate
+        github_issue: 589
+        depends_on:
+          - S235-2
+      - key: S235-4
+        title: Prove deterministic idempotent migration plans with bounded diagnostics (#589)
+        club: short_iron
+        complexity: standard
+        github_issue: 589
+        depends_on:
+          - S235-3
+  - id: 236
+    theme: Transactional Roadmap Migration Apply
+    par: 4
+    slope: 4
+    type: feature + transactional migration
+    status: planned
+    depends_on:
+      - 235
+    note: "Apply #589 only after the repair plan is complete and reproducible."
+    tickets:
+      - key: S236-1
+        title: Stage migration outputs under lock with validation-before-commit and rollback (#589)
+        club: driver
+        complexity: moderate
+        github_issue: 589
+      - key: S236-2
+        title: Generate manifest and bundles while preserving or exporting non-core top-level data (#589)
+        club: long_iron
+        complexity: moderate
+        github_issue: 589
+        depends_on:
+          - S236-1
+      - key: S236-3
+        title: Classify archive eligibility from terminal status and scorecard evidence, then compile and validate (#589)
+        club: long_iron
+        complexity: moderate
+        github_issue: 589
+        depends_on:
+          - S236-2
+      - key: S236-4
+        title: Add Fathoms-scale idempotency, failure rollback, compatibility, and documentation coverage (#589)
+        club: short_iron
+        complexity: standard
+        github_issue: 589
+        depends_on:
+          - S236-3
