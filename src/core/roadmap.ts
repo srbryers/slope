@@ -722,31 +722,34 @@ export function formatStrategicContext(
   roadmap: RoadmapDefinition,
   currentSprint: number,
 ): string | null {
-  const sprint = roadmap.sprints.find(s => s.id === currentSprint);
+  const currentOrder = roadmapSprintOrderValue(roadmap, currentSprint);
+  const sprint = roadmap.sprints.find(s => roadmapSprintOrderValue(roadmap, s.id) === currentOrder);
   if (!sprint) return null;
+  const resolvedSprint = sprint.id;
 
   const criticalPath = computeCriticalPath(roadmap);
-  const onCriticalPath = criticalPath.path.includes(currentSprint);
+  const onCriticalPath = criticalPath.path.some(id => roadmapSprintOrderValue(roadmap, id) === currentOrder);
   const totalSprints = roadmap.sprints.length;
-  const sprintIndex = roadmap.sprints.findIndex(s => s.id === currentSprint) + 1;
+  const sprintIndex = roadmap.sprints.findIndex(s => s.id === resolvedSprint) + 1;
 
   // Find which phase this sprint belongs to
-  const phase = roadmap.phases.find(p => p.sprints.includes(currentSprint));
+  const phase = roadmap.phases.find(p =>
+    p.sprints.some(id => roadmapSprintOrderValue(roadmap, id) === currentOrder));
 
   // Find what depends on this sprint
   const dependents = roadmap.sprints
-    .filter(s => s.depends_on?.includes(currentSprint))
-    .map(s => formatSprintLabel(s.id));
+    .filter(s => s.depends_on?.some(id => roadmapSprintOrderValue(roadmap, id) === currentOrder))
+    .map(s => formatRoadmapSprintLabel(roadmap, s.id));
 
   const lines: string[] = [];
-  lines.push(`Sprint ${sprintIndex} of ${totalSprints} — ${formatSprintLabel(currentSprint)}: ${sprint.theme}`);
+  lines.push(`Sprint ${sprintIndex} of ${totalSprints} — ${formatRoadmapSprintLabel(roadmap, resolvedSprint)}: ${sprint.theme}`);
 
   if (phase) {
     lines.push(`Phase: ${phase.name}`);
   }
 
   if (onCriticalPath) {
-    lines.push(`On critical path: ${criticalPath.path.map(formatSprintLabel).join(' → ')}`);
+    lines.push(`On critical path: ${criticalPath.path.map(id => formatRoadmapSprintLabel(roadmap, id)).join(' → ')}`);
   }
 
   if (dependents.length > 0) {
@@ -754,17 +757,18 @@ export function formatStrategicContext(
   }
 
   // Next planned sprint (dependency-resolved) — see GH #290
-  const next = findNextPlannedSprint(roadmap, currentSprint);
+  const next = findNextPlannedSprint(roadmap, resolvedSprint);
   if (next) {
     const blockers = (next.depends_on ?? [])
       .filter(d => {
-        const dep = roadmap.sprints.find(s => s.id === d);
+        const depOrder = roadmapSprintOrderValue(roadmap, d);
+        const dep = roadmap.sprints.find(s => roadmapSprintOrderValue(roadmap, s.id) === depOrder);
         return !dep || (dep as RoadmapSprint & { status?: string }).status !== 'complete';
       });
     const status = blockers.length === 0
       ? 'ready'
-      : `blocked by ${blockers.map(formatSprintLabel).join(', ')}`;
-    lines.push(`Next: ${formatSprintLabel(next.id)}: ${next.theme} (${status})`);
+      : `blocked by ${blockers.map(id => formatRoadmapSprintLabel(roadmap, id)).join(', ')}`;
+    lines.push(`Next: ${formatRoadmapSprintLabel(roadmap, next.id)}: ${next.theme} (${status})`);
   }
 
   return lines.join('\n');
@@ -779,22 +783,23 @@ export function findNextPlannedSprint(
   roadmap: RoadmapDefinition,
   currentSprint: number,
 ): RoadmapSprint | null {
-  const currentOrder = sprintOrderValue(currentSprint);
+  const currentOrder = roadmapSprintOrderValue(roadmap, currentSprint);
   const candidates = roadmap.sprints
     .filter(s => {
-      return isRoadmapSprintPending(s) && sprintOrderValue(s.id) > currentOrder;
+      return isRoadmapSprintPending(s) && roadmapSprintOrderValue(roadmap, s.id) > currentOrder;
     })
-    .sort((a, b) => compareSprintIds(a.id, b.id));
+    .sort((a, b) => compareRoadmapSprintIds(roadmap, a.id, b.id));
 
   if (candidates.length === 0) return null;
 
   const completedIds = new Set(
     roadmap.sprints
       .filter(s => (s as RoadmapSprint & { status?: string }).status === 'complete')
-      .map(s => s.id),
+      .map(s => roadmapSprintOrderValue(roadmap, s.id)),
   );
 
   // Prefer the lowest-id candidate whose dependencies are all complete
-  const ready = candidates.find(s => (s.depends_on ?? []).every(d => completedIds.has(d)));
+  const ready = candidates.find(s =>
+    (s.depends_on ?? []).every(d => completedIds.has(roadmapSprintOrderValue(roadmap, d))));
   return ready ?? candidates[0];
 }

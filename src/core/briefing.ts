@@ -208,7 +208,7 @@ const ROUTE_STOP_WORDS = new Set([
   'about', 'after', 'again', 'against', 'also', 'before', 'begin', 'being', 'between',
   'agent', 'architecture', 'code', 'context', 'could', 'does', 'feature', 'from', 'gate',
   'handoff', 'into', 'next', 'only', 'other', 'phase', 'planning', 'process', 'project',
-  'review', 'route', 'routes', 'routing', 'should', 'sprint', 'start', 'system', 'than',
+  'review', 'route', 'routes', 'routing', 'should', 'slope', 'sprint', 'start', 'system', 'than',
   'that', 'their', 'then', 'there',
   'these', 'this', 'those', 'through', 'until', 'when', 'where', 'which', 'while', 'with',
   'work', 'would',
@@ -251,16 +251,12 @@ function meaningfulRouteTokens(text: string): Set<string> {
 
 function currentAssignmentTokens(roadmap: RoadmapDefinition, sprint: number): Set<string> {
   const row = roadmapSprintById(roadmap, sprint);
-  const phase = roadmapPhaseForSprint(roadmap, sprint);
   return meaningfulRouteTokens([
     row?.theme,
     row?.type,
     row?.note,
     row?.outcome,
     ...(row?.tickets ?? []).flatMap(ticket => [ticket.title, ticket.note]),
-    phase?.name,
-    phase?.description,
-    phase?.note,
   ].filter((value): value is string => typeof value === 'string').join(' '));
 }
 
@@ -275,16 +271,37 @@ function sprintMentionPattern(roadmap: RoadmapDefinition, sprint: number): RegEx
 function extractTargetAssignmentPremise(sentence: string, mention: RegExp): string | null {
   const target = mention.source;
   const routedAfterTarget = new RegExp(
-    `${target}\\s+(?:routes?\\s+to|becomes?|is\\s+(?:now\\s+)?(?:assigned|reassigned)\\s+to|follows?|hands?\\s+off\\s+to)\\s+(.+?)(?=\\s+(?:before|after|as\\s+if|because)\\b|[;,.!?]|$)`,
+    `${target}\\s+(?:routes?\\s+to|becomes?|will\\s+(?:focus\\s+on|be)|is(?!\\s+(?:blocked|waiting|ready|complete|planned|dependent)\\b)(?:\\s+now)?(?:\\s+(?:assigned|reassigned)\\s+to)?|follows?|hands?\\s+off\\s+to)\\s+(.+?)(?=\\s+(?:before|after|as\\s+if|because)\\b|[;,.!?]|$)`,
     'i',
   ).exec(sentence);
   if (routedAfterTarget?.[1]) return routedAfterTarget[1];
+
+  const forTarget = new RegExp(
+    `for\\s+${target}\\s*,?\\s*(?:route|go|move|focus)(?:\\s+next)?\\s+(?:to|on)\\s+(.+?)(?=\\s+(?:before|after|because)\\b|[;,.!?]|$)`,
+    'i',
+  ).exec(sentence);
+  if (forTarget?.[1]) return forTarget[1];
 
   const startAsAssignment = new RegExp(
     `(?:do\\s+not|don['’]t)?\\s*(?:start|begin)\\s+${target}\\s+(?!until\\b|before\\b|after\\b|if\\b|when\\b)(.+?)(?=\\s+(?:as\\s+if|before|after|because)\\b|[;,.!?]|$)`,
     'i',
   ).exec(sentence);
   return startAsAssignment?.[1] ?? null;
+}
+
+function assignmentPremiseMatchesCurrent(premise: string, assignmentTokens: Set<string>): boolean {
+  const premiseTokens = meaningfulRouteTokens(premise);
+  if (premiseTokens.size === 0) return false;
+  const matches = [...premiseTokens].filter(token => assignmentTokens.has(token));
+  if (premiseTokens.size === 1) return matches.length === 1 && matches[0].length >= 5;
+  return matches.length >= 2 && matches.length / premiseTokens.size >= 0.5;
+}
+
+function splitHazardClauses(description: string): string[] {
+  return description
+    .split(/(?<=[.!?;])\s+|:\s+|\s*,\s*(?:but|however)\s+|\s+[—–-]\s+/i)
+    .map(clause => clause.trim())
+    .filter(Boolean);
 }
 
 function stripSupersededRouteDirectives(
@@ -294,21 +311,28 @@ function stripSupersededRouteDirectives(
   assignmentTokens: Set<string>,
 ): { description: string; suppressed: number } {
   const mention = sprintMentionPattern(roadmap, targetSprint);
-  const sentences = description.split(/(?<=[.!?;])\s+/);
+  const sentences = splitHazardClauses(description);
   const kept: string[] = [];
   let suppressed = 0;
+  let suppressContinuation = false;
   for (const rawSentence of sentences) {
     const sentence = rawSentence.trim();
     if (!sentence) continue;
+    if (suppressContinuation && /^(?:before|after|as\s+if|because|then)\b/i.test(sentence)) {
+      continue;
+    }
+    suppressContinuation = false;
     const assignmentPremise = extractTargetAssignmentPremise(sentence, mention);
     if (!assignmentPremise) {
       kept.push(sentence);
       continue;
     }
-    const premiseTokens = meaningfulRouteTokens(assignmentPremise);
-    const matchesAssignment = [...premiseTokens].some(token => assignmentTokens.has(token));
+    const matchesAssignment = assignmentPremiseMatchesCurrent(assignmentPremise, assignmentTokens);
     if (matchesAssignment) kept.push(sentence);
-    else suppressed++;
+    else {
+      suppressed++;
+      suppressContinuation = true;
+    }
   }
   return { description: kept.join(' '), suppressed };
 }
@@ -489,8 +513,8 @@ export function buildSkillBriefing(opts: {
     return { recommendations: [], gaps: [] };
   }
 
-  const sprint = currentSprint != null
-    ? roadmap?.sprints.find(s => s.id === currentSprint)
+  const sprint = currentSprint != null && roadmap
+    ? roadmapSprintById(roadmap, currentSprint)
     : undefined;
   const sprintText = normalizeSearchText(sprint ? collectStringValues(sprint).join(' ') : '');
   const filterText = normalizeSearchText([
@@ -512,7 +536,9 @@ export function buildSkillBriefing(opts: {
       && bunker.provenance.relationship !== 'transitive_dependency')
     : rawHazardIndex.bunker_locations;
   const recentHazards = [...relevantHazards]
-    .sort((a, b) => b.sprint - a.sprint)
+    .sort((a, b) => roadmap
+      ? roadmapSprintOrderValue(roadmap, b.sprint) - roadmapSprintOrderValue(roadmap, a.sprint)
+      : b.sprint - a.sprint)
     .slice(0, 20);
   const hazardText = normalizeSearchText([
     ...recentHazards.map(h => `${h.type} ${h.ticket} ${h.description}`),
@@ -523,7 +549,9 @@ export function buildSkillBriefing(opts: {
     ...(changedFiles ?? []),
   ].join(' '));
   const requestedScorecard = currentSprint != null
-    ? scorecards.find(card => scorecardSprintNumber(card) === currentSprint)
+    ? scorecards.find(card => roadmap
+      ? roadmapIdsEqual(roadmap, scorecardSprintNumber(card), currentSprint)
+      : scorecardSprintNumber(card) === currentSprint)
     : undefined;
   const requestedSkillIds = collectRequestedScorecardSkillIds(requestedScorecard);
   const historicalSkillIds = collectScorecardSkillIds(scorecards);
@@ -680,7 +708,7 @@ export function formatBriefing(opts: {
   // sprint, direct dependencies, and prior work in its current phase. An
   // explicit keyword remains an escape hatch into labelled transitive or
   // unrelated historical evidence.
-  if (scopedHazards && !effectiveFilter?.keywords?.length) {
+  if (scopedHazards && !filter?.keywords?.length) {
     filteredBunkers = filteredBunkers.filter(b =>
       b.provenance?.relationship !== 'historical'
       && b.provenance?.relationship !== 'transitive_dependency');
