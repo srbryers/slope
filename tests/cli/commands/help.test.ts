@@ -92,6 +92,17 @@ describe('slope help', () => {
     expect(output).toContain('process->workflow alias');
   });
 
+  it('shows the complete audited rollover syntax in sprint help', async () => {
+    await helpCommand(['sprint']);
+
+    const output = consoleOutput.join('\n');
+    expect(output).toContain('slope sprint rollover');
+    expect(output).toContain('--from=<N>');
+    expect(output).toContain('--to=<N>');
+    expect(output).toContain('--force');
+    expect(output).toContain('--reason=<text>');
+  });
+
   it('teaches the --all escape hatch in help usage', async () => {
     await helpCommand(['--help']);
 

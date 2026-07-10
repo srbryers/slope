@@ -162,6 +162,12 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
         { flag: '--ticket=<key>', desc: 'Ticket key to claim and prep' },
         { flag: '--actor=<name>', desc: 'Actor override for audit trail identity' },
       ]},
+      { name: 'rollover', desc: 'Audit prior sprint state and create the next planning state', flags: [
+        { flag: '--from=<N>', desc: 'Prior sprint number (required)' },
+        { flag: '--to=<N>', desc: 'Next sprint number (required)' },
+        { flag: '--force', desc: 'Allow rollover from an in-progress source sprint' },
+        { flag: '--reason=<text>', desc: 'Required justification for an in-progress rollover' },
+      ]},
       { name: 'gate', desc: 'Mark a gate as complete', flags: [
         { flag: '<name>', desc: 'Gate name to complete' },
         { flag: '--reviewer=<id>', desc: 'Independent reviewer id/name for code_review and architect_review' },

@@ -1,7 +1,9 @@
 import {
   loadSprintState,
+  loadSprintStateResult,
   saveSprintState,
   createSprintState,
+  initializeSprintState,
   mutateSprintState,
   updateGate,
   updateSprintPhase,
@@ -27,6 +29,12 @@ import { WorkflowEngine, loadWorkflow, resolveVariables, validateWorkflow, loadC
 import type { WorkflowDefinition, WorkflowExecution } from '../../core/index.js';
 import { createHash } from 'node:crypto';
 import { formatActorName, formatActorSource, formatConflictSummary, resolveActor } from '../actor.js';
+import {
+  inspectSprintRollover,
+  performSprintRollover,
+  SprintRolloverError,
+  type SprintRolloverAssessment,
+} from '../sprint-rollover.js';
 
 /** Get workflow definition from execution snapshot (preferred) or disk (fallback for old executions) */
 function getDefinition(exec: WorkflowExecution, cwd: string): { def: WorkflowDefinition; drifted: boolean } {
@@ -46,7 +54,7 @@ function getDefinition(exec: WorkflowExecution, cwd: string): { def: WorkflowDef
   return { def: loadWorkflow(exec.workflow_name, cwd), drifted: false };
 }
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { join, dirname, basename, isAbsolute } from 'node:path';
+import { join, dirname, basename, isAbsolute, relative } from 'node:path';
 import { createStore } from '../../store/index.js';
 import { formatCliError } from '../error-reporter.js';
 import {
@@ -269,6 +277,136 @@ function printGateUsage(gateName?: GateName): void {
   console.error('');
 }
 
+function rolloverFlagValue(label: string): string {
+  return label.startsWith('S') ? label.slice(1) : label;
+}
+
+function rolloverBaseCommand(assessment: SprintRolloverAssessment): string {
+  return `slope sprint rollover --from=${rolloverFlagValue(assessment.from_label)} --to=${rolloverFlagValue(assessment.to_label)}`;
+}
+
+/**
+ * Return true when the requested sprint is the existing sprint, including a
+ * roadmap-aware legacy alias. Otherwise print bounded recovery guidance and
+ * terminate without mutating local state.
+ */
+function requireMatchingSprintOrRollover(
+  cwd: string,
+  state: SprintState,
+  requestedSprint: number,
+  action: string,
+  retryCommand: string,
+): boolean {
+  if (state.sprint === requestedSprint) return true;
+
+  let assessment: SprintRolloverAssessment;
+  try {
+    assessment = inspectSprintRollover(cwd, { from: state.sprint, to: requestedSprint });
+  } catch (error) {
+    console.error(`Refusing to ${action}: ${(error as Error).message}`);
+    console.error(`After resolving the sprint state, retry: ${retryCommand}`);
+    process.exit(1);
+  }
+
+  if (assessment.from_sprint && assessment.to_sprint && assessment.from === assessment.to) return true;
+
+  console.error(`Refusing to ${action} — sprint-state.json is for ${assessment.from_label}, not ${assessment.to_label}.`);
+  const eligibilityIssues = assessment.issues.filter(issue => issue.code !== 'from_not_terminal');
+  if (eligibilityIssues.length === 0) {
+    const command = assessment.from_terminal
+      ? rolloverBaseCommand(assessment)
+      : `${rolloverBaseCommand(assessment)} --force --reason="<why>"`;
+    console.error(`Record the prior state with: ${command}`);
+  } else {
+    console.error('Rollover is not currently eligible:');
+    for (const issue of eligibilityIssues) console.error(`  - ${issue.message}`);
+  }
+  console.error(`After resolving the rollover, retry: ${retryCommand}`);
+  process.exit(1);
+}
+
+function failOnCorruptSprintState(cwd: string): void {
+  const loaded = loadSprintStateResult(cwd);
+  if (loaded.status !== 'corrupt') return;
+  console.error(`Refusing to change sprint state: corrupt evidence was preserved at ${relative(cwd, loaded.path)}.`);
+  process.exit(1);
+}
+
+function printRolloverUsage(): void {
+  console.error('');
+  console.error('Usage: slope sprint rollover --from=N --to=N [--force --reason="<why>"]');
+  console.error('Safely archives the prior local state in a tracked audit before creating the next planning state.');
+  console.error('');
+}
+
+function rolloverCommand(args: string[], cwd: string): void {
+  if (args.includes('--help') || args.includes('-h')) {
+    printRolloverUsage();
+    return;
+  }
+
+  let fromValue: string | undefined;
+  let toValue: string | undefined;
+  let reason: string | undefined;
+  let force = false;
+  const errors: string[] = [];
+  for (let index = 0; index < args.length; index++) {
+    const arg = args[index];
+    const from = optionValue(args, index, '--from');
+    if (from) {
+      if (!from.value || from.value.startsWith('--')) errors.push('--from requires a sprint id');
+      else fromValue = from.value;
+      index = from.next;
+      continue;
+    }
+    const to = optionValue(args, index, '--to');
+    if (to) {
+      if (!to.value || to.value.startsWith('--')) errors.push('--to requires a sprint id');
+      else toValue = to.value;
+      index = to.next;
+      continue;
+    }
+    const parsedReason = optionValue(args, index, '--reason');
+    if (parsedReason) {
+      if (!parsedReason.value || parsedReason.value.startsWith('--')) errors.push('--reason requires a non-empty value');
+      else reason = parsedReason.value;
+      index = parsedReason.next;
+      continue;
+    }
+    if (arg === '--force') {
+      force = true;
+      continue;
+    }
+    errors.push(`Unknown rollover option: ${arg}`);
+  }
+
+  const from = fromValue ? parseSprintNumber(fromValue) : null;
+  const to = toValue ? parseSprintNumber(toValue) : null;
+  if (from == null) errors.push('--from must be a positive sprint id');
+  if (to == null) errors.push('--to must be a positive sprint id');
+  if (reason && !force) errors.push('--reason is only valid with --force');
+  if (errors.length > 0) {
+    for (const error of errors) console.error(`Error: ${error}`);
+    printRolloverUsage();
+    process.exit(1);
+  }
+
+  try {
+    const result = performSprintRollover(cwd, { from: from!, to: to!, force, reason }, resolveActor(cwd));
+    console.log(`${result.already_applied ? 'Rollover already recorded' : 'Rollover recorded'}: ${result.record.from_label} -> ${result.record.to_label}.`);
+    console.log(`Audit: ${result.audit_path}`);
+    console.log(`Sprint ${rolloverFlagValue(result.record.to_label)} state is ready (phase: ${result.state.phase}).`);
+    console.log('Prior state archived; claims and sessions unchanged.');
+    console.log(`Next: slope sprint begin --sprint=${rolloverFlagValue(result.record.to_label)} --ticket=<key>`);
+  } catch (error) {
+    if (error instanceof SprintRolloverError) {
+      console.error(`Rollover refused: ${error.message}`);
+      process.exit(1);
+    }
+    throw error;
+  }
+}
+
 /**
  * `slope sprint begin --sprint=N --ticket=T` — bundled start-of-work flow.
  *
@@ -296,17 +434,22 @@ async function beginCommand(args: string[], cwd: string): Promise<void> {
     process.exit(1);
   }
 
-  // Step 1: sprint state
-  let state = loadSprintState(cwd);
-  if (state && state.sprint === sprint) {
-    console.log(`Sprint ${formatSprintNumber(sprint)}: already started (phase: ${state.phase}).`);
-  } else if (state && state.sprint !== sprint) {
-    console.error(`Refusing to begin S${formatSprintNumber(sprint)} — sprint-state.json is for S${formatSprintNumber(state.sprint)}.`);
-    console.error('Run `slope sprint reset` first if the previous sprint is done.');
+  // Step 1: initialize without overwriting existing or corrupt local state.
+  const initialized = initializeSprintState(cwd, createSprintState(sprint, 'planning'));
+  if (initialized.status === 'corrupt') {
+    console.error(`Refusing to begin: corrupt sprint evidence was preserved at ${relative(cwd, initialized.path)}.`);
     process.exit(1);
+  }
+  let state = initialized.state;
+  if (initialized.status === 'existing' && requireMatchingSprintOrRollover(
+    cwd,
+    state,
+    sprint,
+    `begin ${formatSprintLabel(sprint)}`,
+    `slope sprint begin --sprint=${formatSprintNumber(sprint)} --ticket=${ticket}`,
+  )) {
+    console.log(`Sprint ${formatSprintNumber(sprint)}: already started (phase: ${state.phase}).`);
   } else {
-    state = createSprintState(sprint, 'planning');
-    saveSprintState(cwd, state);
     console.log(`Sprint ${formatSprintNumber(sprint)}: started (phase: planning).`);
   }
 
@@ -420,8 +563,17 @@ async function startCommand(args: string[], cwd: string): Promise<void> {
   const touchesArg = args.find(a => a.startsWith('--touches='));
   const touchedPaths = parseTouchedPaths(touchesArg?.slice('--touches='.length));
 
-  const existing = loadSprintState(cwd);
-  if (existing && existing.sprint === sprint) {
+  failOnCorruptSprintState(cwd);
+  const existingResult = loadSprintStateResult(cwd);
+  const existing = existingResult.status === 'valid' ? existingResult.state : null;
+  if (existing) {
+    requireMatchingSprintOrRollover(
+      cwd,
+      existing,
+      sprint,
+      `start ${formatSprintLabel(sprint)}`,
+      `slope sprint start --number=${formatSprintNumber(sprint)} --phase=${phase}`,
+    );
     if (phaseArg && existing.phase !== phase) {
       updateSprintPhase(cwd, phase);
       console.log(`Sprint ${formatSprintNumber(sprint)} phase updated: ${phase}.`);
@@ -457,8 +609,22 @@ async function startCommand(args: string[], cwd: string): Promise<void> {
     process.exit(1);
   }
 
-  const state = createSprintState(sprint, phase);
-  saveSprintState(cwd, state);
+  const initialized = initializeSprintState(cwd, createSprintState(sprint, phase));
+  if (initialized.status === 'corrupt') {
+    console.error(`Refusing to start: corrupt sprint evidence was preserved at ${relative(cwd, initialized.path)}.`);
+    process.exit(1);
+  }
+  if (initialized.status === 'existing') {
+    requireMatchingSprintOrRollover(
+      cwd,
+      initialized.state,
+      sprint,
+      `start ${formatSprintLabel(sprint)}`,
+      `slope sprint start --number=${formatSprintNumber(sprint)} --phase=${phase}`,
+    );
+    console.log(`Sprint ${formatSprintNumber(sprint)} state already exists (phase: ${initialized.state.phase}).`);
+    return;
+  }
   const autoClaim = await autoClaimSprint(cwd, sprint, actorOverride(args));
   console.log(`Sprint ${formatSprintNumber(sprint)} started (phase: ${phase}). Use 'slope sprint gate <name>' to mark gates; review gates require evidence options.`);
   if (autoClaim) console.log(autoClaim);
@@ -1498,6 +1664,9 @@ export async function sprintCommand(args: string[]): Promise<void> {
     case 'begin':
       await beginCommand(args.slice(1), cwd);
       break;
+    case 'rollover':
+      rolloverCommand(args.slice(1), cwd);
+      break;
     case 'plan': {
       const { sprintPlanCommand } = await import('./sprint-plan.js');
       await sprintPlanCommand(args.slice(1));
@@ -1561,6 +1730,8 @@ Legacy commands:
   slope sprint start --number=N [--phase=<phase>] [--touches=<paths>] [--actor=<name>] [--force]
                                       Start sprint state tracking with pre-sprint reality checks
   slope sprint begin --sprint=N --ticket=T [--actor=<name>]  Bundled start + claim + briefing + prep (#311)
+  slope sprint rollover --from=N --to=N [--force --reason="<why>"]
+                                      Archive prior state and create the next planning state
   slope sprint plan --sprint=N [--output=path]  Generate markdown sprint plan (#312)
   slope sprint phase <phase>       Update current sprint phase
   slope sprint gate <name> [review evidence options]

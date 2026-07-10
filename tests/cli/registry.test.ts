@@ -63,6 +63,18 @@ describe('CLI_COMMAND_REGISTRY', () => {
     expect(focus?.flags?.map(flag => flag.flag)).toEqual(['--sprint=<N>', '--path=<file>', '--json']);
   });
 
+  it('registers the audited sprint rollover surface', () => {
+    const sprint = CLI_COMMAND_REGISTRY.find(entry => entry.cmd === 'sprint');
+    const rollover = sprint?.subcommands?.find(subcommand => subcommand.name === 'rollover');
+
+    expect(rollover?.flags?.map(flag => flag.flag)).toEqual([
+      '--from=<N>',
+      '--to=<N>',
+      '--force',
+      '--reason=<text>',
+    ]);
+  });
+
   it('registry + internal modules matches the actual command files on disk', () => {
     const commandsDir = join(__dirname, '../../src/cli/commands');
     const files = readdirSync(commandsDir)
