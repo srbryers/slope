@@ -1,7 +1,6 @@
 import { createHash } from 'node:crypto';
 import {
   ROADMAP_TERMINAL_STATUSES,
-  castRoadmapStructure,
   compareRoadmapSprintIds,
   getRoadmapTicketKey,
   type RoadmapDefinition,
@@ -11,6 +10,8 @@ import {
 import type { RoadmapSourceKind } from './roadmap-sources.js';
 
 export type RoadmapMigrationClassification = 'archive' | 'live' | 'history_unverified' | 'backlog';
+
+export const ROADMAP_MIGRATION_DIAGNOSTIC_LIMIT = 100;
 
 export interface RoadmapMigrationOwnershipMapping {
   phase_index: number;
@@ -97,6 +98,8 @@ export interface RoadmapMigrationPlan {
   sources: RoadmapMigrationSourcePlan[];
   audit: RoadmapMigrationAuditEntry[];
   diagnostics: RoadmapMigrationDiagnostic[];
+  diagnostics_total: number;
+  diagnostics_omitted: number;
   unresolved: RoadmapMigrationUnresolvedRepair[];
   mapping_template: RoadmapMigrationMappingTemplate;
   non_core: RoadmapMigrationNonCoreExport;
@@ -289,9 +292,6 @@ function normalizeTicket(
   unresolved: RoadmapMigrationUnresolvedRepair[],
   sprint: number,
 ): void {
-  if ((typeof ticket.key !== 'string' || !ticket.key.trim()) && typeof ticket.id === 'string' && ticket.id.trim()) {
-    auditChange(audit, path, 'ticket_id_alias', ticket, 'key', ticket.id.trim());
-  }
   const key = getRoadmapTicketKey(ticket);
   if (!key) {
     diagnostics.push({ severity: 'error', code: 'ticket_key_missing', sprint, message: `Ticket at ${path} has no key or id.` });
@@ -389,6 +389,13 @@ export function planRoadmapMigration(
   const audit: RoadmapMigrationAuditEntry[] = [];
   const diagnostics: RoadmapMigrationDiagnostic[] = [];
   const unresolved: RoadmapMigrationUnresolvedRepair[] = [];
+  if (parsed.description != null && typeof parsed.description !== 'string') {
+    diagnostics.push({
+      severity: 'error',
+      code: 'invalid_description',
+      message: 'Roadmap description must be a string when present; migration will not drop or coerce it.',
+    });
+  }
   const phases = clone(parsed.phases) as unknown[];
   const sprints = clone(parsed.sprints) as unknown[];
   const phaseRecords: Record<string, unknown>[] = [];
@@ -525,13 +532,12 @@ export function planRoadmapMigration(
     auditChange(audit, `/phases/${phaseOffset}`, 'repair_phase_ownership', phase, 'sprints', retained);
   }
 
-  const preliminary = castRoadmapStructure({
+  const preliminary: RoadmapDefinition = {
     name: parsed.name,
     ...(typeof parsed.description === 'string' ? { description: parsed.description } : {}),
-    phases: phaseRecords,
-    sprints: sprintRecords,
-  });
-  if (!preliminary) throw new RoadmapMigrationError('normalized roadmap could not be structurally represented');
+    phases: phaseRecords as unknown as RoadmapPhase[],
+    sprints: sprintRecords as unknown as RoadmapSprint[],
+  };
   const originalOrder = preliminary.sprints.map(sprint => sprint.id);
   preliminary.sprints.sort((a, b) => compareRoadmapSprintIds(preliminary, a.id, b.id));
   const sortedOrder = preliminary.sprints.map(sprint => sprint.id);
@@ -586,6 +592,7 @@ export function planRoadmapMigration(
   };
   const template = mappingTemplate(sourceSha, unresolved);
   const mappingSha = options.mapping ? computeRoadmapMigrationDigest(options.mapping) : undefined;
+  const boundedDiagnostics = diagnostics.slice(0, ROADMAP_MIGRATION_DIAGNOSTIC_LIMIT);
   const base = {
     version: '1' as const,
     source_sha256: sourceSha,
@@ -594,7 +601,9 @@ export function planRoadmapMigration(
     normalized_roadmap: preliminary,
     sources,
     audit,
-    diagnostics,
+    diagnostics: boundedDiagnostics,
+    diagnostics_total: diagnostics.length,
+    diagnostics_omitted: diagnostics.length - boundedDiagnostics.length,
     unresolved,
     mapping_template: template,
     non_core: nonCore,

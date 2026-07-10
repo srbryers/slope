@@ -3,6 +3,7 @@ import {
   computeRoadmapMigrationDigest,
   parseRoadmapMigrationMapping,
   planRoadmapMigration,
+  ROADMAP_MIGRATION_DIAGNOSTIC_LIMIT,
   RoadmapMigrationError,
   serializeRoadmapMigrationMappingTemplate,
   type RoadmapMigrationMapping,
@@ -175,14 +176,14 @@ describe('roadmap migration normalization', () => {
     expect(plan.normalized_roadmap.sprints[0].tickets).toEqual([
       expect.objectContaining({ club: 'long_iron', complexity: 'multi_package' }),
       expect.objectContaining({ club: 'short_iron', complexity: 'standard' }),
-      expect.objectContaining({ key: 'S1-3', id: 'S1-3', club: 'short_iron', complexity: 'multi_package' }),
+      expect.objectContaining({ id: 'S1-3', club: 'short_iron', complexity: 'multi_package' }),
     ]);
+    expect(plan.normalized_roadmap.sprints[0].tickets[2]).not.toHaveProperty('key');
     expect(plan.audit.map(item => item.rule)).toEqual(expect.arrayContaining([
       'club_alias',
       'complexity_alias',
       'derive_complexity_from_club',
       'derive_club_from_complexity',
-      'ticket_id_alias',
     ]));
   });
 
@@ -283,5 +284,34 @@ describe('roadmap migration preservation and classification', () => {
     expect(first.normalized_roadmap.sprints.map(item => item.id)).toEqual([1, 2]);
     expect(first.audit).toContainEqual(expect.objectContaining({ path: '/sprints', rule: 'compiler_sprint_order' }));
     expect(serializeRoadmapMigrationMappingTemplate(first)).toBe(`${JSON.stringify(first.mapping_template, null, 2)}\n`);
+  });
+
+  it('reports an invalid description instead of silently dropping a core field', () => {
+    const source = roadmap([{ name: 'One', sprints: [1] }], [sprint(1)], { description: 42 });
+    const plan = planRoadmapMigration(source);
+
+    expect(plan.applicable).toBe(false);
+    expect(plan.diagnostics).toContainEqual(expect.objectContaining({
+      code: 'invalid_description',
+      message: expect.stringContaining('will not drop or coerce'),
+    }));
+    expect(plan.diagnostics_total).toBe(1);
+    expect(plan.diagnostics_omitted).toBe(0);
+  });
+
+  it('completes a deterministic 456-sprint analysis with bounded diagnostics and a complete repair template', () => {
+    const largeSprints = Array.from({ length: 456 }, (_, index) => sprint(index + 1));
+    const source = roadmap([{ name: 'Unassigned migration history', sprints: [] }], largeSprints);
+
+    const first = planRoadmapMigration(source);
+    const second = planRoadmapMigration(source);
+
+    expect(first.applicable).toBe(false);
+    expect(first.diagnostics).toHaveLength(ROADMAP_MIGRATION_DIAGNOSTIC_LIMIT);
+    expect(first.diagnostics_total).toBe(456);
+    expect(first.diagnostics_omitted).toBe(456 - ROADMAP_MIGRATION_DIAGNOSTIC_LIMIT);
+    expect(Object.keys(first.mapping_template.ownership)).toHaveLength(456);
+    expect(first.unresolved).toHaveLength(456);
+    expect(first.plan_sha256).toBe(second.plan_sha256);
   });
 });
