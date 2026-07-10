@@ -144,12 +144,16 @@ function formatBriefingGateStatus(state: SprintState, name: string, done: boolea
   }
 
   const satisfied = isReviewGateSatisfied(state, name);
-  const marker = satisfied ? '[x]' : done ? '[!]' : '[ ]';
+  const marker = satisfied
+    ? state.review_gates[name].provenance === 'independent_review_waived' ? '[~]' : '[x]'
+    : done ? '[!]' : '[ ]';
   const review = state.review_gates[name];
   let label = 'pending';
   if (satisfied) {
     label = review.provenance === 'self_review' || review.provenance === 'manual_override'
       ? `${review.provenance}(weaker)`
+      : review.provenance === 'independent_review_waived'
+        ? 'independent_review_waived(required_downgrade)'
       : review.provenance;
   } else if (done) {
     label = 'review_evidence_missing';

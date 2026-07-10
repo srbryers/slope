@@ -2,7 +2,7 @@ import { formatSprintLabel, formatSprintNumber, isRoadmapSprintPending, loadScor
 import type { RoadmapDefinition, RoadmapSprint, RoadmapTicket, SprintClaim } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { inferSprintContext, loadRoadmapForInference } from '../sprint-inference.js';
-import { loadSprintState, pendingGates } from '../sprint-state.js';
+import { isRequiredReviewGate, isReviewGateSatisfied, loadSprintState, pendingGates, waivedReviewGateNames, type ReviewGateName } from '../sprint-state.js';
 import { resolveStore } from '../store.js';
 
 interface NowSnapshot {
@@ -19,6 +19,8 @@ interface NowSnapshot {
   sprintState?: {
     phase: string;
     pendingGates: string[];
+    requiredReviewsPending: ReviewGateName[];
+    reviewWaivers: ReviewGateName[];
   };
   claims: {
     total: number;
@@ -73,6 +75,12 @@ function buildNextAction(snapshot: Omit<NowSnapshot, 'nextAction'>): string {
   if (!snapshot.roadmap) {
     return 'Run slope init or slope roadmap status to establish project direction.';
   }
+  if (snapshot.sprintState?.reviewWaivers.length) {
+    return `Review waiver recorded for ${snapshot.sprintState.reviewWaivers.join(', ')}: attach independent/PR evidence to replace it, or proceed with the explicit downgrade.`;
+  }
+  if (snapshot.sprintState?.requiredReviewsPending.length) {
+    return `Review decision for ${snapshot.sprintState.requiredReviewsPending.join(', ')}: attach independent/PR evidence, or explicitly waive with --waive-independent-review.`;
+  }
   if (snapshot.nextTicket) {
     return `Start ${snapshot.nextTicket.key}: ${snapshot.nextTicket.title}`;
   }
@@ -120,6 +128,9 @@ async function buildNowSnapshot(cwd: string, flags: Record<string, string>): Pro
     sprintState: state?.sprint === sprint ? {
       phase: state.phase,
       pendingGates: pendingGates(state),
+      requiredReviewsPending: (['code_review', 'architect_review'] as ReviewGateName[])
+        .filter(gate => isRequiredReviewGate(state, gate) && !isReviewGateSatisfied(state, gate)),
+      reviewWaivers: waivedReviewGateNames(state),
     } : undefined,
     claims: {
       total: claims.length,
@@ -145,6 +156,9 @@ function printNowSnapshot(snapshot: NowSnapshot): void {
   }
   console.log(`Roadmap: ${snapshot.roadmap?.status ?? 'not found'} (${snapshot.source})`);
   console.log(`Sprint state: ${snapshot.sprintState?.phase ?? 'not started'}`);
+  if (snapshot.sprintState?.reviewWaivers.length) {
+    console.log(`Review downgrade: ${snapshot.sprintState.reviewWaivers.join(', ')} independently required but explicitly waived`);
+  }
   console.log(`Claims: ${snapshot.claims.total} active, ${snapshot.claims.ticketClaims} ticket`);
   console.log(`Next: ${snapshot.nextAction}`);
   if (snapshot.nextTicket) {

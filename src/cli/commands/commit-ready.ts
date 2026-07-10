@@ -262,7 +262,7 @@ function checkPendingGates(cwd: string): CommitReadyCheck {
     ok: false,
     severity: 'warn',
     reason: `${pending.length} pending gate(s): ${pending.join(', ')}`,
-    suggestion: 'slope sprint gate <name>; review gates require --reviewer/--evidence, --pr-review, --self-review, or --override',
+    suggestion: 'slope sprint gate <name>; required reviews need --reviewer/--evidence, --pr-review, or --waive-independent-review --reason',
   };
 }
 

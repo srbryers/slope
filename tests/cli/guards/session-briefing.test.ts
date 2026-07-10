@@ -130,4 +130,19 @@ describe('sessionBriefingGuard', () => {
     expect(context).toContain('[x] code_review:self_review(weaker)');
     expect(context).toContain('[!] architect_review:review_evidence_missing');
   });
+
+  it('surfaces a required independent-review waiver as a downgrade', async () => {
+    const state = createSprintState(74, 'implementing');
+    state.gates.architect_review = true;
+    state.review_gates.architect_review = {
+      provenance: 'independent_review_waived',
+      evidence: [],
+      notes: 'Reviewer unavailable.',
+    };
+    saveSprintState(tmpDir, state);
+
+    const result = await sessionBriefingGuard(makeInput(), tmpDir);
+
+    expect(result.suggestion?.context).toContain('[~] architect_review:independent_review_waived(required_downgrade)');
+  });
 });
