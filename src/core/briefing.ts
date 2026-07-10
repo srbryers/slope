@@ -502,10 +502,14 @@ export function buildSkillBriefing(opts: {
     ? scopeBriefingHazards(rawHazardIndex, roadmap, currentSprint)
     : undefined;
   const relevantHazards = scopedHazardIndex
-    ? scopedHazardIndex.shot_hazards.filter(hazard => hazard.provenance.relationship !== 'historical')
+    ? scopedHazardIndex.shot_hazards.filter(hazard =>
+      hazard.provenance.relationship !== 'historical'
+      && hazard.provenance.relationship !== 'transitive_dependency')
     : rawHazardIndex.shot_hazards;
   const relevantBunkers = scopedHazardIndex
-    ? scopedHazardIndex.bunker_locations.filter(bunker => bunker.provenance.relationship !== 'historical')
+    ? scopedHazardIndex.bunker_locations.filter(bunker =>
+      bunker.provenance.relationship !== 'historical'
+      && bunker.provenance.relationship !== 'transitive_dependency')
     : rawHazardIndex.bunker_locations;
   const recentHazards = [...relevantHazards]
     .sort((a, b) => b.sprint - a.sprint)
@@ -673,11 +677,16 @@ export function formatBriefing(opts: {
     scopedHazards?.shot_hazards ?? hazards.shot_hazards;
 
   // With a resolved roadmap target, default output contains only the selected
-  // sprint, its dependency chain, and its current phase. An explicit keyword
-  // remains an intentional escape hatch into labelled historical evidence.
+  // sprint, direct dependencies, and prior work in its current phase. An
+  // explicit keyword remains an escape hatch into labelled transitive or
+  // unrelated historical evidence.
   if (scopedHazards && !effectiveFilter?.keywords?.length) {
-    filteredBunkers = filteredBunkers.filter(b => b.provenance?.relationship !== 'historical');
-    filteredShotHazards = filteredShotHazards.filter(h => h.provenance?.relationship !== 'historical');
+    filteredBunkers = filteredBunkers.filter(b =>
+      b.provenance?.relationship !== 'historical'
+      && b.provenance?.relationship !== 'transitive_dependency');
+    filteredShotHazards = filteredShotHazards.filter(h =>
+      h.provenance?.relationship !== 'historical'
+      && h.provenance?.relationship !== 'transitive_dependency');
   }
 
   // Role-based focus area filtering: show only hazards relevant to the role's focus

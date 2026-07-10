@@ -724,6 +724,7 @@ function makeReplannedRoadmap(): RoadmapDefinition {
       },
       {
         id: 447, theme: 'AI review gate', par: 3, slope: 2, type: 'review', status: 'complete',
+        depends_on: [446],
         tickets: [{ key: 'S447-1', title: 'Durable review evidence', club: 'short_iron', complexity: 'standard' }],
       },
       {
@@ -995,6 +996,30 @@ describe('formatBriefing — replanned hazard provenance', () => {
 
     expect(output).not.toContain('FUTURE_PHASE_HAZARD');
     expect(output).toContain('No hazards relevant to the current roadmap context.');
+  });
+
+  it('keeps transitive dependency history opt-in and labels its provenance', () => {
+    const card = makeCard({
+      sprint_number: 446,
+      shots: [makeShot({ hazards: [{ type: 'rough', description: 'TRANSITIVE_ASSET_HISTORY' }] })],
+    });
+    const defaultOutput = formatBriefing({
+      scorecards: [card],
+      commonIssues: makeIssues([]),
+      roadmap: makeReplannedRoadmap(),
+      currentSprint: 448,
+    });
+    const focusedOutput = formatBriefing({
+      scorecards: [card],
+      commonIssues: makeIssues([]),
+      filter: { keywords: ['TRANSITIVE_ASSET_HISTORY'] },
+      roadmap: makeReplannedRoadmap(),
+      currentSprint: 448,
+    });
+
+    expect(defaultOutput).not.toContain('TRANSITIVE_ASSET_HISTORY');
+    expect(focusedOutput).toContain('TRANSITIVE_ASSET_HISTORY');
+    expect(focusedOutput).toContain('transitive dependency history for S448');
   });
 
   it('handles decimal and encoded sprint labels without splitting the target mention', () => {
