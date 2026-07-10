@@ -64,11 +64,11 @@ function writeScorecardAt(cwd: string, sprint: number): void {
   writeFileSync(join(dir, `sprint-${sprint}.json`), JSON.stringify({ sprint_number: sprint, score: 4, par: 4 }));
 }
 
-function writeRoadmap(sprints: Array<{ id: number; status?: string }>): void {
+function writeRoadmap(sprints: Array<{ id: number; status?: string; depends_on?: number[] }>): void {
   writeRoadmapAt(tmpDir, sprints);
 }
 
-function writeRoadmapAt(cwd: string, sprints: Array<{ id: number; status?: string }>): void {
+function writeRoadmapAt(cwd: string, sprints: Array<{ id: number; status?: string; depends_on?: number[] }>): void {
   const dir = join(cwd, 'docs', 'backlog');
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, 'roadmap.json'), JSON.stringify({
@@ -78,6 +78,7 @@ function writeRoadmapAt(cwd: string, sprints: Array<{ id: number; status?: strin
       id: s.id, theme: `S${s.id}`, par: 4, slope: 2, type: 'feature',
       tickets: [{ key: `S${s.id}-1`, title: 'T1', club: 'short_iron', complexity: 'standard' }],
       status: s.status ?? 'planned',
+      ...(s.depends_on ? { depends_on: s.depends_on } : {}),
     })),
   }));
 }
@@ -166,14 +167,15 @@ describe('sprint-completion guard', () => {
       saveSprintState(tmpDir, state);
     });
 
-    it('allows gh pr create even with incomplete gates', async () => {
+    it('denies gh pr create when phase is complete but gates remain incomplete', async () => {
       const result = await sprintCompletionGuard(makePreToolUse('gh pr create --title "t"'), tmpDir);
-      expect(result).toEqual({});
+      expect(result.decision).toBe('deny');
+      expect(result.blockReason).toContain('incomplete gates');
     });
 
-    it('allows Stop', async () => {
+    it('advises on Stop when phase is complete but evidence remains incomplete', async () => {
       const result = await sprintCompletionGuard(makeStop(), tmpDir);
-      expect(result).toEqual({});
+      expect(result.context).toContain('Remaining gates');
     });
   });
 
@@ -217,6 +219,7 @@ describe('sprint-completion guard', () => {
 
     it('refuses automatic branch rebind and preserves prior sprint evidence', async () => {
       initGitBranch('feat/sprint-66-schedule-cms');
+      writeRoadmap([{ id: 65 }, { id: 66 }]);
       saveSprintState(tmpDir, createSprintState(65, 'implementing'));
       writeScorecard(66);
 
@@ -231,6 +234,39 @@ describe('sprint-completion guard', () => {
       const state = loadSprintState(tmpDir)!;
       expect(state.sprint).toBe(65);
       expect(state.phase).toBe('implementing');
+    });
+
+    it('does not recommend force when the branch target depends on unfinished source work', async () => {
+      initGitBranch('feat/sprint-66-dependent');
+      writeRoadmap([{ id: 65 }, { id: 66, depends_on: [65] }]);
+      saveSprintState(tmpDir, createSprintState(65, 'implementing'));
+
+      const result = await sprintCompletionGuard(makePreToolUse('gh pr create --title "S66"'), tmpDir);
+
+      expect(result.decision).toBe('deny');
+      expect(result.blockReason).toContain('Rollover is not currently eligible');
+      expect(result.blockReason).toContain('S66 is blocked by S65');
+      expect(result.blockReason).not.toContain('--force --reason');
+      expect(loadSprintState(tmpDir)?.sprint).toBe(65);
+    });
+
+    it('blocks PR creation when rollover-linked state loses its audit', async () => {
+      initGitBranch('feat/sprint-22-lineage');
+      const state = createSprintState(22, 'complete');
+      state.rollover = {
+        transition_id: '0123456789abcdef',
+        from_sprint: 21,
+        audit_path: 'docs/retros/rollovers/missing.json',
+        recorded_at: '2026-07-10T00:00:00.000Z',
+        forced: false,
+      };
+      saveSprintState(tmpDir, state);
+
+      const result = await sprintCompletionGuard(makePreToolUse('gh pr create --title "S22"'), tmpDir);
+
+      expect(result.decision).toBe('deny');
+      expect(result.blockReason).toContain('rollover lineage verification failed');
+      expect(result.blockReason).toContain('audit is missing');
     });
 
     it('uses the shell cd target as the sprint-state and scorecard cwd for gh pr create', async () => {

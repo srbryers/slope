@@ -640,9 +640,11 @@ export function verifySprintRolloverLineage(cwd: string, state: SprintState): Sp
   if (!existsSync(path)) throw new SprintRolloverError('Current rollover lineage audit is missing.');
   const record = readAudit(cwd, path);
   assertAuditPathIdentity(cwd, path, record);
+  assertRecordedScorecardEvidenceAvailable(cwd, record);
   if (state.sprint !== record.next_state.sprint
     || state.started_at !== record.next_state.started_at
     || lineage.transition_id !== record.transition_id
+    || lineage.from_sprint !== record.from_sprint
     || lineage.recorded_at !== record.recorded_at
     || lineage.forced !== record.forced
     || (lineage.reason ?? '') !== (record.reason ?? '')) {
@@ -743,6 +745,7 @@ export function performSprintRollover(
         usedScorecards,
       );
       atomicWriteFileSync(auditPath, JSON.stringify(created, null, 2) + '\n');
+      assertRecordedScorecardEvidenceAvailable(cwd, created);
       return created;
     });
     return record.next_state;

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdirSync, rmSync, existsSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   loadSprintState,
@@ -297,6 +297,17 @@ describe('createSprintState', () => {
   it('initializes review gates as pending', () => {
     expect(createSprintState(22).review_gates).toEqual(createDefaultReviewGates());
     expect(createSprintState(22).review_requirements).toEqual(createDefaultReviewRequirements());
+  });
+});
+
+describe('strict mutation boundaries', () => {
+  it('does not normalize and overwrite corrupt evidence during a gate update', () => {
+    const path = join(tmpDir, '.slope', 'sprint-state.json');
+    writeRawSprintState(legacySprintState({ phase: 'invalid-phase' }));
+    const before = readFileSync(path, 'utf8');
+
+    expect(updateGate(tmpDir, 'tests', true)).toBe(false);
+    expect(readFileSync(path, 'utf8')).toBe(before);
   });
 });
 

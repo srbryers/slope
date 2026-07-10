@@ -4,7 +4,7 @@ import type { HookInput, GuardResult } from '../../core/index.js';
 import { selectSpecialists } from '../../core/index.js';
 import type { CommonIssuesFile } from '../../core/index.js';
 import { loadConfig } from '../config.js';
-import { loadSprintState, saveSprintState, createSprintState } from '../sprint-state.js';
+import { initializeSprintState, loadSprintState, createSprintState } from '../sprint-state.js';
 import { saveReviewState, type ReviewState } from '../commands/review-state.js';
 import {
   findPlanContent,
@@ -137,8 +137,7 @@ export async function reviewTierGuard(input: HookInput, cwd: string): Promise<Gu
     const sprintMatch = plan.content.match(/Sprint\s+(\d+)/i);
     const sprintNumber = sprintMatch ? parseInt(sprintMatch[1], 10) : 0;
     if (sprintNumber > 0) {
-      const state = createSprintState(sprintNumber, 'planning');
-      saveSprintState(cwd, state);
+      initializeSprintState(cwd, createSprintState(sprintNumber, 'planning'));
     }
   }
 

@@ -109,7 +109,7 @@ describe('slope sprint begin (GH #311)', () => {
       let stderr = '';
       let exitCode = 0;
       try {
-        runSlope(cwd, ['sprint', 'begin', '--sprint=2', '--ticket=S2-1']);
+        runSlope(cwd, ['sprint', 'begin', '--sprint=2', '--ticket=S2-1', '--actor=recovery-agent']);
       } catch (err: unknown) {
         const e = err as { status?: number; stderr?: Buffer | string };
         exitCode = e.status ?? 0;
@@ -119,7 +119,7 @@ describe('slope sprint begin (GH #311)', () => {
       expect(exitCode).not.toBe(0);
       expect(stderr).toContain('Refusing to begin S2');
       expect(stderr).toContain('slope sprint rollover --from=1 --to=2 --force --reason="<why>"');
-      expect(stderr).toContain('slope sprint begin --sprint=2 --ticket=S2-1');
+      expect(stderr).toContain('slope sprint begin --sprint=2 --ticket=S2-1 --actor=recovery-agent');
       expect(stderr).not.toContain('sprint reset');
     } finally {
       rmSync(cwd, { recursive: true, force: true });

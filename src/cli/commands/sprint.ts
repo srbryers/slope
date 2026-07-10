@@ -279,6 +279,21 @@ function printGateUsage(gateName?: GateName): void {
   console.error('');
 }
 
+function commandValue(value: string): string {
+  if (/^[A-Za-z0-9._:/-]+$/.test(value)) return value;
+  return process.platform === 'win32'
+    ? `'${value.replaceAll("'", "''")}'`
+    : `'${value.replaceAll("'", `'"'"'`)}`;
+}
+
+function actorRetryOption(args: string[]): string | null {
+  for (const flag of ['--actor', '--player']) {
+    const value = findOptionValue(args, flag);
+    if (value) return `${flag}=${commandValue(value)}`;
+  }
+  return null;
+}
+
 function commandOptionErrors(
   args: string[],
   valueFlags: string[],
@@ -495,12 +510,13 @@ async function beginCommand(args: string[], cwd: string): Promise<void> {
     process.exit(1);
   }
   let state = initialized.state;
+  const retryActor = actorRetryOption(args);
   if (initialized.status === 'existing' && requireMatchingSprintOrRollover(
     cwd,
     state,
     sprint,
     `begin ${formatSprintLabel(sprint)}`,
-    `slope sprint begin --sprint=${formatSprintNumber(sprint)} --ticket=${ticket}`,
+    `slope sprint begin --sprint=${formatSprintNumber(sprint)} --ticket=${commandValue(ticket)}${retryActor ? ` ${retryActor}` : ''}`,
   )) {
     console.log(`Sprint ${formatSprintNumber(sprint)}: already started (phase: ${state.phase}).`);
   } else {
@@ -621,6 +637,14 @@ async function startCommand(args: string[], cwd: string): Promise<void> {
   const phase = phaseInput as SprintPhase;
   const force = args.includes('--force');
   const touchedPaths = parseTouchedPaths(findOptionValue(args, '--touches'));
+  const retryActor = actorRetryOption(args);
+  const retryTouches = findOptionValue(args, '--touches');
+  const retryExtras = [
+    ...(retryTouches ? [`--touches=${commandValue(retryTouches)}`] : []),
+    ...(retryActor ? [retryActor] : []),
+    ...(force ? ['--force'] : []),
+  ];
+  const retryStart = `slope sprint start --number=${formatSprintNumber(sprint)} --phase=${phase}${retryExtras.length > 0 ? ` ${retryExtras.join(' ')}` : ''}`;
 
   failOnCorruptSprintState(cwd);
   const existingResult = loadSprintStateResult(cwd);
@@ -631,7 +655,7 @@ async function startCommand(args: string[], cwd: string): Promise<void> {
       existing,
       sprint,
       `start ${formatSprintLabel(sprint)}`,
-      `slope sprint start --number=${formatSprintNumber(sprint)} --phase=${phase}`,
+      retryStart,
     );
     if (phaseValue && existing.phase !== phase) {
       const updated = updateSprintPhaseForSprint(cwd, existing.sprint, phase);
@@ -683,7 +707,7 @@ async function startCommand(args: string[], cwd: string): Promise<void> {
       initialized.state,
       sprint,
       `start ${formatSprintLabel(sprint)}`,
-      `slope sprint start --number=${formatSprintNumber(sprint)} --phase=${phase}`,
+      retryStart,
     );
     console.log(`Sprint ${formatSprintNumber(sprint)} state already exists (phase: ${initialized.state.phase}).`);
     return;
@@ -1060,7 +1084,7 @@ function syncSprintStateWithWorkflow(cwd: string, sprintId: string | undefined, 
 
   const existing = loadSprintState(cwd);
   if (!existing) {
-    saveSprintState(cwd, createSprintState(sprint, nextPhase));
+    initializeSprintState(cwd, createSprintState(sprint, nextPhase));
     return;
   }
   if (existing.sprint !== sprint || existing.phase === 'complete') return;
@@ -1310,6 +1334,12 @@ function parsePortableResumeFlags(args: string[]): PortableResumeFlags {
 async function portableResumeCommand(args: string[], cwd: string): Promise<void> {
   const flags = parsePortableResumeFlags(args);
   const config = loadConfig(cwd);
+  const loadedState = loadSprintStateResult(cwd);
+  if (loadedState.status === 'corrupt') {
+    console.error(`Portable resume refused: corrupt sprint evidence was preserved at ${relative(cwd, loadedState.path)}.`);
+    process.exit(1);
+    return;
+  }
   if (flags.invalidSprint) {
     console.error(`Error: invalid sprint "${flags.invalidSprint}". Use --sprint=N, e.g. --sprint=177.`);
     process.exit(1);
@@ -1322,7 +1352,7 @@ async function portableResumeCommand(args: string[], cwd: string): Promise<void>
   }
 
   if (flags.writePointer) {
-    const current = loadSprintState(cwd);
+    const current = loadedState.status === 'valid' ? loadedState.state : null;
     const sprint = flags.sprint ?? current?.sprint;
     if (!sprint) {
       console.error('Usage: slope sprint resume --write-pointer --sprint=N [--phase=<phase>] [--output=path]');
@@ -1356,12 +1386,22 @@ async function portableResumeCommand(args: string[], cwd: string): Promise<void>
     return;
   }
 
-  const existing = loadSprintState(cwd);
-  if (existing && existing.sprint !== plan.sprint && !flags.force) {
-    console.error(`\nPortable resume refused. Local sprint-state is ${formatSprintLabel(existing.sprint)}, but resume target is ${formatSprintLabel(plan.sprint)}.`);
-    console.error('Run `slope sprint reset` or rerun with --force if replacing local state is intentional.');
-    process.exit(1);
-    return;
+  const existing = loadedState.status === 'valid' ? loadedState.state : null;
+  if (existing) {
+    const retryResume = [
+      'slope sprint resume --portable',
+      ...(flags.sprint ? [`--sprint=${formatSprintNumber(flags.sprint)}`] : []),
+      ...(flags.phase ? [`--phase=${flags.phase}`] : []),
+      ...(flags.from ? [`--from=${commandValue(flags.from)}`] : []),
+      ...(flags.force ? ['--force'] : []),
+    ].join(' ');
+    requireMatchingSprintOrRollover(
+      cwd,
+      existing,
+      plan.sprint,
+      `resume ${formatSprintLabel(plan.sprint)}`,
+      retryResume,
+    );
   }
 
   if (flags.dryRun) {
@@ -1369,10 +1409,19 @@ async function portableResumeCommand(args: string[], cwd: string): Promise<void>
     return;
   }
 
-  saveSprintState(cwd, createSprintState(plan.sprint, plan.phase));
+  if (!existing) {
+    const initialized = initializeSprintState(cwd, createSprintState(plan.sprint, plan.phase));
+    if (initialized.status !== 'created') {
+      console.error('Portable resume refused because sprint state changed concurrently; retry the command.');
+      process.exit(1);
+      return;
+    }
+  }
   const restoredClaims = await restoreResumeClaims(cwd, plan);
-  console.log(`\nPortable sprint resume complete: ${formatSprintLabel(plan.sprint)} (${plan.phase}).`);
-  console.log(`  Fresh local sprint-state written to .slope/sprint-state.json`);
+  console.log(`\nPortable sprint resume complete: ${formatSprintLabel(plan.sprint)} (${existing?.phase ?? plan.phase}).`);
+  console.log(existing
+    ? '  Existing local sprint-state and rollover lineage preserved'
+    : '  Fresh local sprint-state written to .slope/sprint-state.json');
   console.log(`  Resume claims restored: ${restoredClaims}`);
   console.log('  Local DB/locks/metrics were not imported from another machine.');
 }

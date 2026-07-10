@@ -367,8 +367,9 @@ export function saveSprintState(cwd: string, state: SprintState): void {
 export function mutateSprintState(cwd: string, mutator: (state: SprintState) => boolean): SprintState | null {
   const filePath = sprintStatePath(cwd);
   return withFileLockSync(filePath, () => {
-    const state = loadSprintState(cwd);
-    if (!state) return null;
+    const loaded = loadSprintStateResult(cwd);
+    if (loaded.status !== 'valid') return null;
+    const state = loaded.state;
     if (mutator(state)) {
       saveSprintStateUnlocked(filePath, state);
     }

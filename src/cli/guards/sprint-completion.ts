@@ -6,7 +6,8 @@ import type { HookInput, GuardResult } from '../../core/index.js';
 import { formatSprintNumber, parseSprintNumber } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { loadPrReviewState } from '../pr-review-state.js';
-import { loadSprintState, mutateSprintState, updateGate, isSprintComplete, pendingGates } from '../sprint-state.js';
+import { loadSprintState, loadSprintStateResult, mutateSprintState, updateGate, isSprintComplete, pendingGates } from '../sprint-state.js';
+import { inspectSprintRollover, verifySprintRolloverLineage } from '../sprint-rollover.js';
 import { inferSprintFromBranch } from '../workflow-resync.js';
 
 /**
@@ -58,23 +59,53 @@ function handlePreToolUse(input: HookInput, cwd: string): GuardResult {
   if (!commandContext) return {};
   const guardCwd = commandContext.cwd;
 
-  const state = loadSprintState(guardCwd);
-  if (!state) return {};
+  const loadedState = loadSprintStateResult(guardCwd);
+  if (loadedState.status === 'missing') return {};
+  if (loadedState.status === 'corrupt') {
+    return {
+      decision: 'deny',
+      blockReason: 'SLOPE sprint-completion: corrupt sprint evidence was preserved; repair it before creating a PR.',
+    };
+  }
+  const state = loadedState.state;
+  try {
+    verifySprintRolloverLineage(guardCwd, state);
+  } catch (error) {
+    return {
+      decision: 'deny',
+      blockReason: `SLOPE sprint-completion: rollover lineage verification failed: ${(error as Error).message}`,
+    };
+  }
   const branchSprint = inferSprintFromBranch(guardCwd);
   if (branchSprint !== null && branchSprint !== state.sprint) {
-    const base = `slope sprint rollover --from=${formatSprintNumber(state.sprint)} --to=${formatSprintNumber(branchSprint)}`;
-    const command = isSprintComplete(state) ? base : `${base} --force --reason="<why>"`;
+    let recovery: string[];
+    try {
+      const assessment = inspectSprintRollover(guardCwd, { from: state.sprint, to: branchSprint });
+      const blockers = assessment.issues.filter(issue => issue.code !== 'from_not_terminal');
+      if (blockers.length === 0) {
+        const base = `slope sprint rollover --from=${assessment.from_label.slice(1)} --to=${assessment.to_label.slice(1)}`;
+        recovery = [
+          `Record the handoff with: \`${assessment.from_terminal ? base : `${base} --force --reason="<why>"`}\``,
+        ];
+      } else {
+        recovery = [
+          'Rollover is not currently eligible:',
+          ...blockers.slice(0, 3).map(issue => `  - ${issue.message}`),
+          ...(blockers.length > 3 ? [`  - … ${blockers.length - 3} additional issue(s) omitted`] : []),
+        ];
+      }
+    } catch (error) {
+      recovery = [`Rollover eligibility could not be verified: ${(error as Error).message}`];
+    }
     return {
       decision: 'deny',
       blockReason: [
         'SLOPE sprint-completion: branch and sprint-state disagree; refusing automatic rebind.',
         `State: Sprint ${formatSprintNumber(state.sprint)}; branch suggests Sprint ${formatSprintNumber(branchSprint)}.`,
-        `Record the handoff with: \`${command}\``,
+        ...recovery,
       ].join('\n'),
     };
   }
-  if (state.phase === 'complete') return {}; // Sprint fully complete — skip all checks
-
   // Check scorecard existence independently of gates
   const scorecardMissing = !scorecardExists(state.sprint, guardCwd);
   const gatesComplete = isSprintComplete(state);
@@ -312,8 +343,8 @@ function handleStop(cwd: string): GuardResult {
   const state = loadSprintState(cwd);
   if (!state) return {};
 
-  // Only warn during implementing/scoring phases — don't warn during planning/reviewing
-  if (state.phase !== 'implementing' && state.phase !== 'scoring') return {};
+  // Warn during active/terminal workflow phases; planning/reviewing remain advisory-free.
+  if (state.phase !== 'implementing' && state.phase !== 'scoring' && state.phase !== 'complete') return {};
 
   const scorecardMissing = !scorecardExists(state.sprint, cwd);
   const gatesComplete = isSprintComplete(state);
@@ -351,7 +382,7 @@ function handleStop(cwd: string): GuardResult {
       '  - `slope validate` — validates scorecard (auto-marks gate)',
       `  - \`slope review --sprint=${state.sprint}\` — generates review markdown (auto-marks gate)`,
       '',
-      'Or use `slope sprint reset` to clear sprint state if this sprint was abandoned.',
+      'For abandoned work, use audited `slope sprint rollover --force --reason="..."`; reset is destructive emergency recovery and discards state evidence.',
     );
   }
 

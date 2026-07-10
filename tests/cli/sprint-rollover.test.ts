@@ -340,6 +340,29 @@ describe('performSprintRollover audit recovery', () => {
     });
   });
 
+  it('requires recorded scorecard evidence to remain durable after installation', () => {
+    const definition = roadmap();
+    definition.sprints.unshift(sprint(9));
+    definition.phases[0].sprints.unshift(9);
+    definition.sprints.at(-1)!.depends_on = [9, 10];
+    const cwd = setupWorkspace(definition);
+    mkdirSync(join(cwd, 'docs', 'retros'), { recursive: true });
+    const scorecardPath = join(cwd, 'docs', 'retros', 'sprint-9.json');
+    writeFileSync(scorecardPath, JSON.stringify({
+      sprint_number: 9,
+      par: 3,
+      score: 3,
+      score_label: 'par',
+      date: '2026-07-10',
+      shots: [],
+    }));
+    saveSprintState(cwd, terminalState());
+    performSprintRollover(cwd, { from: 10, to: 11 }, actor);
+    rmSync(scorecardPath);
+
+    expect(() => performSprintRollover(cwd, { from: 10, to: 11 }, actor)).toThrow(/missing scorecard evidence/i);
+  });
+
   it('records the force decision and trimmed reason for an eligible independent target', () => {
     const cwd = setupWorkspace(roadmap('planned', []));
     saveSprintState(cwd, createSprintState(10, 'implementing'));
@@ -413,6 +436,17 @@ describe('performSprintRollover audit recovery', () => {
     expect(retried.record).toEqual(first.record);
     expect(retried.state.phase).toBe('implementing');
     expect(retried.state.gates.tests).toBe(true);
+  });
+
+  it('rejects tampered current source lineage after rollover', () => {
+    const cwd = setupWorkspace();
+    saveSprintState(cwd, terminalState());
+    performSprintRollover(cwd, { from: 10, to: 11 }, actor);
+    const state = loadSprintState(cwd)!;
+    state.rollover!.from_sprint = 999;
+    saveSprintState(cwd, state);
+
+    expect(() => performSprintRollover(cwd, { from: 10, to: 11 }, actor)).toThrow(/lineage/i);
   });
 
   it('recovers an already-audited transition after roadmap bytes drift', () => {

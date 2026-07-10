@@ -329,7 +329,7 @@ function recommendCommands(state: {
       }
       break;
     case 'complete':
-      cmds.push('slope sprint reset');
+      cmds.push(`slope sprint rollover --from=${state.currentSprint} --to=<next>`);
       cmds.push('slope briefing');
       break;
   }
