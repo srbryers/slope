@@ -1,0 +1,268 @@
+{
+  "version": 1,
+  "kind": "sprint_rollover",
+  "transition_id": "e4b80b7ad5b34778",
+  "from_sprint": 233,
+  "to_sprint": 234,
+  "from_label": "S233",
+  "to_label": "S234",
+  "recorded_at": "2026-07-10T21:10:48.753Z",
+  "actor": {
+    "name": "srbry",
+    "source": "env:USERNAME"
+  },
+  "request": {
+    "from": 233,
+    "to": 234,
+    "force": false
+  },
+  "forced": false,
+  "eligibility": {
+    "from_terminal": true,
+    "target_dependency_eligible": true,
+    "blocking_dependencies": [],
+    "target_dependencies": [
+      232
+    ],
+    "completion_evidence": {
+      "roadmap_complete": [
+        61,
+        62,
+        63,
+        64,
+        65,
+        66,
+        67,
+        68,
+        69,
+        70,
+        71,
+        72,
+        73,
+        74,
+        75,
+        76,
+        77,
+        78,
+        79,
+        80,
+        81,
+        82,
+        83,
+        84,
+        86,
+        87,
+        88,
+        89,
+        90,
+        91,
+        92,
+        93,
+        94,
+        95,
+        96,
+        97,
+        98,
+        99,
+        100,
+        101,
+        102,
+        103,
+        104,
+        105,
+        106,
+        107,
+        108,
+        109,
+        110,
+        111,
+        112,
+        113,
+        114,
+        114.5,
+        115,
+        116,
+        117,
+        118,
+        119,
+        120,
+        121,
+        122,
+        123,
+        124,
+        125,
+        126,
+        127,
+        130,
+        131,
+        132,
+        133,
+        134,
+        135,
+        136,
+        137,
+        137.5,
+        138,
+        139,
+        140,
+        141,
+        142,
+        143,
+        143.5,
+        143.6,
+        143.7,
+        143.8,
+        143.9,
+        143.95,
+        143.97,
+        143.98,
+        143.99,
+        144,
+        145,
+        146,
+        146.1,
+        146.2,
+        146.3,
+        148,
+        149,
+        150,
+        151,
+        151.1,
+        152,
+        152.1,
+        153,
+        154,
+        216,
+        217,
+        218,
+        219,
+        220,
+        221,
+        222,
+        223,
+        224,
+        226,
+        227,
+        228,
+        229,
+        230,
+        231,
+        232,
+        233
+      ],
+      "scorecards": [
+        232
+      ],
+      "local_terminal": [
+        233
+      ]
+    },
+    "scorecard_artifacts": [
+      {
+        "sprint": 232,
+        "path": "docs/retros/sprint-232.json",
+        "sha256": "5e20dcd6afb43607795761d912671fc754e7da071066dbd2fb7229671b2620e5"
+      }
+    ],
+    "expected_next": 234
+  },
+  "roadmap": {
+    "path": "docs/backlog/roadmap.json",
+    "sha256": "2709b51a4adca5c78caeed122cdd75f8269458b3a331b28ade56da30782963bc",
+    "from_status": "complete",
+    "to_status": "active"
+  },
+  "prior_state_sha256": "ae8ca84b2c18c2463a7b9927a27e8a709c5d7cde1454f52232be36df31b4a619",
+  "prior_state": {
+    "sprint": 233,
+    "phase": "scoring",
+    "gates": {
+      "tests": true,
+      "code_review": true,
+      "architect_review": true,
+      "scorecard": true,
+      "review_md": true
+    },
+    "review_gates": {
+      "code_review": {
+        "provenance": "independent_review",
+        "evidence": [
+          "docs/retros/sprint-233-architect-review.md"
+        ],
+        "reviewer": "issue_591_crlf",
+        "updated_at": "2026-07-10T21:10:27.834Z"
+      },
+      "architect_review": {
+        "provenance": "independent_review",
+        "evidence": [
+          "docs/retros/sprint-233-architect-review.md"
+        ],
+        "reviewer": "issue_591_crlf",
+        "updated_at": "2026-07-10T21:10:27.483Z"
+      }
+    },
+    "review_requirements": {
+      "code_review": {
+        "priority": "optional",
+        "reason": "Baseline code review",
+        "source": "review_recommend",
+        "updated_at": "2026-07-10T21:09:36.738Z"
+      },
+      "architect_review": {
+        "priority": "required",
+        "reason": "3 tickets warrants architectural review",
+        "source": "review_recommend",
+        "updated_at": "2026-07-10T21:09:36.738Z"
+      }
+    },
+    "started_at": "2026-07-10T21:06:10.958Z",
+    "updated_at": "2026-07-10T21:10:40.334Z",
+    "rollover": {
+      "transition_id": "7e0139f748b1030c",
+      "from_sprint": 232,
+      "audit_path": "docs/retros/rollovers/sprint-232-to-233-829b5404b0ea9587.json",
+      "recorded_at": "2026-07-10T21:06:10.958Z",
+      "forced": false
+    }
+  },
+  "next_state": {
+    "sprint": 234,
+    "phase": "planning",
+    "gates": {
+      "tests": false,
+      "code_review": false,
+      "architect_review": false,
+      "scorecard": false,
+      "review_md": false
+    },
+    "review_gates": {
+      "code_review": {
+        "provenance": "pending",
+        "evidence": []
+      },
+      "architect_review": {
+        "provenance": "pending",
+        "evidence": []
+      }
+    },
+    "review_requirements": {
+      "code_review": {
+        "priority": "unspecified"
+      },
+      "architect_review": {
+        "priority": "unspecified"
+      }
+    },
+    "started_at": "2026-07-10T21:10:48.753Z",
+    "updated_at": "2026-07-10T21:10:48.753Z",
+    "rollover": {
+      "transition_id": "e4b80b7ad5b34778",
+      "from_sprint": 233,
+      "audit_path": "docs/retros/rollovers/sprint-233-to-234-45b3070bbdd6d14b.json",
+      "recorded_at": "2026-07-10T21:10:48.753Z",
+      "forced": false
+    }
+  },
+  "claims_policy": "unchanged",
+  "sessions_policy": "unchanged"
+}

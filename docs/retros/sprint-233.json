@@ -1,0 +1,81 @@
+{
+  "sprint_number": 233,
+  "player": "codex",
+  "theme": "Cross-Platform Roadmap Projection Fidelity",
+  "par": 4,
+  "slope": 2,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-07-10",
+  "type": "bugfix + cross-platform compatibility",
+  "skills_used": ["slope-sprint-workflow", "slope:slope-sprint", "github:github"],
+  "skills_recommended": ["slope-sprint-workflow", "slope:slope-sprint", "github:github"],
+  "skill_gaps_found": [],
+  "shots": [
+    {
+      "ticket_key": "S233-1",
+      "title": "Define checkout-EOL-safe projection comparison without hiding semantic drift (#591)",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "The comparison contract normalizes CRLF pairs only and keeps every other byte-level difference visible."
+    },
+    {
+      "ticket_key": "S233-2",
+      "title": "Normalize generated projection bytes at the comparison and write boundary across CRLF checkouts (#591)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Compile checks, validation, and locked writes share one narrow comparator; archive integrity remains exact-byte."
+    },
+    {
+      "ticket_key": "S233-3",
+      "title": "Add Windows autocrlf and true semantic-drift regression fixtures (#591)",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Regression coverage proves CRLF equivalence, non-mutation, and rejection of whitespace, newline, bare-CR, and semantic drift."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 3,
+    "fairways_total": 3,
+    "greens_in_regulation": 3,
+    "greens_total": 3,
+    "putts": 1,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {"long": 0, "short": 0, "left": 0, "right": 0}
+  },
+  "conditions": [
+    {
+      "type": "wind",
+      "impact": "minor",
+      "description": "Git line-ending conversion changes checkout bytes without changing the generated JSON projection."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Generated-file drift checks must distinguish checkout transport changes from authored content changes.",
+      "outcome": "Normalize only the platform EOL pair at checkout comparison boundaries."
+    }
+  ],
+  "nutrition": [
+    {"category": "testing", "description": "The full repository test suite and 23 focused source-federation tests passed.", "status": "healthy"},
+    {"category": "build", "description": "Production build and TypeScript typecheck passed.", "status": "healthy"},
+    {"category": "review", "description": "Independent architecture and correctness review approved with no blockers.", "status": "healthy"}
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "A small compatibility bug became straightforward once transport normalization was kept separate from semantic normalization.",
+    "advice_for_next_player": "Keep canonical serialization strict and normalize only at checkout-facing equality boundaries.",
+    "what_surprised_you": "A plain compile could rewrite an otherwise current CRLF checkout unless the write boundary shared the same comparator.",
+    "excited_about_next": "Roadmap federation now behaves consistently on Windows without weakening drift protection."
+  },
+  "bunker_locations": ["Do not trim, parse, or reserialize both sides of a generated-file drift comparison; that can hide real drift."],
+  "yardage_book_updates": ["roadmapProjectionMatches is the checkout-facing equality boundary for generated roadmap projections."],
+  "course_management_notes": ["Implementation and review evidence are committed and pushed; no PR merge or release is implied."],
+  "slope_factors": ["windows", "crlf", "projection_fidelity", "semantic_drift"]
+}

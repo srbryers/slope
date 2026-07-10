@@ -41,6 +41,9 @@ describe('slope pr review help is read-only (GH #405)', () => {
     expect(output).toContain('--pr=N');
     expect(output).toContain('--sprint=N');
     expect(output).toContain('--type=architect|code|both');
+    expect(output).toContain('--path=GLOB');
+    expect(output).toContain('--exclude-path=GLOB');
+    expect(output).toContain('--max-diff-bytes=N');
     expect(output).toContain('--json');
     expect(execSyncMock).not.toHaveBeenCalled();
     expect(consoleErrorSpy).not.toHaveBeenCalled();

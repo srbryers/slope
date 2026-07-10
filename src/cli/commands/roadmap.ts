@@ -27,6 +27,7 @@ import {
   estimateComplexity,
   generateRoadmapFromVision,
   RoadmapGenerationError,
+  normalizeDiagnosticPath,
 } from '../../core/index.js';
 import type {
   RoadmapDefinition,
@@ -47,7 +48,13 @@ import {
   applyRoadmapSourceArchive,
   validateRoadmapSourceStore,
   writeRoadmapSourceProjection,
+  roadmapProjectionMatches,
 } from '../roadmap-source-store.js';
+import {
+  applyRoadmapSourceMigration,
+  prepareRoadmapSourceMigration,
+} from '../roadmap-source-migration.js';
+import { serializeRoadmapMigrationMappingTemplate } from '../../core/roadmap-migration.js';
 
 // --- Helpers ---
 
@@ -501,7 +508,7 @@ function compileSourcesSubcommand(flags: Record<string, string>, cwd: string): v
       ].join('\n'));
     }
     const existing = existsSync(store.outputPath) ? readFileSync(store.outputPath, 'utf8') : null;
-    const changed = existing !== store.projection;
+    const changed = existing == null || !roadmapProjectionMatches(existing, store.projection);
     const output = displayPath(cwd, store.outputPath);
 
     if (flags.check === 'true') {
@@ -522,6 +529,87 @@ function compileSourcesSubcommand(flags: Record<string, string>, cwd: string): v
     const result = writeRoadmapSourceProjection(store);
     console.log(`\nRoadmap projection ${result}: ${output}`);
     console.log(`  Sources: ${store.sources.length}; phases: ${store.roadmap.phases.length}; sprints: ${store.roadmap.sprints.length}\n`);
+  } catch (error) {
+    console.error(`\n${(error as Error).message}\n`);
+    process.exit(1);
+  }
+}
+
+function printMigrationPlan(
+  prepared: ReturnType<typeof prepareRoadmapSourceMigration>,
+  dryRun: boolean,
+): void {
+  if (prepared.status === 'unchanged') {
+    console.log(`\nRoadmap migration unchanged: ${prepared.manifestRelativePath}`);
+    console.log(`  Receipt: ${prepared.receipt.receipt_path}`);
+    console.log(`  Migration: ${prepared.receipt.migration_id}\n`);
+    return;
+  }
+  if (prepared.status === 'recovery_required') {
+    console.log('\nAn interrupted roadmap migration requires transactional recovery.');
+    console.log(`  Journal: ${normalizeDiagnosticPath(relative(prepared.input.cwd, prepared.journalPath))}`);
+    console.log(`  Backup: ${normalizeDiagnosticPath(relative(prepared.input.cwd, prepared.backupPath))}`);
+    console.log(dryRun
+      ? '  Dry run made no changes; rerun without --dry-run to recover and apply.\n'
+      : '  Recovery will restore the original bytes before replanning.\n');
+    return;
+  }
+  const plan = prepared.plan;
+  const archives = plan.sources.filter(source => source.classification === 'archive').length;
+  const historyUnverified = plan.sources.filter(source => source.classification === 'history_unverified').length;
+  console.log(`\nRoadmap migration ${dryRun ? 'dry run' : 'plan'}: ${prepared.sourceRelativePath}`);
+  console.log(`  Manifest: ${prepared.manifestRelativePath}`);
+  console.log(`  Sources: ${plan.sources.length}; archives: ${archives}; history-unverified: ${historyUnverified}`);
+  console.log(`  Normalizations: ${plan.audit.length}; diagnostics: ${plan.diagnostics_total}; unresolved: ${plan.unresolved.length}`);
+  for (const diagnostic of plan.diagnostics.slice(0, 10)) {
+    console.log(`  ${diagnostic.severity === 'error' ? 'ERROR' : 'WARN'} ${diagnostic.code}: ${diagnostic.message}`);
+  }
+  if (plan.diagnostics_total > 10) console.log(`  ... ${plan.diagnostics_total - 10} additional diagnostic(s)`);
+  if (!plan.applicable) {
+    console.log('\nExplicit repair mapping required:');
+    for (const repair of plan.unresolved.slice(0, 10)) console.log(`  - ${repair.key}: ${repair.message}`);
+    if (plan.unresolved.length > 10) console.log(`  - ... ${plan.unresolved.length - 10} additional repair(s)`);
+    console.log('\nMapping template:');
+    console.log(serializeRoadmapMigrationMappingTemplate(plan).trimEnd());
+  }
+  console.log('');
+}
+
+function validateMigrationArgs(args: string[]): void {
+  const seen = new Set<string>();
+  for (const arg of args) {
+    const match = arg.match(/^--(path|source|mapping)=(.+)$/);
+    const key = arg === '--dry-run' ? 'dry-run' : match?.[1];
+    if (!key) throw new Error(`Unknown roadmap migrate option: ${arg}`);
+    if (seen.has(key)) throw new Error(`Duplicate roadmap migrate option: --${key}`);
+    seen.add(key);
+  }
+}
+
+function migrateSourcesSubcommand(flags: Record<string, string>, cwd: string, args: string[]): void {
+  const dryRun = flags['dry-run'] === 'true';
+  try {
+    validateMigrationArgs(args);
+    const prepared = prepareRoadmapSourceMigration({
+      cwd,
+      path: flags.path,
+      source: flags.source,
+      mapping: flags.mapping,
+    });
+    printMigrationPlan(prepared, dryRun);
+    if (dryRun) {
+      if (prepared.status === 'blocked' || prepared.status === 'recovery_required') process.exit(1);
+      return;
+    }
+    if (prepared.status === 'blocked') {
+      console.error('Roadmap migration is blocked until the explicit mapping is complete.\n');
+      process.exit(1);
+      return;
+    }
+    const result = applyRoadmapSourceMigration(prepared);
+    console.log(`Roadmap migration ${result.status}: ${prepared.manifestRelativePath}`);
+    console.log(`  Receipt: ${result.receipt.receipt_path}`);
+    console.log(`  Sources: ${result.sources}; archives: ${result.archives}; history-unverified: ${result.historyUnverified}\n`);
   } catch (error) {
     console.error(`\n${(error as Error).message}\n`);
     process.exit(1);
@@ -1022,6 +1110,9 @@ export async function roadmapCommand(args: string[]): Promise<void> {
     case 'focus':
       focusSubcommand(flags, cwd);
       break;
+    case 'migrate':
+      migrateSourcesSubcommand(flags, cwd, args.slice(1));
+      break;
     case 'compile':
       compileSourcesSubcommand(flags, cwd);
       break;
@@ -1053,6 +1144,8 @@ Usage:
   slope roadmap review [--path=<file>]       Automated architect review
   slope roadmap status [--path=<file>] [--sprint=N] [--full]  Compact current progress
   slope roadmap focus --sprint=N [--path=<file>] [--json]     Bounded sprint context
+  slope roadmap migrate [--path=<file>] [--source=<file>] [--mapping=<file>] [--dry-run]
+                                                Plan or apply single-file federation migration
   slope roadmap compile [--source=<file>] [--dry-run|--check] Compile modular YAML sources
   slope roadmap validate-sources [--source=<file>]            Validate sources and projection drift
   slope roadmap archive --through=N [--source=<file>] [--dry-run] Archive whole terminal phases
@@ -1065,6 +1158,7 @@ Options:
   --sprint=N       Select a sprint (required for focus; override for status)
   --json           Emit machine-readable focus JSON
   --source=<file>  Modular roadmap manifest (default: docs/roadmap/project.yaml)
+  --mapping=<file> Explicit ownership and legacy repair mapping for migrate
   --check          Fail when the compiled roadmap projection has drifted
   --full           Show full roadmap history for status
   --dry-run        Show what would change without writing (for sync and generate)

@@ -7,6 +7,8 @@ import {
   extractIssueRefs,
   existingAutoCloseRefs,
   formatReviewRecommendations,
+  parsePrReviewFlags,
+  planPrReview,
 } from '../../src/cli/commands/pr.js';
 import { branchSizeWarnings, buildPrCloseoutStatus, canSettlePrCloseout, formatPrCloseoutStatus, hasSuccessfulCodeRabbitStatus, isBlockedCodeRabbitComment } from '../../src/cli/pr-closeout.js';
 import { recordPrReviewPromptsGenerated } from '../../src/cli/pr-review-state.js';
@@ -91,6 +93,81 @@ describe('pr review workflow helpers (S94-5)', () => {
     expect(output).toContain('architect');
     expect(output).toContain('required');
     expect(output).toContain('Baseline code review');
+  });
+
+  it('preserves repeatable bounded review scope flags for review-run forwarding', () => {
+    expect(parsePrReviewFlags([
+      '--pr=590', '--path=src/**', '--path=tests/**',
+      '--exclude-path=docs/archive/**', '--max-diff-bytes=8192', '--json',
+    ])).toMatchObject({
+      pr: 590,
+      paths: ['src/**', 'tests/**'],
+      excludePaths: ['docs/archive/**'],
+      maxDiffBytes: 8192,
+      json: true,
+    });
+  });
+
+  it.each([
+    [['--pr=0'], '--pr must be a positive integer'],
+    [['--pr=nope'], '--pr must be a positive integer'],
+    [['--sprint=0'], '--sprint must be a positive sprint number'],
+    [['--sprint=nope'], '--sprint must be a positive sprint number'],
+    [['--type=security'], '--type must be architect, code, or both'],
+    [['--path='], '--path requires a non-empty glob'],
+    [['--exclude-path=   '], '--exclude-path requires a non-empty glob'],
+    [['--max-diff-bytes=0'], '--max-diff-bytes must be a positive integer'],
+    [['--max-diff-bytes=NaN'], '--max-diff-bytes must be a positive integer'],
+    [['--max-diff-bytes=4194305'], '--max-diff-bytes cannot exceed'],
+  ])('rejects invalid review scope flags instead of silently falling back: %j', (args, message) => {
+    expect(() => parsePrReviewFlags(args)).toThrow(message);
+  });
+
+  it('plans and reuses bounded paginated metadata instead of legacy name-only execSync', async () => {
+    const reviewDiff = {
+      prNum: 590,
+      repository: 'srbryers/slope',
+      allFiles: ['src/review.ts', 'docs/archive/generated.yaml'],
+      files: [{
+        filename: 'src/review.ts',
+        status: 'modified',
+        additions: 2,
+        deletions: 1,
+        changes: 3,
+        expectedChangedLines: 3,
+        providerChangedLines: 3,
+        providerPatchState: 'complete' as const,
+        includedPatch: '@@\n-old\n+new\n+more',
+        localTruncated: false,
+      }],
+      includedDiffBytes: 20,
+      includedDiffLines: 4,
+      coverage: {
+        complete: ['src/review.ts'],
+        providerPartial: [],
+        providerOmitted: [],
+        localTruncated: [],
+      },
+      providerFileListTruncated: false,
+    };
+    let call: { cwd: string; pr?: number; include: string[]; exclude: string[]; maxDiffBytes: number } | undefined;
+    const collector = async (cwd: string, pr: number | undefined, scope: { include: string[]; exclude: string[]; maxDiffBytes: number }) => {
+      call = { cwd, pr, ...scope };
+      return reviewDiff;
+    };
+
+    const plan = await planPrReview({
+      pr: 590,
+      sprint: 234,
+      paths: ['src/**'],
+      excludePaths: ['docs/archive/**'],
+      maxDiffBytes: 8192,
+    }, collector);
+
+    expect(call).toMatchObject({ pr: 590, include: ['src/**'], exclude: ['docs/archive/**'], maxDiffBytes: 8192 });
+    expect(plan.changedFiles).toEqual(['src/review.ts']);
+    expect(plan.totalChangedFiles).toBe(2);
+    expect(plan.reviewDiff).toBe(reviewDiff);
   });
 });
 

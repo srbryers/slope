@@ -1,0 +1,84 @@
+{
+  "sprint_number": 236,
+  "player": "codex",
+  "theme": "Transactional Roadmap Migration Apply",
+  "par": 4,
+  "slope": 4,
+  "score": 6,
+  "score_label": "double_bogey",
+  "date": "2026-07-10",
+  "type": "feature + transactional migration",
+  "skills_used": ["slope-sprint-workflow", "slope:slope-sprint", "github:github"],
+  "skills_recommended": ["slope-sprint-workflow", "slope:slope-sprint", "github:github"],
+  "skill_gaps_found": [],
+  "shots": [
+    {
+      "ticket_key": "S236-1",
+      "title": "Stage migration outputs under lock with validation-before-commit and rollback (#589)",
+      "club": "driver",
+      "result": "green",
+      "hazards": [],
+      "notes": "Apply replans under the federation lock, writes an exact backup and integrity-bound journal, commits the manifest last, and automatically restores exact original bytes after failures or crashes."
+    },
+    {
+      "ticket_key": "S236-2",
+      "title": "Generate manifest and bundles while preserving or exporting non-core top-level data (#589)",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Strict YAML bundles, manifest, compatibility projection, non-core export, audit, and receipt are rendered and validated in memory before any transaction write."
+    },
+    {
+      "ticket_key": "S236-3",
+      "title": "Classify archive eligibility from terminal status and scorecard evidence, then compile and validate (#589)",
+      "club": "long_iron",
+      "result": "missed_right",
+      "hazards": [{"type": "rough", "severity": "major", "description": "The first receipt bound every discovered scorecard, including unrelated history, and initial discovery inherited minSprint filtering."}],
+      "notes": "Historical discovery now ignores minSprint, explicit mappings validate exact evidence, and durable receipt binding includes only scorecards referenced by generated sources."
+    },
+    {
+      "ticket_key": "S236-4",
+      "title": "Add Fathoms-scale idempotency, failure rollback, compatibility, and documentation coverage (#589)",
+      "club": "short_iron",
+      "result": "missed_right",
+      "hazards": [{"type": "bunker", "severity": "major", "description": "Raw durable text hashes broke idempotency after a clean Windows CRLF recheckout even though Git-visible content was unchanged."}],
+      "notes": "Durable text hashes now normalize CRLF only, while transaction safety hashes stay raw; regression coverage spans CRLF recheckout, 456-sprint planning, TOCTOU, recovery, idempotency, and hand-authored refusal."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 2,
+    "fairways_total": 4,
+    "greens_in_regulation": 2,
+    "greens_total": 4,
+    "putts": 2,
+    "penalties": 0,
+    "hazards_hit": 2,
+    "hazard_penalties": 2,
+    "miss_directions": {"long": 0, "short": 0, "left": 0, "right": 2}
+  },
+  "conditions": [{"type": "wind", "impact": "major", "description": "A multi-file migration needs distinct contracts for durable checkout-stable evidence and exact in-flight rollback bytes."}],
+  "special_plays": [],
+  "training": [
+    {"type": "lessons", "description": "Bind receipts only to evidence that contributes to the generated authority switch.", "outcome": "Unrelated scorecard changes no longer invalidate a completed migration."},
+    {"type": "lessons", "description": "Durable generated-text integrity and transaction rollback integrity require different byte contracts.", "outcome": "Receipts use declared CRLF-normalized text hashes; journals, backups, and TOCTOU checks remain raw-byte exact."}
+  ],
+  "nutrition": [
+    {"category": "testing", "description": "The complete repository suite passed after final migration hardening; independent focused validation passed 106 tests.", "status": "healthy"},
+    {"category": "build", "description": "Production build and TypeScript typecheck passed.", "status": "healthy"},
+    {"category": "review", "description": "Independent review found two final trust gaps; both were repaired and the final re-review approved.", "status": "healthy"}
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "The transaction mechanics were manageable; separating exact recovery bytes from checkout-stable durable evidence was the subtle part.",
+    "advice_for_next_player": "Define which inputs actually authorize the output, then bind only those inputs with the byte contract appropriate to their lifecycle.",
+    "what_surprised_you": "A successful migration could look hand-authored after nothing more than Git checking its text files out as CRLF.",
+    "excited_about_next": "Large single-file projects can now get an actionable dry run and a fail-closed modular migration without a project-specific transform."
+  },
+  "bunker_locations": [
+    "Do not bind migration idempotency to unrelated repository evidence.",
+    "Use checkout-normalized hashes only for durable generated text; keep recovery and concurrency checks byte-exact.",
+    "Commit the manifest last because it switches roadmap authority."
+  ],
+  "yardage_book_updates": ["slope roadmap migrate separates a pure repair plan from a journaled manifest-last apply transaction."],
+  "course_management_notes": ["All implementation, review repair, and validation commits are pushed; no PR merge or release is implied.", "Failed or interrupted applies recover automatically from the durable private journal and backup; no user-facing rollback command is included."],
+  "slope_factors": ["transactional_migration", "manifest_last", "rollback", "archive_evidence", "crlf_idempotency", "durable_receipts"]
+}

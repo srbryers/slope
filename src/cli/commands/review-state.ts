@@ -865,10 +865,23 @@ Mark a deferred finding as resolved. Use \`slope review deferred\` to
 look up ids.`);
       break;
     case 'run':
-      console.log(`Usage: slope review run [options]
+      console.log(`Usage: slope review run [--pr=N] [--sprint=N] [--type=architect|code|both]
+                        [--path=GLOB]... [--exclude-path=GLOB]...
+                        [--max-diff-bytes=N] [--json]
 
-Run a structured review pass on the current sprint plan or PR. Pass
-\`--help\` after \`run\` for full options.`);
+Generate bounded PR review prompts from paginated GitHub file metadata.
+
+Options:
+  --pr=N                           Review a specific pull request
+  --sprint=N                       Use a specific sprint for review context
+  --type=architect|code|both       Select review prompt type (default: both)
+  --path=GLOB                      Include matching changed paths (repeatable)
+  --exclude-path=GLOB              Exclude matching changed paths (repeatable)
+  --max-diff-bytes=N               Bound patch bytes included across review prompts
+  --json                           Emit machine-readable review prompts
+
+Patch coverage reports provider-partial, provider-omitted, and locally
+truncated content separately. Quote globs when your shell expands them.`);
       break;
     default:
       console.log(`Usage:

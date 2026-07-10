@@ -1,0 +1,84 @@
+{
+  "sprint_number": 235,
+  "player": "codex",
+  "theme": "Safe Roadmap Migration Planner",
+  "par": 4,
+  "slope": 4,
+  "score": 6,
+  "score_label": "double_bogey",
+  "date": "2026-07-10",
+  "type": "feature + migration architecture",
+  "skills_used": ["slope-sprint-workflow", "slope:slope-sprint", "github:github"],
+  "skills_recommended": ["slope-sprint-workflow", "slope:slope-sprint", "github:github"],
+  "skill_gaps_found": [],
+  "shots": [
+    {
+      "ticket_key": "S235-1",
+      "title": "Define roadmap migrate dry-run, repair-plan, audit, and mapping contracts (#589)",
+      "club": "driver",
+      "result": "missed_right",
+      "hazards": [{"type": "bunker", "severity": "major", "description": "The first applicable contract did not prove that strict target sources could parse and compile without semantic drift."}],
+      "notes": "The final plan is source-bound, target-schema-valid, and binds the exact expected compatibility projection digest."
+    },
+    {
+      "ticket_key": "S235-2",
+      "title": "Analyze orphan and duplicate ownership, legacy shapes, and non-core top-level fields (#589)",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Ownership ambiguity fails closed, bounded legacy shapes are audited, nested fields are preserved, and non-core blocks are exported losslessly."
+    },
+    {
+      "ticket_key": "S235-3",
+      "title": "Require explicit ownership mappings for ambiguous repairs and audit bounded normalizations (#589)",
+      "club": "long_iron",
+      "result": "missed_right",
+      "hazards": [{"type": "rough", "severity": "major", "description": "Initial phase and scorecard mapping consumption was incomplete, and absent before-values disappeared from serialized audit evidence."}],
+      "notes": "All mappings are now consumed strictly with verified path-safe evidence, and absent values use a durable JSON sentinel."
+    },
+    {
+      "ticket_key": "S235-4",
+      "title": "Prove deterministic idempotent migration plans with bounded diagnostics (#589)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "A 456-sprint regression proves bounded diagnostics, complete repair templates, stable ordering, and identical hashes across mapping insertion order."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 2,
+    "fairways_total": 4,
+    "greens_in_regulation": 2,
+    "greens_total": 4,
+    "putts": 2,
+    "penalties": 0,
+    "hazards_hit": 2,
+    "hazard_penalties": 2,
+    "miss_directions": {"long": 0, "short": 0, "left": 0, "right": 2}
+  },
+  "conditions": [{"type": "wind", "impact": "major", "description": "A migration plan must describe legacy repairs while also proving that the strict target representation will preserve the intended projection."}],
+  "special_plays": [],
+  "training": [
+    {"type": "lessons", "description": "Planner applicability must mean the consumer can render and validate the exact target, not merely that legacy analysis completed.", "outcome": "The planner validates the target schema and binds the expected compiled projection digest."},
+    {"type": "lessons", "description": "Explicit mappings are an audit boundary and every supplied entry must be used or rejected.", "outcome": "Ownership, ticket, phase-kind, and scorecard mappings now fail closed when stale, unnecessary, unverified, or mismatched."}
+  ],
+  "nutrition": [
+    {"category": "testing", "description": "One hundred seventeen focused planner, source-federation, and roadmap tests passed after review repair.", "status": "healthy"},
+    {"category": "build", "description": "TypeScript typecheck passed with the final planner contract.", "status": "healthy"},
+    {"category": "review", "description": "Independent review rejected five contract gaps; all were repaired and final re-review approved.", "status": "healthy"}
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "Analysis was easy to make descriptive; making it an executable, fidelity-bound contract was the difficult part.",
+    "advice_for_next_player": "Treat applicable as a guarantee to the writer, and hash the exact compiled artifact the writer must produce.",
+    "what_surprised_you": "A parser that accepted id-only tickets still silently materialized a key during structural casting.",
+    "excited_about_next": "The transaction layer can now consume a plan without guessing or discovering schema failures mid-write."
+  },
+  "bunker_locations": [
+    "Do not declare a migration plan applicable until strict target parsing and cross-reference validation pass.",
+    "Preserve authored compatibility aliases through the compiler boundary, not only in the planner object.",
+    "Represent absent audit values explicitly; JSON drops undefined object properties."
+  ],
+  "yardage_book_updates": ["RoadmapMigrationPlan.expected_projection_sha256 binds the exact strict-compiled compatibility projection."],
+  "course_management_notes": ["Planner implementation and independent review evidence are pushed; the transactional apply sprint remains active and no PR merge or release is implied."],
+  "slope_factors": ["migration_planning", "semantic_fidelity", "explicit_mapping", "bounded_diagnostics", "determinism"]
+}
