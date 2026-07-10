@@ -1,0 +1,161 @@
+{
+  "sprint_number": 226,
+  "player": "codex",
+  "theme": "Workflow Runtime and MCP Scorecard Contract",
+  "par": 4,
+  "slope": 3,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-07-10",
+  "type": "bugfix + workflow + mcp",
+  "skills_used": [
+    "slope-sprint-workflow",
+    "slope:slope-sprint",
+    "github:github"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow",
+    "slope:slope-sprint",
+    "github:github"
+  ],
+  "skill_gaps_found": [],
+  "shots": [
+    {
+      "ticket_key": "S226-1",
+      "title": "Make sprint-standard tickets variable requirements deterministic (#581)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "Current v1.60 code already auto-filled required tickets from a roadmap after #480; the remaining contract gap was precise failure guidance when no default exists."
+        }
+      ],
+      "notes": "Built-in sprint-standard coverage now proves roadmap ticket defaults are deterministic, and missing defaults explain the accepted list/JSON/count forms instead of surfacing a bare required-variable error."
+    },
+    {
+      "ticket_key": "S226-2",
+      "title": "Preserve per-ticket loop sizing when tickets=N is provided (#581)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "A compound validation/commit shell continued after the new zero-count test failed because the assertion expected the error one engine transition too late; an immediate follow-up corrected the test and reran it green."
+        }
+      ],
+      "notes": "The engine expands tickets=N into N canonical sprint ticket iterations, rejects zero and excessive counts, and continues through every pre-shot/implementation/post-shot cycle before post-hole."
+    },
+    {
+      "ticket_key": "S226-3",
+      "title": "Emit validate/review-compatible scorecard schema from MCP buildScorecard (#582)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "buildScorecard now performs runtime validation and canonicalizes the early MCP ticket alias plus string hazards into ticket_key and structured HazardHit records before computing stats or returning JSON."
+    },
+    {
+      "ticket_key": "S226-4",
+      "title": "Align builder hazard and score defaults with project scorecard conventions (#582)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Builder score defaults now start from par and add recorded misses/hazard/manual penalties, with an explicit judged score override. Seven clean tickets on par 5 remain par instead of mechanically scoring seven. MCP registry types and examples document the contract."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 1,
+    "penalties": 0,
+    "hazards_hit": 2,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "wind",
+      "impact": "minor",
+      "description": "The issue reports were filed against v1.58.4, so each repro was compared with the v1.60 branch before changing current contracts."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "A repeated-variable schema needs one canonical representation plus explicit CLI shorthands; accepting a scalar without interpretation turns a count into one item.",
+      "outcome": "tickets accepts list, JSON array, or positive count with deterministic iteration identity."
+    },
+    {
+      "type": "lessons",
+      "description": "Static TypeScript input types do not protect MCP execute JavaScript calls.",
+      "outcome": "buildScorecard validates and normalizes its runtime boundary before computing or serializing."
+    },
+    {
+      "type": "lessons",
+      "description": "Par already encodes ticket-count complexity, so using shot count as base score double-counts sprint size.",
+      "outcome": "Score defaults are quality-relative-to-par and large clean sprints no longer appear as automatic misses."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "Focused workflow suites passed: 91 tests across four files; builder/MCP/review/validation suites passed: 178 tests across five files.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "Full Vitest passed: 238 files and 3766 tests, with 25 store-pg tests skipped by configuration.",
+      "status": "healthy"
+    },
+    {
+      "category": "build",
+      "description": "Typecheck and build passed, including packages/pi-extension.",
+      "status": "healthy"
+    },
+    {
+      "category": "slope",
+      "description": "Roadmap validation and review recommendation passed; S226 requires architect review and records the disposition explicitly at closeout.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "The two reports shared the same root cause: a typed declarative contract was not enforced at the runtime boundary agents actually use.",
+    "advice_for_next_player": "For MCP and workflow inputs, test the exact untyped payload an agent sends, not only the TypeScript-friendly happy path.",
+    "what_surprised_you": "The roadmap defaulting half of #581 was already repaired, but the numeric count still silently collapsed to one loop item.",
+    "excited_about_next": "Review output safety can now consume canonical scorecards, and the later roadmap work can reuse the same compile/validate boundary pattern."
+  },
+  "bunker_locations": [
+    "Workflow repeat inputs need runtime cardinality normalization before state-machine advancement.",
+    "MCP execute bypasses TypeScript, so exported builders must validate and normalize raw JavaScript objects.",
+    "Scorecard base score should be par, not ticket count, because par already represents sprint size.",
+    "Do not combine validation and commit commands in a shell sequence that can continue after a failed test."
+  ],
+  "yardage_book_updates": [
+    "src/core/workflow-engine.ts expands positive tickets=N counts and preserves per-ticket item identity.",
+    "src/cli/commands/sprint.ts deterministically defaults tickets from roadmap or explains accepted inputs.",
+    "src/core/builder.ts canonicalizes runtime shot/hazard input and uses par-relative default scoring.",
+    "src/mcp/registry.ts documents the executable builder input and computeSlope array contract."
+  ],
+  "course_management_notes": [
+    "Focused and full validation passed after the immediate zero-count assertion repair.",
+    "S226 is stacked behind S224/S223; no PR merge is implied.",
+    "The required architect review cannot be delegated under the current tool policy without an explicit user request, so closeout uses the separately visible waiver path introduced in S224."
+  ],
+  "slope_factors": [
+    "workflow_state_machine",
+    "runtime_schema_boundary",
+    "mcp_javascript_input",
+    "scoring_methodology",
+    "cross_package_contract"
+  ]
+}
