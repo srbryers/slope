@@ -133,8 +133,10 @@ switch (subcommand) {
       const metaphorVal = metaphorArg?.slice('--metaphor='.length);
       const outputArg = reviewArgs.find((a: string) => a.startsWith('--output='));
       const outputPath = reviewArgs.includes('--stdout') ? null : outputArg?.slice('--output='.length);
+      const sprintArg = reviewArgs.find((a: string) => a.startsWith('--sprint='));
+      const sprintSelector = sprintArg?.slice('--sprint='.length);
       const path = reviewArgs.find((a: string) => !a.startsWith('--'));
-      reviewCommand(path, plainFlag ? 'plain' : undefined, metaphorVal, outputPath);
+      reviewCommand(path, plainFlag ? 'plain' : undefined, metaphorVal, outputPath, sprintSelector);
     }
     break;
   }
