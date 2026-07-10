@@ -575,6 +575,7 @@ describe('slope roadmap focus', () => {
     const parsed = JSON.parse(first);
 
     expect(parsed.version).toBe(1);
+    expect(parsed.roadmap).toEqual({ name: 'Test Roadmap' });
     expect(parsed.sprint.id).toBe(8);
     expect(parsed.phase.name).toBe('Phase 1');
     expect(parsed.dependencies.map((item: any) => item.sprint.id)).toEqual([7]);

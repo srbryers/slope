@@ -69,6 +69,7 @@ describe('roadmap focus projection', () => {
     const focus = buildRoadmapFocus(roadmap, 228, { completedSprintIds: [220, 227] });
 
     expect(focus?.version).toBe(1);
+    expect(focus?.roadmap).toEqual({ name: 'Large Roadmap' });
     expect(focus?.sprint.label).toBe('S228');
     expect(focus?.sprint.tickets.map(ticket => ticket.key)).toEqual(['S228-1', 'S228-2']);
     expect(focus?.phase).toMatchObject({

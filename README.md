@@ -307,6 +307,7 @@ orchestrate the rest of the CLI as execution primitives.
 | `npx slope next` | Show next sprint number |
 | `npx slope roadmap interview` | Run the project interview when planning input is needed |
 | `npx slope roadmap status [--sprint=N]` | Compact current roadmap state: active work, blockers, next ready, upcoming |
+| `npx slope roadmap focus --sprint=N [--json]` | Bounded sprint, phase, dependency, hazard, and evidence context for agents |
 | `npx slope roadmap status --full` | Full historical roadmap status |
 | `npx slope roadmap validate` | Validate roadmap dependencies and sprint status |
 | `npx slope vision create` + `npx slope roadmap generate` | Create vision-backed roadmap plans from concrete backlog signals |

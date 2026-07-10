@@ -56,6 +56,13 @@ describe('CLI_COMMAND_REGISTRY', () => {
     }
   });
 
+  it('registers bounded roadmap focus for help and agent discovery', () => {
+    const roadmap = CLI_COMMAND_REGISTRY.find(entry => entry.cmd === 'roadmap');
+    const focus = roadmap?.subcommands?.find(subcommand => subcommand.name === 'focus');
+
+    expect(focus?.flags?.map(flag => flag.flag)).toEqual(['--sprint=<N>', '--path=<file>', '--json']);
+  });
+
   it('registry + internal modules matches the actual command files on disk', () => {
     const commandsDir = join(__dirname, '../../src/cli/commands');
     const files = readdirSync(commandsDir)

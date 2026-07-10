@@ -73,6 +73,9 @@ describe('slope help', () => {
 
     const output = consoleOutput.join('\n');
     expect(output).toContain('slope roadmap interview');
+    expect(output).toContain('slope roadmap focus');
+    expect(output).toContain('--sprint=<N>');
+    expect(output).toContain('--json');
     expect(output).toContain('alias of slope interview');
     expect(output).toContain('slope vision create/update');
     expect(output).toContain('--dry-run');

@@ -66,7 +66,6 @@ export interface RoadmapFocusResult {
   version: 1;
   roadmap: {
     name: string;
-    description?: string;
   };
   sprint: RoadmapFocusSprint;
   phase: RoadmapFocusPhase | null;
@@ -239,7 +238,6 @@ export function buildRoadmapFocus(
     version: 1,
     roadmap: {
       name: roadmap.name,
-      ...(roadmap.description ? { description: roadmap.description } : {}),
     },
     sprint: {
       ...summarizeSprint(roadmap, selected, completed),

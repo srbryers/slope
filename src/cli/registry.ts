@@ -524,6 +524,11 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
         { flag: '--path=<file>', desc: 'Roadmap file path' },
         { flag: '--sprint=<N>', desc: 'Focus on specific sprint' },
       ]},
+      { name: 'focus', desc: 'Bounded sprint, phase, dependency, hazard, and evidence context', flags: [
+        { flag: '--sprint=<N>', desc: 'Sprint number (required)' },
+        { flag: '--path=<file>', desc: 'Roadmap file path' },
+        { flag: '--json', desc: 'Emit machine-readable JSON' },
+      ]},
       { name: 'show', desc: 'Render summary (critical path, parallel tracks)', flags: [
         { flag: '--path=<file>', desc: 'Roadmap file path' },
       ]},
