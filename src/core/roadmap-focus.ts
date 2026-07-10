@@ -23,7 +23,7 @@ export interface RoadmapFocusSprintSummary {
   type: string;
   status: string;
   readiness: 'complete' | 'ready' | 'blocked';
-  blocked_by: number[];
+  blocked_by: Array<{ id: number; label: string }>;
   note?: string;
 }
 
@@ -130,7 +130,7 @@ function summarizeSprint(
     type: sprint.type,
     status: complete ? 'complete' : (sprint.status ?? 'planned'),
     readiness: complete ? 'complete' : blockedBy.length > 0 ? 'blocked' : 'ready',
-    blocked_by: blockedBy,
+    blocked_by: blockedBy.map(id => ({ id, label: formatRoadmapSprintLabel(roadmap, id) })),
     ...(sprint.note ? { note: sprint.note } : {}),
   };
 }
@@ -281,7 +281,9 @@ function oneLine(value: string, limit = 240): string {
 function formatNeighbors(items: RoadmapFocusNeighbor[]): string[] {
   if (items.length === 0) return ['- None'];
   return items.map(({ sprint, direct }) => {
-    const blocked = sprint.blocked_by.length > 0 ? `; blocked by ${sprint.blocked_by.join(', ')}` : '';
+    const blocked = sprint.blocked_by.length > 0
+      ? `; blocked by ${sprint.blocked_by.map(item => item.label).join(', ')}`
+      : '';
     return `- ${sprint.label}: ${oneLine(sprint.theme, 120)} (${sprint.readiness}${direct ? '; direct' : ''}${blocked})`;
   });
 }
@@ -291,7 +293,7 @@ export function formatRoadmapFocus(focus: RoadmapFocusResult): string {
     `# Focused Roadmap Context — ${focus.sprint.label}`,
     '',
     `Roadmap: ${focus.roadmap.name}`,
-    `Readiness: ${focus.sprint.readiness}${focus.sprint.blocked_by.length ? ` (blocked by ${focus.sprint.blocked_by.join(', ')})` : ''}`,
+    `Readiness: ${focus.sprint.readiness}${focus.sprint.blocked_by.length ? ` (blocked by ${focus.sprint.blocked_by.map(item => item.label).join(', ')})` : ''}`,
     '',
     '## Phase Contract',
     '',

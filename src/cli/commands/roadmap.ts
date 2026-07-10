@@ -1,5 +1,5 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import {
   parseRoadmap,
   validateRoadmap,
@@ -11,8 +11,13 @@ import {
   formatSprintLabel,
   formatRoadmapSummary,
   formatStrategicContext,
+  buildRoadmapFocus,
+  formatRoadmapFocus,
+  formatRoadmapSprintLabel,
   isRoadmapSprintPending,
   loadScorecards,
+  discoverScorecardFiles,
+  sprintNumberFromScorecardFile,
   loadVision,
   parseSprintNumber,
   analyzeBacklog,
@@ -22,9 +27,17 @@ import {
   generateRoadmapFromVision,
   RoadmapGenerationError,
 } from '../../core/index.js';
-import type { RoadmapDefinition, RoadmapSprint, RoadmapTicket, RoadmapClub, GolfScorecard } from '../../core/index.js';
+import type {
+  RoadmapDefinition,
+  RoadmapSprint,
+  RoadmapTicket,
+  RoadmapClub,
+  GolfScorecard,
+  RoadmapFocusEvidence,
+  RoadmapFocusHazard,
+} from '../../core/index.js';
 import { loadConfig } from '../config.js';
-import { buildRoadmapReality, formatRoadmapRealitySection } from '../pre-sprint-reality.js';
+import { buildRoadmapReality, formatRoadmapRealitySection, roadmapRealityIssues } from '../pre-sprint-reality.js';
 import { interviewCommand } from './interview.js';
 
 // --- Helpers ---
@@ -32,7 +45,7 @@ import { interviewCommand } from './interview.js';
 function parseArgs(args: string[]): Record<string, string> {
   const result: Record<string, string> = {};
   for (const arg of args) {
-    const match = arg.match(/^--(\w[\w-]*)(?:=(.+))?$/);
+    const match = arg.match(/^--(\w[\w-]*)(?:=(.*))?$/);
     if (match) result[match[1]] = match[2] ?? 'true';
   }
   return result;
@@ -362,6 +375,99 @@ function statusSubcommand(flags: Record<string, string>, cwd: string): void {
     printFullRoadmapStatus(roadmap, currentSprint, completedSprints);
   } else {
     printCompactRoadmapStatus(roadmap, currentSprint, completedSprints, cwd);
+  }
+}
+
+function displayPath(cwd: string, path: string): string {
+  return relative(cwd, resolve(cwd, path)).replace(/\\/g, '/');
+}
+
+function focusEvidence(
+  roadmap: RoadmapDefinition,
+  sprintId: number,
+  flags: Record<string, string>,
+  cwd: string,
+): RoadmapFocusEvidence[] {
+  const config = loadConfig(cwd);
+  const evidence: RoadmapFocusEvidence[] = [{
+    kind: 'roadmap',
+    label: 'Roadmap source',
+    ref: displayPath(cwd, resolveRoadmapPath(flags, cwd)),
+    sprint: sprintId,
+  }];
+  const selected = roadmap.sprints.find(sprint => sprint.id === sprintId);
+  const phase = roadmap.phases.find(candidate => candidate.sprints.includes(sprintId));
+  const phaseIndex = phase?.sprints.indexOf(sprintId) ?? -1;
+  const contextIds = new Set([
+    sprintId,
+    ...(selected?.depends_on ?? []),
+    ...(phaseIndex < 0 ? [] : phase!.sprints.slice(Math.max(0, phaseIndex - 2), phaseIndex)),
+  ]);
+
+  for (const path of discoverScorecardFiles(config, cwd)) {
+    const scorecardSprint = sprintNumberFromScorecardFile(path, config);
+    if (scorecardSprint == null || !contextIds.has(scorecardSprint)) continue;
+    evidence.push({
+      kind: 'scorecard',
+      label: `${formatRoadmapSprintLabel(roadmap, scorecardSprint)} scorecard`,
+      ref: displayPath(cwd, path),
+      sprint: scorecardSprint,
+    });
+    const reviewPath = join(dirname(path), `sprint-${scorecardSprint}-review.md`);
+    if (existsSync(reviewPath)) {
+      evidence.push({
+        kind: 'review',
+        label: `${formatRoadmapSprintLabel(roadmap, scorecardSprint)} review`,
+        ref: displayPath(cwd, reviewPath),
+        sprint: scorecardSprint,
+      });
+    }
+  }
+  return evidence;
+}
+
+function focusSubcommand(flags: Record<string, string>, cwd: string): void {
+  if (!Object.prototype.hasOwnProperty.call(flags, 'sprint') || flags.sprint === 'true') {
+    console.error('\nMissing required --sprint=N for roadmap focus.');
+    console.error('Usage: slope roadmap focus --sprint=N [--path=<file>] [--json]\n');
+    process.exit(1);
+    return;
+  }
+  const sprintId = parseSprintNumber(flags.sprint);
+  if (sprintId == null) {
+    console.error(`\nInvalid sprint number: ${flags.sprint || '(empty)'}`);
+    console.error('Usage: slope roadmap focus --sprint=N [--path=<file>] [--json]\n');
+    process.exit(1);
+    return;
+  }
+
+  const roadmap = loadRoadmapFile(flags, cwd);
+  if (!roadmap) { process.exit(1); return; }
+  const config = loadConfig(cwd);
+  const completedSprintIds = loadScorecards(config, cwd).map(card => card.sprint_number);
+  const hazards: RoadmapFocusHazard[] = roadmapRealityIssues(buildRoadmapReality(cwd, roadmap), sprintId)
+    .map(issue => ({
+      sprint: sprintId,
+      sprint_label: formatRoadmapSprintLabel(roadmap, sprintId),
+      type: 'roadmap_reality',
+      severity: issue.type === 'error' ? 'major' : 'minor',
+      description: issue.message,
+    }));
+  const focus = buildRoadmapFocus(roadmap, sprintId, {
+    completedSprintIds,
+    hazards,
+    evidence: focusEvidence(roadmap, sprintId, flags, cwd),
+  });
+  if (!focus) {
+    console.error(`\nSprint ${formatRoadmapSprintLabel(roadmap, sprintId)} was not found in the roadmap.\n`);
+    process.exit(1);
+    return;
+  }
+
+  if (flags.json === 'true') {
+    console.log(JSON.stringify(focus, null, 2));
+  } else {
+    console.log(formatRoadmapFocus(focus).trimEnd());
   }
 }
 
@@ -735,6 +841,9 @@ export async function roadmapCommand(args: string[]): Promise<void> {
     case 'status':
       statusSubcommand(flags, cwd);
       break;
+    case 'focus':
+      focusSubcommand(flags, cwd);
+      break;
     case 'show':
       showSubcommand(flags, cwd);
       break;
@@ -756,13 +865,15 @@ Usage:
   slope roadmap validate [--path=<file>]     Schema + dependency graph checks
   slope roadmap review [--path=<file>]       Automated architect review
   slope roadmap status [--path=<file>] [--sprint=N] [--full]  Compact current progress
+  slope roadmap focus --sprint=N [--path=<file>] [--json]     Bounded sprint context
   slope roadmap show [--path=<file>]         Render summary (critical path, parallel tracks)
   slope roadmap sync [--path=<file>] [--dry-run]     Sync scorecards into roadmap
   slope roadmap generate [--path=<file>] [--dry-run] Generate from vision + concrete backlog signals
 
 Options:
   --path=<file>    Path to roadmap JSON (default: docs/backlog/roadmap.json)
-  --sprint=N       Override current sprint number (for status)
+  --sprint=N       Select a sprint (required for focus; override for status)
+  --json           Emit machine-readable focus JSON
   --full           Show full roadmap history for status
   --dry-run        Show what would change without writing (for sync and generate)
 
