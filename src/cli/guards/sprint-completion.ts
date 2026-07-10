@@ -343,7 +343,7 @@ function handleStop(cwd: string): GuardResult {
       '  - `slope sprint gate code_review --waive-independent-review --reason="..."` - explicitly waive a required independent review',
       '  - `slope sprint gate code_review --override="manual override reason"` - explicit manual override',
       '  - `slope validate` — validates scorecard (auto-marks gate)',
-      '  - `slope review` — generates review markdown (auto-marks gate)',
+      `  - \`slope review --sprint=${state.sprint}\` — generates review markdown (auto-marks gate)`,
       '',
       'Or use `slope sprint reset` to clear sprint state if this sprint was abandoned.',
     );

@@ -95,7 +95,7 @@ phases:
 
       - id: review
         type: command
-        command: slope review
+        command: slope review --sprint=${sprint_id}
         checkpoint: exit_code_0
 
       - id: codification_sweep

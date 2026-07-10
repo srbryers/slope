@@ -57,6 +57,13 @@ describe('Built-in workflows', () => {
       expect(types.has('agent_input')).toBe(true);
       expect(types.has('agent_work')).toBe(true);
     });
+
+    it('selects the workflow sprint explicitly when generating review output', () => {
+      const def = loadWorkflow('sprint-standard', cwd);
+      const review = def.phases.find(phase => phase.id === 'post_hole')?.steps.find(step => step.id === 'review');
+
+      expect(review?.command).toBe('slope review --sprint=${sprint_id}');
+    });
   });
 
   describe('sprint-autonomous', () => {
