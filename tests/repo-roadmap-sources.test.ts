@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   loadRoadmapSourceStore,
+  roadmapProjectionMatches,
   validateRoadmapSourceStore,
 } from '../src/cli/roadmap-source-store.js';
 
@@ -13,7 +14,7 @@ describe('SLOPE roadmap source federation dogfood', () => {
     const validation = validateRoadmapSourceStore(store);
 
     expect(validation.errors).toEqual([]);
-    expect(readFileSync(store.outputPath, 'utf8')).toBe(store.projection);
+    expect(roadmapProjectionMatches(readFileSync(store.outputPath, 'utf8'), store.projection)).toBe(true);
     expect(store.sources.some(source => source.entry.kind === 'archive')).toBe(true);
     expect(store.sources.some(source => source.entry.kind === 'phase')).toBe(true);
   });

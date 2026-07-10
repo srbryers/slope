@@ -47,6 +47,7 @@ import {
   applyRoadmapSourceArchive,
   validateRoadmapSourceStore,
   writeRoadmapSourceProjection,
+  roadmapProjectionMatches,
 } from '../roadmap-source-store.js';
 
 // --- Helpers ---
@@ -501,7 +502,7 @@ function compileSourcesSubcommand(flags: Record<string, string>, cwd: string): v
       ].join('\n'));
     }
     const existing = existsSync(store.outputPath) ? readFileSync(store.outputPath, 'utf8') : null;
-    const changed = existing !== store.projection;
+    const changed = existing == null || !roadmapProjectionMatches(existing, store.projection);
     const output = displayPath(cwd, store.outputPath);
 
     if (flags.check === 'true') {

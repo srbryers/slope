@@ -7,6 +7,7 @@ import {
   applyRoadmapSourceArchive,
   loadRoadmapSourceStore,
   planRoadmapSourceArchive,
+  roadmapProjectionMatches,
 } from '../../src/cli/roadmap-source-store.js';
 
 let cwd: string;
@@ -100,6 +101,14 @@ afterEach(() => {
 });
 
 describe('slope roadmap compile', () => {
+  it('treats only CRLF checkout conversion as projection-equivalent', () => {
+    expect(roadmapProjectionMatches('{\n  "name": "Roadmap"\n}\n', '{\r\n  "name": "Roadmap"\r\n}\r\n')).toBe(true);
+    expect(roadmapProjectionMatches('{\n}\n', '{\n}\n\n')).toBe(false);
+    expect(roadmapProjectionMatches('{\n}\n', '{ \n}\n')).toBe(false);
+    expect(roadmapProjectionMatches('{\n}\n', '{\n}')).toBe(false);
+    expect(roadmapProjectionMatches('{\r}\r', '{\n}\n')).toBe(false);
+  });
+
   it('supports dry-run and writes a byte-stable compatibility projection', async () => {
     const output = writeFixture();
 
@@ -134,6 +143,36 @@ describe('slope roadmap compile', () => {
     expect(readFileSync(output, 'utf8')).toBe('{"sentinel":true}\n');
     expect(errors.join('\n')).toContain('Roadmap projection drift');
     expect(errors.join('\n')).toContain('roadmap compile');
+  });
+
+  it('accepts a CRLF checkout without rewriting it and still detects semantic drift', async () => {
+    const output = writeFixture();
+    await roadmapCommand(['compile']);
+    const canonical = readFileSync(output, 'utf8');
+    const crlf = canonical.replace(/\n/g, '\r\n');
+    writeFileSync(output, crlf);
+
+    logs.length = 0;
+    await roadmapCommand(['compile', '--check']);
+    expect(logs.join('\n')).toContain('projection is current');
+
+    logs.length = 0;
+    await roadmapCommand(['validate-sources']);
+    expect(logs.join('\n')).toContain('sources and compiled projection are valid');
+
+    logs.length = 0;
+    await roadmapCommand(['compile']);
+    expect(logs.join('\n')).toContain('projection unchanged');
+    expect(readFileSync(output, 'utf8')).toBe(crlf);
+
+    const drifted = crlf.replace('Sprint 9', 'Drifted Sprint 9');
+    writeFileSync(output, drifted);
+    errors.length = 0;
+    const codes = mockExit();
+    await expect(roadmapCommand(['compile', '--check'])).rejects.toThrow('process.exit(1)');
+    expect(codes).toEqual([1]);
+    expect(errors.join('\n')).toContain('Roadmap projection drift');
+    expect(readFileSync(output, 'utf8')).toBe(drifted);
   });
 
   it('fails actionably when a single-file project has no modular manifest', async () => {
