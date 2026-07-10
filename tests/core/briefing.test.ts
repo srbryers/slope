@@ -710,6 +710,50 @@ function makeRoadmap(): RoadmapDefinition {
   };
 }
 
+function makeReplannedRoadmap(): RoadmapDefinition {
+  return {
+    name: 'Replanned Roadmap',
+    phases: [
+      { name: 'Phase 47 — Review Gate', sprints: [446, 447], status: 'complete' },
+      { name: 'Phase 48 — Roadmap Federation', sprints: [448, 449], status: 'planned' },
+    ],
+    sprints: [
+      {
+        id: 446, theme: 'Unrelated asset work', par: 3, slope: 1, type: 'feature', status: 'complete',
+        tickets: [{ key: 'S446-1', title: 'Assets', club: 'wedge', complexity: 'small' }],
+      },
+      {
+        id: 447, theme: 'AI review gate', par: 3, slope: 2, type: 'review', status: 'complete',
+        tickets: [{ key: 'S447-1', title: 'Durable review evidence', club: 'short_iron', complexity: 'standard' }],
+      },
+      {
+        id: 448,
+        theme: 'SLOPE roadmap federation and focused agent context',
+        note: 'Compile modular roadmap sources and select bounded planning context.',
+        par: 4,
+        slope: 3,
+        type: 'planning architecture',
+        status: 'planned',
+        depends_on: [447],
+        tickets: [
+          { key: 'S448-1', title: 'Roadmap federation', club: 'long_iron', complexity: 'moderate' },
+          { key: 'S448-2', title: 'Focused agent context', club: 'short_iron', complexity: 'standard' },
+        ],
+      },
+      {
+        id: 449,
+        theme: 'Flora Studio semantic gate kernel',
+        par: 4,
+        slope: 2,
+        type: 'feature',
+        status: 'planned',
+        depends_on: [448],
+        tickets: [{ key: 'S449-1', title: 'Semantic kernel', club: 'short_iron', complexity: 'standard' }],
+      },
+    ],
+  };
+}
+
 describe('formatBriefing — STRATEGIC CONTEXT', () => {
   it('includes strategic context when roadmap and currentSprint provided', () => {
     const output = formatBriefing({
@@ -783,6 +827,230 @@ describe('formatBriefing — STRATEGIC CONTEXT', () => {
     const hazardsPos = output.indexOf('HAZARDS');
     expect(briefingPos).toBeLessThan(contextPos);
     expect(contextPos).toBeLessThan(hazardsPos);
+  });
+});
+
+describe('formatBriefing — replanned hazard provenance', () => {
+  const dependencyCard = () => makeCard({
+    sprint_number: 447,
+    theme: 'AI review gate',
+    shots: [makeShot({
+      ticket_key: 'S447-1',
+      hazards: [{
+        type: 'bunker',
+        description: 'AI review folded the durable gate evidence; inspect the recorded decision. S448 routes to UE hardening before gumbo.',
+      }],
+    })],
+    bunker_locations: ['Do not start S448 gumbo as if the S447 UE gate shape passed.'],
+  });
+
+  it('keeps dependency risk as history while suppressing superseded route premises', () => {
+    const output = formatBriefing({
+      scorecards: [
+        makeCard({
+          sprint_number: 446,
+          shots: [makeShot({ hazards: [{ type: 'rough', description: 'UNRELATED_ASSET_HISTORY' }] })],
+        }),
+        dependencyCard(),
+      ],
+      commonIssues: makeIssues([]),
+      roadmap: makeReplannedRoadmap(),
+      currentSprint: 448,
+    });
+
+    expect(output).toContain('S448: SLOPE roadmap federation and focused agent context');
+    expect(output).toContain('Next: S449: Flora Studio semantic gate kernel');
+    expect(output).toContain('[S447 | Phase 47 — Review Gate | direct dependency history for S448]');
+    expect(output).toContain('AI review folded the durable gate evidence');
+    expect(output).not.toContain('gumbo');
+    expect(output).not.toContain('UE hardening');
+    expect(output).not.toContain('UNRELATED_ASSET_HISTORY');
+    expect(output).toContain('Suppressed 2 superseded route directives');
+  });
+
+  it('keeps selected-sprint route prose as active evidence', () => {
+    const output = formatBriefing({
+      scorecards: [makeCard({
+        sprint_number: 448,
+        shots: [makeShot({
+          ticket_key: 'S448-1',
+          hazards: [{ type: 'rough', description: 'S448 routes to roadmap federation and focused agent context.' }],
+        })],
+      })],
+      commonIssues: makeIssues([]),
+      roadmap: makeReplannedRoadmap(),
+      currentSprint: 448,
+    });
+
+    expect(output).toContain('[S448 | Phase 48 — Roadmap Federation | active]');
+    expect(output).toContain('S448 routes to roadmap federation and focused agent context.');
+    expect(output).not.toContain('Suppressed');
+  });
+
+  it('preserves legacy all-history output without a resolvable roadmap target', () => {
+    const noRoadmap = formatBriefing({
+      scorecards: [dependencyCard()],
+      commonIssues: makeIssues([]),
+    });
+    const unknownTarget = formatBriefing({
+      scorecards: [dependencyCard()],
+      commonIssues: makeIssues([]),
+      roadmap: makeReplannedRoadmap(),
+      currentSprint: 999,
+    });
+
+    for (const output of [noRoadmap, unknownTarget]) {
+      expect(output).toContain('[S447] bunker: AI review folded');
+      expect(output).toContain('S448 routes to UE hardening before gumbo.');
+      expect(output).toContain('Do not start S448 gumbo');
+    }
+  });
+
+  it('suppresses stale directives before applying the hazard display cap', () => {
+    const stale = Array.from({ length: 12 }, (_, index) => ({
+      type: 'rough' as const,
+      description: `S448 routes to obsolete gumbo lane ${index}.`,
+    }));
+    const card = dependencyCard();
+    card.shots = [makeShot({
+      ticket_key: 'S447-1',
+      hazards: [
+        ...stale,
+        { type: 'bunker', description: 'Preserve durable dependency evidence.' },
+      ],
+    })];
+    card.bunker_locations = [];
+
+    const output = formatBriefing({
+      scorecards: [card],
+      commonIssues: makeIssues([]),
+      roadmap: makeReplannedRoadmap(),
+      currentSprint: 448,
+    });
+
+    expect(output).toContain('Preserve durable dependency evidence.');
+    expect(output).toContain('Suppressed 12 superseded route directives');
+    expect(output).not.toContain('obsolete gumbo lane');
+    expect(output).not.toContain('older hazards omitted');
+  });
+
+  it('retains dependency gating language that does not assert an assignment premise', () => {
+    const card = dependencyCard();
+    card.shots = [makeShot({
+      ticket_key: 'S447-1',
+      hazards: [{
+        type: 'bunker',
+        description: 'Do not start S448 until S447 durable review gate passes.',
+      }],
+    })];
+    card.bunker_locations = [];
+
+    const output = formatBriefing({
+      scorecards: [card],
+      commonIssues: makeIssues([]),
+      roadmap: makeReplannedRoadmap(),
+      currentSprint: 448,
+    });
+
+    expect(output).toContain('Do not start S448 until S447 durable review gate passes.');
+    expect(output).not.toContain('Suppressed');
+  });
+
+  it('removes only the stale route clause when durable risk shares a sentence', () => {
+    const card = dependencyCard();
+    card.shots = [makeShot({
+      ticket_key: 'S447-1',
+      hazards: [{
+        type: 'bunker',
+        description: 'Preserve the durable dependency invariant; S448 routes to UE review gate hardening.',
+      }],
+    })];
+    card.bunker_locations = [];
+
+    const output = formatBriefing({
+      scorecards: [card],
+      commonIssues: makeIssues([]),
+      roadmap: makeReplannedRoadmap(),
+      currentSprint: 448,
+    });
+
+    expect(output).toContain('Preserve the durable dependency invariant;');
+    expect(output).not.toContain('UE review gate hardening');
+    expect(output).toContain('Suppressed 1 superseded route directive');
+  });
+
+  it('omits future same-phase scorecards from current briefing context', () => {
+    const output = formatBriefing({
+      scorecards: [makeCard({
+        sprint_number: 449,
+        shots: [makeShot({
+          ticket_key: 'S449-1',
+          hazards: [{ type: 'rough', description: 'FUTURE_PHASE_HAZARD' }],
+        })],
+      })],
+      commonIssues: makeIssues([]),
+      roadmap: makeReplannedRoadmap(),
+      currentSprint: 448,
+    });
+
+    expect(output).not.toContain('FUTURE_PHASE_HAZARD');
+    expect(output).toContain('No hazards relevant to the current roadmap context.');
+  });
+
+  it('handles decimal and encoded sprint labels without splitting the target mention', () => {
+    const roadmap: RoadmapDefinition = {
+      name: 'Encoded Roadmap',
+      phases: [{ name: 'Phase 43', sprints: [43, 435, 44] }],
+      sprints: [
+        {
+          id: 43, theme: 'Dependency', par: 3, slope: 1, type: 'review', status: 'complete',
+          tickets: [{ key: 'S43-1', title: 'Gate', club: 'wedge', complexity: 'small' }],
+        },
+        {
+          id: 435, theme: 'Roadmap context compiler', par: 3, slope: 2, type: 'architecture',
+          depends_on: [43],
+          tickets: [{ key: 'S43.5-1', title: 'Context compiler', club: 'short_iron', complexity: 'standard' }],
+        },
+        {
+          id: 44, theme: 'Successor', par: 3, slope: 1, type: 'feature', depends_on: [435],
+          tickets: [{ key: 'S44-1', title: 'Next', club: 'wedge', complexity: 'small' }],
+        },
+      ],
+    };
+    const output = formatBriefing({
+      scorecards: [makeCard({
+        sprint_number: 43,
+        shots: [makeShot({
+          ticket_key: 'S43-1',
+          hazards: [{ type: 'rough', description: 'S43.5 routes to obsolete gumbo. Preserve the dependency invariant.' }],
+        })],
+      })],
+      commonIssues: makeIssues([]),
+      roadmap,
+      currentSprint: 435,
+    });
+
+    expect(output).not.toContain('obsolete gumbo');
+    expect(output).toContain('Preserve the dependency invariant.');
+    expect(output).toContain('Suppressed 1 superseded route directive');
+    expect(output).toContain('direct dependency history for S43.5');
+  });
+
+  it('does not let suppressed route prose drive skill recommendations', () => {
+    const registry = makeSkillRegistry();
+    registry.skills.push({
+      ...makeSkill('gumbo-specialist', 'Handle gumbo pipelines.'),
+      triggers: ['gumbo', 'UE hardening'],
+    });
+    const result = buildSkillBriefing({
+      registry,
+      scorecards: [dependencyCard()],
+      commonIssues: makeIssues([]),
+      roadmap: makeReplannedRoadmap(),
+      currentSprint: 448,
+    });
+
+    expect(result.recommendations.map(rec => rec.id)).not.toContain('gumbo-specialist');
   });
 });
 
