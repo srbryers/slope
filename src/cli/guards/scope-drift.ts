@@ -114,14 +114,20 @@ export async function scopeDriftGuard(input: HookInput, cwd: string): Promise<Gu
     state.entries.push(entry);
     saveDriftState(cwd, state);
 
-    const driftMsg = `SLOPE scope drift: ${relativePath} is outside claimed areas (${claimedAreas}). Intentional?`;
+    const driftMsg = [
+      `SLOPE advisory (non-blocking) — scope drift: ${relativePath} is outside claimed areas (${claimedAreas}).`,
+      'This does not grant or deny the host tool permission; update the claim if the broader scope is intentional.',
+    ].join('\n');
     const dedup = dedupGuardContext(cwd, input.session_id, 'scope-drift', driftMsg);
     return { context: dedup ?? driftMsg };
   } catch {
     // Store not available — fall back to disk state (advisory, not blocking)
     const cached = state.entries.find(e => relativePaths.includes(e.file));
     if (cached && (Date.now() - cached.timestamp) < STALE_MS) {
-      const cachedMsg = `SLOPE scope drift: ${cached.file} is outside claimed areas (${cached.claimedAreas}). Intentional?`;
+      const cachedMsg = [
+        `SLOPE advisory (non-blocking) — scope drift: ${cached.file} is outside claimed areas (${cached.claimedAreas}).`,
+        'This does not grant or deny the host tool permission; update the claim if the broader scope is intentional.',
+      ].join('\n');
       const dedup = dedupGuardContext(cwd, input.session_id, 'scope-drift', cachedMsg);
       return { context: dedup ?? cachedMsg };
     }

@@ -119,6 +119,14 @@ describe('phaseBoundaryGuard', () => {
     expect(result).toEqual({});
   });
 
+  it('uses the validated roadmap shape without requiring project-specific sprint fields', async () => {
+    writeRoadmap();
+
+    const result = await phaseBoundaryGuard(makeInput('slope sprint start --sprint=1'), tmpDir);
+
+    expect(result).toEqual({});
+  });
+
   it('warns instead of blocking when the roadmap is unreadable', async () => {
     mkdirSync(join(tmpDir, 'docs', 'backlog'), { recursive: true });
     writeFileSync(join(tmpDir, 'docs', 'backlog', 'roadmap.json'), '{');
@@ -127,6 +135,8 @@ describe('phaseBoundaryGuard', () => {
 
     expect(result.decision).toBeUndefined();
     expect(result.blockReason).toBeUndefined();
-    expect(result.context).toContain('roadmap is unreadable');
+    expect(result.context).toContain('advisory (non-blocking)');
+    expect(result.context).toContain('could not read the roadmap');
+    expect(result.context).toContain('this command is allowed');
   });
 });

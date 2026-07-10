@@ -558,6 +558,8 @@ describe('scopeDriftGuard', () => {
       tmpDir,
     );
     expect(result.context).toContain('scope drift');
+    expect(result.context).toContain('advisory (non-blocking)');
+    expect(result.context).toContain('does not grant or deny the host tool permission');
     expect(result.context).toContain('src/core');
     spy.mockRestore();
   });
@@ -583,6 +585,8 @@ describe('scopeDriftGuard', () => {
     );
 
     expect(result.context).toContain('scope drift');
+    expect(result.context).toContain('advisory (non-blocking)');
+    expect(result.decision).toBeUndefined();
     expect(result.context).toContain('src/cli/commands/version.ts');
     expect(result.context).toContain('src/core');
   });
