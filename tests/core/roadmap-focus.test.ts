@@ -125,6 +125,16 @@ describe('roadmap focus projection', () => {
     expect(roadmap).toEqual(before);
   });
 
+  it('expands legacy multi-issue links into distinct evidence entries', () => {
+    const roadmap = fixture();
+    roadmap.sprints.find(sprint => sprint.id === 228)!.tickets[0].github_issue = [584, 585];
+
+    const focus = buildRoadmapFocus(roadmap, 228)!;
+
+    expect(focus.evidence.filter(item => item.kind === 'issue').map(item => item.ref))
+      .toEqual(['#584', '#585']);
+  });
+
   it('includes only bounded hazards from the selected, dependency, and recent phase scorecards', () => {
     const focus = buildRoadmapFocus(fixture(), 228, {
       scorecards: [
