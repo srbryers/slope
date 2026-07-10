@@ -5806,7 +5806,7 @@
       "par": 4,
       "slope": 3,
       "type": "feature + review reliability",
-      "status": "active",
+      "status": "complete",
       "depends_on": [
         232
       ],
@@ -5857,7 +5857,7 @@
       "par": 4,
       "slope": 4,
       "type": "feature + migration architecture",
-      "status": "planned",
+      "status": "active",
       "depends_on": [
         232
       ],

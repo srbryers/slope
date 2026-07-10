@@ -1,0 +1,84 @@
+{
+  "sprint_number": 234,
+  "player": "codex",
+  "theme": "Bounded Large-PR Review Runner",
+  "par": 4,
+  "slope": 3,
+  "score": 6,
+  "score_label": "double_bogey",
+  "date": "2026-07-10",
+  "type": "feature + review reliability",
+  "skills_used": ["slope-sprint-workflow", "slope:slope-sprint", "github:github"],
+  "skills_recommended": ["slope-sprint-workflow", "slope:slope-sprint", "github:github"],
+  "skill_gaps_found": [],
+  "shots": [
+    {
+      "ticket_key": "S234-1",
+      "title": "Classify gh lookup, authentication, timeout, exit, and buffer failures with bounded diagnostics (#590)",
+      "club": "long_iron",
+      "result": "missed_right",
+      "hazards": [{"type": "bunker", "severity": "major", "description": "The first timeout implementation waited indefinitely if a child ignored termination, and the wrapper retained an unbounded legacy gh call."}],
+      "notes": "The repaired transport drains bounded pipes, redacts credentials, reports typed failures and exit details, and guarantees terminal settlement after timeout escalation."
+    },
+    {
+      "ticket_key": "S234-2",
+      "title": "Retrieve large PR metadata and diffs without the prior exec buffer ceiling (#590)",
+      "club": "long_iron",
+      "result": "missed_right",
+      "hazards": [{"type": "rough", "severity": "moderate", "description": "Initial paging used small pages without an aggregate deadline, and UTF-8 prefixing could become quadratic for multibyte patches."}],
+      "notes": "The final collector uses 100-file pages, one 120-second collection deadline, strict metadata, linear byte-safe truncation, and an explicit 3,000-file ceiling warning."
+    },
+    {
+      "ticket_key": "S234-3",
+      "title": "Add explicit include and exclude path filters for bounded review scope (#590)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Repeatable include/exclude globs match normalized current and previous rename paths and are forwarded strictly by slope pr review."
+    },
+    {
+      "ticket_key": "S234-4",
+      "title": "Cover oversized diffs, filtered prompts, and provider-truncation messaging (#590)",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [],
+      "notes": "Regressions cover output above 1 MiB, 3,000 files, ignored termination, multibyte budgets, dynamic fences, malformed metadata, and distinct provider/local coverage states."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 2,
+    "fairways_total": 4,
+    "greens_in_regulation": 2,
+    "greens_total": 4,
+    "putts": 2,
+    "penalties": 0,
+    "hazards_hit": 2,
+    "hazard_penalties": 2,
+    "miss_directions": {"long": 0, "short": 0, "left": 0, "right": 2}
+  },
+  "conditions": [{"type": "wind", "impact": "major", "description": "Large provider output requires independent bounds on every process, page, aggregate collection, retained byte, and prompt boundary."}],
+  "special_plays": [],
+  "training": [
+    {"type": "lessons", "description": "A timeout is not bounded unless termination and final settlement are bounded too.", "outcome": "The runner escalates termination and resolves terminally even if close never arrives."},
+    {"type": "lessons", "description": "Replacing one large command does not help if a wrapper keeps an older unbounded lookup.", "outcome": "The PR wrapper now reuses the single paginated provider result."}
+  ],
+  "nutrition": [
+    {"category": "testing", "description": "Eighty-eight focused review-runner and wrapper tests passed after review repairs.", "status": "healthy"},
+    {"category": "build", "description": "Production build and TypeScript typecheck passed for the completed S234 implementation.", "status": "healthy"},
+    {"category": "review", "description": "Two independent reviews rejected the first pass; all seven findings were repaired and the final re-review approved.", "status": "healthy"}
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "The happy-path collector was straightforward; proving that every failure and truncation path stayed bounded required the real work.",
+    "advice_for_next_player": "Trace the complete wrapper-to-provider lifecycle and put independent bounds on process exit, pagination, retained data, and prompt encoding.",
+    "what_surprised_you": "A tiny UTF-8 helper and an advisory timeout could each defeat the entire large-diff design.",
+    "excited_about_next": "Review prompts can now cover large PRs honestly without pretending omitted content was reviewed."
+  },
+  "bunker_locations": [
+    "A single legacy execSync in a wrapper can reintroduce the buffer and timeout failure the new collector removes.",
+    "Do not call a process timeout complete until close or a bounded terminal settlement has occurred.",
+    "Byte budgets must use linear, code-point-safe truncation for untrusted multibyte text."
+  ],
+  "yardage_book_updates": ["collectReviewDiff is the single bounded provider boundary for review-run and pr-review workflows."],
+  "course_management_notes": ["Implementation and independent review evidence are pushed; no PR merge or release is implied."],
+  "slope_factors": ["large_diffs", "bounded_processes", "provider_pagination", "prompt_coverage", "credential_redaction"]
+}

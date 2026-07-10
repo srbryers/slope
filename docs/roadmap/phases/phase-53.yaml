@@ -44,7 +44,7 @@ sprints:
     par: 4
     slope: 3
     type: feature + review reliability
-    status: active
+    status: complete
     depends_on:
       - 232
     note: "Fix #590 by separating lookup failures from bounded diff retrieval and provider truncation."
@@ -80,7 +80,7 @@ sprints:
     par: 4
     slope: 4
     type: feature + migration architecture
-    status: planned
+    status: active
     depends_on:
       - 232
     note: "Plan #589 repairs explicitly before any filesystem write."
