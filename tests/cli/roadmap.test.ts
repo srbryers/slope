@@ -588,6 +588,34 @@ describe('slope roadmap focus', () => {
     expect(consoleErrors).toEqual([]);
   });
 
+  it('includes relevant dependency scorecard hazards and excludes unrelated history', async () => {
+    writeRoadmap(tmpDir, makeRoadmapJson());
+    writeConfig(tmpDir, { scorecardDir: 'docs/retros', scorecardPattern: 'sprint-*.json', minSprint: 1 });
+    mkdirSync(join(tmpDir, 'docs', 'retros'), { recursive: true });
+    writeFileSync(join(tmpDir, 'docs', 'retros', 'sprint-7.json'), JSON.stringify({
+      sprint_number: 7, par: 4, score: 4, slope: 2, type: 'feature', theme: 'Foundation',
+      shots: [{
+        ticket_key: 'S7-1', title: 'T1', club: 'wedge', result: 'green',
+        hazards: [{ type: 'bunker', severity: 'moderate', description: 'Dependency hazard' }],
+      }],
+      bunker_locations: ['Dependency location'],
+    }));
+    writeFileSync(join(tmpDir, 'docs', 'retros', 'sprint-6.json'), JSON.stringify({
+      sprint_number: 6, par: 3, score: 3, slope: 1, type: 'feature', theme: 'Unrelated',
+      shots: [{
+        ticket_key: 'S6-1', title: 'Old', club: 'wedge', result: 'green',
+        hazards: [{ type: 'water', severity: 'major', description: 'UNRELATED_HISTORY_HAZARD' }],
+      }],
+    }));
+
+    await roadmapCommand(['focus', '--sprint=8', '--json']);
+    const parsed = JSON.parse(consoleOutput.join('\n'));
+
+    expect(parsed.hazards.map((hazard: any) => hazard.description)).toContain('Dependency hazard');
+    expect(parsed.hazards.map((hazard: any) => hazard.description)).toContain('Dependency location');
+    expect(parsed.hazards.map((hazard: any) => hazard.description)).not.toContain('UNRELATED_HISTORY_HAZARD');
+  });
+
   it.each([
     [],
     ['--sprint='],
@@ -644,6 +672,45 @@ describe('slope roadmap focus', () => {
     consoleOutput.length = 0;
     await roadmapCommand(['focus', '--sprint=225', '--json']);
     expect(JSON.parse(consoleOutput.join('\n')).sprint.label).toBe('S225');
+  });
+
+  it('matches encoded roadmap IDs to decimal scorecard completion and evidence', async () => {
+    const roadmap = makeRoadmapJson({
+      phases: [{ name: 'Encoded', sprints: [43, 435, 44] }],
+      sprints: [
+        { ...makeRoadmapJson().sprints[0], id: 43, theme: 'Before', tickets: [
+          { key: 'S43-1', title: 'T1', club: 'wedge', complexity: 'small' },
+        ] } as any,
+        { ...makeRoadmapJson().sprints[0], id: 435, theme: 'Inserted', tickets: [
+          { key: 'S43.5-1', title: 'T1', club: 'wedge', complexity: 'small' },
+        ] } as any,
+        { ...makeRoadmapJson().sprints[0], id: 44, theme: 'After', tickets: [
+          { key: 'S44-1', title: 'T1', club: 'wedge', complexity: 'small' },
+        ] } as any,
+      ],
+    });
+    writeRoadmap(tmpDir, roadmap);
+    writeConfig(tmpDir, { scorecardDir: 'docs/retros', scorecardPattern: 'sprint-*.json', minSprint: 1 });
+    mkdirSync(join(tmpDir, 'docs', 'retros'), { recursive: true });
+    writeFileSync(join(tmpDir, 'docs', 'retros', 'sprint-43.5.json'), JSON.stringify({
+      sprint_number: 43.5, par: 4, score: 4, slope: 2, type: 'feature', theme: 'Inserted', shots: [],
+    }));
+    writeFileSync(join(tmpDir, 'docs', 'retros', 'sprint-43.5-review.md'), '# Review\n');
+
+    await roadmapCommand(['focus', '--sprint=435', '--json']);
+    const parsed = JSON.parse(consoleOutput.join('\n'));
+
+    expect(parsed.sprint).toMatchObject({ label: 'S43.5', status: 'complete', readiness: 'complete' });
+    expect(parsed.evidence).toContainEqual(expect.objectContaining({
+      kind: 'scorecard',
+      sprint: 435,
+      ref: 'docs/retros/sprint-43.5.json',
+    }));
+    expect(parsed.evidence).toContainEqual(expect.objectContaining({
+      kind: 'review',
+      sprint: 435,
+      ref: 'docs/retros/sprint-43.5-review.md',
+    }));
   });
 
   it('supports a custom single-file roadmap path without mutation', async () => {

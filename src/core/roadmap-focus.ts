@@ -1,5 +1,6 @@
 import {
   formatRoadmapSprintLabel,
+  roadmapSprintOrderValue,
   type RoadmapDefinition,
   type RoadmapSprint,
   type RoadmapTicket,
@@ -91,6 +92,14 @@ export interface RoadmapFocusResult {
 export interface RoadmapFocusOptions {
   completedSprintIds?: Iterable<number>;
   hazards?: RoadmapFocusHazard[];
+  scorecards?: Array<{
+    sprint_number: number;
+    shots?: Array<{
+      ticket_key?: string;
+      hazards?: Array<{ type?: string; severity?: string; description?: string }>;
+    }>;
+    bunker_locations?: Array<string | { area?: string }>;
+  }>;
   evidence?: RoadmapFocusEvidence[];
 }
 
@@ -103,8 +112,15 @@ const TERMINAL_STATUSES = new Set([
   'absorbed',
 ]);
 
-function isComplete(sprint: RoadmapSprint, completed: Set<number>): boolean {
-  return completed.has(sprint.id) || TERMINAL_STATUSES.has(sprint.status ?? '');
+function equivalentSprintValue(roadmap: RoadmapDefinition, id: number): number {
+  return roadmapSprintOrderValue(roadmap, id);
+}
+
+function isComplete(roadmap: RoadmapDefinition, sprint: RoadmapSprint, completed: Set<number>): boolean {
+  const comparable = equivalentSprintValue(roadmap, sprint.id);
+  return completed.has(sprint.id)
+    || completed.has(comparable)
+    || TERMINAL_STATUSES.has(sprint.status ?? '');
 }
 
 function summarizeSprint(
@@ -112,13 +128,17 @@ function summarizeSprint(
   sprint: RoadmapSprint,
   completed: Set<number>,
 ): RoadmapFocusSprintSummary {
-  const complete = isComplete(sprint, completed);
+  const complete = isComplete(roadmap, sprint, completed);
   const blockedBy = complete
     ? []
     : (sprint.depends_on ?? []).filter(dependencyId => {
       const dependency = roadmap.sprints.find(candidate => candidate.id === dependencyId);
-      return dependency ? !isComplete(dependency, completed) : !completed.has(dependencyId);
+      return dependency ? !isComplete(roadmap, dependency, completed) : !completed.has(dependencyId);
     });
+  const authoredStatus = sprint.status ?? 'planned';
+  const projectedStatus = TERMINAL_STATUSES.has(authoredStatus)
+    ? authoredStatus
+    : complete ? 'complete' : authoredStatus;
 
   return {
     id: sprint.id,
@@ -127,7 +147,7 @@ function summarizeSprint(
     par: sprint.par,
     slope: sprint.slope,
     type: sprint.type,
-    status: complete ? 'complete' : (sprint.status ?? 'planned'),
+    status: projectedStatus,
     readiness: complete ? 'complete' : blockedBy.length > 0 ? 'blocked' : 'ready',
     blocked_by: blockedBy.map(id => ({ id, label: formatRoadmapSprintLabel(roadmap, id) })),
     ...(sprint.note ? { note: sprint.note } : {}),
@@ -142,13 +162,23 @@ function cloneTickets(tickets: RoadmapTicket[]): RoadmapTicket[] {
 }
 
 function uniqueHazards(hazards: RoadmapFocusHazard[]): RoadmapFocusHazard[] {
-  const seen = new Set<string>();
-  return hazards.filter(hazard => {
+  const severityRank: Record<string, number> = { minor: 1, moderate: 2, major: 3, critical: 4 };
+  const indexes = new Map<string, number>();
+  const result: RoadmapFocusHazard[] = [];
+  for (const hazard of hazards) {
     const key = [hazard.sprint, hazard.ticket ?? '', hazard.type, hazard.description].join('\u0000');
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+    const existingIndex = indexes.get(key);
+    if (existingIndex == null) {
+      indexes.set(key, result.length);
+      result.push(hazard);
+      continue;
+    }
+    const existing = result[existingIndex];
+    if ((severityRank[hazard.severity ?? ''] ?? 0) > (severityRank[existing.severity ?? ''] ?? 0)) {
+      result[existingIndex] = hazard;
+    }
+  }
+  return result;
 }
 
 function uniqueEvidence(evidence: RoadmapFocusEvidence[]): RoadmapFocusEvidence[] {
@@ -159,6 +189,49 @@ function uniqueEvidence(evidence: RoadmapFocusEvidence[]): RoadmapFocusEvidence[
     seen.add(key);
     return true;
   });
+}
+
+function scorecardHazards(
+  roadmap: RoadmapDefinition,
+  contextSprintIds: number[],
+  scorecards: RoadmapFocusOptions['scorecards'],
+): RoadmapFocusHazard[] {
+  if (!scorecards?.length) return [];
+  const hazards: RoadmapFocusHazard[] = [];
+
+  for (const roadmapSprintId of contextSprintIds) {
+    const comparable = equivalentSprintValue(roadmap, roadmapSprintId);
+    const card = scorecards.find(candidate =>
+      candidate.sprint_number === roadmapSprintId || candidate.sprint_number === comparable,
+    );
+    if (!card) continue;
+
+    for (const shot of card.shots ?? []) {
+      for (const hazard of shot.hazards ?? []) {
+        const description = hazard.description?.trim();
+        if (!description) continue;
+        hazards.push({
+          sprint: roadmapSprintId,
+          sprint_label: formatRoadmapSprintLabel(roadmap, roadmapSprintId),
+          ...(shot.ticket_key ? { ticket: shot.ticket_key } : {}),
+          type: hazard.type ?? 'hazard',
+          ...(hazard.severity ? { severity: hazard.severity } : {}),
+          description,
+        });
+      }
+    }
+    for (const location of card.bunker_locations ?? []) {
+      const description = typeof location === 'string' ? location.trim() : location.area?.trim();
+      if (!description) continue;
+      hazards.push({
+        sprint: roadmapSprintId,
+        sprint_label: formatRoadmapSprintLabel(roadmap, roadmapSprintId),
+        type: 'bunker_location',
+        description,
+      });
+    }
+  }
+  return hazards;
 }
 
 function sprintEvidence(sprint: RoadmapSprint): RoadmapFocusEvidence[] {
@@ -229,9 +302,18 @@ export function buildRoadmapFocus(
     severity: 'moderate',
     description: 'Sprint is not assigned to a roadmap phase.',
   }];
-  const allHazards = uniqueHazards([...phaseHazards, ...(options.hazards ?? [])]);
+  const hazardContextIds = [selected.id, ...dependencies.map(item => item.sprint.id), ...previousIds];
+  const historicalHazards = scorecardHazards(roadmap, hazardContextIds, options.scorecards);
+  const allHazards = uniqueHazards([...phaseHazards, ...(options.hazards ?? []), ...historicalHazards]);
   const hazards = allHazards.slice(0, ROADMAP_FOCUS_LIMITS.hazards);
-  const allEvidence = uniqueEvidence([...(options.evidence ?? []), ...sprintEvidence(selected)]);
+  const suppliedEvidence = options.evidence ?? [];
+  const roadmapEvidence = suppliedEvidence.filter(item => item.kind === 'roadmap');
+  const ancillaryEvidence = suppliedEvidence.filter(item => item.kind !== 'roadmap');
+  const allEvidence = uniqueEvidence([
+    ...roadmapEvidence,
+    ...sprintEvidence(selected),
+    ...ancillaryEvidence,
+  ]);
   const evidence = allEvidence.slice(0, ROADMAP_FOCUS_LIMITS.evidence);
 
   return {

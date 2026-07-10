@@ -50,7 +50,7 @@ function fixture(): RoadmapDefinition {
       sprint(233, { theme: 'FUTURE_SENTINEL' }),
       sprint(219, { theme: 'ARCHIVE_HISTORY_SENTINEL', status: 'complete' }),
       sprint(230, { depends_on: [228] }),
-      sprint(225),
+      sprint(225, { status: 'superseded' }),
       sprint(220, { theme: 'Cross-phase dependency', status: 'complete' }),
       sprint(232, { depends_on: [229] }),
       selected,
@@ -82,6 +82,8 @@ describe('roadmap focus projection', () => {
     expect(focus?.dependencies.every(item => item.sprint.readiness === 'complete')).toBe(true);
     expect(focus?.previous.map(item => item.sprint.id)).toEqual([225, 226]);
     expect(focus?.previous[0].sprint.label).toBe('S225');
+    expect(focus?.previous[0].sprint.status).toBe('superseded');
+    expect(focus?.previous[0].sprint.readiness).toBe('complete');
     expect(focus?.successors.map(item => item.sprint.id)).toEqual([229, 230, 231]);
     expect(focus?.successors.map(item => item.direct)).toEqual([true, true, false]);
     expect(focus?.successors[0].sprint.readiness).toBe('blocked');
@@ -105,6 +107,11 @@ describe('roadmap focus projection', () => {
       evidence: [
         { kind: 'roadmap', label: 'Roadmap source', ref: 'docs/backlog/roadmap.json' },
         { kind: 'roadmap', label: 'Duplicate source', ref: 'docs/backlog/roadmap.json' },
+        ...Array.from({ length: 12 }, (_, index) => ({
+          kind: 'scorecard' as const,
+          label: `Ancillary ${index}`,
+          ref: `ancillary-${index}.json`,
+        })),
       ],
     });
     const second = buildRoadmapFocus(roadmap, 228, { hazards, evidence: first?.evidence });
@@ -112,9 +119,40 @@ describe('roadmap focus projection', () => {
     expect(first?.hazards).toHaveLength(8);
     expect(first?.omitted.hazards).toBe(2);
     expect(first?.evidence.filter(item => item.ref === '#584')).toHaveLength(1);
+    expect(first?.evidence.some(item => item.ref === 'docs/design/roadmap-focus.md')).toBe(true);
     expect(first?.evidence.filter(item => item.ref === 'docs/backlog/roadmap.json')).toHaveLength(1);
     expect(second?.sprint).toEqual(first?.sprint);
     expect(roadmap).toEqual(before);
+  });
+
+  it('includes only bounded hazards from the selected, dependency, and recent phase scorecards', () => {
+    const focus = buildRoadmapFocus(fixture(), 228, {
+      scorecards: [
+        {
+          sprint_number: 227,
+          shots: [{
+            ticket_key: 'S227-2',
+            hazards: [{ type: 'bunker', severity: 'moderate', description: 'Dependency boundary hazard' }],
+          }],
+          bunker_locations: ['Dependency bunker location'],
+        },
+        {
+          sprint_number: 226,
+          shots: [{ hazards: [{ type: 'rough', description: 'Recent phase hazard' }] }],
+        },
+        {
+          sprint_number: 219,
+          shots: [{ hazards: [{ type: 'water', description: 'UNRELATED_HISTORY_HAZARD' }] }],
+        },
+      ],
+    });
+
+    expect(focus?.hazards.map(hazard => hazard.description)).toEqual([
+      'Dependency boundary hazard',
+      'Dependency bunker location',
+      'Recent phase hazard',
+    ]);
+    expect(focus?.hazards.some(hazard => hazard.description === 'UNRELATED_HISTORY_HAZARD')).toBe(false);
   });
 
   it('keeps an unphased sprint focusable and emits a membership hazard', () => {
@@ -152,7 +190,10 @@ describe('roadmap focus projection', () => {
     expect(formatRoadmapSprintLabel(canonical, 455)).toBe('S455');
     expect(buildRoadmapFocus(canonical, 455)?.sprint.label).toBe('S455');
     expect(formatRoadmapSprintLabel(encoded, 435)).toBe('S43.5');
-    expect(buildRoadmapFocus(encoded, 435)?.sprint.label).toBe('S43.5');
+    const encodedFocus = buildRoadmapFocus(encoded, 435, { completedSprintIds: [43.5] });
+    expect(encodedFocus?.sprint.label).toBe('S43.5');
+    expect(encodedFocus?.sprint.status).toBe('complete');
+    expect(encodedFocus?.sprint.readiness).toBe('complete');
   });
 
   it('formats only the bounded focus sections', () => {

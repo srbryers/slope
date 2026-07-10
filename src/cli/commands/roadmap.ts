@@ -14,6 +14,7 @@ import {
   buildRoadmapFocus,
   formatRoadmapFocus,
   formatRoadmapSprintLabel,
+  roadmapSprintOrderValue,
   isRoadmapSprintPending,
   loadScorecards,
   discoverScorecardFiles,
@@ -403,23 +404,30 @@ function focusEvidence(
     ...(selected?.depends_on ?? []),
     ...(phaseIndex < 0 ? [] : phase!.sprints.slice(Math.max(0, phaseIndex - 2), phaseIndex)),
   ]);
+  const contextByValue = new Map(
+    [...contextIds].map(id => [roadmapSprintOrderValue(roadmap, id), id]),
+  );
 
   for (const path of discoverScorecardFiles(config, cwd)) {
     const scorecardSprint = sprintNumberFromScorecardFile(path, config);
-    if (scorecardSprint == null || !contextIds.has(scorecardSprint)) continue;
+    if (scorecardSprint == null) continue;
+    const roadmapSprintId = contextByValue.get(roadmapSprintOrderValue(roadmap, scorecardSprint));
+    if (roadmapSprintId == null) continue;
     evidence.push({
       kind: 'scorecard',
-      label: `${formatRoadmapSprintLabel(roadmap, scorecardSprint)} scorecard`,
+      label: `${formatRoadmapSprintLabel(roadmap, roadmapSprintId)} scorecard`,
       ref: displayPath(cwd, path),
-      sprint: scorecardSprint,
+      sprint: roadmapSprintId,
     });
-    const reviewPath = join(dirname(path), `sprint-${scorecardSprint}-review.md`);
-    if (existsSync(reviewPath)) {
+    const reviewPath = [scorecardSprint, roadmapSprintId]
+      .map(id => join(dirname(path), `sprint-${id}-review.md`))
+      .find(candidate => existsSync(candidate));
+    if (reviewPath) {
       evidence.push({
         kind: 'review',
-        label: `${formatRoadmapSprintLabel(roadmap, scorecardSprint)} review`,
+        label: `${formatRoadmapSprintLabel(roadmap, roadmapSprintId)} review`,
         ref: displayPath(cwd, reviewPath),
-        sprint: scorecardSprint,
+        sprint: roadmapSprintId,
       });
     }
   }
@@ -444,7 +452,8 @@ function focusSubcommand(flags: Record<string, string>, cwd: string): void {
   const roadmap = loadRoadmapFile(flags, cwd);
   if (!roadmap) { process.exit(1); return; }
   const config = loadConfig(cwd);
-  const completedSprintIds = loadScorecards(config, cwd).map(card => card.sprint_number);
+  const scorecards = loadScorecards(config, cwd);
+  const completedSprintIds = scorecards.map(card => card.sprint_number);
   const hazards: RoadmapFocusHazard[] = roadmapRealityIssues(buildRoadmapReality(cwd, roadmap), sprintId)
     .map(issue => ({
       sprint: sprintId,
@@ -456,6 +465,7 @@ function focusSubcommand(flags: Record<string, string>, cwd: string): void {
   const focus = buildRoadmapFocus(roadmap, sprintId, {
     completedSprintIds,
     hazards,
+    scorecards,
     evidence: focusEvidence(roadmap, sprintId, flags, cwd),
   });
   if (!focus) {
