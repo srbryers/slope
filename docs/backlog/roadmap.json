@@ -397,7 +397,7 @@
         226,
         227
       ],
-      "status": "in_progress",
+      "status": "complete",
       "note": "Execute the July 2026 trust/contract batch: review-gate downgrade honesty (#578), guard enforcement wording and phase-boundary diagnostics (#579), sprint-standard workflow loop determinism (#581), MCP scorecard builder schema contract (#582), and review output safety (#583). Issue #580 was already fixed by S216 and v1.60.0, so it is a verified duplicate rather than new sprint work. S225 is intentionally skipped because the legacy encoded-inserted sprint format renders 225 as S22.5."
     },
     {
@@ -5445,7 +5445,8 @@
       "par": 3,
       "slope": 2,
       "type": "bugfix + review",
-      "status": "planned",
+      "status": "complete",
+      "score": 3,
       "depends_on": [
         226
       ],
