@@ -202,6 +202,17 @@ export {
   sprintOrderValue,
   compareSprintIds,
 } from './roadmap.js';
+export type {
+  RoadmapFocusRelation,
+  RoadmapFocusSprintSummary,
+  RoadmapFocusSprint,
+  RoadmapFocusPhase,
+  RoadmapFocusNeighbor,
+  RoadmapFocusHazard,
+  RoadmapFocusEvidence,
+  RoadmapFocusResult,
+  RoadmapFocusOptions,
+} from './roadmap-focus.js';
 export { extractSprintReferences, findShippedSprintsOnMain } from './analyzers/git.js';
 export type {
   RoadmapDefinition,
