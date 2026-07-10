@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  compileRoadmapSources,
   parseRoadmapSourceDocument,
   parseRoadmapSourceProject,
   RoadmapSourceError,
+  serializeRoadmapProjection,
 } from '../../src/core/index.js';
 
 const PROJECT = `
@@ -84,5 +86,32 @@ describe('modular roadmap source schema', () => {
       .toThrow(/phase\.sprints must be a sequence/);
     expect(() => parseRoadmapSourceDocument(PHASE.replace('\nsprints:\n', '\nsprint_rows:\n'), 'phase.yaml'))
       .toThrow(/sprints must be a sequence/);
+  });
+});
+
+describe('modular roadmap compilation', () => {
+  it('preserves input phase order, sorts sprint IDs deterministically, and strips source metadata', () => {
+    const project = parseRoadmapSourceProject(PROJECT);
+    const phase = parseRoadmapSourceDocument(PHASE, 'phases/phase-01.yaml');
+    const deferred = parseRoadmapSourceDocument(PHASE
+      .replace('name: no', 'name: Deferred')
+      .replace('sprints: [7]', 'sprints: [9]')
+      .replaceAll('id: 7', 'id: 9')
+      .replaceAll('S7-', 'S9-')
+      .replace('"7":', '"9":'), 'backlog/deferred.yaml');
+
+    const ordered = [
+      { entry: project.sources[1], document: deferred },
+      { entry: project.sources[0], document: phase },
+    ];
+    const roadmap = compileRoadmapSources(project, ordered);
+    const first = serializeRoadmapProjection(roadmap);
+    const second = serializeRoadmapProjection(compileRoadmapSources(project, ordered));
+
+    expect(roadmap.phases.map(item => item.name)).toEqual(['Deferred', 'no']);
+    expect(roadmap.sprints.map(item => item.id)).toEqual([7, 9]);
+    expect(first).toBe(second);
+    expect(first).not.toContain('scorecards');
+    expect(first.endsWith('\n')).toBe(true);
   });
 });

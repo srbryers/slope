@@ -225,6 +225,8 @@ export {
   parseRoadmapSourceProject,
   parseRoadmapSourceDocument,
   sourceProjectToRoadmap,
+  compileRoadmapSources,
+  serializeRoadmapProjection,
 } from './roadmap-sources.js';
 export type {
   RoadmapSourceKind,

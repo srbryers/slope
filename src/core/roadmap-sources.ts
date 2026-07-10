@@ -1,6 +1,7 @@
 import { isAbsolute, posix } from 'node:path';
 import { parseDocument } from 'yaml';
 import { castRoadmapStructure } from './roadmap.js';
+import { compareRoadmapSprintIds } from './roadmap.js';
 import type { RoadmapDefinition, RoadmapPhase, RoadmapSprint } from './roadmap.js';
 
 export type RoadmapSourceKind = 'phase' | 'backlog' | 'archive';
@@ -204,4 +205,41 @@ export function sourceProjectToRoadmap(project: RoadmapSourceProject): Pick<Road
     name: project.name,
     ...(project.description ? { description: project.description } : {}),
   };
+}
+
+function clonePhase(phase: RoadmapPhase): RoadmapPhase {
+  return { ...phase, sprints: [...phase.sprints] };
+}
+
+function cloneSprint(sprint: RoadmapSprint): RoadmapSprint {
+  return {
+    ...sprint,
+    ...(sprint.depends_on ? { depends_on: [...sprint.depends_on] } : {}),
+    tickets: sprint.tickets.map(ticket => ({
+      ...ticket,
+      ...(ticket.depends_on ? { depends_on: [...ticket.depends_on] } : {}),
+    })),
+    ...(sprint.artifacts ? { artifacts: [...sprint.artifacts] } : {}),
+    ...(sprint.expected_artifacts ? { expected_artifacts: [...sprint.expected_artifacts] } : {}),
+    ...(sprint.research ? { research: [...sprint.research] } : {}),
+  };
+}
+
+/** Compile ordered authoring bundles into the existing roadmap compatibility shape. */
+export function compileRoadmapSources(
+  project: RoadmapSourceProject,
+  sources: LoadedRoadmapSource[],
+): RoadmapDefinition {
+  const roadmap: RoadmapDefinition = {
+    name: project.name,
+    ...(project.description ? { description: project.description } : {}),
+    phases: sources.map(source => clonePhase(source.document.phase)),
+    sprints: sources.flatMap(source => source.document.sprints.map(cloneSprint)),
+  };
+  roadmap.sprints.sort((a, b) => compareRoadmapSprintIds(roadmap, a.id, b.id));
+  return roadmap;
+}
+
+export function serializeRoadmapProjection(roadmap: RoadmapDefinition): string {
+  return `${JSON.stringify(roadmap, null, 2)}\n`;
 }

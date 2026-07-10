@@ -40,6 +40,10 @@ import type {
 import { loadConfig } from '../config.js';
 import { buildRoadmapReality, formatRoadmapRealitySection, roadmapRealityIssues } from '../pre-sprint-reality.js';
 import { interviewCommand } from './interview.js';
+import {
+  loadRoadmapSourceStore,
+  writeRoadmapSourceProjection,
+} from '../roadmap-source-store.js';
 
 // --- Helpers ---
 
@@ -481,6 +485,37 @@ function focusSubcommand(flags: Record<string, string>, cwd: string): void {
   }
 }
 
+function compileSourcesSubcommand(flags: Record<string, string>, cwd: string): void {
+  try {
+    const store = loadRoadmapSourceStore(cwd, flags.source);
+    const existing = existsSync(store.outputPath) ? readFileSync(store.outputPath, 'utf8') : null;
+    const changed = existing !== store.projection;
+    const output = displayPath(cwd, store.outputPath);
+
+    if (flags.check === 'true') {
+      if (changed) {
+        throw new Error(
+          `Roadmap projection drift: ${output}. Run \`slope roadmap compile\` to regenerate it from modular sources.`,
+        );
+      }
+      console.log(`\nRoadmap projection is current: ${output}\n`);
+      return;
+    }
+    if (flags['dry-run'] === 'true') {
+      console.log(`\nRoadmap compile dry run: ${changed ? 'would write' : 'already current'} ${output}`);
+      console.log(`  Sources: ${store.sources.length}; phases: ${store.roadmap.phases.length}; sprints: ${store.roadmap.sprints.length}\n`);
+      return;
+    }
+
+    const result = writeRoadmapSourceProjection(store);
+    console.log(`\nRoadmap projection ${result}: ${output}`);
+    console.log(`  Sources: ${store.sources.length}; phases: ${store.roadmap.phases.length}; sprints: ${store.roadmap.sprints.length}\n`);
+  } catch (error) {
+    console.error(`\n${(error as Error).message}\n`);
+    process.exit(1);
+  }
+}
+
 function printFullRoadmapStatus(
   roadmap: RoadmapDefinition,
   currentSprint: number,
@@ -854,6 +889,9 @@ export async function roadmapCommand(args: string[]): Promise<void> {
     case 'focus':
       focusSubcommand(flags, cwd);
       break;
+    case 'compile':
+      compileSourcesSubcommand(flags, cwd);
+      break;
     case 'show':
       showSubcommand(flags, cwd);
       break;
@@ -876,6 +914,7 @@ Usage:
   slope roadmap review [--path=<file>]       Automated architect review
   slope roadmap status [--path=<file>] [--sprint=N] [--full]  Compact current progress
   slope roadmap focus --sprint=N [--path=<file>] [--json]     Bounded sprint context
+  slope roadmap compile [--source=<file>] [--dry-run|--check] Compile modular YAML sources
   slope roadmap show [--path=<file>]         Render summary (critical path, parallel tracks)
   slope roadmap sync [--path=<file>] [--dry-run]     Sync scorecards into roadmap
   slope roadmap generate [--path=<file>] [--dry-run] Generate from vision + concrete backlog signals
@@ -884,6 +923,8 @@ Options:
   --path=<file>    Path to roadmap JSON (default: docs/backlog/roadmap.json)
   --sprint=N       Select a sprint (required for focus; override for status)
   --json           Emit machine-readable focus JSON
+  --source=<file>  Modular roadmap manifest (default: docs/roadmap/project.yaml)
+  --check          Fail when the compiled roadmap projection has drifted
   --full           Show full roadmap history for status
   --dry-run        Show what would change without writing (for sync and generate)
 
