@@ -3,11 +3,12 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { isAbsolute, join, resolve } from 'node:path';
 import type { HookInput, GuardResult } from '../../core/index.js';
-import { formatSprintNumber } from '../../core/index.js';
+import { formatSprintNumber, parseSprintNumber } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { loadPrReviewState } from '../pr-review-state.js';
-import { loadSprintState, mutateSprintState, updateGate, isSprintComplete, pendingGates } from '../sprint-state.js';
-import { inferSprintFromBranch, reconcileSprintStateForBranch } from '../workflow-resync.js';
+import { loadSprintState, loadSprintStateResult, mutateSprintState, updateGate, isSprintComplete, pendingGates } from '../sprint-state.js';
+import { inspectSprintRollover, verifySprintRolloverLineage } from '../sprint-rollover.js';
+import { inferSprintFromBranch } from '../workflow-resync.js';
 
 /**
  * Sprint-completion guard: enforces post-implementation gates.
@@ -42,7 +43,7 @@ function checkStaleness(sprint: number, cwd: string): string | null {
     if (branch) {
       const branchSprint = inferSprintFromBranch(cwd);
       if (branchSprint !== null && branchSprint !== sprint) {
-        return `Warning: sprint-state is for Sprint ${formatSprintNumber(sprint)} but branch "${branch}" suggests Sprint ${formatSprintNumber(branchSprint)}. Run \`slope sprint reset\` if stale.`;
+        return `Warning: sprint-state is for Sprint ${formatSprintNumber(sprint)} but branch "${branch}" suggests Sprint ${formatSprintNumber(branchSprint)}. Use audited sprint rollover; do not reset away the prior state.`;
       }
     }
     // No sprint number in branch name — can't verify, don't warn
@@ -58,11 +59,53 @@ function handlePreToolUse(input: HookInput, cwd: string): GuardResult {
   if (!commandContext) return {};
   const guardCwd = commandContext.cwd;
 
-  const rebind = reconcileSprintStateForBranch(guardCwd);
-  const state = loadSprintState(guardCwd);
-  if (!state) return {};
-  if (state.phase === 'complete') return {}; // Sprint fully complete — skip all checks
-
+  const loadedState = loadSprintStateResult(guardCwd);
+  if (loadedState.status === 'missing') return {};
+  if (loadedState.status === 'corrupt') {
+    return {
+      decision: 'deny',
+      blockReason: 'SLOPE sprint-completion: corrupt sprint evidence was preserved; repair it before creating a PR.',
+    };
+  }
+  const state = loadedState.state;
+  try {
+    verifySprintRolloverLineage(guardCwd, state);
+  } catch (error) {
+    return {
+      decision: 'deny',
+      blockReason: `SLOPE sprint-completion: rollover lineage verification failed: ${(error as Error).message}`,
+    };
+  }
+  const branchSprint = inferSprintFromBranch(guardCwd);
+  if (branchSprint !== null && branchSprint !== state.sprint) {
+    let recovery: string[];
+    try {
+      const assessment = inspectSprintRollover(guardCwd, { from: state.sprint, to: branchSprint });
+      const blockers = assessment.issues.filter(issue => issue.code !== 'from_not_terminal');
+      if (blockers.length === 0) {
+        const base = `slope sprint rollover --from=${assessment.from_label.slice(1)} --to=${assessment.to_label.slice(1)}`;
+        recovery = [
+          `Record the handoff with: \`${assessment.from_terminal ? base : `${base} --force --reason="<why>"`}\``,
+        ];
+      } else {
+        recovery = [
+          'Rollover is not currently eligible:',
+          ...blockers.slice(0, 3).map(issue => `  - ${issue.message}`),
+          ...(blockers.length > 3 ? [`  - … ${blockers.length - 3} additional issue(s) omitted`] : []),
+        ];
+      }
+    } catch (error) {
+      recovery = [`Rollover eligibility could not be verified: ${(error as Error).message}`];
+    }
+    return {
+      decision: 'deny',
+      blockReason: [
+        'SLOPE sprint-completion: branch and sprint-state disagree; refusing automatic rebind.',
+        `State: Sprint ${formatSprintNumber(state.sprint)}; branch suggests Sprint ${formatSprintNumber(branchSprint)}.`,
+        ...recovery,
+      ].join('\n'),
+    };
+  }
   // Check scorecard existence independently of gates
   const scorecardMissing = !scorecardExists(state.sprint, guardCwd);
   const gatesComplete = isSprintComplete(state);
@@ -97,12 +140,6 @@ function handlePreToolUse(input: HookInput, cwd: string): GuardResult {
   }
 
   if (staleWarning) lines.push('', staleWarning);
-  if (rebind?.rebound) {
-    lines.push(
-      '',
-      `SLOPE sprint-completion: rebound stale sprint-state from Sprint ${rebind.previousSprint} to Sprint ${rebind.sprint} because ${rebind.reason}.`,
-    );
-  }
   return {
     decision: 'deny',
     blockReason: lines.join('\n'),
@@ -306,8 +343,8 @@ function handleStop(cwd: string): GuardResult {
   const state = loadSprintState(cwd);
   if (!state) return {};
 
-  // Only warn during implementing/scoring phases — don't warn during planning/reviewing
-  if (state.phase !== 'implementing' && state.phase !== 'scoring') return {};
+  // Warn during active/terminal workflow phases; planning/reviewing remain advisory-free.
+  if (state.phase !== 'implementing' && state.phase !== 'scoring' && state.phase !== 'complete') return {};
 
   const scorecardMissing = !scorecardExists(state.sprint, cwd);
   const gatesComplete = isSprintComplete(state);
@@ -340,11 +377,12 @@ function handleStop(cwd: string): GuardResult {
       '  - `slope sprint gate architect_review --reviewer=<id> --evidence=<path-or-url>` - record independent architect review',
       '  - `slope sprint gate code_review --pr-review=<url-or-id>` - record PR review evidence',
       '  - `slope sprint gate code_review --self-review --reason="..."` - explicit weaker self-review',
+      '  - `slope sprint gate code_review --waive-independent-review --reason="..."` - explicitly waive a required independent review',
       '  - `slope sprint gate code_review --override="manual override reason"` - explicit manual override',
       '  - `slope validate` — validates scorecard (auto-marks gate)',
-      '  - `slope review` — generates review markdown (auto-marks gate)',
+      `  - \`slope review --sprint=${state.sprint}\` — generates review markdown (auto-marks gate)`,
       '',
-      'Or use `slope sprint reset` to clear sprint state if this sprint was abandoned.',
+      'For abandoned work, use audited `slope sprint rollover --force --reason="..."`; reset is destructive emergency recovery and discards state evidence.',
     );
   }
 
@@ -361,6 +399,7 @@ function reviewGateEvidenceInstructions(): string[] {
     '  - `slope sprint gate architect_review --reviewer=<id> --evidence=<path-or-url>`',
     '  - `slope sprint gate code_review --pr-review=<url-or-id>`',
     '  - `slope sprint gate code_review --self-review --reason="..."`',
+    '  - `slope sprint gate code_review --waive-independent-review --reason="..."`',
     '  - `slope sprint gate code_review --override="manual override reason"`',
   ];
 }
@@ -396,7 +435,7 @@ function handlePostToolUse(input: HookInput, cwd: string): GuardResult {
     && !/\bslope\s+review\s+(start|round|status|reset|recommend|findings|amend|defer|deferred|resolve)\b/.test(segment),
   );
   if (reviewCommand) {
-    return handleReviewCompletion(input, reviewCommand.cwd);
+    return handleReviewCompletion(input, reviewCommand.cwd, reviewCommand.segment);
   }
 
   // Detect slope auto-card completion → suggest validate next
@@ -435,6 +474,12 @@ function handleValidateSuccess(input: HookInput, cwd: string): GuardResult {
   const state = loadSprintState(cwd);
   if (!state) return {};
 
+  if (existsSync(join(cwd, 'docs', 'roadmap', 'project.yaml'))) {
+    return {
+      context: 'SLOPE: Scorecard validated. Modular roadmap sources are authoritative — update the source YAML status and run `slope roadmap compile`.',
+    };
+  }
+
   const config = loadConfig(cwd);
   const roadmapPath = join(cwd, config.roadmapPath);
   if (!existsSync(roadmapPath)) return {};
@@ -469,14 +514,42 @@ function handleValidateSuccess(input: HookInput, cwd: string): GuardResult {
   }
 }
 
+function reviewTargetSprint(segment: string, cwd: string): number | null {
+  const selector = segment.match(/--sprint(?:=|\s+)(S?\d+(?:\.\d+)?)/i)?.[1];
+  if (selector) return parseSprintNumber(selector);
+
+  const pathMatch = segment.match(/\bslope\s+review\s+(?:"([^"]+)"|'([^']+)'|([^\s;&|]+))/);
+  const path = pathMatch?.[1] ?? pathMatch?.[2] ?? pathMatch?.[3];
+  if (!path || path.startsWith('-')) return null;
+
+  try {
+    const raw = JSON.parse(readFileSync(isAbsolute(path) ? path : resolve(cwd, path), 'utf8'));
+    return parseSprintNumber(String(raw.sprint_number ?? ''));
+  } catch {
+    return null;
+  }
+}
+
 /** Detect `slope review` completion → mark review_md gate. */
-function handleReviewCompletion(input: HookInput, cwd: string): GuardResult {
+function handleReviewCompletion(input: HookInput, cwd: string, segment: string): GuardResult {
   const response = input.tool_response ?? {};
   const exitCode = response.exit_code ?? response.exitCode;
   if (exitCode !== 0 && exitCode !== '0') return {};
 
   const state = loadSprintState(cwd);
   if (!state) return {};
+
+  const targetSprint = reviewTargetSprint(segment, cwd);
+  if (targetSprint != null && targetSprint !== state.sprint) {
+    return {
+      context: `SLOPE: Historical Sprint ${formatSprintNumber(targetSprint)} review generated — active Sprint ${formatSprintNumber(state.sprint)} review gate unchanged.`,
+    };
+  }
+  if (targetSprint == null && !state.gates.review_md) {
+    return {
+      context: 'SLOPE: Review command completed without a verifiable sprint target — active review gate unchanged.',
+    };
+  }
 
   if (!state.gates.review_md) updateGate(cwd, 'review_md', true);
   const lines = [state.gates.review_md
@@ -559,7 +632,7 @@ function handlePrMerge(input: HookInput, cwd: string): GuardResult {
       '',
       'Complete these before ending the session:',
       '  1. Create scorecard → `slope validate`',
-      '  2. Generate review → `slope review`',
+      `  2. Generate review → \`slope review --sprint=${state.sprint}\``,
     ].join('\n'),
   };
 }

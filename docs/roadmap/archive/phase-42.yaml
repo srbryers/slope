@@ -1,0 +1,151 @@
+version: "1"
+phase:
+  name: Phase 42 — Closeout Corrections & Issue Scout
+  sprints:
+    - 132
+    - 133
+    - 134
+    - 135
+    - 136
+  status: complete
+  note: Backfill shipped S132-S136 scorecards so roadmap status, review recommendation, and future sprint planning have the real current tail.
+sprints:
+  - id: 132
+    theme: Scorecard and Review Closeout Correctness
+    par: 3
+    slope: 0
+    type: bugfix
+    status: complete
+    score: 1
+    score_label: eagle
+    depends_on:
+      - 131
+    note: Backfill shipped S132 closeout normalization work from docs/retros/sprint-132.json.
+    tickets:
+      - key: S132-1
+        title: Normalize ticket scorecards and review artifacts
+        club: driver
+        complexity: risky
+  - id: 133
+    theme: PR Review State and Runtime Health
+    par: 3
+    slope: 0
+    type: bugfix
+    status: complete
+    score: 1
+    score_label: eagle
+    depends_on:
+      - 132
+    note: Backfill shipped S133 work from docs/retros/sprint-133.json.
+    tickets:
+      - key: S133-1
+        title: Keep PR prompt state pending and surface ABI recovery
+        club: driver
+        complexity: risky
+  - id: 134
+    theme: Warning Hygiene and Briefing/Map Safety
+    par: 3
+    slope: 0
+    type: bugfix
+    status: complete
+    score: 2
+    score_label: birdie
+    depends_on:
+      - 133
+    note: Backfill shipped S134 warning hygiene and zero-source map safety work from docs/retros/sprint-134.json.
+    tickets:
+      - key: S134-1
+        title: Cap briefing hazards and guard zero-source maps
+        club: short_iron
+        complexity: standard
+      - key: S134-2
+        title: Avoid shell-built CLI invocations in map tests
+        club: wedge
+        complexity: small
+        depends_on:
+          - S134-1
+  - id: 135
+    theme: SLOPE Issue Preflight Stabilization
+    par: 4
+    slope: 0
+    type: bugfix
+    status: complete
+    score: 4
+    score_label: par
+    depends_on:
+      - 134
+    note: Backfill shipped S135 issue preflight fixes from docs/retros/sprint-135.json.
+    tickets:
+      - key: S135-1
+        title: Require range bounds for no-roadmap auto-card (#495)
+        club: short_iron
+        complexity: standard
+        github_issue: 495
+      - key: S135-2
+        title: Read active claims from store-backed sprint state (#494)
+        club: long_iron
+        complexity: moderate
+        github_issue: 494
+        depends_on:
+          - S135-1
+      - key: S135-3
+        title: Require bounded auto-card scans without roadmap (#495)
+        club: short_iron
+        complexity: standard
+        github_issue: 495
+        depends_on:
+          - S135-1
+      - key: S135-4
+        title: Prefer source-built slope in dev checkouts (#496)
+        club: long_iron
+        complexity: moderate
+        github_issue: 496
+        depends_on:
+          - S135-2
+          - S135-3
+  - id: 136
+    theme: SLOPE Issue Scout and Daily Triage Loop
+    par: 4
+    slope: 4
+    type: feature
+    status: complete
+    score: 4
+    score_label: par
+    depends_on:
+      - 135
+    note: Backfill shipped S136 issue scout work from docs/retros/sprint-136.json.
+    tickets:
+      - key: S136-1
+        title: Add core issue scout classification, de-dupe, body, digest, and fingerprint state helpers (#493)
+        club: long_iron
+        complexity: moderate
+        github_issue: 493
+      - key: S136-2
+        title: Add issue scout and triage CLI commands with dry-run, create mode, and evidence ingestion (#493)
+        club: long_iron
+        complexity: moderate
+        github_issue: 493
+        depends_on:
+          - S136-1
+      - key: S136-3
+        title: Add scheduled GitHub Action and optional email digest for daily approval loop (#493)
+        club: short_iron
+        complexity: standard
+        github_issue: 493
+        depends_on:
+          - S136-2
+      - key: S136-4
+        title: Document setup and cover scout classification, de-dupe, digest, and CLI behavior (#493)
+        club: short_iron
+        complexity: standard
+        github_issue: 493
+        depends_on:
+          - S136-1
+          - S136-2
+          - S136-3
+scorecards:
+  "132": docs/retros/sprint-132.json
+  "133": docs/retros/sprint-133.json
+  "134": docs/retros/sprint-134.json
+  "135": docs/retros/sprint-135.json
+  "136": docs/retros/sprint-136.json

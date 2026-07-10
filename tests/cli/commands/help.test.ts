@@ -73,6 +73,12 @@ describe('slope help', () => {
 
     const output = consoleOutput.join('\n');
     expect(output).toContain('slope roadmap interview');
+    expect(output).toContain('slope roadmap focus');
+    expect(output).toContain('slope roadmap compile');
+    expect(output).toContain('slope roadmap validate-sources');
+    expect(output).toContain('slope roadmap archive');
+    expect(output).toContain('--sprint=<N>');
+    expect(output).toContain('--json');
     expect(output).toContain('alias of slope interview');
     expect(output).toContain('slope vision create/update');
     expect(output).toContain('--dry-run');
@@ -84,6 +90,17 @@ describe('slope help', () => {
     const output = consoleOutput.join('\n');
     expect(output).toContain('workflow|style|project|hazard|other[:1-10]:text');
     expect(output).toContain('process->workflow alias');
+  });
+
+  it('shows the complete audited rollover syntax in sprint help', async () => {
+    await helpCommand(['sprint']);
+
+    const output = consoleOutput.join('\n');
+    expect(output).toContain('slope sprint rollover');
+    expect(output).toContain('--from=<N>');
+    expect(output).toContain('--to=<N>');
+    expect(output).toContain('--force');
+    expect(output).toContain('--reason=<text>');
   });
 
   it('teaches the --all escape hatch in help usage', async () => {

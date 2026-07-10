@@ -89,6 +89,86 @@ describe('slope briefing reality checks', () => {
     expect(output).toContain('expected "complete"');
   });
 
+  it('de-stales replanned dependency hazards through the full CLI path', async () => {
+    const roadmap: RoadmapDefinition = {
+      name: 'Replanned Briefing Roadmap',
+      phases: [
+        { name: 'Phase 47 — Review Gate', sprints: [447], status: 'complete' },
+        { name: 'Phase 48 — Roadmap Federation', sprints: [448, 449], status: 'planned' },
+      ],
+      sprints: [
+        {
+          id: 447, theme: 'AI review gate', par: 3, slope: 2, type: 'review', status: 'complete',
+          tickets: [{ key: 'S447-1', title: 'Durable review evidence', club: 'wedge', complexity: 'small' }],
+        },
+        {
+          id: 448,
+          theme: 'SLOPE roadmap federation and focused agent context',
+          par: 4,
+          slope: 3,
+          type: 'planning architecture',
+          status: 'planned',
+          depends_on: [447],
+          tickets: [{ key: 'S448-1', title: 'Roadmap federation', club: 'long_iron', complexity: 'moderate' }],
+        },
+        {
+          id: 449,
+          theme: 'Flora Studio semantic gate kernel',
+          par: 4,
+          slope: 2,
+          type: 'feature',
+          status: 'planned',
+          depends_on: [448],
+          tickets: [{ key: 'S449-1', title: 'Semantic kernel', club: 'short_iron', complexity: 'standard' }],
+        },
+      ],
+    };
+    mkdirSync(join(tmpDir, 'docs', 'backlog'), { recursive: true });
+    mkdirSync(join(tmpDir, 'docs', 'retros'), { recursive: true });
+    writeFileSync(join(tmpDir, 'docs', 'backlog', 'roadmap.json'), JSON.stringify(roadmap, null, 2));
+    writeFileSync(join(tmpDir, 'docs', 'retros', 'sprint-447.json'), JSON.stringify({
+      sprint_number: 447,
+      theme: 'AI review gate',
+      par: 3,
+      slope: 2,
+      score: 3,
+      score_label: 'par',
+      type: 'review',
+      shots: [{
+        ticket_key: 'S447-1',
+        title: 'Durable review evidence',
+        club: 'wedge',
+        result: 'green',
+        hazards: [{
+          type: 'bunker',
+          description: 'Preserve the durable review decision. S448 routes to UE hardening before gumbo.',
+        }],
+      }],
+      conditions: [],
+      special_plays: [],
+      stats: { fairways_hit: 1, fairways_total: 1, greens_in_regulation: 1, greens_total: 1, putts: 0, penalties: 0, hazards_hit: 1, hazard_penalties: 0, miss_directions: {} },
+      date: '2026-07-01',
+      yardage_book_updates: [],
+      bunker_locations: ['Do not start S448 gumbo as if the S447 UE gate shape passed.'],
+      course_management_notes: [],
+    }, null, 2));
+    const logs: string[] = [];
+    vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
+      logs.push(args.map(String).join(' '));
+    });
+
+    await briefingCommand(['--sprint=448']);
+
+    const output = logs.join('\n');
+    expect(output).toContain('S448: SLOPE roadmap federation and focused agent context');
+    expect(output).toContain('Next: S449: Flora Studio semantic gate kernel');
+    expect(output).toContain('direct dependency history for S448');
+    expect(output).toContain('Preserve the durable review decision.');
+    expect(output).not.toContain('gumbo');
+    expect(output).not.toContain('UE hardening');
+    expect(output).toContain('Suppressed 2 superseded route directives');
+  });
+
   it('surfaces open codification candidates from review findings', async () => {
     mkdirSync(join(tmpDir, '.slope'), { recursive: true });
     writeFileSync(join(tmpDir, '.slope', 'review-findings.json'), JSON.stringify({

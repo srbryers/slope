@@ -68,7 +68,7 @@ export async function postPushGuard(input: HookInput, cwd: string): Promise<Guar
       options = [
         { id: 'auto-card', label: 'Generate scorecard', command: 'slope auto-card' },
         { id: 'validate', label: 'Validate scorecard', command: 'slope validate' },
-        { id: 'review', label: 'Generate review', command: 'slope review' },
+        { id: 'review', label: 'Generate review', command: `slope review --sprint=${sprintState.sprint}` },
       ];
     }
   } else if (sprintState && sprintState.phase === 'scoring') {
@@ -82,7 +82,7 @@ export async function postPushGuard(input: HookInput, cwd: string): Promise<Guar
       command: g === 'scorecard'
         ? 'slope validate'
         : g === 'review_md'
-          ? 'slope review'
+          ? `slope review --sprint=${sprintState.sprint}`
           : (g === 'code_review' || g === 'architect_review')
               ? `slope sprint gate ${g} --reviewer=<id> --evidence=<path-or-url>`
               : `slope sprint gate ${g}`,

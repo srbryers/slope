@@ -210,6 +210,27 @@ describe('slope sprint run', () => {
     }
   });
 
+  it('defaults built-in sprint-standard tickets deterministically when omitted (#581)', async () => {
+    writeRoadmap(120);
+
+    await captureLog(() =>
+      sprintCommand(['run', '--workflow=sprint-standard', '--var', 'sprint_id=S120'])
+    );
+
+    const store = createStore({ storePath: '.slope/slope.db', cwd: tmpDir });
+    try {
+      const exec = await store.getExecutionBySprint('S120');
+      expect(exec?.variables.tickets).toBe('S120-1,S120-2,S120-3');
+    } finally {
+      store.close();
+    }
+  });
+
+  it('explains the deterministic tickets contract when no roadmap default exists (#581)', async () => {
+    await expect(sprintCommand(['run', '--workflow=sprint-standard', '--var', 'sprint_id=S120']))
+      .rejects.toThrow('no roadmap tickets were found for S120');
+  });
+
   it('syncs sprint-state to implementing when workflow starts in per_ticket', async () => {
     await captureLog(() =>
       sprintCommand(['run', 'S98', '--workflow=sprint-lightweight', '--var=tickets=T1,T2'])
@@ -644,6 +665,141 @@ describe('slope sprint phase', () => {
     expect(output).toContain('phase updated: implementing');
     expect(state.phase).toBe('implementing');
   });
+
+  it('refuses to overwrite a different sprint and prints audited rollover guidance', async () => {
+    writeRoadmapSprints([
+      { sprint: 98, status: 'planned' },
+      { sprint: 99, status: 'planned' },
+    ]);
+    await captureLog(() => sprintCommand(['start', '--number=98', '--phase=planning']));
+    const statePath = join(tmpDir, '.slope', 'sprint-state.json');
+    const before = readFileSync(statePath, 'utf8');
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((code) => { throw new ProcessExitError(code as number); });
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    let errors = '';
+    try {
+      await expect(sprintCommand(['start', '--number=99', '--phase=implementing', '--force']))
+        .rejects.toThrow(ProcessExitError);
+      errors = errSpy.mock.calls.map(call => call.join(' ')).join('\n');
+    } finally {
+      exitSpy.mockRestore();
+      errSpy.mockRestore();
+    }
+
+    expect(errors).toContain('slope sprint rollover --from=98 --to=99 --force --reason="<why>"');
+    expect(errors).toContain('slope sprint start --number=99 --phase=implementing');
+    expect(readFileSync(statePath, 'utf8')).toBe(before);
+  });
+
+  it('preserves corrupt state when sprint start is requested', async () => {
+    const statePath = join(tmpDir, '.slope', 'sprint-state.json');
+    const corrupt = '{"sprint":98,"phase":';
+    writeFileSync(statePath, corrupt);
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((code) => { throw new ProcessExitError(code as number); });
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    let errors = '';
+    try {
+      await expect(sprintCommand(['start', '--number=99', '--phase=planning', '--force']))
+        .rejects.toThrow(ProcessExitError);
+      errors = errSpy.mock.calls.map(call => call.join(' ')).join('\n');
+    } finally {
+      exitSpy.mockRestore();
+      errSpy.mockRestore();
+    }
+
+    expect(errors).toContain('corrupt evidence was preserved');
+    expect(readFileSync(statePath, 'utf8')).toBe(corrupt);
+  });
+});
+
+describe('slope sprint rollover', () => {
+  async function prepareTerminalSprint(): Promise<void> {
+    writeRoadmapSprints([
+      { sprint: 98, status: 'active' },
+      { sprint: 99, status: 'planned' },
+    ]);
+    await captureLog(() => sprintCommand(['start', '--number=98', '--phase=implementing']));
+    await captureLog(() => sprintCommand(['gate', 'tests']));
+    await captureLog(() => sprintCommand(['gate', 'code_review', '--self-review', '--reason=test evidence']));
+    await captureLog(() => sprintCommand(['gate', 'architect_review', '--self-review', '--reason=test evidence']));
+    await captureLog(() => sprintCommand(['gate', 'scorecard']));
+    await captureLog(() => sprintCommand(['gate', 'review_md']));
+  }
+
+  it('routes a safe rollover and reports durable audit semantics', async () => {
+    await prepareTerminalSprint();
+
+    const output = await captureLog(() => sprintCommand(['rollover', '--from=98', '--to=99']));
+    const state = JSON.parse(readFileSync(join(tmpDir, '.slope', 'sprint-state.json'), 'utf8'));
+
+    expect(output).toContain('Rollover recorded: S98 -> S99');
+    expect(output).toContain('Prior state archived; claims and sessions unchanged.');
+    expect(output).toContain('Next: slope sprint begin --sprint=99 --ticket=<key>');
+    expect(state).toMatchObject({ sprint: 99, phase: 'planning' });
+    expect(readFileSync(join(tmpDir, state.rollover.audit_path), 'utf8')).toContain('"kind": "sprint_rollover"');
+  });
+
+  it('rejects unknown flags without mutating sprint state', async () => {
+    await prepareTerminalSprint();
+    const statePath = join(tmpDir, '.slope', 'sprint-state.json');
+    const before = readFileSync(statePath, 'utf8');
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((code) => { throw new ProcessExitError(code as number); });
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    let errors = '';
+    try {
+      await expect(sprintCommand(['rollover', '--from=98', '--to=99', '--bogus']))
+        .rejects.toThrow(ProcessExitError);
+      errors = errSpy.mock.calls.map(call => call.join(' ')).join('\n');
+    } finally {
+      exitSpy.mockRestore();
+      errSpy.mockRestore();
+    }
+
+    expect(errors).toContain('Unknown rollover option: --bogus');
+    expect(readFileSync(statePath, 'utf8')).toBe(before);
+  });
+
+  it('rejects duplicate transition flags without mutating sprint state', async () => {
+    await prepareTerminalSprint();
+    const statePath = join(tmpDir, '.slope', 'sprint-state.json');
+    const before = readFileSync(statePath, 'utf8');
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((code) => { throw new ProcessExitError(code as number); });
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    let errors = '';
+    try {
+      await expect(sprintCommand(['rollover', '--from=bad', '--from=98', '--to=99']))
+        .rejects.toThrow(ProcessExitError);
+      errors = errSpy.mock.calls.map(call => call.join(' ')).join('\n');
+    } finally {
+      exitSpy.mockRestore();
+      errSpy.mockRestore();
+    }
+
+    expect(errors).toContain('--from may only be provided once');
+    expect(readFileSync(statePath, 'utf8')).toBe(before);
+  });
+
+  it('refuses begin when an installed rollover loses its tracked audit', async () => {
+    await prepareTerminalSprint();
+    await captureLog(() => sprintCommand(['rollover', '--from=98', '--to=99']));
+    const statePath = join(tmpDir, '.slope', 'sprint-state.json');
+    const state = JSON.parse(readFileSync(statePath, 'utf8'));
+    rmSync(join(tmpDir, state.rollover.audit_path), { force: true });
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((code) => { throw new ProcessExitError(code as number); });
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    let errors = '';
+    try {
+      await expect(sprintCommand(['begin', '--sprint=99', '--ticket=S99-1']))
+        .rejects.toThrow(ProcessExitError);
+      errors = errSpy.mock.calls.map(call => call.join(' ')).join('\n');
+    } finally {
+      exitSpy.mockRestore();
+      errSpy.mockRestore();
+    }
+
+    expect(errors).toContain('rollover lineage audit is missing');
+    expect(JSON.parse(readFileSync(statePath, 'utf8')).sprint).toBe(99);
+  });
 });
 
 describe('slope sprint status', () => {
@@ -684,6 +840,7 @@ describe('slope sprint (help)', () => {
     expect(output).toContain('slope sprint run');
     expect(output).toContain('slope sprint phase');
     expect(output).toContain('slope sprint resume');
+    expect(output).toContain('slope sprint rollover --from=N --to=N');
     expect(output).toContain('slope sprint skip');
     expect(output).toContain('slope sprint context');
     expect(output).toContain('slope sprint validate');

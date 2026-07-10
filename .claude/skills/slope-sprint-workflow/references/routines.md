@@ -6,12 +6,14 @@ Detailed steps for each routine in the SLOPE sprint hierarchy.
 
 Before writing any code in a new sprint:
 
-1. **Run `slope briefing`** — Single command that outputs handicap snapshot, hazard index, nutrition alerts, filtered gotchas, and session continuity
+1. **Run `slope now`** — Discover the current sprint, state, claims, and next action
+2. **Run `slope roadmap focus --sprint=N`** — Use the discovered sprint to load bounded phase, dependency, hazard, and evidence context
+3. **Run `slope briefing`** — Single command that outputs handicap snapshot, hazard index, nutrition alerts, filtered gotchas, and session continuity
    - Use `--categories=testing,api` or `--keywords=migration` to filter for the sprint's work area
-2. **Verify previous scorecard exists** — If the last sprint's scorecard wasn't created, create it now
-3. **Branch hygiene check** — `git branch -a` to confirm no stale branches remain
-4. **Gap analysis** (if touching API or schema) — Read relevant docs and compare against implementation before writing code
-5. **Set par and slope:**
+4. **Verify previous scorecard exists** — If the last sprint's scorecard wasn't created, create it now
+5. **Branch hygiene check** — `git branch -a` to confirm no stale branches remain
+6. **Gap analysis** (if touching API or schema) — Read relevant docs and compare against implementation before writing code
+7. **Set par and slope:**
    - Par from ticket count: 1-2 = 3, 3-4 = 4, 5+ = 5
    - Slope from complexity factors: new infra, multi-package, schema changes, external APIs, concurrent agents
 

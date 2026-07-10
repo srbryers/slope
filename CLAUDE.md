@@ -47,6 +47,14 @@ SLOPE formalizes context loading into tiers to minimize token usage:
 
 Prefer the lowest tier that answers your question. See `.claude/rules/codebase-context.md` for details.
 
+## Roadmap Sources
+
+Run `slope now`, then use its sprint with `slope roadmap focus --sprint=N` for bounded planning context. This repository
+authors its roadmap through `docs/roadmap/project.yaml` and the declared YAML
+bundles. Do not edit `docs/backlog/roadmap.json` directly; it is generated
+compatibility output. After a source edit, run `slope roadmap compile`,
+`slope roadmap validate-sources`, and `slope roadmap compile --check`.
+
 ## Sprint Workflow
 This repo uses SLOPE to score its own sprints:
 - Scorecards: `docs/retros/sprint-N.json`

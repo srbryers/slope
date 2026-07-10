@@ -1,0 +1,174 @@
+{
+  "sprint_number": 230,
+  "player": "codex",
+  "theme": "Replan-Aware Briefing Hazard Provenance",
+  "par": 4,
+  "slope": 3,
+  "score": 6,
+  "score_label": "double_bogey",
+  "date": "2026-07-10",
+  "type": "bugfix + context architecture",
+  "skills_used": [
+    "slope-sprint-workflow",
+    "slope:slope-sprint",
+    "github:github"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow",
+    "slope:slope-sprint",
+    "github:github"
+  ],
+  "skill_gaps_found": [],
+  "shots": [
+    {
+      "ticket_key": "S230-1",
+      "title": "Add roadmap provenance and active-versus-historical relevance to briefing hazards (#585)",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "moderate",
+          "description": "The first real SLOPE smoke followed the full transitive dependency chain and admitted 296 hazards. Defaults were narrowed to active, direct-dependency, and prior same-phase evidence, with transitive history available only by explicit keyword."
+        }
+      ],
+      "notes": "Derived source sprint, source phase, target sprint, target phase, relationship, and active/historical relevance without mutating durable scorecards or the public raw hazard index."
+    },
+    {
+      "ticket_key": "S230-2",
+      "title": "Detect superseded next-sprint premises against current roadmap assignment (#585)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "Independent review found that phase-wide text and any single overlapping token could validate stale sibling work, while broad copular matching could erase ordinary risk states. Matching now uses only the target sprint row, strong overlap or exact phrase evidence, and explicit assignment forms."
+        }
+      ],
+      "notes": "High-confidence route clauses are compared to the current sprint assignment; unmatched clauses are removed while ambiguous state, negative, vulnerability, and dependency-gating language is preserved."
+    },
+    {
+      "ticket_key": "S230-3",
+      "title": "Render dependency hazards as history and suppress stale route directives (#585)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "Adversarial review found clause suppression could remove valid prefix/suffix risk or carry across sentence boundaries. Clause parsing now preserves durable semicolon, colon, dash, prefix, suffix, Because, and Then evidence around stale routing text."
+        }
+      ],
+      "notes": "Briefing lines label active, direct/transitive dependency history, prior phase history, and unrelated history; suppression is counted without echoing stale prose. Canonical 43.5 identity is consistent across rendering and skills."
+    },
+    {
+      "ticket_key": "S230-4",
+      "title": "Add replanned-sprint regressions for retained risk and removed stale guidance (#585)",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Added exact Fathoms CLI coverage plus unit matrices for mixed clauses, false positives, low-information assignments, future/transitive history, role isolation, skill sanitation, display caps, and encoded IDs."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 2,
+    "penalties": 0,
+    "hazards_hit": 3,
+    "hazard_penalties": 2,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "wind",
+      "impact": "major",
+      "description": "Legacy scorecards contain unstructured prose, so the solution had to improve current routing safety without pretending to infer semantics or rewriting historical evidence."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Phase metadata is provenance, not truth about one sprint's current assignment.",
+      "outcome": "Route validation uses target-row theme, type, note, outcome, and tickets only."
+    },
+    {
+      "type": "lessons",
+      "description": "Automatic de-staling must be conservative because false positives erase operational risk.",
+      "outcome": "Only explicit assignment forms are classified; ordinary state, negation, vulnerability, and gate language survives."
+    },
+    {
+      "type": "lessons",
+      "description": "Context bounds must be tested on accumulated project history.",
+      "outcome": "The real SLOPE smoke reduced default candidates from 296 to 18 before the display cap."
+    },
+    {
+      "type": "lessons",
+      "description": "Logical sprint identity is a cross-consumer contract.",
+      "outcome": "Strategic context, next-sprint selection, hazard ordering, requested scorecards, and skill evidence all resolve 435/43.5 consistently."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "Independent architecture verification passed 180 focused tests; adversarial verification passed 114 focused tests.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "The complete repository suite passed: 3,790 tests.",
+      "status": "healthy"
+    },
+    {
+      "category": "build",
+      "description": "Production build and TypeScript typecheck passed, including packages/pi-extension.",
+      "status": "healthy"
+    },
+    {
+      "category": "review",
+      "description": "Both independent lanes requested changes across multiple rounds and approved the conservative final classifier.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "The hard part was not finding stale prose; it was proving we would not erase valid dependency risk while removing it.",
+    "advice_for_next_player": "Keep future provenance structured at write time so later briefings need less lexical inference.",
+    "what_surprised_you": "Role emphasis and transitive dependencies each reopened large amounts of history through otherwise reasonable defaults.",
+    "excited_about_next": "S231 can use the same explicit identity and durable-event principles for auditable sprint rollover."
+  },
+  "bunker_locations": [
+    "Treat phase prose as provenance only; compare assignment premises with the selected sprint row.",
+    "Explicit role defaults must not behave like explicit user requests for historical expansion.",
+    "Reset suppression at sentence boundaries and preserve durable clauses surrounding stale prose.",
+    "Use roadmap-aware equality, labels, and ordering together for legacy inserted sprint IDs.",
+    "Smoke-test bounded projections against real accumulated history, not only small fixtures."
+  ],
+  "yardage_book_updates": [
+    "src/core/briefing.ts derives scoped hazard provenance and conservatively removes only high-confidence superseded assignment clauses.",
+    "Default full briefings show active, direct-dependency, and prior same-phase hazards; explicit keywords can retrieve labelled transitive/unrelated history.",
+    "Skill recommendations consume the same sanitized bounded hazard view as rendered briefings.",
+    "src/core/roadmap.ts resolves canonical and legacy encoded sprint identities consistently in strategic context and next-sprint selection."
+  ],
+  "course_management_notes": [
+    "All implementation and review-repair commits are pushed; no PR merge is implied.",
+    "Independent architecture and adversarial reviewers approved the final implementation with tracked evidence.",
+    "The lexical matcher is intentionally conservative; unknown paraphrases remain visible rather than risking silent loss of valid hazards."
+  ],
+  "slope_factors": [
+    "hazard_provenance",
+    "replan_safety",
+    "conservative_classifier",
+    "bounded_context",
+    "logical_sprint_identity",
+    "skill_context_sanitation"
+  ]
+}

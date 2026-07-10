@@ -21,6 +21,9 @@ describe('generateProjectContext', () => {
     expect(content).toContain('slope now');
     expect(content).toContain('slope start [--ticket=KEY]');
     expect(content).toContain('slope roadmap interview');
+    expect(content).toContain('slope roadmap focus --sprint=N');
+    expect(content).toContain('slope roadmap validate-sources');
+    expect(content).toContain('Pre-Hole:** `slope now`, use its sprint with `slope roadmap focus --sprint=N`');
     expect(content).toContain("search({ module: 'init' })");
     expect(content).toContain('pre-round briefing');
     expect(content).toContain('Human Surface');
@@ -47,6 +50,10 @@ describe('generateSprintChecklist', () => {
     expect(content).toContain('Run `slope now`');
     expect(content).toContain('Run `slope start` or `slope start --ticket=KEY`');
     expect(content).toContain('Run `slope roadmap interview` when direction is unclear');
+    expect(content).toContain('slope roadmap focus --sprint=N');
+    expect(content).toContain('slope roadmap validate-sources');
+    expect(content).toContain('1. **Run `slope now`**');
+    expect(content.indexOf('1. **Run `slope now`**')).toBeLessThan(content.indexOf('2. **Run `slope roadmap focus --sprint=N`**'));
     expect(content).toContain('Pre-Shot Routine (Per-Ticket, Before Code)');
     expect(content).toContain('Post-Shot Routine (Per-Ticket, After Completion)');
     expect(content).toContain('Post-Hole Routine (Sprint Completion)');
@@ -119,6 +126,7 @@ describe('Cursor templates', () => {
     expect(content).toMatch(/^---\n/);
     expect(content).toContain('alwaysApply: true');
     expect(content).toContain('Pre-Hole Routine');
+    expect(content).toContain('1. **Run `slope now`**');
   });
 
   it('cursor commit discipline has mdc frontmatter', () => {
@@ -151,6 +159,9 @@ describe('generateAgentsMd', () => {
     expect(content).toContain('handicap card');
     expect(content).toContain('slope now');
     expect(content).toContain('slope roadmap interview');
+    expect(content).toContain('slope roadmap focus --sprint=N');
+    expect(content).toContain('slope roadmap validate-sources');
+    expect(content).toContain('Pre-Hole:** `slope now`, use its sprint with `slope roadmap focus --sprint=N`');
     expect(content).toContain("search({ module: 'init' })");
     expect(content).toContain('Human Surface');
     expect(content).toContain('Commit Discipline');
@@ -174,6 +185,9 @@ describe('generateCursorrules', () => {
     expect(content).toContain('handicap card');
     expect(content).toContain('slope now');
     expect(content).toContain('slope roadmap interview');
+    expect(content).toContain('slope roadmap focus --sprint=N');
+    expect(content).toContain('slope roadmap validate-sources');
+    expect(content).toContain('Pre-Hole:** `slope now`, use its sprint with `slope roadmap focus --sprint=N`');
     expect(content).toContain("search({ module: 'init' })");
     expect(content).toContain('Human Surface');
     expect(content).toContain('Pre-Hole');
@@ -201,6 +215,9 @@ describe('generateGenericChecklist', () => {
     expect(content).toContain('slope start');
     expect(content).toContain('slope briefing');
     expect(content).toContain('slope roadmap interview');
+    expect(content).toContain('slope roadmap focus --sprint=N');
+    expect(content).toContain('slope roadmap validate-sources');
+    expect(content).toContain('1. Run `slope now`');
     expect(content).toContain('slope validate');
     expect(content).toContain('slope review');
     expect(content).toContain('slope card');

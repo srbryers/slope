@@ -1,13 +1,18 @@
 import {
   loadSprintState,
+  loadSprintStateResult,
   saveSprintState,
   createSprintState,
+  initializeSprintState,
   mutateSprintState,
   updateGate,
   updateSprintPhase,
+  updateSprintPhaseForSprint,
   clearSprintState,
   isSprintComplete,
   isReviewGateSatisfied,
+  isRequiredReviewGate,
+  waivedReviewGateNames,
   pendingGateNames,
   pendingGates,
   isSprintPhase,
@@ -25,6 +30,13 @@ import { WorkflowEngine, loadWorkflow, resolveVariables, validateWorkflow, loadC
 import type { WorkflowDefinition, WorkflowExecution } from '../../core/index.js';
 import { createHash } from 'node:crypto';
 import { formatActorName, formatActorSource, formatConflictSummary, resolveActor } from '../actor.js';
+import {
+  inspectSprintRollover,
+  performSprintRollover,
+  SprintRolloverError,
+  verifySprintRolloverLineage,
+  type SprintRolloverAssessment,
+} from '../sprint-rollover.js';
 
 /** Get workflow definition from execution snapshot (preferred) or disk (fallback for old executions) */
 function getDefinition(exec: WorkflowExecution, cwd: string): { def: WorkflowDefinition; drifted: boolean } {
@@ -44,7 +56,7 @@ function getDefinition(exec: WorkflowExecution, cwd: string): { def: WorkflowDef
   return { def: loadWorkflow(exec.workflow_name, cwd), drifted: false };
 }
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { join, dirname, basename, isAbsolute } from 'node:path';
+import { join, dirname, basename, isAbsolute, relative } from 'node:path';
 import { createStore } from '../../store/index.js';
 import { formatCliError } from '../error-reporter.js';
 import {
@@ -144,6 +156,7 @@ function parseGateOptions(args: string[]): ParsedGateOptions {
   let reviewer: string | undefined;
   let prReview: string | undefined;
   let selfReview = false;
+  let waiveIndependentReview = false;
   let notes: string | undefined;
   let reason: string | undefined;
   let overrideReason: string | undefined;
@@ -185,6 +198,11 @@ function parseGateOptions(args: string[]): ParsedGateOptions {
       continue;
     }
 
+    if (arg === '--waive-independent-review') {
+      waiveIndependentReview = true;
+      continue;
+    }
+
     const reasonValue = optionValue(args, i, '--reason');
     if (reasonValue) {
       if (!reasonValue.value || reasonValue.value.startsWith('--')) errors.push('--reason requires a value');
@@ -214,12 +232,13 @@ function parseGateOptions(args: string[]): ParsedGateOptions {
 
   const hasPrReview = Boolean(prReview);
   const hasSelfReview = selfReview;
+  const hasWaiver = waiveIndependentReview;
   const hasOverride = Boolean(overrideReason);
-  const hasIndependent = !hasPrReview && !hasSelfReview && !hasOverride && (Boolean(reviewer) || evidence.length > 0);
-  const modeCount = [hasPrReview, hasSelfReview, hasOverride, hasIndependent].filter(Boolean).length;
+  const hasIndependent = !hasPrReview && !hasSelfReview && !hasWaiver && !hasOverride && (Boolean(reviewer) || evidence.length > 0);
+  const modeCount = [hasPrReview, hasSelfReview, hasWaiver, hasOverride, hasIndependent].filter(Boolean).length;
 
   if (modeCount > 1) {
-    errors.push('Use only one review provenance mode: --reviewer/--evidence, --pr-review, --self-review, or --override.');
+    errors.push('Use only one review provenance mode: --reviewer/--evidence, --pr-review, --self-review, --waive-independent-review, or --override.');
   }
 
   let review: ReviewGateCompletionInput | undefined;
@@ -228,6 +247,8 @@ function parseGateOptions(args: string[]): ParsedGateOptions {
       review = { provenance: 'pr_review', evidence: [prReview!, ...evidence], reviewer, notes: notes ?? reason };
     } else if (hasSelfReview) {
       review = { provenance: 'self_review', evidence, reviewer, notes: reason ?? notes };
+    } else if (hasWaiver) {
+      review = { provenance: 'independent_review_waived', evidence, reviewer, notes: reason ?? notes };
     } else if (hasOverride) {
       review = { provenance: 'manual_override', evidence, reviewer, notes: overrideReason };
     } else {
@@ -246,14 +267,211 @@ function printGateUsage(gateName?: GateName): void {
   console.error(`  slope sprint gate ${gate} --reviewer=<agent-or-person> --evidence=<transcript-or-output>`);
   console.error(`  slope sprint gate ${gate} --pr-review=<url-or-id>`);
   console.error(`  slope sprint gate ${gate} --self-review --reason="why self-review is acceptable"`);
+  console.error(`  slope sprint gate ${gate} --waive-independent-review --reason="why the required independent review is being waived"`);
   console.error(`  slope sprint gate ${gate} --override="manual override reason"`);
   console.error('');
   console.error('Review provenance modes:');
   console.error('  independent_review: requires --reviewer and --evidence');
   console.error('  pr_review: records external PR review evidence from --pr-review');
   console.error('  self_review (weaker): requires --self-review and --reason');
+  console.error('  independent_review_waived: explicit waiver for a required review; requires --waive-independent-review and --reason');
   console.error('  manual_override (weaker): requires --override');
   console.error('');
+}
+
+function commandValue(value: string): string {
+  if (/^[A-Za-z0-9._:/-]+$/.test(value)) return value;
+  return process.platform === 'win32'
+    ? `'${value.replaceAll("'", "''")}'`
+    : `'${value.replaceAll("'", `'"'"'`)}`;
+}
+
+function actorRetryOption(args: string[]): string | null {
+  for (const flag of ['--actor', '--player']) {
+    const value = findOptionValue(args, flag);
+    if (value) return `${flag}=${commandValue(value)}`;
+  }
+  return null;
+}
+
+function commandOptionErrors(
+  args: string[],
+  valueFlags: string[],
+  booleanFlags: string[] = [],
+): string[] {
+  const errors: string[] = [];
+  const seen = new Set<string>();
+  for (let index = 0; index < args.length; index++) {
+    const arg = args[index];
+    let matched = false;
+    for (const flag of valueFlags) {
+      const value = optionValue(args, index, flag);
+      if (!value) continue;
+      matched = true;
+      if (seen.has(flag)) errors.push(`${flag} may only be provided once`);
+      seen.add(flag);
+      if (!value.value || value.value.startsWith('--')) errors.push(`${flag} requires a value`);
+      index = value.next;
+      break;
+    }
+    if (matched) continue;
+    if (booleanFlags.includes(arg)) {
+      if (seen.has(arg)) errors.push(`${arg} may only be provided once`);
+      seen.add(arg);
+      continue;
+    }
+    errors.push(`Unknown option: ${arg}`);
+  }
+  if (seen.has('--actor') && seen.has('--player')) {
+    errors.push('Use only one actor identity flag: --actor or --player');
+  }
+  return errors;
+}
+
+function rolloverFlagValue(label: string): string {
+  return label.startsWith('S') ? label.slice(1) : label;
+}
+
+function rolloverBaseCommand(assessment: SprintRolloverAssessment): string {
+  return `slope sprint rollover --from=${rolloverFlagValue(assessment.from_label)} --to=${rolloverFlagValue(assessment.to_label)}`;
+}
+
+/**
+ * Return true when the requested sprint is the existing sprint, including a
+ * roadmap-aware legacy alias. Otherwise print bounded recovery guidance and
+ * terminate without mutating local state.
+ */
+function requireMatchingSprintOrRollover(
+  cwd: string,
+  state: SprintState,
+  requestedSprint: number,
+  action: string,
+  retryCommand: string,
+): boolean {
+  try {
+    verifySprintRolloverLineage(cwd, state);
+  } catch (error) {
+    console.error(`Refusing to ${action}: ${(error as Error).message}`);
+    console.error(`After restoring the tracked rollover audit, retry: ${retryCommand}`);
+    process.exit(1);
+  }
+  if (state.sprint === requestedSprint) return true;
+
+  let assessment: SprintRolloverAssessment;
+  try {
+    assessment = inspectSprintRollover(cwd, { from: state.sprint, to: requestedSprint });
+  } catch (error) {
+    console.error(`Refusing to ${action}: ${(error as Error).message}`);
+    console.error(`After resolving the sprint state, retry: ${retryCommand}`);
+    process.exit(1);
+  }
+
+  if (assessment.from_sprint && assessment.to_sprint && assessment.from === assessment.to) return true;
+
+  console.error(`Refusing to ${action} — sprint-state.json is for ${assessment.from_label}, not ${assessment.to_label}.`);
+  const eligibilityIssues = assessment.issues.filter(issue => issue.code !== 'from_not_terminal');
+  if (eligibilityIssues.length === 0) {
+    const command = assessment.from_terminal
+      ? rolloverBaseCommand(assessment)
+      : `${rolloverBaseCommand(assessment)} --force --reason="<why>"`;
+    console.error(`Record the prior state with: ${command}`);
+  } else {
+    console.error('Rollover is not currently eligible:');
+    for (const issue of eligibilityIssues) console.error(`  - ${issue.message}`);
+  }
+  console.error(`After resolving the rollover, retry: ${retryCommand}`);
+  process.exit(1);
+}
+
+function failOnCorruptSprintState(cwd: string): void {
+  const loaded = loadSprintStateResult(cwd);
+  if (loaded.status !== 'corrupt') return;
+  console.error(`Refusing to change sprint state: corrupt evidence was preserved at ${relative(cwd, loaded.path)}.`);
+  process.exit(1);
+}
+
+function printRolloverUsage(): void {
+  console.error('');
+  console.error('Usage: slope sprint rollover --from=N --to=N [--force --reason="<why>"]');
+  console.error('Safely archives the prior local state in a tracked audit before creating the next planning state.');
+  console.error('');
+}
+
+function rolloverCommand(args: string[], cwd: string): void {
+  if (args.includes('--help') || args.includes('-h')) {
+    printRolloverUsage();
+    return;
+  }
+
+  let fromValue: string | undefined;
+  let toValue: string | undefined;
+  let reason: string | undefined;
+  let force = false;
+  const errors: string[] = [];
+  const seen = new Set<string>();
+  for (let index = 0; index < args.length; index++) {
+    const arg = args[index];
+    const from = optionValue(args, index, '--from');
+    if (from) {
+      if (seen.has('--from')) errors.push('--from may only be provided once');
+      seen.add('--from');
+      if (!from.value || from.value.startsWith('--')) errors.push('--from requires a sprint id');
+      else fromValue = from.value;
+      index = from.next;
+      continue;
+    }
+    const to = optionValue(args, index, '--to');
+    if (to) {
+      if (seen.has('--to')) errors.push('--to may only be provided once');
+      seen.add('--to');
+      if (!to.value || to.value.startsWith('--')) errors.push('--to requires a sprint id');
+      else toValue = to.value;
+      index = to.next;
+      continue;
+    }
+    const parsedReason = optionValue(args, index, '--reason');
+    if (parsedReason) {
+      if (seen.has('--reason')) errors.push('--reason may only be provided once');
+      seen.add('--reason');
+      if (!parsedReason.value || parsedReason.value.startsWith('--')) errors.push('--reason requires a non-empty value');
+      else reason = parsedReason.value;
+      index = parsedReason.next;
+      continue;
+    }
+    if (arg === '--force') {
+      if (seen.has('--force')) errors.push('--force may only be provided once');
+      seen.add('--force');
+      force = true;
+      continue;
+    }
+    errors.push(`Unknown rollover option: ${arg}`);
+  }
+
+  const from = fromValue ? parseSprintNumber(fromValue) : null;
+  const to = toValue ? parseSprintNumber(toValue) : null;
+  if (from == null) errors.push('--from must be a positive sprint id');
+  if (to == null) errors.push('--to must be a positive sprint id');
+  if (reason && !force) errors.push('--reason is only valid with --force');
+  if (errors.length > 0) {
+    for (const error of errors) console.error(`Error: ${error}`);
+    printRolloverUsage();
+    process.exit(1);
+  }
+
+  try {
+    const result = performSprintRollover(cwd, { from: from!, to: to!, force, reason }, resolveActor(cwd));
+    console.log(`${result.already_applied ? 'Rollover already recorded' : 'Rollover recorded'}: ${result.record.from_label} -> ${result.record.to_label}.`);
+    console.log(`Audit: ${result.audit_path}`);
+    console.log(`Sprint ${rolloverFlagValue(result.record.to_label)} state is ready (phase: ${result.state.phase}).`);
+    console.log('Prior state archived; claims and sessions unchanged.');
+    console.log(`Next: slope sprint begin --sprint=${rolloverFlagValue(result.record.to_label)} --ticket=<key>`);
+  } catch (error) {
+    if (error instanceof SprintRolloverError) {
+      console.error(`Rollover refused: ${error.message}`);
+      process.exit(1);
+    }
+    throw error;
+  }
 }
 
 /**
@@ -268,32 +486,40 @@ function printGateUsage(gateName?: GateName): void {
  *   6. Print recommended next implementation step
  */
 async function beginCommand(args: string[], cwd: string): Promise<void> {
-  const sprintArg = args.find(a => a.startsWith('--sprint='));
-  const ticketArg = args.find(a => a.startsWith('--ticket='));
-  if (!sprintArg || !ticketArg) {
+  const optionErrors = commandOptionErrors(args, ['--sprint', '--ticket', '--actor', '--player']);
+  const sprintValue = findOptionValue(args, '--sprint');
+  const ticketValue = findOptionValue(args, '--ticket');
+  if (optionErrors.length > 0 || !sprintValue || !ticketValue) {
+    for (const error of optionErrors) console.error(`Error: ${error}`);
     console.error('\nUsage: slope sprint begin --sprint=N --ticket=KEY [--actor=<name>]');
     console.error('Bundles: sprint start + claim + briefing + prep --lite\n');
     process.exit(1);
   }
 
-  const sprint = parseSprintNumber(sprintArg.split('=')[1]);
-  const ticket = ticketArg.split('=')[1];
+  const sprint = parseSprintNumber(sprintValue);
+  const ticket = ticketValue;
   if (!sprint || !ticket) {
     console.error('Error: --sprint must be a positive sprint id; --ticket must be a non-empty key');
     process.exit(1);
   }
 
-  // Step 1: sprint state
-  let state = loadSprintState(cwd);
-  if (state && state.sprint === sprint) {
-    console.log(`Sprint ${formatSprintNumber(sprint)}: already started (phase: ${state.phase}).`);
-  } else if (state && state.sprint !== sprint) {
-    console.error(`Refusing to begin S${formatSprintNumber(sprint)} — sprint-state.json is for S${formatSprintNumber(state.sprint)}.`);
-    console.error('Run `slope sprint reset` first if the previous sprint is done.');
+  // Step 1: initialize without overwriting existing or corrupt local state.
+  const initialized = initializeSprintState(cwd, createSprintState(sprint, 'planning'));
+  if (initialized.status === 'corrupt') {
+    console.error(`Refusing to begin: corrupt sprint evidence was preserved at ${relative(cwd, initialized.path)}.`);
     process.exit(1);
+  }
+  let state = initialized.state;
+  const retryActor = actorRetryOption(args);
+  if (initialized.status === 'existing' && requireMatchingSprintOrRollover(
+    cwd,
+    state,
+    sprint,
+    `begin ${formatSprintLabel(sprint)}`,
+    `slope sprint begin --sprint=${formatSprintNumber(sprint)} --ticket=${commandValue(ticket)}${retryActor ? ` ${retryActor}` : ''}`,
+  )) {
+    console.log(`Sprint ${formatSprintNumber(sprint)}: already started (phase: ${state.phase}).`);
   } else {
-    state = createSprintState(sprint, 'planning');
-    saveSprintState(cwd, state);
     console.log(`Sprint ${formatSprintNumber(sprint)}: started (phase: planning).`);
   }
 
@@ -384,33 +610,59 @@ async function beginCommand(args: string[], cwd: string): Promise<void> {
 }
 
 async function startCommand(args: string[], cwd: string): Promise<void> {
-  const numberArg = args.find(a => a.startsWith('--number='));
-  if (!numberArg) {
+  const optionErrors = commandOptionErrors(
+    args,
+    ['--number', '--phase', '--touches', '--actor', '--player'],
+    ['--force'],
+  );
+  const numberValue = findOptionValue(args, '--number');
+  if (optionErrors.length > 0 || !numberValue) {
+    for (const error of optionErrors) console.error(`Error: ${error}`);
     console.error('Error: --number=N is required. Usage: slope sprint start --number=22');
     process.exit(1);
   }
 
-  const sprint = parseSprintNumber(numberArg.slice('--number='.length));
+  const sprint = parseSprintNumber(numberValue);
   if (!sprint) {
     console.error('Error: --number must be a positive sprint id, e.g. 114 or 114.5.');
     process.exit(1);
   }
 
-  const phaseArg = args.find(a => a.startsWith('--phase='));
-  const phaseInput = phaseArg?.slice('--phase='.length) ?? 'planning';
+  const phaseValue = findOptionValue(args, '--phase');
+  const phaseInput = phaseValue ?? 'planning';
   if (!isSprintPhase(phaseInput)) {
     console.error(`Error: invalid phase "${phaseInput}". Valid phases: ${SPRINT_PHASES.join(', ')}`);
     process.exit(1);
   }
   const phase = phaseInput as SprintPhase;
   const force = args.includes('--force');
-  const touchesArg = args.find(a => a.startsWith('--touches='));
-  const touchedPaths = parseTouchedPaths(touchesArg?.slice('--touches='.length));
+  const touchedPaths = parseTouchedPaths(findOptionValue(args, '--touches'));
+  const retryActor = actorRetryOption(args);
+  const retryTouches = findOptionValue(args, '--touches');
+  const retryExtras = [
+    ...(retryTouches ? [`--touches=${commandValue(retryTouches)}`] : []),
+    ...(retryActor ? [retryActor] : []),
+    ...(force ? ['--force'] : []),
+  ];
+  const retryStart = `slope sprint start --number=${formatSprintNumber(sprint)} --phase=${phase}${retryExtras.length > 0 ? ` ${retryExtras.join(' ')}` : ''}`;
 
-  const existing = loadSprintState(cwd);
-  if (existing && existing.sprint === sprint) {
-    if (phaseArg && existing.phase !== phase) {
-      updateSprintPhase(cwd, phase);
+  failOnCorruptSprintState(cwd);
+  const existingResult = loadSprintStateResult(cwd);
+  const existing = existingResult.status === 'valid' ? existingResult.state : null;
+  if (existing) {
+    requireMatchingSprintOrRollover(
+      cwd,
+      existing,
+      sprint,
+      `start ${formatSprintLabel(sprint)}`,
+      retryStart,
+    );
+    if (phaseValue && existing.phase !== phase) {
+      const updated = updateSprintPhaseForSprint(cwd, existing.sprint, phase);
+      if (!updated.matched) {
+        console.error('Refusing to update phase because sprint state changed concurrently; retry the start command.');
+        process.exit(1);
+      }
       console.log(`Sprint ${formatSprintNumber(sprint)} phase updated: ${phase}.`);
       return;
     }
@@ -444,8 +696,22 @@ async function startCommand(args: string[], cwd: string): Promise<void> {
     process.exit(1);
   }
 
-  const state = createSprintState(sprint, phase);
-  saveSprintState(cwd, state);
+  const initialized = initializeSprintState(cwd, createSprintState(sprint, phase));
+  if (initialized.status === 'corrupt') {
+    console.error(`Refusing to start: corrupt sprint evidence was preserved at ${relative(cwd, initialized.path)}.`);
+    process.exit(1);
+  }
+  if (initialized.status === 'existing') {
+    requireMatchingSprintOrRollover(
+      cwd,
+      initialized.state,
+      sprint,
+      `start ${formatSprintLabel(sprint)}`,
+      retryStart,
+    );
+    console.log(`Sprint ${formatSprintNumber(sprint)} state already exists (phase: ${initialized.state.phase}).`);
+    return;
+  }
   const autoClaim = await autoClaimSprint(cwd, sprint, actorOverride(args));
   console.log(`Sprint ${formatSprintNumber(sprint)} started (phase: ${phase}). Use 'slope sprint gate <name>' to mark gates; review gates require evidence options.`);
   if (autoClaim) console.log(autoClaim);
@@ -524,19 +790,32 @@ function gateCommand(args: string[], cwd: string): void {
     console.error('Error: review evidence options only apply to code_review and architect_review gates.');
     process.exit(1);
   }
+  const state = loadSprintState(cwd);
+  if (!state) {
+    console.error("No active sprint. Run 'slope sprint start --number=N' first.");
+    process.exit(1);
+  }
+
   if (isReviewGateName(gateName)) {
+    const required = isRequiredReviewGate(state, gateName);
+    const provenance = options.review?.provenance;
+    if (required && (provenance === 'self_review' || provenance === 'manual_override')) {
+      console.error(`Error: ${gateName} is a required independent review; --self-review/--override cannot silently satisfy it.`);
+      console.error(`Choose independent evidence, PR review evidence, or --waive-independent-review --reason="...".`);
+      printGateUsage(gateName);
+      process.exit(1);
+    }
+    if (!required && provenance === 'independent_review_waived') {
+      console.error(`Error: ${gateName} is not recorded as required; use --self-review --reason="..." for a weaker optional/recommended review.`);
+      printGateUsage(gateName);
+      process.exit(1);
+    }
     const validation = validateReviewGateCompletion(options.review);
     if (validation) {
       console.error(`Error: ${validation}.`);
       printGateUsage(gateName);
       process.exit(1);
     }
-  }
-
-  const state = loadSprintState(cwd);
-  if (!state) {
-    console.error("No active sprint. Run 'slope sprint start --number=N' first.");
-    process.exit(1);
   }
 
   if (state.gates[gateName] && (!isReviewGateName(gateName) || !options.review)) {
@@ -566,8 +845,12 @@ function formatReviewEvidence(review: ReviewGateState): string {
 
 function formatReviewGateStatus(state: SprintState, gate: ReviewGateName): string {
   const review = state.review_gates[gate];
+  const requirement = state.review_requirements?.[gate];
+  const requiredLabel = requirement?.priority === 'required' ? 'required independent review' : null;
   if (!state.gates[gate] || review.provenance === 'pending') {
-    return 'pending review evidence';
+    return requiredLabel
+      ? `${requiredLabel} pending; choose reviewer evidence, PR review evidence, or an explicit waiver`
+      : 'pending review evidence';
   }
 
   const validation = validateReviewGateCompletion({
@@ -587,6 +870,8 @@ function formatReviewGateStatus(state: SprintState, gate: ReviewGateName): strin
       return `pr_review; evidence=${formatReviewEvidence(review)}`;
     case 'self_review':
       return `self_review (weaker); reason=${review.notes}`;
+    case 'independent_review_waived':
+      return `required independent review WAIVED; reason=${review.notes}`;
     case 'manual_override':
       return `manual_override (weaker); reason=${review.notes}`;
   }
@@ -600,7 +885,10 @@ function statusCommand(cwd: string): void {
   }
 
   const complete = isSprintComplete(state);
-  const derivedStatus = complete ? 'ready_for_pr' : state.phase;
+  const waivedReviews = waivedReviewGateNames(state);
+  const derivedStatus = complete
+    ? waivedReviews.length > 0 ? 'ready_for_pr_with_review_waiver' : 'ready_for_pr'
+    : state.phase;
   const phaseContext = complete ? ` (phase: ${state.phase}, all gates complete)` : ` (phase: ${state.phase})`;
   console.log(`Sprint ${formatSprintNumber(state.sprint)} - status: ${derivedStatus}${phaseContext}`);
   console.log(`Started: ${state.started_at}`);
@@ -610,7 +898,9 @@ function statusCommand(cwd: string): void {
   for (const [gate, done] of Object.entries(state.gates)) {
     if (isReviewGateName(gate)) {
       const satisfied = isReviewGateSatisfied(state, gate);
-      const marker = satisfied ? '[x]' : done ? '[!]' : '[ ]';
+      const marker = satisfied
+        ? state.review_gates[gate].provenance === 'independent_review_waived' ? '[~]' : '[x]'
+        : done ? '[!]' : '[ ]';
       console.log(`  ${marker} ${gate} (${formatReviewGateStatus(state, gate)})`);
     } else {
       const marker = done ? '[x]' : '[ ]';
@@ -629,7 +919,12 @@ function statusCommand(cwd: string): void {
     });
     console.log(`\nRemaining: ${pending.join(', ')}`);
   } else {
-    console.log('\nNext: create PR for this branch; after merge, run post-merge retro.');
+    if (waivedReviews.length > 0) {
+      console.log(`\nNext: ${waivedReviews.join(', ')} has an explicit independent-review waiver.`);
+      console.log('Attach independent reviewer/PR evidence to replace the waiver, or proceed only with the recorded downgrade visible in PR guidance.');
+    } else {
+      console.log('\nNext: create PR for this branch; after merge, run post-merge retro.');
+    }
   }
 }
 
@@ -724,6 +1019,12 @@ function applyWorkflowVariableDefaults(
     const tickets = roadmapTicketKeysForSprint(cwd, sprintId);
     if (tickets.length > 0) {
       vars.tickets = tickets.join(',');
+    } else {
+      const sprintHint = sprintId ? ` for ${sprintId}` : '';
+      throw new Error(
+        `Required variable "tickets" not provided and no roadmap tickets were found${sprintHint}. ` +
+        'Provide a comma-separated/JSON ticket list or a count, for example `--var tickets=T1,T2` or `--var tickets=3`.',
+      );
     }
   }
 }
@@ -783,7 +1084,7 @@ function syncSprintStateWithWorkflow(cwd: string, sprintId: string | undefined, 
 
   const existing = loadSprintState(cwd);
   if (!existing) {
-    saveSprintState(cwd, createSprintState(sprint, nextPhase));
+    initializeSprintState(cwd, createSprintState(sprint, nextPhase));
     return;
   }
   if (existing.sprint !== sprint || existing.phase === 'complete') return;
@@ -1033,6 +1334,12 @@ function parsePortableResumeFlags(args: string[]): PortableResumeFlags {
 async function portableResumeCommand(args: string[], cwd: string): Promise<void> {
   const flags = parsePortableResumeFlags(args);
   const config = loadConfig(cwd);
+  const loadedState = loadSprintStateResult(cwd);
+  if (loadedState.status === 'corrupt') {
+    console.error(`Portable resume refused: corrupt sprint evidence was preserved at ${relative(cwd, loadedState.path)}.`);
+    process.exit(1);
+    return;
+  }
   if (flags.invalidSprint) {
     console.error(`Error: invalid sprint "${flags.invalidSprint}". Use --sprint=N, e.g. --sprint=177.`);
     process.exit(1);
@@ -1045,7 +1352,7 @@ async function portableResumeCommand(args: string[], cwd: string): Promise<void>
   }
 
   if (flags.writePointer) {
-    const current = loadSprintState(cwd);
+    const current = loadedState.status === 'valid' ? loadedState.state : null;
     const sprint = flags.sprint ?? current?.sprint;
     if (!sprint) {
       console.error('Usage: slope sprint resume --write-pointer --sprint=N [--phase=<phase>] [--output=path]');
@@ -1079,12 +1386,22 @@ async function portableResumeCommand(args: string[], cwd: string): Promise<void>
     return;
   }
 
-  const existing = loadSprintState(cwd);
-  if (existing && existing.sprint !== plan.sprint && !flags.force) {
-    console.error(`\nPortable resume refused. Local sprint-state is ${formatSprintLabel(existing.sprint)}, but resume target is ${formatSprintLabel(plan.sprint)}.`);
-    console.error('Run `slope sprint reset` or rerun with --force if replacing local state is intentional.');
-    process.exit(1);
-    return;
+  const existing = loadedState.status === 'valid' ? loadedState.state : null;
+  if (existing) {
+    const retryResume = [
+      'slope sprint resume --portable',
+      ...(flags.sprint ? [`--sprint=${formatSprintNumber(flags.sprint)}`] : []),
+      ...(flags.phase ? [`--phase=${flags.phase}`] : []),
+      ...(flags.from ? [`--from=${commandValue(flags.from)}`] : []),
+      ...(flags.force ? ['--force'] : []),
+    ].join(' ');
+    requireMatchingSprintOrRollover(
+      cwd,
+      existing,
+      plan.sprint,
+      `resume ${formatSprintLabel(plan.sprint)}`,
+      retryResume,
+    );
   }
 
   if (flags.dryRun) {
@@ -1092,10 +1409,19 @@ async function portableResumeCommand(args: string[], cwd: string): Promise<void>
     return;
   }
 
-  saveSprintState(cwd, createSprintState(plan.sprint, plan.phase));
+  if (!existing) {
+    const initialized = initializeSprintState(cwd, createSprintState(plan.sprint, plan.phase));
+    if (initialized.status !== 'created') {
+      console.error('Portable resume refused because sprint state changed concurrently; retry the command.');
+      process.exit(1);
+      return;
+    }
+  }
   const restoredClaims = await restoreResumeClaims(cwd, plan);
-  console.log(`\nPortable sprint resume complete: ${formatSprintLabel(plan.sprint)} (${plan.phase}).`);
-  console.log(`  Fresh local sprint-state written to .slope/sprint-state.json`);
+  console.log(`\nPortable sprint resume complete: ${formatSprintLabel(plan.sprint)} (${existing?.phase ?? plan.phase}).`);
+  console.log(existing
+    ? '  Existing local sprint-state and rollover lineage preserved'
+    : '  Fresh local sprint-state written to .slope/sprint-state.json');
   console.log(`  Resume claims restored: ${restoredClaims}`);
   console.log('  Local DB/locks/metrics were not imported from another machine.');
 }
@@ -1450,6 +1776,9 @@ export async function sprintCommand(args: string[]): Promise<void> {
     case 'begin':
       await beginCommand(args.slice(1), cwd);
       break;
+    case 'rollover':
+      rolloverCommand(args.slice(1), cwd);
+      break;
     case 'plan': {
       const { sprintPlanCommand } = await import('./sprint-plan.js');
       await sprintPlanCommand(args.slice(1));
@@ -1513,12 +1842,15 @@ Legacy commands:
   slope sprint start --number=N [--phase=<phase>] [--touches=<paths>] [--actor=<name>] [--force]
                                       Start sprint state tracking with pre-sprint reality checks
   slope sprint begin --sprint=N --ticket=T [--actor=<name>]  Bundled start + claim + briefing + prep (#311)
+  slope sprint rollover --from=N --to=N [--force --reason="<why>"]
+                                      Archive prior state and create the next planning state
   slope sprint plan --sprint=N [--output=path]  Generate markdown sprint plan (#312)
   slope sprint phase <phase>       Update current sprint phase
   slope sprint gate <name> [review evidence options]
                                       Mark a gate as complete
                                       Review gates require independent evidence, PR review evidence,
-                                      or explicit weaker-mode self_review/manual_override provenance
+                                      required reviews need independent evidence or an explicit
+                                      --waive-independent-review downgrade; optional reviews may use self_review
   slope sprint status                Show sprint state and gates
   slope sprint resume --portable [--from=path] [--force] [--dry-run]
                                       Reconstruct local sprint state from tracked artifacts
@@ -1528,6 +1860,7 @@ Legacy commands:
 
 Workflow commands:
   slope sprint run <id> --workflow=<name> [--var k=v ...]   Start workflow execution
+                                      tickets accepts a list/JSON array or count (tickets=3)
   slope sprint status [sprint_id]    Show workflow execution progress
   slope sprint resume <sprint_id>    Resume a paused workflow execution
   slope sprint pause <sprint_id>     Pause a running workflow execution

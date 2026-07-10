@@ -1,6 +1,6 @@
 # SLOPE Roadmap
 
-> 166 scorecards filed. Canonical planning now lives in `docs/backlog/roadmap.json`.
+> 166 scorecards filed. Canonical planning lives in `docs/roadmap/project.yaml` and its declared YAML bundles; `docs/backlog/roadmap.json` is generated compatibility output.
 > Last updated: 2026-06-27 (open GitHub issue recovery triage)
 
 Roadmap sprints are SLOPE work units: they may be time-boxed intervals, but this roadmap uses scope-based agent milestones with explicit tickets, acceptance checks, validation gates, dependencies, and artifacts.
@@ -184,4 +184,4 @@ Separate planning from execution into distinct agent roles with different models
 | Store | `packages/store-sqlite/`, `packages/store-pg/` |
 
 ### Machine-Readable Roadmap
-`docs/backlog/roadmap.json` - Consumed by `slope roadmap validate|review|status|show`. It is the canonical plan. The current tail marks S147 superseded, S153 complete for #550, and plans S216-S222 as the open-issue recovery train for #552/#553/#556/#557/#558/#561/#562/#565/#566/#572/#573.
+`docs/backlog/roadmap.json` - Generated compatibility output consumed by `slope roadmap validate|review|status|show`. Author changes through `docs/roadmap/project.yaml` and its declared YAML bundles, then run `slope roadmap compile` and `slope roadmap validate-sources`.

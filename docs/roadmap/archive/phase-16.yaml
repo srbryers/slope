@@ -1,0 +1,102 @@
+version: "1"
+phase:
+  name: Phase 16 — Assessment & Wrap-up
+  sprints:
+    - 77
+    - 79
+    - 81
+    - 82
+    - 83
+    - 84
+  note: S77/S79 plan-and-review work; S81-S84 expanded Phase 16 into harness universality (Codex/OpenCode/Pi adapters + testing polish).
+  status: complete
+sprints:
+  - id: 77
+    theme: The Convergence — Loop Self-Improvement
+    par: 3
+    slope: 3
+    type: architecture
+    tickets:
+      - key: S77-1
+        title: Backlog quality scoring — rate backlog tickets by likelihood of clean execution
+        club: short_iron
+        complexity: standard
+      - key: S77-2
+        title: Auto-generate backlog from common-issues and guard data
+        club: long_iron
+        complexity: moderate
+      - key: S77-3
+        title: Convergence metrics — track handicap improvement rate, predict plateau
+        club: short_iron
+        complexity: standard
+    depends_on:
+      - 75
+      - 76
+    status: complete
+  - id: 79
+    theme: The 19th Hole — Workflow Engine Assessment & Phase Wrap-up
+    par: 4
+    slope: 2
+    type: assessment + hardening
+    note: Capstone sprint. Assess the workflow engine's test coverage and integration health, review what shipped across the roadmap, and identify gaps before declaring the roadmap complete.
+    tickets:
+      - key: S79-1
+        title: Workflow engine test coverage audit — identify gaps vs S67/S68 test suite
+        club: wedge
+        complexity: small
+      - key: S79-2
+        title: Workflow engine E2E smoke test — full sprint lifecycle via CLI against real store
+        club: short_iron
+        complexity: standard
+      - key: S79-3
+        title: Phase retrospective — assess shipped state vs original vision, document gaps for next roadmap
+        club: short_iron
+        complexity: standard
+      - key: S79-4
+        title: CODEBASE.md and docs alignment check — ensure map reflects all shipped features
+        club: wedge
+        complexity: small
+    depends_on:
+      - 77
+      - 78
+      - 80
+    status: complete
+  - id: 81
+    theme: Universal Adapter — Codex CLI, OpenCode, cross-agent support
+    par: 4
+    slope: 1
+    type: feature
+    status: complete
+    note: stub added during roadmap reconcile — sprint shipped without an in-roadmap plan entry
+    tickets: []
+  - id: 82
+    theme: Testing Polish — Pi/OpenCode integration tests + essential guard tier
+    par: 4
+    slope: 1
+    type: test + dx
+    status: complete
+    note: stub added during roadmap reconcile — sprint shipped without an in-roadmap plan entry
+    tickets: []
+  - id: 83
+    theme: Native Pi Adapter — HarnessAdapter + init + tests
+    par: 4
+    slope: 1
+    type: feature
+    status: complete
+    note: stub added during roadmap reconcile — sprint shipped without an in-roadmap plan entry
+    tickets: []
+  - id: 84
+    theme: Pi Extension — local planner+executor harness
+    par: 4
+    slope: 1
+    type: feature
+    status: complete
+    note: stub added during roadmap reconcile — sprint shipped without an in-roadmap plan entry
+    tickets: []
+scorecards:
+  "77": docs/retros/sprint-77.json
+  "79": docs/retros/sprint-79.json
+  "81": docs/retros/sprint-81.json
+  "82": docs/retros/sprint-82.json
+  "83": docs/retros/sprint-83.json
+  "84": docs/retros/sprint-84.json

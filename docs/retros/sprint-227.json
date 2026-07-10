@@ -1,0 +1,146 @@
+{
+  "sprint_number": 227,
+  "player": "codex",
+  "theme": "Review Output Selection and Side-Effect Safety",
+  "par": 3,
+  "slope": 2,
+  "score": 3,
+  "score_label": "par",
+  "date": "2026-07-10",
+  "type": "bugfix + review",
+  "skills_used": [
+    "slope-sprint-workflow",
+    "slope:slope-sprint",
+    "github:github"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow",
+    "slope:slope-sprint",
+    "github:github"
+  ],
+  "skill_gaps_found": [],
+  "shots": [
+    {
+      "ticket_key": "S227-1",
+      "title": "Require explicit retrospective scorecard selection (#583)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Review discovers canonical scorecards centrally, permits implicit selection only when exactly one exists, supports --sprint, and fails with a concrete recovery command when history is ambiguous."
+    },
+    {
+      "ticket_key": "S227-2",
+      "title": "Scope review output and side effects to the selected sprint (#583)",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "Removing latest-card guessing also required updating the built-in workflow, completion guidance, and agent recommendations so mature repositories retained an executable command."
+        },
+        {
+          "type": "bunker",
+          "severity": "moderate",
+          "description": "Independent architecture review found that the PostToolUse guard could reintroduce cross-sprint gate mutation and that three runtime guidance surfaces still emitted the obsolete bare command. Both findings were fixed and independently re-reviewed."
+        }
+      ],
+      "notes": "Default output is adjacent to the selected scorecard, status text is emitted on stderr, and historical review generation cannot complete a different active sprint's review gate."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 2,
+    "fairways_total": 2,
+    "greens_in_regulation": 2,
+    "greens_total": 2,
+    "putts": 1,
+    "penalties": 0,
+    "hazards_hit": 2,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "wind",
+      "impact": "minor",
+      "description": "The legacy implicit-latest behavior was embedded in both the command and its workflow consumers, so the contract change needed cross-surface validation."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "A write-producing command must not infer its target from a directory containing durable history.",
+      "outcome": "Ambiguous review selection now fails closed and offers explicit path and sprint selectors."
+    },
+    {
+      "type": "lessons",
+      "description": "Artifact generation and lifecycle mutation are separate side effects with separate scope checks.",
+      "outcome": "Historical review output stays historical and does not satisfy the current sprint's gate."
+    },
+    {
+      "type": "lessons",
+      "description": "Machine-readable stdout must not be contaminated by operational status messages.",
+      "outcome": "Review markdown remains on stdout while write confirmation goes to stderr."
+    },
+    {
+      "type": "lessons",
+      "description": "A direct-command boundary fix is incomplete until hook-driven mutation paths and every generated invocation are reviewed independently.",
+      "outcome": "The independent reviewer caught and verified repairs for the PostToolUse gate path and remaining runtime consumers."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "Focused review, workflow, agent, and completion suites passed: 138 tests across six files.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "The complete Vitest suite passed after the focused contract tests.",
+      "status": "healthy"
+    },
+    {
+      "category": "build",
+      "description": "Typecheck and build passed, including packages/pi-extension.",
+      "status": "healthy"
+    },
+    {
+      "category": "slope",
+      "description": "Roadmap validation passed and review requirements were persisted before closeout.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "A small CLI ambiguity exposed a broader rule: durable historical artifacts need explicit identity at every write boundary.",
+    "advice_for_next_player": "When making selection stricter, search every generated command and workflow step that depended on the old default.",
+    "what_surprised_you": "The output-path bug and the gate-mutation bug shared the same missing selected-sprint identity.",
+    "excited_about_next": "The roadmap focus API can apply the same explicit-identity rule to bounded planning context."
+  },
+  "bunker_locations": [
+    "Never select a write target by latest-file convention when more than one durable artifact exists.",
+    "Status messages for stdout-capable commands belong on stderr.",
+    "Historical artifact generation must not mutate the active sprint unless sprint identities match.",
+    "When tightening a CLI contract, update all workflow-generated invocations in the same sprint."
+  ],
+  "yardage_book_updates": [
+    "src/cli/commands/review.ts centralizes scorecard discovery and explicit path/sprint selection.",
+    "Review output defaults beside the selected scorecard and only matching active sprint gates are updated.",
+    "Built-in workflow, agent guidance, and completion guidance pass --sprint explicitly."
+  ],
+  "course_management_notes": [
+    "Focused and full validation passed; the branch is pushed but no merge is implied.",
+    "The recommended independent architecture review requested changes, verified the follow-up, and approved the end-to-end historical/current sprint boundary."
+  ],
+  "slope_factors": [
+    "durable_artifact_identity",
+    "filesystem_side_effect_scope",
+    "stdout_stderr_contract",
+    "workflow_cli_compatibility"
+  ]
+}

@@ -1,5 +1,5 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import {
   parseRoadmap,
   validateRoadmap,
@@ -11,8 +11,14 @@ import {
   formatSprintLabel,
   formatRoadmapSummary,
   formatStrategicContext,
+  buildRoadmapFocus,
+  formatRoadmapFocus,
+  formatRoadmapSprintLabel,
+  roadmapSprintOrderValue,
   isRoadmapSprintPending,
   loadScorecards,
+  discoverScorecardFiles,
+  sprintNumberFromScorecardFile,
   loadVision,
   parseSprintNumber,
   analyzeBacklog,
@@ -22,17 +28,33 @@ import {
   generateRoadmapFromVision,
   RoadmapGenerationError,
 } from '../../core/index.js';
-import type { RoadmapDefinition, RoadmapSprint, RoadmapTicket, RoadmapClub, GolfScorecard } from '../../core/index.js';
+import type {
+  RoadmapDefinition,
+  RoadmapSprint,
+  RoadmapTicket,
+  RoadmapClub,
+  GolfScorecard,
+  RoadmapFocusEvidence,
+  RoadmapFocusHazard,
+} from '../../core/index.js';
 import { loadConfig } from '../config.js';
-import { buildRoadmapReality, formatRoadmapRealitySection } from '../pre-sprint-reality.js';
+import { buildRoadmapReality, formatRoadmapRealitySection, roadmapRealityIssues } from '../pre-sprint-reality.js';
 import { interviewCommand } from './interview.js';
+import {
+  loadRoadmapSourceStore,
+  hasModularRoadmapSources,
+  planRoadmapSourceArchive,
+  applyRoadmapSourceArchive,
+  validateRoadmapSourceStore,
+  writeRoadmapSourceProjection,
+} from '../roadmap-source-store.js';
 
 // --- Helpers ---
 
 function parseArgs(args: string[]): Record<string, string> {
   const result: Record<string, string> = {};
   for (const arg of args) {
-    const match = arg.match(/^--(\w[\w-]*)(?:=(.+))?$/);
+    const match = arg.match(/^--(\w[\w-]*)(?:=(.*))?$/);
     if (match) result[match[1]] = match[2] ?? 'true';
   }
   return result;
@@ -365,6 +387,235 @@ function statusSubcommand(flags: Record<string, string>, cwd: string): void {
   }
 }
 
+function displayPath(cwd: string, path: string): string {
+  return relative(cwd, resolve(cwd, path)).replace(/\\/g, '/');
+}
+
+function focusEvidence(
+  roadmap: RoadmapDefinition,
+  sprintId: number,
+  flags: Record<string, string>,
+  cwd: string,
+): RoadmapFocusEvidence[] {
+  const config = loadConfig(cwd);
+  const evidence: RoadmapFocusEvidence[] = [{
+    kind: 'roadmap',
+    label: 'Roadmap source',
+    ref: displayPath(cwd, resolveRoadmapPath(flags, cwd)),
+    sprint: sprintId,
+  }];
+  const selected = roadmap.sprints.find(sprint => sprint.id === sprintId);
+  const phase = roadmap.phases.find(candidate => candidate.sprints.includes(sprintId));
+  const phaseIndex = phase?.sprints.indexOf(sprintId) ?? -1;
+  const contextIds = new Set([
+    sprintId,
+    ...(selected?.depends_on ?? []),
+    ...(phaseIndex < 0 ? [] : phase!.sprints.slice(Math.max(0, phaseIndex - 2), phaseIndex)),
+  ]);
+  const contextByValue = new Map(
+    [...contextIds].map(id => [roadmapSprintOrderValue(roadmap, id), id]),
+  );
+
+  for (const path of discoverScorecardFiles(config, cwd)) {
+    const scorecardSprint = sprintNumberFromScorecardFile(path, config);
+    if (scorecardSprint == null) continue;
+    const roadmapSprintId = contextByValue.get(roadmapSprintOrderValue(roadmap, scorecardSprint));
+    if (roadmapSprintId == null) continue;
+    evidence.push({
+      kind: 'scorecard',
+      label: `${formatRoadmapSprintLabel(roadmap, roadmapSprintId)} scorecard`,
+      ref: displayPath(cwd, path),
+      sprint: roadmapSprintId,
+    });
+    const reviewPath = [scorecardSprint, roadmapSprintId]
+      .map(id => join(dirname(path), `sprint-${id}-review.md`))
+      .find(candidate => existsSync(candidate));
+    if (reviewPath) {
+      evidence.push({
+        kind: 'review',
+        label: `${formatRoadmapSprintLabel(roadmap, roadmapSprintId)} review`,
+        ref: displayPath(cwd, reviewPath),
+        sprint: roadmapSprintId,
+      });
+    }
+  }
+  return evidence;
+}
+
+function focusSubcommand(flags: Record<string, string>, cwd: string): void {
+  if (!Object.prototype.hasOwnProperty.call(flags, 'sprint') || flags.sprint === 'true') {
+    console.error('\nMissing required --sprint=N for roadmap focus.');
+    console.error('Usage: slope roadmap focus --sprint=N [--path=<file>] [--json]\n');
+    process.exit(1);
+    return;
+  }
+  const sprintId = parseSprintNumber(flags.sprint);
+  if (sprintId == null) {
+    console.error(`\nInvalid sprint number: ${flags.sprint || '(empty)'}`);
+    console.error('Usage: slope roadmap focus --sprint=N [--path=<file>] [--json]\n');
+    process.exit(1);
+    return;
+  }
+
+  const roadmap = loadRoadmapFile(flags, cwd);
+  if (!roadmap) { process.exit(1); return; }
+  const config = loadConfig(cwd);
+  const scorecards = loadScorecards(config, cwd);
+  const completedSprintIds = scorecards.map(card => card.sprint_number);
+  const hazards: RoadmapFocusHazard[] = roadmapRealityIssues(buildRoadmapReality(cwd, roadmap), sprintId)
+    .map(issue => ({
+      sprint: sprintId,
+      sprint_label: formatRoadmapSprintLabel(roadmap, sprintId),
+      type: 'roadmap_reality',
+      severity: issue.type === 'error' ? 'major' : 'minor',
+      description: issue.message,
+    }));
+  const focus = buildRoadmapFocus(roadmap, sprintId, {
+    completedSprintIds,
+    hazards,
+    scorecards,
+    evidence: focusEvidence(roadmap, sprintId, flags, cwd),
+  });
+  if (!focus) {
+    console.error(`\nSprint ${formatRoadmapSprintLabel(roadmap, sprintId)} was not found in the roadmap.\n`);
+    process.exit(1);
+    return;
+  }
+
+  if (flags.json === 'true') {
+    console.log(JSON.stringify(focus, null, 2));
+  } else {
+    console.log(formatRoadmapFocus(focus).trimEnd());
+  }
+}
+
+function compileSourcesSubcommand(flags: Record<string, string>, cwd: string): void {
+  try {
+    const store = loadRoadmapSourceStore(cwd, flags.source);
+    const validation = validateRoadmapSourceStore(store, { checkProjection: false });
+    if (!validation.valid) {
+      throw new Error([
+        'Modular roadmap sources are invalid:',
+        ...validation.errors.map(issue => `  - ${issue.source ? `${issue.source}: ` : ''}${issue.message}`),
+        'Run `slope roadmap validate-sources` for the full report.',
+      ].join('\n'));
+    }
+    const existing = existsSync(store.outputPath) ? readFileSync(store.outputPath, 'utf8') : null;
+    const changed = existing !== store.projection;
+    const output = displayPath(cwd, store.outputPath);
+
+    if (flags.check === 'true') {
+      if (changed) {
+        throw new Error(
+          `Roadmap projection drift: ${output}. Run \`slope roadmap compile\` to regenerate it from modular sources.`,
+        );
+      }
+      console.log(`\nRoadmap projection is current: ${output}\n`);
+      return;
+    }
+    if (flags['dry-run'] === 'true') {
+      console.log(`\nRoadmap compile dry run: ${changed ? 'would write' : 'already current'} ${output}`);
+      console.log(`  Sources: ${store.sources.length}; phases: ${store.roadmap.phases.length}; sprints: ${store.roadmap.sprints.length}\n`);
+      return;
+    }
+
+    const result = writeRoadmapSourceProjection(store);
+    console.log(`\nRoadmap projection ${result}: ${output}`);
+    console.log(`  Sources: ${store.sources.length}; phases: ${store.roadmap.phases.length}; sprints: ${store.roadmap.sprints.length}\n`);
+  } catch (error) {
+    console.error(`\n${(error as Error).message}\n`);
+    process.exit(1);
+  }
+}
+
+function validateSourcesSubcommand(flags: Record<string, string>, cwd: string): void {
+  const explicitSource = Object.prototype.hasOwnProperty.call(flags, 'source');
+  let sourceExists: boolean;
+  try {
+    sourceExists = hasModularRoadmapSources(cwd, flags.source);
+  } catch (error) {
+    console.error(`\n${(error as Error).message}\n`);
+    process.exit(1);
+    return;
+  }
+  if (!sourceExists) {
+    if (explicitSource) {
+      console.error(`\nModular roadmap manifest not found: ${flags.source || '(empty)'}\n`);
+      process.exit(1);
+      return;
+    }
+    console.log('\nSingle-file roadmap mode; run `slope roadmap validate` for docs/backlog/roadmap.json.\n');
+    return;
+  }
+
+  let store;
+  try {
+    store = loadRoadmapSourceStore(cwd, flags.source);
+  } catch (error) {
+    console.error(`\n${(error as Error).message}\n`);
+    process.exit(1);
+    return;
+  }
+  const validation = validateRoadmapSourceStore(store);
+  console.log(`\nModular roadmap sources: ${displayPath(cwd, store.manifestPath)}`);
+  console.log('═'.repeat(40));
+  if (validation.valid) {
+    console.log('\n✓ Modular sources and compiled projection are valid');
+  } else {
+    console.log(`\n✗ ${validation.errors.length} source error${validation.errors.length === 1 ? '' : 's'} found`);
+  }
+  for (const issue of validation.errors) {
+    console.log(`  ✗ ${issue.source ? `[${issue.source}] ` : ''}${issue.message}`);
+  }
+  for (const issue of validation.warnings) {
+    console.log(`  ⚠ ${issue.source ? `[${issue.source}] ` : ''}${issue.message}`);
+  }
+  console.log(`\n  Sources: ${store.sources.length}; phases: ${store.roadmap.phases.length}; sprints: ${store.roadmap.sprints.length}\n`);
+  if (!validation.valid) process.exit(1);
+}
+
+function archiveSourcesSubcommand(flags: Record<string, string>, cwd: string): void {
+  if (!Object.prototype.hasOwnProperty.call(flags, 'through') || flags.through === 'true') {
+    console.error('\nMissing required --through=N for roadmap archive.');
+    console.error('Usage: slope roadmap archive --through=N [--source=<file>] [--dry-run]\n');
+    process.exit(1);
+    return;
+  }
+  const through = parseSprintNumber(flags.through);
+  if (through == null) {
+    console.error(`\nInvalid archive boundary: ${flags.through || '(empty)'}\n`);
+    process.exit(1);
+    return;
+  }
+
+  try {
+    const store = loadRoadmapSourceStore(cwd, flags.source);
+    const projectionBefore = existsSync(store.outputPath) ? readFileSync(store.outputPath, 'utf8') : null;
+    const plan = planRoadmapSourceArchive(store, through);
+    console.log(`\nRoadmap archive through Sprint ${through}:`);
+    if (plan.moves.length === 0) {
+      console.log('  No complete live phases are eligible.\n');
+      return;
+    }
+    for (const move of plan.moves) console.log(`  ${move.from} -> ${move.to}`);
+    if (flags['dry-run'] === 'true') {
+      console.log('\n  --dry-run: source files, manifest, and projection are unchanged.\n');
+      return;
+    }
+
+    applyRoadmapSourceArchive(store, plan);
+    const reloaded = loadRoadmapSourceStore(cwd, flags.source);
+    const validation = validateRoadmapSourceStore(reloaded);
+    if (!validation.valid || readFileSync(reloaded.outputPath, 'utf8') !== projectionBefore) {
+      throw new Error('Archive verification failed: compiled projection changed or archived evidence is invalid.');
+    }
+    console.log(`\n  Archived ${plan.moves.length} phase source${plan.moves.length === 1 ? '' : 's'}; compatibility projection unchanged.\n`);
+  } catch (error) {
+    console.error(`\n${(error as Error).message}\n`);
+    process.exit(1);
+  }
+}
+
 function printFullRoadmapStatus(
   roadmap: RoadmapDefinition,
   currentSprint: number,
@@ -560,7 +811,39 @@ function mergeScorecardTickets(existingTickets: RoadmapTicket[], scorecardTicket
   });
 }
 
+function modularAuthorityBlocksProjectionMutation(
+  flags: Record<string, string>,
+  cwd: string,
+  action: 'sync' | 'generate',
+): boolean {
+  let defaultExists = false;
+  let explicitExists = false;
+  try {
+    defaultExists = hasModularRoadmapSources(cwd);
+    if (!defaultExists && Object.prototype.hasOwnProperty.call(flags, 'source')) {
+      explicitExists = hasModularRoadmapSources(cwd, flags.source);
+    }
+  } catch (error) {
+    console.error(`\n${(error as Error).message}\n`);
+    process.exit(1);
+    return true;
+  }
+
+  if (!defaultExists && Object.prototype.hasOwnProperty.call(flags, 'source') && !explicitExists) {
+    console.error(`\nModular roadmap manifest not found: ${flags.source || '(empty)'}\n`);
+    process.exit(1);
+    return true;
+  }
+  if (!defaultExists && !explicitExists) return false;
+
+  console.error(`\nModular roadmap sources are authoritative; \`roadmap ${action}\` cannot edit the generated projection.`);
+  console.error('Update the source YAML and run `slope roadmap compile`.\n');
+  process.exit(1);
+  return true;
+}
+
 function syncSubcommand(flags: Record<string, string>, cwd: string): void {
+  if (modularAuthorityBlocksProjectionMutation(flags, cwd, 'sync')) return;
   const dryRun = flags['dry-run'] === 'true';
   const path = resolveRoadmapPath(flags, cwd);
   const config = loadConfig(cwd);
@@ -636,6 +919,7 @@ function syncSubcommand(flags: Record<string, string>, cwd: string): void {
 }
 
 async function generateSubcommand(flags: Record<string, string>, cwd: string): Promise<void> {
+  if (modularAuthorityBlocksProjectionMutation(flags, cwd, 'generate')) return;
   const vision = loadVision(cwd);
   if (!vision) {
     console.error('\nNo vision found. Create one first:');
@@ -735,6 +1019,18 @@ export async function roadmapCommand(args: string[]): Promise<void> {
     case 'status':
       statusSubcommand(flags, cwd);
       break;
+    case 'focus':
+      focusSubcommand(flags, cwd);
+      break;
+    case 'compile':
+      compileSourcesSubcommand(flags, cwd);
+      break;
+    case 'validate-sources':
+      validateSourcesSubcommand(flags, cwd);
+      break;
+    case 'archive':
+      archiveSourcesSubcommand(flags, cwd);
+      break;
     case 'show':
       showSubcommand(flags, cwd);
       break;
@@ -756,13 +1052,20 @@ Usage:
   slope roadmap validate [--path=<file>]     Schema + dependency graph checks
   slope roadmap review [--path=<file>]       Automated architect review
   slope roadmap status [--path=<file>] [--sprint=N] [--full]  Compact current progress
+  slope roadmap focus --sprint=N [--path=<file>] [--json]     Bounded sprint context
+  slope roadmap compile [--source=<file>] [--dry-run|--check] Compile modular YAML sources
+  slope roadmap validate-sources [--source=<file>]            Validate sources and projection drift
+  slope roadmap archive --through=N [--source=<file>] [--dry-run] Archive whole terminal phases
   slope roadmap show [--path=<file>]         Render summary (critical path, parallel tracks)
   slope roadmap sync [--path=<file>] [--dry-run]     Sync scorecards into roadmap
   slope roadmap generate [--path=<file>] [--dry-run] Generate from vision + concrete backlog signals
 
 Options:
   --path=<file>    Path to roadmap JSON (default: docs/backlog/roadmap.json)
-  --sprint=N       Override current sprint number (for status)
+  --sprint=N       Select a sprint (required for focus; override for status)
+  --json           Emit machine-readable focus JSON
+  --source=<file>  Modular roadmap manifest (default: docs/roadmap/project.yaml)
+  --check          Fail when the compiled roadmap projection has drifted
   --full           Show full roadmap history for status
   --dry-run        Show what would change without writing (for sync and generate)
 

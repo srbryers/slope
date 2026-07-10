@@ -1,0 +1,127 @@
+version: "1"
+phase:
+  name: Phase 10 — Adoption & Onboarding
+  sprints:
+    - 61
+    - 62
+    - 63
+    - 64
+  status: complete
+sprints:
+  - id: 61
+    theme: The Terminal Caddy — OB1 Adapter
+    par: 3
+    slope: 1
+    type: feature
+    status: complete
+    score: 2
+    score_label: birdie
+    tickets:
+      - key: S61-1
+        title: OB1Adapter implementing HarnessAdapter interface
+        club: short_iron
+        complexity: standard
+      - key: S61-2
+        title: Registry + barrel registration, init --ob1, doctor MCP check
+        club: wedge
+        complexity: small
+      - key: S61-3
+        title: Test suite for OB1Adapter + init MCP tests
+        club: wedge
+        complexity: small
+  - id: 62
+    theme: The Welcome Mat v2 + Templates — Streamlined First-Run Experience
+    par: 5
+    slope: 1
+    type: dx
+    status: complete
+    score: 5
+    score_label: par
+    tickets:
+      - key: S62-0
+        title: Sprint & ticket templates — standard templates for sprint plans and tickets
+        club: short_iron
+        complexity: standard
+      - key: S62-1
+        title: Auto-detect coding harness during init (env vars, CLI, project files)
+        club: short_iron
+        complexity: standard
+      - key: S62-2
+        title: Install relevant harness plugin/adapter based on detected harness
+        club: short_iron
+        complexity: standard
+      - key: S62-3
+        title: slope init --migrate — upgrade config from older SLOPE versions
+        club: wedge
+        complexity: small
+      - key: S62-4
+        title: Post-init validation — run doctor checks after init to confirm setup
+        club: putter
+        complexity: trivial
+  - id: 63
+    theme: The Handbook + Template Integration — CLI Help & Documentation Polish
+    par: 5
+    slope: 1
+    type: docs + dx
+    status: complete
+    score: 3
+    score_label: eagle
+    tickets:
+      - key: S63-1
+        title: slope help <command> — detailed usage, examples, and flags for each command
+        club: short_iron
+        complexity: standard
+      - key: S63-2
+        title: slope quickstart — interactive tutorial for new users
+        club: short_iron
+        complexity: standard
+      - key: S63-3
+        title: Guard documentation — explain each guard's purpose, triggers, and config
+        club: wedge
+        complexity: small
+      - key: S63-4
+        title: Integrate ticket templates into sprint-checklist.md
+        club: wedge
+        complexity: small
+      - key: S63-5
+        title: Update CLAUDE.md and harness context files for templates and slope plan
+        club: wedge
+        complexity: small
+      - key: S63-6
+        title: slope plan --sprint=N — show full ticket specs from roadmap
+        club: short_iron
+        complexity: standard
+  - id: 64
+    theme: Claim Hygiene, Worktree Safety & Loop Planner Context
+    par: 5
+    slope: 1
+    type: bug fix + guard + feature
+    status: complete
+    score: 5
+    score_label: par
+    tickets:
+      - key: S64-1
+        title: "Fix stale claims: session cleanup parity + expiry filtering"
+        club: short_iron
+        complexity: standard
+      - key: S64-2
+        title: "worktree-self-remove guard: block git worktree remove on own cwd"
+        club: wedge
+        complexity: small
+      - key: S64-3
+        title: slope worktree cleanup CLI command
+        club: short_iron
+        complexity: standard
+      - key: S64-4
+        title: slope prep --lite — hazards + similar tickets without embedding index
+        club: wedge
+        complexity: small
+      - key: S64-5
+        title: Pass prep-plan-discovered files as Aider --file flags
+        club: wedge
+        complexity: small
+scorecards:
+  "61": docs/retros/sprint-61.json
+  "62": docs/retros/sprint-62.json
+  "63": docs/retros/sprint-63.json
+  "64": docs/retros/sprint-64.json

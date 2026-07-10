@@ -1,0 +1,47 @@
+version: "1"
+phase:
+  name: Phase 24 — Sprint State Inference
+  sprints:
+    - 95
+  status: complete
+  note: "Resolve #364 by making roadmap-inserted sub-sprints and missing active state explicit in next/status/briefing and guard guidance."
+sprints:
+  - id: 95
+    theme: Inserted Sprint Recovery — make next/status respect sub-sprints
+    par: 4
+    slope: 2
+    type: bug fix + dx
+    status: complete
+    depends_on:
+      - 94
+    note: "Scope for #364. Prevent agents from falling through to scorecard+1 when a pending inserted roadmap sprint like id 435 / S43.5 is the real work context but no active sprint state exists."
+    tickets:
+      - key: S95-1
+        title: Normalize and display inserted sprint identifiers like roadmap id 435 as S43.5 (#364)
+        club: short_iron
+        complexity: standard
+        github_issue: 364
+      - key: S95-2
+        title: Teach slope next/status/briefing to prefer pending inserted roadmap sprints over scorecard+1 fallback (#364)
+        club: short_iron
+        complexity: standard
+        github_issue: 364
+        depends_on:
+          - S95-1
+      - key: S95-3
+        title: Warn when branch/roadmap/commit context implies a sprint but no active sprint state exists (#364)
+        club: short_iron
+        complexity: standard
+        github_issue: 364
+        depends_on:
+          - S95-1
+      - key: S95-4
+        title: Document and test starting, claiming, and scorecarding inserted sub-sprints (#364)
+        club: wedge
+        complexity: small
+        github_issue: 364
+        depends_on:
+          - S95-1
+          - S95-2
+scorecards:
+  "95": docs/retros/sprint-95.json

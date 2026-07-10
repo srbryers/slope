@@ -1,0 +1,76 @@
+version: "1"
+phase:
+  name: Phase 20 — Architecture & Automation
+  sprints:
+    - 90
+    - 91
+  status: complete
+  note: "Memory↔store reunification (architectural debt from PR #293) + automation hooks for PR/issue/branch hygiene."
+sprints:
+  - id: 90
+    theme: The Vault — Memory ↔ Store Reunification
+    par: 4
+    slope: 2
+    type: refactor + architecture
+    status: complete
+    depends_on: []
+    note: "Address PR #293 architect finding A1: memory system bypasses store abstraction. Requires extending store interface and migrating memory module across both store backends."
+    tickets:
+      - key: S90-1
+        title: Extend store interface with memory operations (#294)
+        club: short_iron
+        complexity: standard
+        github_issue: 294
+      - key: S90-2
+        title: Implement memory ops in store-sqlite + store-pg
+        club: long_iron
+        complexity: multi_package
+        github_issue: 294
+        depends_on:
+          - S90-1
+      - key: S90-3
+        title: Migrate memory module to use store interface
+        club: short_iron
+        complexity: standard
+        github_issue: 294
+        depends_on:
+          - S90-2
+      - key: S90-4
+        title: Migration script + tests + cleanup of legacy memory paths
+        club: short_iron
+        complexity: standard
+        github_issue: 294
+        depends_on:
+          - S90-3
+  - id: 91
+    theme: The Pit Crew — Automation Hooks
+    par: 4
+    slope: 1
+    type: feature + automation
+    status: complete
+    depends_on: []
+    note: "Hook-based automation: PR review prompts, issue auto-close, branch hygiene. Pairs nicely with S86 drift detection but doesn't depend on it."
+    tickets:
+      - key: S91-1
+        title: PostPRCreate hook — auto-trigger review-loop recommendation (#302)
+        club: short_iron
+        complexity: standard
+        github_issue: 302
+      - key: S91-2
+        title: Auto-close GH issues from fix commits — convention or hook (#321)
+        club: short_iron
+        complexity: standard
+        github_issue: 321
+      - key: S91-3
+        title: Branch hygiene automation in slope doctor (#322)
+        club: short_iron
+        complexity: standard
+        github_issue: 322
+      - key: S91-4
+        title: vision create — tracked Markdown output (#305)
+        club: wedge
+        complexity: small
+        github_issue: 305
+scorecards:
+  "90": docs/retros/sprint-90.json
+  "91": docs/retros/sprint-91.json

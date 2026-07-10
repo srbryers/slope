@@ -12,20 +12,23 @@ The SLOPE framework organizes sprint work into a hierarchy of routines, mirrorin
 
 Before starting a new phase or project:
 
-1. **Build the roadmap** — Create `docs/backlog/roadmap.json` with sprints, dependencies, and phases
-2. **Run `slope roadmap validate`** — Check for dependency cycles, numbering gaps
-3. **Run `slope roadmap review`** — Scope balance, critical path, bottlenecks
-4. **Run `slope roadmap show`** — Dependency graph and parallel tracks
+1. **Build the roadmap** — Edit declared YAML bundles when `docs/roadmap/project.yaml` exists; otherwise create `docs/backlog/roadmap.json`
+2. **Compile modular sources** — Run `slope roadmap compile`, `slope roadmap validate-sources`, and `slope roadmap compile --check`
+3. **Run `slope roadmap validate`** — Check for dependency cycles, numbering gaps
+4. **Run `slope roadmap review`** — Scope balance, critical path, bottlenecks
+5. **Run `slope roadmap show`** — Dependency graph and parallel tracks
 
 ## Pre-Round Routine (Sprint Start)
 
 Before writing any code in a new sprint:
 
-1. **Run `slope briefing`** — Outputs handicap snapshot, hazard index, nutrition alerts, filtered gotchas, and session continuity
+1. **Run `slope now`** — Discover the current sprint and next action
+2. **Run `slope roadmap focus --sprint=N`** — Use the discovered sprint to load bounded context before full history
+3. **Run `slope briefing`** — Outputs handicap snapshot, hazard index, nutrition alerts, filtered gotchas, and session continuity
    - Use `--categories=testing,api` or `--keywords=migration` to filter for the sprint's work area
-2. **Verify previous scorecard exists** — If the last sprint's scorecard wasn't created, create it now
-3. **Branch hygiene check** — `git branch -a` to confirm no stale branches remain
-4. **Set par and slope** — Par from ticket count (1-2=3, 3-4=4, 5+=5), slope from complexity factors
+4. **Verify previous scorecard exists** — If the last sprint's scorecard wasn't created, create it now
+5. **Branch hygiene check** — `git branch -a` to confirm no stale branches remain
+6. **Set par and slope** — Par from ticket count (1-2=3, 3-4=4, 5+=5), slope from complexity factors
 
 ## Pre-Shot Routine (Per-Ticket, Before Code)
 

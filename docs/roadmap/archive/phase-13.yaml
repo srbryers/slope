@@ -1,0 +1,88 @@
+version: "1"
+phase:
+  name: Phase 13 — Multi-Project & Teams
+  sprints:
+    - 70
+    - 71
+    - 72
+  status: complete
+sprints:
+  - id: 70
+    theme: The Replay — Session Insights & Debugging
+    par: 4
+    slope: 2
+    type: feature
+    tickets:
+      - key: S70-1
+        title: Enhanced transcript viewer — filter by tool, show timing, highlight errors
+        club: short_iron
+        complexity: standard
+      - key: S70-2
+        title: Session replay summary — auto-generate narrative of what happened
+        club: long_iron
+        complexity: moderate
+      - key: S70-3
+        title: Compaction event tracking — log what was lost and recovered
+        club: wedge
+        complexity: small
+      - key: S70-4
+        title: Guard fire log — persistent record of every guard decision per session
+        club: wedge
+        complexity: small
+    depends_on:
+      - 66
+    status: complete
+  - id: 71
+    theme: The Intake Desk — Agent-Native Project Interview
+    par: 5
+    slope: 2
+    type: feature + dx
+    tickets:
+      - key: S71-1
+        title: Interview state machine refactor — extract UI-agnostic state machine from interview-steps.ts
+        club: long_iron
+        complexity: moderate
+      - key: S71-2
+        title: slope interview CLI command with --agent JSON mode and human @clack mode
+        club: short_iron
+        complexity: standard
+      - key: S71-3
+        title: Pi extension slope_interview tool using ctx.ui dialogs and state machine
+        club: short_iron
+        complexity: standard
+      - key: S71-4
+        title: Auto-transition fresh → active after interview completion
+        club: wedge
+        complexity: small
+      - key: S71-5
+        title: Test coverage for state machine, CLI JSON mode, Pi tool, and fresh→active flow
+        club: wedge
+        complexity: small
+    status: complete
+  - id: 72
+    theme: The Clubhouse Network — Multi-Repo Aggregation
+    par: 4
+    slope: 3
+    type: architecture
+    tickets:
+      - key: S72-1
+        title: Cross-repo scorecard collection — aggregate from multiple .slope/ directories
+        club: long_iron
+        complexity: moderate
+      - key: S72-2
+        title: Org-level handicap card — compute combined stats across repos
+        club: short_iron
+        complexity: standard
+      - key: S72-3
+        title: slope org status — show all repos, their handicaps, and active sprints
+        club: short_iron
+        complexity: standard
+      - key: S72-4
+        title: Cross-repo common-issues — promote patterns that appear in multiple repos
+        club: wedge
+        complexity: small
+    status: complete
+scorecards:
+  "70": docs/retros/sprint-70.json
+  "71": docs/retros/sprint-71.json
+  "72": docs/retros/sprint-72.json

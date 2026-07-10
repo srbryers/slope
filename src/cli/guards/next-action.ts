@@ -244,7 +244,7 @@ export function buildSuggestionObject(state: SprintState): Suggestion {
         title: 'Next Action',
         context: `Sprint ${state.sprintNumber} has a scorecard but no review`,
         options: [
-          { id: 'review', label: 'Generate sprint review', command: 'slope review' },
+          { id: 'review', label: 'Generate sprint review', command: `slope review --sprint=${state.sprintNumber}` },
           { id: 'distill', label: 'Distill learnings', command: 'slope distill --auto' },
           { id: 'end', label: 'End session', description: 'Nothing more to do right now' },
         ],

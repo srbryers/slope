@@ -239,7 +239,7 @@ describe('agent status (GH #310)', () => {
     expect(status.phase).toBe('scoring');
     expect(status.requiredGates).toEqual(['scorecard', 'review_md']);
     expect(status.recommendedCommands).toContain('slope auto-card --sprint=8');
-    expect(status.recommendedCommands).toContain('slope review');
+    expect(status.recommendedCommands).toContain('slope review --sprint=8');
   });
 
   it('keeps review gates pending when sprint-state booleans lack evidence', async () => {

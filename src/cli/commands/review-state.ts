@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import type { CodificationCost, CodificationStatus, ReviewFinding, ReviewType, HazardSeverity } from '../../core/types.js';
+import type { CodificationCost, CodificationStatus, ReviewFinding, ReviewRecommendation, ReviewType, HazardSeverity } from '../../core/types.js';
 import { recommendReviews, amendScorecardWithFindings } from '../../core/review.js';
 import { loadConfig, detectLatestSprint, normalizeScorecard, parseSprintNumber } from '../../core/index.js';
 import { createDeferred, listDeferred, resolveDeferred } from '../../core/deferred.js';
@@ -22,7 +22,7 @@ export type { FindingsFile } from '../../core/findings.js';
 import type { RoadmapSprint, SlopeConfig } from '../../core/index.js';
 import { findPlanContent, countTickets, countPackageRefs } from '../guards/plan-analysis.js';
 import { inferSprintContext, loadRoadmapForInference } from '../sprint-inference.js';
-import { isActiveSprintState, loadSprintState } from '../sprint-state.js';
+import { isActiveSprintState, loadSprintState, updateReviewRequirements, type ReviewGateRequirementInput } from '../sprint-state.js';
 import { buildReviewerAgentSpecs, formatReviewerAgentGuidance } from '../reviewer-agents.js';
 
 export interface ReviewState {
@@ -337,6 +337,11 @@ function recommendCommand(args: string[], cwd: string): void {
   const context = inferRecommendationContext(args, cwd);
   const recs = recommendReviews(context);
 
+  const requirementInputs = reviewRequirementInputs(recs);
+  const recorded = context.sprintNumber > 0
+    ? updateReviewRequirements(cwd, context.sprintNumber, requirementInputs)
+    : false;
+
   const sprintLabel = context.sprintNumber > 0 ? ` for Sprint ${context.sprintNumber}` : '';
   console.log(`Recommended reviews${sprintLabel} (${context.ticketCount} ticket${context.ticketCount !== 1 ? 's' : ''}, slope ${context.slope}):\n`);
   console.log('  Type           Priority      Reason');
@@ -344,6 +349,9 @@ function recommendCommand(args: string[], cwd: string): void {
     const type = rec.review_type.padEnd(14);
     const priority = rec.priority.padEnd(13);
     console.log(`  ${type} ${priority} ${rec.reason}`);
+  }
+  if (recorded) {
+    console.log(`\nReview requirements recorded in Sprint ${context.sprintNumber} state.`);
   }
 
   const reviewerAgents = buildReviewerAgentSpecs(recs, {
@@ -355,6 +363,42 @@ function recommendCommand(args: string[], cwd: string): void {
   });
   const guidance = formatReviewerAgentGuidance(reviewerAgents);
   if (guidance) console.log(`\n${guidance}`);
+}
+
+const REVIEW_PRIORITY_RANK: Record<ReviewRecommendation['priority'], number> = {
+  optional: 1,
+  recommended: 2,
+  required: 3,
+};
+
+function strongestRecommendation(recommendations: ReviewRecommendation[]): ReviewRecommendation | undefined {
+  return recommendations.reduce<ReviewRecommendation | undefined>((strongest, current) => {
+    if (!strongest || REVIEW_PRIORITY_RANK[current.priority] > REVIEW_PRIORITY_RANK[strongest.priority]) return current;
+    return strongest;
+  }, undefined);
+}
+
+function reviewRequirementInputs(recommendations: ReviewRecommendation[]): ReviewGateRequirementInput[] {
+  const architect = strongestRecommendation(recommendations.filter(rec => rec.review_type === 'architect'));
+  const code = strongestRecommendation(recommendations.filter(rec => rec.review_type !== 'architect'));
+  const inputs: ReviewGateRequirementInput[] = [];
+  if (architect) {
+    inputs.push({
+      gate: 'architect_review',
+      priority: architect.priority,
+      reason: architect.reason,
+      source: 'review_recommend',
+    });
+  }
+  if (code) {
+    inputs.push({
+      gate: 'code_review',
+      priority: code.priority,
+      reason: code.reason,
+      source: 'review_recommend',
+    });
+  }
+  return inputs;
 }
 
 // --- Findings Subcommands ---
@@ -828,12 +872,12 @@ Run a structured review pass on the current sprint plan or PR. Pass
       break;
     default:
       console.log(`Usage:
-  slope review [scorecard.json] [--plain] [--metaphor=<name>]
+  slope review [scorecard.json | --sprint=N] [--plain] [--metaphor=<name>]
   slope review <subcommand> [options]
 
 Retrospective:
-  Format sprint retrospective markdown from a scorecard. Defaults to the
-  latest scorecard when no scorecard path is provided.
+  Format sprint retrospective markdown from a scorecard. When a project has
+  multiple scorecards, pass an explicit path or --sprint so SLOPE never guesses.
 
 Subcommands:
   start       Start a review (auto-detects tier or use --rounds/--tier)

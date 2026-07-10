@@ -6,14 +6,27 @@
 /** Club selection for a roadmap ticket (mirrors core ClubSelection) */
 export type RoadmapClub = 'driver' | 'long_iron' | 'short_iron' | 'wedge' | 'putter';
 
+/** Canonical values plus bounded aliases retained by pre-schema roadmap history. */
+export type RoadmapTicketComplexity =
+  | 'trivial'
+  | 'small'
+  | 'standard'
+  | 'moderate'
+  | 'multi_package'
+  | 'multi-package'
+  | 'risky';
+
 /** A single ticket within a sprint */
 export interface RoadmapTicket {
   key: string;           // e.g., "S7-1"
   id?: string;           // accepted alias for external roadmap inputs
   title: string;
   club: RoadmapClub;
-  complexity: 'trivial' | 'small' | 'standard' | 'moderate';
+  complexity: RoadmapTicketComplexity;
   depends_on?: string[]; // ticket keys (intra-sprint or cross-sprint)
+  /** New tickets use one issue; legacy history may retain multiple issue links. */
+  github_issue?: number | number[];
+  note?: string;
 }
 
 /** A sprint within the roadmap */
@@ -25,12 +38,23 @@ export interface RoadmapSprint {
   type: string;          // e.g., "architecture + methodology"
   tickets: RoadmapTicket[];
   depends_on?: number[]; // sprint IDs this sprint depends on
+  status?: string;
+  note?: string;
+  outcome?: string;
+  phase?: string;
+  wave?: string;
+  artifacts?: string[];
+  expected_artifacts?: string[];
+  research?: string[];
 }
 
 /** A phase grouping sprints */
 export interface RoadmapPhase {
   name: string;          // e.g., "Phase 1 — Foundation"
   sprints: number[];     // sprint IDs in this phase
+  description?: string;
+  status?: string;
+  note?: string;
 }
 
 /** Top-level roadmap definition */
@@ -135,10 +159,23 @@ export function nextCanonicalSprintId(id: number): number {
   return id + 1;
 }
 
+export const ROADMAP_TERMINAL_STATUSES = new Set([
+  'complete',
+  'superseded',
+  'skipped',
+  'cancelled',
+  'cancelled-absorbed',
+  'absorbed',
+]);
+
+/** Return true when a roadmap sprint has a durable terminal disposition. */
+export function isRoadmapSprintTerminal(sprint: RoadmapSprint): boolean {
+  return ROADMAP_TERMINAL_STATUSES.has(sprint.status ?? '');
+}
+
 /** Return true when a roadmap sprint should still be considered selectable work. */
 export function isRoadmapSprintPending(sprint: RoadmapSprint): boolean {
-  const status = (sprint as RoadmapSprint & { status?: string }).status;
-  return status !== 'complete' && status !== 'superseded';
+  return !isRoadmapSprintTerminal(sprint);
 }
 
 type RoadmapTicketInput = Partial<RoadmapTicket> & { id?: unknown; key?: unknown };
@@ -168,6 +205,36 @@ function normalizeRoadmap(roadmap: RoadmapDefinition): RoadmapDefinition {
   };
 }
 
+/** Resolve legacy encoded half-sprint IDs using evidence from one roadmap. */
+export function isEncodedInsertedSprintInRoadmap(roadmap: RoadmapDefinition, id: number): boolean {
+  if (!isEncodedInsertedSprintId(id)) return false;
+
+  const sprintIds = new Set(roadmap.sprints.map(sprint => sprint.id));
+  const sprint = roadmap.sprints.find(candidate => candidate.id === id);
+  const canonicalPrefix = `S${id}-`;
+  const encodedPrefix = `${formatSprintLabel(id)}-`;
+  const ticketKeys = sprint?.tickets.map(getRoadmapTicketKey).filter((key): key is string => key !== null) ?? [];
+
+  if (ticketKeys.some(key => key.startsWith(canonicalPrefix))) return false;
+  if (ticketKeys.some(key => key.startsWith(encodedPrefix))) return true;
+  if (sprintIds.has(id - 1) || sprintIds.has(id + 1)) return false;
+
+  const base = Math.floor(id / 10);
+  return sprintIds.has(base) || sprintIds.has(base + 1);
+}
+
+export function roadmapSprintOrderValue(roadmap: RoadmapDefinition, id: number): number {
+  return isEncodedInsertedSprintInRoadmap(roadmap, id) ? sprintOrderValue(id) : id;
+}
+
+export function compareRoadmapSprintIds(roadmap: RoadmapDefinition, a: number, b: number): number {
+  return roadmapSprintOrderValue(roadmap, a) - roadmapSprintOrderValue(roadmap, b);
+}
+
+export function formatRoadmapSprintLabel(roadmap: RoadmapDefinition, id: number): string {
+  return isEncodedInsertedSprintInRoadmap(roadmap, id) ? formatSprintLabel(id) : `S${id}`;
+}
+
 /** Validate a roadmap definition for structural correctness.
  *  Optionally cross-check sprint status against scorecards and/or shipped
  *  sprint commits on main when provided. Caller is responsible for collecting
@@ -182,32 +249,8 @@ export function validateRoadmap(
   const warnings: RoadmapValidationWarning[] = [];
   const sprintIds = new Set(roadmap.sprints.map(s => s.id));
 
-  const sprintById = new Map(roadmap.sprints.map(sprint => [sprint.id, sprint]));
-
-  // Context-aware encoding guard. The pure helper isEncodedInsertedSprintId
-  // treats every 3-digit id >=200 ending in 5 as a legacy half-sprint
-  // (435 => S43.5). That is ambiguous against ordinary sprint numbers
-  // (S205..S995 also end in 5). Within a roadmap we have context: ticket
-  // prefixes are the strongest signal, immediate canonical neighbours
-  // (S204/S206) indicate a real canonical sprint, and base sprint neighbours
-  // (S43/S44) indicate the genuine legacy S43.5 insertion case.
-  const decodesAsHalf = (id: number): boolean => {
-    if (!isEncodedInsertedSprintId(id)) return false;
-
-    const sprint = sprintById.get(id);
-    const canonicalPrefix = `S${id}-`;
-    const encodedPrefix = `${formatSprintLabel(id)}-`;
-    const ticketKeys = sprint?.tickets.map(getRoadmapTicketKey).filter((key): key is string => key !== null) ?? [];
-
-    if (ticketKeys.some(key => key.startsWith(canonicalPrefix))) return false;
-    if (ticketKeys.some(key => key.startsWith(encodedPrefix))) return true;
-    if (sprintIds.has(id - 1) || sprintIds.has(id + 1)) return false;
-
-    const base = Math.floor(id / 10);
-    return sprintIds.has(base) || sprintIds.has(base + 1);
-  };
-  const orderOf = (id: number): number => (decodesAsHalf(id) ? sprintOrderValue(id) : id);
-  const labelOf = (id: number): string => (decodesAsHalf(id) ? formatSprintLabel(id) : `S${id}`);
+  const orderOf = (id: number): number => roadmapSprintOrderValue(roadmap, id);
+  const labelOf = (id: number): string => formatRoadmapSprintLabel(roadmap, id);
 
   // Check: at least one sprint
   if (roadmap.sprints.length === 0) {
@@ -703,31 +746,34 @@ export function formatStrategicContext(
   roadmap: RoadmapDefinition,
   currentSprint: number,
 ): string | null {
-  const sprint = roadmap.sprints.find(s => s.id === currentSprint);
+  const currentOrder = roadmapSprintOrderValue(roadmap, currentSprint);
+  const sprint = roadmap.sprints.find(s => roadmapSprintOrderValue(roadmap, s.id) === currentOrder);
   if (!sprint) return null;
+  const resolvedSprint = sprint.id;
 
   const criticalPath = computeCriticalPath(roadmap);
-  const onCriticalPath = criticalPath.path.includes(currentSprint);
+  const onCriticalPath = criticalPath.path.some(id => roadmapSprintOrderValue(roadmap, id) === currentOrder);
   const totalSprints = roadmap.sprints.length;
-  const sprintIndex = roadmap.sprints.findIndex(s => s.id === currentSprint) + 1;
+  const sprintIndex = roadmap.sprints.findIndex(s => s.id === resolvedSprint) + 1;
 
   // Find which phase this sprint belongs to
-  const phase = roadmap.phases.find(p => p.sprints.includes(currentSprint));
+  const phase = roadmap.phases.find(p =>
+    p.sprints.some(id => roadmapSprintOrderValue(roadmap, id) === currentOrder));
 
   // Find what depends on this sprint
   const dependents = roadmap.sprints
-    .filter(s => s.depends_on?.includes(currentSprint))
-    .map(s => formatSprintLabel(s.id));
+    .filter(s => s.depends_on?.some(id => roadmapSprintOrderValue(roadmap, id) === currentOrder))
+    .map(s => formatRoadmapSprintLabel(roadmap, s.id));
 
   const lines: string[] = [];
-  lines.push(`Sprint ${sprintIndex} of ${totalSprints} — ${formatSprintLabel(currentSprint)}: ${sprint.theme}`);
+  lines.push(`Sprint ${sprintIndex} of ${totalSprints} — ${formatRoadmapSprintLabel(roadmap, resolvedSprint)}: ${sprint.theme}`);
 
   if (phase) {
     lines.push(`Phase: ${phase.name}`);
   }
 
   if (onCriticalPath) {
-    lines.push(`On critical path: ${criticalPath.path.map(formatSprintLabel).join(' → ')}`);
+    lines.push(`On critical path: ${criticalPath.path.map(id => formatRoadmapSprintLabel(roadmap, id)).join(' → ')}`);
   }
 
   if (dependents.length > 0) {
@@ -735,17 +781,18 @@ export function formatStrategicContext(
   }
 
   // Next planned sprint (dependency-resolved) — see GH #290
-  const next = findNextPlannedSprint(roadmap, currentSprint);
+  const next = findNextPlannedSprint(roadmap, resolvedSprint);
   if (next) {
     const blockers = (next.depends_on ?? [])
       .filter(d => {
-        const dep = roadmap.sprints.find(s => s.id === d);
+        const depOrder = roadmapSprintOrderValue(roadmap, d);
+        const dep = roadmap.sprints.find(s => roadmapSprintOrderValue(roadmap, s.id) === depOrder);
         return !dep || (dep as RoadmapSprint & { status?: string }).status !== 'complete';
       });
     const status = blockers.length === 0
       ? 'ready'
-      : `blocked by ${blockers.map(formatSprintLabel).join(', ')}`;
-    lines.push(`Next: ${formatSprintLabel(next.id)}: ${next.theme} (${status})`);
+      : `blocked by ${blockers.map(id => formatRoadmapSprintLabel(roadmap, id)).join(', ')}`;
+    lines.push(`Next: ${formatRoadmapSprintLabel(roadmap, next.id)}: ${next.theme} (${status})`);
   }
 
   return lines.join('\n');
@@ -760,22 +807,23 @@ export function findNextPlannedSprint(
   roadmap: RoadmapDefinition,
   currentSprint: number,
 ): RoadmapSprint | null {
-  const currentOrder = sprintOrderValue(currentSprint);
+  const currentOrder = roadmapSprintOrderValue(roadmap, currentSprint);
   const candidates = roadmap.sprints
     .filter(s => {
-      return isRoadmapSprintPending(s) && sprintOrderValue(s.id) > currentOrder;
+      return isRoadmapSprintPending(s) && roadmapSprintOrderValue(roadmap, s.id) > currentOrder;
     })
-    .sort((a, b) => compareSprintIds(a.id, b.id));
+    .sort((a, b) => compareRoadmapSprintIds(roadmap, a.id, b.id));
 
   if (candidates.length === 0) return null;
 
   const completedIds = new Set(
     roadmap.sprints
       .filter(s => (s as RoadmapSprint & { status?: string }).status === 'complete')
-      .map(s => s.id),
+      .map(s => roadmapSprintOrderValue(roadmap, s.id)),
   );
 
   // Prefer the lowest-id candidate whose dependencies are all complete
-  const ready = candidates.find(s => (s.depends_on ?? []).every(d => completedIds.has(d)));
+  const ready = candidates.find(s =>
+    (s.depends_on ?? []).every(d => completedIds.has(roadmapSprintOrderValue(roadmap, d))));
   return ready ?? candidates[0];
 }

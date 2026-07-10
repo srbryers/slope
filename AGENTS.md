@@ -43,5 +43,15 @@ SLOPE maintains a codebase map at `CODEBASE.md` (~5k tokens). Read it before exp
 - Run `slope map --check` to verify staleness
 - Use `search({ module: 'map' })` via MCP for targeted queries
 
+## Roadmap Sources
+
+`docs/roadmap/project.yaml` is the authoring manifest. The files under
+`docs/roadmap/archive/` and `docs/roadmap/phases/` are authoritative;
+`docs/backlog/roadmap.json` is generated compatibility output.
+
+- Run `slope now`, then use its sprint with `slope roadmap focus --sprint=N` instead of loading the full history
+- Edit the owning YAML bundle, then run `slope roadmap compile`
+- Run `slope roadmap validate-sources` and `slope roadmap compile --check` before committing
+
 ## Scorecards
 Stored in docs/retros/sprint-N.json. See .slope/config.json for configuration.

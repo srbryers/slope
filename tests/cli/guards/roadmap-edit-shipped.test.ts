@@ -49,6 +49,24 @@ function baseRoadmap() {
   };
 }
 
+function modularSource(status: 'complete' | 'planned', title = 'Original'): string {
+  return `version: 1
+phase:
+  name: Phase 1
+  status: ${status}
+  sprints: [1]
+sprints:
+  - id: 1
+    theme: Sprint 1
+    par: 3
+    slope: 1
+    type: feature
+    status: ${status}
+    tickets:
+      - {key: S1-1, title: ${title}, club: wedge, complexity: small}
+`;
+}
+
 function writeInput(filePath: string, newContent: string): HookInput {
   return {
     session_id: 'test',
@@ -87,6 +105,27 @@ function applyPatchInput(filePath: string, oldLine: string, newLine: string): Ho
         '*** End Patch',
       ].join('\n'),
     },
+    tool_response: {},
+  };
+}
+
+function multiApplyPatchInput(changes: Array<{ filePath: string; oldLine: string; newLine: string }>): HookInput {
+  const lines = ['*** Begin Patch'];
+  for (const change of changes) {
+    lines.push(
+      `*** Update File: ${change.filePath}`,
+      '@@',
+      `-${change.oldLine}`,
+      `+${change.newLine}`,
+    );
+  }
+  lines.push('*** End Patch');
+  return {
+    session_id: 'test',
+    cwd: '/tmp',
+    hook_event_name: 'PreToolUse',
+    tool_name: 'apply_patch',
+    tool_input: { command: lines.join('\n') },
     tool_response: {},
   };
 }
@@ -141,6 +180,114 @@ describe('roadmapEditShippedGuard', () => {
     next.sprints[0].theme = 'Updated theme';
     const result = await roadmapEditShippedGuard(writeInput(path, JSON.stringify(next, null, 2)), cwd);
     expect(result).toEqual({});
+  });
+
+  it('blocks direct edits to a generated modular roadmap projection', async () => {
+    const roadmap = baseRoadmap();
+    roadmap.sprints[0].status = 'planned';
+    const path = writeRoadmap(cwd, roadmap);
+    mkdirSync(join(cwd, 'docs', 'roadmap'), { recursive: true });
+    writeFileSync(join(cwd, 'docs', 'roadmap', 'project.yaml'), 'version: 1\n');
+
+    const next = JSON.parse(JSON.stringify(roadmap));
+    next.sprints[1].theme = 'Direct generated edit';
+    const result = await roadmapEditShippedGuard(writeInput(path, JSON.stringify(next, null, 2)), cwd);
+
+    expect(result.decision).toBe('deny');
+    expect(result.blockReason).toContain('generated modular-roadmap projection');
+    expect(result.blockReason).toContain('roadmap compile');
+  });
+
+  it('blocks shipped history edits in authoritative modular source YAML', async () => {
+    mkdirSync(join(cwd, 'docs', 'roadmap', 'phases'), { recursive: true });
+    writeFileSync(join(cwd, 'docs', 'roadmap', 'project.yaml'), 'version: 1\n');
+    const sourcePath = join(cwd, 'docs', 'roadmap', 'phases', 'phase-01.yaml');
+    writeFileSync(sourcePath, modularSource('complete'));
+
+    const result = await roadmapEditShippedGuard(writeInput(sourcePath, modularSource('complete', 'Rewritten')), cwd);
+
+    expect(result.decision).toBe('deny');
+    expect(result.blockReason).toContain('shipped sprints in modular roadmap sources');
+    expect(result.blockReason).toContain('S1');
+  });
+
+  it('blocks deleting authoritative modular source YAML with terminal history', async () => {
+    mkdirSync(join(cwd, 'docs', 'roadmap', 'phases'), { recursive: true });
+    writeFileSync(join(cwd, 'docs', 'roadmap', 'project.yaml'), 'version: 1\n');
+    const sourcePath = join(cwd, 'docs', 'roadmap', 'phases', 'phase-01.yaml');
+    writeFileSync(sourcePath, modularSource('complete'));
+
+    const result = await roadmapEditShippedGuard(deletePatchInput(sourcePath), cwd);
+
+    expect(result.decision).toBe('deny');
+    expect(result.blockReason).toContain('Cannot delete or replace terminal modular roadmap history');
+    expect(result.blockReason).toContain('S1');
+  });
+
+  it('blocks replacing authoritative terminal source YAML with malformed content', async () => {
+    mkdirSync(join(cwd, 'docs', 'roadmap', 'phases'), { recursive: true });
+    writeFileSync(join(cwd, 'docs', 'roadmap', 'project.yaml'), 'version: 1\n');
+    const sourcePath = join(cwd, 'docs', 'roadmap', 'phases', 'phase-01.yaml');
+    writeFileSync(sourcePath, modularSource('complete'));
+
+    const result = await roadmapEditShippedGuard(writeInput(sourcePath, 'not: [valid'), cwd);
+
+    expect(result.decision).toBe('deny');
+    expect(result.blockReason).toContain('Cannot delete or replace terminal modular roadmap history');
+    expect(result.blockReason).toContain('S1');
+  });
+
+  it('allows planned sprint edits in authoritative modular source YAML', async () => {
+    mkdirSync(join(cwd, 'docs', 'roadmap', 'phases'), { recursive: true });
+    writeFileSync(join(cwd, 'docs', 'roadmap', 'project.yaml'), 'version: 1\n');
+    const sourcePath = join(cwd, 'docs', 'roadmap', 'phases', 'phase-01.yaml');
+    writeFileSync(sourcePath, modularSource('planned'));
+
+    const result = await roadmapEditShippedGuard(writeInput(sourcePath, modularSource('planned', 'Updated')), cwd);
+
+    expect(result).toEqual({});
+  });
+
+  it('checks every source touched by a multi-file patch', async () => {
+    mkdirSync(join(cwd, 'docs', 'roadmap', 'phases'), { recursive: true });
+    writeFileSync(join(cwd, 'docs', 'roadmap', 'project.yaml'), 'version: 1\n');
+    const plannedPath = join(cwd, 'docs', 'roadmap', 'phases', 'planned.yaml');
+    const completePath = join(cwd, 'docs', 'roadmap', 'phases', 'complete.yaml');
+    writeFileSync(plannedPath, modularSource('planned'));
+    writeFileSync(completePath, modularSource('complete'));
+    const oldLine = '      - {key: S1-1, title: Original, club: wedge, complexity: small}';
+
+    const result = await roadmapEditShippedGuard(multiApplyPatchInput([
+      { filePath: plannedPath, oldLine, newLine: oldLine.replace('Original', 'Planned update') },
+      { filePath: completePath, oldLine, newLine: oldLine.replace('Original', 'Shipped rewrite') },
+    ]), cwd);
+
+    expect(result.decision).toBe('deny');
+    expect(result.blockReason).toContain('S1');
+  });
+
+  it('blocks manifest changes that remove or repoint completed history', async () => {
+    mkdirSync(join(cwd, 'docs', 'roadmap', 'phases'), { recursive: true });
+    const completedPath = join(cwd, 'docs', 'roadmap', 'phases', 'complete.yaml');
+    const plannedPath = join(cwd, 'docs', 'roadmap', 'phases', 'planned.yaml');
+    writeFileSync(completedPath, modularSource('complete'));
+    writeFileSync(plannedPath, modularSource('planned'));
+    const manifestPath = join(cwd, 'docs', 'roadmap', 'project.yaml');
+    const manifest = `version: 1
+name: Test
+output: ../backlog/roadmap.json
+sources:
+  - {path: phases/complete.yaml, kind: phase}
+  - {path: phases/planned.yaml, kind: phase}
+`;
+    writeFileSync(manifestPath, manifest);
+    const next = manifest.replace('  - {path: phases/complete.yaml, kind: phase}\n', '');
+
+    const result = await roadmapEditShippedGuard(writeInput(manifestPath, next), cwd);
+
+    expect(result.decision).toBe('deny');
+    expect(result.blockReason).toContain('remove or repoint shipped history');
+    expect(result.blockReason).toContain('phases/complete.yaml');
   });
 
   it('allows edits that only touch planned sprints', async () => {

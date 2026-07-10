@@ -1,0 +1,39 @@
+version: "1"
+phase:
+  name: Phase 44 — Validation Signal Repair
+  sprints:
+    - 145
+  status: complete
+  note: "Close #519/#520 by making roadmap shipped-commit detection ignore sprint-range endpoints and making `slope map --check` use the same file-counting logic as `slope map`."
+sprints:
+  - id: 145
+    theme: Validation Signal Repair
+    par: 4
+    slope: 2
+    type: bugfix
+    status: complete
+    score: 4
+    score_label: par
+    depends_on:
+      - 144
+    note: "Close #519/#520 by removing false-positive validation signals that make healthy external repos look stale or incorrectly shipped."
+    tickets:
+      - key: S145-1
+        title: Make shipped-commit detection ignore sprint-range endpoints while preserving ticket refs (#519)
+        club: short_iron
+        complexity: standard
+        github_issue: 519
+      - key: S145-2
+        title: Make map staleness source counts reuse generator file-discovery rules (#520)
+        club: short_iron
+        complexity: standard
+        github_issue: 520
+      - key: S145-3
+        title: Validate roadmap and map regressions, then close issue references
+        club: wedge
+        complexity: small
+        depends_on:
+          - S145-1
+          - S145-2
+scorecards:
+  "145": docs/retros/sprint-145.json

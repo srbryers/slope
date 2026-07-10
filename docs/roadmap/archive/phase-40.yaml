@@ -1,0 +1,112 @@
+version: "1"
+phase:
+  name: Phase 40 — Codex Runtime Recovery
+  sprints:
+    - 125
+    - 126
+    - 127
+  status: complete
+  note: "Triage the open #456/#459/#460 issue batch into two focused repair sprints and one patch-release sprint: first fix Codex effective-workdir hook routing, then improve native SQLite recovery messaging, then publish the combined fixes."
+sprints:
+  - id: 125
+    theme: Codex Hook Effective Workdir Recovery
+    par: 4
+    slope: 4
+    type: bugfix
+    status: complete
+    score: 4
+    score_label: par
+    depends_on:
+      - 124
+    note: "Close #456 and #459 by making Codex hook dispatch evaluate the effective Bash command workdir, recover workdir from transcripts when Codex omits it, and diagnose duplicate project/user hook installs."
+    tickets:
+      - key: S125-1
+        title: Normalize Codex Bash guard input to the effective exec workdir (#456/#459)
+        club: long_iron
+        complexity: moderate
+        github_issue:
+          - 456
+          - 459
+      - key: S125-2
+        title: Recover and remember exec workdir from Codex transcript/tool_use_id context (#459)
+        club: driver
+        complexity: risky
+        github_issue: 459
+        depends_on:
+          - S125-1
+      - key: S125-3
+        title: Detect duplicate project-level and user-level Codex hook installs in doctor (#459)
+        club: short_iron
+        complexity: standard
+        github_issue: 459
+        depends_on:
+          - S125-1
+      - key: S125-4
+        title: Add cross-repo/worktree regressions for branch-before-commit and worktree-check (#456/#459)
+        club: short_iron
+        complexity: standard
+        github_issue:
+          - 456
+          - 459
+        depends_on:
+          - S125-1
+          - S125-2
+          - S125-3
+  - id: 126
+    theme: Native Store Error Recovery Guidance
+    par: 4
+    slope: 2
+    type: bugfix
+    status: complete
+    score: 3
+    score_label: birdie
+    depends_on:
+      - 125
+    note: "Close #460 by reusing existing native SQLite recovery guidance from common top-level CLI error handlers instead of dumping raw better-sqlite3 binding stacks."
+    tickets:
+      - key: S126-1
+        title: Extract shared CLI error reporter around native SQLite recovery helpers (#460)
+        club: short_iron
+        complexity: standard
+        github_issue: 460
+      - key: S126-2
+        title: Route duplicated top-level command catches through the shared reporter (#460)
+        club: short_iron
+        complexity: standard
+        github_issue: 460
+        depends_on:
+          - S126-1
+      - key: S126-3
+        title: Add native-binding failure regressions for common store-backed commands (#460)
+        club: wedge
+        complexity: small
+        github_issue: 460
+        depends_on:
+          - S126-1
+          - S126-2
+  - id: 127
+    theme: Codex Runtime Patch Release
+    par: 3
+    slope: 1
+    type: release
+    status: complete
+    score: 3
+    score_label: par
+    depends_on:
+      - 126
+    note: Publish the S125/S126 Codex hook and native recovery fixes as the next patch release after validation and npm trusted-publisher verification.
+    tickets:
+      - key: S127-1
+        title: Bump @slope-dev/slope and bundled Codex plugin for the Codex runtime patch release
+        club: wedge
+        complexity: small
+      - key: S127-2
+        title: Run release validation, publish the patch release, and verify npm
+        club: short_iron
+        complexity: standard
+        depends_on:
+          - S127-1
+scorecards:
+  "125": docs/retros/sprint-125.json
+  "126": docs/retros/sprint-126.json
+  "127": docs/retros/sprint-127.json

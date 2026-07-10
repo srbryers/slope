@@ -185,6 +185,7 @@ describe('buildSuggestionObject', () => {
     const suggestion = buildSuggestionObject({ type: 'needs-review', sprintNumber: 26 });
     expect(suggestion.context).toContain('Sprint 26 has a scorecard but no review');
     expect(suggestion.options.map(o => o.label)).toContain('Generate sprint review');
+    expect(suggestion.options.find(o => o.id === 'review')?.command).toBe('slope review --sprint=26');
   });
 
   it('includes roadmap context for between-sprints', () => {

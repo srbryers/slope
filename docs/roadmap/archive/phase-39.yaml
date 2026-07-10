@@ -1,0 +1,41 @@
+version: "1"
+phase:
+  name: Phase 39 — Pre-Sprint Reality Checks
+  sprints:
+    - 124
+  status: complete
+  note: "Close #452 and #453 by surfacing roadmap drift and sibling worktree conflict signals before agents commit to a sprint."
+sprints:
+  - id: 124
+    theme: Pre-Sprint Reality Checks
+    par: 4
+    slope: 3
+    type: enhancement
+    status: complete
+    score: 4
+    score_label: par
+    depends_on:
+      - 123
+    note: Surface stale roadmap status and sibling worktree conflicts in pre-sprint flows before an agent starts overlapping or already-shipped work.
+    tickets:
+      - key: S124-1
+        title: Route roadmap validation drift warnings into briefing, roadmap show, and sprint start (#453)
+        club: short_iron
+        complexity: standard
+        github_issue: 453
+      - key: S124-2
+        title: Surface sibling worktree dirty/ahead/migration state before sprint selection (#452)
+        club: long_iron
+        complexity: moderate
+        github_issue: 452
+        depends_on:
+          - S124-1
+      - key: S124-3
+        title: Add regression coverage for pre-sprint reality checks
+        club: wedge
+        complexity: small
+        depends_on:
+          - S124-1
+          - S124-2
+scorecards:
+  "124": docs/retros/sprint-124.json

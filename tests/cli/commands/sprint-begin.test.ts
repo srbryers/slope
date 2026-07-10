@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -27,7 +27,7 @@ function setupRepo(): string {
   }));
   writeFileSync(join(dir, 'docs', 'backlog', 'roadmap.json'), JSON.stringify({
     name: 'Test',
-    phases: [{ name: 'P1', sprints: [1] }],
+    phases: [{ name: 'P1', sprints: [1, 2] }],
     sprints: [{
       id: 1,
       theme: 'Test sprint',
@@ -38,6 +38,15 @@ function setupRepo(): string {
         { key: 'S1-1', title: 'first', club: 'wedge', complexity: 'small' },
         { key: 'S1-2', title: 'second', club: 'wedge', complexity: 'small' },
         { key: 'S1-3', title: 'third', club: 'wedge', complexity: 'small' },
+      ],
+    }, {
+      id: 2,
+      theme: 'Next sprint',
+      par: 4,
+      slope: 1,
+      type: 'feature',
+      tickets: [
+        { key: 'S2-1', title: 'next', club: 'wedge', complexity: 'small' },
       ],
     }],
   }));
@@ -100,7 +109,7 @@ describe('slope sprint begin (GH #311)', () => {
       let stderr = '';
       let exitCode = 0;
       try {
-        runSlope(cwd, ['sprint', 'begin', '--sprint=2', '--ticket=S2-1']);
+        runSlope(cwd, ['sprint', 'begin', '--sprint=2', '--ticket=S2-1', '--actor=recovery-agent']);
       } catch (err: unknown) {
         const e = err as { status?: number; stderr?: Buffer | string };
         exitCode = e.status ?? 0;
@@ -109,7 +118,62 @@ describe('slope sprint begin (GH #311)', () => {
 
       expect(exitCode).not.toBe(0);
       expect(stderr).toContain('Refusing to begin S2');
-      expect(stderr).toContain('sprint reset');
+      expect(stderr).toContain('slope sprint rollover --from=1 --to=2 --force --reason="<why>"');
+      expect(stderr).toContain('slope sprint begin --sprint=2 --ticket=S2-1 --actor=recovery-agent');
+      expect(stderr).not.toContain('sprint reset');
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('recommends a safe non-force rollover for terminal prior state', () => {
+    const cwd = setupRepo();
+    try {
+      runSlope(cwd, ['sprint', 'begin', '--sprint=1', '--ticket=S1-1']);
+      const statePath = join(cwd, '.slope', 'sprint-state.json');
+      const state = JSON.parse(readFileSync(statePath, 'utf8'));
+      for (const gate of Object.keys(state.gates)) state.gates[gate] = true;
+      state.review_gates = {
+        code_review: { provenance: 'independent_review', evidence: ['code-review.md'], reviewer: 'reviewer' },
+        architect_review: { provenance: 'independent_review', evidence: ['architecture-review.md'], reviewer: 'architect' },
+      };
+      writeFileSync(statePath, JSON.stringify(state, null, 2));
+
+      const result = spawnSync(process.execPath, [
+        SLOPE_BIN,
+        'sprint',
+        'begin',
+        '--sprint=2',
+        '--ticket=S2-1',
+      ], { cwd, encoding: 'utf8' });
+
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain('slope sprint rollover --from=1 --to=2');
+      expect(result.stderr).not.toContain('--force');
+      expect(result.stderr).toContain('slope sprint begin --sprint=2 --ticket=S2-1');
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('preserves corrupt state instead of treating it as missing', () => {
+    const cwd = setupRepo();
+    try {
+      const statePath = join(cwd, '.slope', 'sprint-state.json');
+      const corrupt = '{"sprint": 1, "gates": ';
+      writeFileSync(statePath, corrupt);
+
+      const result = spawnSync(process.execPath, [
+        SLOPE_BIN,
+        'sprint',
+        'begin',
+        '--sprint=2',
+        '--ticket=S2-1',
+      ], { cwd, encoding: 'utf8' });
+
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain('corrupt sprint evidence was preserved');
+      expect(readFileSync(statePath, 'utf8')).toBe(corrupt);
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }

@@ -1,0 +1,39 @@
+version: "1"
+phase:
+  name: Phase 31 — Skill Awareness Release
+  sprints:
+    - 116
+  status: complete
+  note: Published the skill registry and skill-aware briefing work as v1.56.0, including roadmap cleanup for superseded S75.5 status.
+sprints:
+  - id: 116
+    theme: Skill Awareness Release
+    par: 4
+    slope: 2
+    type: release + cleanup
+    status: complete
+    score: 4
+    score_label: par
+    depends_on:
+      - 115
+    note: Release the skill registry and skill-aware briefing work as v1.56.0, and clean up roadmap status display for superseded S75.5.
+    tickets:
+      - key: S116-1
+        title: Treat superseded roadmap sprints as terminal in roadmap status
+        club: wedge
+        complexity: small
+      - key: S116-2
+        title: Bump @slope-dev/slope and bundled Codex plugin to v1.56.0
+        club: wedge
+        complexity: small
+        depends_on:
+          - S116-1
+      - key: S116-3
+        title: Run release validation, publish v1.56.0, and verify npm
+        club: short_iron
+        complexity: standard
+        depends_on:
+          - S116-1
+          - S116-2
+scorecards:
+  "116": docs/retros/sprint-116.json

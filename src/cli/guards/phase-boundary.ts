@@ -36,13 +36,19 @@ export async function phaseBoundaryGuard(input: HookInput, cwd: string): Promise
     roadmap = result.roadmap ?? castRoadmapStructure(raw);
   } catch {
     return {
-      context: 'SLOPE phase-boundary: Cannot determine phase because the roadmap is unreadable. Allowing command; run `slope roadmap validate`.',
+      context: [
+        'SLOPE advisory (non-blocking) — phase-boundary could not read the roadmap, so this command is allowed.',
+        'Run `slope roadmap validate` for the parse error. This advisory does not grant or deny host tool permission.',
+      ].join('\n'),
     };
   }
 
   if (!roadmap || !roadmap.phases) {
     return {
-      context: 'SLOPE phase-boundary: Cannot determine phase because the roadmap is structurally invalid. Allowing command; run `slope roadmap validate`.',
+      context: [
+        'SLOPE advisory (non-blocking) — phase-boundary could not map roadmap phases, so this command is allowed.',
+        'Run `slope roadmap validate` for the structural error. This advisory does not grant or deny host tool permission.',
+      ].join('\n'),
     };
   }
 

@@ -1,0 +1,173 @@
+{
+  "sprint_number": 228,
+  "player": "codex",
+  "theme": "Focused Roadmap Context Projection",
+  "par": 4,
+  "slope": 3,
+  "score": 5,
+  "score_label": "bogey",
+  "date": "2026-07-10",
+  "type": "feature + planning architecture",
+  "skills_used": [
+    "slope-sprint-workflow",
+    "slope:slope-sprint",
+    "github:github"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow",
+    "slope:slope-sprint",
+    "github:github"
+  ],
+  "skill_gaps_found": [],
+  "shots": [
+    {
+      "ticket_key": "S228-1",
+      "title": "Define a bounded focused roadmap context contract (#584)",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "Independent reconnaissance disagreed on successor semantics and exposed the context-free encoded-ID ambiguity; authored phase order and roadmap-aware labels were made explicit before implementation."
+        }
+      ],
+      "notes": "Added a versioned read model with full selected sprint, summary neighbors, phase contract, direct dependencies, bounded hazards/evidence, limits, and omission counts."
+    },
+    {
+      "ticket_key": "S228-2",
+      "title": "Build deterministic focus projection from single-file roadmaps (#584)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "moderate",
+          "description": "Independent architecture/data reviews found terminal status flattening, missing performance hazards, encoded 435/43.5 completion/evidence mismatch, and evidence-cap eviction. The follow-up fixed all four and was independently approved."
+        }
+      ],
+      "notes": "The pure builder follows authored phase order, preserves terminal truth, computes readiness separately, maps legacy IDs with roadmap context, and projects only selected/dependency/recent scorecard hazards."
+    },
+    {
+      "ticket_key": "S228-3",
+      "title": "Add slope roadmap focus --sprint with bounded human and JSON output (#584)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "The CLI requires an explicit selector, supports decimal/encoded IDs and custom paths, keeps JSON stdout pure, scopes reality warnings to the selected sprint, and supplies canonical file evidence."
+    },
+    {
+      "ticket_key": "S228-4",
+      "title": "Lock historical bounds and compatibility behavior (#584)",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "The first real SLOPE smoke exposed a 5 KB top-level roadmap description leaking historical narrative into otherwise bounded JSON; the projection now emits only the roadmap name."
+        }
+      ],
+      "notes": "Core/CLI/help/registry tests cover bounds, shuffled source order, direct dependencies, phase neighbors, JSON purity, invalid selectors, missing phases, custom paths, canonical S225, decimal IDs, and encoded S43.5 evidence."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 1,
+    "penalties": 0,
+    "hazards_hit": 3,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "wind",
+      "impact": "moderate",
+      "description": "The contract had to remain compatible with 131-sprint SLOPE history, a 455-sprint external repro, explicit decimal IDs, and legacy encoded half-sprint IDs."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Bound row counts do not guarantee bounded payloads when a retained field contains accumulated history.",
+      "outcome": "Real-repository smoke checks now verify byte size and removed the global roadmap description from focused JSON."
+    },
+    {
+      "type": "lessons",
+      "description": "Completion/readiness is computed state; superseded/cancelled/skipped is durable authored truth.",
+      "outcome": "Focus preserves authored terminal status while representing operational readiness separately."
+    },
+    {
+      "type": "lessons",
+      "description": "Legacy sprint-ID compatibility must cover labels, equality, ordering, scorecards, and evidence together.",
+      "outcome": "Roadmap-aware identity equivalence now handles canonical S455 and encoded S43.5 end-to-end."
+    },
+    {
+      "type": "lessons",
+      "description": "Evidence caps need priority rules or ancillary history can evict the selected sprint's canonical design records.",
+      "outcome": "Roadmap source and selected sprint issue/design/artifact evidence are prioritized before ancillary scorecards."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "Focused compatibility suites passed, including 135 tests after independent-review repairs.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "The complete Vitest suite passed after the initial implementation; repaired boundaries were then independently revalidated with focused suites and probes.",
+      "status": "healthy"
+    },
+    {
+      "category": "build",
+      "description": "Typecheck and build passed, including packages/pi-extension.",
+      "status": "healthy"
+    },
+    {
+      "category": "slope",
+      "description": "Roadmap validation passed; required architecture and recommended data-contract reviews both approved after changes.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "The read model was straightforward; the hard part was defining what bounded, relevant, and compatible mean across fifteen months of roadmap history.",
+    "advice_for_next_player": "Compile modular sources into this same RoadmapDefinition and keep focus completely source-agnostic.",
+    "what_surprised_you": "A single description string defeated row-level bounds, and encoded sprint compatibility failed independently at three identity surfaces.",
+    "excited_about_next": "S229 can federate authoring sources without changing any focus consumers."
+  },
+  "bunker_locations": [
+    "Bounded projections must test byte size on a real accumulated-history repository, not only row counts in fixtures.",
+    "Preserve authored terminal statuses and compute readiness as a separate field.",
+    "Roadmap-aware sprint identity must normalize labels, equality, ordering, scorecard completion, and evidence paths together.",
+    "Prioritize selected-sprint evidence before applying global evidence caps.",
+    "Focused hazards should include only selected, direct-dependency, and bounded recent-phase scorecards."
+  ],
+  "yardage_book_updates": [
+    "src/core/roadmap-focus.ts owns the source-agnostic bounded projection and human formatter.",
+    "src/core/roadmap.ts now exposes context-aware sprint ID formatting/ordering and typed roadmap metadata extensions.",
+    "src/cli/commands/roadmap.ts enriches focus with selected reality issues and canonical scorecard/review evidence.",
+    "slope roadmap focus --sprint=N supports bounded human output and deterministic --json output."
+  ],
+  "course_management_notes": [
+    "The branch is pushed and all S228 implementation commits are recorded; no PR merge is implied.",
+    "Both independent review lanes requested changes, then approved the repaired implementation with durable evidence files."
+  ],
+  "slope_factors": [
+    "bounded_read_model",
+    "roadmap_identity_compatibility",
+    "phase_order_projection",
+    "evidence_priority",
+    "hazard_relevance",
+    "agent_json_contract"
+  ]
+}

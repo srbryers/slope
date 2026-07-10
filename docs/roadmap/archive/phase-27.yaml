@@ -1,0 +1,175 @@
+version: "1"
+phase:
+  name: Phase 27 — Guard Noise & Workflow Phase Repair
+  sprints:
+    - 98
+    - 99
+    - 100
+    - 101
+  status: complete
+  note: "Close #382/#383 before Codex plugin work: suppress repeated explore guidance and make workflow per-ticket state advance sprint-state into implementing."
+sprints:
+  - id: 98
+    theme: Guard Noise & Workflow Phase Repair
+    par: 5
+    slope: 2
+    type: bug fix + dx
+    status: complete
+    score: 5
+    score_label: par
+    depends_on:
+      - 97
+    note: "Address the two hook bugs filed after the Codex guard restart: explore guidance should not spam every tool response, and workflow-driven sprints must expose implementing phase to claim-required."
+    tickets:
+      - key: S98-1
+        title: Suppress duplicate guard-explore guidance within a Codex/agent session (#382)
+        club: short_iron
+        complexity: standard
+        github_issue: 382
+      - key: S98-2
+        title: Add a sprint phase update path for existing sprint state (#383)
+        club: wedge
+        complexity: small
+        github_issue: 383
+      - key: S98-3
+        title: Sync workflow per-ticket and post-hole phases into sprint-state lifecycle (#383)
+        club: short_iron
+        complexity: standard
+        github_issue: 383
+        depends_on:
+          - S98-2
+      - key: S98-4
+        title: Add guard and workflow regressions for explore dedup and phase advancement (#382/#383)
+        club: short_iron
+        complexity: standard
+        github_issue: 382
+        depends_on:
+          - S98-1
+          - S98-2
+          - S98-3
+      - key: S98-5
+        title: Surface guard-pr-review as PostToolUse additional context instead of a dropped/block-style suggestion (#384)
+        club: wedge
+        complexity: small
+        github_issue: 384
+        depends_on:
+          - S98-4
+  - id: 99
+    theme: Session State Source-of-Truth Repair
+    par: 4
+    slope: 3
+    type: bug fix + dx
+    status: complete
+    score: 4
+    score_label: par
+    depends_on:
+      - 98
+    note: "Fix the session-state split exposed by mid-session sprint starts: status commands, briefing, and workflow guards must agree on the active sprint and must not stay pinned in adhoc mode once a sprint is started."
+    tickets:
+      - key: S99-1
+        title: Make sprint-state the active sprint source for status and briefing (#389)
+        club: short_iron
+        complexity: standard
+        github_issue: 389
+      - key: S99-2
+        title: Promote adhoc session mode to sprint when a sprint starts mid-session (#387/#388)
+        club: short_iron
+        complexity: standard
+        github_issue: 387
+        depends_on:
+          - S99-1
+      - key: S99-3
+        title: Keep workflow guard suppression aligned with live sprint state (#387)
+        club: short_iron
+        complexity: standard
+        github_issue: 387
+        depends_on:
+          - S99-2
+      - key: S99-4
+        title: Add fresh-session and worktree regressions for sprint status/session mode drift (#387/#388/#389)
+        club: short_iron
+        complexity: standard
+        github_issue: 387
+        depends_on:
+          - S99-1
+          - S99-2
+          - S99-3
+  - id: 100
+    theme: Review Closeout Guard Repair
+    par: 4
+    slope: 3
+    type: bug fix + workflow guard
+    status: complete
+    score: 4
+    score_label: par
+    depends_on:
+      - 99
+    note: "Close the remaining review/closeout reliability gaps before Codex plugin packaging: review recommendations must use active SLOPE context, PR review enforcement must be recorded as workflow state, and shipped-sprint validation must recognize normal squash merges."
+    tickets:
+      - key: S100-1
+        title: Make review recommend prefer active sprint state over stale global Claude plans (#392)
+        club: short_iron
+        complexity: standard
+        github_issue: 392
+      - key: S100-2
+        title: Add review recommend explicit sprint/context regressions (#392)
+        club: wedge
+        complexity: small
+        github_issue: 392
+        depends_on:
+          - S100-1
+      - key: S100-3
+        title: Record and enforce PR review completion in post-hole closeout (#390)
+        club: short_iron
+        complexity: standard
+        github_issue: 390
+        depends_on:
+          - S100-1
+      - key: S100-4
+        title: Teach shipped-sprint detection to recognize squash merges via sprint artifacts (#393)
+        club: short_iron
+        complexity: standard
+        github_issue: 393
+  - id: 101
+    theme: Guard Utilization & Payload Diagnostics
+    par: 4
+    slope: 3
+    type: bug fix + diagnostics
+    status: complete
+    score: 1
+    score_label: eagle
+    depends_on:
+      - 100
+    note: "Roadmap status synced after S101 shipped apply_patch path normalization from #396. Original diagnostics plan was partially superseded by adjacent issue sprints."
+    tickets:
+      - key: S101-1
+        title: Add Codex apply_patch regression coverage for file-aware guards (#396)
+        club: short_iron
+        complexity: standard
+        github_issue: 396
+      - key: S101-2
+        title: Normalize touched paths from file_path/path/apply_patch payloads across edit-time guards (#396)
+        club: long_iron
+        complexity: multi-package
+        github_issue: 396
+        depends_on:
+          - S101-1
+      - key: S101-3
+        title: Feed hazard guard from scorecard hazard history when common issues are sparse (#397)
+        club: short_iron
+        complexity: standard
+        github_issue: 397
+        depends_on:
+          - S101-2
+      - key: S101-4
+        title: Record actionable silent reasons in guard metrics and diagnostics (#398)
+        club: short_iron
+        complexity: standard
+        github_issue: 398
+        depends_on:
+          - S101-2
+scorecards:
+  "98": docs/retros/sprint-98.json
+  "99": docs/retros/sprint-99.json
+  "100": docs/retros/sprint-100.json
+  "101": docs/retros/sprint-101.json

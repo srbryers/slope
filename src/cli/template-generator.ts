@@ -35,6 +35,8 @@ This project uses the SLOPE framework for sprint tracking.
 - \`slope review\` — generate sprint review
 - \`slope briefing\` — ${r.briefing.toLowerCase()}
 - \`slope roadmap interview\` — collect planning input when roadmap direction is unclear
+- \`slope roadmap focus --sprint=N\` — load bounded sprint context
+- \`slope roadmap validate-sources\` — validate modular roadmap sources when configured
 
 ## MCP Tools
 A SLOPE MCP server is configured in \`.mcp.json\`. Two tools:
@@ -43,7 +45,7 @@ A SLOPE MCP server is configured in \`.mcp.json\`. Two tools:
 - \`search({ module: 'init' })\` — discover roadmap interview questions and submit helpers
 
 ## Sprint Workflow
-- **Pre-${r.sprint}:** \`slope now\`, then \`slope start\` or \`slope start --ticket=KEY\`
+- **Pre-${r.sprint}:** \`slope now\`, use its sprint with \`slope roadmap focus --sprint=N\`, then \`slope start\`
 - **Per-${r.ticket}:** classify each ticket with approach + result + hazards
 - **Post-${r.sprint}:** \`slope validate\` ${r.scorecard.toLowerCase()}, \`slope review\`, update common-issues
 
@@ -81,24 +83,26 @@ Before starting a new phase or project:
 
 1. **Define the vision** — What does the end state look like? Document in a vision doc
 2. **Run \`slope roadmap interview\` when direction is unclear** — Use \`--agent\` for JSON-mode agent harnesses
-3. **Build the roadmap** — Create \`docs/backlog/roadmap.json\` with sprints, dependencies, and phases
-4. **Run \`slope roadmap validate\`** — Check for structural issues, dependency cycles, numbering gaps
-5. **Run \`slope roadmap review\`** — Automated architect review: scope balance, critical path, bottlenecks
-6. **Identify the critical path** — Run \`slope roadmap show\` to see the dependency graph and parallel tracks
-7. **Plan parallel tracks** — If sprints can run concurrently, plan for multi-agent execution
+3. **Build the roadmap** — If \`docs/roadmap/project.yaml\` exists, edit its declared YAML bundles; otherwise create \`docs/backlog/roadmap.json\`
+4. **Compile modular sources** — Run \`slope roadmap compile\`, \`slope roadmap validate-sources\`, and \`slope roadmap compile --check\`
+5. **Run \`slope roadmap validate\`** — Check for structural issues, dependency cycles, numbering gaps
+6. **Run \`slope roadmap review\`** — Automated architect review: scope balance, critical path, bottlenecks
+7. **Identify the critical path** — Run \`slope roadmap show\` to see the dependency graph and parallel tracks
+8. **Plan parallel tracks** — If sprints can run concurrently, plan for multi-agent execution
 
 ## Pre-${r.sprint} Routine (Sprint Start)
 
 Before writing any code in a new sprint:
 
-1. **Run \`slope now\`** — Compact cockpit with current sprint, state, claims, and next action
-2. **Run \`slope start\` or \`slope start --ticket=KEY\`** — Human entry point for sprint state, briefing, claim guidance, and prep
-3. **Run \`slope briefing\` when deeper context is needed** — Outputs handicap snapshot, hazard index, nutrition alerts, filtered gotchas, and session continuity
+1. **Run \`slope now\`** — Discover the current sprint, state, claims, and next action
+2. **Run \`slope roadmap focus --sprint=N\`** — Use the discovered sprint to load bounded phase, dependency, hazard, and evidence context
+3. **Run \`slope start\` or \`slope start --ticket=KEY\`** — Human entry point for sprint state, briefing, claim guidance, and prep
+4. **Run \`slope briefing\` when deeper context is needed** — Outputs handicap snapshot, hazard index, nutrition alerts, filtered gotchas, and session continuity
    - Use \`--categories=testing,api\` or \`--keywords=migration\` to filter for the sprint's work area
-4. **Verify previous ${r.scorecard.toLowerCase()} exists** — If the last sprint's ${r.scorecard.toLowerCase()} wasn't created, create it now
-5. **Branch hygiene check** — \`git branch -a\` to confirm no stale branches remain
-6. **Gap analysis** (if touching API or schema) — Read relevant docs and compare against implementation before writing code
-7. **Set ${r.onTarget.toLowerCase()} and slope** — ${r.onTarget} from ticket count (1-2=3, 3-4=4, 5+=5), slope from complexity factors
+5. **Verify previous ${r.scorecard.toLowerCase()} exists** — If the last sprint's ${r.scorecard.toLowerCase()} wasn't created, create it now
+6. **Branch hygiene check** — \`git branch -a\` to confirm no stale branches remain
+7. **Gap analysis** (if touching API or schema) — Read relevant docs and compare against implementation before writing code
+8. **Set ${r.onTarget.toLowerCase()} and slope** — ${r.onTarget} from ticket count (1-2=3, 3-4=4, 5+=5), slope from complexity factors
 
 ## Pre-${r.ticket} Routine (Per-Ticket, Before Code)
 
@@ -319,6 +323,8 @@ This project uses the SLOPE framework for sprint tracking.
 - \`slope review\` — generate sprint review
 - \`slope briefing\` — ${r.briefing.toLowerCase()}
 - \`slope roadmap interview\` — collect planning input when roadmap direction is unclear
+- \`slope roadmap focus --sprint=N\` — load bounded sprint context
+- \`slope roadmap validate-sources\` — validate modular roadmap sources when configured
 
 ## MCP Tools
 A SLOPE MCP server is configured in \`opencode.json\`. Two tools:
@@ -327,7 +333,7 @@ A SLOPE MCP server is configured in \`opencode.json\`. Two tools:
 - \`search({ module: 'init' })\` — discover roadmap interview questions and submit helpers
 
 ## Sprint Workflow
-- **Pre-${r.sprint}:** \`slope now\`, then \`slope start\` or \`slope start --ticket=KEY\`
+- **Pre-${r.sprint}:** \`slope now\`, use its sprint with \`slope roadmap focus --sprint=N\`, then \`slope start\`
 - **Per-${r.ticket}:** classify each ticket with approach + result + hazards
 - **Post-${r.sprint}:** \`slope validate\` ${r.scorecard.toLowerCase()}, \`slope review\`, update common-issues
 
@@ -447,20 +453,23 @@ The SLOPE framework organizes sprint work into a hierarchy of routines${m.id ===
 Before starting a new phase or project:
 
 1. **Run \`slope roadmap interview\` when direction is unclear** — Use \`--agent\` for JSON-mode agent harnesses
-2. **Build the roadmap** — Create \`docs/backlog/roadmap.json\` with sprints, dependencies, and phases
-3. **Run \`slope roadmap validate\`** — Check for dependency cycles, numbering gaps
-4. **Run \`slope roadmap review\`** — Scope balance, critical path, bottlenecks
-5. **Run \`slope roadmap show\`** — Dependency graph and parallel tracks
+2. **Build the roadmap** — Edit declared YAML bundles when \`docs/roadmap/project.yaml\` exists; otherwise create \`docs/backlog/roadmap.json\`
+3. **Compile modular sources** — Run \`slope roadmap compile\`, \`slope roadmap validate-sources\`, and \`slope roadmap compile --check\`
+4. **Run \`slope roadmap validate\`** — Check for dependency cycles, numbering gaps
+5. **Run \`slope roadmap review\`** — Scope balance, critical path, bottlenecks
+6. **Run \`slope roadmap show\`** — Dependency graph and parallel tracks
 
 ## Pre-${r.sprint} Routine (Sprint Start)
 
 Before writing any code in a new sprint:
 
-1. **Run \`slope briefing\`** — Outputs handicap snapshot, hazard index, nutrition alerts, filtered gotchas, and session continuity
+1. **Run \`slope now\`** — Discover the current sprint and next action
+2. **Run \`slope roadmap focus --sprint=N\`** — Use the discovered sprint to load bounded context before full history
+3. **Run \`slope briefing\`** — Outputs handicap snapshot, hazard index, nutrition alerts, filtered gotchas, and session continuity
    - Use \`--categories=testing,api\` or \`--keywords=migration\` to filter for the sprint's work area
-2. **Verify previous ${r.scorecard.toLowerCase()} exists** — If the last sprint's ${r.scorecard.toLowerCase()} wasn't created, create it now
-3. **Branch hygiene check** — \`git branch -a\` to confirm no stale branches remain
-4. **Set ${r.onTarget.toLowerCase()} and slope** — ${r.onTarget} from ticket count (1-2=3, 3-4=4, 5+=5), slope from complexity factors
+4. **Verify previous ${r.scorecard.toLowerCase()} exists** — If the last sprint's ${r.scorecard.toLowerCase()} wasn't created, create it now
+5. **Branch hygiene check** — \`git branch -a\` to confirm no stale branches remain
+6. **Set ${r.onTarget.toLowerCase()} and slope** — ${r.onTarget} from ticket count (1-2=3, 3-4=4, 5+=5), slope from complexity factors
 
 ## Pre-${r.ticket} Routine (Per-Ticket, Before Code)
 
@@ -585,6 +594,8 @@ This project uses the SLOPE framework for sprint tracking.
 - \`slope review\` — generate sprint review
 - \`slope briefing\` — ${r.briefing.toLowerCase()}
 - \`slope roadmap interview\` — collect planning input when roadmap direction is unclear
+- \`slope roadmap focus --sprint=N\` — load bounded sprint context
+- \`slope roadmap validate-sources\` — validate modular roadmap sources when configured
 
 ## MCP Tools
 A SLOPE MCP server is configured in \`${mcpPath}\`. Two tools:
@@ -593,7 +604,7 @@ A SLOPE MCP server is configured in \`${mcpPath}\`. Two tools:
 - \`search({ module: 'init' })\` — discover roadmap interview questions and submit helpers
 
 ## Sprint Workflow
-- **Pre-${r.sprint}:** \`slope now\`, then \`slope start\` or \`slope start --ticket=KEY\`
+- **Pre-${r.sprint}:** \`slope now\`, use its sprint with \`slope roadmap focus --sprint=N\`, then \`slope start\`
 - **Per-${r.ticket}:** classify each ticket with approach + result + hazards
 - **Post-${r.sprint}:** \`slope validate\` ${r.scorecard.toLowerCase()}, \`slope review\`, update common-issues
 
@@ -631,17 +642,19 @@ export function generateGenericChecklist(m: MetaphorDefinition): string {
 
 ## Pre-Tournament (Course Strategy)
 1. Run \`slope roadmap interview\` when planning direction is unclear
-2. Build roadmap in \`docs/backlog/roadmap.json\`
-3. Run \`slope roadmap validate\` — check dependencies and structure
-4. Run \`slope roadmap review\` — scope balance, critical path, bottlenecks
-5. Run \`slope roadmap show\` — view dependency graph
+2. Build the roadmap in declared YAML bundles when \`docs/roadmap/project.yaml\` exists; otherwise use \`docs/backlog/roadmap.json\`
+3. For modular sources, run \`slope roadmap compile\`, \`slope roadmap validate-sources\`, and \`slope roadmap compile --check\`
+4. Run \`slope roadmap validate\` — check dependencies and structure
+5. Run \`slope roadmap review\` — scope balance, critical path, bottlenecks
+6. Run \`slope roadmap show\` — view dependency graph
 
 ## Pre-${r.sprint} (Sprint Start)
-1. Run \`slope now\` — current sprint, state, claims, next action
-2. Run \`slope start\` or \`slope start --ticket=KEY\` — sprint state, briefing, claim guidance, prep
-3. Run \`slope briefing\` when deeper hazard context is needed
-4. Verify previous ${r.scorecard.toLowerCase()} exists
-5. Set ${r.onTarget.toLowerCase()} (1-2 tickets=3, 3-4=4, 5+=5) and slope factors
+1. Run \`slope now\` — discover the current sprint, state, claims, and next action
+2. Run \`slope roadmap focus --sprint=N\` — bounded context for the discovered sprint
+3. Run \`slope start\` or \`slope start --ticket=KEY\` — sprint state, briefing, claim guidance, prep
+4. Run \`slope briefing\` when deeper hazard context is needed
+5. Verify previous ${r.scorecard.toLowerCase()} exists
+6. Set ${r.onTarget.toLowerCase()} (1-2 tickets=3, 3-4=4, 5+=5) and slope factors
 
 ## Per-Ticket
 - **Before:** Select approach (${clubs.driver}/${clubs.long_iron}/${clubs.short_iron}/${clubs.wedge}/${clubs.putter}), scan hazards

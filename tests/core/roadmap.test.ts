@@ -12,6 +12,8 @@ import {
   parseSprintNumber,
   sprintOrderValue,
   findNextPlannedSprint,
+  isRoadmapSprintPending,
+  isRoadmapSprintTerminal,
 } from '../../src/core/roadmap.js';
 import type { RoadmapDefinition, RoadmapSprint, RoadmapTicket } from '../../src/core/roadmap.js';
 
@@ -78,6 +80,29 @@ describe('sprint id formatting', () => {
     expect(nextCanonicalSprintId(114)).toBe(115);
     expect(nextCanonicalSprintId(114.5)).toBe(115);
     expect(nextCanonicalSprintId(435)).toBe(44);
+  });
+});
+
+describe('roadmap terminal status semantics', () => {
+  it.each([
+    'complete',
+    'superseded',
+    'skipped',
+    'cancelled',
+    'cancelled-absorbed',
+    'absorbed',
+  ])('treats %s as terminal and not selectable', status => {
+    const sprint = makeSprint(7, { status });
+    expect(isRoadmapSprintTerminal(sprint)).toBe(true);
+    expect(isRoadmapSprintPending(sprint)).toBe(false);
+  });
+
+  it('keeps active, planned, and unset work selectable', () => {
+    for (const status of ['active', 'planned', undefined]) {
+      const sprint = makeSprint(7, status ? { status } : {});
+      expect(isRoadmapSprintTerminal(sprint)).toBe(false);
+      expect(isRoadmapSprintPending(sprint)).toBe(true);
+    }
   });
 });
 

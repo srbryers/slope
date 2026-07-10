@@ -1,0 +1,44 @@
+version: "1"
+phase:
+  name: Phase 25 — Vision & Roadmap Generation Repair
+  sprints:
+    - 96
+  status: complete
+  note: "Close #376/#377 by preserving natural-language vision priorities and making roadmap generation refuse shallow placeholder output when backlog analysis yields no concrete work."
+sprints:
+  - id: 96
+    theme: Vision & Roadmap Generation Repair
+    par: 4
+    slope: 2
+    type: bug fix + dx
+    status: complete
+    depends_on:
+      - 95
+    note: "Address newly filed generator issues before Codex plugin work: preserve commas inside parenthesized vision list items and stop roadmap generation from emitting thin planning stubs while claiming backlog analysis."
+    tickets:
+      - key: S96-1
+        title: Make vision priorities and non-goals split only on top-level commas (#376)
+        club: wedge
+        complexity: small
+        github_issue: 376
+      - key: S96-2
+        title: Add vision create/update regression coverage for parenthesized commas (#376)
+        club: wedge
+        complexity: small
+        github_issue: 376
+        depends_on:
+          - S96-1
+      - key: S96-3
+        title: Remove shallow Investigate-and-plan roadmap stubs and fail loudly with no concrete backlog (#377)
+        club: short_iron
+        complexity: standard
+        github_issue: 377
+      - key: S96-4
+        title: Update roadmap generate CLI messaging and tests for concrete backlog requirements (#377)
+        club: wedge
+        complexity: small
+        github_issue: 377
+        depends_on:
+          - S96-3
+scorecards:
+  "96": docs/retros/sprint-96.json

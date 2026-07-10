@@ -325,11 +325,11 @@ function recommendCommands(state: {
         cmds.push('slope validate');
       }
       if (state.requiredGates.includes('review_md')) {
-        cmds.push('slope review');
+        cmds.push(`slope review --sprint=${state.currentSprint}`);
       }
       break;
     case 'complete':
-      cmds.push('slope sprint reset');
+      cmds.push(`slope sprint rollover --from=${state.currentSprint} --to=<next>`);
       cmds.push('slope briefing');
       break;
   }

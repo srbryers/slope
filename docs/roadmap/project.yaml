@@ -1,0 +1,91 @@
+version: "1"
+name: SLOPE Development Roadmap
+description: "Forward-looking roadmap from S61+. Phases 1-9 (S1-S47) are complete. S48-S60 were hardening, guard enforcement, and process sprints. This roadmap covers adoption, observability, guard maturity, multi-project, loop evolution, and issue-driven recovery. S61-S64 reflect what actually shipped (themes diverged from original plan). Note: the actual S69 diverged from the planned Referee sprint — a carryover patch kit ran instead. The Referee work was rescheduled as S78. S75.5 (The Bug Clearing) added 2026-05-02 to clear accumulated CLI bugs from external repos. S132-S136 were backfilled from shipped scorecards on 2026-06-05; S137 adds post-merge retro tooling and durable memory, S137.5 addresses Windows suite portability for #509, S138-S144 triage open GitHub issues #499/#501/#502/#503/#505/#507/#510/#511/#512/#513/#514/#515/#516/#517/#518 into focused recovery sprints, S145 closed validation-signal regressions #519/#520, S146 cleaned stale roadmap state plus decimal sprint shipped-artifact warnings (#522), S146.1 cut the v1.58.1 patch release while repairing release-bump staging (#524/#528), active inserted sprint status (#525), and guard test isolation (#526), S146.2 closes the decimal post-merge retro gap (#529), S146.3 scopes workflow-step-gate to the relevant execution (#531), S147 was superseded by later human operating surface work, S148-S151.1 completed the human operating surface simplification and Windows git fixture hardening, S152 published v1.59.0, S152.1 completed roadmap interview discoverability across supported harness surfaces, S153 closed semver recommendation hardening for #550, S154 shipped roadmap/status integrity for #563/#567/#568, S216-S222 execute the open-issue recovery train for #552/#553/#556/#557/#558/#561/#562/#565/#566/#572/#573 plus the v1.60.0 release, S223 closes #575/#576, and S224/S226/S227 plan the July 2026 review, workflow, MCP, roadmap, and review-output recovery batch for #578/#579/#580/#581/#582/#583."
+output: ../backlog/roadmap.json
+sources:
+  - path: archive/phase-10.yaml
+    kind: archive
+  - path: archive/phase-11.yaml
+    kind: archive
+  - path: archive/phase-12.yaml
+    kind: archive
+  - path: archive/phase-13.yaml
+    kind: archive
+  - path: archive/phase-14.yaml
+    kind: archive
+  - path: phases/phase-15.yaml
+    kind: phase
+  - path: archive/phase-16.yaml
+    kind: archive
+  - path: phases/phase-17.yaml
+    kind: phase
+  - path: archive/phase-18.yaml
+    kind: archive
+  - path: archive/phase-19.yaml
+    kind: archive
+  - path: archive/phase-20.yaml
+    kind: archive
+  - path: archive/phase-21.yaml
+    kind: archive
+  - path: archive/phase-22.yaml
+    kind: archive
+  - path: archive/phase-23.yaml
+    kind: archive
+  - path: archive/phase-24.yaml
+    kind: archive
+  - path: archive/phase-25.yaml
+    kind: archive
+  - path: archive/phase-26.yaml
+    kind: archive
+  - path: archive/phase-27.yaml
+    kind: archive
+  - path: archive/phase-28.yaml
+    kind: archive
+  - path: archive/phase-29.yaml
+    kind: archive
+  - path: archive/phase-30.yaml
+    kind: archive
+  - path: archive/phase-31.yaml
+    kind: archive
+  - path: archive/phase-32.yaml
+    kind: archive
+  - path: archive/phase-33.yaml
+    kind: archive
+  - path: archive/phase-34.yaml
+    kind: archive
+  - path: archive/phase-35.yaml
+    kind: archive
+  - path: archive/phase-36.yaml
+    kind: archive
+  - path: archive/phase-37.yaml
+    kind: archive
+  - path: archive/phase-38.yaml
+    kind: archive
+  - path: archive/phase-39.yaml
+    kind: archive
+  - path: archive/phase-40.yaml
+    kind: archive
+  - path: phases/phase-41.yaml
+    kind: phase
+  - path: archive/phase-42.yaml
+    kind: archive
+  - path: archive/phase-43.yaml
+    kind: archive
+  - path: archive/phase-44.yaml
+    kind: archive
+  - path: archive/phase-45.yaml
+    kind: archive
+  - path: phases/phase-46.yaml
+    kind: phase
+  - path: archive/phase-47.yaml
+    kind: archive
+  - path: archive/phase-48.yaml
+    kind: archive
+  - path: phases/phase-49.yaml
+    kind: phase
+  - path: archive/phase-50.yaml
+    kind: archive
+  - path: archive/phase-51.yaml
+    kind: archive
+  - path: phases/phase-52.yaml
+    kind: phase

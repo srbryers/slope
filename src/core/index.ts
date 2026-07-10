@@ -93,7 +93,7 @@ export {
   buildScorecard,
   buildAgentBreakdowns,
 } from './builder.js';
-export type { ScorecardInput, AgentShotInput } from './builder.js';
+export type { ScorecardInput, ScorecardShotInput, AgentShotInput } from './builder.js';
 
 // Validation
 export {
@@ -193,15 +193,53 @@ export {
   formatRoadmapSummary,
   formatStrategicContext,
   formatSprintLabel,
+  formatRoadmapSprintLabel,
   formatSprintNumber,
   nextCanonicalSprintId,
   parseSprintNumber,
   findNextPlannedSprint,
   isEncodedInsertedSprintId,
+  isEncodedInsertedSprintInRoadmap,
   isRoadmapSprintPending,
+  isRoadmapSprintTerminal,
+  ROADMAP_TERMINAL_STATUSES,
   sprintOrderValue,
+  roadmapSprintOrderValue,
   compareSprintIds,
+  compareRoadmapSprintIds,
 } from './roadmap.js';
+export type {
+  RoadmapFocusRelation,
+  RoadmapFocusSprintSummary,
+  RoadmapFocusSprint,
+  RoadmapFocusPhase,
+  RoadmapFocusNeighbor,
+  RoadmapFocusHazard,
+  RoadmapFocusEvidence,
+  RoadmapFocusResult,
+  RoadmapFocusOptions,
+} from './roadmap-focus.js';
+export { ROADMAP_FOCUS_LIMITS, buildRoadmapFocus, formatRoadmapFocus } from './roadmap-focus.js';
+export {
+  RoadmapSourceError,
+  normalizeDiagnosticPath,
+  normalizeRoadmapSourcePath,
+  parseRoadmapSourceProject,
+  parseRoadmapSourceDocument,
+  sourceProjectToRoadmap,
+  compileRoadmapSources,
+  serializeRoadmapProjection,
+  validateRoadmapSourceFederation,
+} from './roadmap-sources.js';
+export type {
+  RoadmapSourceKind,
+  RoadmapSourceEntry,
+  RoadmapSourceProject,
+  RoadmapSourceDocument,
+  LoadedRoadmapSource,
+  RoadmapSourceValidationIssue,
+  RoadmapSourceValidationResult,
+} from './roadmap-sources.js';
 export { extractSprintReferences, findShippedSprintsOnMain } from './analyzers/git.js';
 export type {
   RoadmapDefinition,
@@ -209,6 +247,7 @@ export type {
   RoadmapTicket,
   RoadmapPhase,
   RoadmapClub,
+  RoadmapTicketComplexity,
   RoadmapValidationResult,
   RoadmapValidationError,
   RoadmapValidationWarning,

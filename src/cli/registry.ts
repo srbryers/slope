@@ -162,12 +162,19 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
         { flag: '--ticket=<key>', desc: 'Ticket key to claim and prep' },
         { flag: '--actor=<name>', desc: 'Actor override for audit trail identity' },
       ]},
+      { name: 'rollover', desc: 'Audit prior sprint state and create the next planning state', flags: [
+        { flag: '--from=<N>', desc: 'Prior sprint number (required)' },
+        { flag: '--to=<N>', desc: 'Next sprint number (required)' },
+        { flag: '--force', desc: 'Allow rollover from an in-progress source sprint' },
+        { flag: '--reason=<text>', desc: 'Required justification for an in-progress rollover' },
+      ]},
       { name: 'gate', desc: 'Mark a gate as complete', flags: [
         { flag: '<name>', desc: 'Gate name to complete' },
         { flag: '--reviewer=<id>', desc: 'Independent reviewer id/name for code_review and architect_review' },
         { flag: '--evidence=<path-or-url>', desc: 'Independent review transcript or output evidence' },
         { flag: '--pr-review=<url-or-id>', desc: 'External PR review evidence' },
         { flag: '--self-review --reason=<text>', desc: 'Explicit weaker self-review provenance' },
+        { flag: '--waive-independent-review --reason=<text>', desc: 'Explicit downgrade for a required independent review' },
         { flag: '--override=<reason>', desc: 'Explicit weaker manual override provenance' },
       ]},
       { name: 'status', desc: 'Show current sprint state and gates' },
@@ -522,6 +529,24 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
       { name: 'status', desc: 'Current progress', flags: [
         { flag: '--path=<file>', desc: 'Roadmap file path' },
         { flag: '--sprint=<N>', desc: 'Focus on specific sprint' },
+      ]},
+      { name: 'focus', desc: 'Bounded sprint, phase, dependency, hazard, and evidence context', flags: [
+        { flag: '--sprint=<N>', desc: 'Sprint number (required)' },
+        { flag: '--path=<file>', desc: 'Roadmap file path' },
+        { flag: '--json', desc: 'Emit machine-readable JSON' },
+      ]},
+      { name: 'compile', desc: 'Compile modular YAML sources to the compatibility roadmap', flags: [
+        { flag: '--source=<file>', desc: 'Project manifest (default: docs/roadmap/project.yaml)' },
+        { flag: '--dry-run', desc: 'Preview projection changes without writing' },
+        { flag: '--check', desc: 'Fail when the compatibility projection has drifted' },
+      ]},
+      { name: 'validate-sources', desc: 'Validate modular sources, archive evidence, and projection drift', flags: [
+        { flag: '--source=<file>', desc: 'Project manifest (default: docs/roadmap/project.yaml)' },
+      ]},
+      { name: 'archive', desc: 'Move whole terminal phases into the modular archive', flags: [
+        { flag: '--through=<N>', desc: 'Archive complete phases through this sprint' },
+        { flag: '--source=<file>', desc: 'Project manifest (default: docs/roadmap/project.yaml)' },
+        { flag: '--dry-run', desc: 'Preview moves without writing' },
       ]},
       { name: 'show', desc: 'Render summary (critical path, parallel tracks)', flags: [
         { flag: '--path=<file>', desc: 'Roadmap file path' },

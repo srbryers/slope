@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { loadFindings } from '../../src/cli/commands/review-state.js';
 import type { FindingsFile } from '../../src/cli/commands/review-state.js';
-import { createSprintState, saveSprintState } from '../../src/cli/sprint-state.js';
+import { createSprintState, loadSprintState, saveSprintState } from '../../src/cli/sprint-state.js';
 
 let tmpDir: string;
 let origCwd: typeof process.cwd;
@@ -183,7 +183,14 @@ describe('review recommend', () => {
     spy.mockRestore();
 
     expect(logged).toContain('Recommended reviews for Sprint 74 (3 tickets, slope 3)');
+    expect(logged).toContain('Review requirements recorded in Sprint 74 state');
     expect(logged).not.toContain('Sprint 29');
+    const state = loadSprintState(tmpDir)!;
+    expect(state.review_requirements?.architect_review).toMatchObject({
+      priority: 'required',
+      source: 'review_recommend',
+    });
+    expect(state.review_requirements?.code_review.priority).toBe('optional');
   });
 
   it('honors explicit --sprint over a stale plan file', async () => {

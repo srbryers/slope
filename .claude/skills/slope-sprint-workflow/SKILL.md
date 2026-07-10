@@ -37,7 +37,7 @@ Sprint execution agent for SLOPE-managed projects. Follow the routine hierarchy 
 
 | Phase | Routine | Key Actions |
 |-------|---------|-------------|
-| Start | Pre-Round | `slope briefing`, verify last scorecard, set par/slope |
+| Start | Pre-Round | `slope now`, `slope roadmap focus --sprint=N`, briefing, verify last scorecard |
 | Per-Ticket | Pre-Shot | Select club, check yardage book, scan hazards |
 | Per-Ticket | Post-Shot | Score shot, record hazards, push |
 | End | Post-Hole | Score hole, validate, review, distill, PR |

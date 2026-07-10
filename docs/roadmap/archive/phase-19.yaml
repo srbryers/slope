@@ -1,0 +1,73 @@
+version: "1"
+phase:
+  name: Phase 19 — Agent Developer Experience
+  sprints:
+    - 88
+    - 89
+  status: complete
+  note: "Machine-readable state + bundled workflow commands. Foundation for agent-driven SLOPE usage filed as #309-316."
+sprints:
+  - id: 88
+    theme: The Compass — Agent State & Status
+    par: 4
+    slope: 1
+    type: feature + dx
+    status: complete
+    depends_on: []
+    note: "Foundation primitives for the agent-DX batch (#309-316). #310 is the keystone — once status is machine-readable, downstream commands compose."
+    tickets:
+      - key: S88-1
+        title: slope agent status — machine-readable next-step output (#310)
+        club: short_iron
+        complexity: standard
+        github_issue: 310
+      - key: S88-2
+        title: Generate AGENT_NEXT.md with current recommended action (#315)
+        club: short_iron
+        complexity: standard
+        github_issue: 315
+        depends_on:
+          - S88-1
+      - key: S88-3
+        title: slope sprint begin — bundle start, claim, briefing, and prep (#311)
+        club: short_iron
+        complexity: standard
+        github_issue: 311
+      - key: S88-4
+        title: slope ticket done — close claim and update sprint state (#316)
+        club: short_iron
+        complexity: standard
+        github_issue: 316
+  - id: 89
+    theme: The Toolkit — Agent Workflow Commands
+    par: 4
+    slope: 1
+    type: feature + dx
+    status: complete
+    depends_on:
+      - 88
+    note: Builds on S88 status primitive. Adds Codex profile and the bundled commands agents reach for most.
+    tickets:
+      - key: S89-1
+        title: slope sprint plan — generate implementation plan file (#312)
+        club: short_iron
+        complexity: standard
+        github_issue: 312
+      - key: S89-2
+        title: Simpler gate commands for agent workflows (#313)
+        club: short_iron
+        complexity: standard
+        github_issue: 313
+      - key: S89-3
+        title: slope commit-ready — pre-commit agent checks (#314)
+        club: short_iron
+        complexity: standard
+        github_issue: 314
+      - key: S89-4
+        title: First-class Codex initialization/profile (#309)
+        club: short_iron
+        complexity: standard
+        github_issue: 309
+scorecards:
+  "88": docs/retros/sprint-88.json
+  "89": docs/retros/sprint-89.json

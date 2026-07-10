@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { loadConfig } from './config.js';
-import { createSprintState, loadSprintState, mutateSprintState, saveSprintState, type SprintPhase } from './sprint-state.js';
+import { createSprintState, initializeSprintState, loadSprintState, mutateSprintState, type SprintPhase } from './sprint-state.js';
 import {
   castRoadmapStructure,
   formatSprintLabel,
@@ -182,13 +182,11 @@ export function reconcileSprintStateForBranch(cwd: string): SprintStateRebindRes
   if (state.sprint === branchSprint) return { sprint: state.sprint, rebound: false };
   if (!isStaleSprintStateForBranch(cwd, state.sprint, branchSprint)) return null;
 
-  const phase: SprintPhase = scorecardExistsForSprint(cwd, branchSprint) ? 'scoring' : 'implementing';
-  saveSprintState(cwd, createSprintState(branchSprint, phase));
   return {
-    sprint: branchSprint,
+    sprint: state.sprint,
     previousSprint: state.sprint,
-    rebound: true,
-    reason: `branch suggests S${formatSprintNumber(branchSprint)}`,
+    rebound: false,
+    reason: `branch suggests S${formatSprintNumber(branchSprint)}; audited rollover is required`,
   };
 }
 
@@ -276,8 +274,11 @@ function syncSprintStateWithWorkflowPhase(cwd: string, sprint: number, workflowP
   if (!nextPhase) return;
 
   const existing = loadSprintState(cwd);
-  if (!existing || existing.sprint !== sprint) {
-    saveSprintState(cwd, createSprintState(sprint, nextPhase));
+  if (!existing) {
+    initializeSprintState(cwd, createSprintState(sprint, nextPhase));
+    return;
+  }
+  if (existing.sprint !== sprint) {
     return;
   }
   if (existing.phase === 'complete') return;

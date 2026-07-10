@@ -1,0 +1,463 @@
+version: "1"
+phase:
+  name: Phase 49 — Issue-Driven Trust Recovery
+  sprints:
+    - 154
+    - 155
+    - 156
+    - 157
+    - 158
+    - 216
+    - 217
+    - 218
+    - 219
+    - 220
+    - 221
+    - 222
+  status: complete
+  note: S154 shipped roadmap/status integrity. The planned S155-S158 issue lane was superseded by the executed S216-S222 recovery train covering shipped-signal correctness, workflow cleanup, store/bootstrap portability, review provenance, audit trails, retro parsing, workaround codification, sprint terminology, and the v1.60.0 release.
+sprints:
+  - id: 154
+    theme: Roadmap Reality and Sprint Status Integrity
+    par: 4
+    slope: 3
+    type: bugfix + workflow
+    status: complete
+    score: 4
+    score_label: par
+    depends_on:
+      - 153
+    note: "Close #568, #563, and #567 by making roadmap sync/status preserve dependencies, avoid false shipped-sprint attribution, and report the right next action when sprint gates are complete."
+    tickets:
+      - key: S154-1
+        title: Preserve ticket dependencies during roadmap sync and refuse broad destructive rewrites (#568)
+        club: short_iron
+        complexity: standard
+        github_issue: 568
+      - key: S154-2
+        title: "Correct shipped-sprint attribution so post-merge housekeeping commits do not ship the next planned sprint (#563, #568)"
+        club: long_iron
+        complexity: moderate
+        github_issue: 563
+        depends_on:
+          - S154-1
+      - key: S154-3
+        title: Derive closeout-ready sprint status when all gates are complete instead of leaving phase planning active (#567)
+        club: short_iron
+        complexity: standard
+        github_issue: 567
+        depends_on:
+          - S154-2
+      - key: S154-4
+        title: "Add regression fixtures for roadmap sync, shipped attribution, and all-gates-complete status (#568, #563, #567)"
+        club: short_iron
+        complexity: standard
+        github_issue: 568
+        depends_on:
+          - S154-1
+          - S154-2
+          - S154-3
+  - id: 155
+    theme: Review Gate Provenance and Reviewer Routing
+    par: 4
+    slope: 3
+    type: workflow + agent-dx
+    status: superseded
+    depends_on:
+      - 154
+    note: "Superseded by S219, which shipped review gate provenance and purpose-built reviewer-agent guidance for #561/#562."
+    tickets:
+      - key: S155-1
+        title: Require explicit durable reviewer-execution evidence before review gates pass (#561)
+        club: long_iron
+        complexity: moderate
+        github_issue: 561
+      - key: S155-2
+        title: Surface missing, stale, or reused review evidence in gate/status output (#561)
+        club: short_iron
+        complexity: standard
+        github_issue: 561
+        depends_on:
+          - S155-1
+      - key: S155-3
+        title: Prompt Codex to create purpose-built reviewer agents for review gates (#562)
+        club: short_iron
+        complexity: standard
+        github_issue: 562
+        depends_on:
+          - S155-1
+      - key: S155-4
+        title: "Add regression coverage for review provenance enforcement and reviewer-agent prompts (#561, #562)"
+        club: short_iron
+        complexity: standard
+        github_issue: 561
+        depends_on:
+          - S155-1
+          - S155-2
+          - S155-3
+  - id: 156
+    theme: Codex Onboarding and Identity Reliability
+    par: 4
+    slope: 2
+    type: bugfix + documentation
+    status: superseded
+    depends_on:
+      - 155
+    note: "Superseded by S218, S220, and S221, which shipped Codex identity, custom metaphor validation, git/no-git setup, and scope-based sprint language for #556/#557/#558/#566."
+    tickets:
+      - key: S156-1
+        title: Resolve Codex actor identity for sprint claims and support an explicit claimant override (#566)
+        club: short_iron
+        complexity: standard
+        github_issue: 566
+      - key: S156-2
+        title: Reject or normalize custom metaphor interview answers before writing config (#557)
+        club: short_iron
+        complexity: standard
+        github_issue: 557
+      - key: S156-3
+        title: Require a git repository or explicit no-git mode during SLOPE project setup (#558)
+        club: short_iron
+        complexity: standard
+        github_issue: 558
+      - key: S156-4
+        title: Clarify that SLOPE sprints can be scope-based agent work units, not only time-boxed intervals (#556)
+        club: wedge
+        complexity: small
+        github_issue: 556
+        depends_on:
+          - S156-1
+          - S156-3
+  - id: 157
+    theme: Store Portability and Retro Learning Integrity
+    par: 4
+    slope: 3
+    type: bugfix + portability
+    status: superseded
+    depends_on:
+      - 156
+    note: "Superseded by S218 and S220, which shipped store portability and retro-learning prefix integrity for #553/#565."
+    tickets:
+      - key: S157-1
+        title: Detect WSL2 /mnt/c SQLite WAL incompatibility and choose a compatible journal strategy (#553)
+        club: long_iron
+        complexity: moderate
+        github_issue: 553
+      - key: S157-2
+        title: Add store health output and docs for Windows-drive no-WAL behavior (#553)
+        club: short_iron
+        complexity: standard
+        github_issue: 553
+        depends_on:
+          - S157-1
+      - key: S157-3
+        title: Parse or reject category/weight learning prefixes in retro post-merge input (#565)
+        club: short_iron
+        complexity: standard
+        github_issue: 565
+      - key: S157-4
+        title: "Add portability and retro-learning regression coverage for #553 and #565"
+        club: short_iron
+        complexity: standard
+        github_issue: 553
+        depends_on:
+          - S157-1
+          - S157-2
+          - S157-3
+  - id: 158
+    theme: Workaround Ledger and Codification Pipeline
+    par: 4
+    slope: 3
+    type: feature + workflow
+    status: superseded
+    depends_on:
+      - 157
+    note: "Superseded by S221, which shipped recurring workaround findings, codification candidate briefing, and paid-down ledger behavior for #552."
+    tickets:
+      - key: S158-1
+        title: Define the workaround ledger schema, lifecycle states, and dedupe identity (#552)
+        club: long_iron
+        complexity: moderate
+        github_issue: 552
+      - key: S158-2
+        title: Capture codification candidates from retros, reviews, and issue-scout findings (#552)
+        club: short_iron
+        complexity: standard
+        github_issue: 552
+        depends_on:
+          - S158-1
+      - key: S158-3
+        title: Surface workaround ledger candidates in briefing, now, and distill workflows (#552)
+        club: short_iron
+        complexity: standard
+        github_issue: 552
+        depends_on:
+          - S158-1
+          - S158-2
+      - key: S158-4
+        title: Add tests and docs for workaround ledger capture and promotion (#552)
+        club: short_iron
+        complexity: standard
+        github_issue: 552
+        depends_on:
+          - S158-2
+          - S158-3
+  - id: 216
+    theme: Roadmap Shipped-Signal Correctness
+    par: 3
+    slope: 2
+    type: bugfix + roadmap hygiene
+    status: complete
+    score: 4
+    score_label: bogey
+    depends_on:
+      - 154
+    note: "Close #573 before more planning work: roadmap validation must distinguish real shipped sprint work from docs-only planning references."
+    tickets:
+      - key: S216-1
+        title: Require ticket-key or implementation-shaped evidence before a sprint counts as shipped (#573)
+        club: short_iron
+        complexity: standard
+        github_issue: 573
+      - key: S216-2
+        title: Ignore docs and planning-only sprint mentions without losing true shipped detections (#573)
+        club: short_iron
+        complexity: standard
+        github_issue: 573
+        depends_on:
+          - S216-1
+      - key: S216-3
+        title: Add roadmap validate regressions for docs-only references and real ticket-key commits (#573)
+        club: wedge
+        complexity: small
+        github_issue: 573
+        depends_on:
+          - S216-1
+          - S216-2
+  - id: 217
+    theme: Workflow Runtime Cleanup and Guard Scope Recovery
+    par: 4
+    slope: 3
+    type: bugfix + guard hardening
+    status: complete
+    score: 4
+    score_label: par
+    depends_on:
+      - 216
+    note: "Close #572 by clearing abandoned running workflow executions and preventing stale executions from blocking unrelated Bash/Edit work."
+    tickets:
+      - key: S217-1
+        title: Teach cleanup --stale to pause abandoned running executions with complete scorecard and roadmap evidence (#572)
+        club: short_iron
+        complexity: standard
+        github_issue: 572
+      - key: S217-2
+        title: Scope phase-boundary guard away from unrelated Bash commands and abandoned executions (#572)
+        club: short_iron
+        complexity: standard
+        github_issue: 572
+        depends_on:
+          - S217-1
+      - key: S217-3
+        title: Make workflow-step-gate recover or fail open with diagnostics for stale validation steps (#572)
+        club: short_iron
+        complexity: standard
+        github_issue: 572
+        depends_on:
+          - S217-1
+      - key: S217-4
+        title: Add store-backed regression coverage for cleanup and guard misfire paths (#572)
+        club: wedge
+        complexity: small
+        github_issue: 572
+        depends_on:
+          - S217-2
+          - S217-3
+  - id: 218
+    theme: Store and Project Bootstrap Portability
+    par: 4
+    slope: 3
+    type: platform + onboarding bugfix
+    status: complete
+    score: 4
+    score_label: par
+    depends_on:
+      - 217
+    note: "Close the portability/bootstrap defects that break new or Windows-adjacent SLOPE projects: SQLite WAL on WSL2 mounts, no-git project modes, and invalid custom metaphor config."
+    tickets:
+      - key: S218-1
+        title: Add SQLite journal-mode fallback and override for WSL2 DrvFs and network filesystems (#553)
+        club: short_iron
+        complexity: standard
+        github_issue: 553
+      - key: S218-2
+        title: Prefix store I/O failures with resolved store path and journal-mode recovery guidance (#553)
+        club: wedge
+        complexity: small
+        github_issue: 553
+        depends_on:
+          - S218-1
+      - key: S218-3
+        title: Require git repository or explicit degraded no-git mode in init/interview/start paths (#558)
+        club: short_iron
+        complexity: standard
+        github_issue: 558
+      - key: S218-4
+        title: Reject or materialize the custom metaphor sentinel before interview writes config (#557)
+        club: wedge
+        complexity: small
+        github_issue: 557
+        depends_on:
+          - S218-3
+  - id: 219
+    theme: Independent Review Provenance
+    par: 4
+    slope: 3
+    type: workflow + review gates
+    status: complete
+    score: 4
+    score_label: par
+    depends_on:
+      - 217
+    note: "Close #561/#562 by making review gate evidence explicit and making purpose-built reviewer agents the default Codex path for high-value gates."
+    tickets:
+      - key: S219-1
+        title: Split self-authored review notes from independent review evidence in gate state (#561)
+        club: long_iron
+        complexity: moderate
+        github_issue: 561
+      - key: S219-2
+        title: Require reviewer provenance, PR review URL, or explicit weaker-mode override before review gates pass (#561)
+        club: long_iron
+        complexity: moderate
+        github_issue: 561
+        depends_on:
+          - S219-1
+      - key: S219-3
+        title: Prompt Codex to create purpose-built reviewer agents from sprint hazards and artifacts (#562)
+        club: short_iron
+        complexity: standard
+        github_issue: 562
+        depends_on:
+          - S219-1
+      - key: S219-4
+        title: "Add status/help/tests that make self-review visibly distinct from independent review (#561, #562)"
+        club: short_iron
+        complexity: standard
+        github_issue: 561
+        depends_on:
+          - S219-2
+          - S219-3
+  - id: 220
+    theme: Agent Audit Trail and Retro Parsing Repair
+    par: 4
+    slope: 2
+    type: bugfix + agent-dx
+    status: complete
+    score: 4
+    score_label: par
+    depends_on:
+      - 217
+    note: "Close #565/#566 by repairing two audit-trail weak spots: unknown ticket claimants and silently unparsed retro learning prefixes."
+    tickets:
+      - key: S220-1
+        title: Resolve useful actor identity for sprint begin and ticket claims in Codex workflows (#566)
+        club: short_iron
+        complexity: standard
+        github_issue: 566
+      - key: S220-2
+        title: Add actor override, identity-source output, and no-identity fallback tests (#566)
+        club: wedge
+        complexity: small
+        github_issue: 566
+        depends_on:
+          - S220-1
+      - key: S220-3
+        title: Parse or reject retro category and weight prefixes without persisting noisy text (#565)
+        club: short_iron
+        complexity: standard
+        github_issue: 565
+      - key: S220-4
+        title: Align retro docs/help and regression tests with the accepted learning prefix syntax (#565)
+        club: wedge
+        complexity: small
+        github_issue: 565
+        depends_on:
+          - S220-3
+  - id: 221
+    theme: Codification Candidate Ledger and Sprint Model Clarity
+    par: 4
+    slope: 3
+    type: feature + documentation
+    status: complete
+    score: 4
+    score_label: par
+    depends_on:
+      - 219
+    note: "Close #552/#556 by making recurring workarounds first-class findings and clarifying that SLOPE sprints can be scope-based work units."
+    tickets:
+      - key: S221-1
+        title: Extend findings with recurring workaround/codification candidate metadata (#552)
+        club: short_iron
+        complexity: standard
+        github_issue: 552
+      - key: S221-2
+        title: Surface codification candidates in briefing and sprint-close learning prompts (#552)
+        club: short_iron
+        complexity: standard
+        github_issue: 552
+        depends_on:
+          - S221-1
+      - key: S221-3
+        title: Add resolve/ledger behavior for paid-down codification candidates (#552)
+        club: short_iron
+        complexity: standard
+        github_issue: 552
+        depends_on:
+          - S221-1
+          - S221-2
+      - key: S221-4
+        title: Clarify scope-based versus time-boxed sprint language in interview, roadmap, and docs (#556)
+        club: wedge
+        complexity: small
+        github_issue: 556
+  - id: 222
+    theme: Open Issue Recovery Release
+    par: 3
+    slope: 1
+    type: release
+    status: complete
+    score: 4
+    score_label: bogey
+    depends_on:
+      - 218
+      - 219
+      - 220
+      - 221
+    note: Publish the S216-S221 recovery train and refresh roadmap status for the next planning lane.
+    tickets:
+      - key: S222-1
+        title: Run roadmap validation, targeted issue regressions, and full release-readiness checks
+        club: wedge
+        complexity: small
+      - key: S222-2
+        title: Bump package and bundled plugin manifest according to version recommendation
+        club: wedge
+        complexity: small
+        depends_on:
+          - S222-1
+      - key: S222-3
+        title: Publish the recovery release and update roadmap next-lane status
+        club: short_iron
+        complexity: standard
+        depends_on:
+          - S222-2
+scorecards:
+  "154": docs/retros/sprint-154.json
+  "216": docs/retros/sprint-216.json
+  "217": docs/retros/sprint-217.json
+  "218": docs/retros/sprint-218.json
+  "219": docs/retros/sprint-219.json
+  "220": docs/retros/sprint-220.json
+  "221": docs/retros/sprint-221.json
+  "222": docs/retros/sprint-222.json

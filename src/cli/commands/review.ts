@@ -1,52 +1,87 @@
-import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
-import { dirname, isAbsolute, join } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { formatSprintReview, compareSprintIds, normalizeScorecard, parseSprintNumber } from '../../core/index.js';
 import type { GolfScorecard } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { resolveMetaphor } from '../metaphor.js';
-import { updateGate } from '../sprint-state.js';
+import { loadSprintState, updateGate } from '../sprint-state.js';
 
-export function reviewCommand(path?: string, mode?: string, metaphorFlag?: string, outputPath?: string | null): void {
+function discoverScorecardPaths(cwd: string, config: ReturnType<typeof loadConfig>): string[] {
+  const dir = join(cwd, config.scorecardDir);
+  if (!existsSync(dir)) return [];
+  const patternParts = config.scorecardPattern.split('*');
+  const prefix = patternParts[0] ?? '';
+  const suffix = patternParts[1] ?? '';
+  const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const regex = new RegExp(`^${escapeRegex(prefix)}(\\d+(?:\\.\\d+)?)${escapeRegex(suffix)}$`);
+
+  return readdirSync(dir)
+    .map(file => ({ file, sprint: parseSprintNumber(file.match(regex)?.[1] ?? '') }))
+    .filter((entry): entry is { file: string; sprint: number } =>
+      entry.sprint != null && entry.sprint >= config.minSprint,
+    )
+    .sort((a, b) => compareSprintIds(a.sprint, b.sprint))
+    .map(entry => join(dir, entry.file));
+}
+
+function resolveScorecardPath(
+  path: string | undefined,
+  sprintSelector: string | undefined,
+  cwd: string,
+  config: ReturnType<typeof loadConfig>,
+): string {
+  if (path && sprintSelector) {
+    console.error('\nUse either an explicit scorecard path or --sprint, not both.\n');
+    process.exit(1);
+  }
+  if (path) return isAbsolute(path) ? path : resolve(cwd, path);
+
+  if (sprintSelector) {
+    const sprint = parseSprintNumber(sprintSelector);
+    if (sprint == null) {
+      console.error(`\nInvalid sprint selector: ${sprintSelector}\n`);
+      process.exit(1);
+    }
+    const selected = join(cwd, config.scorecardDir, config.scorecardPattern.replace('*', String(sprint)));
+    if (!existsSync(selected)) {
+      console.error(`\nScorecard not found for Sprint ${sprint}: ${relative(cwd, selected)}\n`);
+      process.exit(1);
+    }
+    return selected;
+  }
+
+  const scorecards = discoverScorecardPaths(cwd, config);
+  if (scorecards.length === 0) {
+    console.error('\nNo scorecards found. Pass an explicit scorecard path.\n');
+    process.exit(1);
+  }
+  if (scorecards.length > 1) {
+    console.error('\nMultiple scorecards found; refusing to guess which sprint to review.');
+    console.error('Pass an explicit path, for example:');
+    console.error(`  slope review ${relative(cwd, scorecards[scorecards.length - 1])}`);
+    console.error('');
+    process.exit(1);
+  }
+  return scorecards[0];
+}
+
+export function reviewCommand(
+  path?: string,
+  mode?: string,
+  metaphorFlag?: string,
+  outputPath?: string | null,
+  sprintSelector?: string,
+): void {
   const config = loadConfig();
   const cwd = process.cwd();
   const metaphor = resolveMetaphor(metaphorFlag ? [`--metaphor=${metaphorFlag}`] : [], config.metaphor);
-
-  if (!path) {
-    // Default to latest scorecard
-    const dir = join(cwd, config.scorecardDir);
-    const patternParts = config.scorecardPattern.split('*');
-    const prefix = patternParts[0] ?? '';
-    const suffix = patternParts[1] ?? '';
-    const regex = new RegExp(`^${prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\d+(?:\\.\\d+)?)${suffix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`);
-
-    try {
-      const files = readdirSync(dir)
-        .filter((f: string) => {
-          const m = f.match(regex);
-          const sprint = m ? parseSprintNumber(m[1]) : null;
-          return sprint != null && sprint >= config.minSprint;
-        })
-        .sort((a, b) => {
-          const na = parseSprintNumber(a.match(regex)?.[1] ?? '0') ?? 0;
-          const nb = parseSprintNumber(b.match(regex)?.[1] ?? '0') ?? 0;
-          return compareSprintIds(na, nb);
-        });
-      if (files.length === 0) {
-        console.log('\nNo scorecards found.\n');
-        process.exit(1);
-      }
-      path = join(dir, files[files.length - 1]);
-    } catch {
-      console.log('\nScorecard directory not found.\n');
-      process.exit(1);
-    }
-  }
+  const scorecardPath = resolveScorecardPath(path, sprintSelector, cwd, config);
 
   let raw: any;
   try {
-    raw = JSON.parse(readFileSync(path, 'utf8'));
+    raw = JSON.parse(readFileSync(scorecardPath, 'utf8'));
   } catch {
-    console.error(`\nFailed to parse ${path}\n`);
+    console.error(`\nFailed to parse ${scorecardPath}\n`);
     process.exit(1);
   }
 
@@ -60,12 +95,21 @@ export function reviewCommand(path?: string, mode?: string, metaphorFlag?: strin
   if (outputPath !== null) {
     const reviewPath = outputPath
       ? isAbsolute(outputPath) ? outputPath : join(cwd, outputPath)
-      : join(cwd, config.scorecardDir, `sprint-${card.sprint_number}-review.md`);
+      : join(dirname(scorecardPath), `sprint-${card.sprint_number}-review.md`);
     mkdirSync(dirname(reviewPath), { recursive: true });
     writeFileSync(reviewPath, review + '\n');
-    console.log(`\nReview written: ${reviewPath.replace(cwd + '/', '')}`);
+    console.error(`\nReview written: ${relative(cwd, reviewPath)}`);
   }
 
-  // Mark review_md gate complete
-  updateGate(cwd, 'review_md', true);
+  // Generating a historical sprint's review must not complete a different
+  // active sprint's gate.
+  const sprintState = loadSprintState(cwd);
+  if (sprintState?.sprint === card.sprint_number) {
+    updateGate(cwd, 'review_md', true);
+  }
 }
+
+export const reviewCommandInternals = {
+  discoverScorecardPaths,
+  resolveScorecardPath,
+};

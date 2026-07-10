@@ -1,0 +1,113 @@
+version: "1"
+phase:
+  name: Phase 15 — Loop Evolution
+  sprints:
+    - 74
+    - 75
+    - 75.5
+    - 76
+sprints:
+  - id: 74
+    theme: The Foursome v2 — Multi-Agent Session Coordination
+    par: 4
+    slope: 3
+    type: feature
+    tickets:
+      - key: S74-1
+        title: Session conflict detection across worktrees — real-time claim overlap alerts
+        club: short_iron
+        complexity: standard
+      - key: S74-2
+        title: Agent handoff protocol — structured session transfer between agents
+        club: long_iron
+        complexity: moderate
+      - key: S74-3
+        title: Parallel sprint orchestration — coordinate multiple agents on independent tickets
+        club: long_iron
+        complexity: moderate
+      - key: S74-4
+        title: Agent session dashboard — live view of all active agent sessions
+        club: short_iron
+        complexity: standard
+    depends_on:
+      - 72
+    status: complete
+  - id: 75
+    theme: The Autopilot v2 — Smart Model Routing
+    par: 4
+    slope: 2
+    type: feature
+    tickets:
+      - key: S75-1
+        title: Model success rate tracking — per-club, per-ticket-type success data
+        club: short_iron
+        complexity: standard
+      - key: S75-2
+        title: Adaptive model selection — use historical data to pick optimal model per ticket
+        club: long_iron
+        complexity: moderate
+      - key: S75-3
+        title: Model cost-performance tradeoff — factor cost into routing decisions
+        club: short_iron
+        complexity: standard
+      - key: S75-4
+        title: slope loop config recommend — suggest optimal model config from data
+        club: wedge
+        complexity: small
+    depends_on:
+      - 67
+    status: complete
+  - id: 75.5
+    theme: The Bug Clearing — CLI Bug Fixes
+    par: 3
+    slope: 1
+    type: bug fix
+    note: "Superseded by S87 (The Bug Clearing v2). #297/#299 already shipped via 14d01862; remaining bugs refreshed in S87."
+    tickets:
+      - key: S75.5-1
+        title: "Fix slope version to read from installed package (GH #300)"
+        club: wedge
+        complexity: small
+      - key: S75.5-2
+        title: "Fix review findings stale state — namespace by sprint (GH #297)"
+        club: short_iron
+        complexity: standard
+      - key: S75.5-3
+        title: "Fix review tickets display — schema field mismatch (GH #298)"
+        club: short_iron
+        complexity: standard
+      - key: S75.5-4
+        title: "Fix review findings --help crash (GH #299)"
+        club: wedge
+        complexity: small
+    depends_on: []
+    status: superseded
+  - id: 76
+    theme: The Assembly Line — Batch Sprint Execution
+    par: 4
+    slope: 3
+    type: feature
+    tickets:
+      - key: S76-1
+        title: Dependency-aware sprint scheduling — respect depends_on in continuous mode
+        club: long_iron
+        complexity: moderate
+      - key: S76-2
+        title: Parallel worktree management — auto-create/cleanup worktrees for parallel sprints
+        club: short_iron
+        complexity: standard
+      - key: S76-3
+        title: Sprint failure recovery — auto-retry with different strategy on failure
+        club: short_iron
+        complexity: standard
+      - key: S76-4
+        title: Batch execution report — summary of all sprints run in a batch
+        club: wedge
+        complexity: small
+    depends_on:
+      - 75
+    status: complete
+scorecards:
+  "74": docs/retros/sprint-74.json
+  "75": docs/retros/sprint-75.json
+  "76": docs/retros/sprint-76.json

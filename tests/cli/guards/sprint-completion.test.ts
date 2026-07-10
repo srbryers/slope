@@ -64,11 +64,11 @@ function writeScorecardAt(cwd: string, sprint: number): void {
   writeFileSync(join(dir, `sprint-${sprint}.json`), JSON.stringify({ sprint_number: sprint, score: 4, par: 4 }));
 }
 
-function writeRoadmap(sprints: Array<{ id: number; status?: string }>): void {
+function writeRoadmap(sprints: Array<{ id: number; status?: string; depends_on?: number[] }>): void {
   writeRoadmapAt(tmpDir, sprints);
 }
 
-function writeRoadmapAt(cwd: string, sprints: Array<{ id: number; status?: string }>): void {
+function writeRoadmapAt(cwd: string, sprints: Array<{ id: number; status?: string; depends_on?: number[] }>): void {
   const dir = join(cwd, 'docs', 'backlog');
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, 'roadmap.json'), JSON.stringify({
@@ -78,6 +78,7 @@ function writeRoadmapAt(cwd: string, sprints: Array<{ id: number; status?: strin
       id: s.id, theme: `S${s.id}`, par: 4, slope: 2, type: 'feature',
       tickets: [{ key: `S${s.id}-1`, title: 'T1', club: 'short_iron', complexity: 'standard' }],
       status: s.status ?? 'planned',
+      ...(s.depends_on ? { depends_on: s.depends_on } : {}),
     })),
   }));
 }
@@ -166,14 +167,15 @@ describe('sprint-completion guard', () => {
       saveSprintState(tmpDir, state);
     });
 
-    it('allows gh pr create even with incomplete gates', async () => {
+    it('denies gh pr create when phase is complete but gates remain incomplete', async () => {
       const result = await sprintCompletionGuard(makePreToolUse('gh pr create --title "t"'), tmpDir);
-      expect(result).toEqual({});
+      expect(result.decision).toBe('deny');
+      expect(result.blockReason).toContain('incomplete gates');
     });
 
-    it('allows Stop', async () => {
+    it('advises on Stop when phase is complete but evidence remains incomplete', async () => {
       const result = await sprintCompletionGuard(makeStop(), tmpDir);
-      expect(result).toEqual({});
+      expect(result.context).toContain('Remaining gates');
     });
   });
 
@@ -215,8 +217,9 @@ describe('sprint-completion guard', () => {
       expect(result).toEqual({});
     });
 
-    it('rebinds stale sprint-state to the branch sprint before PR gate checks (#503)', async () => {
+    it('refuses automatic branch rebind and preserves prior sprint evidence', async () => {
       initGitBranch('feat/sprint-66-schedule-cms');
+      writeRoadmap([{ id: 65 }, { id: 66 }]);
       saveSprintState(tmpDir, createSprintState(65, 'implementing'));
       writeScorecard(66);
 
@@ -225,11 +228,45 @@ describe('sprint-completion guard', () => {
       expect(result.decision).toBe('deny');
       expect(result.blockReason).toContain('Sprint 66');
       expect(result.blockReason).not.toContain('Sprint 65 has incomplete gates');
-      expect(result.blockReason).toContain('rebound stale sprint-state from Sprint 65 to Sprint 66');
+      expect(result.blockReason).toContain('refusing automatic rebind');
+      expect(result.blockReason).toContain('slope sprint rollover --from=65 --to=66 --force --reason="<why>"');
 
       const state = loadSprintState(tmpDir)!;
-      expect(state.sprint).toBe(66);
-      expect(state.phase).toBe('scoring');
+      expect(state.sprint).toBe(65);
+      expect(state.phase).toBe('implementing');
+    });
+
+    it('does not recommend force when the branch target depends on unfinished source work', async () => {
+      initGitBranch('feat/sprint-66-dependent');
+      writeRoadmap([{ id: 65 }, { id: 66, depends_on: [65] }]);
+      saveSprintState(tmpDir, createSprintState(65, 'implementing'));
+
+      const result = await sprintCompletionGuard(makePreToolUse('gh pr create --title "S66"'), tmpDir);
+
+      expect(result.decision).toBe('deny');
+      expect(result.blockReason).toContain('Rollover is not currently eligible');
+      expect(result.blockReason).toContain('S66 is blocked by S65');
+      expect(result.blockReason).not.toContain('--force --reason');
+      expect(loadSprintState(tmpDir)?.sprint).toBe(65);
+    });
+
+    it('blocks PR creation when rollover-linked state loses its audit', async () => {
+      initGitBranch('feat/sprint-22-lineage');
+      const state = createSprintState(22, 'complete');
+      state.rollover = {
+        transition_id: '0123456789abcdef',
+        from_sprint: 21,
+        audit_path: 'docs/retros/rollovers/missing.json',
+        recorded_at: '2026-07-10T00:00:00.000Z',
+        forced: false,
+      };
+      saveSprintState(tmpDir, state);
+
+      const result = await sprintCompletionGuard(makePreToolUse('gh pr create --title "S22"'), tmpDir);
+
+      expect(result.decision).toBe('deny');
+      expect(result.blockReason).toContain('rollover lineage verification failed');
+      expect(result.blockReason).toContain('audit is missing');
     });
 
     it('uses the shell cd target as the sprint-state and scorecard cwd for gh pr create', async () => {
@@ -380,6 +417,7 @@ describe('sprint-completion guard', () => {
       const result = await sprintCompletionGuard(makePostToolUse('gh pr merge 117 --squash', 0), tmpDir);
       expect(result.context).toContain('scoring');
       expect(result.context).toContain('Scorecard validated');
+      expect(result.context).toContain('slope review --sprint=22');
       const state = loadSprintState(tmpDir)!;
       expect(state.phase).toBe('scoring');
     });
@@ -566,6 +604,21 @@ describe('sprint-completion guard', () => {
   describe('PostToolUse sprint retrospective review completion', () => {
     beforeEach(() => {
       saveSprintState(tmpDir, createSprintState(22, 'scoring'));
+      writeScorecard(22);
+    });
+
+    it('does not mutate the generated projection when modular sources are authoritative', async () => {
+      saveSprintState(tmpDir, createSprintState(22, 'implementing'));
+      writeRoadmap([{ id: 22, status: 'planned' }]);
+      mkdirSync(join(tmpDir, 'docs', 'roadmap'), { recursive: true });
+      writeFileSync(join(tmpDir, 'docs', 'roadmap', 'project.yaml'), 'version: 1\n');
+
+      const result = await sprintCompletionGuard(makePostToolUse('slope validate', 0), tmpDir);
+
+      expect(result.context).toContain('Modular roadmap sources are authoritative');
+      expect(result.context).toContain('roadmap compile');
+      const roadmap = JSON.parse(readFileSync(join(tmpDir, 'docs', 'backlog', 'roadmap.json'), 'utf8'));
+      expect(roadmap.sprints[0].status).toBe('planned');
     });
 
     it('warns that sprint retrospective review is not PR implementation review', async () => {
@@ -575,6 +628,23 @@ describe('sprint-completion guard', () => {
       expect(result.context).toContain('sprint retrospective review is not PR implementation review');
       expect(result.context).toContain('slope pr status --sprint=22');
       expect(result.context).toContain('slope pr review');
+    });
+
+    it('does not complete the active gate after an explicit historical sprint review', async () => {
+      const result = await sprintCompletionGuard(makePostToolUse('slope review --sprint=109', 0), tmpDir);
+
+      expect(loadSprintState(tmpDir)?.gates.review_md).toBe(false);
+      expect(result.context).toContain('Historical Sprint 109 review generated');
+      expect(result.context).toContain('active Sprint 22 review gate unchanged');
+    });
+
+    it('does not complete the active gate after an explicit historical scorecard path review', async () => {
+      writeScorecard(109);
+
+      const result = await sprintCompletionGuard(makePostToolUse('slope review docs/retros/sprint-109.json', 0), tmpDir);
+
+      expect(loadSprintState(tmpDir)?.gates.review_md).toBe(false);
+      expect(result.context).toContain('Historical Sprint 109 review generated');
     });
 
     it('warns when PR implementation review is recorded but closeout settlement is still pending', async () => {

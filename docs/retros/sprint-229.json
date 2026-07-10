@@ -1,0 +1,181 @@
+{
+  "sprint_number": 229,
+  "player": "codex",
+  "theme": "Modular Roadmap Source Federation",
+  "par": 4,
+  "slope": 4,
+  "score": 6,
+  "score_label": "double_bogey",
+  "date": "2026-07-10",
+  "type": "feature + schema + planning architecture",
+  "skills_used": [
+    "slope-sprint-workflow",
+    "slope:slope-sprint",
+    "github:github"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow",
+    "slope:slope-sprint",
+    "github:github"
+  ],
+  "skill_gaps_found": [],
+  "shots": [
+    {
+      "ticket_key": "S229-1",
+      "title": "Define modular roadmap source documents with stable ordering (#584)",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "Independent review found that permissive compatibility casting could surface raw runtime errors and that manifest membership, kind, and order were not enforced as the compilation authority. Strict source schemas and exact reconciliation replaced the loose boundary."
+        }
+      ],
+      "notes": "Added versioned project, phase, backlog, and archive YAML contracts with an ordered manifest and source-attributed validation errors."
+    },
+    {
+      "ticket_key": "S229-2",
+      "title": "Compile modular sources to deterministic compatibility JSON (#584)",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "The first implementation allowed the manifest output to overlap authored or unrelated repository files and did not reject logical S435/S43.5 collisions. Output is now pinned to roadmapPath and identity normalization is roadmap-aware."
+        }
+      ],
+      "notes": "The compiler preserves authored manifest order and emits a byte-stable RoadmapDefinition projection while unchanged projects remain in single-file mode."
+    },
+    {
+      "ticket_key": "S229-3",
+      "title": "Validate federation integrity, drift, and archive evidence (#584)",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "Safety review exposed repository traversal through symlinked roots, incomplete multi-file guard coverage, malformed/delete terminal-history bypasses, and custom --source authority bypasses. All paths now fail closed with dedicated regressions."
+        }
+      ],
+      "notes": "Validation covers duplicate and logical-collision IDs, phase membership, dependencies, projection drift, archived scorecard identity, strict YAML, realpath containment, and generated-output authority."
+    },
+    {
+      "ticket_key": "S229-4",
+      "title": "Archive terminal phases without compatibility drift (#584)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "Independent review found archive plan/apply races and a data-loss path where an archive destination aliased the live source by symlink, junction, or hard link. Replanning under a federation lock, byte verification, and independent-file identity checks closed the paths."
+        }
+      ],
+      "notes": "Archive moves only whole terminal phases with durable scorecard links, keeps compiled bytes unchanged, and rejects conflicting, raced, or aliased destinations."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 2,
+    "penalties": 0,
+    "hazards_hit": 4,
+    "hazard_penalties": 2,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "wind",
+      "impact": "major",
+      "description": "The feature creates a new filesystem authority boundary over durable project history, so compatibility, identity, path containment, crash behavior, and archive races all had to be proven together."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "A generated compatibility file needs exactly one explicit authoring authority.",
+      "outcome": "Modular projects reject direct sync/generate/projection edits and compile only the complete ordered manifest."
+    },
+    {
+      "type": "lessons",
+      "description": "Lexical path containment is insufficient wherever symlinks, junctions, and hard links can exist.",
+      "outcome": "Source loading uses realpath containment and archive moves prove the destination is an independent regular file."
+    },
+    {
+      "type": "lessons",
+      "description": "Archive safety depends on identity and time, not only equal bytes.",
+      "outcome": "Archive re-plans under a shared lock and verifies source/destination bytes and filesystem identity before committing and deleting."
+    },
+    {
+      "type": "lessons",
+      "description": "History protection must fail closed on deletion and malformed replacement.",
+      "outcome": "The guard parses current terminal history separately and denies unverifiable next content across every touched source."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "Focused federation, guard, and roadmap suites passed after independent-review repairs; both reviewers independently reran their scopes.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "The complete Vitest suite passed: 3,780 tests.",
+      "status": "healthy"
+    },
+    {
+      "category": "build",
+      "description": "Production build and TypeScript typecheck passed, including packages/pi-extension.",
+      "status": "healthy"
+    },
+    {
+      "category": "review",
+      "description": "Independent architecture and filesystem-safety lanes requested changes, then approved the hardened implementation with durable tracked evidence.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "The compatibility compiler was tractable; making a durable filesystem authority genuinely safe required several adversarial review rounds.",
+    "advice_for_next_player": "Dogfood the source layout with byte-for-byte projection checks before treating modular mode as mature.",
+    "what_surprised_you": "Equal destination bytes were not evidence of a safe copy because the path could still be the same inode through an alias.",
+    "excited_about_next": "S232 can migrate SLOPE itself while legacy consumers continue reading the same roadmap.json contract."
+  },
+  "bunker_locations": [
+    "Validate authored schemas before casting to a compatibility model.",
+    "Treat the ordered manifest as an exact closed source set.",
+    "Constrain configured outputs and sources by lexical path, realpath, and filesystem identity.",
+    "Re-plan destructive filesystem operations inside the same lock used for commit.",
+    "Fail closed when durable terminal history cannot be parsed or reconstructed.",
+    "Test CLI authority rules with default, custom, and deliberately missing source selectors."
+  ],
+  "yardage_book_updates": [
+    "src/core/roadmap-sources.ts owns strict modular source parsing, compilation, serialization, and federation validation.",
+    "src/cli/roadmap-source-store.ts owns repository containment, projection authority, archive evidence, locking, and safe moves.",
+    "slope roadmap compile, validate-sources, and archive expose modular operations while single-file projects retain existing commands.",
+    "roadmap edit guards protect generated projections, ordered manifests, and terminal source history across multi-file patches."
+  ],
+  "course_management_notes": [
+    "All implementation and hardening commits are pushed; no PR merge is implied.",
+    "Independent architecture and safety reviews are approved and recorded in adjacent tracked evidence files.",
+    "A process kill after manifest commit may leave an orphan source copy, but authoritative bytes and validation remain intact."
+  ],
+  "slope_factors": [
+    "filesystem_authority",
+    "deterministic_compilation",
+    "roadmap_identity_compatibility",
+    "archive_transaction_safety",
+    "terminal_history_protection",
+    "single_file_fallback"
+  ]
+}

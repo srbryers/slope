@@ -169,6 +169,41 @@ describe('portable sprint resume (#507)', () => {
     ]);
   });
 
+  it('preserves an existing same-sprint state instead of recreating it', async () => {
+    writePointer({ phase: 'planning' });
+    const state = createSprintState(177, 'scoring');
+    state.gates.tests = true;
+    saveSprintState(tmpDir, state);
+
+    const output = await captureLog(() => sprintCommand(['resume', '--portable']));
+    const preserved = loadSprintState(tmpDir)!;
+
+    expect(output).toContain('Existing local sprint-state and rollover lineage preserved');
+    expect(preserved.phase).toBe('scoring');
+    expect(preserved.gates.tests).toBe(true);
+  });
+
+  it('refuses a different local sprint even with force and preserves exact retry flags', async () => {
+    writePointer();
+    saveSprintState(tmpDir, createSprintState(176, 'implementing'));
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((code) => { throw new ProcessExitError(code as number); });
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    let errors = '';
+    try {
+      await expect(sprintCommand([
+        'resume', '--portable', '--sprint=177', '--phase=scoring',
+        '--from=docs/backlog/.sprint-active.json', '--force',
+      ])).rejects.toBeInstanceOf(ProcessExitError);
+      errors = errSpy.mock.calls.flat().join('\n');
+    } finally {
+      errSpy.mockRestore();
+      exitSpy.mockRestore();
+    }
+
+    expect(errors).toContain('slope sprint resume --portable --sprint=177 --phase=scoring --from=docs/backlog/.sprint-active.json --force');
+    expect(loadSprintState(tmpDir)?.sprint).toBe(176);
+  });
+
   it('can dry-run from branch inference when no pointer exists', async () => {
     execFileSync('git', ['checkout', '-q', '-b', 'feature/S178-2'], { cwd: tmpDir });
     const output = await captureLog(() => sprintCommand(['resume', '--portable', '--dry-run']));

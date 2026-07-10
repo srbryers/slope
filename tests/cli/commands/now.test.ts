@@ -109,4 +109,23 @@ describe('slope now', () => {
     expect(parsed.roadmap.theme).toBe('Skill-First Human Cockpit');
     expect(parsed.nextTicket.key).toBe('S151-1');
   });
+
+  it('surfaces an explicit required-review waiver ahead of ordinary next-ticket guidance', async () => {
+    const state = createSprintState(151, 'complete');
+    state.review_requirements!.architect_review = { priority: 'required' };
+    state.gates.architect_review = true;
+    state.review_gates.architect_review = {
+      provenance: 'independent_review_waived',
+      evidence: [],
+      notes: 'Reviewer unavailable.',
+    };
+    saveSprintState(tmpDir, state);
+
+    const output = await captureLog(() => nowCommand([]));
+
+    expect(output).toContain('Review downgrade: architect_review independently required but explicitly waived');
+    expect(output).toContain('Review waiver recorded for architect_review');
+    expect(output).toContain('attach independent/PR evidence to replace it');
+    expect(output).not.toContain('Start: slope start');
+  });
 });

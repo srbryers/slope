@@ -1,0 +1,141 @@
+version: "1"
+phase:
+  name: Phase 45 — Roadmap Hygiene
+  sprints:
+    - 146
+    - 146.1
+    - 146.2
+    - 146.3
+  status: complete
+  note: Clean stale roadmap state after the recovery train, fix decimal sprint shipped-artifact detection (#522), cut the v1.58.1 patch release, repair release-bump staging/status/test-isolation issues (#524/#525/#526/#528), close the decimal post-merge retro gap (#529), and scope workflow-step-gate to the relevant execution (#531).
+sprints:
+  - id: 146
+    theme: Roadmap Hygiene and Decimal Artifact Reality Checks
+    par: 4
+    slope: 2
+    type: roadmap hygiene + bugfix
+    status: complete
+    score: 4
+    score_label: par
+    depends_on:
+      - 145
+    note: Clean stale roadmap state after S145, mark obsolete S128/S129 entries terminal, fix decimal sprint artifact shipped detection (#522), and make the next planned sprint explicit.
+    tickets:
+      - key: S146-1
+        title: Mark obsolete S128/S129 roadmap entries terminal and Phase 41/43 complete
+        club: wedge
+        complexity: small
+      - key: S146-2
+        title: Recognize decimal sprint scorecard and review artifacts as shipped commits (#522)
+        club: short_iron
+        complexity: standard
+        github_issue: 522
+      - key: S146-3
+        title: Restore explicit next sprint target and validate roadmap freshness
+        club: wedge
+        complexity: small
+        depends_on:
+          - S146-1
+          - S146-2
+  - id: 146.1
+    theme: Roadmap Hygiene Patch Release
+    par: 5
+    slope: 2
+    type: release + bugfix
+    status: complete
+    score: 6
+    score_label: bogey
+    depends_on:
+      - 146
+    note: "Cut v1.58.1 after S146, fix release-path issues #524/#525/#526/#528, and verify the CI-backed GitHub Release to npm path."
+    tickets:
+      - key: S146.1-1
+        title: Fix slope version bump staging for the bundled plugin manifest (#524)
+        club: short_iron
+        complexity: standard
+        github_issue: 524
+      - key: S146.1-2
+        title: Make roadmap status select active inserted sprints before later planned work (#525)
+        club: short_iron
+        complexity: standard
+        github_issue: 525
+        depends_on:
+          - S146.1-1
+      - key: S146.1-3
+        title: Bump package and bundled plugin manifest to 1.58.1
+        club: wedge
+        complexity: small
+        depends_on:
+          - S146.1-1
+          - S146.1-2
+      - key: S146.1-4
+        title: Isolate guard tests from parent repo branch and active sprint state (#526)
+        club: short_iron
+        complexity: standard
+        github_issue: 526
+        depends_on:
+          - S146.1-3
+      - key: S146.1-5
+        title: Validate release readiness and publish v1.58.1 through GitHub Release
+        club: wedge
+        complexity: small
+        depends_on:
+          - S146.1-4
+      - key: S146.1-6
+        title: Replace version-bump git staging shell quoting with argv execution (#528)
+        club: wedge
+        complexity: small
+        github_issue: 528
+        depends_on:
+          - S146.1-5
+  - id: 146.2
+    theme: Decimal Post-Merge Retro Support
+    par: 3
+    slope: 1
+    type: bugfix + patch release
+    status: complete
+    score: 3
+    score_label: par
+    depends_on:
+      - 146.1
+    note: "Fix post-merge retro/memory capture for inserted decimal sprints after S146.1 exposed #529, then publish the 1.58.2 patch."
+    tickets:
+      - key: S146.2-1
+        title: Accept decimal sprint ids in retro post-merge and durable retro memory (#529)
+        club: wedge
+        complexity: small
+        github_issue: 529
+      - key: S146.2-2
+        title: Bump package and bundled plugin manifest to 1.58.2 for the retro fix
+        club: wedge
+        complexity: small
+        depends_on:
+          - S146.2-1
+  - id: 146.3
+    theme: Workflow Step Gate Execution Scoping
+    par: 3
+    slope: 1
+    type: bugfix + patch release
+    status: complete
+    score: 3
+    score_label: par
+    depends_on:
+      - 146.2
+    note: "Close #531 by making workflow-step-gate choose the execution relevant to the current session or sprint, then publish the 1.58.3 patch."
+    tickets:
+      - key: S146.3-1
+        title: Scope workflow-step-gate to session/current sprint and fail open on ambiguous executions (#531)
+        club: short_iron
+        complexity: standard
+        github_issue: 531
+      - key: S146.3-2
+        title: Bump package and bundled plugin manifest to 1.58.3 for the workflow gate fix
+        club: wedge
+        complexity: small
+        depends_on:
+          - S146.3-1
+scorecards:
+  "146": docs/retros/sprint-146.json
+  "146.1": docs/retros/sprint-146.1.json
+  "146.2": docs/retros/sprint-146.2.json
+  "146.3": docs/retros/sprint-146.3.json

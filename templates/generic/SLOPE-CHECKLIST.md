@@ -1,15 +1,18 @@
 # SLOPE Sprint Checklist
 
 ## Pre-Tournament (Course Strategy)
-1. Build roadmap in `docs/backlog/roadmap.json`
-2. Run `slope roadmap validate` — check dependencies and structure
-3. Run `slope roadmap review` — scope balance, critical path, bottlenecks
-4. Run `slope roadmap show` — view dependency graph
+1. Build the roadmap in declared YAML bundles when `docs/roadmap/project.yaml` exists; otherwise use `docs/backlog/roadmap.json`
+2. For modular sources, run `slope roadmap compile`, `slope roadmap validate-sources`, and `slope roadmap compile --check`
+3. Run `slope roadmap validate` — check dependencies and structure
+4. Run `slope roadmap review` — scope balance, critical path, bottlenecks
+5. Run `slope roadmap show` — view dependency graph
 
 ## Pre-Round (Sprint Start)
-1. Run `slope briefing` — handicap, hazards, gotchas, session continuity
-2. Verify previous scorecard exists
-3. Set par (1-2 tickets=3, 3-4=4, 5+=5) and slope factors
+1. Run `slope now` — discover the current sprint and next action
+2. Run `slope roadmap focus --sprint=N` — bounded context for the discovered sprint
+3. Run `slope briefing` — handicap, hazards, gotchas, session continuity
+4. Verify previous scorecard exists
+5. Set par (1-2 tickets=3, 3-4=4, 5+=5) and slope factors
 
 ## Per-Ticket
 - **Before:** Select club (driver/long_iron/short_iron/wedge/putter), scan hazards

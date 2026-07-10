@@ -1,0 +1,40 @@
+version: "1"
+phase:
+  name: Phase 30 — Skill Awareness Closeout
+  sprints:
+    - 115
+  status: complete
+  note: "Close the remaining #431 acceptance gap and fix decimal sprint follow-on inference."
+sprints:
+  - id: 115
+    theme: Skill Awareness Closeout
+    par: 3
+    slope: 2
+    type: fix + feature
+    status: complete
+    depends_on:
+      - 114.5
+    note: "Close #431 by adding changed/claimed file matching to skill-aware briefing and fixing next-sprint inference after inserted decimal sprints."
+    tickets:
+      - key: S115-1
+        title: Fix slope next fallback after decimal inserted sprint scorecards
+        club: wedge
+        complexity: small
+        github_issue: 431
+      - key: S115-2
+        title: Include claimed/changed file paths in skill-aware briefing recommendations
+        club: short_iron
+        complexity: standard
+        github_issue: 431
+        depends_on:
+          - S115-1
+      - key: S115-3
+        title: "Record closeout and close #431"
+        club: wedge
+        complexity: small
+        github_issue: 431
+        depends_on:
+          - S115-1
+          - S115-2
+scorecards:
+  "115": docs/retros/sprint-115.json

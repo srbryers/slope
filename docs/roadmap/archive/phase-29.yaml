@@ -1,0 +1,88 @@
+version: "1"
+phase:
+  name: Phase 29 — Agent Skill Awareness
+  sprints:
+    - 114
+    - 114.5
+  status: complete
+  note: "Add repo-local skill registry, skill validation, scorecard skill fields, and skill-aware briefing for #431."
+sprints:
+  - id: 114
+    theme: Skill Registry MVP
+    par: 5
+    slope: 3
+    type: feature + agent-dx
+    status: complete
+    depends_on:
+      - 113
+    note: "Phase 1 for #431: make SLOPE aware of repo-local skills without turning SLOPE into a skill execution runtime."
+    tickets:
+      - key: S114-1
+        title: Add skill registry config, types, and .slope/skills.json persistence (#431)
+        club: short_iron
+        complexity: standard
+        github_issue: 431
+      - key: S114-2
+        title: Scan configured skill roots and parse SKILL.md plus agents/openai.yaml metadata (#431)
+        club: long_iron
+        complexity: multi-package
+        github_issue: 431
+        depends_on:
+          - S114-1
+      - key: S114-3
+        title: Add slope skills scan/list/validate commands and command registry docs (#431)
+        club: short_iron
+        complexity: standard
+        github_issue: 431
+        depends_on:
+          - S114-1
+          - S114-2
+      - key: S114-4
+        title: Add scorecard skill fields and validate --skills reference checks (#431)
+        club: short_iron
+        complexity: standard
+        github_issue: 431
+        depends_on:
+          - S114-1
+          - S114-2
+  - id: 114.5
+    theme: Skill-Aware Briefing & Gap Detection
+    par: 4
+    slope: 3
+    type: feature + planning
+    status: complete
+    depends_on:
+      - 114
+    note: "Phase 2 for #431: recommend registered skills during planning and surface repeated work that should become a skill."
+    tickets:
+      - key: S114.5-1
+        title: Add deterministic Recommended skills section to slope briefing (#431)
+        club: short_iron
+        complexity: standard
+        github_issue: 431
+      - key: S114.5-2
+        title: Match skills from sprint title, roadmap text, filters, hazards, and scorecard skill history (#431)
+        club: long_iron
+        complexity: multi-package
+        github_issue: 431
+        depends_on:
+          - S114.5-1
+      - key: S114.5-3
+        title: Surface possible skill gaps for repeated work with no registered skill (#431)
+        club: short_iron
+        complexity: standard
+        github_issue: 431
+        depends_on:
+          - S114.5-2
+      - key: S114.5-4
+        title: Document skill-aware planning flow and add briefing/validation regressions (#431)
+        club: short_iron
+        complexity: standard
+        github_issue: 431
+        depends_on:
+          - S114.5-1
+          - S114.5-2
+          - S114.5-3
+scorecards:
+  "114": docs/retros/sprint-114.json
+  "114.5": docs/retros/sprint-114.5.json

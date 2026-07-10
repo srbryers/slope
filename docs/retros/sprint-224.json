@@ -1,0 +1,160 @@
+{
+  "sprint_number": 224,
+  "player": "codex",
+  "theme": "Review Gate and Guard Advisory Honesty",
+  "par": 4,
+  "slope": 2,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-07-10",
+  "type": "bugfix + agent-dx",
+  "skills_used": [
+    "slope-sprint-workflow",
+    "slope:slope-sprint",
+    "github:github"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow",
+    "slope:slope-sprint",
+    "github:github"
+  ],
+  "skill_gaps_found": [],
+  "shots": [
+    {
+      "ticket_key": "S224-1",
+      "title": "Reword non-blocking guard advisories as explicit advisory context (#579)",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "The issue described v1.58.3 behavior, while current claim-required can genuinely ask or deny through the host adapter; the fix had to label each current enforcement mode instead of assuming every message was advisory."
+        }
+      ],
+      "notes": "scope-drift and phase-boundary fallback messages now identify themselves as non-blocking and explain that they do not grant or deny host tool permission. Phase-boundary coverage also confirms project-specific sprint fields are not required."
+    },
+    {
+      "ticket_key": "S224-2",
+      "title": "Clarify that SLOPE claims do not control host permission prompts (#579)",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "claim-required now distinguishes an ask-mode SLOPE permission request from a non-blocking missing-claim advisory and states that claims record scope without replacing host permission policy."
+    },
+    {
+      "ticket_key": "S224-3",
+      "title": "Require an explicit waiver path for required-review self-review downgrades (#578)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "review recommend persists required/recommended/optional gate requirements. Required review gates reject ordinary self-review/manual override and accept only independent evidence, PR evidence, or the distinct independent_review_waived provenance with a reason."
+    },
+    {
+      "ticket_key": "S224-4",
+      "title": "Surface required-review next actions in sprint status, slope now, and PR guidance (#578)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "The first dogfood run prioritized the waiver in slope now but still printed a stale Start next-ticket command beneath it."
+        }
+      ],
+      "notes": "sprint status, slope now, session briefing, completion guidance, registry help, and commit-ready guidance now keep required-review waivers visibly distinct, suppress contradictory ticket-start guidance, and tell operators how to replace a waiver with independent evidence."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 1,
+    "penalties": 0,
+    "hazards_hit": 2,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "wind",
+      "impact": "minor",
+      "description": "The architecture recovery train is stacked on the unmerged but clean S223 draft PR so completed issue work is not duplicated."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Agent-facing enforcement text must be derived from the actual GuardResult decision, not from a guard's historical reputation.",
+      "outcome": "Advisory, ask, and deny paths now use enforcement-specific language and tests."
+    },
+    {
+      "type": "lessons",
+      "description": "A review recommendation cannot constrain later gate completion unless its requiredness is persisted beside sprint state.",
+      "outcome": "review recommend now records gate priorities durably and gate mutation enforces them."
+    },
+    {
+      "type": "lessons",
+      "description": "A mechanical completion bit and an assurance disposition are different concepts.",
+      "outcome": "Required review waivers can complete the gate while producing a distinct ready_for_pr_with_review_waiver state and visible downgrade markers."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "Focused S224 lifecycle and guard suites passed: 245 tests across 11 files.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "Full Vitest passed: 238 files and 3758 tests, with 25 store-pg tests skipped by configuration.",
+      "status": "healthy"
+    },
+    {
+      "category": "build",
+      "description": "Typecheck and build passed, including packages/pi-extension.",
+      "status": "healthy"
+    },
+    {
+      "category": "slope",
+      "description": "Roadmap validation passed after triaging #584/#585/#586 into S228-S232 and recording #580 as already fixed by S216.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "The small wording issue exposed a deeper state-model gap, and the sprint closed both without conflating SLOPE claims with host authorization.",
+    "advice_for_next_player": "When a CLI recommendation says required, persist that decision before offering completion commands; otherwise the later gate cannot protect the intent.",
+    "what_surprised_you": "claim-required had evolved from non-blocking advice into a configurable ask/deny guard, so the issue's original blanket characterization was no longer accurate.",
+    "excited_about_next": "The remaining train can now use the new waiver path honestly while repairing workflow, scorecard, review, and roadmap architecture."
+  },
+  "bunker_locations": [
+    "Guard copy must name the enforcement mode actually returned to the harness.",
+    "Review requiredness must be durable state, not transient terminal output.",
+    "A required-review waiver should remain mechanically complete but visibly downgraded across every operator surface."
+  ],
+  "yardage_book_updates": [
+    "src/cli/sprint-state.ts now stores review requirements and independent_review_waived provenance.",
+    "src/cli/commands/review-state.ts persists review recommendation priority into matching sprint state.",
+    "src/cli/commands/sprint.ts enforces and renders the required-review waiver distinction.",
+    "Guard and cockpit surfaces now state enforcement and downgrade semantics explicitly."
+  ],
+  "course_management_notes": [
+    "S224 is stacked on S223 because PR #577 remains open and green; no merge is implied.",
+    "The full suite, typecheck, build, focused suites, and roadmap validation passed before closeout.",
+    "The required architect review cannot be delegated under the current tool policy without an explicit user request, so closeout records an independent-review waiver rather than presenting self-review as equivalent evidence."
+  ],
+  "slope_factors": [
+    "review_state_schema",
+    "agent_dx",
+    "guard_enforcement",
+    "cross_surface_status",
+    "github_issue_triage"
+  ]
+}
