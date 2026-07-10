@@ -158,7 +158,7 @@ describe('computeStatsFromShots', () => {
 // --- buildScorecard ---
 
 describe('buildScorecard', () => {
-  it('computes score as shots.length + penalties', () => {
+  it('computes score as par plus recorded penalties', () => {
     const card = buildScorecard({
       sprint_number: 168,
       theme: 'Test',
@@ -168,7 +168,7 @@ describe('buildScorecard', () => {
       shots: [makeShot(), makeShot(), makeShot(), makeShot()],
       penalties: 1,
     });
-    expect(card.score).toBe(5); // 4 shots + 1 penalty
+    expect(card.score).toBe(5); // par 4 + 1 penalty
   });
 
   it('computes score_label from score and par', () => {
@@ -218,8 +218,8 @@ describe('buildScorecard', () => {
         makeShot(),
       ],
     });
-    // 3 shots + 0 penalties + 2 hazard_penalties = 5
-    expect(card.score).toBe(5);
+    // par 4 + 0 penalties + 2 hazard_penalties = 6
+    expect(card.score).toBe(6);
     expect(card.stats.hazard_penalties).toBe(2);
   });
 
@@ -248,14 +248,13 @@ describe('buildScorecard', () => {
       par: 3,
       slope: 0,
       date: '2026-02-19',
-      shots: [makeShot(), makeShot(), makeShot(), makeShot()],
+      shots: [makeShot({ result: 'missed_long' })],
     });
     expect(card.score).toBe(4);
     expect(card.score_label).toBe('bogey');
   });
 
-  it('returns birdie score_label for 1-under (penalties offset)', () => {
-    // 2 shots on a par 3 = birdie
+  it('honors an explicit judged score override', () => {
     const card = buildScorecard({
       sprint_number: 168,
       theme: 'Test',
@@ -263,9 +262,61 @@ describe('buildScorecard', () => {
       slope: 0,
       date: '2026-02-19',
       shots: [makeShot(), makeShot()],
+      score: 2,
     });
     expect(card.score).toBe(2);
     expect(card.score_label).toBe('birdie');
+  });
+
+  it('scores a clean seven-ticket sprint at par instead of ticket count', () => {
+    const card = buildScorecard({
+      sprint_number: 168,
+      theme: 'Large clean sprint',
+      par: 5,
+      slope: 1,
+      date: '2026-02-19',
+      shots: Array.from({ length: 7 }, (_, index) => makeShot({ ticket_key: `S168-${index + 1}` })),
+    });
+
+    expect(card.score).toBe(5);
+    expect(card.score_label).toBe('par');
+  });
+
+  it('normalizes MCP ticket aliases and string hazards to canonical scorecard schema', () => {
+    const card = buildScorecard({
+      sprint_number: 168,
+      theme: 'MCP compatibility',
+      par: 3,
+      slope: 1,
+      date: '2026-02-19',
+      shots: [{
+        ticket: 'S168-1',
+        title: 'Normalize scorecard',
+        club: 'short_iron',
+        result: 'green',
+        hazards: ['Legacy string hazard'],
+      }],
+    });
+
+    expect(card.shots).toEqual([{
+      ticket_key: 'S168-1',
+      title: 'Normalize scorecard',
+      club: 'short_iron',
+      result: 'green',
+      hazards: [{ type: 'rough', severity: 'minor', description: 'Legacy string hazard' }],
+    }]);
+    expect(validateScorecard(card).valid).toBe(true);
+  });
+
+  it('rejects a missing slope instead of serializing an invalid scorecard', () => {
+    expect(() => buildScorecard({
+      sprint_number: 168,
+      theme: 'Invalid slope',
+      par: 3,
+      slope: undefined as unknown as number,
+      date: '2026-02-19',
+      shots: [makeShot()],
+    })).toThrow('slope must be a non-negative number');
   });
 
   it('defaults optional fields', () => {
@@ -360,8 +411,8 @@ describe('buildScorecard', () => {
       shots,
       putts: 2,
     });
-    expect(card.score).toBe(11);
-    expect(card.score_label).toBe('triple_plus');
+    expect(card.score).toBe(5);
+    expect(card.score_label).toBe('par');
     expect(card.stats.fairways_hit).toBe(11);
     expect(card.stats.greens_in_regulation).toBe(11);
     expect(card.stats.hazards_hit).toBe(2);

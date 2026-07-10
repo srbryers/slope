@@ -12,6 +12,10 @@ import type {
   SprintType,
   ScoreLabel,
   AgentBreakdown,
+  ClubSelection,
+  HazardHit,
+  HazardSeverity,
+  HazardType,
 } from './types.js';
 import { computeScoreLabel } from './handicap.js';
 import { HAZARD_SEVERITY_PENALTIES } from './constants.js';
@@ -24,6 +28,24 @@ const MISS_RESULT_TO_DIR: Partial<Record<ShotResult, MissDirection>> = {
   missed_left: 'left',
   missed_right: 'right',
 };
+
+const CLUBS: readonly ClubSelection[] = ['driver', 'long_iron', 'short_iron', 'wedge', 'putter'];
+const SHOT_RESULTS: readonly ShotResult[] = ['fairway', 'green', 'in_the_hole', 'missed_long', 'missed_short', 'missed_left', 'missed_right'];
+const HAZARD_TYPES: readonly HazardType[] = ['bunker', 'water', 'ob', 'rough', 'trees'];
+const HAZARD_SEVERITIES: readonly HazardSeverity[] = ['minor', 'moderate', 'major', 'critical'];
+
+/** Runtime-friendly shot input accepted by buildScorecard, including MCP/JS aliases. */
+export interface ScorecardShotInput {
+  ticket_key?: string;
+  /** Backward-compatible alias used by early MCP examples. */
+  ticket?: string;
+  title?: string;
+  club: ClubSelection;
+  result: ShotResult;
+  hazards?: Array<HazardHit | string>;
+  provisional_declared?: boolean;
+  notes?: string;
+}
 
 // --- Stats computation ---
 
@@ -157,12 +179,14 @@ export interface ScorecardInput {
   par: 3 | 4 | 5;
   slope: number;
   date: string;
-  shots: ShotRecord[];
+  shots: ScorecardShotInput[];
   player?: string;
 
   // Optional overrides for fields that can't be derived from shots
   putts?: number;
   penalties?: number;
+  /** Optional judged final score. Defaults to par plus recorded misses/penalties. */
+  score?: number;
   type?: SprintType;
   conditions?: ConditionRecord[];
   special_plays?: SpecialPlay[];
@@ -197,16 +221,20 @@ export interface ScorecardInput {
  * shot results, hazard descriptions, training, nutrition, reflection.
  */
 export function buildScorecard(input: ScorecardInput): GolfScorecard {
+  validateScorecardInput(input);
+  const shots = input.shots.map((shot, index) => normalizeScorecardShot(shot, input.sprint_number, index));
   const penalties = input.penalties ?? 0;
-  const stats = computeStatsFromShots(input.shots, {
+  const stats = computeStatsFromShots(shots, {
     putts: input.putts ?? 0,
     penalties,
   });
 
-  // Score = base strokes (1 per ticket) + miss penalties + hazard penalties + manual penalties
-  // Misses add a stroke: each missed_* result adds 1 to the score
+  // Score is quality relative to sprint par, not ticket count. Par already
+  // captures sprint size (1-2 → 3, 3-4 → 4, 5+ → 5), so counting every
+  // ticket again punishes larger, clean sprints. Misses and penalties add
+  // strokes; callers may provide a judged score when the retro warrants it.
   const missCount = Object.values(stats.miss_directions).reduce((a, b) => a + b, 0);
-  const score = Math.round(input.shots.length + missCount + penalties + stats.hazard_penalties);
+  const score = Math.round(input.score ?? (input.par + missCount + penalties + stats.hazard_penalties));
   const score_label: ScoreLabel = computeScoreLabel(score, input.par);
 
   return {
@@ -218,7 +246,7 @@ export function buildScorecard(input: ScorecardInput): GolfScorecard {
     score,
     score_label,
     date: input.date,
-    shots: input.shots,
+    shots,
     stats,
     type: input.type,
     conditions: input.conditions ?? [],
@@ -236,6 +264,83 @@ export function buildScorecard(input: ScorecardInput): GolfScorecard {
     ...(input.skill_gaps_found ? { skill_gaps_found: input.skill_gaps_found } : {}),
     ...(input.agents ? { agents: input.agents } : {}),
     ...(input.inspired_by ? { inspired_by: input.inspired_by } : {}),
+  };
+}
+
+function validateScorecardInput(input: ScorecardInput): void {
+  if (!Number.isFinite(input.sprint_number) || input.sprint_number <= 0) {
+    throw new Error('Scorecard sprint_number must be a positive number');
+  }
+  if (input.par !== 3 && input.par !== 4 && input.par !== 5) {
+    throw new Error('Scorecard par must be 3, 4, or 5');
+  }
+  if (!Number.isFinite(input.slope) || input.slope < 0) {
+    throw new Error('Scorecard slope must be a non-negative number; call computeSlope with an array of factor names');
+  }
+  if (input.score !== undefined && (!Number.isFinite(input.score) || input.score < 0)) {
+    throw new Error('Scorecard score override must be a non-negative number');
+  }
+  if (!Array.isArray(input.shots)) {
+    throw new Error('Scorecard shots must be an array');
+  }
+}
+
+function normalizeScorecardShot(raw: ScorecardShotInput, sprintNumber: number, index: number): ShotRecord {
+  if (!raw || typeof raw !== 'object') {
+    throw new Error(`Scorecard shot ${index + 1} must be an object`);
+  }
+  const ticketKey = raw.ticket_key?.trim() || raw.ticket?.trim();
+  if (!ticketKey) {
+    throw new Error(`Scorecard shot ${index + 1} requires ticket_key (ticket is accepted as a backward-compatible alias)`);
+  }
+  if (!CLUBS.includes(raw.club)) {
+    throw new Error(`Scorecard shot ${ticketKey} has invalid club "${String(raw.club)}"`);
+  }
+  if (!SHOT_RESULTS.includes(raw.result)) {
+    throw new Error(`Scorecard shot ${ticketKey} has invalid result "${String(raw.result)}"`);
+  }
+  const hazards = (raw.hazards ?? []).map((hazard, hazardIndex) =>
+    normalizeScorecardHazard(hazard, ticketKey, hazardIndex),
+  );
+  return {
+    ticket_key: ticketKey,
+    title: raw.title?.trim() || `${ticketKey} (Sprint ${sprintNumber})`,
+    club: raw.club,
+    result: raw.result,
+    hazards,
+    ...(raw.provisional_declared !== undefined ? { provisional_declared: raw.provisional_declared } : {}),
+    ...(raw.notes?.trim() ? { notes: raw.notes.trim() } : {}),
+  };
+}
+
+function normalizeScorecardHazard(
+  raw: HazardHit | string,
+  ticketKey: string,
+  index: number,
+): HazardHit {
+  if (typeof raw === 'string') {
+    const description = raw.trim();
+    if (!description) throw new Error(`Scorecard shot ${ticketKey} hazard ${index + 1} cannot be empty`);
+    return { type: 'rough', severity: 'minor', description };
+  }
+  if (!raw || typeof raw !== 'object') {
+    throw new Error(`Scorecard shot ${ticketKey} hazard ${index + 1} must be a string or hazard object`);
+  }
+  if (!HAZARD_TYPES.includes(raw.type)) {
+    throw new Error(`Scorecard shot ${ticketKey} hazard ${index + 1} has invalid type "${String(raw.type)}"`);
+  }
+  if (raw.severity !== undefined && !HAZARD_SEVERITIES.includes(raw.severity)) {
+    throw new Error(`Scorecard shot ${ticketKey} hazard ${index + 1} has invalid severity "${String(raw.severity)}"`);
+  }
+  const description = raw.description?.trim();
+  if (!description) {
+    throw new Error(`Scorecard shot ${ticketKey} hazard ${index + 1} requires a description`);
+  }
+  return {
+    type: raw.type,
+    ...(raw.severity ? { severity: raw.severity } : {}),
+    description,
+    ...(raw.gotcha_id?.trim() ? { gotcha_id: raw.gotcha_id.trim() } : {}),
   };
 }
 

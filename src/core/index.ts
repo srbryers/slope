@@ -93,7 +93,7 @@ export {
   buildScorecard,
   buildAgentBreakdowns,
 } from './builder.js';
-export type { ScorecardInput, AgentShotInput } from './builder.js';
+export type { ScorecardInput, ScorecardShotInput, AgentShotInput } from './builder.js';
 
 // Validation
 export {
