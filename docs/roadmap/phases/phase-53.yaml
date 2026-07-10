@@ -15,7 +15,7 @@ sprints:
     par: 4
     slope: 2
     type: bugfix + cross-platform compatibility
-    status: active
+    status: complete
     depends_on:
       - 232
     note: "Fix #591 without weakening semantic projection-drift detection."
@@ -44,7 +44,7 @@ sprints:
     par: 4
     slope: 3
     type: feature + review reliability
-    status: planned
+    status: active
     depends_on:
       - 232
     note: "Fix #590 by separating lookup failures from bounded diff retrieval and provider truncation."
