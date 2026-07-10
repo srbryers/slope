@@ -148,10 +148,23 @@ export function nextCanonicalSprintId(id: number): number {
   return id + 1;
 }
 
+export const ROADMAP_TERMINAL_STATUSES = new Set([
+  'complete',
+  'superseded',
+  'skipped',
+  'cancelled',
+  'cancelled-absorbed',
+  'absorbed',
+]);
+
+/** Return true when a roadmap sprint has a durable terminal disposition. */
+export function isRoadmapSprintTerminal(sprint: RoadmapSprint): boolean {
+  return ROADMAP_TERMINAL_STATUSES.has(sprint.status ?? '');
+}
+
 /** Return true when a roadmap sprint should still be considered selectable work. */
 export function isRoadmapSprintPending(sprint: RoadmapSprint): boolean {
-  const status = (sprint as RoadmapSprint & { status?: string }).status;
-  return status !== 'complete' && status !== 'superseded';
+  return !isRoadmapSprintTerminal(sprint);
 }
 
 type RoadmapTicketInput = Partial<RoadmapTicket> & { id?: unknown; key?: unknown };

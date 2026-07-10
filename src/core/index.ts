@@ -201,6 +201,8 @@ export {
   isEncodedInsertedSprintId,
   isEncodedInsertedSprintInRoadmap,
   isRoadmapSprintPending,
+  isRoadmapSprintTerminal,
+  ROADMAP_TERMINAL_STATUSES,
   sprintOrderValue,
   roadmapSprintOrderValue,
   compareSprintIds,

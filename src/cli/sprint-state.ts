@@ -64,7 +64,27 @@ export interface SprintState {
   review_requirements?: Record<ReviewGateName, ReviewGateRequirement>;
   started_at: string;
   updated_at: string;
+  rollover?: SprintRolloverLineage;
 }
+
+export interface SprintRolloverLineage {
+  transition_id: string;
+  from_sprint: number;
+  audit_path: string;
+  recorded_at: string;
+  forced: boolean;
+  reason?: string;
+}
+
+export type SprintStateLoadResult =
+  | { status: 'missing' }
+  | { status: 'corrupt'; path: string }
+  | { status: 'valid'; state: SprintState };
+
+export type SprintStateInitializationResult =
+  | { status: 'created'; state: SprintState }
+  | { status: 'existing'; state: SprintState }
+  | { status: 'corrupt'; path: string };
 
 const SPRINT_STATE_FILE = '.slope/sprint-state.json';
 
@@ -255,6 +275,14 @@ export function loadSprintState(cwd: string): SprintState | null {
   }
 }
 
+/** Distinguish absent local state from corrupt evidence that must fail closed. */
+export function loadSprintStateResult(cwd: string): SprintStateLoadResult {
+  const path = sprintStatePath(cwd);
+  if (!existsSync(path)) return { status: 'missing' };
+  const state = loadSprintState(cwd);
+  return state ? { status: 'valid', state } : { status: 'corrupt', path };
+}
+
 /** True when sprint-state represents an active workflow sprint. */
 export function isActiveSprintState(state: SprintState | null): state is SprintState {
   return Boolean(state && state.phase !== 'complete' && !isSprintComplete(state));
@@ -264,8 +292,8 @@ function sprintStatePath(cwd: string): string {
   return join(cwd, SPRINT_STATE_FILE);
 }
 
-function saveSprintStateUnlocked(filePath: string, state: SprintState): void {
-  state.updated_at = new Date().toISOString();
+function saveSprintStateUnlocked(filePath: string, state: SprintState, touchUpdatedAt = true): void {
+  if (touchUpdatedAt) state.updated_at = new Date().toISOString();
   atomicWriteFileSync(filePath, JSON.stringify(state, null, 2) + '\n');
 }
 
@@ -317,6 +345,50 @@ export function updateGate(cwd: string, gate: GateName, value: boolean, options:
     return true;
   });
   return Boolean(state && updated);
+}
+
+/** Create sprint state only when the tracked local slot is truly absent. */
+export function initializeSprintState(
+  cwd: string,
+  state: SprintState,
+): SprintStateInitializationResult {
+  const filePath = sprintStatePath(cwd);
+  return withFileLockSync(filePath, () => {
+    const loaded = loadSprintStateResult(cwd);
+    if (loaded.status === 'valid') return { status: 'existing', state: loaded.state };
+    if (loaded.status === 'corrupt') return loaded;
+    saveSprintStateUnlocked(filePath, state, false);
+    return { status: 'created', state };
+  });
+}
+
+export interface SprintStateReplacement {
+  previous: SprintState;
+  current: SprintState;
+  replaced: boolean;
+}
+
+/**
+ * Replace sprint state while holding the same lock used by ordinary mutations.
+ * The replacer may persist prerequisite audit evidence before returning the
+ * new state. Returning null leaves the current state untouched.
+ */
+export function replaceSprintState(
+  cwd: string,
+  replacer: (state: SprintState) => SprintState | null,
+): SprintStateReplacement | null {
+  const filePath = sprintStatePath(cwd);
+  return withFileLockSync(filePath, () => {
+    const previous = loadSprintState(cwd);
+    if (!previous) {
+      if (existsSync(filePath)) throw new Error(`Sprint state is corrupt and was preserved at ${filePath}.`);
+      return null;
+    }
+    const next = replacer(previous);
+    if (!next) return { previous, current: previous, replaced: false };
+    saveSprintStateUnlocked(filePath, next, false);
+    return { previous, current: next, replaced: true };
+  });
 }
 
 /** Persist review priorities inferred by `slope review recommend` for the matching active sprint. */
