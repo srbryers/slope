@@ -130,9 +130,14 @@ describe('roadmap focus projection', () => {
     roadmap.sprints.find(sprint => sprint.id === 228)!.tickets[0].github_issue = [584, 585];
 
     const focus = buildRoadmapFocus(roadmap, 228)!;
+    const projectedIssues = focus.sprint.tickets[0].github_issue;
+    expect(Array.isArray(projectedIssues)).toBe(true);
+    if (Array.isArray(projectedIssues)) projectedIssues[0] = 999;
 
     expect(focus.evidence.filter(item => item.kind === 'issue').map(item => item.ref))
       .toEqual(['#584', '#585']);
+    expect(roadmap.sprints.find(sprint => sprint.id === 228)!.tickets[0].github_issue)
+      .toEqual([584, 585]);
   });
 
   it('includes only bounded hazards from the selected, dependency, and recent phase scorecards', () => {

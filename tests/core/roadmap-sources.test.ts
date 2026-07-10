@@ -144,6 +144,21 @@ describe('modular roadmap compilation', () => {
     expect(first).not.toContain('scorecards');
     expect(first.endsWith('\n')).toBe(true);
   });
+
+  it('does not alias legacy issue arrays from authored sources into the projection', () => {
+    const project = parseRoadmapSourceProject(PROJECT);
+    project.sources = [project.sources[0]];
+    const document = parseRoadmapSourceDocument(
+      PHASE.replace('complexity: small', 'complexity: risky\n        github_issue: [290, 324]'),
+      'phases/phase-01.yaml',
+    );
+    const roadmap = compileRoadmapSources(project, [{ entry: project.sources[0], document }]);
+    const projectedIssues = roadmap.sprints[0].tickets[0].github_issue;
+
+    expect(Array.isArray(projectedIssues)).toBe(true);
+    if (Array.isArray(projectedIssues)) projectedIssues[0] = 999;
+    expect(document.sprints[0].tickets[0].github_issue).toEqual([290, 324]);
+  });
 });
 
 describe('modular roadmap federation validation', () => {

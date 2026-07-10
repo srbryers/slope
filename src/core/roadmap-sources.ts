@@ -350,6 +350,7 @@ function cloneSprint(sprint: RoadmapSprint): RoadmapSprint {
     tickets: sprint.tickets.map(ticket => ({
       ...ticket,
       ...(ticket.depends_on ? { depends_on: [...ticket.depends_on] } : {}),
+      ...(Array.isArray(ticket.github_issue) ? { github_issue: [...ticket.github_issue] } : {}),
     })),
     ...(sprint.artifacts ? { artifacts: [...sprint.artifacts] } : {}),
     ...(sprint.expected_artifacts ? { expected_artifacts: [...sprint.expected_artifacts] } : {}),
