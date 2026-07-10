@@ -1,0 +1,176 @@
+{
+  "sprint_number": 231,
+  "player": "codex",
+  "theme": "Auditable Terminal Sprint Rollover",
+  "par": 4,
+  "slope": 3,
+  "score": 6,
+  "score_label": "double_bogey",
+  "date": "2026-07-10",
+  "type": "feature + lifecycle safety",
+  "skills_used": [
+    "slope-sprint-workflow",
+    "slope:slope-sprint",
+    "github:github"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow",
+    "slope:slope-sprint",
+    "github:github"
+  ],
+  "skill_gaps_found": [],
+  "shots": [
+    {
+      "ticket_key": "S231-1",
+      "title": "Define terminal rollover eligibility and tracked audit record shape (#586)",
+      "club": "long_iron",
+      "result": "missed_right",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "The first audit bound the prior state but not the complete next state, accepted permissively normalized state, and could strand recovery after roadmap drift. Independent review required a full transition integrity payload, strict evidence shape, and audit-as-commit recovery semantics."
+        }
+      ],
+      "notes": "The final tracked audit records actor/request, exact prior and canonical next state, roadmap digest, dependency evidence, validated scorecard paths/digests, claims/session policy, and durable lineage."
+    },
+    {
+      "ticket_key": "S231-2",
+      "title": "Implement slope sprint rollover --from --to with dependency and terminal-state checks (#586)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "moderate",
+          "description": "Roadmap-complete metadata initially allowed a forced unfinished source to satisfy a dependency on itself. Completion evidence now excludes the local source unless its exact gate-derived state is terminal."
+        }
+      ],
+      "notes": "The command selects the next authored dependency-eligible pending sprint, supports explicit forced/reasoned incomplete handoff, writes audit before replacement under locks, and reuses the exact audited next state after a crash."
+    },
+    {
+      "ticket_key": "S231-3",
+      "title": "Teach sprint begin to emit the exact safe rollover recovery command (#586)",
+      "club": "short_iron",
+      "result": "missed_right",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "Fixing begin/start alone left older workflow rebind, review-tier initialization, PR guard, and portable-resume paths able to erase or ignore lineage. Retry rendering also needed platform-aware shell quoting and identity/pointer flag preservation."
+        }
+      ],
+      "notes": "Every normal cross-sprint entry now refuses destructive replacement, emits bounded eligibility-aware guidance, preserves meaningful retry flags, and verifies existing lineage before progressing."
+    },
+    {
+      "ticket_key": "S231-4",
+      "title": "Cover terminal, dependency-blocked, in-progress forced, and audit-preservation rollover paths (#586)",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Coverage includes terminal/forced/dependency/terminal-status matrices, 435/43.5 identity, corrupt state, audit tampering, next-state integrity, roadmap drift recovery, scorecard durability, duplicate flags, missing lineage, guard behavior, portable resume, and evolved target state."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 2,
+    "fairways_total": 4,
+    "greens_in_regulation": 2,
+    "greens_total": 4,
+    "putts": 2,
+    "penalties": 0,
+    "hazards_hit": 3,
+    "hazard_penalties": 2,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 2
+    }
+  },
+  "conditions": [
+    {
+      "type": "wind",
+      "impact": "major",
+      "description": "Sprint state is consumed by commands, workflow synchronization, guards, portable recovery, claims, and PR gates, so a safe new transition required auditing and closing older mutation paths rather than adding one isolated command."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "An audit is useful only when every downstream consumer verifies its lineage.",
+      "outcome": "Begin, start, workflow synchronization, review-tier initialization, portable resume, agent guidance, and PR guards now preserve or verify rollover evidence."
+    },
+    {
+      "type": "lessons",
+      "description": "Audit persistence is the transition commit point.",
+      "outcome": "Crash recovery trusts the integrity-bound audit and tolerates later roadmap byte drift while reusing the exact recorded next state."
+    },
+    {
+      "type": "lessons",
+      "description": "Missing and corrupt state are different operational facts.",
+      "outcome": "Strict load and initialize/mutate helpers fail closed and preserve corrupt bytes."
+    },
+    {
+      "type": "lessons",
+      "description": "Copyable recovery output is part of the security boundary.",
+      "outcome": "Duplicate flags are rejected, output is bounded, and user values are platform-aware shell-quoted with actor and pointer flags retained."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "testing",
+      "description": "The final focused matrix passed 208 tests across rollover, state, workflow, begin/start, guards, agent output, review-tier initialization, and portable resume.",
+      "status": "healthy"
+    },
+    {
+      "category": "testing",
+      "description": "The complete repository suite passed 3,918 tests with 25 skipped after final review hardening and closeout evidence edits.",
+      "status": "healthy"
+    },
+    {
+      "category": "build",
+      "description": "Production build and TypeScript typecheck passed, including packages/pi-extension.",
+      "status": "healthy"
+    },
+    {
+      "category": "review",
+      "description": "Both independent lanes rejected multiple rounds, all required fixes were addressed, and both reviewers approved the final normal-flow lifecycle contract.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "The command itself was straightforward; the real work was finding every older path that could silently make its audit meaningless.",
+    "advice_for_next_player": "Treat tracked lineage as a system-wide invariant and test recovery after evidence changes, not only the happy transition.",
+    "what_surprised_you": "A safe retry message had both identity correctness and shell-execution consequences.",
+    "excited_about_next": "S232 can now dogfood both modular roadmap sources and the audited S231-to-S232 handoff."
+  },
+  "bunker_locations": [
+    "Do not let roadmap-complete metadata satisfy a dependency on locally unfinished forced work.",
+    "Bind the complete canonical transition, then permit only documented target-state evolution.",
+    "Validate and digest evidence artifacts; identifiers alone are not durable completion proof.",
+    "Treat missing, corrupt, and valid state as distinct cases at every mutation boundary.",
+    "Audit every legacy overwrite path, including workflow resync, guards, and portable recovery.",
+    "Shell-quote copyable guidance and preserve actor, pointer, phase, and force semantics."
+  ],
+  "yardage_book_updates": [
+    "src/cli/sprint-rollover.ts owns pure eligibility, contained evidence loading, integrity-bound audit persistence, crash recovery, and lineage verification.",
+    "src/cli/sprint-state.ts provides strict missing/corrupt/valid loading plus locked initialize, mutation, conditional phase update, and replacement primitives.",
+    "Sprint begin/start, workflow synchronization, completion guards, review-tier initialization, and portable resume no longer silently replace cross-sprint state.",
+    "Roadmap terminal dispositions are centralized and legacy encoded sprint identity is used for eligibility and labels."
+  ],
+  "course_management_notes": [
+    "All implementation and review-repair commits are pushed; no PR merge is implied.",
+    "Independent architecture and adversarial reviewers approved the final implementation with tracked evidence.",
+    "slope sprint reset remains an explicitly destructive emergency exception and is no longer recommended for normal sprint handoff."
+  ],
+  "slope_factors": [
+    "state_machine_integrity",
+    "audit_durability",
+    "dependency_evidence",
+    "crash_recovery",
+    "lineage_consumption",
+    "shell_safe_guidance",
+    "legacy_bypass_closure"
+  ]
+}
