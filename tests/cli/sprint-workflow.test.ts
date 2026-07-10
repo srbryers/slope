@@ -210,6 +210,27 @@ describe('slope sprint run', () => {
     }
   });
 
+  it('defaults built-in sprint-standard tickets deterministically when omitted (#581)', async () => {
+    writeRoadmap(120);
+
+    await captureLog(() =>
+      sprintCommand(['run', '--workflow=sprint-standard', '--var', 'sprint_id=S120'])
+    );
+
+    const store = createStore({ storePath: '.slope/slope.db', cwd: tmpDir });
+    try {
+      const exec = await store.getExecutionBySprint('S120');
+      expect(exec?.variables.tickets).toBe('S120-1,S120-2,S120-3');
+    } finally {
+      store.close();
+    }
+  });
+
+  it('explains the deterministic tickets contract when no roadmap default exists (#581)', async () => {
+    await expect(sprintCommand(['run', '--workflow=sprint-standard', '--var', 'sprint_id=S120']))
+      .rejects.toThrow('no roadmap tickets were found for S120');
+  });
+
   it('syncs sprint-state to implementing when workflow starts in per_ticket', async () => {
     await captureLog(() =>
       sprintCommand(['run', 'S98', '--workflow=sprint-lightweight', '--var=tickets=T1,T2'])

@@ -766,6 +766,12 @@ function applyWorkflowVariableDefaults(
     const tickets = roadmapTicketKeysForSprint(cwd, sprintId);
     if (tickets.length > 0) {
       vars.tickets = tickets.join(',');
+    } else {
+      const sprintHint = sprintId ? ` for ${sprintId}` : '';
+      throw new Error(
+        `Required variable "tickets" not provided and no roadmap tickets were found${sprintHint}. ` +
+        'Provide a comma-separated/JSON ticket list or a count, for example `--var tickets=T1,T2` or `--var tickets=3`.',
+      );
     }
   }
 }
@@ -1571,6 +1577,7 @@ Legacy commands:
 
 Workflow commands:
   slope sprint run <id> --workflow=<name> [--var k=v ...]   Start workflow execution
+                                      tickets accepts a list/JSON array or count (tickets=3)
   slope sprint status [sprint_id]    Show workflow execution progress
   slope sprint resume <sprint_id>    Resume a paused workflow execution
   slope sprint pause <sprint_id>     Pause a running workflow execution
