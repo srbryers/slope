@@ -5857,7 +5857,7 @@
       "par": 4,
       "slope": 4,
       "type": "feature + migration architecture",
-      "status": "active",
+      "status": "complete",
       "depends_on": [
         232
       ],
@@ -5908,7 +5908,7 @@
       "par": 4,
       "slope": 4,
       "type": "feature + transactional migration",
-      "status": "planned",
+      "status": "active",
       "depends_on": [
         235
       ],

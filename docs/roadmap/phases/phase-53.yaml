@@ -80,7 +80,7 @@ sprints:
     par: 4
     slope: 4
     type: feature + migration architecture
-    status: active
+    status: complete
     depends_on:
       - 232
     note: "Plan #589 repairs explicitly before any filesystem write."
@@ -116,7 +116,7 @@ sprints:
     par: 4
     slope: 4
     type: feature + transactional migration
-    status: planned
+    status: active
     depends_on:
       - 235
     note: "Apply #589 only after the repair plan is complete and reproducible."
