@@ -438,7 +438,7 @@
         235,
         236
       ],
-      "status": "active",
+      "status": "complete",
       "note": "Issue-driven recovery for #591, #590, and #589. Prioritize the Windows federation unblocker, then review scale, then migration planning/apply safety."
     }
   ],
@@ -5908,7 +5908,7 @@
       "par": 4,
       "slope": 4,
       "type": "feature + transactional migration",
-      "status": "active",
+      "status": "complete",
       "depends_on": [
         235
       ],
