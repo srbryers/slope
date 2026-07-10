@@ -24,14 +24,13 @@ sprints:
         title: Normalize Codex Bash guard input to the effective exec workdir (#456/#459)
         club: long_iron
         complexity: moderate
-        github_issue: 456
-        github_issues:
+        github_issue:
           - 456
           - 459
       - key: S125-2
         title: Recover and remember exec workdir from Codex transcript/tool_use_id context (#459)
         club: driver
-        complexity: moderate
+        complexity: risky
         github_issue: 459
         depends_on:
           - S125-1
@@ -46,14 +45,13 @@ sprints:
         title: Add cross-repo/worktree regressions for branch-before-commit and worktree-check (#456/#459)
         club: short_iron
         complexity: standard
-        github_issue: 456
+        github_issue:
+          - 456
+          - 459
         depends_on:
           - S125-1
           - S125-2
           - S125-3
-        github_issues:
-          - 456
-          - 459
   - id: 126
     theme: Native Store Error Recovery Guidance
     par: 4

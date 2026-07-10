@@ -211,7 +211,7 @@ sprints:
       - key: S141-2
         title: Add workflow resync path that fast-forwards execution state from branch and commits (#503)
         club: driver
-        complexity: moderate
+        complexity: risky
         github_issue: 503
         depends_on:
           - S141-1
@@ -287,7 +287,7 @@ sprints:
       - key: S143-2
         title: Add sprint resume command that reconstructs local sprint phase and ticket progress (#507)
         club: driver
-        complexity: moderate
+        complexity: risky
         github_issue: 507
         depends_on:
           - S143-1

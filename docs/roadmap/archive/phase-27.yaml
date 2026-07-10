@@ -150,7 +150,7 @@ sprints:
       - key: S101-2
         title: Normalize touched paths from file_path/path/apply_patch payloads across edit-time guards (#396)
         club: long_iron
-        complexity: moderate
+        complexity: multi-package
         github_issue: 396
         depends_on:
           - S101-1

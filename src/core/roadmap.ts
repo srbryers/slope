@@ -6,15 +6,26 @@
 /** Club selection for a roadmap ticket (mirrors core ClubSelection) */
 export type RoadmapClub = 'driver' | 'long_iron' | 'short_iron' | 'wedge' | 'putter';
 
+/** Canonical values plus bounded aliases retained by pre-schema roadmap history. */
+export type RoadmapTicketComplexity =
+  | 'trivial'
+  | 'small'
+  | 'standard'
+  | 'moderate'
+  | 'multi_package'
+  | 'multi-package'
+  | 'risky';
+
 /** A single ticket within a sprint */
 export interface RoadmapTicket {
   key: string;           // e.g., "S7-1"
   id?: string;           // accepted alias for external roadmap inputs
   title: string;
   club: RoadmapClub;
-  complexity: 'trivial' | 'small' | 'standard' | 'moderate';
+  complexity: RoadmapTicketComplexity;
   depends_on?: string[]; // ticket keys (intra-sprint or cross-sprint)
-  github_issue?: number;
+  /** New tickets use one issue; legacy history may retain multiple issue links. */
+  github_issue?: number | number[];
   note?: string;
 }
 

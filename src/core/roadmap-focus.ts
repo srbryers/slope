@@ -238,12 +238,15 @@ function sprintEvidence(sprint: RoadmapSprint): RoadmapFocusEvidence[] {
   const evidence: RoadmapFocusEvidence[] = [];
   for (const ticket of sprint.tickets) {
     if (ticket.github_issue == null) continue;
-    evidence.push({
-      kind: 'issue',
-      label: `GitHub issue #${ticket.github_issue}`,
-      ref: `#${ticket.github_issue}`,
-      sprint: sprint.id,
-    });
+    const issues = Array.isArray(ticket.github_issue) ? ticket.github_issue : [ticket.github_issue];
+    for (const issue of issues) {
+      evidence.push({
+        kind: 'issue',
+        label: `GitHub issue #${issue}`,
+        ref: `#${issue}`,
+        sprint: sprint.id,
+      });
+    }
   }
   for (const ref of sprint.artifacts ?? []) {
     evidence.push({ kind: 'other', label: 'Artifact', ref, sprint: sprint.id });

@@ -203,7 +203,17 @@ export function parseRoadmapSourceDocument(
   }
 
   const validClubs = new Set(['driver', 'long_iron', 'short_iron', 'wedge', 'putter']);
-  const validComplexities = new Set(['trivial', 'small', 'standard', 'moderate']);
+  // Pre-schema compatibility values are deliberately bounded rather than
+  // normalized: federation must reproduce accepted historical JSON exactly.
+  const validComplexities = new Set([
+    'trivial',
+    'small',
+    'standard',
+    'moderate',
+    'multi_package',
+    'multi-package',
+    'risky',
+  ]);
   for (const [sprintIndex, value] of raw.sprints.entries()) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) {
       throw new RoadmapSourceError(`sprints[${sprintIndex}] must be a mapping`, sourcePath);
@@ -268,9 +278,11 @@ export function parseRoadmapSourceDocument(
           || ticket.depends_on.some(id => typeof id !== 'string' || !id.trim()))) {
         throw new RoadmapSourceError(`sprints[${sprintIndex}].tickets[${ticketIndex}].depends_on must contain ticket keys`, sourcePath);
       }
+      const issueValues = Array.isArray(ticket.github_issue) ? ticket.github_issue : [ticket.github_issue];
       if (ticket.github_issue != null
-        && (typeof ticket.github_issue !== 'number' || !Number.isInteger(ticket.github_issue) || ticket.github_issue <= 0)) {
-        throw new RoadmapSourceError(`sprints[${sprintIndex}].tickets[${ticketIndex}].github_issue must be a positive integer`, sourcePath);
+        && (issueValues.length === 0
+          || issueValues.some(issue => typeof issue !== 'number' || !Number.isInteger(issue) || issue <= 0))) {
+        throw new RoadmapSourceError(`sprints[${sprintIndex}].tickets[${ticketIndex}].github_issue must be a positive integer or non-empty sequence of positive integers`, sourcePath);
       }
       if (ticket.note != null && typeof ticket.note !== 'string') {
         throw new RoadmapSourceError(`sprints[${sprintIndex}].tickets[${ticketIndex}].note must be a string`, sourcePath);

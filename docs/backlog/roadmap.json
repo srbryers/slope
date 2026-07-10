@@ -1318,7 +1318,7 @@
           "key": "S86-4",
           "title": "Backfill missing scorecards for S70, S74-S83 (#318)",
           "club": "long_iron",
-          "complexity": "moderate",
+          "complexity": "multi_package",
           "github_issue": 318
         },
         {
@@ -1326,8 +1326,7 @@
           "title": "Briefing surfaces next sprint + fix title/theme schema drift (#290, #324)",
           "club": "wedge",
           "complexity": "small",
-          "github_issue": 290,
-          "github_issues": [
+          "github_issue": [
             290,
             324
           ]
@@ -1480,7 +1479,7 @@
           "key": "S90-2",
           "title": "Implement memory ops in store-sqlite + store-pg",
           "club": "long_iron",
-          "complexity": "moderate",
+          "complexity": "multi_package",
           "github_issue": 294,
           "depends_on": [
             "S90-1"
@@ -2005,7 +2004,7 @@
           "key": "S101-2",
           "title": "Normalize touched paths from file_path/path/apply_patch payloads across edit-time guards (#396)",
           "club": "long_iron",
-          "complexity": "moderate",
+          "complexity": "multi-package",
           "github_issue": 396,
           "depends_on": [
             "S101-1"
@@ -2385,7 +2384,7 @@
           "key": "S114-2",
           "title": "Scan configured skill roots and parse SKILL.md plus agents/openai.yaml metadata (#431)",
           "club": "long_iron",
-          "complexity": "moderate",
+          "complexity": "multi-package",
           "github_issue": 431,
           "depends_on": [
             "S114-1"
@@ -2438,7 +2437,7 @@
           "key": "S114.5-2",
           "title": "Match skills from sprint title, roadmap text, filters, hazards, and scorecard skill history (#431)",
           "club": "long_iron",
-          "complexity": "moderate",
+          "complexity": "multi-package",
           "github_issue": 431,
           "depends_on": [
             "S114.5-1"
@@ -2832,8 +2831,7 @@
           "title": "Normalize Codex Bash guard input to the effective exec workdir (#456/#459)",
           "club": "long_iron",
           "complexity": "moderate",
-          "github_issue": 456,
-          "github_issues": [
+          "github_issue": [
             456,
             459
           ]
@@ -2842,7 +2840,7 @@
           "key": "S125-2",
           "title": "Recover and remember exec workdir from Codex transcript/tool_use_id context (#459)",
           "club": "driver",
-          "complexity": "moderate",
+          "complexity": "risky",
           "github_issue": 459,
           "depends_on": [
             "S125-1"
@@ -2863,15 +2861,14 @@
           "title": "Add cross-repo/worktree regressions for branch-before-commit and worktree-check (#456/#459)",
           "club": "short_iron",
           "complexity": "standard",
-          "github_issue": 456,
+          "github_issue": [
+            456,
+            459
+          ],
           "depends_on": [
             "S125-1",
             "S125-2",
             "S125-3"
-          ],
-          "github_issues": [
-            456,
-            459
           ]
         }
       ]
@@ -3157,7 +3154,7 @@
           "key": "S132-1",
           "title": "Normalize ticket scorecards and review artifacts",
           "club": "driver",
-          "complexity": "moderate"
+          "complexity": "risky"
         }
       ]
     },
@@ -3179,7 +3176,7 @@
           "key": "S133-1",
           "title": "Keep PR prompt state pending and surface ABI recovery",
           "club": "driver",
-          "complexity": "moderate"
+          "complexity": "risky"
         }
       ]
     },
@@ -3585,7 +3582,7 @@
           "key": "S141-2",
           "title": "Add workflow resync path that fast-forwards execution state from branch and commits (#503)",
           "club": "driver",
-          "complexity": "moderate",
+          "complexity": "risky",
           "github_issue": 503,
           "depends_on": [
             "S141-1"
@@ -3691,7 +3688,7 @@
           "key": "S143-2",
           "title": "Add sprint resume command that reconstructs local sprint phase and ticket progress (#507)",
           "club": "driver",
-          "complexity": "moderate",
+          "complexity": "risky",
           "github_issue": 507,
           "depends_on": [
             "S143-1"

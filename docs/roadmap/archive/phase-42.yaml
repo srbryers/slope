@@ -25,7 +25,7 @@ sprints:
       - key: S132-1
         title: Normalize ticket scorecards and review artifacts
         club: driver
-        complexity: moderate
+        complexity: risky
   - id: 133
     theme: PR Review State and Runtime Health
     par: 3
@@ -41,7 +41,7 @@ sprints:
       - key: S133-1
         title: Keep PR prompt state pending and surface ABI recovery
         club: driver
-        complexity: moderate
+        complexity: risky
   - id: 134
     theme: Warning Hygiene and Briefing/Map Safety
     par: 3

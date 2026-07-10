@@ -24,7 +24,7 @@ sprints:
       - key: S90-2
         title: Implement memory ops in store-sqlite + store-pg
         club: long_iron
-        complexity: moderate
+        complexity: multi_package
         github_issue: 294
         depends_on:
           - S90-1

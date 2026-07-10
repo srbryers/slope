@@ -247,6 +247,7 @@ export type {
   RoadmapTicket,
   RoadmapPhase,
   RoadmapClub,
+  RoadmapTicketComplexity,
   RoadmapValidationResult,
   RoadmapValidationError,
   RoadmapValidationWarning,

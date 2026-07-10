@@ -25,7 +25,7 @@ sprints:
       - key: S114-2
         title: Scan configured skill roots and parse SKILL.md plus agents/openai.yaml metadata (#431)
         club: long_iron
-        complexity: moderate
+        complexity: multi-package
         github_issue: 431
         depends_on:
           - S114-1
@@ -63,7 +63,7 @@ sprints:
       - key: S114.5-2
         title: Match skills from sprint title, roadmap text, filters, hazards, and scorecard skill history (#431)
         club: long_iron
-        complexity: moderate
+        complexity: multi-package
         github_issue: 431
         depends_on:
           - S114.5-1

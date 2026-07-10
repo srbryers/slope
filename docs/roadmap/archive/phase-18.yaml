@@ -37,14 +37,13 @@ sprints:
       - key: S86-4
         title: Backfill missing scorecards for S70, S74-S83 (#318)
         club: long_iron
-        complexity: moderate
+        complexity: multi_package
         github_issue: 318
       - key: S86-5
         title: "Briefing surfaces next sprint + fix title/theme schema drift (#290, #324)"
         club: wedge
         complexity: small
-        github_issue: 290
-        github_issues:
+        github_issue:
           - 290
           - 324
   - id: 87

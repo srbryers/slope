@@ -67,6 +67,29 @@ describe('modular roadmap source schema', () => {
     expect(source.scorecards).toEqual({ '7': 'docs/retros/sprint-7.json' });
   });
 
+  it('preserves bounded pre-schema ticket values without compatibility drift', () => {
+    const legacy = PHASE
+      .replace('complexity: small', 'complexity: multi_package\n        github_issue: [290, 324]');
+    const source = parseRoadmapSourceDocument(legacy, 'docs/roadmap/archive/phase-01.yaml');
+
+    expect(source.sprints[0].tickets[0]).toMatchObject({
+      complexity: 'multi_package',
+      github_issue: [290, 324],
+    });
+    expect(serializeRoadmapProjection({
+      name: 'Legacy',
+      phases: [source.phase],
+      sprints: source.sprints,
+    })).toContain('"github_issue": [');
+  });
+
+  it('still rejects unbounded complexity and issue compatibility values', () => {
+    expect(() => parseRoadmapSourceDocument(PHASE.replace('complexity: small', 'complexity: enormous'), 'phase.yaml'))
+      .toThrow(/complexity is invalid/);
+    expect(() => parseRoadmapSourceDocument(PHASE.replace('complexity: small', 'complexity: small\n        github_issue: []'), 'phase.yaml'))
+      .toThrow(/github_issue must be/);
+  });
+
   it('reports duplicate YAML keys with a normalized source path', () => {
     expect(() => parseRoadmapSourceProject(`${PROJECT}\nname: duplicate\n`, 'docs\\roadmap\\project.yaml'))
       .toThrow(/docs\/roadmap\/project\.yaml: YAML parse error/);
