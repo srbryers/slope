@@ -14,6 +14,8 @@ export interface RoadmapTicket {
   club: RoadmapClub;
   complexity: 'trivial' | 'small' | 'standard' | 'moderate';
   depends_on?: string[]; // ticket keys (intra-sprint or cross-sprint)
+  github_issue?: number;
+  note?: string;
 }
 
 /** A sprint within the roadmap */
@@ -25,12 +27,23 @@ export interface RoadmapSprint {
   type: string;          // e.g., "architecture + methodology"
   tickets: RoadmapTicket[];
   depends_on?: number[]; // sprint IDs this sprint depends on
+  status?: string;
+  note?: string;
+  outcome?: string;
+  phase?: string;
+  wave?: string;
+  artifacts?: string[];
+  expected_artifacts?: string[];
+  research?: string[];
 }
 
 /** A phase grouping sprints */
 export interface RoadmapPhase {
   name: string;          // e.g., "Phase 1 — Foundation"
   sprints: number[];     // sprint IDs in this phase
+  description?: string;
+  status?: string;
+  note?: string;
 }
 
 /** Top-level roadmap definition */
@@ -168,6 +181,36 @@ function normalizeRoadmap(roadmap: RoadmapDefinition): RoadmapDefinition {
   };
 }
 
+/** Resolve legacy encoded half-sprint IDs using evidence from one roadmap. */
+export function isEncodedInsertedSprintInRoadmap(roadmap: RoadmapDefinition, id: number): boolean {
+  if (!isEncodedInsertedSprintId(id)) return false;
+
+  const sprintIds = new Set(roadmap.sprints.map(sprint => sprint.id));
+  const sprint = roadmap.sprints.find(candidate => candidate.id === id);
+  const canonicalPrefix = `S${id}-`;
+  const encodedPrefix = `${formatSprintLabel(id)}-`;
+  const ticketKeys = sprint?.tickets.map(getRoadmapTicketKey).filter((key): key is string => key !== null) ?? [];
+
+  if (ticketKeys.some(key => key.startsWith(canonicalPrefix))) return false;
+  if (ticketKeys.some(key => key.startsWith(encodedPrefix))) return true;
+  if (sprintIds.has(id - 1) || sprintIds.has(id + 1)) return false;
+
+  const base = Math.floor(id / 10);
+  return sprintIds.has(base) || sprintIds.has(base + 1);
+}
+
+export function roadmapSprintOrderValue(roadmap: RoadmapDefinition, id: number): number {
+  return isEncodedInsertedSprintInRoadmap(roadmap, id) ? sprintOrderValue(id) : id;
+}
+
+export function compareRoadmapSprintIds(roadmap: RoadmapDefinition, a: number, b: number): number {
+  return roadmapSprintOrderValue(roadmap, a) - roadmapSprintOrderValue(roadmap, b);
+}
+
+export function formatRoadmapSprintLabel(roadmap: RoadmapDefinition, id: number): string {
+  return isEncodedInsertedSprintInRoadmap(roadmap, id) ? formatSprintLabel(id) : `S${id}`;
+}
+
 /** Validate a roadmap definition for structural correctness.
  *  Optionally cross-check sprint status against scorecards and/or shipped
  *  sprint commits on main when provided. Caller is responsible for collecting
@@ -182,32 +225,8 @@ export function validateRoadmap(
   const warnings: RoadmapValidationWarning[] = [];
   const sprintIds = new Set(roadmap.sprints.map(s => s.id));
 
-  const sprintById = new Map(roadmap.sprints.map(sprint => [sprint.id, sprint]));
-
-  // Context-aware encoding guard. The pure helper isEncodedInsertedSprintId
-  // treats every 3-digit id >=200 ending in 5 as a legacy half-sprint
-  // (435 => S43.5). That is ambiguous against ordinary sprint numbers
-  // (S205..S995 also end in 5). Within a roadmap we have context: ticket
-  // prefixes are the strongest signal, immediate canonical neighbours
-  // (S204/S206) indicate a real canonical sprint, and base sprint neighbours
-  // (S43/S44) indicate the genuine legacy S43.5 insertion case.
-  const decodesAsHalf = (id: number): boolean => {
-    if (!isEncodedInsertedSprintId(id)) return false;
-
-    const sprint = sprintById.get(id);
-    const canonicalPrefix = `S${id}-`;
-    const encodedPrefix = `${formatSprintLabel(id)}-`;
-    const ticketKeys = sprint?.tickets.map(getRoadmapTicketKey).filter((key): key is string => key !== null) ?? [];
-
-    if (ticketKeys.some(key => key.startsWith(canonicalPrefix))) return false;
-    if (ticketKeys.some(key => key.startsWith(encodedPrefix))) return true;
-    if (sprintIds.has(id - 1) || sprintIds.has(id + 1)) return false;
-
-    const base = Math.floor(id / 10);
-    return sprintIds.has(base) || sprintIds.has(base + 1);
-  };
-  const orderOf = (id: number): number => (decodesAsHalf(id) ? sprintOrderValue(id) : id);
-  const labelOf = (id: number): string => (decodesAsHalf(id) ? formatSprintLabel(id) : `S${id}`);
+  const orderOf = (id: number): number => roadmapSprintOrderValue(roadmap, id);
+  const labelOf = (id: number): string => formatRoadmapSprintLabel(roadmap, id);
 
   // Check: at least one sprint
   if (roadmap.sprints.length === 0) {

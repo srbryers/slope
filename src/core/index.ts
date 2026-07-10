@@ -193,14 +193,18 @@ export {
   formatRoadmapSummary,
   formatStrategicContext,
   formatSprintLabel,
+  formatRoadmapSprintLabel,
   formatSprintNumber,
   nextCanonicalSprintId,
   parseSprintNumber,
   findNextPlannedSprint,
   isEncodedInsertedSprintId,
+  isEncodedInsertedSprintInRoadmap,
   isRoadmapSprintPending,
   sprintOrderValue,
+  roadmapSprintOrderValue,
   compareSprintIds,
+  compareRoadmapSprintIds,
 } from './roadmap.js';
 export type {
   RoadmapFocusRelation,
@@ -213,6 +217,7 @@ export type {
   RoadmapFocusResult,
   RoadmapFocusOptions,
 } from './roadmap-focus.js';
+export { ROADMAP_FOCUS_LIMITS, buildRoadmapFocus, formatRoadmapFocus } from './roadmap-focus.js';
 export { extractSprintReferences, findShippedSprintsOnMain } from './analyzers/git.js';
 export type {
   RoadmapDefinition,
