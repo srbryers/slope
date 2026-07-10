@@ -240,6 +240,28 @@ export type {
   RoadmapSourceValidationIssue,
   RoadmapSourceValidationResult,
 } from './roadmap-sources.js';
+export {
+  RoadmapMigrationError,
+  computeRoadmapMigrationDigest,
+  parseRoadmapMigrationMapping,
+  planRoadmapMigration,
+  serializeRoadmapMigrationMappingTemplate,
+} from './roadmap-migration.js';
+export type {
+  RoadmapMigrationClassification,
+  RoadmapMigrationOwnershipMapping,
+  RoadmapMigrationTicketRepair,
+  RoadmapMigrationMapping,
+  RoadmapMigrationScorecardEvidence,
+  RoadmapMigrationAuditEntry,
+  RoadmapMigrationDiagnostic,
+  RoadmapMigrationUnresolvedRepair,
+  RoadmapMigrationSourcePlan,
+  RoadmapMigrationNonCoreExport,
+  RoadmapMigrationMappingTemplate,
+  RoadmapMigrationPlan,
+  PlanRoadmapMigrationOptions,
+} from './roadmap-migration.js';
 export { extractSprintReferences, findShippedSprintsOnMain } from './analyzers/git.js';
 export type {
   RoadmapDefinition,
