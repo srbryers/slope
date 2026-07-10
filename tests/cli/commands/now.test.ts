@@ -126,5 +126,6 @@ describe('slope now', () => {
     expect(output).toContain('Review downgrade: architect_review independently required but explicitly waived');
     expect(output).toContain('Review waiver recorded for architect_review');
     expect(output).toContain('attach independent/PR evidence to replace it');
+    expect(output).not.toContain('Start: slope start');
   });
 });

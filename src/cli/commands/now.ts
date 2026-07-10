@@ -161,7 +161,7 @@ function printNowSnapshot(snapshot: NowSnapshot): void {
   }
   console.log(`Claims: ${snapshot.claims.total} active, ${snapshot.claims.ticketClaims} ticket`);
   console.log(`Next: ${snapshot.nextAction}`);
-  if (snapshot.nextTicket) {
+  if (snapshot.nextTicket && snapshot.nextAction.startsWith('Start ')) {
     console.log(`Start: slope start --ticket=${snapshot.nextTicket.key}`);
   }
   console.log(`More: slope roadmap status --sprint=${formatSprintNumber(snapshot.sprint)}\n`);
