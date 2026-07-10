@@ -114,7 +114,7 @@ function choosePendingSprint(
   );
   if (insertedRecovery) return insertedRecovery;
 
-  return pendingSprints.find(sprint => sprintOrderValue(sprint.id) > sprintOrderValue(latestScorecard));
+  return pendingSprints[0];
 }
 
 function isInsertedSprintId(id: number): boolean {
