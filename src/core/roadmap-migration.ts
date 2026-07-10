@@ -8,7 +8,11 @@ import {
   type RoadmapPhase,
   type RoadmapSprint,
 } from './roadmap.js';
-import { serializeRoadmapProjection, type RoadmapSourceKind } from './roadmap-sources.js';
+import {
+  normalizeRoadmapSourcePath,
+  serializeRoadmapProjection,
+  type RoadmapSourceKind,
+} from './roadmap-sources.js';
 
 export type RoadmapMigrationClassification = 'archive' | 'live' | 'history_unverified' | 'backlog';
 
@@ -257,7 +261,7 @@ export function parseRoadmapMigrationMapping(input: unknown): RoadmapMigrationMa
     for (const [id, path] of Object.entries(input.scorecards).sort(([a], [b]) => Number(a) - Number(b))) {
       parsePositiveSprintKey(id, 'scorecards');
       if (typeof path !== 'string' || !path.trim()) throw new RoadmapMigrationError(`scorecards.${id} must be a non-empty path`);
-      scorecards[id] = path.trim().replace(/\\/g, '/');
+      scorecards[id] = normalizeRoadmapSourcePath(path, `scorecards.${id}`);
     }
   }
 

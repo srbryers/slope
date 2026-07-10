@@ -56,11 +56,13 @@ describe('roadmap migration mapping', () => {
     const source = roadmap([{ name: 'One', sprints: [1] }], [sprint(1)]);
     const parsed = mapping(source, {
       ownership: { '1': { phase_index: 1, phase_name: 'One' } },
-      scorecards: { '1': 'docs\\retros\\sprint-1.json' },
+      scorecards: { '1': '.\\docs\\retros\\sprint-1.json' },
     });
 
     expect(parsed.version).toBe('1');
     expect(parsed.scorecards['1']).toBe('docs/retros/sprint-1.json');
+    expect(() => mapping(source, { scorecards: { '1': '../outside.json' } })).toThrow(/escapes/);
+    expect(() => mapping(source, { scorecards: { '1': '/absolute.json' } })).toThrow(/relative/);
     expect(() => parseRoadmapMigrationMapping({ ...parsed, mystery: true })).toThrow(/unknown field/);
     expect(() => planRoadmapMigration(source, {
       mapping: { ...parsed, source_sha256: '0'.repeat(64) },
