@@ -7,22 +7,24 @@ The SLOPE framework organizes sprint work into a hierarchy of routines, mirrorin
 Before starting a new phase or project:
 
 1. **Define the vision** — What does the end state look like? Document in a vision doc
-2. **Build the roadmap** — Create `docs/backlog/roadmap.json` with sprints, dependencies, and phases
-3. **Run `slope roadmap validate`** — Check for structural issues, dependency cycles, numbering gaps
-4. **Run `slope roadmap review`** — Automated architect review: scope balance, critical path, bottlenecks
-5. **Identify the critical path** — Run `slope roadmap show` to see the dependency graph and parallel tracks
-6. **Plan parallel tracks** — If sprints can run concurrently, plan for multi-agent execution
+2. **Build the roadmap** — If `docs/roadmap/project.yaml` exists, edit its declared YAML bundles; otherwise create `docs/backlog/roadmap.json`
+3. **Compile and validate modular sources** — Run `slope roadmap compile`, `slope roadmap validate-sources`, and `slope roadmap compile --check`
+4. **Run `slope roadmap validate`** — Check for structural issues, dependency cycles, numbering gaps
+5. **Run `slope roadmap review`** — Automated architect review: scope balance, critical path, bottlenecks
+6. **Identify the critical path** — Run `slope roadmap show` to see the dependency graph and parallel tracks
+7. **Plan parallel tracks** — If sprints can run concurrently, plan for multi-agent execution
 
 ## Pre-Round Routine (Sprint Start)
 
 Before writing any code in a new sprint:
 
-1. **Run `slope briefing`** — Single command that outputs handicap snapshot, hazard index, nutrition alerts, filtered gotchas, and session continuity
+1. **Run `slope roadmap focus --sprint=N`** — Load bounded sprint, phase, dependency, hazard, and evidence context
+2. **Run `slope briefing`** — Single command that outputs handicap snapshot, hazard index, nutrition alerts, filtered gotchas, and session continuity
    - Use `--categories=testing,api` or `--keywords=migration` to filter for the sprint's work area
-2. **Verify previous scorecard exists** — If the last sprint's scorecard wasn't created, create it now
-3. **Branch hygiene check** — `git branch -a` to confirm no stale branches remain
-4. **Gap analysis** (if touching API or schema) — Read relevant docs and compare against implementation before writing code
-5. **Set par and slope** — Par from ticket count (1-2=3, 3-4=4, 5+=5), slope from complexity factors
+3. **Verify previous scorecard exists** — If the last sprint's scorecard wasn't created, create it now
+4. **Branch hygiene check** — `git branch -a` to confirm no stale branches remain
+5. **Gap analysis** (if touching API or schema) — Read relevant docs and compare against implementation before writing code
+6. **Set par and slope** — Par from ticket count (1-2=3, 3-4=4, 5+=5), slope from complexity factors
 
 ## Pre-Shot Routine (Per-Ticket, Before Code)
 

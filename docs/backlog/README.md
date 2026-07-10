@@ -30,9 +30,10 @@ Sprint plans and backlog items for the SLOPE framework (core, CLI, MCP tools).
 
 ## Roadmap
 
-Unified roadmap covering all 13 phases (S1-S58) plus active Phase 10 (Loop Quality): [roadmap.md](roadmap.md)
-
-Machine-readable version: [roadmap.json](roadmap.json)
+Author the roadmap through [the modular source manifest](../roadmap/project.yaml)
+and its declared archive/live phase bundles. [roadmap.json](roadmap.json) is the
+generated compatibility projection; run `slope roadmap compile` after source
+edits and verify it with `slope roadmap validate-sources`.
 
 ## Research
 
