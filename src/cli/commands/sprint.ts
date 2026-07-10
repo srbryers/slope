@@ -8,6 +8,8 @@ import {
   clearSprintState,
   isSprintComplete,
   isReviewGateSatisfied,
+  isRequiredReviewGate,
+  waivedReviewGateNames,
   pendingGateNames,
   pendingGates,
   isSprintPhase,
@@ -144,6 +146,7 @@ function parseGateOptions(args: string[]): ParsedGateOptions {
   let reviewer: string | undefined;
   let prReview: string | undefined;
   let selfReview = false;
+  let waiveIndependentReview = false;
   let notes: string | undefined;
   let reason: string | undefined;
   let overrideReason: string | undefined;
@@ -185,6 +188,11 @@ function parseGateOptions(args: string[]): ParsedGateOptions {
       continue;
     }
 
+    if (arg === '--waive-independent-review') {
+      waiveIndependentReview = true;
+      continue;
+    }
+
     const reasonValue = optionValue(args, i, '--reason');
     if (reasonValue) {
       if (!reasonValue.value || reasonValue.value.startsWith('--')) errors.push('--reason requires a value');
@@ -214,12 +222,13 @@ function parseGateOptions(args: string[]): ParsedGateOptions {
 
   const hasPrReview = Boolean(prReview);
   const hasSelfReview = selfReview;
+  const hasWaiver = waiveIndependentReview;
   const hasOverride = Boolean(overrideReason);
-  const hasIndependent = !hasPrReview && !hasSelfReview && !hasOverride && (Boolean(reviewer) || evidence.length > 0);
-  const modeCount = [hasPrReview, hasSelfReview, hasOverride, hasIndependent].filter(Boolean).length;
+  const hasIndependent = !hasPrReview && !hasSelfReview && !hasWaiver && !hasOverride && (Boolean(reviewer) || evidence.length > 0);
+  const modeCount = [hasPrReview, hasSelfReview, hasWaiver, hasOverride, hasIndependent].filter(Boolean).length;
 
   if (modeCount > 1) {
-    errors.push('Use only one review provenance mode: --reviewer/--evidence, --pr-review, --self-review, or --override.');
+    errors.push('Use only one review provenance mode: --reviewer/--evidence, --pr-review, --self-review, --waive-independent-review, or --override.');
   }
 
   let review: ReviewGateCompletionInput | undefined;
@@ -228,6 +237,8 @@ function parseGateOptions(args: string[]): ParsedGateOptions {
       review = { provenance: 'pr_review', evidence: [prReview!, ...evidence], reviewer, notes: notes ?? reason };
     } else if (hasSelfReview) {
       review = { provenance: 'self_review', evidence, reviewer, notes: reason ?? notes };
+    } else if (hasWaiver) {
+      review = { provenance: 'independent_review_waived', evidence, reviewer, notes: reason ?? notes };
     } else if (hasOverride) {
       review = { provenance: 'manual_override', evidence, reviewer, notes: overrideReason };
     } else {
@@ -246,12 +257,14 @@ function printGateUsage(gateName?: GateName): void {
   console.error(`  slope sprint gate ${gate} --reviewer=<agent-or-person> --evidence=<transcript-or-output>`);
   console.error(`  slope sprint gate ${gate} --pr-review=<url-or-id>`);
   console.error(`  slope sprint gate ${gate} --self-review --reason="why self-review is acceptable"`);
+  console.error(`  slope sprint gate ${gate} --waive-independent-review --reason="why the required independent review is being waived"`);
   console.error(`  slope sprint gate ${gate} --override="manual override reason"`);
   console.error('');
   console.error('Review provenance modes:');
   console.error('  independent_review: requires --reviewer and --evidence');
   console.error('  pr_review: records external PR review evidence from --pr-review');
   console.error('  self_review (weaker): requires --self-review and --reason');
+  console.error('  independent_review_waived: explicit waiver for a required review; requires --waive-independent-review and --reason');
   console.error('  manual_override (weaker): requires --override');
   console.error('');
 }
@@ -524,19 +537,32 @@ function gateCommand(args: string[], cwd: string): void {
     console.error('Error: review evidence options only apply to code_review and architect_review gates.');
     process.exit(1);
   }
+  const state = loadSprintState(cwd);
+  if (!state) {
+    console.error("No active sprint. Run 'slope sprint start --number=N' first.");
+    process.exit(1);
+  }
+
   if (isReviewGateName(gateName)) {
+    const required = isRequiredReviewGate(state, gateName);
+    const provenance = options.review?.provenance;
+    if (required && (provenance === 'self_review' || provenance === 'manual_override')) {
+      console.error(`Error: ${gateName} is a required independent review; --self-review/--override cannot silently satisfy it.`);
+      console.error(`Choose independent evidence, PR review evidence, or --waive-independent-review --reason="...".`);
+      printGateUsage(gateName);
+      process.exit(1);
+    }
+    if (!required && provenance === 'independent_review_waived') {
+      console.error(`Error: ${gateName} is not recorded as required; use --self-review --reason="..." for a weaker optional/recommended review.`);
+      printGateUsage(gateName);
+      process.exit(1);
+    }
     const validation = validateReviewGateCompletion(options.review);
     if (validation) {
       console.error(`Error: ${validation}.`);
       printGateUsage(gateName);
       process.exit(1);
     }
-  }
-
-  const state = loadSprintState(cwd);
-  if (!state) {
-    console.error("No active sprint. Run 'slope sprint start --number=N' first.");
-    process.exit(1);
   }
 
   if (state.gates[gateName] && (!isReviewGateName(gateName) || !options.review)) {
@@ -566,8 +592,12 @@ function formatReviewEvidence(review: ReviewGateState): string {
 
 function formatReviewGateStatus(state: SprintState, gate: ReviewGateName): string {
   const review = state.review_gates[gate];
+  const requirement = state.review_requirements?.[gate];
+  const requiredLabel = requirement?.priority === 'required' ? 'required independent review' : null;
   if (!state.gates[gate] || review.provenance === 'pending') {
-    return 'pending review evidence';
+    return requiredLabel
+      ? `${requiredLabel} pending; choose reviewer evidence, PR review evidence, or an explicit waiver`
+      : 'pending review evidence';
   }
 
   const validation = validateReviewGateCompletion({
@@ -587,6 +617,8 @@ function formatReviewGateStatus(state: SprintState, gate: ReviewGateName): strin
       return `pr_review; evidence=${formatReviewEvidence(review)}`;
     case 'self_review':
       return `self_review (weaker); reason=${review.notes}`;
+    case 'independent_review_waived':
+      return `required independent review WAIVED; reason=${review.notes}`;
     case 'manual_override':
       return `manual_override (weaker); reason=${review.notes}`;
   }
@@ -600,7 +632,10 @@ function statusCommand(cwd: string): void {
   }
 
   const complete = isSprintComplete(state);
-  const derivedStatus = complete ? 'ready_for_pr' : state.phase;
+  const waivedReviews = waivedReviewGateNames(state);
+  const derivedStatus = complete
+    ? waivedReviews.length > 0 ? 'ready_for_pr_with_review_waiver' : 'ready_for_pr'
+    : state.phase;
   const phaseContext = complete ? ` (phase: ${state.phase}, all gates complete)` : ` (phase: ${state.phase})`;
   console.log(`Sprint ${formatSprintNumber(state.sprint)} - status: ${derivedStatus}${phaseContext}`);
   console.log(`Started: ${state.started_at}`);
@@ -610,7 +645,9 @@ function statusCommand(cwd: string): void {
   for (const [gate, done] of Object.entries(state.gates)) {
     if (isReviewGateName(gate)) {
       const satisfied = isReviewGateSatisfied(state, gate);
-      const marker = satisfied ? '[x]' : done ? '[!]' : '[ ]';
+      const marker = satisfied
+        ? state.review_gates[gate].provenance === 'independent_review_waived' ? '[~]' : '[x]'
+        : done ? '[!]' : '[ ]';
       console.log(`  ${marker} ${gate} (${formatReviewGateStatus(state, gate)})`);
     } else {
       const marker = done ? '[x]' : '[ ]';
@@ -629,7 +666,12 @@ function statusCommand(cwd: string): void {
     });
     console.log(`\nRemaining: ${pending.join(', ')}`);
   } else {
-    console.log('\nNext: create PR for this branch; after merge, run post-merge retro.');
+    if (waivedReviews.length > 0) {
+      console.log(`\nNext: ${waivedReviews.join(', ')} has an explicit independent-review waiver.`);
+      console.log('Attach independent reviewer/PR evidence to replace the waiver, or proceed only with the recorded downgrade visible in PR guidance.');
+    } else {
+      console.log('\nNext: create PR for this branch; after merge, run post-merge retro.');
+    }
   }
 }
 
@@ -1518,7 +1560,8 @@ Legacy commands:
   slope sprint gate <name> [review evidence options]
                                       Mark a gate as complete
                                       Review gates require independent evidence, PR review evidence,
-                                      or explicit weaker-mode self_review/manual_override provenance
+                                      required reviews need independent evidence or an explicit
+                                      --waive-independent-review downgrade; optional reviews may use self_review
   slope sprint status                Show sprint state and gates
   slope sprint resume --portable [--from=path] [--force] [--dry-run]
                                       Reconstruct local sprint state from tracked artifacts

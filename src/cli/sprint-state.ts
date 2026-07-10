@@ -9,8 +9,23 @@ export type SprintPhase = typeof SPRINT_PHASES[number];
 /** Gate names that must be completed before PR */
 export type GateName = 'tests' | 'code_review' | 'architect_review' | 'scorecard' | 'review_md';
 export type ReviewGateName = Extract<GateName, 'code_review' | 'architect_review'>;
-export type ReviewGateProvenance = 'pending' | 'self_review' | 'independent_review' | 'manual_override' | 'pr_review';
+export type ReviewGateProvenance = 'pending' | 'self_review' | 'independent_review' | 'independent_review_waived' | 'manual_override' | 'pr_review';
 export type ReviewGateCompletionProvenance = Exclude<ReviewGateProvenance, 'pending'>;
+export type ReviewGatePriority = 'required' | 'recommended' | 'optional' | 'unspecified';
+
+export interface ReviewGateRequirement {
+  priority: ReviewGatePriority;
+  reason?: string;
+  source?: string;
+  updated_at?: string;
+}
+
+export interface ReviewGateRequirementInput {
+  gate: ReviewGateName;
+  priority: Exclude<ReviewGatePriority, 'unspecified'>;
+  reason?: string;
+  source?: string;
+}
 
 export interface ReviewGateState {
   provenance: ReviewGateProvenance;
@@ -46,6 +61,7 @@ export interface SprintState {
   phase: SprintPhase;
   gates: Record<GateName, boolean>;
   review_gates: Record<ReviewGateName, ReviewGateState>;
+  review_requirements?: Record<ReviewGateName, ReviewGateRequirement>;
   started_at: string;
   updated_at: string;
 }
@@ -58,6 +74,7 @@ const REVIEW_GATE_PROVENANCES: readonly ReviewGateProvenance[] = [
   'pending',
   'self_review',
   'independent_review',
+  'independent_review_waived',
   'manual_override',
   'pr_review',
 ];
@@ -79,6 +96,17 @@ export function createDefaultReviewGates(): Record<ReviewGateName, ReviewGateSta
   return {
     code_review: createDefaultReviewGateState(),
     architect_review: createDefaultReviewGateState(),
+  };
+}
+
+function createDefaultReviewGateRequirement(): ReviewGateRequirement {
+  return { priority: 'unspecified' };
+}
+
+export function createDefaultReviewRequirements(): Record<ReviewGateName, ReviewGateRequirement> {
+  return {
+    code_review: createDefaultReviewGateRequirement(),
+    architect_review: createDefaultReviewGateRequirement(),
   };
 }
 
@@ -108,6 +136,30 @@ function normalizeReviewGates(raw: unknown): Record<ReviewGateName, ReviewGateSt
   return reviewGates;
 }
 
+function normalizeReviewGateRequirement(raw: unknown): ReviewGateRequirement {
+  if (!raw || typeof raw !== 'object') return createDefaultReviewGateRequirement();
+  const obj = raw as Partial<ReviewGateRequirement>;
+  const priority = obj.priority === 'required' || obj.priority === 'recommended' || obj.priority === 'optional'
+    ? obj.priority
+    : 'unspecified';
+  return {
+    priority,
+    ...(typeof obj.reason === 'string' ? { reason: obj.reason } : {}),
+    ...(typeof obj.source === 'string' ? { source: obj.source } : {}),
+    ...(typeof obj.updated_at === 'string' ? { updated_at: obj.updated_at } : {}),
+  };
+}
+
+function normalizeReviewRequirements(raw: unknown): Record<ReviewGateName, ReviewGateRequirement> {
+  const requirements = createDefaultReviewRequirements();
+  if (!raw || typeof raw !== 'object') return requirements;
+  const obj = raw as Partial<Record<ReviewGateName, unknown>>;
+  for (const gate of REVIEW_GATES) {
+    requirements[gate] = normalizeReviewGateRequirement(obj[gate]);
+  }
+  return requirements;
+}
+
 function cleanEvidence(evidence: string[] | undefined): string[] {
   return (evidence ?? []).map(item => item.trim()).filter(Boolean);
 }
@@ -131,6 +183,9 @@ export function validateReviewGateCompletion(input: ReviewGateCompletionInput | 
       return null;
     case 'self_review':
       if (!notes) return 'self-review gates require --reason=<why-self-review-is-acceptable>';
+      return null;
+    case 'independent_review_waived':
+      if (!notes) return 'independent-review waivers require --reason=<why-the-downgrade-is-accepted>';
       return null;
     case 'manual_override':
       if (!notes) return 'manual review overrides require --override=<reason>';
@@ -164,6 +219,16 @@ export function isReviewGateSatisfied(state: SprintState, gate: ReviewGateName):
   }) === null;
 }
 
+export function isRequiredReviewGate(state: SprintState, gate: ReviewGateName): boolean {
+  return state.review_requirements?.[gate]?.priority === 'required';
+}
+
+export function waivedReviewGateNames(state: SprintState): ReviewGateName[] {
+  return REVIEW_GATES.filter(gate =>
+    state.gates[gate] === true && state.review_gates?.[gate]?.provenance === 'independent_review_waived',
+  );
+}
+
 /** Load sprint state from .slope/sprint-state.json. Returns null if missing or malformed. */
 export function loadSprintState(cwd: string): SprintState | null {
   const statePath = join(cwd, SPRINT_STATE_FILE);
@@ -183,6 +248,7 @@ export function loadSprintState(cwd: string): SprintState | null {
     return {
       ...raw,
       review_gates: normalizeReviewGates(raw.review_gates),
+      review_requirements: normalizeReviewRequirements(raw.review_requirements),
     } as SprintState;
   } catch {
     return null;
@@ -234,6 +300,10 @@ export function updateGate(cwd: string, gate: GateName, value: boolean, options:
         updated = true;
         return true;
       } else {
+        const required = current.review_requirements?.[gate]?.priority === 'required';
+        const provenance = options.review?.provenance;
+        if (required && (provenance === 'self_review' || provenance === 'manual_override')) return false;
+        if (!required && provenance === 'independent_review_waived') return false;
         const review = createReviewGateCompletionState(options.review);
         if (!review) return false;
         current.gates[gate] = true;
@@ -243,6 +313,31 @@ export function updateGate(cwd: string, gate: GateName, value: boolean, options:
       }
     }
     current.gates[gate] = value;
+    updated = true;
+    return true;
+  });
+  return Boolean(state && updated);
+}
+
+/** Persist review priorities inferred by `slope review recommend` for the matching active sprint. */
+export function updateReviewRequirements(
+  cwd: string,
+  sprint: number,
+  inputs: ReviewGateRequirementInput[],
+): boolean {
+  let updated = false;
+  const state = mutateSprintState(cwd, current => {
+    if (current.sprint !== sprint) return false;
+    current.review_requirements ??= createDefaultReviewRequirements();
+    const now = new Date().toISOString();
+    for (const input of inputs) {
+      current.review_requirements[input.gate] = {
+        priority: input.priority,
+        ...(input.reason?.trim() ? { reason: input.reason.trim() } : {}),
+        source: input.source?.trim() || 'review_recommend',
+        updated_at: now,
+      };
+    }
     updated = true;
     return true;
   });
@@ -290,6 +385,7 @@ export function createSprintState(sprint: number, phase: SprintPhase = 'planning
       review_md: false,
     },
     review_gates: createDefaultReviewGates(),
+    review_requirements: createDefaultReviewRequirements(),
     started_at: now,
     updated_at: now,
   };

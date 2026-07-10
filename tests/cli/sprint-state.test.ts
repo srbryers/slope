@@ -11,6 +11,9 @@ import {
   pendingGates,
   createSprintState,
   createDefaultReviewGates,
+  createDefaultReviewRequirements,
+  updateReviewRequirements,
+  waivedReviewGateNames,
   clearSprintState,
 } from '../../src/cli/sprint-state.js';
 
@@ -94,6 +97,7 @@ describe('loadSprintState', () => {
 
     expect(loaded).not.toBeNull();
     expect(loaded!.review_gates).toEqual(createDefaultReviewGates());
+    expect(loaded!.review_requirements).toEqual(createDefaultReviewRequirements());
   });
 
   it('normalizes partial or invalid review gate provenance', () => {
@@ -148,6 +152,7 @@ describe('saveSprintState', () => {
     expect(loaded!.phase).toBe('implementing');
     expect(loaded!.gates.tests).toBe(false);
     expect(loaded!.review_gates.code_review.provenance).toBe('pending');
+    expect(loaded!.review_requirements).toEqual(createDefaultReviewRequirements());
   });
 
   it('round-trips decimal inserted sprint ids', () => {
@@ -229,6 +234,27 @@ describe('updateGate', () => {
     });
   });
 
+  it('records an explicit required independent-review waiver as distinct provenance', () => {
+    const state = createSprintState(22);
+    state.review_requirements!.architect_review = { priority: 'required' };
+    saveSprintState(tmpDir, state);
+
+    const result = updateGate(tmpDir, 'architect_review', true, {
+      review: {
+        provenance: 'independent_review_waived',
+        notes: 'Delegated reviewers are unavailable in this environment.',
+      },
+    });
+
+    const loaded = loadSprintState(tmpDir)!;
+    expect(result).toBe(true);
+    expect(loaded.review_gates.architect_review).toMatchObject({
+      provenance: 'independent_review_waived',
+      notes: 'Delegated reviewers are unavailable in this environment.',
+    });
+    expect(waivedReviewGateNames(loaded)).toEqual(['architect_review']);
+  });
+
   it('resets review gate provenance when marking incomplete', () => {
     saveSprintState(tmpDir, createSprintState(22));
     updateGate(tmpDir, 'architect_review', true, {
@@ -249,6 +275,32 @@ describe('updateGate', () => {
 describe('createSprintState', () => {
   it('initializes review gates as pending', () => {
     expect(createSprintState(22).review_gates).toEqual(createDefaultReviewGates());
+    expect(createSprintState(22).review_requirements).toEqual(createDefaultReviewRequirements());
+  });
+});
+
+describe('updateReviewRequirements', () => {
+  it('persists review recommendation priority only for the matching sprint', () => {
+    saveSprintState(tmpDir, createSprintState(22));
+
+    expect(updateReviewRequirements(tmpDir, 22, [{
+      gate: 'architect_review',
+      priority: 'required',
+      reason: 'Three tickets warrants architectural review',
+    }])).toBe(true);
+    expect(updateReviewRequirements(tmpDir, 23, [{
+      gate: 'code_review',
+      priority: 'required',
+    }])).toBe(false);
+
+    const loaded = loadSprintState(tmpDir)!;
+    expect(loaded.review_requirements?.architect_review).toMatchObject({
+      priority: 'required',
+      reason: 'Three tickets warrants architectural review',
+      source: 'review_recommend',
+      updated_at: expect.any(String),
+    });
+    expect(loaded.review_requirements?.code_review.priority).toBe('unspecified');
   });
 });
 

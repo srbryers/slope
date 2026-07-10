@@ -168,6 +168,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
         { flag: '--evidence=<path-or-url>', desc: 'Independent review transcript or output evidence' },
         { flag: '--pr-review=<url-or-id>', desc: 'External PR review evidence' },
         { flag: '--self-review --reason=<text>', desc: 'Explicit weaker self-review provenance' },
+        { flag: '--waive-independent-review --reason=<text>', desc: 'Explicit downgrade for a required independent review' },
         { flag: '--override=<reason>', desc: 'Explicit weaker manual override provenance' },
       ]},
       { name: 'status', desc: 'Show current sprint state and gates' },

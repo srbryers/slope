@@ -60,6 +60,66 @@ describe('slope sprint gate review provenance', () => {
     expect(logs.join('\n')).toContain("Gate 'architect_review' marked complete (independent_review)");
   });
 
+  it('requires an explicit waiver instead of self-review for a required gate', async () => {
+    const state = createSprintState(219, 'implementing');
+    state.review_requirements!.architect_review = {
+      priority: 'required',
+      reason: 'Three tickets warrants architectural review',
+    };
+    saveSprintState(tmpDir, state);
+    const errors: string[] = [];
+    vi.spyOn(console, 'error').mockImplementation((...args) => { errors.push(args.join(' ')); });
+    vi.spyOn(process, 'exit').mockImplementation(((code?: number) => {
+      throw new Error(`process.exit(${code ?? 0})`);
+    }) as never);
+
+    await expect(sprintCommand([
+      'gate',
+      'architect_review',
+      '--self-review',
+      '--reason=No delegated reviewer available',
+    ])).rejects.toThrow('process.exit(1)');
+
+    expect(loadSprintState(tmpDir)!.gates.architect_review).toBe(false);
+    expect(errors.join('\n')).toContain('required independent review');
+    expect(errors.join('\n')).toContain('--waive-independent-review');
+  });
+
+  it('records required-review waivers as a visibly downgraded ready state', async () => {
+    const state = createSprintState(219, 'complete');
+    state.review_requirements!.architect_review = {
+      priority: 'required',
+      reason: 'Three tickets warrants architectural review',
+    };
+    state.gates.tests = true;
+    state.gates.code_review = true;
+    state.review_gates.code_review = {
+      provenance: 'independent_review',
+      evidence: ['reviews/code.md'],
+      reviewer: 'code-agent',
+    };
+    state.gates.scorecard = true;
+    state.gates.review_md = true;
+    saveSprintState(tmpDir, state);
+    const logs: string[] = [];
+    vi.spyOn(console, 'log').mockImplementation((...args) => { logs.push(args.join(' ')); });
+
+    await sprintCommand([
+      'gate',
+      'architect_review',
+      '--waive-independent-review',
+      '--reason=Delegated reviewers require explicit operator authorization',
+    ]);
+    await sprintCommand(['status']);
+
+    const loaded = loadSprintState(tmpDir)!;
+    expect(loaded.review_gates.architect_review.provenance).toBe('independent_review_waived');
+    const output = logs.join('\n');
+    expect(output).toContain('ready_for_pr_with_review_waiver');
+    expect(output).toContain('[~] architect_review (required independent review WAIVED');
+    expect(output).toContain('Attach independent reviewer/PR evidence to replace the waiver');
+  });
+
   it('shows self-review as a weaker provenance in sprint status', async () => {
     const state = createSprintState(219, 'implementing');
     state.gates.code_review = true;
@@ -122,6 +182,8 @@ describe('slope sprint gate review provenance', () => {
 
     const output = errors.join('\n');
     expect(output).toContain('self_review (weaker)');
+    expect(output).toContain('independent_review_waived');
+    expect(output).toContain('--waive-independent-review');
     expect(output).toContain('manual_override (weaker)');
     expect(output).toContain('independent_review');
   });
