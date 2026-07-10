@@ -535,6 +535,12 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
         { flag: '--path=<file>', desc: 'Roadmap file path' },
         { flag: '--json', desc: 'Emit machine-readable JSON' },
       ]},
+      { name: 'migrate', desc: 'Plan or apply transactional single-file federation migration', flags: [
+        { flag: '--path=<file>', desc: 'Source roadmap (must match configured roadmapPath)' },
+        { flag: '--source=<file>', desc: 'Project manifest (default: docs/roadmap/project.yaml)' },
+        { flag: '--mapping=<file>', desc: 'Explicit ownership and legacy repair mapping' },
+        { flag: '--dry-run', desc: 'Print diagnostics and mapping template without writing' },
+      ]},
       { name: 'compile', desc: 'Compile modular YAML sources to the compatibility roadmap', flags: [
         { flag: '--source=<file>', desc: 'Project manifest (default: docs/roadmap/project.yaml)' },
         { flag: '--dry-run', desc: 'Preview projection changes without writing' },
