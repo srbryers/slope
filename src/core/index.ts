@@ -218,6 +218,21 @@ export type {
   RoadmapFocusOptions,
 } from './roadmap-focus.js';
 export { ROADMAP_FOCUS_LIMITS, buildRoadmapFocus, formatRoadmapFocus } from './roadmap-focus.js';
+export {
+  RoadmapSourceError,
+  normalizeDiagnosticPath,
+  normalizeRoadmapSourcePath,
+  parseRoadmapSourceProject,
+  parseRoadmapSourceDocument,
+  sourceProjectToRoadmap,
+} from './roadmap-sources.js';
+export type {
+  RoadmapSourceKind,
+  RoadmapSourceEntry,
+  RoadmapSourceProject,
+  RoadmapSourceDocument,
+  LoadedRoadmapSource,
+} from './roadmap-sources.js';
 export { extractSprintReferences, findShippedSprintsOnMain } from './analyzers/git.js';
 export type {
   RoadmapDefinition,
