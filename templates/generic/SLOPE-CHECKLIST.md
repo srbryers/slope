@@ -8,10 +8,11 @@
 5. Run `slope roadmap show` — view dependency graph
 
 ## Pre-Round (Sprint Start)
-1. Run `slope roadmap focus --sprint=N` — bounded sprint context
-2. Run `slope briefing` — handicap, hazards, gotchas, session continuity
-3. Verify previous scorecard exists
-4. Set par (1-2 tickets=3, 3-4=4, 5+=5) and slope factors
+1. Run `slope now` — discover the current sprint and next action
+2. Run `slope roadmap focus --sprint=N` — bounded context for the discovered sprint
+3. Run `slope briefing` — handicap, hazards, gotchas, session continuity
+4. Verify previous scorecard exists
+5. Set par (1-2 tickets=3, 3-4=4, 5+=5) and slope factors
 
 ## Per-Ticket
 - **Before:** Select club (driver/long_iron/short_iron/wedge/putter), scan hazards

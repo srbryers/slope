@@ -49,7 +49,7 @@ Prefer the lowest tier that answers your question. See `.claude/rules/codebase-c
 
 ## Roadmap Sources
 
-Use `slope roadmap focus --sprint=N` for bounded planning context. This repository
+Run `slope now`, then use its sprint with `slope roadmap focus --sprint=N` for bounded planning context. This repository
 authors its roadmap through `docs/roadmap/project.yaml` and the declared YAML
 bundles. Do not edit `docs/backlog/roadmap.json` directly; it is generated
 compatibility output. After a source edit, run `slope roadmap compile`,

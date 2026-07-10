@@ -45,7 +45,7 @@ A SLOPE MCP server is configured in \`.mcp.json\`. Two tools:
 - \`search({ module: 'init' })\` — discover roadmap interview questions and submit helpers
 
 ## Sprint Workflow
-- **Pre-${r.sprint}:** \`slope roadmap focus --sprint=N\`, then \`slope now\` and \`slope start\`
+- **Pre-${r.sprint}:** \`slope now\`, use its sprint with \`slope roadmap focus --sprint=N\`, then \`slope start\`
 - **Per-${r.ticket}:** classify each ticket with approach + result + hazards
 - **Post-${r.sprint}:** \`slope validate\` ${r.scorecard.toLowerCase()}, \`slope review\`, update common-issues
 
@@ -94,8 +94,8 @@ Before starting a new phase or project:
 
 Before writing any code in a new sprint:
 
-1. **Run \`slope roadmap focus --sprint=N\`** — Load bounded sprint, phase, dependency, hazard, and evidence context
-2. **Run \`slope now\`** — Compact cockpit with current sprint, state, claims, and next action
+1. **Run \`slope now\`** — Discover the current sprint, state, claims, and next action
+2. **Run \`slope roadmap focus --sprint=N\`** — Use the discovered sprint to load bounded phase, dependency, hazard, and evidence context
 3. **Run \`slope start\` or \`slope start --ticket=KEY\`** — Human entry point for sprint state, briefing, claim guidance, and prep
 4. **Run \`slope briefing\` when deeper context is needed** — Outputs handicap snapshot, hazard index, nutrition alerts, filtered gotchas, and session continuity
    - Use \`--categories=testing,api\` or \`--keywords=migration\` to filter for the sprint's work area
@@ -333,7 +333,7 @@ A SLOPE MCP server is configured in \`opencode.json\`. Two tools:
 - \`search({ module: 'init' })\` — discover roadmap interview questions and submit helpers
 
 ## Sprint Workflow
-- **Pre-${r.sprint}:** \`slope roadmap focus --sprint=N\`, then \`slope now\` and \`slope start\`
+- **Pre-${r.sprint}:** \`slope now\`, use its sprint with \`slope roadmap focus --sprint=N\`, then \`slope start\`
 - **Per-${r.ticket}:** classify each ticket with approach + result + hazards
 - **Post-${r.sprint}:** \`slope validate\` ${r.scorecard.toLowerCase()}, \`slope review\`, update common-issues
 
@@ -463,12 +463,13 @@ Before starting a new phase or project:
 
 Before writing any code in a new sprint:
 
-1. **Run \`slope roadmap focus --sprint=N\`** — Load bounded sprint context before full history
-2. **Run \`slope briefing\`** — Outputs handicap snapshot, hazard index, nutrition alerts, filtered gotchas, and session continuity
+1. **Run \`slope now\`** — Discover the current sprint and next action
+2. **Run \`slope roadmap focus --sprint=N\`** — Use the discovered sprint to load bounded context before full history
+3. **Run \`slope briefing\`** — Outputs handicap snapshot, hazard index, nutrition alerts, filtered gotchas, and session continuity
    - Use \`--categories=testing,api\` or \`--keywords=migration\` to filter for the sprint's work area
-3. **Verify previous ${r.scorecard.toLowerCase()} exists** — If the last sprint's ${r.scorecard.toLowerCase()} wasn't created, create it now
-4. **Branch hygiene check** — \`git branch -a\` to confirm no stale branches remain
-5. **Set ${r.onTarget.toLowerCase()} and slope** — ${r.onTarget} from ticket count (1-2=3, 3-4=4, 5+=5), slope from complexity factors
+4. **Verify previous ${r.scorecard.toLowerCase()} exists** — If the last sprint's ${r.scorecard.toLowerCase()} wasn't created, create it now
+5. **Branch hygiene check** — \`git branch -a\` to confirm no stale branches remain
+6. **Set ${r.onTarget.toLowerCase()} and slope** — ${r.onTarget} from ticket count (1-2=3, 3-4=4, 5+=5), slope from complexity factors
 
 ## Pre-${r.ticket} Routine (Per-Ticket, Before Code)
 
@@ -603,7 +604,7 @@ A SLOPE MCP server is configured in \`${mcpPath}\`. Two tools:
 - \`search({ module: 'init' })\` — discover roadmap interview questions and submit helpers
 
 ## Sprint Workflow
-- **Pre-${r.sprint}:** \`slope roadmap focus --sprint=N\`, then \`slope now\` and \`slope start\`
+- **Pre-${r.sprint}:** \`slope now\`, use its sprint with \`slope roadmap focus --sprint=N\`, then \`slope start\`
 - **Per-${r.ticket}:** classify each ticket with approach + result + hazards
 - **Post-${r.sprint}:** \`slope validate\` ${r.scorecard.toLowerCase()}, \`slope review\`, update common-issues
 
@@ -648,8 +649,8 @@ export function generateGenericChecklist(m: MetaphorDefinition): string {
 6. Run \`slope roadmap show\` — view dependency graph
 
 ## Pre-${r.sprint} (Sprint Start)
-1. Run \`slope roadmap focus --sprint=N\` — bounded sprint context
-2. Run \`slope now\` — current sprint, state, claims, next action
+1. Run \`slope now\` — discover the current sprint, state, claims, and next action
+2. Run \`slope roadmap focus --sprint=N\` — bounded context for the discovered sprint
 3. Run \`slope start\` or \`slope start --ticket=KEY\` — sprint state, briefing, claim guidance, prep
 4. Run \`slope briefing\` when deeper hazard context is needed
 5. Verify previous ${r.scorecard.toLowerCase()} exists
