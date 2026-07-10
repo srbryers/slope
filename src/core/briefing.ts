@@ -249,15 +249,28 @@ function meaningfulRouteTokens(text: string): Set<string> {
   return new Set(tokens.filter(token => !ROUTE_STOP_WORDS.has(token) && !/^s\d/.test(token)));
 }
 
-function currentAssignmentTokens(roadmap: RoadmapDefinition, sprint: number): Set<string> {
+interface CurrentAssignmentEvidence {
+  tokens: Set<string>;
+  phrases: Set<string>;
+}
+
+function normalizeAssignmentPhrase(text: string): string {
+  return text.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function currentAssignmentEvidence(roadmap: RoadmapDefinition, sprint: number): CurrentAssignmentEvidence {
   const row = roadmapSprintById(roadmap, sprint);
-  return meaningfulRouteTokens([
+  const values = [
     row?.theme,
     row?.type,
     row?.note,
     row?.outcome,
     ...(row?.tickets ?? []).flatMap(ticket => [ticket.title, ticket.note]),
-  ].filter((value): value is string => typeof value === 'string').join(' '));
+  ].filter((value): value is string => typeof value === 'string');
+  return {
+    tokens: meaningfulRouteTokens(values.join(' ')),
+    phrases: new Set(values.map(normalizeAssignmentPhrase).filter(Boolean)),
+  };
 }
 
 function sprintMentionPattern(roadmap: RoadmapDefinition, sprint: number): RegExp {
@@ -271,7 +284,7 @@ function sprintMentionPattern(roadmap: RoadmapDefinition, sprint: number): RegEx
 function extractTargetAssignmentPremise(sentence: string, mention: RegExp): string | null {
   const target = mention.source;
   const routedAfterTarget = new RegExp(
-    `${target}\\s+(?:routes?\\s+to|becomes?|will\\s+(?:focus\\s+on|be)|is(?!\\s+(?:blocked|waiting|ready|complete|planned|dependent)\\b)(?:\\s+now)?(?:\\s+(?:assigned|reassigned)\\s+to)?|follows?|hands?\\s+off\\s+to)\\s+(.+?)(?=\\s+(?:before|after|as\\s+if|because)\\b|[;,.!?]|$)`,
+    `${target}\\s+(?:routes?\\s+to|will\\s+focus\\s+on|is\\s+(?:now\\s+)?(?:assigned|reassigned)\\s+to|follows?|hands?\\s+off\\s+to)\\s+(.+?)(?=\\s+(?:before|after|as\\s+if|because)\\b|[;,.!?]|$)`,
     'i',
   ).exec(sentence);
   if (routedAfterTarget?.[1]) return routedAfterTarget[1];
@@ -289,17 +302,22 @@ function extractTargetAssignmentPremise(sentence: string, mention: RegExp): stri
   return startAsAssignment?.[1] ?? null;
 }
 
-function assignmentPremiseMatchesCurrent(premise: string, assignmentTokens: Set<string>): boolean {
+function assignmentPremiseMatchesCurrent(
+  premise: string,
+  assignment: CurrentAssignmentEvidence,
+): boolean {
+  const phrase = normalizeAssignmentPhrase(premise);
+  if (assignment.phrases.has(phrase)) return true;
   const premiseTokens = meaningfulRouteTokens(premise);
   if (premiseTokens.size === 0) return false;
-  const matches = [...premiseTokens].filter(token => assignmentTokens.has(token));
+  const matches = [...premiseTokens].filter(token => assignment.tokens.has(token));
   if (premiseTokens.size === 1) return matches.length === 1 && matches[0].length >= 5;
   return matches.length >= 2 && matches.length / premiseTokens.size >= 0.5;
 }
 
 function splitHazardClauses(description: string): string[] {
   return description
-    .split(/(?<=[.!?;])\s+|:\s+|\s*,\s*(?:but|however)\s+|\s+[—–-]\s+/i)
+    .split(/(?<=;)\s+|:\s+|\s*,\s*(?:but|however)\s+|\s+[—–-]\s+/i)
     .map(clause => clause.trim())
     .filter(Boolean);
 }
@@ -308,30 +326,31 @@ function stripSupersededRouteDirectives(
   description: string,
   roadmap: RoadmapDefinition,
   targetSprint: number,
-  assignmentTokens: Set<string>,
+  assignment: CurrentAssignmentEvidence,
 ): { description: string; suppressed: number } {
   const mention = sprintMentionPattern(roadmap, targetSprint);
-  const sentences = splitHazardClauses(description);
   const kept: string[] = [];
   let suppressed = 0;
-  let suppressContinuation = false;
-  for (const rawSentence of sentences) {
-    const sentence = rawSentence.trim();
-    if (!sentence) continue;
-    if (suppressContinuation && /^(?:before|after|as\s+if|because|then)\b/i.test(sentence)) {
-      continue;
-    }
-    suppressContinuation = false;
-    const assignmentPremise = extractTargetAssignmentPremise(sentence, mention);
-    if (!assignmentPremise) {
-      kept.push(sentence);
-      continue;
-    }
-    const matchesAssignment = assignmentPremiseMatchesCurrent(assignmentPremise, assignmentTokens);
-    if (matchesAssignment) kept.push(sentence);
-    else {
-      suppressed++;
-      suppressContinuation = true;
+  for (const sentence of description.split(/(?<=[.!?])\s+/)) {
+    let suppressContinuation = false;
+    for (const rawClause of splitHazardClauses(sentence)) {
+      const clause = rawClause.trim();
+      if (!clause) continue;
+      if (suppressContinuation && /^(?:before|after|as\s+if|because|then)\b/i.test(clause)) {
+        continue;
+      }
+      suppressContinuation = false;
+      const assignmentPremise = extractTargetAssignmentPremise(clause, mention);
+      if (!assignmentPremise) {
+        kept.push(clause);
+        continue;
+      }
+      const matchesAssignment = assignmentPremiseMatchesCurrent(assignmentPremise, assignment);
+      if (matchesAssignment) kept.push(clause);
+      else {
+        suppressed++;
+        suppressContinuation = true;
+      }
     }
   }
   return { description: kept.join(' '), suppressed };
@@ -353,7 +372,7 @@ function scopeBriefingHazards(
   }
   const targetPhase = roadmapPhaseForSprint(roadmap, currentSprint);
   const dependencyDepths = collectDependencyDepths(roadmap, currentSprint);
-  const assignmentTokens = currentAssignmentTokens(roadmap, currentSprint);
+  const assignment = currentAssignmentEvidence(roadmap, currentSprint);
   let suppressed = 0;
 
   const provenanceFor = (sourceSprint: number): BriefingHazardProvenance => {
@@ -383,7 +402,7 @@ function scopeBriefingHazards(
   for (const hazard of index.shot_hazards) {
     const scoped = roadmapIdsEqual(roadmap, hazard.sprint, target.id)
       ? { description: hazard.description, suppressed: 0 }
-      : stripSupersededRouteDirectives(hazard.description, roadmap, target.id, assignmentTokens);
+      : stripSupersededRouteDirectives(hazard.description, roadmap, target.id, assignment);
     suppressed += scoped.suppressed;
     if (!scoped.description) continue;
     shotHazards.push({ ...hazard, description: scoped.description, provenance: provenanceFor(hazard.sprint) });
@@ -393,7 +412,7 @@ function scopeBriefingHazards(
   for (const bunker of index.bunker_locations) {
     const scoped = roadmapIdsEqual(roadmap, bunker.sprint, target.id)
       ? { description: bunker.location, suppressed: 0 }
-      : stripSupersededRouteDirectives(bunker.location, roadmap, target.id, assignmentTokens);
+      : stripSupersededRouteDirectives(bunker.location, roadmap, target.id, assignment);
     suppressed += scoped.suppressed;
     if (!scoped.description) continue;
     bunkerLocations.push({ ...bunker, location: scoped.description, provenance: provenanceFor(bunker.sprint) });

@@ -1039,7 +1039,7 @@ describe('formatBriefing — replanned hazard provenance', () => {
     card.shots = [makeShot({
       ticket_key: 'S447-1',
       hazards: [
-        { type: 'rough', description: 'S448 is UE hardening before gumbo.' },
+        { type: 'rough', description: 'S448 is assigned to UE hardening before gumbo.' },
         { type: 'rough', description: 'S448 will focus on gumbo.' },
         { type: 'rough', description: 'For S448, route next to gumbo.' },
         { type: 'rough', description: 'S448 routes to obsolete roadmap gumbo hardening.' },
@@ -1058,6 +1058,81 @@ describe('formatBriefing — replanned hazard provenance', () => {
     expect(output).not.toContain('gumbo');
     expect(output).not.toContain('UE hardening');
     expect(output).toContain('Suppressed 5 superseded route directives');
+  });
+
+  it('retains negative, status, and vulnerability predicates as dependency risk', () => {
+    const card = dependencyCard();
+    const relevant = [
+      'S448 will be blocked until S447 passes.',
+      'S448 becomes blocked when the gate fails.',
+      'S448 is not gumbo; preserve the negation.',
+      'S448 is missing durable review evidence.',
+      'S448 is at risk of data loss.',
+      'S448 is vulnerable to schema drift. Preserve durable evidence.',
+    ];
+    card.shots = [makeShot({
+      ticket_key: 'S447-1',
+      hazards: relevant.map(description => ({ type: 'bunker' as const, description })),
+    })];
+    card.bunker_locations = [];
+
+    const output = formatBriefing({
+      scorecards: [card],
+      commonIssues: makeIssues([]),
+      roadmap: makeReplannedRoadmap(),
+      currentSprint: 448,
+    });
+
+    for (const description of relevant) expect(output).toContain(description);
+    expect(output).not.toContain('Suppressed');
+  });
+
+  it('does not carry route suppression into a new durable sentence', () => {
+    const card = dependencyCard();
+    card.shots = [makeShot({
+      ticket_key: 'S447-1',
+      hazards: [
+        { type: 'bunker', description: 'S448 routes to UE hardening. Because the database lock is global, preserve transaction isolation.' },
+        { type: 'bunker', description: 'S448 routes to UE hardening. Then preserve rollback evidence.' },
+      ],
+    })];
+    card.bunker_locations = [];
+
+    const output = formatBriefing({
+      scorecards: [card],
+      commonIssues: makeIssues([]),
+      roadmap: makeReplannedRoadmap(),
+      currentSprint: 448,
+    });
+
+    expect(output).toContain('Because the database lock is global, preserve transaction isolation.');
+    expect(output).toContain('Then preserve rollback evidence.');
+    expect(output).not.toContain('UE hardening');
+    expect(output).toContain('Suppressed 2 superseded route directives');
+  });
+
+  it('retains an exact current assignment even when its tokens are low information', () => {
+    const roadmap = makeReplannedRoadmap();
+    const target = roadmap.sprints.find(sprint => sprint.id === 448)!;
+    target.theme = 'AI gate';
+    target.note = undefined;
+    target.tickets = [{ key: 'S448-1', title: 'AI gate', club: 'wedge', complexity: 'small' }];
+    const card = dependencyCard();
+    card.shots = [makeShot({
+      ticket_key: 'S447-1',
+      hazards: [{ type: 'rough', description: 'S448 routes to AI gate.' }],
+    })];
+    card.bunker_locations = [];
+
+    const output = formatBriefing({
+      scorecards: [card],
+      commonIssues: makeIssues([]),
+      roadmap,
+      currentSprint: 448,
+    });
+
+    expect(output).toContain('S448 routes to AI gate.');
+    expect(output).not.toContain('Suppressed');
   });
 
   it('retains a dependency route premise that strongly matches the current sprint row', () => {
