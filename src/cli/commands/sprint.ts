@@ -7,6 +7,7 @@ import {
   mutateSprintState,
   updateGate,
   updateSprintPhase,
+  updateSprintPhaseForSprint,
   clearSprintState,
   isSprintComplete,
   isReviewGateSatisfied,
@@ -33,6 +34,7 @@ import {
   inspectSprintRollover,
   performSprintRollover,
   SprintRolloverError,
+  verifySprintRolloverLineage,
   type SprintRolloverAssessment,
 } from '../sprint-rollover.js';
 
@@ -277,6 +279,40 @@ function printGateUsage(gateName?: GateName): void {
   console.error('');
 }
 
+function commandOptionErrors(
+  args: string[],
+  valueFlags: string[],
+  booleanFlags: string[] = [],
+): string[] {
+  const errors: string[] = [];
+  const seen = new Set<string>();
+  for (let index = 0; index < args.length; index++) {
+    const arg = args[index];
+    let matched = false;
+    for (const flag of valueFlags) {
+      const value = optionValue(args, index, flag);
+      if (!value) continue;
+      matched = true;
+      if (seen.has(flag)) errors.push(`${flag} may only be provided once`);
+      seen.add(flag);
+      if (!value.value || value.value.startsWith('--')) errors.push(`${flag} requires a value`);
+      index = value.next;
+      break;
+    }
+    if (matched) continue;
+    if (booleanFlags.includes(arg)) {
+      if (seen.has(arg)) errors.push(`${arg} may only be provided once`);
+      seen.add(arg);
+      continue;
+    }
+    errors.push(`Unknown option: ${arg}`);
+  }
+  if (seen.has('--actor') && seen.has('--player')) {
+    errors.push('Use only one actor identity flag: --actor or --player');
+  }
+  return errors;
+}
+
 function rolloverFlagValue(label: string): string {
   return label.startsWith('S') ? label.slice(1) : label;
 }
@@ -297,6 +333,13 @@ function requireMatchingSprintOrRollover(
   action: string,
   retryCommand: string,
 ): boolean {
+  try {
+    verifySprintRolloverLineage(cwd, state);
+  } catch (error) {
+    console.error(`Refusing to ${action}: ${(error as Error).message}`);
+    console.error(`After restoring the tracked rollover audit, retry: ${retryCommand}`);
+    process.exit(1);
+  }
   if (state.sprint === requestedSprint) return true;
 
   let assessment: SprintRolloverAssessment;
@@ -350,10 +393,13 @@ function rolloverCommand(args: string[], cwd: string): void {
   let reason: string | undefined;
   let force = false;
   const errors: string[] = [];
+  const seen = new Set<string>();
   for (let index = 0; index < args.length; index++) {
     const arg = args[index];
     const from = optionValue(args, index, '--from');
     if (from) {
+      if (seen.has('--from')) errors.push('--from may only be provided once');
+      seen.add('--from');
       if (!from.value || from.value.startsWith('--')) errors.push('--from requires a sprint id');
       else fromValue = from.value;
       index = from.next;
@@ -361,6 +407,8 @@ function rolloverCommand(args: string[], cwd: string): void {
     }
     const to = optionValue(args, index, '--to');
     if (to) {
+      if (seen.has('--to')) errors.push('--to may only be provided once');
+      seen.add('--to');
       if (!to.value || to.value.startsWith('--')) errors.push('--to requires a sprint id');
       else toValue = to.value;
       index = to.next;
@@ -368,12 +416,16 @@ function rolloverCommand(args: string[], cwd: string): void {
     }
     const parsedReason = optionValue(args, index, '--reason');
     if (parsedReason) {
+      if (seen.has('--reason')) errors.push('--reason may only be provided once');
+      seen.add('--reason');
       if (!parsedReason.value || parsedReason.value.startsWith('--')) errors.push('--reason requires a non-empty value');
       else reason = parsedReason.value;
       index = parsedReason.next;
       continue;
     }
     if (arg === '--force') {
+      if (seen.has('--force')) errors.push('--force may only be provided once');
+      seen.add('--force');
       force = true;
       continue;
     }
@@ -419,16 +471,18 @@ function rolloverCommand(args: string[], cwd: string): void {
  *   6. Print recommended next implementation step
  */
 async function beginCommand(args: string[], cwd: string): Promise<void> {
-  const sprintArg = args.find(a => a.startsWith('--sprint='));
-  const ticketArg = args.find(a => a.startsWith('--ticket='));
-  if (!sprintArg || !ticketArg) {
+  const optionErrors = commandOptionErrors(args, ['--sprint', '--ticket', '--actor', '--player']);
+  const sprintValue = findOptionValue(args, '--sprint');
+  const ticketValue = findOptionValue(args, '--ticket');
+  if (optionErrors.length > 0 || !sprintValue || !ticketValue) {
+    for (const error of optionErrors) console.error(`Error: ${error}`);
     console.error('\nUsage: slope sprint begin --sprint=N --ticket=KEY [--actor=<name>]');
     console.error('Bundles: sprint start + claim + briefing + prep --lite\n');
     process.exit(1);
   }
 
-  const sprint = parseSprintNumber(sprintArg.split('=')[1]);
-  const ticket = ticketArg.split('=')[1];
+  const sprint = parseSprintNumber(sprintValue);
+  const ticket = ticketValue;
   if (!sprint || !ticket) {
     console.error('Error: --sprint must be a positive sprint id; --ticket must be a non-empty key');
     process.exit(1);
@@ -540,28 +594,33 @@ async function beginCommand(args: string[], cwd: string): Promise<void> {
 }
 
 async function startCommand(args: string[], cwd: string): Promise<void> {
-  const numberArg = args.find(a => a.startsWith('--number='));
-  if (!numberArg) {
+  const optionErrors = commandOptionErrors(
+    args,
+    ['--number', '--phase', '--touches', '--actor', '--player'],
+    ['--force'],
+  );
+  const numberValue = findOptionValue(args, '--number');
+  if (optionErrors.length > 0 || !numberValue) {
+    for (const error of optionErrors) console.error(`Error: ${error}`);
     console.error('Error: --number=N is required. Usage: slope sprint start --number=22');
     process.exit(1);
   }
 
-  const sprint = parseSprintNumber(numberArg.slice('--number='.length));
+  const sprint = parseSprintNumber(numberValue);
   if (!sprint) {
     console.error('Error: --number must be a positive sprint id, e.g. 114 or 114.5.');
     process.exit(1);
   }
 
-  const phaseArg = args.find(a => a.startsWith('--phase='));
-  const phaseInput = phaseArg?.slice('--phase='.length) ?? 'planning';
+  const phaseValue = findOptionValue(args, '--phase');
+  const phaseInput = phaseValue ?? 'planning';
   if (!isSprintPhase(phaseInput)) {
     console.error(`Error: invalid phase "${phaseInput}". Valid phases: ${SPRINT_PHASES.join(', ')}`);
     process.exit(1);
   }
   const phase = phaseInput as SprintPhase;
   const force = args.includes('--force');
-  const touchesArg = args.find(a => a.startsWith('--touches='));
-  const touchedPaths = parseTouchedPaths(touchesArg?.slice('--touches='.length));
+  const touchedPaths = parseTouchedPaths(findOptionValue(args, '--touches'));
 
   failOnCorruptSprintState(cwd);
   const existingResult = loadSprintStateResult(cwd);
@@ -574,8 +633,12 @@ async function startCommand(args: string[], cwd: string): Promise<void> {
       `start ${formatSprintLabel(sprint)}`,
       `slope sprint start --number=${formatSprintNumber(sprint)} --phase=${phase}`,
     );
-    if (phaseArg && existing.phase !== phase) {
-      updateSprintPhase(cwd, phase);
+    if (phaseValue && existing.phase !== phase) {
+      const updated = updateSprintPhaseForSprint(cwd, existing.sprint, phase);
+      if (!updated.matched) {
+        console.error('Refusing to update phase because sprint state changed concurrently; retry the start command.');
+        process.exit(1);
+      }
       console.log(`Sprint ${formatSprintNumber(sprint)} phase updated: ${phase}.`);
       return;
     }

@@ -215,7 +215,7 @@ describe('sprint-completion guard', () => {
       expect(result).toEqual({});
     });
 
-    it('rebinds stale sprint-state to the branch sprint before PR gate checks (#503)', async () => {
+    it('refuses automatic branch rebind and preserves prior sprint evidence', async () => {
       initGitBranch('feat/sprint-66-schedule-cms');
       saveSprintState(tmpDir, createSprintState(65, 'implementing'));
       writeScorecard(66);
@@ -225,11 +225,12 @@ describe('sprint-completion guard', () => {
       expect(result.decision).toBe('deny');
       expect(result.blockReason).toContain('Sprint 66');
       expect(result.blockReason).not.toContain('Sprint 65 has incomplete gates');
-      expect(result.blockReason).toContain('rebound stale sprint-state from Sprint 65 to Sprint 66');
+      expect(result.blockReason).toContain('refusing automatic rebind');
+      expect(result.blockReason).toContain('slope sprint rollover --from=65 --to=66 --force --reason="<why>"');
 
       const state = loadSprintState(tmpDir)!;
-      expect(state.sprint).toBe(66);
-      expect(state.phase).toBe('scoring');
+      expect(state.sprint).toBe(65);
+      expect(state.phase).toBe('implementing');
     });
 
     it('uses the shell cd target as the sprint-state and scorecard cwd for gh pr create', async () => {

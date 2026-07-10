@@ -7,7 +7,7 @@ import { formatSprintNumber, parseSprintNumber } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { loadPrReviewState } from '../pr-review-state.js';
 import { loadSprintState, mutateSprintState, updateGate, isSprintComplete, pendingGates } from '../sprint-state.js';
-import { inferSprintFromBranch, reconcileSprintStateForBranch } from '../workflow-resync.js';
+import { inferSprintFromBranch } from '../workflow-resync.js';
 
 /**
  * Sprint-completion guard: enforces post-implementation gates.
@@ -42,7 +42,7 @@ function checkStaleness(sprint: number, cwd: string): string | null {
     if (branch) {
       const branchSprint = inferSprintFromBranch(cwd);
       if (branchSprint !== null && branchSprint !== sprint) {
-        return `Warning: sprint-state is for Sprint ${formatSprintNumber(sprint)} but branch "${branch}" suggests Sprint ${formatSprintNumber(branchSprint)}. Run \`slope sprint reset\` if stale.`;
+        return `Warning: sprint-state is for Sprint ${formatSprintNumber(sprint)} but branch "${branch}" suggests Sprint ${formatSprintNumber(branchSprint)}. Use audited sprint rollover; do not reset away the prior state.`;
       }
     }
     // No sprint number in branch name — can't verify, don't warn
@@ -58,9 +58,21 @@ function handlePreToolUse(input: HookInput, cwd: string): GuardResult {
   if (!commandContext) return {};
   const guardCwd = commandContext.cwd;
 
-  const rebind = reconcileSprintStateForBranch(guardCwd);
   const state = loadSprintState(guardCwd);
   if (!state) return {};
+  const branchSprint = inferSprintFromBranch(guardCwd);
+  if (branchSprint !== null && branchSprint !== state.sprint) {
+    const base = `slope sprint rollover --from=${formatSprintNumber(state.sprint)} --to=${formatSprintNumber(branchSprint)}`;
+    const command = isSprintComplete(state) ? base : `${base} --force --reason="<why>"`;
+    return {
+      decision: 'deny',
+      blockReason: [
+        'SLOPE sprint-completion: branch and sprint-state disagree; refusing automatic rebind.',
+        `State: Sprint ${formatSprintNumber(state.sprint)}; branch suggests Sprint ${formatSprintNumber(branchSprint)}.`,
+        `Record the handoff with: \`${command}\``,
+      ].join('\n'),
+    };
+  }
   if (state.phase === 'complete') return {}; // Sprint fully complete — skip all checks
 
   // Check scorecard existence independently of gates
@@ -97,12 +109,6 @@ function handlePreToolUse(input: HookInput, cwd: string): GuardResult {
   }
 
   if (staleWarning) lines.push('', staleWarning);
-  if (rebind?.rebound) {
-    lines.push(
-      '',
-      `SLOPE sprint-completion: rebound stale sprint-state from Sprint ${rebind.previousSprint} to Sprint ${rebind.sprint} because ${rebind.reason}.`,
-    );
-  }
   return {
     decision: 'deny',
     blockReason: lines.join('\n'),

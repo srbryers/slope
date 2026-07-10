@@ -758,6 +758,48 @@ describe('slope sprint rollover', () => {
     expect(errors).toContain('Unknown rollover option: --bogus');
     expect(readFileSync(statePath, 'utf8')).toBe(before);
   });
+
+  it('rejects duplicate transition flags without mutating sprint state', async () => {
+    await prepareTerminalSprint();
+    const statePath = join(tmpDir, '.slope', 'sprint-state.json');
+    const before = readFileSync(statePath, 'utf8');
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((code) => { throw new ProcessExitError(code as number); });
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    let errors = '';
+    try {
+      await expect(sprintCommand(['rollover', '--from=bad', '--from=98', '--to=99']))
+        .rejects.toThrow(ProcessExitError);
+      errors = errSpy.mock.calls.map(call => call.join(' ')).join('\n');
+    } finally {
+      exitSpy.mockRestore();
+      errSpy.mockRestore();
+    }
+
+    expect(errors).toContain('--from may only be provided once');
+    expect(readFileSync(statePath, 'utf8')).toBe(before);
+  });
+
+  it('refuses begin when an installed rollover loses its tracked audit', async () => {
+    await prepareTerminalSprint();
+    await captureLog(() => sprintCommand(['rollover', '--from=98', '--to=99']));
+    const statePath = join(tmpDir, '.slope', 'sprint-state.json');
+    const state = JSON.parse(readFileSync(statePath, 'utf8'));
+    rmSync(join(tmpDir, state.rollover.audit_path), { force: true });
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((code) => { throw new ProcessExitError(code as number); });
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    let errors = '';
+    try {
+      await expect(sprintCommand(['begin', '--sprint=99', '--ticket=S99-1']))
+        .rejects.toThrow(ProcessExitError);
+      errors = errSpy.mock.calls.map(call => call.join(' ')).join('\n');
+    } finally {
+      exitSpy.mockRestore();
+      errSpy.mockRestore();
+    }
+
+    expect(errors).toContain('rollover lineage audit is missing');
+    expect(JSON.parse(readFileSync(statePath, 'utf8')).sprint).toBe(99);
+  });
 });
 
 describe('slope sprint status', () => {
