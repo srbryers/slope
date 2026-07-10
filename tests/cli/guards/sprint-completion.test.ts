@@ -380,6 +380,7 @@ describe('sprint-completion guard', () => {
       const result = await sprintCompletionGuard(makePostToolUse('gh pr merge 117 --squash', 0), tmpDir);
       expect(result.context).toContain('scoring');
       expect(result.context).toContain('Scorecard validated');
+      expect(result.context).toContain('slope review --sprint=22');
       const state = loadSprintState(tmpDir)!;
       expect(state.phase).toBe('scoring');
     });
@@ -566,6 +567,7 @@ describe('sprint-completion guard', () => {
   describe('PostToolUse sprint retrospective review completion', () => {
     beforeEach(() => {
       saveSprintState(tmpDir, createSprintState(22, 'scoring'));
+      writeScorecard(22);
     });
 
     it('warns that sprint retrospective review is not PR implementation review', async () => {
@@ -575,6 +577,23 @@ describe('sprint-completion guard', () => {
       expect(result.context).toContain('sprint retrospective review is not PR implementation review');
       expect(result.context).toContain('slope pr status --sprint=22');
       expect(result.context).toContain('slope pr review');
+    });
+
+    it('does not complete the active gate after an explicit historical sprint review', async () => {
+      const result = await sprintCompletionGuard(makePostToolUse('slope review --sprint=109', 0), tmpDir);
+
+      expect(loadSprintState(tmpDir)?.gates.review_md).toBe(false);
+      expect(result.context).toContain('Historical Sprint 109 review generated');
+      expect(result.context).toContain('active Sprint 22 review gate unchanged');
+    });
+
+    it('does not complete the active gate after an explicit historical scorecard path review', async () => {
+      writeScorecard(109);
+
+      const result = await sprintCompletionGuard(makePostToolUse('slope review docs/retros/sprint-109.json', 0), tmpDir);
+
+      expect(loadSprintState(tmpDir)?.gates.review_md).toBe(false);
+      expect(result.context).toContain('Historical Sprint 109 review generated');
     });
 
     it('warns when PR implementation review is recorded but closeout settlement is still pending', async () => {

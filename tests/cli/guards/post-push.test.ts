@@ -63,4 +63,27 @@ describe('postPushGuard claim state (#494)', () => {
     expect(result.suggestion?.context).toContain('1 claim(s) active');
     expect(result.suggestion?.context).not.toContain('all tickets done');
   });
+
+  it('includes the active sprint in review guidance', async () => {
+    writeFileSync(join(tmpDir, '.slope', 'sprint-state.json'), JSON.stringify({
+      sprint: 135,
+      phase: 'scoring',
+      gates: {
+        tests: true,
+        code_review: true,
+        architect_review: true,
+        scorecard: true,
+        review_md: false,
+      },
+      started_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }));
+
+    const result = await postPushGuard(pushInput(), tmpDir);
+
+    expect(result.suggestion?.options).toContainEqual(expect.objectContaining({
+      id: 'gate-review_md',
+      command: 'slope review --sprint=135',
+    }));
+  });
 });

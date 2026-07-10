@@ -3,7 +3,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { isAbsolute, join, resolve } from 'node:path';
 import type { HookInput, GuardResult } from '../../core/index.js';
-import { formatSprintNumber } from '../../core/index.js';
+import { formatSprintNumber, parseSprintNumber } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { loadPrReviewState } from '../pr-review-state.js';
 import { loadSprintState, mutateSprintState, updateGate, isSprintComplete, pendingGates } from '../sprint-state.js';
@@ -398,7 +398,7 @@ function handlePostToolUse(input: HookInput, cwd: string): GuardResult {
     && !/\bslope\s+review\s+(start|round|status|reset|recommend|findings|amend|defer|deferred|resolve)\b/.test(segment),
   );
   if (reviewCommand) {
-    return handleReviewCompletion(input, reviewCommand.cwd);
+    return handleReviewCompletion(input, reviewCommand.cwd, reviewCommand.segment);
   }
 
   // Detect slope auto-card completion → suggest validate next
@@ -471,14 +471,42 @@ function handleValidateSuccess(input: HookInput, cwd: string): GuardResult {
   }
 }
 
+function reviewTargetSprint(segment: string, cwd: string): number | null {
+  const selector = segment.match(/--sprint(?:=|\s+)(S?\d+(?:\.\d+)?)/i)?.[1];
+  if (selector) return parseSprintNumber(selector);
+
+  const pathMatch = segment.match(/\bslope\s+review\s+(?:"([^"]+)"|'([^']+)'|([^\s;&|]+))/);
+  const path = pathMatch?.[1] ?? pathMatch?.[2] ?? pathMatch?.[3];
+  if (!path || path.startsWith('-')) return null;
+
+  try {
+    const raw = JSON.parse(readFileSync(isAbsolute(path) ? path : resolve(cwd, path), 'utf8'));
+    return parseSprintNumber(String(raw.sprint_number ?? ''));
+  } catch {
+    return null;
+  }
+}
+
 /** Detect `slope review` completion → mark review_md gate. */
-function handleReviewCompletion(input: HookInput, cwd: string): GuardResult {
+function handleReviewCompletion(input: HookInput, cwd: string, segment: string): GuardResult {
   const response = input.tool_response ?? {};
   const exitCode = response.exit_code ?? response.exitCode;
   if (exitCode !== 0 && exitCode !== '0') return {};
 
   const state = loadSprintState(cwd);
   if (!state) return {};
+
+  const targetSprint = reviewTargetSprint(segment, cwd);
+  if (targetSprint != null && targetSprint !== state.sprint) {
+    return {
+      context: `SLOPE: Historical Sprint ${formatSprintNumber(targetSprint)} review generated — active Sprint ${formatSprintNumber(state.sprint)} review gate unchanged.`,
+    };
+  }
+  if (targetSprint == null && !state.gates.review_md) {
+    return {
+      context: 'SLOPE: Review command completed without a verifiable sprint target — active review gate unchanged.',
+    };
+  }
 
   if (!state.gates.review_md) updateGate(cwd, 'review_md', true);
   const lines = [state.gates.review_md
@@ -561,7 +589,7 @@ function handlePrMerge(input: HookInput, cwd: string): GuardResult {
       '',
       'Complete these before ending the session:',
       '  1. Create scorecard → `slope validate`',
-      '  2. Generate review → `slope review`',
+      `  2. Generate review → \`slope review --sprint=${state.sprint}\``,
     ].join('\n'),
   };
 }
