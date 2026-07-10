@@ -16,23 +16,27 @@ Run the complete pre-sprint routine: verify prior sprint hygiene, get briefing, 
 ### 1. Determine sprint number
 
 - If a number was provided as an argument, use it
-- Otherwise, run `slope next` to auto-detect the next sprint number
+- Otherwise, run `slope now` and use its active or next sprint; use `slope next` only if no sprint is reported
 - Treat the sprint number as the current SLOPE work unit. It may be a time-boxed interval or a scope-based agent milestone.
 
-### 2. Verify prior sprint scorecard
+### 2. Load bounded roadmap context
+
+Run `slope roadmap focus --sprint=N` for the discovered sprint before loading full roadmap history.
+
+### 3. Verify prior sprint scorecard
 
 Check that the previous sprint's scorecard exists at `docs/retros/sprint-{N-1}.json`:
 - If missing, **stop and create it first** using `/skill:post-sprint`
 - If it exists, continue
 - Note: the sprint-completion guard also enforces this — PR creation is blocked without a scorecard
 
-### 3. Branch hygiene
+### 4. Branch hygiene
 
 - Run `git branch` to check for stale branches from prior sprints
 - If stale branches exist, warn the user
 - Create a new feature branch: `feat/sprint-{N}-<theme-slug>`
 
-### 4. Run briefing
+### 5. Run briefing
 
 Run `slope briefing` to get:
 - Handicap snapshot (rolling performance stats)
@@ -45,7 +49,7 @@ If you know the sprint's work area, add filters:
 slope briefing --categories=<area> --keywords=<topic>
 ```
 
-### 5. Start sprint with workflow engine
+### 6. Start sprint with workflow engine
 
 Run `slope sprint run --workflow=sprint-standard --var sprint_id=S{N}` to start a workflow-controlled sprint.
 

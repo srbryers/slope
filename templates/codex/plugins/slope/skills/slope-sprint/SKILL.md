@@ -9,10 +9,11 @@ Use these commands from the repository root.
 
 ## Inspect
 
-1. Run `slope sprint status`.
-2. If no sprint is active, run `slope next` and `slope briefing --sprint=<next>`.
-3. If a sprint is active, run `slope briefing --sprint=<active>` before editing.
-4. If the user asks for a roadmap interview or planning input, run `slope roadmap interview` or `slope roadmap interview --agent`; MCP agents can also search `module: "init"`.
+1. Run `slope now` to discover the active or next sprint and its next action.
+2. Run `slope roadmap focus --sprint=<discovered>` before loading full roadmap history.
+3. Run `slope sprint status` when operational gate or rollover detail is needed.
+4. Run `slope briefing --sprint=<discovered>` before editing.
+5. If the user asks for a roadmap interview or planning input, run `slope roadmap interview` or `slope roadmap interview --agent`; MCP agents can also search `module: "init"`.
 
 ## Start Or Claim
 
