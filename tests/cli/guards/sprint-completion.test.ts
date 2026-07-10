@@ -570,6 +570,20 @@ describe('sprint-completion guard', () => {
       writeScorecard(22);
     });
 
+    it('does not mutate the generated projection when modular sources are authoritative', async () => {
+      saveSprintState(tmpDir, createSprintState(22, 'implementing'));
+      writeRoadmap([{ id: 22, status: 'planned' }]);
+      mkdirSync(join(tmpDir, 'docs', 'roadmap'), { recursive: true });
+      writeFileSync(join(tmpDir, 'docs', 'roadmap', 'project.yaml'), 'version: 1\n');
+
+      const result = await sprintCompletionGuard(makePostToolUse('slope validate', 0), tmpDir);
+
+      expect(result.context).toContain('Modular roadmap sources are authoritative');
+      expect(result.context).toContain('roadmap compile');
+      const roadmap = JSON.parse(readFileSync(join(tmpDir, 'docs', 'backlog', 'roadmap.json'), 'utf8'));
+      expect(roadmap.sprints[0].status).toBe('planned');
+    });
+
     it('warns that sprint retrospective review is not PR implementation review', async () => {
       const result = await sprintCompletionGuard(makePostToolUse('slope review docs/retros/sprint-22.json', 0), tmpDir);
 

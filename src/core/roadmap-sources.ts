@@ -1,6 +1,6 @@
 import { isAbsolute, posix } from 'node:path';
 import { parseDocument } from 'yaml';
-import { castRoadmapStructure } from './roadmap.js';
+import { castRoadmapStructure, getRoadmapTicketKey, validateRoadmap } from './roadmap.js';
 import { compareRoadmapSprintIds } from './roadmap.js';
 import type { RoadmapDefinition, RoadmapPhase, RoadmapSprint } from './roadmap.js';
 
@@ -30,6 +30,21 @@ export interface LoadedRoadmapSource {
   entry: RoadmapSourceEntry;
   document: RoadmapSourceDocument;
   absolutePath?: string;
+}
+
+export interface RoadmapSourceValidationIssue {
+  code: string;
+  message: string;
+  source?: string;
+  sprint?: number;
+  ticket?: string;
+}
+
+export interface RoadmapSourceValidationResult {
+  valid: boolean;
+  errors: RoadmapSourceValidationIssue[];
+  warnings: RoadmapSourceValidationIssue[];
+  roadmap: RoadmapDefinition;
 }
 
 export class RoadmapSourceError extends Error {
@@ -242,4 +257,145 @@ export function compileRoadmapSources(
 
 export function serializeRoadmapProjection(roadmap: RoadmapDefinition): string {
   return `${JSON.stringify(roadmap, null, 2)}\n`;
+}
+
+function sourceLabel(source: LoadedRoadmapSource): string {
+  return normalizeDiagnosticPath(source.entry.path);
+}
+
+/** Validate source federation invariants before any compatibility write. */
+export function validateRoadmapSourceFederation(
+  project: RoadmapSourceProject,
+  sources: LoadedRoadmapSource[],
+): RoadmapSourceValidationResult {
+  const errors: RoadmapSourceValidationIssue[] = [];
+  const warnings: RoadmapSourceValidationIssue[] = [];
+  const roadmap = compileRoadmapSources(project, sources);
+
+  const sourcePaths = new Map<string, number>();
+  for (const source of sources) {
+    const prior = sourcePaths.get(source.entry.path);
+    if (prior != null) {
+      errors.push({
+        code: 'duplicate_source_path',
+        source: sourceLabel(source),
+        message: `Source path is listed more than once (entries ${prior + 1} and ${sourcePaths.size + 1}).`,
+      });
+    } else {
+      sourcePaths.set(source.entry.path, sourcePaths.size);
+    }
+  }
+
+  const phaseNames = new Map<string, string>();
+  const sprintDefinitions = new Map<number, string>();
+  const sprintMemberships = new Map<number, string[]>();
+  const ticketDefinitions = new Map<string, string>();
+
+  for (const source of sources) {
+    const label = sourceLabel(source);
+    const priorPhase = phaseNames.get(source.document.phase.name);
+    if (priorPhase) {
+      errors.push({
+        code: 'duplicate_phase',
+        source: label,
+        message: `Phase "${source.document.phase.name}" is also defined in ${priorPhase}.`,
+      });
+    } else {
+      phaseNames.set(source.document.phase.name, label);
+    }
+
+    const localMembership = source.document.phase.sprints;
+    const localDefinitions = source.document.sprints.map(sprint => sprint.id);
+    const membershipSet = new Set(localMembership);
+    const definitionSet = new Set(localDefinitions);
+    for (const id of localMembership) {
+      const memberships = sprintMemberships.get(id) ?? [];
+      memberships.push(label);
+      sprintMemberships.set(id, memberships);
+      if (!definitionSet.has(id)) {
+        errors.push({
+          code: 'missing_sprint_definition',
+          source: label,
+          sprint: id,
+          message: `Phase membership S${id} has no sprint definition in the same bundle.`,
+        });
+      }
+    }
+    for (const id of localDefinitions) {
+      if (!membershipSet.has(id)) {
+        errors.push({
+          code: 'orphan_sprint_definition',
+          source: label,
+          sprint: id,
+          message: `Sprint S${id} is defined but missing from phase.sprints in the same bundle.`,
+        });
+      }
+    }
+    if (membershipSet.size !== localMembership.length) {
+      errors.push({ code: 'duplicate_phase_membership', source: label, message: 'phase.sprints contains duplicate IDs.' });
+    }
+    if (definitionSet.size !== localDefinitions.length) {
+      errors.push({ code: 'duplicate_local_sprint', source: label, message: 'Bundle contains duplicate sprint definitions.' });
+    }
+
+    for (const sprint of source.document.sprints) {
+      const priorSprint = sprintDefinitions.get(sprint.id);
+      if (priorSprint) {
+        errors.push({
+          code: 'duplicate_sprint',
+          source: label,
+          sprint: sprint.id,
+          message: `Sprint S${sprint.id} is also defined in ${priorSprint}.`,
+        });
+      } else {
+        sprintDefinitions.set(sprint.id, label);
+      }
+      for (const ticket of sprint.tickets) {
+        const key = getRoadmapTicketKey(ticket);
+        if (!key) continue;
+        const priorTicket = ticketDefinitions.get(key);
+        if (priorTicket) {
+          errors.push({
+            code: 'duplicate_ticket',
+            source: label,
+            sprint: sprint.id,
+            ticket: key,
+            message: `Ticket ${key} is also defined in ${priorTicket}.`,
+          });
+        } else {
+          ticketDefinitions.set(key, label);
+        }
+      }
+    }
+  }
+
+  for (const [sprint, memberships] of sprintMemberships) {
+    if (memberships.length > 1) {
+      errors.push({
+        code: 'multiple_phase_membership',
+        sprint,
+        message: `Sprint S${sprint} belongs to multiple phase bundles: ${memberships.join(', ')}.`,
+      });
+    }
+  }
+
+  const roadmapValidation = validateRoadmap(roadmap);
+  for (const issue of roadmapValidation.errors) {
+    errors.push({
+      code: 'roadmap_validation',
+      message: issue.message,
+      ...(issue.sprint != null ? { sprint: issue.sprint, source: sprintDefinitions.get(issue.sprint) } : {}),
+      ...(issue.ticket ? { ticket: issue.ticket } : {}),
+    });
+  }
+  for (const issue of roadmapValidation.warnings) {
+    warnings.push({
+      code: 'roadmap_validation',
+      message: issue.message,
+      ...(issue.sprint != null ? { sprint: issue.sprint, source: sprintDefinitions.get(issue.sprint) } : {}),
+      ...(issue.ticket ? { ticket: issue.ticket } : {}),
+    });
+  }
+
+  return { valid: errors.length === 0, errors, warnings, roadmap };
 }

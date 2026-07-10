@@ -5,6 +5,7 @@ import {
   parseRoadmapSourceProject,
   RoadmapSourceError,
   serializeRoadmapProjection,
+  validateRoadmapSourceFederation,
 } from '../../src/core/index.js';
 
 const PROJECT = `
@@ -113,5 +114,61 @@ describe('modular roadmap compilation', () => {
     expect(first).toBe(second);
     expect(first).not.toContain('scorecards');
     expect(first.endsWith('\n')).toBe(true);
+  });
+});
+
+describe('modular roadmap federation validation', () => {
+  function loaded(entryIndex: number, document = PHASE) {
+    const project = parseRoadmapSourceProject(PROJECT);
+    return {
+      project,
+      source: {
+        entry: project.sources[entryIndex],
+        document: parseRoadmapSourceDocument(document, project.sources[entryIndex].path),
+      },
+    };
+  }
+
+  it('accepts a locally self-contained phase bundle', () => {
+    const { project, source } = loaded(0);
+    const result = validateRoadmapSourceFederation(project, [source]);
+
+    expect(result.valid).toBe(true);
+  });
+
+  it('reports duplicate sprint/ticket definitions and multiple phase membership with source attribution', () => {
+    const { project, source } = loaded(0);
+    const duplicate = loaded(1).source;
+    const result = validateRoadmapSourceFederation(project, [source, duplicate]);
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'duplicate_sprint', sprint: 7, source: 'backlog/deferred.yaml' }),
+      expect.objectContaining({ code: 'duplicate_ticket', ticket: 'S7-1' }),
+      expect.objectContaining({ code: 'multiple_phase_membership', sprint: 7 }),
+    ]));
+  });
+
+  it('reports local orphan and missing definitions separately', () => {
+    const { project } = loaded(0);
+    const orphan = parseRoadmapSourceDocument(PHASE.replace('sprints: [7]', 'sprints: [99]'), 'phases/phase-01.yaml');
+    const result = validateRoadmapSourceFederation(project, [{ entry: project.sources[0], document: orphan }]);
+
+    expect(result.errors).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'missing_sprint_definition', sprint: 99 }),
+      expect.objectContaining({ code: 'orphan_sprint_definition', sprint: 7 }),
+    ]));
+  });
+
+  it('surfaces dangling sprint and ticket dependencies from the compatibility validator', () => {
+    const { project } = loaded(0);
+    const dangling = parseRoadmapSourceDocument(PHASE
+      .replace('    tickets:', '    depends_on: [99]\n    tickets:')
+      .replace('        complexity: small', '        complexity: small\n        depends_on: [S99-1]'), 'phases/phase-01.yaml');
+    const result = validateRoadmapSourceFederation(project, [{ entry: project.sources[0], document: dangling }]);
+
+    expect(result.errors.filter(issue => issue.code === 'roadmap_validation').map(issue => issue.message).join('\n'))
+      .toContain('depends on');
+    expect(result.errors.some(issue => issue.ticket === 'S7-1')).toBe(true);
   });
 });

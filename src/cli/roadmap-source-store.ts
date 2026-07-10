@@ -5,11 +5,15 @@ import {
   normalizeDiagnosticPath,
   parseRoadmapSourceDocument,
   parseRoadmapSourceProject,
+  parseSprintNumber,
+  roadmapSprintOrderValue,
   RoadmapSourceError,
   serializeRoadmapProjection,
+  validateRoadmapSourceFederation,
   type LoadedRoadmapSource,
   type RoadmapDefinition,
   type RoadmapSourceProject,
+  type RoadmapSourceValidationResult,
 } from '../core/index.js';
 import { atomicWriteFileSync, withFileLockSync } from './atomic-write.js';
 
@@ -77,4 +81,100 @@ export function writeRoadmapSourceProjection(store: RoadmapSourceStore): 'writte
     atomicWriteFileSync(store.outputPath, store.projection);
     return 'written';
   });
+}
+
+export interface RoadmapSourceStoreValidationOptions {
+  checkProjection?: boolean;
+  checkArchiveEvidence?: boolean;
+}
+
+export function validateRoadmapSourceStore(
+  store: RoadmapSourceStore,
+  options: RoadmapSourceStoreValidationOptions = {},
+): RoadmapSourceValidationResult {
+  const result = validateRoadmapSourceFederation(store.project, store.sources);
+  const checkProjection = options.checkProjection ?? true;
+  const checkArchiveEvidence = options.checkArchiveEvidence ?? true;
+
+  if (checkProjection) {
+    if (!existsSync(store.outputPath)) {
+      result.errors.push({
+        code: 'projection_missing',
+        message: `Compiled projection is missing: ${normalizeDiagnosticPath(relative(store.cwd, store.outputPath))}. Run slope roadmap compile.`,
+      });
+    } else if (readFileSync(store.outputPath, 'utf8') !== store.projection) {
+      result.errors.push({
+        code: 'projection_drift',
+        message: `Compiled projection has drifted: ${normalizeDiagnosticPath(relative(store.cwd, store.outputPath))}. Run slope roadmap compile.`,
+      });
+    }
+  }
+
+  if (checkArchiveEvidence) {
+    for (const source of store.sources.filter(candidate => candidate.entry.kind === 'archive')) {
+      for (const sprint of source.document.sprints.filter(candidate => candidate.status === 'complete')) {
+        const scorecardRef = source.document.scorecards?.[String(sprint.id)];
+        if (!scorecardRef) {
+          result.errors.push({
+            code: 'archive_scorecard_missing',
+            source: source.entry.path,
+            sprint: sprint.id,
+            message: `Archived complete Sprint S${sprint.id} has no scorecard link.`,
+          });
+          continue;
+        }
+        let scorecardPath: string;
+        try {
+          scorecardPath = ensureWithin(
+            store.cwd,
+            resolve(store.cwd, ...scorecardRef.split('/')),
+            `scorecard path for S${sprint.id}`,
+          );
+        } catch (error) {
+          result.errors.push({
+            code: 'archive_scorecard_unsafe',
+            source: source.entry.path,
+            sprint: sprint.id,
+            message: (error as Error).message,
+          });
+          continue;
+        }
+        if (!existsSync(scorecardPath)) {
+          result.errors.push({
+            code: 'archive_scorecard_not_found',
+            source: source.entry.path,
+            sprint: sprint.id,
+            message: `Archived scorecard does not exist: ${normalizeDiagnosticPath(scorecardRef)}.`,
+          });
+          continue;
+        }
+        try {
+          const raw = JSON.parse(readFileSync(scorecardPath, 'utf8')) as { sprint_number?: unknown };
+          const scorecardSprint = parseSprintNumber(raw.sprint_number as string | number);
+          const expected = roadmapSprintOrderValue(store.roadmap, sprint.id);
+          const actual = scorecardSprint == null
+            ? null
+            : roadmapSprintOrderValue(store.roadmap, scorecardSprint);
+          if (actual !== expected) {
+            result.errors.push({
+              code: 'archive_scorecard_mismatch',
+              source: source.entry.path,
+              sprint: sprint.id,
+              message: `Scorecard ${normalizeDiagnosticPath(scorecardRef)} records ${String(raw.sprint_number)} instead of Sprint S${sprint.id}.`,
+            });
+          }
+        } catch (error) {
+          result.errors.push({
+            code: 'archive_scorecard_invalid',
+            source: source.entry.path,
+            sprint: sprint.id,
+            message: `Could not parse ${normalizeDiagnosticPath(scorecardRef)}: ${(error as Error).message}`,
+          });
+        }
+      }
+    }
+  }
+
+  result.valid = result.errors.length === 0;
+  return result;
 }

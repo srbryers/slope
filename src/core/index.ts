@@ -227,6 +227,7 @@ export {
   sourceProjectToRoadmap,
   compileRoadmapSources,
   serializeRoadmapProjection,
+  validateRoadmapSourceFederation,
 } from './roadmap-sources.js';
 export type {
   RoadmapSourceKind,
@@ -234,6 +235,8 @@ export type {
   RoadmapSourceProject,
   RoadmapSourceDocument,
   LoadedRoadmapSource,
+  RoadmapSourceValidationIssue,
+  RoadmapSourceValidationResult,
 } from './roadmap-sources.js';
 export { extractSprintReferences, findShippedSprintsOnMain } from './analyzers/git.js';
 export type {

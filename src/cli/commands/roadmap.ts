@@ -42,6 +42,8 @@ import { buildRoadmapReality, formatRoadmapRealitySection, roadmapRealityIssues 
 import { interviewCommand } from './interview.js';
 import {
   loadRoadmapSourceStore,
+  hasModularRoadmapSources,
+  validateRoadmapSourceStore,
   writeRoadmapSourceProjection,
 } from '../roadmap-source-store.js';
 
@@ -488,6 +490,14 @@ function focusSubcommand(flags: Record<string, string>, cwd: string): void {
 function compileSourcesSubcommand(flags: Record<string, string>, cwd: string): void {
   try {
     const store = loadRoadmapSourceStore(cwd, flags.source);
+    const validation = validateRoadmapSourceStore(store, { checkProjection: false });
+    if (!validation.valid) {
+      throw new Error([
+        'Modular roadmap sources are invalid:',
+        ...validation.errors.map(issue => `  - ${issue.source ? `${issue.source}: ` : ''}${issue.message}`),
+        'Run `slope roadmap validate-sources` for the full report.',
+      ].join('\n'));
+    }
     const existing = existsSync(store.outputPath) ? readFileSync(store.outputPath, 'utf8') : null;
     const changed = existing !== store.projection;
     const output = displayPath(cwd, store.outputPath);
@@ -514,6 +524,38 @@ function compileSourcesSubcommand(flags: Record<string, string>, cwd: string): v
     console.error(`\n${(error as Error).message}\n`);
     process.exit(1);
   }
+}
+
+function validateSourcesSubcommand(flags: Record<string, string>, cwd: string): void {
+  if (!hasModularRoadmapSources(cwd, flags.source)) {
+    console.log('\nSingle-file roadmap mode; run `slope roadmap validate` for docs/backlog/roadmap.json.\n');
+    return;
+  }
+
+  let store;
+  try {
+    store = loadRoadmapSourceStore(cwd, flags.source);
+  } catch (error) {
+    console.error(`\n${(error as Error).message}\n`);
+    process.exit(1);
+    return;
+  }
+  const validation = validateRoadmapSourceStore(store);
+  console.log(`\nModular roadmap sources: ${displayPath(cwd, store.manifestPath)}`);
+  console.log('═'.repeat(40));
+  if (validation.valid) {
+    console.log('\n✓ Modular sources and compiled projection are valid');
+  } else {
+    console.log(`\n✗ ${validation.errors.length} source error${validation.errors.length === 1 ? '' : 's'} found`);
+  }
+  for (const issue of validation.errors) {
+    console.log(`  ✗ ${issue.source ? `[${issue.source}] ` : ''}${issue.message}`);
+  }
+  for (const issue of validation.warnings) {
+    console.log(`  ⚠ ${issue.source ? `[${issue.source}] ` : ''}${issue.message}`);
+  }
+  console.log(`\n  Sources: ${store.sources.length}; phases: ${store.roadmap.phases.length}; sprints: ${store.roadmap.sprints.length}\n`);
+  if (!validation.valid) process.exit(1);
 }
 
 function printFullRoadmapStatus(
@@ -712,6 +754,12 @@ function mergeScorecardTickets(existingTickets: RoadmapTicket[], scorecardTicket
 }
 
 function syncSubcommand(flags: Record<string, string>, cwd: string): void {
+  if (hasModularRoadmapSources(cwd, flags.source)) {
+    console.error('\nModular roadmap sources are authoritative; `roadmap sync` cannot edit the generated projection.');
+    console.error('Update the source YAML and run `slope roadmap compile`.\n');
+    process.exit(1);
+    return;
+  }
   const dryRun = flags['dry-run'] === 'true';
   const path = resolveRoadmapPath(flags, cwd);
   const config = loadConfig(cwd);
@@ -787,6 +835,12 @@ function syncSubcommand(flags: Record<string, string>, cwd: string): void {
 }
 
 async function generateSubcommand(flags: Record<string, string>, cwd: string): Promise<void> {
+  if (hasModularRoadmapSources(cwd, flags.source)) {
+    console.error('\nModular roadmap sources are authoritative; `roadmap generate` cannot replace the generated projection.');
+    console.error('Update the source YAML and run `slope roadmap compile`.\n');
+    process.exit(1);
+    return;
+  }
   const vision = loadVision(cwd);
   if (!vision) {
     console.error('\nNo vision found. Create one first:');
@@ -892,6 +946,9 @@ export async function roadmapCommand(args: string[]): Promise<void> {
     case 'compile':
       compileSourcesSubcommand(flags, cwd);
       break;
+    case 'validate-sources':
+      validateSourcesSubcommand(flags, cwd);
+      break;
     case 'show':
       showSubcommand(flags, cwd);
       break;
@@ -915,6 +972,7 @@ Usage:
   slope roadmap status [--path=<file>] [--sprint=N] [--full]  Compact current progress
   slope roadmap focus --sprint=N [--path=<file>] [--json]     Bounded sprint context
   slope roadmap compile [--source=<file>] [--dry-run|--check] Compile modular YAML sources
+  slope roadmap validate-sources [--source=<file>]            Validate sources and projection drift
   slope roadmap show [--path=<file>]         Render summary (critical path, parallel tracks)
   slope roadmap sync [--path=<file>] [--dry-run]     Sync scorecards into roadmap
   slope roadmap generate [--path=<file>] [--dry-run] Generate from vision + concrete backlog signals

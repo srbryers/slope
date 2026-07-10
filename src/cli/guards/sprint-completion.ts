@@ -437,6 +437,12 @@ function handleValidateSuccess(input: HookInput, cwd: string): GuardResult {
   const state = loadSprintState(cwd);
   if (!state) return {};
 
+  if (existsSync(join(cwd, 'docs', 'roadmap', 'project.yaml'))) {
+    return {
+      context: 'SLOPE: Scorecard validated. Modular roadmap sources are authoritative — update the source YAML status and run `slope roadmap compile`.',
+    };
+  }
+
   const config = loadConfig(cwd);
   const roadmapPath = join(cwd, config.roadmapPath);
   if (!existsSync(roadmapPath)) return {};

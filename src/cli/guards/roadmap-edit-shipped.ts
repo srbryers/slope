@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { HookInput, GuardResult } from '../../core/index.js';
 import { loadConfig } from '../../core/index.js';
@@ -29,6 +29,17 @@ export async function roadmapEditShippedGuard(input: HookInput, cwd: string): Pr
   const touchesRoadmap = resolveTouchedPaths(input)
     .some(filePath => toAbsoluteTouchedPath(filePath, cwd) === roadmapAbs);
   if (!touchesRoadmap) return {};
+
+  if (existsSync(resolve(cwd, 'docs/roadmap/project.yaml'))) {
+    return {
+      decision: 'deny',
+      blockReason: [
+        'SLOPE: This roadmap.json is a generated modular-roadmap projection.',
+        'Edit docs/roadmap YAML sources, then run `slope roadmap compile`.',
+        'Direct projection edits create source drift and are not authoritative.',
+      ].join('\n'),
+    };
+  }
 
   let currentContent: string;
   try {

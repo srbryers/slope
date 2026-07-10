@@ -143,6 +143,22 @@ describe('roadmapEditShippedGuard', () => {
     expect(result).toEqual({});
   });
 
+  it('blocks direct edits to a generated modular roadmap projection', async () => {
+    const roadmap = baseRoadmap();
+    roadmap.sprints[0].status = 'planned';
+    const path = writeRoadmap(cwd, roadmap);
+    mkdirSync(join(cwd, 'docs', 'roadmap'), { recursive: true });
+    writeFileSync(join(cwd, 'docs', 'roadmap', 'project.yaml'), 'version: 1\n');
+
+    const next = JSON.parse(JSON.stringify(roadmap));
+    next.sprints[1].theme = 'Direct generated edit';
+    const result = await roadmapEditShippedGuard(writeInput(path, JSON.stringify(next, null, 2)), cwd);
+
+    expect(result.decision).toBe('deny');
+    expect(result.blockReason).toContain('generated modular-roadmap projection');
+    expect(result.blockReason).toContain('roadmap compile');
+  });
+
   it('allows edits that only touch planned sprints', async () => {
     const path = writeRoadmap(cwd, baseRoadmap());
     const next = baseRoadmap();

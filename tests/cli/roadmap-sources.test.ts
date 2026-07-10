@@ -128,3 +128,57 @@ describe('slope roadmap compile', () => {
     expect(errors.join('\n')).toContain('single-file projects should use slope roadmap validate');
   });
 });
+
+describe('slope roadmap validate-sources', () => {
+  it('validates clean sources and detects projection drift without mutation', async () => {
+    const output = writeFixture();
+    await roadmapCommand(['compile']);
+
+    logs.length = 0;
+    await roadmapCommand(['validate-sources']);
+    expect(logs.join('\n')).toContain('sources and compiled projection are valid');
+
+    writeFileSync(output, readFileSync(output, 'utf8').replace('Sprint 9', 'Drifted Sprint 9'));
+    logs.length = 0;
+    const codes = mockExit();
+    await expect(roadmapCommand(['validate-sources'])).rejects.toThrow('process.exit(1)');
+    expect(codes).toEqual([1]);
+    expect(logs.join('\n')).toContain('projection has drifted');
+    expect(readFileSync(output, 'utf8')).toContain('Drifted Sprint 9');
+  });
+
+  it('skips successfully in unchanged single-file mode', async () => {
+    await roadmapCommand(['validate-sources']);
+
+    expect(logs.join('\n')).toContain('Single-file roadmap mode');
+    expect(errors).toEqual([]);
+  });
+
+  it('blocks compile on duplicate source definitions without replacing the projection', async () => {
+    const output = writeFixture();
+    mkdirSync(join(cwd, 'docs', 'backlog'), { recursive: true });
+    writeFileSync(output, '{"sentinel":true}\n');
+    writeFileSync(
+      join(cwd, 'docs', 'roadmap', 'phases', 'phase-02.yaml'),
+      source('Duplicate', [7], 'complete'),
+    );
+    const codes = mockExit();
+
+    await expect(roadmapCommand(['compile'])).rejects.toThrow('process.exit(1)');
+
+    expect(codes).toEqual([1]);
+    expect(errors.join('\n')).toContain('also defined');
+    expect(readFileSync(output, 'utf8')).toBe('{"sentinel":true}\n');
+  });
+
+  it('refuses direct roadmap sync when modular sources are authoritative', async () => {
+    writeFixture();
+    const codes = mockExit();
+
+    await expect(roadmapCommand(['sync', '--dry-run'])).rejects.toThrow('process.exit(1)');
+
+    expect(codes).toEqual([1]);
+    expect(errors.join('\n')).toContain('source YAML');
+    expect(errors.join('\n')).toContain('roadmap compile');
+  });
+});
