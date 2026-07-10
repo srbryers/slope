@@ -1,7 +1,7 @@
 import { isAbsolute, posix } from 'node:path';
 import { parseDocument } from 'yaml';
 import { castRoadmapStructure, getRoadmapTicketKey, validateRoadmap } from './roadmap.js';
-import { compareRoadmapSprintIds } from './roadmap.js';
+import { compareRoadmapSprintIds, roadmapSprintOrderValue } from './roadmap.js';
 import type { RoadmapDefinition, RoadmapPhase, RoadmapSprint } from './roadmap.js';
 
 export type RoadmapSourceKind = 'phase' | 'backlog' | 'archive';
@@ -80,7 +80,15 @@ function normalizeOutputPath(path: string): string {
   if (isAbsolute(portable) || /^[A-Za-z]:\//.test(portable)) {
     throw new RoadmapSourceError(`output must be relative: ${portable}`);
   }
-  return posix.normalize(portable).replace(/^\.\//, '');
+  const normalized = posix.normalize(portable).replace(/^\.\//, '');
+  if (!normalized.endsWith('.json')) {
+    throw new RoadmapSourceError(`output must be a JSON compatibility artifact: ${portable}`);
+  }
+  const parentEscapes = normalized.split('/').filter(part => part === '..').length;
+  if (parentEscapes > 1) {
+    throw new RoadmapSourceError(`output escapes the roadmap compatibility area: ${portable}`);
+  }
+  return normalized;
 }
 
 function parseYamlMapping(yaml: string, sourcePath: string): Record<string, unknown> {
@@ -88,7 +96,15 @@ function parseYamlMapping(yaml: string, sourcePath: string): Record<string, unkn
   if (document.errors.length > 0) {
     throw new RoadmapSourceError(`YAML parse error: ${document.errors[0].message}`, sourcePath);
   }
-  const value = document.toJS();
+  if (document.warnings.length > 0) {
+    throw new RoadmapSourceError(`YAML warning: ${document.warnings[0].message}`, sourcePath);
+  }
+  let value: unknown;
+  try {
+    value = document.toJS({ maxAliasCount: 100 });
+  } catch (error) {
+    throw new RoadmapSourceError(`YAML expansion error: ${(error as Error).message}`, sourcePath);
+  }
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new RoadmapSourceError('document must be a YAML mapping', sourcePath);
   }
@@ -146,6 +162,10 @@ export function parseRoadmapSourceProject(
     }
     return { path, kind };
   });
+  const uniquePaths = new Set(sources.map(source => source.path));
+  if (uniquePaths.size !== sources.length) {
+    throw new RoadmapSourceError('sources contains duplicate paths', sourcePath);
+  }
 
   return {
     version,
@@ -169,11 +189,93 @@ export function parseRoadmapSourceDocument(
   if (typeof phase.name !== 'string' || !phase.name.trim()) {
     throw new RoadmapSourceError('phase.name must be a non-empty string', sourcePath);
   }
-  if (!Array.isArray(phase.sprints) || phase.sprints.some(id => typeof id !== 'number')) {
-    throw new RoadmapSourceError('phase.sprints must be a sequence of numeric sprint IDs', sourcePath);
+  for (const field of ['description', 'status', 'note'] as const) {
+    if (phase[field] != null && typeof phase[field] !== 'string') {
+      throw new RoadmapSourceError(`phase.${field} must be a string when present`, sourcePath);
+    }
+  }
+  if (!Array.isArray(phase.sprints)
+    || phase.sprints.some(id => typeof id !== 'number' || !Number.isFinite(id) || id <= 0)) {
+    throw new RoadmapSourceError('phase.sprints must be a sequence of positive numeric sprint IDs', sourcePath);
   }
   if (!Array.isArray(raw.sprints)) {
     throw new RoadmapSourceError('sprints must be a sequence', sourcePath);
+  }
+
+  const validClubs = new Set(['driver', 'long_iron', 'short_iron', 'wedge', 'putter']);
+  const validComplexities = new Set(['trivial', 'small', 'standard', 'moderate']);
+  for (const [sprintIndex, value] of raw.sprints.entries()) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      throw new RoadmapSourceError(`sprints[${sprintIndex}] must be a mapping`, sourcePath);
+    }
+    const sprint = value as Record<string, unknown>;
+    if (typeof sprint.id !== 'number' || !Number.isFinite(sprint.id) || sprint.id <= 0) {
+      throw new RoadmapSourceError(`sprints[${sprintIndex}].id must be a positive number`, sourcePath);
+    }
+    if (typeof sprint.theme !== 'string' || !sprint.theme.trim()) {
+      throw new RoadmapSourceError(`sprints[${sprintIndex}].theme must be a non-empty string`, sourcePath);
+    }
+    if (![3, 4, 5].includes(sprint.par as number)) {
+      throw new RoadmapSourceError(`sprints[${sprintIndex}].par must be 3, 4, or 5`, sourcePath);
+    }
+    if (typeof sprint.slope !== 'number' || !Number.isFinite(sprint.slope)) {
+      throw new RoadmapSourceError(`sprints[${sprintIndex}].slope must be numeric`, sourcePath);
+    }
+    if (typeof sprint.type !== 'string' || !sprint.type.trim()) {
+      throw new RoadmapSourceError(`sprints[${sprintIndex}].type must be a non-empty string`, sourcePath);
+    }
+    if (sprint.depends_on != null
+      && (!Array.isArray(sprint.depends_on)
+        || sprint.depends_on.some(id => typeof id !== 'number' || !Number.isFinite(id) || id <= 0))) {
+      throw new RoadmapSourceError(`sprints[${sprintIndex}].depends_on must contain numeric sprint IDs`, sourcePath);
+    }
+    for (const field of ['status', 'note', 'outcome', 'phase', 'wave'] as const) {
+      if (sprint[field] != null && typeof sprint[field] !== 'string') {
+        throw new RoadmapSourceError(`sprints[${sprintIndex}].${field} must be a string when present`, sourcePath);
+      }
+    }
+    for (const field of ['artifacts', 'expected_artifacts', 'research'] as const) {
+      if (sprint[field] != null
+        && (!Array.isArray(sprint[field]) || sprint[field].some(item => typeof item !== 'string'))) {
+        throw new RoadmapSourceError(`sprints[${sprintIndex}].${field} must contain string paths`, sourcePath);
+      }
+    }
+    if (!Array.isArray(sprint.tickets)) {
+      throw new RoadmapSourceError(`sprints[${sprintIndex}].tickets must be a sequence`, sourcePath);
+    }
+    for (const [ticketIndex, ticketValue] of sprint.tickets.entries()) {
+      if (!ticketValue || typeof ticketValue !== 'object' || Array.isArray(ticketValue)) {
+        throw new RoadmapSourceError(`sprints[${sprintIndex}].tickets[${ticketIndex}] must be a mapping`, sourcePath);
+      }
+      const ticket = ticketValue as Record<string, unknown>;
+      const key = typeof ticket.key === 'string' && ticket.key.trim()
+        ? ticket.key
+        : typeof ticket.id === 'string' && ticket.id.trim() ? ticket.id : null;
+      if (!key) {
+        throw new RoadmapSourceError(`sprints[${sprintIndex}].tickets[${ticketIndex}] requires key or id`, sourcePath);
+      }
+      if (typeof ticket.title !== 'string' || !ticket.title.trim()) {
+        throw new RoadmapSourceError(`sprints[${sprintIndex}].tickets[${ticketIndex}].title must be a non-empty string`, sourcePath);
+      }
+      if (!validClubs.has(String(ticket.club))) {
+        throw new RoadmapSourceError(`sprints[${sprintIndex}].tickets[${ticketIndex}].club is invalid`, sourcePath);
+      }
+      if (!validComplexities.has(String(ticket.complexity))) {
+        throw new RoadmapSourceError(`sprints[${sprintIndex}].tickets[${ticketIndex}].complexity is invalid`, sourcePath);
+      }
+      if (ticket.depends_on != null
+        && (!Array.isArray(ticket.depends_on)
+          || ticket.depends_on.some(id => typeof id !== 'string' || !id.trim()))) {
+        throw new RoadmapSourceError(`sprints[${sprintIndex}].tickets[${ticketIndex}].depends_on must contain ticket keys`, sourcePath);
+      }
+      if (ticket.github_issue != null
+        && (typeof ticket.github_issue !== 'number' || !Number.isInteger(ticket.github_issue) || ticket.github_issue <= 0)) {
+        throw new RoadmapSourceError(`sprints[${sprintIndex}].tickets[${ticketIndex}].github_issue must be a positive integer`, sourcePath);
+      }
+      if (ticket.note != null && typeof ticket.note !== 'string') {
+        throw new RoadmapSourceError(`sprints[${sprintIndex}].tickets[${ticketIndex}].note must be a string`, sourcePath);
+      }
+    }
   }
 
   const structural = castRoadmapStructure({
@@ -200,6 +302,9 @@ export function parseRoadmapSourceDocument(
     }
     scorecards = {};
     for (const [sprint, value] of Object.entries(raw.scorecards as Record<string, unknown>)) {
+      if (!/^\d+(?:\.\d+)?$/.test(sprint) || Number(sprint) <= 0) {
+        throw new RoadmapSourceError(`scorecards key must be a positive sprint ID: ${sprint}`, sourcePath);
+      }
       if (typeof value !== 'string') {
         throw new RoadmapSourceError(`scorecards.${sprint} must be a string path`, sourcePath);
       }
@@ -245,11 +350,30 @@ export function compileRoadmapSources(
   project: RoadmapSourceProject,
   sources: LoadedRoadmapSource[],
 ): RoadmapDefinition {
+  const byPath = new Map<string, LoadedRoadmapSource>();
+  for (const source of sources) {
+    if (byPath.has(source.entry.path)) {
+      throw new RoadmapSourceError(`Loaded source is duplicated: ${source.entry.path}`);
+    }
+    byPath.set(source.entry.path, source);
+  }
+  const manifestPaths = new Set(project.sources.map(source => source.path));
+  const unexpected = sources.find(source => !manifestPaths.has(source.entry.path));
+  if (unexpected) throw new RoadmapSourceError(`Loaded source is not declared by the manifest: ${unexpected.entry.path}`);
+  const ordered = project.sources.map(entry => {
+    const source = byPath.get(entry.path);
+    if (!source) throw new RoadmapSourceError(`Manifest source was not loaded: ${entry.path}`);
+    if (source.entry.kind !== entry.kind) {
+      throw new RoadmapSourceError(`Source kind mismatch for ${entry.path}: expected ${entry.kind}, received ${source.entry.kind}`);
+    }
+    return source;
+  });
+
   const roadmap: RoadmapDefinition = {
     name: project.name,
     ...(project.description ? { description: project.description } : {}),
-    phases: sources.map(source => clonePhase(source.document.phase)),
-    sprints: sources.flatMap(source => source.document.sprints.map(cloneSprint)),
+    phases: ordered.map(source => clonePhase(source.document.phase)),
+    sprints: ordered.flatMap(source => source.document.sprints.map(cloneSprint)),
   };
   roadmap.sprints.sort((a, b) => compareRoadmapSprintIds(roadmap, a.id, b.id));
   return roadmap;
@@ -270,7 +394,14 @@ export function validateRoadmapSourceFederation(
 ): RoadmapSourceValidationResult {
   const errors: RoadmapSourceValidationIssue[] = [];
   const warnings: RoadmapSourceValidationIssue[] = [];
-  const roadmap = compileRoadmapSources(project, sources);
+  let roadmap: RoadmapDefinition;
+  try {
+    roadmap = compileRoadmapSources(project, sources);
+  } catch (error) {
+    roadmap = { name: project.name, phases: [], sprints: [] };
+    errors.push({ code: 'manifest_fidelity', message: (error as Error).message });
+    return { valid: false, errors, warnings, roadmap };
+  }
 
   const sourcePaths = new Map<string, number>();
   for (const source of sources) {
@@ -376,6 +507,22 @@ export function validateRoadmapSourceFederation(
         sprint,
         message: `Sprint S${sprint} belongs to multiple phase bundles: ${memberships.join(', ')}.`,
       });
+    }
+  }
+
+  const normalizedSprintIds = new Map<number, { id: number; source?: string }>();
+  for (const sprint of roadmap.sprints) {
+    const normalized = roadmapSprintOrderValue(roadmap, sprint.id);
+    const prior = normalizedSprintIds.get(normalized);
+    if (prior && prior.id !== sprint.id) {
+      errors.push({
+        code: 'logical_sprint_collision',
+        source: sprintDefinitions.get(sprint.id),
+        sprint: sprint.id,
+        message: `Sprint S${sprint.id} and Sprint S${prior.id} resolve to the same roadmap identity (${normalized}); first defined in ${prior.source ?? 'unknown source'}.`,
+      });
+    } else {
+      normalizedSprintIds.set(normalized, { id: sprint.id, source: sprintDefinitions.get(sprint.id) });
     }
   }
 

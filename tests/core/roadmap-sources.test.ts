@@ -82,6 +82,12 @@ describe('modular roadmap source schema', () => {
     expect(() => parseRoadmapSourceProject(yaml)).toThrow(RoadmapSourceError);
   });
 
+  it.each(['project.yaml', '../../package.json', '../backlog/roadmap.yaml'])
+    ('rejects unsafe compatibility outputs: %s', output => {
+      expect(() => parseRoadmapSourceProject(PROJECT.replace('../backlog/roadmap.json', output)))
+        .toThrow(RoadmapSourceError);
+    });
+
   it('requires redundant phase membership and sprint definition sequences', () => {
     expect(() => parseRoadmapSourceDocument(PHASE.replace('sprints: [7]', 'sprints: missing'), 'phase.yaml'))
       .toThrow(/phase\.sprints must be a sequence/);
@@ -109,7 +115,7 @@ describe('modular roadmap compilation', () => {
     const first = serializeRoadmapProjection(roadmap);
     const second = serializeRoadmapProjection(compileRoadmapSources(project, ordered));
 
-    expect(roadmap.phases.map(item => item.name)).toEqual(['Deferred', 'no']);
+    expect(roadmap.phases.map(item => item.name)).toEqual(['no', 'Deferred']);
     expect(roadmap.sprints.map(item => item.id)).toEqual([7, 9]);
     expect(first).toBe(second);
     expect(first).not.toContain('scorecards');
@@ -131,7 +137,7 @@ describe('modular roadmap federation validation', () => {
 
   it('accepts a locally self-contained phase bundle', () => {
     const { project, source } = loaded(0);
-    const result = validateRoadmapSourceFederation(project, [source]);
+    const result = validateRoadmapSourceFederation({ ...project, sources: [source.entry] }, [source]);
 
     expect(result.valid).toBe(true);
   });
@@ -152,7 +158,10 @@ describe('modular roadmap federation validation', () => {
   it('reports local orphan and missing definitions separately', () => {
     const { project } = loaded(0);
     const orphan = parseRoadmapSourceDocument(PHASE.replace('sprints: [7]', 'sprints: [99]'), 'phases/phase-01.yaml');
-    const result = validateRoadmapSourceFederation(project, [{ entry: project.sources[0], document: orphan }]);
+    const result = validateRoadmapSourceFederation(
+      { ...project, sources: [project.sources[0]] },
+      [{ entry: project.sources[0], document: orphan }],
+    );
 
     expect(result.errors).toEqual(expect.arrayContaining([
       expect.objectContaining({ code: 'missing_sprint_definition', sprint: 99 }),
@@ -165,10 +174,52 @@ describe('modular roadmap federation validation', () => {
     const dangling = parseRoadmapSourceDocument(PHASE
       .replace('    tickets:', '    depends_on: [99]\n    tickets:')
       .replace('        complexity: small', '        complexity: small\n        depends_on: [S99-1]'), 'phases/phase-01.yaml');
-    const result = validateRoadmapSourceFederation(project, [{ entry: project.sources[0], document: dangling }]);
+    const result = validateRoadmapSourceFederation(
+      { ...project, sources: [project.sources[0]] },
+      [{ entry: project.sources[0], document: dangling }],
+    );
 
     expect(result.errors.filter(issue => issue.code === 'roadmap_validation').map(issue => issue.message).join('\n'))
       .toContain('depends on');
     expect(result.errors.some(issue => issue.ticket === 'S7-1')).toBe(true);
+  });
+
+  it('rejects missing/unexpected loaded sources and always compiles in manifest order', () => {
+    const project = parseRoadmapSourceProject(PROJECT);
+    const phase = loaded(0).source;
+    const backlog = loaded(1).source;
+
+    const missing = validateRoadmapSourceFederation(project, [phase]);
+    expect(missing.errors).toContainEqual(expect.objectContaining({ code: 'manifest_fidelity' }));
+    expect(compileRoadmapSources(project, [backlog, phase]).phases.map(item => item.name)).toEqual(['no', 'no']);
+  });
+
+  it('rejects weak sprint/ticket schemas with source-attributed errors', () => {
+    expect(() => parseRoadmapSourceDocument(`
+version: 1
+phase: {name: Weak, sprints: [7]}
+sprints:
+  - id: 7
+    tickets: [null]
+`, 'phases/weak.yaml')).toThrow(/phases\/weak\.yaml: sprints\[0\]\.theme/);
+  });
+
+  it('rejects decimal and encoded IDs that resolve to the same roadmap identity', () => {
+    const project = parseRoadmapSourceProject(PROJECT);
+    const encoded = parseRoadmapSourceDocument(PHASE
+      .replace('sprints: [7]', 'sprints: [435]')
+      .replaceAll('id: 7', 'id: 435')
+      .replaceAll('S7-', 'S43.5-'), 'phases/phase-01.yaml');
+    const decimal = parseRoadmapSourceDocument(PHASE
+      .replace('name: no', 'name: Decimal')
+      .replace('sprints: [7]', 'sprints: [43.5]')
+      .replaceAll('id: 7', 'id: 43.5')
+      .replaceAll('S7-', 'S43.5-'), 'backlog/deferred.yaml');
+    const result = validateRoadmapSourceFederation(project, [
+      { entry: project.sources[0], document: encoded },
+      { entry: project.sources[1], document: decimal },
+    ]);
+
+    expect(result.errors).toContainEqual(expect.objectContaining({ code: 'logical_sprint_collision' }));
   });
 });

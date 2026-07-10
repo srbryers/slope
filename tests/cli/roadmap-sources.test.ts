@@ -1,8 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { roadmapCommand } from '../../src/cli/commands/roadmap.js';
+import {
+  applyRoadmapSourceArchive,
+  loadRoadmapSourceStore,
+  planRoadmapSourceArchive,
+} from '../../src/cli/roadmap-source-store.js';
 
 let cwd: string;
 let originalCwd: string;
@@ -139,6 +144,49 @@ describe('slope roadmap compile', () => {
     expect(codes).toEqual([1]);
     expect(errors.join('\n')).toContain('single-file projects should use slope roadmap validate');
   });
+
+  it('rejects output paths that do not match configured roadmapPath', async () => {
+    writeFixture();
+    const manifest = join(cwd, 'docs', 'roadmap', 'project.yaml');
+    writeFileSync(manifest, readFileSync(manifest, 'utf8').replace('../backlog/roadmap.json', '../backlog/other.json'));
+    const codes = mockExit();
+
+    await expect(roadmapCommand(['compile'])).rejects.toThrow('process.exit(1)');
+
+    expect(codes).toEqual([1]);
+    expect(errors.join('\n')).toContain('must match configured roadmapPath');
+    expect(existsSync(join(cwd, 'docs', 'backlog', 'other.json'))).toBe(false);
+  });
+
+  it('rejects explicit manifests and symlinked source roots outside the repository', async () => {
+    const outside = mkdtempSync(join(tmpdir(), 'slope-roadmap-outside-'));
+    try {
+      writeFileSync(join(outside, 'project.yaml'), PROJECT);
+      let codes = mockExit();
+      await expect(roadmapCommand(['compile', `--source=${join(outside, 'project.yaml')}`]))
+        .rejects.toThrow('process.exit(1)');
+      expect(codes).toEqual([1]);
+      expect(errors.join('\n')).toContain('manifest path');
+
+      vi.restoreAllMocks();
+      logs = [];
+      errors = [];
+      vi.spyOn(console, 'log').mockImplementation((...args) => logs.push(args.map(String).join(' ')));
+      vi.spyOn(console, 'error').mockImplementation((...args) => errors.push(args.map(String).join(' ')));
+      mkdirSync(join(cwd, 'docs'), { recursive: true });
+      try {
+        symlinkSync(outside, join(cwd, 'docs', 'roadmap'), process.platform === 'win32' ? 'junction' : 'dir');
+      } catch {
+        return; // Host does not permit symlink/junction creation.
+      }
+      codes = mockExit();
+      await expect(roadmapCommand(['compile'])).rejects.toThrow('process.exit(1)');
+      expect(codes).toEqual([1]);
+      expect(errors.join('\n')).toContain('resolves outside');
+    } finally {
+      rmSync(outside, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('slope roadmap validate-sources', () => {
@@ -164,6 +212,51 @@ describe('slope roadmap validate-sources', () => {
 
     expect(logs.join('\n')).toContain('Single-file roadmap mode');
     expect(errors).toEqual([]);
+  });
+
+  it('does not let an explicit missing manifest bypass default modular authority', async () => {
+    writeFixture();
+    let codes = mockExit();
+
+    await expect(roadmapCommand(['validate-sources', '--source=missing.yaml'])).rejects.toThrow('process.exit(1)');
+    expect(codes).toEqual([1]);
+    expect(errors.join('\n')).toContain('manifest not found');
+
+    vi.restoreAllMocks();
+    logs = [];
+    errors = [];
+    vi.spyOn(console, 'log').mockImplementation((...args) => logs.push(args.map(String).join(' ')));
+    vi.spyOn(console, 'error').mockImplementation((...args) => errors.push(args.map(String).join(' ')));
+    codes = mockExit();
+    await expect(roadmapCommand(['sync', '--source=missing.yaml', '--dry-run'])).rejects.toThrow('process.exit(1)');
+    expect(codes).toEqual([1]);
+    expect(errors.join('\n')).toContain('source YAML');
+  });
+
+  it('treats an explicit custom manifest as authoritative for projection mutations', async () => {
+    writeFixture();
+    renameSync(join(cwd, 'docs', 'roadmap'), join(cwd, 'docs', 'custom'));
+    const codes = mockExit();
+
+    await expect(roadmapCommand([
+      'sync',
+      '--source=docs/custom/project.yaml',
+      '--dry-run',
+    ])).rejects.toThrow('process.exit(1)');
+
+    expect(codes).toEqual([1]);
+    expect(errors.join('\n')).toContain('source YAML');
+    expect(errors.join('\n')).toContain('roadmap compile');
+  });
+
+  it('reports an explicit missing manifest when no default authority exists', async () => {
+    const codes = mockExit();
+
+    await expect(roadmapCommand(['sync', '--source=missing.yaml', '--dry-run']))
+      .rejects.toThrow('process.exit(1)');
+
+    expect(codes).toEqual([1]);
+    expect(errors.join('\n')).toContain('manifest not found');
   });
 
   it('blocks compile on duplicate source definitions without replacing the projection', async () => {
@@ -263,5 +356,54 @@ describe('slope roadmap archive', () => {
     await expect(roadmapCommand(['archive', '--through=8'])).rejects.toThrow('process.exit(1)');
     expect(codes).toEqual([1]);
     expect(errors.join('\n')).toContain('not fully terminal');
+  });
+
+  it('replans under the federation lock and refuses a destination created after planning', async () => {
+    writeFixture();
+    addPhaseOneArchiveEvidence();
+    await roadmapCommand(['compile']);
+    const store = loadRoadmapSourceStore(cwd);
+    const plan = planRoadmapSourceArchive(store, 8);
+    const archivePath = join(cwd, 'docs', 'roadmap', 'archive', 'phase-01.yaml');
+    mkdirSync(join(cwd, 'docs', 'roadmap', 'archive'), { recursive: true });
+    writeFileSync(archivePath, 'conflicting bytes\n');
+
+    expect(() => applyRoadmapSourceArchive(store, plan)).toThrow(/different content|changed before commit/);
+    expect(existsSync(join(cwd, 'docs', 'roadmap', 'phases', 'phase-01.yaml'))).toBe(true);
+    expect(readFileSync(archivePath, 'utf8')).toBe('conflicting bytes\n');
+    expect(readFileSync(join(cwd, 'docs', 'roadmap', 'project.yaml'), 'utf8')).toContain('phases/phase-01.yaml');
+  });
+
+  it('refuses an archive destination that aliases the live source', async () => {
+    writeFixture();
+    addPhaseOneArchiveEvidence();
+    await roadmapCommand(['compile']);
+    const store = loadRoadmapSourceStore(cwd);
+    const sourcePath = join(cwd, 'docs', 'roadmap', 'phases', 'phase-01.yaml');
+    const archivePath = join(cwd, 'docs', 'roadmap', 'archive', 'phase-01.yaml');
+    mkdirSync(join(cwd, 'docs', 'roadmap', 'archive'), { recursive: true });
+    linkSync(sourcePath, archivePath);
+
+    expect(() => planRoadmapSourceArchive(store, 8)).toThrow(/aliases the live source/);
+    expect(existsSync(sourcePath)).toBe(true);
+    expect(readFileSync(join(cwd, 'docs', 'roadmap', 'project.yaml'), 'utf8')).toContain('phases/phase-01.yaml');
+  });
+
+  it('refuses an archive directory symlinked back to live phase sources', async () => {
+    writeFixture();
+    addPhaseOneArchiveEvidence();
+    await roadmapCommand(['compile']);
+    const store = loadRoadmapSourceStore(cwd);
+    const phaseRoot = join(cwd, 'docs', 'roadmap', 'phases');
+    const archiveRoot = join(cwd, 'docs', 'roadmap', 'archive');
+    try {
+      symlinkSync(phaseRoot, archiveRoot, process.platform === 'win32' ? 'junction' : 'dir');
+    } catch {
+      return; // Host does not permit symlink/junction creation.
+    }
+
+    expect(() => planRoadmapSourceArchive(store, 8)).toThrow(/aliases the live source/);
+    expect(existsSync(join(phaseRoot, 'phase-01.yaml'))).toBe(true);
+    expect(readFileSync(join(cwd, 'docs', 'roadmap', 'project.yaml'), 'utf8')).toContain('phases/phase-01.yaml');
   });
 });

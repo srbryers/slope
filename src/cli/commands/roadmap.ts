@@ -529,7 +529,21 @@ function compileSourcesSubcommand(flags: Record<string, string>, cwd: string): v
 }
 
 function validateSourcesSubcommand(flags: Record<string, string>, cwd: string): void {
-  if (!hasModularRoadmapSources(cwd, flags.source)) {
+  const explicitSource = Object.prototype.hasOwnProperty.call(flags, 'source');
+  let sourceExists: boolean;
+  try {
+    sourceExists = hasModularRoadmapSources(cwd, flags.source);
+  } catch (error) {
+    console.error(`\n${(error as Error).message}\n`);
+    process.exit(1);
+    return;
+  }
+  if (!sourceExists) {
+    if (explicitSource) {
+      console.error(`\nModular roadmap manifest not found: ${flags.source || '(empty)'}\n`);
+      process.exit(1);
+      return;
+    }
     console.log('\nSingle-file roadmap mode; run `slope roadmap validate` for docs/backlog/roadmap.json.\n');
     return;
   }
@@ -797,13 +811,39 @@ function mergeScorecardTickets(existingTickets: RoadmapTicket[], scorecardTicket
   });
 }
 
-function syncSubcommand(flags: Record<string, string>, cwd: string): void {
-  if (hasModularRoadmapSources(cwd, flags.source)) {
-    console.error('\nModular roadmap sources are authoritative; `roadmap sync` cannot edit the generated projection.');
-    console.error('Update the source YAML and run `slope roadmap compile`.\n');
+function modularAuthorityBlocksProjectionMutation(
+  flags: Record<string, string>,
+  cwd: string,
+  action: 'sync' | 'generate',
+): boolean {
+  let defaultExists = false;
+  let explicitExists = false;
+  try {
+    defaultExists = hasModularRoadmapSources(cwd);
+    if (!defaultExists && Object.prototype.hasOwnProperty.call(flags, 'source')) {
+      explicitExists = hasModularRoadmapSources(cwd, flags.source);
+    }
+  } catch (error) {
+    console.error(`\n${(error as Error).message}\n`);
     process.exit(1);
-    return;
+    return true;
   }
+
+  if (!defaultExists && Object.prototype.hasOwnProperty.call(flags, 'source') && !explicitExists) {
+    console.error(`\nModular roadmap manifest not found: ${flags.source || '(empty)'}\n`);
+    process.exit(1);
+    return true;
+  }
+  if (!defaultExists && !explicitExists) return false;
+
+  console.error(`\nModular roadmap sources are authoritative; \`roadmap ${action}\` cannot edit the generated projection.`);
+  console.error('Update the source YAML and run `slope roadmap compile`.\n');
+  process.exit(1);
+  return true;
+}
+
+function syncSubcommand(flags: Record<string, string>, cwd: string): void {
+  if (modularAuthorityBlocksProjectionMutation(flags, cwd, 'sync')) return;
   const dryRun = flags['dry-run'] === 'true';
   const path = resolveRoadmapPath(flags, cwd);
   const config = loadConfig(cwd);
@@ -879,12 +919,7 @@ function syncSubcommand(flags: Record<string, string>, cwd: string): void {
 }
 
 async function generateSubcommand(flags: Record<string, string>, cwd: string): Promise<void> {
-  if (hasModularRoadmapSources(cwd, flags.source)) {
-    console.error('\nModular roadmap sources are authoritative; `roadmap generate` cannot replace the generated projection.');
-    console.error('Update the source YAML and run `slope roadmap compile`.\n');
-    process.exit(1);
-    return;
-  }
+  if (modularAuthorityBlocksProjectionMutation(flags, cwd, 'generate')) return;
   const vision = loadVision(cwd);
   if (!vision) {
     console.error('\nNo vision found. Create one first:');

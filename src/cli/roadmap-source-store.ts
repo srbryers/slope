@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, unlinkSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, statSync, unlinkSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { stringify } from 'yaml';
 import {
@@ -17,6 +17,7 @@ import {
   type RoadmapSourceValidationResult,
 } from '../core/index.js';
 import { atomicWriteFileSync, withFileLockSync } from './atomic-write.js';
+import { loadConfig } from './config.js';
 
 export const DEFAULT_ROADMAP_SOURCE_MANIFEST = 'docs/roadmap/project.yaml';
 
@@ -38,11 +39,21 @@ function ensureWithin(root: string, path: string, label: string): string {
   if (rel === '..' || rel.startsWith(`..${process.platform === 'win32' ? '\\' : '/'}`) || isAbsolute(rel)) {
     throw new RoadmapSourceError(`${label} escapes ${normalizeDiagnosticPath(resolvedRoot)}: ${normalizeDiagnosticPath(resolvedPath)}`);
   }
+  const realRoot = realpathSync(resolvedRoot);
+  let existing = resolvedPath;
+  while (!existsSync(existing) && dirname(existing) !== existing) existing = dirname(existing);
+  const realExisting = realpathSync(existing);
+  const realRel = relative(realRoot, realExisting);
+  if (realRel === '..'
+    || realRel.startsWith(`..${process.platform === 'win32' ? '\\' : '/'}`)
+    || isAbsolute(realRel)) {
+    throw new RoadmapSourceError(`${label} resolves outside ${normalizeDiagnosticPath(realRoot)}: ${normalizeDiagnosticPath(realExisting)}`);
+  }
   return resolvedPath;
 }
 
 export function resolveRoadmapSourceManifest(cwd: string, sourceFlag?: string): string {
-  return resolve(cwd, sourceFlag || DEFAULT_ROADMAP_SOURCE_MANIFEST);
+  return ensureWithin(cwd, resolve(cwd, sourceFlag || DEFAULT_ROADMAP_SOURCE_MANIFEST), 'manifest path');
 }
 
 export function hasModularRoadmapSources(cwd: string, sourceFlag?: string): boolean {
@@ -70,16 +81,35 @@ export function loadRoadmapSourceStore(cwd: string, sourceFlag?: string): Roadma
     };
   });
   const outputPath = ensureWithin(cwd, resolve(sourceRoot, ...project.output.split('/')), 'output path');
+  const configuredOutput = resolve(cwd, loadConfig(cwd).roadmapPath);
+  if (outputPath !== configuredOutput) {
+    throw new RoadmapSourceError(
+      `manifest output must match configured roadmapPath ${normalizeDiagnosticPath(relative(cwd, configuredOutput))}`,
+      manifestPath,
+    );
+  }
+  if (outputPath === manifestPath || sources.some(source => source.absolutePath === outputPath)) {
+    throw new RoadmapSourceError('compiled output overlaps an authored roadmap source', manifestPath);
+  }
   const roadmap = compileRoadmapSources(project, sources);
   const projection = serializeRoadmapProjection(roadmap);
   return { cwd, manifestPath, sourceRoot, outputPath, project, sources, roadmap, projection };
 }
 
 export function writeRoadmapSourceProjection(store: RoadmapSourceStore): 'written' | 'unchanged' {
-  return withFileLockSync(store.outputPath, () => {
-    const existing = existsSync(store.outputPath) ? readFileSync(store.outputPath, 'utf8') : null;
-    if (existing === store.projection) return 'unchanged';
-    atomicWriteFileSync(store.outputPath, store.projection);
+  const federationLock = join(store.sourceRoot, '.federation');
+  return withFileLockSync(federationLock, () => {
+    const fresh = loadRoadmapSourceStore(store.cwd, relative(store.cwd, store.manifestPath));
+    const validation = validateRoadmapSourceStore(fresh, { checkProjection: false });
+    if (!validation.valid) {
+      throw new RoadmapSourceError([
+        'Modular roadmap sources changed before compile write:',
+        ...validation.errors.map(issue => `  - ${issue.source ? `${issue.source}: ` : ''}${issue.message}`),
+      ].join('\n'));
+    }
+    const existing = existsSync(fresh.outputPath) ? readFileSync(fresh.outputPath, 'utf8') : null;
+    if (existing === fresh.projection) return 'unchanged';
+    atomicWriteFileSync(fresh.outputPath, fresh.projection);
     return 'written';
   });
 }
@@ -204,6 +234,20 @@ export interface RoadmapSourceArchivePlan {
   manifestYaml: string;
 }
 
+function assertIndependentArchiveDestination(fromAbsolute: string, toAbsolute: string, label: string): void {
+  const linkStat = lstatSync(toAbsolute);
+  if (linkStat.isSymbolicLink()) {
+    throw new RoadmapSourceError(`archive destination must be an independent regular file, not a symlink: ${label}`);
+  }
+  const sourceStat = statSync(fromAbsolute);
+  const destinationStat = statSync(toAbsolute);
+  const sameInode = sourceStat.dev === destinationStat.dev && sourceStat.ino === destinationStat.ino;
+  const sameRealPath = realpathSync(fromAbsolute) === realpathSync(toAbsolute);
+  if (!destinationStat.isFile() || sameInode || sameRealPath) {
+    throw new RoadmapSourceError(`archive destination aliases the live source instead of preserving a copy: ${label}`);
+  }
+}
+
 export function planRoadmapSourceArchive(
   store: RoadmapSourceStore,
   through: number,
@@ -237,6 +281,7 @@ export function planRoadmapSourceArchive(
     const to = `archive/${basename(source.entry.path)}`;
     const toAbsolute = ensureWithin(store.sourceRoot, join(store.sourceRoot, 'archive', basename(source.entry.path)), 'archive path');
     if (existsSync(toAbsolute) && source.absolutePath !== toAbsolute) {
+      assertIndependentArchiveDestination(source.absolutePath!, toAbsolute, to);
       const sourceBytes = readFileSync(source.absolutePath!, 'utf8');
       const destinationBytes = readFileSync(toAbsolute, 'utf8');
       if (sourceBytes !== destinationBytes) {
@@ -291,16 +336,41 @@ export function applyRoadmapSourceArchive(
   plan: RoadmapSourceArchivePlan,
 ): void {
   if (plan.moves.length === 0) return;
-  withFileLockSync(store.manifestPath, () => {
-    for (const move of plan.moves) {
+  const federationLock = join(store.sourceRoot, '.federation');
+  withFileLockSync(federationLock, () => {
+    const fresh = loadRoadmapSourceStore(store.cwd, relative(store.cwd, store.manifestPath));
+    const freshPlan = planRoadmapSourceArchive(fresh, plan.through);
+    const captured = new Map<string, string>();
+    for (const move of freshPlan.moves) {
+      const sourceBytes = readFileSync(move.fromAbsolute, 'utf8');
+      captured.set(move.fromAbsolute, sourceBytes);
       mkdirSync(dirname(move.toAbsolute), { recursive: true });
-      if (!existsSync(move.toAbsolute)) {
-        atomicWriteFileSync(move.toAbsolute, readFileSync(move.fromAbsolute, 'utf8'));
+      ensureWithin(fresh.sourceRoot, move.toAbsolute, 'archive destination');
+      if (existsSync(move.toAbsolute)) {
+        assertIndependentArchiveDestination(move.fromAbsolute, move.toAbsolute, move.to);
+        if (readFileSync(move.toAbsolute, 'utf8') !== sourceBytes) {
+          throw new RoadmapSourceError(`archive destination changed before commit: ${move.to}`);
+        }
+      } else {
+        atomicWriteFileSync(move.toAbsolute, sourceBytes);
       }
     }
-    atomicWriteFileSync(store.manifestPath, plan.manifestYaml);
-    for (const move of plan.moves) {
-      if (existsSync(move.fromAbsolute) && move.fromAbsolute !== move.toAbsolute) unlinkSync(move.fromAbsolute);
+    for (const move of freshPlan.moves) {
+      assertIndependentArchiveDestination(move.fromAbsolute, move.toAbsolute, move.to);
+      if (readFileSync(move.fromAbsolute, 'utf8') !== captured.get(move.fromAbsolute)) {
+        throw new RoadmapSourceError(`source changed during archive planning: ${move.from}`);
+      }
+      if (readFileSync(move.toAbsolute, 'utf8') !== captured.get(move.fromAbsolute)) {
+        throw new RoadmapSourceError(`archive copy verification failed: ${move.to}`);
+      }
+    }
+    atomicWriteFileSync(fresh.manifestPath, freshPlan.manifestYaml);
+    for (const move of freshPlan.moves) {
+      if (existsSync(move.fromAbsolute)
+        && move.fromAbsolute !== move.toAbsolute
+        && readFileSync(move.fromAbsolute, 'utf8') === captured.get(move.fromAbsolute)) {
+        unlinkSync(move.fromAbsolute);
+      }
     }
   });
 }
