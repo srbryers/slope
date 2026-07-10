@@ -398,6 +398,23 @@ describe('performSprintRollover audit recovery', () => {
     expect(retried.state).toEqual(first.state);
   });
 
+  it('keeps lineage valid as the target sprint legitimately evolves', () => {
+    const cwd = setupWorkspace();
+    saveSprintState(cwd, terminalState());
+    const first = performSprintRollover(cwd, { from: 10, to: 11 }, actor);
+    const evolved = loadSprintState(cwd)!;
+    evolved.phase = 'implementing';
+    evolved.gates.tests = true;
+    saveSprintState(cwd, evolved);
+
+    const retried = performSprintRollover(cwd, { from: 10, to: 11 }, actor);
+
+    expect(retried.already_applied).toBe(true);
+    expect(retried.record).toEqual(first.record);
+    expect(retried.state.phase).toBe('implementing');
+    expect(retried.state.gates.tests).toBe(true);
+  });
+
   it('recovers an already-audited transition after roadmap bytes drift', () => {
     const cwd = setupWorkspace();
     saveSprintState(cwd, terminalState());

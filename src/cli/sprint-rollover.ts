@@ -640,7 +640,8 @@ export function verifySprintRolloverLineage(cwd: string, state: SprintState): Sp
   if (!existsSync(path)) throw new SprintRolloverError('Current rollover lineage audit is missing.');
   const record = readAudit(cwd, path);
   assertAuditPathIdentity(cwd, path, record);
-  if (JSON.stringify(record.next_state) !== JSON.stringify(state)
+  if (state.sprint !== record.next_state.sprint
+    || state.started_at !== record.next_state.started_at
     || lineage.transition_id !== record.transition_id
     || lineage.recorded_at !== record.recorded_at
     || lineage.forced !== record.forced
