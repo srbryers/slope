@@ -4,7 +4,15 @@ import { join } from 'node:path';
 import { detectLatestSprint, loadConfig, normalizeScorecard, parseSprintNumber, recommendReviews } from '../../core/index.js';
 import type { ReviewRecommendation } from '../../core/index.js';
 import { reviewRunCommand } from './review-run.js';
-import { MAX_REVIEW_DIFF_BYTES } from '../review-diff.js';
+import {
+  collectReviewDiff,
+  DEFAULT_REVIEW_DIFF_BYTES,
+  formatReviewDiffError,
+  MAX_REVIEW_DIFF_BYTES,
+  ReviewDiffError,
+  type ReviewDiffResult,
+  type ReviewDiffScope,
+} from '../review-diff.js';
 import { recordPrCloseoutSettled, recordPrReviewPromptsGenerated } from '../pr-review-state.js';
 import { branchSizeWarnings, buildPrCloseoutStatus, canSettlePrCloseout, closeoutPolicy, formatPrCloseoutStatus } from '../pr-closeout.js';
 
@@ -43,17 +51,21 @@ export interface PrReviewOptions {
   maxDiffBytes?: number;
 }
 
-interface PrReviewPlan {
+export interface PrReviewPlan {
   pr: number;
   sprint?: number;
   ticketCount: number;
   slope: number;
   changedFiles: string[];
+  totalChangedFiles: number;
   hasNewInfra: boolean;
   recommendations: ReviewRecommendation[];
   reviewType: 'architect' | 'code' | 'both';
   branchSizeWarnings: string[];
+  reviewDiff: ReviewDiffResult;
 }
+
+export type PrReviewDiffCollector = typeof collectReviewDiff;
 
 export async function prCommand(args: string[]): Promise<void> {
   const sub = args[0];
@@ -229,15 +241,6 @@ function loadSprintReviewSignals(sprint?: number): { ticketCount: number; slope:
   }
 }
 
-function changedFilesForPr(pr: number): string[] {
-  try {
-    const raw = gh(`pr diff ${pr} --name-only`);
-    return raw ? raw.split('\n').filter(Boolean) : [];
-  } catch {
-    return [];
-  }
-}
-
 export function defaultReviewType(_recommendations: ReviewRecommendation[]): 'architect' | 'code' | 'both' {
   // Keep the transport-independent command aligned with `slope review run`,
   // whose default is both. Recommendations are printed for prioritization,
@@ -256,13 +259,26 @@ export function formatReviewRecommendations(recommendations: ReviewRecommendatio
     .join('\n');
 }
 
-export async function planPrReview(opts: PrReviewOptions): Promise<PrReviewPlan | null> {
-  const pr = resolvePrNumber(opts);
-  if (!pr) return null;
+export async function planPrReview(
+  opts: PrReviewOptions,
+  collect: PrReviewDiffCollector = collectReviewDiff,
+): Promise<PrReviewPlan> {
+  const scope: ReviewDiffScope = {
+    include: opts.paths ?? [],
+    exclude: opts.excludePaths ?? [],
+    maxDiffBytes: opts.maxDiffBytes ?? DEFAULT_REVIEW_DIFF_BYTES,
+  };
+  let reviewDiff: ReviewDiffResult;
+  try {
+    reviewDiff = await collect(process.cwd(), opts.pr, scope);
+  } catch (error) {
+    if (error instanceof ReviewDiffError) throw new Error(formatReviewDiffError(error));
+    throw error;
+  }
 
   const sprint = inferSprintNumber(opts.sprint);
   const { ticketCount, slope } = loadSprintReviewSignals(sprint);
-  const changedFiles = changedFilesForPr(pr);
+  const changedFiles = reviewDiff.files.map(file => file.filename);
   const hasNewInfra = changedFiles.some(p => /(\.sql|migration|schema|infra|terraform|k8s|deploy)/i.test(p));
   const policy = closeoutPolicy(process.cwd());
   const recommendations = recommendReviews({
@@ -273,15 +289,17 @@ export async function planPrReview(opts: PrReviewOptions): Promise<PrReviewPlan 
   });
 
   return {
-    pr,
+    pr: reviewDiff.prNum,
     sprint,
     ticketCount,
     slope,
     changedFiles,
+    totalChangedFiles: reviewDiff.allFiles.length,
     hasNewInfra,
     recommendations,
     reviewType: opts.type ?? defaultReviewType(recommendations),
-    branchSizeWarnings: branchSizeWarnings({ files: changedFiles.length }, policy),
+    branchSizeWarnings: branchSizeWarnings({ files: reviewDiff.allFiles.length }, policy),
+    reviewDiff,
   };
 }
 
@@ -480,7 +498,7 @@ async function reviewSubcommand(args: string[]): Promise<void> {
   if (opts.maxDiffBytes != null) reviewArgs.push(`--max-diff-bytes=${opts.maxDiffBytes}`);
   if (opts.json) {
     reviewArgs.push('--json');
-    await reviewRunCommand(reviewArgs);
+    await reviewRunCommand(reviewArgs, plan.reviewDiff);
     recordPrReviewPromptsGenerated(process.cwd(), {
       pr: plan.pr,
       sprint: plan.sprint,
@@ -491,7 +509,7 @@ async function reviewSubcommand(args: string[]): Promise<void> {
   }
 
   console.log(`\nPR #${plan.pr} review workflow${plan.sprint ? ` for Sprint ${plan.sprint}` : ''}`);
-  console.log(`Files changed: ${plan.changedFiles.length}`);
+  console.log(`Files selected: ${plan.changedFiles.length}/${plan.totalChangedFiles}`);
   console.log(`Signals: ${plan.ticketCount} ticket${plan.ticketCount !== 1 ? 's' : ''}, slope ${plan.slope}${plan.hasNewInfra ? ', infrastructure/schema paths' : ''}`);
   if (plan.branchSizeWarnings.length > 0) {
     console.log('\nBranch size warnings:\n');
@@ -502,7 +520,7 @@ async function reviewSubcommand(args: string[]): Promise<void> {
   console.log(formatReviewRecommendations(plan.recommendations));
   console.log('\nReview prompts:\n');
 
-  await reviewRunCommand(reviewArgs);
+  await reviewRunCommand(reviewArgs, plan.reviewDiff);
   recordPrReviewPromptsGenerated(process.cwd(), {
     pr: plan.pr,
     sprint: plan.sprint,

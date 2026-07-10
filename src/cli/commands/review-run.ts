@@ -152,6 +152,14 @@ function formatScopedDiff(review: ReviewDiffResult): string {
   return review.files.map(formatFileDiff).join('\n\n');
 }
 
+function formatDiffBlock(review: ReviewDiffResult): string[] {
+  const diff = formatScopedDiff(review);
+  let longestBacktickRun = 0;
+  for (const match of diff.matchAll(/`+/g)) longestBacktickRun = Math.max(longestBacktickRun, match[0].length);
+  const fence = '`'.repeat(Math.max(4, longestBacktickRun + 1));
+  return [`${fence}diff`, diff, fence];
+}
+
 function buildPrompt(
   type: 'architect' | 'code',
   review: ReviewDiffResult,
@@ -201,9 +209,7 @@ function buildPrompt(
     review.files.map(file => `- ${file.filename} (${file.status}, +${file.additions}/-${file.deletions})`).join('\n'),
     '',
     '## Diff',
-    '````diff',
-    formatScopedDiff(review),
-    '````',
+    ...formatDiffBlock(review),
     '',
     '## Output Format',
     'For each finding, output:',
@@ -245,7 +251,7 @@ function promptContext(
   };
 }
 
-export async function reviewRunCommand(args: string[]): Promise<void> {
+export async function reviewRunCommand(args: string[], preloadedReview?: ReviewDiffResult): Promise<void> {
   let options: ReviewRunOptions;
   try {
     options = parseReviewRunArgs(args);
@@ -265,15 +271,24 @@ export async function reviewRunCommand(args: string[]): Promise<void> {
   }
 
   let review: ReviewDiffResult;
-  try {
-    review = await collectReviewDiff(cwd, options.prNumber, options.scope);
-  } catch (error) {
-    if (error instanceof ReviewDiffError) {
-      console.error(formatReviewDiffError(error));
+  if (preloadedReview) {
+    if (options.prNumber != null && preloadedReview.prNum !== options.prNumber) {
+      console.error(`Preloaded review context is for PR #${preloadedReview.prNum}, not requested PR #${options.prNumber}.`);
       process.exit(1);
       return;
     }
-    throw error;
+    review = preloadedReview;
+  } else {
+    try {
+      review = await collectReviewDiff(cwd, options.prNumber, options.scope);
+    } catch (error) {
+      if (error instanceof ReviewDiffError) {
+        console.error(formatReviewDiffError(error));
+        process.exit(1);
+        return;
+      }
+      throw error;
+    }
   }
 
   if (review.files.length === 0) {
@@ -342,4 +357,5 @@ export const reviewRunInternals = {
   coverageWarnings,
   formatFileDiff,
   formatScopedDiff,
+  formatDiffBlock,
 };

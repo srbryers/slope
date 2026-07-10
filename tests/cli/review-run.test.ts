@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   collectReviewDiff,
   formatReviewDiffError,
@@ -6,6 +6,7 @@ import {
   ReviewDiffError,
   runBoundedProcess,
   sanitizeGhDiagnostic,
+  utf8Prefix,
   type BoundedProcessResult,
   type ReviewGhRunner,
 } from '../../src/cli/review-diff.js';
@@ -62,6 +63,18 @@ describe('bounded review diff transport (GH #590)', () => {
     expect(Buffer.byteLength(output.stdout)).toBe(bytes);
   });
 
+  it('terminates within a bounded grace when a child traps SIGTERM', async () => {
+    const started = Date.now();
+    const output = await runBoundedProcess(process.execPath, [
+      '-e',
+      "process.on('SIGTERM', () => {}); setInterval(() => {}, 1000)",
+    ], { timeoutMs: 300, killGraceMs: 100, terminalWaitMs: 100 });
+
+    expect(output.timedOut).toBe(true);
+    expect(Date.now() - started).toBeLessThan(2_000);
+    if (process.platform !== 'win32') expect(output.signal).toBe('SIGKILL');
+  });
+
   it('classifies authentication separately and retains redacted diagnostics', async () => {
     const runner: ReviewGhRunner = async () => result({
       exitCode: 1,
@@ -94,15 +107,44 @@ describe('bounded review diff transport (GH #590)', () => {
       .rejects.toMatchObject({ kind: 'buffer' });
   });
 
+  it('enforces one aggregate deadline across lookup and pagination', async () => {
+    const now = vi.spyOn(Date, 'now')
+      .mockReturnValueOnce(0)
+      .mockReturnValueOnce(0)
+      .mockReturnValueOnce(0)
+      .mockReturnValueOnce(120_001);
+    const { runner, calls } = fakeRunner([[]]);
+    try {
+      await expect(collectReviewDiff('.', 590, { include: [], exclude: [], maxDiffBytes: 10 }, runner))
+        .rejects.toMatchObject({ kind: 'timeout', stage: 'PR file metadata page 1' });
+      expect(calls.some(args => args[0] === 'api')).toBe(false);
+    } finally {
+      now.mockRestore();
+    }
+  });
+
   it('redacts common credential forms from gh stderr', () => {
     const sanitized = sanitizeGhDiagnostic(
-      'Authorization: Bearer ghp_abcdef GH_TOKEN=github_pat_xyz https://user:password@example.test?a=1&token=secret',
+      'Authorization: Basic dXNlcjpwYXNz\nGH_TOKEN=github_pat_xyz https://user:password@example.test?a=1&token=secret',
     );
+    expect(sanitized).not.toContain('dXNlcjpwYXNz');
     expect(sanitized).not.toContain('ghp_abcdef');
     expect(sanitized).not.toContain('github_pat_xyz');
     expect(sanitized).not.toContain('user:password');
     expect(sanitized).not.toContain('token=secret');
     expect(sanitized).toContain('[REDACTED]');
+  });
+
+  it('takes a linear byte-safe prefix of multi-megabyte multibyte text', () => {
+    const value = 'é😀z'.repeat(300_000);
+    const budget = 1_500_003;
+    const prefix = utf8Prefix(value, budget);
+    const nextCodePoint = [...value.slice(prefix.length)][0] ?? '';
+
+    expect(value.startsWith(prefix)).toBe(true);
+    expect(Buffer.byteLength(prefix, 'utf8')).toBeLessThanOrEqual(budget);
+    expect(prefix).not.toContain('\uFFFD');
+    expect(Buffer.byteLength(prefix + nextCodePoint, 'utf8')).toBeGreaterThan(budget);
   });
 });
 
@@ -133,7 +175,7 @@ describe('review path scope and patch coverage', () => {
   });
 
   it('paginates metadata and filters generated paths before prompt construction', async () => {
-    const firstPage = Array.from({ length: 20 }, (_, index) => pullFile(
+    const firstPage = Array.from({ length: 100 }, (_, index) => pullFile(
       index === 0 ? 'src/review.ts' : `docs/archive/generated-${index}.yaml`,
     ));
     const secondPage = [pullFile('tests/review.test.ts')];
@@ -145,9 +187,22 @@ describe('review path scope and patch coverage', () => {
       maxDiffBytes: 1024,
     }, runner);
 
-    expect(review.allFiles).toHaveLength(21);
+    expect(review.allFiles).toHaveLength(101);
     expect(review.files.map(file => file.filename)).toEqual(['src/review.ts', 'tests/review.test.ts']);
-    expect(calls.filter(args => args[0] === 'api')).toHaveLength(2);
+    const apiCalls = calls.filter(args => args[0] === 'api');
+    expect(apiCalls).toHaveLength(2);
+    expect(apiCalls[0]).toContain('per_page=100');
+  });
+
+  it('marks the exact 3,000-file GitHub metadata ceiling', async () => {
+    const pages = Array.from({ length: 30 }, (_, page) =>
+      Array.from({ length: 100 }, (_, index) => pullFile(`generated/file-${page * 100 + index}.txt`)));
+    const { runner, calls } = fakeRunner(pages);
+    const review = await collectReviewDiff('.', 590, { include: [], exclude: [], maxDiffBytes: 1 }, runner);
+
+    expect(review.allFiles).toHaveLength(3_000);
+    expect(review.providerFileListTruncated).toBe(true);
+    expect(calls.filter(args => args[0] === 'api')).toHaveLength(30);
   });
 
   it('reports provider partial/omitted patches separately from local budget truncation', async () => {
@@ -213,5 +268,29 @@ describe('review path scope and patch coverage', () => {
     };
     await expect(collectReviewDiff('.', 590, { include: [], exclude: [], maxDiffBytes: 10 }, runner))
       .rejects.toMatchObject({ kind: 'malformed-response', stage: 'PR file metadata page 1' });
+  });
+
+  it.each([
+    { additions: -1 },
+    { deletions: 1.5 },
+    { changes: Number.MAX_SAFE_INTEGER + 1 },
+    { previous_filename: 42 },
+    { patch: { unexpected: true } },
+  ])('rejects malformed file metadata rather than coercing it: %j', async malformed => {
+    const { runner } = fakeRunner([[pullFile('src/invalid.ts', malformed)]]);
+    await expect(collectReviewDiff('.', 590, { include: [], exclude: [], maxDiffBytes: 10 }, runner))
+      .rejects.toMatchObject({ kind: 'malformed-response' });
+  });
+
+  it('uses a diff fence longer than any authored backtick run', async () => {
+    const { runner } = fakeRunner([[
+      pullFile('src/fence.ts', { patch: '@@ -1 +1 @@\n-old\n+`````authored' }),
+    ]]);
+    const review = await collectReviewDiff('.', 590, { include: [], exclude: [], maxDiffBytes: 1024 }, runner);
+    const [opening, body, closing] = reviewRunInternals.formatDiffBlock(review);
+
+    expect(body).toContain('`````authored');
+    expect(opening).toBe('``````diff');
+    expect(closing).toBe('``````');
   });
 });

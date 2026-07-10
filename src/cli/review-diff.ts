@@ -6,7 +6,10 @@ export const MAX_REVIEW_DIFF_BYTES = 4 * 1024 * 1024;
 const GH_STDOUT_LIMIT = 32 * 1024 * 1024;
 const GH_STDERR_LIMIT = 16 * 1024;
 const GH_TIMEOUT_MS = 45_000;
-const FILES_PAGE_SIZE = 20;
+const REVIEW_COLLECTION_TIMEOUT_MS = 120_000;
+const PROCESS_KILL_GRACE_MS = 1_000;
+const PROCESS_TERMINAL_WAIT_MS = 1_000;
+const FILES_PAGE_SIZE = 100;
 const GITHUB_FILES_LIMIT = 3_000;
 
 export interface BoundedProcessResult {
@@ -23,6 +26,8 @@ export interface BoundedProcessResult {
 export interface BoundedProcessOptions {
   cwd?: string;
   timeoutMs?: number;
+  killGraceMs?: number;
+  terminalWaitMs?: number;
   maxStdoutBytes?: number;
   maxStderrBytes?: number;
 }
@@ -128,6 +133,8 @@ export function runBoundedProcess(
   const maxStdoutBytes = options.maxStdoutBytes ?? GH_STDOUT_LIMIT;
   const maxStderrBytes = options.maxStderrBytes ?? GH_STDERR_LIMIT;
   const timeoutMs = options.timeoutMs ?? GH_TIMEOUT_MS;
+  const killGraceMs = options.killGraceMs ?? PROCESS_KILL_GRACE_MS;
+  const terminalWaitMs = options.terminalWaitMs ?? PROCESS_TERMINAL_WAIT_MS;
 
   return new Promise(resolve => {
     const stdout: Buffer[] = [];
@@ -139,6 +146,8 @@ export function runBoundedProcess(
     let timedOut = false;
     let spawnCode: string | undefined;
     let settled = false;
+    let forceKillTimer: NodeJS.Timeout | undefined;
+    let terminalTimer: NodeJS.Timeout | undefined;
 
     const child = spawn(command, args, {
       cwd: options.cwd,
@@ -158,15 +167,12 @@ export function runBoundedProcess(
       spawnCode = error.code;
     });
 
-    const timer = setTimeout(() => {
-      timedOut = true;
-      child.kill();
-    }, timeoutMs);
-
-    child.on('close', (exitCode, signal) => {
+    const finish = (exitCode: number | null, signal: NodeJS.Signals | null): void => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      if (forceKillTimer) clearTimeout(forceKillTimer);
+      if (terminalTimer) clearTimeout(terminalTimer);
       resolve({
         stdout: Buffer.concat(stdout).toString('utf8'),
         stderr: Buffer.concat(stderr).toString('utf8'),
@@ -177,6 +183,31 @@ export function runBoundedProcess(
         stderrOverflow,
         spawnCode,
       });
+    };
+
+    const timer = setTimeout(() => {
+      timedOut = true;
+      child.kill();
+      forceKillTimer = setTimeout(() => {
+        if (settled) return;
+        child.kill('SIGKILL');
+        // A platform or mocked process may never emit close even after a
+        // force-kill attempt. Resolve terminally after one final bounded wait;
+        // timedOut remains the authoritative cross-platform signal.
+        terminalTimer = setTimeout(() => {
+          child.stdout.destroy();
+          child.stderr.destroy();
+          child.unref();
+          finish(null, 'SIGKILL');
+        }, terminalWaitMs);
+        terminalTimer.unref();
+      }, killGraceMs);
+      forceKillTimer.unref();
+    }, timeoutMs);
+    timer.unref();
+
+    child.on('close', (exitCode, signal) => {
+      finish(exitCode, signal);
     });
   });
 }
@@ -184,7 +215,7 @@ export function runBoundedProcess(
 export function sanitizeGhDiagnostic(input: string): string {
   return input
     .replace(/\b(?:github_pat_[A-Za-z0-9_]+|gh[pousr]_[A-Za-z0-9]+)\b/g, '[REDACTED]')
-    .replace(/(Authorization\s*:\s*(?:bearer|token)\s+)\S+/gi, '$1[REDACTED]')
+    .replace(/(\bAuthorization\s*:\s*)[^\r\n]+/gi, '$1[REDACTED]')
     .replace(/\b((?:GH|GITHUB)_TOKEN\s*=\s*)\S+/gi, '$1[REDACTED]')
     .replace(/([?&](?:access_token|token)=)[^&\s]+/gi, '$1[REDACTED]')
     .replace(/(https?:\/\/)[^/@\s]+@/gi, '$1[REDACTED]@')
@@ -219,10 +250,15 @@ async function runGhChecked(
   args: string[],
   stage: string,
   cwd: string,
+  deadlineAt?: number,
 ): Promise<string> {
+  const remainingMs = deadlineAt == null ? GH_TIMEOUT_MS : deadlineAt - Date.now();
+  if (remainingMs <= 0) {
+    throw new ReviewDiffError('timeout', stage, `GitHub review collection exceeded its aggregate deadline during ${stage}.`);
+  }
   const result = await runner(args, {
     cwd,
-    timeoutMs: GH_TIMEOUT_MS,
+    timeoutMs: Math.min(GH_TIMEOUT_MS, remainingMs),
     maxStdoutBytes: GH_STDOUT_LIMIT,
     maxStderrBytes: GH_STDERR_LIMIT,
   });
@@ -300,12 +336,18 @@ function utf8Bytes(value: string): number {
   return Buffer.byteLength(value, 'utf8');
 }
 
-function utf8Prefix(value: string, maxBytes: number): string {
+export function utf8Prefix(value: string, maxBytes: number): string {
   if (maxBytes <= 0) return '';
-  if (utf8Bytes(value) <= maxBytes) return value;
-  let end = Math.min(value.length, maxBytes);
-  while (end > 0 && utf8Bytes(value.slice(0, end)) > maxBytes) end -= 1;
-  return value.slice(0, end);
+  const encoded = Buffer.from(value, 'utf8');
+  if (encoded.length <= maxBytes) return value;
+
+  // `end` is the first excluded byte. If it points into a continuation
+  // sequence, walk back to the leading byte so decoding never manufactures a
+  // replacement character or splits a UTF-16 surrogate pair. This is linear
+  // in input size (encoding once) rather than repeatedly re-encoding slices.
+  let end = maxBytes;
+  while (end > 0 && (encoded[end] & 0b1100_0000) === 0b1000_0000) end -= 1;
+  return encoded.subarray(0, end).toString('utf8');
 }
 
 function allocatePatchBudgets(sizes: number[], budget: number): number[] {
@@ -341,26 +383,55 @@ function parsePullFiles(raw: string, stage: string): GitHubPullFile[] {
   try {
     value = JSON.parse(raw);
   } catch {
-    throw new ReviewDiffError('malformed-response', stage, `GitHub returned malformed JSON during ${stage}.`);
+    throw new ReviewDiffError('malformed-response', stage, `GitHub returned malformed JSON during ${stage}.`, 0);
   }
   if (!Array.isArray(value)) {
-    throw new ReviewDiffError('malformed-response', stage, `GitHub returned an unexpected response during ${stage}.`);
+    throw new ReviewDiffError('malformed-response', stage, `GitHub returned an unexpected response during ${stage}.`, 0);
   }
   return value.map((item, index) => {
     if (!item || typeof item !== 'object') {
-      throw new ReviewDiffError('malformed-response', stage, `GitHub returned an invalid file record at index ${index}.`);
+      throw new ReviewDiffError('malformed-response', stage, `GitHub returned an invalid file record at index ${index}.`, 0);
     }
     const record = item as Record<string, unknown>;
-    if (typeof record.filename !== 'string' || typeof record.status !== 'string') {
-      throw new ReviewDiffError('malformed-response', stage, `GitHub returned an invalid file record at index ${index}.`);
+    if (typeof record.filename !== 'string' || record.filename.length === 0
+      || typeof record.status !== 'string' || record.status.length === 0) {
+      throw new ReviewDiffError('malformed-response', stage, `GitHub returned an invalid file record at index ${index}.`, 0);
+    }
+    const numericFields = ['additions', 'deletions', 'changes'] as const;
+    for (const field of numericFields) {
+      if (typeof record[field] !== 'number' || !Number.isSafeInteger(record[field]) || record[field] < 0) {
+        throw new ReviewDiffError(
+          'malformed-response',
+          stage,
+          `GitHub returned invalid ${field} metadata at file index ${index}.`,
+          0,
+        );
+      }
+    }
+    if (record.previous_filename !== undefined
+      && (typeof record.previous_filename !== 'string' || record.previous_filename.length === 0)) {
+      throw new ReviewDiffError('malformed-response', stage, `GitHub returned an invalid previous_filename at file index ${index}.`, 0);
+    }
+    if (record.patch !== undefined && typeof record.patch !== 'string') {
+      throw new ReviewDiffError('malformed-response', stage, `GitHub returned an invalid patch at file index ${index}.`, 0);
+    }
+    const filename = normalizeReviewPath(record.filename);
+    const previousFilename = typeof record.previous_filename === 'string'
+      ? normalizeReviewPath(record.previous_filename)
+      : undefined;
+    if (!filename || previousFilename === '') {
+      throw new ReviewDiffError('malformed-response', stage, `GitHub returned an empty normalized path at file index ${index}.`, 0);
+    }
+    if (!Number.isSafeInteger((record.additions as number) + (record.deletions as number))) {
+      throw new ReviewDiffError('malformed-response', stage, `GitHub returned unsafe aggregate change metadata at file index ${index}.`, 0);
     }
     return {
-      filename: normalizeReviewPath(record.filename),
-      previous_filename: typeof record.previous_filename === 'string' ? normalizeReviewPath(record.previous_filename) : undefined,
+      filename,
+      previous_filename: previousFilename,
       status: record.status,
-      additions: typeof record.additions === 'number' ? record.additions : 0,
-      deletions: typeof record.deletions === 'number' ? record.deletions : 0,
-      changes: typeof record.changes === 'number' ? record.changes : 0,
+      additions: record.additions as number,
+      deletions: record.deletions as number,
+      changes: record.changes as number,
       patch: typeof record.patch === 'string' ? record.patch : undefined,
     };
   });
@@ -372,13 +443,14 @@ export async function collectReviewDiff(
   scope: ReviewDiffScope,
   runner: ReviewGhRunner = (args, options) => runBoundedProcess('gh', args, options),
 ): Promise<ReviewDiffResult> {
+  const deadlineAt = Date.now() + REVIEW_COLLECTION_TIMEOUT_MS;
   const prArgs = ['pr', 'view'];
   if (requestedPr != null) prArgs.push(String(requestedPr));
   prArgs.push('--json', 'number', '--jq', '.number');
-  const prRaw = await runGhChecked(runner, prArgs, 'PR lookup', cwd);
+  const prRaw = await runGhChecked(runner, prArgs, 'PR lookup', cwd, deadlineAt);
   const prNum = Number(prRaw);
   if (!Number.isInteger(prNum) || prNum <= 0) {
-    throw new ReviewDiffError('malformed-response', 'PR lookup', 'GitHub returned an invalid pull request number.');
+    throw new ReviewDiffError('malformed-response', 'PR lookup', 'GitHub returned an invalid pull request number.', 0);
   }
 
   const repository = await runGhChecked(
@@ -386,9 +458,10 @@ export async function collectReviewDiff(
     ['repo', 'view', '--json', 'nameWithOwner', '--jq', '.nameWithOwner'],
     'repository lookup',
     cwd,
+    deadlineAt,
   );
   if (!/^[^/\s]+\/[^/\s]+$/.test(repository)) {
-    throw new ReviewDiffError('malformed-response', 'repository lookup', 'GitHub returned an invalid repository name.');
+    throw new ReviewDiffError('malformed-response', 'repository lookup', 'GitHub returned an invalid repository name.', 0);
   }
 
   const allFiles: string[] = [];
@@ -402,7 +475,7 @@ export async function collectReviewDiff(
       `repos/${repository}/pulls/${prNum}/files`,
       '-f', `per_page=${FILES_PAGE_SIZE}`,
       '-f', `page=${page}`,
-    ], stage, cwd);
+    ], stage, cwd, deadlineAt);
     const records = parsePullFiles(raw, stage);
     for (const record of records) {
       allFiles.push(record.filename);
