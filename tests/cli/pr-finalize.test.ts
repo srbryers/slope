@@ -7,6 +7,7 @@ import {
   extractIssueRefs,
   existingAutoCloseRefs,
   formatReviewRecommendations,
+  parsePrReviewFlags,
 } from '../../src/cli/commands/pr.js';
 import { branchSizeWarnings, buildPrCloseoutStatus, canSettlePrCloseout, formatPrCloseoutStatus, hasSuccessfulCodeRabbitStatus, isBlockedCodeRabbitComment } from '../../src/cli/pr-closeout.js';
 import { recordPrReviewPromptsGenerated } from '../../src/cli/pr-review-state.js';
@@ -91,6 +92,19 @@ describe('pr review workflow helpers (S94-5)', () => {
     expect(output).toContain('architect');
     expect(output).toContain('required');
     expect(output).toContain('Baseline code review');
+  });
+
+  it('preserves repeatable bounded review scope flags for review-run forwarding', () => {
+    expect(parsePrReviewFlags([
+      '--pr=590', '--path=src/**', '--path=tests/**',
+      '--exclude-path=docs/archive/**', '--max-diff-bytes=8192', '--json',
+    ])).toMatchObject({
+      pr: 590,
+      paths: ['src/**', 'tests/**'],
+      excludePaths: ['docs/archive/**'],
+      maxDiffBytes: 8192,
+      json: true,
+    });
   });
 });
 

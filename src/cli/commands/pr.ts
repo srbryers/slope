@@ -37,6 +37,9 @@ interface PrReviewOptions {
   sprint?: number;
   type?: 'architect' | 'code' | 'both';
   json?: boolean;
+  paths?: string[];
+  excludePaths?: string[];
+  maxDiffBytes?: number;
 }
 
 interface PrReviewPlan {
@@ -113,13 +116,18 @@ function printReviewHelp(): void {
 slope pr review — Generate post-PR review prompts
 
 Usage:
-  slope pr review [--pr=N] [--sprint=N] [--type=architect|code|both] [--json]
+  slope pr review [--pr=N] [--sprint=N] [--type=architect|code|both]
+                  [--path=GLOB]... [--exclude-path=GLOB]...
+                  [--max-diff-bytes=N] [--json]
 
 Options:
   --help, -h                       Show this help without resolving PR state
   --pr=N                           Review a specific pull request
   --sprint=N                       Use a specific sprint for review context
   --type=architect|code|both       Select review prompt type (default: both)
+  --path=GLOB                      Include matching changed paths (repeatable)
+  --exclude-path=GLOB              Exclude matching changed paths (repeatable)
+  --max-diff-bytes=N               Bound patch bytes included across review prompts
   --json                           Emit machine-readable review prompts
 
 Defaults:
@@ -140,8 +148,8 @@ function parseFlags(args: string[]): FinalizeOptions {
   return opts;
 }
 
-function parseReviewFlags(args: string[]): PrReviewOptions {
-  const opts: PrReviewOptions = {};
+export function parsePrReviewFlags(args: string[]): PrReviewOptions {
+  const opts: PrReviewOptions = { paths: [], excludePaths: [] };
   for (const a of args) {
     if (a.startsWith('--pr=')) opts.pr = parseInt(a.slice('--pr='.length), 10);
     else if (a.startsWith('--sprint=')) opts.sprint = parseInt(a.slice('--sprint='.length), 10);
@@ -150,6 +158,12 @@ function parseReviewFlags(args: string[]): PrReviewOptions {
       if (type === 'architect' || type === 'code' || type === 'both') opts.type = type;
     } else if (a === '--json') {
       opts.json = true;
+    } else if (a.startsWith('--path=')) {
+      opts.paths?.push(a.slice('--path='.length));
+    } else if (a.startsWith('--exclude-path=')) {
+      opts.excludePaths?.push(a.slice('--exclude-path='.length));
+    } else if (a.startsWith('--max-diff-bytes=')) {
+      opts.maxDiffBytes = Number(a.slice('--max-diff-bytes='.length));
     }
   }
   return opts;
@@ -430,7 +444,7 @@ async function reviewSubcommand(args: string[]): Promise<void> {
     return;
   }
 
-  const opts = parseReviewFlags(args);
+  const opts = parsePrReviewFlags(args);
   const plan = await planPrReview(opts);
 
   if (!plan) {
@@ -440,6 +454,9 @@ async function reviewSubcommand(args: string[]): Promise<void> {
 
   const reviewArgs = [`--pr=${plan.pr}`, `--type=${plan.reviewType}`];
   if (plan.sprint) reviewArgs.push(`--sprint=${plan.sprint}`);
+  for (const path of opts.paths ?? []) reviewArgs.push(`--path=${path}`);
+  for (const path of opts.excludePaths ?? []) reviewArgs.push(`--exclude-path=${path}`);
+  if (opts.maxDiffBytes != null) reviewArgs.push(`--max-diff-bytes=${opts.maxDiffBytes}`);
   if (opts.json) {
     reviewArgs.push('--json');
     await reviewRunCommand(reviewArgs);
@@ -474,7 +491,7 @@ async function reviewSubcommand(args: string[]): Promise<void> {
 }
 
 async function statusSubcommand(args: string[]): Promise<void> {
-  const opts = parseReviewFlags(args);
+  const opts = parsePrReviewFlags(args);
   const status = buildPrCloseoutStatus(process.cwd(), { pr: opts.pr, sprint: opts.sprint });
   console.log(formatPrCloseoutStatus(status));
   if (canSettlePrCloseout(status) && status.closeoutSettlement !== 'settled' && status.pr) {
