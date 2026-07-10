@@ -1,0 +1,109 @@
+version: "1"
+phase:
+  name: Phase 51 — Review and Workflow Trust Recovery
+  sprints:
+    - 224
+    - 226
+    - 227
+  status: complete
+  note: "Execute the July 2026 trust/contract batch: review-gate downgrade honesty (#578), guard enforcement wording and phase-boundary diagnostics (#579), sprint-standard workflow loop determinism (#581), MCP scorecard builder schema contract (#582), and review output safety (#583). Issue #580 was already fixed by S216 and v1.60.0, so it is a verified duplicate rather than new sprint work. S225 is intentionally skipped because the legacy encoded-inserted sprint format renders 225 as S22.5."
+sprints:
+  - id: 224
+    theme: Review Gate and Guard Advisory Honesty
+    par: 4
+    slope: 2
+    type: bugfix + agent-dx
+    status: complete
+    score: 4
+    score_label: par
+    depends_on:
+      - 223
+    note: "Close #578/#579 by making required review downgrades explicit and making non-blocking guard advisories read like advisory context rather than hard permission gates."
+    tickets:
+      - key: S224-1
+        title: Reword non-blocking guard advisories as explicit advisory context (#579)
+        club: wedge
+        complexity: small
+        github_issue: 579
+      - key: S224-2
+        title: Clarify that SLOPE claims do not control host permission prompts (#579)
+        club: wedge
+        complexity: small
+        github_issue: 579
+        depends_on:
+          - S224-1
+      - key: S224-3
+        title: Require an explicit waiver path for required-review self-review downgrades (#578)
+        club: short_iron
+        complexity: standard
+        github_issue: 578
+      - key: S224-4
+        title: Surface required-review next actions in sprint status, slope now, and PR guidance (#578)
+        club: short_iron
+        complexity: standard
+        github_issue: 578
+        depends_on:
+          - S224-3
+  - id: 226
+    theme: Workflow Runtime and MCP Scorecard Contract
+    par: 4
+    slope: 3
+    type: bugfix + workflow + mcp
+    status: complete
+    score: 4
+    score_label: par
+    depends_on:
+      - 224
+    note: "Close #581/#582 by making sprint-standard ticket looping deterministic and aligning MCP scorecard builder output with validate/review scorecard schema and scoring conventions."
+    tickets:
+      - key: S226-1
+        title: Make sprint-standard tickets variable requirements deterministic (#581)
+        club: short_iron
+        complexity: standard
+        github_issue: 581
+      - key: S226-2
+        title: Preserve per-ticket loop sizing when tickets=N is provided (#581)
+        club: short_iron
+        complexity: standard
+        github_issue: 581
+        depends_on:
+          - S226-1
+      - key: S226-3
+        title: Emit validate/review-compatible scorecard schema from MCP buildScorecard (#582)
+        club: short_iron
+        complexity: standard
+        github_issue: 582
+      - key: S226-4
+        title: Align builder hazard and score defaults with project scorecard conventions (#582)
+        club: short_iron
+        complexity: standard
+        github_issue: 582
+        depends_on:
+          - S226-3
+  - id: 227
+    theme: Review Output Selection and Side-Effect Safety
+    par: 3
+    slope: 2
+    type: bugfix + review
+    status: complete
+    score: 3
+    depends_on:
+      - 226
+    note: "Close #583 by making slope review scorecard selection and filesystem/stdout side effects explicit. Issue #580 is already covered by S216/v1.60.0 and is not reimplemented here."
+    tickets:
+      - key: S227-1
+        title: Require an explicit scorecard or fail loudly when review sees multiple scorecards (#583)
+        club: short_iron
+        complexity: standard
+        github_issue: 583
+      - key: S227-2
+        title: Scope review output side effects to the explicit scorecard and keep status text out of redirected markdown (#583)
+        club: wedge
+        complexity: small
+        github_issue: 583
+        depends_on:
+          - S227-1
+scorecards:
+  "224": docs/retros/sprint-224.json
+  "226": docs/retros/sprint-226.json
+  "227": docs/retros/sprint-227.json

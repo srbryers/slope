@@ -1,0 +1,49 @@
+version: "1"
+phase:
+  name: Phase 23 — Guard Enforcement Hardening
+  sprints:
+    - 94
+  status: complete
+  note: "Closed the remaining enforcement/diagnostic gaps exposed by #368: full dispatcher coverage, Codex matcher coverage, stale runtime detection, configurable strictness for implementation writes outside sprint state, and transport-independent PR review handoff. Shipped in v1.55.6."
+sprints:
+  - id: 94
+    theme: Guard Enforcement Hardening — make workflow-control guards provable
+    par: 4
+    slope: 2
+    type: hardening + dx
+    status: complete
+    depends_on:
+      - 93
+    score: 5
+    score_label: par
+    note: "Follow-up to #368 and v1.55.5. Shipped in v1.55.6 with dispatcher/runtime coverage, configurable strictness, diagnostics, and explicit post-PR review handoff."
+    tickets:
+      - key: S94-1
+        title: Dispatcher-level regression tests for adhoc claim-required and suppressed workflow guards
+        club: short_iron
+        complexity: standard
+        github_issue: 368
+      - key: S94-2
+        title: Codex matcher coverage for claim-required under apply_patch/Edit/Write installs
+        club: wedge
+        complexity: small
+        github_issue: 368
+      - key: S94-3
+        title: Doctor diagnostics for stale hook runtime resolution and local binary precedence
+        club: short_iron
+        complexity: standard
+        github_issue: 368
+      - key: S94-4
+        title: Configurable implementation-write strictness and non-implementing phase behavior
+        club: short_iron
+        complexity: standard
+        github_issue: 368
+        depends_on:
+          - S94-1
+      - key: S94-5
+        title: Transport-independent post-PR review workflow
+        club: wedge
+        complexity: small
+        note: Close the connector-created PR gap where pr-review cannot fire because no Bash gh pr create hook event exists.
+scorecards:
+  "94": docs/retros/sprint-94.json

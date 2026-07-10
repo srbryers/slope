@@ -1,0 +1,201 @@
+version: "1"
+phase:
+  name: Phase 52 — Roadmap Architecture and Handoff Federation
+  sprints:
+    - 228
+    - 229
+    - 230
+    - 231
+    - 232
+  status: active
+  note: "Turn the large-project findings from Fathoms into reusable SLOPE architecture: bounded roadmap context, modular source federation, replan-aware briefing hazards, auditable sprint rollover, and a final dogfood migration of SLOPE's own roadmap sources (#584/#585/#586)."
+sprints:
+  - id: 228
+    theme: Focused Roadmap Context Projection
+    par: 4
+    slope: 3
+    type: feature + planning architecture
+    status: complete
+    score: 5
+    depends_on:
+      - 227
+    note: "Deliver the bounded read model from #584 before changing authoring storage, so agents can request canonical sprint/phase/dependency context without ingesting full roadmap history."
+    tickets:
+      - key: S228-1
+        title: Define a focused roadmap context result with sprint, phase, dependency, successor, hazard, and evidence sections (#584)
+        club: long_iron
+        complexity: moderate
+        github_issue: 584
+      - key: S228-2
+        title: Build a deterministic focus projection from existing single-file roadmaps (#584)
+        club: short_iron
+        complexity: standard
+        github_issue: 584
+        depends_on:
+          - S228-1
+      - key: S228-3
+        title: Add slope roadmap focus --sprint with bounded human and JSON output (#584)
+        club: short_iron
+        complexity: standard
+        github_issue: 584
+        depends_on:
+          - S228-2
+      - key: S228-4
+        title: Cover historical bounds, phase-local neighbors, dependencies, successors, and compatibility behavior (#584)
+        club: wedge
+        complexity: small
+        github_issue: 584
+        depends_on:
+          - S228-2
+          - S228-3
+  - id: 229
+    theme: Modular Roadmap Source Federation
+    par: 4
+    slope: 4
+    type: feature + schema + planning architecture
+    status: complete
+    depends_on:
+      - 228
+    note: "Complete #584 with opt-in modular authoring sources that compile deterministically to the existing roadmap.json compatibility contract while single-file projects remain unchanged."
+    tickets:
+      - key: S229-1
+        title: Define project, live phase, deferred backlog, and archive source documents with stable ordering (#584)
+        club: long_iron
+        complexity: moderate
+        github_issue: 584
+      - key: S229-2
+        title: Implement deterministic roadmap compile to the compatibility JSON shape (#584)
+        club: long_iron
+        complexity: moderate
+        github_issue: 584
+        depends_on:
+          - S229-1
+      - key: S229-3
+        title: Validate duplicate IDs, phase membership, dependency gaps, projection drift, and archived scorecard links (#584)
+        club: long_iron
+        complexity: moderate
+        github_issue: 584
+        depends_on:
+          - S229-1
+          - S229-2
+      - key: S229-4
+        title: Archive completed phases without changing compiled compatibility output and document single-file fallback (#584)
+        club: short_iron
+        complexity: standard
+        github_issue: 584
+        depends_on:
+          - S229-2
+          - S229-3
+  - id: 230
+    theme: Replan-Aware Briefing Hazard Provenance
+    par: 4
+    slope: 3
+    type: bugfix + context architecture
+    status: complete
+    depends_on:
+      - 228
+    note: "Close #585 by preserving dependency history while preventing old next-sprint routing prose from masquerading as current roadmap guidance after a replan."
+    tickets:
+      - key: S230-1
+        title: Add sprint/phase/dependency provenance and active-versus-historical relevance to briefing hazards (#585)
+        club: long_iron
+        complexity: moderate
+        github_issue: 585
+      - key: S230-2
+        title: Detect superseded next-sprint premises against the current roadmap assignment (#585)
+        club: short_iron
+        complexity: standard
+        github_issue: 585
+        depends_on:
+          - S230-1
+      - key: S230-3
+        title: Render dependency hazards as history and suppress stale route directives in briefing defaults (#585)
+        club: short_iron
+        complexity: standard
+        github_issue: 585
+        depends_on:
+          - S230-2
+      - key: S230-4
+        title: Add replanned-sprint regressions for retained dependency risk and removed stale guidance (#585)
+        club: wedge
+        complexity: small
+        github_issue: 585
+        depends_on:
+          - S230-3
+  - id: 231
+    theme: Auditable Terminal Sprint Rollover
+    par: 4
+    slope: 3
+    type: feature + lifecycle safety
+    status: complete
+    depends_on:
+      - 224
+    note: "Close #586 with a one-command, audited handoff from terminal ready-for-PR state to the next dependency-eligible sprint while keeping in-progress rollover explicitly forced and reasoned."
+    tickets:
+      - key: S231-1
+        title: Define terminal rollover eligibility and tracked audit record shape (#586)
+        club: long_iron
+        complexity: moderate
+        github_issue: 586
+      - key: S231-2
+        title: Implement slope sprint rollover --from --to with dependency and terminal-state checks (#586)
+        club: short_iron
+        complexity: standard
+        github_issue: 586
+        depends_on:
+          - S231-1
+      - key: S231-3
+        title: Teach sprint begin to emit the exact safe rollover recovery command (#586)
+        club: short_iron
+        complexity: standard
+        github_issue: 586
+        depends_on:
+          - S231-2
+      - key: S231-4
+        title: Cover terminal, dependency-blocked, in-progress forced, and audit-preservation rollover paths (#586)
+        club: wedge
+        complexity: small
+        github_issue: 586
+        depends_on:
+          - S231-2
+          - S231-3
+  - id: 232
+    theme: SLOPE Roadmap Federation Dogfood
+    par: 4
+    slope: 3
+    type: migration + documentation
+    status: active
+    depends_on:
+      - 229
+      - 230
+      - 231
+    note: "Apply the architecture learnings to SLOPE itself: move authored roadmap history/live plan into modular sources, retain the compiled compatibility artifact, use focused context in contributor workflows, and prove no roadmap/scorecard drift."
+    tickets:
+      - key: S232-1
+        title: Split SLOPE's roadmap into project, archived-history, and live-phase source documents
+        club: long_iron
+        complexity: moderate
+      - key: S232-2
+        title: Compile and validate the existing docs/backlog/roadmap.json compatibility artifact without semantic drift
+        club: long_iron
+        complexity: moderate
+        depends_on:
+          - S232-1
+      - key: S232-3
+        title: Route SLOPE contributor and agent guidance through roadmap focus and modular-source validation
+        club: short_iron
+        complexity: standard
+        depends_on:
+          - S232-2
+      - key: S232-4
+        title: Record dogfood hazards and verify focused context, compilation, scorecards, and roadmap validation end to end
+        club: wedge
+        complexity: small
+        depends_on:
+          - S232-2
+          - S232-3
+scorecards:
+  "228": docs/retros/sprint-228.json
+  "229": docs/retros/sprint-229.json
+  "230": docs/retros/sprint-230.json
+  "231": docs/retros/sprint-231.json

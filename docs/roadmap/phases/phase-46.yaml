@@ -1,0 +1,39 @@
+version: "1"
+phase:
+  name: Phase 46 — Handoff Continuity
+  sprints:
+    - 147
+  status: complete
+  note: S147 remained a stale planned handoff-continuity entry after S148-S151.1 shipped the broader human operating surface. It is closed as superseded rather than complete because no standalone S147 scorecard shipped.
+sprints:
+  - id: 147
+    theme: Handoff and Cross-Session Continuity
+    par: 4
+    slope: 3
+    type: feature
+    status: superseded
+    depends_on:
+      - 146.3
+    note: Superseded by the S148-S151.1 human operating surface work before a standalone S147 sprint shipped. Keep the original ticket sketch here for reference if handoff-continuity work is revived.
+    tickets:
+      - key: S147-1
+        title: Briefing surfaces latest durable handoff as a resume block
+        club: short_iron
+        complexity: standard
+      - key: S147-2
+        title: agent next-md merges durable human handoff state with auto-derived state
+        club: long_iron
+        complexity: moderate
+        depends_on:
+          - S147-1
+      - key: S147-3
+        title: Add slope hazard add one-liner that writes to common issues
+        club: wedge
+        complexity: small
+      - key: S147-4
+        title: Add PreCompact and session-end nudges to update durable handoff state
+        club: wedge
+        complexity: small
+        depends_on:
+          - S147-1
+          - S147-2

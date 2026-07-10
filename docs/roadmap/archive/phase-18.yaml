@@ -1,0 +1,81 @@
+version: "1"
+phase:
+  name: Phase 18 — Drift Detection & Bug Clearing
+  sprints:
+    - 86
+    - 87
+  status: complete
+  note: Builds the drift-detection scaffolding (S86) the project lacked during S70-S84, and clears accumulated CLI bugs from external users (S87, supersedes S75.5).
+sprints:
+  - id: 86
+    theme: The Marshal — Drift Detection
+    par: 5
+    slope: 2
+    type: feature + guard
+    status: complete
+    depends_on:
+      - 85
+    note: "Drift catches up. Builds the audit infrastructure that would have caught the S70-S84 status drift fixed in PR #317."
+    tickets:
+      - key: S86-1
+        title: slope roadmap validate — detect status drift against git log (#319)
+        club: short_iron
+        complexity: standard
+        github_issue: 319
+      - key: S86-2
+        title: "Guard: block edits to sprints with status:complete (#320)"
+        club: wedge
+        complexity: small
+        github_issue: 320
+      - key: S86-3
+        title: Post-hole enforcement hook — fail session-end on roadmap/scorecard drift (#291)
+        club: short_iron
+        complexity: standard
+        github_issue: 291
+        depends_on:
+          - S86-1
+      - key: S86-4
+        title: Backfill missing scorecards for S70, S74-S83 (#318)
+        club: long_iron
+        complexity: moderate
+        github_issue: 318
+      - key: S86-5
+        title: "Briefing surfaces next sprint + fix title/theme schema drift (#290, #324)"
+        club: wedge
+        complexity: small
+        github_issue: 290
+        github_issues:
+          - 290
+          - 324
+  - id: 87
+    theme: The Bug Clearing v2 — CLI fixes for external repos
+    par: 4
+    slope: 1
+    type: bug fix
+    status: complete
+    depends_on: []
+    note: Supersedes S75.5. Highest-impact CLI bugs from external SLOPE users.
+    tickets:
+      - key: S87-1
+        title: slope version returns 'vunknown' — read from installed package, not cwd (#300)
+        club: wedge
+        complexity: small
+        github_issue: 300
+      - key: S87-2
+        title: "slope review formatted output shows 'Tickets Delivered: 0' despite tickets array (#298)"
+        club: short_iron
+        complexity: standard
+        github_issue: 298
+      - key: S87-3
+        title: roadmap generate --dry-run should not write roadmap.json (#304)
+        club: putter
+        complexity: trivial
+        github_issue: 304
+      - key: S87-4
+        title: init should not create a completed example retrospective by default (#306)
+        club: wedge
+        complexity: small
+        github_issue: 306
+scorecards:
+  "86": docs/retros/sprint-86.json
+  "87": docs/retros/sprint-87.json

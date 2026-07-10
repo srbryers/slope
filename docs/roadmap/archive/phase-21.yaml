@@ -1,0 +1,33 @@
+version: "1"
+phase:
+  name: Phase 21 — Backlog Cleanup
+  sprints:
+    - 92
+  status: complete
+  note: "Closed the 3 remaining backlog items (#307, #318, #323) from the Phase 18-20 sweep. Shipped in v1.55.0."
+sprints:
+  - id: 92
+    theme: Backlog Cleanup — empty the queue
+    par: 3
+    slope: 1
+    type: bug fix + dx
+    status: complete
+    note: Three small follow-ups closing the last items from the Phase 18-20 backlog. Shipped in v1.55.0.
+    tickets:
+      - key: S92-1
+        title: Align hook install count with slope doctor count (#307)
+        club: wedge
+        complexity: small
+        github_issue: 307
+      - key: S92-2
+        title: slope doctor gitignore audit for common-noise patterns (#323)
+        club: short_iron
+        complexity: standard
+        github_issue: 323
+      - key: S92-3
+        title: slope retro backfill CLI + status drift surfacing (#318)
+        club: short_iron
+        complexity: standard
+        github_issue: 318
+scorecards:
+  "92": docs/retros/sprint-92.json

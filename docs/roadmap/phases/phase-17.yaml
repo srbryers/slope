@@ -1,0 +1,17 @@
+version: "1"
+phase:
+  name: Phase 17 — Superseded Planning Placeholder
+  description: Retains the superseded S85 planning placeholder as explicit historical membership between Phase 16 and Phase 18.
+  sprints:
+    - 85
+  status: complete
+  note: S85 was superseded before execution and has no scorecard, so this bundle remains a live phase source rather than archived evidence.
+sprints:
+  - id: 85
+    theme: TBD — current sprint
+    par: 4
+    slope: 1
+    type: tbd
+    status: superseded
+    tickets: []
+    note: "Superseded by S86-S91 (agent-DX initiative). Was a placeholder added during the PR #317 roadmap reconcile; never had its own work."

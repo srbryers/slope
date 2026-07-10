@@ -1,0 +1,37 @@
+version: "1"
+phase:
+  name: Phase 50 — Agent-DX Trust Polish
+  sprints:
+    - 223
+  status: complete
+  note: "Triage the next open GitHub issues after v1.60.0: guard scoping noise outside the project root (#575) and slope next help/date portability polish plus roadmap-selection regression coverage (#576)."
+sprints:
+  - id: 223
+    theme: Agent-DX Trust Polish
+    par: 4
+    slope: 2
+    type: bugfix + agent-dx
+    status: complete
+    depends_on:
+      - 222
+    note: "Close #575/#576 by keeping claim-required scoped to the project root and polishing slope next help, date portability, and roadmap-selection regression coverage."
+    tickets:
+      - key: S223-1
+        title: Scope claim-required implementation-write matching to files inside the project root (#575)
+        club: short_iron
+        complexity: standard
+        github_issue: 575
+      - key: S223-2
+        title: Polish slope next help output and portable quick-start date guidance (#576)
+        club: wedge
+        complexity: small
+        github_issue: 576
+      - key: S223-3
+        title: Add regression coverage for skipped planned roadmap sprint selection (#576)
+        club: wedge
+        complexity: small
+        github_issue: 576
+        depends_on:
+          - S223-2
+scorecards:
+  "223": docs/retros/sprint-223.json

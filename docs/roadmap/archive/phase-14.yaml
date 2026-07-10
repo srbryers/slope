@@ -1,0 +1,36 @@
+version: "1"
+phase:
+  name: Phase 14 — Agent Memory & Context
+  sprints:
+    - 73
+  status: complete
+sprints:
+  - id: 73
+    theme: The Caddy's Notes — Cross-Session Memory System
+    par: 5
+    slope: 2
+    type: feature
+    tickets:
+      - key: S73-1
+        title: Memory storage core — .slope/memories.json schema, CRUD, search API
+        club: short_iron
+        complexity: standard
+      - key: S73-2
+        title: Memory CLI — slope memory add/list/remove/edit/search/import/export
+        club: short_iron
+        complexity: standard
+      - key: S73-3
+        title: Pi extension memory integration — session-start load, briefing injection, /slope-memory command
+        club: short_iron
+        complexity: standard
+      - key: S73-4
+        title: Auto-memory from guard corrections and workflow outcomes
+        club: long_iron
+        complexity: moderate
+      - key: S73-5
+        title: Test coverage — unit, CLI, Pi extension, auto-memory tests
+        club: wedge
+        complexity: small
+    status: complete
+scorecards:
+  "73": docs/retros/sprint-73.json
