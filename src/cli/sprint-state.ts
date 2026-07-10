@@ -1,5 +1,5 @@
 import { readFileSync, existsSync, unlinkSync } from 'node:fs';
-import { join } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 import { atomicWriteFileSync, withFileLockSync } from './atomic-write.js';
 
 /** Sprint lifecycle phases */
@@ -275,10 +275,70 @@ export function loadSprintState(cwd: string): SprintState | null {
   }
 }
 
+function validOptionalString(value: unknown): boolean {
+  return value === undefined || typeof value === 'string';
+}
+
+function validEvidenceTimestamp(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0 && Number.isFinite(Date.parse(value));
+}
+
+/** Strict persisted-state shape used at mutation and rollover trust boundaries. */
+export function isValidSprintStateEvidence(value: unknown): value is SprintState {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const state = value as Partial<SprintState>;
+  if (typeof state.sprint !== 'number' || !Number.isFinite(state.sprint) || state.sprint <= 0
+    || typeof state.phase !== 'string' || !isSprintPhase(state.phase)
+    || !validEvidenceTimestamp(state.started_at) || !validEvidenceTimestamp(state.updated_at)
+    || !state.gates || typeof state.gates !== 'object') return false;
+  if (!ALL_GATES.every(gate => typeof state.gates?.[gate] === 'boolean')) return false;
+
+  if (state.review_gates !== undefined) {
+    if (!state.review_gates || typeof state.review_gates !== 'object') return false;
+    for (const gate of REVIEW_GATES) {
+      const review = state.review_gates[gate];
+      if (!review || typeof review !== 'object'
+        || !REVIEW_GATE_PROVENANCES.includes(review.provenance)
+        || !Array.isArray(review.evidence) || review.evidence.some(item => typeof item !== 'string')
+        || !validOptionalString(review.reviewer) || !validOptionalString(review.notes)
+        || (review.updated_at !== undefined && !validEvidenceTimestamp(review.updated_at))) return false;
+    }
+  }
+
+  if (state.review_requirements !== undefined) {
+    if (!state.review_requirements || typeof state.review_requirements !== 'object') return false;
+    for (const gate of REVIEW_GATES) {
+      const requirement = state.review_requirements[gate];
+      if (!requirement || typeof requirement !== 'object'
+        || !['required', 'recommended', 'optional', 'unspecified'].includes(requirement.priority)
+        || !validOptionalString(requirement.reason) || !validOptionalString(requirement.source)
+        || (requirement.updated_at !== undefined && !validEvidenceTimestamp(requirement.updated_at))) return false;
+    }
+  }
+
+  if (state.rollover !== undefined) {
+    const lineage = state.rollover;
+    const portablePath = typeof lineage.audit_path === 'string' ? lineage.audit_path.replaceAll('\\', '/') : '';
+    if (typeof lineage.transition_id !== 'string' || !/^[a-f0-9]{16}$/.test(lineage.transition_id)
+      || typeof lineage.from_sprint !== 'number' || !Number.isFinite(lineage.from_sprint) || lineage.from_sprint <= 0
+      || !portablePath || isAbsolute(portablePath) || portablePath.split('/').includes('..')
+      || !validEvidenceTimestamp(lineage.recorded_at)
+      || typeof lineage.forced !== 'boolean'
+      || !validOptionalString(lineage.reason)) return false;
+  }
+  return true;
+}
+
 /** Distinguish absent local state from corrupt evidence that must fail closed. */
 export function loadSprintStateResult(cwd: string): SprintStateLoadResult {
   const path = sprintStatePath(cwd);
   if (!existsSync(path)) return { status: 'missing' };
+  try {
+    const raw = JSON.parse(readFileSync(path, 'utf8'));
+    if (!isValidSprintStateEvidence(raw)) return { status: 'corrupt', path };
+  } catch {
+    return { status: 'corrupt', path };
+  }
   const state = loadSprintState(cwd);
   return state ? { status: 'valid', state } : { status: 'corrupt', path };
 }
@@ -379,11 +439,12 @@ export function replaceSprintState(
 ): SprintStateReplacement | null {
   const filePath = sprintStatePath(cwd);
   return withFileLockSync(filePath, () => {
-    const previous = loadSprintState(cwd);
-    if (!previous) {
-      if (existsSync(filePath)) throw new Error(`Sprint state is corrupt and was preserved at ${filePath}.`);
+    const loaded = loadSprintStateResult(cwd);
+    if (loaded.status !== 'valid') {
+      if (loaded.status === 'corrupt') throw new Error(`Sprint state is corrupt and was preserved at ${filePath}.`);
       return null;
     }
+    const previous = loaded.state;
     const next = replacer(previous);
     if (!next) return { previous, current: previous, replaced: false };
     saveSprintStateUnlocked(filePath, next, false);
@@ -422,6 +483,31 @@ export function updateSprintPhase(cwd: string, phase: SprintPhase): SprintState 
     state.phase = phase;
     return true;
   });
+}
+
+export interface ConditionalSprintPhaseUpdate {
+  state: SprintState | null;
+  matched: boolean;
+  changed: boolean;
+}
+
+/** Update phase only if the state still represents the observed sprint. */
+export function updateSprintPhaseForSprint(
+  cwd: string,
+  expectedSprint: number,
+  phase: SprintPhase,
+): ConditionalSprintPhaseUpdate {
+  let matched = false;
+  let changed = false;
+  const state = mutateSprintState(cwd, current => {
+    if (current.sprint !== expectedSprint) return false;
+    matched = true;
+    if (current.phase === phase) return false;
+    current.phase = phase;
+    changed = true;
+    return true;
+  });
+  return { state, matched, changed };
 }
 
 /** Check if all gates are true. */

@@ -177,6 +177,20 @@ describe('assessSprintRollover', () => {
     expect(assessment.issues.map(issue => issue.code)).toContain('target_dependency_blocked');
   });
 
+  it('does not let roadmap-complete metadata override unfinished local source state', () => {
+    const definition = roadmap();
+    definition.sprints[0].status = 'complete';
+    const assessment = assessSprintRollover(
+      createSprintState(10, 'implementing'),
+      definition,
+      'docs/backlog/roadmap.json',
+      { from: 10, to: 11, force: true, reason: 'Intentional handoff.' },
+    );
+
+    expect(assessment.valid).toBe(false);
+    expect(assessment.blocking_dependencies).toEqual([10]);
+  });
+
   it('matches legacy encoded and decimal sprint identities without relabeling canonical ids', () => {
     const definition: RoadmapDefinition = {
       name: 'Encoded inserted sprint',
@@ -300,7 +314,14 @@ describe('performSprintRollover audit recovery', () => {
     definition.sprints.at(-1)!.depends_on = [9, 10];
     const cwd = setupWorkspace(definition);
     mkdirSync(join(cwd, 'docs', 'retros'), { recursive: true });
-    writeFileSync(join(cwd, 'docs', 'retros', 'sprint-9.json'), JSON.stringify({ sprint_number: 9 }));
+    writeFileSync(join(cwd, 'docs', 'retros', 'sprint-9.json'), JSON.stringify({
+      sprint_number: 9,
+      par: 3,
+      score: 3,
+      score_label: 'par',
+      date: '2026-07-10',
+      shots: [],
+    }));
     saveSprintState(cwd, terminalState());
 
     const result = performSprintRollover(cwd, { from: 10, to: 11 }, actor);
@@ -312,6 +333,10 @@ describe('performSprintRollover audit recovery', () => {
         scorecards: [9],
         local_terminal: [10],
       },
+      scorecard_artifacts: [expect.objectContaining({
+        sprint: 9,
+        path: 'docs/retros/sprint-9.json',
+      })],
     });
   });
 
@@ -373,6 +398,50 @@ describe('performSprintRollover audit recovery', () => {
     expect(retried.state).toEqual(first.state);
   });
 
+  it('recovers an already-audited transition after roadmap bytes drift', () => {
+    const cwd = setupWorkspace();
+    saveSprintState(cwd, terminalState());
+    const first = performSprintRollover(cwd, { from: 10, to: 11 }, actor);
+    writeFileSync(join(cwd, '.slope', 'sprint-state.json'), JSON.stringify(first.record.prior_state, null, 2));
+    const roadmapPath = join(cwd, 'docs', 'backlog', 'roadmap.json');
+    const changed = JSON.parse(readFileSync(roadmapPath, 'utf8'));
+    changed.description = 'Roadmap advanced after audit persistence.';
+    writeFileSync(roadmapPath, JSON.stringify(changed, null, 2));
+
+    const recovered = performSprintRollover(cwd, { from: 10, to: 11 }, actor);
+    const idempotent = performSprintRollover(cwd, { from: 10, to: 11 }, actor);
+
+    expect(recovered.record).toEqual(first.record);
+    expect(recovered.state).toEqual(first.record.next_state);
+    expect(idempotent.already_applied).toBe(true);
+  });
+
+  it('rejects an out-of-repository roadmap authority', () => {
+    const cwd = setupWorkspace();
+    writeFileSync(join(cwd, '.slope', 'config.json'), JSON.stringify({
+      roadmapPath: '../outside-roadmap.json',
+      scorecardDir: 'docs/retros',
+      scorecardPattern: 'sprint-*.json',
+      minSprint: 1,
+    }));
+    saveSprintState(cwd, terminalState());
+
+    expect(() => performSprintRollover(cwd, { from: 10, to: 11 }, actor)).toThrow(/escapes the repository/i);
+  });
+
+  it('does not accept a normalized but invalid minimal scorecard as dependency evidence', () => {
+    const definition = roadmap();
+    definition.sprints.unshift(sprint(9));
+    definition.phases[0].sprints.unshift(9);
+    definition.sprints.at(-1)!.depends_on = [9, 10];
+    const cwd = setupWorkspace(definition);
+    mkdirSync(join(cwd, 'docs', 'retros'), { recursive: true });
+    writeFileSync(join(cwd, 'docs', 'retros', 'sprint-9.json'), JSON.stringify({ sprint_number: 9 }));
+    saveSprintState(cwd, terminalState());
+
+    expect(() => performSprintRollover(cwd, { from: 10, to: 11 }, actor)).toThrow(/blocked by S9/i);
+  });
+
   it('fails closed and preserves corrupt sprint state', () => {
     const cwd = setupWorkspace();
     const statePath = join(cwd, '.slope', 'sprint-state.json');
@@ -392,6 +461,22 @@ describe('performSprintRollover audit recovery', () => {
     const tampered = JSON.parse(readFileSync(absoluteAuditPath, 'utf8')) as SprintRolloverAuditRecord;
     tampered.prior_state.updated_at = '1999-01-01T00:00:00.000Z';
     writeFileSync(absoluteAuditPath, JSON.stringify(tampered, null, 2) + '\n');
+
+    expect(() => performSprintRollover(cwd, { from: 10, to: 11 }, actor)).toThrow(/integrity|audit/i);
+    expect(readFileSync(statePath, 'utf8')).toBe(beforeState);
+  });
+
+  it('rejects a tampered next planning state during crash recovery', () => {
+    const cwd = setupWorkspace();
+    saveSprintState(cwd, terminalState());
+    const first = performSprintRollover(cwd, { from: 10, to: 11 }, actor);
+    const statePath = join(cwd, '.slope', 'sprint-state.json');
+    const absoluteAuditPath = auditPath(cwd, first.audit_path);
+    const tampered = JSON.parse(readFileSync(absoluteAuditPath, 'utf8'));
+    for (const gate of Object.keys(tampered.next_state.gates)) tampered.next_state.gates[gate] = true;
+    writeFileSync(absoluteAuditPath, JSON.stringify(tampered, null, 2));
+    writeFileSync(statePath, JSON.stringify(first.record.prior_state, null, 2));
+    const beforeState = readFileSync(statePath, 'utf8');
 
     expect(() => performSprintRollover(cwd, { from: 10, to: 11 }, actor)).toThrow(/integrity|audit/i);
     expect(readFileSync(statePath, 'utf8')).toBe(beforeState);
@@ -456,7 +541,14 @@ describe('performSprintRollover audit recovery', () => {
     definition.sprints.at(-1)!.depends_on = [9, 10];
     const cwd = setupWorkspace(definition);
     mkdirSync(join(cwd, 'docs', 'retros'), { recursive: true });
-    writeFileSync(join(cwd, 'docs', 'retros', 'sprint-9.json'), JSON.stringify({ sprint_number: 9 }));
+    writeFileSync(join(cwd, 'docs', 'retros', 'sprint-9.json'), JSON.stringify({
+      sprint_number: 9,
+      par: 3,
+      score: 3,
+      score_label: 'par',
+      date: '2026-07-10',
+      shots: [],
+    }));
     saveSprintState(cwd, terminalState());
     const first = performSprintRollover(cwd, { from: 10, to: 11 }, actor);
     const statePath = join(cwd, '.slope', 'sprint-state.json');

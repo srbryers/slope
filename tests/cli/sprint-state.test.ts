@@ -3,6 +3,7 @@ import { mkdirSync, rmSync, existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   loadSprintState,
+  loadSprintStateResult,
   saveSprintState,
   updateGate,
   isActiveSprintState,
@@ -232,6 +233,26 @@ describe('updateGate', () => {
       notes: 'No blocking findings.',
       updated_at: expect.any(String),
     });
+  });
+
+  it.each([
+    ['invalid phase', { phase: 'ready_for_pr' }],
+    ['non-positive sprint', { sprint: 0 }],
+    ['missing start timestamp', { started_at: undefined }],
+    ['invalid update timestamp', { updated_at: 'not-a-date' }],
+    ['unsafe rollover lineage', {
+      rollover: {
+        transition_id: '0123456789abcdef',
+        from_sprint: 21,
+        audit_path: '../outside.json',
+        recorded_at: '2026-01-01T00:00:00Z',
+        forced: false,
+      },
+    }],
+  ])('classifies %s as corrupt at strict trust boundaries', (_label, override) => {
+    writeRawSprintState(legacySprintState(override));
+
+    expect(loadSprintStateResult(tmpDir)).toMatchObject({ status: 'corrupt' });
   });
 
   it('records an explicit required independent-review waiver as distinct provenance', () => {
