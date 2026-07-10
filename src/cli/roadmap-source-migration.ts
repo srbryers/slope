@@ -11,7 +11,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
-import { stringify } from 'yaml';
+import { parseDocument, stringify } from 'yaml';
 import {
   discoverScorecardFiles,
   normalizeDiagnosticPath,
@@ -61,6 +61,7 @@ interface MigrationEvidenceArtifact {
   path: string;
   absolutePath: string;
   sha256: string;
+  textSha256: string;
 }
 
 interface RoadmapMigrationReceiptOutput {
@@ -72,6 +73,7 @@ interface RoadmapMigrationReceiptOutput {
 export interface RoadmapMigrationReceipt {
   version: 1;
   kind: 'roadmap_migration_receipt';
+  digest_kind: 'text_crlf_normalized_sha256';
   migration_id: string;
   recorded_at: string;
   plan_sha256: string;
@@ -84,6 +86,10 @@ export interface RoadmapMigrationReceipt {
   audit_path: string;
   non_core_path: string;
   receipt_path: string;
+  inputs: {
+    mapping?: { path: string; sha256: string };
+    scorecards: Array<{ path: string; sha256: string }>;
+  };
   summary: { sources: number; archives: number; history_unverified: number };
   outputs: RoadmapMigrationReceiptOutput[];
   integrity_sha256: string;
@@ -134,6 +140,7 @@ export interface ReadyRoadmapSourceMigration extends PreparedMigrationBase {
   recordedAt: string;
   sourceBytes: Buffer;
   sourceSha256: string;
+  mappingPath?: string;
   mappingSha256?: string;
   evidenceSha256: string;
   evidenceArtifacts: MigrationEvidenceArtifact[];
@@ -176,6 +183,11 @@ export interface RoadmapSourceMigrationApplyHooks {
 
 function sha256(value: string | Buffer): string {
   return createHash('sha256').update(value).digest('hex');
+}
+
+function textSha256(value: string | Buffer): string {
+  const text = Buffer.isBuffer(value) ? value.toString('utf8') : value;
+  return sha256(text.replace(/\r\n/g, '\n'));
 }
 
 function json(value: unknown): string {
@@ -229,55 +241,88 @@ function atomicWriteBytes(path: string, bytes: Buffer): void {
   }
 }
 
-function readMapping(cwd: string, mappingFlag?: string): { mapping?: ReturnType<typeof parseRoadmapMigrationMapping>; sha?: string } {
+function readMapping(cwd: string, mappingFlag?: string): {
+  mapping?: ReturnType<typeof parseRoadmapMigrationMapping>;
+  path?: string;
+  sha?: string;
+  textSha?: string;
+} {
   if (!mappingFlag) return {};
   const path = ensureWithin(cwd, resolve(cwd, mappingFlag), 'migration mapping path');
   if (!existsSync(path)) throw new Error(`Roadmap migration mapping not found: ${portablePath(cwd, path)}`);
   const bytes = readFileSync(path);
   let raw: unknown;
   try {
-    raw = JSON.parse(bytes.toString('utf8'));
+    const document = parseDocument(bytes.toString('utf8'), { schema: 'core', uniqueKeys: true });
+    if (document.errors.length > 0) throw new Error(document.errors[0].message);
+    if (document.warnings.length > 0) throw new Error(document.warnings[0].message);
+    raw = document.toJS({ maxAliasCount: 100 });
   } catch (error) {
     throw new Error(`Could not parse migration mapping ${portablePath(cwd, path)}: ${(error as Error).message}`);
   }
-  return { mapping: parseRoadmapMigrationMapping(raw), sha: sha256(bytes) };
+  return {
+    mapping: parseRoadmapMigrationMapping(raw),
+    path: portablePath(cwd, path),
+    sha: sha256(bytes),
+    textSha: textSha256(bytes),
+  };
 }
 
-function collectScorecardEvidence(cwd: string): {
+function collectScorecardEvidence(
+  cwd: string,
+  explicit: Record<string, string> = {},
+): {
   evidence: Record<string, RoadmapMigrationScorecardEvidence>;
   artifacts: MigrationEvidenceArtifact[];
-  digest: string;
 } {
-  const config = loadConfig(cwd);
-  const evidence: Record<string, RoadmapMigrationScorecardEvidence> = {};
-  const artifacts: MigrationEvidenceArtifact[] = [];
-  const evidenceDigests: Array<{ sprint: string; path: string; sha256: string; evidence: RoadmapMigrationScorecardEvidence }> = [];
-  for (const discovered of discoverScorecardFiles(config, cwd)) {
-    const absolutePath = ensureWithin(cwd, resolve(cwd, discovered), 'scorecard evidence path');
-    const bytes = readFileSync(absolutePath);
+  const selected = new Map<string, { evidence: RoadmapMigrationScorecardEvidence; artifact?: MigrationEvidenceArtifact }>();
+  const inspect = (candidate: string, expectedSprint?: string): { sprint?: string; evidence: RoadmapMigrationScorecardEvidence; artifact?: MigrationEvidenceArtifact } => {
+    const absolutePath = ensureWithin(cwd, resolve(cwd, candidate), 'scorecard evidence path');
     const path = portablePath(cwd, absolutePath);
+    if (!existsSync(absolutePath)) {
+      return { sprint: expectedSprint, evidence: { path, valid: false, reason: 'scorecard evidence file does not exist' } };
+    }
+    const bytes = readFileSync(absolutePath);
+    const artifact = { path, absolutePath, sha256: sha256(bytes), textSha256: textSha256(bytes) };
     let raw: Record<string, unknown>;
     try {
       raw = JSON.parse(bytes.toString('utf8')) as Record<string, unknown>;
-    } catch (error) {
-      continue;
+    } catch {
+      return { sprint: expectedSprint, evidence: { path, valid: false, reason: 'scorecard evidence is not valid JSON' }, artifact };
     }
     const sprint = parseSprintNumber(raw.sprint_number as string | number ?? raw.sprint as string | number);
-    if (sprint == null) continue;
+    const sprintKey = expectedSprint ?? (sprint == null ? undefined : String(sprint));
+    if (!sprintKey) return { evidence: { path, valid: false, reason: 'scorecard evidence has no sprint number' }, artifact };
     const validation = validateScorecard(normalizeScorecard(raw) as GolfScorecard);
-    const sprintKey = String(sprint);
-    evidence[sprintKey] = {
+    const sprintMatches = sprint != null && Number(sprintKey) === sprint;
+    const valid = validation.valid && sprintMatches;
+    return { sprint: sprintKey, artifact, evidence: {
       path,
-      valid: validation.valid,
-      ...(!validation.valid ? { reason: validation.errors.slice(0, 3).map(issue => issue.message).join('; ') } : {}),
-    };
-    const digest = sha256(bytes);
-    artifacts.push({ path, absolutePath, sha256: digest });
-    evidenceDigests.push({ sprint: sprintKey, path, sha256: digest, evidence: evidence[sprintKey] });
+      valid,
+      ...(!valid ? {
+        reason: !sprintMatches
+          ? `scorecard records ${String(raw.sprint_number ?? raw.sprint ?? 'no sprint')} instead of Sprint ${sprintKey}`
+          : validation.errors.slice(0, 3).map(issue => issue.message).join('; '),
+      } : {}),
+    } };
+  };
+
+  const config = { ...loadConfig(cwd), minSprint: 0 };
+  for (const discovered of discoverScorecardFiles(config, cwd)) {
+    const inspected = inspect(discovered);
+    if (inspected.sprint) selected.set(inspected.sprint, { evidence: inspected.evidence, artifact: inspected.artifact });
   }
-  artifacts.sort((a, b) => a.path.localeCompare(b.path));
-  evidenceDigests.sort((a, b) => a.path.localeCompare(b.path));
-  return { evidence, artifacts, digest: computeRoadmapMigrationDigest(evidenceDigests) };
+  for (const [sprint, path] of Object.entries(explicit).sort(([left], [right]) => Number(left) - Number(right))) {
+    const inspected = inspect(path, sprint);
+    if (inspected.artifact) selected.set(sprint, { evidence: inspected.evidence, artifact: inspected.artifact });
+    else selected.delete(sprint);
+  }
+  const evidence = Object.fromEntries([...selected.entries()].sort(([left], [right]) => Number(left) - Number(right))
+    .map(([sprint, item]) => [sprint, item.evidence]));
+  const artifactsByPath = new Map<string, MigrationEvidenceArtifact>();
+  for (const item of selected.values()) if (item.artifact) artifactsByPath.set(item.artifact.path, item.artifact);
+  const artifacts = [...artifactsByPath.values()].sort((a, b) => a.path.localeCompare(b.path));
+  return { evidence, artifacts };
 }
 
 function renderMigration(
@@ -286,6 +331,7 @@ function renderMigration(
   manifestPath: string,
   recordedAt: string,
   plan: RoadmapMigrationPlan,
+  inputs: { mappingPath?: string; mappingTextSha256?: string; evidenceArtifacts: MigrationEvidenceArtifact[] },
 ): { artifacts: MigrationArtifact[]; receipt: RoadmapMigrationReceipt } {
   const sourceRoot = dirname(manifestPath);
   const project: RoadmapSourceProject = {
@@ -323,6 +369,9 @@ function renderMigration(
     ].join('\n'));
   }
   const projection = serializeRoadmapProjection(stagedValidation.roadmap);
+  if (sha256(projection) !== plan.expected_projection_sha256) {
+    throw new Error('Rendered roadmap migration projection does not match the planner fidelity digest.');
+  }
   const artifacts: MigrationArtifact[] = loadedSources.map((source, index) => {
     const contents = stringify({
       version: '1',
@@ -378,6 +427,7 @@ function renderMigration(
   const receiptWithoutIntegrity = {
     version: 1 as const,
     kind: 'roadmap_migration_receipt' as const,
+    digest_kind: 'text_crlf_normalized_sha256' as const,
     migration_id: migrationId,
     recorded_at: recordedAt,
     plan_sha256: plan.plan_sha256,
@@ -390,12 +440,21 @@ function renderMigration(
     audit_path: portablePath(cwd, auditPath),
     non_core_path: portablePath(cwd, nonCorePath),
     receipt_path: portablePath(cwd, receiptPath),
+    inputs: {
+      ...(inputs.mappingPath && inputs.mappingTextSha256
+        ? { mapping: { path: inputs.mappingPath, sha256: inputs.mappingTextSha256 } }
+        : {}),
+      scorecards: inputs.evidenceArtifacts.map(artifact => ({ path: artifact.path, sha256: artifact.textSha256 })),
+    },
     summary: {
       sources: plan.sources.length,
       archives: plan.sources.filter(source => source.classification === 'archive').length,
       history_unverified: plan.sources.filter(source => source.classification === 'history_unverified').length,
     },
-    outputs: receiptOutputs,
+    outputs: receiptOutputs.map(output => {
+      const artifact = artifacts.find(candidate => candidate.path === output.path)!;
+      return { ...output, sha256: textSha256(artifact.contents) };
+    }),
   };
   const receipt: RoadmapMigrationReceipt = {
     ...receiptWithoutIntegrity,
@@ -446,7 +505,7 @@ function basePaths(input: RoadmapSourceMigrationInput): PreparedMigrationBase {
 }
 
 function parseReceipt(base: PreparedMigrationBase): RoadmapMigrationReceipt | null {
-  const receiptPath = join(base.sourceRoot, RECEIPT_RELATIVE_PATH);
+  const receiptPath = ensureWithin(base.input.cwd, join(base.sourceRoot, RECEIPT_RELATIVE_PATH), 'migration receipt path');
   if (!existsSync(receiptPath)) return null;
   let receipt: RoadmapMigrationReceipt;
   try {
@@ -454,15 +513,27 @@ function parseReceipt(base: PreparedMigrationBase): RoadmapMigrationReceipt | nu
   } catch {
     return null;
   }
-  if (!receipt || typeof receipt !== 'object' || !receipt.source || !receipt.manifest || !receipt.summary
+  if (!receipt || typeof receipt !== 'object' || !receipt.source || !receipt.manifest || !receipt.inputs || !receipt.summary
     || !Array.isArray(receipt.outputs) || typeof receipt.integrity_sha256 !== 'string') return null;
   const { integrity_sha256: receiptIntegrity, ...receiptPayload } = receipt;
   if (receipt.version !== 1 || receipt.kind !== 'roadmap_migration_receipt'
+    || receipt.digest_kind !== 'text_crlf_normalized_sha256'
     || receipt.receipt_path !== portablePath(base.input.cwd, receiptPath)
     || receipt.manifest.path !== base.manifestRelativePath
     || receipt.source.path !== base.sourceRelativePath
     || receiptIntegrity !== computeRoadmapMigrationDigest(receiptPayload)) {
     return null;
+  }
+  if (!Array.isArray(receipt.inputs.scorecards)) return null;
+  for (const evidence of receipt.inputs.scorecards) {
+    if (!evidence || typeof evidence.path !== 'string' || typeof evidence.sha256 !== 'string') return null;
+    const path = ensureWithin(base.input.cwd, resolve(base.input.cwd, ...evidence.path.split('/')), 'receipt scorecard path');
+    if (!existsSync(path) || textSha256(readFileSync(path)) !== evidence.sha256) return null;
+  }
+  if (base.input.mapping) {
+    const supplied = readMapping(base.input.cwd, base.input.mapping);
+    if (!receipt.inputs.mapping || supplied.path !== receipt.inputs.mapping.path
+      || supplied.textSha !== receipt.inputs.mapping.sha256) return null;
   }
   const roles = new Map<Exclude<ArtifactRole, 'receipt'>, RoadmapMigrationReceiptOutput>();
   const outputPaths = new Set<string>();
@@ -476,7 +547,7 @@ function parseReceipt(base: PreparedMigrationBase): RoadmapMigrationReceipt | nu
     const pathKey = process.platform === 'win32' ? path.toLowerCase() : path;
     if (outputPaths.has(pathKey)) return null;
     outputPaths.add(pathKey);
-    if (!existsSync(path) || sha256(readFileSync(path)) !== output.sha256) return null;
+    if (!existsSync(path) || textSha256(readFileSync(path)) !== output.sha256) return null;
   }
   if (roles.get('manifest')?.path !== receipt.manifest.path
     || roles.get('manifest')?.sha256 !== receipt.manifest.sha256
@@ -488,7 +559,7 @@ function parseReceipt(base: PreparedMigrationBase): RoadmapMigrationReceipt | nu
     || !Number.isInteger(receipt.summary.archives) || receipt.summary.archives < 0
     || !Number.isInteger(receipt.summary.history_unverified) || receipt.summary.history_unverified < 0
     || receipt.summary.archives + receipt.summary.history_unverified > receipt.summary.sources) return null;
-  if (sha256(readFileSync(receiptPath)) !== sha256(json(receipt))) return null;
+  if (textSha256(readFileSync(receiptPath)) !== textSha256(json(receipt))) return null;
   try {
     const store = loadRoadmapSourceStore(base.input.cwd, base.manifestRelativePath);
     if (!validateRoadmapSourceStore(store).valid) return null;
@@ -533,14 +604,20 @@ export function prepareRoadmapSourceMigration(input: RoadmapSourceMigrationInput
   const sourceBytes = readFileSync(base.sourcePath);
   const sourceText = sourceBytes.toString('utf8');
   const mapping = readMapping(base.input.cwd, input.mapping);
-  const evidence = collectScorecardEvidence(base.input.cwd);
+  const evidence = collectScorecardEvidence(base.input.cwd, mapping.mapping?.scorecards);
   const plan = planRoadmapMigration(sourceText, { mapping: mapping.mapping, evidence: evidence.evidence });
   if (plan.source_sha256 !== sha256(sourceBytes)) {
     throw new Error('Roadmap migration planner source digest does not match the exact input bytes.');
   }
   if (!plan.applicable) return { ...base, status: 'blocked', plan };
+  const durableEvidencePaths = new Set(plan.sources.flatMap(source => Object.values(source.scorecards)));
+  const durableEvidenceArtifacts = evidence.artifacts.filter(artifact => durableEvidencePaths.has(artifact.path));
   const recordedAt = input.recordedAt ?? new Date().toISOString();
-  const rendered = renderMigration(base.input.cwd, base.sourcePath, base.manifestPath, recordedAt, plan);
+  const rendered = renderMigration(base.input.cwd, base.sourcePath, base.manifestPath, recordedAt, plan, {
+    mappingPath: mapping.path,
+    mappingTextSha256: mapping.textSha,
+    evidenceArtifacts: durableEvidenceArtifacts,
+  });
   const simulated = {
     cwd: base.input.cwd,
     manifestPath: base.manifestPath,
@@ -578,9 +655,12 @@ export function prepareRoadmapSourceMigration(input: RoadmapSourceMigrationInput
     recordedAt,
     sourceBytes,
     sourceSha256: sha256(sourceBytes),
+    ...(mapping.path ? { mappingPath: mapping.path } : {}),
     ...(mapping.sha ? { mappingSha256: mapping.sha } : {}),
-    evidenceSha256: evidence.digest,
-    evidenceArtifacts: evidence.artifacts,
+    evidenceSha256: computeRoadmapMigrationDigest(
+      durableEvidenceArtifacts.map(artifact => ({ path: artifact.path, sha256: artifact.sha256 })),
+    ),
+    evidenceArtifacts: durableEvidenceArtifacts,
     plan,
     artifacts: rendered.artifacts,
     receipt: rendered.receipt,
@@ -719,6 +799,7 @@ function applyPreparedUnderLock(
   const fresh = prepareRoadmapSourceMigration({ ...prepared.input, recordedAt: prepared.recordedAt });
   if (fresh.status !== 'ready'
     || fresh.sourceSha256 !== prepared.sourceSha256
+    || fresh.mappingPath !== prepared.mappingPath
     || fresh.mappingSha256 !== prepared.mappingSha256
     || fresh.evidenceSha256 !== prepared.evidenceSha256
     || fresh.plan.plan_sha256 !== prepared.plan.plan_sha256

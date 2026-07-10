@@ -1,4 +1,5 @@
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -54,9 +55,9 @@ function roadmap(extra: Record<string, unknown> = {}): string {
   }, null, 2)}\n`;
 }
 
-function validScorecard(): Record<string, unknown> {
+function validScorecard(sprint = 1): Record<string, unknown> {
   return {
-    sprint_number: 1,
+    sprint_number: sprint,
     theme: 'History',
     par: 3,
     slope: 1,
@@ -98,6 +99,23 @@ function writeFixture(options: { scorecard?: boolean } = {}): string {
     writeFileSync(join(cwd, 'docs', 'retros', 'sprint-1.json'), JSON.stringify(validScorecard(), null, 2));
   }
   return path;
+}
+
+function mappingYaml(source: Buffer, scorecardPath: string): string {
+  return [
+    'version: 1',
+    `source_sha256: ${createHash('sha256').update(source).digest('hex')}`,
+    'ownership: {}',
+    'ticket_repairs: {}',
+    'phase_kinds: {}',
+    'scorecards:',
+    `  "1": ${scorecardPath}`,
+    '',
+  ].join('\n');
+}
+
+function rewriteCrlf(path: string): void {
+  writeFileSync(path, readFileSync(path, 'utf8').replace(/\r?\n/g, '\r\n'));
 }
 
 beforeEach(() => {
@@ -161,6 +179,10 @@ describe('slope roadmap migrate transaction', () => {
     const source = writeFixture({ scorecard: true });
     const prepared = prepareRoadmapSourceMigration({ cwd, recordedAt: '2026-07-10T20:00:00.000Z' });
     expect(prepared.status).toBe('ready');
+    if (prepared.status === 'ready') {
+      const projection = prepared.artifacts.find(artifact => artifact.role === 'projection');
+      expect(projection?.sha256).toBe(prepared.plan.expected_projection_sha256);
+    }
 
     const writes: string[] = [];
     const result = applyRoadmapSourceMigration(prepared, {
@@ -182,6 +204,85 @@ describe('slope roadmap migrate transaction', () => {
     expect(repeated.status).toBe('unchanged');
     expect(applyRoadmapSourceMigration(repeated).status).toBe('unchanged');
     expect(JSON.parse(readFileSync(source, 'utf8')).name).toBe('Migration Fixture');
+  });
+
+  it('discovers historical scorecards even when config.minSprint excludes them', () => {
+    writeFixture({ scorecard: true });
+    mkdirSync(join(cwd, '.slope'), { recursive: true });
+    writeFileSync(join(cwd, '.slope', 'config.json'), JSON.stringify({ minSprint: 100 }));
+
+    const prepared = prepareRoadmapSourceMigration({ cwd });
+    expect(prepared.status).toBe('ready');
+    if (prepared.status === 'ready') {
+      expect(prepared.plan.sources.find(source => source.phase_name === 'History')?.classification).toBe('archive');
+    }
+  });
+
+  it('accepts strict YAML mappings, verifies explicit scorecards, and binds supplied mapping bytes in the receipt', () => {
+    const source = writeFixture();
+    mkdirSync(join(cwd, 'evidence'), { recursive: true });
+    writeFileSync(join(cwd, 'evidence', 'history.json'), JSON.stringify(validScorecard(), null, 2));
+    const mappingPath = join(cwd, 'migration-mapping.yaml');
+    writeFileSync(mappingPath, mappingYaml(readFileSync(source), './evidence\\history.json'));
+
+    const prepared = prepareRoadmapSourceMigration({ cwd, mapping: 'migration-mapping.yaml' });
+    expect(prepared.status).toBe('ready');
+    if (prepared.status === 'ready') {
+      expect(prepared.plan.sources.find(item => item.phase_name === 'History')?.classification).toBe('archive');
+    }
+    expect(applyRoadmapSourceMigration(prepared).status).toBe('applied');
+
+    const receiptPath = join(cwd, 'docs', 'roadmap', 'migration', 'receipt.json');
+    const receipt = JSON.parse(readFileSync(receiptPath, 'utf8')) as {
+      outputs: Array<{ path: string }>;
+      inputs: { scorecards: Array<{ path: string }> };
+    };
+    for (const path of new Set([
+      ...receipt.outputs.map(output => output.path),
+      ...receipt.inputs.scorecards.map(scorecard => scorecard.path),
+      'migration-mapping.yaml',
+    ])) rewriteCrlf(join(cwd, ...path.split('/')));
+    rewriteCrlf(receiptPath);
+    expect(prepareRoadmapSourceMigration({ cwd, mapping: 'migration-mapping.yaml' }).status).toBe('unchanged');
+
+    const auditPath = join(cwd, 'docs', 'roadmap', 'migration', 'audit.json');
+    const audit = readFileSync(auditPath, 'utf8');
+    writeFileSync(auditPath, `${audit} `);
+    expect(() => prepareRoadmapSourceMigration({ cwd, mapping: 'migration-mapping.yaml' }))
+      .toThrow(/refusing to replace hand-authored sources/);
+    writeFileSync(auditPath, audit);
+
+    writeFileSync(mappingPath, `${readFileSync(mappingPath, 'utf8')}# changed after apply\n`);
+    expect(() => prepareRoadmapSourceMigration({ cwd, mapping: 'migration-mapping.yaml' }))
+      .toThrow(/refusing to replace hand-authored sources/);
+    expect(prepareRoadmapSourceMigration({ cwd }).status).toBe('unchanged');
+  });
+
+  it('binds receipt idempotency only to scorecards referenced by generated sources', () => {
+    writeFixture({ scorecard: true });
+    writeFileSync(join(cwd, 'docs', 'retros', 'sprint-99.json'), JSON.stringify(validScorecard(99), null, 2));
+    const prepared = prepareRoadmapSourceMigration({ cwd });
+    expect(prepared.status).toBe('ready');
+    expect(applyRoadmapSourceMigration(prepared).status).toBe('applied');
+
+    writeFileSync(join(cwd, 'docs', 'retros', 'sprint-99.json'), JSON.stringify({ changed: true }));
+    expect(prepareRoadmapSourceMigration({ cwd }).status).toBe('unchanged');
+
+    writeFileSync(join(cwd, 'docs', 'retros', 'sprint-1.json'), JSON.stringify({ changed: true }));
+    expect(() => prepareRoadmapSourceMigration({ cwd })).toThrow(/refusing to replace hand-authored sources/);
+  });
+
+  it('keeps a mapped missing scorecard out of evidence and blocks apply', () => {
+    const source = writeFixture();
+    writeFileSync(join(cwd, 'migration-mapping.yaml'), mappingYaml(readFileSync(source), 'evidence/missing.json'));
+
+    const prepared = prepareRoadmapSourceMigration({ cwd, mapping: 'migration-mapping.yaml' });
+
+    expect(prepared.status).toBe('blocked');
+    if (prepared.status === 'blocked') {
+      expect(prepared.plan.diagnostics.some(item => item.code.includes('scorecard'))).toBe(true);
+    }
+    expect(existsSync(join(cwd, 'docs', 'roadmap'))).toBe(false);
   });
 
   it('applies and reports a migration through the public roadmap command', async () => {
