@@ -53,9 +53,9 @@ export const SLOPE_REGISTRY: FunctionRegistryEntry[] = [
   {
     name: 'buildScorecard',
     module: 'core',
-    description: 'Builds a complete GolfScorecard from minimal ScorecardInput, auto-computing stats and score. Supports optional agents field for swarm sprints.',
+    description: 'Builds a validate/review-compatible GolfScorecard, normalizing ticket aliases and string hazards while scoring quality relative to par. Supports an explicit judged score and optional agents field.',
     signature: 'buildScorecard(input: ScorecardInput): GolfScorecard',
-    example: 'return buildScorecard({ sprint_number: 4, theme: "Code Mode", par: 4, slope: 3, date: "2026-02-21", shots: [...] });',
+    example: 'return buildScorecard({ sprint_number: 4, theme: "Code Mode", par: 4, slope: computeSlope(["new_area"]), date: "2026-02-21", shots: [{ ticket_key: "S4-1", title: "Build", club: "short_iron", result: "green", hazards: [] }] });',
   },
   {
     name: 'buildAgentBreakdowns',
@@ -1033,7 +1033,8 @@ interface RoleDefinition { id: string; name: string; description: string; focusA
 // ─── Builder Input ───
 interface AgentBreakdown { session_id: string; agent_role: string; shots: ShotRecord[]; score: number; stats: HoleStats; }
 interface AgentShotInput { session_id: string; agent_role: string; shots: ShotRecord[]; }
-interface ScorecardInput { sprint_number: number; theme: string; par: 3 | 4 | 5; slope: number; date: string; shots: ShotRecord[]; putts?: number; penalties?: number; type?: SprintType; conditions?: ConditionRecord[]; special_plays?: SpecialPlay[]; training?: TrainingSession[]; nutrition?: NutritionEntry[]; nineteenth_hole?: NineteenthHole; bunker_locations?: string[]; yardage_book_updates?: string[]; course_management_notes?: string[]; agents?: AgentBreakdown[]; }
+interface ScorecardShotInput { ticket_key?: string; ticket?: string; title?: string; club: ClubSelection; result: ShotResult; hazards?: Array<HazardHit | string>; provisional_declared?: boolean; notes?: string; }
+interface ScorecardInput { sprint_number: number; theme: string; par: 3 | 4 | 5; slope: number; date: string; shots: ScorecardShotInput[]; putts?: number; penalties?: number; score?: number; type?: SprintType; conditions?: ConditionRecord[]; special_plays?: SpecialPlay[]; training?: TrainingSession[]; nutrition?: NutritionEntry[]; nineteenth_hole?: NineteenthHole; bunker_locations?: string[]; yardage_book_updates?: string[]; course_management_notes?: string[]; agents?: AgentBreakdown[]; }
 
 // ─── Escalation ───
 type EscalationTrigger = 'blocker_timeout' | 'claim_conflict' | 'test_failure_cascade' | 'manual';

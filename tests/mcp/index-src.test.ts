@@ -207,6 +207,7 @@ describe('registry', () => {
     expect(SLOPE_TYPES).toContain('EscalationConfig');
     expect(SLOPE_TYPES).toContain('EscalationResult');
     expect(SLOPE_TYPES).toContain('AgentBreakdown');
+    expect(SLOPE_TYPES).toContain('ScorecardShotInput');
     expect(SLOPE_TYPES).toContain('TeamHandicapCard');
     expect(SLOPE_TYPES).toContain('SwarmEfficiency');
     expect(SLOPE_TYPES).toContain('RoleHandicap');
@@ -228,6 +229,39 @@ describe('sandbox', () => {
     const { result } = await runInSandbox('return computeHandicapCard([]);', process.cwd());
     expect(result).toBeDefined();
     expect((result as Record<string, unknown>).all_time).toBeDefined();
+  });
+
+  it('buildScorecard emits validate-compatible canonical schema from MCP-style input (#582)', async () => {
+    const code = `
+      const card = buildScorecard({
+        sprint_number: 122,
+        theme: 'MCP scorecard contract',
+        par: 5,
+        slope: computeSlope(['cross_package']),
+        date: '2026-07-10',
+        shots: Array.from({ length: 7 }, (_, index) => ({
+          ticket: 'S122-' + (index + 1),
+          title: 'Ticket ' + (index + 1),
+          club: 'short_iron',
+          result: index < 2 ? 'in_the_hole' : 'green',
+          hazards: index === 6 ? ['Legacy MCP hazard'] : [],
+        })),
+      });
+      return { card, validation: validateScorecard(card) };
+    `;
+
+    const { result } = await runInSandbox(code, process.cwd());
+    const payload = result as { card: GolfScorecard; validation: { valid: boolean } };
+    expect(payload.validation.valid).toBe(true);
+    expect(payload.card.slope).toBe(1);
+    expect(payload.card.score).toBe(5);
+    expect(payload.card.score_label).toBe('par');
+    expect(payload.card.shots[0].ticket_key).toBe('S122-1');
+    expect(payload.card.shots[6].hazards[0]).toMatchObject({
+      type: 'rough',
+      severity: 'minor',
+      description: 'Legacy MCP hazard',
+    });
   });
 
   it('captures console.log output', async () => {
