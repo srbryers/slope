@@ -294,6 +294,17 @@ describe('WorkflowEngine', () => {
       expect(next.step?.id).toBe('review');
     });
 
+    it('rejects a zero ticket-count shorthand instead of silently skipping the loop', async () => {
+      const exec = await engine.start(REPEAT_WORKFLOW, store, {
+        sprint_id: 'S122',
+        variables: { tickets: '0' },
+      });
+      await engine.complete(exec.id, 'setup', {}, REPEAT_WORKFLOW, store);
+
+      await expect(engine.next(exec.id, REPEAT_WORKFLOW, store))
+        .rejects.toThrow('count must be at least 1');
+    });
+
     it('completes after all items processed', async () => {
       const exec = await engine.start(REPEAT_WORKFLOW, store, {
         variables: { tickets: 'T1' },

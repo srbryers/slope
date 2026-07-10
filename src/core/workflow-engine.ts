@@ -364,13 +364,14 @@ export class WorkflowEngine {
     // ticket named "N". Other repeat variables keep ordinary scalar behavior.
     if (variableName === 'tickets' && /^\d+$/.test(value.trim())) {
       const count = Number(value.trim());
+      if (count < 1) {
+        throw new Error('Variable "tickets" count must be at least 1');
+      }
       if (count > 1000) {
         throw new Error(`Variable "tickets" count ${count} exceeds the maximum of 1000`);
       }
       const rawPrefix = sprintId ?? variables.sprint_id;
-      const prefix = rawPrefix
-        ? rawPrefix.toUpperCase().startsWith('S') ? rawPrefix : `S${rawPrefix}`
-        : null;
+      const prefix = rawPrefix ? `S${rawPrefix.replace(/^s/i, '')}` : null;
       return Array.from({ length: count }, (_, index) =>
         prefix ? `${prefix}-${index + 1}` : `ticket-${index + 1}`,
       );
