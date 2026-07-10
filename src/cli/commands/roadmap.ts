@@ -43,6 +43,8 @@ import { interviewCommand } from './interview.js';
 import {
   loadRoadmapSourceStore,
   hasModularRoadmapSources,
+  planRoadmapSourceArchive,
+  applyRoadmapSourceArchive,
   validateRoadmapSourceStore,
   writeRoadmapSourceProjection,
 } from '../roadmap-source-store.js';
@@ -558,6 +560,48 @@ function validateSourcesSubcommand(flags: Record<string, string>, cwd: string): 
   if (!validation.valid) process.exit(1);
 }
 
+function archiveSourcesSubcommand(flags: Record<string, string>, cwd: string): void {
+  if (!Object.prototype.hasOwnProperty.call(flags, 'through') || flags.through === 'true') {
+    console.error('\nMissing required --through=N for roadmap archive.');
+    console.error('Usage: slope roadmap archive --through=N [--source=<file>] [--dry-run]\n');
+    process.exit(1);
+    return;
+  }
+  const through = parseSprintNumber(flags.through);
+  if (through == null) {
+    console.error(`\nInvalid archive boundary: ${flags.through || '(empty)'}\n`);
+    process.exit(1);
+    return;
+  }
+
+  try {
+    const store = loadRoadmapSourceStore(cwd, flags.source);
+    const projectionBefore = existsSync(store.outputPath) ? readFileSync(store.outputPath, 'utf8') : null;
+    const plan = planRoadmapSourceArchive(store, through);
+    console.log(`\nRoadmap archive through Sprint ${through}:`);
+    if (plan.moves.length === 0) {
+      console.log('  No complete live phases are eligible.\n');
+      return;
+    }
+    for (const move of plan.moves) console.log(`  ${move.from} -> ${move.to}`);
+    if (flags['dry-run'] === 'true') {
+      console.log('\n  --dry-run: source files, manifest, and projection are unchanged.\n');
+      return;
+    }
+
+    applyRoadmapSourceArchive(store, plan);
+    const reloaded = loadRoadmapSourceStore(cwd, flags.source);
+    const validation = validateRoadmapSourceStore(reloaded);
+    if (!validation.valid || readFileSync(reloaded.outputPath, 'utf8') !== projectionBefore) {
+      throw new Error('Archive verification failed: compiled projection changed or archived evidence is invalid.');
+    }
+    console.log(`\n  Archived ${plan.moves.length} phase source${plan.moves.length === 1 ? '' : 's'}; compatibility projection unchanged.\n`);
+  } catch (error) {
+    console.error(`\n${(error as Error).message}\n`);
+    process.exit(1);
+  }
+}
+
 function printFullRoadmapStatus(
   roadmap: RoadmapDefinition,
   currentSprint: number,
@@ -949,6 +993,9 @@ export async function roadmapCommand(args: string[]): Promise<void> {
     case 'validate-sources':
       validateSourcesSubcommand(flags, cwd);
       break;
+    case 'archive':
+      archiveSourcesSubcommand(flags, cwd);
+      break;
     case 'show':
       showSubcommand(flags, cwd);
       break;
@@ -973,6 +1020,7 @@ Usage:
   slope roadmap focus --sprint=N [--path=<file>] [--json]     Bounded sprint context
   slope roadmap compile [--source=<file>] [--dry-run|--check] Compile modular YAML sources
   slope roadmap validate-sources [--source=<file>]            Validate sources and projection drift
+  slope roadmap archive --through=N [--source=<file>] [--dry-run] Archive whole terminal phases
   slope roadmap show [--path=<file>]         Render summary (critical path, parallel tracks)
   slope roadmap sync [--path=<file>] [--dry-run]     Sync scorecards into roadmap
   slope roadmap generate [--path=<file>] [--dry-run] Generate from vision + concrete backlog signals

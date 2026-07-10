@@ -529,6 +529,19 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
         { flag: '--path=<file>', desc: 'Roadmap file path' },
         { flag: '--json', desc: 'Emit machine-readable JSON' },
       ]},
+      { name: 'compile', desc: 'Compile modular YAML sources to the compatibility roadmap', flags: [
+        { flag: '--source=<file>', desc: 'Project manifest (default: docs/roadmap/project.yaml)' },
+        { flag: '--dry-run', desc: 'Preview projection changes without writing' },
+        { flag: '--check', desc: 'Fail when the compatibility projection has drifted' },
+      ]},
+      { name: 'validate-sources', desc: 'Validate modular sources, archive evidence, and projection drift', flags: [
+        { flag: '--source=<file>', desc: 'Project manifest (default: docs/roadmap/project.yaml)' },
+      ]},
+      { name: 'archive', desc: 'Move whole terminal phases into the modular archive', flags: [
+        { flag: '--through=<N>', desc: 'Archive complete phases through this sprint' },
+        { flag: '--source=<file>', desc: 'Project manifest (default: docs/roadmap/project.yaml)' },
+        { flag: '--dry-run', desc: 'Preview moves without writing' },
+      ]},
       { name: 'show', desc: 'Render summary (critical path, parallel tracks)', flags: [
         { flag: '--path=<file>', desc: 'Roadmap file path' },
       ]},

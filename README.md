@@ -310,7 +310,12 @@ orchestrate the rest of the CLI as execution primitives.
 | `npx slope roadmap focus --sprint=N [--json]` | Bounded sprint, phase, dependency, hazard, and evidence context for agents |
 | `npx slope roadmap status --full` | Full historical roadmap status |
 | `npx slope roadmap validate` | Validate roadmap dependencies and sprint status |
+| `npx slope roadmap compile [--dry-run\|--check]` | Compile opt-in `docs/roadmap/` YAML sources to the generated compatibility JSON |
+| `npx slope roadmap validate-sources` | Validate modular membership, dependencies, archive evidence, and projection drift |
+| `npx slope roadmap archive --through=N [--dry-run]` | Move whole terminal phase sources to the archive without changing compiled output |
 | `npx slope vision create` + `npx slope roadmap generate` | Create vision-backed roadmap plans from concrete backlog signals |
+
+Modular roadmap authoring is opt-in through `docs/roadmap/project.yaml`. Existing projects keep editing `docs/backlog/roadmap.json` directly. In modular mode that JSON is generated compatibility output: edit the YAML source bundle, then run `slope roadmap compile`.
 
 ### Review & Findings
 

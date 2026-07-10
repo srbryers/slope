@@ -57,6 +57,18 @@ function writeFixture(): string {
   return join(cwd, 'docs', 'backlog', 'roadmap.json');
 }
 
+function addPhaseOneArchiveEvidence(): void {
+  const phasePath = join(cwd, 'docs', 'roadmap', 'phases', 'phase-01.yaml');
+  writeFileSync(phasePath, `${readFileSync(phasePath, 'utf8')}
+scorecards:
+  "7": docs/retros/sprint-7.json
+  "8": docs/retros/sprint-8.json
+`);
+  mkdirSync(join(cwd, 'docs', 'retros'), { recursive: true });
+  writeFileSync(join(cwd, 'docs', 'retros', 'sprint-7.json'), JSON.stringify({ sprint_number: 7 }));
+  writeFileSync(join(cwd, 'docs', 'retros', 'sprint-8.json'), JSON.stringify({ sprint_number: 8 }));
+}
+
 function mockExit(): number[] {
   const codes: number[] = [];
   vi.spyOn(process, 'exit').mockImplementation((code?: string | number | null) => {
@@ -180,5 +192,76 @@ describe('slope roadmap validate-sources', () => {
     expect(codes).toEqual([1]);
     expect(errors.join('\n')).toContain('source YAML');
     expect(errors.join('\n')).toContain('roadmap compile');
+  });
+});
+
+describe('slope roadmap archive', () => {
+  it('keeps dry-run read-only and moves a whole terminal phase without projection drift', async () => {
+    const output = writeFixture();
+    addPhaseOneArchiveEvidence();
+    await roadmapCommand(['compile']);
+    const projectionBefore = readFileSync(output, 'utf8');
+    const manifestPath = join(cwd, 'docs', 'roadmap', 'project.yaml');
+    const sourcePath = join(cwd, 'docs', 'roadmap', 'phases', 'phase-01.yaml');
+    const archivePath = join(cwd, 'docs', 'roadmap', 'archive', 'phase-01.yaml');
+    const manifestBefore = readFileSync(manifestPath, 'utf8');
+    const sourceBefore = readFileSync(sourcePath, 'utf8');
+
+    logs.length = 0;
+    await roadmapCommand(['archive', '--through=8', '--dry-run']);
+    expect(readFileSync(manifestPath, 'utf8')).toBe(manifestBefore);
+    expect(readFileSync(sourcePath, 'utf8')).toBe(sourceBefore);
+    expect(existsSync(archivePath)).toBe(false);
+    expect(readFileSync(output, 'utf8')).toBe(projectionBefore);
+
+    logs.length = 0;
+    await roadmapCommand(['archive', '--through=8']);
+    expect(existsSync(sourcePath)).toBe(false);
+    expect(readFileSync(archivePath, 'utf8')).toBe(sourceBefore);
+    expect(readFileSync(output, 'utf8')).toBe(projectionBefore);
+    const manifestAfter = readFileSync(manifestPath, 'utf8');
+    expect(manifestAfter.indexOf('archive/phase-01.yaml')).toBeLessThan(manifestAfter.indexOf('phases/phase-02.yaml'));
+    expect(logs.join('\n')).toContain('compatibility projection unchanged');
+
+    logs.length = 0;
+    await roadmapCommand(['validate-sources']);
+    expect(logs.join('\n')).toContain('sources and compiled projection are valid');
+  });
+
+  it('refuses a boundary that would split a phase', async () => {
+    writeFixture();
+    addPhaseOneArchiveEvidence();
+    await roadmapCommand(['compile']);
+    const codes = mockExit();
+
+    await expect(roadmapCommand(['archive', '--through=7'])).rejects.toThrow('process.exit(1)');
+
+    expect(codes).toEqual([1]);
+    expect(errors.join('\n')).toContain('split phase');
+    expect(existsSync(join(cwd, 'docs', 'roadmap', 'phases', 'phase-01.yaml'))).toBe(true);
+  });
+
+  it('refuses incomplete phases and missing archived scorecard links', async () => {
+    writeFixture();
+    await roadmapCommand(['compile']);
+    let codes = mockExit();
+
+    await expect(roadmapCommand(['archive', '--through=8'])).rejects.toThrow('process.exit(1)');
+    expect(codes).toEqual([1]);
+    expect(errors.join('\n')).toContain('no scorecard link');
+
+    vi.restoreAllMocks();
+    logs = [];
+    errors = [];
+    vi.spyOn(console, 'log').mockImplementation((...args) => logs.push(args.map(String).join(' ')));
+    vi.spyOn(console, 'error').mockImplementation((...args) => errors.push(args.map(String).join(' ')));
+    const phasePath = join(cwd, 'docs', 'roadmap', 'phases', 'phase-01.yaml');
+    writeFileSync(phasePath, readFileSync(phasePath, 'utf8').replaceAll('status: complete', 'status: planned'));
+    await roadmapCommand(['compile']);
+    codes = mockExit();
+
+    await expect(roadmapCommand(['archive', '--through=8'])).rejects.toThrow('process.exit(1)');
+    expect(codes).toEqual([1]);
+    expect(errors.join('\n')).toContain('not fully terminal');
   });
 });

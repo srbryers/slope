@@ -49,6 +49,24 @@ function baseRoadmap() {
   };
 }
 
+function modularSource(status: 'complete' | 'planned', title = 'Original'): string {
+  return `version: 1
+phase:
+  name: Phase 1
+  status: ${status}
+  sprints: [1]
+sprints:
+  - id: 1
+    theme: Sprint 1
+    par: 3
+    slope: 1
+    type: feature
+    status: ${status}
+    tickets:
+      - {key: S1-1, title: ${title}, club: wedge, complexity: small}
+`;
+}
+
 function writeInput(filePath: string, newContent: string): HookInput {
   return {
     session_id: 'test',
@@ -157,6 +175,30 @@ describe('roadmapEditShippedGuard', () => {
     expect(result.decision).toBe('deny');
     expect(result.blockReason).toContain('generated modular-roadmap projection');
     expect(result.blockReason).toContain('roadmap compile');
+  });
+
+  it('blocks shipped history edits in authoritative modular source YAML', async () => {
+    mkdirSync(join(cwd, 'docs', 'roadmap', 'phases'), { recursive: true });
+    writeFileSync(join(cwd, 'docs', 'roadmap', 'project.yaml'), 'version: 1\n');
+    const sourcePath = join(cwd, 'docs', 'roadmap', 'phases', 'phase-01.yaml');
+    writeFileSync(sourcePath, modularSource('complete'));
+
+    const result = await roadmapEditShippedGuard(writeInput(sourcePath, modularSource('complete', 'Rewritten')), cwd);
+
+    expect(result.decision).toBe('deny');
+    expect(result.blockReason).toContain('shipped sprints in modular roadmap sources');
+    expect(result.blockReason).toContain('S1');
+  });
+
+  it('allows planned sprint edits in authoritative modular source YAML', async () => {
+    mkdirSync(join(cwd, 'docs', 'roadmap', 'phases'), { recursive: true });
+    writeFileSync(join(cwd, 'docs', 'roadmap', 'project.yaml'), 'version: 1\n');
+    const sourcePath = join(cwd, 'docs', 'roadmap', 'phases', 'phase-01.yaml');
+    writeFileSync(sourcePath, modularSource('planned'));
+
+    const result = await roadmapEditShippedGuard(writeInput(sourcePath, modularSource('planned', 'Updated')), cwd);
+
+    expect(result).toEqual({});
   });
 
   it('allows edits that only touch planned sprints', async () => {

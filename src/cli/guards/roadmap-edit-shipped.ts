@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { extname, relative, resolve } from 'node:path';
 import type { HookInput, GuardResult } from '../../core/index.js';
-import { loadConfig } from '../../core/index.js';
+import { loadConfig, parseRoadmapSourceDocument } from '../../core/index.js';
 import { getApplyPatchText, resolveTouchedPaths, toAbsoluteTouchedPath } from './hook-input.js';
 
 const DEFAULT_ROADMAP_PATH = 'docs/backlog/roadmap.json';
@@ -16,8 +16,6 @@ const DEFAULT_ROADMAP_PATH = 'docs/backlog/roadmap.json';
  * Override: set SLOPE_ALLOW_SHIPPED_EDIT=1 in the shell to bypass.
  */
 export async function roadmapEditShippedGuard(input: HookInput, cwd: string): Promise<GuardResult> {
-  if (process.env.SLOPE_ALLOW_SHIPPED_EDIT === '1') return {};
-
   let roadmapAbs: string;
   try {
     const config = loadConfig(cwd);
@@ -26,20 +24,35 @@ export async function roadmapEditShippedGuard(input: HookInput, cwd: string): Pr
     roadmapAbs = resolve(cwd, DEFAULT_ROADMAP_PATH);
   }
 
-  const touchesRoadmap = resolveTouchedPaths(input)
-    .some(filePath => toAbsoluteTouchedPath(filePath, cwd) === roadmapAbs);
-  if (!touchesRoadmap) return {};
+  const touched = resolveTouchedPaths(input).map(filePath => toAbsoluteTouchedPath(filePath, cwd));
+  const touchesRoadmap = touched.includes(roadmapAbs);
+  const sourceRoot = resolve(cwd, 'docs/roadmap');
+  const modular = existsSync(resolve(sourceRoot, 'project.yaml'));
 
-  if (existsSync(resolve(cwd, 'docs/roadmap/project.yaml'))) {
-    return {
-      decision: 'deny',
-      blockReason: [
-        'SLOPE: This roadmap.json is a generated modular-roadmap projection.',
-        'Edit docs/roadmap YAML sources, then run `slope roadmap compile`.',
-        'Direct projection edits create source drift and are not authoritative.',
-      ].join('\n'),
-    };
+  if (modular) {
+    if (touchesRoadmap) {
+      return {
+        decision: 'deny',
+        blockReason: [
+          'SLOPE: This roadmap.json is a generated modular-roadmap projection.',
+          'Edit docs/roadmap YAML sources, then run `slope roadmap compile`.',
+          'Direct projection edits create source drift and are not authoritative.',
+        ].join('\n'),
+      };
+    }
+    if (process.env.SLOPE_ALLOW_SHIPPED_EDIT === '1') return {};
+    const sourcePath = touched.find(path => {
+      const rel = relative(sourceRoot, path);
+      return rel !== 'project.yaml'
+        && rel !== '..'
+        && !rel.startsWith(`..${process.platform === 'win32' ? '\\' : '/'}`)
+        && ['.yaml', '.yml'].includes(extname(path).toLowerCase());
+    });
+    if (sourcePath) return protectModularSource(input, sourcePath, cwd);
   }
+
+  if (process.env.SLOPE_ALLOW_SHIPPED_EDIT === '1') return {};
+  if (!touchesRoadmap) return {};
 
   let currentContent: string;
   try {
@@ -103,6 +116,40 @@ export async function roadmapEditShippedGuard(input: HookInput, cwd: string): Pr
       'correct shipped-sprint history.',
     ].join('\n'),
   };
+}
+
+function protectModularSource(input: HookInput, sourcePath: string, cwd: string): GuardResult {
+  let currentContent: string;
+  try {
+    currentContent = readFileSync(sourcePath, 'utf8');
+  } catch {
+    return {};
+  }
+  const wouldBeContent = resolveWouldBeContent(input, sourcePath, currentContent, cwd);
+  if (wouldBeContent === null) return {};
+
+  try {
+    const current = parseRoadmapSourceDocument(currentContent, sourcePath);
+    const next = parseRoadmapSourceDocument(wouldBeContent, sourcePath);
+    const nextById = new Map(next.sprints.map(sprint => [sprint.id, sprint]));
+    const violations = current.sprints
+      .filter(sprint => sprint.status === 'complete')
+      .filter(sprint => !deepEqual(sprint, nextById.get(sprint.id)))
+      .map(sprint => `S${sprint.id}: shipped source fields modified or removed`);
+    if (violations.length === 0) return {};
+    return {
+      decision: 'deny',
+      blockReason: [
+        'SLOPE: Cannot edit shipped sprints in modular roadmap sources.',
+        '',
+        ...violations.map(violation => `  • ${violation}`),
+        '',
+        'Add new work to a new sprint source. Use SLOPE_ALLOW_SHIPPED_EDIT=1 only for a deliberate historical correction.',
+      ].join('\n'),
+    };
+  } catch {
+    return {};
+  }
 }
 
 function resolveWouldBeContent(

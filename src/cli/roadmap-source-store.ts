@@ -1,5 +1,6 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, unlinkSync } from 'node:fs';
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
+import { stringify } from 'yaml';
 import {
   compileRoadmapSources,
   normalizeDiagnosticPath,
@@ -177,4 +178,129 @@ export function validateRoadmapSourceStore(
 
   result.valid = result.errors.length === 0;
   return result;
+}
+
+const ARCHIVABLE_STATUSES = new Set([
+  'complete',
+  'superseded',
+  'skipped',
+  'cancelled',
+  'cancelled-absorbed',
+  'absorbed',
+]);
+
+export interface RoadmapSourceArchiveMove {
+  sourceId: string;
+  from: string;
+  to: string;
+  fromAbsolute: string;
+  toAbsolute: string;
+}
+
+export interface RoadmapSourceArchivePlan {
+  through: number;
+  moves: RoadmapSourceArchiveMove[];
+  project: RoadmapSourceProject;
+  manifestYaml: string;
+}
+
+export function planRoadmapSourceArchive(
+  store: RoadmapSourceStore,
+  through: number,
+): RoadmapSourceArchivePlan {
+  const throughOrder = roadmapSprintOrderValue(store.roadmap, through);
+  const moves: RoadmapSourceArchiveMove[] = [];
+  const nextEntries = store.project.sources.map(entry => ({ ...entry }));
+
+  for (const [index, source] of store.sources.entries()) {
+    if (source.entry.kind !== 'phase') continue;
+    const sprintOrders = source.document.phase.sprints.map(id => roadmapSprintOrderValue(store.roadmap, id));
+    const includesAtOrBefore = sprintOrders.some(order => order <= throughOrder);
+    const includesAfter = sprintOrders.some(order => order > throughOrder);
+    if (includesAtOrBefore && includesAfter) {
+      throw new RoadmapSourceError(
+        `--through would split phase "${source.document.phase.name}"; archive whole phases only`,
+        source.entry.path,
+      );
+    }
+    if (!includesAtOrBefore || includesAfter) continue;
+
+    const phaseStatus = source.document.phase.status ?? '';
+    const incomplete = source.document.sprints.filter(sprint => !ARCHIVABLE_STATUSES.has(sprint.status ?? ''));
+    if (!ARCHIVABLE_STATUSES.has(phaseStatus) || incomplete.length > 0) {
+      throw new RoadmapSourceError(
+        `phase "${source.document.phase.name}" is not fully terminal through Sprint ${through}`,
+        source.entry.path,
+      );
+    }
+
+    const to = `archive/${basename(source.entry.path)}`;
+    const toAbsolute = ensureWithin(store.sourceRoot, join(store.sourceRoot, 'archive', basename(source.entry.path)), 'archive path');
+    if (existsSync(toAbsolute) && source.absolutePath !== toAbsolute) {
+      const sourceBytes = readFileSync(source.absolutePath!, 'utf8');
+      const destinationBytes = readFileSync(toAbsolute, 'utf8');
+      if (sourceBytes !== destinationBytes) {
+        throw new RoadmapSourceError(`archive destination already exists with different content: ${to}`);
+      }
+    }
+    nextEntries[index] = { path: to, kind: 'archive' };
+    moves.push({
+      sourceId: source.document.phase.name,
+      from: source.entry.path,
+      to,
+      fromAbsolute: source.absolutePath!,
+      toAbsolute,
+    });
+  }
+
+  const project: RoadmapSourceProject = { ...store.project, sources: nextEntries };
+  const plannedSources = store.sources.map((source, index) => ({
+    ...source,
+    entry: nextEntries[index],
+    absolutePath: moves.find(move => move.from === source.entry.path)?.toAbsolute ?? source.absolutePath,
+  }));
+  const plannedRoadmap = compileRoadmapSources(project, plannedSources);
+  if (serializeRoadmapProjection(plannedRoadmap) !== store.projection) {
+    throw new RoadmapSourceError('archive plan would change the compiled compatibility projection');
+  }
+  const simulated: RoadmapSourceStore = {
+    ...store,
+    project,
+    sources: plannedSources,
+    roadmap: plannedRoadmap,
+    projection: store.projection,
+  };
+  const validation = validateRoadmapSourceStore(simulated, { checkProjection: true, checkArchiveEvidence: true });
+  if (!validation.valid) {
+    throw new RoadmapSourceError([
+      'archive plan is invalid:',
+      ...validation.errors.map(issue => `  - ${issue.source ? `${issue.source}: ` : ''}${issue.message}`),
+    ].join('\n'));
+  }
+
+  return {
+    through,
+    moves,
+    project,
+    manifestYaml: stringify(project, { lineWidth: 0 }),
+  };
+}
+
+export function applyRoadmapSourceArchive(
+  store: RoadmapSourceStore,
+  plan: RoadmapSourceArchivePlan,
+): void {
+  if (plan.moves.length === 0) return;
+  withFileLockSync(store.manifestPath, () => {
+    for (const move of plan.moves) {
+      mkdirSync(dirname(move.toAbsolute), { recursive: true });
+      if (!existsSync(move.toAbsolute)) {
+        atomicWriteFileSync(move.toAbsolute, readFileSync(move.fromAbsolute, 'utf8'));
+      }
+    }
+    atomicWriteFileSync(store.manifestPath, plan.manifestYaml);
+    for (const move of plan.moves) {
+      if (existsSync(move.fromAbsolute) && move.fromAbsolute !== move.toAbsolute) unlinkSync(move.fromAbsolute);
+    }
+  });
 }
