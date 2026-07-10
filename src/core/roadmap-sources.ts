@@ -327,7 +327,11 @@ export function parseRoadmapSourceDocument(
   return {
     version,
     phase: structural.phases[0],
-    sprints: structural.sprints,
+    // The strict checks above accept `id` as a legacy ticket-key alias. Keep
+    // the authored record intact here: `castRoadmapStructure` normalizes that
+    // alias by materializing `key`, which would introduce compatibility
+    // projection drift during a storage-only migration.
+    sprints: raw.sprints as RoadmapSprint[],
     ...(scorecards ? { scorecards } : {}),
   };
 }

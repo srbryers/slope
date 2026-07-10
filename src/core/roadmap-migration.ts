@@ -3,15 +3,17 @@ import {
   ROADMAP_TERMINAL_STATUSES,
   compareRoadmapSprintIds,
   getRoadmapTicketKey,
+  validateRoadmap,
   type RoadmapDefinition,
   type RoadmapPhase,
   type RoadmapSprint,
 } from './roadmap.js';
-import type { RoadmapSourceKind } from './roadmap-sources.js';
+import { serializeRoadmapProjection, type RoadmapSourceKind } from './roadmap-sources.js';
 
 export type RoadmapMigrationClassification = 'archive' | 'live' | 'history_unverified' | 'backlog';
 
 export const ROADMAP_MIGRATION_DIAGNOSTIC_LIMIT = 100;
+export const ROADMAP_MIGRATION_ABSENT = Object.freeze({ $slope_migration: 'absent' as const });
 
 export interface RoadmapMigrationOwnershipMapping {
   phase_index: number;
@@ -93,6 +95,7 @@ export interface RoadmapMigrationPlan {
   source_sha256: string;
   mapping_sha256?: string;
   plan_sha256: string;
+  expected_projection_sha256: string;
   applicable: boolean;
   normalized_roadmap: RoadmapDefinition;
   sources: RoadmapMigrationSourcePlan[];
@@ -153,7 +156,7 @@ function canonicalize(value: unknown): unknown {
   if (value && typeof value === 'object') {
     return Object.fromEntries(
       Object.entries(value as Record<string, unknown>)
-        .sort(([a], [b]) => a.localeCompare(b))
+        .sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)
         .map(([key, child]) => [key, canonicalize(child)]),
     );
   }
@@ -204,7 +207,7 @@ export function parseRoadmapMigrationMapping(input: unknown): RoadmapMigrationMa
   const ownership: RoadmapMigrationMapping['ownership'] = {};
   if (input.ownership != null) {
     if (!isRecord(input.ownership)) throw new RoadmapMigrationError('migration mapping ownership must be an object');
-    for (const [id, raw] of Object.entries(input.ownership)) {
+    for (const [id, raw] of Object.entries(input.ownership).sort(([a], [b]) => Number(a) - Number(b))) {
       parsePositiveSprintKey(id, 'ownership');
       if (!isRecord(raw)) throw new RoadmapMigrationError(`ownership.${id} must be an object`);
       rejectUnknownKeys(raw, new Set(['phase_index', 'phase_name']), `ownership.${id}`);
@@ -224,7 +227,7 @@ export function parseRoadmapMigrationMapping(input: unknown): RoadmapMigrationMa
   const ticketRepairs: RoadmapMigrationMapping['ticket_repairs'] = {};
   if (input.ticket_repairs != null) {
     if (!isRecord(input.ticket_repairs)) throw new RoadmapMigrationError('migration mapping ticket_repairs must be an object');
-    for (const [ticket, raw] of Object.entries(input.ticket_repairs)) {
+    for (const [ticket, raw] of Object.entries(input.ticket_repairs).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)) {
       if (!ticket.trim() || !isRecord(raw)) throw new RoadmapMigrationError(`ticket_repairs.${ticket} must be an object`);
       rejectUnknownKeys(raw, new Set(['club', 'complexity']), `ticket_repairs.${ticket}`);
       if (raw.club != null && !CLUBS.has(String(raw.club))) throw new RoadmapMigrationError(`ticket_repairs.${ticket}.club is invalid`);
@@ -240,7 +243,7 @@ export function parseRoadmapMigrationMapping(input: unknown): RoadmapMigrationMa
   const phaseKinds: RoadmapMigrationMapping['phase_kinds'] = {};
   if (input.phase_kinds != null) {
     if (!isRecord(input.phase_kinds)) throw new RoadmapMigrationError('migration mapping phase_kinds must be an object');
-    for (const [index, kind] of Object.entries(input.phase_kinds)) {
+    for (const [index, kind] of Object.entries(input.phase_kinds).sort(([a], [b]) => Number(a) - Number(b))) {
       if (!/^\d+$/.test(index) || Number(index) <= 0 || (kind !== 'phase' && kind !== 'backlog')) {
         throw new RoadmapMigrationError(`phase_kinds.${index} must be phase or backlog at a positive 1-based index`);
       }
@@ -251,7 +254,7 @@ export function parseRoadmapMigrationMapping(input: unknown): RoadmapMigrationMa
   const scorecards: Record<string, string> = {};
   if (input.scorecards != null) {
     if (!isRecord(input.scorecards)) throw new RoadmapMigrationError('migration mapping scorecards must be an object');
-    for (const [id, path] of Object.entries(input.scorecards)) {
+    for (const [id, path] of Object.entries(input.scorecards).sort(([a], [b]) => Number(a) - Number(b))) {
       parsePositiveSprintKey(id, 'scorecards');
       if (typeof path !== 'string' || !path.trim()) throw new RoadmapMigrationError(`scorecards.${id} must be a non-empty path`);
       scorecards[id] = path.trim().replace(/\\/g, '/');
@@ -276,10 +279,106 @@ function auditChange(
   field: string,
   after: unknown,
 ): void {
-  const before = record[field];
+  const present = Object.prototype.hasOwnProperty.call(record, field);
+  const before = present ? record[field] : ROADMAP_MIGRATION_ABSENT;
   if (JSON.stringify(before) === JSON.stringify(after)) return;
   audit.push({ path: `${path}/${pointerPart(field)}`, rule, before: clone(before), after: clone(after) });
   record[field] = after;
+}
+
+function targetSchemaError(
+  diagnostics: RoadmapMigrationDiagnostic[],
+  message: string,
+  details: Pick<RoadmapMigrationDiagnostic, 'sprint' | 'ticket' | 'phase_index'> = {},
+): void {
+  diagnostics.push({ severity: 'error', code: 'target_schema', message, ...details });
+}
+
+function validateTargetTicket(
+  ticket: Record<string, unknown>,
+  sprint: number,
+  diagnostics: RoadmapMigrationDiagnostic[],
+): boolean {
+  const key = getRoadmapTicketKey(ticket) ?? undefined;
+  let valid = true;
+  const reject = (message: string): void => {
+    valid = false;
+    targetSchemaError(diagnostics, message, { sprint, ...(key ? { ticket: key } : {}) });
+  };
+  if (!key) reject(`Sprint S${sprint} has a ticket without a non-empty key or id.`);
+  if (typeof ticket.title !== 'string' || !ticket.title.trim()) reject(`${key ?? `Sprint S${sprint} ticket`} title must be a non-empty string.`);
+  if (!CLUBS.has(String(ticket.club))) reject(`${key ?? `Sprint S${sprint} ticket`} club must be canonical.`);
+  if (!COMPLEXITIES.has(String(ticket.complexity))) reject(`${key ?? `Sprint S${sprint} ticket`} complexity must be canonical.`);
+  if (ticket.depends_on != null
+    && (!Array.isArray(ticket.depends_on)
+      || ticket.depends_on.some(value => typeof value !== 'string' || !value.trim()))) {
+    reject(`${key ?? `Sprint S${sprint} ticket`} depends_on must contain non-empty ticket keys.`);
+  }
+  if (ticket.github_issue != null) {
+    const issues = Array.isArray(ticket.github_issue) ? ticket.github_issue : [ticket.github_issue];
+    if (issues.length === 0 || issues.some(value => !Number.isSafeInteger(value) || Number(value) <= 0)) {
+      reject(`${key ?? `Sprint S${sprint} ticket`} github_issue must be a positive integer or non-empty list of them.`);
+    }
+  }
+  if (ticket.note != null && typeof ticket.note !== 'string') reject(`${key ?? `Sprint S${sprint} ticket`} note must be a string.`);
+  return valid;
+}
+
+function validateTargetSprint(
+  sprint: Record<string, unknown>,
+  diagnostics: RoadmapMigrationDiagnostic[],
+): boolean {
+  const id = sprint.id as number;
+  let valid = true;
+  const reject = (message: string): void => {
+    valid = false;
+    targetSchemaError(diagnostics, message, { sprint: id });
+  };
+  if (typeof sprint.theme !== 'string' || !sprint.theme.trim()) reject(`Sprint S${id} theme must be a non-empty string.`);
+  if (![3, 4, 5].includes(sprint.par as number)) reject(`Sprint S${id} par must be 3, 4, or 5.`);
+  if (typeof sprint.slope !== 'number' || !Number.isFinite(sprint.slope)) reject(`Sprint S${id} slope must be numeric.`);
+  if (typeof sprint.type !== 'string' || !sprint.type.trim()) reject(`Sprint S${id} type must be a non-empty string.`);
+  if (sprint.depends_on != null
+    && (!Array.isArray(sprint.depends_on)
+      || sprint.depends_on.some(value => typeof value !== 'number' || !Number.isFinite(value) || value <= 0))) {
+    reject(`Sprint S${id} depends_on must contain positive numeric sprint IDs.`);
+  }
+  for (const field of ['status', 'note', 'outcome', 'phase', 'wave']) {
+    if (sprint[field] != null && typeof sprint[field] !== 'string') reject(`Sprint S${id} ${field} must be a string.`);
+  }
+  for (const field of ['research', 'artifacts', 'expected_artifacts']) {
+    if (sprint[field] != null
+      && (!Array.isArray(sprint[field]) || (sprint[field] as unknown[]).some(value => typeof value !== 'string'))) {
+      reject(`Sprint S${id} ${field} must contain string paths.`);
+    }
+  }
+  if (!Array.isArray(sprint.tickets)) {
+    reject(`Sprint S${id} tickets must be an array.`);
+    return false;
+  }
+  for (const ticket of sprint.tickets) {
+    if (!isRecord(ticket)) {
+      reject(`Sprint S${id} tickets must contain mappings.`);
+    } else if (!validateTargetTicket(ticket, id, diagnostics)) {
+      valid = false;
+    }
+  }
+  return valid;
+}
+
+function validateTargetPhase(
+  phase: Record<string, unknown>,
+  index: number,
+  diagnostics: RoadmapMigrationDiagnostic[],
+): boolean {
+  let valid = true;
+  for (const field of ['description', 'status', 'note']) {
+    if (phase[field] != null && typeof phase[field] !== 'string') {
+      valid = false;
+      targetSchemaError(diagnostics, `Phase ${index} ${field} must be a string.`, { phase_index: index });
+    }
+  }
+  return valid;
 }
 
 function normalizeTicket(
@@ -389,7 +488,8 @@ export function planRoadmapMigration(
   const audit: RoadmapMigrationAuditEntry[] = [];
   const diagnostics: RoadmapMigrationDiagnostic[] = [];
   const unresolved: RoadmapMigrationUnresolvedRepair[] = [];
-  if (parsed.description != null && typeof parsed.description !== 'string') {
+  const invalidDescription = parsed.description != null && typeof parsed.description !== 'string';
+  if (invalidDescription) {
     diagnostics.push({
       severity: 'error',
       code: 'invalid_description',
@@ -400,6 +500,7 @@ export function planRoadmapMigration(
   const sprints = clone(parsed.sprints) as unknown[];
   const phaseRecords: Record<string, unknown>[] = [];
   const memberships = new Map<number, number[]>();
+  let targetShapeValid = !invalidDescription;
 
   for (const [phaseOffset, value] of phases.entries()) {
     if (!isRecord(value) || typeof value.name !== 'string' || !value.name.trim() || !Array.isArray(value.sprints)) {
@@ -420,6 +521,7 @@ export function planRoadmapMigration(
     if (seen.size !== value.sprints.length) {
       auditChange(audit, `/phases/${phaseOffset}`, 'deduplicate_local_membership', value, 'sprints', [...seen]);
     }
+    if (!validateTargetPhase(value, phaseOffset + 1, diagnostics)) targetShapeValid = false;
     phaseRecords.push(value);
   }
 
@@ -466,16 +568,18 @@ export function planRoadmapMigration(
         if (key) ticketKeys.add(key);
       }
     }
+    if (!validateTargetSprint(value, diagnostics)) targetShapeValid = false;
     sprintRecords.push(value);
   }
 
-  for (const [id, owners] of memberships) {
+  for (const [id, owners] of [...memberships.entries()].sort(([a], [b]) => a - b)) {
     if (!definitions.has(id)) diagnostics.push({ severity: 'error', code: 'missing_sprint_definition', sprint: id, message: `Phase membership S${id} has no sprint definition.` });
   }
 
   const ownerBySprint = new Map<number, number>();
   const usedOwnership = new Set<string>();
-  for (const id of definitions.keys()) {
+  const orderedDefinitionIds = [...definitions.keys()].sort((a, b) => a - b);
+  for (const id of orderedDefinitionIds) {
     const key = sprintKey(id);
     const owners = memberships.get(id) ?? [];
     if (owners.length === 1) {
@@ -509,24 +613,24 @@ export function planRoadmapMigration(
     usedOwnership.add(key);
   }
 
-  for (const [id] of Object.entries(options.mapping?.ownership ?? {})) {
+  for (const [id] of Object.entries(options.mapping?.ownership ?? {}).sort(([a], [b]) => Number(a) - Number(b))) {
     if (!definitions.has(Number(id))) diagnostics.push({ severity: 'error', code: 'stale_ownership_mapping', sprint: Number(id), message: `Ownership mapping references undefined Sprint S${id}.` });
     else if (!usedOwnership.has(id) && (memberships.get(Number(id))?.length ?? 0) !== 1) {
       diagnostics.push({ severity: 'error', code: 'unused_ownership_mapping', sprint: Number(id), message: `Ownership mapping for S${id} could not be applied.` });
     }
   }
-  for (const ticket of Object.keys(options.mapping?.ticket_repairs ?? {})) {
+  for (const ticket of Object.keys(options.mapping?.ticket_repairs ?? {}).sort((a, b) => a < b ? -1 : a > b ? 1 : 0)) {
     if (!ticketKeys.has(ticket)) diagnostics.push({ severity: 'error', code: 'stale_ticket_repair', ticket, message: `Ticket repair references undefined ticket ${ticket}.` });
     else if (!usedTicketRepairs.has(ticket)) diagnostics.push({ severity: 'error', code: 'unused_ticket_repair', ticket, message: `Ticket repair for ${ticket} was not needed.` });
   }
-  for (const index of Object.keys(options.mapping?.phase_kinds ?? {})) {
+  for (const index of Object.keys(options.mapping?.phase_kinds ?? {}).sort((a, b) => Number(a) - Number(b))) {
     if (Number(index) > phaseRecords.length) diagnostics.push({ severity: 'error', code: 'stale_phase_kind', phase_index: Number(index), message: `Phase kind references missing phase index ${index}.` });
   }
 
   for (const [phaseOffset, phase] of phaseRecords.entries()) {
     const before = [...(phase.sprints as number[])];
     const retained = before.filter(id => ownerBySprint.get(id) === phaseOffset + 1);
-    for (const id of definitions.keys()) {
+    for (const id of orderedDefinitionIds) {
       if (ownerBySprint.get(id) === phaseOffset + 1 && !retained.includes(id)) retained.push(id);
     }
     auditChange(audit, `/phases/${phaseOffset}`, 'repair_phase_ownership', phase, 'sprints', retained);
@@ -539,15 +643,51 @@ export function planRoadmapMigration(
     sprints: sprintRecords as unknown as RoadmapSprint[],
   };
   const originalOrder = preliminary.sprints.map(sprint => sprint.id);
-  preliminary.sprints.sort((a, b) => compareRoadmapSprintIds(preliminary, a.id, b.id));
+  const canResolveEncodedIdentity = preliminary.sprints.every(sprint => Array.isArray(sprint.tickets));
+  preliminary.sprints.sort((a, b) => canResolveEncodedIdentity
+    ? compareRoadmapSprintIds(preliminary, a.id, b.id)
+    : a.id - b.id);
   const sortedOrder = preliminary.sprints.map(sprint => sprint.id);
   if (JSON.stringify(originalOrder) !== JSON.stringify(sortedOrder)) {
     audit.push({ path: '/sprints', rule: 'compiler_sprint_order', before: originalOrder, after: sortedOrder });
   }
+  if (targetShapeValid) {
+    const validation = validateRoadmap(preliminary);
+    for (const issue of validation.errors) {
+      diagnostics.push({
+        severity: 'error',
+        code: 'target_roadmap_validation',
+        message: issue.message,
+        ...(issue.sprint != null ? { sprint: issue.sprint } : {}),
+        ...(issue.ticket ? { ticket: issue.ticket } : {}),
+      });
+    }
+    for (const issue of validation.warnings) {
+      diagnostics.push({
+        severity: 'warning',
+        code: 'target_roadmap_validation',
+        message: issue.message,
+        ...(issue.sprint != null ? { sprint: issue.sprint } : {}),
+        ...(issue.ticket ? { ticket: issue.ticket } : {}),
+      });
+    }
+  }
 
   const evidence = { ...(options.evidence ?? {}) };
-  for (const [id, path] of Object.entries(options.mapping?.scorecards ?? {})) {
-    if (!evidence[id]) evidence[id] = { path, valid: false, reason: 'scorecard mapping has not been verified by the filesystem planner' };
+  for (const [id, path] of Object.entries(options.mapping?.scorecards ?? {}).sort(([a], [b]) => Number(a) - Number(b))) {
+    const sprint = definitions.get(Number(id));
+    const card = evidence[id];
+    if (!sprint) {
+      diagnostics.push({ severity: 'error', code: 'stale_scorecard_mapping', sprint: Number(id), message: `Scorecard mapping references undefined Sprint S${id}.` });
+    } else if (sprint.status !== 'complete') {
+      diagnostics.push({ severity: 'error', code: 'unused_scorecard_mapping', sprint: Number(id), message: `Scorecard mapping for S${id} is unused because the sprint is not complete.` });
+    } else if (!card) {
+      diagnostics.push({ severity: 'error', code: 'unverified_scorecard_mapping', sprint: Number(id), message: `Scorecard mapping for S${id} has no verified filesystem evidence.` });
+    } else if (card.path.replace(/\\/g, '/') !== path) {
+      diagnostics.push({ severity: 'error', code: 'scorecard_mapping_mismatch', sprint: Number(id), message: `Scorecard mapping for S${id} does not match verified evidence path ${card.path.replace(/\\/g, '/')}.` });
+    } else if (!card.valid) {
+      diagnostics.push({ severity: 'error', code: 'invalid_scorecard_mapping', sprint: Number(id), message: `Scorecard mapping for S${id} failed evidence validation${card.reason ? `: ${card.reason}` : '.'}` });
+    }
   }
   const width = Math.max(3, String(phaseRecords.length).length);
   const sources: RoadmapMigrationSourcePlan[] = phaseRecords.map((phase, offset) => {
@@ -563,13 +703,17 @@ export function planRoadmapMigration(
     const override = options.mapping?.phase_kinds[String(index)];
     let classification: RoadmapMigrationClassification;
     if (override === 'backlog') classification = 'backlog';
+    else if (override === 'phase') {
+      reasons.push('explicit phase mapping prevents archive classification');
+      classification = nonterminal.length > 0 ? 'live' : 'history_unverified';
+    }
     else if (phaseTerminal && nonterminal.length === 0 && unverified.length === 0) classification = 'archive';
     else if (owned.some(sprint => !ROADMAP_TERMINAL_STATUSES.has(sprint.status ?? ''))) classification = 'live';
     else classification = 'history_unverified';
     const scorecards: Record<string, string> = {};
     for (const sprint of owned) {
       const card = evidence[sprintKey(sprint.id)];
-      if (card?.valid) scorecards[sprintKey(sprint.id)] = card.path;
+      if (sprint.status === 'complete' && card?.valid) scorecards[sprintKey(sprint.id)] = card.path.replace(/\\/g, '/');
     }
     return {
       phase_index: index,
@@ -593,10 +737,12 @@ export function planRoadmapMigration(
   const template = mappingTemplate(sourceSha, unresolved);
   const mappingSha = options.mapping ? computeRoadmapMigrationDigest(options.mapping) : undefined;
   const boundedDiagnostics = diagnostics.slice(0, ROADMAP_MIGRATION_DIAGNOSTIC_LIMIT);
+  const expectedProjectionSha = computeRoadmapMigrationDigest(serializeRoadmapProjection(preliminary));
   const base = {
     version: '1' as const,
     source_sha256: sourceSha,
     ...(mappingSha ? { mapping_sha256: mappingSha } : {}),
+    expected_projection_sha256: expectedProjectionSha,
     applicable: diagnostics.every(diagnostic => diagnostic.severity !== 'error'),
     normalized_roadmap: preliminary,
     sources,

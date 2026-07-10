@@ -1,11 +1,16 @@
 import { describe, expect, it } from 'vitest';
+import { stringify } from 'yaml';
 import {
+  compileRoadmapSources,
   computeRoadmapMigrationDigest,
   parseRoadmapMigrationMapping,
+  parseRoadmapSourceDocument,
   planRoadmapMigration,
   ROADMAP_MIGRATION_DIAGNOSTIC_LIMIT,
+  ROADMAP_MIGRATION_ABSENT,
   RoadmapMigrationError,
   serializeRoadmapMigrationMappingTemplate,
+  serializeRoadmapProjection,
   type RoadmapMigrationMapping,
 } from '../../src/core/index.js';
 
@@ -185,6 +190,12 @@ describe('roadmap migration normalization', () => {
       'derive_complexity_from_club',
       'derive_club_from_complexity',
     ]));
+    expect(plan.audit).toContainEqual(expect.objectContaining({
+      path: '/sprints/0/tickets/0/complexity',
+      rule: 'derive_complexity_from_club',
+      before: ROADMAP_MIGRATION_ABSENT,
+      after: 'multi_package',
+    }));
   });
 
   it('requires an explicit repair when neither approach field is usable', () => {
@@ -275,6 +286,103 @@ describe('roadmap migration preservation and classification', () => {
     expect(plan.sources[0].scorecards).toEqual({ '1': 'docs/retros/sprint-1.json' });
   });
 
+  it('lets an explicit phase mapping prevent otherwise eligible archive classification', () => {
+    const source = roadmap(
+      [{ name: 'Retained history', status: 'complete', sprints: [1] }],
+      [sprint(1, { status: 'complete' })],
+    );
+    const plan = planRoadmapMigration(source, {
+      mapping: mapping(source, { phase_kinds: { '1': 'phase' } }),
+      evidence: { '1': { path: 'docs/retros/sprint-1.json', valid: true } },
+    });
+
+    expect(plan.applicable).toBe(true);
+    expect(plan.sources[0]).toMatchObject({ classification: 'history_unverified', kind: 'phase' });
+    expect(plan.sources[0].classification_reasons).toContain('explicit phase mapping prevents archive classification');
+  });
+
+  it.each([
+    {
+      name: 'stale sprint',
+      scorecards: { '9': 'docs/retros/sprint-9.json' },
+      evidence: { '9': { path: 'docs/retros/sprint-9.json', valid: true } },
+      code: 'stale_scorecard_mapping',
+    },
+    {
+      name: 'non-complete sprint',
+      scorecards: { '1': 'docs/retros/sprint-1.json' },
+      evidence: { '1': { path: 'docs/retros/sprint-1.json', valid: true } },
+      code: 'unused_scorecard_mapping',
+    },
+    {
+      name: 'missing evidence',
+      complete: true,
+      scorecards: { '1': 'docs/retros/sprint-1.json' },
+      evidence: {},
+      code: 'unverified_scorecard_mapping',
+    },
+    {
+      name: 'path mismatch',
+      complete: true,
+      scorecards: { '1': 'docs/retros/sprint-1.json' },
+      evidence: { '1': { path: 'docs/retros/other.json', valid: true } },
+      code: 'scorecard_mapping_mismatch',
+    },
+    {
+      name: 'invalid evidence',
+      complete: true,
+      scorecards: { '1': 'docs/retros/sprint-1.json' },
+      evidence: { '1': { path: 'docs/retros/sprint-1.json', valid: false, reason: 'wrong sprint' } },
+      code: 'invalid_scorecard_mapping',
+    },
+  ])('rejects $name scorecard mappings', ({ complete, scorecards, evidence, code }) => {
+    const source = roadmap(
+      [{ name: 'One', status: complete ? 'complete' : 'active', sprints: [1] }],
+      [sprint(1, { status: complete ? 'complete' : 'planned' })],
+    );
+    const plan = planRoadmapMigration(source, {
+      mapping: mapping(source, { scorecards }),
+      evidence,
+    });
+
+    expect(plan.applicable).toBe(false);
+    expect(plan.diagnostics).toContainEqual(expect.objectContaining({ code }));
+  });
+
+  it('strict-parses planned sources without materializing id-only ticket keys and binds projection fidelity', () => {
+    const idOnly = sprint(1, {
+      status: 'complete',
+      tickets: [
+        { id: 'S1-1', title: 'One', club: 'wedge', complexity: 'small' },
+        ticket('S1-2'),
+        ticket('S1-3'),
+      ],
+    });
+    const source = roadmap([{ name: 'One', status: 'complete', sprints: [1] }], [idOnly]);
+    const plan = planRoadmapMigration(source, {
+      evidence: { '1': { path: 'docs/retros/sprint-1.json', valid: true } },
+    });
+    const sourcePlan = plan.sources[0];
+    const document = parseRoadmapSourceDocument(stringify({
+      version: 1,
+      phase: sourcePlan.phase,
+      sprints: sourcePlan.sprints,
+      scorecards: sourcePlan.scorecards,
+    }), sourcePlan.path);
+    const project = {
+      version: '1' as const,
+      name: plan.normalized_roadmap.name,
+      output: '../backlog/roadmap.json',
+      sources: [{ path: sourcePlan.path, kind: sourcePlan.kind }],
+    };
+    const compiled = compileRoadmapSources(project, [{ entry: project.sources[0], document }]);
+
+    expect(document.sprints[0].tickets[0]).toEqual(expect.objectContaining({ id: 'S1-1' }));
+    expect(document.sprints[0].tickets[0]).not.toHaveProperty('key');
+    expect(compiled.sprints[0].tickets[0]).not.toHaveProperty('key');
+    expect(computeRoadmapMigrationDigest(serializeRoadmapProjection(compiled))).toBe(plan.expected_projection_sha256);
+  });
+
   it('is deterministic and digest-bound independent of object key insertion order', () => {
     const source = roadmap([{ name: 'One', sprints: [2, 1] }], [sprint(2), sprint(1)]);
     const first = planRoadmapMigration(source);
@@ -284,6 +392,58 @@ describe('roadmap migration preservation and classification', () => {
     expect(first.normalized_roadmap.sprints.map(item => item.id)).toEqual([1, 2]);
     expect(first.audit).toContainEqual(expect.objectContaining({ path: '/sprints', rule: 'compiler_sprint_order' }));
     expect(serializeRoadmapMigrationMappingTemplate(first)).toBe(`${JSON.stringify(first.mapping_template, null, 2)}\n`);
+  });
+
+  it('keeps mapping iteration and plan digests stable across reversed object insertion order', () => {
+    const source = roadmap(
+      [{ name: 'One', sprints: [] }, { name: 'Two', sprints: [] }],
+      [sprint(1), sprint(2)],
+    );
+    const forward = mapping(source, {
+      ownership: { '1': { phase_index: 1 }, '2': { phase_index: 2 } },
+      phase_kinds: { '1': 'phase', '2': 'backlog' },
+    });
+    const reverse = parseRoadmapMigrationMapping({
+      version: 1,
+      source_sha256: computeRoadmapMigrationDigest(source),
+      ownership: { '2': { phase_index: 2 }, '1': { phase_index: 1 } },
+      ticket_repairs: {},
+      phase_kinds: { '2': 'backlog', '1': 'phase' },
+      scorecards: {},
+    });
+
+    const first = planRoadmapMigration(source, { mapping: forward });
+    const second = planRoadmapMigration(source, { mapping: reverse });
+    expect(first.plan_sha256).toBe(second.plan_sha256);
+    expect(first.sources.map(item => item.path)).toEqual(second.sources.map(item => item.path));
+    expect(first.diagnostics).toEqual(second.diagnostics);
+  });
+
+  it('rejects invalid target-required fields and dangling dependencies before apply', () => {
+    const malformed = sprint(1, {
+      theme: '',
+      par: 2,
+      slope: 'steep',
+      type: '',
+      depends_on: ['2'],
+      tickets: [{ key: 'S1-1', title: '', club: 'wedge', complexity: 'small', depends_on: [2] }],
+    });
+    const source = roadmap([{ name: 'One', description: 42, sprints: [1] }], [malformed]);
+    const plan = planRoadmapMigration(source);
+
+    expect(plan.applicable).toBe(false);
+    expect(plan.diagnostics.filter(item => item.code === 'target_schema').length).toBeGreaterThanOrEqual(7);
+
+    const dependencySource = roadmap(
+      [{ name: 'One', sprints: [1] }],
+      [sprint(1, { depends_on: [99] })],
+    );
+    const dependencyPlan = planRoadmapMigration(dependencySource);
+    expect(dependencyPlan.applicable).toBe(false);
+    expect(dependencyPlan.diagnostics).toContainEqual(expect.objectContaining({
+      code: 'target_roadmap_validation',
+      message: expect.stringContaining('does not exist'),
+    }));
   });
 
   it('reports an invalid description instead of silently dropping a core field', () => {

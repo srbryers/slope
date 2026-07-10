@@ -242,6 +242,7 @@ export type {
 } from './roadmap-sources.js';
 export {
   RoadmapMigrationError,
+  ROADMAP_MIGRATION_ABSENT,
   ROADMAP_MIGRATION_DIAGNOSTIC_LIMIT,
   computeRoadmapMigrationDigest,
   parseRoadmapMigrationMapping,
