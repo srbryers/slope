@@ -164,9 +164,11 @@ describe('claimRequiredGuard', () => {
       const result = await claimRequiredGuard(makeInput(cwd, join(cwd, 'src/foo.ts')), cwd);
 
       expect(result.decision).toBe('ask');
+      expect(result.context).toContain('SLOPE permission request');
       expect(result.context).toContain('no active sprint state');
       expect(result.context).toContain('slope sprint start');
       expect(result.context).toContain('slope claim');
+      expect(result.context).toContain('does not replace the host permission policy');
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }
@@ -298,7 +300,9 @@ describe('claimRequiredGuard', () => {
       const result = await claimRequiredGuard(makeInput(cwd, join(cwd, 'src/foo.ts')), cwd);
 
       expect(result.decision).toBeUndefined();
-      expect(result.context).toContain('No active sprint claim');
+      expect(result.context).toContain('advisory (non-blocking)');
+      expect(result.context).toContain('no active sprint claim');
+      expect(result.context).toContain('does not grant or deny the host tool permission');
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }

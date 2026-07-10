@@ -171,7 +171,9 @@ describe('guardCommand dispatcher path', () => {
 
     expect(parsed.hookSpecificOutput.hookEventName).toBe('PreToolUse');
     expect(parsed.hookSpecificOutput.permissionDecision).toBe('ask');
+    expect(parsed.hookSpecificOutput.additionalContext).toContain('SLOPE permission request');
     expect(parsed.hookSpecificOutput.additionalContext).toContain('no active sprint state');
+    expect(parsed.hookSpecificOutput.additionalContext).toContain('host decides whether to allow this edit');
 
     const metrics = readFileSync(join(cwd, '.slope', 'guard-metrics.jsonl'), 'utf8');
     expect(metrics).toContain('"guard":"claim-required"');

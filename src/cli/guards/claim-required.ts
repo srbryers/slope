@@ -144,9 +144,12 @@ export async function claimRequiredGuard(input: HookInput, cwd: string): Promise
   // Mark as warned
   updateSessionState(cwd, 'claim_warned_session_id', sessionId);
 
-  return {
-    context: 'SLOPE: No active sprint claim. Consider running `slope claim` to track this work.',
-  };
+    return {
+      context: [
+        'SLOPE advisory (non-blocking) — no active sprint claim covers this implementation edit.',
+        'A claim records sprint scope; it does not grant or deny the host tool permission. Consider running `slope claim` to track the work.',
+      ].join('\n'),
+    };
 }
 
 function inferMissingSprintHint(cwd: string): { sprint: number; label: string; source: string } | null {
@@ -205,7 +208,11 @@ function implementationWritePolicyResult(policy: ImplementationWritePolicy, line
   }
   return {
     decision: 'ask',
-    context: lines.join('\n'),
+    context: [
+      'SLOPE permission request — the configured implementation-write policy is "ask".',
+      ...lines,
+      'A SLOPE claim records work scope but does not replace the host permission policy; the host decides whether to allow this edit.',
+    ].join('\n'),
   };
 }
 
