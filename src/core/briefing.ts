@@ -14,7 +14,11 @@ import { computeDispersion } from './dispersion.js';
 import { generateTrainingPlan } from './advisor.js';
 import { checkConflicts } from './registry.js';
 import type { RoadmapDefinition } from './roadmap.js';
-import { formatStrategicContext } from './roadmap.js';
+import {
+  formatRoadmapSprintLabel,
+  formatStrategicContext,
+  roadmapSprintOrderValue,
+} from './roadmap.js';
 import type { SkillDefinition, SkillRegistryFile } from './skills.js';
 
 // --- Input types ---
@@ -60,6 +64,38 @@ export interface HazardEntry {
   ticket: string;
   type: string;
   description: string;
+}
+
+type BriefingHazardRelationship =
+  | 'active_sprint'
+  | 'direct_dependency'
+  | 'transitive_dependency'
+  | 'same_phase'
+  | 'historical';
+
+interface BriefingHazardProvenance {
+  source_sprint: number;
+  source_phase?: string;
+  target_sprint: number;
+  target_phase?: string;
+  relationship: BriefingHazardRelationship;
+  relevance: 'active' | 'historical';
+}
+
+interface ScopedBriefingHazard extends HazardEntry {
+  provenance: BriefingHazardProvenance;
+}
+
+interface ScopedBriefingBunker {
+  sprint: number;
+  location: string;
+  provenance: BriefingHazardProvenance;
+}
+
+interface ScopedBriefingHazardIndex {
+  shot_hazards: ScopedBriefingHazard[];
+  bunker_locations: ScopedBriefingBunker[];
+  suppressed_route_directives: number;
 }
 
 /** Nutrition trend for a single category */
@@ -168,6 +204,203 @@ export function extractHazardIndex(
   return { shot_hazards: shotHazards, bunker_locations: bunkers };
 }
 
+const ROUTE_STOP_WORDS = new Set([
+  'about', 'after', 'again', 'against', 'also', 'before', 'begin', 'being', 'between',
+  'agent', 'architecture', 'code', 'context', 'could', 'does', 'feature', 'from', 'gate',
+  'handoff', 'into', 'next', 'only', 'other', 'phase', 'planning', 'process', 'project',
+  'review', 'route', 'routes', 'routing', 'should', 'sprint', 'start', 'system', 'than',
+  'that', 'their', 'then', 'there',
+  'these', 'this', 'those', 'through', 'until', 'when', 'where', 'which', 'while', 'with',
+  'work', 'would',
+]);
+
+function roadmapIdsEqual(roadmap: RoadmapDefinition, left: number, right: number): boolean {
+  return roadmapSprintOrderValue(roadmap, left) === roadmapSprintOrderValue(roadmap, right);
+}
+
+function roadmapSprintById(roadmap: RoadmapDefinition, sprint: number) {
+  return roadmap.sprints.find(candidate => roadmapIdsEqual(roadmap, candidate.id, sprint));
+}
+
+function roadmapPhaseForSprint(roadmap: RoadmapDefinition, sprint: number) {
+  return roadmap.phases.find(phase => phase.sprints.some(id => roadmapIdsEqual(roadmap, id, sprint)));
+}
+
+function collectDependencyDepths(roadmap: RoadmapDefinition, sprint: number): Map<number, number> {
+  const depths = new Map<number, number>();
+  const root = roadmapSprintById(roadmap, sprint);
+  const queue = (root?.depends_on ?? []).map(id => ({ id, depth: 1 }));
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    const order = roadmapSprintOrderValue(roadmap, current.id);
+    const previous = depths.get(order);
+    if (previous != null && previous <= current.depth) continue;
+    depths.set(order, current.depth);
+    const dependency = roadmapSprintById(roadmap, current.id);
+    for (const nested of dependency?.depends_on ?? []) {
+      queue.push({ id: nested, depth: current.depth + 1 });
+    }
+  }
+  return depths;
+}
+
+function meaningfulRouteTokens(text: string): Set<string> {
+  const tokens = text.toLowerCase().match(/[a-z][a-z0-9_-]{2,}/g) ?? [];
+  return new Set(tokens.filter(token => !ROUTE_STOP_WORDS.has(token) && !/^s\d/.test(token)));
+}
+
+function currentAssignmentTokens(roadmap: RoadmapDefinition, sprint: number): Set<string> {
+  const row = roadmapSprintById(roadmap, sprint);
+  const phase = roadmapPhaseForSprint(roadmap, sprint);
+  return meaningfulRouteTokens([
+    row?.theme,
+    row?.type,
+    row?.note,
+    row?.outcome,
+    ...(row?.tickets ?? []).flatMap(ticket => [ticket.title, ticket.note]),
+    phase?.name,
+    phase?.description,
+    phase?.note,
+  ].filter((value): value is string => typeof value === 'string').join(' '));
+}
+
+function sprintMentionPattern(roadmap: RoadmapDefinition, sprint: number): RegExp {
+  const raw = String(sprint).replace('.', '\\.');
+  const order = String(roadmapSprintOrderValue(roadmap, sprint)).replace('.', '\\.');
+  const label = formatRoadmapSprintLabel(roadmap, sprint).slice(1).replace('.', '\\.');
+  const aliases = [...new Set([raw, order, label])].join('|');
+  return new RegExp(`\\bS(?:${aliases})\\b`, 'i');
+}
+
+function extractTargetAssignmentPremise(sentence: string, mention: RegExp): string | null {
+  const target = mention.source;
+  const routedAfterTarget = new RegExp(
+    `${target}\\s+(?:routes?\\s+to|becomes?|is\\s+(?:now\\s+)?(?:assigned|reassigned)\\s+to|follows?|hands?\\s+off\\s+to)\\s+(.+?)(?=\\s+(?:before|after|as\\s+if|because)\\b|[;,.!?]|$)`,
+    'i',
+  ).exec(sentence);
+  if (routedAfterTarget?.[1]) return routedAfterTarget[1];
+
+  const startAsAssignment = new RegExp(
+    `(?:do\\s+not|don['’]t)?\\s*(?:start|begin)\\s+${target}\\s+(?!until\\b|before\\b|after\\b|if\\b|when\\b)(.+?)(?=\\s+(?:as\\s+if|before|after|because)\\b|[;,.!?]|$)`,
+    'i',
+  ).exec(sentence);
+  return startAsAssignment?.[1] ?? null;
+}
+
+function stripSupersededRouteDirectives(
+  description: string,
+  roadmap: RoadmapDefinition,
+  targetSprint: number,
+  assignmentTokens: Set<string>,
+): { description: string; suppressed: number } {
+  const mention = sprintMentionPattern(roadmap, targetSprint);
+  const sentences = description.split(/(?<=[.!?;])\s+/);
+  const kept: string[] = [];
+  let suppressed = 0;
+  for (const rawSentence of sentences) {
+    const sentence = rawSentence.trim();
+    if (!sentence) continue;
+    const assignmentPremise = extractTargetAssignmentPremise(sentence, mention);
+    if (!assignmentPremise) {
+      kept.push(sentence);
+      continue;
+    }
+    const premiseTokens = meaningfulRouteTokens(assignmentPremise);
+    const matchesAssignment = [...premiseTokens].some(token => assignmentTokens.has(token));
+    if (matchesAssignment) kept.push(sentence);
+    else suppressed++;
+  }
+  return { description: kept.join(' '), suppressed };
+}
+
+/**
+ * Derive current-roadmap provenance for immutable scorecard hazards. Route-like
+ * sentences that name the requested sprint are removed only when their premise
+ * has no meaningful overlap with that sprint's current authored assignment.
+ */
+function scopeBriefingHazards(
+  index: ReturnType<typeof extractHazardIndex>,
+  roadmap: RoadmapDefinition,
+  currentSprint: number,
+): ScopedBriefingHazardIndex {
+  const target = roadmapSprintById(roadmap, currentSprint);
+  if (!target) {
+    return { shot_hazards: [], bunker_locations: [], suppressed_route_directives: 0 };
+  }
+  const targetPhase = roadmapPhaseForSprint(roadmap, currentSprint);
+  const dependencyDepths = collectDependencyDepths(roadmap, currentSprint);
+  const assignmentTokens = currentAssignmentTokens(roadmap, currentSprint);
+  let suppressed = 0;
+
+  const provenanceFor = (sourceSprint: number): BriefingHazardProvenance => {
+    const sourcePhase = roadmapPhaseForSprint(roadmap, sourceSprint);
+    const dependencyDepth = dependencyDepths.get(roadmapSprintOrderValue(roadmap, sourceSprint));
+    let relationship: BriefingHazardRelationship = 'historical';
+    if (roadmapIdsEqual(roadmap, sourceSprint, currentSprint)) relationship = 'active_sprint';
+    else if (dependencyDepth === 1) relationship = 'direct_dependency';
+    else if (dependencyDepth != null) relationship = 'transitive_dependency';
+    else if (sourcePhase
+      && targetPhase
+      && sourcePhase === targetPhase
+      && roadmapSprintOrderValue(roadmap, sourceSprint) < roadmapSprintOrderValue(roadmap, target.id)) {
+      relationship = 'same_phase';
+    }
+    return {
+      source_sprint: sourceSprint,
+      source_phase: sourcePhase?.name,
+      target_sprint: target.id,
+      target_phase: targetPhase?.name,
+      relationship,
+      relevance: relationship === 'active_sprint' ? 'active' : 'historical',
+    };
+  };
+
+  const shotHazards: ScopedBriefingHazard[] = [];
+  for (const hazard of index.shot_hazards) {
+    const scoped = roadmapIdsEqual(roadmap, hazard.sprint, target.id)
+      ? { description: hazard.description, suppressed: 0 }
+      : stripSupersededRouteDirectives(hazard.description, roadmap, target.id, assignmentTokens);
+    suppressed += scoped.suppressed;
+    if (!scoped.description) continue;
+    shotHazards.push({ ...hazard, description: scoped.description, provenance: provenanceFor(hazard.sprint) });
+  }
+
+  const bunkerLocations: ScopedBriefingBunker[] = [];
+  for (const bunker of index.bunker_locations) {
+    const scoped = roadmapIdsEqual(roadmap, bunker.sprint, target.id)
+      ? { description: bunker.location, suppressed: 0 }
+      : stripSupersededRouteDirectives(bunker.location, roadmap, target.id, assignmentTokens);
+    suppressed += scoped.suppressed;
+    if (!scoped.description) continue;
+    bunkerLocations.push({ ...bunker, location: scoped.description, provenance: provenanceFor(bunker.sprint) });
+  }
+
+  return {
+    shot_hazards: shotHazards,
+    bunker_locations: bunkerLocations,
+    suppressed_route_directives: suppressed,
+  };
+}
+
+function formatBriefingHazardProvenance(
+  provenance: BriefingHazardProvenance,
+  roadmap: RoadmapDefinition,
+): string {
+  const source = formatRoadmapSprintLabel(roadmap, provenance.source_sprint);
+  const target = formatRoadmapSprintLabel(roadmap, provenance.target_sprint);
+  const phase = provenance.source_phase ?? 'unassigned phase';
+  const relationship = provenance.relationship === 'active_sprint'
+    ? 'active'
+    : provenance.relationship === 'direct_dependency'
+      ? `direct dependency history for ${target}`
+      : provenance.relationship === 'transitive_dependency'
+        ? `transitive dependency history for ${target}`
+        : provenance.relationship === 'same_phase'
+          ? 'phase history'
+          : 'historical';
+  return `[${source} | ${phase} | ${relationship}]`;
+}
+
 /**
  * Compute nutrition trends across scorecards.
  * Shows which dev health categories are consistently healthy vs neglected.
@@ -264,13 +497,22 @@ export function buildSkillBriefing(opts: {
     ...(filter?.categories ?? []),
     ...(filter?.keywords ?? []),
   ].join(' '));
-  const hazardIndex = extractHazardIndex(scorecards);
-  const recentHazards = [...hazardIndex.shot_hazards]
+  const rawHazardIndex = extractHazardIndex(scorecards);
+  const scopedHazardIndex = roadmap && currentSprint != null && roadmapSprintById(roadmap, currentSprint)
+    ? scopeBriefingHazards(rawHazardIndex, roadmap, currentSprint)
+    : undefined;
+  const relevantHazards = scopedHazardIndex
+    ? scopedHazardIndex.shot_hazards.filter(hazard => hazard.provenance.relationship !== 'historical')
+    : rawHazardIndex.shot_hazards;
+  const relevantBunkers = scopedHazardIndex
+    ? scopedHazardIndex.bunker_locations.filter(bunker => bunker.provenance.relationship !== 'historical')
+    : rawHazardIndex.bunker_locations;
+  const recentHazards = [...relevantHazards]
     .sort((a, b) => b.sprint - a.sprint)
     .slice(0, 20);
   const hazardText = normalizeSearchText([
     ...recentHazards.map(h => `${h.type} ${h.ticket} ${h.description}`),
-    ...hazardIndex.bunker_locations.slice(-10).map(b => b.location),
+    ...relevantBunkers.slice(-10).map(b => b.location),
   ].join(' '));
   const changedFilesText = normalizeSearchText([
     ...(claims ?? []).map(c => c.target),
@@ -422,8 +664,21 @@ export function formatBriefing(opts: {
   lines.push('HAZARDS');
 
   const hazards = extractHazardIndex(scorecards, filter?.keywords?.[0]);
-  let filteredBunkers = hazards.bunker_locations;
-  let filteredShotHazards = hazards.shot_hazards;
+  const scopedHazards = roadmap && currentSprint && roadmapSprintById(roadmap, currentSprint)
+    ? scopeBriefingHazards(hazards, roadmap, currentSprint)
+    : undefined;
+  let filteredBunkers: Array<{ sprint: number; location: string; provenance?: BriefingHazardProvenance }> =
+    scopedHazards?.bunker_locations ?? hazards.bunker_locations;
+  let filteredShotHazards: Array<HazardEntry & { provenance?: BriefingHazardProvenance }> =
+    scopedHazards?.shot_hazards ?? hazards.shot_hazards;
+
+  // With a resolved roadmap target, default output contains only the selected
+  // sprint, its dependency chain, and its current phase. An explicit keyword
+  // remains an intentional escape hatch into labelled historical evidence.
+  if (scopedHazards && !effectiveFilter?.keywords?.length) {
+    filteredBunkers = filteredBunkers.filter(b => b.provenance?.relationship !== 'historical');
+    filteredShotHazards = filteredShotHazards.filter(h => h.provenance?.relationship !== 'historical');
+  }
 
   // Role-based focus area filtering: show only hazards relevant to the role's focus
   if (role && role.focusAreas.length > 0) {
@@ -440,13 +695,19 @@ export function formatBriefing(opts: {
     const hazardLines = [
       ...filteredShotHazards.map(h => ({
         sprint: h.sprint,
-        line: `  [S${h.sprint}] ${h.type}: ${h.description}`,
+        order: roadmap ? roadmapSprintOrderValue(roadmap, h.sprint) : h.sprint,
+        line: scopedHazards && h.provenance
+          ? `  ${formatBriefingHazardProvenance(h.provenance, roadmap!)} ${h.type}: ${h.description}`
+          : `  [S${h.sprint}] ${h.type}: ${h.description}`,
       })),
       ...filteredBunkers.map(b => ({
         sprint: b.sprint,
-        line: `  [S${b.sprint}] ${b.location}`,
+        order: roadmap ? roadmapSprintOrderValue(roadmap, b.sprint) : b.sprint,
+        line: scopedHazards && b.provenance
+          ? `  ${formatBriefingHazardProvenance(b.provenance, roadmap!)} bunker: ${b.location}`
+          : `  [S${b.sprint}] ${b.location}`,
       })),
-    ].sort((a, b) => b.sprint - a.sprint);
+    ].sort((a, b) => b.order - a.order);
 
     for (const entry of hazardLines.slice(0, DEFAULT_BRIEFING_HAZARD_LIMIT)) {
       lines.push(entry.line);
@@ -456,7 +717,10 @@ export function formatBriefing(opts: {
       lines.push(`  ... ${omitted} older hazard${omitted === 1 ? '' : 's'} omitted. Use --keywords=<term> or --categories=<category> to focus the briefing.`);
     }
   } else {
-    lines.push('  No bunker locations recorded.');
+    lines.push(scopedHazards ? '  No hazards relevant to the current roadmap context.' : '  No bunker locations recorded.');
+  }
+  if (scopedHazards && scopedHazards.suppressed_route_directives > 0) {
+    lines.push(`  Suppressed ${scopedHazards.suppressed_route_directives} superseded route directive${scopedHazards.suppressed_route_directives === 1 ? '' : 's'} that no longer match ${formatRoadmapSprintLabel(roadmap!, currentSprint!)}'s roadmap assignment.`);
   }
 
   // Section 2.5: Course status (active claims)
