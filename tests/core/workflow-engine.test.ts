@@ -299,9 +299,8 @@ describe('WorkflowEngine', () => {
         sprint_id: 'S122',
         variables: { tickets: '0' },
       });
-      await engine.complete(exec.id, 'setup', {}, REPEAT_WORKFLOW, store);
 
-      await expect(engine.next(exec.id, REPEAT_WORKFLOW, store))
+      await expect(engine.complete(exec.id, 'setup', {}, REPEAT_WORKFLOW, store))
         .rejects.toThrow('count must be at least 1');
     });
 
