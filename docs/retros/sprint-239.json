@@ -1,0 +1,46 @@
+{
+  "sprint_number": 239,
+  "theme": "Canonical S455 lifecycle identity",
+  "par": 3,
+  "slope": 0,
+  "score": 3,
+  "score_label": "par",
+  "date": "2026-07-11",
+  "shots": [
+    {
+      "ticket_key": "S239-1",
+      "title": "#605 Preserve canonical roadmap S455 lifecycle labels",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "5 files changed; focused regressions, full tests, typecheck, build, docs, map, and compiled CLI smoke passed."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 1,
+    "fairways_total": 1,
+    "greens_in_regulation": 1,
+    "greens_total": 1,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [],
+  "special_plays": [],
+  "bunker_locations": [],
+  "yardage_book_updates": [],
+  "course_management_notes": [],
+  "slope_factors": [],
+  "_auto_generated": true,
+  "_commits": 1,
+  "_ci_signal": null,
+  "_pr_signal": null,
+  "_note": "Auto-generated from git only (no CI). Shots default to green. Provide --test-output for better scoring."
+}
