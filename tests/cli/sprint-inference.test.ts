@@ -64,4 +64,28 @@ describe('inferSprintContext', () => {
     expect(context.sprint).toBe(18);
     expect(context.source).toBe('config');
   });
+
+  it('ignores active local sprint-state older than completed scorecard evidence (#601)', () => {
+    mkdirSync(join(tmpDir, 'docs', 'retros'), { recursive: true });
+    writeFileSync(join(tmpDir, 'docs', 'retros', 'sprint-453.json'), JSON.stringify({
+      sprint_number: 453,
+      theme: 'Merged feature',
+      par: 3,
+      slope: 1,
+      score: 3,
+      shots: [],
+    }));
+    saveSprintState(tmpDir, createSprintState(444, 'planning'));
+
+    const context = inferSprintContext(tmpDir);
+
+    expect(context.sprint).toBe(454);
+    expect(context.source).toBe('scorecards');
+    expect(context.latestScorecard).toBe(453);
+    expect(context.staleSprintState).toMatchObject({
+      sprint: 444,
+      phase: 'planning',
+    });
+    expect(context.staleConfigSprint).toMatchObject({ sprint: 18 });
+  });
 });
