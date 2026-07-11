@@ -826,7 +826,8 @@ describe('slope sprint status', () => {
 
     const output = await captureLog(() => sprintCommand(['status']));
 
-    expect(output).toContain('status: ready_for_pr (phase: planning, all gates complete)');
+    expect(output).toContain('status: ready_for_pr (all gates complete)');
+    expect(output).not.toContain('phase: planning, all gates complete');
     expect(output).toContain('Next: create PR for this branch');
     expect(output).not.toContain('Remaining:');
   });

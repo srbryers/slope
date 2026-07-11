@@ -889,7 +889,7 @@ function statusCommand(cwd: string): void {
   const derivedStatus = complete
     ? waivedReviews.length > 0 ? 'ready_for_pr_with_review_waiver' : 'ready_for_pr'
     : state.phase;
-  const phaseContext = complete ? ` (phase: ${state.phase}, all gates complete)` : ` (phase: ${state.phase})`;
+  const phaseContext = complete ? ' (all gates complete)' : ` (phase: ${state.phase})`;
   console.log(`Sprint ${formatSprintNumber(state.sprint)} - status: ${derivedStatus}${phaseContext}`);
   console.log(`Started: ${state.started_at}`);
   console.log(`Updated: ${state.updated_at}`);
