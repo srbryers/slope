@@ -32,6 +32,15 @@ export function nextCommand(args: string[] = []): void {
     console.log(`  (auto-detected from scorecards)`);
   }
 
+  if (context.staleSprintState) {
+    console.log(`  Warning: ignoring stale local sprint state ${formatSprintLabel(context.staleSprintState.sprint)} (${context.staleSprintState.phase}); ${context.staleSprintState.reason}.`);
+    console.log('  Run `slope sprint reset` after confirming the merged sprint is closed, or `slope sprint begin --sprint=<N>` to replace the local slot.');
+  }
+  if (context.staleConfigSprint) {
+    console.log(`  Warning: ignoring stale configured currentSprint ${formatSprintLabel(context.staleConfigSprint.sprint)}; ${context.staleConfigSprint.reason}.`);
+    console.log('  Update .slope/config.json currentSprint or remove it after reconciling the merged sprint.');
+  }
+
   console.log('');
   console.log('  Quick start:');
   console.log(`    slope briefing --sprint=${context.sprint}`);

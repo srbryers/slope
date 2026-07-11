@@ -22,6 +22,15 @@ export interface InferredSprintContext {
   source: 'sprint-state' | 'config' | 'roadmap' | 'scorecards' | 'initial';
   latestScorecard: number;
   roadmapSprint?: RoadmapSprint;
+  staleSprintState?: {
+    sprint: number;
+    phase: string;
+    reason: string;
+  };
+  staleConfigSprint?: {
+    sprint: number;
+    reason: string;
+  };
 }
 
 export function loadRoadmapForInference(cwd: string, config: SlopeConfig): RoadmapDefinition | null {
@@ -39,7 +48,9 @@ export function loadRoadmapForInference(cwd: string, config: SlopeConfig): Roadm
 export function inferSprintContext(cwd: string = process.cwd(), config: SlopeConfig = loadConfig(cwd)): InferredSprintContext {
   const latestScorecard = detectLatestSprint(config, cwd);
   const sprintState = loadSprintState(cwd);
-  if (isActiveSprintState(sprintState)) {
+  const staleSprintState = activeStateCompletedByScorecards(sprintState, latestScorecard);
+  const staleConfigSprint = configuredSprintCompletedByScorecards(config.currentSprint, latestScorecard);
+  if (isActiveSprintState(sprintState) && !staleSprintState) {
     return {
       sprint: sprintState.sprint,
       label: formatSprintLabel(sprintState.sprint),
@@ -48,12 +59,13 @@ export function inferSprintContext(cwd: string = process.cwd(), config: SlopeCon
     };
   }
 
-  if (config.currentSprint) {
+  if (config.currentSprint && !staleConfigSprint) {
     return {
       sprint: config.currentSprint,
       label: formatSprintLabel(config.currentSprint),
       source: 'config',
       latestScorecard,
+      ...(staleSprintState ? { staleSprintState } : {}),
     };
   }
 
@@ -76,6 +88,8 @@ export function inferSprintContext(cwd: string = process.cwd(), config: SlopeCon
       source: 'roadmap',
       latestScorecard,
       roadmapSprint: pending,
+      ...(staleSprintState ? { staleSprintState } : {}),
+      ...(staleConfigSprint ? { staleConfigSprint } : {}),
     };
   }
 
@@ -86,6 +100,8 @@ export function inferSprintContext(cwd: string = process.cwd(), config: SlopeCon
       label: formatSprintLabel(sprint),
       source: 'scorecards',
       latestScorecard,
+      ...(staleSprintState ? { staleSprintState } : {}),
+      ...(staleConfigSprint ? { staleConfigSprint } : {}),
     };
   }
 
@@ -94,6 +110,33 @@ export function inferSprintContext(cwd: string = process.cwd(), config: SlopeCon
     label: 'S1',
     source: 'initial',
     latestScorecard: 0,
+    ...(staleSprintState ? { staleSprintState } : {}),
+    ...(staleConfigSprint ? { staleConfigSprint } : {}),
+  };
+}
+
+function activeStateCompletedByScorecards(
+  sprintState: ReturnType<typeof loadSprintState>,
+  latestScorecard: number,
+): InferredSprintContext['staleSprintState'] | null {
+  if (!isActiveSprintState(sprintState) || latestScorecard <= 0) return null;
+  if (sprintOrderValue(sprintState.sprint) > sprintOrderValue(latestScorecard)) return null;
+  return {
+    sprint: sprintState.sprint,
+    phase: sprintState.phase,
+    reason: `completed scorecard evidence has advanced to ${formatSprintLabel(latestScorecard)}`,
+  };
+}
+
+function configuredSprintCompletedByScorecards(
+  currentSprint: number | undefined,
+  latestScorecard: number,
+): InferredSprintContext['staleConfigSprint'] | null {
+  if (!currentSprint || latestScorecard <= 0) return null;
+  if (sprintOrderValue(currentSprint) > sprintOrderValue(latestScorecard)) return null;
+  return {
+    sprint: currentSprint,
+    reason: `completed scorecard evidence has advanced to ${formatSprintLabel(latestScorecard)}`,
   };
 }
 

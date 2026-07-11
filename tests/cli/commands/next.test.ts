@@ -267,6 +267,29 @@ describe('slope next', () => {
     expect(output).not.toContain('Next sprint: S1');
   });
 
+  it('warns and skips active local sprint-state older than completed scorecard evidence (#601)', () => {
+    const cwd = makeRepo();
+    repos.push(cwd);
+    writeScorecard(cwd, 453);
+    saveSprintState(cwd, createSprintState(444, 'planning'));
+    const originalCwd = process.cwd();
+    const logs: string[] = [];
+    vi.spyOn(console, 'log').mockImplementation((msg = '') => logs.push(String(msg)));
+
+    try {
+      process.chdir(cwd);
+      nextCommand();
+    } finally {
+      process.chdir(originalCwd);
+    }
+
+    const output = logs.join('\n');
+    expect(output).toContain('Latest scorecard: S453');
+    expect(output).toContain('Next sprint: S454');
+    expect(output).toContain('Warning: ignoring stale local sprint state S444 (planning)');
+    expect(output).not.toContain('Next sprint: S444');
+  });
+
   it('falls back to the next canonical sprint after a decimal inserted scorecard', () => {
     const cwd = makeRepo();
     repos.push(cwd);
