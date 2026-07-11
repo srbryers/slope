@@ -26,8 +26,8 @@ import {
   type SprintPhase,
   type SprintState,
 } from '../sprint-state.js';
-import { WorkflowEngine, loadWorkflow, resolveVariables, validateWorkflow, loadConfig, parseRoadmap, castRoadmapStructure, formatSprintLabel, formatSprintNumber, parseSprintNumber } from '../../core/index.js';
-import type { WorkflowDefinition, WorkflowExecution } from '../../core/index.js';
+import { WorkflowEngine, loadWorkflow, resolveVariables, validateWorkflow, loadConfig, parseRoadmap, castRoadmapStructure, formatSprintLabel, formatSprintNumber, formatRoadmapSprintLabel, parseSprintNumber } from '../../core/index.js';
+import type { RoadmapDefinition, WorkflowDefinition, WorkflowExecution } from '../../core/index.js';
 import { createHash } from 'node:crypto';
 import { formatActorName, formatActorSource, formatConflictSummary, resolveActor } from '../actor.js';
 import {
@@ -286,6 +286,29 @@ function commandValue(value: string): string {
     : `'${value.replaceAll("'", `'"'"'`)}`;
 }
 
+function loadRoadmapForSprintLabels(cwd: string): RoadmapDefinition | null {
+  const config = loadConfig(cwd);
+  const roadmapPath = join(cwd, config.roadmapPath);
+  if (!existsSync(roadmapPath)) return null;
+  try {
+    const raw = JSON.parse(readFileSync(roadmapPath, 'utf8'));
+    const parsed = parseRoadmap(raw);
+    return parsed.roadmap ?? castRoadmapStructure(raw);
+  } catch {
+    return null;
+  }
+}
+
+function sprintLabelForCwd(cwd: string, sprint: number): string {
+  const roadmap = loadRoadmapForSprintLabels(cwd);
+  return roadmap ? formatRoadmapSprintLabel(roadmap, sprint) : formatSprintLabel(sprint);
+}
+
+function sprintNumberForCwd(cwd: string, sprint: number): string {
+  const label = sprintLabelForCwd(cwd, sprint);
+  return label.startsWith('S') ? label.slice(1) : label;
+}
+
 function actorRetryOption(args: string[]): string | null {
   for (const flag of ['--actor', '--player']) {
     const value = findOptionValue(args, flag);
@@ -504,6 +527,8 @@ async function beginCommand(args: string[], cwd: string): Promise<void> {
   }
 
   // Step 1: initialize without overwriting existing or corrupt local state.
+  const sprintLabel = sprintLabelForCwd(cwd, sprint);
+  const sprintNumber = sprintNumberForCwd(cwd, sprint);
   const initialized = initializeSprintState(cwd, createSprintState(sprint, 'planning'));
   if (initialized.status === 'corrupt') {
     console.error(`Refusing to begin: corrupt sprint evidence was preserved at ${relative(cwd, initialized.path)}.`);
@@ -515,12 +540,12 @@ async function beginCommand(args: string[], cwd: string): Promise<void> {
     cwd,
     state,
     sprint,
-    `begin ${formatSprintLabel(sprint)}`,
-    `slope sprint begin --sprint=${formatSprintNumber(sprint)} --ticket=${commandValue(ticket)}${retryActor ? ` ${retryActor}` : ''}`,
+    `begin ${sprintLabel}`,
+    `slope sprint begin --sprint=${sprintNumber} --ticket=${commandValue(ticket)}${retryActor ? ` ${retryActor}` : ''}`,
   )) {
-    console.log(`Sprint ${formatSprintNumber(sprint)}: already started (phase: ${state.phase}).`);
+    console.log(`Sprint ${sprintNumber}: already started (phase: ${state.phase}).`);
   } else {
-    console.log(`Sprint ${formatSprintNumber(sprint)}: started (phase: planning).`);
+    console.log(`Sprint ${sprintNumber}: started (phase: planning).`);
   }
 
   // Step 2: claim
@@ -549,7 +574,7 @@ async function beginCommand(args: string[], cwd: string): Promise<void> {
       if (overlaps.length > 0) {
         console.error(`\nClaim blocked — overlap conflict(s) detected:`);
         for (const c of overlaps) console.error(`  [!!] ${formatConflictSummary(c)}`);
-        console.error(`\nResolve conflicts or run \`slope claim --target=${ticket} --sprint=${formatSprintNumber(sprint)} --force\` to override.`);
+        console.error(`\nResolve conflicts or run \`slope claim --target=${ticket} --sprint=${sprintNumber} --force\` to override.`);
         process.exit(1);
       }
       const claim = await store.claim({ sprint_number: sprint, player, target: ticket, scope: 'ticket' });
@@ -566,10 +591,10 @@ async function beginCommand(args: string[], cwd: string): Promise<void> {
   console.log('\n' + '─'.repeat(50));
   try {
     const { briefingCommand } = await import('./briefing.js');
-    await briefingCommand([`--sprint=${formatSprintNumber(sprint)}`]);
+    await briefingCommand([`--sprint=${sprintNumber}`]);
   } catch (err) {
     console.error(`  Could not run briefing: ${(err as Error).message}`);
-    console.error(`  Sprint state was already created; retry with: slope briefing --sprint=${formatSprintNumber(sprint)}`);
+    console.error(`  Sprint state was already created; retry with: slope briefing --sprint=${sprintNumber}`);
   }
 
   // Step 4: prep --lite
@@ -644,7 +669,9 @@ async function startCommand(args: string[], cwd: string): Promise<void> {
     ...(retryActor ? [retryActor] : []),
     ...(force ? ['--force'] : []),
   ];
-  const retryStart = `slope sprint start --number=${formatSprintNumber(sprint)} --phase=${phase}${retryExtras.length > 0 ? ` ${retryExtras.join(' ')}` : ''}`;
+  const sprintLabel = sprintLabelForCwd(cwd, sprint);
+  const sprintNumber = sprintNumberForCwd(cwd, sprint);
+  const retryStart = `slope sprint start --number=${sprintNumber} --phase=${phase}${retryExtras.length > 0 ? ` ${retryExtras.join(' ')}` : ''}`;
 
   failOnCorruptSprintState(cwd);
   const existingResult = loadSprintStateResult(cwd);
@@ -654,7 +681,7 @@ async function startCommand(args: string[], cwd: string): Promise<void> {
       cwd,
       existing,
       sprint,
-      `start ${formatSprintLabel(sprint)}`,
+      `start ${sprintLabel}`,
       retryStart,
     );
     if (phaseValue && existing.phase !== phase) {
@@ -663,17 +690,17 @@ async function startCommand(args: string[], cwd: string): Promise<void> {
         console.error('Refusing to update phase because sprint state changed concurrently; retry the start command.');
         process.exit(1);
       }
-      console.log(`Sprint ${formatSprintNumber(sprint)} phase updated: ${phase}.`);
+      console.log(`Sprint ${sprintNumber} phase updated: ${phase}.`);
       return;
     }
-    console.log(`Sprint ${formatSprintNumber(sprint)} state already exists (phase: ${existing.phase}).`);
+    console.log(`Sprint ${sprintNumber} state already exists (phase: ${existing.phase}).`);
     return;
   }
 
   const roadmapReality = loadRoadmapReality(cwd);
   const blockingRoadmapIssues = blockingRoadmapIssuesForSprint(roadmapReality, sprint);
   if (blockingRoadmapIssues.length > 0 && !force) {
-    console.error(`\nPre-sprint reality check failed for ${formatSprintLabel(sprint)}:`);
+    console.error(`\nPre-sprint reality check failed for ${sprintLabel}:`);
     for (const issue of blockingRoadmapIssues) {
       console.error(`  [${issue.type}] ${issue.message}`);
     }
@@ -706,14 +733,14 @@ async function startCommand(args: string[], cwd: string): Promise<void> {
       cwd,
       initialized.state,
       sprint,
-      `start ${formatSprintLabel(sprint)}`,
+      `start ${sprintLabel}`,
       retryStart,
     );
-    console.log(`Sprint ${formatSprintNumber(sprint)} state already exists (phase: ${initialized.state.phase}).`);
+    console.log(`Sprint ${sprintNumber} state already exists (phase: ${initialized.state.phase}).`);
     return;
   }
   const autoClaim = await autoClaimSprint(cwd, sprint, actorOverride(args));
-  console.log(`Sprint ${formatSprintNumber(sprint)} started (phase: ${phase}). Use 'slope sprint gate <name>' to mark gates; review gates require evidence options.`);
+  console.log(`Sprint ${sprintNumber} started (phase: ${phase}). Use 'slope sprint gate <name>' to mark gates; review gates require evidence options.`);
   if (autoClaim) console.log(autoClaim);
 }
 
@@ -722,7 +749,7 @@ async function autoClaimSprint(cwd: string, sprint: number, explicitActor?: stri
   const actor = resolveActor(cwd, { explicitActor });
   const player = actor.name;
   const playerDisplay = formatActorName(actor);
-  const target = `sprint:${formatSprintLabel(sprint)}`;
+  const target = `sprint:${sprintLabelForCwd(cwd, sprint)}`;
 
   try {
     const store = await resolveStore(cwd);
@@ -762,9 +789,9 @@ function phaseCommand(args: string[], cwd: string): void {
 
   updateSprintPhase(cwd, phaseInput);
   if (before.phase === phaseInput) {
-    console.log(`Sprint ${formatSprintNumber(before.sprint)} already in ${phaseInput} phase.`);
+    console.log(`Sprint ${sprintNumberForCwd(cwd, before.sprint)} already in ${phaseInput} phase.`);
   } else {
-    console.log(`Sprint ${formatSprintNumber(before.sprint)} phase updated: ${before.phase} -> ${phaseInput}.`);
+    console.log(`Sprint ${sprintNumberForCwd(cwd, before.sprint)} phase updated: ${before.phase} -> ${phaseInput}.`);
   }
 }
 
@@ -890,7 +917,7 @@ function statusCommand(cwd: string): void {
     ? waivedReviews.length > 0 ? 'ready_for_pr_with_review_waiver' : 'ready_for_pr'
     : state.phase;
   const phaseContext = complete ? ' (all gates complete)' : ` (phase: ${state.phase})`;
-  console.log(`Sprint ${formatSprintNumber(state.sprint)} - status: ${derivedStatus}${phaseContext}`);
+  console.log(`Sprint ${sprintNumberForCwd(cwd, state.sprint)} - status: ${derivedStatus}${phaseContext}`);
   console.log(`Started: ${state.started_at}`);
   console.log(`Updated: ${state.updated_at}`);
   console.log('');

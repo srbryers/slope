@@ -638,6 +638,26 @@ describe('slope sprint phase', () => {
     expect(state.sprint).toBe(114.5);
   });
 
+  it('starts and reports canonical roadmap S455 instead of legacy encoded S45.5 (#605)', async () => {
+    writeRoadmapSprints([{ sprint: 455, status: 'planned' }]);
+
+    const output = await captureLog(() =>
+      sprintCommand(['begin', '--sprint=455', '--ticket=S455-1'])
+    );
+    const status = await captureLog(() =>
+      sprintCommand(['status'])
+    );
+    const state = JSON.parse(readFileSync(join(tmpDir, '.slope', 'sprint-state.json'), 'utf8'));
+
+    expect(output).toContain('Sprint 455: started');
+    expect(output).toContain('S455: Sprint 455');
+    expect(output).not.toContain('Sprint 45.5');
+    expect(output).not.toContain('S45.5');
+    expect(status).toContain('Sprint 455 - status');
+    expect(status).not.toContain('Sprint 45.5');
+    expect(state.sprint).toBe(455);
+  });
+
   it('updates an existing sprint state phase', async () => {
     await captureLog(() =>
       sprintCommand(['start', '--number=98', '--phase=planning'])

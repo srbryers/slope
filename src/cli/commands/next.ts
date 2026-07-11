@@ -17,7 +17,7 @@ export function nextCommand(args: string[] = []): void {
   if (context.latestScorecard === 0) {
     console.log(`  No scorecards found. Next sprint: ${context.label}`);
   } else {
-    console.log(`  Latest scorecard: S${context.latestScorecard}`);
+    console.log(`  Latest scorecard: ${context.latestScorecardLabel}`);
     console.log(`  Next sprint: ${context.label}`);
   }
 
@@ -26,7 +26,7 @@ export function nextCommand(args: string[] = []): void {
   } else if (context.source === 'roadmap') {
     console.log(`  (selected from pending roadmap sprint${context.roadmapSprint?.theme ? `: ${context.roadmapSprint.theme}` : ''})`);
     if (context.latestScorecard > 0 && context.sprint !== nextCanonicalSprintId(context.latestScorecard)) {
-      console.log(`  (roadmap state overrides scorecard fallback to ${formatSprintLabel(nextCanonicalSprintId(context.latestScorecard))})`);
+      console.log(`  (roadmap state overrides scorecard fallback to ${context.scorecardFallbackLabel ?? formatSprintLabel(nextCanonicalSprintId(context.latestScorecard))})`);
     }
   } else {
     console.log(`  (auto-detected from scorecards)`);

@@ -3,13 +3,15 @@ import { join } from 'node:path';
 import {
   castRoadmapStructure,
   compareSprintIds,
+  compareRoadmapSprintIds,
   detectLatestSprint,
   formatSprintLabel,
-  isEncodedInsertedSprintId,
+  formatRoadmapSprintLabel,
   isRoadmapSprintPending,
   loadScorecards,
   nextCanonicalSprintId,
   parseRoadmap,
+  roadmapSprintOrderValue,
   sprintOrderValue,
 } from '../core/index.js';
 import type { RoadmapDefinition, RoadmapSprint, SlopeConfig } from '../core/index.js';
@@ -21,6 +23,9 @@ export interface InferredSprintContext {
   label: string;
   source: 'sprint-state' | 'config' | 'roadmap' | 'scorecards' | 'initial';
   latestScorecard: number;
+  latestScorecardLabel: string;
+  scorecardFallbackSprint?: number;
+  scorecardFallbackLabel?: string;
   roadmapSprint?: RoadmapSprint;
   staleSprintState?: {
     sprint: number;
@@ -47,46 +52,53 @@ export function loadRoadmapForInference(cwd: string, config: SlopeConfig): Roadm
 
 export function inferSprintContext(cwd: string = process.cwd(), config: SlopeConfig = loadConfig(cwd)): InferredSprintContext {
   const latestScorecard = detectLatestSprint(config, cwd);
+  const roadmap = loadRoadmapForInference(cwd, config);
+  const latestScorecardLabel = labelForSprint(latestScorecard, roadmap);
   const sprintState = loadSprintState(cwd);
-  const staleSprintState = activeStateCompletedByScorecards(sprintState, latestScorecard);
-  const staleConfigSprint = configuredSprintCompletedByScorecards(config.currentSprint, latestScorecard);
+  const staleSprintState = activeStateCompletedByScorecards(sprintState, latestScorecard, roadmap);
+  const staleConfigSprint = configuredSprintCompletedByScorecards(config.currentSprint, latestScorecard, roadmap);
   if (isActiveSprintState(sprintState) && !staleSprintState) {
     return {
       sprint: sprintState.sprint,
-      label: formatSprintLabel(sprintState.sprint),
+      label: labelForSprint(sprintState.sprint, roadmap),
       source: 'sprint-state',
       latestScorecard,
+      latestScorecardLabel,
     };
   }
 
   if (config.currentSprint && !staleConfigSprint) {
     return {
       sprint: config.currentSprint,
-      label: formatSprintLabel(config.currentSprint),
+      label: labelForSprint(config.currentSprint, roadmap),
       source: 'config',
       latestScorecard,
+      latestScorecardLabel,
       ...(staleSprintState ? { staleSprintState } : {}),
     };
   }
 
-  const roadmap = loadRoadmapForInference(cwd, config);
   const scorecards = loadScorecards(config, cwd);
   const completedIds = new Set<number>(scorecards.map(card => card.sprint_number));
   const pendingSprints = roadmap?.sprints
     .filter(sprint => {
       return isRoadmapSprintPending(sprint) && !completedIds.has(sprint.id);
     })
-    .sort((a, b) => compareSprintIds(a.id, b.id)) ?? [];
+    .sort((a, b) => compareSprintIdsForRoadmap(a.id, b.id, roadmap)) ?? [];
 
   const scorecardNext = latestScorecard > 0 ? nextCanonicalSprintId(latestScorecard) : 1;
-  const pending = choosePendingSprint(pendingSprints, latestScorecard, scorecardNext);
+  const scorecardFallbackLabel = labelForSprint(scorecardNext, roadmap);
+  const pending = choosePendingSprint(pendingSprints, latestScorecard, scorecardNext, roadmap);
 
   if (pending) {
     return {
       sprint: pending.id,
-      label: formatSprintLabel(pending.id),
+      label: labelForSprint(pending.id, roadmap),
       source: 'roadmap',
       latestScorecard,
+      latestScorecardLabel,
+      scorecardFallbackSprint: scorecardNext,
+      scorecardFallbackLabel,
       roadmapSprint: pending,
       ...(staleSprintState ? { staleSprintState } : {}),
       ...(staleConfigSprint ? { staleConfigSprint } : {}),
@@ -97,9 +109,12 @@ export function inferSprintContext(cwd: string = process.cwd(), config: SlopeCon
     const sprint = scorecardNext;
     return {
       sprint,
-      label: formatSprintLabel(sprint),
+      label: labelForSprint(sprint, roadmap),
       source: 'scorecards',
       latestScorecard,
+      latestScorecardLabel,
+      scorecardFallbackSprint: scorecardNext,
+      scorecardFallbackLabel,
       ...(staleSprintState ? { staleSprintState } : {}),
       ...(staleConfigSprint ? { staleConfigSprint } : {}),
     };
@@ -110,6 +125,9 @@ export function inferSprintContext(cwd: string = process.cwd(), config: SlopeCon
     label: 'S1',
     source: 'initial',
     latestScorecard: 0,
+    latestScorecardLabel: 'S0',
+    scorecardFallbackSprint: 1,
+    scorecardFallbackLabel: 'S1',
     ...(staleSprintState ? { staleSprintState } : {}),
     ...(staleConfigSprint ? { staleConfigSprint } : {}),
   };
@@ -118,25 +136,27 @@ export function inferSprintContext(cwd: string = process.cwd(), config: SlopeCon
 function activeStateCompletedByScorecards(
   sprintState: ReturnType<typeof loadSprintState>,
   latestScorecard: number,
+  roadmap: RoadmapDefinition | null,
 ): InferredSprintContext['staleSprintState'] | null {
   if (!isActiveSprintState(sprintState) || latestScorecard <= 0) return null;
-  if (sprintOrderValue(sprintState.sprint) > sprintOrderValue(latestScorecard)) return null;
+  if (orderForSprint(sprintState.sprint, roadmap) > orderForSprint(latestScorecard, roadmap)) return null;
   return {
     sprint: sprintState.sprint,
     phase: sprintState.phase,
-    reason: `completed scorecard evidence has advanced to ${formatSprintLabel(latestScorecard)}`,
+    reason: `completed scorecard evidence has advanced to ${labelForSprint(latestScorecard, roadmap)}`,
   };
 }
 
 function configuredSprintCompletedByScorecards(
   currentSprint: number | undefined,
   latestScorecard: number,
+  roadmap: RoadmapDefinition | null,
 ): InferredSprintContext['staleConfigSprint'] | null {
   if (!currentSprint || latestScorecard <= 0) return null;
-  if (sprintOrderValue(currentSprint) > sprintOrderValue(latestScorecard)) return null;
+  if (orderForSprint(currentSprint, roadmap) > orderForSprint(latestScorecard, roadmap)) return null;
   return {
     sprint: currentSprint,
-    reason: `completed scorecard evidence has advanced to ${formatSprintLabel(latestScorecard)}`,
+    reason: `completed scorecard evidence has advanced to ${labelForSprint(latestScorecard, roadmap)}`,
   };
 }
 
@@ -144,6 +164,7 @@ function choosePendingSprint(
   pendingSprints: RoadmapSprint[],
   latestScorecard: number,
   scorecardNext: number,
+  roadmap: RoadmapDefinition | null,
 ): RoadmapSprint | undefined {
   if (pendingSprints.length === 0) return undefined;
   if (latestScorecard === 0) return pendingSprints[0];
@@ -151,17 +172,30 @@ function choosePendingSprint(
   const exactNext = pendingSprints.find(sprint => sprint.id === scorecardNext);
   if (exactNext) return exactNext;
 
-  const nextOrder = sprintOrderValue(scorecardNext);
+  const nextOrder = orderForSprint(scorecardNext, roadmap);
   const insertedRecovery = pendingSprints.find(sprint =>
-    isInsertedSprintId(sprint.id) && sprintOrderValue(sprint.id) <= nextOrder,
+    isInsertedSprintId(sprint.id, roadmap) && orderForSprint(sprint.id, roadmap) <= nextOrder,
   );
   if (insertedRecovery) return insertedRecovery;
 
   return pendingSprints[0];
 }
 
-function isInsertedSprintId(id: number): boolean {
-  return !Number.isInteger(id) || isEncodedInsertedSprintId(id);
+function isInsertedSprintId(id: number, roadmap: RoadmapDefinition | null): boolean {
+  return !Number.isInteger(id) || orderForSprint(id, roadmap) !== id;
+}
+
+function labelForSprint(id: number, roadmap: RoadmapDefinition | null): string {
+  if (id <= 0) return `S${id}`;
+  return roadmap ? formatRoadmapSprintLabel(roadmap, id) : formatSprintLabel(id);
+}
+
+function orderForSprint(id: number, roadmap: RoadmapDefinition | null): number {
+  return roadmap ? roadmapSprintOrderValue(roadmap, id) : sprintOrderValue(id);
+}
+
+function compareSprintIdsForRoadmap(a: number, b: number, roadmap: RoadmapDefinition | null): number {
+  return roadmap ? compareRoadmapSprintIds(roadmap, a, b) : compareSprintIds(a, b);
 }
 
 export function maxSprintByOrder(ids: number[]): number {
