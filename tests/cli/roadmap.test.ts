@@ -842,7 +842,7 @@ describe('slope roadmap sync', () => {
     expect(s8.depends_on).toEqual([7]);
   });
 
-  it('marks scorecard-backed sprints complete and preserves per-ticket metadata (#568)', () => {
+  it('marks scorecard-backed sprints complete while preserving roadmap-owned tickets (#568, #597)', () => {
     const roadmap = makeRoadmapJson({
       sprints: makeRoadmapJson().sprints.map(sprint => sprint.id === 8
         ? {
@@ -872,32 +872,66 @@ describe('slope roadmap sync', () => {
     const result = JSON.parse(readFileSync(join(tmpDir, 'docs', 'backlog', 'roadmap.json'), 'utf8'));
     const s8 = result.sprints.find((s: { id: number }) => s.id === 8);
     expect(s8.status).toBe('complete');
-    expect(s8.tickets[0].title).toBe('Synced T1');
+    expect(s8.tickets[0].title).toBe('T1');
     expect(s8.tickets[0].github_issue).toBe(568);
     expect(s8.tickets[1].depends_on).toEqual(['S8-1']);
     expect(s8.tickets[1].github_issue).toBe(568);
     expect(s8.tickets[2].depends_on).toEqual(['S8-2']);
   });
 
-  it('maps club to complexity correctly', () => {
-    const roadmap = makeRoadmapJson();
+  it('does not collapse existing roadmap tickets when a scorecard shot covers multiple ticket keys (#597)', () => {
+    const roadmap = makeRoadmapJson({
+      sprints: makeRoadmapJson().sprints.map(sprint => sprint.id === 8
+        ? {
+          ...sprint,
+          tickets: [
+            { key: 'S8-1', title: 'Roadmap task 1', club: 'short_iron', complexity: 'standard' },
+            { key: 'S8-2', title: 'Roadmap task 2', club: 'wedge', complexity: 'small' },
+            { key: 'S8-3', title: 'Roadmap task 3', club: 'putter', complexity: 'trivial' },
+          ],
+        } as RoadmapDefinition['sprints'][number]
+        : sprint),
+    });
     writeRoadmap(tmpDir, roadmap);
     writeConfig(tmpDir, { scorecardDir: 'docs/retros', scorecardPattern: 'sprint-*.json', minSprint: 1 });
-    writeScorecard(tmpDir, 7, {
+    writeScorecard(tmpDir, 8, {
       shots: [
-        { ticket_key: 'S7-1', title: 'Driver', club: 'driver', result: 'green', hazards: [] },
-        { ticket_key: 'S7-2', title: 'Long Iron', club: 'long_iron', result: 'green', hazards: [] },
-        { ticket_key: 'S7-3', title: 'Putter', club: 'putter', result: 'green', hazards: [] },
+        { ticket_key: 'S8-1', title: 'S8-1 S8-2 S8-3: Did the whole sprint', club: 'short_iron', result: 'green', hazards: [] },
       ],
     });
 
     roadmapCommand(['sync']);
 
     const result = JSON.parse(readFileSync(join(tmpDir, 'docs', 'backlog', 'roadmap.json'), 'utf8'));
-    const s7 = result.sprints.find((s: { id: number }) => s.id === 7);
-    expect(s7.tickets[0].complexity).toBe('moderate'); // driver
-    expect(s7.tickets[1].complexity).toBe('moderate'); // long_iron
-    expect(s7.tickets[2].complexity).toBe('trivial');  // putter
+    const s8 = result.sprints.find((s: { id: number }) => s.id === 8);
+    expect(s8.tickets.map((ticket: { key: string }) => ticket.key)).toEqual(['S8-1', 'S8-2', 'S8-3']);
+    expect(s8.tickets.map((ticket: { title: string }) => ticket.title)).toEqual([
+      'Roadmap task 1',
+      'Roadmap task 2',
+      'Roadmap task 3',
+    ]);
+  });
+
+  it('maps club to complexity correctly', () => {
+    const roadmap = makeRoadmapJson();
+    writeRoadmap(tmpDir, roadmap);
+    writeConfig(tmpDir, { scorecardDir: 'docs/retros', scorecardPattern: 'sprint-*.json', minSprint: 1 });
+    writeScorecard(tmpDir, 10, {
+      theme: 'New Sprint',
+      shots: [
+        { ticket_key: 'S10-1', title: 'Driver', club: 'driver', result: 'green', hazards: [] },
+        { ticket_key: 'S10-2', title: 'Long Iron', club: 'long_iron', result: 'green', hazards: [] },
+        { ticket_key: 'S10-3', title: 'Putter', club: 'putter', result: 'green', hazards: [] },
+      ],
+    });
+
+    roadmapCommand(['sync']);
+
+    const result = JSON.parse(readFileSync(join(tmpDir, 'docs', 'backlog', 'roadmap.json'), 'utf8'));
+    const s10 = result.sprints.find((s: { id: number }) => s.id === 10);
+    expect(s10.tickets[0].complexity).toBe('moderate'); // driver
+    expect(s10.tickets[1].complexity).toBe('moderate'); // long_iron
+    expect(s10.tickets[2].complexity).toBe('trivial');  // putter
   });
 
   it('dry-run shows changes without writing', () => {

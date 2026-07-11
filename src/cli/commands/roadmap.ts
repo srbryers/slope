@@ -886,19 +886,6 @@ function scorecardToSprint(card: GolfScorecard): RoadmapSprint {
   };
 }
 
-function ticketIdentity(ticket: RoadmapTicket): string {
-  return ticket.key || ticket.id || '';
-}
-
-function mergeScorecardTickets(existingTickets: RoadmapTicket[], scorecardTickets: RoadmapTicket[]): RoadmapTicket[] {
-  const existingByKey = new Map(existingTickets.map(ticket => [ticketIdentity(ticket), ticket]));
-
-  return scorecardTickets.map(ticket => {
-    const existing = existingByKey.get(ticketIdentity(ticket));
-    return existing ? { ...existing, ...ticket } : ticket;
-  });
-}
-
 function modularAuthorityBlocksProjectionMutation(
   flags: Record<string, string>,
   cwd: string,
@@ -969,14 +956,16 @@ function syncSubcommand(flags: Record<string, string>, cwd: string): void {
     const existing = existingById.get(card.sprint_number);
 
     if (existing) {
-      // Update scorecard-derived fields, preserve manually-authored fields
+      // Update sprint-level scorecard-derived fields only. Tickets are roadmap-owned:
+      // scorecard shots are execution evidence and may be coarser, shorter, or
+      // grouped differently than the planning record. Do not overwrite, delete,
+      // add, or retitle existing roadmap tickets during sync.
       existing.theme = fromCard.theme;
       existing.par = fromCard.par;
       existing.slope = fromCard.slope;
       existing.type = fromCard.type;
-      existing.tickets = mergeScorecardTickets(existing.tickets, fromCard.tickets);
       (existing as RoadmapSprint & { status?: string }).status = 'complete';
-      // Preserve: sprint depends_on and ticket metadata such as depends_on/github_issue.
+      // Preserve: sprint depends_on and all ticket identity/metadata.
       updated++;
     } else {
       roadmap.sprints.push({ ...fromCard, status: 'complete' } as RoadmapSprint);
