@@ -686,6 +686,12 @@ function writeCodexPluginHooksMetadata(pluginRoot: string): boolean {
   return writeJsonIfChanged(hooksPath, payload);
 }
 
+function installCodexProjectGuardShim(cwd: string): void {
+  const adapter = getAdapter('codex');
+  if (!adapter) return;
+  adapter.installGuards(cwd, GUARD_DEFINITIONS, { scope: 'project' });
+}
+
 function syncCodexPluginManifest(pluginRoot: string): boolean {
   const manifestPath = join(pluginRoot, '.codex-plugin', 'plugin.json');
   if (!existsSync(manifestPath)) return false;
@@ -921,6 +927,7 @@ function installForProvider(cwd: string, provider: InitProvider, metaphor: Metap
         }
       }
       installCodexPluginBundle(cwd);
+      installCodexProjectGuardShim(cwd);
       installDefaultHooks(cwd, 'codex');
       console.log('\n  Codex CLI: Guards installed to .codex/hooks.json');
       console.log('  Codex CLI: AGENTS.md provides project context');

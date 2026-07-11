@@ -1,5 +1,6 @@
 import { writeFileSync, readFileSync, existsSync, unlinkSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { detectActiveHarnessGuardShims } from '../harness-hook-status.js';
 import { loadHooksConfig, saveHooksConfig } from '../hooks-config.js';
 import { getAllGuardDefinitions, loadPluginGuards, loadConfig, detectAdapter, getAdapter, listAdapters, SLOPE_BIN_PREAMBLE, writeOrUpdateManagedScript } from '../../core/index.js';
 import type { AnyGuardDefinition } from '../../core/index.js';
@@ -218,7 +219,17 @@ function listHooks(cwd: string, showAvailable: boolean): void {
 
   const config = loadHooksConfig(cwd);
   const names = Object.keys(config.installed);
+  const activeShims = detectActiveHarnessGuardShims(cwd);
+  const hasRegisteredGuards = names.some(name => name.startsWith('guard-'));
   if (names.length === 0) {
+    if (activeShims.length > 0) {
+      console.log('\nInstalled hooks:\n');
+      for (const shim of activeShims) {
+        console.log(`  active ${shim.provider} ${shim.scope} guard shim  guards: ${shim.guardCount}  config: ${shim.configPath}`);
+      }
+      console.log('\n  Internal .slope/hooks.json registry has no entries; harness shim is active.\n');
+      return;
+    }
     console.log('\nNo hooks installed. Run "slope hook list --available" to see options.\n');
     return;
   }
@@ -227,6 +238,12 @@ function listHooks(cwd: string, showAvailable: boolean): void {
   for (const name of names) {
     const entry = config.installed[name];
     console.log(`  ${name.padEnd(20)} provider: ${entry.provider}  installed: ${entry.installed_at}`);
+  }
+  if (activeShims.length > 0 && !hasRegisteredGuards) {
+    console.log('\nActive harness guard shims:\n');
+    for (const shim of activeShims) {
+      console.log(`  active ${shim.provider} ${shim.scope} guard shim  guards: ${shim.guardCount}  config: ${shim.configPath}`);
+    }
   }
   console.log('');
 }

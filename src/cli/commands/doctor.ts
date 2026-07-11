@@ -4,6 +4,7 @@ import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
 import { detectPlatforms, type InitProvider } from './init.js';
+import { detectActiveHarnessGuardShims } from '../harness-hook-status.js';
 import { GUARD_DEFINITIONS } from '../../core/guard.js';
 import { hasMetaphor } from '../../core/metaphor.js';
 import { detectAdapter, SLOPE_BIN_PREAMBLE, writeOrUpdateManagedScript } from '../../core/harness.js';
@@ -667,8 +668,20 @@ function repairCodexProjectHooksConfig(cwd: string): boolean {
 function checkGuards(cwd: string, originalCwd = cwd): DoctorCheck[] {
   const checks: DoctorCheck[] = [];
   const hooksPath = join(cwd, '.slope', 'hooks.json');
+  const activeShims = detectActiveHarnessGuardShims(cwd);
+  const shimSummary = activeShims
+    .map(shim => `${shim.provider} ${shim.scope} shim (${shim.guardCount} guard command${shim.guardCount === 1 ? '' : 's'} in ${shim.configPath})`)
+    .join('; ');
 
   if (!existsSync(hooksPath)) {
+    if (activeShims.length > 0) {
+      checks.push({
+        name: 'guards',
+        status: 'ok',
+        message: `No internal hook registry found, but active harness guard shim detected: ${shimSummary}`,
+      });
+      return checks;
+    }
     checks.push({
       name: 'guards',
       status: 'warn',
@@ -689,6 +702,14 @@ function checkGuards(cwd: string, originalCwd = cwd): DoctorCheck[] {
     const totalGuards = GUARD_DEFINITIONS.length;
 
     if (installedCount === 0) {
+      if (activeShims.length > 0) {
+        checks.push({
+          name: 'guards',
+          status: 'ok',
+          message: `Internal hook registry has no guard entries, but active harness guard shim detected: ${shimSummary}`,
+        });
+        return checks;
+      }
       checks.push({
         name: 'guards',
         status: 'warn',
