@@ -137,6 +137,30 @@ function writeLinearRoadmap(cwd: string): void {
   }));
 }
 
+function writeCanonicalPostHundredRoadmap(cwd: string): void {
+  writeFileSync(join(cwd, 'docs', 'backlog', 'roadmap.json'), JSON.stringify({
+    name: 'Canonical Post-100 Roadmap',
+    phases: [{ name: 'P1', sprints: [454, 455, 456] }],
+    sprints: [
+      { id: 454, theme: 'Done 454', par: 4, slope: 1, type: 'feature', status: 'complete', tickets: [
+        { key: 'S454-1', title: 'done', club: 'wedge', complexity: 'small' },
+        { key: 'S454-2', title: 'done', club: 'wedge', complexity: 'small' },
+        { key: 'S454-3', title: 'done', club: 'wedge', complexity: 'small' },
+      ] },
+      { id: 455, theme: 'Canonical 455', par: 4, slope: 1, type: 'feature', status: 'planned', tickets: [
+        { key: 'S455-1', title: 'current', club: 'wedge', complexity: 'small' },
+        { key: 'S455-2', title: 'current', club: 'wedge', complexity: 'small' },
+        { key: 'S455-3', title: 'current', club: 'wedge', complexity: 'small' },
+      ] },
+      { id: 456, theme: 'Later 456', par: 4, slope: 1, type: 'feature', status: 'planned', tickets: [
+        { key: 'S456-1', title: 'later', club: 'wedge', complexity: 'small' },
+        { key: 'S456-2', title: 'later', club: 'wedge', complexity: 'small' },
+        { key: 'S456-3', title: 'later', club: 'wedge', complexity: 'small' },
+      ] },
+    ],
+  }));
+}
+
 describe('slope next', () => {
   const repos: string[] = [];
 
@@ -288,6 +312,54 @@ describe('slope next', () => {
     expect(output).toContain('Next sprint: S454');
     expect(output).toContain('Warning: ignoring stale local sprint state S444 (planning)');
     expect(output).not.toContain('Next sprint: S444');
+  });
+
+  it('keeps canonical roadmap S455 distinct from legacy encoded S45.5 (#605)', () => {
+    const cwd = makeRepo();
+    repos.push(cwd);
+    writeScorecard(cwd, 454);
+    writeCanonicalPostHundredRoadmap(cwd);
+    const originalCwd = process.cwd();
+    const logs: string[] = [];
+    vi.spyOn(console, 'log').mockImplementation((msg = '') => logs.push(String(msg)));
+
+    try {
+      process.chdir(cwd);
+      nextCommand();
+    } finally {
+      process.chdir(originalCwd);
+    }
+
+    const output = logs.join('\n');
+    expect(output).toContain('Latest scorecard: S454');
+    expect(output).toContain('Next sprint: S455');
+    expect(output).toContain('selected from pending roadmap sprint: Canonical 455');
+    expect(output).toContain('slope briefing --sprint=455');
+    expect(output).not.toContain('S45.5');
+  });
+
+  it('does not mark active canonical S455 sprint-state stale after S454 scorecard evidence (#605)', () => {
+    const cwd = makeRepo();
+    repos.push(cwd);
+    writeScorecard(cwd, 454);
+    writeCanonicalPostHundredRoadmap(cwd);
+    saveSprintState(cwd, createSprintState(455, 'planning'));
+    const originalCwd = process.cwd();
+    const logs: string[] = [];
+    vi.spyOn(console, 'log').mockImplementation((msg = '') => logs.push(String(msg)));
+
+    try {
+      process.chdir(cwd);
+      nextCommand();
+    } finally {
+      process.chdir(originalCwd);
+    }
+
+    const output = logs.join('\n');
+    expect(output).toContain('Latest scorecard: S454');
+    expect(output).toContain('Next sprint: S455');
+    expect(output).not.toContain('ignoring stale local sprint state');
+    expect(output).not.toContain('S45.5');
   });
 
   it('falls back to the next canonical sprint after a decimal inserted scorecard', () => {
