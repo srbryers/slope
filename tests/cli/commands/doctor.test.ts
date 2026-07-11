@@ -254,6 +254,40 @@ describe('doctor checks', () => {
       expect(codexCheck!.fixable).toBe(true);
     });
 
+    it('treats an active Codex project guard shim as guard coverage', () => {
+      setupSlopeDir(cwd);
+      writeFileSync(join(cwd, '.slope', 'hooks.json'), JSON.stringify({
+        installed: {
+          'session-start': { provider: 'codex', installed_at: '2026-01-01T00:00:00.000Z' },
+          'session-end': { provider: 'codex', installed_at: '2026-01-01T00:00:00.000Z' },
+        },
+      }));
+      const hooksDir = join(cwd, '.codex', 'hooks');
+      mkdirSync(hooksDir, { recursive: true });
+      writeFileSync(join(hooksDir, 'slope-guard.sh'), '#!/usr/bin/env bash\nexit 0\n', { mode: 0o755 });
+      writeFileSync(join(cwd, '.codex', 'hooks.json'), JSON.stringify({
+        hooks: {
+          PreToolUse: [{
+            matcher: 'apply_patch',
+            hooks: [{ type: 'command', command: '"./.codex/hooks/slope-guard.sh" claim-required' }],
+          }],
+          Stop: [{
+            hooks: [{ type: 'command', command: '"./.codex/hooks/slope-guard.sh" stop-check' }],
+          }],
+        },
+      }));
+
+      const checks = runDoctorChecks(cwd);
+      const guardCheck = checks.find(c => c.name === 'guards');
+
+      expect(guardCheck).toBeDefined();
+      expect(guardCheck!.status).toBe('ok');
+      expect(guardCheck!.message).toContain('active harness guard shim');
+      expect(guardCheck!.message).toContain('2 guard commands');
+      expect(guardCheck!.message).not.toContain('No guards active');
+      expect(guardCheck!.fixable).toBeUndefined();
+    });
+
     it('warns when SLOPE Codex hooks are installed at both project and user level', () => {
       setupSlopeDir(cwd);
       const previousCodexHome = process.env.SLOPE_CODEX_HOME;

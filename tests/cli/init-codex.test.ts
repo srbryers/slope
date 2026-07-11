@@ -103,6 +103,15 @@ describe('slope init --codex (GH #309)', () => {
       runSlopeInit(cwd);
       expect(existsSync(join(cwd, '.codex', 'hooks', 'slope-session-start.sh'))).toBe(true);
       expect(existsSync(join(cwd, '.codex', 'hooks', 'slope-session-end.sh'))).toBe(true);
+      expect(existsSync(join(cwd, '.codex', 'hooks', 'slope-guard.sh'))).toBe(true);
+      expect(existsSync(join(cwd, '.codex', 'hooks.json'))).toBe(true);
+
+      const hooks = readJson(join(cwd, '.codex', 'hooks.json'));
+      const hookCommands = Object.values(hooks.hooks).flatMap((groups: any) =>
+        groups.flatMap((group: any) => group.hooks.map((hook: any) => hook.command)),
+      );
+      expect(hookCommands.some((command: string) => command.includes('claim-required'))).toBe(true);
+      expect(hookCommands.some((command: string) => command.includes('stop-check'))).toBe(true);
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }

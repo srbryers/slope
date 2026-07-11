@@ -76,4 +76,51 @@ describe('slope hook add --harness=codex', () => {
     expect(group).toBeDefined();
     expect(group?.matcher?.split('|')).toEqual(expect.arrayContaining(['apply_patch', 'Edit', 'Write']));
   });
+
+  it('lists an active Codex guard shim when the internal registry is empty', async () => {
+    const log = vi.mocked(console.log);
+    mkdirSync(join(cwd, '.codex'), { recursive: true });
+    writeFileSync(join(cwd, '.codex', 'hooks.json'), JSON.stringify({
+      hooks: {
+        PreToolUse: [{
+          matcher: 'apply_patch',
+          hooks: [{ type: 'command', command: '"./.codex/hooks/slope-guard.sh" claim-required' }],
+        }],
+      },
+    }));
+
+    await hookCommand(['list']);
+
+    const output = log.mock.calls.map(call => call.join(' ')).join('\n');
+    expect(output).toContain('active codex project guard shim');
+    expect(output).toContain('Internal .slope/hooks.json registry has no entries; harness shim is active.');
+    expect(output).not.toContain('No hooks installed.');
+  });
+
+  it('lists an active Codex guard shim alongside session-only registry entries', async () => {
+    const log = vi.mocked(console.log);
+    writeFileSync(join(cwd, '.slope', 'hooks.json'), JSON.stringify({
+      installed: {
+        'session-start': { provider: 'codex', installed_at: '2026-01-01T00:00:00.000Z' },
+        'session-end': { provider: 'codex', installed_at: '2026-01-01T00:00:00.000Z' },
+      },
+    }));
+    mkdirSync(join(cwd, '.codex'), { recursive: true });
+    writeFileSync(join(cwd, '.codex', 'hooks.json'), JSON.stringify({
+      hooks: {
+        PreToolUse: [{
+          matcher: 'apply_patch',
+          hooks: [{ type: 'command', command: '"./.codex/hooks/slope-guard.sh" claim-required' }],
+        }],
+      },
+    }));
+
+    await hookCommand(['list']);
+
+    const output = log.mock.calls.map(call => call.join(' ')).join('\n');
+    expect(output).toContain('Installed hooks (2):');
+    expect(output).toContain('session-start');
+    expect(output).toContain('Active harness guard shims:');
+    expect(output).toContain('active codex project guard shim');
+  });
 });
