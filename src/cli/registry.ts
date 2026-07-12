@@ -34,7 +34,7 @@ export interface CliCommandMeta {
 }
 
 /** Command files that are internal implementation modules, not user-invocable top-level commands. */
-export const CLI_INTERNAL_MODULES = ['phase', 'review-state', 'review-run', 'sprint-plan'] as const;
+export const CLI_INTERNAL_MODULES = ['phase', 'review-state', 'review-run', 'review-packet', 'sprint-plan'] as const;
 
 export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
   // ── Lifecycle ──────────────────────────────────────────────────
@@ -230,6 +230,15 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
         { flag: '--type=<type>', desc: 'Review type: architect, code, or both (default: both)' },
         { flag: '--sprint=<N>', desc: 'Sprint number for findings' },
         { flag: '--json', desc: 'Output as JSON for programmatic use' },
+      ]},
+      { name: 'packet', desc: 'Generate bounded review packet evidence', flags: [
+        { flag: '--lane=<lane>', desc: 'Review lane: architect, code, security, ux, or ml-engineer' },
+        { flag: '--sprint=<N>', desc: 'Sprint number' },
+        { flag: '--base=<sha>', desc: 'Base commit for full review packet' },
+        { flag: '--head=<sha>', desc: 'Head commit for review packet' },
+        { flag: '--rereview-from=<sha>', desc: 'Create a delta-only re-review packet from this reviewed commit' },
+        { flag: '--budget-tier=<tier>', desc: 'focused, standard, deep, or exceptional' },
+        { flag: '--exclude-path=<glob>', desc: 'Exclude changed paths from the packet (repeatable)' },
       ]},
     ],
     flags: [
@@ -545,6 +554,12 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
         { flag: '--source=<file>', desc: 'Project manifest (default: docs/roadmap/project.yaml)' },
         { flag: '--dry-run', desc: 'Preview projection changes without writing' },
         { flag: '--check', desc: 'Fail when the compatibility projection has drifted' },
+      ]},
+      { name: 'complete', desc: 'Mark a modular source sprint complete and compile projection', flags: [
+        { flag: '--sprint=<N>', desc: 'Sprint number (required)' },
+        { flag: '--source=<file>', desc: 'Project manifest (default: docs/roadmap/project.yaml)' },
+        { flag: '--scorecard=<path>', desc: 'Override scorecard path recorded in source YAML' },
+        { flag: '--dry-run', desc: 'Preview source/projection changes without writing' },
       ]},
       { name: 'validate-sources', desc: 'Validate modular sources, archive evidence, and projection drift', flags: [
         { flag: '--source=<file>', desc: 'Project manifest (default: docs/roadmap/project.yaml)' },

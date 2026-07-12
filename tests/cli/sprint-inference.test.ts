@@ -88,4 +88,37 @@ describe('inferSprintContext', () => {
     });
     expect(context.staleConfigSprint).toMatchObject({ sprint: 18 });
   });
+
+  it('prefers a ready focused successor over older pending backlog after the latest scorecard (#610)', () => {
+    writeFileSync(join(tmpDir, '.slope', 'config.json'), JSON.stringify({
+      scorecardDir: 'docs/retros',
+      scorecardPattern: 'sprint-*.json',
+      roadmapPath: 'docs/backlog/roadmap.json',
+    }));
+    mkdirSync(join(tmpDir, 'docs', 'retros'), { recursive: true });
+    mkdirSync(join(tmpDir, 'docs', 'backlog'), { recursive: true });
+    writeFileSync(join(tmpDir, 'docs', 'retros', 'sprint-455.json'), JSON.stringify({
+      sprint_number: 455,
+      theme: 'Merged feature',
+      par: 3,
+      slope: 1,
+      score: 3,
+      shots: [],
+    }));
+    writeFileSync(join(tmpDir, 'docs', 'backlog', 'roadmap.json'), JSON.stringify({
+      name: 'Focused roadmap',
+      phases: [{ name: 'Old backlog', sprints: [115] }, { name: 'Current phase', sprints: [455, 456] }],
+      sprints: [
+        { id: 115, theme: 'Historical backlog', par: 3, slope: 1, type: 'feature', status: 'planned', tickets: [] },
+        { id: 455, theme: 'Merged feature', par: 3, slope: 1, type: 'feature', status: 'complete', tickets: [] },
+        { id: 456, theme: 'Ready successor', par: 3, slope: 1, type: 'feature', status: 'planned', depends_on: [455], tickets: [] },
+      ],
+    }));
+
+    const context = inferSprintContext(tmpDir);
+
+    expect(context.sprint).toBe(456);
+    expect(context.source).toBe('roadmap');
+    expect(context.roadmapSprint?.theme).toBe('Ready successor');
+  });
 });

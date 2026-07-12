@@ -12,6 +12,7 @@ export type ReviewGateName = Extract<GateName, 'code_review' | 'architect_review
 export type ReviewGateProvenance = 'pending' | 'self_review' | 'independent_review' | 'independent_review_waived' | 'manual_override' | 'pr_review';
 export type ReviewGateCompletionProvenance = Exclude<ReviewGateProvenance, 'pending'>;
 export type ReviewGatePriority = 'required' | 'recommended' | 'optional' | 'unspecified';
+export type ReviewGateVerdict = 'pass' | 'changes_requested' | 'blocked';
 
 export interface ReviewGateRequirement {
   priority: ReviewGatePriority;
@@ -32,6 +33,12 @@ export interface ReviewGateState {
   evidence: string[];
   reviewer?: string;
   notes?: string;
+  verdict?: ReviewGateVerdict;
+  packet?: string;
+  reviewed_commit?: string;
+  token_budget?: string;
+  tokens_used?: number;
+  over_budget_reason?: string;
   updated_at?: string;
 }
 
@@ -40,6 +47,12 @@ export interface ReviewGateCompletionInput {
   evidence?: string[];
   reviewer?: string;
   notes?: string;
+  verdict?: ReviewGateVerdict;
+  packet?: string;
+  reviewed_commit?: string;
+  token_budget?: string;
+  tokens_used?: number;
+  over_budget_reason?: string;
 }
 
 export interface UpdateGateOptions {
@@ -142,6 +155,12 @@ function normalizeReviewGateState(raw: unknown): ReviewGateState {
     evidence: Array.isArray(obj.evidence) ? obj.evidence.filter((item): item is string => typeof item === 'string') : [],
     ...(typeof obj.reviewer === 'string' ? { reviewer: obj.reviewer } : {}),
     ...(typeof obj.notes === 'string' ? { notes: obj.notes } : {}),
+    ...(isReviewGateVerdict(obj.verdict) ? { verdict: obj.verdict } : {}),
+    ...(typeof obj.packet === 'string' ? { packet: obj.packet } : {}),
+    ...(typeof obj.reviewed_commit === 'string' ? { reviewed_commit: obj.reviewed_commit } : {}),
+    ...(typeof obj.token_budget === 'string' ? { token_budget: obj.token_budget } : {}),
+    ...(typeof obj.tokens_used === 'number' && Number.isFinite(obj.tokens_used) ? { tokens_used: obj.tokens_used } : {}),
+    ...(typeof obj.over_budget_reason === 'string' ? { over_budget_reason: obj.over_budget_reason } : {}),
     ...(typeof obj.updated_at === 'string' ? { updated_at: obj.updated_at } : {}),
   };
 }
@@ -184,6 +203,10 @@ function cleanEvidence(evidence: string[] | undefined): string[] {
   return (evidence ?? []).map(item => item.trim()).filter(Boolean);
 }
 
+export function isReviewGateVerdict(value: unknown): value is ReviewGateVerdict {
+  return value === 'pass' || value === 'changes_requested' || value === 'blocked';
+}
+
 export function validateReviewGateCompletion(input: ReviewGateCompletionInput | undefined): string | null {
   if (!input) {
     return 'review gate requires explicit independent-review evidence, PR review evidence, or weaker-mode override';
@@ -197,9 +220,13 @@ export function validateReviewGateCompletion(input: ReviewGateCompletionInput | 
     case 'independent_review':
       if (!reviewer) return 'independent review gates require --reviewer=<agent-or-person>';
       if (evidence.length === 0) return 'independent review gates require --evidence=<transcript-or-output>';
+      if (input.verdict === 'changes_requested') return 'review gate evidence verdict is changes_requested; record a PASS re-review or use an explicit waiver/override';
+      if (input.verdict === 'blocked') return 'review gate evidence verdict is blocked; resolve the blocker or use an explicit waiver/override';
       return null;
     case 'pr_review':
       if (evidence.length === 0) return 'PR review gates require --pr-review=<url-or-id>';
+      if (input.verdict === 'changes_requested') return 'PR review evidence verdict is changes_requested; record a resolved PASS review or use an explicit waiver/override';
+      if (input.verdict === 'blocked') return 'PR review evidence verdict is blocked; resolve the blocker or use an explicit waiver/override';
       return null;
     case 'self_review':
       if (!notes) return 'self-review gates require --reason=<why-self-review-is-acceptable>';
@@ -223,6 +250,12 @@ function createReviewGateCompletionState(input: ReviewGateCompletionInput | unde
     evidence: cleanEvidence(input.evidence),
     ...(reviewer ? { reviewer } : {}),
     ...(notes ? { notes } : {}),
+    ...(input.verdict ? { verdict: input.verdict } : {}),
+    ...(input.packet?.trim() ? { packet: input.packet.trim() } : {}),
+    ...(input.reviewed_commit?.trim() ? { reviewed_commit: input.reviewed_commit.trim() } : {}),
+    ...(input.token_budget?.trim() ? { token_budget: input.token_budget.trim() } : {}),
+    ...(typeof input.tokens_used === 'number' && Number.isFinite(input.tokens_used) ? { tokens_used: input.tokens_used } : {}),
+    ...(input.over_budget_reason?.trim() ? { over_budget_reason: input.over_budget_reason.trim() } : {}),
     updated_at: new Date().toISOString(),
   };
 }
@@ -236,6 +269,7 @@ export function isReviewGateSatisfied(state: SprintState, gate: ReviewGateName):
     evidence: review.evidence,
     reviewer: review.reviewer,
     notes: review.notes,
+    verdict: review.verdict,
   }) === null;
 }
 
@@ -301,6 +335,12 @@ export function isValidSprintStateEvidence(value: unknown): value is SprintState
         || !REVIEW_GATE_PROVENANCES.includes(review.provenance)
         || !Array.isArray(review.evidence) || review.evidence.some(item => typeof item !== 'string')
         || !validOptionalString(review.reviewer) || !validOptionalString(review.notes)
+        || (review.verdict !== undefined && !isReviewGateVerdict(review.verdict))
+        || !validOptionalString(review.packet)
+        || !validOptionalString(review.reviewed_commit)
+        || !validOptionalString(review.token_budget)
+        || (review.tokens_used !== undefined && (typeof review.tokens_used !== 'number' || !Number.isFinite(review.tokens_used)))
+        || !validOptionalString(review.over_budget_reason)
         || (review.updated_at !== undefined && !validEvidenceTimestamp(review.updated_at))) return false;
     }
   }

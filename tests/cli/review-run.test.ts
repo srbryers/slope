@@ -1,4 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
+import { execSync } from 'node:child_process';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   collectReviewDiff,
   formatReviewDiffError,
@@ -11,6 +15,7 @@ import {
   type ReviewGhRunner,
 } from '../../src/cli/review-diff.js';
 import { parseReviewRunArgs, reviewRunInternals } from '../../src/cli/commands/review-run.js';
+import { buildReviewPacket } from '../../src/cli/commands/review-packet.js';
 
 function result(overrides: Partial<BoundedProcessResult> = {}): BoundedProcessResult {
   return {
@@ -145,6 +150,53 @@ describe('bounded review diff transport (GH #590)', () => {
     expect(Buffer.byteLength(prefix, 'utf8')).toBeLessThanOrEqual(budget);
     expect(prefix).not.toContain('\uFFFD');
     expect(Buffer.byteLength(prefix + nextCodePoint, 'utf8')).toBeGreaterThan(budget);
+  });
+});
+
+describe('review packet generation (#609)', () => {
+  it('builds bounded delta re-review packet metadata and honors excluded paths', () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'slope-review-packet-'));
+    try {
+      mkdirSync(join(cwd, '.slope'), { recursive: true });
+      writeFileSync(join(cwd, '.slope', 'config.json'), JSON.stringify({
+        scorecardDir: 'docs/retros',
+        scorecardPattern: 'sprint-*.json',
+      }));
+      execSync('git init -q', { cwd });
+      execSync('git config user.email t@t', { cwd });
+      execSync('git config user.name t', { cwd });
+      writeFileSync(join(cwd, 'src.ts'), 'one\n');
+      execSync('git add . && git commit -q -m initial', { cwd });
+      const base = execSync('git rev-parse HEAD', { cwd, encoding: 'utf8' }).trim();
+      mkdirSync(join(cwd, 'docs', 'archive'), { recursive: true });
+      writeFileSync(join(cwd, 'src.ts'), 'two\n');
+      writeFileSync(join(cwd, 'docs', 'archive', 'generated.txt'), 'generated\n');
+      execSync('git add . && git commit -q -m changes', { cwd });
+      const head = execSync('git rev-parse HEAD', { cwd, encoding: 'utf8' }).trim();
+
+      const packet = buildReviewPacket(cwd, {
+        sprint: 455,
+        lane: 'architect',
+        head,
+        rereviewFrom: base,
+        budgetTier: 'focused',
+        exclude: [],
+        json: true,
+      } as any);
+
+      expect(packet).toMatchObject({
+        schema: 'slope.review_packet.v1',
+        sprint: 455,
+        lane: 'architect',
+        mode: 'delta_rereview',
+      });
+      expect(packet.included_paths).toContain('src.ts');
+      expect(packet.excluded_paths).toContain('docs/archive/generated.txt');
+      expect(packet.budget).toMatchObject({ tier: 'focused', tokens: 8000 });
+      expect(packet.packet_hash).toMatch(/^[a-f0-9]{64}$/);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
   });
 });
 

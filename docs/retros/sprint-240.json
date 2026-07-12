@@ -1,0 +1,91 @@
+{
+  "sprint_number": 240,
+  "theme": "Open issue architecture triage and review packets",
+  "par": 5,
+  "slope": 2,
+  "score": 5,
+  "score_label": "par",
+  "date": "2026-07-12",
+  "shots": [
+    {
+      "ticket_key": "#604",
+      "title": "Review gates accept CHANGES_REQUESTED evidence without resolved verdict",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Added verdict metadata and rejection for changes_requested/blocked independent and PR review evidence."
+    },
+    {
+      "ticket_key": "#608",
+      "title": "slope init --codex appends non-portable hooks and duplicate CODEBASE frontmatter",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Project Codex hooks now use repo-relative commands; map metadata replacement consumes stacked leading YAML blocks."
+    },
+    {
+      "ticket_key": "#609",
+      "title": "Add token-budgeted review packets and delta-only re-reviews",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Added slope review packet with full/delta modes, budget tiers, excluded paths, packet hash, and gate evidence linkage."
+    },
+    {
+      "ticket_key": "#610",
+      "title": "slope next ignores ready focused successor and merged latest scorecard",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Next-sprint inference now prefers ready successors after latest scorecard/topology before historical backlog."
+    },
+    {
+      "ticket_key": "#611",
+      "title": "post-merge retro leaves sprint status at ready_for_pr with stale next action",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [],
+      "notes": "post-merge retro now reconciles matching local sprint state to complete."
+    },
+    {
+      "ticket_key": "#612",
+      "title": "scorecard validation does not reconcile canonical modular roadmap status",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Added modular roadmap complete command and validate-time source reconciliation guidance."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 6,
+    "fairways_total": 6,
+    "greens_in_regulation": 6,
+    "greens_total": 6,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [],
+  "special_plays": [],
+  "bunker_locations": [
+    "Large open-issue batches can hide feature-sized work among fix tickets; triage feature scope before implementation."
+  ],
+  "yardage_book_updates": [
+    "Review gate evidence should carry verdict metadata and packets should be bounded before reviewers run.",
+    "For modular roadmaps, use slope roadmap complete --sprint=N rather than editing generated roadmap.json."
+  ],
+  "course_management_notes": [
+    "Implemented #609 as a minimal compatible packet generator instead of a full reviewer orchestration system."
+  ],
+  "slope_factors": [
+    "multi_package",
+    "new_area"
+  ]
+}

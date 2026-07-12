@@ -32,6 +32,7 @@ import type {
   RoadmapSprint,
 } from '../../core/index.js';
 import { loadConfig } from '../config.js';
+import { updateSprintPhaseForSprint } from '../sprint-state.js';
 
 interface BackfillOptions {
   sprint?: number;
@@ -525,6 +526,7 @@ async function postMergeSubcommand(args: string[]): Promise<void> {
 
   if (!opts.dryRun) {
     writePostMergeRetro(cwd, record);
+    updateSprintPhaseForSprint(cwd, retro.sprint, 'complete');
   }
 
   const payload = {
@@ -545,6 +547,7 @@ async function postMergeSubcommand(args: string[]): Promise<void> {
     console.log(`\n${target}: wrote ${path}`);
   }
   console.log(`  Outcome: ${retro.outcome}`);
+  if (!opts.dryRun) console.log('  Sprint state: reconciled to complete when local state matched this sprint');
   console.log(`  Memories: ${record.memory.added.length} added, ${record.memory.skipped} skipped, ${record.memory.planned} planned`);
   if (retro.followUps.length > 0) {
     console.log(`  Follow-ups: ${retro.followUps.length}`);

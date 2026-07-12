@@ -1,5 +1,5 @@
-import { readFileSync } from 'node:fs';
-import { isAbsolute, join } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
+import { isAbsolute, join, relative } from 'node:path';
 import {
   DEFAULT_SKILLS_PATH,
   discoverScorecardFiles,
@@ -11,6 +11,7 @@ import {
 } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { updateGate } from '../sprint-state.js';
+import { completeRoadmapSourceSprint } from '../roadmap-source-store.js';
 
 export function validateCommand(input?: string | string[]): void {
   const args = Array.isArray(input) ? input : input ? [input] : [];
@@ -58,6 +59,7 @@ export function validateCommand(input?: string | string[]): void {
   }
 
   let allValid = true;
+  const validScorecards: Array<{ sprint: number; path: string }> = [];
 
   for (const file of files) {
     let raw: any;
@@ -76,11 +78,13 @@ export function validateCommand(input?: string | string[]): void {
 
     if (result.valid && result.warnings.length === 0) {
       console.log(`\u2713 ${sprintLabel}: Valid (no errors, no warnings)`);
+      if (typeof card.sprint_number === 'number') validScorecards.push({ sprint: card.sprint_number, path: file });
     } else if (result.valid) {
       console.log(`\u2713 ${sprintLabel}: Valid (${result.warnings.length} warning${result.warnings.length === 1 ? '' : 's'})`);
       for (const w of result.warnings) {
         console.log(`  \u26A0 [${w.code}] ${w.message}`);
       }
+      if (typeof card.sprint_number === 'number') validScorecards.push({ sprint: card.sprint_number, path: file });
     } else {
       console.log(`\u2717 ${sprintLabel}: INVALID (${result.errors.length} error${result.errors.length === 1 ? '' : 's'}, ${result.warnings.length} warning${result.warnings.length === 1 ? '' : 's'})`);
       for (const e of result.errors) {
@@ -98,9 +102,25 @@ export function validateCommand(input?: string | string[]): void {
   // Mark scorecard gate complete on successful validation
   if (allValid && registryAvailable) {
     updateGate(cwd, 'scorecard', true);
+    reconcileModularRoadmapSources(cwd, validScorecards);
   }
 
   process.exit(allValid && registryAvailable ? 0 : 1);
+}
+
+function reconcileModularRoadmapSources(cwd: string, scorecards: Array<{ sprint: number; path: string }>): void {
+  if (!existsSync(join(cwd, 'docs', 'roadmap', 'project.yaml'))) return;
+  for (const scorecard of scorecards) {
+    try {
+      const result = completeRoadmapSourceSprint(cwd, scorecard.sprint, {
+        scorecardPath: relative(cwd, scorecard.path).replace(/\\/g, '/'),
+      });
+      console.log(`  Roadmap source reconciled: S${scorecard.sprint} -> complete (${result.source}; projection ${result.projection})`);
+    } catch (error) {
+      console.log(`  \u26A0 Roadmap source not reconciled for S${scorecard.sprint}: ${(error as Error).message}`);
+      console.log(`    Run: slope roadmap complete --sprint=${scorecard.sprint}`);
+    }
+  }
 }
 
 function parseRequestedSprint(args: string[], sprintArgIndex: number): number | null {

@@ -206,6 +206,40 @@ describe('slope map in a non-SLOPE repo (#351)', () => {
     }
   });
 
+  it('replaces stacked leading YAML metadata blocks instead of prepending duplicates (#608)', () => {
+    const cwd = setupNonSlopeRepo({ name: 'frontmatter-tool' });
+    try {
+      writeFileSync(join(cwd, 'CODEBASE.md'), [
+        '---',
+        'generated_at: "old"',
+        'git_sha: "abc"',
+        'sprint: 1',
+        'source_files: 0',
+        'test_files: 0',
+        'flows: 0',
+        '---',
+        '---',
+        'generated_at: "older"',
+        'git_sha: "def"',
+        'sprint: 0',
+        'source_files: 0',
+        'test_files: 0',
+        'flows: 0',
+        '---',
+        '# Useful existing map',
+        '',
+      ].join('\n'));
+
+      runSlopeMap(cwd);
+      const refreshed = readFileSync(join(cwd, 'CODEBASE.md'), 'utf8');
+      expect(refreshed.match(/^---$/gm)).toHaveLength(2);
+      expect(refreshed).toContain('# Useful existing map');
+      expect(refreshed).not.toContain('older');
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
   it('uses an ancestry-path git distance so sibling worktree bases do not inflate --check (#505)', () => {
     const cwd = setupNonSlopeRepo({ name: 'worktree-map-tool' });
     try {

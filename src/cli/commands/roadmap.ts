@@ -9,6 +9,7 @@ import {
   computeCriticalPath,
   findParallelOpportunities,
   formatSprintLabel,
+  formatSprintNumber,
   formatRoadmapSummary,
   formatStrategicContext,
   buildRoadmapFocus,
@@ -49,6 +50,7 @@ import {
   validateRoadmapSourceStore,
   writeRoadmapSourceProjection,
   roadmapProjectionMatches,
+  completeRoadmapSourceSprint,
 } from '../roadmap-source-store.js';
 import {
   applyRoadmapSourceMigration,
@@ -529,6 +531,53 @@ function compileSourcesSubcommand(flags: Record<string, string>, cwd: string): v
     const result = writeRoadmapSourceProjection(store);
     console.log(`\nRoadmap projection ${result}: ${output}`);
     console.log(`  Sources: ${store.sources.length}; phases: ${store.roadmap.phases.length}; sprints: ${store.roadmap.sprints.length}\n`);
+  } catch (error) {
+    console.error(`\n${(error as Error).message}\n`);
+    process.exit(1);
+  }
+}
+
+function completeSourcesSubcommand(flags: Record<string, string>, cwd: string): void {
+  if (!Object.prototype.hasOwnProperty.call(flags, 'sprint') || flags.sprint === 'true') {
+    console.error('\nMissing required --sprint=N for roadmap complete.');
+    console.error('Usage: slope roadmap complete --sprint=N [--source=<file>] [--scorecard=<path>] [--dry-run]\n');
+    process.exit(1);
+    return;
+  }
+  const sprint = parseSprintNumber(flags.sprint);
+  if (sprint == null) {
+    console.error(`\nInvalid sprint number: ${flags.sprint || '(empty)'}`);
+    console.error('Usage: slope roadmap complete --sprint=N [--source=<file>] [--scorecard=<path>] [--dry-run]\n');
+    process.exit(1);
+    return;
+  }
+
+  const config = loadConfig(cwd);
+  const scorecard = flags.scorecard && flags.scorecard !== 'true'
+    ? flags.scorecard
+    : discoverScorecardFiles(config, cwd)
+      .find(file => sprintNumberFromScorecardFile(file, config) === sprint);
+  const scorecardPath = scorecard ? displayPath(cwd, scorecard) : undefined;
+
+  try {
+    const result = completeRoadmapSourceSprint(cwd, sprint, {
+      sourceFlag: flags.source,
+      scorecardPath,
+      dryRun: flags['dry-run'] === 'true',
+    });
+    const label = `S${formatSprintNumber(sprint)}`;
+    if (flags['dry-run'] === 'true') {
+      console.log(`\nRoadmap complete dry run: ${label} in ${result.source}`);
+      console.log(`  Would change source: ${result.changed ? 'yes' : 'no'}`);
+      if (scorecardPath) console.log(`  Scorecard: ${scorecardPath}`);
+      console.log('');
+      return;
+    }
+    console.log(`\nRoadmap source reconciled: ${label}`);
+    console.log(`  Source: ${result.source}`);
+    if (scorecardPath) console.log(`  Scorecard: ${scorecardPath}`);
+    console.log(`  Projection: ${result.projection}`);
+    console.log('');
   } catch (error) {
     console.error(`\n${(error as Error).message}\n`);
     process.exit(1);
@@ -1105,6 +1154,9 @@ export async function roadmapCommand(args: string[]): Promise<void> {
     case 'compile':
       compileSourcesSubcommand(flags, cwd);
       break;
+    case 'complete':
+      completeSourcesSubcommand(flags, cwd);
+      break;
     case 'validate-sources':
       validateSourcesSubcommand(flags, cwd);
       break;
@@ -1136,6 +1188,8 @@ Usage:
   slope roadmap migrate [--path=<file>] [--source=<file>] [--mapping=<file>] [--dry-run]
                                                 Plan or apply single-file federation migration
   slope roadmap compile [--source=<file>] [--dry-run|--check] Compile modular YAML sources
+  slope roadmap complete --sprint=N [--source=<file>] [--scorecard=<path>] [--dry-run]
+                                                Mark a modular source sprint complete and compile projection
   slope roadmap validate-sources [--source=<file>]            Validate sources and projection drift
   slope roadmap archive --through=N [--source=<file>] [--dry-run] Archive whole terminal phases
   slope roadmap show [--path=<file>]         Render summary (critical path, parallel tracks)
