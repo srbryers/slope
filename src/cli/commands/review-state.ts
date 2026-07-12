@@ -883,6 +883,16 @@ Options:
 Patch coverage reports provider-partial, provider-omitted, and locally
 truncated content separately. Quote globs when your shell expands them.`);
       break;
+    case 'packet':
+      console.log(`Usage: slope review packet --lane=<lane> [--sprint=N] [--base=<sha>] --head=<sha>
+                           [--rereview-from=<sha>] [--budget-tier=focused|standard|deep|exceptional]
+                           [--exclude-path=GLOB]... [--out=<path>] [--json]
+
+Generate a bounded, hashable review packet for independent reviewers.
+Use --rereview-from to create a delta-only re-review packet from the last
+reviewed commit to the fix commit. The output path can be cited in
+\`slope sprint gate <review_gate> --packet=<path> --evidence=<review-output> --verdict=pass\`.`);
+      break;
     default:
       console.log(`Usage:
   slope review [scorecard.json | --sprint=N] [--plain] [--metaphor=<name>]
@@ -904,6 +914,7 @@ Subcommands:
   deferred    List deferred findings
   resolve     Mark a deferred finding as resolved
   run         Run a structured review pass
+  packet      Generate bounded review packet evidence
 
 Use \`slope review <subcommand> --help\` for per-subcommand options.`);
   }
@@ -958,8 +969,13 @@ export async function reviewStateCommand(args: string[]): Promise<void> {
       await reviewRunCommand(args.slice(1));
       break;
     }
+    case 'packet': {
+      const { reviewPacketCommand } = await import('./review-packet.js');
+      reviewPacketCommand(args.slice(1));
+      break;
+    }
     default:
-      console.error(`Unknown review subcommand: ${sub}. Use start, round, status, reset, recommend, findings, amend, defer, deferred, resolve, run.`);
+      console.error(`Unknown review subcommand: ${sub}. Use start, round, status, reset, recommend, findings, amend, defer, deferred, resolve, run, packet.`);
       process.exit(1);
   }
 }
