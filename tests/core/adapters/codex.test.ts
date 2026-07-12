@@ -212,11 +212,33 @@ describe('CodexAdapter', () => {
 
       const config = JSON.parse(readFileSync(join(tmpDir, '.codex', 'hooks.json'), 'utf8'));
       expect(config.hooks.PreToolUse).toBeDefined();
+      expect(config.hooks.PreToolUse[0].hooks[0].command).toBe('"./.codex/hooks/slope-guard.sh" hazard');
       const script = readFileSync(join(tmpDir, '.codex', 'hooks', 'slope-guard.sh'), 'utf8');
       expect(script).toContain('#!/usr/bin/env bash');
       expect(script).toContain('exec npx --yes @slope-dev/slope guard "$@"');
       expect(script).not.toContain('SLOPE_BIN="npx --yes @slope-dev/slope"');
       expect(script).not.toContain('\r\n');
+    });
+
+    it('replaces older absolute project Codex hooks with portable managed commands (#608)', () => {
+      const tmpDir = mkdtempSync(join(tmpdir(), 'slope-codex-portable-'));
+      const hooksDir = join(tmpDir, '.codex', 'hooks');
+      mkdirSync(hooksDir, { recursive: true });
+      const absolute = join(hooksDir, 'slope-guard.sh');
+      writeFileSync(join(tmpDir, '.codex', 'hooks.json'), JSON.stringify({
+        hooks: {
+          PreToolUse: [
+            { matcher: 'Bash', hooks: [{ type: 'command', command: `"${absolute}" branch-before-commit` }] },
+          ],
+        },
+      }));
+
+      adapter.installGuards(tmpDir, GUARD_DEFINITIONS.filter(g => g.name === 'branch-before-commit'));
+
+      const config = JSON.parse(readFileSync(join(tmpDir, '.codex', 'hooks.json'), 'utf8'));
+      const commands = config.hooks.PreToolUse.flatMap((group: CodexHookEntry) => group.hooks.map(hook => hook.command));
+      expect(commands).toEqual(['"./.codex/hooks/slope-guard.sh" branch-before-commit']);
+      expect(commands[0]).not.toContain(tmpDir);
     });
 
     it('normalizes CRLF in existing generated dispatchers on reinstall', () => {

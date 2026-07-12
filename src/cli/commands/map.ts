@@ -554,21 +554,22 @@ function replaceAutoSection(content: string, sectionName: string, newContent: st
 }
 
 function updateMetadataBlock(content: string, meta: MapMetadata): string {
-  return content.replace(
-    /^---\n[\s\S]*?\n---/m,
-    [
-      '---',
-      `generated_at: "${meta.generated_at}"`,
-      `git_sha: "${meta.git_sha}"`,
-      `sprint: ${meta.sprint}`,
-      `source_files: ${meta.source_files}`,
-      `test_files: ${meta.test_files}`,
-      `cli_commands: ${meta.cli_commands}`,
-      `guards: ${meta.guards}`,
-      `flows: ${meta.flows}`,
-      '---',
-    ].join('\n'),
-  );
+  const metadata = formatMetadataBlock(meta);
+  const withoutLeadingMetadata = stripLeadingMetadataBlocks(content);
+  return `${metadata}\n\n${withoutLeadingMetadata.replace(/^\s+/, '')}`;
+}
+
+function stripLeadingMetadataBlocks(content: string): string {
+  let remaining = content;
+  while (remaining.startsWith('---\n')) {
+    const end = remaining.indexOf('\n---', 4);
+    if (end === -1) break;
+    const afterEnd = end + '\n---'.length;
+    const nextChar = remaining[afterEnd];
+    if (nextChar != null && nextChar !== '\n' && nextChar !== '\r') break;
+    remaining = remaining.slice(afterEnd).replace(/^\r?\n/, '');
+  }
+  return remaining;
 }
 
 // ── Template for new map ────────────────────────────────────────

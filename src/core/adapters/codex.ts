@@ -159,7 +159,8 @@ export class CodexAdapter implements HarnessAdapter {
     const scriptPath = join(hooksDir, 'slope-guard.sh');
     writeCodexGuardDispatcher(scriptPath, options.scope === 'user');
 
-    const hooksConfig = this.generateHooksConfig(guards, scriptPath);
+    const guardCommandPath = options.scope === 'user' ? scriptPath : './.codex/hooks/slope-guard.sh';
+    const hooksConfig = this.generateHooksConfig(guards, guardCommandPath);
     const configPath = join(rootDir, 'hooks.json');
     writeCodexHooksConfig(configPath, hooksConfig, scriptPath);
   }
@@ -255,12 +256,18 @@ function writeCodexHooksConfig(configPath: string, hooksConfig: CodexHooksFile, 
   for (const [event, entries] of Object.entries(hooksConfig.hooks)) {
     const existingEntries = existing.hooks[event] ?? [];
     const withoutManagedSlope = existingEntries.filter(entry =>
-      !entry.hooks.some(hook => hook.command.includes(scriptPath)),
+      !entry.hooks.some(hook => isManagedCodexHookCommand(hook.command, scriptPath)),
     );
     existing.hooks[event] = [...withoutManagedSlope, ...entries];
   }
 
   writeFileSync(configPath, JSON.stringify(existing, null, 2) + '\n');
+}
+
+function isManagedCodexHookCommand(command: string, scriptPath: string): boolean {
+  return command.includes(scriptPath)
+    || command.includes('./.codex/hooks/slope-guard.sh')
+    || /(?:^|["'\s])\.codex[\\/]hooks[\\/]slope-guard\.sh(?:["'\s]|$)/.test(command);
 }
 
 function isHooksByEvent(value: unknown): value is CodexHooksByEvent {
