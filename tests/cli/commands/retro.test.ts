@@ -6,6 +6,7 @@ import { mkdtempSync } from 'node:fs';
 import { retroCommand } from '../../../src/cli/commands/retro.js';
 import { memoryCommand } from '../../../src/cli/commands/memory.js';
 import { searchMemories } from '../../../src/core/memory.js';
+import { createSprintState, loadSprintState, saveSprintState } from '../../../src/cli/sprint-state.js';
 
 function createTempDir(): string {
   const cwd = mkdtempSync(join(tmpdir(), 'slope-retro-cli-'));
@@ -89,6 +90,35 @@ describe('retro post-merge CLI', () => {
     expect(memories).toHaveLength(4);
     expect(memories.some(m => m.category === 'project' && m.weight === 8 && m.text.includes('auto-retro'))).toBe(true);
     expect(memories.some(m => m.category === 'hazard' && m.text.includes('help flags'))).toBe(true);
+  });
+
+  it('reconciles matching local sprint state to complete after post-merge retro (#611)', async () => {
+    const state = createSprintState(137, 'scoring');
+    state.gates.tests = true;
+    state.gates.code_review = true;
+    state.gates.architect_review = true;
+    state.gates.scorecard = true;
+    state.gates.review_md = true;
+    state.review_gates.code_review = {
+      provenance: 'independent_review',
+      reviewer: 'code-reviewer',
+      evidence: ['review.md'],
+    };
+    state.review_gates.architect_review = {
+      provenance: 'independent_review',
+      reviewer: 'architect-reviewer',
+      evidence: ['review.md'],
+    };
+    saveSprintState(cwd, state);
+
+    await captureLogs(() => retroCommand([
+      'post-merge',
+      '--sprint=137',
+      '--pr=512',
+      '--summary=merged cleanly',
+    ]));
+
+    expect(loadSprintState(cwd)?.phase).toBe('complete');
   });
 
   it('parses non-project category and weight prefixes without persisting prefix text', async () => {

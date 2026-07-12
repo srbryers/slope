@@ -7,6 +7,7 @@ import {
   detectLatestSprint,
   formatSprintLabel,
   formatRoadmapSprintLabel,
+  isRoadmapSprintTerminal,
   isRoadmapSprintPending,
   loadScorecards,
   nextCanonicalSprintId,
@@ -79,7 +80,10 @@ export function inferSprintContext(cwd: string = process.cwd(), config: SlopeCon
   }
 
   const scorecards = loadScorecards(config, cwd);
-  const completedIds = new Set<number>(scorecards.map(card => card.sprint_number));
+  const completedIds = new Set<number>([
+    ...scorecards.map(card => card.sprint_number),
+    ...(roadmap?.sprints.filter(isRoadmapSprintTerminal).map(sprint => sprint.id) ?? []),
+  ]);
   const pendingSprints = roadmap?.sprints
     .filter(sprint => {
       return isRoadmapSprintPending(sprint) && !completedIds.has(sprint.id);
@@ -88,7 +92,7 @@ export function inferSprintContext(cwd: string = process.cwd(), config: SlopeCon
 
   const scorecardNext = latestScorecard > 0 ? nextCanonicalSprintId(latestScorecard) : 1;
   const scorecardFallbackLabel = labelForSprint(scorecardNext, roadmap);
-  const pending = choosePendingSprint(pendingSprints, latestScorecard, scorecardNext, roadmap);
+  const pending = choosePendingSprint(pendingSprints, latestScorecard, scorecardNext, roadmap, completedIds);
 
   if (pending) {
     return {
@@ -165,20 +169,36 @@ function choosePendingSprint(
   latestScorecard: number,
   scorecardNext: number,
   roadmap: RoadmapDefinition | null,
+  completedIds: Set<number>,
 ): RoadmapSprint | undefined {
   if (pendingSprints.length === 0) return undefined;
   if (latestScorecard === 0) return pendingSprints[0];
 
-  const exactNext = pendingSprints.find(sprint => sprint.id === scorecardNext);
+  const exactNext = pendingSprints.find(sprint => sprint.id === scorecardNext && dependenciesAreComplete(sprint, completedIds));
   if (exactNext) return exactNext;
 
   const nextOrder = orderForSprint(scorecardNext, roadmap);
   const insertedRecovery = pendingSprints.find(sprint =>
-    isInsertedSprintId(sprint.id, roadmap) && orderForSprint(sprint.id, roadmap) <= nextOrder,
+    isInsertedSprintId(sprint.id, roadmap)
+    && orderForSprint(sprint.id, roadmap) <= nextOrder
+    && dependenciesAreComplete(sprint, completedIds),
   );
   if (insertedRecovery) return insertedRecovery;
 
+  const latestOrder = orderForSprint(latestScorecard, roadmap);
+  const readySuccessor = pendingSprints.find(sprint =>
+    orderForSprint(sprint.id, roadmap) > latestOrder && dependenciesAreComplete(sprint, completedIds),
+  );
+  if (readySuccessor) return readySuccessor;
+
+  const readyHistorical = pendingSprints.find(sprint => dependenciesAreComplete(sprint, completedIds));
+  if (readyHistorical) return readyHistorical;
+
   return pendingSprints[0];
+}
+
+function dependenciesAreComplete(sprint: RoadmapSprint, completedIds: Set<number>): boolean {
+  return (sprint.depends_on ?? []).every(dep => completedIds.has(dep));
 }
 
 function isInsertedSprintId(id: number, roadmap: RoadmapDefinition | null): boolean {

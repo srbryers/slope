@@ -131,6 +131,21 @@ describe('slope roadmap compile', () => {
     expect(logs.join('\n')).toContain('projection unchanged');
   });
 
+  it('marks the owning modular source sprint complete and recompiles projection (#612)', async () => {
+    const output = writeFixture();
+    mkdirSync(join(cwd, 'docs', 'retros'), { recursive: true });
+    writeFileSync(join(cwd, 'docs', 'retros', 'sprint-9.json'), JSON.stringify({ sprint_number: 9 }));
+
+    await roadmapCommand(['complete', '--sprint=9']);
+
+    const sourceYaml = readFileSync(join(cwd, 'docs', 'roadmap', 'phases', 'phase-02.yaml'), 'utf8');
+    expect(sourceYaml).toContain('status: complete');
+    expect(sourceYaml).toContain('"9": docs/retros/sprint-9.json');
+    const roadmap = JSON.parse(readFileSync(output, 'utf8'));
+    expect(roadmap.sprints.find((s: any) => s.id === 9).status).toBe('complete');
+    expect(logs.join('\n')).toContain('Roadmap source reconciled: S9');
+  });
+
   it('detects projection drift in check mode without writing', async () => {
     const output = writeFixture();
     mkdirSync(join(cwd, 'docs', 'backlog'), { recursive: true });

@@ -476,7 +476,7 @@ function handleValidateSuccess(input: HookInput, cwd: string): GuardResult {
 
   if (existsSync(join(cwd, 'docs', 'roadmap', 'project.yaml'))) {
     return {
-      context: 'SLOPE: Scorecard validated. Modular roadmap sources are authoritative — update the source YAML status and run `slope roadmap compile`.',
+      context: `SLOPE: Scorecard validated. Modular roadmap sources are authoritative - reconcile with \`slope roadmap complete --sprint=${state.sprint}\` if validate did not already update the source.`,
     };
   }
 
