@@ -17,6 +17,7 @@ import {
   pendingGates,
   isSprintPhase,
   isReviewGateName,
+  isReviewGateVerdict,
   validateReviewGateCompletion,
   SPRINT_PHASES,
   type GateName,
@@ -160,6 +161,12 @@ function parseGateOptions(args: string[]): ParsedGateOptions {
   let notes: string | undefined;
   let reason: string | undefined;
   let overrideReason: string | undefined;
+  let verdict: ReviewGateCompletionInput['verdict'] | undefined;
+  let packet: string | undefined;
+  let reviewedCommit: string | undefined;
+  let tokenBudget: string | undefined;
+  let tokensUsed: number | undefined;
+  let overBudgetReason: string | undefined;
   let help = false;
 
   for (let i = 0; i < args.length; i++) {
@@ -190,6 +197,61 @@ function parseGateOptions(args: string[]): ParsedGateOptions {
       if (!prReviewValue.value || prReviewValue.value.startsWith('--')) errors.push('--pr-review requires a value');
       else prReview = prReviewValue.value;
       i = prReviewValue.next;
+      continue;
+    }
+
+    const verdictValue = optionValue(args, i, '--verdict');
+    if (verdictValue) {
+      const normalized = verdictValue.value?.trim().toLowerCase().replace(/[\s-]+/g, '_');
+      if (!normalized || normalized.startsWith('--')) errors.push('--verdict requires pass, changes_requested, or blocked');
+      else if (!isReviewGateVerdict(normalized)) errors.push('--verdict must be pass, changes_requested, or blocked');
+      else verdict = normalized;
+      i = verdictValue.next;
+      continue;
+    }
+
+    const packetValue = optionValue(args, i, '--packet');
+    if (packetValue) {
+      if (!packetValue.value || packetValue.value.startsWith('--')) errors.push('--packet requires a value');
+      else packet = packetValue.value;
+      i = packetValue.next;
+      continue;
+    }
+
+    const reviewedCommitValue = optionValue(args, i, '--reviewed-commit') ?? optionValue(args, i, '--head');
+    if (reviewedCommitValue) {
+      if (!reviewedCommitValue.value || reviewedCommitValue.value.startsWith('--')) errors.push('--reviewed-commit requires a value');
+      else reviewedCommit = reviewedCommitValue.value;
+      i = reviewedCommitValue.next;
+      continue;
+    }
+
+    const tokenBudgetValue = optionValue(args, i, '--token-budget');
+    if (tokenBudgetValue) {
+      if (!tokenBudgetValue.value || tokenBudgetValue.value.startsWith('--')) errors.push('--token-budget requires a value');
+      else tokenBudget = tokenBudgetValue.value;
+      i = tokenBudgetValue.next;
+      continue;
+    }
+
+    const tokensUsedValue = optionValue(args, i, '--tokens-used');
+    if (tokensUsedValue) {
+      if (!tokensUsedValue.value || tokensUsedValue.value.startsWith('--')) {
+        errors.push('--tokens-used requires a numeric value');
+      } else {
+        const parsed = Number(tokensUsedValue.value);
+        if (!Number.isFinite(parsed) || parsed < 0) errors.push('--tokens-used must be a non-negative number');
+        else tokensUsed = parsed;
+      }
+      i = tokensUsedValue.next;
+      continue;
+    }
+
+    const overBudgetValue = optionValue(args, i, '--over-budget-reason');
+    if (overBudgetValue) {
+      if (!overBudgetValue.value || overBudgetValue.value.startsWith('--')) errors.push('--over-budget-reason requires a value');
+      else overBudgetReason = overBudgetValue.value;
+      i = overBudgetValue.next;
       continue;
     }
 
@@ -241,6 +303,8 @@ function parseGateOptions(args: string[]): ParsedGateOptions {
     errors.push('Use only one review provenance mode: --reviewer/--evidence, --pr-review, --self-review, --waive-independent-review, or --override.');
   }
 
+  const inferredVerdict = verdict ?? inferVerdictFromEvidence(evidence);
+
   let review: ReviewGateCompletionInput | undefined;
   if (modeCount === 1) {
     if (hasPrReview) {
@@ -254,9 +318,39 @@ function parseGateOptions(args: string[]): ParsedGateOptions {
     } else {
       review = { provenance: 'independent_review', evidence, reviewer, notes: notes ?? reason };
     }
+    review = {
+      ...review,
+      ...(inferredVerdict ? { verdict: inferredVerdict } : {}),
+      ...(packet ? { packet } : {}),
+      ...(reviewedCommit ? { reviewed_commit: reviewedCommit } : {}),
+      ...(tokenBudget ? { token_budget: tokenBudget } : {}),
+      ...(tokensUsed !== undefined ? { tokens_used: tokensUsed } : {}),
+      ...(overBudgetReason ? { over_budget_reason: overBudgetReason } : {}),
+    };
   }
 
   return { review, errors, help };
+}
+
+function inferVerdictFromEvidence(evidence: string[]): ReviewGateCompletionInput['verdict'] | undefined {
+  const verdicts: ReviewGateCompletionInput['verdict'][] = [];
+  for (const item of evidence) {
+    if (/^https?:\/\//i.test(item)) continue;
+    const path = isAbsolute(item) ? item : join(process.cwd(), item);
+    if (!existsSync(path)) continue;
+    try {
+      const content = readFileSync(path, 'utf8');
+      const match = content.match(/^\s*verdict\s*:\s*([A-Za-z _-]+)/im);
+      const value = match?.[1]?.trim().toLowerCase().replace(/[\s-]+/g, '_');
+      if (isReviewGateVerdict(value)) verdicts.push(value);
+    } catch {
+      continue;
+    }
+  }
+  if (verdicts.includes('blocked')) return 'blocked';
+  if (verdicts.includes('changes_requested')) return 'changes_requested';
+  if (verdicts.includes('pass')) return 'pass';
+  return undefined;
 }
 
 function printGateUsage(gateName?: GateName): void {
@@ -266,6 +360,7 @@ function printGateUsage(gateName?: GateName): void {
   console.error('  slope sprint gate <name>');
   console.error(`  slope sprint gate ${gate} --reviewer=<agent-or-person> --evidence=<transcript-or-output>`);
   console.error(`  slope sprint gate ${gate} --pr-review=<url-or-id>`);
+  console.error(`  slope sprint gate ${gate} --reviewer=<id> --evidence=<file> --verdict=pass --packet=<review-packet.json>`);
   console.error(`  slope sprint gate ${gate} --self-review --reason="why self-review is acceptable"`);
   console.error(`  slope sprint gate ${gate} --waive-independent-review --reason="why the required independent review is being waived"`);
   console.error(`  slope sprint gate ${gate} --override="manual override reason"`);
@@ -276,6 +371,7 @@ function printGateUsage(gateName?: GateName): void {
   console.error('  self_review (weaker): requires --self-review and --reason');
   console.error('  independent_review_waived: explicit waiver for a required review; requires --waive-independent-review and --reason');
   console.error('  manual_override (weaker): requires --override');
+  console.error('  verdict metadata: --verdict=pass|changes_requested|blocked; local evidence files with "Verdict:" are parsed automatically');
   console.error('');
 }
 

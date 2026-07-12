@@ -235,6 +235,24 @@ describe('updateGate', () => {
     });
   });
 
+  it('rejects changes-requested review verdicts for independent gates (#604)', () => {
+    saveSprintState(tmpDir, createSprintState(22));
+
+    const result = updateGate(tmpDir, 'architect_review', true, {
+      review: {
+        provenance: 'independent_review',
+        evidence: ['reviews/architect.md'],
+        reviewer: 'architect-reviewer',
+        verdict: 'changes_requested',
+      },
+    });
+
+    const state = loadSprintState(tmpDir)!;
+    expect(result).toBe(false);
+    expect(state.gates.architect_review).toBe(false);
+    expect(state.review_gates.architect_review.provenance).toBe('pending');
+  });
+
   it.each([
     ['invalid phase', { phase: 'ready_for_pr' }],
     ['non-positive sprint', { sprint: 0 }],
