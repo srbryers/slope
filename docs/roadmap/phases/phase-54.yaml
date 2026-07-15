@@ -16,7 +16,7 @@ sprints:
     par: 4
     slope: 3
     type: bugfix + data integrity
-    status: planned
+    status: complete
     note: "Fix #618 (decimal identity mismatch mutates adjacent sprints) and #615/#617 (whole-bundle YAML reserialization on a one-field status change). Reconciliation must patch only the owned sprint fields and preserve source formatting."
     tickets:
       - key: S241-1
@@ -25,14 +25,14 @@ sprints:
         complexity: moderate
         github_issue: 618
       - key: S241-2
-        title: Patch sprint status/outcome in modular YAML sources without reserializing the bundle (#615, #617)
+        title: "Patch sprint status/outcome in modular YAML sources without reserializing the bundle (#615, #617)"
         club: driver
         complexity: moderate
         github_issue: 617
         depends_on:
           - S241-1
       - key: S241-3
-        title: Add regression fixtures for pre-existing quote/wrap/indent styles and decimal adjacency (#615, #617, #618)
+        title: "Add regression fixtures for pre-existing quote/wrap/indent styles and decimal adjacency (#615, #617, #618)"
         club: short_iron
         complexity: standard
         github_issue: 615
@@ -144,3 +144,5 @@ sprints:
         github_issue: 608
         depends_on:
           - S245-1
+scorecards:
+  "241": docs/retros/sprint-241.json
