@@ -136,7 +136,8 @@ switch (subcommand) {
       const sprintArg = reviewArgs.find((a: string) => a.startsWith('--sprint='));
       const sprintSelector = sprintArg?.slice('--sprint='.length);
       const path = reviewArgs.find((a: string) => !a.startsWith('--'));
-      reviewCommand(path, plainFlag ? 'plain' : undefined, metaphorVal, outputPath, sprintSelector);
+      const force = reviewArgs.includes('--force');
+      reviewCommand(path, plainFlag ? 'plain' : undefined, metaphorVal, outputPath, sprintSelector, { force });
     }
     break;
   }
