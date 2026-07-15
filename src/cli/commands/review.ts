@@ -106,7 +106,12 @@ export function reviewCommand(
   const card: GolfScorecard = normalizeScorecard(raw);
 
   const reviewMode = mode === 'plain' ? 'plain' : 'technical';
-  const review = formatSprintReview(card, undefined, undefined, reviewMode, metaphor);
+  // Repair at the source so stdout and the written file always match.
+  const rawReview = formatSprintReview(card, undefined, undefined, reviewMode, metaphor);
+  const review = repairMojibake(rawReview);
+  if (review !== rawReview) {
+    console.error('Note: repaired cp1252-mangled character sequences from scorecard data (#616).');
+  }
   console.log('');
   console.log(review);
 
@@ -116,7 +121,7 @@ export function reviewCommand(
     const reviewPath = outputPath
       ? isAbsolute(outputPath) ? outputPath : join(cwd, outputPath)
       : join(dirname(scorecardPath), `sprint-${card.sprint_number}-review.md`);
-    const nextContent = repairMojibake(`${REVIEW_GENERATED_MARKER}\n\n${review}\n`);
+    const nextContent = `${REVIEW_GENERATED_MARKER}\n\n${review}\n`;
     const existing = existsSync(reviewPath) ? readFileSync(reviewPath, 'utf8') : null;
     if (existing != null
       && existing !== nextContent
@@ -126,7 +131,8 @@ export function reviewCommand(
       // richer required sections; silently replacing it destroys work (#616).
       console.error(`\nRefusing to overwrite existing review: ${relative(cwd, reviewPath)}`);
       console.error('It does not carry the slope generation marker, so it may be project-authored.');
-      console.error('Keep it, re-run with --force to replace it, or use --stdout / --output=<path>.');
+      console.error('Keep it (it still satisfies the review_md gate, subject to required sections),');
+      console.error('re-run with --force to replace it, or use --stdout / --output=<path>.');
       reviewOnDisk = existing;
     } else if (existing === nextContent) {
       console.error(`\nReview unchanged: ${relative(cwd, reviewPath)}`);
@@ -143,7 +149,14 @@ export function reviewCommand(
   // active sprint's gate.
   const sprintState = loadSprintState(cwd);
   if (sprintState?.sprint === card.sprint_number) {
-    const requiredSections = config.reviewRequiredSections ?? [];
+    // User-supplied config: tolerate any shape without crashing closeout.
+    const configuredSections = config.reviewRequiredSections;
+    if (configuredSections != null && !Array.isArray(configuredSections)) {
+      console.error('\nIgnoring reviewRequiredSections: expected an array of heading strings.');
+    }
+    const requiredSections = Array.isArray(configuredSections)
+      ? configuredSections.filter((section): section is string => typeof section === 'string' && section.trim() !== '')
+      : [];
     const haystack = reviewOnDisk.toLowerCase();
     const missing = requiredSections.filter(section => !haystack.includes(section.toLowerCase()));
     if (missing.length > 0) {
