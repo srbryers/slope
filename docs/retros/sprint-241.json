@@ -38,6 +38,12 @@
           "severity": "minor",
           "description": "[code review] Fail-hard-instead-of-fallback family: empty/comment-only status lines glued scalars, invariant path-normalization asymmetry broke dot-prefixed scorecard refs, dead blockEnd mutation. All fixed; no corruption paths found by adversarial review.",
           "gotcha_id": "review:code"
+        },
+        {
+          "type": "water",
+          "severity": "minor",
+          "description": "[security review] CodeQL: polynomial-backtracking regexes in the YAML patcher and incomplete regex-metacharacter escaping of scorecards keys. Practical exposure bounded (keys are numeric, input is repo-local YAML); both hardened with linear parsing and full escaping.",
+          "gotcha_id": "review:security"
         }
       ],
       "notes": "New pure text patcher (src/core/roadmap-source-patch.ts) edits only the targeted status line and scorecards entry; a post-patch semantic invariant reparses and refuses to write if anything else changed; flow-style or mixed-EOL documents fall back to the legacy rewrite with an explicit warning."
@@ -58,7 +64,7 @@
     "greens_total": 3,
     "putts": 0,
     "penalties": 0,
-    "hazards_hit": 3,
+    "hazards_hit": 4,
     "hazard_penalties": 0.5,
     "miss_directions": {
       "long": 0,
