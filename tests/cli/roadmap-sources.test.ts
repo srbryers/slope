@@ -590,6 +590,93 @@ sprints:
     expect(store.sources[0].document.scorecards?.['235']).toBe('docs/retros/sprint-23.5.json');
   });
 
+  it('preserves authored formatting end to end — only the status and scorecard lines change (#615, #617)', () => {
+    const root = join(cwd, 'docs', 'roadmap');
+    mkdirSync(join(root, 'phases'), { recursive: true });
+    writeFileSync(join(root, 'project.yaml'), `
+version: 1
+name: Styled Roadmap
+output: ../backlog/roadmap.json
+sources:
+  - path: phases/phase-48.yaml
+    kind: phase
+`);
+    const styled = `version: "1"
+phase:
+  name: 'Phase 48 — Enforcement and Product'
+  status: active
+  sprints: [457, 458]
+  note: >-
+    A deliberately wrapped scalar that a canonical
+    reserializer would reflow onto different lines.
+sprints:
+  - id: 457
+    theme: 'Shipped work'  # trailing comment
+    par: 3
+    slope: 1
+    type: feature
+    status: complete
+    tickets:
+      - {key: S457-1, title: 'Quoted title', club: wedge, complexity: small}
+  - id: 458
+    theme: Enforcement follow-up
+    par: 3
+    slope: 1
+    type: feature
+    status: planned
+    tickets:
+      - key: S458-1
+        title: T1
+        club: wedge
+        complexity: small
+scorecards:
+  "457": docs/retros/sprint-457.json
+`;
+    const phasePath = join(root, 'phases', 'phase-48.yaml');
+    writeFileSync(phasePath, styled);
+
+    const result = completeRoadmapSourceSprint(cwd, 458, { scorecardPath: 'docs/retros/sprint-458.json' });
+
+    expect(result.reformatted).toBeFalsy();
+    const after = readFileSync(phasePath, 'utf8');
+    // The result is byte-for-byte the input with exactly two reconciled edits:
+    // the targeted status line and the appended scorecards entry.
+    const expected = styled
+      .replace('    status: planned\n', '    status: complete\n')
+      .replace(
+        '  "457": docs/retros/sprint-457.json\n',
+        '  "457": docs/retros/sprint-457.json\n  "458": docs/retros/sprint-458.json\n',
+      );
+    expect(after).toBe(expected);
+  });
+
+  it('falls back to a canonical rewrite with a warning for flow-style entries', () => {
+    const root = join(cwd, 'docs', 'roadmap');
+    mkdirSync(join(root, 'phases'), { recursive: true });
+    writeFileSync(join(root, 'project.yaml'), `
+version: 1
+name: Flow Roadmap
+output: ../backlog/roadmap.json
+sources:
+  - path: phases/phase-01.yaml
+    kind: phase
+`);
+    writeFileSync(join(root, 'phases', 'phase-01.yaml'), `version: 1
+phase:
+  name: Phase 1
+  status: active
+  sprints: [7]
+sprints:
+  - {id: 7, theme: T, par: 3, slope: 1, type: feature, status: planned, tickets: [{key: S7-1, title: T1, club: wedge, complexity: small}]}
+`);
+
+    const result = completeRoadmapSourceSprint(cwd, 7, {});
+
+    expect(result.reformatted).toBe(true);
+    const store = loadRoadmapSourceStore(cwd);
+    expect(store.sources[0].document.sprints[0].status).toBe('complete');
+  });
+
   it('refuses to reconcile when a sprint identity is ambiguous across sources', () => {
     const root = join(cwd, 'docs', 'roadmap');
     mkdirSync(join(root, 'phases'), { recursive: true });
