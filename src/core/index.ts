@@ -240,6 +240,8 @@ export type {
   RoadmapSourceValidationIssue,
   RoadmapSourceValidationResult,
 } from './roadmap-sources.js';
+export { patchRoadmapSourceSprintText } from './roadmap-source-patch.js';
+export type { RoadmapSourceSprintTextPatch } from './roadmap-source-patch.js';
 export {
   RoadmapMigrationError,
   ROADMAP_MIGRATION_ABSENT,

@@ -19,6 +19,24 @@ import {
 } from '../core/index.js';
 import { atomicWriteFileSync, withFileLockSync } from './atomic-write.js';
 import { loadConfig } from './config.js';
+import { patchRoadmapSourceSprintText } from '../core/roadmap-source-patch.js';
+
+/** Deterministic JSON with sorted keys, for order-insensitive semantic comparison. */
+function stableJson(value: unknown): string {
+  return JSON.stringify(sortKeysDeep(value));
+}
+
+function sortKeysDeep(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(sortKeysDeep);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([key, entry]) => [key, sortKeysDeep(entry)]),
+    );
+  }
+  return value;
+}
 
 export const DEFAULT_ROADMAP_SOURCE_MANIFEST = 'docs/roadmap/project.yaml';
 
@@ -119,6 +137,8 @@ export interface CompleteRoadmapSourceSprintResult {
   source: string;
   projection: 'written' | 'unchanged';
   changed: boolean;
+  /** True when the source could not be patched surgically and was rewritten in canonical style. */
+  reformatted?: boolean;
 }
 
 interface RoadmapSourceSprintMatch {
@@ -185,20 +205,59 @@ export function completeRoadmapSourceSprint(
 
     const storedId = freshMatch.storedId;
     const scorecardKey = String(storedId);
-    const nextDocument = {
-      version: 1,
-      phase: freshOwner.document.phase,
-      sprints: freshOwner.document.sprints.map(item =>
-        item.id === storedId ? { ...item, status: 'complete' } : item,
-      ),
-      ...(freshOwner.document.scorecards || options.scorecardPath ? {
-        scorecards: {
-          ...(freshOwner.document.scorecards ?? {}),
-          ...(options.scorecardPath ? { [scorecardKey]: normalizeDiagnosticPath(options.scorecardPath) } : {}),
-        },
-      } : {}),
-    };
-    atomicWriteFileSync(freshOwner.absolutePath, stringify(nextDocument));
+    const normalizedScorecard = options.scorecardPath ? normalizeDiagnosticPath(options.scorecardPath) : undefined;
+    const originalText = readFileSync(freshOwner.absolutePath, 'utf8');
+    const patchedText = patchRoadmapSourceSprintText(originalText, storedId, {
+      status: 'complete',
+      ...(normalizedScorecard ? { scorecardKey, scorecardPath: normalizedScorecard } : {}),
+    });
+    let reformatted = false;
+    let nextText: string;
+    if (patchedText != null) {
+      // Refuse a surgical patch that changed anything beyond the targeted
+      // sprint's status and scorecard link — the invariant that makes an
+      // adjacent-sprint mutation (#618) structurally impossible.
+      const reparsed = parseRoadmapSourceDocument(patchedText, freshOwner.absolutePath);
+      const expected = {
+        version: freshOwner.document.version,
+        phase: freshOwner.document.phase,
+        sprints: freshOwner.document.sprints.map(item =>
+          item.id === storedId ? { ...item, status: 'complete' } : item,
+        ),
+        ...(freshOwner.document.scorecards || normalizedScorecard ? {
+          scorecards: {
+            ...(freshOwner.document.scorecards ?? {}),
+            ...(normalizedScorecard ? { [scorecardKey]: normalizedScorecard } : {}),
+          },
+        } : {}),
+      };
+      if (stableJson(reparsed) !== stableJson(expected)) {
+        throw new RoadmapSourceError(
+          `Reconciling Sprint ${formatRoadmapSprintLabel(fresh.roadmap, sprint)} would change more than the targeted sprint entry; refusing to write.`,
+          freshOwner.absolutePath,
+        );
+      }
+      nextText = patchedText;
+    } else {
+      // The document shape prevents a confidently surgical edit (flow-style
+      // entries, mixed EOLs). Fall back to the legacy full rewrite, which
+      // reformats the bundle; post-write federation validation still runs.
+      reformatted = true;
+      nextText = stringify({
+        version: 1,
+        phase: freshOwner.document.phase,
+        sprints: freshOwner.document.sprints.map(item =>
+          item.id === storedId ? { ...item, status: 'complete' } : item,
+        ),
+        ...(freshOwner.document.scorecards || normalizedScorecard ? {
+          scorecards: {
+            ...(freshOwner.document.scorecards ?? {}),
+            ...(normalizedScorecard ? { [scorecardKey]: normalizedScorecard } : {}),
+          },
+        } : {}),
+      });
+    }
+    atomicWriteFileSync(freshOwner.absolutePath, nextText);
     const reloaded = loadRoadmapSourceStore(cwd, options.sourceFlag);
     const validation = validateRoadmapSourceStore(reloaded, { checkProjection: false });
     if (!validation.valid) {
@@ -212,7 +271,7 @@ export function completeRoadmapSourceSprint(
       ? 'unchanged'
       : 'written';
     if (projection === 'written') atomicWriteFileSync(reloaded.outputPath, reloaded.projection);
-    return { source: sourceLabel, projection, changed: true };
+    return { source: sourceLabel, projection, changed: true, reformatted };
   });
 }
 

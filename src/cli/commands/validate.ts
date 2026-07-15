@@ -116,6 +116,9 @@ function reconcileModularRoadmapSources(cwd: string, scorecards: Array<{ sprint:
         scorecardPath: relative(cwd, scorecard.path).replace(/\\/g, '/'),
       });
       console.log(`  Roadmap source reconciled: S${scorecard.sprint} -> complete (${result.source}; projection ${result.projection})`);
+      if (result.reformatted) {
+        console.log(`  ⚠ ${result.source} could not be patched surgically and was rewritten in canonical YAML style.`);
+      }
     } catch (error) {
       console.log(`  \u26A0 Roadmap source not reconciled for S${scorecard.sprint}: ${(error as Error).message}`);
       console.log(`    Run: slope roadmap complete --sprint=${scorecard.sprint}`);
