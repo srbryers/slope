@@ -1,0 +1,90 @@
+{
+  "sprint_number": 241,
+  "theme": "Surgical Roadmap Reconciliation",
+  "par": 4,
+  "slope": 3,
+  "score": 5,
+  "score_label": "bogey",
+  "date": "2026-07-15",
+  "shots": [
+    {
+      "ticket_key": "S241-1",
+      "title": "Match reconciliation targets by exact sprint identity so decimal sprints never mutate neighbours (#618)",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Reconciliation now resolves targets through formatRoadmapSprintLabel (string-exact canonical labels), keeps legacy encoded ids (235 ~ S23.5) working, refuses ambiguous identities across sources, and keys scorecard entries by the stored id used in archive evidence lookups."
+    },
+    {
+      "ticket_key": "S241-2",
+      "title": "Patch sprint status/outcome in modular YAML sources without reserializing the bundle (#615, #617)",
+      "club": "driver",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "moderate",
+          "description": "[architect review] Flow-style scorecards section made the patcher append a duplicate top-level key; nothing was written but the error was a raw YAML parse failure instead of the declared fallback. Fixed: patcher declines flow-style scorecards.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "bunker",
+          "severity": "minor",
+          "description": "[architect review] Invariant reparse errors escaped unclassified instead of triggering fallback; scorecards upsert dropped trailing comments; fallback hardcoded version 1. All fixed in review-fix commit.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "[code review] Fail-hard-instead-of-fallback family: empty/comment-only status lines glued scalars, invariant path-normalization asymmetry broke dot-prefixed scorecard refs, dead blockEnd mutation. All fixed; no corruption paths found by adversarial review.",
+          "gotcha_id": "review:code"
+        },
+        {
+          "type": "water",
+          "severity": "minor",
+          "description": "[security review] CodeQL: polynomial-backtracking regexes in the YAML patcher and incomplete regex-metacharacter escaping of scorecards keys. Practical exposure bounded (keys are numeric, input is repo-local YAML); both hardened with linear parsing and full escaping.",
+          "gotcha_id": "review:security"
+        }
+      ],
+      "notes": "New pure text patcher (src/core/roadmap-source-patch.ts) edits only the targeted status line and scorecards entry; a post-patch semantic invariant reparses and refuses to write if anything else changed; flow-style or mixed-EOL documents fall back to the legacy rewrite with an explicit warning."
+    },
+    {
+      "ticket_key": "S241-3",
+      "title": "Add regression fixtures for pre-existing quote/wrap/indent styles and decimal adjacency (#615, #617, #618)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "End-to-end fixture proves a styled bundle reconciles byte-exactly except the status line and appended scorecards entry; decimal adjacency, legacy encoded ids, ambiguity refusal, CRLF, and fallback paths all covered."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 3,
+    "fairways_total": 3,
+    "greens_in_regulation": 3,
+    "greens_total": 3,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 4,
+    "hazard_penalties": 0.5,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    "Two pre-existing environment-dependent test failures on this machine (doctor guards check, interview alias) reproduce on clean main and are unrelated to this sprint."
+  ],
+  "special_plays": [],
+  "bunker_locations": [
+    "The exact reporter trigger for #618 could not be reproduced locally; the semantic invariant makes the failure class unwritable rather than proving the original mechanism."
+  ],
+  "yardage_book_updates": [
+    "completeRoadmapSourceSprint now patches source text surgically; any tool that edits modular roadmap YAML should go through patchRoadmapSourceSprintText or accept reformat fallback warnings.",
+    "S240 already shipped fixes for #608 and #611 that remain open on GitHub — verify shipped reality before executing S242-3 and S245."
+  ],
+  "course_management_notes": [
+    "Sprint executed on a branch stacked on the Phase 54 triage commits so roadmap, implementation, and scorecard travel in one PR."
+  ]
+}

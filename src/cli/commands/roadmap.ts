@@ -575,6 +575,9 @@ function completeSourcesSubcommand(flags: Record<string, string>, cwd: string): 
     }
     console.log(`\nRoadmap source reconciled: ${label}`);
     console.log(`  Source: ${result.source}`);
+    if (result.reformatted) {
+      console.log('  ⚠ Source could not be patched surgically and was rewritten in canonical YAML style.');
+    }
     if (scorecardPath) console.log(`  Scorecard: ${scorecardPath}`);
     console.log(`  Projection: ${result.projection}`);
     console.log('');
