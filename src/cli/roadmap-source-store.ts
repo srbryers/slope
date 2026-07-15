@@ -5,6 +5,7 @@ import {
   compileRoadmapSources,
   formatRoadmapSprintLabel,
   normalizeDiagnosticPath,
+  normalizeRoadmapSourcePath,
   parseRoadmapSourceDocument,
   parseRoadmapSourceProject,
   parseSprintNumber,
@@ -149,6 +150,21 @@ interface RoadmapSourceSprintMatch {
 }
 
 /**
+ * Normalize a scorecard reference the same way the source parser will, so the
+ * post-patch invariant compares like with like (e.g. `./docs/x.json` becomes
+ * `docs/x.json` on reparse). Paths the parser would reject keep their
+ * diagnostic form; post-write federation validation reports them.
+ */
+function normalizeScorecardRef(path: string): string {
+  const diagnostic = normalizeDiagnosticPath(path);
+  try {
+    return normalizeRoadmapSourcePath(diagnostic, 'scorecard path');
+  } catch {
+    return diagnostic;
+  }
+}
+
+/**
  * Resolve a sprint number to the single source entry that owns it, comparing
  * by canonical sprint label so legacy encoded ids (235 ~ S23.5) still match
  * while decimal neighbours (458.1 vs 458.2) never do. Label comparison is
@@ -188,7 +204,7 @@ export function completeRoadmapSourceSprint(
   const sourceLabel = normalizeDiagnosticPath(relative(cwd, owner.absolutePath ?? owner.entry.path));
   const changed = initialMatch.status !== 'complete'
     || Boolean(options.scorecardPath
-      && owner.document.scorecards?.[String(initialMatch.storedId)] !== normalizeDiagnosticPath(options.scorecardPath));
+      && owner.document.scorecards?.[String(initialMatch.storedId)] !== normalizeScorecardRef(options.scorecardPath));
 
   if (options.dryRun) {
     return { source: sourceLabel, projection: 'unchanged', changed };
@@ -205,7 +221,7 @@ export function completeRoadmapSourceSprint(
 
     const storedId = freshMatch.storedId;
     const scorecardKey = String(storedId);
-    const normalizedScorecard = options.scorecardPath ? normalizeDiagnosticPath(options.scorecardPath) : undefined;
+    const normalizedScorecard = options.scorecardPath ? normalizeScorecardRef(options.scorecardPath) : undefined;
     const originalText = readFileSync(freshOwner.absolutePath, 'utf8');
     const patchedText = patchRoadmapSourceSprintText(originalText, storedId, {
       status: 'complete',

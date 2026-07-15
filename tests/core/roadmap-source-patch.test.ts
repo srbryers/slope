@@ -163,6 +163,28 @@ sprints:
     expect(patched).not.toContain('\n    status: complete\n');
   });
 
+  it('handles empty and comment-only status values without gluing scalars', () => {
+    const base = (statusLine: string) => `version: 1
+phase:
+  name: P
+  sprints: [7]
+sprints:
+  - id: 7
+    theme: T
+    par: 3
+    slope: 1
+    type: feature
+${statusLine}
+    tickets:
+      - {key: S7-1, title: T1, club: wedge, complexity: small}
+`;
+    const emptyValue = patchRoadmapSourceSprintText(base('    status:'), 7, { status: 'complete' });
+    expect(emptyValue).toContain('    status: complete\n');
+
+    const commentOnly = patchRoadmapSourceSprintText(base('    status: # promoted later'), 7, { status: 'complete' });
+    expect(commentOnly).toContain('    status: complete # promoted later\n');
+  });
+
   it('declines a flow-style scorecards section instead of appending a duplicate key', () => {
     const doc = `version: 1
 phase:

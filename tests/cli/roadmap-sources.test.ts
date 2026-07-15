@@ -650,6 +650,17 @@ scorecards:
     expect(after).toBe(expected);
   });
 
+  it('normalizes dot-prefixed scorecard paths the same way the parser will', () => {
+    writeFixture();
+
+    const result = completeRoadmapSourceSprint(cwd, 9, { scorecardPath: './docs/retros/sprint-9.json' });
+
+    expect(result.reformatted).toBeFalsy();
+    const store = loadRoadmapSourceStore(cwd);
+    const owner = store.sources.find(source => source.document.sprints.some(item => item.id === 9));
+    expect(owner?.document.scorecards?.['9']).toBe('docs/retros/sprint-9.json');
+  });
+
   it('falls back to a canonical rewrite with a warning for flow-style entries', () => {
     const root = join(cwd, 'docs', 'roadmap');
     mkdirSync(join(root, 'phases'), { recursive: true });

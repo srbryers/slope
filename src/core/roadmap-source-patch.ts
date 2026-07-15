@@ -117,14 +117,18 @@ function locateSprintEntry(
 
 function patchStatusLine(lines: string[], location: SprintEntryLocation, status: string): void {
   for (let index = location.entryLine + 1; index < location.blockEnd; index++) {
-    const match = new RegExp(`^(${location.propertyIndent}status:\\s*)([^#]*?)(\\s*#.*)?$`).exec(lines[index]);
+    const match = new RegExp(`^(${location.propertyIndent}status:)(\\s*)([^#]*?)(\\s*#.*)?$`).exec(lines[index]);
     if (match) {
-      lines[index] = `${match[1]}${status}${match[3] ?? ''}`;
+      // Guarantee separators so empty values (`status:`) and comment-only
+      // values (`status: # note`) cannot glue into an invalid scalar.
+      const separator = match[2] || ' ';
+      const comment = match[4] ?? '';
+      const commentSeparator = comment && !/^\s/.test(comment) ? ' ' : '';
+      lines[index] = `${match[1]}${separator}${status}${commentSeparator}${comment}`;
       return;
     }
   }
   lines.splice(location.entryLine + 1, 0, `${location.propertyIndent}status: ${status}`);
-  location.blockEnd += 1;
 }
 
 /** Returns false when a scorecards section exists in a shape (flow style)
