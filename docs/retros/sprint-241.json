@@ -3,8 +3,8 @@
   "theme": "Surgical Roadmap Reconciliation",
   "par": 4,
   "slope": 3,
-  "score": 4,
-  "score_label": "par",
+  "score": 5,
+  "score_label": "bogey",
   "date": "2026-07-15",
   "shots": [
     {
@@ -20,7 +20,26 @@
       "title": "Patch sprint status/outcome in modular YAML sources without reserializing the bundle (#615, #617)",
       "club": "driver",
       "result": "green",
-      "hazards": [],
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "moderate",
+          "description": "[architect review] Flow-style scorecards section made the patcher append a duplicate top-level key; nothing was written but the error was a raw YAML parse failure instead of the declared fallback. Fixed: patcher declines flow-style scorecards.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "bunker",
+          "severity": "minor",
+          "description": "[architect review] Invariant reparse errors escaped unclassified instead of triggering fallback; scorecards upsert dropped trailing comments; fallback hardcoded version 1. All fixed in review-fix commit.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "[code review] Fail-hard-instead-of-fallback family: empty/comment-only status lines glued scalars, invariant path-normalization asymmetry broke dot-prefixed scorecard refs, dead blockEnd mutation. All fixed; no corruption paths found by adversarial review.",
+          "gotcha_id": "review:code"
+        }
+      ],
       "notes": "New pure text patcher (src/core/roadmap-source-patch.ts) edits only the targeted status line and scorecards entry; a post-patch semantic invariant reparses and refuses to write if anything else changed; flow-style or mixed-EOL documents fall back to the legacy rewrite with an explicit warning."
     },
     {
@@ -39,8 +58,8 @@
     "greens_total": 3,
     "putts": 0,
     "penalties": 0,
-    "hazards_hit": 0,
-    "hazard_penalties": 0,
+    "hazards_hit": 3,
+    "hazard_penalties": 0.5,
     "miss_directions": {
       "long": 0,
       "short": 0,
@@ -61,10 +80,5 @@
   ],
   "course_management_notes": [
     "Sprint executed on a branch stacked on the Phase 54 triage commits so roadmap, implementation, and scorecard travel in one PR."
-  ],
-  "slope_factors": [
-    "data_integrity",
-    "text_level_patching",
-    "multi_consumer_api"
   ]
 }
