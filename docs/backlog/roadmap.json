@@ -1,6 +1,6 @@
 {
   "name": "SLOPE Development Roadmap",
-  "description": "Forward-looking roadmap from S61+. Phases 1-9 (S1-S47) are complete. S48-S60 were hardening, guard enforcement, and process sprints. This roadmap covers adoption, observability, guard maturity, multi-project, loop evolution, and issue-driven recovery. S61-S64 reflect what actually shipped (themes diverged from original plan). Note: the actual S69 diverged from the planned Referee sprint — a carryover patch kit ran instead. The Referee work was rescheduled as S78. S75.5 (The Bug Clearing) added 2026-05-02 to clear accumulated CLI bugs from external repos. S132-S136 were backfilled from shipped scorecards on 2026-06-05; S137 adds post-merge retro tooling and durable memory, S137.5 addresses Windows suite portability for #509, S138-S144 triage open GitHub issues #499/#501/#502/#503/#505/#507/#510/#511/#512/#513/#514/#515/#516/#517/#518 into focused recovery sprints, S145 closed validation-signal regressions #519/#520, S146 cleaned stale roadmap state plus decimal sprint shipped-artifact warnings (#522), S146.1 cut the v1.58.1 patch release while repairing release-bump staging (#524/#528), active inserted sprint status (#525), and guard test isolation (#526), S146.2 closes the decimal post-merge retro gap (#529), S146.3 scopes workflow-step-gate to the relevant execution (#531), S147 was superseded by later human operating surface work, S148-S151.1 completed the human operating surface simplification and Windows git fixture hardening, S152 published v1.59.0, S152.1 completed roadmap interview discoverability across supported harness surfaces, S153 closed semver recommendation hardening for #550, S154 shipped roadmap/status integrity for #563/#567/#568, S216-S222 execute the open-issue recovery train for #552/#553/#556/#557/#558/#561/#562/#565/#566/#572/#573 plus the v1.60.0 release, S223 closes #575/#576, and S224/S226/S227 plan the July 2026 review, workflow, MCP, roadmap, and review-output recovery batch for #578/#579/#580/#581/#582/#583.",
+  "description": "Forward-looking roadmap from S61+. Phases 1-9 (S1-S47) are complete. S48-S60 were hardening, guard enforcement, and process sprints. This roadmap covers adoption, observability, guard maturity, multi-project, loop evolution, and issue-driven recovery. S61-S64 reflect what actually shipped (themes diverged from original plan). Note: the actual S69 diverged from the planned Referee sprint — a carryover patch kit ran instead. The Referee work was rescheduled as S78. S75.5 (The Bug Clearing) added 2026-05-02 to clear accumulated CLI bugs from external repos. S132-S136 were backfilled from shipped scorecards on 2026-06-05; S137 adds post-merge retro tooling and durable memory, S137.5 addresses Windows suite portability for #509, S138-S144 triage open GitHub issues #499/#501/#502/#503/#505/#507/#510/#511/#512/#513/#514/#515/#516/#517/#518 into focused recovery sprints, S145 closed validation-signal regressions #519/#520, S146 cleaned stale roadmap state plus decimal sprint shipped-artifact warnings (#522), S146.1 cut the v1.58.1 patch release while repairing release-bump staging (#524/#528), active inserted sprint status (#525), and guard test isolation (#526), S146.2 closes the decimal post-merge retro gap (#529), S146.3 scopes workflow-step-gate to the relevant execution (#531), S147 was superseded by later human operating surface work, S148-S151.1 completed the human operating surface simplification and Windows git fixture hardening, S152 published v1.59.0, S152.1 completed roadmap interview discoverability across supported harness surfaces, S153 closed semver recommendation hardening for #550, S154 shipped roadmap/status integrity for #563/#567/#568, S216-S222 execute the open-issue recovery train for #552/#553/#556/#557/#558/#561/#562/#565/#566/#572/#573 plus the v1.60.0 release, S223 closes #575/#576, S224/S226/S227 plan the July 2026 review, workflow, MCP, roadmap, and review-output recovery batch for #578/#579/#580/#581/#582/#583, and S241-S245 (Phase 54) triage the mid-July issue batch #608/#611/#615/#616/#617/#618/#619/#620/#621 into themed recovery sprints.",
   "phases": [
     {
       "name": "Phase 10 — Adoption & Onboarding",
@@ -440,6 +440,19 @@
       ],
       "status": "complete",
       "note": "Issue-driven recovery for #591, #590, and #589. Prioritize the Windows federation unblocker, then review scale, then migration planning/apply safety."
+    },
+    {
+      "name": "Phase 54 — July Issue Recovery",
+      "description": "Triage of the nine open GitHub issues (2026-07-11 to 2026-07-15) into themed recovery sprints. Data-integrity fixes to roadmap reconciliation lead, followed by closeout correctness, stale-state guard scoping, session wrap ergonomics, and init idempotency.",
+      "sprints": [
+        241,
+        242,
+        243,
+        244,
+        245
+      ],
+      "status": "planned",
+      "note": "Issue-driven recovery for #608, #611, #615, #616, #617, #618, #619, #620, #621. Ordered by blast radius: reconciliation corrupts roadmap sources on every closeout, so it goes first."
     }
   ],
   "sprints": [
@@ -5949,6 +5962,193 @@
           "github_issue": 589,
           "depends_on": [
             "S236-3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 241,
+      "theme": "Surgical Roadmap Reconciliation",
+      "par": 4,
+      "slope": 3,
+      "type": "bugfix + data integrity",
+      "status": "planned",
+      "note": "Fix #618 (decimal identity mismatch mutates adjacent sprints) and #615/#617 (whole-bundle YAML reserialization on a one-field status change). Reconciliation must patch only the owned sprint fields and preserve source formatting.",
+      "tickets": [
+        {
+          "key": "S241-1",
+          "title": "Match reconciliation targets by exact sprint identity so decimal sprints never mutate neighbours (#618)",
+          "club": "long_iron",
+          "complexity": "moderate",
+          "github_issue": 618
+        },
+        {
+          "key": "S241-2",
+          "title": "Patch sprint status/outcome in modular YAML sources without reserializing the bundle (#615,",
+          "club": "driver",
+          "complexity": "moderate",
+          "github_issue": 617,
+          "depends_on": [
+            "S241-1"
+          ]
+        },
+        {
+          "key": "S241-3",
+          "title": "Add regression fixtures for pre-existing quote/wrap/indent styles and decimal adjacency (#615,",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 615,
+          "depends_on": [
+            "S241-2"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 242,
+      "theme": "Closeout Integrity",
+      "par": 4,
+      "slope": 2,
+      "type": "bugfix + lifecycle correctness",
+      "status": "planned",
+      "depends_on": [
+        241
+      ],
+      "note": "Fix #616 (slope review silently overwrites a compliant project-authored review and emits mojibake) and #611 (post-merge retro leaves sprint status at ready_for_pr with a stale next action).",
+      "tickets": [
+        {
+          "key": "S242-1",
+          "title": "Refuse to overwrite an existing sprint review without --force and validate required sections before closing review_md (#616)",
+          "club": "long_iron",
+          "complexity": "moderate",
+          "github_issue": 616
+        },
+        {
+          "key": "S242-2",
+          "title": "Emit UTF-8-clean review markdown across platforms (#616)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 616,
+          "depends_on": [
+            "S242-1"
+          ]
+        },
+        {
+          "key": "S242-3",
+          "title": "Reconcile sprint lifecycle to merged state after post-merge retro and correct the next-action text (#611)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 611
+        }
+      ]
+    },
+    {
+      "id": 243,
+      "theme": "Stale State and Guard Scoping",
+      "par": 4,
+      "slope": 4,
+      "type": "bugfix + guard reliability",
+      "status": "planned",
+      "depends_on": [
+        241
+      ],
+      "note": "Fix #621: dangling workflow executions from dead sessions gate a fresh session's edits days later; phase-boundary guard blocks unrelated Bash from a silently stale phase ledger; edit gates apply outside the repo root.",
+      "tickets": [
+        {
+          "key": "S243-1",
+          "title": "Reap or ignore dangling workflow executions from dead sessions in workflow-step-gate and surface them in status/briefing with a clear-command (#621)",
+          "club": "driver",
+          "complexity": "moderate",
+          "github_issue": 621
+        },
+        {
+          "key": "S243-2",
+          "title": "Scope edit and Bash gates to the repo root and exempt non-sprint commands like gh issue create (#621)",
+          "club": "long_iron",
+          "complexity": "moderate",
+          "github_issue": 621,
+          "depends_on": [
+            "S243-1"
+          ]
+        },
+        {
+          "key": "S243-3",
+          "title": "Add phase-ledger staleness heuristic — scorecards far past the boundary downgrade block to warn (#621)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 621,
+          "depends_on": [
+            "S243-2"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 244,
+      "theme": "Session Wrap and Standup Substance",
+      "par": 4,
+      "slope": 2,
+      "type": "feature + agent ergonomics",
+      "status": "planned",
+      "depends_on": [
+        243
+      ],
+      "note": "Fix #619 (standup reports only an event count while richer transcript/scorecard data exists; transcript stats shows negative duration) and #620 (no wrap-session skill; session end demands --session-id even with one active session).",
+      "tickets": [
+        {
+          "key": "S244-1",
+          "title": "Default slope session end to the single active session (#620)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 620
+        },
+        {
+          "key": "S244-2",
+          "title": "Enrich standup with sprint, branch, scorecard state, commits, and claims, and fix negative transcript durations (#619)",
+          "club": "long_iron",
+          "complexity": "moderate",
+          "github_issue": 619
+        },
+        {
+          "key": "S244-3",
+          "title": "Ship a wrap-session skill covering session end, unpushed-work warning, and handoff summary across harness templates (#620)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 620,
+          "depends_on": [
+            "S244-1",
+            "S244-2"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 245,
+      "theme": "Init Idempotency",
+      "par": 3,
+      "slope": 2,
+      "type": "bugfix + cross-platform compatibility",
+      "status": "planned",
+      "depends_on": [
+        242
+      ],
+      "note": "Fix #608: slope init --codex appends a duplicate hook set with absolute worktree paths and prepends duplicate CODEBASE.md frontmatter. Re-running init must be a no-op when nothing changed.",
+      "tickets": [
+        {
+          "key": "S245-1",
+          "title": "Emit repo-relative codex hook commands and merge instead of appending on re-init (#608)",
+          "club": "long_iron",
+          "complexity": "moderate",
+          "github_issue": 608
+        },
+        {
+          "key": "S245-2",
+          "title": "Replace existing generated CODEBASE.md frontmatter atomically instead of duplicating (#608)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 608,
+          "depends_on": [
+            "S245-1"
           ]
         }
       ]
