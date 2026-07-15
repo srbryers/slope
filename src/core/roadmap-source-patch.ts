@@ -115,18 +115,42 @@ function locateSprintEntry(
   return { entryLine, blockEnd, propertyIndent };
 }
 
-function patchStatusLine(lines: string[], location: SprintEntryLocation, status: string): void {
-  for (let index = location.entryLine + 1; index < location.blockEnd; index++) {
-    const match = new RegExp(`^(${location.propertyIndent}status:)(\\s*)([^#]*?)(\\s*#.*)?$`).exec(lines[index]);
-    if (match) {
-      // Guarantee separators so empty values (`status:`) and comment-only
-      // values (`status: # note`) cannot glue into an invalid scalar.
-      const separator = match[2] || ' ';
-      const comment = match[4] ?? '';
-      const commentSeparator = comment && !/^\s/.test(comment) ? ' ' : '';
-      lines[index] = `${match[1]}${separator}${status}${commentSeparator}${comment}`;
-      return;
+/** Split the text after a mapping key into leading whitespace, scalar value,
+ *  and trailing comment (a `#` at the start or preceded by whitespace),
+ *  without regex backtracking. */
+function splitValueAndComment(rest: string): { separator: string; value: string; comment: string } {
+  let commentStart = -1;
+  for (let index = 0; index < rest.length; index++) {
+    if (rest[index] === '#' && (index === 0 || rest[index - 1] === ' ' || rest[index - 1] === '\t')) {
+      commentStart = index;
+      break;
     }
+  }
+  const head = commentStart < 0 ? rest : rest.slice(0, commentStart);
+  let comment = commentStart < 0 ? '' : rest.slice(commentStart);
+  let separatorEnd = 0;
+  while (separatorEnd < head.length && (head[separatorEnd] === ' ' || head[separatorEnd] === '\t')) separatorEnd += 1;
+  const separator = head.slice(0, separatorEnd);
+  let valueEnd = head.length;
+  while (valueEnd > separatorEnd && (head[valueEnd - 1] === ' ' || head[valueEnd - 1] === '\t')) valueEnd -= 1;
+  if (comment) comment = `${head.slice(valueEnd)}${comment}`;
+  return { separator, value: head.slice(separatorEnd, valueEnd), comment };
+}
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function patchStatusLine(lines: string[], location: SprintEntryLocation, status: string): void {
+  const prefix = `${location.propertyIndent}status:`;
+  for (let index = location.entryLine + 1; index < location.blockEnd; index++) {
+    if (!lines[index].startsWith(prefix)) continue;
+    const { separator, comment } = splitValueAndComment(lines[index].slice(prefix.length));
+    // Guarantee separators so empty values (`status:`) and comment-only
+    // values (`status: # note`) cannot glue into an invalid scalar.
+    const commentSeparator = comment && !/^[ \t]/.test(comment) ? ' ' : '';
+    lines[index] = `${prefix}${separator || ' '}${status}${commentSeparator}${comment}`;
+    return;
   }
   lines.splice(location.entryLine + 1, 0, `${location.propertyIndent}status: ${status}`);
 }
@@ -146,19 +170,22 @@ function upsertScorecardEntry(lines: string[], key: string, path: string): boole
     return true;
   }
 
-  const escapedKey = key.replace(/\./g, '\\.');
+  const escapedKey = escapeRegExp(key);
+  const keyPattern = new RegExp(`^([ \\t]+)(['"]?)${escapedKey}\\2:`);
   let entryIndent = '  ';
   let lastEntry = section.start;
   for (let index = section.start + 1; index < section.end; index++) {
-    const entry = /^(\s+)(['"]?)([0-9][0-9.]*)\2:\s*([^#]*?)(\s*#.*)?$/.exec(lines[index]);
+    const entry = /^([ \t]+)(['"]?)([0-9][0-9.]*)\2:/.exec(lines[index]);
     if (!entry) continue;
     entryIndent = entry[1];
     lastEntry = index;
-    if (new RegExp(`^(\\s+)(['"]?)${escapedKey}\\2:`).test(lines[index])) {
+    const keyMatch = keyPattern.exec(lines[index]);
+    if (keyMatch) {
       // Leave the line untouched when the value already matches, and keep any
       // trailing comment when it does not.
-      if (entry[4].trim() !== path) {
-        lines[index] = `${entry[1]}${entry[2]}${key}${entry[2]}: ${path}${entry[5] ?? ''}`;
+      const { value, comment } = splitValueAndComment(lines[index].slice(keyMatch[0].length));
+      if (value !== path) {
+        lines[index] = `${keyMatch[1]}${keyMatch[2]}${key}${keyMatch[2]}: ${path}${comment ? ` ${comment.trimStart()}` : ''}`;
       }
       return true;
     }
