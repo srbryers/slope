@@ -163,6 +163,61 @@ sprints:
     expect(patched).not.toContain('\n    status: complete\n');
   });
 
+  it('declines a flow-style scorecards section instead of appending a duplicate key', () => {
+    const doc = `version: 1
+phase:
+  name: P
+  sprints: [7]
+sprints:
+  - id: 7
+    theme: T
+    par: 3
+    slope: 1
+    type: feature
+    status: planned
+    tickets:
+      - {key: S7-1, title: T1, club: wedge, complexity: small}
+scorecards: {"6": docs/retros/sprint-6.json}
+`;
+    expect(patchRoadmapSourceSprintText(doc, 7, {
+      status: 'complete',
+      scorecardKey: '7',
+      scorecardPath: 'docs/retros/sprint-7.json',
+    })).toBeNull();
+  });
+
+  it('keeps trailing comments when replacing a scorecards value and leaves matching values untouched', () => {
+    const doc = `version: 1
+phase:
+  name: P
+  sprints: [7]
+sprints:
+  - id: 7
+    theme: T
+    par: 3
+    slope: 1
+    type: feature
+    status: planned
+    tickets:
+      - {key: S7-1, title: T1, club: wedge, complexity: small}
+scorecards:
+  "7": docs/retros/old-7.json # audited
+`;
+    const patched = patchRoadmapSourceSprintText(doc, 7, {
+      status: 'complete',
+      scorecardKey: '7',
+      scorecardPath: 'docs/retros/sprint-7.json',
+    });
+    expect(patched).toContain('  "7": docs/retros/sprint-7.json # audited');
+
+    const again = patchRoadmapSourceSprintText(patched!, 7, {
+      status: 'complete',
+      scorecardKey: '7',
+      scorecardPath: 'docs/retros/sprint-7.json',
+    });
+    expect(again).toBe(patched);
+  });
+
   it('declines flow-style sprint entries', () => {
     const doc = `version: 1
 phase:

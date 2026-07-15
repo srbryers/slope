@@ -211,51 +211,51 @@ export function completeRoadmapSourceSprint(
       status: 'complete',
       ...(normalizedScorecard ? { scorecardKey, scorecardPath: normalizedScorecard } : {}),
     });
+    const expectedDocument = {
+      version: freshOwner.document.version,
+      phase: freshOwner.document.phase,
+      sprints: freshOwner.document.sprints.map(item =>
+        item.id === storedId ? { ...item, status: 'complete' } : item,
+      ),
+      ...(freshOwner.document.scorecards || normalizedScorecard ? {
+        scorecards: {
+          ...(freshOwner.document.scorecards ?? {}),
+          ...(normalizedScorecard ? { [scorecardKey]: normalizedScorecard } : {}),
+        },
+      } : {}),
+    };
     let reformatted = false;
-    let nextText: string;
+    let nextText: string | null = null;
     if (patchedText != null) {
       // Refuse a surgical patch that changed anything beyond the targeted
       // sprint's status and scorecard link — the invariant that makes an
-      // adjacent-sprint mutation (#618) structurally impossible.
-      const reparsed = parseRoadmapSourceDocument(patchedText, freshOwner.absolutePath);
-      const expected = {
-        version: freshOwner.document.version,
-        phase: freshOwner.document.phase,
-        sprints: freshOwner.document.sprints.map(item =>
-          item.id === storedId ? { ...item, status: 'complete' } : item,
-        ),
-        ...(freshOwner.document.scorecards || normalizedScorecard ? {
-          scorecards: {
-            ...(freshOwner.document.scorecards ?? {}),
-            ...(normalizedScorecard ? { [scorecardKey]: normalizedScorecard } : {}),
-          },
-        } : {}),
-      };
-      if (stableJson(reparsed) !== stableJson(expected)) {
-        throw new RoadmapSourceError(
-          `Reconciling Sprint ${formatRoadmapSprintLabel(fresh.roadmap, sprint)} would change more than the targeted sprint entry; refusing to write.`,
-          freshOwner.absolutePath,
-        );
+      // adjacent-sprint mutation (#618) structurally impossible. A patched
+      // text that no longer parses means the document shape defeated the
+      // patcher (e.g. column-0 comments inside an entry); treat that like an
+      // undetectable shape and fall back rather than surfacing a raw parse
+      // error.
+      let reparsed: unknown = null;
+      try {
+        reparsed = parseRoadmapSourceDocument(patchedText, freshOwner.absolutePath);
+      } catch {
+        reparsed = null;
       }
-      nextText = patchedText;
-    } else {
+      if (reparsed != null) {
+        if (stableJson(reparsed) !== stableJson(expectedDocument)) {
+          throw new RoadmapSourceError(
+            `Reconciling Sprint ${formatRoadmapSprintLabel(fresh.roadmap, sprint)} would change more than the targeted sprint entry; refusing to write.`,
+            freshOwner.absolutePath,
+          );
+        }
+        nextText = patchedText;
+      }
+    }
+    if (nextText == null) {
       // The document shape prevents a confidently surgical edit (flow-style
       // entries, mixed EOLs). Fall back to the legacy full rewrite, which
       // reformats the bundle; post-write federation validation still runs.
       reformatted = true;
-      nextText = stringify({
-        version: 1,
-        phase: freshOwner.document.phase,
-        sprints: freshOwner.document.sprints.map(item =>
-          item.id === storedId ? { ...item, status: 'complete' } : item,
-        ),
-        ...(freshOwner.document.scorecards || normalizedScorecard ? {
-          scorecards: {
-            ...(freshOwner.document.scorecards ?? {}),
-            ...(normalizedScorecard ? { [scorecardKey]: normalizedScorecard } : {}),
-          },
-        } : {}),
-      });
+      nextText = stringify(expectedDocument);
     }
     atomicWriteFileSync(freshOwner.absolutePath, nextText);
     const reloaded = loadRoadmapSourceStore(cwd, options.sourceFlag);

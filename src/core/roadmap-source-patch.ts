@@ -53,7 +53,7 @@ export function patchRoadmapSourceSprintText(
 
   patchStatusLine(lines, location, patch.status);
   if (patch.scorecardKey && patch.scorecardPath) {
-    upsertScorecardEntry(lines, patch.scorecardKey, patch.scorecardPath);
+    if (!upsertScorecardEntry(lines, patch.scorecardKey, patch.scorecardPath)) return null;
   }
   return lines.join(eol);
 }
@@ -127,27 +127,38 @@ function patchStatusLine(lines: string[], location: SprintEntryLocation, status:
   location.blockEnd += 1;
 }
 
-function upsertScorecardEntry(lines: string[], key: string, path: string): void {
+/** Returns false when a scorecards section exists in a shape (flow style)
+ *  that cannot be edited surgically, so the caller can fall back explicitly. */
+function upsertScorecardEntry(lines: string[], key: string, path: string): boolean {
   const section = findTopLevelSection(lines, 'scorecards');
   if (!section) {
+    // A `scorecards:` line that carries inline content (flow-style map) is a
+    // real section this patcher cannot edit; appending a second key would
+    // corrupt the document.
+    if (lines.some(line => /^scorecards:/.test(line))) return false;
     let insertAt = lines.length;
     while (insertAt > 0 && lines[insertAt - 1].trim() === '') insertAt -= 1;
     lines.splice(insertAt, 0, 'scorecards:', `  "${key}": ${path}`);
-    return;
+    return true;
   }
 
   const escapedKey = key.replace(/\./g, '\\.');
   let entryIndent = '  ';
   let lastEntry = section.start;
   for (let index = section.start + 1; index < section.end; index++) {
-    const entry = /^(\s+)(['"]?)([0-9][0-9.]*)\2:\s*/.exec(lines[index]);
+    const entry = /^(\s+)(['"]?)([0-9][0-9.]*)\2:\s*([^#]*?)(\s*#.*)?$/.exec(lines[index]);
     if (!entry) continue;
     entryIndent = entry[1];
     lastEntry = index;
     if (new RegExp(`^(\\s+)(['"]?)${escapedKey}\\2:`).test(lines[index])) {
-      lines[index] = `${entry[1]}${entry[2]}${key}${entry[2]}: ${path}`;
-      return;
+      // Leave the line untouched when the value already matches, and keep any
+      // trailing comment when it does not.
+      if (entry[4].trim() !== path) {
+        lines[index] = `${entry[1]}${entry[2]}${key}${entry[2]}: ${path}${entry[5] ?? ''}`;
+      }
+      return true;
     }
   }
   lines.splice(lastEntry + 1, 0, `${entryIndent}"${key}": ${path}`);
+  return true;
 }
