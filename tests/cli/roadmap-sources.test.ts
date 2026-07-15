@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { roadmapCommand } from '../../src/cli/commands/roadmap.js';
 import {
   applyRoadmapSourceArchive,
+  completeRoadmapSourceSprint,
   loadRoadmapSourceStore,
   planRoadmapSourceArchive,
   roadmapProjectionMatches,
@@ -459,5 +460,171 @@ describe('slope roadmap archive', () => {
     expect(() => planRoadmapSourceArchive(store, 8)).toThrow(/aliases the live source/);
     expect(existsSync(join(phaseRoot, 'phase-01.yaml'))).toBe(true);
     expect(readFileSync(join(cwd, 'docs', 'roadmap', 'project.yaml'), 'utf8')).toContain('phases/phase-01.yaml');
+  });
+});
+
+describe('completeRoadmapSourceSprint identity matching (#618)', () => {
+  function writeDecimalFixture(statuses: { base: string; a: string; b: string }): string {
+    const root = join(cwd, 'docs', 'roadmap');
+    mkdirSync(join(root, 'phases'), { recursive: true });
+    writeFileSync(join(root, 'project.yaml'), `
+version: 1
+name: Decimal Roadmap
+output: ../backlog/roadmap.json
+sources:
+  - path: phases/phase-01.yaml
+    kind: phase
+`);
+    writeFileSync(join(root, 'phases', 'phase-01.yaml'), `
+version: 1
+phase:
+  name: Phase 1
+  status: active
+  sprints: [458, 458.1, 458.2]
+sprints:
+  - id: 458
+    theme: Base
+    par: 3
+    slope: 1
+    type: feature
+    status: ${statuses.base}
+    tickets:
+      - {key: S458-1, title: T1, club: wedge, complexity: small}
+  - id: 458.1
+    theme: Variant A
+    par: 3
+    slope: 1
+    type: feature
+    status: ${statuses.a}
+    tickets:
+      - {key: S458.1-1, title: T1, club: wedge, complexity: small}
+  - id: 458.2
+    theme: Variant B
+    par: 3
+    slope: 1
+    type: feature
+    status: ${statuses.b}
+    tickets:
+      - {key: S458.2-1, title: T1, club: wedge, complexity: small}
+`);
+    return join(root, 'phases', 'phase-01.yaml');
+  }
+
+  it('reconciles only the exact decimal sprint, never an adjacent one', () => {
+    const phasePath = writeDecimalFixture({ base: 'complete', a: 'planned', b: 'planned' });
+
+    completeRoadmapSourceSprint(cwd, 458.1, { scorecardPath: 'docs/retros/sprint-458.1.json' });
+
+    const store = loadRoadmapSourceStore(cwd);
+    const byId = new Map(store.sources[0].document.sprints.map(item => [item.id, item.status]));
+    expect(byId.get(458.1)).toBe('complete');
+    expect(byId.get(458.2)).toBe('planned');
+    expect(byId.get(458)).toBe('complete');
+    expect(readFileSync(phasePath, 'utf8')).toContain('"458.1": docs/retros/sprint-458.1.json');
+  });
+
+  it('keeps adjacent decimal sprints untouched when re-reconciling an already complete sprint', () => {
+    const phasePath = writeDecimalFixture({ base: 'complete', a: 'complete', b: 'planned' });
+    writeFileSync(phasePath, `${readFileSync(phasePath, 'utf8')}scorecards:
+  "458.1": docs/retros/sprint-458.1.json
+`);
+
+    completeRoadmapSourceSprint(cwd, 458.1, { scorecardPath: 'docs/retros/sprint-458.1.json' });
+
+    const store = loadRoadmapSourceStore(cwd);
+    const byId = new Map(store.sources[0].document.sprints.map(item => [item.id, item.status]));
+    expect(byId.get(458.2)).toBe('planned');
+  });
+
+  it('matches a legacy encoded sprint id through its canonical label', () => {
+    const root = join(cwd, 'docs', 'roadmap');
+    mkdirSync(join(root, 'phases'), { recursive: true });
+    writeFileSync(join(root, 'project.yaml'), `
+version: 1
+name: Encoded Roadmap
+output: ../backlog/roadmap.json
+sources:
+  - path: phases/phase-01.yaml
+    kind: phase
+`);
+    writeFileSync(join(root, 'phases', 'phase-01.yaml'), `
+version: 1
+phase:
+  name: Phase 1
+  status: active
+  sprints: [23, 235, 24]
+sprints:
+  - id: 23
+    theme: Before
+    par: 3
+    slope: 1
+    type: feature
+    status: complete
+    tickets:
+      - {key: S23-1, title: T1, club: wedge, complexity: small}
+  - id: 235
+    theme: Inserted
+    par: 3
+    slope: 1
+    type: feature
+    status: planned
+    tickets:
+      - {key: S23.5-1, title: T1, club: wedge, complexity: small}
+  - id: 24
+    theme: After
+    par: 3
+    slope: 1
+    type: feature
+    status: planned
+    tickets:
+      - {key: S24-1, title: T1, club: wedge, complexity: small}
+`);
+
+    completeRoadmapSourceSprint(cwd, 23.5, { scorecardPath: 'docs/retros/sprint-23.5.json' });
+
+    const store = loadRoadmapSourceStore(cwd);
+    const byId = new Map(store.sources[0].document.sprints.map(item => [item.id, item.status]));
+    expect(byId.get(235)).toBe('complete');
+    expect(byId.get(23)).toBe('complete');
+    expect(byId.get(24)).toBe('planned');
+    expect(store.sources[0].document.scorecards?.['235']).toBe('docs/retros/sprint-23.5.json');
+  });
+
+  it('refuses to reconcile when a sprint identity is ambiguous across sources', () => {
+    const root = join(cwd, 'docs', 'roadmap');
+    mkdirSync(join(root, 'phases'), { recursive: true });
+    writeFileSync(join(root, 'project.yaml'), `
+version: 1
+name: Ambiguous Roadmap
+output: ../backlog/roadmap.json
+sources:
+  - path: phases/phase-01.yaml
+    kind: phase
+  - path: phases/phase-02.yaml
+    kind: phase
+`);
+    const sprintNine = `
+version: 1
+phase:
+  name: PHASE_NAME
+  status: active
+  sprints: [9]
+sprints:
+  - id: 9
+    theme: Duplicate
+    par: 3
+    slope: 1
+    type: feature
+    status: planned
+    tickets:
+      - {key: S9-1, title: T1, club: wedge, complexity: small}
+`;
+    writeFileSync(join(root, 'phases', 'phase-01.yaml'), sprintNine.replace('PHASE_NAME', 'Phase 1'));
+    writeFileSync(join(root, 'phases', 'phase-02.yaml'), sprintNine.replace('PHASE_NAME', 'Phase 2'));
+    const before = readFileSync(join(root, 'phases', 'phase-01.yaml'), 'utf8');
+
+    expect(() => completeRoadmapSourceSprint(cwd, 9, {}))
+      .toThrow(/ambiguous identity/);
+    expect(readFileSync(join(root, 'phases', 'phase-01.yaml'), 'utf8')).toBe(before);
   });
 });

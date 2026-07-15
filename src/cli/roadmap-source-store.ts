@@ -3,6 +3,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:pat
 import { stringify } from 'yaml';
 import {
   compileRoadmapSources,
+  formatRoadmapSprintLabel,
   normalizeDiagnosticPath,
   parseRoadmapSourceDocument,
   parseRoadmapSourceProject,
@@ -120,19 +121,54 @@ export interface CompleteRoadmapSourceSprintResult {
   changed: boolean;
 }
 
+interface RoadmapSourceSprintMatch {
+  source: LoadedRoadmapSource;
+  /** The sprint id exactly as stored in the owning source (may be a legacy encoded id). */
+  storedId: number;
+  status?: string;
+}
+
+/**
+ * Resolve a sprint number to the single source entry that owns it, comparing
+ * by canonical sprint label so legacy encoded ids (235 ~ S23.5) still match
+ * while decimal neighbours (458.1 vs 458.2) never do. Label comparison is
+ * string-exact, so float representation drift cannot widen the match. (#618)
+ */
+function findRoadmapSourceSprint(store: RoadmapSourceStore, sprint: number): RoadmapSourceSprintMatch {
+  const targetLabel = formatRoadmapSprintLabel(store.roadmap, sprint);
+  const matches: RoadmapSourceSprintMatch[] = [];
+  for (const source of store.sources) {
+    for (const item of source.document.sprints) {
+      if (formatRoadmapSprintLabel(store.roadmap, item.id) === targetLabel) {
+        matches.push({ source, storedId: item.id, status: item.status });
+      }
+    }
+  }
+  if (matches.length === 0) {
+    throw new RoadmapSourceError(`Sprint ${targetLabel} was not found in modular roadmap sources.`, store.manifestPath);
+  }
+  if (matches.length > 1) {
+    const locations = matches.map(match => `${match.source.entry.path} (id: ${match.storedId})`).join(', ');
+    throw new RoadmapSourceError(
+      `Sprint ${targetLabel} resolves to ${matches.length} roadmap source entries (${locations}); refusing to reconcile an ambiguous identity.`,
+      store.manifestPath,
+    );
+  }
+  return matches[0];
+}
+
 export function completeRoadmapSourceSprint(
   cwd: string,
   sprint: number,
   options: { sourceFlag?: string; scorecardPath?: string; dryRun?: boolean } = {},
 ): CompleteRoadmapSourceSprintResult {
   const initial = loadRoadmapSourceStore(cwd, options.sourceFlag);
-  const owner = initial.sources.find(source => source.document.sprints.some(item => item.id === sprint));
-  if (!owner) {
-    throw new RoadmapSourceError(`Sprint S${sprint} was not found in modular roadmap sources.`, initial.manifestPath);
-  }
+  const initialMatch = findRoadmapSourceSprint(initial, sprint);
+  const owner = initialMatch.source;
   const sourceLabel = normalizeDiagnosticPath(relative(cwd, owner.absolutePath ?? owner.entry.path));
-  const changed = owner.document.sprints.some(item => item.id === sprint && item.status !== 'complete')
-    || Boolean(options.scorecardPath && owner.document.scorecards?.[String(sprint)] !== normalizeDiagnosticPath(options.scorecardPath));
+  const changed = initialMatch.status !== 'complete'
+    || Boolean(options.scorecardPath
+      && owner.document.scorecards?.[String(initialMatch.storedId)] !== normalizeDiagnosticPath(options.scorecardPath));
 
   if (options.dryRun) {
     return { source: sourceLabel, projection: 'unchanged', changed };
@@ -141,21 +177,24 @@ export function completeRoadmapSourceSprint(
   const federationLock = join(initial.sourceRoot, '.federation');
   return withFileLockSync(federationLock, () => {
     const fresh = loadRoadmapSourceStore(cwd, options.sourceFlag);
-    const freshOwner = fresh.sources.find(source => source.document.sprints.some(item => item.id === sprint));
-    if (!freshOwner?.absolutePath) {
+    const freshMatch = findRoadmapSourceSprint(fresh, sprint);
+    const freshOwner = freshMatch.source;
+    if (!freshOwner.absolutePath) {
       throw new RoadmapSourceError(`Sprint S${sprint} was not found in modular roadmap sources.`, fresh.manifestPath);
     }
 
+    const storedId = freshMatch.storedId;
+    const scorecardKey = String(storedId);
     const nextDocument = {
       version: 1,
       phase: freshOwner.document.phase,
       sprints: freshOwner.document.sprints.map(item =>
-        item.id === sprint ? { ...item, status: 'complete' } : item,
+        item.id === storedId ? { ...item, status: 'complete' } : item,
       ),
       ...(freshOwner.document.scorecards || options.scorecardPath ? {
         scorecards: {
           ...(freshOwner.document.scorecards ?? {}),
-          ...(options.scorecardPath ? { [String(sprint)]: normalizeDiagnosticPath(options.scorecardPath) } : {}),
+          ...(options.scorecardPath ? { [scorecardKey]: normalizeDiagnosticPath(options.scorecardPath) } : {}),
         },
       } : {}),
     };
