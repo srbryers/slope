@@ -90,7 +90,7 @@ describe('formatSprintReview', () => {
 
   it('shows dash for missing deltas', () => {
     const output = formatSprintReview(makeCard(), makeProjectStats());
-    expect(output).toContain('| Endpoints | 168 | \u2014 |');
+    expect(output).toContain('| Endpoints | 168 | -- |');
   });
 
   it('includes shot-by-shot table', () => {
@@ -99,8 +99,8 @@ describe('formatSprintReview', () => {
       makeShot({ ticket_key: 'S168-2', club: 'short_iron', result: 'green' }),
     ];
     const output = formatSprintReview(makeCard({ shots }), makeProjectStats());
-    expect(output).toContain('| S168-1 | wedge | in_the_hole | \u2014 | Clean |');
-    expect(output).toContain('| S168-2 | short_iron | green | \u2014 | \u2014 |');
+    expect(output).toContain('| S168-1 | wedge | in_the_hole | -- | Clean |');
+    expect(output).toContain('| S168-2 | short_iron | green | -- | -- |');
   });
 
   it('includes hazards in shot-by-shot table', () => {
