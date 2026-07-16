@@ -3,8 +3,8 @@
   "theme": "Session Wrap and Standup Substance",
   "par": 4,
   "slope": 2,
-  "score": 4,
-  "score_label": "par",
+  "score": 5,
+  "score_label": "bogey",
   "date": "2026-07-16",
   "shots": [
     {
@@ -12,7 +12,14 @@
       "title": "Default slope session end to the single active session (#620)",
       "club": "wedge",
       "result": "green",
-      "hazards": [],
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "moderate",
+          "description": "[architect review] Single-active session-end default could end a live teammate's session in same-checkout swarms (installed hook shape with unset SLOPE_SESSION_ID falls through to the default). Fixed: identity-gated default, explicit empty-flag error, stale env id ignored.",
+          "gotcha_id": "review:architect"
+        }
+      ],
       "notes": "session end now prefers an explicit flag, then SLOPE_SESSION_ID, then the single active session; multiple active sessions list themselves in the error instead of a bare flag demand."
     },
     {
@@ -20,7 +27,20 @@
       "title": "Enrich standup with sprint, branch, scorecard state, commits, and claims, and fix negative transcript durations (#619)",
       "club": "long_iron",
       "result": "green",
-      "hazards": [],
+      "hazards": [
+        {
+          "type": "water",
+          "severity": "moderate",
+          "description": "[security review] Store-sourced session timestamp interpolated into an execSync shell string (JSON.stringify escapes for JSON, not sh) — command substitution probe-confirmed via poisoned slope.db. Fixed with execFileSync arg arrays.",
+          "gotcha_id": "review:security"
+        },
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "[code review] parseStandup dropped the new context on aggregate round-trips; pi skill lacked frontmatter; commit counts overstated precision. All fixed.",
+          "gotcha_id": "review:code"
+        }
+      ],
       "notes": "StandupContext (sprint + scorecard state, branch + commits since session start, transcript volume) gathered best-effort in the CLI and rendered by the core formatter; transcript durations now come from min/max valid timestamps instead of positional first/last."
     },
     {
@@ -39,8 +59,8 @@
     "greens_total": 3,
     "putts": 0,
     "penalties": 0,
-    "hazards_hit": 0,
-    "hazard_penalties": 0,
+    "hazards_hit": 3,
+    "hazard_penalties": 1,
     "miss_directions": {
       "long": 0,
       "short": 0,
@@ -57,9 +77,5 @@
   ],
   "course_management_notes": [
     "The codex plugin's skill set was left untouched; its session guidance flows through AGENTS.md rather than a skill file, so parity there is a separate decision."
-  ],
-  "slope_factors": [
-    "agent_ergonomics",
-    "template_wiring"
   ]
 }
