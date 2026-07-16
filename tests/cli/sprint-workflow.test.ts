@@ -416,6 +416,70 @@ describe('slope sprint workflow cleanup', () => {
     }
   });
 
+  it('detects executions from dead sessions as stale when session tracking is active (#621)', async () => {
+    const recent = new Date('2026-07-15T23:00:00Z').toISOString();
+    const makeExec = (id: string, sprintId: string, sessionId: string) => ({
+      id,
+      workflow_name: 'sprint-standard',
+      sprint_id: sprintId,
+      session_id: sessionId,
+      current_phase: 'post_hole',
+      current_step: 'review',
+      status: 'running' as const,
+      variables: {},
+      completed_steps: [],
+      started_at: recent,
+      updated_at: recent,
+    });
+    const store = {
+      listExecutions: async () => [
+        makeExec('wf-dead', 'S70', 'dead-session'),
+        makeExec('wf-live', 'S71', 'live-session'),
+        makeExec('wf-mine', 'S72', 'my-session'),
+      ],
+      getActiveSessions: async () => [{ session_id: 'live-session' } as never],
+    };
+
+    const stale = await findStaleWorkflowExecutions(tmpDir, store, {
+      now: new Date('2026-07-16T00:00:00Z'),
+      branchSprint: null,
+      includeNewerRunning: false,
+      currentSessionId: 'my-session',
+    });
+
+    expect(stale).toHaveLength(1);
+    expect(stale[0].exec.id).toBe('wf-dead');
+    expect(stale[0].reason).toContain('owning session is no longer active');
+  });
+
+  it('ignores dead-session evidence when no sessions are tracked (#621)', async () => {
+    const recent = new Date('2026-07-15T23:00:00Z').toISOString();
+    const store = {
+      listExecutions: async () => [{
+        id: 'wf-untracked',
+        workflow_name: 'sprint-standard',
+        sprint_id: 'S70',
+        session_id: 'some-session',
+        current_phase: 'post_hole',
+        current_step: 'review',
+        status: 'running' as const,
+        variables: {},
+        completed_steps: [],
+        started_at: recent,
+        updated_at: recent,
+      }],
+      getActiveSessions: async () => [],
+    };
+
+    const stale = await findStaleWorkflowExecutions(tmpDir, store, {
+      now: new Date('2026-07-16T00:00:00Z'),
+      branchSprint: null,
+      includeNewerRunning: false,
+    });
+
+    expect(stale).toHaveLength(0);
+  });
+
   it('detects aged running executions as stale (#503)', async () => {
     const old = new Date('2026-01-01T00:00:00Z').toISOString();
     const store = {

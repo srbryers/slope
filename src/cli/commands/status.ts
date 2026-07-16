@@ -5,6 +5,30 @@ import { join } from 'node:path';
 import { loadConfig } from '../config.js';
 import { inferSprintContext } from '../sprint-inference.js';
 import { resolveStore } from '../store.js';
+import { findStaleWorkflowExecutions, sprintLabelForExecution } from '../workflow-resync.js';
+import type { SlopeStore } from '../../core/index.js';
+
+/** Surface dangling workflow executions that would gate a fresh session's
+ *  edits, with the command that clears them. Advisory only. (#621) */
+async function showDanglingExecutions(cwd: string, store: unknown): Promise<void> {
+  const candidate = store as Partial<Pick<SlopeStore, 'listExecutions' | 'getActiveSessions'>>;
+  if (typeof candidate.listExecutions !== 'function') return;
+  try {
+    const stale = await findStaleWorkflowExecutions(
+      cwd,
+      candidate as Pick<SlopeStore, 'listExecutions'> & Partial<Pick<SlopeStore, 'getActiveSessions'>>,
+    );
+    if (stale.length === 0) return;
+    console.log(`  Dangling workflow executions (${stale.length}) — these can gate file edits:`);
+    for (const { exec, reason } of stale) {
+      console.log(`    ${sprintLabelForExecution(exec)} (${exec.workflow_name}) — ${reason}`);
+    }
+    console.log('  Clear with: slope sprint workflow cleanup --stale');
+    console.log('');
+  } catch {
+    // Diagnostics must never break status output.
+  }
+}
 
 function parseArgs(args: string[]): Record<string, string> {
   const result: Record<string, string> = {};
@@ -36,6 +60,7 @@ export async function statusCommand(args: string[]): Promise<void> {
     const store = await resolveStore(cwd);
     try {
       await showSprintStatus(store, sprintNumber);
+      await showDanglingExecutions(cwd, store);
     } finally {
       store.close();
     }

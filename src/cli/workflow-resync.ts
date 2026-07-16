@@ -115,12 +115,22 @@ export function completedRoadmapSprintIds(cwd: string, config = loadConfig(cwd))
 
 export async function findStaleWorkflowExecutions(
   cwd: string,
-  store: Pick<SlopeStore, 'listExecutions'>,
-  options: { staleAgeMs?: number; now?: Date; branchSprint?: number | null; includeNewerRunning?: boolean } = {},
+  store: Pick<SlopeStore, 'listExecutions'> & Partial<Pick<SlopeStore, 'getActiveSessions'>>,
+  options: { staleAgeMs?: number; now?: Date; branchSprint?: number | null; includeNewerRunning?: boolean; currentSessionId?: string } = {},
 ): Promise<StaleWorkflowExecution[]> {
   const config = loadConfig(cwd);
   const scorecardSprintIds = new Set(loadScorecards(config, cwd).map(card => card.sprint_number));
   const roadmapDoneIds = completedRoadmapSprintIds(cwd, config);
+  // Executions whose owning session has ended gate NEW sessions' work days
+  // later (#621). Treat a dead owning session as staleness evidence.
+  let activeSessionIds: Set<string> | null = null;
+  if (typeof store.getActiveSessions === 'function') {
+    try {
+      activeSessionIds = new Set((await store.getActiveSessions()).map(session => session.session_id));
+    } catch {
+      activeSessionIds = null;
+    }
+  }
   const running = await store.listExecutions({ status: 'running' });
   const runningSprints = running
     .map(exec => sprintNumberForExecution(exec))
@@ -141,6 +151,16 @@ export async function findStaleWorkflowExecutions(
     if (branchSprint !== null && sprint < branchSprint) reasons.push(`branch is on newer sprint S${formatSprintNumber(branchSprint)}`);
     if (includeNewerRunning && newestRunningSprint !== null && sprint < newestRunningSprint) reasons.push(`newer running sprint S${formatSprintNumber(newestRunningSprint)} exists`);
     if (isOlderThan(exec.updated_at || exec.started_at, now, staleAgeMs)) reasons.push(`older than ${Math.round(staleAgeMs / (24 * 60 * 60 * 1000))} days`);
+    // Dead-session evidence applies only when session tracking is in use
+    // (at least one active session) and never to the invoking session's own
+    // executions, so repos without session rows are unaffected.
+    if (exec.session_id
+      && activeSessionIds !== null
+      && activeSessionIds.size > 0
+      && !activeSessionIds.has(exec.session_id)
+      && exec.session_id !== options.currentSessionId) {
+      reasons.push('owning session is no longer active');
+    }
     if (reasons.length > 0) {
       stale.push({ exec, reason: reasons.join(', ') });
     }
@@ -151,8 +171,9 @@ export async function findStaleWorkflowExecutions(
 
 export async function reconcileWorkflowExecutions(
   cwd: string,
-  store: Pick<SlopeStore, 'listExecutions' | 'completeExecution' | 'updateExecutionState'>,
-  options: { includeNewerRunning?: boolean } = {},
+  store: Pick<SlopeStore, 'listExecutions' | 'completeExecution' | 'updateExecutionState'>
+    & Partial<Pick<SlopeStore, 'getActiveSessions'>>,
+  options: { includeNewerRunning?: boolean; currentSessionId?: string } = {},
 ): Promise<WorkflowResyncResult> {
   const paused = await findStaleWorkflowExecutions(cwd, store, options);
   for (const { exec } of paused) {

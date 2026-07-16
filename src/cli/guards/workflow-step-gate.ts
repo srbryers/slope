@@ -28,7 +28,10 @@ export async function workflowStepGateGuard(input: HookInput, cwd: string): Prom
   let store: SqliteSlopeStore | null = null;
   try {
     store = new SqliteSlopeStore(storePath);
-    const resync = await reconcileWorkflowExecutions(cwd, store, { includeNewerRunning: false });
+    const resync = await reconcileWorkflowExecutions(cwd, store, {
+      includeNewerRunning: false,
+      currentSessionId: input.session_id?.trim() || undefined,
+    });
     const active = await store.listExecutions({ status: 'running' });
     if (active.length === 0) return resyncContext(resync);
 
