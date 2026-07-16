@@ -3,8 +3,8 @@
   "theme": "Stale State and Guard Scoping",
   "par": 4,
   "slope": 4,
-  "score": 4,
-  "score_label": "par",
+  "score": 7,
+  "score_label": "triple_plus",
   "date": "2026-07-16",
   "shots": [
     {
@@ -12,7 +12,26 @@
       "title": "Reap or ignore dangling workflow executions from dead sessions in workflow-step-gate and surface them in status/briefing with a clear-command (#621)",
       "club": "driver",
       "result": "green",
-      "hazards": [],
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "[architect review] Dead-session evidence could pause a live teammate's execution after a 10-minute heartbeat lapse (peer cleanStaleSessions deletes the row); fixed with a 60-minute execution-quiet grace window.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "rough",
+          "severity": "major",
+          "description": "[code review] Dead-session staleness was dead code in production: no shipped path set session_id on executions. slope sprint run and the loop adapter now bind executions to SLOPE_SESSION_ID.",
+          "gotcha_id": "review:code"
+        },
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "[code review] slope status could advertise a live parallel execution as dangling with a cleanup command that would pause it; surfacing now excludes newer-running evidence and passes currentSessionId.",
+          "gotcha_id": "review:code"
+        }
+      ],
       "notes": "findStaleWorkflowExecutions now counts a dead owning session as staleness evidence — gated on session tracking being in use and never for the invoking session — and slope status lists dangling executions with the cleanup command."
     },
     {
@@ -20,7 +39,14 @@
       "title": "Scope edit and Bash gates to the repo root and exempt non-sprint commands like gh issue create (#621)",
       "club": "long_iron",
       "result": "green",
-      "hazards": [],
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "minor",
+          "description": "[architect review] isWithinRepo lacked realpath handling (symlinked roots could bypass the gate) and cast file_path unchecked; advisory recommended unvalidated phase complete. All fixed.",
+          "gotcha_id": "review:architect"
+        }
+      ],
       "notes": "workflow-step-gate allows any Edit/Write whose target resolves outside cwd before touching the store. Main had already narrowed phase-boundary to slope commands; a gh issue create regression test locks that in."
     },
     {
@@ -28,7 +54,14 @@
       "title": "Add phase-ledger staleness heuristic — scorecards far past the boundary downgrade block to warn (#621)",
       "club": "short_iron",
       "result": "green",
-      "hazards": [],
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "[architect review] Raw sprintOrderValue mis-decoded modern sprint ids ending in 5 (245 read as 24.5), making the staleness downgrade both fail-open and fail-closed; fixed with roadmap-aware ordering and roadmap-membership evidence.",
+          "gotcha_id": "review:architect"
+        }
+      ],
       "notes": "When scorecards exist at or past the target phase's first sprint, phase-boundary emits a non-blocking advisory recommending slope phase complete N instead of denying."
     }
   ],
@@ -39,8 +72,8 @@
     "greens_total": 3,
     "putts": 0,
     "penalties": 0,
-    "hazards_hit": 0,
-    "hazard_penalties": 0,
+    "hazards_hit": 5,
+    "hazard_penalties": 3,
     "miss_directions": {
       "long": 0,
       "short": 0,
@@ -61,11 +94,5 @@
   ],
   "course_management_notes": [
     "Issue #621 was filed from an older slope version; each ticket was re-scoped against current main before implementation."
-  ],
-  "slope_factors": [
-    "guard_reliability",
-    "multi_session_semantics",
-    "state_machine",
-    "cross_platform_paths"
   ]
 }

@@ -70,7 +70,7 @@ sprints:
     par: 4
     slope: 4
     type: bugfix + guard reliability
-    status: planned
+    status: complete
     depends_on:
       - 241
     note: "Fix #621: dangling workflow executions from dead sessions gate a fresh session's edits days later; phase-boundary guard blocks unrelated Bash from a silently stale phase ledger; edit gates apply outside the repo root."
@@ -147,3 +147,4 @@ sprints:
 scorecards:
   "241": docs/retros/sprint-241.json
   "242": docs/retros/sprint-242.json
+  "243": docs/retros/sprint-243.json
