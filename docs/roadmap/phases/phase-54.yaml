@@ -99,7 +99,7 @@ sprints:
     par: 4
     slope: 2
     type: feature + agent ergonomics
-    status: planned
+    status: complete
     depends_on:
       - 243
     note: "Fix #619 (standup reports only an event count while richer transcript/scorecard data exists; transcript stats shows negative duration) and #620 (no wrap-session skill; session end demands --session-id even with one active session)."
@@ -148,3 +148,4 @@ scorecards:
   "241": docs/retros/sprint-241.json
   "242": docs/retros/sprint-242.json
   "243": docs/retros/sprint-243.json
+  "244": docs/retros/sprint-244.json

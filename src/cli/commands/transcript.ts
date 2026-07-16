@@ -210,11 +210,19 @@ function computeStats(turns: TranscriptTurn[]): TranscriptStats {
     if (turn.outcome === 'retry') retryCount++;
   }
 
+  // Turns can arrive unordered (aggregates across sessions) or carry invalid
+  // timestamps; positional first/last produced negative durations (#619).
   let durationMin = 0;
-  if (turns.length >= 2) {
-    const first = new Date(turns[0].timestamp).getTime();
-    const last = new Date(turns[turns.length - 1].timestamp).getTime();
-    durationMin = Math.round((last - first) / 60000);
+  let earliest = Number.POSITIVE_INFINITY;
+  let latest = Number.NEGATIVE_INFINITY;
+  for (const turn of turns) {
+    const time = new Date(turn.timestamp).getTime();
+    if (!Number.isFinite(time)) continue;
+    if (time < earliest) earliest = time;
+    if (time > latest) latest = time;
+  }
+  if (Number.isFinite(earliest) && Number.isFinite(latest) && latest > earliest) {
+    durationMin = Math.round((latest - earliest) / 60000);
   }
 
   return { turnCount: turns.length, durationMin, toolCounts, toolStats, successCount, failureCount, retryCount, hasTokenData };
