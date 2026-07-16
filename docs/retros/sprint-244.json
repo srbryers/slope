@@ -1,0 +1,65 @@
+{
+  "sprint_number": 244,
+  "theme": "Session Wrap and Standup Substance",
+  "par": 4,
+  "slope": 2,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-07-16",
+  "shots": [
+    {
+      "ticket_key": "S244-1",
+      "title": "Default slope session end to the single active session (#620)",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [],
+      "notes": "session end now prefers an explicit flag, then SLOPE_SESSION_ID, then the single active session; multiple active sessions list themselves in the error instead of a bare flag demand."
+    },
+    {
+      "ticket_key": "S244-2",
+      "title": "Enrich standup with sprint, branch, scorecard state, commits, and claims, and fix negative transcript durations (#619)",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "StandupContext (sprint + scorecard state, branch + commits since session start, transcript volume) gathered best-effort in the CLI and rendered by the core formatter; transcript durations now come from min/max valid timestamps instead of positional first/last."
+    },
+    {
+      "ticket_key": "S244-3",
+      "title": "Ship a wrap-session skill covering session end, unpushed-work warning, and handoff summary across harness templates (#620)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "wrap-session template installed by slope init for Claude Code and Pi: standup wrap, uncommitted/unpushed checks, sprint + dangling-execution state, session end, handoff summary. Generated CLAUDE.md lists it."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 3,
+    "fairways_total": 3,
+    "greens_in_regulation": 3,
+    "greens_total": 3,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [],
+  "special_plays": [],
+  "bunker_locations": [],
+  "yardage_book_updates": [
+    "Standup context lives in the CLI layer (gatherStandupContext) so the core generator stays store/git-free; extend context there, not in core.",
+    "The root dist must be rebuilt (pnpm build) before dogfooding CLI changes — racing a background build reruns old code silently."
+  ],
+  "course_management_notes": [
+    "The codex plugin's skill set was left untouched; its session guidance flows through AGENTS.md rather than a skill file, so parity there is a separate decision."
+  ],
+  "slope_factors": [
+    "agent_ergonomics",
+    "template_wiring"
+  ]
+}
