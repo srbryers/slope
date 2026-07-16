@@ -3,8 +3,8 @@
   "theme": "Closeout Integrity",
   "par": 4,
   "slope": 2,
-  "score": 4,
-  "score_label": "par",
+  "score": 5,
+  "score_label": "bogey",
   "date": "2026-07-15",
   "shots": [
     {
@@ -12,7 +12,32 @@
       "title": "Refuse to overwrite an existing sprint review without --force and validate required sections before closing review_md (#616)",
       "club": "long_iron",
       "result": "green",
-      "hazards": [],
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "minor",
+          "description": "[architect review] --force missing from registry help; reviewRequiredSections consumed unvalidated (TypeError risk on malformed config); stdout/disk repair asymmetry; refusal message understated gate effect. All fixed.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "rough",
+          "severity": "moderate",
+          "description": "[code review] Marker-presence check let human-enriched generated reviews be silently clobbered and misclassified authored files that quoted the marker; fixed with a line-1 content-hash marker (pristine-only regeneration).",
+          "gotcha_id": "review:code"
+        },
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "[code review] Missing required sections did not reopen an already-closed review_md gate; repair table lacked right-double-quote and ellipsis forms; section check was unanchored substring. All fixed.",
+          "gotcha_id": "review:code"
+        },
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "[code review] Re-review R1: gate reopen leaked into view-only --stdout/--output runs, flipping review_md without touching disk. Fixed by scoping gate mutation to canonical-path runs.",
+          "gotcha_id": "review:code"
+        }
+      ],
       "notes": "Generated reviews carry a marker comment; unmarked (project-authored) files are never overwritten without --force, the kept file still satisfies the gate, identical regeneration is a no-op, and reviewRequiredSections config gates review_md on required headings."
     },
     {
@@ -39,8 +64,8 @@
     "greens_total": 3,
     "putts": 0,
     "penalties": 0,
-    "hazards_hit": 0,
-    "hazard_penalties": 0,
+    "hazards_hit": 4,
+    "hazard_penalties": 0.5,
     "miss_directions": {
       "long": 0,
       "short": 0,
@@ -61,9 +86,5 @@
   ],
   "course_management_notes": [
     "Executed S242-3 first while the #611 repro from S241's closeout was live in the working state."
-  ],
-  "slope_factors": [
-    "lifecycle_state_machine",
-    "backward_compatibility"
   ]
 }
