@@ -5,7 +5,17 @@
 - **Scope reviewed:** `src/cli/guards/workflow-step-gate.ts`, `src/cli/workflow-resync.ts`, `src/cli/commands/status.ts`, `src/cli/guards/phase-boundary.ts`, plus tests
 - **Verification:** touched test files pass (69/69), `pnpm typecheck` clean
 
-## Verdict: REQUEST CHANGES
+## FINAL VERDICT (Round 2, delta re-review of fed16fd): APPROVE — with one minor note
+
+See the [Round 2 addendum](#round-2--delta-re-review-fed16fd) at the end. All Round 1
+findings (F1–F6) are correctly addressed and were re-verified behaviorally, including a
+transient S245-class regression check the reviewer ran locally. One non-blocking note
+remains: commit regression tests for the F1/F4 phase-boundary evidence logic, which
+currently has no committed coverage.
+
+---
+
+## Round 1 verdict: REQUEST CHANGES (superseded)
 
 The design direction is right on all four changes — repo scoping fails open, dead-session
 evidence is preconditioned, the phase downgrade still surfaces a reconciliation path, and
@@ -166,3 +176,69 @@ still take the full gate path. Inconsistent but safe; note it or normalize both 
 3. **F3** — stop recommending an unvalidated `phase complete` as the sole remediation (or add validation to it).
 
 F4–F6 are recommended hardening; fine as fast-follows if ticketed.
+
+---
+
+## Round 2 — Delta re-review (fed16fd)
+
+**Commit reviewed:** `fed16fd` "fix(S243): address architect review findings"
+**Verification:** all 3 touched test files pass (69/69), `pnpm typecheck` clean, plus
+three transient behavioral checks run by the reviewer (see F1/F4 below).
+
+### F1 (HIGH) — RESOLVED
+`src/cli/guards/phase-boundary.ts` now resolves every order through a local
+`orderOf = roadmapSprintOrderValue(roadmap, id)`; the raw `sprintOrderValue` import is
+gone. `isEncodedInsertedSprintInRoadmap` resolves modern ids canonically (ticket keys
+`S245-` force canonical; adjacent ids 244/246 force canonical), so the S245 hazard is
+closed. **Behaviorally verified** with a transient test: a roadmap with Phase 2 starting
+at S245 and only a pre-boundary S243 scorecard still **denies** (raw `sprintOrderValue`
+would have decoded 245 → 24.5 and wrongly downgraded); a roadmap-member S245 scorecard
+correctly downgrades to the advisory.
+
+### F2 (HIGH) — RESOLVED
+`src/cli/workflow-resync.ts` adds `DEAD_SESSION_GRACE_MS = 60 min` (~6× the 10-minute
+heartbeat TTL); dead-session evidence now also requires
+`isOlderThan(exec.updated_at || exec.started_at, now, grace)`. A live teammate whose
+session row is reaped after one long tool call can no longer be paused unless their
+execution has also been quiet for an hour — and even then pause remains lossless and
+resumable. The committed test includes the required negative case (`wf-lapsed`, 5 minutes
+old, dead session row → survives). Residual risk (execution parked >60 min at an
+agent_work step during a heartbeat lapse + peer edit) is narrow, recoverable, and an
+acceptable trade against #621's original failure. `deadSessionGraceMs` is injectable for
+tuning.
+
+### F3 (MEDIUM) — RESOLVED
+The advisory now enumerates `pendingPhaseGates(cwd, prevPhaseNum)` output and explicitly
+labels `slope phase complete N` as a manual override that "records all gates without
+validation". The stale-ledger/unverified-gates distinction is preserved for the operator.
+
+### F4 (MEDIUM/LOW) — RESOLVED
+Evidence is now membership-based: scorecard order must be in the set of roadmap sprint
+orders at/past the boundary. **Behaviorally verified** with a transient test: a stray
+non-roadmap `sprint-999.json` no longer downgrades an earlier boundary (still denies).
+Exact-equality on orders computed by the same `orderOf` is sound.
+
+### F5 (LOW) — RESOLVED
+`isWithinRepo` realpaths the cwd and the target's nearest existing ancestor and fails
+**toward gating** (`return true`) on resolution errors — the correct hardening posture,
+inverting the previous fail-open. The existing gate tests run under macOS `tmpdir()`
+(`/var` → `/private/var` symlink) and the in-repo deny still holds, exercising exactly the
+symlink case. Noted, acceptable: an in-repo symlink whose real target lives outside the
+repo now resolves outside and is ungated — consistent with the scoping rationale (the file
+genuinely lives elsewhere).
+
+### F6 (LOW) — RESOLVED
+Unchecked cast replaced with a `typeof === 'string'` + non-empty check; `notebook_path`
+accepted alongside `file_path`.
+
+### Remaining note (non-blocking)
+The F1/F4 evidence logic has **no committed regression tests** — the reviewer's checks
+were transient. Before or shortly after merge, add three cases to
+`tests/cli/guards/phase-boundary.test.ts`:
+1. Phase boundary at S245 + pre-boundary S243 scorecard only → still denies.
+2. Roadmap-member S245 scorecard at the boundary → downgrades to advisory.
+3. Stray non-roadmap scorecard (e.g. sprint 999) past the boundary → still denies.
+
+### Final verdict: APPROVE
+All required fixes land correctly and were verified behaviorally. Ship it; ticket the
+regression tests if not added in this PR.

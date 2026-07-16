@@ -59,6 +59,24 @@ afterEach(() => {
   rmSync(tmpDir, { recursive: true, force: true });
 });
 
+function writeModernRoadmap(): void {
+  const ticket = (sprint: number, index: number) =>
+    ({ id: `S${sprint}-${index}`, title: `t${index}`, club: 'wedge', complexity: 'small' });
+  mkdirSync(join(tmpDir, 'docs', 'backlog'), { recursive: true });
+  writeFileSync(join(tmpDir, 'docs', 'backlog', 'roadmap.json'), JSON.stringify({
+    name: 'Modern',
+    phases: [
+      { name: 'Phase 53', sprints: [243] },
+      { name: 'Phase 54', sprints: [245, 246] },
+    ],
+    sprints: [
+      { id: 243, theme: 'Prior', par: 4, slope: 1, type: 'feature', tickets: [ticket(243, 1), ticket(243, 2), ticket(243, 3)] },
+      { id: 245, theme: 'Next', par: 4, slope: 1, type: 'feature', tickets: [ticket(245, 1), ticket(245, 2), ticket(245, 3)] },
+      { id: 246, theme: 'Later', par: 4, slope: 1, type: 'feature', tickets: [ticket(246, 1), ticket(246, 2), ticket(246, 3)] },
+    ],
+  }));
+}
+
 describe('phaseBoundaryGuard', () => {
   it('blocks actual slope sprint starts when the previous phase is incomplete', async () => {
     writeRoadmap();
@@ -81,6 +99,39 @@ describe('phaseBoundaryGuard', () => {
     expect(result.suggestion).toBeUndefined();
     expect(result.context).toContain('phase ledger looks stale');
     expect(result.context).toContain('slope phase complete 1');
+  });
+
+  it('still denies at a boundary whose sprint id ends in 5 with only pre-boundary scorecards', async () => {
+    // sprintOrderValue would decode 245 as legacy half-sprint 24.5; the guard
+    // must use roadmap-aware ordering so this boundary stays enforceable.
+    writeModernRoadmap();
+    mkdirSync(join(tmpDir, 'docs', 'retros'), { recursive: true });
+    writeFileSync(join(tmpDir, 'docs', 'retros', 'sprint-243.json'), JSON.stringify({ sprint_number: 243 }));
+
+    const result = await phaseBoundaryGuard(makeInput('slope sprint start --sprint=245'), tmpDir);
+
+    expect(result.decision).toBe('deny');
+  });
+
+  it('downgrades an ends-in-5 boundary when a roadmap-member scorecard exists past it', async () => {
+    writeModernRoadmap();
+    mkdirSync(join(tmpDir, 'docs', 'retros'), { recursive: true });
+    writeFileSync(join(tmpDir, 'docs', 'retros', 'sprint-245.json'), JSON.stringify({ sprint_number: 245 }));
+
+    const result = await phaseBoundaryGuard(makeInput('slope sprint start --sprint=245'), tmpDir);
+
+    expect(result.decision).toBeUndefined();
+    expect(result.context).toContain('phase ledger looks stale');
+  });
+
+  it('ignores stray non-roadmap scorecards as staleness evidence', async () => {
+    writeModernRoadmap();
+    mkdirSync(join(tmpDir, 'docs', 'retros'), { recursive: true });
+    writeFileSync(join(tmpDir, 'docs', 'retros', 'sprint-999.json'), JSON.stringify({ sprint_number: 999 }));
+
+    const result = await phaseBoundaryGuard(makeInput('slope sprint start --sprint=245'), tmpDir);
+
+    expect(result.decision).toBe('deny');
   });
 
   it('never matches non-slope commands like gh issue create (#621)', async () => {
