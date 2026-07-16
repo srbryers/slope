@@ -1,0 +1,90 @@
+{
+  "sprint_number": 242,
+  "theme": "Closeout Integrity",
+  "par": 4,
+  "slope": 2,
+  "score": 5,
+  "score_label": "bogey",
+  "date": "2026-07-15",
+  "shots": [
+    {
+      "ticket_key": "S242-1",
+      "title": "Refuse to overwrite an existing sprint review without --force and validate required sections before closing review_md (#616)",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "minor",
+          "description": "[architect review] --force missing from registry help; reviewRequiredSections consumed unvalidated (TypeError risk on malformed config); stdout/disk repair asymmetry; refusal message understated gate effect. All fixed.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "rough",
+          "severity": "moderate",
+          "description": "[code review] Marker-presence check let human-enriched generated reviews be silently clobbered and misclassified authored files that quoted the marker; fixed with a line-1 content-hash marker (pristine-only regeneration).",
+          "gotcha_id": "review:code"
+        },
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "[code review] Missing required sections did not reopen an already-closed review_md gate; repair table lacked right-double-quote and ellipsis forms; section check was unanchored substring. All fixed.",
+          "gotcha_id": "review:code"
+        },
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "[code review] Re-review R1: gate reopen leaked into view-only --stdout/--output runs, flipping review_md without touching disk. Fixed by scoping gate mutation to canonical-path runs.",
+          "gotcha_id": "review:code"
+        }
+      ],
+      "notes": "Generated reviews carry a marker comment; unmarked (project-authored) files are never overwritten without --force, the kept file still satisfies the gate, identical regeneration is a no-op, and reviewRequiredSections config gates review_md on required headings."
+    },
+    {
+      "ticket_key": "S242-2",
+      "title": "Emit UTF-8-clean review markdown across platforms (#616)",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [],
+      "notes": "Empty-cell placeholders switched from em dashes to ASCII '--', and repairMojibake fixes cp1252-mangled sequences arriving from input data."
+    },
+    {
+      "ticket_key": "S242-3",
+      "title": "Reconcile sprint lifecycle to merged state after post-merge retro and correct the next-action text (#611)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Reproduced live during S241 closeout: post-merge retro set phase=complete but sprint status still derived ready_for_pr from gates alone. Status now short-circuits on the complete phase and the next action says the sprint is closed out."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 3,
+    "fairways_total": 3,
+    "greens_in_regulation": 3,
+    "greens_total": 3,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 4,
+    "hazard_penalties": 0.5,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    "S240 had already shipped the phase-reconciliation half of #611; the residual bug was in status derivation, found by dogfooding the retro during S241 closeout."
+  ],
+  "special_plays": [],
+  "bunker_locations": [
+    "A sprint claiming to fix an issue in its scorecard does not mean the issue is closed — S240 claimed #611/#608 while #611 remained half-broken."
+  ],
+  "yardage_book_updates": [
+    "sprint status derives its headline from gates AND phase now; phase complete is terminal (set by post-merge retro).",
+    "Generated sprint reviews start with the marker comment; regenerating historical unmarked reviews requires --force."
+  ],
+  "course_management_notes": [
+    "Executed S242-3 first while the #611 repro from S241's closeout was live in the working state."
+  ]
+}

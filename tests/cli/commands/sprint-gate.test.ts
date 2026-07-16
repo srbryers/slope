@@ -86,7 +86,9 @@ describe('slope sprint gate review provenance', () => {
   });
 
   it('records required-review waivers as a visibly downgraded ready state', async () => {
-    const state = createSprintState(219, 'complete');
+    // 'scoring' is the pre-merge closeout phase; 'complete' now means merged
+    // with the post-merge retro recorded (#611).
+    const state = createSprintState(219, 'scoring');
     state.review_requirements!.architect_review = {
       priority: 'required',
       reason: 'Three tickets warrants architectural review',
@@ -186,5 +188,55 @@ describe('slope sprint gate review provenance', () => {
     expect(output).toContain('--waive-independent-review');
     expect(output).toContain('manual_override (weaker)');
     expect(output).toContain('independent_review');
+  });
+});
+
+describe('slope sprint status after post-merge closeout (#611)', () => {
+  function completeGates(state: ReturnType<typeof createSprintState>): void {
+    state.gates.tests = true;
+    state.gates.scorecard = true;
+    state.gates.review_md = true;
+    state.gates.code_review = true;
+    state.review_gates.code_review = {
+      provenance: 'independent_review',
+      evidence: ['reviews/code.md'],
+      reviewer: 'code-agent',
+    };
+    state.gates.architect_review = true;
+    state.review_gates.architect_review = {
+      provenance: 'independent_review',
+      evidence: ['reviews/architect.md'],
+      reviewer: 'architect-agent',
+    };
+  }
+
+  it('reports complete, not ready_for_pr, once the phase is complete', async () => {
+    const state = createSprintState(219, 'complete');
+    completeGates(state);
+    saveSprintState(tmpDir, state);
+    const logs: string[] = [];
+    vi.spyOn(console, 'log').mockImplementation((...args) => { logs.push(args.join(' ')); });
+
+    await sprintCommand(['status']);
+
+    const output = logs.join('\n');
+    expect(output).toContain('status: complete (merged; all gates complete)');
+    expect(output).toContain('sprint is closed out');
+    expect(output).not.toContain('status: ready_for_pr');
+    expect(output).not.toContain('create PR for this branch');
+  });
+
+  it('still reports ready_for_pr while the phase is pre-merge', async () => {
+    const state = createSprintState(219, 'scoring');
+    completeGates(state);
+    saveSprintState(tmpDir, state);
+    const logs: string[] = [];
+    vi.spyOn(console, 'log').mockImplementation((...args) => { logs.push(args.join(' ')); });
+
+    await sprintCommand(['status']);
+
+    const output = logs.join('\n');
+    expect(output).toContain('status: ready_for_pr (all gates complete)');
+    expect(output).toContain('create PR for this branch');
   });
 });

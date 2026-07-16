@@ -27,7 +27,7 @@ function pct(num: number, den: number): string {
 }
 
 function delta(n: number | undefined): string {
-  if (n == null || n === 0) return '—';
+  if (n == null || n === 0) return '--';
   return `+${n}`;
 }
 
@@ -155,8 +155,8 @@ export function formatSprintReview(
   for (const shot of shots) {
     const hazards = (shot.hazards ?? []).length > 0
       ? shot.hazards.map(h => `${m?.hazards[h.type] ?? h.type}: ${h.description ?? 'unknown'}`).join('; ')
-      : '—';
-    const notes = shot.notes ?? '—';
+      : '--';
+    const notes = shot.notes ?? '--';
     lines.push(`| ${shot.ticket_key} | ${m?.clubs[shot.club] ?? shot.club} | ${m?.shotResults[shot.result] ?? shot.result} | ${hazards} | ${notes} |`);
   }
   lines.push('');
@@ -335,7 +335,7 @@ function formatPlainReview(
   for (const shot of shots) {
     const approach = PLAIN_CLUBS[shot.club] ?? shot.club;
     const outcome = PLAIN_RESULTS[shot.result] ?? shot.result;
-    const notes = shot.notes ?? '—';
+    const notes = shot.notes ?? '--';
     lines.push(`| ${shot.ticket_key} | ${approach} | ${outcome} | ${notes} |`);
   }
   lines.push('');

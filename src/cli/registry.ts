@@ -243,6 +243,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     ],
     flags: [
       { flag: '--metaphor=<id>', desc: 'Display theme override' },
+      { flag: '--force', desc: 'Overwrite an existing review that lacks the slope generation marker' },
       { flag: '<path>', desc: 'Scorecard file to review (default: latest)' },
     ],
   },

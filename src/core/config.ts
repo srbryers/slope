@@ -20,6 +20,9 @@ export interface SlopeConfig {
   repoProfilePath: string;
   transcriptsPath: string;
   metaphor: string;
+  /** Section headings that must appear in a sprint review before the
+   *  review_md gate closes (case-insensitive substring match). */
+  reviewRequiredSections?: string[];
   registryApiUrl?: string;
   currentSprint?: number;
   store?: string;

@@ -1009,10 +1009,18 @@ function statusCommand(cwd: string): void {
 
   const complete = isSprintComplete(state);
   const waivedReviews = waivedReviewGateNames(state);
-  const derivedStatus = complete
-    ? waivedReviews.length > 0 ? 'ready_for_pr_with_review_waiver' : 'ready_for_pr'
-    : state.phase;
-  const phaseContext = complete ? ' (all gates complete)' : ` (phase: ${state.phase})`;
+  // A closed-out sprint (post-merge retro sets phase to complete) must not
+  // resurface as ready_for_pr, or agents are told to open an already-merged
+  // PR. (#611)
+  const closedOut = state.phase === 'complete';
+  const derivedStatus = closedOut
+    ? 'complete'
+    : complete
+      ? waivedReviews.length > 0 ? 'ready_for_pr_with_review_waiver' : 'ready_for_pr'
+      : state.phase;
+  const phaseContext = closedOut
+    ? complete ? ' (merged; all gates complete)' : ' (phase: complete)'
+    : complete ? ' (all gates complete)' : ` (phase: ${state.phase})`;
   console.log(`Sprint ${sprintNumberForCwd(cwd, state.sprint)} - status: ${derivedStatus}${phaseContext}`);
   console.log(`Started: ${state.started_at}`);
   console.log(`Updated: ${state.updated_at}`);
@@ -1041,6 +1049,8 @@ function statusCommand(cwd: string): void {
       return pendingLabels[index] ?? gate;
     });
     console.log(`\nRemaining: ${pending.join(', ')}`);
+  } else if (closedOut) {
+    console.log('\nNext: sprint is closed out (merged, retro recorded). Start the next sprint with `slope sprint start`.');
   } else {
     if (waivedReviews.length > 0) {
       console.log(`\nNext: ${waivedReviews.join(', ')} has an explicit independent-review waiver.`);
