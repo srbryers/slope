@@ -212,8 +212,11 @@ async function endSession(flags: Record<string, string>, cwd: string, rawArgs: s
     if (!sessionId) {
       const active = await store.getActiveSessions();
       const envId = process.env.SLOPE_SESSION_ID?.trim();
-      if (envId && active.some(s => s.session_id === envId)) {
-        sessionId = envId;
+      // Use the store row's id (not the env string) so the value we act on
+      // and log always originates from the session registry.
+      const envMatch = envId ? active.find(s => s.session_id === envId) : undefined;
+      if (envMatch) {
+        sessionId = envMatch.session_id;
       } else if (active.length === 1 && sessionMatchesContext(active[0], cwd)) {
         sessionId = active[0].session_id;
         console.log(`Defaulting to the single active session: ${sessionId}`);
