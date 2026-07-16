@@ -1,5 +1,5 @@
-import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, realpathSync } from 'node:fs';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import type { HookInput, GuardResult, SlopeConfig, WorkflowExecution } from '../../core/index.js';
 import { formatSprintLabel, loadWorkflow, parseSprintNumber } from '../../core/index.js';
 import { loadConfig } from '../config.js';
@@ -13,6 +13,12 @@ import { inferSprintFromBranch, reconcileWorkflowExecutions, sprintLabelForExecu
  * the current step type is not `agent_work`.
  */
 export async function workflowStepGateGuard(input: HookInput, cwd: string): Promise<GuardResult> {
+  // Workflow steps only govern this repository; edits to files outside the
+  // project root (agent memory dirs, other checkouts) are never gated. (#621)
+  const rawTarget = input.tool_input?.file_path ?? input.tool_input?.notebook_path;
+  const targetPath = typeof rawTarget === 'string' && rawTarget.trim() !== '' ? rawTarget : undefined;
+  if (targetPath && !isWithinRepo(cwd, targetPath)) return {};
+
   const config = loadConfig(cwd);
   const storePath = join(cwd, config.store_path ?? '.slope/slope.db');
   if (!existsSync(storePath)) return {};
@@ -23,7 +29,10 @@ export async function workflowStepGateGuard(input: HookInput, cwd: string): Prom
   let store: SqliteSlopeStore | null = null;
   try {
     store = new SqliteSlopeStore(storePath);
-    const resync = await reconcileWorkflowExecutions(cwd, store, { includeNewerRunning: false });
+    const resync = await reconcileWorkflowExecutions(cwd, store, {
+      includeNewerRunning: false,
+      currentSessionId: input.session_id?.trim() || undefined,
+    });
     const active = await store.listExecutions({ status: 'running' });
     if (active.length === 0) return resyncContext(resync);
 
@@ -65,6 +74,21 @@ export async function workflowStepGateGuard(input: HookInput, cwd: string): Prom
     return {};
   } finally {
     store?.close();
+  }
+}
+
+function isWithinRepo(cwd: string, path: string): boolean {
+  // Compare real paths so symlinked roots (macOS /tmp) resolve consistently;
+  // walk up to the nearest existing ancestor for not-yet-created targets.
+  // On any resolution failure, treat the path as in-repo (gate stays active).
+  try {
+    const realCwd = realpathSync(resolve(cwd));
+    let existing = isAbsolute(path) ? resolve(path) : resolve(cwd, path);
+    while (!existsSync(existing) && dirname(existing) !== existing) existing = dirname(existing);
+    const rel = relative(realCwd, realpathSync(existing));
+    return rel === '' || (!rel.startsWith(`..${sep}`) && rel !== '..' && !isAbsolute(rel));
+  } catch {
+    return true;
   }
 }
 

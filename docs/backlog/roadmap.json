@@ -6048,7 +6048,7 @@
       "par": 4,
       "slope": 4,
       "type": "bugfix + guard reliability",
-      "status": "planned",
+      "status": "complete",
       "depends_on": [
         241
       ],

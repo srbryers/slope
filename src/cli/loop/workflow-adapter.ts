@@ -52,6 +52,9 @@ export class WorkflowAdapter {
     this.execution = await this.engine.start(resolved, this.store, {
       sprint_id: sprint.id,
       variables: vars,
+      // Bind the execution to the owning session so dead-session staleness
+      // detection can reap it after the session ends. (#621)
+      session_id: process.env.SLOPE_SESSION_ID?.trim() || undefined,
     });
 
     this.log.info(`Workflow "${this.config.workflowName}" started (${this.execution.id})`);
