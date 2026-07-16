@@ -14,9 +14,12 @@ async function showDanglingExecutions(cwd: string, store: unknown): Promise<void
   const candidate = store as Partial<Pick<SlopeStore, 'listExecutions' | 'getActiveSessions'>>;
   if (typeof candidate.listExecutions !== 'function') return;
   try {
+    // includeNewerRunning=false: parallel live executions are not dangling,
+    // and this list suggests a cleanup command that would pause them.
     const stale = await findStaleWorkflowExecutions(
       cwd,
       candidate as Pick<SlopeStore, 'listExecutions'> & Partial<Pick<SlopeStore, 'getActiveSessions'>>,
+      { includeNewerRunning: false, currentSessionId: process.env.SLOPE_SESSION_ID?.trim() || undefined },
     );
     if (stale.length === 0) return;
     console.log(`  Dangling workflow executions (${stale.length}) — these can gate file edits:`);

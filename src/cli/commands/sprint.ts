@@ -1287,6 +1287,9 @@ async function runWorkflowCommand(args: string[], cwd: string): Promise<void> {
     const exec = await engine.start(resolved, store, {
       sprint_id: sprintId,
       variables: vars,
+      // Bind the execution to the owning session so dead-session staleness
+      // detection can reap it after the session ends. (#621)
+      session_id: process.env.SLOPE_SESSION_ID?.trim() || undefined,
     });
 
     console.log(`\nWorkflow "${def.name}" started (execution: ${exec.id})`);
@@ -1356,7 +1359,9 @@ async function workflowCleanupCommand(args: string[], cwd: string): Promise<void
   if (resync) {
     const store = getStore(cwd);
     try {
-      const result = await reconcileWorkflowExecutions(cwd, store);
+      const result = await reconcileWorkflowExecutions(cwd, store, {
+        currentSessionId: process.env.SLOPE_SESSION_ID?.trim() || undefined,
+      });
       for (const { exec, reason } of result.paused) {
         console.log(`Paused ${sprintLabelForExecution(exec)} (${exec.workflow_name}) at ${exec.current_phase}/${exec.current_step} — ${reason}`);
       }
@@ -1381,7 +1386,9 @@ async function workflowCleanupCommand(args: string[], cwd: string): Promise<void
 
   const store = getStore(cwd);
   try {
-    const stale = await findStaleWorkflowExecutions(cwd, store);
+    const stale = await findStaleWorkflowExecutions(cwd, store, {
+      currentSessionId: process.env.SLOPE_SESSION_ID?.trim() || undefined,
+    });
     if (stale.length === 0) {
       console.log('No stale running workflow executions found.');
       return;
