@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { HookInput, GuardResult, Suggestion } from '../../core/index.js';
-import { castRoadmapStructure, loadConfig, parseRoadmap, parseSprintNumber } from '../../core/index.js';
+import { castRoadmapStructure, loadConfig, loadScorecards, parseRoadmap, parseSprintNumber, sprintOrderValue } from '../../core/index.js';
 import { isPhaseComplete, pendingPhaseGates } from '../phase-cleanup.js';
 
 /** Extract phase number from name like "Phase 7 — Helmsman 3D". Falls back to array index + 1. */
@@ -75,6 +75,31 @@ export async function phaseBoundaryGuard(input: HookInput, cwd: string): Promise
 
   // Check if previous phase cleanup is complete
   if (isPhaseComplete(cwd, prevPhaseNum)) return {};
+
+  // Staleness heuristic (#621): the phase ledger can silently fall behind
+  // reality (phases ship without `slope phase complete` ever running). When
+  // scorecards already exist at or past the target phase's first sprint, the
+  // boundary is history — warn instead of blocking on ancient state.
+  const targetPhaseSprints = (roadmap.phases[targetPhaseIdx].sprints ?? [])
+    .filter((id): id is number => typeof id === 'number')
+    .map(id => sprintOrderValue(id));
+  const boundaryOrder = targetPhaseSprints.length > 0 ? Math.min(...targetPhaseSprints) : null;
+  if (boundaryOrder !== null) {
+    try {
+      const scorecardOrders = loadScorecards(config, cwd).map(card => sprintOrderValue(card.sprint_number));
+      if (scorecardOrders.some(order => order >= boundaryOrder)) {
+        return {
+          context: [
+            `SLOPE advisory (non-blocking) — Phase ${prevPhaseNum} cleanup was never recorded, but scorecards already exist at or past Phase ${targetPhaseNum}, so the phase ledger looks stale rather than the work incomplete.`,
+            `Reconcile it with: slope phase complete ${prevPhaseNum}`,
+            'This advisory does not grant or deny host tool permission.',
+          ].join('\n'),
+        };
+      }
+    } catch {
+      // Scorecard evidence is advisory; fall through to the normal block.
+    }
+  }
 
   // Previous phase cleanup incomplete — block with suggestion
   const pending = pendingPhaseGates(cwd, prevPhaseNum);

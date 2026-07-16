@@ -70,6 +70,30 @@ describe('phaseBoundaryGuard', () => {
     expect(result.suggestion?.context).toContain('Phase 1 cleanup is incomplete');
   });
 
+  it('downgrades to an advisory when scorecards already exist past the boundary (#621)', async () => {
+    writeRoadmap();
+    mkdirSync(join(tmpDir, 'docs', 'retros'), { recursive: true });
+    writeFileSync(join(tmpDir, 'docs', 'retros', 'sprint-2.json'), JSON.stringify({ sprint_number: 2 }));
+
+    const result = await phaseBoundaryGuard(makeInput('slope sprint start --sprint=2'), tmpDir);
+
+    expect(result.decision).toBeUndefined();
+    expect(result.suggestion).toBeUndefined();
+    expect(result.context).toContain('phase ledger looks stale');
+    expect(result.context).toContain('slope phase complete 1');
+  });
+
+  it('never matches non-slope commands like gh issue create (#621)', async () => {
+    writeRoadmap();
+
+    const result = await phaseBoundaryGuard(
+      makeInput('gh issue create --repo srbryers/slope --title "sprint 2 bug" --body "slope sprint start --sprint=2 failed"'),
+      tmpDir,
+    );
+
+    expect(result).toEqual({});
+  });
+
   it('matches package-manager slope claim invocations', async () => {
     writeRoadmap();
 
