@@ -175,9 +175,11 @@ export function reviewCommand(
   }
 
   // Generating a historical sprint's review must not complete a different
-  // active sprint's gate.
+  // active sprint's gate, and view-only runs (--stdout, --output=<custom>)
+  // must not mutate gate state at all — only a canonical-path run validates
+  // what closeout will actually ship.
   const sprintState = loadSprintState(cwd);
-  if (sprintState?.sprint === card.sprint_number) {
+  if (outputPath === undefined && sprintState?.sprint === card.sprint_number) {
     // User-supplied config: tolerate any shape without crashing closeout.
     const configuredSections = config.reviewRequiredSections;
     if (configuredSections != null && !Array.isArray(configuredSections)) {

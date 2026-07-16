@@ -252,6 +252,27 @@ describe('reviewCommand overwrite protection (#616)', () => {
     expect(errors.join('\n')).toContain('## What went wrong');
   });
 
+  it('never mutates gate state on view-only runs (--stdout / --output) (#616 R1)', () => {
+    const scorecardPath = writeCard(137);
+    writeFileSync(join(tmpDir, '.slope', 'config.json'), JSON.stringify({
+      scorecardDir: 'docs/retros',
+      scorecardPattern: 'sprint-*.json',
+      minSprint: 1,
+      reviewRequiredSections: ['## What went wrong'],
+    }));
+    const state = createSprintState(137, 'scoring');
+    state.gates.review_md = true;
+    saveSprintState(tmpDir, state);
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    reviewCommand(scorecardPath, undefined, undefined, null);
+    expect(loadSprintState(tmpDir)?.gates.review_md).toBe(true);
+
+    reviewCommand(scorecardPath, undefined, undefined, 'docs/retros/elsewhere.md');
+    expect(loadSprintState(tmpDir)?.gates.review_md).toBe(true);
+  });
+
   it('repairs cp1252 mojibake sequences in written reviews', () => {
     const card = buildScorecard({
       sprint_number: 133,
