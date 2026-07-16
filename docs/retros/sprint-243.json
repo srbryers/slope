@@ -1,0 +1,71 @@
+{
+  "sprint_number": 243,
+  "theme": "Stale State and Guard Scoping",
+  "par": 4,
+  "slope": 4,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-07-16",
+  "shots": [
+    {
+      "ticket_key": "S243-1",
+      "title": "Reap or ignore dangling workflow executions from dead sessions in workflow-step-gate and surface them in status/briefing with a clear-command (#621)",
+      "club": "driver",
+      "result": "green",
+      "hazards": [],
+      "notes": "findStaleWorkflowExecutions now counts a dead owning session as staleness evidence — gated on session tracking being in use and never for the invoking session — and slope status lists dangling executions with the cleanup command."
+    },
+    {
+      "ticket_key": "S243-2",
+      "title": "Scope edit and Bash gates to the repo root and exempt non-sprint commands like gh issue create (#621)",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "workflow-step-gate allows any Edit/Write whose target resolves outside cwd before touching the store. Main had already narrowed phase-boundary to slope commands; a gh issue create regression test locks that in."
+    },
+    {
+      "ticket_key": "S243-3",
+      "title": "Add phase-ledger staleness heuristic — scorecards far past the boundary downgrade block to warn (#621)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "When scorecards exist at or past the target phase's first sprint, phase-boundary emits a non-blocking advisory recommending slope phase complete N instead of denying."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 3,
+    "fairways_total": 3,
+    "greens_in_regulation": 3,
+    "greens_total": 3,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    "Main had already fixed parts of #621 (gate resync on invocation, phase-boundary matching only slope commands) — the residual gaps were dead-session staleness, out-of-repo edit gating, status surfacing, and the ledger staleness heuristic."
+  ],
+  "special_plays": [],
+  "bunker_locations": [
+    "Dead-session staleness can misfire in multi-agent setups if guarded only by session-row presence; it is fenced to tracked-session repos and never the invoking session, pending review scrutiny."
+  ],
+  "yardage_book_updates": [
+    "Existing workflow-step-gate tests used an out-of-repo default edit path; repo-scoping changes flip such fixtures — keep guard test fixtures inside the temp repo.",
+    "findStaleWorkflowExecutions store parameter widened with Partial getActiveSessions; mock stores without it are unaffected."
+  ],
+  "course_management_notes": [
+    "Issue #621 was filed from an older slope version; each ticket was re-scoped against current main before implementation."
+  ],
+  "slope_factors": [
+    "guard_reliability",
+    "multi_session_semantics",
+    "state_machine",
+    "cross_platform_paths"
+  ]
+}
