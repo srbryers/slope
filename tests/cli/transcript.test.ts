@@ -161,6 +161,37 @@ describe('transcriptCommand', () => {
       expect(output).toContain('Token counts unavailable');
     });
 
+    it('never reports negative durations for unordered or invalid timestamps (#619)', async () => {
+      writeSampleTranscript('sess-unordered', [
+        {
+          role: 'tool_result',
+          timestamp: '2026-02-26T15:45:00Z',
+          tool_calls: [{ tool: 'Read', params_summary: 'late turn first', success: true }],
+          outcome: 'success',
+        },
+        {
+          role: 'tool_result',
+          timestamp: 'not-a-timestamp',
+          tool_calls: [{ tool: 'Grep', params_summary: 'bad clock', success: true }],
+          outcome: 'success',
+        },
+        {
+          role: 'tool_result',
+          timestamp: '2026-02-26T14:30:00Z',
+          tool_calls: [{ tool: 'Edit', params_summary: 'early turn last', success: true }],
+          outcome: 'success',
+        },
+      ]);
+
+      const spy = vi.spyOn(console, 'log');
+      await transcriptCommand(['stats', 'sess-unordered']);
+      const output = spy.mock.calls.map(c => String(c[0])).join('\n');
+      spy.mockRestore();
+
+      expect(output).toContain('Duration: 75m');
+      expect(output).not.toMatch(/Duration: -/);
+    });
+
     it('aggregates stats across all sessions', async () => {
       writeSampleTranscript('sess-a', sampleTurns);
       writeSampleTranscript('sess-b', sampleTurns.slice(0, 2));

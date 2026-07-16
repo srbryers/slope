@@ -14,6 +14,17 @@ export interface StandupReport {
   decisions: string[];
   handoffs: HandoffEntry[];
   timestamp: string;
+  context?: StandupContext;
+}
+
+/** Repo-derived context that makes a standup usable as an actual wrap:
+ *  sprint + scorecard state, branch + commits, and transcript volume. (#619) */
+export interface StandupContext {
+  sprint?: number;
+  scorecard?: 'present' | 'missing';
+  branch?: string;
+  commits?: { count: number; latest?: string };
+  transcript?: { turns: number; toolCalls: number; durationMin: number };
 }
 
 /** A handoff — files or areas another agent needs to know about */
@@ -32,8 +43,9 @@ export function generateStandup(opts: {
   agent_role?: string;
   events: SlopeEvent[];
   claims: SprintClaim[];
+  context?: StandupContext;
 }): StandupReport {
-  const { sessionId, agent_role, events, claims } = opts;
+  const { sessionId, agent_role, events, claims, context } = opts;
 
   // Determine current ticket from claims
   const ticketClaims = claims.filter(c => c.scope === 'ticket' && c.session_id === sessionId);
@@ -117,6 +129,7 @@ export function generateStandup(opts: {
     decisions,
     handoffs,
     timestamp: new Date().toISOString(),
+    ...(context ? { context } : {}),
   };
 }
 
@@ -141,6 +154,25 @@ export function formatStandup(report: StandupReport): string {
   }
   lines.push(`**Status:** ${report.status}`);
   lines.push('');
+
+  // Repo context — sprint/scorecard/branch/commits/transcript (#619)
+  const context = report.context;
+  if (context) {
+    if (context.sprint != null) {
+      const scorecardNote = context.scorecard ? ` (scorecard ${context.scorecard})` : '';
+      lines.push(`**Sprint:** S${context.sprint}${scorecardNote}`);
+    }
+    if (context.branch) {
+      const commitsNote = context.commits
+        ? ` — ${context.commits.count} commit${context.commits.count === 1 ? '' : 's'} this session${context.commits.latest ? `; latest: ${context.commits.latest}` : ''}`
+        : '';
+      lines.push(`**Branch:** ${context.branch}${commitsNote}`);
+    }
+    if (context.transcript) {
+      lines.push(`**Transcript:** ${context.transcript.turns} turns, ${context.transcript.toolCalls} tool calls, ${context.transcript.durationMin}m`);
+    }
+    lines.push('');
+  }
 
   // Progress
   lines.push(`**Progress:** ${report.progress}`);

@@ -536,3 +536,34 @@ describe('formatTeamStandup', () => {
     expect(output).toContain('## Agent Reports');
   });
 });
+
+// --- Standup context (#619) ---
+
+describe('standup context', () => {
+  it('carries repo context through generateStandup and renders it', () => {
+    const report = generateStandup({
+      sessionId: 'sess-1',
+      events: [makeEvent('decision', { choice: 'ship it' })],
+      claims: [makeClaim()],
+      context: {
+        sprint: 244,
+        scorecard: 'missing',
+        branch: 'feat/S244-session-wrap-standup',
+        commits: { count: 3, latest: 'feat(S244-1): default session end' },
+        transcript: { turns: 132, toolCalls: 468, durationMin: 84 },
+      },
+    });
+
+    expect(report.context?.sprint).toBe(244);
+    const formatted = formatStandup(report);
+    expect(formatted).toContain('**Sprint:** S244 (scorecard missing)');
+    expect(formatted).toContain('**Branch:** feat/S244-session-wrap-standup — 3 commits this session; latest: feat(S244-1): default session end');
+    expect(formatted).toContain('**Transcript:** 132 turns, 468 tool calls, 84m');
+  });
+
+  it('omits the context block entirely when absent', () => {
+    const report = generateStandup({ sessionId: 'sess-1', events: [], claims: [] });
+    expect(report.context).toBeUndefined();
+    expect(formatStandup(report)).not.toContain('**Sprint:**');
+  });
+});

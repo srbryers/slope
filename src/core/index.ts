@@ -514,6 +514,7 @@ export {
 } from './standup.js';
 export type {
   StandupReport,
+  StandupContext,
   HandoffEntry,
   TeamStandup,
 } from './standup.js';

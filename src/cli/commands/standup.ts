@@ -1,4 +1,6 @@
+import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   generateStandup,
   formatStandup,
@@ -7,9 +9,80 @@ import {
   aggregateStandups,
   formatTeamStandup,
 } from '../../core/index.js';
-import type { SlopeEvent, SprintClaim, StandupReport } from '../../core/index.js';
+import type { SlopeEvent, SprintClaim, StandupContext, StandupReport } from '../../core/index.js';
+import { readTranscript } from '../../core/transcript.js';
 import { loadConfig } from '../config.js';
+import { inferSprintContext } from '../sprint-inference.js';
+import { scorecardExistsForSprint } from '../workflow-resync.js';
 import { resolveStore } from '../store.js';
+
+/** Gather repo-derived standup context; every probe is best-effort. (#619) */
+function gatherStandupContext(
+  cwd: string,
+  config: ReturnType<typeof loadConfig>,
+  sessionId: string,
+  sprintNumber: number | undefined,
+  sessionStartedAt: string | undefined,
+): StandupContext {
+  const context: StandupContext = {};
+
+  try {
+    const sprint = sprintNumber ?? inferSprintContext(cwd, config).sprint;
+    if (sprint != null) {
+      context.sprint = sprint;
+      context.scorecard = scorecardExistsForSprint(cwd, sprint) ? 'present' : 'missing';
+    }
+  } catch {
+    // Sprint inference is advisory.
+  }
+
+  try {
+    const branch = execSync('git rev-parse --abbrev-ref HEAD', { cwd, stdio: ['ignore', 'pipe', 'ignore'] })
+      .toString().trim();
+    if (branch) {
+      context.branch = branch;
+      if (sessionStartedAt) {
+        const log = execSync(
+          `git log --oneline --since=${JSON.stringify(sessionStartedAt)}`,
+          { cwd, stdio: ['ignore', 'pipe', 'ignore'] },
+        ).toString().trim();
+        const commits = log ? log.split('\n') : [];
+        context.commits = {
+          count: commits.length,
+          ...(commits.length > 0 ? { latest: commits[0].replace(/^\S+\s+/, '') } : {}),
+        };
+      }
+    }
+  } catch {
+    // Not a git checkout, or git unavailable.
+  }
+
+  try {
+    const dir = join(cwd, config.transcriptsPath ?? '.slope/transcripts');
+    const turns = readTranscript(dir, sessionId);
+    if (turns.length > 0) {
+      let toolCalls = 0;
+      let earliest = Number.POSITIVE_INFINITY;
+      let latest = Number.NEGATIVE_INFINITY;
+      for (const turn of turns) {
+        toolCalls += turn.tool_calls?.length ?? 0;
+        const time = new Date(turn.timestamp).getTime();
+        if (!Number.isFinite(time)) continue;
+        if (time < earliest) earliest = time;
+        if (time > latest) latest = time;
+      }
+      context.transcript = {
+        turns: turns.length,
+        toolCalls,
+        durationMin: Number.isFinite(earliest) && latest > earliest ? Math.round((latest - earliest) / 60000) : 0,
+      };
+    }
+  } catch {
+    // Transcript capture may be disabled.
+  }
+
+  return context;
+}
 
 export async function standupCommand(args: string[]): Promise<void> {
   const cwd = process.cwd();
@@ -140,6 +213,7 @@ export async function standupCommand(args: string[]): Promise<void> {
         agent_role,
         events,
         claims,
+        context: gatherStandupContext(cwd, config, sessionId, sprintNumber, session?.started_at),
       });
 
       // Store standup as event
