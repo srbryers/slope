@@ -43,7 +43,7 @@ sprints:
     par: 4
     slope: 2
     type: bugfix + lifecycle correctness
-    status: planned
+    status: complete
     depends_on:
       - 241
     note: "Fix #616 (slope review silently overwrites a compliant project-authored review and emits mojibake) and #611 (post-merge retro leaves sprint status at ready_for_pr with a stale next action)."
@@ -146,3 +146,4 @@ sprints:
           - S245-1
 scorecards:
   "241": docs/retros/sprint-241.json
+  "242": docs/retros/sprint-242.json
