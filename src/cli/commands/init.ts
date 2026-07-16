@@ -253,7 +253,7 @@ function installClaudeCodeTemplates(cwd: string, metaphor: MetaphorDefinition): 
   // Install slash commands (sprint workflow automation)
   const commandsDir = join(cwd, '.claude', 'commands');
   mkdirSync(commandsDir, { recursive: true });
-  const commandFiles = ['post-sprint.md', 'review-pr.md', 'start-sprint.md'];
+  const commandFiles = ['post-sprint.md', 'review-pr.md', 'start-sprint.md', 'wrap-session.md'];
   let commandsInstalled = 0;
   for (const file of commandFiles) {
     const src = join(templatesRoot, 'commands', file);
@@ -811,6 +811,7 @@ function installPiTemplates(cwd: string): void {
     'start-sprint': 'start-sprint.md',
     'post-sprint': 'post-sprint.md',
     'review-pr': 'review-pr.md',
+    'wrap-session': 'wrap-session.md',
   };
   let skillsInstalled = 0;
   for (const [skillName, file] of Object.entries(skillFiles)) {
@@ -1002,7 +1003,7 @@ const PROVIDER_FILES: Partial<Record<InitProvider, string[]>> = {
   'claude-code': [
     '.claude/rules/ (sprint checklist, commit discipline, review loop, codebase context)',
     '.claude/hooks/ (pre-merge-check, session hooks)',
-    '.claude/commands/ (post-sprint, review-pr, start-sprint slash commands)',
+    '.claude/commands/ (post-sprint, review-pr, start-sprint, wrap-session slash commands)',
     '.mcp.json (SLOPE MCP server)',
     'CLAUDE.md (project context)',
   ],

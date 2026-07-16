@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { execSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync, existsSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -140,6 +140,28 @@ describe('buildSummary', () => {
 });
 
 describe('init command backward compatibility', () => {
+  it('installs the wrap-session skill alongside the sprint lifecycle commands (#620)', async () => {
+    const { initCommand } = await import('../../src/cli/commands/init.js');
+    const origCwd = process.cwd;
+    const origExit = process.exit;
+    process.cwd = () => tmpDir;
+    process.exit = vi.fn() as never;
+
+    try {
+      await initCommand(['--claude-code', '--metaphor=golf']);
+
+      const wrapPath = join(tmpDir, '.claude', 'commands', 'wrap-session.md');
+      expect(existsSync(wrapPath)).toBe(true);
+      const content = readFileSync(wrapPath, 'utf8');
+      expect(content).toContain('slope session end');
+      expect(content).toContain('slope standup');
+      expect(content).toContain('unpushed');
+    } finally {
+      process.cwd = origCwd;
+      process.exit = origExit;
+    }
+  });
+
   it('non-interactive flag-based init still works after refactor', async () => {
     const { initCommand } = await import('../../src/cli/commands/init.js');
 
