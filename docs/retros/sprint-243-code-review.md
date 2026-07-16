@@ -86,3 +86,45 @@ With a shared store (PG) and two genuinely concurrent running sprints, `slope st
 3. **F3:** heartbeat-based (or grace-period) liveness before dead-session pausing — land with F2, not after it.
 
 F4/F5 are recommended hardening; F6/F7 need only an explicit "yes, intended" from the sprint owner.
+
+---
+
+# Delta Re-Review Addendum (HEAD 74ac060)
+
+- **Scope:** `git diff 5f07089..74ac060 -- src/ tests/` (commits fed16fd, 3807bee, 74ac060)
+- **Verification:** `pnpm vitest run tests/cli/guards/ tests/cli/sprint-workflow.test.ts` — 24 files, **358/358 pass**. `pnpm typecheck` clean. Fixes re-probed with throwaway scripts (scratchpad only, removed afterward).
+
+## Finding-by-finding disposition
+
+### F1 (HIGH) — RESOLVED, and strengthened
+`phase-boundary.ts` now routes all ordering through `roadmapSprintOrderValue` (local `orderOf`), and additionally requires the scorecard's order to match a **roadmap-member** sprint at/past the boundary. Probe-verified at HEAD with the original failing input (Phase 2 `[245, 246]`, only `sprint-243.json` on disk): now **denies**. `sprint-245.json` present → advisory, correctly. Stray `sprint-999.json` (non-roadmap) → still denies — the membership check closes an evidence leak I had not flagged. Committed regression tests (`tests/cli/guards/phase-boundary.test.ts`, `writeModernRoadmap` with `[243]/[245,246]`) cover all three cases. The new `roadmap.sprints.map(...)` sits inside the existing try/catch, so structural surprises fall through to the block (fail-safe).
+
+### F2 (HIGH) — RESOLVED as designed, with a coverage caveat (R1, non-blocking)
+`slope sprint run` (`sprint.ts:1292`) and the loop adapter (`workflow-adapter.ts:57`) now pass `session_id: process.env.SLOPE_SESSION_ID?.trim() || undefined` to `engine.start`. The mechanism is correct and fail-safe (unset env → `session_id` undefined → dead-session leg skips, exactly the pre-S243 behavior).
+
+**Caveat R1:** nothing in the repo *exports* `SLOPE_SESSION_ID` — it is consumed by hook templates (`.claude/hooks/slope-session-end.sh`, opencode plugin template, `slope hook`/`init`/`doctor` snippets) but `slope session start` prints the id without exporting it, and `.claude/settings.json` has no `env` block. On a stock Claude Code setup the variable is typically unset, so executions remain unbound there and the dead-session leg stays dormant (the scorecard/roadmap/age/branch reasons still cover #621's common cases). This is a coverage gap, not a correctness bug. Suggested follow-up (separate ticket): export it via the generated hook/env templates, or document the requirement.
+
+**Caveat R2 (Low):** two id namespaces now exist — `exec.session_id` comes from `SLOPE_SESSION_ID` (often a `randomUUID` from `slope session start`), while the gate's `currentSessionId` is the harness hook `input.session_id` (also what worktree-check registers). Where these differ, the gate's self-protection clause cannot match its own execution. Bounded by the F3 grace window plus the requirement that the owning session row be gone, so note-only.
+
+### F3 (MEDIUM) — RESOLVED with an accepted residual (R3, Low)
+Dead-session evidence now additionally requires the execution to be quiet for `DEAD_SESSION_GRACE_MS` (60 min, `workflow-resync.ts`), keyed off `exec.updated_at || started_at`. This covers the TTL/`cleanStaleSessions` legs and the ordinary between-turn stop-check row deletion; the committed test includes a 5-minute-old lapsed-session execution that must survive, and it does (358 pass).
+
+**Residual R3:** `updated_at` only ticks on workflow state changes, not on tool activity. A live owner sitting in a single `agent_work` step for >60 min, whose session row happens to be absent between turns (stop-check deletes on every clean Stop), can still have its execution paused by a peer. Recoverable (`resume`/resync, visible reason string) and much narrower than before — acceptable; consider touching `updated_at` on heartbeat as future hardening.
+
+### F4 (LOW/MED) — RESOLVED for symlinks; case-flip residual remains (R4, Low)
+`isWithinRepo` now realpaths the cwd and the target's nearest existing ancestor, and **fails toward gating** on resolution errors. Probe-verified at HEAD: macOS `/tmp` vs `/private/tmp` aliasing now resolves in-repo in both directions, including not-yet-created targets; genuinely-outside and nonexistent-root paths still early-allow.
+
+**Residual R4:** `realpathSync` does not canonicalize letter case on case-insensitive APFS (probe: `realpathSync('/USERS') === '/USERS'`), so a deliberately case-mangled in-repo path (`/users/...` for `/Users/...`) still bypasses the gate. Requires intentional mangling; fail-open only for this guard. Note-only.
+
+### F5 (LOW) — RESOLVED
+`typeof rawTarget === 'string' && rawTarget.trim() !== ''` replaces the cast; `notebook_path` accepted as a fallback target. Non-string inputs can no longer throw ahead of the try/catch.
+
+### F6 (INFO) — CLOSED as intended
+Owner confirms the `>=` boundary semantic (a scored attempt at the target phase's first sprint means the boundary was crossed). The advisory now lists the unrecorded pending gates and clarifies that `slope phase complete` is an unvalidated manual override — the UX note is addressed.
+
+### F7 (INFO) — RESOLVED
+`slope status` now passes `includeNewerRunning: false` and `currentSessionId`; CLI `resync`/`cleanup --stale` pass `currentSessionId`. Live parallel executions are no longer advertised as dangling. (`cleanup --stale` itself retains `includeNewerRunning: true` — pre-existing, explicitly invoked semantics; fine.)
+
+## Final verdict: APPROVE (with notes)
+
+All blocking findings (F1, F2, F3) are correctly addressed at 74ac060 and covered by committed regression tests; the probes that originally demonstrated F1 and F4 now pass. Residuals R1–R4 are non-blocking follow-up candidates — R1 (exporting `SLOPE_SESSION_ID` so execution-session binding is live on stock Claude Code setups) is the one most worth a ticket, since until then the dead-session leg is dormant on the primary harness.
