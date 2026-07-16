@@ -451,8 +451,8 @@
         244,
         245
       ],
-      "status": "planned",
-      "note": "Issue-driven recovery for #608, #611, #615, #616, #617, #618, #619, #620, #621. Ordered by blast radius: reconciliation corrupts roadmap sources on every closeout, so it goes first."
+      "status": "complete",
+      "note": "Issue-driven recovery for #608, #611, #615, #616, #617, #618, #619, #620, #621. Ordered by blast radius: reconciliation corrupts roadmap sources on every closeout, so it went first. Completed 2026-07-16: S241-S244 shipped (PRs #622, #626, #627, #628); S245 superseded — #608 had already been fixed by S240 in v1.63.0."
     }
   ],
   "sprints": [
@@ -6128,11 +6128,11 @@
       "par": 3,
       "slope": 2,
       "type": "bugfix + cross-platform compatibility",
-      "status": "planned",
+      "status": "superseded",
       "depends_on": [
         242
       ],
-      "note": "Fix #608: slope init --codex appends a duplicate hook set with absolute worktree paths and prepends duplicate CODEBASE.md frontmatter. Re-running init must be a no-op when nothing changed.",
+      "note": "Superseded: #608 was already fixed on main by S240 (commit bbd75f5, shipped in v1.63.0) before this sprint could start. Verified 2026-07-16 in a sandbox: codex hook commands are repo-relative, re-running init is idempotent (only the intentional generated_at metadata changes), and existing CODEBASE.md frontmatter is replaced, not duplicated.",
       "tickets": [
         {
           "key": "S245-1",
