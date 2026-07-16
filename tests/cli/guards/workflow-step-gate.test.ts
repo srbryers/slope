@@ -16,7 +16,8 @@ function makeInput(overrides: Partial<HookInput> = {}): HookInput {
     cwd: TMP,
     hook_event_name: 'PreToolUse',
     tool_name: 'Edit',
-    tool_input: { file_path: '/foo/bar.ts' },
+    // In-repo target: the gate only governs files inside the project root.
+    tool_input: { file_path: join(TMP, 'src', 'bar.ts') },
     tool_response: {},
     ...overrides,
   };
@@ -148,6 +149,23 @@ describe('workflowStepGateGuard', () => {
 
     const result = await workflowStepGateGuard(makeInput(), TMP);
     expect(result).toEqual({});
+  });
+
+  it('never gates edits to paths outside the repository root (#621)', async () => {
+    writeConfig();
+    writeWorkflow('gating-wf', 'command');
+    const store = new SqliteSlopeStore(join(TMP, '.slope/slope.db'));
+    await createRunningExecution(store, 'gating-wf', 'phase1', 'step1', { sessionId: 'test-session' });
+    store.close();
+
+    const outside = await workflowStepGateGuard(
+      makeInput({ tool_input: { file_path: join(tmpdir(), 'other-project', 'MEMORY.md') } }),
+      TMP,
+    );
+    expect(outside).toEqual({});
+
+    const inside = await workflowStepGateGuard(makeInput(), TMP);
+    expect(inside.decision).toBe('deny');
   });
 
   it('allows file edit on agent_work step', async () => {

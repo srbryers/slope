@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import type { HookInput, GuardResult, SlopeConfig, WorkflowExecution } from '../../core/index.js';
 import { formatSprintLabel, loadWorkflow, parseSprintNumber } from '../../core/index.js';
 import { loadConfig } from '../config.js';
@@ -13,6 +13,11 @@ import { inferSprintFromBranch, reconcileWorkflowExecutions, sprintLabelForExecu
  * the current step type is not `agent_work`.
  */
 export async function workflowStepGateGuard(input: HookInput, cwd: string): Promise<GuardResult> {
+  // Workflow steps only govern this repository; edits to files outside the
+  // project root (agent memory dirs, other checkouts) are never gated. (#621)
+  const targetPath = input.tool_input?.file_path as string | undefined;
+  if (targetPath && !isWithinRepo(cwd, targetPath)) return {};
+
   const config = loadConfig(cwd);
   const storePath = join(cwd, config.store_path ?? '.slope/slope.db');
   if (!existsSync(storePath)) return {};
@@ -66,6 +71,12 @@ export async function workflowStepGateGuard(input: HookInput, cwd: string): Prom
   } finally {
     store?.close();
   }
+}
+
+function isWithinRepo(cwd: string, path: string): boolean {
+  const resolved = isAbsolute(path) ? resolve(path) : resolve(cwd, path);
+  const rel = relative(resolve(cwd), resolved);
+  return rel === '' || (!rel.startsWith(`..${sep}`) && rel !== '..' && !isAbsolute(rel));
 }
 
 function selectWorkflowExecution(
