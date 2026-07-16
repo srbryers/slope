@@ -170,10 +170,25 @@ async function startSession(flags: Record<string, string>, cwd: string): Promise
 async function endSession(flags: Record<string, string>, cwd: string): Promise<void> {
   const store = await resolveStore(cwd);
   try {
-    const sessionId = flags['session-id'];
+    // Prefer an explicit id, then the environment session, then the single
+    // active session — copying an id out of `session list` first is the #620
+    // papercut this removes. Multiple active sessions still require the flag.
+    let sessionId = flags['session-id'] || process.env.SLOPE_SESSION_ID?.trim();
     if (!sessionId) {
-      console.error('Error: --session-id is required');
-      process.exit(1);
+      const active = await store.getActiveSessions();
+      if (active.length === 1) {
+        sessionId = active[0].session_id;
+        console.log(`Defaulting to the single active session: ${sessionId}`);
+      } else if (active.length === 0) {
+        console.error('Error: no active sessions to end.');
+        process.exit(1);
+      } else {
+        console.error(`Error: ${active.length} sessions are active — pass --session-id=<id>:`);
+        for (const s of active) {
+          console.error(`  ${s.session_id} [${s.role}] ${s.branch ?? 'no branch'}`);
+        }
+        process.exit(1);
+      }
     }
 
     const removed = await store.removeSession(sessionId);
