@@ -557,7 +557,7 @@ describe('standup context', () => {
     expect(report.context?.sprint).toBe(244);
     const formatted = formatStandup(report);
     expect(formatted).toContain('**Sprint:** S244 (scorecard missing)');
-    expect(formatted).toContain('**Branch:** feat/S244-session-wrap-standup — 3 commits this session; latest: feat(S244-1): default session end');
+    expect(formatted).toContain('**Branch:** feat/S244-session-wrap-standup — ~3 commits since session start; latest: feat(S244-1): default session end');
     expect(formatted).toContain('**Transcript:** 132 turns, 468 tool calls, 84m');
   });
 

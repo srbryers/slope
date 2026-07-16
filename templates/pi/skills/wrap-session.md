@@ -1,3 +1,8 @@
+---
+name: wrap-session
+description: Session-close routine. Generates the standup wrap, checks for uncommitted and unpushed work, reports sprint state, ends the session to release claims, and emits a handoff summary.
+---
+
 # Wrap Session — Close Out the Working Session
 
 Run the session-close routine. A session is not a sprint: a long session can span several sprints or end mid-sprint, so this complements `/post-sprint` rather than replacing it. Leaked claims and unpushed work are the two failure modes this prevents.

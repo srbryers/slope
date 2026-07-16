@@ -164,7 +164,7 @@ export function formatStandup(report: StandupReport): string {
     }
     if (context.branch) {
       const commitsNote = context.commits
-        ? ` — ${context.commits.count} commit${context.commits.count === 1 ? '' : 's'} this session${context.commits.latest ? `; latest: ${context.commits.latest}` : ''}`
+        ? ` — ~${context.commits.count} commit${context.commits.count === 1 ? '' : 's'} since session start${context.commits.latest ? `; latest: ${context.commits.latest}` : ''}`
         : '';
       lines.push(`**Branch:** ${context.branch}${commitsNote}`);
     }
@@ -228,6 +228,9 @@ export function parseStandup(data: Record<string, unknown>): StandupReport | nul
     decisions: (data.decisions as string[]) ?? [],
     handoffs: (data.handoffs as HandoffEntry[]) ?? [],
     timestamp: (data.timestamp as string) ?? new Date().toISOString(),
+    ...(data.context && typeof data.context === 'object' && !Array.isArray(data.context)
+      ? { context: data.context as StandupContext }
+      : {}),
   };
 }
 

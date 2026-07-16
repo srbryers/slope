@@ -10,10 +10,10 @@ let logs: string[];
 let errors: string[];
 let savedEnvSession: string | undefined;
 
-async function registerSession(id: string): Promise<void> {
+async function registerSession(id: string, extras: { worktree_path?: string; branch?: string } = {}): Promise<void> {
   const store = new SqliteSlopeStore(join(tmpDir, '.slope', 'slope.db'));
   try {
-    await store.registerSession({ session_id: id, role: 'primary', ide: 'test' });
+    await store.registerSession({ session_id: id, role: 'primary', ide: 'test', ...extras });
   } finally {
     store.close();
   }
@@ -70,6 +70,16 @@ describe('slope session end defaults (#620)', () => {
     expect(await activeSessionIds()).toEqual(['other-session']);
   });
 
+  it('ignores a stale SLOPE_SESSION_ID and still defaults to the single active session', async () => {
+    await registerSession('real-session');
+    process.env.SLOPE_SESSION_ID = 'gone-session';
+
+    await sessionCommand(['end']);
+
+    expect(logs.join('\n')).toContain('Defaulting to the single active session: real-session');
+    expect(await activeSessionIds()).toEqual([]);
+  });
+
   it('errors with the session list when several sessions are active', async () => {
     await registerSession('session-a');
     await registerSession('session-b');
@@ -83,6 +93,30 @@ describe('slope session end defaults (#620)', () => {
     expect(errors.join('\n')).toContain('session-a');
     expect(errors.join('\n')).toContain('session-b');
     expect(await activeSessionIds()).toHaveLength(2);
+  });
+
+  it('keeps the installed hook shape failing when --session-id is empty', async () => {
+    await registerSession('teammate-session');
+    vi.spyOn(process, 'exit').mockImplementation(((code?: number) => {
+      throw new Error(`process.exit(${code ?? 0})`);
+    }) as never);
+
+    await expect(sessionCommand(['end', '--session-id='])).rejects.toThrow('process.exit(1)');
+
+    expect(errors.join('\n')).toContain('provided but empty');
+    expect(await activeSessionIds()).toEqual(['teammate-session']);
+  });
+
+  it('refuses the default when the single active session belongs to another worktree', async () => {
+    await registerSession('other-worktree-session', { worktree_path: join(tmpdir(), 'somewhere-else-entirely') });
+    vi.spyOn(process, 'exit').mockImplementation(((code?: number) => {
+      throw new Error(`process.exit(${code ?? 0})`);
+    }) as never);
+
+    await expect(sessionCommand(['end'])).rejects.toThrow('process.exit(1)');
+
+    expect(errors.join('\n')).toContain('different worktree or branch');
+    expect(await activeSessionIds()).toEqual(['other-worktree-session']);
   });
 
   it('errors clearly when no sessions are active', async () => {

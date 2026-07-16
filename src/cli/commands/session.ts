@@ -1,9 +1,34 @@
+import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { existsSync, writeFileSync, readFileSync, readdirSync, mkdirSync } from 'node:fs';
+import { existsSync, realpathSync, writeFileSync, readFileSync, readdirSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { checkConflicts } from '../../core/index.js';
+import type { SlopeSession } from '../../core/index.js';
 import { STALE_SESSION_THRESHOLD_MS } from '../../core/constants.js';
 import { resolveStore } from '../store.js';
+
+/** A session may only be ended by default when its recorded identity does not
+ *  contradict this checkout — in a same-checkout swarm, "the single active
+ *  session" can be a live teammate's. */
+function sessionMatchesContext(session: SlopeSession, cwd: string): boolean {
+  if (session.worktree_path) {
+    try {
+      if (realpathSync(session.worktree_path) !== realpathSync(cwd)) return false;
+    } catch {
+      return false;
+    }
+  }
+  if (session.branch) {
+    try {
+      const branch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd, stdio: ['ignore', 'pipe', 'ignore'] })
+        .toString().trim();
+      if (branch && branch !== session.branch) return false;
+    } catch {
+      // Not a git checkout — branch identity cannot be corroborated either way.
+    }
+  }
+  return true;
+}
 
 function parseArgs(args: string[]): Record<string, string> {
   const result: Record<string, string> = {};
@@ -43,7 +68,7 @@ export async function sessionCommand(args: string[]): Promise<void> {
       await startSession(flags, cwd);
       break;
     case 'end':
-      await endSession(flags, cwd);
+      await endSession(flags, cwd, args);
       break;
     case 'heartbeat':
       await heartbeat(flags, cwd);
@@ -167,20 +192,37 @@ async function startSession(flags: Record<string, string>, cwd: string): Promise
   }
 }
 
-async function endSession(flags: Record<string, string>, cwd: string): Promise<void> {
+async function endSession(flags: Record<string, string>, cwd: string, rawArgs: string[] = []): Promise<void> {
+  // An explicitly EMPTY --session-id (the installed hook shape with
+  // SLOPE_SESSION_ID unset) must keep failing harmlessly rather than fall
+  // through to the single-active default and end a teammate's session.
+  if (!flags['session-id'] && rawArgs.some(arg => arg === '--session-id' || arg === '--session-id=' || arg === '--session-id=""' || arg === "--session-id=''")) {
+    console.error('Error: --session-id was provided but empty (is SLOPE_SESSION_ID set?).');
+    process.exit(1);
+  }
+
   const store = await resolveStore(cwd);
   try {
-    // Prefer an explicit id, then the environment session, then the single
-    // active session — copying an id out of `session list` first is the #620
-    // papercut this removes. Multiple active sessions still require the flag.
-    let sessionId = flags['session-id'] || process.env.SLOPE_SESSION_ID?.trim();
+    // Prefer an explicit id, then the environment session (only when it is
+    // actually active — a stale exported id must not defeat the fallback),
+    // then the single active session — copying an id out of `session list`
+    // first is the #620 papercut this removes. The default only applies when
+    // the session's recorded worktree/branch identity matches this checkout.
+    let sessionId = flags['session-id'];
     if (!sessionId) {
       const active = await store.getActiveSessions();
-      if (active.length === 1) {
+      const envId = process.env.SLOPE_SESSION_ID?.trim();
+      if (envId && active.some(s => s.session_id === envId)) {
+        sessionId = envId;
+      } else if (active.length === 1 && sessionMatchesContext(active[0], cwd)) {
         sessionId = active[0].session_id;
         console.log(`Defaulting to the single active session: ${sessionId}`);
       } else if (active.length === 0) {
         console.error('Error: no active sessions to end.');
+        process.exit(1);
+      } else if (active.length === 1) {
+        console.error('Error: the single active session belongs to a different worktree or branch — pass --session-id=<id> explicitly:');
+        console.error(`  ${active[0].session_id} [${active[0].role}] ${active[0].branch ?? 'no branch'}`);
         process.exit(1);
       } else {
         console.error(`Error: ${active.length} sessions are active — pass --session-id=<id>:`);

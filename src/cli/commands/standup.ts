@@ -1,4 +1,4 @@
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
@@ -37,13 +37,16 @@ function gatherStandupContext(
   }
 
   try {
-    const branch = execSync('git rev-parse --abbrev-ref HEAD', { cwd, stdio: ['ignore', 'pipe', 'ignore'] })
+    const branch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd, stdio: ['ignore', 'pipe', 'ignore'] })
       .toString().trim();
     if (branch) {
       context.branch = branch;
       if (sessionStartedAt) {
-        const log = execSync(
-          `git log --oneline --since=${JSON.stringify(sessionStartedAt)}`,
+        // execFileSync: the timestamp is machine-generated today, but it must
+        // never pass through a shell regardless.
+        const log = execFileSync(
+          'git',
+          ['log', '--oneline', `--since=${sessionStartedAt}`],
           { cwd, stdio: ['ignore', 'pipe', 'ignore'] },
         ).toString().trim();
         const commits = log ? log.split('\n') : [];
