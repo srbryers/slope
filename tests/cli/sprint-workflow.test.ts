@@ -417,8 +417,8 @@ describe('slope sprint workflow cleanup', () => {
   });
 
   it('detects executions from dead sessions as stale when session tracking is active (#621)', async () => {
-    const recent = new Date('2026-07-15T23:00:00Z').toISOString();
-    const makeExec = (id: string, sprintId: string, sessionId: string) => ({
+    const beyondGrace = new Date('2026-07-15T20:00:00Z').toISOString();
+    const makeExec = (id: string, sprintId: string, sessionId: string, timestamp = beyondGrace) => ({
       id,
       workflow_name: 'sprint-standard',
       sprint_id: sprintId,
@@ -428,14 +428,18 @@ describe('slope sprint workflow cleanup', () => {
       status: 'running' as const,
       variables: {},
       completed_steps: [],
-      started_at: recent,
-      updated_at: recent,
+      started_at: timestamp,
+      updated_at: timestamp,
     });
+    const withinGrace = new Date('2026-07-15T23:55:00Z').toISOString();
     const store = {
       listExecutions: async () => [
         makeExec('wf-dead', 'S70', 'dead-session'),
         makeExec('wf-live', 'S71', 'live-session'),
         makeExec('wf-mine', 'S72', 'my-session'),
+        // A live teammate whose session row was reaped after one long tool
+        // call must survive the grace window.
+        makeExec('wf-lapsed', 'S73', 'lapsed-session', withinGrace),
       ],
       getActiveSessions: async () => [{ session_id: 'live-session' } as never],
     };

@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { HookInput, GuardResult, Suggestion } from '../../core/index.js';
-import { castRoadmapStructure, loadConfig, loadScorecards, parseRoadmap, parseSprintNumber, sprintOrderValue } from '../../core/index.js';
+import { castRoadmapStructure, loadConfig, loadScorecards, parseRoadmap, parseSprintNumber, roadmapSprintOrderValue } from '../../core/index.js';
 import { isPhaseComplete, pendingPhaseGates } from '../phase-cleanup.js';
 
 /** Extract phase number from name like "Phase 7 — Helmsman 3D". Falls back to array index + 1. */
@@ -77,21 +77,31 @@ export async function phaseBoundaryGuard(input: HookInput, cwd: string): Promise
   if (isPhaseComplete(cwd, prevPhaseNum)) return {};
 
   // Staleness heuristic (#621): the phase ledger can silently fall behind
-  // reality (phases ship without `slope phase complete` ever running). When
-  // scorecards already exist at or past the target phase's first sprint, the
-  // boundary is history — warn instead of blocking on ancient state.
+  // reality (phases ship without `slope phase complete` ever running). When a
+  // scorecard exists for a ROADMAP sprint at or past the target phase's first
+  // sprint, the boundary is history — warn instead of blocking on ancient
+  // state. Orders resolve through the roadmap so legacy encoded ids (235 ~
+  // S23.5) cannot skew the boundary, and only roadmap-member scorecards count
+  // as evidence, so a stray high-numbered recovery scorecard cannot downgrade
+  // every earlier boundary.
+  const orderOf = (id: number): number => roadmapSprintOrderValue(roadmap, id);
   const targetPhaseSprints = (roadmap.phases[targetPhaseIdx].sprints ?? [])
     .filter((id): id is number => typeof id === 'number')
-    .map(id => sprintOrderValue(id));
+    .map(orderOf);
   const boundaryOrder = targetPhaseSprints.length > 0 ? Math.min(...targetPhaseSprints) : null;
   if (boundaryOrder !== null) {
     try {
-      const scorecardOrders = loadScorecards(config, cwd).map(card => sprintOrderValue(card.sprint_number));
-      if (scorecardOrders.some(order => order >= boundaryOrder)) {
+      const roadmapOrdersAtOrPastBoundary = new Set(
+        roadmap.sprints.map(sprint => orderOf(sprint.id)).filter(order => order >= boundaryOrder),
+      );
+      const scorecardOrders = loadScorecards(config, cwd).map(card => orderOf(card.sprint_number));
+      if (scorecardOrders.some(order => roadmapOrdersAtOrPastBoundary.has(order))) {
+        const pendingGates = pendingPhaseGates(cwd, prevPhaseNum);
         return {
           context: [
             `SLOPE advisory (non-blocking) — Phase ${prevPhaseNum} cleanup was never recorded, but scorecards already exist at or past Phase ${targetPhaseNum}, so the phase ledger looks stale rather than the work incomplete.`,
-            `Reconcile it with: slope phase complete ${prevPhaseNum}`,
+            ...(pendingGates.length > 0 ? [`Unrecorded Phase ${prevPhaseNum} gates: ${pendingGates.join('; ')}`] : []),
+            `Review those gates, then reconcile the ledger with: slope phase complete ${prevPhaseNum} (manual override — it records all gates without validation).`,
             'This advisory does not grant or deny host tool permission.',
           ].join('\n'),
         };

@@ -1,5 +1,5 @@
-import { existsSync } from 'node:fs';
-import { isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { existsSync, realpathSync } from 'node:fs';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import type { HookInput, GuardResult, SlopeConfig, WorkflowExecution } from '../../core/index.js';
 import { formatSprintLabel, loadWorkflow, parseSprintNumber } from '../../core/index.js';
 import { loadConfig } from '../config.js';
@@ -15,7 +15,8 @@ import { inferSprintFromBranch, reconcileWorkflowExecutions, sprintLabelForExecu
 export async function workflowStepGateGuard(input: HookInput, cwd: string): Promise<GuardResult> {
   // Workflow steps only govern this repository; edits to files outside the
   // project root (agent memory dirs, other checkouts) are never gated. (#621)
-  const targetPath = input.tool_input?.file_path as string | undefined;
+  const rawTarget = input.tool_input?.file_path ?? input.tool_input?.notebook_path;
+  const targetPath = typeof rawTarget === 'string' && rawTarget.trim() !== '' ? rawTarget : undefined;
   if (targetPath && !isWithinRepo(cwd, targetPath)) return {};
 
   const config = loadConfig(cwd);
@@ -77,9 +78,18 @@ export async function workflowStepGateGuard(input: HookInput, cwd: string): Prom
 }
 
 function isWithinRepo(cwd: string, path: string): boolean {
-  const resolved = isAbsolute(path) ? resolve(path) : resolve(cwd, path);
-  const rel = relative(resolve(cwd), resolved);
-  return rel === '' || (!rel.startsWith(`..${sep}`) && rel !== '..' && !isAbsolute(rel));
+  // Compare real paths so symlinked roots (macOS /tmp) resolve consistently;
+  // walk up to the nearest existing ancestor for not-yet-created targets.
+  // On any resolution failure, treat the path as in-repo (gate stays active).
+  try {
+    const realCwd = realpathSync(resolve(cwd));
+    let existing = isAbsolute(path) ? resolve(path) : resolve(cwd, path);
+    while (!existsSync(existing) && dirname(existing) !== existing) existing = dirname(existing);
+    const rel = relative(realCwd, realpathSync(existing));
+    return rel === '' || (!rel.startsWith(`..${sep}`) && rel !== '..' && !isAbsolute(rel));
+  } catch {
+    return true;
+  }
 }
 
 function selectWorkflowExecution(

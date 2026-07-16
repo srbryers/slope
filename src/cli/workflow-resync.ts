@@ -18,6 +18,9 @@ import {
 import type { SlopeStore } from '../core/store.js';
 
 const DEFAULT_STALE_WORKFLOW_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+/** Grace before a dead owning session marks an execution stale — ~6x the
+ *  10-minute session heartbeat TTL, so one long tool call cannot trigger it. */
+const DEAD_SESSION_GRACE_MS = 60 * 60 * 1000;
 
 export interface StaleWorkflowExecution {
   exec: WorkflowExecution;
@@ -116,7 +119,14 @@ export function completedRoadmapSprintIds(cwd: string, config = loadConfig(cwd))
 export async function findStaleWorkflowExecutions(
   cwd: string,
   store: Pick<SlopeStore, 'listExecutions'> & Partial<Pick<SlopeStore, 'getActiveSessions'>>,
-  options: { staleAgeMs?: number; now?: Date; branchSprint?: number | null; includeNewerRunning?: boolean; currentSessionId?: string } = {},
+  options: {
+    staleAgeMs?: number;
+    now?: Date;
+    branchSprint?: number | null;
+    includeNewerRunning?: boolean;
+    currentSessionId?: string;
+    deadSessionGraceMs?: number;
+  } = {},
 ): Promise<StaleWorkflowExecution[]> {
   const config = loadConfig(cwd);
   const scorecardSprintIds = new Set(loadScorecards(config, cwd).map(card => card.sprint_number));
@@ -152,13 +162,17 @@ export async function findStaleWorkflowExecutions(
     if (includeNewerRunning && newestRunningSprint !== null && sprint < newestRunningSprint) reasons.push(`newer running sprint S${formatSprintNumber(newestRunningSprint)} exists`);
     if (isOlderThan(exec.updated_at || exec.started_at, now, staleAgeMs)) reasons.push(`older than ${Math.round(staleAgeMs / (24 * 60 * 60 * 1000))} days`);
     // Dead-session evidence applies only when session tracking is in use
-    // (at least one active session) and never to the invoking session's own
-    // executions, so repos without session rows are unaffected.
+    // (at least one active session), never to the invoking session's own
+    // executions, and only after a grace window well past the session
+    // heartbeat TTL — a peer's cleanStaleSessions can delete a LIVE session's
+    // row after one long tool call, and that alone must not pause its
+    // execution.
     if (exec.session_id
       && activeSessionIds !== null
       && activeSessionIds.size > 0
       && !activeSessionIds.has(exec.session_id)
-      && exec.session_id !== options.currentSessionId) {
+      && exec.session_id !== options.currentSessionId
+      && isOlderThan(exec.updated_at || exec.started_at, now, options.deadSessionGraceMs ?? DEAD_SESSION_GRACE_MS)) {
       reasons.push('owning session is no longer active');
     }
     if (reasons.length > 0) {
