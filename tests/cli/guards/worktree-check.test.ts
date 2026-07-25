@@ -408,9 +408,14 @@ describe('worktreeCheckGuard', () => {
   });
 
   it('reconciles current session metadata when already in a worktree', async () => {
+    // The primary checkout owns SLOPE state; the worktree also has a committed
+    // config, which is what used to send the write to a worktree-local store.
+    sentinelFiles.add('/repo');
+    sentinelFiles.add(join('/repo', '.slope', 'config.json'));
     sentinelFiles.add(join('/tmp/test', '.slope', 'config.json'));
     mockExecFileSync
       .mockReturnValueOnce('../../.git' as never) // git-common-dir != '.git'
+      .mockReturnValueOnce('/repo/.git' as never) // session-scope: --git-common-dir
       .mockReturnValueOnce('/tmp/test' as never) // git rev-parse --show-toplevel
       .mockReturnValueOnce('fix/deadlock' as never); // branch
 
@@ -422,6 +427,9 @@ describe('worktreeCheckGuard', () => {
       branch: 'fix/deadlock',
       worktree_path: '/tmp/test',
     });
+    // Repo-scoped: written to the primary checkout's store, not the worktree's,
+    // so `slope session list|prune|end` sees the same record (GH #630, #631).
+    expect(mockResolveStore).toHaveBeenCalledWith('/repo');
   });
 
   it('silently passes on store resolve error (#263)', async () => {
@@ -640,9 +648,9 @@ describe('worktreeCheckGuard', () => {
 
   it('auto-registers current session with correct params', async () => {
     mockGitMainRepo('feat/my-branch');
-    (mockStore.getActiveSessions as ReturnType<typeof vi.fn>).mockResolvedValue([
-      makeSession({ session_id: 'test-session' }),
-    ]);
+    // No existing record — registration closes the detection gap for the *next*
+    // session. An already-registered session is not re-registered (GH #631).
+    (mockStore.getActiveSessions as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 
     await worktreeCheckGuard(makeInput('test-session'), '/tmp/test');
     expect(mockStore.registerSession).toHaveBeenCalledWith({
@@ -736,9 +744,7 @@ describe('worktreeCheckGuard', () => {
       .mockReturnValueOnce('.git' as never)                              // git-common-dir
       .mockImplementationOnce(() => { throw new Error('detached'); });    // branch fails
 
-    (mockStore.getActiveSessions as ReturnType<typeof vi.fn>).mockResolvedValue([
-      makeSession({ session_id: 'test-session' }),
-    ]);
+    (mockStore.getActiveSessions as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 
     await worktreeCheckGuard(makeInput(), '/tmp/test');
     const call = (mockStore.registerSession as ReturnType<typeof vi.fn>).mock.calls[0][0];

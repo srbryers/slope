@@ -8,6 +8,7 @@ import { STALE_SESSION_THRESHOLD_MS } from '../../core/constants.js';
 import { SlopeStoreError } from '../../core/store.js';
 import type { SlopeSession } from '../../core/store.js';
 import { resolveStore } from '../store.js';
+import { resolveSessionStoreCwd } from '../session-scope.js';
 
 const COMMAND_TEXT_KEYS = ['command', 'cmd', 'input'] as const;
 const FILE_PATH_KEYS = ['file_path', 'path'] as const;
@@ -78,7 +79,11 @@ export async function worktreeCheckGuard(input: HookInput, cwd: string): Promise
     branch = 'unknown';
   }
 
-  // Query store for concurrent sessions
+  // Query store for concurrent sessions. gitCommonDir === '.git' above already
+  // establishes that cwd is the primary checkout, so this is the repo-scoped
+  // session store that `slope session list|prune|end` now also resolves to via
+  // resolveSessionStoreCwd — the two agree, so the printed remediation can
+  // actually clear what the guard blocks on (GH #630, #631).
   let store;
   try {
     store = await resolveStore(cwd);
@@ -91,32 +96,23 @@ export async function worktreeCheckGuard(input: HookInput, cwd: string): Promise
     // Clean stale sessions first to reduce false positives
     await store.cleanStaleSessions(STALE_SESSION_THRESHOLD_MS);
 
-    // Auto-register the current session
-    let currentSwarmId: string | undefined;
-    let active: Awaited<ReturnType<typeof store.getActiveSessions>> | undefined;
-    try {
-      const registered = await store.registerSession({
-        session_id: sessionId,
-        role: 'primary',
-        ide: 'claude-code',
-        branch,
-      });
-      currentSwarmId = registered.swarm_id;
-    } catch (err) {
-      // SESSION_CONFLICT means this session is already registered — that's fine
-      if (err instanceof SlopeStoreError && err.code === 'SESSION_CONFLICT') {
-        // Fetch active sessions once — reuse for both swarm lookup and conflict check
-        active = await store.getActiveSessions();
-        const existing = active.find(s => s.session_id === sessionId);
-        currentSwarmId = existing?.swarm_id;
-      } else {
-        throw err;
-      }
+    // Inspect existing sessions BEFORE registering. Registering first meant a
+    // session that was about to be denied still got written as
+    // `role: primary` on the launch-dir branch, leaving a phantom primary that
+    // could then block the legitimate primary session (GH #631).
+    let active = await store.getActiveSessions();
+    const existing = active.find(s => s.session_id === sessionId);
+    const currentSwarmId = existing?.swarm_id;
+
+    // An already-registered worktree session is isolated by definition, even
+    // when the hook payload still reports the launch directory (GH #630, #631).
+    if (existing?.worktree_path) {
+      writeFileSync(sentinel, new Date().toISOString());
+      return {};
     }
 
     // Check for concurrent sessions in the same store (no worktree_path).
     // Swarm members are excluded — they coordinate via claims, not worktrees.
-    if (!active) active = await store.getActiveSessions();
     const others = active.filter(s => s.session_id !== sessionId);
     const now = Date.now();
     const conflicting = others.filter(s =>
@@ -126,10 +122,27 @@ export async function worktreeCheckGuard(input: HookInput, cwd: string): Promise
     );
 
     if (conflicting.length > 0) {
+      // The hook payload's cwd is the session's *launch* directory. A session
+      // moved into a worktree (WorktreeCreate at launch, or EnterWorktree
+      // mid-session) keeps reporting the launch dir, so the git-common-dir check
+      // above misses it and the session gets judged against the primary
+      // checkout's sessions. That was a permanent deadlock whose printed
+      // remediation could not help: there is nothing left to enter, and the
+      // session is already isolated. Trust where the work actually lands
+      // (GH #630, #631). Checked here rather than earlier so the common pass
+      // path spawns no extra git processes.
+      const worktrees = listGitWorktreeInfo(cwd);
+      const targetWorktree = resolveTargetWorktree(input, cwd, worktrees);
+      if (targetWorktree) {
+        await reconcileWorktreeSession(input, cwd, sessionId, targetWorktree);
+        writeFileSync(sentinel, new Date().toISOString());
+        return {};
+      }
+
       const sessionList = conflicting
         .map(s => `  - ${s.session_id} [${s.role}] ${s.ide} (branch: ${s.branch ?? '-'})`)
         .join('\n');
-      const existingWorktreeGuidance = formatExistingWorktreeGuidance(cwd, input, conflicting, branch);
+      const existingWorktreeGuidance = formatExistingWorktreeGuidance(cwd, input, conflicting, branch, worktrees);
       // Do NOT write sentinel — denied sessions should re-check next invocation
       return {
         decision: 'deny',
@@ -137,7 +150,21 @@ export async function worktreeCheckGuard(input: HookInput, cwd: string): Promise
       };
     }
 
-    // No conflict — write sentinel so we don't re-check this session
+    // No conflict — register this session so the next one can see it, then
+    // write the sentinel so we don't re-check.
+    if (!existing) {
+      try {
+        await store.registerSession({
+          session_id: sessionId,
+          role: 'primary',
+          ide: 'claude-code',
+          branch,
+        });
+      } catch (err) {
+        // Already registered by a concurrent invocation — harmless.
+        if (!(err instanceof SlopeStoreError && err.code === 'SESSION_CONFLICT')) throw err;
+      }
+    }
     writeFileSync(sentinel, new Date().toISOString());
     return {};
   } catch {
@@ -239,10 +266,15 @@ function isSlopeRecoveryCommand(words: string[]): boolean {
   if (args[0] === 'worktree' && args[1] === 'start') return true;
   if (args[0] !== 'session') return false;
 
+  // `start` and `heartbeat` must be exempt: registering is the one action that
+  // lets a legitimately isolated session prove itself, so denying it makes the
+  // block permanent (GH #631).
   return args[1] === 'end'
     || args[1] === 'list'
     || args[1] === 'prune'
-    || args[1] === 'dashboard';
+    || args[1] === 'dashboard'
+    || args[1] === 'start'
+    || args[1] === 'heartbeat';
 }
 
 function splitShellSegments(command: string): string[] {
@@ -346,9 +378,9 @@ function formatExistingWorktreeGuidance(
   input: HookInput,
   conflicting: SlopeSession[],
   currentBranch: string,
+  allWorktrees: GitWorktreeInfo[],
 ): string {
-  const worktrees = listGitWorktreeInfo(cwd)
-    .filter(wt => resolve(wt.path) !== resolve(cwd));
+  const worktrees = allWorktrees.filter(wt => resolve(wt.path) !== resolve(cwd));
   if (worktrees.length === 0) return '';
 
   const filePath = extractFilePath(input);
@@ -400,15 +432,44 @@ function pathContains(root: string, filePath: string): boolean {
   return rel === '' || (!!rel && !rel.startsWith('..') && !isAbsolute(rel));
 }
 
-async function reconcileWorktreeSession(input: HookInput, cwd: string, sessionId: string): Promise<void> {
+/**
+ * Resolve the worktree that a tool call's target path belongs to, if any.
+ *
+ * Only called from the primary-checkout branch, so `cwd` is the primary checkout
+ * and is excluded: an edit landing in the primary checkout is not isolated and
+ * must still be denied so the #499 "enter the existing worktree" guidance fires.
+ * A relative path is likewise not evidence — it resolves against the launch dir,
+ * which is exactly the value we cannot trust here (GH #630, #631).
+ */
+function resolveTargetWorktree(
+  input: HookInput,
+  cwd: string,
+  worktrees: GitWorktreeInfo[],
+): string | null {
+  const filePath = extractFilePath(input);
+  if (!filePath || !isAbsolute(filePath)) return null;
+
+  for (const worktree of worktrees) {
+    if (resolve(worktree.path) === resolve(cwd)) continue;
+    if (pathContains(worktree.path, filePath)) return worktree.path;
+  }
+  return null;
+}
+
+async function reconcileWorktreeSession(
+  input: HookInput,
+  cwd: string,
+  sessionId: string,
+  explicitWorktreePath?: string,
+): Promise<void> {
   let store;
   try {
-    const stateCwd = resolveSlopeStateCwd(cwd);
-    if (!stateCwd) return;
+    const stateCwd = resolveSessionStoreCwd(cwd);
     store = await resolveStore(stateCwd);
 
-    const worktreePath = gitRevParse(cwd, '--show-toplevel');
-    const branch = safeGitRevParse(cwd, '--abbrev-ref', 'HEAD') ?? 'unknown';
+    const worktreePath = explicitWorktreePath ?? gitRevParse(cwd, '--show-toplevel');
+    const branchCwd = explicitWorktreePath ?? cwd;
+    const branch = safeGitRevParse(branchCwd, '--abbrev-ref', 'HEAD') ?? 'unknown';
 
     try {
       await store.updateSession(sessionId, {
@@ -434,21 +495,6 @@ async function reconcileWorktreeSession(input: HookInput, cwd: string, sessionId
   } finally {
     try { store?.close(); } catch { /* ignore */ }
   }
-}
-
-function resolveSlopeStateCwd(cwd: string): string | undefined {
-  if (existsSync(join(cwd, '.slope', 'config.json'))) return cwd;
-
-  for (const worktree of listGitWorktrees(cwd)) {
-    if (resolve(worktree) === resolve(cwd)) continue;
-    if (existsSync(join(worktree, '.slope', 'config.json'))) return worktree;
-  }
-
-  return undefined;
-}
-
-function listGitWorktrees(cwd: string): string[] {
-  return listGitWorktreeInfo(cwd).map(wt => wt.path);
 }
 
 function listGitWorktreeInfo(cwd: string): GitWorktreeInfo[] {

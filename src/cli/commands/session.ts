@@ -6,6 +6,7 @@ import { checkConflicts } from '../../core/index.js';
 import type { SlopeSession } from '../../core/index.js';
 import { STALE_SESSION_THRESHOLD_MS } from '../../core/constants.js';
 import { resolveStore } from '../store.js';
+import { resolveSessionStoreCwd } from '../session-scope.js';
 
 /** A session may only be ended by default when its recorded identity does not
  *  contradict this checkout — in a same-checkout swarm, "the single active
@@ -108,7 +109,7 @@ Usage:
 }
 
 async function startSession(flags: Record<string, string>, cwd: string): Promise<void> {
-  const store = await resolveStore(cwd);
+  const store = await resolveStore(resolveSessionStoreCwd(cwd));
   try {
     const sessionId = flags['session-id'] || randomUUID();
     const role = (flags.role ?? 'primary') as 'primary' | 'secondary' | 'observer';
@@ -201,7 +202,7 @@ async function endSession(flags: Record<string, string>, cwd: string, rawArgs: s
     process.exit(1);
   }
 
-  const store = await resolveStore(cwd);
+  const store = await resolveStore(resolveSessionStoreCwd(cwd));
   try {
     // Prefer an explicit id, then the environment session (only when it is
     // actually active — a stale exported id must not defeat the fallback),
@@ -250,7 +251,7 @@ async function endSession(flags: Record<string, string>, cwd: string, rawArgs: s
 }
 
 async function heartbeat(flags: Record<string, string>, cwd: string): Promise<void> {
-  const store = await resolveStore(cwd);
+  const store = await resolveStore(resolveSessionStoreCwd(cwd));
   try {
     const sessionId = flags['session-id'];
     if (!sessionId) {
@@ -267,7 +268,7 @@ async function heartbeat(flags: Record<string, string>, cwd: string): Promise<vo
 
 async function pruneSessions(flags: Record<string, string>, cwd: string): Promise<void> {
   const maxAgeMs = parseMaxAgeMs(flags['max-age-ms']);
-  const store = await resolveStore(cwd);
+  const store = await resolveStore(resolveSessionStoreCwd(cwd));
   try {
     const removed = await store.cleanStaleSessions(maxAgeMs);
     console.log(`\nStale session cleanup:`);
@@ -291,7 +292,7 @@ function parseMaxAgeMs(raw: string | undefined): number {
 }
 
 async function listSessions(flags: Record<string, string>, cwd: string): Promise<void> {
-  const store = await resolveStore(cwd);
+  const store = await resolveStore(resolveSessionStoreCwd(cwd));
   try {
     const swarmId = flags.swarm;
     const sessions = swarmId
@@ -367,7 +368,7 @@ async function listSessions(flags: Record<string, string>, cwd: string): Promise
 // ── T4: Dashboard ────────────────────────────────────
 
 async function dashboardCommand(flags: Record<string, string>, cwd: string): Promise<void> {
-  const store = await resolveStore(cwd);
+  const store = await resolveStore(resolveSessionStoreCwd(cwd));
   try {
     await store.cleanStaleSessions(STALE_SESSION_THRESHOLD_MS);
     const sessions = await store.getActiveSessions();
@@ -474,7 +475,7 @@ async function handoffCommand(flags: Record<string, string>, cwd: string): Promi
     process.exit(1);
   }
 
-  const store = await resolveStore(cwd);
+  const store = await resolveStore(resolveSessionStoreCwd(cwd));
   try {
     const sessions = await store.getActiveSessions();
     const fromSession = sessions.find(s => s.session_id.startsWith(from));
@@ -510,7 +511,7 @@ async function assignCommand(flags: Record<string, string>, cwd: string): Promis
     process.exit(1);
   }
 
-  const store = await resolveStore(cwd);
+  const store = await resolveStore(resolveSessionStoreCwd(cwd));
   try {
     const sessions = await store.getActiveSessions();
     const target = sessions.find(s => s.session_id.startsWith(agent));
@@ -546,7 +547,7 @@ async function assignCommand(flags: Record<string, string>, cwd: string): Promis
 }
 
 async function planCommand(flags: Record<string, string>, cwd: string): Promise<void> {
-  const store = await resolveStore(cwd);
+  const store = await resolveStore(resolveSessionStoreCwd(cwd));
   try {
     const sessions = await store.getActiveSessions();
     if (sessions.length === 0) { console.log('\nNo active sessions.\n'); return; }
