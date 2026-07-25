@@ -490,6 +490,15 @@
       ],
       "status": "in_progress",
       "note": "Closes out #635, #646 and #648. #635 cannot be fully fixed without canonical string sprint ids — a representational change across roadmap compile/focus/archive, sprint state, scorecards, retro paths and the store schema — so S252 removes the silent-corruption path and defers the representation. #646 and #648 are both about failures that are reachable in normal use but not diagnosable without reading source."
+    },
+    {
+      "name": "Phase 58 — Shell Write Enforcement",
+      "description": "Make the no-shell-inline-writes convention mechanical. It was recorded in an S248 scorecard and still recurred twice, so documentation alone is demonstrably insufficient for this hazard.",
+      "sprints": [
+        254
+      ],
+      "status": "in_progress",
+      "note": "Single-sprint phase. The convention landed in CLAUDE.md via #653; this adds the guard that enforces it. Scoped deliberately narrow: inline scripting that only reads or prints is correct and was used constantly and successfully, so the guard must key on a file-write call rather than on the interpreter alone."
     }
   ],
   "sprints": [
@@ -6542,6 +6551,41 @@
           "github_issue": 648,
           "depends_on": [
             "S253-2"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 254,
+      "theme": "Shell Write Enforcement",
+      "par": 3,
+      "slope": 2,
+      "type": "feature + agent ergonomics",
+      "status": "planned",
+      "note": "Escaping in shell-inline scripts mangled a write three times in one session: `python -c` with backticks had them substituted by bash (silently deleting every code span from a markdown rule), and a heredoc twice emitted a real newline where a literal \\n was wanted (unterminated TS string literals). All three exited 0 with wrong content. Every failure used shell-inline scripting; every success used the Write/Edit tools or a script file.",
+      "tickets": [
+        {
+          "key": "S254-1",
+          "title": "Add a shell-write guard that warns when an inline interpreter also writes a file",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S254-2",
+          "title": "Register the guard across the name union, handlers, relevance, docs and harness templates",
+          "club": "wedge",
+          "complexity": "small",
+          "depends_on": [
+            "S254-1"
+          ]
+        },
+        {
+          "key": "S254-3",
+          "title": "Cover the read-only-probe case so legitimate inline scripting stays silent",
+          "club": "wedge",
+          "complexity": "small",
+          "depends_on": [
+            "S254-1"
           ]
         }
       ]

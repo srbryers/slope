@@ -9,7 +9,7 @@ import {
 } from '../../../src/cli/guards/claim-required.js';
 import type { HookInput } from '../../../src/core/index.js';
 import { createStore } from '../../../src/store/index.js';
-import { setSessionMode } from '../../../src/cli/session-state.js';
+import { createSprintState, saveSprintState } from '../../../src/cli/sprint-state.js';
 
 function makeInput(cwd: string, filePath: string): HookInput {
   return {
@@ -173,31 +173,35 @@ describe('isImplementationWritePath', () => {
 });
 
 describe('claimRequiredGuard', () => {
-  describe('adhoc mode (GH #643)', () => {
-    it('emits advisory context instead of gating the host', async () => {
-      const cwd = mkdtempSync(join(tmpdir(), 'slope-claim-adhoc-'));
+  describe('implementation-write policy (GH #643, #650)', () => {
+    function writeConfigWithPolicy(cwd: string, policy: string): void {
+      mkdirSync(join(cwd, '.slope'), { recursive: true });
+      writeFileSync(join(cwd, '.slope', 'config.json'), JSON.stringify({
+        scorecardDir: 'docs/retros',
+        guidance: { requireSprintForImplementationWrites: policy },
+      }));
+    }
+
+    it('emits advisory context rather than gating under the default ask policy', async () => {
+      const cwd = mkdtempSync(join(tmpdir(), 'slope-claim-policy-'));
       try {
         writeConfig(cwd);
-        setSessionMode(cwd, 'test-session', 'adhoc');
-
         const result = await claimRequiredGuard(makeInput(cwd, join(cwd, 'src/foo.ts')), cwd);
 
-        // Adhoc advertises "sprint-workflow guards silenced", so no ask/deny.
+        // Every remedy this guard prints is agent-actionable, so it must not ask
+        // the operator to approve it.
         expect(result.decision).toBeUndefined();
-        expect(result.context).toContain('adhoc session');
+        expect(result.context).toContain('not a permission request');
         expect(result.context).toContain('src/foo.ts');
-        expect(result.context).toContain('slope sprint start');
       } finally {
         rmSync(cwd, { recursive: true, force: true });
       }
     });
 
     it('warns once per session rather than on every write', async () => {
-      const cwd = mkdtempSync(join(tmpdir(), 'slope-claim-adhoc-'));
+      const cwd = mkdtempSync(join(tmpdir(), 'slope-claim-policy-'));
       try {
         writeConfig(cwd);
-        setSessionMode(cwd, 'test-session', 'adhoc');
-
         const first = await claimRequiredGuard(makeInput(cwd, join(cwd, 'src/foo.ts')), cwd);
         const second = await claimRequiredGuard(makeInput(cwd, join(cwd, 'src/bar.ts')), cwd);
 
@@ -208,45 +212,72 @@ describe('claimRequiredGuard', () => {
       }
     });
 
-    it('still gates with ask when the session is not adhoc', async () => {
-      const cwd = mkdtempSync(join(tmpdir(), 'slope-claim-sprint-'));
+    // These deny assertions are the coverage whose absence let an earlier attempt
+    // at this change silently disable strict mode (GH #650).
+    it('still blocks under the deny policy when no sprint state exists', async () => {
+      const cwd = mkdtempSync(join(tmpdir(), 'slope-claim-deny-'));
       try {
-        writeConfig(cwd);
-        setSessionMode(cwd, 'test-session', 'sprint');
-
+        writeConfigWithPolicy(cwd, 'deny');
         const result = await claimRequiredGuard(makeInput(cwd, join(cwd, 'src/foo.ts')), cwd);
 
-        expect(result.decision).toBe('ask');
+        expect(result.decision).toBe('deny');
+        expect(result.blockReason).toContain('no active sprint state');
+      } finally {
+        rmSync(cwd, { recursive: true, force: true });
+      }
+    });
+
+    it('still blocks under the deny policy when the sprint is not implementing', async () => {
+      const cwd = mkdtempSync(join(tmpdir(), 'slope-claim-deny-'));
+      try {
+        writeConfigWithPolicy(cwd, 'deny');
+        saveSprintState(cwd, createSprintState(300, 'scoring'));
+        const result = await claimRequiredGuard(makeInput(cwd, join(cwd, 'src/foo.ts')), cwd);
+
+        expect(result.decision).toBe('deny');
+        expect(result.blockReason).toContain('scoring');
+      } finally {
+        rmSync(cwd, { recursive: true, force: true });
+      }
+    });
+
+    it('stays silent under the off policy', async () => {
+      const cwd = mkdtempSync(join(tmpdir(), 'slope-claim-off-'));
+      try {
+        writeConfigWithPolicy(cwd, 'off');
+        const result = await claimRequiredGuard(makeInput(cwd, join(cwd, 'src/foo.ts')), cwd);
+
+        expect(result).toEqual({});
       } finally {
         rmSync(cwd, { recursive: true, force: true });
       }
     });
   });
 
-  it('asks before implementation writes when no sprint state is active', async () => {
+  it('reports implementation writes without gating when no sprint state is active', async () => {
     const cwd = mkdtempSync(join(tmpdir(), 'slope-claim-required-'));
     try {
       writeConfig(cwd);
       const result = await claimRequiredGuard(makeInput(cwd, join(cwd, 'src/foo.ts')), cwd);
 
-      expect(result.decision).toBe('ask');
-      expect(result.context).toContain('SLOPE permission request');
+      expect(result.decision).toBeUndefined();
+      expect(result.context).toContain('not a permission request');
       expect(result.context).toContain('no active sprint state');
       expect(result.context).toContain('slope sprint start');
       expect(result.context).toContain('slope claim');
-      expect(result.context).toContain('does not replace the host permission policy');
+      expect(result.context).toContain('deny');
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }
   });
 
-  it('asks before Codex apply_patch implementation writes when no sprint state is active', async () => {
+  it('reports Codex apply_patch implementation writes without gating when no sprint state is active', async () => {
     const cwd = mkdtempSync(join(tmpdir(), 'slope-claim-required-'));
     try {
       writeConfig(cwd);
       const result = await claimRequiredGuard(makeApplyPatchInput(cwd, join(cwd, 'src/foo.ts')), cwd);
 
-      expect(result.decision).toBe('ask');
+      expect(result.decision).toBeUndefined();
       expect(result.context).toContain('src/foo.ts');
       expect(result.context).toContain('no active sprint state');
       expect(result.context).toContain('slope claim');
@@ -297,7 +328,7 @@ describe('claimRequiredGuard', () => {
       writeInsertedRoadmap(cwd);
       const result = await claimRequiredGuard(makeInput(cwd, join(cwd, 'src/foo.ts')), cwd);
 
-      expect(result.decision).toBe('ask');
+      expect(result.decision).toBeUndefined();
       expect(result.context).toContain('Detected likely sprint context: S43.5');
       expect(result.context).toContain('slope sprint start --number=435 --phase=implementing');
     } finally {
@@ -330,14 +361,14 @@ describe('claimRequiredGuard', () => {
     }
   });
 
-  it('asks before implementation writes when sprint is not in implementing phase', async () => {
+  it('reports implementation writes without gating when sprint is not in implementing phase', async () => {
     const cwd = mkdtempSync(join(tmpdir(), 'slope-claim-required-'));
     try {
       writeConfig(cwd);
       writeSprintState(cwd, 'planning');
       const result = await claimRequiredGuard(makeInput(cwd, join(cwd, 'src/foo.ts')), cwd);
 
-      expect(result.decision).toBe('ask');
+      expect(result.decision).toBeUndefined();
       expect(result.context).toContain('planning phase');
     } finally {
       rmSync(cwd, { recursive: true, force: true });

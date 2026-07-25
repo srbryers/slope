@@ -99,3 +99,5 @@ sources:
     kind: phase
   - path: phases/phase-57.yaml
     kind: phase
+  - path: phases/phase-58.yaml
+    kind: phase

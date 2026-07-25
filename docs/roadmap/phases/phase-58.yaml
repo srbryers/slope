@@ -1,0 +1,39 @@
+version: "1"
+phase:
+  name: Phase 58 — Stop Asking the Operator
+  description: "Two process failures that documentation demonstrably did not fix. Both were recorded in earlier scorecards and both recurred anyway, so each gets mechanical enforcement instead of another note."
+  sprints:
+    - 254
+  status: in_progress
+  note: "Re-planned mid-sprint. The phase began as a single shell-write guard ticket; the permission prompt then recurred a fourth time — immediately after the process rule for it was merged — which made clear that #650 was the priority and that process docs were not going to fix either hazard. #650 landed first."
+sprints:
+  - id: 254
+    theme: Stop Asking the Operator
+    par: 4
+    slope: 3
+    type: bugfix + agent ergonomics
+    status: planned
+    note: "#650: claim-required returned ask on every implementation write whenever sprint state was absent or in a non-implementing phase — including the scoring phase slope pr sets the moment a PR merges — so beginning the next sprint's work always prompted. Every remedy it prints is agent-actionable, so the operator was being asked to approve a fix only the agent could apply. An earlier attempt was reverted for lack of deny coverage; this lands with it. Then the shell-write guard, making the no-shell-inline-writes convention mechanical."
+    tickets:
+      - key: S254-1
+        title: "Make claim-required advisory under the default ask policy, keeping deny blocking (#650)"
+        club: short_iron
+        complexity: standard
+        github_issue: 650
+      - key: S254-2
+        title: "Add deny-policy coverage for both non-implementing branches (#650)"
+        club: wedge
+        complexity: small
+        github_issue: 650
+        depends_on:
+          - S254-1
+      - key: S254-3
+        title: Add a shell-write guard that warns when an inline interpreter also writes a file
+        club: short_iron
+        complexity: standard
+      - key: S254-4
+        title: Register the shell-write guard across the name union, handlers, relevance, docs and templates
+        club: wedge
+        complexity: small
+        depends_on:
+          - S254-3
