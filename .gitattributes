@@ -1,1 +1,13 @@
+# Normalize all text files to LF, in the repo and in the working tree.
+#
+# core.autocrlf=true on Windows otherwise rewrites tracked text to CRLF on every
+# checkout. That did two kinds of damage:
+#   - a "LF will be replaced by CRLF" warning on literally every commit, and
+#   - changed content hashes, which invalidated rollover audits and hard-blocked
+#     the sprint lifecycle (GH #649).
+# eol=lf forces LF on checkout regardless of a contributor's autocrlf setting, so
+# the working tree matches what CI (Linux) sees.
+* text=auto eol=lf
+
+# Shell scripts must be LF to run; kept explicit even though text=auto covers it.
 *.sh text eol=lf
