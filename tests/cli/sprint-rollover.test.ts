@@ -258,6 +258,58 @@ describe('assessSprintRollover', () => {
     expect(assessment.valid).toBe(false);
     expect(assessment.issues.map(issue => issue.code)).toContain('target_not_pending');
   });
+
+  describe('terminal target with completion evidence (GH #641)', () => {
+    it('accepts a complete target that has completion evidence', () => {
+      // `slope validate` reconciles every scorecarded sprint to complete during
+      // closeout. Blocking rollover into it left the last sprint of a phase
+      // unable to reach ready_for_pr, so its PR could never be created.
+      const assessment = assessSprintRollover(
+        terminalState(),
+        roadmap('complete'),
+        'docs/backlog/roadmap.json',
+        { from: 10, to: 11 },
+        [11],
+      );
+
+      expect(assessment.issues.map(issue => issue.code)).not.toContain('target_not_pending');
+    });
+
+    it('accepts a complete target without evidence when --force and a reason are given', () => {
+      const assessment = assessSprintRollover(
+        terminalState(),
+        roadmap('complete'),
+        'docs/backlog/roadmap.json',
+        { from: 10, to: 11, force: true, reason: 'recording state for a merged sprint' },
+      );
+
+      expect(assessment.issues.map(issue => issue.code)).not.toContain('target_not_pending');
+    });
+
+    it('still requires a reason with --force', () => {
+      const assessment = assessSprintRollover(
+        terminalState(),
+        roadmap('complete'),
+        'docs/backlog/roadmap.json',
+        { from: 10, to: 11, force: true },
+      );
+
+      expect(assessment.valid).toBe(false);
+      expect(assessment.issues.map(issue => issue.code)).toContain('force_reason_required');
+    });
+
+    it('names the escape hatch when refusing a terminal target', () => {
+      const assessment = assessSprintRollover(
+        terminalState(),
+        roadmap('complete'),
+        'docs/backlog/roadmap.json',
+        { from: 10, to: 11 },
+      );
+
+      const issue = assessment.issues.find(i => i.code === 'target_not_pending');
+      expect(issue?.message).toContain('--force --reason');
+    });
+  });
 });
 
 describe('performSprintRollover audit recovery', () => {

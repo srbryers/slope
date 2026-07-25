@@ -286,7 +286,21 @@ export function assessSprintRollover(
     issues.push({ code: 'target_not_later', message: `${toLabel} is not later than ${fromLabel}.` });
   }
   if (toSprint && isRoadmapSprintTerminal(toSprint)) {
-    issues.push({ code: 'target_not_pending', message: `${toLabel} is not pending roadmap work (status: ${toSprint.status ?? 'unset'}).` });
+    // A sprint that is terminal in the roadmap *and* has completion evidence is
+    // finished work being recorded, not finished work being restarted: closeout
+    // still needs local state for it to run gates and open its PR. Blocking that
+    // made the last sprint of a phase permanently un-PR-able once `slope validate`
+    // had reconciled it to complete, and `--force` did not help because this check
+    // ignored it (GH #641).
+    const toOrder = roadmapSprintOrderValue(roadmap, toSprint.id);
+    const toHasEvidence = completionEvidence
+      .some(id => roadmapSprintOrderValue(roadmap, id) === toOrder);
+    if (!toHasEvidence && !force) {
+      issues.push({
+        code: 'target_not_pending',
+        message: `${toLabel} is not pending roadmap work (status: ${toSprint.status ?? 'unset'}) and has no completion evidence. Re-run with --force --reason=<why> to record state for it anyway.`,
+      });
+    }
   }
   if (state && !terminal && !force) {
     issues.push({
