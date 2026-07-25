@@ -32,6 +32,13 @@ export interface RoadmapTicket {
 /** A sprint within the roadmap */
 export interface RoadmapSprint {
   id: number;            // sprint number, e.g., 7
+  /**
+   * Canonical string id, present only when authored as a string to preserve an
+   * exact suffix a number cannot hold (e.g. "458.10", distinct from 458.1). When
+   * absent, identity derives from `id` via the roadmap-aware helpers. `id` remains
+   * the numeric mirror used for ordering arithmetic and the store (GH #635).
+   */
+  id_key?: string;
   theme: string;         // e.g., "The Yardage Book"
   par: 3 | 4 | 5;
   slope: number;
@@ -51,7 +58,14 @@ export interface RoadmapSprint {
 /** A phase grouping sprints */
 export interface RoadmapPhase {
   name: string;          // e.g., "Phase 1 — Foundation"
-  sprints: number[];     // sprint IDs in this phase
+  sprints: number[];     // sprint IDs in this phase (numeric mirror)
+  /**
+   * Canonical membership keys, present when any member was authored as a string
+   * to preserve an exact suffix (e.g. "458.10" alongside "458.1"). When present,
+   * this is the authoritative membership; `sprints` is the numeric mirror, which
+   * cannot distinguish 458.10 from 458.1 (GH #635).
+   */
+  sprint_keys?: string[];
   description?: string;
   status?: string;
   note?: string;
@@ -145,9 +159,10 @@ export function describeSprintIdAmbiguity(written: string): string | null {
 
   const collapsed = String(Number(body));
   const suggestion = fraction.replace(/0+$/, '');
-  return `sprint id "${body}" cannot round-trip: ids are stored as numbers, so it reads back as `
-    + `${collapsed} and would alias that sprint. Renumber it — use a fraction with no trailing `
-    + `zero (for example ${body.slice(0, dot)}.${suggestion || '1'}1) or a whole sprint id.`;
+  return `sprint id ${body} cannot round-trip as a number: it reads back as `
+    + `${collapsed} and would alias that sprint. Quote it to preserve the exact id `
+    + `(id: "${body}"), or use a fraction with no trailing zero `
+    + `(for example ${body.slice(0, dot)}.${suggestion || '1'}1) or a whole sprint id.`;
 }
 
 /** Parse human-entered sprint ids such as "114", "114.5", or "S114.5". */
@@ -270,6 +285,19 @@ export function formatRoadmapSprintLabel(roadmap: RoadmapDefinition, id: number)
   return isEncodedInsertedSprintInRoadmap(roadmap, id) ? formatSprintLabel(id) : `S${id}`;
 }
 
+/**
+ * Canonical string identity for a sprint: the authored `id_key` when present
+ * (preserving an exact suffix), else derived from the numeric `id` with the same
+ * roadmap-aware legacy decode as the label. This is THE identity for a sprint —
+ * use it wherever `458.10` must stay distinct from `458.1` (GH #635).
+ */
+export function roadmapSprintKey(roadmap: RoadmapDefinition, sprint: RoadmapSprint): string {
+  if (sprint.id_key) return sprint.id_key;
+  return isEncodedInsertedSprintInRoadmap(roadmap, sprint.id)
+    ? formatSprintNumber(sprint.id)
+    : String(sprint.id);
+}
+
 /** Validate a roadmap definition for structural correctness.
  *  Optionally cross-check sprint status against scorecards and/or shipped
  *  sprint commits on main when provided. Caller is responsible for collecting
@@ -286,6 +314,9 @@ export function validateRoadmap(
 
   const orderOf = (id: number): number => roadmapSprintOrderValue(roadmap, id);
   const labelOf = (id: number): string => formatRoadmapSprintLabel(roadmap, id);
+  // Canonical identity so 458.10 and 458.1 are distinct sprints with distinct
+  // ticket-key prefixes (GH #635).
+  const keyLabelOf = (sprint: RoadmapSprint): string => `S${roadmapSprintKey(roadmap, sprint)}`;
 
   // Check: at least one sprint
   if (roadmap.sprints.length === 0) {
@@ -312,8 +343,10 @@ export function validateRoadmap(
     }
   }
 
-  // Check: duplicate sprint IDs
-  if (sprintIds.size !== roadmap.sprints.length) {
+  // Check: duplicate sprint IDs — by canonical key, so 458.10 and 458.1 are not
+  // reported as duplicates even though their numeric mirror collides (GH #635).
+  const canonicalKeys = new Set(roadmap.sprints.map(s => roadmapSprintKey(roadmap, s)));
+  if (canonicalKeys.size !== roadmap.sprints.length) {
     errors.push({ type: 'error', message: 'Duplicate sprint IDs detected' });
   }
 
@@ -343,7 +376,7 @@ export function validateRoadmap(
 
     // Check: ticket key format matches sprint
     for (const ticket of sprint.tickets) {
-      const expected = `${labelOf(sprint.id)}-`;
+      const expected = `${keyLabelOf(sprint)}-`;
       const ticketKey = getRoadmapTicketKey(ticket);
       if (!ticketKey) {
         errors.push({
@@ -359,7 +392,7 @@ export function validateRoadmap(
           type: 'error',
           sprint: sprint.id,
           ticket: ticketKey,
-          message: `Ticket ${ticketKey} does not match sprint ${labelOf(sprint.id)} (expected prefix ${expected})`,
+          message: `Ticket ${ticketKey} does not match sprint ${keyLabelOf(sprint)} (expected prefix ${expected})`,
         });
       }
     }

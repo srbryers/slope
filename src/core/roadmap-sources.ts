@@ -1,7 +1,8 @@
 import { isAbsolute, posix } from 'node:path';
 import { parseDocument } from 'yaml';
 import { castRoadmapStructure, getRoadmapTicketKey, validateRoadmap } from './roadmap.js';
-import { compareRoadmapSprintIds, describeSprintIdAmbiguity, roadmapSprintOrderValue } from './roadmap.js';
+import { compareRoadmapSprintIds, describeSprintIdAmbiguity, roadmapSprintKey, roadmapSprintOrderValue } from './roadmap.js';
+import { sprintIdKey } from './sprint-id.js';
 import type { RoadmapDefinition, RoadmapPhase, RoadmapSprint } from './roadmap.js';
 
 export type RoadmapSourceKind = 'phase' | 'backlog' | 'archive';
@@ -244,10 +245,23 @@ export function parseRoadmapSourceDocument(
       throw new RoadmapSourceError(`phase.${field} must be a string when present`, sourcePath);
     }
   }
-  if (!Array.isArray(phase.sprints)
-    || phase.sprints.some(id => typeof id !== 'number' || !Number.isFinite(id) || id <= 0)) {
-    throw new RoadmapSourceError('phase.sprints must be a sequence of positive numeric sprint IDs', sourcePath);
+  // Accept string-authored membership ids (e.g. "458.10") alongside numbers.
+  // Record the canonical keys and coerce the numeric mirror (GH #635).
+  if (!Array.isArray(phase.sprints)) {
+    throw new RoadmapSourceError('phase.sprints must be a sequence of sprint IDs', sourcePath);
   }
+  const memberKeys: string[] = [];
+  let anyStringMember = false;
+  for (const [i, member] of phase.sprints.entries()) {
+    if (typeof member === 'string') anyStringMember = true;
+    const key = typeof member === 'number' || typeof member === 'string' ? sprintIdKey(member) : null;
+    if (key === null) {
+      throw new RoadmapSourceError(`phase.sprints[${i}] is not a valid sprint id`, sourcePath);
+    }
+    memberKeys.push(key);
+    phase.sprints[i] = Number(key);
+  }
+  if (anyStringMember) phase.sprint_keys = memberKeys;
   if (!Array.isArray(raw.sprints)) {
     throw new RoadmapSourceError('sprints must be a sequence', sourcePath);
   }
@@ -269,8 +283,18 @@ export function parseRoadmapSourceDocument(
       throw new RoadmapSourceError(`sprints[${sprintIndex}] must be a mapping`, sourcePath);
     }
     const sprint = value as Record<string, unknown>;
-    if (typeof sprint.id !== 'number' || !Number.isFinite(sprint.id) || sprint.id <= 0) {
-      throw new RoadmapSourceError(`sprints[${sprintIndex}].id must be a positive number`, sourcePath);
+    // Accept a string-authored id to preserve an exact suffix a number cannot
+    // hold (e.g. "458.10"). Record the canonical id_key and coerce id to its
+    // numeric mirror for ordering and the store (GH #635).
+    if (typeof sprint.id === 'string') {
+      const key = sprintIdKey(sprint.id);
+      if (key === null) {
+        throw new RoadmapSourceError(`sprints[${sprintIndex}].id is not a valid sprint id: ${sprint.id}`, sourcePath);
+      }
+      sprint.id_key = key;
+      sprint.id = Number(key);
+    } else if (typeof sprint.id !== 'number' || !Number.isFinite(sprint.id) || sprint.id <= 0) {
+      throw new RoadmapSourceError(`sprints[${sprintIndex}].id must be a positive number or a quoted sprint id`, sourcePath);
     }
     if (typeof sprint.theme !== 'string' || !sprint.theme.trim()) {
       throw new RoadmapSourceError(`sprints[${sprintIndex}].theme must be a non-empty string`, sourcePath);
@@ -284,10 +308,20 @@ export function parseRoadmapSourceDocument(
     if (typeof sprint.type !== 'string' || !sprint.type.trim()) {
       throw new RoadmapSourceError(`sprints[${sprintIndex}].type must be a non-empty string`, sourcePath);
     }
-    if (sprint.depends_on != null
-      && (!Array.isArray(sprint.depends_on)
-        || sprint.depends_on.some(id => typeof id !== 'number' || !Number.isFinite(id) || id <= 0))) {
-      throw new RoadmapSourceError(`sprints[${sprintIndex}].depends_on must contain numeric sprint IDs`, sourcePath);
+    // depends_on may reference a canonical string id (e.g. "458.10"); coerce to
+    // the numeric mirror. Distinctness between coexisting 458.1 and 458.10 in a
+    // dependency uses the numeric mirror, the same boundary as the store (GH #635).
+    if (sprint.depends_on != null) {
+      if (!Array.isArray(sprint.depends_on)) {
+        throw new RoadmapSourceError(`sprints[${sprintIndex}].depends_on must be a sequence of sprint IDs`, sourcePath);
+      }
+      for (const [i, dep] of sprint.depends_on.entries()) {
+        const key = typeof dep === 'number' || typeof dep === 'string' ? sprintIdKey(dep) : null;
+        if (key === null) {
+          throw new RoadmapSourceError(`sprints[${sprintIndex}].depends_on[${i}] is not a valid sprint id`, sourcePath);
+        }
+        sprint.depends_on[i] = Number(key);
+      }
     }
     for (const field of ['status', 'note', 'outcome', 'phase', 'wave'] as const) {
       if (sprint[field] != null && typeof sprint[field] !== 'string') {
@@ -602,9 +636,16 @@ export function validateRoadmapSourceFederation(
   }
 
   const phaseNames = new Map<string, string>();
-  const sprintDefinitions = new Map<number, string>();
-  const sprintMemberships = new Map<number, string[]>();
+  const sprintDefinitions = new Map<string, string>();
+  const sprintMemberships = new Map<string, string[]>();
   const ticketDefinitions = new Map<string, string>();
+
+  // Identity is the canonical key so 458.10 and 458.1 stay distinct through the
+  // uniqueness and membership checks (GH #635). No roadmap-aware legacy decode is
+  // needed here — within a source, id_key is set for string-authored ids and a
+  // numeric id is its own consistent key.
+  const defKey = (sprint: RoadmapSprint): string => sprint.id_key ?? String(sprint.id);
+  const membershipKeys = (phase: RoadmapPhase): string[] => phase.sprint_keys ?? phase.sprints.map(String);
 
   for (const source of sources) {
     const label = sourceLabel(source);
@@ -619,30 +660,30 @@ export function validateRoadmapSourceFederation(
       phaseNames.set(source.document.phase.name, label);
     }
 
-    const localMembership = source.document.phase.sprints;
-    const localDefinitions = source.document.sprints.map(sprint => sprint.id);
+    const localMembership = membershipKeys(source.document.phase);
+    const localDefinitions = source.document.sprints.map(defKey);
     const membershipSet = new Set(localMembership);
     const definitionSet = new Set(localDefinitions);
-    for (const id of localMembership) {
-      const memberships = sprintMemberships.get(id) ?? [];
+    for (const key of localMembership) {
+      const memberships = sprintMemberships.get(key) ?? [];
       memberships.push(label);
-      sprintMemberships.set(id, memberships);
-      if (!definitionSet.has(id)) {
+      sprintMemberships.set(key, memberships);
+      if (!definitionSet.has(key)) {
         errors.push({
           code: 'missing_sprint_definition',
           source: label,
-          sprint: id,
-          message: `Phase membership S${id} has no sprint definition in the same bundle.`,
+          sprint: Number(key),
+          message: `Phase membership S${key} has no sprint definition in the same bundle.`,
         });
       }
     }
-    for (const id of localDefinitions) {
-      if (!membershipSet.has(id)) {
+    for (const key of localDefinitions) {
+      if (!membershipSet.has(key)) {
         errors.push({
           code: 'orphan_sprint_definition',
           source: label,
-          sprint: id,
-          message: `Sprint S${id} is defined but missing from phase.sprints in the same bundle.`,
+          sprint: Number(key),
+          message: `Sprint S${key} is defined but missing from phase.sprints in the same bundle.`,
         });
       }
     }
@@ -654,16 +695,17 @@ export function validateRoadmapSourceFederation(
     }
 
     for (const sprint of source.document.sprints) {
-      const priorSprint = sprintDefinitions.get(sprint.id);
+      const key = defKey(sprint);
+      const priorSprint = sprintDefinitions.get(key);
       if (priorSprint) {
         errors.push({
           code: 'duplicate_sprint',
           source: label,
           sprint: sprint.id,
-          message: `Sprint S${sprint.id} is also defined in ${priorSprint}.`,
+          message: `Sprint S${key} is also defined in ${priorSprint}.`,
         });
       } else {
-        sprintDefinitions.set(sprint.id, label);
+        sprintDefinitions.set(key, label);
       }
       for (const ticket of sprint.tickets) {
         const key = getRoadmapTicketKey(ticket);
@@ -684,29 +726,32 @@ export function validateRoadmapSourceFederation(
     }
   }
 
-  for (const [sprint, memberships] of sprintMemberships) {
+  for (const [key, memberships] of sprintMemberships) {
     if (memberships.length > 1) {
       errors.push({
         code: 'multiple_phase_membership',
-        sprint,
-        message: `Sprint S${sprint} belongs to multiple phase bundles: ${memberships.join(', ')}.`,
+        sprint: Number(key),
+        message: `Sprint S${key} belongs to multiple phase bundles: ${memberships.join(', ')}.`,
       });
     }
   }
 
-  const normalizedSprintIds = new Map<number, { id: number; source?: string }>();
+  // Collision is by canonical identity, not the float order value: 458.1 and
+  // 458.10 are legitimately distinct (their id_keys differ), while a legacy 435
+  // and an explicit 43.5 still resolve to the same key "43.5" and collide (GH #635).
+  const canonicalIds = new Map<string, { key: string; source?: string }>();
   for (const sprint of roadmap.sprints) {
-    const normalized = roadmapSprintOrderValue(roadmap, sprint.id);
-    const prior = normalizedSprintIds.get(normalized);
-    if (prior && prior.id !== sprint.id) {
+    const key = roadmapSprintKey(roadmap, sprint);
+    const prior = canonicalIds.get(key);
+    if (prior) {
       errors.push({
         code: 'logical_sprint_collision',
-        source: sprintDefinitions.get(sprint.id),
+        source: sprintDefinitions.get(defKey(sprint)),
         sprint: sprint.id,
-        message: `Sprint S${sprint.id} and Sprint S${prior.id} resolve to the same roadmap identity (${normalized}); first defined in ${prior.source ?? 'unknown source'}.`,
+        message: `Sprint S${key} and Sprint S${prior.key} resolve to the same roadmap identity (${key}); first defined in ${prior.source ?? 'unknown source'}.`,
       });
     } else {
-      normalizedSprintIds.set(normalized, { id: sprint.id, source: sprintDefinitions.get(sprint.id) });
+      canonicalIds.set(key, { key, source: sprintDefinitions.get(defKey(sprint)) });
     }
   }
 
@@ -715,7 +760,7 @@ export function validateRoadmapSourceFederation(
     errors.push({
       code: 'roadmap_validation',
       message: issue.message,
-      ...(issue.sprint != null ? { sprint: issue.sprint, source: sprintDefinitions.get(issue.sprint) } : {}),
+      ...(issue.sprint != null ? { sprint: issue.sprint, source: sprintDefinitions.get(String(issue.sprint)) } : {}),
       ...(issue.ticket ? { ticket: issue.ticket } : {}),
     });
   }
@@ -723,7 +768,7 @@ export function validateRoadmapSourceFederation(
     warnings.push({
       code: 'roadmap_validation',
       message: issue.message,
-      ...(issue.sprint != null ? { sprint: issue.sprint, source: sprintDefinitions.get(issue.sprint) } : {}),
+      ...(issue.sprint != null ? { sprint: issue.sprint, source: sprintDefinitions.get(String(issue.sprint)) } : {}),
       ...(issue.ticket ? { ticket: issue.ticket } : {}),
     });
   }
