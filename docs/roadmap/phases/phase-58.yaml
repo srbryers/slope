@@ -12,7 +12,7 @@ sprints:
     par: 4
     slope: 3
     type: bugfix + agent ergonomics
-    status: planned
+    status: complete
     note: "#650: claim-required returned ask on every implementation write whenever sprint state was absent or in a non-implementing phase — including the scoring phase slope pr sets the moment a PR merges — so beginning the next sprint's work always prompted. Every remedy it prints is agent-actionable, so the operator was being asked to approve a fix only the agent could apply. An earlier attempt was reverted for lack of deny coverage; this lands with it. Then the shell-write guard, making the no-shell-inline-writes convention mechanical."
     tickets:
       - key: S254-1
@@ -37,3 +37,5 @@ sprints:
         complexity: small
         depends_on:
           - S254-3
+scorecards:
+  "254": docs/retros/sprint-254.json
