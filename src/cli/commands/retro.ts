@@ -22,6 +22,7 @@ import {
   buildRetroMemoryPlans,
   persistRetroMemories,
   parseSprintNumber,
+  formatSprintLabel,
 } from '../../core/index.js';
 import type {
   MemoryCategory,
@@ -32,7 +33,8 @@ import type {
   RoadmapSprint,
 } from '../../core/index.js';
 import { loadConfig } from '../config.js';
-import { updateSprintPhaseForSprint } from '../sprint-state.js';
+import { updateSprintPhaseForSprintAcrossWorktrees } from '../sprint-state.js';
+import type { WorktreePhaseReconcile } from '../sprint-state.js';
 
 interface BackfillOptions {
   sprint?: number;
@@ -524,9 +526,12 @@ async function postMergeSubcommand(args: string[]): Promise<void> {
   const record = buildSavedRetro(retro, memory);
   const path = postMergeOutputPath(cwd, retro);
 
+  let reconciled: WorktreePhaseReconcile[] = [];
   if (!opts.dryRun) {
     writePostMergeRetro(cwd, record);
-    updateSprintPhaseForSprint(cwd, retro.sprint, 'complete');
+    // Reconcile every checkout, not just this one — sibling worktrees otherwise
+    // keep reporting the merged sprint as in progress (GH #624).
+    reconciled = updateSprintPhaseForSprintAcrossWorktrees(cwd, retro.sprint, 'complete');
   }
 
   const payload = {
@@ -547,12 +552,40 @@ async function postMergeSubcommand(args: string[]): Promise<void> {
     console.log(`\n${target}: wrote ${path}`);
   }
   console.log(`  Outcome: ${retro.outcome}`);
-  if (!opts.dryRun) console.log('  Sprint state: reconciled to complete when local state matched this sprint');
+  if (!opts.dryRun) console.log(`  Sprint state: ${formatPhaseReconcile(reconciled, retro.sprint)}`);
   console.log(`  Memories: ${record.memory.added.length} added, ${record.memory.skipped} skipped, ${record.memory.planned} planned`);
   if (retro.followUps.length > 0) {
     console.log(`  Follow-ups: ${retro.followUps.length}`);
   }
   console.log('');
+}
+
+/**
+ * Describe what reconciliation actually did. The previous fixed message claimed
+ * a reconcile had happened even when no checkout matched the sprint, which is
+ * how a stale worktree could report the sprint still in progress right after a
+ * "successful" closeout (GH #624).
+ */
+function formatPhaseReconcile(results: WorktreePhaseReconcile[], sprint: number): string {
+  if (results.length === 0) return 'no sprint state found to reconcile';
+
+  const changed = results.filter(r => r.changed);
+  const matched = results.filter(r => r.matched);
+  const stale = results.filter(r => !r.matched);
+
+  const parts: string[] = [];
+  parts.push(changed.length > 0
+    ? `advanced to complete in ${changed.length} of ${results.length} checkout(s)`
+    : matched.length > 0
+      ? 'already complete'
+      : `no checkout holds state for ${formatSprintLabel(sprint)}`);
+
+  if (stale.length > 0) {
+    const names = stale.map(r => r.path).join(', ');
+    parts.push(`left unchanged (different sprint): ${names}`);
+  }
+
+  return parts.join('; ');
 }
 
 async function backfillSubcommand(args: string[]): Promise<void> {

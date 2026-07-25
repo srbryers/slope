@@ -141,7 +141,8 @@ describe('withFileLockSync', () => {
   }, 15000);
 
   it('keeps representative sprint and session state writes valid under concurrent processes', async () => {
-    const moduleDir = compileCliModules(['atomic-write', 'sprint-state', 'session-state']);
+    // session-scope is a dependency of sprint-state (cross-worktree reconcile).
+    const moduleDir = compileCliModules(['atomic-write', 'sprint-state', 'session-state', 'session-scope']);
     const sprintUrl = pathToFileURL(join(moduleDir, 'sprint-state.js')).href;
     const sessionUrl = pathToFileURL(join(moduleDir, 'session-state.js')).href;
     const slopeDir = join(tmpDir, '.slope');

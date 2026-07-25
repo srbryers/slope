@@ -180,6 +180,60 @@ describe('guardCommand dispatcher path', () => {
     expect(metrics).toContain('"decision":"ask"');
   });
 
+  it('ignores out-of-repo scratchpad writes instead of adopting them as the workspace (GH #625)', async () => {
+    const scratchpad = makeTmpPath('slope-scratchpad');
+    mkdirSync(scratchpad, { recursive: true });
+    try {
+      const output = await runGuardCommandWithInput(['claim-required'], makeHookInput(cwd, {
+        tool_input: { file_path: join(scratchpad, 'probe.config.ts'), content: 'x' },
+      }));
+
+      expect(output).toBe('');
+    } finally {
+      rmSync(scratchpad, { recursive: true, force: true });
+    }
+  });
+
+  it('does not cache a non-workspace cwd for later tool calls (GH #625)', async () => {
+    const scratchpad = makeTmpPath('slope-scratchpad');
+    mkdirSync(scratchpad, { recursive: true });
+    try {
+      await runGuardCommandWithInput(['claim-required'], makeHookInput(cwd, {
+        tool_input: { file_path: join(scratchpad, 'probe.ts'), content: 'x' },
+      }));
+
+      const store = join(cwd, '.slope', 'codex-workdirs');
+      const memos = existsSync(store) ? readdirSync(store) : [];
+      const remembered = memos.map(name => JSON.parse(readFileSync(join(store, name), 'utf8')).cwd);
+      expect(remembered).not.toContain(scratchpad);
+    } finally {
+      rmSync(scratchpad, { recursive: true, force: true });
+    }
+  });
+
+  it('refuses to replay a remembered cwd that is not a workspace (GH #625)', async () => {
+    const scratchpad = makeTmpPath('slope-scratchpad');
+    mkdirSync(scratchpad, { recursive: true });
+    const store = join(cwd, '.slope', 'codex-workdirs');
+    mkdirSync(store, { recursive: true });
+    // Simulate a memo written by an older version that pinned a non-workspace dir.
+    writeFileSync(
+      join(store, `${'0'.repeat(32)}.json`),
+      JSON.stringify({ session_id: 'test-session', cwd: scratchpad, source: 'tool-path' }),
+    );
+    try {
+      const output = await runGuardCommandWithInput(['claim-required'], makeHookInput(cwd, {
+        tool_input: { file_path: join(cwd, 'src/example.ts') },
+      }));
+
+      // Falls back to the real workspace, so the in-repo edit is still classified.
+      expect(output).toContain('src/example.ts');
+      expect(output).not.toContain('scratchpad');
+    } finally {
+      rmSync(scratchpad, { recursive: true, force: true });
+    }
+  });
+
   it('records suppressed metrics for adhoc workflow guards that do not run', async () => {
     const output = await runGuardCommandWithInput(['workflow-step-gate'], makeHookInput(cwd));
 

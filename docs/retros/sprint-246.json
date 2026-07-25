@@ -1,0 +1,110 @@
+{
+  "sprint_number": 246,
+  "theme": "Session and Worktree Isolation",
+  "par": 5,
+  "slope": 5,
+  "score": 6,
+  "score_label": "bogey",
+  "date": "2026-07-25",
+  "shots": [
+    {
+      "ticket_key": "S246-1",
+      "title": "Classify guard session location by the tool call target path rather than hook input.cwd (#631, #630)",
+      "club": "driver",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "moderate",
+          "description": "First implementation ran the worktree lookup eagerly after the git-common-dir check, adding two git subprocess calls to every guard invocation (a hot path on Edit/Write/Bash) and shifting the programmed execFileSync mock sequences of five existing tests. Restructured to check lazily on the would-deny path only, reusing the worktree list the guidance formatter already computes.",
+          "gotcha_id": "self:hot-path"
+        }
+      ],
+      "notes": "Trusts where work actually lands. An edit landing in the primary checkout still denies, so the #499 EnterWorktree guidance is preserved; pinned by a new both-directions integration test pair."
+    },
+    {
+      "ticket_key": "S246-2",
+      "title": "Resolve the same session store in guards and the slope session CLI (#630, #631)",
+      "club": "driver",
+      "result": "green",
+      "hazards": [],
+      "notes": "New src/cli/session-scope.ts resolves the primary checkout via --git-common-dir. Nine session CLI call sites plus worktree reconciliation share it, so the printed remediation can clear what the guard reads. The guard primary-checkout branch already had cwd equal to primary, so no redundant git call was added there."
+    },
+    {
+      "ticket_key": "S246-3",
+      "title": "Stop auto-registering a denied session as primary and exempt session start/heartbeat (#631)",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "Changed the register call ide from the hardcoded claude-code to resolveIde(input) as a drive-by improvement, breaking an existing assertion. Reverted to keep the diff focused; the ide detection inconsistency between register and reconcile remains a separate concern.",
+          "gotcha_id": "self:scope-creep"
+        }
+      ],
+      "notes": "Registration moved to the pass path and skipped when a record already exists. Verified registerSession does not auto-assign swarm_id, so reordering cannot break swarm-member exclusion."
+    },
+    {
+      "ticket_key": "S246-4",
+      "title": "Scope claim-required to the repo working tree and exclude temp/scratchpad roots (#625)",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "The stated cause in the issue (guard classifies any .ts write as implementation regardless of path) was wrong: findImplementationWritePath already scoped to the repo. Instrumenting the real functions showed the defect was upstream in resolveEffectiveHookCwd, which derives cwd from the tool target path; canonicalHookCwd fell back to the raw path, so an out-of-repo write made the scratchpad the workspace root. Fixing it there fixes every guard at once and needs no temp-dir denylist.",
+          "gotcha_id": "self:diagnose-before-fix"
+        }
+      ],
+      "notes": "Also guarded the Codex workdir memo on both write and read: one out-of-repo call previously pinned the whole session, and caches from older versions kept doing so after the fix."
+    },
+    {
+      "ticket_key": "S246-5",
+      "title": "Advance sprint status to complete across worktrees after post-merge retro (#624)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "moderate",
+          "description": "Adding a session-scope import to sprint-state.ts broke the atomic-write concurrency test, which compiles a hand-listed subset of CLI modules into a temp dir for child processes. New transitive dependencies must be added to that list.",
+          "gotcha_id": "self:module-subset"
+        }
+      ],
+      "notes": "updateSprintPhaseForSprintAcrossWorktrees applies the conditional update to every checkout; worktrees holding a different sprint are reported unmatched and untouched. The caller also discarded matched/changed and printed reconciled unconditionally, which is why a closeout that reconciled nothing still reported success."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 5,
+    "fairways_total": 5,
+    "greens_in_regulation": 5,
+    "greens_total": 5,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 4,
+    "hazard_penalties": 1,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    "Installed slope binary (published v1.63.0) predates main, so guard hooks in this session ran code without the fixes until a local node_modules/.bin shim was added."
+  ],
+  "special_plays": [],
+  "bunker_locations": [],
+  "yardage_book_updates": [
+    "Guard cwd is derived, not given: resolveEffectiveHookCwd prefers tool_input workdir, then the tool target path, then transcript, then a persisted memo. Any of these can relocate a guard notion of the workspace.",
+    "worktree-check unit tests program execFileSync with ordered mockReturnValueOnce sequences. Adding a git call anywhere in the guard shifts every downstream expectation.",
+    "The worktree-check pass-sentinel lives in the real tmpdir and outlives the process; tests must reset it for every session id they use, on entry as well as exit.",
+    "tests/cli/atomic-write.test.ts compiles a hand-listed module subset for child processes; new transitive imports of sprint-state or session-state must be added there."
+  ],
+  "course_management_notes": [
+    "Verify an issue reproduces against current main before fixing it. The #625 stated cause was wrong and two other issues in this batch were already fixed.",
+    "claim-required returns ask even in adhoc mode, which the session briefing describes as sprint-workflow guards silenced. Demanding a claim in a mode that means not running sprint workflow is contradictory and trains agents to ignore the guard."
+  ]
+}

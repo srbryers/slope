@@ -1,6 +1,7 @@
 import { readFileSync, existsSync, unlinkSync } from 'node:fs';
 import { isAbsolute, join } from 'node:path';
 import { atomicWriteFileSync, withFileLockSync } from './atomic-write.js';
+import { listRepoWorktrees } from './session-scope.js';
 
 /** Sprint lifecycle phases */
 export const SPRINT_PHASES = ['planning', 'reviewing', 'implementing', 'scoring', 'complete'] as const;
@@ -549,6 +550,43 @@ export function updateSprintPhaseForSprint(
     return true;
   });
   return { state, matched, changed };
+}
+
+export interface WorktreePhaseReconcile {
+  /** Checkout root whose sprint state was inspected. */
+  path: string;
+  /** True when that checkout's state was for the expected sprint. */
+  matched: boolean;
+  /** True when the phase actually changed. */
+  changed: boolean;
+}
+
+/**
+ * Apply a conditional phase update to every checkout of this repository.
+ *
+ * Sprint state is per checkout, so reconciling only `cwd` left sibling worktrees
+ * reporting an already-merged sprint as still in progress — agents then received
+ * contradictory next actions and could restart completed work (GH #624).
+ * Checkouts whose state is for a different sprint are reported as unmatched and
+ * left untouched, so unrelated in-flight work is never clobbered.
+ */
+export function updateSprintPhaseForSprintAcrossWorktrees(
+  cwd: string,
+  expectedSprint: number,
+  phase: SprintPhase,
+): WorktreePhaseReconcile[] {
+  const results: WorktreePhaseReconcile[] = [];
+  for (const root of listRepoWorktrees(cwd)) {
+    if (!existsSync(join(root, SPRINT_STATE_FILE))) continue;
+    try {
+      const { matched, changed } = updateSprintPhaseForSprint(root, expectedSprint, phase);
+      results.push({ path: root, matched, changed });
+    } catch {
+      // A locked or unreadable sibling checkout must not fail the closeout.
+      results.push({ path: root, matched: false, changed: false });
+    }
+  }
+  return results;
 }
 
 /** Check if all gates are true. */
