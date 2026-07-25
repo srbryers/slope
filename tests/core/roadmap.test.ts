@@ -8,6 +8,7 @@ import {
   formatRoadmapSummary,
   formatStrategicContext,
   formatSprintLabel,
+  formatRoadmapSprintLabel,
   nextCanonicalSprintId,
   parseSprintNumber,
   sprintOrderValue,
@@ -882,5 +883,37 @@ describe('formatStrategicContext next-sprint output', () => {
     });
     const context = formatStrategicContext(roadmap, 9);
     expect(context).not.toContain('Next:');
+  });
+});
+
+describe('roadmap-aware sprint labelling (GH #635)', () => {
+  function roadmapWith(id: number, ticketKey: string) {
+    return {
+      name: 'r',
+      phases: [{ name: 'P', sprints: [id] }],
+      sprints: [{
+        id,
+        theme: 'T',
+        par: 3,
+        slope: 1,
+        tickets: [{ key: ticketKey, title: 'x', club: 'wedge' as const, complexity: 'small' as const }],
+      }],
+    };
+  }
+
+  it('renders a real three-digit sprint ending in 5 as itself, not a decimal', () => {
+    // Bare formatSprintLabel cannot disambiguate: any integer 200-999 ending in 5
+    // looks like the legacy encoding, so this repo's own S245 rendered "S24.5".
+    expect(formatSprintLabel(245)).toBe('S24.5');
+    // With roadmap evidence (ticket keys prove the canonical identity) it is correct.
+    expect(formatRoadmapSprintLabel(roadmapWith(245, 'S245-1'), 245)).toBe('S245');
+  });
+
+  it.each([205, 215, 225, 235, 245, 255])('resolves S%i from roadmap evidence', id => {
+    expect(formatRoadmapSprintLabel(roadmapWith(id, `S${id}-1`), id)).toBe(`S${id}`);
+  });
+
+  it('still renders a genuinely encoded inserted sprint as a decimal', () => {
+    expect(formatRoadmapSprintLabel(roadmapWith(435, 'S43.5-1'), 435)).toBe('S43.5');
   });
 });

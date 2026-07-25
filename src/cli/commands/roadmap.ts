@@ -8,7 +8,6 @@ import {
   compareSprintIds,
   computeCriticalPath,
   findParallelOpportunities,
-  formatSprintLabel,
   formatSprintNumber,
   formatRoadmapSummary,
   formatStrategicContext,
@@ -107,7 +106,7 @@ function statusLabelForSprint(
   if (isSuperseded) return '\u21B7 superseded';
   if (isCompleted) return '\u2713 completed';
   if (isCurrent) return '\u25B6 active';
-  if (blockedBy.length > 0) return `\u2718 blocked by ${blockedBy.map(formatSprintLabel).join(', ')}`;
+  if (blockedBy.length > 0) return `\u2718 blocked by ${blockedBy.map(dep => formatRoadmapSprintLabel(roadmap, dep)).join(', ')}`;
   return '\u25CB pending';
 }
 
@@ -763,7 +762,7 @@ function printFullRoadmapStatus(
 ): void {
   console.log(`\n# Roadmap Status — ${roadmap.name}`);
   console.log('\u2550'.repeat(40));
-  console.log(`\nCurrent sprint: ${formatSprintLabel(currentSprint)}`);
+  console.log(`\nCurrent sprint: ${formatRoadmapSprintLabel(roadmap, currentSprint)}`);
   console.log('');
 
   for (const phase of roadmap.phases || []) {
@@ -799,13 +798,13 @@ function printFullRoadmapStatus(
       } else if (isCurrent) {
         status = '\u25B6 active';
       } else if (isBlocked) {
-        status = `\u2718 blocked by ${blockedBy.map(formatSprintLabel).join(', ')}`;
+        status = `\u2718 blocked by ${blockedBy.map(dep => formatRoadmapSprintLabel(roadmap, dep)).join(', ')}`;
       } else {
         status = '\u25CB pending';
       }
 
       const theme = sprint.theme || 'Untitled Sprint';
-      console.log(`  ${formatSprintLabel(sprint.id)} ${theme.padEnd(30)} ${status}`);
+      console.log(`  ${formatRoadmapSprintLabel(roadmap, sprint.id)} ${theme.padEnd(30)} ${status}`);
     }
     console.log('');
   }
@@ -827,8 +826,8 @@ function printCompactRoadmapStatus(
 ): void {
   const current = roadmap.sprints.find(s => s.id === currentSprint);
   const currentLabel = current
-    ? `${formatSprintLabel(current.id)} ${current.theme || 'Untitled Sprint'}`
-    : `${formatSprintLabel(currentSprint)} (not found in roadmap)`;
+    ? `${formatRoadmapSprintLabel(roadmap, current.id)} ${current.theme || 'Untitled Sprint'}`
+    : `${formatRoadmapSprintLabel(roadmap, currentSprint)} (not found in roadmap)`;
   const currentIsPending = current ? isRoadmapSprintPending(current) : false;
   const currentPhase = phaseForSprint(roadmap, currentSprint);
   const pendingAfterCurrent = sortedRoadmapSprints(roadmap)
@@ -851,14 +850,14 @@ function printCompactRoadmapStatus(
 
   console.log('\nActive sprint:');
   if (!current) {
-    console.log(`  ${formatSprintLabel(currentSprint)} is not defined in the roadmap.`);
+    console.log(`  ${formatRoadmapSprintLabel(roadmap, currentSprint)} is not defined in the roadmap.`);
   } else {
-    console.log(`  ${formatSprintLabel(current.id)} ${current.theme || 'Untitled Sprint'} - ${statusLabelForSprint(roadmap, current, currentSprint, completedSprints)}`);
+    console.log(`  ${formatRoadmapSprintLabel(roadmap, current.id)} ${current.theme || 'Untitled Sprint'} - ${statusLabelForSprint(roadmap, current, currentSprint, completedSprints)}`);
     if ((current.depends_on ?? []).length > 0) {
       const deps = current.depends_on!.map(dep => {
         const sprint = roadmap.sprints.find(s => s.id === dep);
-        if (!sprint) return `${formatSprintLabel(dep)} missing`;
-        return `${formatSprintLabel(dep)} ${statusLabelForSprint(roadmap, sprint, currentSprint, completedSprints).replace(/^[^\w]+ /, '')}`;
+        if (!sprint) return `${formatRoadmapSprintLabel(roadmap, dep)} missing`;
+        return `${formatRoadmapSprintLabel(roadmap, dep)} ${statusLabelForSprint(roadmap, sprint, currentSprint, completedSprints).replace(/^[^\w]+ /, '')}`;
       });
       console.log(`  Dependencies: ${deps.join(', ')}`);
     }
@@ -869,7 +868,7 @@ function printCompactRoadmapStatus(
 
   console.log('\nNext ready:');
   if (nextReady) {
-    console.log(`  ${formatSprintLabel(nextReady.id)} ${nextReady.theme || 'Untitled Sprint'} - ${statusLabelForSprint(roadmap, nextReady, currentSprint, completedSprints)}`);
+    console.log(`  ${formatRoadmapSprintLabel(roadmap, nextReady.id)} ${nextReady.theme || 'Untitled Sprint'} - ${statusLabelForSprint(roadmap, nextReady, currentSprint, completedSprints)}`);
   } else {
     console.log('  None yet');
   }
@@ -879,7 +878,7 @@ function printCompactRoadmapStatus(
     console.log('  None');
   } else {
     for (const sprint of upcoming) {
-      console.log(`  ${formatSprintLabel(sprint.id)} ${sprint.theme || 'Untitled Sprint'} - ${statusLabelForSprint(roadmap, sprint, currentSprint, completedSprints)}`);
+      console.log(`  ${formatRoadmapSprintLabel(roadmap, sprint.id)} ${sprint.theme || 'Untitled Sprint'} - ${statusLabelForSprint(roadmap, sprint, currentSprint, completedSprints)}`);
     }
   }
 
@@ -890,7 +889,7 @@ function printCompactRoadmapStatus(
     const first = current.tickets[0];
     console.log(`  Work ${first.key}: ${first.title}`);
   } else if (nextReady) {
-    console.log(`  Start ${formatSprintLabel(nextReady.id)}: ${nextReady.theme || 'Untitled Sprint'}`);
+    console.log(`  Start ${formatRoadmapSprintLabel(roadmap, nextReady.id)}: ${nextReady.theme || 'Untitled Sprint'}`);
   } else {
     console.log('  No roadmap action is currently ready.');
   }
