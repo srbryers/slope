@@ -1,0 +1,104 @@
+{
+  "sprint_number": 247,
+  "theme": "Roadmap Projection Safety and Sprint Identity",
+  "par": 5,
+  "slope": 5,
+  "score": 7,
+  "score_label": "double_bogey",
+  "date": "2026-07-25",
+  "shots": [
+    {
+      "ticket_key": "S247-1",
+      "title": "Add a generated-file marker to the roadmap projection and refuse to discard unexplained divergence (#637)",
+      "club": "driver",
+      "result": "missed_short",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "The in-file _generated marker was implemented, then reverted. Making store.projection carry the marker broke seven roadmap-migration tests: the planner computes expected_projection_sha256 and the applier recomputes it, so both sides plus the archive comparison must agree on projection bytes. Threading a consistent label through migration digests risks receipt binding and rollback integrity, so it needs its own ticket.",
+          "gotcha_id": "self:deferred-marker"
+        }
+      ],
+      "notes": "Divergence protection shipped and is the substantive fix: findRoadmapProjectionDivergence blocks any write that would drop phases or sprints present only on disk, naming them, with --force to discard deliberately. Reproduced on this repo first: an injected phase vanished on slope validate with exit 0."
+    },
+    {
+      "ticket_key": "S247-2",
+      "title": "Make slope validate read-only and leave regeneration to slope roadmap compile (#637)",
+      "club": "long_iron",
+      "result": "missed_short",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "moderate",
+          "description": "Not delivered. Removing regeneration from validate would also remove the closeout source reconciliation this repo own workflow depends on. Instead the validate write was made safe and its exit code corrected. The surprise that a validate command mutates tracked files remains.",
+          "gotcha_id": "self:deferred-readonly"
+        }
+      ],
+      "notes": "RoadmapSourceError.projectionContentLoss stops callers downgrading the refusal to a warning; validate reports once and exits 1 instead of printing a per-sprint note and exiting 0."
+    },
+    {
+      "ticket_key": "S247-3",
+      "title": "Label canonical source, owning bundle, and generated projection distinctly in focused evidence (#636)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Focused evidence now names the canonical manifest, the owning bundle with its kind, and the projection as generated and read-only. An explicit --path still reports what was read; invalid federation falls back."
+    },
+    {
+      "ticket_key": "S247-4",
+      "title": "Preserve sprint IDs canonically and stop mis-rendering integer IDs ending in 5 (#635)",
+      "club": "driver",
+      "result": "missed_short",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "moderate",
+          "description": "Canonical string sprint IDs (458.10 distinct from 458.1) not delivered: it is a representational change across roadmap compile, focus, archive, sprint state, scorecards and retro paths. Only the display mis-rendering was fixed.",
+          "gotcha_id": "self:deferred-canonical-ids"
+        }
+      ],
+      "notes": "Found during S246 pre-round, not from the issue: isEncodedInsertedSprintId treats any integer 200-999 ending in 5 as a legacy encoded half-sprint, so this repo own S245 rendered as S24.5. S243 built the evidence-based resolver and used it for ordering but never switched the display paths over."
+    },
+    {
+      "ticket_key": "S247-5",
+      "title": "Exclude docs-only and range-mention commits from shipped-commit detection (#632)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "No production change needed. Verified all three reported subjects already yield no refs on main via hasImplementationCommitType and isSprintRangeEndpoint; the range case was already pinned verbatim. Added the one uncovered case, the forward reference plan S134."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 5,
+    "fairways_total": 5,
+    "greens_in_regulation": 2,
+    "greens_total": 5,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 3,
+    "hazard_penalties": 2,
+    "miss_directions": {
+      "long": 0,
+      "short": 3,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    "Sprint executed on a branch cut from the S246 branch, so its history stacks."
+  ],
+  "special_plays": [],
+  "bunker_locations": [
+    "src/cli/roadmap-source-store.ts and src/core/roadmap-migration.ts both serialize the projection for digest comparison; planner and applier must agree byte for byte."
+  ],
+  "yardage_book_updates": [
+    "docs/backlog/roadmap.json is generated from docs/roadmap/project.yaml. Author phases in docs/roadmap/phases/ and run slope roadmap compile.",
+    "slope validate mutates tracked files as a side effect: it reconciles scorecard indexes into phase YAML and regenerates the projection.",
+    "Projection bytes are compared in four places: compile write, closeout reconcile, archive plan, and migration receipt digest. Changing the serialized shape touches all of them."
+  ],
+  "course_management_notes": [
+    "Three of five tickets landed partially, each with a documented reason rather than an overrun. The reported harm in every case is fixed; the deferred parts are representational or digest-sensitive work that deserves its own sprint.",
+    "Reverting the marker after seeing seven migration failures was the right call over threading digests thin on remaining context."
+  ]
+}

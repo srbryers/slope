@@ -1,0 +1,77 @@
+{
+  "sprint_number": 248,
+  "theme": "CLI Argument and Reference Correctness",
+  "par": 4,
+  "slope": 2,
+  "score": 5,
+  "score_label": "bogey",
+  "date": "2026-07-25",
+  "shots": [
+    {
+      "ticket_key": "S248-1",
+      "title": "Parse --sprint and --help in slope review (#633)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "No production change needed. Verified on main: slope review --help prints usage and --sprint=241 renders Sprint 241, not the highest-numbered scorecard. Filed against v1.58.4 and fixed since."
+    },
+    {
+      "ticket_key": "S248-2",
+      "title": "Detect ticket keys anywhere in a plan so bulleted lists select the correct review tier (#634)",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "Two rounds of heredoc escaping mangled newline escapes into real newlines inside test string literals, producing unterminated-string parse failures. Switched to escape-free construction and to writing scripts as files rather than heredocs.",
+          "gotcha_id": "self:heredoc-escaping"
+        }
+      ],
+      "notes": "Distinct-key pass added after the header and table checks, so well-formed plans are untouched. Counted as a set so dependency back-references cannot inflate the total; sprint ranges like S64-S80 still count 0."
+    },
+    {
+      "ticket_key": "S248-3",
+      "title": "Derive Closes lines only from fix-intent commits and parse multi-issue references (#623)",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "moderate",
+          "description": "[self review] Fix-intent classification treated merge and revert subjects as fix intent: \"Merge pull request #613 from ...\" contributed the PR number as a closable issue, and a revert contributed the issue it un-fixed. Both would have produced wrong Closes lines. Fixed by skipping merge/revert subjects; pinned by two tests.",
+          "gotcha_id": "review:code"
+        }
+      ],
+      "notes": "git log now uses a record separator so intent is judged per commit: feat, fix, perf, refactor and untyped squash subjects contribute refs, while docs, chore, test and style do not. The PR body is no longer swept, since a bare issue reference there is not a fix declaration; explicit Closes lines are still honoured via existingAutoCloseRefs."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 3,
+    "fairways_total": 3,
+    "greens_in_regulation": 3,
+    "greens_total": 3,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 2,
+    "hazard_penalties": 1,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [],
+  "special_plays": [],
+  "bunker_locations": [
+    "src/cli/commands/pr.ts extractFixIntentIssueRefs: merge and revert subjects must be excluded before conventional-commit typing is considered."
+  ],
+  "yardage_book_updates": [
+    "countTickets tries H3 headers, then a Markdown table, then distinct ticket keys, then a bare H3 count. Earlier strategies short-circuit.",
+    "Conventional-commit type carries fix intent; reuse that signal rather than sweeping raw issue references."
+  ],
+  "course_management_notes": [
+    "Two of three issues in this sprint were already fixed on main. Verifying first and adding the missing regression case is cheaper than re-fixing, and prevents an S245-style wasted sprint."
+  ]
+}

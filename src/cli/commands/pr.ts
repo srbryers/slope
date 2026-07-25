@@ -367,8 +367,11 @@ export function extractFixIntentIssueRefs(commitText: string): number[] {
     const commit = record.trim();
     if (!commit) continue;
     const subject = commit.split(/\r?\n/, 1)[0]?.trim() ?? '';
-    // Untyped subjects (plain merge/squash subjects like "Fix thing (#123)")
-    // stay eligible; only an explicit non-fix type disqualifies a commit.
+    // "Merge pull request #613 from ..." carries a *PR* number, not an issue, and
+    // a revert un-fixes whatever it names. Neither should close anything.
+    if (/^(?:merge|revert)\b/i.test(subject)) continue;
+    // Untyped subjects (plain squash subjects like "Fix thing (#123)") stay
+    // eligible; only an explicit non-fix type disqualifies a commit.
     if (/^[a-z]+(?:\([^)]*\))?!?:/i.test(subject) && !FIX_INTENT_COMMIT_TYPES.test(subject)) continue;
     for (const ref of extractIssueRefs(commit)) found.add(ref);
   }

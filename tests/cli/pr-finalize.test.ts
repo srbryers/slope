@@ -369,6 +369,14 @@ describe('extractFixIntentIssueRefs (GH #623)', () => {
     expect(extractFixIntentIssueRefs(commits)).toEqual([10, 11, 12]);
   });
 
+  it('ignores merge commits, whose number is a PR not an issue', () => {
+    expect(extractFixIntentIssueRefs(SEP + 'Merge pull request #613 from srbryers/codex/s240')).toEqual([]);
+  });
+
+  it('ignores reverts, which un-fix the issue they name', () => {
+    expect(extractFixIntentIssueRefs(SEP + 'Revert "fix: something (#99)"')).toEqual([]);
+  });
+
   it('keeps untyped squash subjects eligible', () => {
     expect(extractFixIntentIssueRefs(`${SEP}Fix the thing (#42)`)).toEqual([42]);
   });
