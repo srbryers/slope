@@ -12,7 +12,7 @@ sprints:
     par: 4
     slope: 2
     type: chore + maintainability
-    status: planned
+    status: complete
     note: ".codex is the slope-init generated plugin bundle, the exact sibling of the already-ignored .slope, but it was not gitignored, so it showed as untracked on every git status and was nearly committed by accident during the Phase 56 merge. isWithinClaimedArea (scope-drift) and claimOverlapsPath (claim-required) are two copies of area-matching that both needed the identical #651 root-claim fix. The guard-ask audit found the #650 pattern in exactly one guard, already fixed."
     tickets:
       - key: S256-1
@@ -27,3 +27,5 @@ sprints:
         title: "Pin the invariant that no guard prompts the operator for an agent-actionable fix (#650)"
         club: wedge
         complexity: small
+scorecards:
+  "256": docs/retros/sprint-256.json

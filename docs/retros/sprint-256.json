@@ -1,0 +1,66 @@
+{
+  "sprint_number": 256,
+  "theme": "Cleanups",
+  "par": 4,
+  "slope": 2,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-07-25",
+  "shots": [
+    {
+      "ticket_key": "S256-1",
+      "title": "Gitignore the generated .codex bundle, matching how .slope is treated",
+      "club": "putter",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": ".codex is slope-init generated output, the exact sibling of the already-ignored .slope. It had shown as untracked on every git status all session and was nearly committed during the Phase 56 merge. One line."
+    },
+    {
+      "ticket_key": "S256-2",
+      "title": "Consolidate the duplicated claim-area matcher into one shared function",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "isWithinClaimedArea and claimOverlapsPath were two copies that both needed the identical #651 whole-repo fix. Extracted claim-area.ts; both delegate. Behaviour preserved (35 claim-required tests pass), with a small consistency gain (backslash target normalization). New module has its own 18-test suite."
+    },
+    {
+      "ticket_key": "S256-3",
+      "title": "Pin the invariant that no guard prompts the operator for an agent-actionable fix (#650)",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "The audit's premise (10 ask/deny guards to review) was wrong: only claim-required ever emitted ask, and #650 fixed it. That fix also left a dead decision: 'ask' branch, which the invariant test would have failed on until removed. Verifying the premise before writing code saved building a downgrade for guards that were correct deny gates.",
+          "gotcha_id": "self:verify-premise"
+        }
+      ],
+      "notes": "Source-level test asserts no guard emits decision: 'ask'. The remaining deny guards return to the agent, not the operator, and are legitimate safety gates. Removed the now-unreachable ask branch from implementationWritePolicyResult, replacing it with an advisory fallback rather than deleting it."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 3,
+    "fairways_total": 3,
+    "greens_in_regulation": 3,
+    "greens_total": 3,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 1,
+    "hazard_penalties": 0,
+    "miss_directions": { "long": 0, "short": 0, "left": 0, "right": 0 }
+  },
+  "conditions": [
+    "Landed on the .gitattributes-normalized tree, so no CRLF churn — the first sprint this session with a genuinely quiet git status."
+  ],
+  "special_plays": [],
+  "bunker_locations": [],
+  "yardage_book_updates": [
+    "Claim-area membership lives in src/cli/guards/claim-area.ts; both claim-required and scope-drift delegate. Change area/root/sprint matching there once.",
+    "No guard should emit decision: 'ask' — that prompts the operator. Use deny (agent-facing block) or advisory context. tests/cli/guards/no-operator-ask.test.ts enforces it."
+  ],
+  "course_management_notes": [
+    "The 'audit the 10 guards' ask turned out to need no downgrade — verifying the premise (which guards actually emit ask vs deny) converted a speculative refactor into a one-line invariant test plus a dead-code removal.",
+    "A guard firing on its own author (shell-write earlier; the advisory claim-required message this sprint) is the mechanism working — the signal reaches the agent, not the operator."
+  ]
+}
