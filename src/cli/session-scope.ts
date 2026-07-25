@@ -43,6 +43,27 @@ export function resolvePrimaryCheckout(cwd: string): string | null {
   return existsSync(root) ? root : null;
 }
 
+/**
+ * List every checkout of the repository containing `cwd` — the primary checkout
+ * and all linked worktrees — with `cwd` itself always included.
+ *
+ * Sprint lifecycle state is stored per checkout (`.slope/sprint-state.json`), so
+ * a closeout that only touches `cwd` leaves every sibling worktree reporting a
+ * stale sprint and contradictory next actions (GH #624).
+ */
+export function listRepoWorktrees(cwd: string): string[] {
+  const roots = new Set<string>([resolve(cwd)]);
+
+  const raw = safeGit(cwd, ['worktree', 'list', '--porcelain']);
+  for (const line of (raw ?? '').split('\n')) {
+    if (!line.startsWith('worktree ')) continue;
+    const path = line.slice('worktree '.length).trim();
+    if (path) roots.add(resolve(path));
+  }
+
+  return [...roots];
+}
+
 function safeGit(cwd: string, args: string[]): string | null {
   try {
     const out = execFileSync('git', args, {
