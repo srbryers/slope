@@ -399,6 +399,62 @@ function displayPath(cwd: string, path: string): string {
   return relative(cwd, resolve(cwd, path)).replace(/\\/g, '/');
 }
 
+/**
+ * Describe where the roadmap for this sprint actually comes from.
+ *
+ * With federated sources, docs/backlog/roadmap.json is a generated compatibility
+ * projection, but focused evidence labelled it flatly "Roadmap source". Agents
+ * read that as authority and edit the generated file — which #637 then showed
+ * silently destroys the work. Name the canonical manifest and the owning bundle,
+ * and mark the projection as generated and read-only (GH #636).
+ */
+function roadmapSourceEvidence(
+  cwd: string,
+  flags: Record<string, string>,
+  sprintId: number,
+): RoadmapFocusEvidence[] {
+  const projection: RoadmapFocusEvidence = {
+    kind: 'roadmap',
+    label: 'Roadmap source',
+    ref: displayPath(cwd, resolveRoadmapPath(flags, cwd)),
+    sprint: sprintId,
+  };
+
+  // An explicit --path overrides federation: report exactly what was read.
+  if (flags.path || !hasModularRoadmapSources(cwd)) return [projection];
+
+  try {
+    const store = loadRoadmapSourceStore(cwd);
+    const owner = store.sources.find(source =>
+      source.document.sprints.some(sprint => sprint.id === sprintId));
+
+    const evidence: RoadmapFocusEvidence[] = [{
+      kind: 'roadmap',
+      label: 'Roadmap source (canonical manifest)',
+      ref: displayPath(cwd, store.manifestPath),
+      sprint: sprintId,
+    }];
+    if (owner?.absolutePath) {
+      evidence.push({
+        kind: 'roadmap',
+        label: `Owning source bundle (${owner.entry.kind})`,
+        ref: displayPath(cwd, owner.absolutePath),
+        sprint: sprintId,
+      });
+    }
+    evidence.push({
+      kind: 'roadmap',
+      label: 'Compatibility projection (generated, read-only)',
+      ref: displayPath(cwd, store.outputPath),
+      sprint: sprintId,
+    });
+    return evidence;
+  } catch {
+    // Unreadable or invalid federation — fall back to what was actually loaded.
+    return [projection];
+  }
+}
+
 function focusEvidence(
   roadmap: RoadmapDefinition,
   sprintId: number,
@@ -406,12 +462,7 @@ function focusEvidence(
   cwd: string,
 ): RoadmapFocusEvidence[] {
   const config = loadConfig(cwd);
-  const evidence: RoadmapFocusEvidence[] = [{
-    kind: 'roadmap',
-    label: 'Roadmap source',
-    ref: displayPath(cwd, resolveRoadmapPath(flags, cwd)),
-    sprint: sprintId,
-  }];
+  const evidence: RoadmapFocusEvidence[] = roadmapSourceEvidence(cwd, flags, sprintId);
   const selected = roadmap.sprints.find(sprint => sprint.id === sprintId);
   const phase = roadmap.phases.find(candidate => candidate.sprints.includes(sprintId));
   const phaseIndex = phase?.sprints.indexOf(sprintId) ?? -1;

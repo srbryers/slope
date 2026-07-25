@@ -799,3 +799,20 @@ describe('projection content-loss protection (GH #637)', () => {
     expect(findRoadmapProjectionDivergence('not json', { name: 'x', phases: [], sprints: [] })).toBeNull();
   });
 });
+
+describe('focused roadmap evidence labelling (GH #636)', () => {
+  it('names the canonical manifest and owning bundle, and marks the projection generated', async () => {
+    writeFixture();
+    const store = loadRoadmapSourceStore(cwd, 'docs/roadmap/project.yaml');
+    writeRoadmapSourceProjection(store);
+
+    await roadmapCommand(['focus', '--sprint=7']);
+    const output = logs.join(String.fromCharCode(10));
+
+    expect(output).toContain('Roadmap source (canonical manifest): docs/roadmap/project.yaml');
+    expect(output).toContain('Owning source bundle (phase): docs/roadmap/phases/phase-01.yaml');
+    expect(output).toContain('Compatibility projection (generated, read-only): docs/backlog/roadmap.json');
+    // The generated file must never be presented as the plain "Roadmap source".
+    expect(output).not.toContain('Roadmap source: docs/backlog/roadmap.json');
+  });
+});
