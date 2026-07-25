@@ -453,6 +453,17 @@
       ],
       "status": "complete",
       "note": "Issue-driven recovery for #608, #611, #615, #616, #617, #618, #619, #620, #621. Ordered by blast radius: reconciliation corrupts roadmap sources on every closeout, so it went first. Completed 2026-07-16: S241-S244 shipped (PRs #622, #626, #627, #628); S245 superseded — #608 had already been fixed by S240 in v1.63.0."
+    },
+    {
+      "name": "Phase 55 — Late-July Issue Recovery",
+      "description": "Triage of the eleven open GitHub issues (2026-07-15 to 2026-07-25) into themed recovery sprints. Worktree/session deadlocks lead because they hard-block autonomous agents, followed by roadmap projection safety (silent planning-work loss), then CLI argument and reference correctness.",
+      "sprints": [
+        246,
+        247,
+        248
+      ],
+      "status": "in_progress",
+      "note": "Issue-driven recovery for #623, #624, #625, #630, #631, #632, #633, #634, #635, #636, #637. Ordered by blast radius: #630/#631 deadlock any worktree session while a primary session is live (no shell, no reads, no way to file the bug), so isolation goes first. #637 silently destroys committed planning work on a success exit, so projection safety goes second. CLI correctness closes last."
     }
   ],
   "sprints": [
@@ -6150,6 +6161,148 @@
           "depends_on": [
             "S245-1"
           ]
+        }
+      ]
+    },
+    {
+      "id": 246,
+      "theme": "Session and Worktree Isolation",
+      "par": 5,
+      "slope": 5,
+      "type": "bugfix + guard reliability",
+      "status": "planned",
+      "note": "Fix #631/#630 (worktree-check evaluates hook input.cwd — the launch dir — so a session moved into a worktree is judged against the primary checkout's session store and deadlocks; the guard also auto-registers the denied session as role primary, and slope session start is missing from the recovery exemptions), #625 (claim-required treats out-of-repo scratchpad .ts writes as implementation edits), and #624 (post-merge retro does not advance sprint status across worktrees). Root theme: session identity has uncoordinated channels and guard/CLI resolve different stores, so the guard's own printed remediation can never clear the block.",
+      "tickets": [
+        {
+          "key": "S246-1",
+          "title": "Classify guard session location by the tool call's target path and shell cwd rather than hook input.cwd (#631,",
+          "club": "driver",
+          "complexity": "moderate",
+          "github_issue": 631
+        },
+        {
+          "key": "S246-2",
+          "title": "Resolve the same session store in guards and the slope session CLI so printed remediations can clear the state the guard reads (#630,",
+          "club": "driver",
+          "complexity": "moderate",
+          "github_issue": 630,
+          "depends_on": [
+            "S246-1"
+          ]
+        },
+        {
+          "key": "S246-3",
+          "title": "Stop auto-registering a denied session as role primary and exempt slope session start/heartbeat from the recovery allowlist (#631)",
+          "club": "long_iron",
+          "complexity": "moderate",
+          "github_issue": 631,
+          "depends_on": [
+            "S246-1"
+          ]
+        },
+        {
+          "key": "S246-4",
+          "title": "Scope claim-required to the repo working tree and exclude temp/scratchpad roots (#625)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 625
+        },
+        {
+          "key": "S246-5",
+          "title": "Advance sprint status to complete across worktrees after a successful post-merge retro (#624)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 624,
+          "depends_on": [
+            "S246-2"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 247,
+      "theme": "Roadmap Projection Safety and Sprint Identity",
+      "par": 5,
+      "slope": 5,
+      "type": "bugfix + data integrity",
+      "status": "planned",
+      "depends_on": [
+        246
+      ],
+      "note": "Fix #637 (slope validate regenerates the docs/backlog/roadmap.json projection as a side effect, silently discarding committed edits and exiting success — cost a whole phase of planning work in the Fathoms repo, and reproduced across operators), #636 (focused evidence labels the generated projection as 'Roadmap source'), #635 (sprint IDs are stored as JSON numbers so 458.10 aliases 458.1), and #632 (docs-only commits mentioning a sprint key count as shipped implementation). Also fixes a defect found during S246 pre-round: isEncodedInsertedSprintId treats any integer 200-999 ending in 5 as a legacy encoded half-sprint, so this repo's own S245 renders as S24.5 in slope now and roadmap status.",
+      "tickets": [
+        {
+          "key": "S247-1",
+          "title": "Add a generated-file marker to the roadmap projection and refuse to discard unexplained divergence without --force (#637)",
+          "club": "driver",
+          "complexity": "moderate",
+          "github_issue": 637
+        },
+        {
+          "key": "S247-2",
+          "title": "Make slope validate read-only and leave projection regeneration to slope roadmap compile (#637)",
+          "club": "long_iron",
+          "complexity": "moderate",
+          "github_issue": 637,
+          "depends_on": [
+            "S247-1"
+          ]
+        },
+        {
+          "key": "S247-3",
+          "title": "Label canonical source, owning bundle, and generated projection distinctly in focused roadmap evidence (#636)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 636
+        },
+        {
+          "key": "S247-4",
+          "title": "Preserve sprint IDs canonically so 458.10 and 458.1 are distinct, and stop mis-rendering integer IDs ending in 5 as decimals (#635)",
+          "club": "driver",
+          "complexity": "moderate",
+          "github_issue": 635
+        },
+        {
+          "key": "S247-5",
+          "title": "Exclude docs-only and range-mention commits from roadmap validate shipped-commit detection (#632)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 632
+        }
+      ]
+    },
+    {
+      "id": 248,
+      "theme": "CLI Argument and Reference Correctness",
+      "par": 4,
+      "slope": 2,
+      "type": "bugfix + CLI correctness",
+      "status": "planned",
+      "depends_on": [
+        247
+      ],
+      "note": "Fix #633 (slope review ignores --sprint and --help and always renders the highest-numbered scorecard, so an older sprint cannot generate its review), #634 (the plan-review hook detects 0 tickets on a bold/bulleted ticket list and downgrades a Standard-tier plan to Skip), and #623 (slope pr finalize sweeps every #N from commit messages — including triage/planning commits — while missing issues named in the comma/paren form).",
+      "tickets": [
+        {
+          "key": "S248-1",
+          "title": "Parse --sprint and --help in slope review instead of always rendering the highest-numbered scorecard (#633)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 633
+        },
+        {
+          "key": "S248-2",
+          "title": "Detect ticket keys matching S<n>-<n> anywhere in a plan so bulleted ticket lists select the correct review tier (#634)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 634
+        },
+        {
+          "key": "S248-3",
+          "title": "Derive Closes lines only from fix-intent commit trailers and parse multi-issue references like (#615, #617) (#623)",
+          "club": "long_iron",
+          "complexity": "moderate",
+          "github_issue": 623
         }
       ]
     }
