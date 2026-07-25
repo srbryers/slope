@@ -151,6 +151,28 @@ interface LoadedCompletionEvidence {
   scorecards: SprintRolloverScorecardEvidence[];
 }
 
+/**
+ * Hash a tracked text file's content with line endings normalized to LF.
+ *
+ * Raw-byte hashing made every rollover audit single-use on Windows: with
+ * `core.autocrlf` any checkout, merge or branch switch renormalizes tracked text
+ * to CRLF, changing the bytes without changing the content, so verification
+ * reported "scorecard evidence changed" for a file nobody had touched — and the
+ * lifecycle could not advance (GH #649). Normalizing matches what git stores, so
+ * the digest is reproducible across platforms and checkouts.
+ */
+export function hashTrackedContent(content: Buffer | string): string {
+  const text = typeof content === 'string' ? content : content.toString('utf8');
+  return createHash('sha256').update(text.replace(/\r\n/g, '\n')).digest('hex');
+}
+
+/** True when a digest matches, accepting legacy raw-byte digests written before
+ *  normalization so existing audits keep verifying. */
+export function trackedContentMatches(content: Buffer, expected: string): boolean {
+  if (hashTrackedContent(content) === expected) return true;
+  return createHash('sha256').update(content).digest('hex') === expected;
+}
+
 function roadmapIdsEqual(roadmap: RoadmapDefinition, left: number, right: number): boolean {
   return roadmapSprintOrderValue(roadmap, left) === roadmapSprintOrderValue(roadmap, right);
 }
@@ -180,7 +202,7 @@ function loadRolloverRoadmap(cwd: string): { roadmap: RoadmapDefinition; path: s
     const detail = boundedMessages(parsed.validation.errors.map(issue => issue.message));
     throw new SprintRolloverError(`Roadmap is not safe for rollover${detail ? `: ${detail}` : '.'}`);
   }
-  return { roadmap, path, sha256: createHash('sha256').update(source).digest('hex') };
+  return { roadmap, path, sha256: hashTrackedContent(source) };
 }
 
 function loadCompletionEvidence(cwd: string): LoadedCompletionEvidence {
@@ -204,7 +226,7 @@ function loadCompletionEvidence(cwd: string): LoadedCompletionEvidence {
     scorecards.push({
       sprint: fileSprint,
       path: relative(cwd, absolutePath).replaceAll('\\', '/'),
-      sha256: createHash('sha256').update(source).digest('hex'),
+      sha256: hashTrackedContent(source),
     });
     recorded.add(fileSprint);
   }
@@ -597,9 +619,12 @@ function assertRecordedScorecardEvidenceAvailable(
     if (!existsSync(path)) {
       throw new SprintRolloverError(`Existing rollover audit references missing scorecard evidence: ${artifact.path}.`);
     }
-    const digest = createHash('sha256').update(readFileSync(path)).digest('hex');
-    if (digest !== artifact.sha256) {
-      throw new SprintRolloverError(`Existing rollover audit scorecard evidence changed: ${artifact.path}.`);
+    if (!trackedContentMatches(readFileSync(path), artifact.sha256)) {
+      throw new SprintRolloverError(
+        `Existing rollover audit scorecard evidence changed: ${artifact.path}.`
+        + ' Content differs from what the audit recorded (line endings are normalized before hashing,'
+        + ' so this is a real content change).',
+      );
     }
   }
 }

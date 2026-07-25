@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -7,6 +8,8 @@ import type { ResolvedActor } from '../../src/cli/actor.js';
 import {
   assessSprintRollover,
   performSprintRollover,
+  hashTrackedContent,
+  trackedContentMatches,
   type SprintRolloverAuditRecord,
 } from '../../src/cli/sprint-rollover.js';
 import {
@@ -324,6 +327,37 @@ describe('assessSprintRollover', () => {
       const issue = assessment.issues.find(i => i.code === 'target_not_pending');
       expect(issue?.message).toContain('--force --reason');
     });
+  });
+});
+
+describe('tracked-content hashing is line-ending stable (GH #649)', () => {
+  const CR = String.fromCharCode(13);
+  const LF = String.fromCharCode(10);
+  const lfText = ['{', '  "sprint_number": 10', '}', ''].join(LF);
+  const crlfText = lfText.split(LF).join(CR + LF);
+
+  it('hashes CRLF and LF content identically', () => {
+    // git renormalizes tracked text on checkout when core.autocrlf is set, so a
+    // raw-byte digest changed without the content changing and permanently
+    // invalidated every rollover audit on Windows.
+    expect(hashTrackedContent(crlfText)).toBe(hashTrackedContent(lfText));
+  });
+
+  it('accepts CRLF bytes against a digest recorded from LF content', () => {
+    const recorded = hashTrackedContent(lfText);
+    expect(trackedContentMatches(Buffer.from(crlfText, 'utf8'), recorded)).toBe(true);
+  });
+
+  it('still accepts a legacy raw-byte digest so existing audits keep verifying', () => {
+    const legacy = createHash('sha256').update(Buffer.from(crlfText, 'utf8')).digest('hex');
+    expect(legacy).not.toBe(hashTrackedContent(crlfText));
+    expect(trackedContentMatches(Buffer.from(crlfText, 'utf8'), legacy)).toBe(true);
+  });
+
+  it('rejects a real content change', () => {
+    const recorded = hashTrackedContent(lfText);
+    const tampered = lfText.replace('10', '11');
+    expect(trackedContentMatches(Buffer.from(tampered, 'utf8'), recorded)).toBe(false);
   });
 });
 

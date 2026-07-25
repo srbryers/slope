@@ -119,6 +119,35 @@ export function formatSprintLabel(id: number): string {
   return `S${formatSprintNumber(id)}`;
 }
 
+/**
+ * Describe why a sprint id cannot be represented unambiguously, or null when it
+ * is fine.
+ *
+ * Sprint ids are stored as JSON numbers, so a decimal whose fraction ends in a
+ * zero loses that zero and silently becomes a different, usually existing,
+ * sprint: `458.10` reads back as `458.1`, and `458.0` as `458`. That corrupts
+ * dependencies, focused context, evidence lookup and scorecard identity, and it
+ * is why a phase had to be renumbered to whole sprints (GH #635).
+ *
+ * Rejecting these is a stopgap. The durable fix is canonical string ids, which
+ * spans roadmap compile/focus/archive, sprint state, scorecards, retro paths and
+ * the store schema.
+ */
+export function describeSprintIdAmbiguity(value: string | number): string | null {
+  const raw = typeof value === 'number' ? String(value) : value.trim();
+  const body = raw[0]?.toLowerCase() === 's' ? raw.slice(1) : raw;
+  const dot = body.indexOf('.');
+  if (dot < 0) return null;
+
+  const fraction = body.slice(dot + 1);
+  if (!fraction.endsWith('0')) return null;
+
+  const collapsed = String(Number(body));
+  return `Sprint id "${body}" is ambiguous: it is stored as a number, so it reads back as ${collapsed}`
+    + ` and would alias that sprint. Renumber it — use a fraction with no trailing zero`
+    + ` (for example ${body.slice(0, dot)}.${fraction.replace(/0+$/, '') || '1'}1) or a whole sprint id.`;
+}
+
 /** Parse human-entered sprint ids such as "114", "114.5", or "S114.5". */
 export function parseSprintNumber(value: string | number): number | null {
   if (typeof value === 'number') {

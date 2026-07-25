@@ -480,6 +480,16 @@
       ],
       "status": "in_progress",
       "note": "Issue-driven recovery for #641, #642, #643, #644, #645 — all self-reported from the Phase 55 run. #645 makes a clean checkout fail to install on pnpm 8 with an error that names the wrong cause, and lets CI float to whatever latest pnpm means; #643 raises a host permission prompt on every implementation write in the mode that advertises guards are silenced; #641/#642 are lifecycle and claim-state safety, where a plausible command silently does the opposite of what was asked; #644 completes the two #637 fixes deferred from S247."
+    },
+    {
+      "name": "Phase 57 — Identity Safety and Diagnosability",
+      "description": "The tail of the July issue batch: the two items deliberately left open after Phase 56, plus the stacked-PR workflow gap that landing Phase 55-56 exposed. Identity safety first because silent aliasing corrupts data; diagnosability second because opaque refusals cost a source read each.",
+      "sprints": [
+        252,
+        253
+      ],
+      "status": "in_progress",
+      "note": "Closes out #635, #646 and #648. #635 cannot be fully fixed without canonical string sprint ids — a representational change across roadmap compile/focus/archive, sprint state, scorecards, retro paths and the store schema — so S252 removes the silent-corruption path and defers the representation. #646 and #648 are both about failures that are reachable in normal use but not diagnosable without reading source."
     }
   ],
   "sprints": [
@@ -6457,6 +6467,82 @@
           "club": "wedge",
           "complexity": "small",
           "github_issue": 644
+        }
+      ]
+    },
+    {
+      "id": 252,
+      "theme": "Sprint Identity Safety",
+      "par": 4,
+      "slope": 3,
+      "type": "bugfix + data integrity",
+      "status": "planned",
+      "note": "Fix the harmful half of #635: sprint ids are stored as JSON numbers, so a decimal whose fraction ends in zero silently aliases another sprint (458.10 reads back as 458.1; 458.0 as 458). Reject those at every entry point with a message that says how to renumber, rather than corrupting dependencies, focused context, evidence lookup and scorecard identity. The canonical-string representation stays deferred and #635 stays open for it.",
+      "tickets": [
+        {
+          "key": "S252-1",
+          "title": "Reject decimal sprint ids whose fraction ends in zero, with a renumbering message (#635)",
+          "club": "long_iron",
+          "complexity": "moderate",
+          "github_issue": 635
+        },
+        {
+          "key": "S252-2",
+          "title": "Fail roadmap source authoring on an ambiguous sprint id instead of compiling it (#635)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 635,
+          "depends_on": [
+            "S252-1"
+          ]
+        },
+        {
+          "key": "S252-3",
+          "title": "Add round-trip coverage for 458.1, 458.9, 458.10, 458.11 and 459 (#635)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 635,
+          "depends_on": [
+            "S252-1"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 253,
+      "theme": "Diagnosability and Branch Workflow",
+      "par": 4,
+      "slope": 2,
+      "type": "bugfix + agent ergonomics",
+      "status": "planned",
+      "depends_on": [
+        252
+      ],
+      "note": "Fix #646 (rollover audit validation reports a blanket 'invalid shape' naming no field, so diagnosing it required reading the validator — it was a field absent rather than malformed) and #648 (stacked sprint PRs are unsupported: squash-merging the base makes every dependent conflict, --delete-branch closes them outright so their Closes trailers never fire, and until Phase 56 they ran no CI). Landing Phase 55-56 cost three recoveries to this.",
+      "tickets": [
+        {
+          "key": "S253-1",
+          "title": "Name the failing field when refusing a rollover audit instead of reporting invalid shape (#646)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 646
+        },
+        {
+          "key": "S253-2",
+          "title": "Document stacked-PR rules in branch discipline — merge order, no squash on a base, no branch delete (#648)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 648
+        },
+        {
+          "key": "S253-3",
+          "title": "Warn at PR creation when the base is not main so the stack rules are seen before they bite (#648)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 648,
+          "depends_on": [
+            "S253-2"
+          ]
         }
       ]
     }
