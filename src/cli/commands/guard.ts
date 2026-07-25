@@ -371,21 +371,36 @@ function normalizePath(rawPath: string, baseCwd: string): string {
 }
 
 function canonicalHookCwd(path: string): string {
+  return resolveWorkspaceRoot(path) ?? path;
+}
+
+/**
+ * Resolve a path to the workspace root that owns it — the nearest ancestor with
+ * .slope/config.json, else the enclosing git toplevel. Returns null when the
+ * path belongs to no workspace at all (e.g. a harness scratchpad under /tmp).
+ *
+ * Callers that *infer* a cwd must treat null as "no workspace" rather than
+ * adopting the orphan directory: doing so would relocate every guard's notion
+ * of the workspace to a directory with no .slope state, which both discards the
+ * real sprint state and defeats repo-scoped path checks (GH #625).
+ */
+function resolveWorkspaceRoot(path: string): string | null {
   const start = existingDirectory(path);
-  const slopeRoot = start ? findAncestorWithSlopeConfig(start) : null;
+  if (!start) return null;
+
+  const slopeRoot = findAncestorWithSlopeConfig(start);
   if (slopeRoot) return slopeRoot;
 
-  if (start) {
-    try {
-      return execFileSync('git', ['-C', start, 'rev-parse', '--show-toplevel'], {
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'ignore'],
-        timeout: 3000,
-      }).trim();
-    } catch { /* not a git repo */ }
-  }
+  try {
+    const toplevel = execFileSync('git', ['-C', start, 'rev-parse', '--show-toplevel'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+      timeout: 3000,
+    }).trim();
+    if (toplevel) return toplevel;
+  } catch { /* not a git repo */ }
 
-  return path;
+  return null;
 }
 
 function existingDirectory(path: string): string | null {
@@ -427,7 +442,11 @@ function extractToolInputPathCwd(input: HookInput, baseCwd: string): string | nu
     if (typeof value !== 'string' || value.trim().length === 0) continue;
     const absolute = isAbsolute(value) ? value : resolve(baseCwd, value);
     if (!existingDirectory(dirname(absolute))) continue;
-    return canonicalHookCwd(dirname(absolute));
+    // Only adopt a path-derived cwd when the target lives in a real workspace.
+    // A write to a harness scratchpad outside any repo must not become the
+    // guard's workspace root (GH #625).
+    const workspace = resolveWorkspaceRoot(dirname(absolute));
+    if (workspace) return workspace;
   }
   return null;
 }
@@ -532,8 +551,10 @@ function readRememberedCodexWorkdir(input: HookInput, fallbackCwd: string): stri
     if (!existsSync(path)) return null;
     const parsed = JSON.parse(readFileSync(path, 'utf8')) as { cwd?: unknown };
     if (typeof parsed.cwd !== 'string' || parsed.cwd.trim().length === 0) return null;
-    const remembered = canonicalHookCwd(parsed.cwd.trim());
-    return existsSync(remembered) ? remembered : null;
+    // Never replay a memo that does not resolve to a real workspace. A cache
+    // written before this check (or by an older version) must not keep
+    // relocating the workspace to an out-of-repo directory (GH #625).
+    return resolveWorkspaceRoot(parsed.cwd.trim());
   } catch {
     return null;
   }
@@ -554,6 +575,9 @@ function comparisonPath(path: string): string {
 function rememberCodexWorkdir(input: HookInput, resolution: HookCwdResolution): void {
   const sessionId = typeof input.session_id === 'string' ? input.session_id.trim() : '';
   if (!sessionId || resolution.source === 'remembered') return;
+  // Only cache a cwd that belongs to a real workspace, so a single out-of-repo
+  // tool call cannot pin the whole session to a non-workspace directory (#625).
+  if (!resolveWorkspaceRoot(resolution.cwd)) return;
 
   try {
     const path = codexWorkdirStatePath(sessionId);
