@@ -64,6 +64,18 @@ This repo uses SLOPE to score its own sprints:
 - Plans: `docs/backlog/sprint-N-plan.md`
 - Post-Hole: validate scorecard, generate review, update common-issues
 
+## Editing files — never through a shell
+
+Use the **Write** tool for new files and **Edit** for changes. Both take literal content with no escaping layer.
+
+When a change genuinely needs scripting (many mechanical call sites, generated JSON), **Write the script to a file, then run it** — `python scripts/foo.py`. Never inline it:
+
+- ❌ `python -c "..."` — backticks and `$` are live inside double quotes and get substituted by bash, silently deleting content.
+- ❌ `python - <<'EOF'` — you end up reasoning about escape levels across shell → Python → target file, and writing `\n` when the Python string needs `\\n` produces a real newline instead of the literal.
+- ✅ Write tool → script file → run it. One escaping layer, and the script is reviewable.
+
+**Always read back anything a script wrote.** All three failures of this kind wrote successfully with wrong content: two only surfaced when esbuild failed to parse, and one produced valid markdown with every code span silently deleted. A successful exit code proves nothing about correctness here.
+
 ## Conventions
 - `workspace:*` protocol for intra-monorepo deps
 - Conventional commits (feat/fix/chore)
