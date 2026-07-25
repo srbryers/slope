@@ -343,6 +343,38 @@ function resolvePrNumber(opts: FinalizeOptions): number | null {
  * or `(GH #NNN)` or `gh-NNN` regardless of surrounding wording. Returns
  * unique sorted ascending integers.
  */
+/**
+ * Conventional-commit types that assert the change *fixes* something. A commit
+ * that documents, plans or triages an issue references it without resolving it.
+ */
+const FIX_INTENT_COMMIT_TYPES = /^(?:feat|fix|perf|refactor)(?:\([^)]*\))?!?:/i;
+
+/** Record separator used to split `git log --format=%x1eBODY`. */
+export const COMMIT_RECORD_SEPARATOR = '\x1e';
+
+/**
+ * Extract issue refs only from commits that claim to fix something.
+ *
+ * `slope pr finalize` previously swept every `#N` out of the concatenated commit
+ * text. On PR #622 that included a roadmap-triage commit which merely *planned*
+ * sprints for six issues, so merging would have auto-closed all six with no fix
+ * shipped (GH #623). Intent lives in the conventional-commit type, so classify
+ * per commit and ignore docs/chore/test/style entirely.
+ */
+export function extractFixIntentIssueRefs(commitText: string): number[] {
+  const found = new Set<number>();
+  for (const record of commitText.split(COMMIT_RECORD_SEPARATOR)) {
+    const commit = record.trim();
+    if (!commit) continue;
+    const subject = commit.split(/\r?\n/, 1)[0]?.trim() ?? '';
+    // Untyped subjects (plain merge/squash subjects like "Fix thing (#123)")
+    // stay eligible; only an explicit non-fix type disqualifies a commit.
+    if (/^[a-z]+(?:\([^)]*\))?!?:/i.test(subject) && !FIX_INTENT_COMMIT_TYPES.test(subject)) continue;
+    for (const ref of extractIssueRefs(commit)) found.add(ref);
+  }
+  return [...found].sort((a, b) => a - b);
+}
+
 export function extractIssueRefs(text: string): number[] {
   const found = new Set<number>();
   // Lookbehind avoids in-word matches like `abc#1234` (commit-SHA-style refs).
@@ -413,17 +445,21 @@ export async function planPrFinalize(opts: FinalizeOptions): Promise<FinalizeRes
   // when the branch doesn't have a remote (or the remote ref is stale). The
   // previous version embedded a `||` shell fallback inside the git() arg
   // string which obscured the failure mode.
+  // %x1e delimits commits so intent can be judged per commit rather than across
+  // the concatenated text (GH #623).
   const tryRange = branch ? `origin/${base}..origin/${branch}` : `origin/${base}..HEAD`;
-  let commitText = git(`log ${tryRange} --format=%B`);
+  let commitText = git(`log ${tryRange} --format=%x1e%B`);
   if (!commitText) {
-    commitText = git(`log origin/${base}..HEAD --format=%B`);
+    commitText = git(`log origin/${base}..HEAD --format=%x1e%B`);
   }
 
-  const fromCommits = extractIssueRefs(commitText);
+  const fromCommits = extractFixIntentIssueRefs(commitText);
   const fromTitle = extractIssueRefs(meta.title ?? '');
-  const fromBody = extractIssueRefs(body);
 
-  const referenced = [...new Set([...fromCommits, ...fromTitle, ...fromBody])].sort((a, b) => a - b);
+  // The PR body is deliberately not swept: a bare "#N" there is a reference, not
+  // a declaration that this PR fixes it. Explicit Closes/Fixes lines already in
+  // the body are picked up by existingAutoCloseRefs and excluded below.
+  const referenced = [...new Set([...fromCommits, ...fromTitle])].sort((a, b) => a - b);
   const alreadyClosed = existingAutoCloseRefs(body);
   const toAdd = referenced.filter(n => !alreadyClosed.has(n));
 

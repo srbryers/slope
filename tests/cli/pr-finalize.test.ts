@@ -5,6 +5,8 @@ import { tmpdir } from 'node:os';
 import {
   defaultReviewType,
   extractIssueRefs,
+  extractFixIntentIssueRefs,
+  COMMIT_RECORD_SEPARATOR,
   existingAutoCloseRefs,
   formatReviewRecommendations,
   parsePrReviewFlags,
@@ -334,4 +336,45 @@ describe('pr closeout status helpers (S130)', () => {
       rmSync(cwd, { recursive: true, force: true });
     }
   }, 15000);
+});
+
+describe('extractFixIntentIssueRefs (GH #623)', () => {
+  const SEP = COMMIT_RECORD_SEPARATOR;
+
+  it('ignores issues that a triage commit only plans', () => {
+    // PR #622: fixed #615/#617/#618, but merely triaged the rest into sprints.
+    const commits = [
+      'fix(S241-1): match reconciliation targets by exact identity (#618)',
+      'fix(S241-2): patch sprint status without reserializing (#615, #617)',
+      'docs(roadmap): triage open issues into Phase 54 (#608, #611, #616, #619, #620, #621)',
+    ].map(c => SEP + c).join('');
+
+    expect(extractFixIntentIssueRefs(commits)).toEqual([615, 617, 618]);
+  });
+
+  it('collects every issue in a comma/paren multi-issue reference', () => {
+    expect(extractFixIntentIssueRefs(`${SEP}fix(S241-2): patch status (#615, #617)`))
+      .toEqual([615, 617]);
+  });
+
+  it('ignores chore, test, style and docs commits', () => {
+    const commits = ['chore: bump (#1)', 'test: add case (#2)', 'style: reformat (#3)', 'docs: note (#4)']
+      .map(c => SEP + c).join('');
+    expect(extractFixIntentIssueRefs(commits)).toEqual([]);
+  });
+
+  it('counts feat, perf and refactor as fix intent', () => {
+    const commits = ['feat: add (#10)', 'perf: speed up (#11)', 'refactor!: rework (#12)']
+      .map(c => SEP + c).join('');
+    expect(extractFixIntentIssueRefs(commits)).toEqual([10, 11, 12]);
+  });
+
+  it('keeps untyped squash subjects eligible', () => {
+    expect(extractFixIntentIssueRefs(`${SEP}Fix the thing (#42)`)).toEqual([42]);
+  });
+
+  it('reads issue refs from a commit body, not just the subject', () => {
+    const body = [`${SEP}fix: repair thing`, '', 'Closes #77.'].join(String.fromCharCode(10));
+    expect(extractFixIntentIssueRefs(body)).toEqual([77]);
+  });
 });
