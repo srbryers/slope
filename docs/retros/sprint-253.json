@@ -1,0 +1,96 @@
+{
+  "sprint_number": 253,
+  "theme": "Diagnosability and Branch Workflow",
+  "par": 5,
+  "slope": 2,
+  "score": 5,
+  "score_label": "par",
+  "date": "2026-07-25",
+  "shots": [
+    {
+      "ticket_key": "S253-1",
+      "title": "Name the failing field when refusing a rollover audit (#646)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "A 40-term boolean chain became describeAuditShapeProblem returning the first specific problem, with array indices. Verified by breaking each field in a real audit. The original message named no field, which is why the real cause \u2014 an absent rather than malformed field \u2014 took a source read to find."
+    },
+    {
+      "ticket_key": "S253-2",
+      "title": "Document stacked-PR rules in branch discipline (#648)",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "Backticks in a python -c string were command-substituted by bash, silently stripping every code span from the written rule. Second escaping incident this phase and third overall; the S248 scorecard already says to write scripts as files rather than inline. Rewrote from a file.",
+          "gotcha_id": "self:inline-script-escaping"
+        }
+      ],
+      "notes": "Recommends one phase branch with per-sprint commits, and states the three rules if stacking anyway: merge commit not squash, never --delete-branch a base with dependents, merge in order. Also records the per-branch scorecard and rollover-audit requirement."
+    },
+    {
+      "ticket_key": "S253-3",
+      "title": "Warn at PR creation when the base is not the default branch (#648)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "pr-review emits the stack rules when --base is neither main nor master, so they are seen at creation rather than at merge. Landing Phase 55-56 as four stacked PRs cost three recoveries to exactly these."
+    },
+    {
+      "ticket_key": "S253-4",
+      "title": "Unplanned: make a whole-repo claim cover the repo (#651)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "moderate",
+          "description": "Prompted by the operator asking whether the scope-drift guard was useful at all. A claim on '.' silenced nothing because both matchers built the prefix './', which no relative path starts with \u2014 so claiming the repo was impossible to express and every write was reported as drift. Two independent copies of the logic needed the same fix.",
+          "gotcha_id": "self:duplicated-matcher"
+        }
+      ],
+      "notes": "isWithinClaimedArea and claimOverlapsPath both handle root claims now, with tests; a narrow claim still scopes correctly. They should probably be one function."
+    },
+    {
+      "ticket_key": "S253-5",
+      "title": "Unplanned: stay silent when the guard context budget is exhausted (#651)",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [],
+      "notes": "dedupGuardContext substituted a note about the budget itself for every guard on every fire, naming no file and no action, spending context to announce there was none left. Now returns empty; writeGuardOutput already treats empty context as no output."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 5,
+    "fairways_total": 5,
+    "greens_in_regulation": 5,
+    "greens_total": 5,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 2,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    "Two of five shots came from the operator questioning whether a guard was worth keeping, which is a better defect-finding signal than the backlog."
+  ],
+  "special_plays": [],
+  "bunker_locations": [
+    "Claim-area matching is duplicated in scope-drift and claim-required; changes must land in both."
+  ],
+  "yardage_book_updates": [
+    "A guard with nothing useful left to say should emit empty, not a note about its own limits.",
+    "Write helper scripts to files. Inline python -c with backticks gets command-substituted by bash and silently mangles output."
+  ],
+  "course_management_notes": [
+    "scope-drift still has no value in a solo session \u2014 it exists for multi-agent claim coordination. Gating it on another live session or another actor's claim is left open on #651 as a design decision rather than patched.",
+    "Answering 'is this guard useful?' honestly surfaced two real bugs. Worth doing for other advisory guards."
+  ]
+}

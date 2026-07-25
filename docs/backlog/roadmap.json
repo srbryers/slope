@@ -6476,7 +6476,7 @@
       "par": 4,
       "slope": 3,
       "type": "bugfix + data integrity",
-      "status": "planned",
+      "status": "complete",
       "note": "Fix the harmful half of #635: sprint ids are stored as JSON numbers, so a decimal whose fraction ends in zero silently aliases another sprint (458.10 reads back as 458.1; 458.0 as 458). Reject those at every entry point with a message that says how to renumber, rather than corrupting dependencies, focused context, evidence lookup and scorecard identity. The canonical-string representation stays deferred and #635 stays open for it.",
       "tickets": [
         {
@@ -6514,7 +6514,7 @@
       "par": 4,
       "slope": 2,
       "type": "bugfix + agent ergonomics",
-      "status": "planned",
+      "status": "complete",
       "depends_on": [
         252
       ],
