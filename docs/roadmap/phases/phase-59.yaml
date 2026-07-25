@@ -1,0 +1,31 @@
+version: "1"
+phase:
+  name: Phase 59 — Cleanups
+  description: "Three low-risk items surfaced while reviewing the session: the generated .codex bundle showing as untracked on every status, duplicated claim-area matching logic that both needed the same #651 fix, and an audit of which guards prompt the operator. The audit's conclusion is a regression test rather than a downgrade."
+  sprints:
+    - 256
+  status: in_progress
+  note: "The ask/deny guard audit found only claim-required ever emitted an operator ask (fixed in #650); every other guard uses deny, which blocks the tool and returns to the agent, not the operator. Nothing to downgrade — the deliverable is a fleet-level invariant test so the pattern cannot silently reappear."
+sprints:
+  - id: 256
+    theme: Cleanups
+    par: 4
+    slope: 2
+    type: chore + maintainability
+    status: complete
+    note: ".codex is the slope-init generated plugin bundle, the exact sibling of the already-ignored .slope, but it was not gitignored, so it showed as untracked on every git status and was nearly committed by accident during the Phase 56 merge. isWithinClaimedArea (scope-drift) and claimOverlapsPath (claim-required) are two copies of area-matching that both needed the identical #651 root-claim fix. The guard-ask audit found the #650 pattern in exactly one guard, already fixed."
+    tickets:
+      - key: S256-1
+        title: Gitignore the generated .codex bundle, matching how .slope is treated
+        club: putter
+        complexity: trivial
+      - key: S256-2
+        title: Consolidate the duplicated claim-area matcher into one shared function
+        club: short_iron
+        complexity: standard
+      - key: S256-3
+        title: "Pin the invariant that no guard prompts the operator for an agent-actionable fix (#650)"
+        club: wedge
+        complexity: small
+scorecards:
+  "256": docs/retros/sprint-256.json

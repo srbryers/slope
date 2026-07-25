@@ -4,6 +4,7 @@ import type { HookInput, GuardResult } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import type { SlopeConfig } from '../config.js';
 import { loadSprintState } from '../sprint-state.js';
+import { pathWithinClaimedArea } from './claim-area.js';
 import { resolveStore } from '../store.js';
 import { dedupGuardContext } from '../session-state.js';
 import { normalizeTouchedPath, resolveTouchedPaths } from './hook-input.js';
@@ -141,12 +142,5 @@ function resolveCurrentSprint(cwd: string, config: SlopeConfig): number | undefi
 }
 
 function isWithinClaimedArea(relativePath: string, target: string): boolean {
-  const normalizedTarget = target.replace(/\\/g, '/').replace(/\/$/, '');
-  if (/^sprint:S\d+(?:\.\d+)?$/i.test(normalizedTarget)) return true;
-  // `slope claim --target=. --scope=area` is the natural way to say "working
-  // across this repo", but the prefix test built `./`, which no relative path
-  // starts with — so a root claim silenced nothing and every write was reported
-  // as drift (GH #651).
-  if (normalizedTarget === '.' || normalizedTarget === '' || normalizedTarget === '/') return true;
-  return relativePath === normalizedTarget || relativePath.startsWith(`${normalizedTarget}/`);
+  return pathWithinClaimedArea(relativePath, target);
 }

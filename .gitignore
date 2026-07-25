@@ -4,6 +4,7 @@ dist/
 *.tsbuildinfo
 .DS_Store
 .slope/
+.codex/
 .env
 .aider*
 .claude/worktrees/
