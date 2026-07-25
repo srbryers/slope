@@ -535,41 +535,11 @@ function readAudit(cwd: string, path: string): SprintRolloverAuditRecord {
     throw new SprintRolloverError(`Existing rollover audit is unreadable: ${(error as Error).message}`);
   }
   const record = raw as Partial<SprintRolloverAuditRecord>;
-  if (record.version !== 1 || record.kind !== 'sprint_rollover'
-    || typeof record.transition_id !== 'string'
-    || typeof record.from_sprint !== 'number' || typeof record.to_sprint !== 'number'
-    || typeof record.from_label !== 'string' || typeof record.to_label !== 'string'
-    || typeof record.recorded_at !== 'string'
-    || !Number.isFinite(Date.parse(record.recorded_at))
-    || !record.actor || typeof record.actor.name !== 'string' || record.actor.name.trim().length === 0
-    || typeof record.actor.source !== 'string' || record.actor.source.trim().length === 0
-    || !record.request || typeof record.request.from !== 'number' || typeof record.request.to !== 'number'
-    || typeof record.request.force !== 'boolean'
-    || (record.request.reason !== undefined && typeof record.request.reason !== 'string')
-    || typeof record.forced !== 'boolean'
-    || (record.reason !== undefined && typeof record.reason !== 'string')
-    || !record.eligibility
-    // expected_next is legitimately absent when no pending successor exists; a
-    // required-number check rejected audits this tool itself writes (GH #646).
-    || (record.eligibility.expected_next !== undefined
-      && typeof record.eligibility.expected_next !== 'number')
-    || typeof record.eligibility.from_terminal !== 'boolean'
-    || typeof record.eligibility.target_dependency_eligible !== 'boolean'
-    || !Array.isArray(record.eligibility.blocking_dependencies)
-    || !Array.isArray(record.eligibility.target_dependencies)
-    || !record.eligibility.completion_evidence
-    || !Array.isArray(record.eligibility.completion_evidence.roadmap_complete)
-    || !Array.isArray(record.eligibility.completion_evidence.scorecards)
-    || !Array.isArray(record.eligibility.completion_evidence.local_terminal)
-    || !Array.isArray(record.eligibility.scorecard_artifacts)
-    || !record.eligibility.scorecard_artifacts.every(validScorecardArtifact)
-    || !record.roadmap || typeof record.roadmap.path !== 'string' || typeof record.roadmap.sha256 !== 'string'
-    || typeof record.prior_state_sha256 !== 'string'
-    || !isValidSprintStateEvidence(record.prior_state)
-    || !isValidSprintStateEvidence(record.next_state)
-    || record.claims_policy !== 'unchanged'
-    || record.sessions_policy !== 'unchanged') {
-    throw new SprintRolloverError('Existing rollover audit has an invalid shape; refusing to replace it.');
+  const shapeProblem = describeAuditShapeProblem(record);
+  if (shapeProblem) {
+    throw new SprintRolloverError(
+      `Existing rollover audit is not valid: ${shapeProblem}. Refusing to replace it.`,
+    );
   }
   const complete = record as SprintRolloverAuditRecord;
   ensureTrackedPath(cwd, resolve(cwd, complete.roadmap.path));
@@ -684,6 +654,95 @@ function buildAuditRecord(
 }
 
 /** Verify that a rollover-linked state still has exact tracked audit evidence. */
+/**
+ * Return the first structural problem with a persisted audit, or null when it is
+ * valid.
+ *
+ * Replaces a single 40-term boolean chain that threw "invalid shape" naming no
+ * field. Diagnosing a refusal meant reading this function — and the actual cause
+ * turned out to be a field that was *absent* rather than malformed, which the
+ * message gave no way to guess (GH #646).
+ */
+function describeAuditShapeProblem(record: Partial<SprintRolloverAuditRecord>): string | null {
+  const nonEmptyString = (value: unknown): boolean => typeof value === 'string' && value.trim().length > 0;
+
+  if (record.version !== 1) return 'version must be 1';
+  if (record.kind !== 'sprint_rollover') return "kind must be 'sprint_rollover'";
+  if (typeof record.transition_id !== 'string') return 'transition_id must be a string';
+  if (typeof record.from_sprint !== 'number') return 'from_sprint must be a number';
+  if (typeof record.to_sprint !== 'number') return 'to_sprint must be a number';
+  if (typeof record.from_label !== 'string') return 'from_label must be a string';
+  if (typeof record.to_label !== 'string') return 'to_label must be a string';
+  if (typeof record.recorded_at !== 'string') return 'recorded_at must be a string';
+  if (!Number.isFinite(Date.parse(record.recorded_at))) return 'recorded_at must be a parseable timestamp';
+
+  if (!record.actor) return 'actor is missing';
+  if (!nonEmptyString(record.actor.name)) return 'actor.name must be a non-empty string';
+  if (!nonEmptyString(record.actor.source)) return 'actor.source must be a non-empty string';
+
+  if (!record.request) return 'request is missing';
+  if (typeof record.request.from !== 'number') return 'request.from must be a number';
+  if (typeof record.request.to !== 'number') return 'request.to must be a number';
+  if (typeof record.request.force !== 'boolean') return 'request.force must be a boolean';
+  if (record.request.reason !== undefined && typeof record.request.reason !== 'string') {
+    return 'request.reason must be a string when present';
+  }
+
+  if (typeof record.forced !== 'boolean') return 'forced must be a boolean';
+  if (record.reason !== undefined && typeof record.reason !== 'string') {
+    return 'reason must be a string when present';
+  }
+
+  const eligibility = record.eligibility;
+  if (!eligibility) return 'eligibility is missing';
+  // Absent is valid: no pending successor exists once a phase is fully complete.
+  if (eligibility.expected_next !== undefined && typeof eligibility.expected_next !== 'number') {
+    return 'eligibility.expected_next must be a number when present';
+  }
+  if (typeof eligibility.from_terminal !== 'boolean') return 'eligibility.from_terminal must be a boolean';
+  if (typeof eligibility.target_dependency_eligible !== 'boolean') {
+    return 'eligibility.target_dependency_eligible must be a boolean';
+  }
+  if (!Array.isArray(eligibility.blocking_dependencies)) {
+    return 'eligibility.blocking_dependencies must be an array';
+  }
+  if (!Array.isArray(eligibility.target_dependencies)) {
+    return 'eligibility.target_dependencies must be an array';
+  }
+
+  const evidence = eligibility.completion_evidence;
+  if (!evidence) return 'eligibility.completion_evidence is missing';
+  if (!Array.isArray(evidence.roadmap_complete)) {
+    return 'eligibility.completion_evidence.roadmap_complete must be an array';
+  }
+  if (!Array.isArray(evidence.scorecards)) {
+    return 'eligibility.completion_evidence.scorecards must be an array';
+  }
+  if (!Array.isArray(evidence.local_terminal)) {
+    return 'eligibility.completion_evidence.local_terminal must be an array';
+  }
+
+  if (!Array.isArray(eligibility.scorecard_artifacts)) {
+    return 'eligibility.scorecard_artifacts must be an array';
+  }
+  const badArtifact = eligibility.scorecard_artifacts.findIndex(artifact => !validScorecardArtifact(artifact));
+  if (badArtifact >= 0) {
+    return `eligibility.scorecard_artifacts[${badArtifact}] must have sprint, path and sha256`;
+  }
+
+  if (!record.roadmap) return 'roadmap is missing';
+  if (typeof record.roadmap.path !== 'string') return 'roadmap.path must be a string';
+  if (typeof record.roadmap.sha256 !== 'string') return 'roadmap.sha256 must be a string';
+
+  if (typeof record.prior_state_sha256 !== 'string') return 'prior_state_sha256 must be a string';
+  if (!isValidSprintStateEvidence(record.prior_state)) return 'prior_state is not valid sprint state';
+  if (!isValidSprintStateEvidence(record.next_state)) return 'next_state is not valid sprint state';
+  if (record.claims_policy !== 'unchanged') return "claims_policy must be 'unchanged'";
+  if (record.sessions_policy !== 'unchanged') return "sessions_policy must be 'unchanged'";
+
+  return null;
+}
+
 export function verifySprintRolloverLineage(cwd: string, state: SprintState): SprintRolloverAuditRecord | null {
   const lineage = state.rollover;
   if (!lineage) return null;
