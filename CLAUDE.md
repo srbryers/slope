@@ -21,7 +21,7 @@ Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint 
 - `pnpm test:pg` — run PostgreSQL store tests (requires local PG, see below)
 
 ### Toolchain
-`pnpm` is pinned via `packageManager` in `package.json`. Run `corepack enable` once so the pinned version activates automatically; without it, a system pnpm older than 9 fails on the v9 lockfile with `ERR_PNPM_LOCKFILE_BREAKING_CHANGE`. **Never** run `pnpm install --force` to resolve that — it recreates the lockfile. Use `corepack pnpm@10 <cmd>` if you need a one-off without enabling corepack.
+`pnpm` is pinned via `packageManager` in `package.json` — the single source of truth. CI workflows must **not** also set `version:` on `pnpm/action-setup`; specifying both fails with "Multiple versions of pnpm specified". Run `corepack enable` once so the pinned version activates automatically; without it, a system pnpm older than 9 fails on the v9 lockfile with `ERR_PNPM_LOCKFILE_BREAKING_CHANGE`. **Never** run `pnpm install --force` to resolve that — it recreates the lockfile. Use `corepack pnpm@10 <cmd>` if you need a one-off without enabling corepack.
 
 ## PostgreSQL Store Tests
 The `store-pg` tests require a running PostgreSQL instance. They skip automatically when `SLOPE_TEST_PG_URL` is unset.
