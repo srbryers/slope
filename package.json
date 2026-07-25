@@ -75,8 +75,10 @@
     "url": "git+https://github.com/srbryers/slope.git"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=18",
+    "pnpm": ">=9"
   },
+  "packageManager": "pnpm@10.32.1",
   "dependencies": {
     "@clack/prompts": "^1.0.1",
     "@modelcontextprotocol/sdk": "^1.26.0",

@@ -5,7 +5,7 @@ import type { HookInput, GuardResult, SprintClaim } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { inferSprintContext } from '../sprint-inference.js';
 import { loadSprintState } from '../sprint-state.js';
-import { loadSessionState, updateSessionState } from '../session-state.js';
+import { isAdhocSession, loadSessionState, updateSessionState } from '../session-state.js';
 import { resolveStore } from '../store.js';
 import { normalizeTouchedPath, resolveTouchedPaths, toAbsoluteTouchedPath } from './hook-input.js';
 
@@ -90,6 +90,13 @@ export async function claimRequiredGuard(input: HookInput, cwd: string): Promise
 
   const policy = getImplementationWritePolicy(cwd);
 
+  // Adhoc mode advertises "sprint-workflow guards silenced", so this guard must
+  // not gate the host there. It still runs — the missing-claim signal is useful —
+  // but it emits advisory context instead of ask/deny, and only once per session.
+  // Previously every implementation write in an adhoc session raised a host
+  // permission prompt (GH #643).
+  const advisoryOnly = isAdhocSession(cwd, sessionId);
+
   // Check if there's an active sprint with claims
   const sprintState = loadSprintState(cwd);
   if (sprintState && sprintState.phase === 'implementing') {
@@ -110,6 +117,7 @@ export async function claimRequiredGuard(input: HookInput, cwd: string): Promise
   } else if (!sprintState) {
     const relativePath = findImplementationWritePath(input, cwd);
     if (!relativePath || !isImplementationWritePath(relativePath)) return {};
+    if (advisoryOnly && alreadyWarned(cwd, sessionId)) return {};
 
     const hint = inferMissingSprintHint(cwd);
     return implementationWritePolicyResult(policy, [
@@ -119,16 +127,17 @@ export async function claimRequiredGuard(input: HookInput, cwd: string): Promise
       hint
         ? `Suggested commands: \`slope sprint start --number=${hint.sprint} --phase=implementing\` then \`slope claim --target=<path> --ticket=<ticket>\`.`
         : 'Suggested commands: `slope sprint start --number=<N> --phase=implementing` then `slope claim --target=<path> --ticket=<ticket>`.',
-    ]);
+    ], { advisoryOnly, cwd, sessionId });
   } else {
     const relativePath = findImplementationWritePath(input, cwd);
     if (!relativePath || !isImplementationWritePath(relativePath)) return {};
+    if (advisoryOnly && alreadyWarned(cwd, sessionId)) return {};
 
     return implementationWritePolicyResult(policy, [
       `SLOPE claim-required: ${relativePath} looks like an implementation edit, but sprint ${sprintState.sprint} is in ${sprintState.phase} phase.`,
       'Implementation edits should happen during the implementing phase with a claim, or with explicit user approval to continue outside the sprint workflow.',
       'Suggested command: `slope sprint start --number=<N> --phase=implementing` or update the current sprint phase before editing.',
-    ]);
+    ], { advisoryOnly, cwd, sessionId });
   }
 
   if (policy === 'deny') {
@@ -195,8 +204,38 @@ function getImplementationWritePolicy(cwd: string): ImplementationWritePolicy {
   return value === 'deny' || value === 'off' || value === 'ask' ? value : 'ask';
 }
 
-function implementationWritePolicyResult(policy: ImplementationWritePolicy, lines: string[]): GuardResult {
+/** True when this session has already been warned about a missing claim. */
+function alreadyWarned(cwd: string, sessionId: string): boolean {
+  return loadSessionState(cwd).claim_warned_session_id === sessionId;
+}
+
+interface PolicyResultContext {
+  /** Adhoc session — emit context, never gate the host (GH #643). */
+  advisoryOnly: boolean;
+  cwd: string;
+  sessionId: string;
+}
+
+function implementationWritePolicyResult(
+  policy: ImplementationWritePolicy,
+  lines: string[],
+  ctx?: PolicyResultContext,
+): GuardResult {
   if (policy === 'off') return {};
+
+  // Adhoc sessions get the signal without the gate. Recorded once per session so
+  // a long adhoc session is not narrated on every write.
+  if (ctx?.advisoryOnly) {
+    updateSessionState(ctx.cwd, 'claim_warned_session_id', ctx.sessionId);
+    return {
+      context: [
+        'SLOPE advisory (non-blocking) — adhoc session, so sprint-workflow gating is off.',
+        ...lines,
+        'Run `slope sprint start` to re-enter the sprint workflow if this is sprint work.',
+      ].join('\n'),
+    };
+  }
+
   if (policy === 'deny') {
     return {
       decision: 'deny',
