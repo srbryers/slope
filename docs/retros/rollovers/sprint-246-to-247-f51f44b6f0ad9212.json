@@ -1,0 +1,277 @@
+{
+  "version": 1,
+  "kind": "sprint_rollover",
+  "transition_id": "eeedc57400a678af",
+  "from_sprint": 246,
+  "to_sprint": 247,
+  "from_label": "S246",
+  "to_label": "S247",
+  "recorded_at": "2026-07-25T16:07:31.504Z",
+  "actor": {
+    "name": "srbry",
+    "source": "env:USERNAME"
+  },
+  "request": {
+    "from": 246,
+    "to": 247,
+    "force": false
+  },
+  "forced": false,
+  "eligibility": {
+    "from_terminal": true,
+    "target_dependency_eligible": true,
+    "blocking_dependencies": [],
+    "target_dependencies": [
+      246
+    ],
+    "completion_evidence": {
+      "roadmap_complete": [
+        61,
+        62,
+        63,
+        64,
+        65,
+        66,
+        67,
+        68,
+        69,
+        70,
+        71,
+        72,
+        73,
+        74,
+        75,
+        76,
+        77,
+        78,
+        79,
+        80,
+        81,
+        82,
+        83,
+        84,
+        86,
+        87,
+        88,
+        89,
+        90,
+        91,
+        92,
+        93,
+        94,
+        95,
+        96,
+        97,
+        98,
+        99,
+        100,
+        101,
+        102,
+        103,
+        104,
+        105,
+        106,
+        107,
+        108,
+        109,
+        110,
+        111,
+        112,
+        113,
+        114,
+        114.5,
+        115,
+        116,
+        117,
+        118,
+        119,
+        120,
+        121,
+        122,
+        123,
+        124,
+        125,
+        126,
+        127,
+        130,
+        131,
+        132,
+        133,
+        134,
+        135,
+        136,
+        137,
+        137.5,
+        138,
+        139,
+        140,
+        141,
+        142,
+        143,
+        143.5,
+        143.6,
+        143.7,
+        143.8,
+        143.9,
+        143.95,
+        143.97,
+        143.98,
+        143.99,
+        144,
+        145,
+        146,
+        146.1,
+        146.2,
+        146.3,
+        148,
+        149,
+        150,
+        151,
+        151.1,
+        152,
+        152.1,
+        153,
+        154,
+        216,
+        217,
+        218,
+        219,
+        220,
+        221,
+        222,
+        223,
+        224,
+        226,
+        227,
+        228,
+        229,
+        230,
+        231,
+        232,
+        233,
+        234,
+        235,
+        236,
+        241,
+        242,
+        243,
+        244
+      ],
+      "scorecards": [
+        246,
+        247
+      ],
+      "local_terminal": [
+        246
+      ]
+    },
+    "scorecard_artifacts": [
+      {
+        "sprint": 246,
+        "path": "docs/retros/sprint-246.json",
+        "sha256": "3702a8d54d569455bef5c4976231431bdf2d9e2240ce747457153cb17c8660fc"
+      },
+      {
+        "sprint": 247,
+        "path": "docs/retros/sprint-247.json",
+        "sha256": "ddacbeef07c37c19cdbf1aa4aae18a75128ca8139c0494daa37d8d8c39a45b4c"
+      }
+    ],
+    "expected_next": 247
+  },
+  "roadmap": {
+    "path": "docs/backlog/roadmap.json",
+    "sha256": "d50f2b50b7c770e7070d07bff256c01a09ebd18ef825a2a737dd8b186b990463",
+    "from_status": "planned",
+    "to_status": "planned"
+  },
+  "prior_state_sha256": "0951e043cbffc16e3a0d6fb22f3f445b50c14be68c801b1535b8c038b29a36f2",
+  "prior_state": {
+    "sprint": 246,
+    "phase": "implementing",
+    "gates": {
+      "tests": true,
+      "code_review": true,
+      "architect_review": true,
+      "scorecard": true,
+      "review_md": true
+    },
+    "review_gates": {
+      "code_review": {
+        "provenance": "independent_review_waived",
+        "evidence": [],
+        "notes": "No independent code reviewer available: the operator directed that no subagents be spawned this session, and no PR review exists yet. Waived in favour of a documented local self review, which found and fixed a real defect (merge/revert subjects treated as fix intent in the sibling S248 work) and logged five findings. Evidence: 4099 tests passing, tsc --noEmit clean, build clean, three scorecards validating, and live before/after reproductions of #625, #630/#631 and #637. Recommend an independent review on the PR before merge.",
+        "updated_at": "2026-07-25T16:02:56.469Z"
+      },
+      "architect_review": {
+        "provenance": "independent_review_waived",
+        "evidence": [],
+        "notes": "No independent architecture reviewer available (same subagent constraint). Local architecture self review covered guard cwd derivation, repo-scoped session store resolution, cross-worktree sprint state, and the three deferral decisions (projection marker, validate read-only, canonical sprint IDs), each recorded as an architect finding with rationale rather than silently dropped. Recommend independent architecture review on the PR, particularly for the deferred projection-marker/migration-digest coupling.",
+        "updated_at": "2026-07-25T16:02:56.783Z"
+      }
+    },
+    "review_requirements": {
+      "code_review": {
+        "priority": "required",
+        "reason": "File patterns include security-sensitive paths",
+        "source": "review_recommend",
+        "updated_at": "2026-07-25T15:58:40.622Z"
+      },
+      "architect_review": {
+        "priority": "required",
+        "reason": "5 tickets warrants architectural review",
+        "source": "review_recommend",
+        "updated_at": "2026-07-25T15:58:40.622Z"
+      }
+    },
+    "started_at": "2026-07-25T15:03:02.676Z",
+    "updated_at": "2026-07-25T16:02:56.783Z",
+    "rollover": {
+      "transition_id": "cec2f6377741a3f9",
+      "from_sprint": 222,
+      "audit_path": "docs/retros/rollovers/sprint-222-to-246-503731c57d58679b.json",
+      "recorded_at": "2026-07-25T15:03:02.676Z",
+      "forced": false
+    }
+  },
+  "next_state": {
+    "sprint": 247,
+    "phase": "planning",
+    "gates": {
+      "tests": false,
+      "code_review": false,
+      "architect_review": false,
+      "scorecard": false,
+      "review_md": false
+    },
+    "review_gates": {
+      "code_review": {
+        "provenance": "pending",
+        "evidence": []
+      },
+      "architect_review": {
+        "provenance": "pending",
+        "evidence": []
+      }
+    },
+    "review_requirements": {
+      "code_review": {
+        "priority": "unspecified"
+      },
+      "architect_review": {
+        "priority": "unspecified"
+      }
+    },
+    "started_at": "2026-07-25T16:07:31.504Z",
+    "updated_at": "2026-07-25T16:07:31.504Z",
+    "rollover": {
+      "transition_id": "eeedc57400a678af",
+      "from_sprint": 246,
+      "audit_path": "docs/retros/rollovers/sprint-246-to-247-f51f44b6f0ad9212.json",
+      "recorded_at": "2026-07-25T16:07:31.504Z",
+      "forced": false
+    }
+  },
+  "claims_policy": "unchanged",
+  "sessions_policy": "unchanged"
+}
