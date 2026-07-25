@@ -549,9 +549,19 @@ export function findRoadmapProjectionDivergence(
   const compiledPhases = new Set((compiled.phases ?? []).map(phase => phase.name));
   const diskPhases = Array.isArray(disk.phases) ? disk.phases : [];
   const phases = diskPhases
-    .map(phase => (phase && typeof phase === 'object' ? (phase as { name?: unknown }).name : undefined))
-    .filter((name): name is string => typeof name === 'string')
-    .filter(name => !compiledPhases.has(name));
+    .filter((phase): phase is { name?: unknown; sprints?: unknown } =>
+      !!phase && typeof phase === 'object')
+    .filter(phase => typeof phase.name === 'string' && !compiledPhases.has(phase.name))
+    // A phase whose sprints all still compile was renamed or reorganised, not
+    // lost. Reporting it as content loss made every phase rename look destructive
+    // and blocked the compile — the original #637 case lost the phase *and* its
+    // six sprints, so requiring an orphaned sprint keeps that caught.
+    .filter(phase => {
+      const ids = Array.isArray(phase.sprints) ? phase.sprints : [];
+      if (ids.length === 0) return true;
+      return ids.some(id => id != null && !compiledSprints.has(String(id)));
+    })
+    .map(phase => phase.name as string);
 
   if (sprints.length === 0 && phases.length === 0) return null;
   return { sprints: [...new Set(sprints)], phases: [...new Set(phases)] };

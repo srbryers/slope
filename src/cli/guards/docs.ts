@@ -35,6 +35,13 @@ export const GUARD_DOCS: Record<string, GuardDoc> = {
     configuration: 'guidance.commitInterval (default: 15 minutes) controls the nudge threshold. Disable: add "commit-nudge" to guidance.disabled.',
     level: 'full',
   },
+  'shell-write': {
+    purpose: 'Warns when file content is written through a shell instead of the Write/Edit tools. Shell escaping silently corrupts written content, and the write still exits 0.',
+    triggers: 'PreToolUse on Bash. Fires when an inline interpreter (python -c, node -e, a piped heredoc) also contains a file-write call, or when a heredoc is redirected straight into a file.',
+    behavior: 'Advisory — injects guidance to use the Write/Edit tools, or to write the script to a file and run it. Does not block. Once per session. Inline scripting that only reads, computes or prints is not flagged.',
+    configuration: 'Advisory only. Disable: add "shell-write" to guidance.disabled.',
+    level: 'full',
+  },
   'scope-drift': {
     purpose: 'Warns when the agent edits files outside the claimed ticket scope. Keeps work focused and prevents unintended changes.',
     triggers: 'PreToolUse on Edit, Write. Fires when a file modification is attempted.',

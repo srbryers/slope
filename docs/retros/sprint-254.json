@@ -1,0 +1,113 @@
+{
+  "sprint_number": 254,
+  "theme": "Stop Asking the Operator",
+  "par": 4,
+  "slope": 3,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-07-25",
+  "shots": [
+    {
+      "ticket_key": "S254-1",
+      "title": "Make claim-required advisory under the default ask policy, keeping deny blocking (#650)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "This exact change was attempted in S252 and reverted because it appeared to break deny. It had not: the earlier check went through the CLI, and the failure was a probe artifact. Calling the guard directly shows deny blocking on both non-implementing branches. An hour was lost to an unverified revert that a direct-call harness would have settled immediately.",
+          "gotcha_id": "self:probe-artifact"
+        }
+      ],
+      "notes": "Keyed off the policy rather than the session mode: deny blocks, off returns early, default ask becomes advisory context addressed to the agent, once per session. Verified through the real hook path in this repo \u2014 no output reaches the operator."
+    },
+    {
+      "ticket_key": "S254-2",
+      "title": "Add deny-policy coverage for both non-implementing branches (#650)",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [],
+      "notes": "The coverage whose absence made the S252 revert unresolvable. Five existing tests asserted the old ask contract, two of them added by me in S249 and S253; all updated to the intended behaviour."
+    },
+    {
+      "ticket_key": "S254-3",
+      "title": "Add a shell-write guard that warns when an inline interpreter also writes a file",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "moderate",
+          "description": "The guard caught its own author within a minute of being wired up, on an inline python file write \u2014 the fourth occurrence of a hazard first recorded in S248 and re-documented in #653 the same day. Confirms the mechanism was the right call over another note, and that the signal now reaches the agent rather than the operator.",
+          "gotcha_id": "self:guard-caught-author"
+        }
+      ],
+      "notes": "Keyed on the file-write call, not the interpreter, so read-only inline scripting stays silent. 11/11 against three real failures and six legitimate patterns."
+    },
+    {
+      "ticket_key": "S254-4",
+      "title": "Register the shell-write guard across the name union, handlers, relevance, docs and templates",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "Two registration assumptions were wrong and only typecheck caught them: toolCategories has no 'run_command' (it is 'execute_command'), and GuardHandler requires a Promise return. The docs entry shape was also different from what I assumed and had to be read first. Eight registration sites for one guard is a lot of coupling.",
+          "gotcha_id": "self:registration-coupling"
+        }
+      ],
+      "notes": "slope hook add generates hook config from the registry, so the registry entry covers new installs; this repo's .claude/settings.json was patched directly to take effect now."
+    },
+    {
+      "ticket_key": "S254-5",
+      "title": "Unplanned: stop treating a phase rename as projection content loss",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "Re-planning this phase mid-sprint renamed it, which blocked slope roadmap compile: my own #637 divergence check matched phases by name, so a rename looked like authored content vanishing. A false positive in a data-protection check is expensive \u2014 it blocks legitimate work and trains operators to reach for --force, which is exactly what the check exists to prevent.",
+          "gotcha_id": "self:false-positive-protection"
+        }
+      ],
+      "notes": "Divergence now requires an orphaned sprint, so a phase whose sprints still compile is treated as renamed. The original #637 case (a phase plus six sprints existing only in the projection) is still caught, as is a projection-only phase declaring no sprints."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 5,
+    "fairways_total": 5,
+    "greens_in_regulation": 5,
+    "greens_total": 5,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 4,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    "Phase re-planned mid-sprint: it began as a single shell-write guard ticket, and the permission prompt recurring a fourth time made #650 the priority.",
+    "Committing was blocked by branch-before-commit because work had begun on main after a merge \u2014 the guard caught it, which is the pattern this sprint is about."
+  ],
+  "special_plays": [],
+  "bunker_locations": [
+    "src/core/roadmap-sources.ts findRoadmapProjectionDivergence: a protective check with a false positive blocks real work and pushes operators toward --force.",
+    "Adding a guard touches eight registration sites; toolCategories and GuardHandler shapes are easy to get wrong and only typecheck catches them."
+  ],
+  "yardage_book_updates": [
+    "Test guard behaviour by calling the guard function directly, not through the CLI \u2014 a CLI probe produced a false negative that caused a wrongful revert.",
+    "slope hook add generates hook config from GUARD_DEFINITIONS; a new guard needs the registry entry plus a manual patch to an already-installed .claude/settings.json.",
+    "Guards should only ask the operator when the operator has a decision. Anything an agent can resolve deterministically belongs in context."
+  ],
+  "course_management_notes": [
+    "Two hazards this sprint were process failures documentation had already been written for. Both are now mechanical. Where a rule has failed twice, stop writing rules.",
+    "Never revert on an unverified failure. Build the direct harness first \u2014 the S252 revert cost real time and the regression was never there."
+  ]
+}

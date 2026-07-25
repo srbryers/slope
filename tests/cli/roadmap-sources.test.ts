@@ -883,3 +883,50 @@ describe('generated-file marker (GH #644)', () => {
     expect(stripRoadmapProjectionMarker(store.projection)).toBe(store.projection);
   });
 });
+
+describe('projection divergence ignores phase renames (GH #637 follow-up)', () => {
+  const compiled = {
+    name: 'r',
+    phases: [{ name: 'Phase 58 — Current Name', sprints: [254] }],
+    sprints: [{ id: 254, theme: 'T', par: 3 as const, slope: 1, type: 'feature', tickets: [] }],
+  };
+
+  it('does not treat a renamed phase as content loss when its sprints survive', () => {
+    // Renaming a phase in the source used to look destructive, because phases were
+    // matched by name — which blocked the compile on any rename.
+    const disk = JSON.stringify({
+      phases: [{ name: 'Phase 58 — Previous Name', sprints: [254] }],
+      sprints: [{ id: 254 }],
+    });
+
+    expect(findRoadmapProjectionDivergence(disk, compiled)).toBeNull();
+  });
+
+  it('still reports a phase whose sprints exist only in the projection', () => {
+    // The original #637 loss: a phase plus six sprints that no source produced.
+    const disk = JSON.stringify({
+      phases: [
+        { name: 'Phase 58 — Current Name', sprints: [254] },
+        { name: 'Phase 49 — Authored Only', sprints: [464, 465] },
+      ],
+      sprints: [{ id: 254 }, { id: 464 }, { id: 465 }],
+    });
+
+    const divergence = findRoadmapProjectionDivergence(disk, compiled);
+    expect(divergence?.phases).toEqual(['Phase 49 — Authored Only']);
+    expect(divergence?.sprints).toEqual(['464', '465']);
+  });
+
+  it('still reports a projection-only phase that declares no sprints', () => {
+    const disk = JSON.stringify({
+      phases: [
+        { name: 'Phase 58 — Current Name', sprints: [254] },
+        { name: 'Phase 99 — Empty Authored', sprints: [] },
+      ],
+      sprints: [{ id: 254 }],
+    });
+
+    expect(findRoadmapProjectionDivergence(disk, compiled)?.phases)
+      .toEqual(['Phase 99 — Empty Authored']);
+  });
+});

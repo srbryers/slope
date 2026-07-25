@@ -11,6 +11,7 @@ import { exploreGuard } from '../guards/explore.js';
 import { hazardGuard } from '../guards/hazard.js';
 import { commitNudgeGuard } from '../guards/commit-nudge.js';
 import { scopeDriftGuard } from '../guards/scope-drift.js';
+import { shellWriteGuard } from '../guards/shell-write.js';
 import { compactionGuard } from '../guards/compaction.js';
 import { stopCheckGuard } from '../guards/stop-check.js';
 import { subagentGateGuard } from '../guards/subagent-gate.js';
@@ -85,6 +86,7 @@ const handlers: Partial<Record<GuardName, GuardHandler>> = {
   hazard: hazardGuard,
   'commit-nudge': commitNudgeGuard,
   'scope-drift': scopeDriftGuard,
+  'shell-write': shellWriteGuard,
   compaction: compactionGuard,
   'stop-check': stopCheckGuard,
   'subagent-gate': subagentGateGuard,
@@ -965,6 +967,7 @@ const GUARD_RELEVANCE: Record<string, GuardRelevance> = {
   'worktree-merge': { when: 'multi-session', why: 'Prevents gh pr merge failures in worktrees' },
   'worktree-self-remove': { when: 'multi-session', why: 'Prevents shell breakage from self-removing worktree' },
   'scope-drift': { when: 'sprint-workflow', why: 'Keeps work focused on claimed tickets' },
+  'shell-write': { when: 'always', why: 'Shell escaping silently corrupts written file content' },
   'sprint-completion': { when: 'sprint-workflow', why: 'Blocks PR until tests pass and scorecard exists' },
   'review-tier': { when: 'sprint-workflow', why: 'Prompts for plan review after writing plan files' },
   'workflow-gate': { when: 'sprint-workflow', why: 'Blocks plan exit until review rounds complete' },

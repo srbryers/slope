@@ -5,7 +5,7 @@ import type { HookInput, GuardResult, SprintClaim } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { inferSprintContext } from '../sprint-inference.js';
 import { loadSprintState } from '../sprint-state.js';
-import { isAdhocSession, loadSessionState, updateSessionState } from '../session-state.js';
+import { loadSessionState, updateSessionState } from '../session-state.js';
 import { resolveStore } from '../store.js';
 import { normalizeTouchedPath, resolveTouchedPaths, toAbsoluteTouchedPath } from './hook-input.js';
 
@@ -90,12 +90,18 @@ export async function claimRequiredGuard(input: HookInput, cwd: string): Promise
 
   const policy = getImplementationWritePolicy(cwd);
 
-  // Adhoc mode advertises "sprint-workflow guards silenced", so this guard must
-  // not gate the host there. It still runs — the missing-claim signal is useful —
-  // but it emits advisory context instead of ask/deny, and only once per session.
-  // Previously every implementation write in an adhoc session raised a host
-  // permission prompt (GH #643).
-  const advisoryOnly = isAdhocSession(cwd, sessionId);
+  // Never raise a host permission prompt for something the agent can fix itself.
+  // Every remedy this guard prints — `slope sprint start`, `slope claim` — is
+  // deterministic and needs no human judgement, so asking interrupts the operator
+  // for a decision that is not theirs. It fired on every implementation write
+  // whenever sprint state was absent or in a non-implementing phase, including the
+  // `scoring` phase that `slope pr` sets the moment a PR merges, so beginning the
+  // next sprint's work always prompted (GH #643, #650).
+  //
+  // Keyed off the policy, not the session mode: "deny" still blocks, "off" already
+  // returns early, and the default "ask" becomes advisory context addressed to the
+  // agent, recorded once per session.
+  const advisoryOnly = policy !== 'deny';
 
   // Check if there's an active sprint with claims
   const sprintState = loadSprintState(cwd);
@@ -229,9 +235,9 @@ function implementationWritePolicyResult(
     updateSessionState(ctx.cwd, 'claim_warned_session_id', ctx.sessionId);
     return {
       context: [
-        'SLOPE advisory (non-blocking) — adhoc session, so sprint-workflow gating is off.',
+        'SLOPE advisory (non-blocking) — addressed to the agent, not a permission request.',
         ...lines,
-        'Run `slope sprint start` to re-enter the sprint workflow if this is sprint work.',
+        'Run the suggested command, then continue. Set guidance.requireSprintForImplementationWrites to "deny" to block instead.',
       ].join('\n'),
     };
   }

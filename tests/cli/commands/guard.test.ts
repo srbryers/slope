@@ -165,7 +165,7 @@ describe('guardCommand dispatcher path', () => {
     vi.restoreAllMocks();
   });
 
-  it('emits advisory context, not ask, for claim-required on adhoc implementation writes (GH #643)', async () => {
+  it('emits advisory context, not ask, for claim-required implementation writes (GH #643, #650)', async () => {
     const output = await runGuardCommandWithInput(['claim-required'], makeHookInput(cwd));
     const parsed = JSON.parse(output);
 
@@ -173,7 +173,7 @@ describe('guardCommand dispatcher path', () => {
     // Adhoc mode advertises "sprint-workflow guards silenced", so the guard
     // reports but must not gate the host on every write.
     expect(parsed.hookSpecificOutput.permissionDecision).toBeUndefined();
-    expect(parsed.hookSpecificOutput.additionalContext).toContain('adhoc session');
+    expect(parsed.hookSpecificOutput.additionalContext).toContain('not a permission request');
     expect(parsed.hookSpecificOutput.additionalContext).toContain('no active sprint state');
     expect(parsed.hookSpecificOutput.additionalContext).toContain('slope sprint start');
 
