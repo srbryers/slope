@@ -94,6 +94,7 @@ export type GuardName =
   | 'hazard'
   | 'commit-nudge'
   | 'scope-drift'
+  | 'shell-write'
   | 'compaction'
   | 'stop-check'
   | 'subagent-gate'
@@ -207,6 +208,15 @@ export const GUARD_DEFINITIONS: GuardDefinition[] = [
     hookEvent: 'PreToolUse',
     toolCategories: ['write_file'],
     matcher: 'Edit|Write',
+    level: 'full',
+    guardType: 'advisory',
+  },
+  {
+    name: 'shell-write',
+    description: 'Warn when file content is written through a shell instead of the Write/Edit tools',
+    hookEvent: 'PreToolUse',
+    toolCategories: ['execute_command'],
+    matcher: 'Bash',
     level: 'full',
     guardType: 'advisory',
   },

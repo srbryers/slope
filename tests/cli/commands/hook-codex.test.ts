@@ -62,7 +62,7 @@ describe('slope hook add --harness=codex', () => {
     await hookCommand(['add', '--level=full', '--harness=codex']);
 
     const output = log.mock.calls.map(call => call.join(' ')).join('\n');
-    expect(output).toContain('Installed 30 of 31 guard hooks (level: full)');
+    expect(output).toContain('Installed 31 of 32 guard hooks (level: full)');
     expect(output).toContain('compaction');
     expect(output).toContain('unsupported by harness');
   });

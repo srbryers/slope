@@ -12,7 +12,7 @@ import '../../src/core/adapters/claude-code.js';
 
 describe('GUARD_DEFINITIONS', () => {
   it('has 31 guard definitions', () => {
-    expect(GUARD_DEFINITIONS).toHaveLength(31);
+    expect(GUARD_DEFINITIONS).toHaveLength(32);
   });
 
   it('all guards have required fields', () => {
