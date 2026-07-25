@@ -10,8 +10,14 @@ import {
   planRoadmapSourceArchive,
   roadmapProjectionMatches,
   writeRoadmapSourceProjection,
+  validateRoadmapSourceStore,
 } from '../../src/cli/roadmap-source-store.js';
-import { findRoadmapProjectionDivergence } from '../../src/core/index.js';
+import {
+  findRoadmapProjectionDivergence,
+  stripRoadmapProjectionMarker,
+  withRoadmapProjectionMarker,
+  ROADMAP_PROJECTION_MARKER_KEY,
+} from '../../src/core/index.js';
 
 let cwd: string;
 let originalCwd: string;
@@ -814,5 +820,66 @@ describe('focused roadmap evidence labelling (GH #636)', () => {
     expect(output).toContain('Compatibility projection (generated, read-only): docs/backlog/roadmap.json');
     // The generated file must never be presented as the plain "Roadmap source".
     expect(output).not.toContain('Roadmap source: docs/backlog/roadmap.json');
+  });
+});
+
+describe('generated-file marker (GH #644)', () => {
+  it('writes the marker into the projection naming its source', () => {
+    const output = writeFixture();
+    const store = loadRoadmapSourceStore(cwd, 'docs/roadmap/project.yaml');
+
+    expect(writeRoadmapSourceProjection(store)).toBe('written');
+
+    const parsed = JSON.parse(readFileSync(output, 'utf8'));
+    expect(parsed[ROADMAP_PROJECTION_MARKER_KEY]).toMatchObject({
+      by: 'slope roadmap compile',
+      source: 'docs/roadmap/project.yaml',
+    });
+    expect(parsed[ROADMAP_PROJECTION_MARKER_KEY].warning).toContain('GENERATED FILE');
+    // The marker must not disturb the compiled content.
+    expect(parsed.sprints.length).toBe(store.roadmap.sprints.length);
+  });
+
+  it('is idempotent — a marked projection is unchanged on re-compile', () => {
+    writeFixture();
+    let store = loadRoadmapSourceStore(cwd, 'docs/roadmap/project.yaml');
+    expect(writeRoadmapSourceProjection(store)).toBe('written');
+
+    store = loadRoadmapSourceStore(cwd, 'docs/roadmap/project.yaml');
+    expect(writeRoadmapSourceProjection(store)).toBe('unchanged');
+  });
+
+  it('adds the marker to a current projection that lacks one', () => {
+    const output = writeFixture();
+    const store = loadRoadmapSourceStore(cwd, 'docs/roadmap/project.yaml');
+    writeRoadmapSourceProjection(store);
+    // Simulate a projection written before the marker existed, or by the
+    // migration path, whose content is otherwise current.
+    writeFileSync(output, store.projection);
+
+    expect(writeRoadmapSourceProjection(loadRoadmapSourceStore(cwd, 'docs/roadmap/project.yaml')))
+      .toBe('written');
+    expect(readFileSync(output, 'utf8')).toContain(ROADMAP_PROJECTION_MARKER_KEY);
+  });
+
+  it('does not report a marked projection as drift', () => {
+    writeFixture();
+    const store = loadRoadmapSourceStore(cwd, 'docs/roadmap/project.yaml');
+    writeRoadmapSourceProjection(store);
+
+    const fresh = loadRoadmapSourceStore(cwd, 'docs/roadmap/project.yaml');
+    const validation = validateRoadmapSourceStore(fresh);
+    expect(validation.errors.map(e => e.code)).not.toContain('projection_drift');
+  });
+
+  it('round-trips marker add then strip back to canonical bytes', () => {
+    writeFixture();
+    const store = loadRoadmapSourceStore(cwd, 'docs/roadmap/project.yaml');
+    const marked = withRoadmapProjectionMarker(store.projection, 'docs/roadmap/project.yaml');
+
+    expect(marked).not.toBe(store.projection);
+    expect(stripRoadmapProjectionMarker(marked)).toBe(store.projection);
+    // Stripping an unmarked projection is a no-op.
+    expect(stripRoadmapProjectionMarker(store.projection)).toBe(store.projection);
   });
 });

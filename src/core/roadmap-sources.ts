@@ -408,6 +408,62 @@ export function serializeRoadmapProjection(roadmap: RoadmapDefinition): string {
   return `${JSON.stringify(roadmap, null, 2)}\n`;
 }
 
+/**
+ * Key of the generated-file marker written into the compiled projection.
+ *
+ * The marker exists only in the bytes on disk. `serializeRoadmapProjection`
+ * stays canonical and marker-free, because projection bytes are compared in four
+ * places — compile write, closeout reconciliation, archive planning, and the
+ * migration planner/applier `expected_projection_sha256` pair. Stamping the
+ * marker into those canonical bytes broke migration receipt binding (seven
+ * tests), so it is applied at the write boundary and stripped again on read
+ * (GH #644, deferred from #637).
+ */
+export const ROADMAP_PROJECTION_MARKER_KEY = '_generated';
+
+/** Add the generated-file marker to projection bytes about to be written. */
+export function withRoadmapProjectionMarker(projection: string, sourcePath: string): string {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(projection);
+  } catch {
+    return projection;
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return projection;
+
+  const marked = {
+    [ROADMAP_PROJECTION_MARKER_KEY]: {
+      by: 'slope roadmap compile',
+      source: sourcePath,
+      warning: `GENERATED FILE — do not edit. Edit the modular sources under docs/roadmap/ and re-run \`slope roadmap compile\`. Edits here are refused or discarded.`,
+    },
+    ...(parsed as Record<string, unknown>),
+  };
+  return `${JSON.stringify(marked, null, 2)}\n`;
+}
+
+/**
+ * Remove the generated-file marker so on-disk bytes can be compared against
+ * canonical projection bytes. Returns the input unchanged when no marker exists,
+ * so projections written before this change still compare correctly.
+ */
+export function stripRoadmapProjectionMarker(projection: string): string {
+  if (!projection.includes(`"${ROADMAP_PROJECTION_MARKER_KEY}"`)) return projection;
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(projection);
+  } catch {
+    return projection;
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return projection;
+
+  const rest = { ...(parsed as Record<string, unknown>) };
+  if (!(ROADMAP_PROJECTION_MARKER_KEY in rest)) return projection;
+  delete rest[ROADMAP_PROJECTION_MARKER_KEY];
+  return `${JSON.stringify(rest, null, 2)}\n`;
+}
+
 export interface RoadmapProjectionDivergence {
   /** Sprint ids present in the on-disk projection but produced by no source. */
   sprints: string[];

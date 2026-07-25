@@ -230,6 +230,9 @@ export {
   compileRoadmapSources,
   serializeRoadmapProjection,
   findRoadmapProjectionDivergence,
+  withRoadmapProjectionMarker,
+  stripRoadmapProjectionMarker,
+  ROADMAP_PROJECTION_MARKER_KEY,
   validateRoadmapSourceFederation,
 } from './roadmap-sources.js';
 export type {

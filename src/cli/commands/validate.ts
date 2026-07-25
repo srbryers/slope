@@ -17,6 +17,7 @@ import type { RoadmapSourceError } from '../../core/index.js';
 export function validateCommand(input?: string | string[]): void {
   const args = Array.isArray(input) ? input : input ? [input] : [];
   const validateSkills = args.includes('--skills');
+  const readOnly = args.includes('--read-only');
   const sprintArgIndex = args.findIndex(arg => arg === '--sprint' || arg.startsWith('--sprint='));
   const requestedSprint = parseRequestedSprint(args, sprintArgIndex);
   const path = args.find((arg, index) => {
@@ -102,9 +103,17 @@ export function validateCommand(input?: string | string[]): void {
 
   // Mark scorecard gate complete on successful validation
   let reconciled = true;
-  if (allValid && registryAvailable) {
+  if (allValid && registryAvailable && !readOnly) {
     updateGate(cwd, 'scorecard', true);
     reconciled = reconcileModularRoadmapSources(cwd, validScorecards);
+  } else if (readOnly) {
+    // `validate` writes tracked files as a side effect: it marks the scorecard
+    // gate, reconciles scorecard indexes and sprint status into the phase YAML,
+    // and regenerates the compiled projection. Surprising for a read-sounding
+    // command, so --read-only offers a pure check (GH #644, #637 fix 3). The
+    // default is unchanged, because the closeout workflow depends on that
+    // reconciliation.
+    console.log('  (--read-only: skipped gate update and roadmap source reconciliation)\n');
   }
 
   process.exit(allValid && registryAvailable && reconciled ? 0 : 1);
