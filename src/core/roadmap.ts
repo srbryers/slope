@@ -159,9 +159,10 @@ export function describeSprintIdAmbiguity(written: string): string | null {
 
   const collapsed = String(Number(body));
   const suggestion = fraction.replace(/0+$/, '');
-  return `sprint id "${body}" cannot round-trip: ids are stored as numbers, so it reads back as `
-    + `${collapsed} and would alias that sprint. Renumber it — use a fraction with no trailing `
-    + `zero (for example ${body.slice(0, dot)}.${suggestion || '1'}1) or a whole sprint id.`;
+  return `sprint id ${body} cannot round-trip as a number: it reads back as `
+    + `${collapsed} and would alias that sprint. Quote it to preserve the exact id `
+    + `(id: "${body}"), or use a fraction with no trailing zero `
+    + `(for example ${body.slice(0, dot)}.${suggestion || '1'}1) or a whole sprint id.`;
 }
 
 /** Parse human-entered sprint ids such as "114", "114.5", or "S114.5". */

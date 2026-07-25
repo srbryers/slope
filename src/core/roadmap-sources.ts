@@ -308,10 +308,20 @@ export function parseRoadmapSourceDocument(
     if (typeof sprint.type !== 'string' || !sprint.type.trim()) {
       throw new RoadmapSourceError(`sprints[${sprintIndex}].type must be a non-empty string`, sourcePath);
     }
-    if (sprint.depends_on != null
-      && (!Array.isArray(sprint.depends_on)
-        || sprint.depends_on.some(id => typeof id !== 'number' || !Number.isFinite(id) || id <= 0))) {
-      throw new RoadmapSourceError(`sprints[${sprintIndex}].depends_on must contain numeric sprint IDs`, sourcePath);
+    // depends_on may reference a canonical string id (e.g. "458.10"); coerce to
+    // the numeric mirror. Distinctness between coexisting 458.1 and 458.10 in a
+    // dependency uses the numeric mirror, the same boundary as the store (GH #635).
+    if (sprint.depends_on != null) {
+      if (!Array.isArray(sprint.depends_on)) {
+        throw new RoadmapSourceError(`sprints[${sprintIndex}].depends_on must be a sequence of sprint IDs`, sourcePath);
+      }
+      for (const [i, dep] of sprint.depends_on.entries()) {
+        const key = typeof dep === 'number' || typeof dep === 'string' ? sprintIdKey(dep) : null;
+        if (key === null) {
+          throw new RoadmapSourceError(`sprints[${sprintIndex}].depends_on[${i}] is not a valid sprint id`, sourcePath);
+        }
+        sprint.depends_on[i] = Number(key);
+      }
     }
     for (const field of ['status', 'note', 'outcome', 'phase', 'wave'] as const) {
       if (sprint[field] != null && typeof sprint[field] !== 'string') {

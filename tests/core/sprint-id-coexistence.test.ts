@@ -82,3 +82,43 @@ describe('canonical sprint ids coexist through compile (GH #635)', () => {
     expect(validation.valid).toBe(false);
   });
 });
+
+describe('authoring a canonical sprint id (GH #635)', () => {
+  function doc(idLine: string, extraLines: string[] = []): string {
+    return [
+      'version: "1"',
+      'phase:',
+      '  name: Phase 99',
+      '  sprints: ["458.10"]',
+      'sprints:',
+      `  - id: ${idLine}`,
+      '    theme: T',
+      '    par: 3',
+      '    slope: 1',
+      '    type: feature',
+      '    status: planned',
+      ...extraLines,
+      '    tickets:',
+      '      - {key: S458.10-1, title: T1, club: wedge, complexity: small}',
+      '',
+    ].join(LF);
+  }
+
+  it('rejects an unquoted trailing-zero id and points at quoting', () => {
+    expect(() => parseRoadmapSourceDocument(doc('458.10'), 'phases/phase-99.yaml'))
+      .toThrow(/Quote it to preserve/);
+  });
+
+  it('accepts a quoted trailing-zero id and preserves it', () => {
+    const parsed = parseRoadmapSourceDocument(doc('"458.10"'), 'phases/phase-99.yaml');
+    expect(parsed.sprints[0].id_key).toBe('458.10');
+  });
+
+  it('accepts a string depends_on reference', () => {
+    const parsed = parseRoadmapSourceDocument(
+      doc('"458.10"', ['    depends_on: ["458.9"]']),
+      'phases/phase-99.yaml',
+    );
+    expect(parsed.sprints[0].depends_on).toEqual([458.9]);
+  });
+});
