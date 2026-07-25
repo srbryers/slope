@@ -89,6 +89,21 @@ function writeSprintState(cwd: string, phase: string): void {
 }
 
 describe('claimOverlapsPath', () => {
+  describe('whole-repo area claim (GH #651)', () => {
+    it.each(['.', './', ''])('treats %j as covering every path', target => {
+      // `slope claim --target=. --scope=area` is how you say "working across this
+      // repo". The prefix test built `./`, which no relative path starts with, so a
+      // root claim silenced nothing and every write was reported as scope drift.
+      expect(claimOverlapsPath('area', target, 'src/core/roadmap.ts', 'src/core')).toBe(true);
+      expect(claimOverlapsPath('area', target, 'package.json', '.')).toBe(true);
+    });
+
+    it('still scopes a narrow area claim', () => {
+      expect(claimOverlapsPath('area', 'src/cli', 'src/core/roadmap.ts', 'src/core')).toBe(false);
+      expect(claimOverlapsPath('area', 'src/cli', 'src/cli/guards/x.ts', 'src/cli/guards')).toBe(true);
+    });
+  });
+
   describe('area scope', () => {
     it('matches exact path', () => {
       expect(claimOverlapsPath('area', 'src/core', 'src/core', 'src')).toBe(true);

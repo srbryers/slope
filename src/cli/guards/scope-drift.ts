@@ -143,5 +143,10 @@ function resolveCurrentSprint(cwd: string, config: SlopeConfig): number | undefi
 function isWithinClaimedArea(relativePath: string, target: string): boolean {
   const normalizedTarget = target.replace(/\\/g, '/').replace(/\/$/, '');
   if (/^sprint:S\d+(?:\.\d+)?$/i.test(normalizedTarget)) return true;
+  // `slope claim --target=. --scope=area` is the natural way to say "working
+  // across this repo", but the prefix test built `./`, which no relative path
+  // starts with — so a root claim silenced nothing and every write was reported
+  // as drift (GH #651).
+  if (normalizedTarget === '.' || normalizedTarget === '' || normalizedTarget === '/') return true;
   return relativePath === normalizedTarget || relativePath.startsWith(`${normalizedTarget}/`);
 }

@@ -189,11 +189,14 @@ export function dedupGuardContext(
       return `SLOPE ${guardName}: (same as prior warning, shown ${existing.count}x)`;
     }
 
-    // Check token budget — if exceeded, return short message instead of full context
+    // Budget exhausted: stay silent. This previously substituted a note about the
+    // budget itself, which every guard then repeated on every fire — spending
+    // context to announce that there is no context left, naming no file and no
+    // action. A guard with nothing useful left to say should say nothing (GH #651).
     const budget = DEFAULT_CONTEXT_BUDGET_CHARS;
     if ((state.total_chars ?? 0) + context.length > budget) {
       saveDedupStateUnlocked(filePath, state);
-      return `SLOPE ${guardName}: context budget exhausted (${Math.round((state.total_chars ?? 0) / 4)}+ tokens injected). Run \`slope briefing --compact\` for status.`;
+      return '';
     }
 
     // New content — track chars and record
