@@ -342,8 +342,17 @@ export function assessSprintRollover(
       message: `${toLabel} is blocked by ${boundedSprintLabels(roadmap, blockers)}.`,
     });
   }
-  if (fromSprint && !expectedNext) {
-    issues.push({ code: 'no_eligible_successor', message: `No dependency-eligible pending sprint follows ${fromLabel}.` });
+  // Only relevant when there is no usable explicit target: it answers "where do I
+  // go next?", not "may I go where I said?". Raising it for a resolvable,
+  // dependency-clear target meant that once closeout marked a whole phase
+  // complete, no pending successor existed and rollover stayed blocked even after
+  // target_not_pending was fixed — the same deadlock one check further on
+  // (GH #641).
+  if (fromSprint && !expectedNext && (!toSprint || blockers.length > 0)) {
+    issues.push({
+      code: 'no_eligible_successor',
+      message: `No dependency-eligible pending sprint follows ${fromLabel}.`,
+    });
   } else if (toSprint && expectedNext && !roadmapIdsEqual(roadmap, toSprint.id, expectedNext.id)) {
     issues.push({
       code: 'target_not_next_eligible',

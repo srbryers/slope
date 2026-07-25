@@ -6328,7 +6328,7 @@
       "par": 4,
       "slope": 2,
       "type": "bugfix + contributor experience",
-      "status": "planned",
+      "status": "complete",
       "note": "Fix #645 (no packageManager field: lockfile v9 makes a clean checkout unbuildable on pnpm 8, the error steers toward rewriting the lockfile, and pnpm/action-setup floats to latest in CI; stacked PRs also get no CI because ci.yml only triggers on base main) and #643 (claim-required returns 'ask' on every implementation write even in adhoc mode, which the briefing describes as sprint-workflow guards silenced). Both are daily friction rather than data risk, but they are what an operator hits first.",
       "tickets": [
         {
@@ -6363,7 +6363,7 @@
       "par": 5,
       "slope": 4,
       "type": "bugfix + state integrity",
-      "status": "planned",
+      "status": "complete",
       "depends_on": [
         249
       ],
@@ -6418,7 +6418,7 @@
       "par": 4,
       "slope": 5,
       "type": "bugfix + data integrity",
-      "status": "planned",
+      "status": "complete",
       "depends_on": [
         250
       ],

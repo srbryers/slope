@@ -298,6 +298,21 @@ describe('assessSprintRollover', () => {
       expect(assessment.issues.map(issue => issue.code)).toContain('force_reason_required');
     });
 
+    it('does not demand a pending successor when an explicit target is given (GH #641)', () => {
+      // Once closeout marks a whole phase complete there is no *pending*
+      // successor, which kept rollover blocked one check past target_not_pending.
+      const assessment = assessSprintRollover(
+        terminalState(),
+        roadmap('complete'),
+        'docs/backlog/roadmap.json',
+        { from: 10, to: 11 },
+        [11],
+      );
+
+      expect(assessment.issues.map(issue => issue.code)).not.toContain('no_eligible_successor');
+      expect(assessment.valid).toBe(true);
+    });
+
     it('names the escape hatch when refusing a terminal target', () => {
       const assessment = assessSprintRollover(
         terminalState(),

@@ -1,0 +1,70 @@
+{
+  "sprint_number": 249,
+  "theme": "Toolchain Pin and Guard Signal",
+  "par": 4,
+  "slope": 2,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-07-25",
+  "shots": [
+    {
+      "ticket_key": "S249-1",
+      "title": "Pin packageManager so a clean checkout installs and CI stops floating (#645)",
+      "club": "putter",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "packageManager pnpm@10.32.1 plus engines.pnpm >= 9. pnpm/action-setup reads the field, so CI and local converge instead of CI floating to latest."
+    },
+    {
+      "ticket_key": "S249-2",
+      "title": "Run CI on pull requests that target a feature branch (#645)",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [],
+      "notes": "pull_request branches ['**']. Stacked PRs #639 and #640 ran no CI at all while #638 ran the full suite \u2014 the PRs where a regression is easiest to miss."
+    },
+    {
+      "ticket_key": "S249-3",
+      "title": "Stop claim-required gating every write with ask in adhoc mode (#643)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "Two existing tests asserted the old contract, one named \"emits ask output ... on adhoc ... writes\" \u2014 precisely what #643 reports as wrong. Updated to the intended behaviour rather than worked around, which is the right call but worth noting: a test name can encode a bug as a requirement.",
+          "gotcha_id": "self:test-encodes-bug"
+        }
+      ],
+      "notes": "Advisory context in adhoc instead of ask/deny, deduped once per session. Sprint sessions still gate with ask."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 3,
+    "fairways_total": 3,
+    "greens_in_regulation": 3,
+    "greens_total": 3,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 1,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    "All three Phase 56 sprints were implemented on one branch rather than three stacked branches; the Phase 55 stack was already three deep."
+  ],
+  "special_plays": [],
+  "bunker_locations": [],
+  "yardage_book_updates": [
+    "parseArgs in the claim and release commands only captures --key=value; bare flags must be read from argv, as --force already is.",
+    "GUARD_RELEVANCE.suppressInAdhoc controls whether a sprint-workflow guard runs in adhoc mode; gating strength is separate and lives in the guard."
+  ],
+  "course_management_notes": [
+    "A test name can encode a defect as a requirement. When a fix breaks a test whose name states the wrong behaviour, the test is the thing to change."
+  ]
+}
