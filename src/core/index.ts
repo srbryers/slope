@@ -197,6 +197,7 @@ export {
   formatSprintNumber,
   nextCanonicalSprintId,
   parseSprintNumber,
+  describeSprintIdAmbiguity,
   findNextPlannedSprint,
   isEncodedInsertedSprintId,
   isEncodedInsertedSprintInRoadmap,

@@ -299,6 +299,7 @@ export function claimOverlapsPath(
 ): boolean {
   if (scope !== 'area') return relativePath === target;
   if (isWholeSprintClaim(target)) return true;
+  if (isWholeRepoClaim(target)) return true;
   const areaPrefix = target.endsWith('/') ? target : `${target}/`;
   return (
     relativePath === target || relativePath.startsWith(areaPrefix) ||
@@ -362,4 +363,17 @@ async function loadSprintClaims(cwd: string, sprintNumber: number): Promise<Spri
 
 function isWholeSprintClaim(target: string): boolean {
   return /^sprint:S\d+(?:\.\d+)?$/i.test(target);
+}
+
+/**
+ * True when an area claim covers the whole working tree.
+ *
+ * `slope claim --target=. --scope=area` is the natural way to say "I am working
+ * across this repo", but the prefix match built `./`, which no relative path
+ * starts with — so a root claim silenced nothing and every write was reported as
+ * scope drift (GH #651).
+ */
+function isWholeRepoClaim(target: string): boolean {
+  const normalized = target.replace(/\\/g, '/').replace(/\/+$/, '');
+  return normalized === '.' || normalized === '' || normalized === '/';
 }

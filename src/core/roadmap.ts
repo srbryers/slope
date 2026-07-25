@@ -119,6 +119,37 @@ export function formatSprintLabel(id: number): string {
   return `S${formatSprintNumber(id)}`;
 }
 
+/**
+ * Describe why a written sprint id cannot round-trip, or null when it is fine.
+ *
+ * Sprint ids are stored as JSON/YAML numbers, so a decimal whose fraction ends in
+ * a zero loses that zero and silently becomes a different — usually existing —
+ * sprint: `458.10` reads back as `458.1`, and `458.0` as `458`. That corrupts
+ * dependencies, focused context, evidence lookup and scorecard identity, and it is
+ * why a phase had to be renumbered to whole sprints (GH #635).
+ *
+ * Takes a **string** deliberately. By the time such an id has been parsed into a
+ * number the trailing zero is already gone, so the ambiguity is only detectable in
+ * the text as written.
+ *
+ * Rejecting these is a stopgap; the durable fix is canonical string ids.
+ */
+export function describeSprintIdAmbiguity(written: string): string | null {
+  const trimmed = written.trim();
+  const body = trimmed[0]?.toLowerCase() === 's' ? trimmed.slice(1) : trimmed;
+  const dot = body.indexOf('.');
+  if (dot < 0) return null;
+
+  const fraction = body.slice(dot + 1);
+  if (!/^\d+$/.test(fraction) || !fraction.endsWith('0')) return null;
+
+  const collapsed = String(Number(body));
+  const suggestion = fraction.replace(/0+$/, '');
+  return `sprint id "${body}" cannot round-trip: ids are stored as numbers, so it reads back as `
+    + `${collapsed} and would alias that sprint. Renumber it — use a fraction with no trailing `
+    + `zero (for example ${body.slice(0, dot)}.${suggestion || '1'}1) or a whole sprint id.`;
+}
+
 /** Parse human-entered sprint ids such as "114", "114.5", or "S114.5". */
 export function parseSprintNumber(value: string | number): number | null {
   if (typeof value === 'number') {
@@ -139,6 +170,10 @@ export function parseSprintNumber(value: string | number): number | null {
     }
     return null;
   }
+
+  // A trailing zero in the fraction cannot round-trip through a number, so the id
+  // would silently alias an existing sprint. Reject rather than corrupt (GH #635).
+  if (typeof value === 'string' && describeSprintIdAmbiguity(body)) return null;
 
   const parsed = Number(body);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;

@@ -1,0 +1,272 @@
+{
+  "version": 1,
+  "kind": "sprint_rollover",
+  "transition_id": "cdbe5058a5c646e0",
+  "from_sprint": 252,
+  "to_sprint": 253,
+  "from_label": "S252",
+  "to_label": "S253",
+  "recorded_at": "2026-07-25T17:48:41.244Z",
+  "actor": {
+    "name": "srbry",
+    "source": "env:USERNAME"
+  },
+  "request": {
+    "from": 252,
+    "to": 253,
+    "force": false
+  },
+  "forced": false,
+  "eligibility": {
+    "from_terminal": true,
+    "target_dependency_eligible": true,
+    "blocking_dependencies": [],
+    "target_dependencies": [
+      252
+    ],
+    "completion_evidence": {
+      "roadmap_complete": [
+        61,
+        62,
+        63,
+        64,
+        65,
+        66,
+        67,
+        68,
+        69,
+        70,
+        71,
+        72,
+        73,
+        74,
+        75,
+        76,
+        77,
+        78,
+        79,
+        80,
+        81,
+        82,
+        83,
+        84,
+        86,
+        87,
+        88,
+        89,
+        90,
+        91,
+        92,
+        93,
+        94,
+        95,
+        96,
+        97,
+        98,
+        99,
+        100,
+        101,
+        102,
+        103,
+        104,
+        105,
+        106,
+        107,
+        108,
+        109,
+        110,
+        111,
+        112,
+        113,
+        114,
+        114.5,
+        115,
+        116,
+        117,
+        118,
+        119,
+        120,
+        121,
+        122,
+        123,
+        124,
+        125,
+        126,
+        127,
+        130,
+        131,
+        132,
+        133,
+        134,
+        135,
+        136,
+        137,
+        137.5,
+        138,
+        139,
+        140,
+        141,
+        142,
+        143,
+        143.5,
+        143.6,
+        143.7,
+        143.8,
+        143.9,
+        143.95,
+        143.97,
+        143.98,
+        143.99,
+        144,
+        145,
+        146,
+        146.1,
+        146.2,
+        146.3,
+        148,
+        149,
+        150,
+        151,
+        151.1,
+        152,
+        152.1,
+        153,
+        154,
+        216,
+        217,
+        218,
+        219,
+        220,
+        221,
+        222,
+        223,
+        224,
+        226,
+        227,
+        228,
+        229,
+        230,
+        231,
+        232,
+        233,
+        234,
+        235,
+        236,
+        241,
+        242,
+        243,
+        244,
+        246,
+        247,
+        248,
+        249,
+        250,
+        251,
+        252,
+        253
+      ],
+      "scorecards": [
+        252
+      ],
+      "local_terminal": [
+        252
+      ]
+    },
+    "scorecard_artifacts": [
+      {
+        "sprint": 252,
+        "path": "docs/retros/sprint-252.json",
+        "sha256": "186279c3c4a576ec5f049f7b8daaaa65c8578e0efcc1575a8fbdcb25920744b1"
+      }
+    ]
+  },
+  "roadmap": {
+    "path": "docs/backlog/roadmap.json",
+    "sha256": "57a3e93f225c68f2103e68b11fbdb229d02601ab42371aaa163b6fc1da3a08c1",
+    "from_status": "complete",
+    "to_status": "complete"
+  },
+  "prior_state_sha256": "1df18f1320fd1da7081574c3b3158f0fe20253aaed0b53bdf8ca1ffbc0107726",
+  "prior_state": {
+    "sprint": 252,
+    "phase": "implementing",
+    "gates": {
+      "tests": true,
+      "code_review": true,
+      "architect_review": true,
+      "scorecard": true,
+      "review_md": true
+    },
+    "review_gates": {
+      "code_review": {
+        "provenance": "self_review",
+        "evidence": [],
+        "notes": "Local self review; no subagents per operator direction. This review caught that the planned S252 approach was impossible (YAML collapses the id before validation) and that a reverted claim-required change had no deny coverage. Evidence: 4145 tests, tsc clean, per-field audit refusals verified against a real audit, both #635 enforcement points probed.",
+        "updated_at": "2026-07-25T17:48:39.808Z"
+      },
+      "architect_review": {
+        "provenance": "self_review",
+        "evidence": [],
+        "notes": "Local architecture self review of where sprint-id ambiguity is detectable (text, not parsed value), tracked-content hashing, and duplicated claim-area matching across two guards.",
+        "updated_at": "2026-07-25T17:48:40.132Z"
+      }
+    },
+    "review_requirements": {
+      "code_review": {
+        "priority": "unspecified"
+      },
+      "architect_review": {
+        "priority": "unspecified"
+      }
+    },
+    "started_at": "2026-07-25T17:18:32.631Z",
+    "updated_at": "2026-07-25T17:48:40.458Z",
+    "rollover": {
+      "transition_id": "d6be4a9bb2bc441b",
+      "from_sprint": 251,
+      "audit_path": "docs/retros/rollovers/sprint-251-to-252-f3b3e6125b7896a1.json",
+      "recorded_at": "2026-07-25T17:18:32.631Z",
+      "forced": false
+    }
+  },
+  "next_state": {
+    "sprint": 253,
+    "phase": "planning",
+    "gates": {
+      "tests": false,
+      "code_review": false,
+      "architect_review": false,
+      "scorecard": false,
+      "review_md": false
+    },
+    "review_gates": {
+      "code_review": {
+        "provenance": "pending",
+        "evidence": []
+      },
+      "architect_review": {
+        "provenance": "pending",
+        "evidence": []
+      }
+    },
+    "review_requirements": {
+      "code_review": {
+        "priority": "unspecified"
+      },
+      "architect_review": {
+        "priority": "unspecified"
+      }
+    },
+    "started_at": "2026-07-25T17:48:41.244Z",
+    "updated_at": "2026-07-25T17:48:41.244Z",
+    "rollover": {
+      "transition_id": "cdbe5058a5c646e0",
+      "from_sprint": 252,
+      "audit_path": "docs/retros/rollovers/sprint-252-to-253-49b40f8d28b50c91.json",
+      "recorded_at": "2026-07-25T17:48:41.244Z",
+      "forced": false
+    }
+  },
+  "claims_policy": "unchanged",
+  "sessions_policy": "unchanged"
+}

@@ -121,3 +121,41 @@ describe('prReviewGuard', () => {
     }
   });
 });
+
+describe('stacked PR base warning (GH #648)', () => {
+  function input(base: string) {
+    return {
+      session_id: 'stack-test',
+      cwd: process.cwd(),
+      hook_event_name: 'PostToolUse',
+      tool_name: 'Bash',
+      tool_input: { command: `gh pr create --base ${base} --head feat/x` },
+      tool_response: { stdout: 'https://github.com/srbryers/slope/pull/999' },
+    } as unknown as HookInput;
+  }
+
+  it('warns when the base is another feature branch', async () => {
+    const result = await prReviewGuard(input('feat/S246-session'), process.cwd());
+    expect(result.context).toContain('stacked PR');
+    expect(result.context).toContain('never squash');
+    expect(result.context).toContain('--delete-branch');
+  });
+
+  it.each(['main', 'master'])('does not warn for the default branch %s', async base => {
+    const result = await prReviewGuard(input(base), process.cwd());
+    expect(result.context).not.toContain('stacked PR');
+  });
+
+  it('does not warn when no base is given', async () => {
+    const bare = {
+      session_id: 'stack-test',
+      cwd: process.cwd(),
+      hook_event_name: 'PostToolUse',
+      tool_name: 'Bash',
+      tool_input: { command: 'gh pr create --fill' },
+      tool_response: { stdout: 'https://github.com/srbryers/slope/pull/999' },
+    } as unknown as HookInput;
+    const result = await prReviewGuard(bare, process.cwd());
+    expect(result.context).not.toContain('stacked PR');
+  });
+});

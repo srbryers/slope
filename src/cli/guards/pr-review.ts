@@ -14,6 +14,35 @@ import { buildReviewerAgentSpecs, formatReviewerAgentSummary } from '../reviewer
  * As of S91-4 (#302) the suggestion includes recommended review types
  * computed from the PR's diff (file patterns) and current sprint metadata.
  */
+/**
+ * Return the base branch when a PR was opened against something other than the
+ * default branch, i.e. a stacked PR.
+ */
+function detectStackedPrBase(command: string): string | null {
+  const match = command.match(/--base[=\s]+("[^"]+"|'[^']+'|[^\s]+)/);
+  if (!match) return null;
+  const base = match[1].replace(/^["']|["']$/g, '');
+  if (base === 'main' || base === 'master') return null;
+  return base;
+}
+
+/**
+ * Stacked PRs are easy to open and hard to land: squashing the base rewrites
+ * history so every dependent conflicts, and deleting the base closes the
+ * dependent outright so its Closes trailers never fire. Landing Phase 55-56 as
+ * four stacked PRs cost three recoveries to exactly that, so surface the rules
+ * at creation rather than at merge (GH #648).
+ */
+function formatStackedPrWarning(base: string): string {
+  return [
+    'SLOPE stacked PR: this PR targets ' + base + ', not the default branch.',
+    'Merge the base with a merge commit (never squash — it rewrites history and every dependent conflicts),',
+    'do not pass --delete-branch on the base (it closes this PR, and a closed PR cannot be retargeted,',
+    'so its Closes #N trailers never fire), and merge strictly in order.',
+    'Consider one phase branch with per-sprint commits instead. See .claude/rules/branch-discipline.md.',
+  ].join(' ');
+}
+
 export async function prReviewGuard(input: HookInput, cwd: string): Promise<GuardResult> {
   const command = (input.tool_input?.command as string) ?? '';
   const response = (input.tool_response?.stdout as string) ?? (input.tool_response?.result as string) ?? '';
@@ -33,6 +62,8 @@ export async function prReviewGuard(input: HookInput, cwd: string): Promise<Guar
 
   recordPendingReview(cwd, parseInt(prNumber, 10));
 
+  const stackedBase = detectStackedPrBase(command);
+
   const recommendationContext = computeRecommendationContext(cwd);
   const recs = recommendationContext.recommendations;
   const recLine = formatRecommendations(recs);
@@ -51,6 +82,7 @@ export async function prReviewGuard(input: HookInput, cwd: string): Promise<Guar
       `Then run \`slope pr status --pr=${prNumber}\` after checks and review threads settle before presenting the PR as ready.`,
       `After review, capture findings with \`slope review findings add\`, then \`slope review amend\` to apply them to the scorecard.`,
       'Tip: also run `slope pr finalize` to add Closes #N for any issues referenced in commits.',
+      ...(stackedBase ? [formatStackedPrWarning(stackedBase)] : []),
     ].join(' '),
   };
 }
