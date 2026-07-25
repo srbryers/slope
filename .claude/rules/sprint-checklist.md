@@ -27,6 +27,26 @@ Before writing any code in a new sprint:
 6. **Gap analysis** (if touching API or schema) — Read relevant docs and compare against implementation before writing code
 7. **Set par and slope** — Par from ticket count (1-2=3, 3-4=4, 5+=5), slope from complexity factors
 
+## Sprint State Gate (Before ANY Implementation Write)
+
+Before the first Edit/Write of a work session **and again after every PR merge**, confirm sprint state is `implementing` for the sprint you are about to work on:
+
+```
+slope sprint status
+```
+
+If the phase is anything else — `complete`, `scoring`, `planning`, or a different sprint — transition first:
+
+```
+slope sprint rollover --from=<current> --to=<next>
+slope sprint start --number=<next> --phase=implementing
+slope claim --target=<area> --ticket=<key> --scope=area
+```
+
+**Why:** `claim-required` returns `ask` on every implementation write when state is absent or in a non-implementing phase, so the operator gets a host permission prompt per edit. `slope pr` sets the phase to `scoring` automatically the moment a PR merges, so starting the next sprint's work always trips this unless state is advanced first. The remedy is entirely agent-actionable — never make the operator answer for it.
+
+Observed twice in one session: at session start (state left at a long-completed sprint) and immediately after a merge.
+
 ## Pre-Shot Routine (Per-Ticket, Before Code)
 
 Before starting each ticket:
