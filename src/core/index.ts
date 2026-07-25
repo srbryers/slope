@@ -229,6 +229,7 @@ export {
   sourceProjectToRoadmap,
   compileRoadmapSources,
   serializeRoadmapProjection,
+  findRoadmapProjectionDivergence,
   validateRoadmapSourceFederation,
 } from './roadmap-sources.js';
 export type {

@@ -1,0 +1,334 @@
+{
+  "version": 1,
+  "kind": "sprint_rollover",
+  "transition_id": "cec2f6377741a3f9",
+  "from_sprint": 222,
+  "to_sprint": 246,
+  "from_label": "S222",
+  "to_label": "S246",
+  "recorded_at": "2026-07-25T15:03:02.676Z",
+  "actor": {
+    "name": "srbry",
+    "source": "env:USERNAME"
+  },
+  "request": {
+    "from": 222,
+    "to": 246,
+    "force": false
+  },
+  "forced": false,
+  "eligibility": {
+    "from_terminal": true,
+    "target_dependency_eligible": true,
+    "blocking_dependencies": [],
+    "target_dependencies": [],
+    "completion_evidence": {
+      "roadmap_complete": [
+        61,
+        62,
+        63,
+        64,
+        65,
+        66,
+        67,
+        68,
+        69,
+        70,
+        71,
+        72,
+        73,
+        74,
+        75,
+        76,
+        77,
+        78,
+        79,
+        80,
+        81,
+        82,
+        83,
+        84,
+        86,
+        87,
+        88,
+        89,
+        90,
+        91,
+        92,
+        93,
+        94,
+        95,
+        96,
+        97,
+        98,
+        99,
+        100,
+        101,
+        102,
+        103,
+        104,
+        105,
+        106,
+        107,
+        108,
+        109,
+        110,
+        111,
+        112,
+        113,
+        114,
+        114.5,
+        115,
+        116,
+        117,
+        118,
+        119,
+        120,
+        121,
+        122,
+        123,
+        124,
+        125,
+        126,
+        127,
+        130,
+        131,
+        132,
+        133,
+        134,
+        135,
+        136,
+        137,
+        137.5,
+        138,
+        139,
+        140,
+        141,
+        142,
+        143,
+        143.5,
+        143.6,
+        143.7,
+        143.8,
+        143.9,
+        143.95,
+        143.97,
+        143.98,
+        143.99,
+        144,
+        145,
+        146,
+        146.1,
+        146.2,
+        146.3,
+        148,
+        149,
+        150,
+        151,
+        151.1,
+        152,
+        152.1,
+        153,
+        154,
+        216,
+        217,
+        218,
+        219,
+        220,
+        221,
+        222,
+        223,
+        224,
+        226,
+        227,
+        228,
+        229,
+        230,
+        231,
+        232,
+        233,
+        234,
+        235,
+        236,
+        241,
+        242,
+        243,
+        244
+      ],
+      "scorecards": [
+        235,
+        222,
+        223,
+        224,
+        226,
+        227,
+        228,
+        229,
+        230,
+        231,
+        232,
+        241,
+        242,
+        243
+      ],
+      "local_terminal": [
+        222
+      ]
+    },
+    "scorecard_artifacts": [
+      {
+        "sprint": 235,
+        "path": "docs/retros/sprint-235.json",
+        "sha256": "e634d45f8ceacc0931e9bffc6c4cb23cbf90b5461486937ed4fc55dc95e6944b"
+      },
+      {
+        "sprint": 222,
+        "path": "docs/retros/sprint-222.json",
+        "sha256": "e71c5a0ada133f85f95ff7fdf4959607803dab06d80fcb3e4e3b5753b9383950"
+      },
+      {
+        "sprint": 223,
+        "path": "docs/retros/sprint-223.json",
+        "sha256": "4aa327cd6be5abc5c835884d1d9bb961ee128d80b98599546d3d941814e7de4d"
+      },
+      {
+        "sprint": 224,
+        "path": "docs/retros/sprint-224.json",
+        "sha256": "575b8c4257f93567d2a7d32ef3fe559a8edab9ebab1e7feca98467ebc97ec5d8"
+      },
+      {
+        "sprint": 226,
+        "path": "docs/retros/sprint-226.json",
+        "sha256": "ac593a709ec1b43cea0568e5763278a28a753c84f883c11bdb679dc1a8702eb4"
+      },
+      {
+        "sprint": 227,
+        "path": "docs/retros/sprint-227.json",
+        "sha256": "0d7cfd1369eed43cf16181028441b9e1ce189947e2ca87582a5977bceda5c3c9"
+      },
+      {
+        "sprint": 228,
+        "path": "docs/retros/sprint-228.json",
+        "sha256": "5a735e31e8289de103bcd794f54770e037b618e6c8a6dbe5bc48fb84964f6860"
+      },
+      {
+        "sprint": 229,
+        "path": "docs/retros/sprint-229.json",
+        "sha256": "a2335698910481237b15578e63563b7cd61d3fe192b28af7e2c525dacbea13c5"
+      },
+      {
+        "sprint": 230,
+        "path": "docs/retros/sprint-230.json",
+        "sha256": "daf6c651c004bb0e5dc1ad6577add3a30189fffc914b1910b59506c3049a01e2"
+      },
+      {
+        "sprint": 231,
+        "path": "docs/retros/sprint-231.json",
+        "sha256": "a1beb32eff3ffd28b76a1e0032b252d6a566c5f73b59ed1373511bf37db7a6d3"
+      },
+      {
+        "sprint": 232,
+        "path": "docs/retros/sprint-232.json",
+        "sha256": "3282dd8455a1ddfd869c3e0cf0603a538093e8a052f408d369ab6ead1acc0eda"
+      },
+      {
+        "sprint": 241,
+        "path": "docs/retros/sprint-241.json",
+        "sha256": "9ffa3e294bc7f2320ec1139d9af497bd3bb87ba84c30df7c32bd9d18568c244b"
+      },
+      {
+        "sprint": 242,
+        "path": "docs/retros/sprint-242.json",
+        "sha256": "1317a7ee733e92cc103444b3d01cf9d5a72ee7bc7485c24319a1460e572dfd13"
+      },
+      {
+        "sprint": 243,
+        "path": "docs/retros/sprint-243.json",
+        "sha256": "4e142665cda433e32161a9fb114aa9a018d05b769671ea221eeed755408b7d65"
+      }
+    ],
+    "expected_next": 246
+  },
+  "roadmap": {
+    "path": "docs/backlog/roadmap.json",
+    "sha256": "61de6634bc1da1130121c07576acc496549e73881172914df2c0e94d2576320b",
+    "from_status": "complete",
+    "to_status": "planned"
+  },
+  "prior_state_sha256": "f3ab626131ea4d9e72d03fd224794cf70674723c8da0839dba23866f6c1635f3",
+  "prior_state": {
+    "sprint": 222,
+    "phase": "complete",
+    "gates": {
+      "tests": true,
+      "code_review": true,
+      "architect_review": true,
+      "scorecard": true,
+      "review_md": true
+    },
+    "review_gates": {
+      "code_review": {
+        "provenance": "self_review",
+        "evidence": [],
+        "notes": "Local implementing-agent release review; evidence includes pre-merge targeted regressions (26 files, 340 tests), merged focused suite (10 files, 216 tests), merged full Vitest (238 files, 3746 tests), tsc --noEmit, build, roadmap validate, map --check, version smoke, npm latest check, and npm dry-run for 1.60.0. No independent reviewer or PR review was run locally before PR creation.",
+        "updated_at": "2026-06-27T23:34:16.705Z"
+      },
+      "architect_review": {
+        "provenance": "self_review",
+        "evidence": [],
+        "notes": "Local implementing-agent release architecture review; scope covered mainline integration, roadmap conflict resolution, version bump, release branch hygiene, S155-S158 supersession, S216-S222 completion, and trusted-publishing handoff. No independent architecture reviewer or PR review was run locally before PR creation.",
+        "updated_at": "2026-06-27T23:34:23.193Z"
+      }
+    },
+    "started_at": "2026-06-27T23:15:58.984Z",
+    "updated_at": "2026-06-27T23:34:30.227Z",
+    "review_requirements": {
+      "code_review": {
+        "priority": "unspecified"
+      },
+      "architect_review": {
+        "priority": "unspecified"
+      }
+    }
+  },
+  "next_state": {
+    "sprint": 246,
+    "phase": "planning",
+    "gates": {
+      "tests": false,
+      "code_review": false,
+      "architect_review": false,
+      "scorecard": false,
+      "review_md": false
+    },
+    "review_gates": {
+      "code_review": {
+        "provenance": "pending",
+        "evidence": []
+      },
+      "architect_review": {
+        "provenance": "pending",
+        "evidence": []
+      }
+    },
+    "review_requirements": {
+      "code_review": {
+        "priority": "unspecified"
+      },
+      "architect_review": {
+        "priority": "unspecified"
+      }
+    },
+    "started_at": "2026-07-25T15:03:02.676Z",
+    "updated_at": "2026-07-25T15:03:02.676Z",
+    "rollover": {
+      "transition_id": "cec2f6377741a3f9",
+      "from_sprint": 222,
+      "audit_path": "docs/retros/rollovers/sprint-222-to-246-503731c57d58679b.json",
+      "recorded_at": "2026-07-25T15:03:02.676Z",
+      "forced": false
+    }
+  },
+  "claims_policy": "unchanged",
+  "sessions_policy": "unchanged"
+}

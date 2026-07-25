@@ -12,6 +12,7 @@ import {
   roadmapSprintOrderValue,
   RoadmapSourceError,
   serializeRoadmapProjection,
+  findRoadmapProjectionDivergence,
   validateRoadmapSourceFederation,
   type LoadedRoadmapSource,
   type RoadmapDefinition,
@@ -116,7 +117,15 @@ export function loadRoadmapSourceStore(cwd: string, sourceFlag?: string): Roadma
   return { cwd, manifestPath, sourceRoot, outputPath, project, sources, roadmap, projection };
 }
 
-export function writeRoadmapSourceProjection(store: RoadmapSourceStore): 'written' | 'unchanged' {
+export interface WriteRoadmapProjectionOptions {
+  /** Overwrite even when the on-disk projection holds content no source produces. */
+  force?: boolean;
+}
+
+export function writeRoadmapSourceProjection(
+  store: RoadmapSourceStore,
+  options: WriteRoadmapProjectionOptions = {},
+): 'written' | 'unchanged' {
   const federationLock = join(store.sourceRoot, '.federation');
   return withFileLockSync(federationLock, () => {
     const fresh = loadRoadmapSourceStore(store.cwd, relative(store.cwd, store.manifestPath));
@@ -129,9 +138,44 @@ export function writeRoadmapSourceProjection(store: RoadmapSourceStore): 'writte
     }
     const existing = existsSync(fresh.outputPath) ? readFileSync(fresh.outputPath, 'utf8') : null;
     if (existing != null && roadmapProjectionMatches(existing, fresh.projection)) return 'unchanged';
+    if (existing != null && !options.force) assertNoProjectionContentLoss(fresh, existing);
     atomicWriteFileSync(fresh.outputPath, fresh.projection);
     return 'written';
   });
+}
+
+/**
+ * Refuse to silently discard authored content that exists only in the projection.
+ *
+ * `slope validate` regenerated the projection as a side effect and reported
+ * success, so a phase, six sprints and 26 tickets edited into the generated file
+ * vanished with no error, no warning and no diff — and it reproduced across
+ * operators, because nothing in the file said it was generated (GH #637).
+ */
+export function assertNoProjectionContentLoss(store: RoadmapSourceStore, existing: string): void {
+  const divergence = findRoadmapProjectionDivergence(existing, store.roadmap);
+  if (!divergence) return;
+
+  const target = normalizeDiagnosticPath(relative(store.cwd, store.outputPath));
+  const manifest = normalizeDiagnosticPath(relative(store.cwd, store.manifestPath));
+  const lines = [
+    `Refusing to overwrite ${target}: it contains planning work that no roadmap source produces.`,
+    `${target} is a GENERATED projection of ${manifest}. Rewriting it would discard:`,
+  ];
+  if (divergence.phases.length > 0) {
+    lines.push(`  phases: ${divergence.phases.join(', ')}`);
+  }
+  if (divergence.sprints.length > 0) {
+    lines.push(`  sprints: ${divergence.sprints.map(id => `S${id}`).join(', ')}`);
+  }
+  lines.push(
+    '',
+    'Move this work into the modular sources under docs/roadmap/, then re-run',
+    '`slope roadmap compile`. To discard it deliberately, re-run with --force.',
+  );
+  const error = new RoadmapSourceError(lines.join('\n'));
+  error.projectionContentLoss = true;
+  throw error;
 }
 
 export interface CompleteRoadmapSourceSprintResult {
@@ -286,6 +330,9 @@ export function completeRoadmapSourceSprint(
     const projection = existing != null && roadmapProjectionMatches(existing, reloaded.projection)
       ? 'unchanged'
       : 'written';
+    // Closeout reconciliation runs from `slope validate`, which is where the
+    // silent projection rewrite destroyed authored planning work (GH #637).
+    if (projection === 'written' && existing != null) assertNoProjectionContentLoss(reloaded, existing);
     if (projection === 'written') atomicWriteFileSync(reloaded.outputPath, reloaded.projection);
     return { source: sourceLabel, projection, changed: true, reformatted };
   });

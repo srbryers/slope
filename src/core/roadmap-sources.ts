@@ -48,6 +48,14 @@ export interface RoadmapSourceValidationResult {
 }
 
 export class RoadmapSourceError extends Error {
+  /**
+   * True when the failure is a refusal to discard authored content that exists
+   * only in the generated projection. Callers must treat this as fatal rather
+   * than downgrading it to a warning — reporting success while planning work is
+   * destroyed is the whole defect (GH #637).
+   */
+  projectionContentLoss?: boolean;
+
   constructor(
     message: string,
     readonly sourcePath?: string,
@@ -398,6 +406,57 @@ export function compileRoadmapSources(
 
 export function serializeRoadmapProjection(roadmap: RoadmapDefinition): string {
   return `${JSON.stringify(roadmap, null, 2)}\n`;
+}
+
+export interface RoadmapProjectionDivergence {
+  /** Sprint ids present in the on-disk projection but produced by no source. */
+  sprints: string[];
+  /** Phase names present in the on-disk projection but produced by no source. */
+  phases: string[];
+}
+
+/**
+ * Find content that exists only in the checked-out projection.
+ *
+ * A projection that merely lags its sources contains nothing the sources do not
+ * produce, so it is safe to overwrite. Content present *only* on disk is
+ * authored planning work that a blind rewrite would destroy — which is exactly
+ * how a phase, six sprints and 26 tickets were lost on a success exit (GH #637).
+ *
+ * Returns null when nothing would be lost.
+ */
+export function findRoadmapProjectionDivergence(
+  existing: string,
+  compiled: RoadmapDefinition,
+): RoadmapProjectionDivergence | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(existing);
+  } catch {
+    // Unparseable projections carry no recoverable authored content.
+    return null;
+  }
+  if (!parsed || typeof parsed !== 'object') return null;
+
+  const disk = parsed as { phases?: unknown; sprints?: unknown };
+
+  const compiledSprints = new Set((compiled.sprints ?? []).map(sprint => String(sprint.id)));
+  const diskSprints = Array.isArray(disk.sprints) ? disk.sprints : [];
+  const sprints = diskSprints
+    .map(sprint => (sprint && typeof sprint === 'object' ? (sprint as { id?: unknown }).id : undefined))
+    .filter(id => id != null)
+    .map(id => String(id))
+    .filter(id => !compiledSprints.has(id));
+
+  const compiledPhases = new Set((compiled.phases ?? []).map(phase => phase.name));
+  const diskPhases = Array.isArray(disk.phases) ? disk.phases : [];
+  const phases = diskPhases
+    .map(phase => (phase && typeof phase === 'object' ? (phase as { name?: unknown }).name : undefined))
+    .filter((name): name is string => typeof name === 'string')
+    .filter(name => !compiledPhases.has(name));
+
+  if (sprints.length === 0 && phases.length === 0) return null;
+  return { sprints: [...new Set(sprints)], phases: [...new Set(phases)] };
 }
 
 function sourceLabel(source: LoadedRoadmapSource): string {

@@ -9,7 +9,9 @@ import {
   loadRoadmapSourceStore,
   planRoadmapSourceArchive,
   roadmapProjectionMatches,
+  writeRoadmapSourceProjection,
 } from '../../src/cli/roadmap-source-store.js';
+import { findRoadmapProjectionDivergence } from '../../src/core/index.js';
 
 let cwd: string;
 let originalCwd: string;
@@ -724,5 +726,76 @@ sprints:
     expect(() => completeRoadmapSourceSprint(cwd, 9, {}))
       .toThrow(/ambiguous identity/);
     expect(readFileSync(join(root, 'phases', 'phase-01.yaml'), 'utf8')).toBe(before);
+  });
+});
+
+describe('projection content-loss protection (GH #637)', () => {
+  function projectionWithExtra(output: string, mutate: (data: Record<string, unknown>) => void): void {
+    const data = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
+    mutate(data);
+    writeFileSync(output, `${JSON.stringify(data, null, 2)}
+`);
+  }
+
+  it('refuses to discard a phase that exists only in the projection', () => {
+    const output = writeFixture();
+    let store = loadRoadmapSourceStore(cwd, 'docs/roadmap/project.yaml');
+    writeRoadmapSourceProjection(store);
+
+    projectionWithExtra(output, data => {
+      (data.phases as unknown[]).push({ name: 'Phase 99 — Authored', sprints: [9001], status: 'in_progress' });
+      (data.sprints as unknown[]).push({ id: 9001, theme: 'Authored', par: 3, slope: 1, status: 'planned', tickets: [] });
+    });
+    const before = readFileSync(output, 'utf8');
+
+    store = loadRoadmapSourceStore(cwd, 'docs/roadmap/project.yaml');
+    expect(() => writeRoadmapSourceProjection(store)).toThrow(/Phase 99 — Authored/);
+    // The authored work must survive the refusal.
+    expect(readFileSync(output, 'utf8')).toBe(before);
+  });
+
+  it('names the projection-only sprints in the refusal', () => {
+    const output = writeFixture();
+    let store = loadRoadmapSourceStore(cwd, 'docs/roadmap/project.yaml');
+    writeRoadmapSourceProjection(store);
+    projectionWithExtra(output, data => {
+      (data.sprints as unknown[]).push({ id: 9002, theme: 'Only here', par: 3, slope: 1, status: 'planned', tickets: [] });
+    });
+
+    store = loadRoadmapSourceStore(cwd, 'docs/roadmap/project.yaml');
+    expect(() => writeRoadmapSourceProjection(store)).toThrow(/S9002/);
+  });
+
+  it('overwrites projection-only content when --force is passed', () => {
+    const output = writeFixture();
+    let store = loadRoadmapSourceStore(cwd, 'docs/roadmap/project.yaml');
+    writeRoadmapSourceProjection(store);
+    projectionWithExtra(output, data => {
+      (data.sprints as unknown[]).push({ id: 9003, theme: 'Discard me', par: 3, slope: 1, status: 'planned', tickets: [] });
+    });
+
+    store = loadRoadmapSourceStore(cwd, 'docs/roadmap/project.yaml');
+    expect(writeRoadmapSourceProjection(store, { force: true })).toBe('written');
+    expect(readFileSync(output, 'utf8')).not.toContain('9003');
+  });
+
+  it('still rewrites a merely stale projection without --force', () => {
+    const output = writeFixture();
+    let store = loadRoadmapSourceStore(cwd, 'docs/roadmap/project.yaml');
+    writeRoadmapSourceProjection(store);
+    // Staleness in the safe direction: the projection lags its sources, holding
+    // nothing the sources do not produce.
+    projectionWithExtra(output, data => {
+      (data.sprints as unknown[]).pop();
+      (data.phases as unknown[]).pop();
+    });
+
+    store = loadRoadmapSourceStore(cwd, 'docs/roadmap/project.yaml');
+    expect(writeRoadmapSourceProjection(store)).toBe('written');
+    expect(roadmapProjectionMatches(readFileSync(output, 'utf8'), store.projection)).toBe(true);
+  });
+
+  it('reports no divergence for an unparseable projection', () => {
+    expect(findRoadmapProjectionDivergence('not json', { name: 'x', phases: [], sprints: [] })).toBeNull();
   });
 });

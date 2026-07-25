@@ -528,7 +528,7 @@ function compileSourcesSubcommand(flags: Record<string, string>, cwd: string): v
       return;
     }
 
-    const result = writeRoadmapSourceProjection(store);
+    const result = writeRoadmapSourceProjection(store, { force: flags.force === 'true' });
     console.log(`\nRoadmap projection ${result}: ${output}`);
     console.log(`  Sources: ${store.sources.length}; phases: ${store.roadmap.phases.length}; sprints: ${store.roadmap.sprints.length}\n`);
   } catch (error) {
@@ -1190,7 +1190,7 @@ Usage:
   slope roadmap focus --sprint=N [--path=<file>] [--json]     Bounded sprint context
   slope roadmap migrate [--path=<file>] [--source=<file>] [--mapping=<file>] [--dry-run]
                                                 Plan or apply single-file federation migration
-  slope roadmap compile [--source=<file>] [--dry-run|--check] Compile modular YAML sources
+  slope roadmap compile [--source=<file>] [--dry-run|--check] [--force] Compile modular YAML sources
   slope roadmap complete --sprint=N [--source=<file>] [--scorecard=<path>] [--dry-run]
                                                 Mark a modular source sprint complete and compile projection
   slope roadmap validate-sources [--source=<file>]            Validate sources and projection drift
