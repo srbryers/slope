@@ -1,0 +1,267 @@
+{
+  "version": 1,
+  "kind": "sprint_rollover",
+  "transition_id": "9fdae7a5160ace85",
+  "from_sprint": 247,
+  "to_sprint": 248,
+  "from_label": "S247",
+  "to_label": "S248",
+  "recorded_at": "2026-07-25T16:10:25.773Z",
+  "actor": {
+    "name": "srbry",
+    "source": "env:USERNAME"
+  },
+  "request": {
+    "from": 247,
+    "to": 248,
+    "force": false
+  },
+  "forced": false,
+  "eligibility": {
+    "from_terminal": true,
+    "target_dependency_eligible": true,
+    "blocking_dependencies": [],
+    "target_dependencies": [
+      247
+    ],
+    "completion_evidence": {
+      "roadmap_complete": [
+        61,
+        62,
+        63,
+        64,
+        65,
+        66,
+        67,
+        68,
+        69,
+        70,
+        71,
+        72,
+        73,
+        74,
+        75,
+        76,
+        77,
+        78,
+        79,
+        80,
+        81,
+        82,
+        83,
+        84,
+        86,
+        87,
+        88,
+        89,
+        90,
+        91,
+        92,
+        93,
+        94,
+        95,
+        96,
+        97,
+        98,
+        99,
+        100,
+        101,
+        102,
+        103,
+        104,
+        105,
+        106,
+        107,
+        108,
+        109,
+        110,
+        111,
+        112,
+        113,
+        114,
+        114.5,
+        115,
+        116,
+        117,
+        118,
+        119,
+        120,
+        121,
+        122,
+        123,
+        124,
+        125,
+        126,
+        127,
+        130,
+        131,
+        132,
+        133,
+        134,
+        135,
+        136,
+        137,
+        137.5,
+        138,
+        139,
+        140,
+        141,
+        142,
+        143,
+        143.5,
+        143.6,
+        143.7,
+        143.8,
+        143.9,
+        143.95,
+        143.97,
+        143.98,
+        143.99,
+        144,
+        145,
+        146,
+        146.1,
+        146.2,
+        146.3,
+        148,
+        149,
+        150,
+        151,
+        151.1,
+        152,
+        152.1,
+        153,
+        154,
+        216,
+        217,
+        218,
+        219,
+        220,
+        221,
+        222,
+        223,
+        224,
+        226,
+        227,
+        228,
+        229,
+        230,
+        231,
+        232,
+        233,
+        234,
+        235,
+        236,
+        241,
+        242,
+        243,
+        244,
+        246,
+        247
+      ],
+      "scorecards": [
+        247
+      ],
+      "local_terminal": [
+        247
+      ]
+    },
+    "scorecard_artifacts": [
+      {
+        "sprint": 247,
+        "path": "docs/retros/sprint-247.json",
+        "sha256": "ddacbeef07c37c19cdbf1aa4aae18a75128ca8139c0494daa37d8d8c39a45b4c"
+      }
+    ],
+    "expected_next": 248
+  },
+  "roadmap": {
+    "path": "docs/backlog/roadmap.json",
+    "sha256": "983ef6725e7af12cc0506a28abe388376f1e366f3eb6346afe2af85ea2c32530",
+    "from_status": "complete",
+    "to_status": "planned"
+  },
+  "prior_state_sha256": "e086b0ad6971dccfbde3daa5f7e8437f45d2cf70795c721988cee4e6320c73c7",
+  "prior_state": {
+    "sprint": 247,
+    "phase": "implementing",
+    "gates": {
+      "tests": true,
+      "code_review": true,
+      "architect_review": true,
+      "scorecard": true,
+      "review_md": true
+    },
+    "review_gates": {
+      "code_review": {
+        "provenance": "self_review",
+        "evidence": [],
+        "notes": "Local implementing-agent self review; no subagents per operator direction. Found and fixed a real defect in sibling S248 work; recorded five findings including three deferred-scope decisions. Evidence: 4099 tests, tsc clean, live before/after reproduction of #637.",
+        "updated_at": "2026-07-25T16:08:37.917Z"
+      },
+      "architect_review": {
+        "provenance": "self_review",
+        "evidence": [],
+        "notes": "Local architecture self review of the projection write paths and the four projection-byte comparison sites; the deferred marker/migration-digest coupling is flagged for independent review on the PR.",
+        "updated_at": "2026-07-25T16:08:38.254Z"
+      }
+    },
+    "review_requirements": {
+      "code_review": {
+        "priority": "unspecified"
+      },
+      "architect_review": {
+        "priority": "unspecified"
+      }
+    },
+    "started_at": "2026-07-25T16:07:31.504Z",
+    "updated_at": "2026-07-25T16:08:38.576Z",
+    "rollover": {
+      "transition_id": "eeedc57400a678af",
+      "from_sprint": 246,
+      "audit_path": "docs/retros/rollovers/sprint-246-to-247-f51f44b6f0ad9212.json",
+      "recorded_at": "2026-07-25T16:07:31.504Z",
+      "forced": false
+    }
+  },
+  "next_state": {
+    "sprint": 248,
+    "phase": "planning",
+    "gates": {
+      "tests": false,
+      "code_review": false,
+      "architect_review": false,
+      "scorecard": false,
+      "review_md": false
+    },
+    "review_gates": {
+      "code_review": {
+        "provenance": "pending",
+        "evidence": []
+      },
+      "architect_review": {
+        "provenance": "pending",
+        "evidence": []
+      }
+    },
+    "review_requirements": {
+      "code_review": {
+        "priority": "unspecified"
+      },
+      "architect_review": {
+        "priority": "unspecified"
+      }
+    },
+    "started_at": "2026-07-25T16:10:25.773Z",
+    "updated_at": "2026-07-25T16:10:25.773Z",
+    "rollover": {
+      "transition_id": "9fdae7a5160ace85",
+      "from_sprint": 247,
+      "audit_path": "docs/retros/rollovers/sprint-247-to-248-3335b7878c9cc4c5.json",
+      "recorded_at": "2026-07-25T16:10:25.773Z",
+      "forced": false
+    }
+  },
+  "claims_policy": "unchanged",
+  "sessions_policy": "unchanged"
+}

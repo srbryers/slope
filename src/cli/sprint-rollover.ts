@@ -115,7 +115,9 @@ export interface SprintRolloverAuditRecord {
     target_dependencies: number[];
     completion_evidence: SprintRolloverAssessment['completion_evidence'];
     scorecard_artifacts: SprintRolloverScorecardEvidence[];
-    expected_next: number;
+    /** Absent when no pending successor exists — e.g. an explicit rollover into
+     *  the last sprint of a phase that closeout already marked complete. */
+    expected_next?: number;
   };
   roadmap: {
     path: string;
@@ -286,7 +288,21 @@ export function assessSprintRollover(
     issues.push({ code: 'target_not_later', message: `${toLabel} is not later than ${fromLabel}.` });
   }
   if (toSprint && isRoadmapSprintTerminal(toSprint)) {
-    issues.push({ code: 'target_not_pending', message: `${toLabel} is not pending roadmap work (status: ${toSprint.status ?? 'unset'}).` });
+    // A sprint that is terminal in the roadmap *and* has completion evidence is
+    // finished work being recorded, not finished work being restarted: closeout
+    // still needs local state for it to run gates and open its PR. Blocking that
+    // made the last sprint of a phase permanently un-PR-able once `slope validate`
+    // had reconciled it to complete, and `--force` did not help because this check
+    // ignored it (GH #641).
+    const toOrder = roadmapSprintOrderValue(roadmap, toSprint.id);
+    const toHasEvidence = completionEvidence
+      .some(id => roadmapSprintOrderValue(roadmap, id) === toOrder);
+    if (!toHasEvidence && !force) {
+      issues.push({
+        code: 'target_not_pending',
+        message: `${toLabel} is not pending roadmap work (status: ${toSprint.status ?? 'unset'}) and has no completion evidence. Re-run with --force --reason=<why> to record state for it anyway.`,
+      });
+    }
   }
   if (state && !terminal && !force) {
     issues.push({
@@ -328,8 +344,17 @@ export function assessSprintRollover(
       message: `${toLabel} is blocked by ${boundedSprintLabels(roadmap, blockers)}.`,
     });
   }
-  if (fromSprint && !expectedNext) {
-    issues.push({ code: 'no_eligible_successor', message: `No dependency-eligible pending sprint follows ${fromLabel}.` });
+  // Only relevant when there is no usable explicit target: it answers "where do I
+  // go next?", not "may I go where I said?". Raising it for a resolvable,
+  // dependency-clear target meant that once closeout marked a whole phase
+  // complete, no pending successor existed and rollover stayed blocked even after
+  // target_not_pending was fixed — the same deadlock one check further on
+  // (GH #641).
+  if (fromSprint && !expectedNext && (!toSprint || blockers.length > 0)) {
+    issues.push({
+      code: 'no_eligible_successor',
+      message: `No dependency-eligible pending sprint follows ${fromLabel}.`,
+    });
   } else if (toSprint && expectedNext && !roadmapIdsEqual(roadmap, toSprint.id, expectedNext.id)) {
     issues.push({
       code: 'target_not_next_eligible',
@@ -501,7 +526,11 @@ function readAudit(cwd: string, path: string): SprintRolloverAuditRecord {
     || (record.request.reason !== undefined && typeof record.request.reason !== 'string')
     || typeof record.forced !== 'boolean'
     || (record.reason !== undefined && typeof record.reason !== 'string')
-    || !record.eligibility || typeof record.eligibility.expected_next !== 'number'
+    || !record.eligibility
+    // expected_next is legitimately absent when no pending successor exists; a
+    // required-number check rejected audits this tool itself writes (GH #646).
+    || (record.eligibility.expected_next !== undefined
+      && typeof record.eligibility.expected_next !== 'number')
     || typeof record.eligibility.from_terminal !== 'boolean'
     || typeof record.eligibility.target_dependency_eligible !== 'boolean'
     || !Array.isArray(record.eligibility.blocking_dependencies)
@@ -610,7 +639,7 @@ function buildAuditRecord(
         .map(id => roadmapSprintOrderValue(assessment.roadmap, id)),
       completion_evidence: assessment.completion_evidence,
       scorecard_artifacts: scorecards,
-      expected_next: assessment.expected_next!,
+      ...(assessment.expected_next != null ? { expected_next: assessment.expected_next } : {}),
     },
     roadmap: {
       path: assessment.roadmap_path,

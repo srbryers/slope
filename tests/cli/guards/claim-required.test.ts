@@ -9,6 +9,7 @@ import {
 } from '../../../src/cli/guards/claim-required.js';
 import type { HookInput } from '../../../src/core/index.js';
 import { createStore } from '../../../src/store/index.js';
+import { setSessionMode } from '../../../src/cli/session-state.js';
 
 function makeInput(cwd: string, filePath: string): HookInput {
   return {
@@ -157,6 +158,56 @@ describe('isImplementationWritePath', () => {
 });
 
 describe('claimRequiredGuard', () => {
+  describe('adhoc mode (GH #643)', () => {
+    it('emits advisory context instead of gating the host', async () => {
+      const cwd = mkdtempSync(join(tmpdir(), 'slope-claim-adhoc-'));
+      try {
+        writeConfig(cwd);
+        setSessionMode(cwd, 'test-session', 'adhoc');
+
+        const result = await claimRequiredGuard(makeInput(cwd, join(cwd, 'src/foo.ts')), cwd);
+
+        // Adhoc advertises "sprint-workflow guards silenced", so no ask/deny.
+        expect(result.decision).toBeUndefined();
+        expect(result.context).toContain('adhoc session');
+        expect(result.context).toContain('src/foo.ts');
+        expect(result.context).toContain('slope sprint start');
+      } finally {
+        rmSync(cwd, { recursive: true, force: true });
+      }
+    });
+
+    it('warns once per session rather than on every write', async () => {
+      const cwd = mkdtempSync(join(tmpdir(), 'slope-claim-adhoc-'));
+      try {
+        writeConfig(cwd);
+        setSessionMode(cwd, 'test-session', 'adhoc');
+
+        const first = await claimRequiredGuard(makeInput(cwd, join(cwd, 'src/foo.ts')), cwd);
+        const second = await claimRequiredGuard(makeInput(cwd, join(cwd, 'src/bar.ts')), cwd);
+
+        expect(first.context).toBeTruthy();
+        expect(second).toEqual({});
+      } finally {
+        rmSync(cwd, { recursive: true, force: true });
+      }
+    });
+
+    it('still gates with ask when the session is not adhoc', async () => {
+      const cwd = mkdtempSync(join(tmpdir(), 'slope-claim-sprint-'));
+      try {
+        writeConfig(cwd);
+        setSessionMode(cwd, 'test-session', 'sprint');
+
+        const result = await claimRequiredGuard(makeInput(cwd, join(cwd, 'src/foo.ts')), cwd);
+
+        expect(result.decision).toBe('ask');
+      } finally {
+        rmSync(cwd, { recursive: true, force: true });
+      }
+    });
+  });
+
   it('asks before implementation writes when no sprint state is active', async () => {
     const cwd = mkdtempSync(join(tmpdir(), 'slope-claim-required-'));
     try {

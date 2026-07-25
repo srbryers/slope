@@ -1,0 +1,87 @@
+{
+  "sprint_number": 251,
+  "theme": "Projection Marker and Read-Only Validate",
+  "par": 4,
+  "slope": 5,
+  "score": 5,
+  "score_label": "bogey",
+  "date": "2026-07-25",
+  "shots": [
+    {
+      "ticket_key": "S251-1",
+      "title": "Emit the _generated marker at the write boundary and strip it on read (#644)",
+      "club": "driver",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "moderate",
+          "description": "S247 attempted this by stamping the marker into store.projection and reverted after seven migration receipt tests failed. The fix was scoping, not cleverness: keep canonical bytes marker-free and confine the marker to write/read. Worth recording that the earlier revert was correct \u2014 retrying the same approach would have failed again.",
+          "gotcha_id": "self:scope-not-cleverness"
+        }
+      ],
+      "notes": "withRoadmapProjectionMarker on write, stripRoadmapProjectionMarker on compare. All four projection-byte comparison sites still agree."
+    },
+    {
+      "ticket_key": "S251-2",
+      "title": "Keep migration, archive and closeout agreeing on projection identity (#644)",
+      "club": "driver",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "moderate",
+          "description": "A marker-insensitive unchanged check would have meant the marker never got added to an already-current projection. The write decision compares exact bytes; the drift check stays marker-insensitive. Two comparisons with deliberately different sensitivity.",
+          "gotcha_id": "self:two-comparisons"
+        }
+      ],
+      "notes": "The seven migration receipt tests pass unchanged. Verified idempotent: second compile reports unchanged, --check reports no drift."
+    },
+    {
+      "ticket_key": "S251-3",
+      "title": "Move validate's tracked-file writes behind a flag (#644)",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "slope validate --read-only performs no writes. Default deliberately unchanged: reconciliation marks the scorecard gate, registers scorecard indexes and regenerates the projection, and this repo's closeout depends on it. The surprise is escapable rather than removed."
+    },
+    {
+      "ticket_key": "S251-4",
+      "title": "Name the cause in the reconciliation warning (#644)",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [],
+      "notes": "The warning named a symptom while a phase of planning work was being discarded. It now states that the projection is generated and projection-only sprints are dropped on the next compile."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 2,
+    "hazard_penalties": 1,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    "Slope 5 for a 4-ticket sprint: the migration receipt digest chain makes any change to projection bytes high-consequence."
+  ],
+  "special_plays": [],
+  "bunker_locations": [
+    "Projection bytes are compared in four places with different sensitivity requirements; changing the serialized shape touches all of them."
+  ],
+  "yardage_book_updates": [
+    "The compiled projection carries a _generated marker on disk only. serializeRoadmapProjection stays canonical \u2014 never add fields there.",
+    "slope validate --read-only for a pure check; the default still writes."
+  ],
+  "course_management_notes": [
+    "S247's revert was the right call, and re-attempting it identically would have failed identically. What changed was confining the marker to the write boundary rather than the canonical representation."
+  ]
+}

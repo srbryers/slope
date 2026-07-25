@@ -12,6 +12,9 @@ import {
   roadmapSprintOrderValue,
   RoadmapSourceError,
   serializeRoadmapProjection,
+  findRoadmapProjectionDivergence,
+  withRoadmapProjectionMarker,
+  stripRoadmapProjectionMarker,
   validateRoadmapSourceFederation,
   type LoadedRoadmapSource,
   type RoadmapDefinition,
@@ -116,7 +119,15 @@ export function loadRoadmapSourceStore(cwd: string, sourceFlag?: string): Roadma
   return { cwd, manifestPath, sourceRoot, outputPath, project, sources, roadmap, projection };
 }
 
-export function writeRoadmapSourceProjection(store: RoadmapSourceStore): 'written' | 'unchanged' {
+export interface WriteRoadmapProjectionOptions {
+  /** Overwrite even when the on-disk projection holds content no source produces. */
+  force?: boolean;
+}
+
+export function writeRoadmapSourceProjection(
+  store: RoadmapSourceStore,
+  options: WriteRoadmapProjectionOptions = {},
+): 'written' | 'unchanged' {
   const federationLock = join(store.sourceRoot, '.federation');
   return withFileLockSync(federationLock, () => {
     const fresh = loadRoadmapSourceStore(store.cwd, relative(store.cwd, store.manifestPath));
@@ -128,10 +139,52 @@ export function writeRoadmapSourceProjection(store: RoadmapSourceStore): 'writte
       ].join('\n'));
     }
     const existing = existsSync(fresh.outputPath) ? readFileSync(fresh.outputPath, 'utf8') : null;
-    if (existing != null && roadmapProjectionMatches(existing, fresh.projection)) return 'unchanged';
-    atomicWriteFileSync(fresh.outputPath, fresh.projection);
+    const desired = projectionBytesForWrite(fresh);
+    // Compare the exact bytes we would write, not marker-stripped content. A file
+    // whose content is current but whose marker is missing — one written by the
+    // migration path, or before the marker existed — must still be rewritten so
+    // it gains the warning (GH #644).
+    if (existing != null && existing.replace(/\r\n/g, '\n') === desired.replace(/\r\n/g, '\n')) {
+      return 'unchanged';
+    }
+    if (existing != null && !options.force) assertNoProjectionContentLoss(fresh, existing);
+    atomicWriteFileSync(fresh.outputPath, desired);
     return 'written';
   });
+}
+
+/**
+ * Refuse to silently discard authored content that exists only in the projection.
+ *
+ * `slope validate` regenerated the projection as a side effect and reported
+ * success, so a phase, six sprints and 26 tickets edited into the generated file
+ * vanished with no error, no warning and no diff — and it reproduced across
+ * operators, because nothing in the file said it was generated (GH #637).
+ */
+export function assertNoProjectionContentLoss(store: RoadmapSourceStore, existing: string): void {
+  const divergence = findRoadmapProjectionDivergence(existing, store.roadmap);
+  if (!divergence) return;
+
+  const target = normalizeDiagnosticPath(relative(store.cwd, store.outputPath));
+  const manifest = normalizeDiagnosticPath(relative(store.cwd, store.manifestPath));
+  const lines = [
+    `Refusing to overwrite ${target}: it contains planning work that no roadmap source produces.`,
+    `${target} is a GENERATED projection of ${manifest}. Rewriting it would discard:`,
+  ];
+  if (divergence.phases.length > 0) {
+    lines.push(`  phases: ${divergence.phases.join(', ')}`);
+  }
+  if (divergence.sprints.length > 0) {
+    lines.push(`  sprints: ${divergence.sprints.map(id => `S${id}`).join(', ')}`);
+  }
+  lines.push(
+    '',
+    'Move this work into the modular sources under docs/roadmap/, then re-run',
+    '`slope roadmap compile`. To discard it deliberately, re-run with --force.',
+  );
+  const error = new RoadmapSourceError(lines.join('\n'));
+  error.projectionContentLoss = true;
+  throw error;
 }
 
 export interface CompleteRoadmapSourceSprintResult {
@@ -181,7 +234,15 @@ function findRoadmapSourceSprint(store: RoadmapSourceStore, sprint: number): Roa
     }
   }
   if (matches.length === 0) {
-    throw new RoadmapSourceError(`Sprint ${targetLabel} was not found in modular roadmap sources.`, store.manifestPath);
+    // Name the cause: the projection is generated, so a sprint present only there
+    // is invisible to reconciliation and will be dropped on the next compile. The
+    // bare "not found" wording read as a per-sprint nit rather than a data warning
+    // (GH #644, #637 fix 4).
+    throw new RoadmapSourceError(
+      `Sprint ${targetLabel} was not found in modular roadmap sources. `
+      + 'The compiled roadmap projection is generated from these sources, so a sprint that exists only in the projection is not tracked and will be dropped on the next compile. Add it under docs/roadmap/.',
+      store.manifestPath,
+    );
   }
   if (matches.length > 1) {
     const locations = matches.map(match => `${match.source.entry.path} (id: ${match.storedId})`).join(', ');
@@ -216,7 +277,11 @@ export function completeRoadmapSourceSprint(
     const freshMatch = findRoadmapSourceSprint(fresh, sprint);
     const freshOwner = freshMatch.source;
     if (!freshOwner.absolutePath) {
-      throw new RoadmapSourceError(`Sprint S${sprint} was not found in modular roadmap sources.`, fresh.manifestPath);
+      throw new RoadmapSourceError(
+        `Sprint S${sprint} was not found in modular roadmap sources. `
+        + 'The compiled roadmap projection is generated from these sources, so a sprint that exists only in the projection is not tracked and will be dropped on the next compile. Add it under docs/roadmap/.',
+        fresh.manifestPath,
+      );
     }
 
     const storedId = freshMatch.storedId;
@@ -286,7 +351,10 @@ export function completeRoadmapSourceSprint(
     const projection = existing != null && roadmapProjectionMatches(existing, reloaded.projection)
       ? 'unchanged'
       : 'written';
-    if (projection === 'written') atomicWriteFileSync(reloaded.outputPath, reloaded.projection);
+    // Closeout reconciliation runs from `slope validate`, which is where the
+    // silent projection rewrite destroyed authored planning work (GH #637).
+    if (projection === 'written' && existing != null) assertNoProjectionContentLoss(reloaded, existing);
+    if (projection === 'written') atomicWriteFileSync(reloaded.outputPath, projectionBytesForWrite(reloaded));
     return { source: sourceLabel, projection, changed: true, reformatted };
   });
 }
@@ -298,7 +366,18 @@ export function completeRoadmapSourceSprint(
  * remains observable drift.
  */
 export function roadmapProjectionMatches(actual: string, expected: string): boolean {
-  return actual.replace(/\r\n/g, '\n') === expected.replace(/\r\n/g, '\n');
+  // `actual` is on-disk bytes, which carry the generated-file marker; `expected`
+  // is canonical marker-free bytes. Strip before comparing so a marked file is
+  // not mistaken for drift, and so projections written before the marker existed
+  // still compare equal (GH #644).
+  return stripRoadmapProjectionMarker(actual).replace(/\r\n/g, '\n')
+    === stripRoadmapProjectionMarker(expected).replace(/\r\n/g, '\n');
+}
+
+/** Projection bytes to write: canonical content plus the generated-file marker. */
+function projectionBytesForWrite(store: RoadmapSourceStore): string {
+  const manifestLabel = normalizeDiagnosticPath(relative(store.cwd, store.manifestPath));
+  return withRoadmapProjectionMarker(store.projection, manifestLabel);
 }
 
 export interface RoadmapSourceStoreValidationOptions {

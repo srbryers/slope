@@ -3,8 +3,12 @@ name: CI
 on:
   push:
     branches: [main]
+  # Any base branch, not just main. Sequential sprints are reviewed as stacked
+  # PRs (PR 2 targets PR 1's branch), and restricting to `main` meant those got
+  # no CI at all until their predecessor merged and GitHub retargeted them —
+  # exactly the PRs where a regression is easiest to miss (GH #645).
   pull_request:
-    branches: [main]
+    branches: ['**']
 
 jobs:
   ci:
@@ -32,8 +36,6 @@ jobs:
           node-version: 22
 
       - uses: pnpm/action-setup@v6
-        with:
-          version: 10
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile

@@ -147,3 +147,8 @@ sprints:
         github_issue: 589
         depends_on:
           - S236-3
+scorecards:
+  "235": docs/retros/sprint-235.json
+  "233": docs/retros/sprint-233.json
+  "234": docs/retros/sprint-234.json
+  "236": docs/retros/sprint-236.json

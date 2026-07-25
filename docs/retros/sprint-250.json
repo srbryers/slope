@@ -1,0 +1,101 @@
+{
+  "sprint_number": 250,
+  "theme": "Sprint Lifecycle and Claim Safety",
+  "par": 5,
+  "slope": 4,
+  "score": 5,
+  "score_label": "par",
+  "date": "2026-07-25",
+  "shots": [
+    {
+      "ticket_key": "S250-1",
+      "title": "Allow rollover into a sprint complete in the roadmap but with no local state (#641)",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "A terminal sprint with completion evidence is finished work being recorded, not restarted. completionEvidence was already a parameter of assessSprintRollover, so no new plumbing."
+    },
+    {
+      "ticket_key": "S250-2",
+      "title": "Make --force override rollover eligibility and record it (#641)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "moderate",
+          "description": "target_not_pending ignored force entirely while its sibling from_not_terminal honoured it, so the documented --force --reason escape hatch silently did nothing for this refusal. Two checks in the same function disagreeing about whether force applies is the kind of gap only dogfooding finds.",
+          "gotcha_id": "self:force-inconsistent"
+        }
+      ],
+      "notes": "Refusal message now names the escape hatch instead of leaving the operator to guess."
+    },
+    {
+      "ticket_key": "S250-3",
+      "title": "Report every missing PR-readiness artifact at once (#641)",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [],
+      "notes": "sprint-completion returned on the first missing artifact, costing a round trip per refusal. Lineage and scorecard are now collected together, and the lineage message says the audit must be on the branch being PR'd."
+    },
+    {
+      "ticket_key": "S250-4",
+      "title": "Reject unknown claim subcommands instead of silently registering (#642)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [
+        {
+          "type": "water",
+          "severity": "major",
+          "description": "`slope claim release --target=X` registered a claim rather than releasing one \u2014 a guessable command doing the exact opposite of what was asked, with no list command to notice and no CLI path to undo it. Four spurious claims were created this way during Phase 55 closeout and had to be deleted from the SQLite store by hand.",
+          "gotcha_id": "self:silent-opposite"
+        }
+      ],
+      "notes": "Unknown positionals now error with usage. Discarding unrecognised input while still mutating state is the anti-pattern."
+    },
+    {
+      "ticket_key": "S250-5",
+      "title": "Add slope claim list and an explicit release path (#642)",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "--all did nothing on first implementation: parseArgs only captures --key=value, so the bare flag was never seen. Caught by self review, not by types.",
+          "gotcha_id": "self:bare-flag"
+        }
+      ],
+      "notes": "release delegates to the existing releaseCommand, which already handled --id and --target and was simply undiscoverable. list defaults to the current sprint to match what slope now counts."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 5,
+    "fairways_total": 5,
+    "greens_in_regulation": 5,
+    "greens_total": 5,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 3,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [],
+  "special_plays": [],
+  "bunker_locations": [
+    "src/cli/sprint-rollover.ts assessSprintRollover: each eligibility check decides independently whether --force applies; they must agree."
+  ],
+  "yardage_book_updates": [
+    "slope release --target=<t> already releases claims across a sprint range; slope claim release now delegates to it.",
+    "assessSprintRollover takes completionEvidence (sprint ids with scorecards) \u2014 use it to distinguish recording finished work from restarting it."
+  ],
+  "course_management_notes": [
+    "Every defect in this sprint came from running the tool on itself. None would have surfaced from reading the code.",
+    "A command that discards unrecognised input and mutates anyway is worse than one that errors; it produces state the operator cannot see or undo."
+  ]
+}

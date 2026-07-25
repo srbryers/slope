@@ -68,8 +68,8 @@ export function findPlanContent(cwd: string, options: FindPlanContentOptions = {
 /**
  * Count tickets in plan content.
  * Matches `### T\d+:` or `### S\d+-\d+:` patterns, then the Markdown
- * ticket table emitted by `slope sprint plan`, and finally falls back to
- * all H3 headers.
+ * ticket table emitted by `slope sprint plan`, then distinct ticket keys
+ * anywhere in the document, and finally falls back to all H3 headers.
  */
 export function countTickets(content: string): number {
   const ticketHeaders = content.match(/^###\s+(?:T\d+|S\d+-\d+):/gm) ?? [];
@@ -77,6 +77,20 @@ export function countTickets(content: string): number {
 
   const ticketTableRows = content.match(/^\|\s*(?:T\d+|S\d+(?:\.\d+)?-\d+)\s*\|/gim) ?? [];
   if (ticketTableRows.length > 0) return ticketTableRows.length;
+
+  // Neither headers nor a table: plans commonly list tickets as bold bullets,
+  // e.g. `- **S156-1** (long_iron / multi-package): ...`. Missing those reported
+  // 0 tickets and silently downgraded a Standard-tier plan to Skip, waving a
+  // schema+API sprint through with no review (GH #634).
+  //
+  // Counted as a distinct set so dependency back-references (`depends_on:
+  // S156-1`) cannot inflate the total. Only reached when the two explicit
+  // formats found nothing, so well-formed plans are unaffected.
+  const ticketKeys = new Set<string>();
+  for (const match of content.matchAll(/\b(?:T\d+|S\d+(?:\.\d+)?-\d+)\b/g)) {
+    ticketKeys.add(match[0]);
+  }
+  if (ticketKeys.size > 0) return ticketKeys.size;
 
   // Fallback: count ### level headers that look like tickets
   const h3Headers = content.match(/^###\s+/gm) ?? [];

@@ -1,0 +1,113 @@
+version: "1"
+phase:
+  name: Phase 56 — Dogfooding Friction
+  description: "Five defects found by running SLOPE's own Phase 55 closeout end to end, rather than reported from another repo. Ordered by who is blocked: an unbuildable clean checkout and a guard that prompts on every write come first, then the lifecycle deadlock that made the last sprint of a phase un-PR-able, then the deferred #637 projection work."
+  sprints:
+    - 249
+    - 250
+    - 251
+  status: in_progress
+  note: "Issue-driven recovery for #641, #642, #643, #644, #645 — all self-reported from the Phase 55 run. #645 makes a clean checkout fail to install on pnpm 8 with an error that names the wrong cause, and lets CI float to whatever latest pnpm means; #643 raises a host permission prompt on every implementation write in the mode that advertises guards are silenced; #641/#642 are lifecycle and claim-state safety, where a plausible command silently does the opposite of what was asked; #644 completes the two #637 fixes deferred from S247."
+sprints:
+  - id: 249
+    theme: Toolchain Pin and Guard Signal
+    par: 4
+    slope: 2
+    type: bugfix + contributor experience
+    status: complete
+    note: "Fix #645 (no packageManager field: lockfile v9 makes a clean checkout unbuildable on pnpm 8, the error steers toward rewriting the lockfile, and pnpm/action-setup floats to latest in CI; stacked PRs also get no CI because ci.yml only triggers on base main) and #643 (claim-required returns 'ask' on every implementation write even in adhoc mode, which the briefing describes as sprint-workflow guards silenced). Both are daily friction rather than data risk, but they are what an operator hits first."
+    tickets:
+      - key: S249-1
+        title: Pin packageManager so a clean checkout installs and CI stops floating to latest pnpm (#645)
+        club: putter
+        complexity: trivial
+        github_issue: 645
+      - key: S249-2
+        title: Run CI on pull requests that target a feature branch so stacked PRs are covered (#645)
+        club: wedge
+        complexity: small
+        github_issue: 645
+      - key: S249-3
+        title: "Stop claim-required gating every write with 'ask' in adhoc mode (#643)"
+        club: short_iron
+        complexity: standard
+        github_issue: 643
+        depends_on:
+          - S249-1
+  - id: 250
+    theme: Sprint Lifecycle and Claim Safety
+    par: 5
+    slope: 4
+    type: bugfix + state integrity
+    status: complete
+    depends_on:
+      - 249
+    note: "Fix #641 (slope validate reconciles every scorecarded sprint to complete, after which rollover refuses to advance into the phase's final sprint and --force does not bypass because eligibility is checked first, so the last sprint can never reach ready_for_pr; sprint-completion also reports its two required PR artifacts one at a time) and #642 (slope claim ignores unknown positionals, so 'slope claim release --target=X' registers instead of releasing, there is no way to list claims, and claims stranded on another sprint cannot be released at all)."
+    tickets:
+      - key: S250-1
+        title: Allow rollover into a sprint that is complete in the roadmap but has no local state yet (#641)
+        club: long_iron
+        complexity: moderate
+        github_issue: 641
+      - key: S250-2
+        title: "Make --force actually override rollover eligibility and record the override in the audit (#641)"
+        club: short_iron
+        complexity: standard
+        github_issue: 641
+        depends_on:
+          - S250-1
+      - key: S250-3
+        title: Report every missing PR-readiness artifact at once instead of one refusal per round trip (#641)
+        club: wedge
+        complexity: small
+        github_issue: 641
+      - key: S250-4
+        title: Reject unknown claim subcommands instead of silently registering a claim (#642)
+        club: short_iron
+        complexity: standard
+        github_issue: 642
+      - key: S250-5
+        title: "Add slope claim list and an explicit release path that can reach claims on another sprint (#642)"
+        club: long_iron
+        complexity: moderate
+        github_issue: 642
+        depends_on:
+          - S250-4
+  - id: 251
+    theme: Projection Marker and Read-Only Validate
+    par: 4
+    slope: 5
+    type: bugfix + data integrity
+    status: complete
+    depends_on:
+      - 250
+    note: "Fix #644, the two #637 items deferred from S247. The marker must be applied at the write boundary only: store.projection stays canonical marker-free bytes so the four existing projection-byte comparisons keep agreeing, including the migration planner/applier expected_projection_sha256 pair whose mismatch broke seven receipt tests when the marker was stamped into the store. Then decide where validate's reconciliation writes move so a read-sounding command stops mutating tracked files."
+    tickets:
+      - key: S251-1
+        title: Emit the _generated marker at the projection write boundary and strip it when comparing on-disk bytes (#644)
+        club: driver
+        complexity: risky
+        github_issue: 644
+      - key: S251-2
+        title: Keep migration plan/apply, archive planning and closeout reconciliation agreeing on projection identity (#644)
+        club: driver
+        complexity: risky
+        github_issue: 644
+        depends_on:
+          - S251-1
+      - key: S251-3
+        title: "Move validate's tracked-file writes behind an explicit step or flag (#644)"
+        club: long_iron
+        complexity: moderate
+        github_issue: 644
+        depends_on:
+          - S251-2
+      - key: S251-4
+        title: Name the cause in the projection reconciliation warning instead of reading as a per-sprint nit (#644)
+        club: wedge
+        complexity: small
+        github_issue: 644
+scorecards:
+  "249": docs/retros/sprint-249.json
+  "250": docs/retros/sprint-250.json
+  "251": docs/retros/sprint-251.json

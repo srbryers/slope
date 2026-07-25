@@ -68,13 +68,14 @@ function handlePreToolUse(input: HookInput, cwd: string): GuardResult {
     };
   }
   const state = loadedState.state;
+  // Collected rather than returned immediately: a branch can be missing the
+  // lineage audit *and* the scorecard, and reporting one at a time cost a round
+  // trip each with differently-worded refusals (GH #641).
+  let lineageError: string | null = null;
   try {
     verifySprintRolloverLineage(guardCwd, state);
   } catch (error) {
-    return {
-      decision: 'deny',
-      blockReason: `SLOPE sprint-completion: rollover lineage verification failed: ${(error as Error).message}`,
-    };
+    lineageError = (error as Error).message;
   }
   const branchSprint = inferSprintFromBranch(guardCwd);
   if (branchSprint !== null && branchSprint !== state.sprint) {
@@ -110,12 +111,23 @@ function handlePreToolUse(input: HookInput, cwd: string): GuardResult {
   const scorecardMissing = !scorecardExists(state.sprint, guardCwd);
   const gatesComplete = isSprintComplete(state);
 
-  if (gatesComplete && !scorecardMissing) return {};
+  if (gatesComplete && !scorecardMissing && !lineageError) return {};
 
   const staleWarning = checkStaleness(state.sprint, guardCwd);
   const lines: string[] = [];
 
+  if (lineageError) {
+    lines.push(
+      `SLOPE sprint-completion: rollover lineage verification failed: ${lineageError}`,
+      '',
+      'The rollover audit must be present on the branch being PR\'d, not only',
+      'elsewhere in a branch stack. Record it with `slope sprint rollover`, or',
+      'copy the existing audit from docs/retros/rollovers/ onto this branch.',
+    );
+  }
+
   if (scorecardMissing) {
+    if (lines.length > 0) lines.push('');
     lines.push(
       `SLOPE sprint-completion: Cannot create PR — Sprint ${state.sprint} scorecard not found.`,
       '',

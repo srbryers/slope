@@ -1,4 +1,4 @@
-import { formatSprintLabel, formatSprintNumber, isRoadmapSprintPending, loadScorecards, parseSprintNumber } from '../../core/index.js';
+import { formatSprintLabel, formatRoadmapSprintLabel, formatSprintNumber, isRoadmapSprintPending, loadScorecards, parseSprintNumber } from '../../core/index.js';
 import type { RoadmapDefinition, RoadmapSprint, RoadmapTicket, SprintClaim } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { inferSprintContext, loadRoadmapForInference } from '../sprint-inference.js';
@@ -98,8 +98,11 @@ async function buildNowSnapshot(cwd: string, flags: Record<string, string>): Pro
     throw new Error(`Invalid sprint number: ${flags.sprint}`);
   }
   const sprint = parsedSprint;
-  const sprintLabel = formatSprintLabel(sprint);
   const roadmap = loadRoadmapForInference(cwd, config) ?? undefined;
+  // Without roadmap evidence, an integer like 245 is ambiguous: it could be a
+  // real S245 or the legacy encoding of S24.5. Prefer roadmap-aware labelling so
+  // this repo's own S245 stops rendering as "S24.5" (GH #635).
+  const sprintLabel = roadmap ? formatRoadmapSprintLabel(roadmap, sprint) : formatSprintLabel(sprint);
   const scorecards = loadScorecards(config, cwd);
   const completed = new Set(scorecards.map(card => card.sprint_number));
   const current = roadmap?.sprints.find(s => s.id === sprint);

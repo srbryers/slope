@@ -12,10 +12,12 @@ import {
 import { loadConfig } from '../config.js';
 import { updateGate } from '../sprint-state.js';
 import { completeRoadmapSourceSprint } from '../roadmap-source-store.js';
+import type { RoadmapSourceError } from '../../core/index.js';
 
 export function validateCommand(input?: string | string[]): void {
   const args = Array.isArray(input) ? input : input ? [input] : [];
   const validateSkills = args.includes('--skills');
+  const readOnly = args.includes('--read-only');
   const sprintArgIndex = args.findIndex(arg => arg === '--sprint' || arg.startsWith('--sprint='));
   const requestedSprint = parseRequestedSprint(args, sprintArgIndex);
   const path = args.find((arg, index) => {
@@ -100,16 +102,36 @@ export function validateCommand(input?: string | string[]): void {
   console.log('');
 
   // Mark scorecard gate complete on successful validation
-  if (allValid && registryAvailable) {
+  let reconciled = true;
+  if (allValid && registryAvailable && !readOnly) {
     updateGate(cwd, 'scorecard', true);
-    reconcileModularRoadmapSources(cwd, validScorecards);
+    reconciled = reconcileModularRoadmapSources(cwd, validScorecards);
+  } else if (readOnly) {
+    // `validate` writes tracked files as a side effect: it marks the scorecard
+    // gate, reconciles scorecard indexes and sprint status into the phase YAML,
+    // and regenerates the compiled projection. Surprising for a read-sounding
+    // command, so --read-only offers a pure check (GH #644, #637 fix 3). The
+    // default is unchanged, because the closeout workflow depends on that
+    // reconciliation.
+    console.log('  (--read-only: skipped gate update and roadmap source reconciliation)\n');
   }
 
-  process.exit(allValid && registryAvailable ? 0 : 1);
+  process.exit(allValid && registryAvailable && reconciled ? 0 : 1);
 }
 
-function reconcileModularRoadmapSources(cwd: string, scorecards: Array<{ sprint: number; path: string }>): void {
-  if (!existsSync(join(cwd, 'docs', 'roadmap', 'project.yaml'))) return;
+/**
+ * Reconcile closeout status into the modular sources.
+ *
+ * Returns false when reconciliation was blocked by a refusal to discard authored
+ * projection content. That must fail the command: exiting 0 while planning work
+ * is silently destroyed is the defect itself (GH #637).
+ */
+function reconcileModularRoadmapSources(
+  cwd: string,
+  scorecards: Array<{ sprint: number; path: string }>,
+): boolean {
+  if (!existsSync(join(cwd, 'docs', 'roadmap', 'project.yaml'))) return true;
+  let ok = true;
   for (const scorecard of scorecards) {
     try {
       const result = completeRoadmapSourceSprint(cwd, scorecard.sprint, {
@@ -120,10 +142,17 @@ function reconcileModularRoadmapSources(cwd: string, scorecards: Array<{ sprint:
         console.log(`  ⚠ ${result.source} could not be patched surgically and was rewritten in canonical YAML style.`);
       }
     } catch (error) {
+      if ((error as RoadmapSourceError).projectionContentLoss) {
+        // Report once, not per scorecard \u2014 the cause is the projection, not the sprint.
+        if (ok) console.error(`\n\u2717 ${(error as Error).message}\n`);
+        ok = false;
+        continue;
+      }
       console.log(`  \u26A0 Roadmap source not reconciled for S${scorecard.sprint}: ${(error as Error).message}`);
       console.log(`    Run: slope roadmap complete --sprint=${scorecard.sprint}`);
     }
   }
+  return ok;
 }
 
 function parseRequestedSprint(args: string[], sprintArgIndex: number): number | null {

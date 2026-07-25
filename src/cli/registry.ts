@@ -206,6 +206,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     flags: [
       { flag: '<path>', desc: 'Scorecard JSON file to validate' },
       { flag: '--skills', desc: 'Check scorecard skill references against .slope/skills.json' },
+      { flag: '--read-only', desc: 'Validate without marking gates or reconciling roadmap sources' },
     ],
   },
   {

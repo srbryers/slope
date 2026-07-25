@@ -165,19 +165,74 @@ describe('guardCommand dispatcher path', () => {
     vi.restoreAllMocks();
   });
 
-  it('emits ask output for claim-required on adhoc implementation writes with no sprint state', async () => {
+  it('emits advisory context, not ask, for claim-required on adhoc implementation writes (GH #643)', async () => {
     const output = await runGuardCommandWithInput(['claim-required'], makeHookInput(cwd));
     const parsed = JSON.parse(output);
 
     expect(parsed.hookSpecificOutput.hookEventName).toBe('PreToolUse');
-    expect(parsed.hookSpecificOutput.permissionDecision).toBe('ask');
-    expect(parsed.hookSpecificOutput.additionalContext).toContain('SLOPE permission request');
+    // Adhoc mode advertises "sprint-workflow guards silenced", so the guard
+    // reports but must not gate the host on every write.
+    expect(parsed.hookSpecificOutput.permissionDecision).toBeUndefined();
+    expect(parsed.hookSpecificOutput.additionalContext).toContain('adhoc session');
     expect(parsed.hookSpecificOutput.additionalContext).toContain('no active sprint state');
-    expect(parsed.hookSpecificOutput.additionalContext).toContain('host decides whether to allow this edit');
+    expect(parsed.hookSpecificOutput.additionalContext).toContain('slope sprint start');
 
     const metrics = readFileSync(join(cwd, '.slope', 'guard-metrics.jsonl'), 'utf8');
     expect(metrics).toContain('"guard":"claim-required"');
-    expect(metrics).toContain('"decision":"ask"');
+  });
+
+  it('ignores out-of-repo scratchpad writes instead of adopting them as the workspace (GH #625)', async () => {
+    const scratchpad = makeTmpPath('slope-scratchpad');
+    mkdirSync(scratchpad, { recursive: true });
+    try {
+      const output = await runGuardCommandWithInput(['claim-required'], makeHookInput(cwd, {
+        tool_input: { file_path: join(scratchpad, 'probe.config.ts'), content: 'x' },
+      }));
+
+      expect(output).toBe('');
+    } finally {
+      rmSync(scratchpad, { recursive: true, force: true });
+    }
+  });
+
+  it('does not cache a non-workspace cwd for later tool calls (GH #625)', async () => {
+    const scratchpad = makeTmpPath('slope-scratchpad');
+    mkdirSync(scratchpad, { recursive: true });
+    try {
+      await runGuardCommandWithInput(['claim-required'], makeHookInput(cwd, {
+        tool_input: { file_path: join(scratchpad, 'probe.ts'), content: 'x' },
+      }));
+
+      const store = join(cwd, '.slope', 'codex-workdirs');
+      const memos = existsSync(store) ? readdirSync(store) : [];
+      const remembered = memos.map(name => JSON.parse(readFileSync(join(store, name), 'utf8')).cwd);
+      expect(remembered).not.toContain(scratchpad);
+    } finally {
+      rmSync(scratchpad, { recursive: true, force: true });
+    }
+  });
+
+  it('refuses to replay a remembered cwd that is not a workspace (GH #625)', async () => {
+    const scratchpad = makeTmpPath('slope-scratchpad');
+    mkdirSync(scratchpad, { recursive: true });
+    const store = join(cwd, '.slope', 'codex-workdirs');
+    mkdirSync(store, { recursive: true });
+    // Simulate a memo written by an older version that pinned a non-workspace dir.
+    writeFileSync(
+      join(store, `${'0'.repeat(32)}.json`),
+      JSON.stringify({ session_id: 'test-session', cwd: scratchpad, source: 'tool-path' }),
+    );
+    try {
+      const output = await runGuardCommandWithInput(['claim-required'], makeHookInput(cwd, {
+        tool_input: { file_path: join(cwd, 'src/example.ts') },
+      }));
+
+      // Falls back to the real workspace, so the in-repo edit is still classified.
+      expect(output).toContain('src/example.ts');
+      expect(output).not.toContain('scratchpad');
+    } finally {
+      rmSync(scratchpad, { recursive: true, force: true });
+    }
   });
 
   it('ignores out-of-repo scratchpad writes instead of adopting them as the workspace (GH #625)', async () => {
@@ -306,14 +361,15 @@ describe('guardCommand dispatcher path', () => {
     );
     const parsed = JSON.parse(output);
 
-    expect(parsed.hookSpecificOutput.permissionDecision).toBe('ask');
+    // Still effective — it produces output where workflow-step-gate is fully
+    // suppressed — but advisory in adhoc rather than gating (GH #643).
+    expect(parsed.hookSpecificOutput.permissionDecision).toBeUndefined();
     expect(parsed.hookSpecificOutput.additionalContext).toContain('slope claim');
 
     const metrics = readFileSync(join(cwd, '.slope', 'guard-metrics.jsonl'), 'utf8');
     expect(metrics).toContain('"guard":"workflow-step-gate"');
     expect(metrics).toContain('"decision":"suppressed"');
     expect(metrics).toContain('"guard":"claim-required"');
-    expect(metrics).toContain('"decision":"ask"');
   });
 
   it('uses hook input cwd instead of launcher cwd when running branch-before-commit', async () => {
