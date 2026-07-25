@@ -217,6 +217,14 @@ describe('extractSprintReferences', () => {
     ])).toEqual(new Set());
   });
 
+  it('does not treat a forward-planning mention as a shipped sprint ref (GH #632)', () => {
+    // "plan S134" announces future work; S134 was never implemented. Counting it
+    // made `slope roadmap validate` demand status "complete" and exit 1.
+    expect(extractSprintReferences([
+      'docs: close S133 (reverted) + verified UCP findings + plan S134 (#339)',
+    ])).toEqual(new Set());
+  });
+
   it('does not match S75 inside S75.5', () => {
     expect(extractSprintReferences(['feat(S75.5): The Bug Clearing'])).toEqual(new Set());
   });
