@@ -6651,7 +6651,7 @@
       "par": 5,
       "slope": 5,
       "type": "feature + data integrity",
-      "status": "planned",
+      "status": "complete",
       "note": "Core canonical module (parse/format/compare/equal preserving trailing zeros), roadmap source acceptance of string-authored ids, threading id_key through compile uniqueness and ordering, focus/archive and retro/scorecard path derivation, and replacing the S252 ambiguity rejection with support plus a quote-it hint for unquoted trailing-zero numbers.",
       "tickets": [
         {

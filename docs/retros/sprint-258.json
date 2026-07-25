@@ -1,0 +1,94 @@
+{
+  "sprint_number": 258,
+  "theme": "Canonical Sprint IDs",
+  "par": 5,
+  "slope": 5,
+  "score": 6,
+  "score_label": "bogey",
+  "date": "2026-07-25",
+  "shots": [
+    {
+      "ticket_key": "S258-1",
+      "title": "Add a canonical sprint-id module that preserves the exact authored suffix (#635)",
+      "club": "driver",
+      "result": "green",
+      "hazards": [],
+      "notes": "src/core/sprint-id.ts: sprintIdKey (exact string, trailing zeros preserved), parseSprintId (base + insert + digits), compareSprintIdKeys (inserts by integer value, .9 before .10), sprintIdsEqual. Deliberately no legacy 435 => 43.5 decode (needs roadmap evidence). Fully unit-tested and committed as a safe foundation before any integration."
+    },
+    {
+      "ticket_key": "S258-2",
+      "title": "Accept string-authored sprint ids in roadmap sources and carry a canonical id_key (#635)",
+      "club": "driver",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "The scope was under-estimated at planning. I presented the roadmap+identity layer as bounded (add id_key to sprints), but #635's real scenario (458.1 … 458.9 coexisting with 458.10) required canonical threading through phase membership, compile uniqueness, the logical-collision check, validateRoadmap's duplicate and ticket-prefix checks, and dependencies — because all keyed on the numeric id. That is materially larger than the framing the operator chose the scope under, and closer to the full-migration size I had recommended against.",
+          "gotcha_id": "self:under-scoped"
+        }
+      ],
+      "notes": "Dual representation: id/sprints stay numeric mirror; id_key/sprint_keys hold the canonical form, present only when string-authored. Every existing all-numeric roadmap is untouched (id_key absent, prior numeric path). RoadmapSprint.id_key and RoadmapPhase.sprint_keys added."
+    },
+    {
+      "ticket_key": "S258-3",
+      "title": "Key roadmap compile uniqueness, ordering and focus on the canonical id_key (#635)",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "moderate",
+          "description": "The logical_sprint_collision check keyed on roadmapSprintOrderValue (a float), which would false-positive on 458.1 vs 458.10 (both float 458.1). Rerouted through roadmapSprintKey so distinct id_keys don't collide while a legacy 435 and explicit 43.5 still resolve to the same '43.5' key. A float-based identity check is exactly what #635 is about; it had to be replaced, not patched.",
+          "gotcha_id": "self:float-identity"
+        }
+      ],
+      "notes": "Federation uniqueness/membership and validateRoadmap identity checks now key by canonical string. Verified end to end: a phase with 458.1/458.9/458.10/458.11 parses, validates, and compiles with all four distinct in the projection."
+    },
+    {
+      "ticket_key": "S258-4",
+      "title": "Derive retro and scorecard file paths from the canonical id so 458.10 and 458.1 stay distinct (#635)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "The roadmap scorecards map is already string-keyed and validated as \\d+(\\.\\d+)?, so 458.10 -> sprint-458.10.json is already preserved distinctly. Verified; no change needed at the roadmap layer."
+    },
+    {
+      "ticket_key": "S258-5",
+      "title": "Replace the S252 ambiguity rejection with support and a quote-to-preserve hint (#635)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "An unquoted trailing-zero id is still rejected (a number cannot hold it), but the message now leads with the fix that works — quote it (id: \"458.10\") — then the renumber options. depends_on also accepts a canonical string reference."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 5,
+    "fairways_total": 5,
+    "greens_in_regulation": 5,
+    "greens_total": 5,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 2,
+    "hazard_penalties": 1,
+    "miss_directions": { "long": 0, "short": 0, "left": 0, "right": 0 }
+  },
+  "conditions": [
+    "The scope was chosen by the operator as 'roadmap+identity layer' over a full store migration, on my framing that it was bounded; the integration proved deeper than that framing.",
+    "Built and verified incrementally — core module committed and green before any integration, full suite run after each layer — so the 4218-test baseline was never at risk."
+  ],
+  "special_plays": [],
+  "bunker_locations": [
+    "src/core/roadmap-sources.ts and src/core/roadmap.ts: sprint identity was keyed on the numeric id or the float order value in ~6 places (uniqueness, membership, collision, duplicate, ticket-prefix). Any float-based identity check cannot distinguish 458.10 from 458.1.",
+    "Display labels (formatRoadmapSprintLabel) take a numeric id, so a string-id sprint still DISPLAYS as S458.1 — the label functions can't reach id_key without the sprint object. Threading that spans ~11 caller files; latent because no real roadmap uses string ids yet."
+  ],
+  "yardage_book_updates": [
+    "Sprint identity is roadmapSprintKey(roadmap, sprint) — id_key if present, else the roadmap-aware label form of the numeric id. Use it wherever 458.10 must stay distinct from 458.1.",
+    "Trailing-zero decimal ids must be authored as quoted YAML strings; a number cannot carry them.",
+    "Documented boundaries left numeric by scope: the store mirror (sprint_number columns), dependency-distinctness between coexisting 458.1/458.10, and display labels for string-id sprints."
+  ],
+  "course_management_notes": [
+    "I under-scoped the estimate when the operator was choosing depth. When a change touches an identity that is structurally numeric, assume every numeric reference to that identity is in scope, not just the obvious field.",
+    "Committing the core module as a standalone, fully-tested foundation before integration was the right call: it made the large integration verifiable in layers and kept a green baseline throughout."
+  ]
+}
