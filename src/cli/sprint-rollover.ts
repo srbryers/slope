@@ -115,7 +115,9 @@ export interface SprintRolloverAuditRecord {
     target_dependencies: number[];
     completion_evidence: SprintRolloverAssessment['completion_evidence'];
     scorecard_artifacts: SprintRolloverScorecardEvidence[];
-    expected_next: number;
+    /** Absent when no pending successor exists — e.g. an explicit rollover into
+     *  the last sprint of a phase that closeout already marked complete. */
+    expected_next?: number;
   };
   roadmap: {
     path: string;
@@ -524,7 +526,11 @@ function readAudit(cwd: string, path: string): SprintRolloverAuditRecord {
     || (record.request.reason !== undefined && typeof record.request.reason !== 'string')
     || typeof record.forced !== 'boolean'
     || (record.reason !== undefined && typeof record.reason !== 'string')
-    || !record.eligibility || typeof record.eligibility.expected_next !== 'number'
+    || !record.eligibility
+    // expected_next is legitimately absent when no pending successor exists; a
+    // required-number check rejected audits this tool itself writes (GH #646).
+    || (record.eligibility.expected_next !== undefined
+      && typeof record.eligibility.expected_next !== 'number')
     || typeof record.eligibility.from_terminal !== 'boolean'
     || typeof record.eligibility.target_dependency_eligible !== 'boolean'
     || !Array.isArray(record.eligibility.blocking_dependencies)
@@ -633,7 +639,7 @@ function buildAuditRecord(
         .map(id => roadmapSprintOrderValue(assessment.roadmap, id)),
       completion_evidence: assessment.completion_evidence,
       scorecard_artifacts: scorecards,
-      expected_next: assessment.expected_next!,
+      ...(assessment.expected_next != null ? { expected_next: assessment.expected_next } : {}),
     },
     roadmap: {
       path: assessment.roadmap_path,
