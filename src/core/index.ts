@@ -797,6 +797,13 @@ export { generateConfig } from './generators/config.js';
 export { generateFirstSprint } from './generators/first-sprint.js';
 export { generateCommonIssues } from './generators/common-issues.js';
 export { generateRoadmap, generateRoadmapFromVision, RoadmapGenerationError } from './generators/roadmap.js';
+export {
+  sprintIdKey,
+  parseSprintId,
+  compareSprintIdKeys,
+  sprintIdsEqual,
+} from './sprint-id.js';
+export type { SprintIdParts } from './sprint-id.js';
 export type { GeneratedConfig } from './generators/config.js';
 export type { GeneratedSprint } from './generators/first-sprint.js';
 

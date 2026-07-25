@@ -1,0 +1,50 @@
+version: "1"
+phase:
+  name: Phase 60 — Canonical Sprint IDs
+  description: "The durable fix for #635, at the roadmap and identity layer. Sprint ids are stored as JavaScript numbers, so 458.10 collapses to 458.1 and distinct planned sprints silently alias existing ones. Introduce a canonical string representation that preserves the exact suffix, thread it through compile/focus/archive and retro/scorecard paths, and lift the S252 rejection. The store's numeric mirror columns are left as-is by design."
+  sprints:
+    - 258
+  status: in_progress
+  note: "Scoped to the roadmap+identity layer, chosen over a full store-schema migration: scorecards are file-sourced (the file name already distinguishes sprint-458.10.json), S252 already prevents the corruption by rejecting ambiguous ids, and RoadmapSprint.id is a number in 96 roadmap-layer uses plus two store schemas. Dual representation: id stays numeric for ordering and the store mirror; a canonical id_key string carries the exact authored form and is authoritative for identity, comparison and paths."
+sprints:
+  - id: 258
+    theme: Canonical Sprint IDs
+    par: 5
+    slope: 5
+    type: feature + data integrity
+    status: planned
+    note: "Core canonical module (parse/format/compare/equal preserving trailing zeros), roadmap source acceptance of string-authored ids, threading id_key through compile uniqueness and ordering, focus/archive and retro/scorecard path derivation, and replacing the S252 ambiguity rejection with support plus a quote-it hint for unquoted trailing-zero numbers."
+    tickets:
+      - key: S258-1
+        title: Add a canonical sprint-id module that preserves the exact authored suffix (#635)
+        club: driver
+        complexity: moderate
+        github_issue: 635
+      - key: S258-2
+        title: Accept string-authored sprint ids in roadmap sources and carry a canonical id_key (#635)
+        club: driver
+        complexity: risky
+        github_issue: 635
+        depends_on:
+          - S258-1
+      - key: S258-3
+        title: Key roadmap compile uniqueness, ordering and focus on the canonical id_key (#635)
+        club: long_iron
+        complexity: moderate
+        github_issue: 635
+        depends_on:
+          - S258-2
+      - key: S258-4
+        title: Derive retro and scorecard file paths from the canonical id so 458.10 and 458.1 stay distinct (#635)
+        club: short_iron
+        complexity: standard
+        github_issue: 635
+        depends_on:
+          - S258-2
+      - key: S258-5
+        title: "Replace the S252 ambiguity rejection with support and a quote-to-preserve hint (#635)"
+        club: short_iron
+        complexity: standard
+        github_issue: 635
+        depends_on:
+          - S258-2
