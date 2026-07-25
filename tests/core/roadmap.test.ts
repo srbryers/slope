@@ -9,6 +9,7 @@ import {
   formatStrategicContext,
   formatSprintLabel,
   formatRoadmapSprintLabel,
+  describeSprintIdAmbiguity,
   nextCanonicalSprintId,
   parseSprintNumber,
   sprintOrderValue,
@@ -915,5 +916,34 @@ describe('roadmap-aware sprint labelling (GH #635)', () => {
 
   it('still renders a genuinely encoded inserted sprint as a decimal', () => {
     expect(formatRoadmapSprintLabel(roadmapWith(435, 'S43.5-1'), 435)).toBe('S43.5');
+  });
+});
+
+describe('ambiguous sprint id rejection (GH #635)', () => {
+  it.each([
+    ['458.1', 458.1],
+    ['458.9', 458.9],
+    ['458.11', 458.11],
+    ['459', 459],
+  ])('round-trips %s', (written, expected) => {
+    expect(parseSprintNumber(written)).toBe(expected);
+    expect(describeSprintIdAmbiguity(written)).toBeNull();
+  });
+
+  it.each(['458.10', '458.0', '458.100', 'S458.10'])('rejects %s as unrepresentable', written => {
+    // Stored as a number, "458.10" reads back as 458.1 and silently aliases it.
+    expect(parseSprintNumber(written)).toBeNull();
+    expect(describeSprintIdAmbiguity(written)).toContain('cannot round-trip');
+  });
+
+  it('names what the id would collapse to and suggests a renumbering', () => {
+    const problem = describeSprintIdAmbiguity('458.10');
+    expect(problem).toContain('reads back as 458.1');
+    expect(problem).toContain('458.11');
+  });
+
+  it('only inspects text, since a parsed number has already lost the zero', () => {
+    // 458.10 and 458.1 are the same number; the ambiguity exists only as written.
+    expect(describeSprintIdAmbiguity(String(458.10))).toBeNull();
   });
 });

@@ -1,7 +1,7 @@
 import { isAbsolute, posix } from 'node:path';
 import { parseDocument } from 'yaml';
 import { castRoadmapStructure, getRoadmapTicketKey, validateRoadmap } from './roadmap.js';
-import { compareRoadmapSprintIds, roadmapSprintOrderValue } from './roadmap.js';
+import { compareRoadmapSprintIds, describeSprintIdAmbiguity, roadmapSprintOrderValue } from './roadmap.js';
 import type { RoadmapDefinition, RoadmapPhase, RoadmapSprint } from './roadmap.js';
 
 export type RoadmapSourceKind = 'phase' | 'backlog' | 'archive';
@@ -184,10 +184,52 @@ export function parseRoadmapSourceProject(
   };
 }
 
+/**
+ * Reject sprint ids written with a trailing zero in the fraction before YAML
+ * parsing collapses them.
+ *
+ * `458.10` parses to the number 458.1, so by the time any validator sees the
+ * document the id has already silently become an existing sprint — the text is the
+ * only place the ambiguity is still visible (GH #635).
+ *
+ * Scans only the two positions a sprint id is written: a `- <number>` item under
+ * `phase.sprints`, and an `id: <number>` key on a sprint mapping. Other decimals in
+ * the file (par, slope, version) are left alone.
+ */
+function assertNoAmbiguousWrittenSprintIds(yaml: string, sourcePath: string): void {
+  const lines = yaml.split(/\r?\n/);
+  let inPhaseSprints = false;
+
+  for (const [index, line] of lines.entries()) {
+    if (/^\s*sprints:\s*$/.test(line)) {
+      // `phase.sprints` is indented; the top-level `sprints:` list is not.
+      inPhaseSprints = /^\s+sprints:\s*$/.test(line);
+      continue;
+    }
+
+    const idMatch = line.match(/^\s*-?\s*id:\s*([0-9]+\.[0-9]+)\s*(?:#.*)?$/);
+    const itemMatch = inPhaseSprints
+      ? line.match(/^\s*-\s*([0-9]+\.[0-9]+)\s*(?:#.*)?$/)
+      : null;
+    const written = idMatch?.[1] ?? itemMatch?.[1];
+    if (!written) {
+      // Any non-list, non-blank line ends the phase.sprints block.
+      if (inPhaseSprints && line.trim() && !/^\s*-/.test(line)) inPhaseSprints = false;
+      continue;
+    }
+
+    const problem = describeSprintIdAmbiguity(written);
+    if (problem) {
+      throw new RoadmapSourceError(`line ${index + 1}: ${problem}`, sourcePath);
+    }
+  }
+}
+
 export function parseRoadmapSourceDocument(
   yaml: string,
   sourcePath: string,
 ): RoadmapSourceDocument {
+  assertNoAmbiguousWrittenSprintIds(yaml, sourcePath);
   const raw = parseYamlMapping(yaml, sourcePath);
   const version = parseVersion(raw.version, sourcePath);
   if (!raw.phase || typeof raw.phase !== 'object' || Array.isArray(raw.phase)) {

@@ -261,3 +261,46 @@ sprints:
     expect(result.errors).toContainEqual(expect.objectContaining({ code: 'logical_sprint_collision' }));
   });
 });
+
+function sourceWithSprintId(id: string): string {
+  return [
+    'version: "1"',
+    'phase:',
+    '  name: Phase 99',
+    '  sprints:',
+    `    - ${id}`,
+    'sprints:',
+    `  - id: ${id}`,
+    '    theme: T',
+    '    par: 3',
+    '    slope: 1',
+    '    type: feature',
+    '    status: planned',
+    '    tickets:',
+    `      - {key: S${id}-1, title: T1, club: wedge, complexity: small}`,
+    '',
+  ].join(String.fromCharCode(10));
+}
+
+describe('authored sprint id ambiguity (GH #635)', () => {
+  it.each(['458.1', '458.9', '458.11', '459'])('accepts %s', id => {
+    expect(() => parseRoadmapSourceDocument(sourceWithSprintId(id), 'phases/phase-99.yaml')).not.toThrow();
+  });
+
+  it.each(['458.10', '458.0'])('rejects %s before YAML collapses it', id => {
+    // The parser would silently yield 458.1 / 458, so the text is the only place
+    // this is still detectable.
+    expect(() => parseRoadmapSourceDocument(sourceWithSprintId(id), 'phases/phase-99.yaml'))
+      .toThrow(/cannot round-trip/);
+  });
+
+  it('reports the offending line number', () => {
+    expect(() => parseRoadmapSourceDocument(sourceWithSprintId('458.10'), 'phases/phase-99.yaml'))
+      .toThrow(/line 5/);
+  });
+
+  it('leaves other decimals alone', () => {
+    // par/slope/version are numbers too but are not sprint ids.
+    expect(() => parseRoadmapSourceDocument(sourceWithSprintId('459'), 'phases/phase-99.yaml')).not.toThrow();
+  });
+});
