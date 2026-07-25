@@ -14,7 +14,7 @@ sprints:
     par: 5
     slope: 5
     type: bugfix + guard reliability
-    status: planned
+    status: complete
     note: "Fix #631/#630 (worktree-check evaluates hook input.cwd — the launch dir — so a session moved into a worktree is judged against the primary checkout's session store and deadlocks; the guard also auto-registers the denied session as role primary, and slope session start is missing from the recovery exemptions), #625 (claim-required treats out-of-repo scratchpad .ts writes as implementation edits), and #624 (post-merge retro does not advance sprint status across worktrees). Root theme: session identity has uncoordinated channels and guard/CLI resolve different stores, so the guard's own printed remediation can never clear the block."
     tickets:
       - key: S246-1
@@ -53,7 +53,7 @@ sprints:
     par: 5
     slope: 5
     type: bugfix + data integrity
-    status: planned
+    status: complete
     depends_on:
       - 246
     note: "Fix #637 (slope validate regenerates the docs/backlog/roadmap.json projection as a side effect, silently discarding committed edits and exiting success — cost a whole phase of planning work in the Fathoms repo, and reproduced across operators), #636 (focused evidence labels the generated projection as 'Roadmap source'), #635 (sprint IDs are stored as JSON numbers so 458.10 aliases 458.1), and #632 (docs-only commits mentioning a sprint key count as shipped implementation). Also fixes a defect found during S246 pre-round: isEncodedInsertedSprintId treats any integer 200-999 ending in 5 as a legacy encoded half-sprint, so this repo's own S245 renders as S24.5 in slope now and roadmap status."
@@ -110,3 +110,6 @@ sprints:
         club: long_iron
         complexity: moderate
         github_issue: 623
+scorecards:
+  "246": docs/retros/sprint-246.json
+  "247": docs/retros/sprint-247.json

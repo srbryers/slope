@@ -6170,7 +6170,7 @@
       "par": 5,
       "slope": 5,
       "type": "bugfix + guard reliability",
-      "status": "planned",
+      "status": "complete",
       "note": "Fix #631/#630 (worktree-check evaluates hook input.cwd — the launch dir — so a session moved into a worktree is judged against the primary checkout's session store and deadlocks; the guard also auto-registers the denied session as role primary, and slope session start is missing from the recovery exemptions), #625 (claim-required treats out-of-repo scratchpad .ts writes as implementation edits), and #624 (post-merge retro does not advance sprint status across worktrees). Root theme: session identity has uncoordinated channels and guard/CLI resolve different stores, so the guard's own printed remediation can never clear the block.",
       "tickets": [
         {
@@ -6225,7 +6225,7 @@
       "par": 5,
       "slope": 5,
       "type": "bugfix + data integrity",
-      "status": "planned",
+      "status": "complete",
       "depends_on": [
         246
       ],
