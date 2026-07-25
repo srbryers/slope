@@ -8,6 +8,7 @@ import { loadSprintState } from '../sprint-state.js';
 import { loadSessionState, updateSessionState } from '../session-state.js';
 import { resolveStore } from '../store.js';
 import { normalizeTouchedPath, resolveTouchedPaths, toAbsoluteTouchedPath } from './hook-input.js';
+import { pathWithinClaimedArea } from './claim-area.js';
 
 const IMPLEMENTATION_DIRS = [
   'app/',
@@ -251,12 +252,14 @@ function implementationWritePolicyResult(
       ].join('\n'),
     };
   }
+
+  // Only "deny" produces a decision. Everything short of it is advisory: the guard
+  // must not raise an operator permission prompt for a fix the agent can apply
+  // (GH #650). Reached only if a caller omits ctx; the ctx path above dedups.
   return {
-    decision: 'ask',
     context: [
-      'SLOPE permission request — the configured implementation-write policy is "ask".',
+      'SLOPE advisory (non-blocking) — addressed to the agent, not a permission request.',
       ...lines,
-      'A SLOPE claim records work scope but does not replace the host permission policy; the host decides whether to allow this edit.',
     ].join('\n'),
   };
 }
@@ -304,13 +307,7 @@ export function claimOverlapsPath(
   fileArea: string,
 ): boolean {
   if (scope !== 'area') return relativePath === target;
-  if (isWholeSprintClaim(target)) return true;
-  if (isWholeRepoClaim(target)) return true;
-  const areaPrefix = target.endsWith('/') ? target : `${target}/`;
-  return (
-    relativePath === target || relativePath.startsWith(areaPrefix) ||
-    fileArea === target || fileArea.startsWith(areaPrefix)
-  );
+  return pathWithinClaimedArea(relativePath, target) || pathWithinClaimedArea(fileArea, target);
 }
 
 /**
@@ -367,19 +364,3 @@ async function loadSprintClaims(cwd: string, sprintNumber: number): Promise<Spri
   }
 }
 
-function isWholeSprintClaim(target: string): boolean {
-  return /^sprint:S\d+(?:\.\d+)?$/i.test(target);
-}
-
-/**
- * True when an area claim covers the whole working tree.
- *
- * `slope claim --target=. --scope=area` is the natural way to say "I am working
- * across this repo", but the prefix match built `./`, which no relative path
- * starts with — so a root claim silenced nothing and every write was reported as
- * scope drift (GH #651).
- */
-function isWholeRepoClaim(target: string): boolean {
-  const normalized = target.replace(/\\/g, '/').replace(/\/+$/, '');
-  return normalized === '.' || normalized === '' || normalized === '/';
-}
