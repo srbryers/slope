@@ -610,10 +610,16 @@ function completeSourcesSubcommand(flags: Record<string, string>, cwd: string): 
   const scorecardPath = scorecard ? displayPath(cwd, scorecard) : undefined;
 
   try {
+    // `slope roadmap complete` is the explicit operator override — the escape
+    // hatch validate points at when it refuses to auto-promote a deliberate
+    // status (absorbed/blocked/deferred/...). Force the completion so the
+    // command still works on those statuses; the automatic validate path stays
+    // safe because it does not force (GH #660).
     const result = completeRoadmapSourceSprint(cwd, sprint, {
       sourceFlag: flags.source,
       scorecardPath,
       dryRun: flags['dry-run'] === 'true',
+      force: true,
     });
     const label = `S${formatSprintNumber(sprint)}`;
     if (flags['dry-run'] === 'true') {

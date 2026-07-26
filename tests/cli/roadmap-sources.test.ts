@@ -155,6 +155,24 @@ describe('slope roadmap compile', () => {
     expect(logs.join('\n')).toContain('Roadmap source reconciled: S9');
   });
 
+  it('forces completion of a deliberate status as the explicit override (#660)', async () => {
+    const output = writeFixture();
+    const phase2 = join(cwd, 'docs', 'roadmap', 'phases', 'phase-02.yaml');
+    // Sprint 9 carries a deliberate 'absorbed' disposition — the automatic
+    // validate path would leave it, but `slope roadmap complete` is the
+    // explicit override and must force it through.
+    writeFileSync(phase2, readFileSync(phase2, 'utf8').replace('\n    status: planned\n', '\n    status: absorbed\n'));
+    mkdirSync(join(cwd, 'docs', 'retros'), { recursive: true });
+    writeFileSync(join(cwd, 'docs', 'retros', 'sprint-9.json'), JSON.stringify({ sprint_number: 9 }));
+
+    await roadmapCommand(['complete', '--sprint=9']);
+
+    const sourceYaml = readFileSync(phase2, 'utf8');
+    expect(sourceYaml).toContain('status: complete');
+    expect(sourceYaml).not.toContain('status: absorbed');
+    expect(JSON.parse(readFileSync(output, 'utf8')).sprints.find((s: any) => s.id === 9).status).toBe('complete');
+  });
+
   it('detects projection drift in check mode without writing', async () => {
     const output = writeFixture();
     mkdirSync(join(cwd, 'docs', 'backlog'), { recursive: true });
