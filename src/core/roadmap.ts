@@ -218,14 +218,28 @@ export const ROADMAP_TERMINAL_STATUSES = new Set([
   'absorbed',
 ]);
 
+/**
+ * Statuses that are not durably terminal but are intentionally not offered as
+ * the next sprint to work on. A deferred sprint is postponed by choice — it is
+ * neither done (so not terminal) nor queued work (so not selectable). It becomes
+ * selectable again once its status is edited back to planned/active (GH #660).
+ */
+export const ROADMAP_DEFERRED_STATUSES = new Set(['deferred']);
+
 /** Return true when a roadmap sprint has a durable terminal disposition. */
 export function isRoadmapSprintTerminal(sprint: RoadmapSprint): boolean {
   return ROADMAP_TERMINAL_STATUSES.has(sprint.status ?? '');
 }
 
-/** Return true when a roadmap sprint should still be considered selectable work. */
+/**
+ * Return true when a roadmap sprint should still be considered selectable work —
+ * the pool the "next sprint" pickers, rollover target, and current-sprint
+ * inference draw from. Excludes both terminal statuses and deferred (a
+ * deliberately postponed sprint must not be surfaced as the next thing to do).
+ */
 export function isRoadmapSprintPending(sprint: RoadmapSprint): boolean {
-  return !isRoadmapSprintTerminal(sprint);
+  return !isRoadmapSprintTerminal(sprint)
+    && !ROADMAP_DEFERRED_STATUSES.has(sprint.status ?? '');
 }
 
 type RoadmapTicketInput = Partial<RoadmapTicket> & { id?: unknown; key?: unknown };
