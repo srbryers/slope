@@ -1,0 +1,43 @@
+version: "1"
+phase:
+  name: Phase 61 — Reconciliation Status Safety
+  description: "Fix #660: slope validate back-propagates scorecard completion into the authored source YAML and forces status: complete regardless of the authored status, silently destroying absorbed/blocked/planned/deferred history and inflating completion stats. Sibling of #637 but worse — it rewrites project history, not just the generated projection."
+  sprints:
+    - 259
+  status: in_progress
+  note: "A scorecard records how a sprint was played; it does not decide the sprint's disposition. Reconciliation must only promote to complete from an in-flight status and report a conflict otherwise, never overriding a deliberate absorbed/blocked/superseded/deferred/cancelled. Ships as a v1.64.1 patch — no schema change, no new commands."
+sprints:
+  - id: 259
+    theme: Reconciliation Status Safety
+    par: 4
+    slope: 3
+    type: bugfix + data integrity
+    status: complete
+    note: "completeRoadmapSourceSprint patches the source to status: complete whenever a scorecard exists, ignoring the authored status. Restrict auto-promotion to in-flight statuses; report a mismatch for terminal/deliberate statuses; keep slope roadmap complete as the explicit override; stop offering deferred sprints as the next sprint."
+    tickets:
+      - key: S259-1
+        title: "Only auto-promote a scorecarded sprint to complete from an in-flight status; report a conflict otherwise (#660)"
+        club: long_iron
+        complexity: moderate
+        github_issue: 660
+      - key: S259-2
+        title: Report the status conflict in slope validate instead of silently rewriting the source (#660)
+        club: short_iron
+        complexity: standard
+        github_issue: 660
+        depends_on:
+          - S259-1
+      - key: S259-3
+        title: "Keep slope roadmap complete as the explicit override for a deliberate status (#660)"
+        club: wedge
+        complexity: small
+        github_issue: 660
+        depends_on:
+          - S259-1
+      - key: S259-4
+        title: Stop offering a deferred sprint as the next sprint to work on (#660)
+        club: wedge
+        complexity: small
+        github_issue: 660
+scorecards:
+  "259": docs/retros/sprint-259.json

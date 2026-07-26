@@ -106,6 +106,14 @@ describe('roadmap terminal status semantics', () => {
       expect(isRoadmapSprintPending(sprint)).toBe(true);
     }
   });
+
+  it('treats deferred as non-terminal but not selectable (GH #660)', () => {
+    // A deferred sprint is postponed, not done — it must not be offered as the
+    // next sprint to work on, yet it is not a durable terminal disposition.
+    const sprint = makeSprint(7, { status: 'deferred' });
+    expect(isRoadmapSprintTerminal(sprint)).toBe(false);
+    expect(isRoadmapSprintPending(sprint)).toBe(false);
+  });
 });
 
 // --- validateRoadmap ---
@@ -802,6 +810,28 @@ describe('findNextPlannedSprint', () => {
     });
     const next = findNextPlannedSprint(roadmap, 7);
     expect(next?.id).toBe(9);
+  });
+
+  it('skips deferred sprints (GH #660)', () => {
+    const roadmap = makeRoadmap({
+      sprints: [
+        { ...makeSprint(7), status: 'complete' } as any,
+        { ...makeSprint(8), status: 'deferred' } as any,
+        { ...makeSprint(9), status: 'planned' } as any,
+      ],
+    });
+    const next = findNextPlannedSprint(roadmap, 7);
+    expect(next?.id).toBe(9);
+  });
+
+  it('returns null when the only later sprint is deferred (GH #660)', () => {
+    const roadmap = makeRoadmap({
+      sprints: [
+        { ...makeSprint(7), status: 'complete' } as any,
+        { ...makeSprint(8), status: 'deferred' } as any,
+      ],
+    });
+    expect(findNextPlannedSprint(roadmap, 7)).toBeNull();
   });
 
   it('returns null when no later sprints exist', () => {

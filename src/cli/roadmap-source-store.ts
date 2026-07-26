@@ -193,7 +193,25 @@ export interface CompleteRoadmapSourceSprintResult {
   changed: boolean;
   /** True when the source could not be patched surgically and was rewritten in canonical style. */
   reformatted?: boolean;
+  /**
+   * Set when the sprint holds a scorecard but its authored status is a deliberate
+   * non-complete disposition (absorbed, blocked, ...). Reconciliation refuses to
+   * overwrite it — a scorecard records how a sprint was played, not whether it
+   * completed (GH #660). The authored status is reported so the caller can surface
+   * the mismatch; nothing is written.
+   */
+  skipped?: 'status_conflict';
+  /** The authored status that blocked auto-promotion, when skipped. */
+  authoredStatus?: string;
 }
+
+/**
+ * Statuses from which a scorecard legitimately means "now complete" — the normal
+ * closeout path (a planned/active sprint gets run and scored). Every other status
+ * is a deliberate disposition (absorbed, blocked, deferred, superseded, cancelled,
+ * skipped) that a scorecard must never override (GH #660).
+ */
+const PROMOTABLE_TO_COMPLETE = new Set(['', 'planned', 'active', 'in_progress', 'ready_for_pr']);
 
 interface RoadmapSourceSprintMatch {
   source: LoadedRoadmapSource;
@@ -257,13 +275,32 @@ function findRoadmapSourceSprint(store: RoadmapSourceStore, sprint: number): Roa
 export function completeRoadmapSourceSprint(
   cwd: string,
   sprint: number,
-  options: { sourceFlag?: string; scorecardPath?: string; dryRun?: boolean } = {},
+  options: { sourceFlag?: string; scorecardPath?: string; dryRun?: boolean; force?: boolean } = {},
 ): CompleteRoadmapSourceSprintResult {
   const initial = loadRoadmapSourceStore(cwd, options.sourceFlag);
   const initialMatch = findRoadmapSourceSprint(initial, sprint);
   const owner = initialMatch.source;
   const sourceLabel = normalizeDiagnosticPath(relative(cwd, owner.absolutePath ?? owner.entry.path));
-  const changed = initialMatch.status !== 'complete'
+  const authoredStatus = initialMatch.status ?? '';
+
+  // A scorecard records how a sprint was played, not whether it should be marked
+  // complete. Auto-promotion is only legitimate from an in-flight status; every
+  // other status is a deliberate disposition (absorbed, blocked, deferred,
+  // superseded, cancelled, skipped) that reconciliation must never overwrite
+  // (GH #660). `slope roadmap complete` passes force to intentionally override.
+  if (!options.force
+    && authoredStatus !== 'complete'
+    && !PROMOTABLE_TO_COMPLETE.has(authoredStatus)) {
+    return {
+      source: sourceLabel,
+      projection: 'unchanged',
+      changed: false,
+      skipped: 'status_conflict',
+      authoredStatus,
+    };
+  }
+
+  const changed = authoredStatus !== 'complete'
     || Boolean(options.scorecardPath
       && owner.document.scorecards?.[String(initialMatch.storedId)] !== normalizeScorecardRef(options.scorecardPath));
 
@@ -282,6 +319,23 @@ export function completeRoadmapSourceSprint(
         + 'The compiled roadmap projection is generated from these sources, so a sprint that exists only in the projection is not tracked and will be dropped on the next compile. Add it under docs/roadmap/.',
         fresh.manifestPath,
       );
+    }
+
+    // Re-check under the lock: a concurrent edit could have moved the authored
+    // status into a deliberate disposition after the pre-lock read. Re-derive
+    // the conflict from the freshly-loaded state rather than trusting the stale
+    // snapshot (GH #660).
+    const freshStatus = freshMatch.status ?? '';
+    if (!options.force
+      && freshStatus !== 'complete'
+      && !PROMOTABLE_TO_COMPLETE.has(freshStatus)) {
+      return {
+        source: sourceLabel,
+        projection: 'unchanged' as const,
+        changed: false,
+        skipped: 'status_conflict' as const,
+        authoredStatus: freshStatus,
+      };
     }
 
     const storedId = freshMatch.storedId;

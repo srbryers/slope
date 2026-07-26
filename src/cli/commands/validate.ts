@@ -126,7 +126,7 @@ export function validateCommand(input?: string | string[]): void {
  * projection content. That must fail the command: exiting 0 while planning work
  * is silently destroyed is the defect itself (GH #637).
  */
-function reconcileModularRoadmapSources(
+export function reconcileModularRoadmapSources(
   cwd: string,
   scorecards: Array<{ sprint: number; path: string }>,
 ): boolean {
@@ -137,6 +137,16 @@ function reconcileModularRoadmapSources(
       const result = completeRoadmapSourceSprint(cwd, scorecard.sprint, {
         scorecardPath: relative(cwd, scorecard.path).replace(/\\/g, '/'),
       });
+      if (result.skipped === 'status_conflict') {
+        // A scorecard exists but the sprint carries a deliberate disposition
+        // (absorbed, blocked, deferred, ...). Reconciliation must not overwrite
+        // it back to complete (GH #660) — surface the mismatch and leave the
+        // authored status alone. This is a legitimate state, not a failure.
+        console.log(`  ⚠ Roadmap source left as-authored: S${scorecard.sprint} has a scorecard but status '${result.authoredStatus}' (${result.source}).`);
+        console.log('    A scorecard records how the sprint was played, not its disposition; leaving the status untouched.');
+        console.log(`    To intentionally mark it complete, run: slope roadmap complete --sprint=${scorecard.sprint}`);
+        continue;
+      }
       console.log(`  Roadmap source reconciled: S${scorecard.sprint} -> complete (${result.source}; projection ${result.projection})`);
       if (result.reformatted) {
         console.log(`  ⚠ ${result.source} could not be patched surgically and was rewritten in canonical YAML style.`);
