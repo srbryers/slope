@@ -735,6 +735,115 @@ sprints:
   });
 });
 
+describe('completeRoadmapSourceSprint status safety (GH #660)', () => {
+  function writeSingle(status: string): string {
+    const root = join(cwd, 'docs', 'roadmap');
+    mkdirSync(join(root, 'phases'), { recursive: true });
+    writeFileSync(join(root, 'project.yaml'), `
+version: 1
+name: Status Roadmap
+output: ../backlog/roadmap.json
+sources:
+  - path: phases/phase-01.yaml
+    kind: phase
+`);
+    const phasePath = join(root, 'phases', 'phase-01.yaml');
+    writeFileSync(phasePath, `version: "1"
+phase:
+  name: Phase 1
+  status: active
+  sprints: [9]
+sprints:
+  - id: 9
+    theme: Deliberate
+    par: 3
+    slope: 1
+    type: feature
+    status: ${status}
+    tickets:
+      - {key: S9-1, title: T1, club: wedge, complexity: small}
+`);
+    return phasePath;
+  }
+
+  for (const status of ['absorbed', 'blocked', 'deferred', 'superseded', 'cancelled', 'skipped']) {
+    it(`refuses to overwrite a deliberate '${status}' status and leaves the source untouched`, () => {
+      const phasePath = writeSingle(status);
+      const before = readFileSync(phasePath, 'utf8');
+
+      const result = completeRoadmapSourceSprint(cwd, 9, { scorecardPath: 'docs/retros/sprint-9.json' });
+
+      expect(result.skipped).toBe('status_conflict');
+      expect(result.authoredStatus).toBe(status);
+      expect(result.changed).toBe(false);
+      expect(result.projection).toBe('unchanged');
+      // A scorecard records how a sprint was played, not its disposition —
+      // nothing is written, so the authored status and scorecard map survive.
+      expect(readFileSync(phasePath, 'utf8')).toBe(before);
+    });
+  }
+
+  it('reports the conflict without writing under dryRun as well', () => {
+    const phasePath = writeSingle('absorbed');
+    const before = readFileSync(phasePath, 'utf8');
+
+    const result = completeRoadmapSourceSprint(cwd, 9, {
+      scorecardPath: 'docs/retros/sprint-9.json',
+      dryRun: true,
+    });
+
+    expect(result.skipped).toBe('status_conflict');
+    expect(result.authoredStatus).toBe('absorbed');
+    expect(readFileSync(phasePath, 'utf8')).toBe(before);
+  });
+
+  for (const status of ['planned', 'active', 'in_progress', 'ready_for_pr']) {
+    it(`still auto-promotes an in-flight '${status}' status to complete`, () => {
+      writeSingle(status);
+
+      const result = completeRoadmapSourceSprint(cwd, 9, { scorecardPath: 'docs/retros/sprint-9.json' });
+
+      expect(result.skipped).toBeUndefined();
+      const store = loadRoadmapSourceStore(cwd);
+      expect(store.sources[0].document.sprints[0].status).toBe('complete');
+      expect(store.sources[0].document.scorecards?.['9']).toBe('docs/retros/sprint-9.json');
+    });
+  }
+
+  it('force overrides a deliberate status (the slope roadmap complete path)', () => {
+    writeSingle('absorbed');
+
+    const result = completeRoadmapSourceSprint(cwd, 9, {
+      scorecardPath: 'docs/retros/sprint-9.json',
+      force: true,
+    });
+
+    expect(result.skipped).toBeUndefined();
+    const store = loadRoadmapSourceStore(cwd);
+    expect(store.sources[0].document.sprints[0].status).toBe('complete');
+    expect(store.sources[0].document.scorecards?.['9']).toBe('docs/retros/sprint-9.json');
+  });
+
+  it('treats an already-complete sprint as reconcilable, not a conflict', () => {
+    writeSingle('complete');
+
+    const result = completeRoadmapSourceSprint(cwd, 9, {});
+
+    expect(result.skipped).toBeUndefined();
+    const store = loadRoadmapSourceStore(cwd);
+    expect(store.sources[0].document.sprints[0].status).toBe('complete');
+  });
+
+  it('reports an already-complete sprint as unchanged under dryRun', () => {
+    writeSingle('complete');
+
+    const result = completeRoadmapSourceSprint(cwd, 9, { dryRun: true });
+
+    expect(result.skipped).toBeUndefined();
+    expect(result.changed).toBe(false);
+  });
+});
+
 describe('projection content-loss protection (GH #637)', () => {
   function projectionWithExtra(output: string, mutate: (data: Record<string, unknown>) => void): void {
     const data = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
