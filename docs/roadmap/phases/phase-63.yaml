@@ -10,6 +10,7 @@ phase:
   note: "Keep #659 isolated from the immediate v1.x recovery train because it changes store schemas and release-policy treats that as a 2.0.0 major. Plan the migration in layers: schema first, then API/display/scorecard identity, then release packaging and migration notes. Land canonical sprint keys before Phase 64 so the multiplayer ledger does not require a second identity migration."
 sprints:
   - id: 265
+    status: complete
     theme: Store Canonical Sprint IDs
     par: 5
     slope: 5
@@ -102,3 +103,5 @@ sprints:
         depends_on:
           - S267-1
           - S267-2
+scorecards:
+  "265": docs/retros/sprint-265.json
