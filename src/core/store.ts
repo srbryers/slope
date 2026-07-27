@@ -66,6 +66,7 @@ export interface SlopeStore extends SprintRegistry {
 
   // Events (session telemetry)
   insertEvent(event: Omit<SlopeEvent, 'id' | 'timestamp'>): Promise<SlopeEvent>;
+  getAllEvents(): Promise<SlopeEvent[]>;
   getEventsBySession(sessionId: string): Promise<SlopeEvent[]>;
   getEventsBySprint(sprintNumber: SprintId): Promise<SlopeEvent[]>;
   getEventsByTicket(ticketKey: string): Promise<SlopeEvent[]>;

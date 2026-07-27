@@ -750,6 +750,12 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
     return rows.map(rowToEvent);
   }
 
+  async getAllEvents(): Promise<SlopeEvent[]> {
+    const rows = this.db.prepare('SELECT * FROM events ORDER BY timestamp')
+      .all() as Array<Record<string, unknown>>;
+    return rows.map(rowToEvent);
+  }
+
   async getEventsBySprint(sprintNumber: SprintId): Promise<SlopeEvent[]> {
     const rows = this.db.prepare('SELECT * FROM events WHERE sprint_number = ? ORDER BY timestamp')
       .all(canonicalSprintKey(sprintNumber)) as Array<Record<string, unknown>>;

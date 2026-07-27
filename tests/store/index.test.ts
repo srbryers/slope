@@ -460,6 +460,15 @@ describe('Events', () => {
     expect(sprint3[1].type).toBe('decision');
   });
 
+  it('retrieves all events without requiring scorecard sprint discovery', async () => {
+    await store.insertEvent({ type: 'decision', data: { scope: 'active' }, sprint_number: '458.10' });
+    await store.insertEvent({ type: 'hazard', data: { scope: 'unscoped' } });
+
+    const events = await store.getAllEvents();
+
+    expect(events.map(event => event.data.scope)).toEqual(['active', 'unscoped']);
+  });
+
   it('keeps 458.10 events distinct from 458.1', async () => {
     await store.insertEvent({ type: 'decision', data: { sprint: '.1' }, sprint_number: '458.1' });
     await store.insertEvent({ type: 'decision', data: { sprint: '.10' }, sprint_number: '458.10' });

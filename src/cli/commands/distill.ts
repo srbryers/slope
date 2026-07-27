@@ -34,14 +34,7 @@ export async function distillCommand(args: string[]): Promise<void> {
     if (sprintNumber) {
       events = await store.getEventsBySprint(sprintNumber);
     } else {
-      const sprintKeys = new Set(
-        (await store.listScorecards())
-          .map(card => sprintIdKey(card.sprint_number))
-          .filter((key): key is string => key !== null),
-      );
-      events = (
-        await Promise.all([...sprintKeys].map(sprint => store.getEventsBySprint(sprint)))
-      ).flat();
+      events = await store.getAllEvents();
     }
 
     if (events.length === 0) {

@@ -675,6 +675,14 @@ export class PostgresSlopeStore implements SlopeStore {
     return result.rows.map(rowToEvent);
   }
 
+  async getAllEvents(): Promise<SlopeEvent[]> {
+    const result = await this.pool.query(
+      'SELECT * FROM events WHERE project_id = $1 ORDER BY timestamp',
+      [this.projectId],
+    );
+    return result.rows.map(rowToEvent);
+  }
+
   async getEventsBySprint(sprintNumber: SprintId): Promise<SlopeEvent[]> {
     const result = await this.pool.query(
       'SELECT * FROM events WHERE sprint_number = $1 AND project_id = $2 ORDER BY timestamp',
