@@ -506,9 +506,7 @@ describe.skipIf(!PG_URL)('PostgresSlopeStore canonical sprint migration', () => 
           completed_steps JSONB DEFAULT '[]',
           started_at TEXT NOT NULL,
           updated_at TEXT NOT NULL,
-          session_id TEXT,
-          definition_json TEXT,
-          definition_hash TEXT
+          session_id TEXT
         );
 
         INSERT INTO claims VALUES (
@@ -530,22 +528,22 @@ describe.skipIf(!PG_URL)('PostgresSlopeStore canonical sprint migration', () => 
         INSERT INTO workflow_executions VALUES (
           'legacy-workflow', 'legacy', 'test', 'S458', NULL, NULL, 'running',
           '{}', '[]', '2026-01-01T00:00:00.000Z',
-          '2026-01-01T00:00:00.000Z', NULL, NULL, NULL
+          '2026-01-01T00:00:00.000Z', NULL
         );
         INSERT INTO workflow_executions VALUES (
           'non-sprint-workflow', 'legacy', 'test', 'R1', NULL, NULL, 'running',
           '{}', '[]', '2026-01-01T00:00:00.000Z',
-          '2026-01-01T00:00:00.000Z', NULL, NULL, NULL
+          '2026-01-01T00:00:00.000Z', NULL
         );
         INSERT INTO workflow_executions VALUES (
           'trimmed-workflow', 'legacy', 'test', ' 458.10 ', NULL, NULL, 'running',
           '{}', '[]', '2026-01-01T00:00:00.000Z',
-          '2026-01-01T00:00:00.000Z', NULL, NULL, NULL
+          '2026-01-01T00:00:00.000Z', NULL
         );
         INSERT INTO workflow_executions VALUES (
           'invalid-workflow', 'legacy', 'test', 'S0', NULL, NULL, 'running',
           '{}', '[]', '2026-01-01T00:00:00.000Z',
-          '2026-01-01T00:00:00.000Z', NULL, NULL, NULL
+          '2026-01-01T00:00:00.000Z', NULL
         );
       `);
 
@@ -564,6 +562,16 @@ describe.skipIf(!PG_URL)('PostgresSlopeStore canonical sprint migration', () => 
       expect((await migrated.getExecutionBySprint('458.10'))?.sprint_id).toBe('458.10');
       expect((await migrated.getExecutionBySprint('R1'))?.sprint_id).toBe('R1');
       expect((await migrated.getExecution('invalid-workflow'))?.sprint_id).toBe('S0');
+      const execution = await migrated.startExecution({
+        workflow_name: 'snapshot',
+        sprint_id: '458.10',
+        definition_json: '{"name":"snapshot"}',
+        definition_hash: 'sha256:test',
+      });
+      expect(await migrated.getExecution(execution.id)).toMatchObject({
+        definition_json: '{"name":"snapshot"}',
+        definition_hash: 'sha256:test',
+      });
       await expect(migrated.claim({
         sprint_number: '458',
         player: 'bob',
@@ -583,6 +591,114 @@ describe.skipIf(!PG_URL)('PostgresSlopeStore canonical sprint migration', () => 
         { table_name: 'claims', data_type: 'text' },
         { table_name: 'events', data_type: 'text' },
         { table_name: 'scorecards', data_type: 'text' },
+      ]);
+
+      const workflowColumns = await schemaPool.query(`
+        SELECT column_name, data_type
+        FROM information_schema.columns
+        WHERE table_schema = $1
+          AND table_name = 'workflow_executions'
+          AND column_name IN ('definition_json', 'definition_hash')
+        ORDER BY column_name
+      `, [schema]);
+      expect(workflowColumns.rows).toEqual([
+        { column_name: 'definition_hash', data_type: 'text' },
+        { column_name: 'definition_json', data_type: 'text' },
+      ]);
+
+      const eventIndexes = await schemaPool.query(`
+        SELECT indexname
+        FROM pg_indexes
+        WHERE schemaname = $1
+          AND tablename = 'events'
+          AND indexname = 'idx_events_sprint'
+      `, [schema]);
+      expect(eventIndexes.rows).toEqual([{ indexname: 'idx_events_sprint' }]);
+
+      const constraints = await schemaPool.query(`
+        SELECT table_name, constraint_type
+        FROM information_schema.table_constraints
+        WHERE table_schema = $1
+          AND (
+            (table_name = 'claims' AND constraint_type = 'UNIQUE')
+            OR (table_name = 'scorecards' AND constraint_type = 'PRIMARY KEY')
+          )
+        ORDER BY table_name
+      `, [schema]);
+      expect(constraints.rows).toEqual([
+        { table_name: 'claims', constraint_type: 'UNIQUE' },
+        { table_name: 'scorecards', constraint_type: 'PRIMARY KEY' },
+      ]);
+    } finally {
+      await schemaPool?.end();
+      await adminPool.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);
+      await adminPool.end();
+    }
+  }, 15_000);
+
+  it('rolls back schema and version changes when the canonical migration fails', async () => {
+    const pgModule = await import('pg');
+    const PgPool = pgModule.default?.Pool ?? pgModule.Pool;
+    const schema = `s265_rollback_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const adminPool = new PgPool({ connectionString: PG_URL });
+    let schemaPool: Pool | null = null;
+
+    try {
+      await adminPool.query(`CREATE SCHEMA "${schema}"`);
+      const schemaUrl = new URL(PG_URL!);
+      schemaUrl.searchParams.set('options', `-c search_path=${schema}`);
+      schemaPool = new PgPool({ connectionString: schemaUrl.toString() });
+
+      await schemaPool.query(`
+        CREATE TABLE schema_version (
+          version INTEGER PRIMARY KEY,
+          applied_at TEXT NOT NULL
+        );
+        INSERT INTO schema_version VALUES (5, '2026-01-01T00:00:00.000Z');
+
+        CREATE TABLE claims (
+          id TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL DEFAULT 'default',
+          session_id TEXT,
+          sprint_number INTEGER NOT NULL,
+          target TEXT NOT NULL,
+          player TEXT NOT NULL,
+          scope TEXT NOT NULL,
+          claimed_at TEXT NOT NULL,
+          expires_at TEXT,
+          notes TEXT,
+          metadata JSONB,
+          UNIQUE(project_id, sprint_number, scope, target)
+        );
+
+        CREATE TABLE scorecards (
+          project_id TEXT NOT NULL DEFAULT 'default',
+          sprint_number INTEGER NOT NULL,
+          data JSONB NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          PRIMARY KEY(project_id, sprint_number)
+        );
+      `);
+
+      const { PostgresSlopeStore } = await import('../../src/store-pg/index.js');
+      const migrated = new PostgresSlopeStore({ pool: schemaPool, projectId: 'legacy' });
+      await expect(migrated.migrate()).rejects.toThrow(/relation "events" does not exist/);
+
+      const version = await schemaPool.query('SELECT MAX(version) AS version FROM schema_version');
+      expect(version.rows[0].version).toBe(5);
+
+      const columns = await schemaPool.query(`
+        SELECT table_name, data_type
+        FROM information_schema.columns
+        WHERE table_schema = $1
+          AND column_name = 'sprint_number'
+          AND table_name IN ('claims', 'scorecards')
+        ORDER BY table_name
+      `, [schema]);
+      expect(columns.rows).toEqual([
+        { table_name: 'claims', data_type: 'integer' },
+        { table_name: 'scorecards', data_type: 'integer' },
       ]);
 
       const constraints = await schemaPool.query(`

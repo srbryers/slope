@@ -771,6 +771,15 @@ describe('Schema Migration', () => {
       'idx_events_ticket',
       'idx_events_type',
     ]));
+    const claimForeignKeys = inspected.prepare('PRAGMA foreign_key_list(claims)').all();
+    expect(claimForeignKeys).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        table: 'sessions',
+        from: 'session_id',
+        to: 'session_id',
+        on_delete: 'CASCADE',
+      }),
+    ]));
     inspected.close();
   });
 

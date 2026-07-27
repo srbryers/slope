@@ -260,6 +260,11 @@ const MIGRATIONS: Array<{ version: number; sql: string }> = [
         ALTER COLUMN sprint_number TYPE TEXT USING sprint_number::TEXT;
       CREATE INDEX idx_events_sprint ON events(sprint_number);
 
+      ALTER TABLE workflow_executions
+        ADD COLUMN IF NOT EXISTS definition_json TEXT;
+      ALTER TABLE workflow_executions
+        ADD COLUMN IF NOT EXISTS definition_hash TEXT;
+
       UPDATE workflow_executions
       SET sprint_id = substring(btrim(sprint_id) FROM 2)
       WHERE btrim(sprint_id) ~* '^s[0-9]+([.][0-9]+)?$'
