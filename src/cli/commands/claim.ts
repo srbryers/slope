@@ -1,7 +1,7 @@
-import { checkConflicts, sprintIdKey } from '../../core/index.js';
+import { checkConflicts, roadmapSprintKeyFromId, sprintIdKey } from '../../core/index.js';
 import { formatActorName, formatActorSource, formatConflictSummary, resolveActor } from '../actor.js';
 import { loadConfig } from '../config.js';
-import { inferSprintContext } from '../sprint-inference.js';
+import { inferSprintContext, loadRoadmapForInference } from '../sprint-inference.js';
 import { resolveStore } from '../store.js';
 import type { ClaimScope, SprintClaim } from '../../core/index.js';
 
@@ -83,7 +83,9 @@ function resolveSprint(flags: Record<string, string>, cwd: string): string {
       console.error('Error: --sprint must be a positive sprint id, e.g. 114 or 114.5');
       process.exit(1);
     }
-    return sprint;
+    const config = loadConfig(cwd);
+    const roadmap = loadRoadmapForInference(cwd, config);
+    return roadmap ? roadmapSprintKeyFromId(roadmap, sprint) ?? sprint : sprint;
   }
   const config = loadConfig(cwd);
   return inferSprintContext(cwd, config).sprint;

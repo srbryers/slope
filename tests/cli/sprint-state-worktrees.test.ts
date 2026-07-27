@@ -68,8 +68,8 @@ describe('updateSprintPhaseForSprintAcrossWorktrees (GH #624)', () => {
     state.phase = 'implementing';
     saveSprintState(other, state);
 
-    expect(loadSprintState(primary)?.sprint).toBe(247);
-    expect(loadSprintState(other)?.sprint).toBe(247);
+    expect(loadSprintState(primary)?.sprint).toBe('247');
+    expect(loadSprintState(other)?.sprint).toBe('247');
     expect(existsSync(join(other, '.slope', 'sprint-state.json'))).toBe(false);
   });
 

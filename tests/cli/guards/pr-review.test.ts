@@ -112,7 +112,7 @@ describe('prReviewGuard', () => {
       expect(state.reviews).toHaveLength(1);
       expect(state.reviews[0]).toMatchObject({
         pr: 42,
-        sprint: 100,
+        sprint: '100',
         status: 'pending',
         closeout_status: 'pending',
       });

@@ -1,7 +1,7 @@
 import { readFileSync, existsSync, unlinkSync } from 'node:fs';
 import { isAbsolute, join } from 'node:path';
 import { resolveRepoStatePath } from '../core/repo-state-scope.js';
-import { sprintIdKey, sprintIdsEqual, type SprintId } from '../core/index.js';
+import { sprintIdKey, sprintIdsEqual, type SprintId } from '../core/sprint-id.js';
 import { atomicWriteFileSync, withFileLockSync } from './atomic-write.js';
 import { listRepoWorktrees } from './session-scope.js';
 
@@ -386,7 +386,17 @@ export function loadSprintStateResult(cwd: string): SprintStateLoadResult {
   if (!existsSync(path)) return { status: 'missing' };
   try {
     const raw = JSON.parse(readFileSync(path, 'utf8'));
-    if (!isValidSprintStateEvidence(raw)) return { status: 'corrupt', path };
+    const normalized = {
+      ...raw,
+      sprint: sprintIdKey(raw.sprint as SprintId),
+      ...(raw.rollover ? {
+        rollover: {
+          ...raw.rollover,
+          from_sprint: sprintIdKey(raw.rollover.from_sprint as SprintId),
+        },
+      } : {}),
+    };
+    if (!isValidSprintStateEvidence(normalized)) return { status: 'corrupt', path };
   } catch {
     return { status: 'corrupt', path };
   }
