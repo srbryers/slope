@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { workflowGateGuard } from '../../../src/cli/guards/workflow-gate.js';
 import type { HookInput } from '../../../src/core/index.js';
 
-const TMP = join(import.meta.dirname ?? __dirname, '..', '..', '..', '.test-tmp-workflow-gate');
+let TMP: string;
 
 function makeInput(): HookInput {
   return {
@@ -37,7 +38,7 @@ function writeSprintState(phase: string): void {
 
 describe('workflowGateGuard', () => {
   beforeEach(() => {
-    mkdirSync(TMP, { recursive: true });
+    TMP = mkdtempSync(join(tmpdir(), 'slope-workflow-gate-'));
   });
 
   afterEach(() => {

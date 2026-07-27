@@ -123,6 +123,20 @@ phases:
 `);
 }
 
+function writeCommandWorkflow(name: string): void {
+  mkdirSync(join(tmpDir, '.slope', 'workflows'), { recursive: true });
+  writeFileSync(join(tmpDir, '.slope', 'workflows', `${name}.yaml`), `
+name: ${name}
+version: "1"
+phases:
+  - id: post_hole
+    steps:
+      - id: capture_execution
+        type: command
+        command: node -e "require('node:fs').writeFileSync('workflow-env.txt', process.env.SLOPE_WORKFLOW_EXECUTION_ID || '')"
+`);
+}
+
 function initGitForSprint(sprint: number): void {
   execFileSync('git', ['init'], { cwd: tmpDir, stdio: 'ignore' });
   execFileSync('git', ['config', 'user.email', 'test@example.com'], { cwd: tmpDir });
@@ -190,6 +204,24 @@ describe('slope sprint run', () => {
     );
     expect(output).toContain('Execution:');
     expect(output).toContain('Sprint:    S64');
+  });
+
+  it('identifies the invoking execution to workflow command subprocesses (#668)', async () => {
+    writeCommandWorkflow('execution-env');
+
+    await captureLog(() =>
+      sprintCommand(['run', 'S68', '--workflow=execution-env'])
+    );
+
+    const store = createStore({ storePath: '.slope/slope.db', cwd: tmpDir });
+    try {
+      const executions = await store.listExecutions({ sprint_id: 'S68' });
+      expect(executions).toHaveLength(1);
+      expect(readFileSync(join(tmpDir, 'workflow-env.txt'), 'utf8')).toBe(executions[0].id);
+      expect(executions[0].status).toBe('completed');
+    } finally {
+      store.close();
+    }
   });
 
   it('defaults required tickets from the roadmap when omitted (#480)', async () => {

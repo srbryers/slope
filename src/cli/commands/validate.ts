@@ -12,9 +12,11 @@ import {
 import { loadConfig } from '../config.js';
 import { updateGate } from '../sprint-state.js';
 import { completeRoadmapSourceSprint } from '../roadmap-source-store.js';
+import { sprintLabelForExecution } from '../workflow-resync.js';
+import { reconcileWorkflowCloseout, WORKFLOW_EXECUTION_ID_ENV } from '../workflow-closeout.js';
 import type { RoadmapSourceError } from '../../core/index.js';
 
-export function validateCommand(input?: string | string[]): void {
+export async function validateCommand(input?: string | string[]): Promise<void> {
   const args = Array.isArray(input) ? input : input ? [input] : [];
   const validateSkills = args.includes('--skills');
   const readOnly = args.includes('--read-only');
@@ -105,7 +107,11 @@ export function validateCommand(input?: string | string[]): void {
   let reconciled = true;
   if (allValid && registryAvailable && !readOnly) {
     updateGate(cwd, 'scorecard', true);
-    reconciled = reconcileModularRoadmapSources(cwd, validScorecards);
+    const completedRoadmapSprints = new Set<number>();
+    reconciled = reconcileModularRoadmapSources(cwd, validScorecards, completedRoadmapSprints);
+    if (reconciled && completedRoadmapSprints.size > 0) {
+      reconciled = await reconcileValidatedWorkflowExecutions(cwd, completedRoadmapSprints);
+    }
   } else if (readOnly) {
     // `validate` writes tracked files as a side effect: it marks the scorecard
     // gate, reconciles scorecard indexes and sprint status into the phase YAML,
@@ -119,6 +125,22 @@ export function validateCommand(input?: string | string[]): void {
   process.exit(allValid && registryAvailable && reconciled ? 0 : 1);
 }
 
+async function reconcileValidatedWorkflowExecutions(cwd: string, sprints: Iterable<number>): Promise<boolean> {
+  const invokingExecutionId = process.env[WORKFLOW_EXECUTION_ID_ENV]?.trim();
+  const result = await reconcileWorkflowCloseout(cwd, sprints, {
+    ...(invokingExecutionId ? { preserveExecutionIds: [invokingExecutionId] } : {}),
+    preserveNewestPerSprint: true,
+  });
+  for (const exec of result.completed) {
+    console.log(`  Workflow execution reconciled: ${sprintLabelForExecution(exec)} duplicate -> completed (${exec.id})`);
+  }
+  if (result.warning) {
+    console.error(`  \u2717 Workflow execution reconciliation failed: ${result.warning}`);
+    return false;
+  }
+  return true;
+}
+
 /**
  * Reconcile closeout status into the modular sources.
  *
@@ -129,8 +151,12 @@ export function validateCommand(input?: string | string[]): void {
 export function reconcileModularRoadmapSources(
   cwd: string,
   scorecards: Array<{ sprint: number; path: string }>,
+  completedSprints: Set<number> = new Set(),
 ): boolean {
-  if (!existsSync(join(cwd, 'docs', 'roadmap', 'project.yaml'))) return true;
+  if (!existsSync(join(cwd, 'docs', 'roadmap', 'project.yaml'))) {
+    for (const scorecard of scorecards) completedSprints.add(scorecard.sprint);
+    return true;
+  }
   let ok = true;
   for (const scorecard of scorecards) {
     try {
@@ -151,6 +177,7 @@ export function reconcileModularRoadmapSources(
       if (result.reformatted) {
         console.log(`  ⚠ ${result.source} could not be patched surgically and was rewritten in canonical YAML style.`);
       }
+      completedSprints.add(scorecard.sprint);
     } catch (error) {
       if ((error as RoadmapSourceError).projectionContentLoss) {
         // Report once, not per scorecard \u2014 the cause is the projection, not the sprint.

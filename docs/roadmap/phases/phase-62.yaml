@@ -1,7 +1,7 @@
 version: "1"
 phase:
   name: Phase 62 — Parallel Agent Coordination Recovery
-  description: "Triage of the late-July multi-agent and status-surface issue batch (#663, #664, #665, #666, #667, #668, #669). The triage pass runs first so the roadmap records the open-issue ordering before implementation begins. A short inserted research sprint then translates lessons from block/buzz into SLOPE's roadmap without importing its transport or chat model. Worktree store split-brain leads implementation because it silently disables the coordination primitives and sprint guards in the path the collision guard mandates. Session/status truth comes next, then workflow execution scoping, then the formal SLOPE Team Round contract."
+  description: "Triage of the late-July multi-agent and status-surface issue batch (#663, #664, #665, #666, #667, #668, #669), plus the linked-worktree post-merge evidence defect found during S262 (#673). The triage pass runs first so the roadmap records the open-issue ordering before implementation begins. A short inserted research sprint then translates lessons from block/buzz into SLOPE's roadmap without importing its transport or chat model. Worktree store split-brain leads implementation because it silently disables the coordination primitives and sprint guards in the path the collision guard mandates. Session/status truth comes next, then workflow execution and post-merge evidence scoping, then the formal SLOPE Team Round contract."
   sprints:
     - 260
     - 260.1
@@ -12,7 +12,7 @@ phase:
     - 264.1
     - 264.2
   status: in_progress
-  note: "Issue-driven recovery for #663-#669. Ordered by blast radius: S260 records the triage, S260.1 captures Buzz-informed product and architecture lessons, #665/#667 make worktree sessions guard-blind and claim-blind, #666/#663/#664 make the status surface misleading for operators and agents, #668 gates fresh work on stale executions, and #669 formalizes the Team Round model after the plumbing stops lying."
+  note: "Issue-driven recovery for #663-#669 and #673. Ordered by blast radius: S260 records the triage, S260.1 captures Buzz-informed product and architecture lessons, #665/#667 make worktree sessions guard-blind and claim-blind, #666/#663/#664 make the status surface misleading for operators and agents, #668 gates fresh work on stale executions, #673 can strand post-merge evidence in a linked checkout, and #669 formalizes the Team Round model after the plumbing stops lying."
 sprints:
   - id: 260
     status: complete
@@ -153,13 +153,14 @@ sprints:
         complexity: standard
         github_issue: 664
   - id: 263
+    status: complete
     theme: Workflow Execution Scope Recovery
     par: 4
     slope: 3
     type: bugfix + guard reliability
     depends_on:
       - 261
-    note: "Fix #668: workflow-step-gate can block a fresh sprint because an old execution for an already-merged sprint is still sitting at pre_shot. The guard should scope by active sprint and status, name the blocking execution when it must block, and close the lifecycle gap that leaves executions stale after scorecard/review validation."
+    note: "Fix #668 and #673: workflow-step-gate can block a fresh sprint because an old execution for an already-merged sprint is still sitting at pre_shot, while post-merge retro evidence can resolve relative to the invoking linked checkout instead of the repository state owner. Scope guards and evidence to authoritative active repository state, name the blocking execution when the guard must block, and close the lifecycle gap that leaves executions stale after scorecard/review validation."
     tickets:
       - key: S263-1
         title: Scope workflow-step-gate to the active sprint and ignore completed or merged sprint executions (#668)
@@ -180,6 +181,13 @@ sprints:
         github_issue: 668
         depends_on:
           - S263-1
+      - key: S263-4
+        title: Route post-merge retro evidence through the repository state owner with linked-worktree regression coverage (#673)
+        club: wedge
+        complexity: small
+        github_issue: 673
+        depends_on:
+          - S263-3
   - id: 264
     theme: Team Round Domain and Scoring Contract
     par: 4
@@ -306,3 +314,4 @@ scorecards:
   "260.1": docs/retros/sprint-260.1.json
   "261": docs/retros/sprint-261.json
   "262": docs/retros/sprint-262.json
+  "263": docs/retros/sprint-263.json

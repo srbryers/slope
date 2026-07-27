@@ -788,6 +788,13 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
     }
   }
 
+  async completeRunningExecution(executionId: string): Promise<boolean> {
+    const result = this.db.prepare(
+      "UPDATE workflow_executions SET status = 'completed', updated_at = ? WHERE id = ? AND status = 'running'"
+    ).run(nowISO(), executionId);
+    return result.changes > 0;
+  }
+
   async recordStepResult(params: { execution_id: string; step_id: string; phase: string; status: 'completed' | 'skipped' | 'failed'; output?: Record<string, unknown>; exit_code?: number; item?: string; started_at?: string }): Promise<WorkflowStepResult> {
     const id = generateId('wfs');
     const now = nowISO();

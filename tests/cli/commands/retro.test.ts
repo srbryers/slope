@@ -1,12 +1,15 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { mkdtempSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
 import { retroCommand } from '../../../src/cli/commands/retro.js';
 import { memoryCommand } from '../../../src/cli/commands/memory.js';
 import { searchMemories } from '../../../src/core/memory.js';
 import { createSprintState, loadSprintState, saveSprintState } from '../../../src/cli/sprint-state.js';
+import { SqliteSlopeStore } from '../../../src/store/index.js';
 
 function createTempDir(): string {
   const cwd = mkdtempSync(join(tmpdir(), 'slope-retro-cli-'));
@@ -42,16 +45,19 @@ async function captureLogs(fn: () => void | Promise<void>): Promise<{ stdout: st
 
 describe('retro post-merge CLI', () => {
   let cwd: string;
+  let linkedCwd: string | null;
   let origCwd: string;
 
   beforeEach(() => {
     cwd = createTempDir();
+    linkedCwd = null;
     origCwd = process.cwd();
     process.chdir(cwd);
   });
 
   afterEach(() => {
     process.chdir(origCwd);
+    if (linkedCwd && existsSync(linkedCwd)) rmSync(linkedCwd, { recursive: true, force: true });
     rmSync(cwd, { recursive: true, force: true });
   });
 
@@ -92,6 +98,34 @@ describe('retro post-merge CLI', () => {
     expect(memories.some(m => m.category === 'hazard' && m.text.includes('help flags'))).toBe(true);
   });
 
+  it('writes linked-worktree retro evidence only to the repository state owner (#673)', async () => {
+    writeFileSync(join(cwd, '.slope', 'config.json'), '{}\n');
+    writeFileSync(join(cwd, 'README.md'), 'primary\n');
+    execFileSync('git', ['init'], { cwd, stdio: 'ignore' });
+    execFileSync('git', ['config', 'user.email', 'test@example.com'], { cwd });
+    execFileSync('git', ['config', 'user.name', 'Test User'], { cwd });
+    execFileSync('git', ['add', 'README.md'], { cwd });
+    execFileSync('git', ['commit', '-m', 'chore: initialize test repository'], { cwd, stdio: 'ignore' });
+    linkedCwd = join(tmpdir(), `${basename(cwd)}-linked`);
+    execFileSync('git', ['worktree', 'add', '-b', 'retro-linked', linkedCwd], { cwd, stdio: 'ignore' });
+    process.chdir(linkedCwd);
+
+    const out = await captureLogs(() => retroCommand([
+      'post-merge',
+      '--sprint=137',
+      '--pr=512',
+      '--summary=merged from linked worktree',
+      '--json',
+    ]));
+
+    const primaryPath = join(realpathSync(cwd), '.slope', 'retros', 'post-merge', 'sprint-137-pr-512.json');
+    const linkedPath = join(linkedCwd, '.slope', 'retros', 'post-merge', 'sprint-137-pr-512.json');
+    const payload = JSON.parse(out.stdout);
+    expect(payload.path).toBe(primaryPath);
+    expect(existsSync(primaryPath)).toBe(true);
+    expect(existsSync(linkedPath)).toBe(false);
+  });
+
   it('reconciles matching local sprint state to complete after post-merge retro (#611)', async () => {
     const state = createSprintState(137, 'scoring');
     state.gates.tests = true;
@@ -119,6 +153,95 @@ describe('retro post-merge CLI', () => {
     ]));
 
     expect(loadSprintState(cwd)?.phase).toBe('complete');
+  });
+
+  it('atomically completes remaining running workflow executions at post-merge closeout (#668)', async () => {
+    const store = new SqliteSlopeStore(join(cwd, '.slope', 'slope.db'));
+    const running = await store.startExecution({ workflow_name: 'sprint-standard', sprint_id: 'S137' });
+    const paused = await store.startExecution({ workflow_name: 'sprint-standard', sprint_id: 'S137' });
+    await store.completeExecution(paused.id, 'paused');
+    store.close();
+
+    await captureLogs(() => retroCommand([
+      'post-merge',
+      '--sprint=137',
+      '--pr=512',
+      '--summary=merged cleanly',
+    ]));
+
+    const updated = new SqliteSlopeStore(join(cwd, '.slope', 'slope.db'));
+    try {
+      await expect(updated.getExecution(running.id)).resolves.toMatchObject({ status: 'completed' });
+      await expect(updated.getExecution(paused.id)).resolves.toMatchObject({ status: 'paused' });
+    } finally {
+      updated.close();
+    }
+  });
+
+  it('allows no-op closeout when a custom store lacks atomic completion capability (#668)', async () => {
+    const adapterPath = join(cwd, 'custom-store.mjs');
+    writeFileSync(adapterPath, `
+export function createStore() {
+  return {
+    async listExecutions() { return []; },
+    close() {},
+  };
+}
+`);
+    writeFileSync(join(cwd, '.slope', 'config.json'), JSON.stringify({
+      store: pathToFileURL(adapterPath).href,
+    }));
+
+    const out = await captureLogs(() => retroCommand([
+      'post-merge',
+      '--sprint=137',
+      '--summary=custom adapter closeout',
+    ]));
+
+    expect(out.exitCode).toBe(0);
+    expect(out.stderr).toBe('');
+    expect(existsSync(join(cwd, '.slope', 'retros', 'post-merge', 'sprint-137.json'))).toBe(true);
+  });
+
+  it('fails before durable retro writes when custom store closeout needs atomic completion (#668)', async () => {
+    const adapterPath = join(cwd, 'custom-store.mjs');
+    writeFileSync(adapterPath, `
+export function createStore() {
+  return {
+    async listExecutions() {
+      return [{
+        id: 'legacy-running',
+        workflow_name: 'sprint-standard',
+        sprint_id: 'S137',
+        status: 'running',
+        phase: 'validation',
+        current_step: 'validate',
+        variables: {},
+        started_at: '2026-07-27T18:00:00.000Z',
+        updated_at: '2026-07-27T18:00:00.000Z'
+      }];
+    },
+    close() {},
+  };
+}
+`);
+    writeFileSync(join(cwd, '.slope', 'config.json'), JSON.stringify({
+      store: pathToFileURL(adapterPath).href,
+    }));
+    saveSprintState(cwd, createSprintState(137, 'scoring'));
+
+    const out = await captureLogs(() => retroCommand([
+      'post-merge',
+      '--sprint=137',
+      '--summary=custom adapter closeout',
+      '--learning=workflow:7:closeout should fail before evidence writes',
+    ]));
+
+    expect(out.exitCode).toBe(1);
+    expect(out.stderr).toContain('completeRunningExecution@1');
+    expect(loadSprintState(cwd)?.phase).toBe('scoring');
+    expect(existsSync(join(cwd, '.slope', 'retros', 'post-merge', 'sprint-137.json'))).toBe(false);
+    expect(searchMemories(cwd, { source: 'auto-retro' })).toHaveLength(0);
   });
 
   it('parses non-project category and weight prefixes without persisting prefix text', async () => {

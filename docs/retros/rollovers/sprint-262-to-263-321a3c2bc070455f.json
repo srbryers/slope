@@ -1,0 +1,300 @@
+{
+  "version": 1,
+  "kind": "sprint_rollover",
+  "transition_id": "2c2d460af6f05254",
+  "from_sprint": 262,
+  "to_sprint": 263,
+  "from_label": "S262",
+  "to_label": "S263",
+  "recorded_at": "2026-07-27T17:04:20.777Z",
+  "actor": {
+    "name": "sebastianbryers",
+    "source": "env:USER"
+  },
+  "request": {
+    "from": 262,
+    "to": 263,
+    "force": false
+  },
+  "forced": false,
+  "eligibility": {
+    "from_terminal": true,
+    "target_dependency_eligible": true,
+    "blocking_dependencies": [],
+    "target_dependencies": [
+      261
+    ],
+    "completion_evidence": {
+      "roadmap_complete": [
+        61,
+        62,
+        63,
+        64,
+        65,
+        66,
+        67,
+        68,
+        69,
+        70,
+        71,
+        72,
+        73,
+        74,
+        75,
+        76,
+        77,
+        78,
+        79,
+        80,
+        81,
+        82,
+        83,
+        84,
+        86,
+        87,
+        88,
+        89,
+        90,
+        91,
+        92,
+        93,
+        94,
+        95,
+        96,
+        97,
+        98,
+        99,
+        100,
+        101,
+        102,
+        103,
+        104,
+        105,
+        106,
+        107,
+        108,
+        109,
+        110,
+        111,
+        112,
+        113,
+        114,
+        114.5,
+        115,
+        116,
+        117,
+        118,
+        119,
+        120,
+        121,
+        122,
+        123,
+        124,
+        125,
+        126,
+        127,
+        130,
+        131,
+        132,
+        133,
+        134,
+        135,
+        136,
+        137,
+        137.5,
+        138,
+        139,
+        140,
+        141,
+        142,
+        143,
+        143.5,
+        143.6,
+        143.7,
+        143.8,
+        143.9,
+        143.95,
+        143.97,
+        143.98,
+        143.99,
+        144,
+        145,
+        146,
+        146.1,
+        146.2,
+        146.3,
+        148,
+        149,
+        150,
+        151,
+        151.1,
+        152,
+        152.1,
+        153,
+        154,
+        216,
+        217,
+        218,
+        219,
+        220,
+        221,
+        222,
+        223,
+        224,
+        226,
+        227,
+        228,
+        229,
+        230,
+        231,
+        232,
+        233,
+        234,
+        235,
+        236,
+        241,
+        242,
+        243,
+        244,
+        246,
+        247,
+        248,
+        249,
+        250,
+        251,
+        252,
+        253,
+        254,
+        256,
+        258,
+        259,
+        260,
+        260.1,
+        261,
+        262
+      ],
+      "scorecards": [
+        261,
+        262
+      ],
+      "local_terminal": [
+        262
+      ]
+    },
+    "scorecard_artifacts": [
+      {
+        "sprint": 261,
+        "path": "docs/retros/sprint-261.json",
+        "sha256": "02099e4476e22632ed72c23aca77b43cffdd6783f6c52c9bfa52372f1c1140a7"
+      },
+      {
+        "sprint": 262,
+        "path": "docs/retros/sprint-262.json",
+        "sha256": "1a1398c591f8c4e981a69ce9e54d22cf73720b2400ead12952a7b0190d29472a"
+      }
+    ],
+    "expected_next": 263
+  },
+  "roadmap": {
+    "path": "docs/backlog/roadmap.json",
+    "sha256": "63a46540f0cce515339154df5d58580a8653a5dc4eec8d03f8db6e50a9adb8b9",
+    "from_status": "complete"
+  },
+  "prior_state_sha256": "a3ededb272818dd426cdcb1cc13227b2c07a94463d671f1de99e3d9b71fcdf9c",
+  "prior_state": {
+    "sprint": 262,
+    "phase": "complete",
+    "gates": {
+      "tests": true,
+      "code_review": true,
+      "architect_review": true,
+      "scorecard": true,
+      "review_md": true
+    },
+    "review_gates": {
+      "code_review": {
+        "provenance": "independent_review",
+        "evidence": [
+          "docs/retros/sprint-262-security-review.md"
+        ],
+        "reviewer": "019fa44f-331f-77c2-87e6-b461d77e5312",
+        "verdict": "pass",
+        "reviewed_commit": "71ca4ae",
+        "updated_at": "2026-07-27T16:55:51.004Z"
+      },
+      "architect_review": {
+        "provenance": "independent_review",
+        "evidence": [
+          "docs/retros/sprint-262-architect-review.md"
+        ],
+        "reviewer": "019fa44f-2fde-79d1-a5d6-1d7482a46c79",
+        "verdict": "pass",
+        "reviewed_commit": "71ca4ae",
+        "updated_at": "2026-07-27T16:55:41.005Z"
+      }
+    },
+    "review_requirements": {
+      "code_review": {
+        "priority": "required",
+        "reason": "File patterns include security-sensitive paths",
+        "source": "review_recommend",
+        "updated_at": "2026-07-27T15:57:09.599Z"
+      },
+      "architect_review": {
+        "priority": "required",
+        "reason": "4 tickets warrants architectural review",
+        "source": "review_recommend",
+        "updated_at": "2026-07-27T15:57:09.599Z"
+      }
+    },
+    "started_at": "2026-07-27T15:37:07.819Z",
+    "updated_at": "2026-07-27T17:01:46.344Z",
+    "rollover": {
+      "transition_id": "314c93b75f20b878",
+      "from_sprint": 261,
+      "audit_path": "docs/retros/rollovers/sprint-261-to-262-046227aafe9304fc.json",
+      "recorded_at": "2026-07-27T15:37:07.819Z",
+      "forced": false
+    }
+  },
+  "next_state": {
+    "sprint": 263,
+    "phase": "planning",
+    "gates": {
+      "tests": false,
+      "code_review": false,
+      "architect_review": false,
+      "scorecard": false,
+      "review_md": false
+    },
+    "review_gates": {
+      "code_review": {
+        "provenance": "pending",
+        "evidence": []
+      },
+      "architect_review": {
+        "provenance": "pending",
+        "evidence": []
+      }
+    },
+    "review_requirements": {
+      "code_review": {
+        "priority": "unspecified"
+      },
+      "architect_review": {
+        "priority": "unspecified"
+      }
+    },
+    "started_at": "2026-07-27T17:04:20.777Z",
+    "updated_at": "2026-07-27T17:04:20.777Z",
+    "rollover": {
+      "transition_id": "2c2d460af6f05254",
+      "from_sprint": 262,
+      "audit_path": "docs/retros/rollovers/sprint-262-to-263-321a3c2bc070455f.json",
+      "recorded_at": "2026-07-27T17:04:20.777Z",
+      "forced": false
+    }
+  },
+  "claims_policy": "unchanged",
+  "sessions_policy": "unchanged"
+}

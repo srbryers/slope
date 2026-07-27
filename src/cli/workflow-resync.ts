@@ -39,6 +39,61 @@ export interface SprintStateRebindResult {
   reason?: string;
 }
 
+export async function completeWorkflowExecutionsForSprints(
+  store: Pick<SlopeStore, 'listExecutions'> & Partial<Pick<SlopeStore, 'completeRunningExecution'>>,
+  sprints: Iterable<number>,
+  options: {
+    preserveExecutionIds?: Iterable<string>;
+    preserveNewestPerSprint?: boolean;
+  } = {},
+): Promise<WorkflowExecution[]> {
+  const targetSprints = new Set(sprints);
+  if (targetSprints.size === 0) return [];
+
+  const preserveExecutionIds = new Set(options.preserveExecutionIds ?? []);
+  const bySprint = new Map<number, WorkflowExecution[]>();
+  const running = await store.listExecutions({ status: 'running' });
+  for (const exec of running) {
+    const sprint = sprintNumberForExecution(exec);
+    if (sprint === null || !targetSprints.has(sprint)) continue;
+    const executions = bySprint.get(sprint) ?? [];
+    executions.push(exec);
+    bySprint.set(sprint, executions);
+  }
+
+  const pending: WorkflowExecution[] = [];
+  for (const executions of bySprint.values()) {
+    const explicitlyPreserved = executions.filter(exec => preserveExecutionIds.has(exec.id));
+    const newestStartedAt = options.preserveNewestPerSprint && explicitlyPreserved.length === 0
+      ? executions.reduce((latest, exec) => exec.started_at > latest ? exec.started_at : latest, '')
+      : null;
+    const preserved = new Set(
+      explicitlyPreserved.length > 0
+        ? explicitlyPreserved.map(exec => exec.id)
+        : newestStartedAt
+          ? executions.filter(exec => exec.started_at === newestStartedAt).map(exec => exec.id)
+          : [],
+    );
+
+    for (const exec of executions) {
+      if (preserved.has(exec.id)) continue;
+      pending.push(exec);
+    }
+  }
+
+  if (pending.length === 0) return [];
+  const completeRunningExecution = store.completeRunningExecution?.bind(store);
+  if (!completeRunningExecution) {
+    throw new Error('Configured store does not support workflow closeout capability completeRunningExecution@1.');
+  }
+
+  const completed: WorkflowExecution[] = [];
+  for (const exec of pending) {
+    if (await completeRunningExecution(exec.id)) completed.push(exec);
+  }
+  return completed;
+}
+
 export function inferSprintFromBranch(cwd: string): number | null {
   const branch = currentBranch(cwd);
   if (!branch) return null;

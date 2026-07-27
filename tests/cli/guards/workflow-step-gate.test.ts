@@ -235,6 +235,42 @@ describe('workflowStepGateGuard', () => {
     expect(result.blockReason).toBeUndefined();
   });
 
+  it('treats active sprint state as authoritative over a stale branch label (#668)', async () => {
+    writeConfig();
+    initGitForSprint(85);
+    saveSprintState(TMP, createSprintState(217, 'implementing'));
+    writeWorkflow('current-wf', 'agent_work');
+    writeWorkflow('stale-branch-wf', 'command');
+    const store = new SqliteSlopeStore(join(TMP, '.slope/slope.db'));
+    await createRunningExecution(store, 'current-wf', 'phase1', 'step1', { sprintId: 'S217' });
+    await waitForTimestampTick();
+    await createRunningExecution(store, 'stale-branch-wf', 'phase1', 'step1', { sprintId: 'S85' });
+    store.close();
+
+    const result = await workflowStepGateGuard(makeInput(), TMP);
+
+    expect(result.decision).toBeUndefined();
+    expect(result.blockReason).toBeUndefined();
+  });
+
+  it('treats an explicit sprint branch as authoritative over roadmap fallback inference (#668)', async () => {
+    writeConfig({ roadmapPath: 'docs/backlog/roadmap.json' });
+    initGitForSprint(85);
+    writeRoadmap([{ id: 217, status: 'planned' }]);
+    writeWorkflow('branch-wf', 'command');
+    const store = new SqliteSlopeStore(join(TMP, '.slope/slope.db'));
+    const execId = await createRunningExecution(store, 'branch-wf', 'phase1', 'step1', {
+      sprintId: 'S85',
+      sessionId: 'test-session',
+    });
+    store.close();
+
+    const result = await workflowStepGateGuard(makeInput(), TMP);
+
+    expect(result.decision).toBe('deny');
+    expect(result.blockReason).toContain(`blocked by execution ${execId} for S85`);
+  });
+
   it('fails open when multiple executions cannot be disambiguated (#531)', async () => {
     writeConfig();
     writeWorkflow('command-wf', 'command');
@@ -303,11 +339,12 @@ describe('workflowStepGateGuard', () => {
     writeConfig();
     writeWorkflow('test-wf', 'command');
     const store = new SqliteSlopeStore(join(TMP, '.slope/slope.db'));
-    await createRunningExecution(store, 'test-wf', 'phase1', 'step1');
+    const execId = await createRunningExecution(store, 'test-wf', 'phase1', 'step1');
     store.close();
 
     const result = await workflowStepGateGuard(makeInput(), TMP);
     expect(result.decision).toBe('deny');
+    expect(result.blockReason).toContain(`blocked by execution ${execId} for S77`);
     expect(result.blockReason).toContain('command');
     expect(result.blockReason).toContain('not "agent_work"');
   });
