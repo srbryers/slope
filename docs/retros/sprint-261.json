@@ -1,0 +1,221 @@
+{
+  "sprint_number": 261,
+  "player": "codex",
+  "theme": "Worktree Store Coordination",
+  "par": 5,
+  "slope": 5,
+  "score": 17,
+  "score_label": "triple_plus",
+  "date": "2026-07-27",
+  "shots": [
+    {
+      "ticket_key": "S261-1",
+      "title": "Resolve SLOPE state from the git common-dir owner so repo worktrees share one store (#665/#667)",
+      "club": "driver",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "moderate",
+          "description": "[code review] Worktree-only initialization did not resolve descendants when the primary checkout lacked SLOPE state.",
+          "gotcha_id": "review:code"
+        },
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "[architect review] First-time initialization from an unconfigured git descendant could create nested SLOPE state.",
+          "gotcha_id": "review:architect"
+        }
+      ],
+      "notes": "Added one repository-state owner resolver based on git common-dir semantics and routed configuration, SQLite creation, sessions, claims, sprint state, review state, baselines, and repository-scoped ignored files through it. Branch-local tracked roadmap and source reads remain worktree-local."
+    },
+    {
+      "ticket_key": "S261-2",
+      "title": "Make hook briefing, guard baselines, session state, and MCP tools agree on the same store path inside worktrees (#665)",
+      "club": "driver",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "moderate",
+          "description": "[architect review] MCP execute, context, map, and related tools did not retain the discovered source root.",
+          "gotcha_id": "review:architect"
+        }
+      ],
+      "notes": "Aligned CLI hooks, MCP project discovery, guard baselines, session identity, interview state, direct semantic-index consumers, store backup/restore, and generated testing worktrees with the common repository state owner."
+    },
+    {
+      "ticket_key": "S261-3",
+      "title": "Warn when an in-repo child worktree would be globbed by parent tooling (#667)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "moderate",
+          "description": "[architect review] In-repository worktree warnings compared lexical paths and could be bypassed through symlinks.",
+          "gotcha_id": "review:architect"
+        }
+      ],
+      "notes": "Added an explicit warning for visible child worktrees while preserving the managed ignored worktree directory. Canonical existing-ancestor resolution prevents symlink aliases from bypassing the warning."
+    },
+    {
+      "ticket_key": "S261-4",
+      "title": "Add cross-worktree claim, briefing, and guard regressions proving shared coordination (#665/#667)",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "description": "The first implementation pass covered shared configuration and primary store entry points but independent review found direct SQLite consumers, generated-worktree copying, init/interview, nested project discovery, legacy claims, and rejection cleanup still needed the same ownership contract."
+        },
+        {
+          "type": "rough",
+          "description": "The first full-suite run exposed nested fixture projects accidentally resolving to the live checkout state; the fixtures and review-tier test were isolated, and the live sprint-state hash now remains unchanged across the complete suite."
+        },
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "[architect review] Direct semantic-index consumers and store backup/restore bypassed the shared state resolver.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "[architect review] Linked-worktree init and interview could overwrite primary state or create partial local state.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "[architect review] MCP testing sessions and autonomous loop worktrees copied or symlinked .slope state.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "bunker",
+          "severity": "moderate",
+          "description": "[architect review] Nested SLOPE projects beneath a repository root were not consistently discovered.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "rough",
+          "severity": "major",
+          "description": "[code review] Stop-check trimmed leading porcelain status whitespace and misclassified unstaged baseline files.",
+          "gotcha_id": "review:code"
+        },
+        {
+          "type": "rough",
+          "severity": "moderate",
+          "description": "[code review] Legacy file-backed claims were hidden whenever the shared store opened successfully.",
+          "gotcha_id": "review:code"
+        },
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "[code review] Briefing store handles were not closed when execution or claim reads rejected.",
+          "gotcha_id": "review:code"
+        },
+        {
+          "type": "rough",
+          "severity": "major",
+          "description": "[code review] Project custom workflows were loaded from the linked worktree and workflow-step-gate failed open.",
+          "gotcha_id": "review:code"
+        },
+        {
+          "type": "rough",
+          "severity": "major",
+          "description": "[code review] Cross-session memory selected a worktree-local JSON backend instead of the shared SQLite or JSON owner.",
+          "gotcha_id": "review:code"
+        },
+        {
+          "type": "rough",
+          "severity": "major",
+          "description": "[code review] First-time CLI and MCP initialization from a git descendant split tracked project artifacts from repository state.",
+          "gotcha_id": "review:code"
+        },
+        {
+          "type": "rough",
+          "severity": "major",
+          "description": "[code review] Checkout-root source resolution overrode explicitly configured nested SLOPE projects.",
+          "gotcha_id": "review:code"
+        }
+      ],
+      "notes": "Added real linked-worktree tests for shared claims, MCP discovery and source-root propagation, briefing, Git baselines, semantic-index commands, backup/restore, init/interview protection, custom workflow enforcement, shared memory backends, canonical child-path warnings, legacy claim merging, and store cleanup on failure. Final verification passed 258 test files and 4,281 tests, with 26 skips, plus typecheck and build."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 17,
+    "hazard_penalties": 11.5,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "Wind",
+      "impact": "major",
+      "description": "The fix crosses CLI, MCP, hooks, guards, session state, SQLite ownership, generated worktrees, and test isolation, so every repository-state consumer had to agree on one boundary."
+    },
+    {
+      "type": "Rough",
+      "impact": "moderate",
+      "description": "Two independent review lanes requested changes after the initial implementation and expanded regression coverage was required before approval."
+    }
+  ],
+  "special_plays": [
+    "Kept tracked roadmap and source reads branch-local while sharing only repository-scoped ignored coordination state.",
+    "Verified the full test suite cannot mutate the live S261 state by comparing the state-file hash before and after all 4,281 tests."
+  ],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "A shared-state migration must inventory direct constructors, maintenance commands, generated worktrees, initialization paths, and compatibility registries, not only the central store factory.",
+      "outcome": "S261 now has command-level actual-git coverage across those entry points."
+    },
+    {
+      "type": "lessons",
+      "description": "Repository ownership and nested project discovery are related but distinct: linked worktrees adopt the primary owner, while an explicit nested SLOPE project keeps its own state.",
+      "outcome": "The resolver and MCP discovery tests cover both descendants of nested projects and legacy copied configs at linked-worktree roots."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "tests",
+      "description": "258 test files passed; 4,281 tests passed and 26 were skipped.",
+      "status": "healthy"
+    },
+    {
+      "category": "build",
+      "description": "TypeScript typecheck and the root plus pi-extension production build passed on Node 22.",
+      "status": "healthy"
+    },
+    {
+      "category": "state",
+      "description": "The primary sprint-state SHA-256 remained unchanged across the full test suite.",
+      "status": "healthy"
+    }
+  ],
+  "bunker_locations": [
+    "Direct SqliteSlopeStore construction bypasses resolveStore and must explicitly resolve repository state ownership.",
+    "Generated worktrees must never copy or symlink .slope state; git common-dir ownership is the only supported sharing mechanism.",
+    "Porcelain status parsing must preserve the two-character status column, including a leading space for unstaged changes."
+  ],
+  "yardage_book_updates": [
+    "Use resolveRepoStateCwd for repository-scoped ignored state and resolveRepoStatePath for configured state files.",
+    "Use the current worktree for tracked roadmap and source files; sharing those reads would erase branch-local reality.",
+    "Place generated testing worktrees beside the repository or under the ignored managed worktree directory."
+  ],
+  "course_management_notes": [
+    "Carry the shared-owner contract into S262 status work so operator output describes the same sessions and claims seen by guards and MCP.",
+    "Keep explicit nested SLOPE fixture projects isolated from the enclosing repository owner in tests."
+  ]
+}

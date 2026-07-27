@@ -6899,6 +6899,7 @@
     },
     {
       "id": 261,
+      "status": "complete",
       "theme": "Worktree Store Coordination",
       "par": 5,
       "slope": 5,
