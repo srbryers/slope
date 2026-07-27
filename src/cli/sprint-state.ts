@@ -1,6 +1,6 @@
 import { readFileSync, existsSync, unlinkSync } from 'node:fs';
 import { isAbsolute, join } from 'node:path';
-import { resolveRepoStatePath } from '../core/index.js';
+import { resolveRepoStatePath } from '../core/repo-state-scope.js';
 import { atomicWriteFileSync, withFileLockSync } from './atomic-write.js';
 import { listRepoWorktrees } from './session-scope.js';
 

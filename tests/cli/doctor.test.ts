@@ -6,10 +6,13 @@ import { runDoctorChecks, runDoctorFixes } from '../../src/cli/commands/doctor.j
 
 let tmpDir: string;
 let originalCwd: string;
+let originalCodexHome: string | undefined;
 
 beforeEach(() => {
   tmpDir = mkdtempSync(join(tmpdir(), 'slope-doctor-'));
   originalCwd = process.cwd();
+  originalCodexHome = process.env.SLOPE_CODEX_HOME;
+  process.env.SLOPE_CODEX_HOME = join(tmpDir, '.test-codex-home');
   process.chdir(tmpDir);
   vi.spyOn(console, 'log').mockImplementation(() => {});
   vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -17,6 +20,11 @@ beforeEach(() => {
 
 afterEach(() => {
   process.chdir(originalCwd);
+  if (originalCodexHome === undefined) {
+    delete process.env.SLOPE_CODEX_HOME;
+  } else {
+    process.env.SLOPE_CODEX_HOME = originalCodexHome;
+  }
   rmSync(tmpDir, { recursive: true, force: true });
   vi.restoreAllMocks();
 });

@@ -58,6 +58,27 @@ describe('repository state scope', () => {
     expect(existsSync(join(worktree, '.slope'))).toBe(false);
   });
 
+  it('ignores a legacy copied config at a linked worktree root', () => {
+    mkdirSync(join(worktree, '.slope'), { recursive: true });
+    writeFileSync(join(worktree, '.slope', 'config.json'), JSON.stringify({
+      store_path: '.slope/local.db',
+    }));
+
+    expect(loadConfig(worktree).store_path).toBe('.slope/slope.db');
+    expect(resolveRepoStateCwd(worktree)).toBe(realpathSync(primary));
+  });
+
+  it('keeps an explicitly nested SLOPE project locally scoped', () => {
+    const nested = join(worktree, 'fixtures', 'standalone');
+    mkdirSync(join(nested, '.slope'), { recursive: true });
+    writeFileSync(join(nested, '.slope', 'config.json'), JSON.stringify({
+      store_path: '.slope/nested.db',
+    }));
+
+    expect(resolveRepoStateCwd(nested)).toBe(nested);
+    expect(loadConfig(nested).store_path).toBe('.slope/nested.db');
+  });
+
   it('opens the same SQLite store from the primary and linked worktree', async () => {
     const fromWorktree = createStore({ storePath: '.slope/slope.db', cwd: worktree });
     await fromWorktree.registerSession({

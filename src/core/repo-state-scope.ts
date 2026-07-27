@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, realpathSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 
 /**
@@ -30,6 +30,14 @@ export function resolvePrimaryCheckout(cwd: string): string | null {
  */
 export function resolveRepoStateCwd(cwd: string = process.cwd()): string {
   const local = resolve(cwd);
+  const gitTopLevel = safeGit(local, ['rev-parse', '--show-toplevel']);
+  if (
+    existsSync(join(local, '.slope')) &&
+    (!gitTopLevel || !samePath(local, gitTopLevel))
+  ) {
+    return local;
+  }
+
   const primary = resolvePrimaryCheckout(local);
   if (!primary || !existsSync(join(primary, '.slope', 'config.json'))) return local;
   return primary;
@@ -55,5 +63,13 @@ function safeGit(cwd: string, args: string[]): string | null {
     return output || null;
   } catch {
     return null;
+  }
+}
+
+function samePath(left: string, right: string): boolean {
+  try {
+    return realpathSync(left) === realpathSync(right);
+  } catch {
+    return resolve(left) === resolve(right);
   }
 }

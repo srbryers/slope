@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { resolveRepoStatePath } from '../core/index.js';
+import { resolveRepoStatePath } from '../core/repo-state-scope.js';
 import { atomicWriteFileSync, withFileLockSync } from './atomic-write.js';
 import { isActiveSprintState, loadSprintState } from './sprint-state.js';
 

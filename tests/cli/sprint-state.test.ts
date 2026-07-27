@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, readFileSync, rmSync, existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import {
   loadSprintState,
   loadSprintStateResult,
@@ -18,7 +19,7 @@ import {
   clearSprintState,
 } from '../../src/cli/sprint-state.js';
 
-const tmpDir = join(import.meta.dirname ?? __dirname, '.tmp-sprint-state-test');
+const tmpDir = join(tmpdir(), `slope-sprint-state-test-${process.pid}`);
 
 function writeRawSprintState(state: unknown): void {
   const dir = join(tmpDir, '.slope');

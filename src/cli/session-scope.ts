@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import {
   resolvePrimaryCheckout as resolvePrimaryCheckoutCore,
   resolveRepoStateCwd,
-} from '../core/index.js';
+} from '../core/repo-state-scope.js';
 
 /**
  * Resolve the working directory whose store owns *session* coordination state.
