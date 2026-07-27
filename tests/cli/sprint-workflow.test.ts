@@ -273,6 +273,21 @@ describe('slope sprint status (workflow mode)', () => {
     expect(output).toContain('No active workflow execution');
   });
 
+  it('keeps unknown workflow status structured when JSON is requested', async () => {
+    const store = createStore({ storePath: '.slope/slope.db', cwd: tmpDir });
+    store.close();
+
+    const output = await captureLog(() =>
+      sprintCommand(['status', '999', '--json'])
+    );
+
+    expect(JSON.parse(output)).toEqual({
+      mode: 'workflow',
+      sprint: '999',
+      execution: null,
+    });
+  });
+
   it('falls back to legacy status when no workflow executions exist', async () => {
     const store = createStore({ storePath: '.slope/slope.db', cwd: tmpDir });
     store.close();
@@ -723,6 +738,8 @@ describe('slope sprint phase', () => {
     expect(output).not.toContain('S45.5');
     expect(status).toContain('Sprint 455 - status');
     expect(status).not.toContain('Sprint 45.5');
+    expect(status).toContain('Active claims:');
+    expect(status).toContain('[ticket] S455-1');
     expect(state.sprint).toBe(455);
   });
 
@@ -891,6 +908,62 @@ describe('slope sprint rollover', () => {
 });
 
 describe('slope sprint status', () => {
+  it('prints status-specific help without running status (#664)', async () => {
+    const output = await captureLog(() => sprintCommand(['status', '--help']));
+
+    expect(output).toContain('slope sprint status [sprint_id] [--json]');
+    expect(output).not.toContain('No active sprint state');
+  });
+
+  it('rejects unsupported status options with a non-zero exit (#664)', async () => {
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((code) => {
+      throw new ProcessExitError(code as number);
+    });
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    let errors = '';
+    try {
+      await expect(sprintCommand(['status', '--definitely-bogus']))
+        .rejects.toThrow(ProcessExitError);
+      errors = errSpy.mock.calls.map(call => call.join(' ')).join('\n');
+    } finally {
+      errSpy.mockRestore();
+      exitSpy.mockRestore();
+    }
+
+    expect(errors).toContain('Unknown option: --definitely-bogus');
+  });
+
+  it('emits lifecycle state and active claims as JSON (#663/#664)', async () => {
+    writeRoadmapSprints([{ sprint: 465, status: 'planned' }]);
+    await captureLog(() => sprintCommand([
+      'begin',
+      '--sprint=465',
+      '--ticket=S465-2',
+      '--actor=windows-agent',
+    ]));
+
+    const output = await captureLog(() => sprintCommand(['status', '--json']));
+    const status = JSON.parse(output) as {
+      sprint: string;
+      status: string;
+      phase: string;
+      claims: Array<{ player: string; target: string; scope: string }>;
+    };
+
+    expect(status).toMatchObject({
+      sprint: '465',
+      status: 'planning',
+      phase: 'planning',
+    });
+    expect(status.claims).toEqual([
+      expect.objectContaining({
+        player: 'windows-agent',
+        target: 'S465-2',
+        scope: 'ticket',
+      }),
+    ]);
+  });
+
   it('shows derived closeout state and next action when all gates are complete (#567)', async () => {
     await captureLog(() =>
       sprintCommand(['start', '--number=16', '--phase=planning'])
