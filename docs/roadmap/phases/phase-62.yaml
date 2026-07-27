@@ -121,6 +121,7 @@ sprints:
           - S261-1
           - S261-2
   - id: 262
+    status: complete
     theme: Session and Sprint Status Truth
     par: 5
     slope: 3
@@ -304,3 +305,4 @@ scorecards:
   "260": docs/retros/sprint-260.json
   "260.1": docs/retros/sprint-260.1.json
   "261": docs/retros/sprint-261.json
+  "262": docs/retros/sprint-262.json

@@ -1,0 +1,192 @@
+{
+  "sprint_number": 262,
+  "player": "codex",
+  "theme": "Session and Sprint Status Truth",
+  "par": 5,
+  "slope": 3,
+  "score": 14,
+  "score_label": "triple_plus",
+  "date": "2026-07-27",
+  "shots": [
+    {
+      "ticket_key": "S262-1",
+      "title": "Refresh session branch truth on heartbeat and status reads (#666)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "description": "The first live smoke test showed that an unscoped session in a linked checkout could only be resolved honestly after heartbeat recorded its worktree path."
+        },
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "[architect review] Routine transcript heartbeats bypassed linked-worktree checkout reconciliation",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "[architect review] Linked-checkout heartbeat reconciliation overwrote durable session role identity",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "bunker",
+          "severity": "moderate",
+          "description": "[architect review] Dashboard and top-level swarm status presented stored branches as current",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "water",
+          "severity": "major",
+          "description": "[security review] Cross-checkout heartbeats could preserve the wrong checkout and bypass collision protection",
+          "gotcha_id": "review:security"
+        },
+        {
+          "type": "water",
+          "severity": "moderate",
+          "description": "[security review] Branch observation executed Git in arbitrary persisted worktree paths",
+          "gotcha_id": "review:security"
+        }
+      ],
+      "notes": "Added explicit current, at-start, and unknown branch provenance. Heartbeat now rejects cross-checkout updates, persists the caller checkout branch and linked path, and preserves durable role identity; session list, dashboard, swarm status, and MCP status share the same provenance without extending liveness on reads."
+    },
+    {
+      "ticket_key": "S262-2",
+      "title": "Disambiguate concurrent session collision messages (#666)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [
+        {
+          "type": "water",
+          "severity": "major",
+          "description": "[security review] A primary checkout stored as a worktree path bypassed collision protection",
+          "gotcha_id": "review:security"
+        },
+        {
+          "type": "water",
+          "severity": "moderate",
+          "description": "[security review] Prunable or missing Git worktree records still satisfied collision isolation",
+          "gotcha_id": "review:security"
+        }
+      ],
+      "notes": "Collision output identifies sessions by durable session ID, IDE, and current checkout branch while omitting the misleading primary authority label. Isolation requires an existing, non-prunable, registered non-primary linked worktree; explicit primary, unrelated, deleted, and prunable paths are rejected or treated as unscoped."
+    },
+    {
+      "ticket_key": "S262-3",
+      "title": "Show active actors and ticket claims in sprint status (#663)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [
+        {
+          "type": "water",
+          "severity": "moderate",
+          "description": "[security review] Sprint-scoped active claims included expired and stale-session claims",
+          "gotcha_id": "review:security"
+        },
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "[architect review] Heartbeat age created an unfenced reversible claim lease",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "[architect review] Ordinary commands implicitly pruned stale sessions and released their claims",
+          "gotcha_id": "review:architect"
+        }
+      ],
+      "notes": "Human and structured sprint status show active claim ownership plus explicit owner liveness. Claim authority persists until release, expiry, or an explicit session-prune transition; ordinary commands never delete stale-owned claims."
+    },
+    {
+      "ticket_key": "S262-4",
+      "title": "Define strict help, option, and JSON behavior for sprint status (#664)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [
+        {
+          "type": "water",
+          "severity": "moderate",
+          "description": "[security review] Workflow status JSON exposed raw persisted variables and definition fields",
+          "gotcha_id": "review:security"
+        }
+      ],
+      "notes": "Status-specific help is read-only, unsupported options exit non-zero, and discriminated JSON remains structured across lifecycle, workflow, missing-state, and missing-execution responses. Workflow output uses an allowlisted projection that excludes variables, definitions, and session identity."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 12,
+    "hazard_penalties": 8.5,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "Wind",
+      "impact": "moderate",
+      "description": "Session state is shared across primary and linked checkouts, while live branch identity must be re-observed from a registered checkout and must not mutate durable role semantics."
+    }
+  ],
+  "special_plays": [
+    "Preserved heartbeat liveness semantics by observing branches on reads without writing heartbeat timestamps.",
+    "Verified the complete suite cannot mutate the live S262 sprint-state file.",
+    "Smoke-tested the compiled help, JSON, invalid-option, heartbeat, and session-list paths."
+  ],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Stored identity fields need provenance when they can become stale; a current-looking historical value is worse than an explicitly qualified observation.",
+      "outcome": "Branch status now says whether it is live, captured at start, or unknown."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "tests",
+      "description": "259 test files passed; 4,304 tests passed and 27 were skipped.",
+      "status": "healthy"
+    },
+    {
+      "category": "build",
+      "description": "TypeScript typecheck and the root plus pi-extension production build passed on Node 22.",
+      "status": "healthy"
+    },
+    {
+      "category": "state",
+      "description": "The primary sprint-state SHA-256 remained unchanged across the full test suite.",
+      "status": "healthy"
+    }
+  ],
+  "bunker_locations": [
+    "Reading branch state must not refresh session liveness.",
+    "A heartbeat must reject a caller checkout that contradicts the session's registered worktree.",
+    "The primary checkout must never satisfy worktree-isolation checks, even when persisted as a worktree path.",
+    "Prunable and missing Git worktree records must never satisfy worktree-isolation checks.",
+    "Stored worktree paths are data, not filesystem capabilities; observe them only after matching Git's registered worktree set.",
+    "Sprint JSON identity remains a string so decimal and canonical roadmap labels are not collapsed.",
+    "Public workflow status must project allowlisted fields instead of serializing persistence records."
+  ],
+  "yardage_book_updates": [
+    "Use observeSessionBranches for presentation and the shared reconciliation helper for every heartbeat path.",
+    "Preserve durable role identity while refreshing checkout observations.",
+    "Filter active claims by explicit expiry in every store adapter.",
+    "Report owning-session freshness separately from claim authority; do not infer a reversible lease from heartbeat age.",
+    "Reserve destructive stale-session and claim cleanup for the explicit session-prune command.",
+    "Reject unknown status options before opening the store or reading sprint state.",
+    "Include active claims in both human and structured lifecycle status."
+  ],
+  "course_management_notes": [
+    "Keep durable authenticated actor and authority semantics deferred to S264.",
+    "Carry the remaining post-merge retro state-path bypass into S263 lifecycle reconciliation."
+  ]
+}
