@@ -274,6 +274,7 @@ sprints:
           - S264.1-1
           - S264.1-2
   - id: 264.2
+    status: complete
     theme: Collaboration Workflow and Evaluation Contract
     par: 4
     slope: 4
@@ -319,3 +320,4 @@ scorecards:
   "263": docs/retros/sprint-263.json
   "264": docs/retros/sprint-264.json
   "264.1": docs/retros/sprint-264.1.json
+  "264.2": docs/retros/sprint-264.2.json
