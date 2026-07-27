@@ -46,6 +46,7 @@ sprints:
           - S260-2
           - S260-3
   - id: 260.1
+    status: complete
     theme: Buzz Multiplayer Model Synthesis
     par: 4
     slope: 3
@@ -300,3 +301,4 @@ sprints:
           - S264.2-3
 scorecards:
   "260": docs/retros/sprint-260.json
+  "260.1": docs/retros/sprint-260.1.json
