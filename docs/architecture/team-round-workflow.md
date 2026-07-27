@@ -234,6 +234,7 @@ An authorization entry has this canonical schema:
 ```text
 authorization_obligation_id
 target_kind                 # operation | transition
+primary_operation           # true for exactly one operation entry
 target_operation_id
 target_aggregate_type?
 target_aggregate_id?
@@ -256,6 +257,11 @@ separation_of_duties_proof?
 Each registered compound-event schema declares its complete authorization
 obligations: operation capabilities, per-transition capabilities, distinct
 authority roles, active policy revision, and separation-of-duties rules.
+The schema designates exactly one operation obligation as
+`primary_operation = true`; callers and adapters never choose it dynamically.
+When several operation capabilities are required, the schema-designated
+primary capability authorizes the append operation and every other capability
+is a separate non-primary obligation.
 `authorization_obligation_id` is the domain-separated commitment to the event
 schema revision, target kind and identity, capability, and authority role. An
 operation entry binds `target_operation_id` and its decision context to
@@ -294,13 +300,27 @@ unrelated, ambiguously targeted, or separation-of-duties-invalid entry. A
 decision for one transition, operation, policy revision, principal, or
 authentication context cannot authorize another.
 
+Version 2 retains the singular S264.1 `authorization` field as a compatibility
+projection, not an independent allow decision. Exactly one authorization-set
+entry MUST be the schema-designated primary operation entry. Its `capability`,
+`policy_revision`, and `decision_id` MUST equal the singular authorization
+field; its `requesting_principal_id` and `authentication_context_id` MUST equal
+the trusted envelope identity. The entry's decision record MUST identify the
+same authenticated principal and context. These equalities are checked before
+`canonical_body` is committed. Missing or multiple primary entries, a
+caller-selected primary capability, or any field mismatch rejects the append.
+Version 1 replay validates only its singular decision and does not synthesize
+an authorization set; every version 2 event requires both representations and
+their exact equivalence.
+
 S268-2 publishes cross-adapter golden vectors for the canonical body, every
 intermediate commitment, each chain link, both roots, and final event hash. The
 conformance corpus covers link and authorization substitution, reordering,
-duplication, omission, owner mismatch, version 1-to-2 replay, and digest-cycle
-regressions. S268-4 adds capability and separation-of-duties bypass attempts,
-including distinct recovery and waiver authorities, on SQLite, PostgreSQL, and
-an independent verifier.
+duplication, omission, owner mismatch, singular-versus-set authorization
+substitution, primary-operation substitution, version 1-to-2 replay, and
+digest-cycle regressions. S268-4 adds capability and separation-of-duties
+bypass attempts, including distinct recovery and waiver authorities, on
+SQLite, PostgreSQL, and an independent verifier.
 
 The compound event's idempotency identity follows S264.1:
 
@@ -334,6 +354,7 @@ The initial compound events are:
   `evaluation.evidence_rejected.v2`, and
   `evaluation.evidence_unverifiable.v2`, owned by the trial aggregate;
 - `evaluation.attempt_retryable_failed.v2`,
+  `evaluation.trial_allocated.v2`,
   `evaluation.trial_failed.v2`, `evaluation.trial_timed_out.v2`, and
   `evaluation.trial_cancelled.v2`, owned by the trial aggregate;
 - `evaluation.campaign_invalidated.v1`, owned by the campaign aggregate when it
@@ -2964,7 +2985,7 @@ transitions are:
 | From | Event | To | Capability |
 |---|---|---|---|
 | absent | `evaluation.trial_planned.v1` | `planned` | `evaluation:seal` |
-| `planned` | `evaluation.trial_allocated.v1` | `allocated` | `evaluation:allocate` |
+| `planned` | `evaluation.trial_allocated.v2` | `allocated` | `evaluation:allocate` |
 | `allocated` | `evaluation.trial_started.v1` | `running` | `evaluation:execute` |
 | `running` | `evaluation.trial_outcome_reported.v1` | `outcome_reported` | `evaluation:execute` |
 | `outcome_reported` | `evaluation.evidence_verified.v2` | `evidence_verified` | `evaluation:evidence_verify` |
@@ -3008,7 +3029,7 @@ planned -> running -> outcome_reported -> verified
 
 | From | Event | To | Capability | Guard |
 |---|---|---|---|---|
-| absent | `evaluation.attempt_planned.v1` | `planned` | `evaluation:allocate` | Next gap-free number and sealed retry policy permits it |
+| absent | `evaluation.trial_allocated.v2` or `evaluation.attempt_retryable_failed.v2` | `planned` | `evaluation:allocate` or `evaluation:fail` | Create attempt 1 or the next gap-free retry in the same trial-owned compound event |
 | `planned` | `evaluation.attempt_started.v1` | `running` | `evaluation:execute` | Trial running, assignment and leases valid |
 | `running` | `evaluation.attempt_outcome_reported.v1` | `outcome_reported` | `evaluation:execute` | Callback, scorecard, budget, and evidence roots present |
 | `outcome_reported` | `evaluation.evidence_verified.v2` | `verified` | `evaluation:evidence_verify` | Evidence policy satisfied |
@@ -3020,8 +3041,11 @@ planned -> running -> outcome_reported -> verified
 | any non-terminal | `evaluation.trial_cancelled.v2` | `cancelled` | `evaluation:cancel` | Cancellation policy permits |
 
 Attempt terminal events preserve consumed resource and elapsed accounting.
-Retry creation locks trial, prior attempt, budget meter, and resource claims and
-cannot exceed the sealed limit.
+Initial allocation locks the trial, budget meter, and resource claims and uses
+`evaluation.trial_allocated.v2` to create attempt 1 in `planned` atomically
+with the trial's transition to `allocated`. Retry creation locks the trial,
+prior attempt, budget meter, and resource claims, cannot exceed the sealed
+limit, and occurs inside `evaluation.attempt_retryable_failed.v2`.
 
 `evaluation:execute` is constrained to the allocated trial assignee principal
 or an explicitly authorized orchestrator. `evaluation:evidence_verify` is
@@ -3034,7 +3058,7 @@ Failure, timeout, and cancellation use the same compound reconciliation rule:
 
 | Compound event | Trial transition | Current attempt transition |
 |---|---|---|
-| `evaluation.attempt_retryable_failed.v2` | `running` -> `running`, clear current-attempt pointer and record retry pending | `running` -> `retryable_failed` |
+| `evaluation.attempt_retryable_failed.v2` | `running` -> `running`, advance current-attempt pointer | `running` -> `retryable_failed`; successor absent -> `planned` |
 | `evaluation.trial_failed.v2` | `allocated` or `running` -> `failed` | `planned` or `running` -> `terminal_failed` |
 | `evaluation.trial_timed_out.v2` | `allocated` or `running` -> `timed_out` | `planned` or `running` -> `timed_out` |
 | `evaluation.trial_cancelled.v2` | any non-terminal -> `cancelled` | current non-terminal -> `cancelled`, when one exists |
@@ -3042,25 +3066,32 @@ Failure, timeout, and cancellation use the same compound reconciliation rule:
 The trial owns each event. The current attempt is an affected aggregate and
 advances in the same transition set. Retryable failure is the only terminal
 attempt disposition that leaves the trial active: it increments the trial
-attempts-consumed count, records the failed attempt as reconciled, clears the
-current pointer, and permits one later gap-free `evaluation.attempt_planned.v1`
-under the sealed retry and budget policy. A trial cannot have more than one
-current non-terminal attempt. Terminal trial failure and timeout require a
-current attempt. Cancellation MAY have no current non-terminal attempt. In
-that case the compound event records `attempt_disposition = absent` when no
-attempt exists, or `attempt_disposition = already_terminal` with the current
-attempt version and hash as a precondition, and has no attempt transition or
-link.
+attempts-consumed count, records the failed attempt as reconciled, creates
+attempt `n + 1` in `planned`, and advances the current pointer to it in the same
+transition set under the sealed retry and budget policy. Allocation similarly
+creates attempt 1 atomically. An `allocated` or `running` trial therefore has
+exactly one current attempt: `planned` while allocated, and `planned` or
+`running` while the trial is running. Once the trial is
+`outcome_reported`, its current attempt must also be `outcome_reported`; a
+one-sided transition blocks evidence processing. Terminal trial failure and
+timeout transition the current `planned` or `running` attempt in the same
+event. Cancellation MAY encounter no attempt when the trial is still
+`planned`, or an already terminal current attempt after evidence disposition.
+The compound event then records `attempt_disposition = absent` or
+`attempt_disposition = already_terminal`; the latter includes the attempt
+version and hash as a precondition. Neither case creates an attempt transition
+or link.
 
 Every compound terminal event records typed cause, attempt and trial prior
 states, consumed arm budget and resources, elapsed time, metric missingness,
 evidence availability, sealed loss-policy result, and the trial/attempt
 reconciliation root. Replay rejects a separate attempt-only terminal event,
 multiple terminal dispositions for one attempt, a terminal trial with a live
-attempt, a retry-pending trial without exactly one reconciled retryable
-failure, or a new attempt that exceeds the sealed limit. Collection closure
-recomputes the reconciliation root from these compound events and requires
-every attempt to appear exactly once.
+attempt, an allocated or running trial without exactly one current attempt, a
+retry transition without exactly one reconciled failed attempt and one
+gap-free planned successor, or a new attempt that exceeds the sealed limit.
+Collection closure recomputes the reconciliation root from these compound
+events and requires every attempt to appear exactly once.
 
 `evaluation:evidence_recover` is constrained to a registered recovery principal
 and may invoke only `evaluation.evidence_unverifiable.v2` after an authoritative

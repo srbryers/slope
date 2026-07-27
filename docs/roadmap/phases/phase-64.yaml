@@ -29,7 +29,7 @@ sprints:
         complexity: risky
         github_issue: 669
       - key: S268-2
-        title: Implement exact S264.1 idempotency, payload-conflict rejection, and version-2 one-event compound envelopes with the normative cycle-free digest DAG, owner/link bijection, per-affected-aggregate chain positions, replayable per-operation and per-transition authorization sets, cross-adapter golden vectors, ordered locking, all-or-none reducers, contribution and verification-domain high-water marks, ordering, version-1-to-2 replay, and schema evolution
+        title: Implement exact S264.1 idempotency, payload-conflict rejection, and version-2 one-event compound envelopes with the normative cycle-free digest DAG, owner/link bijection, per-affected-aggregate chain positions, singular-to-primary authorization equivalence, replayable per-operation and per-transition authorization sets, cross-adapter golden vectors, ordered locking, all-or-none reducers, contribution and verification-domain high-water marks, ordering, version-1-to-2 replay, and schema evolution
         club: driver
         complexity: risky
         github_issue: 669
@@ -187,7 +187,7 @@ sprints:
         complexity: risky
         github_issue: 669
       - key: S272-2
-        title: Implement explicit capability-mapped and idempotent campaign, trial, and attempt lifecycles with compound trial-attempt evidence, failure, timeout, cancellation, and retry reconciliation, recovery-authorized unverifiable outcomes, complete collection-closure reconciliation, aggregate arm budget, price, leakage and learning-quarantine policy, plus content-addressed redacted evidence
+        title: Implement explicit capability-mapped and idempotent campaign, trial, and attempt lifecycles with atomic initial and retry attempt creation, compound trial-attempt evidence, failure, timeout, cancellation, and retry reconciliation, recovery-authorized unverifiable outcomes, complete collection-closure reconciliation, aggregate arm budget, price, leakage and learning-quarantine policy, plus content-addressed redacted evidence
         club: driver
         complexity: risky
         github_issue: 669
