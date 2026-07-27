@@ -5,6 +5,7 @@ import {
   discoverScorecardFiles,
   loadSkillRegistry,
   parseSprintNumber,
+  resolveRepoStatePath,
   skillIds,
   sprintNumberFromScorecardFile,
   validateScorecard,
@@ -12,9 +13,11 @@ import {
 import { loadConfig } from '../config.js';
 import { updateGate } from '../sprint-state.js';
 import { completeRoadmapSourceSprint } from '../roadmap-source-store.js';
+import { getStoreInfo, resolveStore } from '../store.js';
+import { completeWorkflowExecutionsForSprints, sprintLabelForExecution } from '../workflow-resync.js';
 import type { RoadmapSourceError } from '../../core/index.js';
 
-export function validateCommand(input?: string | string[]): void {
+export async function validateCommand(input?: string | string[]): Promise<void> {
   const args = Array.isArray(input) ? input : input ? [input] : [];
   const validateSkills = args.includes('--skills');
   const readOnly = args.includes('--read-only');
@@ -106,6 +109,9 @@ export function validateCommand(input?: string | string[]): void {
   if (allValid && registryAvailable && !readOnly) {
     updateGate(cwd, 'scorecard', true);
     reconciled = reconcileModularRoadmapSources(cwd, validScorecards);
+    if (reconciled) {
+      await reconcileValidatedWorkflowExecutions(cwd, validScorecards.map(scorecard => scorecard.sprint));
+    }
   } else if (readOnly) {
     // `validate` writes tracked files as a side effect: it marks the scorecard
     // gate, reconciles scorecard indexes and sprint status into the phase YAML,
@@ -117,6 +123,27 @@ export function validateCommand(input?: string | string[]): void {
   }
 
   process.exit(allValid && registryAvailable && reconciled ? 0 : 1);
+}
+
+async function reconcileValidatedWorkflowExecutions(cwd: string, sprints: number[]): Promise<void> {
+  const storeInfo = getStoreInfo(cwd);
+  if (storeInfo.type === 'sqlite') {
+    const storePath = resolveRepoStatePath(cwd, storeInfo.path ?? '.slope/slope.db');
+    if (!existsSync(storePath)) return;
+  }
+
+  let store: Awaited<ReturnType<typeof resolveStore>> | null = null;
+  try {
+    store = await resolveStore(cwd);
+    const completed = await completeWorkflowExecutionsForSprints(store, sprints);
+    for (const exec of completed) {
+      console.log(`  Workflow execution reconciled: ${sprintLabelForExecution(exec)} -> completed (${exec.id})`);
+    }
+  } catch (error) {
+    console.log(`  \u26A0 Workflow execution reconciliation skipped: ${(error as Error).message}`);
+  } finally {
+    store?.close();
+  }
 }
 
 /**

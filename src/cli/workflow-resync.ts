@@ -39,6 +39,24 @@ export interface SprintStateRebindResult {
   reason?: string;
 }
 
+export async function completeWorkflowExecutionsForSprints(
+  store: Pick<SlopeStore, 'listExecutions' | 'completeExecution'>,
+  sprints: Iterable<number>,
+): Promise<WorkflowExecution[]> {
+  const targetSprints = new Set(sprints);
+  if (targetSprints.size === 0) return [];
+
+  const completed: WorkflowExecution[] = [];
+  const running = await store.listExecutions({ status: 'running' });
+  for (const exec of running) {
+    const sprint = sprintNumberForExecution(exec);
+    if (sprint === null || !targetSprints.has(sprint)) continue;
+    await store.completeExecution(exec.id, 'completed');
+    completed.push(exec);
+  }
+  return completed;
+}
+
 export function inferSprintFromBranch(cwd: string): number | null {
   const branch = currentBranch(cwd);
   if (!branch) return null;

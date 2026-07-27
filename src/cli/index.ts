@@ -121,7 +121,7 @@ switch (subcommand) {
     cardCommand(process.argv.slice(3));
     break;
   case 'validate':
-    validateCommand(process.argv.slice(3));
+    validateCommand(process.argv.slice(3)).catch(reportCliError);
     break;
   case 'review': {
     const reviewArgs = process.argv.slice(3);

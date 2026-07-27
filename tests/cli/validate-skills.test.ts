@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { buildScorecard } from '../../src/core/builder.js';
 import type { SkillRegistryFile } from '../../src/core/skills.js';
+import { SqliteSlopeStore } from '../../src/store/index.js';
 
 let tmpDir: string;
 let exitCode: number | undefined;
@@ -112,56 +113,91 @@ afterEach(() => {
 });
 
 describe('slope validate --skills', () => {
-  it('passes when scorecard skill references exist in the registry', () => {
+  it('passes when scorecard skill references exist in the registry', async () => {
     writeRegistry(['slope-sprint-workflow']);
     const path = writeScorecard(['slope-sprint-workflow']);
 
-    expect(() => validateCommand([path, '--skills'])).toThrow('process.exit(0)');
+    await expect(validateCommand([path, '--skills'])).rejects.toThrow('process.exit(0)');
     expect(exitCode).toBe(0);
   });
 
-  it('fails when scorecard skill references are unknown', () => {
+  it('fails when scorecard skill references are unknown', async () => {
     writeRegistry(['slope-sprint-workflow']);
     const path = writeScorecard(['missing-skill']);
 
-    expect(() => validateCommand([path, '--skills'])).toThrow('process.exit(1)');
+    await expect(validateCommand([path, '--skills'])).rejects.toThrow('process.exit(1)');
     expect(exitCode).toBe(1);
   });
 
-  it('fails when --skills is used before scanning a registry', () => {
+  it('fails when --skills is used before scanning a registry', async () => {
     const path = writeScorecard(['slope-sprint-workflow']);
 
-    expect(() => validateCommand([path, '--skills'])).toThrow('process.exit(1)');
+    await expect(validateCommand([path, '--skills'])).rejects.toThrow('process.exit(1)');
     expect(exitCode).toBe(1);
   });
 
-  it('includes decimal inserted sprint scorecards during default validation', () => {
+  it('includes decimal inserted sprint scorecards during default validation', async () => {
     writeScorecard([], 114.5);
 
-    expect(() => validateCommand()).toThrow('process.exit(0)');
+    await expect(validateCommand()).rejects.toThrow('process.exit(0)');
     expect(exitCode).toBe(0);
   });
 
-  it('includes nested sN/scorecard.json scorecards during default validation', () => {
+  it('includes nested sN/scorecard.json scorecards during default validation', async () => {
     writeNestedScorecard(155);
 
-    expect(() => validateCommand()).toThrow('process.exit(0)');
+    await expect(validateCommand()).rejects.toThrow('process.exit(0)');
     expect(exitCode).toBe(0);
   });
 
-  it('validates only the requested sprint with --sprint=N', () => {
+  it('validates only the requested sprint with --sprint=N', async () => {
     writeScorecard([], 348);
     mkdirSync(join(tmpDir, 'docs', 'retros'), { recursive: true });
     writeFileSync(join(tmpDir, 'docs', 'retros', 'sprint-349.json'), '{not-json');
 
-    expect(() => validateCommand(['--sprint=348'])).toThrow('process.exit(0)');
+    await expect(validateCommand(['--sprint=348'])).rejects.toThrow('process.exit(0)');
     expect(exitCode).toBe(0);
   });
 
-  it('fails when --sprint requests a missing scorecard', () => {
+  it('fails when --sprint requests a missing scorecard', async () => {
     writeScorecard([], 348);
 
-    expect(() => validateCommand(['--sprint=349'])).toThrow('process.exit(1)');
+    await expect(validateCommand(['--sprint=349'])).rejects.toThrow('process.exit(1)');
     expect(exitCode).toBe(1);
+  });
+
+  it('completes only workflow executions for scorecards that validate (#668)', async () => {
+    const path = writeScorecard([], 348);
+    const store = new SqliteSlopeStore(join(tmpDir, '.slope', 'slope.db'));
+    const current = await store.startExecution({ workflow_name: 'sprint-standard', sprint_id: 'S348' });
+    const unrelated = await store.startExecution({ workflow_name: 'sprint-standard', sprint_id: 'S349' });
+    store.close();
+
+    await expect(validateCommand([path])).rejects.toThrow('process.exit(0)');
+
+    const updated = new SqliteSlopeStore(join(tmpDir, '.slope', 'slope.db'));
+    try {
+      await expect(updated.getExecution(current.id)).resolves.toMatchObject({ status: 'completed' });
+      await expect(updated.getExecution(unrelated.id)).resolves.toMatchObject({ status: 'running' });
+    } finally {
+      updated.close();
+    }
+  });
+
+  it('leaves workflow executions running when scorecard validation fails (#668)', async () => {
+    writeRegistry(['slope-sprint-workflow']);
+    const path = writeScorecard(['missing-skill'], 348);
+    const store = new SqliteSlopeStore(join(tmpDir, '.slope', 'slope.db'));
+    const execution = await store.startExecution({ workflow_name: 'sprint-standard', sprint_id: 'S348' });
+    store.close();
+
+    await expect(validateCommand([path, '--skills'])).rejects.toThrow('process.exit(1)');
+
+    const updated = new SqliteSlopeStore(join(tmpDir, '.slope', 'slope.db'));
+    try {
+      await expect(updated.getExecution(execution.id)).resolves.toMatchObject({ status: 'running' });
+    } finally {
+      updated.close();
+    }
   });
 });
