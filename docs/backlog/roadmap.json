@@ -7365,7 +7365,7 @@
       "tickets": [
         {
           "key": "S268-1",
-          "title": "Migrate the existing event store to a versioned coordination envelope and minimum canonical scorecard schema with project, round, attempt, scorecard, actor, session, role, contributor, verifier, authority, visibility, correlation, and causation identity",
+          "title": "Migrate the existing event store to a versioned coordination envelope and minimum canonical scorecard schema with project, round, attempt, scorecard, shot, penalty, loss-component, actor, session, role, contributor, verifier, authority, visibility, correlation, and causation identity",
           "club": "driver",
           "complexity": "risky",
           "github_issue": 669
@@ -7504,7 +7504,7 @@
         },
         {
           "key": "S270-4",
-          "title": "Add unique penalty identity with non-additive team and actor projections plus append-only or transactional merge-safe common-issues learning",
+          "title": "Implement penalty causation, normalized allocation, non-additive participant diagnostics, and append-only or transactional merge-safe common-issues learning on canonical S268 penalty identity",
           "club": "driver",
           "complexity": "risky",
           "github_issue": 669,

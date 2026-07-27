@@ -220,7 +220,10 @@ Reopen is exceptional and capability-gated. It MUST record:
 - `round_id`, prior `scorecard_version`, and prior content hash
 - a monotonic `reopen_epoch`
 - requesting and authorizing authenticated principals
-- reason, scope, and referenced late or incorrect evidence
+- reason and an enforceable `correction_scope` allowlist containing affected
+  shot IDs, penalty IDs, field paths, evidence IDs, or explicitly permitted new
+  records
+- referenced late or incorrect evidence
 - authoritative timestamp
 
 Reopen changes the same round from `closed` to `open`; it does not delete or
@@ -237,6 +240,12 @@ The authoritative reopen operation atomically:
 - clears completion eligibility for the project sprint
 - creates a fresh `draft_scorecard` based on the prior published version
 
+Every mutation during a reopened epoch is checked against
+`correction_scope`. Out-of-scope scorecard, evidence, identity, attribution,
+verification, or metadata changes are rejected even when the caller otherwise
+has ordinary mutation authority. Expanding scope requires a new authorized,
+idempotent audit action that records the added selectors and reason.
+
 Roadmap and status reads MUST immediately present the sprint as reopened and
 not complete. A tracked roadmap source is a denormalized projection: its
 recoverable update to an in-progress disposition is part of the reopen
@@ -250,6 +259,9 @@ epoch. Repeated reopen requests with the same identity are idempotent. A reopen
 request against a stale version or epoch fails. Reclose atomically publishes
 the next version, restores `accepted_scorecard_version`, and restores roadmap
 completion eligibility before the tracked projection is reported complete.
+Before publishing, finalization computes a semantic delta from the prior
+published version and proves every changed or added field and source identity
+is allowed by `correction_scope`. Any out-of-scope delta fails finalization.
 
 ## Lifecycle Invariants
 
@@ -551,8 +563,10 @@ score = par + sum(team_loss_component)
 A loss may appear under only one source identity. Intrinsic shot loss MUST
 exclude every loss represented by a `penalty_id`; attaching a penalty to a shot
 does not also make it shot loss. A round adjustment is excluded from actor and
-role estimates unless a later estimator revision defines an independently
-reviewed allocation rule.
+role estimates. Penalty loss is also excluded from the version 1 actor and role
+handicap estimand and its expected-loss target; penalty attribution is reported
+separately. A later estimator revision MAY include either class only with an
+independently reviewed missing-attribution and allocation rule.
 
 The existing scorecard builder folds hazard penalties into score. Migration to
 the new schema MUST decompose that total into disjoint components without
@@ -571,15 +585,16 @@ attempt, start and end evidence, and terminal disposition.
 For eligible spell `j`:
 
 ```text
-observed_loss_j = disjoint loss components incurred during and attributed to the spell
-expected_loss_j = expected subsequent loss from the difficulty snapshot frozen at spell start
+observed_loss_j = intrinsic shot-loss components incurred during the spell
+expected_loss_j = expected subsequent intrinsic shot loss from the spell-start difficulty snapshot
 adjusted_loss_j = observed_loss_j - expected_loss_j
 ```
 
 The response contains only loss arising after the spell begins and before it
 ends. A prior owner's failures cannot be placed in a later owner's response.
 The final owner receives the intrinsic accepted-shot component; earlier owners
-retain any intrinsic or penalty components incurred during their spells.
+retain any intrinsic components incurred during their spells. Penalties and
+team-only adjustments never enter `observed_loss_j` in estimator version 1.
 
 For actor `a` in window `W`, let `E(a,W)` be every eligible ownership spell the
 actor accepted in scorecard versions selected for that window. Version 1 uses
@@ -625,6 +640,9 @@ history MUST NOT adjust the full-shot response or any earlier spell.
 Outcome-derived values from within the current spell, such as test failures,
 observed hazards, final review findings, elapsed time after completion, or
 whether the shot landed cleanly, MUST NOT enter its difficulty snapshot.
+`principal_id`, `actor_id`, `session_id`, display identity, and role MUST NOT be
+difficulty predictors. In particular, the actor estimand cannot adjust for
+actor identity and the role estimand cannot adjust for role.
 
 The difficulty model MUST publish:
 
@@ -634,6 +652,12 @@ The difficulty model MUST publish:
 - fallback behavior for unseen strata
 - calibration and reliability evidence
 - predictive uncertainty needed by the estimator
+
+Expected-loss predictions are either produced by a model trained outside the
+evaluation window or cross-fitted by whole round. Cross-fitting assigns every
+round to a held-out fold, trains without any observation from that fold, and
+predicts all spells in the held-out round. Shot-level folds are prohibited.
+Model selection and feature selection occur inside the training folds.
 
 If expected loss cannot be estimated reliably, the spell remains in exposure,
 raw, and team summaries while its adjusted value is missing with a reason.
@@ -649,17 +673,24 @@ Every spell receives one terminal disposition. For each required outcome,
 attribution, and difficulty value, the estimator stores observed state or a
 typed missing reason. Estimator version 1 follows these publication rules:
 
-1. The point estimate `theta(a,W)` is published only when every eligible spell
+1. Absence of a loss component is not an observed zero. A zero response is
+   observed only when a versioned scoring policy validates a complete terminal
+   response and explicitly records `observed_loss: 0`.
+2. A handed-off, abandoned, retried, or unresolved spell defaults to a typed
+   missing outcome. It becomes observed only when the scoring policy defines a
+   complete terminal response for that exact disposition and the required
+   evidence is present.
+3. The point estimate `theta(a,W)` is published only when every eligible spell
    has an observed adjusted loss.
-2. If any eligible spell is missing, the point estimate is `unavailable`; an
+4. If any eligible spell is missing, the point estimate is `unavailable`; an
    observed-complete-case mean MAY be shown only as a diagnostic explicitly
    labeled conditional on observed spells.
-3. The scoring revision MUST define finite pre-outcome lower and upper loss
+5. The scoring revision MUST define finite pre-outcome lower and upper loss
    bounds for each spell stratum. Missing spells remain in the denominator and
    produce a sensitivity interval by substituting those bounds.
-4. If defensible bounds are unavailable, the sensitivity interval is also
+6. If defensible bounds are unavailable, the sensitivity interval is also
    `unavailable`.
-5. Outcome, identity, attribution, and difficulty coverage are reported
+7. Outcome, identity, attribution, and difficulty coverage are reported
    separately. Reliability cannot be high when any required coverage is below
    100 percent in estimator version 1.
 
@@ -675,8 +706,8 @@ Several versions of one reopened round MUST NOT enter the same aggregation.
 
 Estimator version 1 requires at least:
 
-- 20 eligible ownership spells
-- 5 distinct closed rounds
+- 60 eligible ownership spells
+- 30 distinct closed rounds
 
 Below either threshold, the result is `insufficient_data`, not zero. With equal
 weights, effective sample size is:
@@ -697,16 +728,23 @@ Every actor or role estimate MUST identify:
 
 When a point estimate is available, uncertainty uses a 95 percent
 round-clustered bootstrap with 2,000 resamples of rounds. Each resample includes
-all selected spells and shared penalty allocations from each sampled round.
-If the expected-loss model was fitted on the evaluated data, it is refitted in
-each resample. An externally fitted model contributes draws from its published
-predictive uncertainty. This propagates within-round dependence, shared
-penalties, and expected-loss uncertainty.
+all selected spells from each sampled round. A cross-fitted expected-loss model
+is refitted with the same round-level fold assignment logic inside each
+resample.
 
-If there are fewer than five independent rounds, the model cannot supply
-predictive uncertainty, or bootstrap computation fails, the uncertainty
-interval is `unavailable`, never zero-width. Reliability is low until every
-required interval and coverage field is available.
+An externally trained model contributes draws only from uncertainty in its
+conditional mean or fitted parameters. Aleatoric outcome noise and full
+predictive variance MUST NOT be drawn because clustered outcome resampling
+already represents outcome variation. If the model cannot separate
+conditional-mean uncertainty from predictive noise, the adjusted-loss
+uncertainty interval is `unavailable`.
+
+If there are fewer than 30 independent rounds, model-parameter uncertainty is
+unavailable, or bootstrap computation fails, the inferential interval is
+`unavailable`, never zero-width. Sub-threshold summaries are descriptive and
+marked `insufficient_data`; they MUST NOT be labeled actor or role handicap.
+Reliability is low until every required interval and coverage field is
+available.
 
 Repository and operator views aggregate canonical rounds or actor estimates.
 They are reporting scopes, not player identities.
@@ -730,11 +768,12 @@ once. Participant and role views reference the same component; they do not
 clone it.
 
 Verified `caused_by` allocation weights are non-negative and sum to exactly
-`1.0` across unique actor recipients. The allocated fraction enters each
-recipient's spell `observed_loss_j` once, using the role and spell in force when
-the causal action occurred. If causation is unknown, disputed, unverified, or
-cannot be mapped to an ownership spell, the full penalty remains in team score
-and is diagnostic-only for participant estimates.
+`1.0` across unique actor recipients. Version 1 participant and role penalty
+views are diagnostics separate from the handicap estimand. They reference the
+role and spell in force when the causal action occurred but never enter
+`observed_loss_j` or `expected_loss_j`. If causation is unknown, disputed,
+unverified, or cannot be mapped to an ownership spell, the full penalty remains
+in team score and its participant attribution remains explicitly missing.
 
 `caused_by` and `resolved_by` are independent:
 
@@ -743,8 +782,8 @@ and is diagnostic-only for participant estimates.
 - Allocation weights do not alter full team impact.
 - Unknown causation remains unknown and lowers attribution coverage.
 - Disputed causation remains visibly disputed until resolved by policy.
-- A penalty already represented in `observed_loss_j` through its
-  `penalty_id` MUST NOT also appear in intrinsic shot loss.
+- A penalty MUST NOT appear in intrinsic shot loss or the version 1
+  `observed_loss_j`.
 
 Participant penalty projections are not a source for team scoring. Summing
 actor or role views is invalid because unattributed penalties, team-only round
@@ -759,6 +798,8 @@ adjustments, overlapping role views, and missing data may remain.
 - Actor and role estimates use all eligible accountable ownership spells and
   spell-start difficulty, never display aliases or sessions as durable
   identity.
+- Version 1 actor and role handicap loss excludes penalties and team-only
+  adjustments; their attribution remains a separate diagnostic.
 - Exposure includes incomplete and handed-off work instead of selecting only
   successful completions.
 - Missing exposure outcomes suppress the version 1 point estimate and remain in
@@ -841,7 +882,8 @@ schema before deterministic projection or finalization ships. It includes
 `reopen_epoch`, scorecard schema and published version, actor/principal/session
 and role identity required by each canonical shot, optional contributor and
 verifier references, authority and visibility scope, loss-component identities,
-content hash, and projection revision.
+canonical `shot_id`, `penalty_id`, and `loss_component_id` fields, content hash,
+and projection revision.
 Participant projections reference canonical shot IDs instead of copying shot
 records. Readers MUST continue to support legacy scorecards.
 
@@ -969,11 +1011,12 @@ implementation constraint requires a semantic change, the contract and schema
 revision must change before code ships.
 
 S268 owns the minimum scorecard schema, identity fields, immutable projection,
-and finalization mechanics. S270 owns accountable attribution validation,
-ownership-spell and participant projections, descriptive estimators,
-missingness and reliability reporting, penalty attribution, and merge-safe
-learning. S270 MUST extend the S268 schema compatibly rather than introduce the
-identity or version fields finalization already hashes.
+canonical shot, penalty, and loss-component identity, and finalization
+mechanics. S270 owns accountable attribution validation, ownership-spell and
+participant projections, descriptive estimators, missingness and reliability
+reporting, penalty causation and allocation, and merge-safe learning. S270 MUST
+extend the S268 schema compatibly rather than introduce identities or version
+fields finalization already hashes.
 
 ## Acceptance Criteria
 
