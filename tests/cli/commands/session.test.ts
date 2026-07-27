@@ -160,6 +160,32 @@ describe('slope session command', () => {
     }
   });
 
+  it('rejects the primary checkout as an explicit worktree path', async () => {
+    execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: tmpDir });
+    const exit = vi.spyOn(process, 'exit').mockImplementation(((code?: number) => {
+      throw new Error(`process.exit(${code ?? 0})`);
+    }) as never);
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(sessionCommand([
+      'start',
+      '--session-id=primary-as-worktree',
+      `--worktree-path=${tmpDir}`,
+    ])).rejects.toThrow('process.exit(1)');
+
+    expect(error).toHaveBeenCalledWith(
+      'Error: --worktree-path must identify the current non-primary linked worktree.',
+    );
+    error.mockRestore();
+    exit.mockRestore();
+    const after = createStore();
+    try {
+      expect(await after.getActiveSessions()).toHaveLength(0);
+    } finally {
+      after.close();
+    }
+  });
+
   it('shows the live branch on session list without trusting the stored branch', async () => {
     execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: tmpDir });
     const store = createStore();

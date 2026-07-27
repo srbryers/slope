@@ -7,7 +7,6 @@ import type { CommonIssuesFile } from '../core/briefing.js';
 import type { StoreStats } from '../core/store.js';
 import { SlopeStoreError } from '../core/store.js';
 import type { SlopeStore, SlopeSession, SlopeSessionUpdate } from '../core/store.js';
-import { STALE_SESSION_THRESHOLD_MS } from '../core/constants.js';
 // EmbeddingStore not implemented for PG — hasEmbeddingSupport() returns false.
 // Deferred to a future pgvector sprint.
 
@@ -505,27 +504,17 @@ export class PostgresSlopeStore implements SlopeStore {
   }
 
   async getActiveClaims(sprintNumber?: number): Promise<SprintClaim[]> {
-    const cutoff = new Date(Date.now() - STALE_SESSION_THRESHOLD_MS).toISOString();
-    const sprintClause = sprintNumber !== undefined ? 'AND claims.sprint_number = $3' : '';
+    const sprintClause = sprintNumber !== undefined ? 'AND claims.sprint_number = $2' : '';
     const result = await this.pool.query(
       `SELECT claims.*
        FROM claims
        WHERE claims.project_id = $1
          AND (claims.expires_at IS NULL OR claims.expires_at > NOW())
          ${sprintClause}
-         AND (
-           claims.session_id IS NULL
-           OR EXISTS (
-             SELECT 1 FROM sessions
-             WHERE sessions.session_id = claims.session_id
-               AND sessions.project_id = claims.project_id
-               AND sessions.last_heartbeat_at >= $2
-           )
-         )
        ORDER BY claims.sprint_number, claims.claimed_at`,
       sprintNumber !== undefined
-        ? [this.projectId, cutoff, sprintNumber]
-        : [this.projectId, cutoff],
+        ? [this.projectId, sprintNumber]
+        : [this.projectId],
     );
     return result.rows.map(rowToClaim);
   }

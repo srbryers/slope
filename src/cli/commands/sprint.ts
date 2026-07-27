@@ -28,7 +28,8 @@ import {
   type SprintState,
 } from '../sprint-state.js';
 import { WorkflowEngine, loadWorkflow, resolveVariables, validateWorkflow, loadConfig, parseRoadmap, castRoadmapStructure, formatSprintLabel, formatSprintNumber, formatRoadmapSprintLabel, parseSprintNumber } from '../../core/index.js';
-import type { RoadmapDefinition, WorkflowDefinition, WorkflowExecution } from '../../core/index.js';
+import type { RoadmapDefinition, SprintClaim, SlopeSession, WorkflowDefinition, WorkflowExecution } from '../../core/index.js';
+import { STALE_SESSION_THRESHOLD_MS } from '../../core/constants.js';
 import { createHash } from 'node:crypto';
 import { formatActorName, formatActorSource, formatConflictSummary, resolveActor } from '../actor.js';
 import {
@@ -1018,6 +1019,63 @@ interface WorkflowStatusProjection {
   updated_at: string;
 }
 
+type ClaimOwnerLiveness = 'live' | 'stale' | 'missing' | 'unscoped';
+
+interface SprintStatusClaimProjection {
+  player: string;
+  target: string;
+  scope: SprintClaim['scope'];
+  session_id: string | null;
+  owner_liveness: ClaimOwnerLiveness;
+}
+
+interface SprintStatusActorProjection {
+  player: string;
+  session_id: string | null;
+  liveness: ClaimOwnerLiveness;
+}
+
+function claimOwnerLiveness(
+  claim: SprintClaim,
+  sessions: Map<string, SlopeSession>,
+  now = Date.now(),
+): ClaimOwnerLiveness {
+  if (!claim.session_id) return 'unscoped';
+  const session = sessions.get(claim.session_id);
+  if (!session) return 'missing';
+  return now - new Date(session.last_heartbeat_at).getTime() > STALE_SESSION_THRESHOLD_MS
+    ? 'stale'
+    : 'live';
+}
+
+function projectSprintStatusClaims(
+  claims: SprintClaim[],
+  sessions: SlopeSession[],
+): {
+  claims: SprintStatusClaimProjection[];
+  actors: SprintStatusActorProjection[];
+} {
+  const sessionsById = new Map(sessions.map(session => [session.session_id, session]));
+  const now = Date.now();
+  const projected = claims.map(claim => ({
+    player: claim.player,
+    target: claim.target,
+    scope: claim.scope,
+    session_id: claim.session_id ?? null,
+    owner_liveness: claimOwnerLiveness(claim, sessionsById, now),
+  }));
+  const actors = new Map<string, SprintStatusActorProjection>();
+  for (const claim of projected) {
+    const key = `${claim.player}\0${claim.session_id ?? ''}`;
+    actors.set(key, {
+      player: claim.player,
+      session_id: claim.session_id,
+      liveness: claim.owner_liveness,
+    });
+  }
+  return { claims: projected, actors: [...actors.values()] };
+}
+
 function projectWorkflowStatus(exec: WorkflowExecution): WorkflowStatusProjection {
   return {
     execution_id: exec.id,
@@ -1086,6 +1144,7 @@ async function statusCommand(
         phase: null,
         gates: null,
         review_gates: null,
+        actors: [],
         claims: [],
       }, null, 2));
       return;
@@ -1109,7 +1168,11 @@ async function statusCommand(
     ? complete ? ' (merged; all gates complete)' : ' (phase: complete)'
     : complete ? ' (all gates complete)' : ` (phase: ${state.phase})`;
   const sprint = sprintNumberForCwd(cwd, state.sprint);
-  const claims = await store.getActiveClaims(state.sprint);
+  const storedClaims = await store.getActiveClaims(state.sprint);
+  const { claims, actors } = projectSprintStatusClaims(
+    storedClaims,
+    await store.getActiveSessions(),
+  );
   const pending = pendingGateNames(state);
 
   if (json) {
@@ -1123,6 +1186,7 @@ async function statusCommand(
       gates: state.gates,
       review_gates: state.review_gates,
       pending_gates: pending,
+      actors,
       claims,
     }, null, 2));
     return;
@@ -1146,6 +1210,16 @@ async function statusCommand(
     }
   }
 
+  console.log('\nActors:');
+  if (actors.length === 0) {
+    console.log('  none');
+  } else {
+    for (const actor of actors) {
+      const session = actor.session_id ? ` (session ${actor.session_id})` : '';
+      console.log(`  ${actor.player}: ${actor.liveness}${session}`);
+    }
+  }
+
   console.log('\nActive claims:');
   if (claims.length === 0) {
     console.log('  none');
@@ -1159,7 +1233,9 @@ async function statusCommand(
     for (const [player, playerClaims] of claimsByPlayer) {
       console.log(`  ${player}:`);
       for (const claim of playerClaims) {
-        const session = claim.session_id ? ` (session ${claim.session_id})` : '';
+        const session = claim.session_id
+          ? ` (session ${claim.session_id}; owner ${claim.owner_liveness})`
+          : ' (unscoped owner)';
         console.log(`    [${claim.scope}] ${claim.target}${session}`);
       }
     }

@@ -104,11 +104,14 @@ export async function worktreeCheckGuard(input: HookInput, cwd: string): Promise
     const existing = active.find(s => s.session_id === sessionId);
     const currentSwarmId = existing?.swarm_id;
     let registeredWorktrees: GitWorktreeInfo[] | undefined;
+    const primaryCheckout = canonicalPath(cwd);
     const hasRegisteredWorktree = (worktreePath: string | undefined): boolean => {
       if (!worktreePath) return false;
+      const candidate = canonicalPath(worktreePath);
+      if (candidate === primaryCheckout) return false;
       registeredWorktrees ??= listGitWorktreeInfo(cwd);
       return registeredWorktrees.some(
-        worktree => canonicalPath(worktree.path) === canonicalPath(worktreePath),
+        worktree => canonicalPath(worktree.path) === candidate,
       );
     };
 

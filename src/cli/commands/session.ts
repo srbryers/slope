@@ -137,7 +137,17 @@ async function startSession(flags: Record<string, string>, cwd: string): Promise
     const role = (flags.role ?? 'primary') as 'primary' | 'secondary' | 'observer';
     const ide = flags.ide ?? 'unknown';
     const branch = flags.branch ?? currentGitBranch(sourceCwd);
-    const worktreePath = flags['worktree-path'] ?? (linkedCheckout ? sourceCwd : undefined);
+    const requestedWorktreePath = flags['worktree-path'];
+    if (
+      requestedWorktreePath &&
+      (!linkedCheckout || !sameCheckout(requestedWorktreePath, sourceCwd))
+    ) {
+      console.error(
+        'Error: --worktree-path must identify the current non-primary linked worktree.',
+      );
+      process.exit(1);
+    }
+    const worktreePath = linkedCheckout ? sourceCwd : undefined;
     const swarmId = flags.swarm;
     const agentRole = flags['agent-role'];
 

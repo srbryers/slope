@@ -297,7 +297,7 @@ describe('Claims', () => {
     expect(await store.list(1)).toHaveLength(2);
   });
 
-  it('filters claims owned by a stale session without deleting history', async () => {
+  it('does not turn heartbeat age into an implicit claim lease', async () => {
     await store.registerSession({
       session_id: 'stale-owner',
       role: 'observer',
@@ -317,7 +317,7 @@ describe('Claims', () => {
       'UPDATE sessions SET last_heartbeat_at = ? WHERE session_id = ?',
     ).run('2020-01-01T00:00:00.000Z', 'stale-owner');
 
-    expect(await store.getActiveClaims(1)).toHaveLength(0);
+    expect(await store.getActiveClaims(1)).toHaveLength(1);
     expect(await store.list(1)).toHaveLength(1);
   });
 });

@@ -988,10 +988,16 @@ describe('slope sprint status', () => {
 
     const output = await captureLog(() => sprintCommand(['status', '--json']));
     const status = JSON.parse(output) as {
+      actors: Array<{ player: string; liveness: string }>;
       sprint: string;
       status: string;
       phase: string;
-      claims: Array<{ player: string; target: string; scope: string }>;
+      claims: Array<{
+        player: string;
+        target: string;
+        scope: string;
+        owner_liveness: string;
+      }>;
     };
 
     expect(status).toMatchObject({
@@ -1005,8 +1011,59 @@ describe('slope sprint status', () => {
         player: 'windows-agent',
         target: 'S465-2',
         scope: 'ticket',
+        owner_liveness: 'unscoped',
       }),
     ]);
+    expect(status.actors).toEqual([
+      expect.objectContaining({
+        player: 'windows-agent',
+        liveness: 'unscoped',
+      }),
+    ]);
+  });
+
+  it('reports stale claim owners without releasing or hiding their claims (#663)', async () => {
+    await captureLog(() => sprintCommand(['start', '--number=466', '--phase=implementing']));
+    const store = createStore({ storePath: '.slope/slope.db', cwd: tmpDir });
+    await store.registerSession({
+      session_id: 'stale-status-owner',
+      role: 'observer',
+      ide: 'test',
+    });
+    await store.claim({
+      sprint_number: 466,
+      player: 'stale-agent',
+      target: 'S466-1',
+      scope: 'ticket',
+      session_id: 'stale-status-owner',
+    });
+    const rawStore = store as unknown as {
+      db: { prepare: (sql: string) => { run: (...params: unknown[]) => unknown } };
+    };
+    rawStore.db.prepare(
+      'UPDATE sessions SET last_heartbeat_at = ? WHERE session_id = ?',
+    ).run('2020-01-01T00:00:00.000Z', 'stale-status-owner');
+    store.close();
+
+    const output = await captureLog(() => sprintCommand(['status', '--json']));
+    const status = JSON.parse(output);
+
+    expect(status.actors).toEqual(expect.arrayContaining([
+      {
+        player: 'stale-agent',
+        session_id: 'stale-status-owner',
+        liveness: 'stale',
+      },
+    ]));
+    expect(status.claims).toEqual(expect.arrayContaining([
+      {
+        player: 'stale-agent',
+        target: 'S466-1',
+        scope: 'ticket',
+        session_id: 'stale-status-owner',
+        owner_liveness: 'stale',
+      },
+    ]));
   });
 
   it('shows derived closeout state and next action when all gates are complete (#567)', async () => {

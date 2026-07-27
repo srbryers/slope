@@ -422,6 +422,33 @@ describe('worktreeCheckGuard', () => {
     expect(result.blockReason).toContain('other-session');
   });
 
+  it('does not treat the primary checkout as isolated when stored as a worktree path', async () => {
+    mockExecFileSync
+      .mockReturnValueOnce('.git' as never)
+      .mockReturnValueOnce('feat/foo' as never)
+      .mockReturnValueOnce([
+        'worktree /tmp/test',
+        'HEAD abc123',
+        'branch refs/heads/feat/foo',
+        '',
+      ].join('\n') as never);
+    (mockStore.getActiveSessions as ReturnType<typeof vi.fn>).mockResolvedValue([
+      makeSession({
+        session_id: 'test-session',
+        worktree_path: '/tmp/test',
+      }),
+      makeSession({
+        session_id: 'other-session',
+        worktree_path: '/tmp/test',
+      }),
+    ]);
+
+    const result = await worktreeCheckGuard(makeInput(), '/tmp/test');
+
+    expect(result.decision).toBe('deny');
+    expect(result.blockReason).toContain('other-session');
+  });
+
   it('allows when current session is alone', async () => {
     mockExecFileSync
       .mockReturnValueOnce('.git' as never)

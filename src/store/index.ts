@@ -11,7 +11,6 @@ import type { CommonIssuesFile, StoreStats } from '../core/index.js';
 import { resolveRepoStateCwd, SlopeStoreError } from '../core/index.js';
 import type { SlopeStore, SlopeSession, SlopeSessionUpdate } from '../core/index.js';
 import type { EmbeddingStore, EmbeddingEntry, EmbeddingSearchResult, EmbeddingStats, IndexMeta } from '../core/embedding-store.js';
-import { STALE_SESSION_THRESHOLD_MS } from '../core/constants.js';
 
 function generateId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -550,26 +549,17 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
 
   async getActiveClaims(sprintNumber?: number): Promise<SprintClaim[]> {
     const now = nowISO();
-    const cutoff = new Date(Date.now() - STALE_SESSION_THRESHOLD_MS).toISOString();
     const sprintClause = sprintNumber !== undefined ? 'AND claims.sprint_number = ?' : '';
     const sql = `
       SELECT claims.*
       FROM claims
       WHERE (claims.expires_at IS NULL OR claims.expires_at > ?)
         ${sprintClause}
-        AND (
-          claims.session_id IS NULL
-          OR EXISTS (
-            SELECT 1 FROM sessions
-            WHERE sessions.session_id = claims.session_id
-              AND sessions.last_heartbeat_at >= ?
-          )
-        )
       ORDER BY claims.sprint_number, claims.claimed_at
     `;
     const params = sprintNumber !== undefined
-      ? [now, sprintNumber, cutoff]
-      : [now, cutoff];
+      ? [now, sprintNumber]
+      : [now];
     const rows = this.db.prepare(sql).all(...params) as Array<Record<string, unknown>>;
     return rows.map(rowToClaim);
   }
