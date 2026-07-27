@@ -149,7 +149,7 @@ sprints:
         complexity: risky
         github_issue: 669
       - key: S271-2
-        title: Enforce verification-epoch, slot-decision, and terminal timeout-escalation aggregate state, producer-proven contribution closure, principal conflict roots, quorum reducer, appeal, waiver, invalidation, and independent verifier gates across authors, contributors, delegators, sessions, aliases, handoffs, and late-mutation races
+        title: Enforce verification-epoch, slot-decision, single-CAS timeout-disposition, and terminal timeout-escalation aggregate state with sequential and concurrent different-key race tests, producer-proven contribution closure, principal conflict roots, quorum reducer, appeal, waiver, invalidation, and independent verifier gates across authors, contributors, delegators, sessions, aliases, handoffs, and late-mutation races
         club: driver
         complexity: risky
         github_issue: 669

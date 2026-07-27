@@ -344,7 +344,10 @@ The initial compound events are:
 - `contribution.material_mutation_accepted.v2`, owned by the assignment
   verification domain;
 - `verification.appeal_granted.v1`, owned by the verification family;
-- `verification.timeout_disposed.v1`, owned by the verification family;
+- `verification.timed_out.v2`, owned by the verification family and creating
+  its timeout-disposition aggregate;
+- `verification.timeout_disposed.v1`, owned by the timeout-disposition
+  aggregate;
 - `verification.escalation_disposed.v1` and
   `verification.escalation_expired.v1`, owned by the verification escalation;
 - `learning.patterns_merged.v2` and `learning.pattern_split.v2`, owned by a
@@ -580,7 +583,7 @@ are:
 | `disputed` | `verification.epoch_reduced.v1` | `approved`, `rejected`, or `disputed` | quorum reducer with `verification:reduce` |
 | `requested`, `reserved`, `active`, or `disputed` | `verification.waived.v1` | `waived` | waiver authority with `verification:waive` |
 | any non-terminal | `verification.cancelled.v1` | `cancelled` | principal with `verification:cancel` |
-| `requested`, `reserved`, `active`, or `disputed` | `verification.timed_out.v1` | `timed_out` | recovery service with `verification:recover` |
+| `requested`, `reserved`, `active`, or `disputed` | `verification.timed_out.v2` | `timed_out` | recovery service with `verification:recover` |
 | `approved`, `waived`, or `not_required` | `verification.invalidated.v1` | `invalidated` | policy engine with `verification:invalidate` |
 
 An invalidated epoch never resumes. Reverification of unchanged completion
@@ -1524,9 +1527,19 @@ criteria are not appealable and require assignment revision `r + 1`.
 
 ### Verification Timeout Disposition
 
-A terminal timed-out epoch follows its versioned recovery policy. An authorized
-principal with `verification:recover` invokes compound primary event
-`verification.timeout_disposed.v1` with one disposition:
+A terminal timed-out epoch follows its versioned recovery policy and can
+receive exactly one semantic disposition. Compound event
+`verification.timed_out.v2` transitions the epoch to `timed_out` and atomically
+creates a timeout-disposition aggregate keyed by:
+
+```text
+(project_id, verification_family_id, timed_out_epoch)
+```
+
+Its initial state is `undisposed`, version 1. The key is unique for all time.
+An authorized principal with `verification:recover` invokes compound primary
+event `verification.timeout_disposed.v1`, owned by this aggregate, with one
+compare-and-set transition from `undisposed` to:
 
 - `abandon`: preserve `verification_timed_out` as final and escalate the
   assignment;
@@ -1541,7 +1554,18 @@ The event binds authoritative deadline, slot terminal states, notification
 delivery, target and contribution hashes, recovery count, retry limit,
 principal eligibility, waiver proof when applicable, and idempotency. The
 recovery principal cannot serve as a successor verifier unless independently
-eligible. No disposition resumes or rewrites the timed-out epoch.
+eligible. Acceptance locks the disposition aggregate, verification family,
+assignment verification domain, and successor-epoch key. It requires state
+`undisposed`, expected version 1, no prior disposition, and no successor epoch.
+No disposition resumes or rewrites the timed-out epoch.
+
+`abandon`, `requeue`, `waive`, and `escalate` are terminal disposition states.
+The accepted event ID, outcome, idempotency identity, request hash, and
+successor or escalation identity are persisted on the disposition aggregate.
+An exact retry returns that event. Every different key, request hash, or
+outcome conflicts without append, even when it arrives after the first
+transaction. Concurrent different-key requests serialize on the disposition
+row and only one can win.
 
 For `escalate`, `verification.timeout_disposed.v1` creates exactly one
 verification escalation aggregate keyed by:
@@ -1599,6 +1623,16 @@ An `open` escalation observed after its deadline is deterministically
 `overdue`, blocks finalization that relies on the verification family, and must
 be terminalized by the next recovery sweep; replay does not invent an expiry
 event.
+
+Replay also requires each timed-out verification epoch to have exactly one
+timeout-disposition aggregate, at most one accepted
+`verification.timeout_disposed.v1`, and no successor epoch except the one
+created by a `requeue` or `waive` disposition or by the escalation aggregate
+after an `escalate` disposition. Once disposition is `escalate`, only
+`verification.escalation_disposed.v1` may create a successor. Replay rejects a
+successor without its originating compound disposition, multiple semantic
+dispositions, or an open escalation when another path already created a
+successor.
 
 ## Reverification
 
