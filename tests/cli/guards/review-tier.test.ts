@@ -1,11 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { reviewTierGuard } from '../../../src/cli/guards/review-tier.js';
 import { workflowGateGuard } from '../../../src/cli/guards/workflow-gate.js';
 import type { HookInput } from '../../../src/core/index.js';
 
-const TMP = join(import.meta.dirname ?? __dirname, '..', '..', '..', '.test-tmp-review-tier');
+const TMP = join(tmpdir(), `slope-review-tier-test-${process.pid}`);
 
 // Mock homedir so findPlanContent's global fallback doesn't find real user plans
 vi.mock('node:os', async (importOriginal) => {
