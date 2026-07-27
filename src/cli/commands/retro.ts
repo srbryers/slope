@@ -35,6 +35,7 @@ import type {
 } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { updateSprintPhaseForSprintAcrossWorktrees } from '../sprint-state.js';
+import { reconcileWorkflowCloseout } from '../workflow-closeout.js';
 import type { WorktreePhaseReconcile } from '../sprint-state.js';
 
 interface BackfillOptions {
@@ -528,11 +529,17 @@ async function postMergeSubcommand(args: string[]): Promise<void> {
   const path = postMergeOutputPath(cwd, retro);
 
   let reconciled: WorktreePhaseReconcile[] = [];
+  let completedWorkflowExecutions = 0;
   if (!opts.dryRun) {
     writePostMergeRetro(cwd, record);
     // Reconcile every checkout, not just this one — sibling worktrees otherwise
     // keep reporting the merged sprint as in progress (GH #624).
     reconciled = updateSprintPhaseForSprintAcrossWorktrees(cwd, retro.sprint, 'complete');
+    const workflowCloseout = await reconcileWorkflowCloseout(cwd, [retro.sprint]);
+    completedWorkflowExecutions = workflowCloseout.completed.length;
+    if (workflowCloseout.warning) {
+      console.error(`Warning: workflow execution closeout skipped: ${workflowCloseout.warning}`);
+    }
   }
 
   const payload = {
@@ -554,6 +561,9 @@ async function postMergeSubcommand(args: string[]): Promise<void> {
   }
   console.log(`  Outcome: ${retro.outcome}`);
   if (!opts.dryRun) console.log(`  Sprint state: ${formatPhaseReconcile(reconciled, retro.sprint)}`);
+  if (!opts.dryRun && completedWorkflowExecutions > 0) {
+    console.log(`  Workflow executions: ${completedWorkflowExecutions} completed`);
+  }
   console.log(`  Memories: ${record.memory.added.length} added, ${record.memory.skipped} skipped, ${record.memory.planned} planned`);
   if (retro.followUps.length > 0) {
     console.log(`  Follow-ups: ${retro.followUps.length}`);

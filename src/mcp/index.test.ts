@@ -72,6 +72,7 @@ function createMockStore(): SlopeStore & { sessions: SlopeSession[]; claims: Spr
     async getExecutionBySprint() { return null; },
     async updateExecutionState() {},
     async completeExecution() {},
+    async completeRunningExecution() { return true; },
     async recordStepResult(p) { return { id: `wfs-${Date.now()}`, execution_id: p.execution_id, step_id: p.step_id, phase: p.phase, status: p.status, started_at: new Date().toISOString() }; },
     async listExecutions() { return []; },
     close() {},

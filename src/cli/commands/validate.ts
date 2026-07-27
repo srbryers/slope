@@ -5,7 +5,6 @@ import {
   discoverScorecardFiles,
   loadSkillRegistry,
   parseSprintNumber,
-  resolveRepoStatePath,
   skillIds,
   sprintNumberFromScorecardFile,
   validateScorecard,
@@ -13,8 +12,8 @@ import {
 import { loadConfig } from '../config.js';
 import { updateGate } from '../sprint-state.js';
 import { completeRoadmapSourceSprint } from '../roadmap-source-store.js';
-import { getStoreInfo, resolveStore } from '../store.js';
-import { completeWorkflowExecutionsForSprints, sprintLabelForExecution } from '../workflow-resync.js';
+import { sprintLabelForExecution } from '../workflow-resync.js';
+import { reconcileWorkflowCloseout, WORKFLOW_EXECUTION_ID_ENV } from '../workflow-closeout.js';
 import type { RoadmapSourceError } from '../../core/index.js';
 
 export async function validateCommand(input?: string | string[]): Promise<void> {
@@ -108,9 +107,10 @@ export async function validateCommand(input?: string | string[]): Promise<void> 
   let reconciled = true;
   if (allValid && registryAvailable && !readOnly) {
     updateGate(cwd, 'scorecard', true);
-    reconciled = reconcileModularRoadmapSources(cwd, validScorecards);
-    if (reconciled) {
-      await reconcileValidatedWorkflowExecutions(cwd, validScorecards.map(scorecard => scorecard.sprint));
+    const completedRoadmapSprints = new Set<number>();
+    reconciled = reconcileModularRoadmapSources(cwd, validScorecards, completedRoadmapSprints);
+    if (reconciled && completedRoadmapSprints.size > 0) {
+      await reconcileValidatedWorkflowExecutions(cwd, completedRoadmapSprints);
     }
   } else if (readOnly) {
     // `validate` writes tracked files as a side effect: it marks the scorecard
@@ -125,25 +125,16 @@ export async function validateCommand(input?: string | string[]): Promise<void> 
   process.exit(allValid && registryAvailable && reconciled ? 0 : 1);
 }
 
-async function reconcileValidatedWorkflowExecutions(cwd: string, sprints: number[]): Promise<void> {
-  const storeInfo = getStoreInfo(cwd);
-  if (storeInfo.type === 'sqlite') {
-    const storePath = resolveRepoStatePath(cwd, storeInfo.path ?? '.slope/slope.db');
-    if (!existsSync(storePath)) return;
+async function reconcileValidatedWorkflowExecutions(cwd: string, sprints: Iterable<number>): Promise<void> {
+  const invokingExecutionId = process.env[WORKFLOW_EXECUTION_ID_ENV]?.trim();
+  const result = await reconcileWorkflowCloseout(cwd, sprints, {
+    ...(invokingExecutionId ? { preserveExecutionIds: [invokingExecutionId] } : {}),
+    preserveNewestPerSprint: true,
+  });
+  for (const exec of result.completed) {
+    console.log(`  Workflow execution reconciled: ${sprintLabelForExecution(exec)} duplicate -> completed (${exec.id})`);
   }
-
-  let store: Awaited<ReturnType<typeof resolveStore>> | null = null;
-  try {
-    store = await resolveStore(cwd);
-    const completed = await completeWorkflowExecutionsForSprints(store, sprints);
-    for (const exec of completed) {
-      console.log(`  Workflow execution reconciled: ${sprintLabelForExecution(exec)} -> completed (${exec.id})`);
-    }
-  } catch (error) {
-    console.log(`  \u26A0 Workflow execution reconciliation skipped: ${(error as Error).message}`);
-  } finally {
-    store?.close();
-  }
+  if (result.warning) console.log(`  \u26A0 Workflow execution reconciliation skipped: ${result.warning}`);
 }
 
 /**
@@ -156,8 +147,12 @@ async function reconcileValidatedWorkflowExecutions(cwd: string, sprints: number
 export function reconcileModularRoadmapSources(
   cwd: string,
   scorecards: Array<{ sprint: number; path: string }>,
+  completedSprints: Set<number> = new Set(),
 ): boolean {
-  if (!existsSync(join(cwd, 'docs', 'roadmap', 'project.yaml'))) return true;
+  if (!existsSync(join(cwd, 'docs', 'roadmap', 'project.yaml'))) {
+    for (const scorecard of scorecards) completedSprints.add(scorecard.sprint);
+    return true;
+  }
   let ok = true;
   for (const scorecard of scorecards) {
     try {
@@ -178,6 +173,7 @@ export function reconcileModularRoadmapSources(
       if (result.reformatted) {
         console.log(`  ⚠ ${result.source} could not be patched surgically and was rewritten in canonical YAML style.`);
       }
+      completedSprints.add(scorecard.sprint);
     } catch (error) {
       if ((error as RoadmapSourceError).projectionContentLoss) {
         // Report once, not per scorecard \u2014 the cause is the projection, not the sprint.

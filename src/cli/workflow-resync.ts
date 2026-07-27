@@ -40,19 +40,42 @@ export interface SprintStateRebindResult {
 }
 
 export async function completeWorkflowExecutionsForSprints(
-  store: Pick<SlopeStore, 'listExecutions' | 'completeExecution'>,
+  store: Pick<SlopeStore, 'listExecutions' | 'completeRunningExecution'>,
   sprints: Iterable<number>,
+  options: {
+    preserveExecutionIds?: Iterable<string>;
+    preserveNewestPerSprint?: boolean;
+  } = {},
 ): Promise<WorkflowExecution[]> {
   const targetSprints = new Set(sprints);
   if (targetSprints.size === 0) return [];
 
-  const completed: WorkflowExecution[] = [];
+  const preserveExecutionIds = new Set(options.preserveExecutionIds ?? []);
+  const bySprint = new Map<number, WorkflowExecution[]>();
   const running = await store.listExecutions({ status: 'running' });
   for (const exec of running) {
     const sprint = sprintNumberForExecution(exec);
     if (sprint === null || !targetSprints.has(sprint)) continue;
-    await store.completeExecution(exec.id, 'completed');
-    completed.push(exec);
+    const executions = bySprint.get(sprint) ?? [];
+    executions.push(exec);
+    bySprint.set(sprint, executions);
+  }
+
+  const completed: WorkflowExecution[] = [];
+  for (const executions of bySprint.values()) {
+    const explicitlyPreserved = executions.filter(exec => preserveExecutionIds.has(exec.id));
+    const preserved = new Set(
+      explicitlyPreserved.length > 0
+        ? explicitlyPreserved.map(exec => exec.id)
+        : options.preserveNewestPerSprint && executions.length > 0
+          ? [executions[0].id]
+          : [],
+    );
+
+    for (const exec of executions) {
+      if (preserved.has(exec.id)) continue;
+      if (await store.completeRunningExecution(exec.id)) completed.push(exec);
+    }
   }
   return completed;
 }

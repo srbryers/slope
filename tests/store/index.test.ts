@@ -808,6 +808,17 @@ describe('Workflow Executions', () => {
     expect(updated!.status).toBe('completed');
   });
 
+  it('completes an execution only while it is still running', async () => {
+    const running = await store.startExecution({ workflow_name: 'test' });
+    await expect(store.completeRunningExecution(running.id)).resolves.toBe(true);
+    await expect(store.getExecution(running.id)).resolves.toMatchObject({ status: 'completed' });
+
+    const paused = await store.startExecution({ workflow_name: 'test' });
+    await store.completeExecution(paused.id, 'paused');
+    await expect(store.completeRunningExecution(paused.id)).resolves.toBe(false);
+    await expect(store.getExecution(paused.id)).resolves.toMatchObject({ status: 'paused' });
+  });
+
   it('records step results and updates completed_steps', async () => {
     const exec = await store.startExecution({ workflow_name: 'test' });
 

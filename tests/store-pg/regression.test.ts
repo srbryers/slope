@@ -43,6 +43,24 @@ describe('store-pg regression (no PG required)', () => {
     expect(params[2]).toBe(262);
   });
 
+  it('completes workflow execution only from running status', async () => {
+    const { PostgresSlopeStore } = await import('../../src/store-pg/index.js');
+    const query = vi.fn().mockResolvedValue({ rowCount: 1 });
+    const store = new PostgresSlopeStore({
+      pool: { query } as never,
+      projectId: 'workflow-test',
+    });
+
+    await expect(store.completeRunningExecution('wf-263')).resolves.toBe(true);
+
+    const [sql, params] = query.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain("status = 'completed'");
+    expect(sql).toContain("status = 'running'");
+    expect(sql).toContain('project_id = $3');
+    expect(params[1]).toBe('wf-263');
+    expect(params[2]).toBe('workflow-test');
+  });
+
   it('createPostgresStore fails with clear error when connection is refused', async () => {
     const { createPostgresStore } = await import('../../src/store-pg/index.js');
     await expect(createPostgresStore({

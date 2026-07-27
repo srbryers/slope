@@ -779,6 +779,14 @@ export class PostgresSlopeStore implements SlopeStore {
     }
   }
 
+  async completeRunningExecution(executionId: string): Promise<boolean> {
+    const result = await this.pool.query(
+      "UPDATE workflow_executions SET status = 'completed', updated_at = $1 WHERE id = $2 AND project_id = $3 AND status = 'running'",
+      [nowISO(), executionId, this.projectId],
+    );
+    return (result.rowCount ?? 0) > 0;
+  }
+
   async recordStepResult(params: { execution_id: string; step_id: string; phase: string; status: 'completed' | 'skipped' | 'failed'; output?: Record<string, unknown>; exit_code?: number; item?: string; started_at?: string }): Promise<WorkflowStepResult> {
     const id = generateId('wfs');
     const now = nowISO();

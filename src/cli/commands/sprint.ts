@@ -77,6 +77,7 @@ import {
   parseTouchedPaths,
 } from '../pre-sprint-reality.js';
 import { findStaleWorkflowExecutions, reconcileWorkflowExecutions, sprintLabelForExecution } from '../workflow-resync.js';
+import { WORKFLOW_EXECUTION_ID_ENV } from '../workflow-closeout.js';
 
 /**
  * Check completion_conditions for a step before allowing completion/skip.
@@ -1293,7 +1294,15 @@ async function autoRunCommandSteps(
 
     let exitCode = 0;
     try {
-      execSync(cmd, { cwd, stdio: 'inherit', timeout: 60000 });
+      execSync(cmd, {
+        cwd,
+        stdio: 'inherit',
+        timeout: 60000,
+        env: {
+          ...process.env,
+          [WORKFLOW_EXECUTION_ID_ENV]: execId,
+        },
+      });
     } catch (err) {
       exitCode = (err as { status?: number }).status ?? 1;
       console.log(`  Command exited with code ${exitCode}`);

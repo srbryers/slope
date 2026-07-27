@@ -79,6 +79,7 @@ export interface SlopeStore extends SprintRegistry {
   getExecutionBySprint(sprintId: string): Promise<WorkflowExecution | null>;
   updateExecutionState(executionId: string, phase: string, step: string): Promise<void>;
   completeExecution(executionId: string, status: 'completed' | 'failed' | 'paused' | 'running'): Promise<void>;
+  completeRunningExecution(executionId: string): Promise<boolean>;
   recordStepResult(params: { execution_id: string; step_id: string; phase: string; status: 'completed' | 'skipped' | 'failed'; output?: Record<string, unknown>; exit_code?: number; item?: string; started_at?: string }): Promise<WorkflowStepResult>;
   listExecutions(filter?: { sprint_id?: string; status?: string }): Promise<WorkflowExecution[]>;
 

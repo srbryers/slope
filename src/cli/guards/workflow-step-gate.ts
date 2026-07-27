@@ -119,15 +119,17 @@ function selectWorkflowExecution(
 }
 
 function sprintLabelForContext(cwd: string, config: SlopeConfig): string | null {
+  let inferred: ReturnType<typeof inferSprintContext> | null = null;
   try {
-    const inferred = inferSprintContext(cwd, config);
-    if (inferred.source !== 'initial') return inferred.label;
+    inferred = inferSprintContext(cwd, config);
+    if (inferred.source === 'sprint-state' || inferred.source === 'config') return inferred.label;
   } catch {
     // Sprint inference is advisory for this guard; ambiguity should fail open.
   }
 
   const branchSprint = inferSprintFromBranch(cwd);
-  return branchSprint === null ? null : formatSprintLabel(branchSprint);
+  if (branchSprint !== null) return formatSprintLabel(branchSprint);
+  return inferred && inferred.source !== 'initial' ? inferred.label : null;
 }
 
 function executionMatchesSprint(exec: WorkflowExecution, label: string): boolean {

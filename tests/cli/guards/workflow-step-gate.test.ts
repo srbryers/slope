@@ -253,6 +253,24 @@ describe('workflowStepGateGuard', () => {
     expect(result.blockReason).toBeUndefined();
   });
 
+  it('treats an explicit sprint branch as authoritative over roadmap fallback inference (#668)', async () => {
+    writeConfig({ roadmapPath: 'docs/backlog/roadmap.json' });
+    initGitForSprint(85);
+    writeRoadmap([{ id: 217, status: 'planned' }]);
+    writeWorkflow('branch-wf', 'command');
+    const store = new SqliteSlopeStore(join(TMP, '.slope/slope.db'));
+    const execId = await createRunningExecution(store, 'branch-wf', 'phase1', 'step1', {
+      sprintId: 'S85',
+      sessionId: 'test-session',
+    });
+    store.close();
+
+    const result = await workflowStepGateGuard(makeInput(), TMP);
+
+    expect(result.decision).toBe('deny');
+    expect(result.blockReason).toContain(`blocked by execution ${execId} for S85`);
+  });
+
   it('fails open when multiple executions cannot be disambiguated (#531)', async () => {
     writeConfig();
     writeWorkflow('command-wf', 'command');

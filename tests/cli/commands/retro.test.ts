@@ -8,6 +8,7 @@ import { retroCommand } from '../../../src/cli/commands/retro.js';
 import { memoryCommand } from '../../../src/cli/commands/memory.js';
 import { searchMemories } from '../../../src/core/memory.js';
 import { createSprintState, loadSprintState, saveSprintState } from '../../../src/cli/sprint-state.js';
+import { SqliteSlopeStore } from '../../../src/store/index.js';
 
 function createTempDir(): string {
   const cwd = mkdtempSync(join(tmpdir(), 'slope-retro-cli-'));
@@ -151,6 +152,29 @@ describe('retro post-merge CLI', () => {
     ]));
 
     expect(loadSprintState(cwd)?.phase).toBe('complete');
+  });
+
+  it('atomically completes remaining running workflow executions at post-merge closeout (#668)', async () => {
+    const store = new SqliteSlopeStore(join(cwd, '.slope', 'slope.db'));
+    const running = await store.startExecution({ workflow_name: 'sprint-standard', sprint_id: 'S137' });
+    const paused = await store.startExecution({ workflow_name: 'sprint-standard', sprint_id: 'S137' });
+    await store.completeExecution(paused.id, 'paused');
+    store.close();
+
+    await captureLogs(() => retroCommand([
+      'post-merge',
+      '--sprint=137',
+      '--pr=512',
+      '--summary=merged cleanly',
+    ]));
+
+    const updated = new SqliteSlopeStore(join(cwd, '.slope', 'slope.db'));
+    try {
+      await expect(updated.getExecution(running.id)).resolves.toMatchObject({ status: 'completed' });
+      await expect(updated.getExecution(paused.id)).resolves.toMatchObject({ status: 'paused' });
+    } finally {
+      updated.close();
+    }
   });
 
   it('parses non-project category and weight prefixes without persisting prefix text', async () => {
