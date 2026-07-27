@@ -27,8 +27,24 @@ import {
   type SprintPhase,
   type SprintState,
 } from '../sprint-state.js';
-import { WorkflowEngine, loadWorkflow, resolveVariables, validateWorkflow, loadConfig, parseRoadmap, castRoadmapStructure, formatSprintLabel, formatSprintNumber, formatRoadmapSprintLabel, parseSprintNumber } from '../../core/index.js';
-import type { RoadmapDefinition, SprintClaim, SlopeSession, WorkflowDefinition, WorkflowExecution } from '../../core/index.js';
+import {
+  WorkflowEngine,
+  loadWorkflow,
+  resolveVariables,
+  validateWorkflow,
+  loadConfig,
+  parseRoadmap,
+  castRoadmapStructure,
+  findRoadmapSprint,
+  formatSprintLabel,
+  formatSprintNumber,
+  formatRoadmapSprintLabel,
+  parseSprintNumber,
+  roadmapSprintKey,
+  sprintIdKey,
+  sprintIdsEqual,
+} from '../../core/index.js';
+import type { RoadmapDefinition, SprintClaim, SprintId, SlopeSession, WorkflowDefinition, WorkflowExecution } from '../../core/index.js';
 import { STALE_SESSION_THRESHOLD_MS } from '../../core/constants.js';
 import { createHash } from 'node:crypto';
 import { formatActorName, formatActorSource, formatConflictSummary, resolveActor } from '../actor.js';
@@ -69,7 +85,6 @@ import {
   type SprintResumeClaimPointer,
 } from '../sprint-resume.js';
 import {
-  blockingRoadmapIssuesForSprint,
   collectSiblingWorktreeReality,
   findWorktreeOverlaps,
   formatWorktreeRealitySection,
@@ -397,14 +412,30 @@ function loadRoadmapForSprintLabels(cwd: string): RoadmapDefinition | null {
   }
 }
 
-function sprintLabelForCwd(cwd: string, sprint: number): string {
+function sprintLabelForCwd(cwd: string, sprint: SprintId): string {
   const roadmap = loadRoadmapForSprintLabels(cwd);
   return roadmap ? formatRoadmapSprintLabel(roadmap, sprint) : formatSprintLabel(sprint);
 }
 
-function sprintNumberForCwd(cwd: string, sprint: number): string {
+function sprintNumberForCwd(cwd: string, sprint: SprintId): string {
   const label = sprintLabelForCwd(cwd, sprint);
   return label.startsWith('S') ? label.slice(1) : label;
+}
+
+function blockingRoadmapIssuesForCanonicalSprint(
+  reality: ReturnType<typeof loadRoadmapReality>,
+  sprint: SprintId,
+) {
+  if (!reality.roadmap || !reality.validation) return [];
+  const roadmapSprint = findRoadmapSprint(reality.roadmap, sprint);
+  if (!roadmapSprint) return [];
+  const label = formatRoadmapSprintLabel(
+    reality.roadmap,
+    roadmapSprintKey(reality.roadmap, roadmapSprint),
+  );
+  return [...reality.validation.errors, ...reality.validation.warnings]
+    .filter(issue => issue.message.startsWith(`${label} `))
+    .filter(issue => /has shipped commits on main|has a scorecard/.test(issue.message));
 }
 
 function actorRetryOption(args: string[]): string | null {
@@ -465,7 +496,7 @@ function rolloverBaseCommand(assessment: SprintRolloverAssessment): string {
 function requireMatchingSprintOrRollover(
   cwd: string,
   state: SprintState,
-  requestedSprint: number,
+  requestedSprint: SprintId,
   action: string,
   retryCommand: string,
 ): boolean {
@@ -476,18 +507,26 @@ function requireMatchingSprintOrRollover(
     console.error(`After restoring the tracked rollover audit, retry: ${retryCommand}`);
     process.exit(1);
   }
-  if (state.sprint === requestedSprint) return true;
+  if (sprintIdsEqual(state.sprint, requestedSprint)) return true;
 
   let assessment: SprintRolloverAssessment;
   try {
-    assessment = inspectSprintRollover(cwd, { from: state.sprint, to: requestedSprint });
+    assessment = inspectSprintRollover(cwd, {
+      from: state.sprint as unknown as number,
+      to: requestedSprint as unknown as number,
+    });
   } catch (error) {
     console.error(`Refusing to ${action}: ${(error as Error).message}`);
     console.error(`After resolving the sprint state, retry: ${retryCommand}`);
     process.exit(1);
   }
 
-  if (assessment.from_sprint && assessment.to_sprint && assessment.from === assessment.to) return true;
+  if (
+    assessment.from_sprint
+    && assessment.to_sprint
+    && roadmapSprintKey(assessment.roadmap, assessment.from_sprint)
+      === roadmapSprintKey(assessment.roadmap, assessment.to_sprint)
+  ) return true;
 
   console.error(`Refusing to ${action} — sprint-state.json is for ${assessment.from_label}, not ${assessment.to_label}.`);
   const eligibilityIssues = assessment.issues.filter(issue => issue.code !== 'from_not_terminal');
@@ -617,9 +656,9 @@ async function beginCommand(args: string[], cwd: string): Promise<void> {
     process.exit(1);
   }
 
-  const sprint = parseSprintNumber(sprintValue);
+  const sprint = sprintIdKey(sprintValue);
   const ticket = ticketValue;
-  if (!sprint || !ticket) {
+  if (sprint === null || !ticket) {
     console.error('Error: --sprint must be a positive sprint id; --ticket must be a non-empty key');
     process.exit(1);
   }
@@ -745,8 +784,8 @@ async function startCommand(args: string[], cwd: string): Promise<void> {
     process.exit(1);
   }
 
-  const sprint = parseSprintNumber(numberValue);
-  if (!sprint) {
+  const sprint = sprintIdKey(numberValue);
+  if (sprint === null) {
     console.error('Error: --number must be a positive sprint id, e.g. 114 or 114.5.');
     process.exit(1);
   }
@@ -796,7 +835,7 @@ async function startCommand(args: string[], cwd: string): Promise<void> {
   }
 
   const roadmapReality = loadRoadmapReality(cwd);
-  const blockingRoadmapIssues = blockingRoadmapIssuesForSprint(roadmapReality, sprint);
+  const blockingRoadmapIssues = blockingRoadmapIssuesForCanonicalSprint(roadmapReality, sprint);
   if (blockingRoadmapIssues.length > 0 && !force) {
     console.error(`\nPre-sprint reality check failed for ${sprintLabel}:`);
     for (const issue of blockingRoadmapIssues) {
@@ -842,7 +881,7 @@ async function startCommand(args: string[], cwd: string): Promise<void> {
   if (autoClaim) console.log(autoClaim);
 }
 
-async function autoClaimSprint(cwd: string, sprint: number, explicitActor?: string): Promise<string | null> {
+async function autoClaimSprint(cwd: string, sprint: SprintId, explicitActor?: string): Promise<string | null> {
   const { resolveStore } = await import('../store.js');
   const actor = resolveActor(cwd, { explicitActor });
   const player = actor.name;
@@ -1328,8 +1367,8 @@ function getStore(cwd: string) {
 
 function roadmapTicketKeysForSprint(cwd: string, sprintId: string | undefined): string[] {
   if (!sprintId) return [];
-  const sprintNumber = parseSprintNumber(sprintId);
-  if (sprintNumber === null) return [];
+  const sprintKey = sprintIdKey(sprintId);
+  if (sprintKey === null) return [];
 
   const config = loadConfig(cwd);
   if (!config.roadmapPath) return [];
@@ -1341,7 +1380,7 @@ function roadmapTicketKeysForSprint(cwd: string, sprintId: string | undefined): 
     const raw = JSON.parse(readFileSync(roadmapPath, 'utf8'));
     const parsed = parseRoadmap(raw);
     const roadmap = parsed.roadmap ?? castRoadmapStructure(raw);
-    const sprint = roadmap?.sprints.find(s => s.id === sprintNumber);
+    const sprint = roadmap ? findRoadmapSprint(roadmap, sprintKey) : undefined;
     return sprint?.tickets.map(t => t.key).filter(Boolean) ?? [];
   } catch {
     return [];
@@ -1415,10 +1454,9 @@ function workflowPhaseToSprintPhase(workflowPhase: string | undefined): SprintPh
   }
 }
 
-function sprintNumberFromId(sprintId: string | undefined): number | null {
+function sprintNumberFromId(sprintId: string | undefined): string | null {
   if (!sprintId) return null;
-  const parsed = Number(sprintId.replace(/^S/i, ''));
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  return sprintIdKey(sprintId);
 }
 
 function syncSprintStateWithWorkflow(cwd: string, sprintId: string | undefined, workflowPhase: string | undefined): void {
@@ -1431,11 +1469,11 @@ function syncSprintStateWithWorkflow(cwd: string, sprintId: string | undefined, 
     initializeSprintState(cwd, createSprintState(sprint, nextPhase));
     return;
   }
-  if (existing.sprint !== sprint || existing.phase === 'complete') return;
+  if (!sprintIdsEqual(existing.sprint, sprint) || existing.phase === 'complete') return;
   if (SPRINT_PHASE_ORDER[nextPhase] <= SPRINT_PHASE_ORDER[existing.phase]) return;
 
   mutateSprintState(cwd, current => {
-    if (current.sprint !== sprint || current.phase === 'complete') return false;
+    if (!sprintIdsEqual(current.sprint, sprint) || current.phase === 'complete') return false;
     if (SPRINT_PHASE_ORDER[nextPhase] <= SPRINT_PHASE_ORDER[current.phase]) return false;
     current.phase = nextPhase;
     return true;
@@ -1443,7 +1481,7 @@ function syncSprintStateWithWorkflow(cwd: string, sprintId: string | undefined, 
 }
 
 async function runWorkflowCommand(args: string[], cwd: string): Promise<void> {
-  const explicitSprintId = sprintIdFromRunArgs(args);
+  const explicitSprintValue = sprintIdFromRunArgs(args);
   const workflowArg = args.find(a => a.startsWith('--workflow='));
   const varArgs: string[] = [];
   for (let i = 0; i < args.length; i++) {
@@ -1464,7 +1502,7 @@ async function runWorkflowCommand(args: string[], cwd: string): Promise<void> {
 
   // Parse variables
   const vars: Record<string, string> = {};
-  if (explicitSprintId) vars.sprint_id = explicitSprintId;
+  if (explicitSprintValue) vars.sprint_id = explicitSprintValue;
   for (const v of varArgs) {
     const kv = v.slice('--var='.length);
     const eq = kv.indexOf('=');
@@ -1472,7 +1510,12 @@ async function runWorkflowCommand(args: string[], cwd: string): Promise<void> {
       vars[kv.slice(0, eq)] = kv.slice(eq + 1);
     }
   }
-  const sprintId = explicitSprintId ?? vars.sprint_id;
+  const rawSprintId = explicitSprintValue ?? vars.sprint_id;
+  const sprintId = rawSprintId ? sprintIdKey(rawSprintId) ?? undefined : undefined;
+  if (rawSprintId && !sprintId) {
+    console.error(`Error: invalid sprint id "${rawSprintId}".`);
+    process.exit(1);
+  }
 
 
   // Load and validate workflow
@@ -1486,7 +1529,7 @@ async function runWorkflowCommand(args: string[], cwd: string): Promise<void> {
     process.exit(1);
   }
 
-  applyWorkflowVariableDefaults(def, vars, cwd, sprintId);
+  applyWorkflowVariableDefaults(def, vars, cwd, rawSprintId);
 
   // Resolve variables
   const resolved = resolveVariables(def, vars);
@@ -1742,7 +1785,11 @@ async function portableResumeCommand(args: string[], cwd: string): Promise<void>
     }
     const phase = flags.phase ?? current?.phase ?? 'implementing';
     const resumeClaims = await collectResumeClaimPointers(cwd, sprint);
-    const pointer = buildSprintResumePointer(cwd, config, { sprint, phase, resumeClaims });
+    const pointer = buildSprintResumePointer(cwd, config, {
+      sprint: sprint as unknown as number,
+      phase,
+      resumeClaims,
+    });
     const outputPath = flags.output ? (isAbsolute(flags.output) ? flags.output : join(cwd, flags.output)) : undefined;
     const written = writeSprintResumePointer(cwd, pointer, outputPath);
     console.log(`Sprint resume pointer written: ${written}`);
@@ -1834,7 +1881,7 @@ function printPortableResumePlan(plan: PortableResumePlan): void {
   }
 }
 
-async function collectResumeClaimPointers(cwd: string, sprint: number): Promise<SprintResumeClaimPointer[]> {
+async function collectResumeClaimPointers(cwd: string, sprint: SprintId): Promise<SprintResumeClaimPointer[]> {
   const { resolveStore } = await import('../store.js');
   const store = await resolveStore(cwd);
   try {

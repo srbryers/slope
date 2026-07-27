@@ -269,7 +269,7 @@ describe('slope sprint run', () => {
     );
 
     const state = JSON.parse(readFileSync(join(tmpDir, '.slope', 'sprint-state.json'), 'utf8'));
-    expect(state.sprint).toBe(98);
+    expect(state.sprint).toBe('98');
     expect(state.phase).toBe('implementing');
   });
 });
@@ -814,7 +814,7 @@ describe('slope sprint phase', () => {
     const state = JSON.parse(readFileSync(join(tmpDir, '.slope', 'sprint-state.json'), 'utf8'));
 
     expect(output).toContain('Sprint 114.5 started');
-    expect(state.sprint).toBe(114.5);
+    expect(state.sprint).toBe('114.5');
   });
 
   it('starts and reports canonical roadmap S455 instead of legacy encoded S45.5 (#605)', async () => {
@@ -836,7 +836,7 @@ describe('slope sprint phase', () => {
     expect(status).not.toContain('Sprint 45.5');
     expect(status).toContain('Active claims:');
     expect(status).toContain('[ticket] S455-1');
-    expect(state.sprint).toBe(455);
+    expect(state.sprint).toBe('455');
   });
 
   it('updates an existing sprint state phase', async () => {
@@ -936,7 +936,7 @@ describe('slope sprint rollover', () => {
     expect(output).toContain('Rollover recorded: S98 -> S99');
     expect(output).toContain('Prior state archived; claims and sessions unchanged.');
     expect(output).toContain('Next: slope sprint begin --sprint=99 --ticket=<key>');
-    expect(state).toMatchObject({ sprint: 99, phase: 'planning' });
+    expect(state).toMatchObject({ sprint: '99', phase: 'planning' });
     expect(readFileSync(join(tmpDir, state.rollover.audit_path), 'utf8')).toContain('"kind": "sprint_rollover"');
   });
 
@@ -999,7 +999,7 @@ describe('slope sprint rollover', () => {
     }
 
     expect(errors).toContain('rollover lineage audit is missing');
-    expect(JSON.parse(readFileSync(statePath, 'utf8')).sprint).toBe(99);
+    expect(JSON.parse(readFileSync(statePath, 'utf8')).sprint).toBe('99');
   });
 });
 
@@ -1175,7 +1175,7 @@ describe('slope sprint (help)', () => {
 
     expect(output).toContain('slope sprint reset');
     expect(output).toContain('Clear sprint state');
-    expect(state.sprint).toBe(160);
+    expect(state.sprint).toBe('160');
     expect(state.phase).toBe('implementing');
   });
 
@@ -1194,7 +1194,7 @@ describe('slope sprint (help)', () => {
     }
 
     const state = JSON.parse(readFileSync(join(tmpDir, '.slope', 'sprint-state.json'), 'utf8'));
-    expect(state.sprint).toBe(160);
+    expect(state.sprint).toBe('160');
     expect(state.phase).toBe('implementing');
   });
 });
