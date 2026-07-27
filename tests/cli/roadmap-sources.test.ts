@@ -371,7 +371,7 @@ describe('slope roadmap validate-sources', () => {
 });
 
 describe('slope roadmap archive', () => {
-  it('keeps a canonical .10 archive boundary distinct from .1', async () => {
+  it('archives a phase containing .9 and .10 without a numeric split false positive', async () => {
     const root = join(cwd, 'docs', 'roadmap');
     mkdirSync(join(root, 'phases'), { recursive: true });
     mkdirSync(join(cwd, 'docs', 'retros'), { recursive: true });
@@ -388,18 +388,18 @@ version: 1
 phase:
   name: Canonical inserts
   status: complete
-  sprints: ["458.1", "458.10"]
+  sprints: ["458.9", "458.10"]
 sprints:
-  - id: "458.1"
-    theme: First insert
+  - id: "458.9"
+    theme: Ninth insert
     par: 3
     slope: 1
     type: feature
     status: complete
     tickets:
-      - {key: S458.1-1, title: T1, club: wedge, complexity: small}
-      - {key: S458.1-2, title: T2, club: wedge, complexity: small}
-      - {key: S458.1-3, title: T3, club: wedge, complexity: small}
+      - {key: S458.9-1, title: T1, club: wedge, complexity: small}
+      - {key: S458.9-2, title: T2, club: wedge, complexity: small}
+      - {key: S458.9-3, title: T3, club: wedge, complexity: small}
   - id: "458.10"
     theme: Tenth insert
     par: 3
@@ -411,17 +411,17 @@ sprints:
       - {key: S458.10-2, title: T2, club: wedge, complexity: small}
       - {key: S458.10-3, title: T3, club: wedge, complexity: small}
 scorecards:
-  "458.1": docs/retros/sprint-458.1.json
+  "458.9": docs/retros/sprint-458.9.json
   "458.10": docs/retros/sprint-458.10.json
 `);
-    writeFileSync(join(cwd, 'docs', 'retros', 'sprint-458.1.json'), JSON.stringify({ sprint_number: '458.1' }));
+    writeFileSync(join(cwd, 'docs', 'retros', 'sprint-458.9.json'), JSON.stringify({ sprint_number: '458.9' }));
     writeFileSync(join(cwd, 'docs', 'retros', 'sprint-458.10.json'), JSON.stringify({ sprint_number: '458.10' }));
     await roadmapCommand(['compile']);
 
     logs = [];
     errors = [];
     const codes = mockExit();
-    await expect(roadmapCommand(['archive', '--through=458.1', '--dry-run']))
+    await expect(roadmapCommand(['archive', '--through=458.9', '--dry-run']))
       .rejects.toThrow('process.exit(1)');
     expect(codes).toEqual([1]);
     expect(errors.join('\n')).toContain('split phase "Canonical inserts"');
@@ -432,6 +432,48 @@ scorecards:
     expect(logs.join('\n')).toContain('Roadmap archive through Sprint 458.10');
     expect(logs.join('\n')).toContain('phases/canonical.yaml -> archive/canonical.yaml');
     expect(errors).toEqual([]);
+  });
+
+  it('resolves a legacy encoded archive selector through the roadmap identity', async () => {
+    const root = join(cwd, 'docs', 'roadmap');
+    mkdirSync(join(root, 'phases'), { recursive: true });
+    mkdirSync(join(cwd, 'docs', 'retros'), { recursive: true });
+    writeFileSync(join(root, 'project.yaml'), `
+version: 1
+name: Legacy Archive
+output: ../backlog/roadmap.json
+sources:
+  - path: phases/legacy.yaml
+    kind: phase
+`);
+    writeFileSync(join(root, 'phases', 'legacy.yaml'), `
+version: 1
+phase:
+  name: Legacy insert
+  status: complete
+  sprints: [435]
+sprints:
+  - id: 435
+    theme: Legacy insert
+    par: 3
+    slope: 1
+    type: feature
+    status: complete
+    tickets:
+      - {key: S43.5-1, title: T1, club: wedge, complexity: small}
+      - {key: S43.5-2, title: T2, club: wedge, complexity: small}
+      - {key: S43.5-3, title: T3, club: wedge, complexity: small}
+scorecards:
+  "43.5": docs/retros/sprint-43.5.json
+`);
+    writeFileSync(join(cwd, 'docs', 'retros', 'sprint-43.5.json'), JSON.stringify({ sprint_number: '43.5' }));
+    await roadmapCommand(['compile']);
+
+    logs = [];
+    await roadmapCommand(['archive', '--through=435', '--dry-run']);
+
+    expect(logs.join('\n')).toContain('Roadmap archive through Sprint 43.5');
+    expect(logs.join('\n')).toContain('phases/legacy.yaml -> archive/legacy.yaml');
   });
 
   it('validates coexisting .1 and .10 archive evidence by canonical key', () => {

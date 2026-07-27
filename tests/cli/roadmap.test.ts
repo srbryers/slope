@@ -1097,6 +1097,45 @@ describe('slope roadmap sync', () => {
     const ids = result.sprints.map((s: { id: number }) => s.id);
     expect(ids).toEqual([5, 7, 8, 9, 10]);
   });
+
+  it('sorts reverse-authored canonical sprint keys without aliasing .10 to .1', () => {
+    const roadmap = makeRoadmapJson({
+      phases: [{
+        name: 'Canonical inserts',
+        sprints: [458.1, 458.1],
+        sprint_keys: ['458.10', '458.1'],
+      }],
+      sprints: [
+        {
+          id: 458.1,
+          id_key: '458.10',
+          theme: 'Tenth insert',
+          par: 3,
+          slope: 1,
+          type: 'feature',
+          tickets: [],
+        },
+        {
+          id: 458.1,
+          id_key: '458.1',
+          theme: 'First insert',
+          par: 3,
+          slope: 1,
+          type: 'feature',
+          tickets: [],
+        },
+      ],
+    });
+    writeRoadmap(tmpDir, roadmap);
+    writeConfig(tmpDir, { scorecardDir: 'docs/retros', scorecardPattern: 'sprint-*.json', minSprint: 1 });
+    writeScorecard(tmpDir, 458.1, { sprint_number: '458.1' });
+
+    roadmapCommand(['sync']);
+
+    const result = JSON.parse(readFileSync(join(tmpDir, 'docs', 'backlog', 'roadmap.json'), 'utf8'));
+    expect(result.sprints.map((sprint: { id_key?: string }) => sprint.id_key))
+      .toEqual(['458.1', '458.10']);
+  });
 });
 
 describe('slope roadmap (no subcommand)', () => {

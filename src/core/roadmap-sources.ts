@@ -1,7 +1,7 @@
 import { isAbsolute, posix } from 'node:path';
 import { parseDocument } from 'yaml';
 import { castRoadmapStructure, getRoadmapTicketKey, validateRoadmap } from './roadmap.js';
-import { compareRoadmapSprintIds, describeSprintIdAmbiguity, roadmapSprintKey, roadmapSprintOrderValue } from './roadmap.js';
+import { compareRoadmapSprintIds, describeSprintIdAmbiguity, roadmapSprintKey } from './roadmap.js';
 import { sprintIdKey } from './sprint-id.js';
 import type { RoadmapDefinition, RoadmapPhase, RoadmapSprint } from './roadmap.js';
 import type { SprintId } from './sprint-id.js';
@@ -476,7 +476,11 @@ export function compileRoadmapSources(
     phases: ordered.map(source => clonePhase(source.document.phase)),
     sprints: ordered.flatMap(source => source.document.sprints.map(cloneSprint)),
   };
-  roadmap.sprints.sort((a, b) => compareRoadmapSprintIds(roadmap, a.id, b.id));
+  roadmap.sprints.sort((a, b) => compareRoadmapSprintIds(
+    roadmap,
+    roadmapSprintKey(roadmap, a),
+    roadmapSprintKey(roadmap, b),
+  ));
   return roadmap;
 }
 

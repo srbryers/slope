@@ -3,6 +3,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:pat
 import { stringify } from 'yaml';
 import {
   compileRoadmapSources,
+  compareRoadmapSprintIds,
   formatRoadmapSprintLabel,
   normalizeDiagnosticPath,
   normalizeRoadmapSourcePath,
@@ -10,7 +11,6 @@ import {
   parseRoadmapSourceProject,
   roadmapSprintKey,
   roadmapSprintKeyFromId,
-  roadmapSprintOrderValue,
   RoadmapSourceError,
   serializeRoadmapProjection,
   findRoadmapProjectionDivergence,
@@ -557,7 +557,7 @@ export interface RoadmapSourceArchiveMove {
 }
 
 export interface RoadmapSourceArchivePlan {
-  through: number;
+  through: SprintId;
   moves: RoadmapSourceArchiveMove[];
   project: RoadmapSourceProject;
   manifestYaml: string;
@@ -579,17 +579,18 @@ function assertIndependentArchiveDestination(fromAbsolute: string, toAbsolute: s
 
 export function planRoadmapSourceArchive(
   store: RoadmapSourceStore,
-  through: number,
+  through: SprintId,
 ): RoadmapSourceArchivePlan {
-  const throughOrder = roadmapSprintOrderValue(store.roadmap, through);
   const moves: RoadmapSourceArchiveMove[] = [];
   const nextEntries = store.project.sources.map(entry => ({ ...entry }));
 
   for (const [index, source] of store.sources.entries()) {
     if (source.entry.kind !== 'phase') continue;
-    const sprintOrders = source.document.phase.sprints.map(id => roadmapSprintOrderValue(store.roadmap, id));
-    const includesAtOrBefore = sprintOrders.some(order => order <= throughOrder);
-    const includesAfter = sprintOrders.some(order => order > throughOrder);
+    const sprintIds: SprintId[] = source.document.phase.sprint_keys
+      ?? source.document.phase.sprints;
+    const comparisons = sprintIds.map(id => compareRoadmapSprintIds(store.roadmap, id, through));
+    const includesAtOrBefore = comparisons.some(comparison => comparison <= 0);
+    const includesAfter = comparisons.some(comparison => comparison > 0);
     if (includesAtOrBefore && includesAfter) {
       throw new RoadmapSourceError(
         `--through would split phase "${source.document.phase.name}"; archive whole phases only`,

@@ -76,6 +76,13 @@ describe('canonical sprint ids coexist through compile (GH #635)', () => {
     expect(new Set(keys).size).toBe(ids.length);
   });
 
+  it('sorts reverse-authored .10 and .1 by their exact canonical keys', () => {
+    const { project, source } = buildSource(['458.10', '458.1']);
+    const roadmap = compileRoadmapSources(project, [source]);
+
+    expect(roadmap.sprints.map(sprint => sprint.id_key)).toEqual(['458.1', '458.10']);
+  });
+
   it('still rejects two sprints with the same canonical key', () => {
     const { project, source } = buildSource(['458.10', '458.10']);
     const validation = validateRoadmapSourceFederation(project, [source]);

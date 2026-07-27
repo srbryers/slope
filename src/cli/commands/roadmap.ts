@@ -839,8 +839,8 @@ function archiveSourcesSubcommand(flags: Record<string, string>, cwd: string): v
     process.exit(1);
     return;
   }
-  const through = sprintIdKey(flags.through);
-  if (through == null) {
+  const requestedThrough = sprintIdKey(flags.through);
+  if (requestedThrough == null) {
     console.error(`\nInvalid archive boundary: ${flags.through || '(empty)'}\n`);
     process.exit(1);
     return;
@@ -848,11 +848,10 @@ function archiveSourcesSubcommand(flags: Record<string, string>, cwd: string): v
 
   try {
     const store = loadRoadmapSourceStore(cwd, flags.source);
+    const through = roadmapSprintKeyFromId(store.roadmap, requestedThrough) ?? requestedThrough;
     assertCanonicalArchiveBoundary(store, through);
     const projectionBefore = existsSync(store.outputPath) ? readFileSync(store.outputPath, 'utf8') : null;
-    // The source-store API is still typed with its legacy numeric boundary, but
-    // it accepts SprintId at runtime through roadmap-aware ordering.
-    const plan = planRoadmapSourceArchive(store, through as unknown as number);
+    const plan = planRoadmapSourceArchive(store, through);
     console.log(`\nRoadmap archive through Sprint ${through}:`);
     if (plan.moves.length === 0) {
       console.log('  No complete live phases are eligible.\n');
@@ -1180,8 +1179,11 @@ function syncSubcommand(flags: Record<string, string>, cwd: string): void {
     }
   }
 
-  // Sort sprints by id
-  roadmap.sprints.sort((a, b) => a.id - b.id);
+  roadmap.sprints.sort((a, b) => compareRoadmapSprintIds(
+    roadmap,
+    roadmapSprintKey(roadmap, a),
+    roadmapSprintKey(roadmap, b),
+  ));
 
   // Build output
   const output = JSON.stringify(roadmap, null, 2) + '\n';
