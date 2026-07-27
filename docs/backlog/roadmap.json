@@ -6996,6 +6996,7 @@
     },
     {
       "id": 263,
+      "status": "complete",
       "theme": "Workflow Execution Scope Recovery",
       "par": 4,
       "slope": 3,

@@ -153,6 +153,7 @@ sprints:
         complexity: standard
         github_issue: 664
   - id: 263
+    status: complete
     theme: Workflow Execution Scope Recovery
     par: 4
     slope: 3
@@ -313,3 +314,4 @@ scorecards:
   "260.1": docs/retros/sprint-260.1.json
   "261": docs/retros/sprint-261.json
   "262": docs/retros/sprint-262.json
+  "263": docs/retros/sprint-263.json

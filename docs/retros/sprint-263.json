@@ -1,0 +1,160 @@
+{
+  "sprint_number": 263,
+  "player": "codex",
+  "theme": "Workflow Execution Scope Recovery",
+  "par": 4,
+  "slope": 3,
+  "score": 9,
+  "score_label": "triple_plus",
+  "date": "2026-07-27",
+  "shots": [
+    {
+      "ticket_key": "S263-1",
+      "title": "Scope workflow-step-gate to the active sprint and ignore completed or merged sprint executions (#668)",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "moderate",
+          "description": "[code review] Weak roadmap inference could override an explicit sprint branch and fail open",
+          "gotcha_id": "review:code"
+        }
+      ],
+      "notes": "Made active sprint-state and explicit branch identity authoritative over stale workflow executions and weak roadmap inference."
+    },
+    {
+      "ticket_key": "S263-2",
+      "title": "Include blocking sprint id and execution id in workflow-step-gate error output (#668)",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Guard diagnostics now identify the blocking sprint and workflow execution directly."
+    },
+    {
+      "ticket_key": "S263-3",
+      "title": "Finalize or reconcile the current sprint execution when validation/review closes the sprint lifecycle (#668)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "description": "A legacy workflow-gate test used repository-local fake state and mutated the live shared sprint-state file during the full suite."
+        },
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "[architect review] Validation could complete the workflow execution that invoked it before the workflow engine recorded validation",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "[architect review] List-then-unconditional closeout could overwrite a concurrent paused or failed transition",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "rough",
+          "severity": "moderate",
+          "description": "[code review] Protected roadmap dispositions could still make workflow executions eligible for completion",
+          "gotcha_id": "review:code"
+        },
+        {
+          "type": "rough",
+          "severity": "moderate",
+          "description": "[code review] Same-millisecond workflow starts could preserve an older execution while completing an equally new peer",
+          "gotcha_id": "review:code"
+        },
+        {
+          "type": "rough",
+          "severity": "moderate",
+          "description": "[code review] Required atomic closeout on the base store interface broke compatible custom adapters",
+          "gotcha_id": "review:code"
+        }
+      ],
+      "notes": "Validation preserves its invoking execution, closes stale duplicates with atomic compare-and-set transitions, and post-merge completes any remaining current execution."
+    },
+    {
+      "ticket_key": "S263-4",
+      "title": "Route post-merge retro evidence through the repository state owner with linked-worktree regression coverage (#673)",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "description": "The first linked-worktree assertion compared macOS /var and /private/var spellings instead of canonical paths."
+        },
+        {
+          "type": "rough",
+          "severity": "moderate",
+          "description": "[code review] No-op capability negotiation failed compatible stores and post-merge reported failure after durable writes",
+          "gotcha_id": "review:code"
+        }
+      ],
+      "notes": "Post-merge retro, memories, sprint-state reconciliation, and workflow closeout resolve through the primary repository state owner."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 9,
+    "hazard_penalties": 4.5,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "type": "bugfix",
+  "conditions": [
+    {
+      "type": "wind",
+      "impact": "major",
+      "description": "Multiple concurrent workflow executions and linked worktrees share lifecycle state, so weak inference and unconditional writes are unsafe."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Lifecycle closeout needs both authoritative scope selection and an atomic terminal transition.",
+      "outcome": "Closeout now preserves the caller, filters protected dispositions, and uses adapter-level compare-and-set completion."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "tests",
+      "description": "259 test files passed; 4,324 tests passed and 27 were skipped.",
+      "status": "healthy"
+    },
+    {
+      "category": "build",
+      "description": "TypeScript typecheck and the root plus pi-extension production build passed on Node 22.",
+      "status": "healthy"
+    },
+    {
+      "category": "state",
+      "description": "The primary sprint-state SHA-256 remained unchanged across the complete test suite.",
+      "status": "healthy"
+    }
+  ],
+  "bunker_locations": [
+    "Do not infer a sprint from roadmap history when active state or an explicit sprint branch is available.",
+    "Preserve every execution tied for newest when timestamps cannot distinguish them.",
+    "Treat optional store mutations as negotiated capabilities and require them only when a transition is actually pending.",
+    "Fail post-merge closeout before writing memories, retro evidence, or sprint state."
+  ],
+  "yardage_book_updates": [
+    "Pass SLOPE_WORKFLOW_EXECUTION_ID into workflow command subprocesses so terminal validation can preserve its caller.",
+    "Close only executions still running; never overwrite paused or failed state.",
+    "Route post-merge evidence and store access through the repository state owner."
+  ],
+  "course_management_notes": [
+    "The next roadmap sprint is S264, defining the Team Round domain and scoring contract for #669."
+  ]
+}
