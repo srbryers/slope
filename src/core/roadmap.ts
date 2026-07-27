@@ -125,7 +125,8 @@ export function sprintOrderValue(id: number): number {
 }
 
 /** Format the numeric portion of a sprint id for human-facing output. */
-export function formatSprintNumber(id: number): string {
+export function formatSprintNumber(id: SprintId): string {
+  if (typeof id === 'string') return sprintIdKey(id) ?? id;
   if (isEncodedInsertedSprintId(id)) {
     return `${Math.floor(id / 10)}.${id % 10}`;
   }
@@ -133,7 +134,7 @@ export function formatSprintNumber(id: number): string {
 }
 
 /** Format a full sprint label, e.g. S95 or S43.5. */
-export function formatSprintLabel(id: number): string {
+export function formatSprintLabel(id: SprintId): string {
   return `S${formatSprintNumber(id)}`;
 }
 
@@ -203,13 +204,13 @@ export function compareSprintIds(a: number, b: number): number {
 }
 
 /** Return the next canonical sprint id after a completed sprint/inserted sprint. */
-export function nextCanonicalSprintId(id: SprintId): number {
+export function nextCanonicalSprintId(id: SprintId): string {
   if (typeof id === 'number' && isEncodedInsertedSprintId(id)) {
-    return Math.floor(id / 10) + 1;
+    return String(Math.floor(id / 10) + 1);
   }
   const parsed = parseSprintId(id);
-  if (!parsed) return 1;
-  return parsed.base + 1;
+  if (!parsed) return '1';
+  return String(parsed.base + 1);
 }
 
 export const ROADMAP_TERMINAL_STATUSES = new Set([
@@ -304,6 +305,18 @@ export function compareRoadmapSprintIds(roadmap: RoadmapDefinition, a: SprintId,
   return compareSprintIdKeys(ka, kb);
 }
 
+function areAdjacentSprintKeys(previousKey: string, currentKey: string): boolean {
+  const previous = parseSprintId(previousKey);
+  const current = parseSprintId(currentKey);
+  if (!previous || !current) return false;
+
+  if (previous.base === current.base) {
+    return current.insert !== null && compareSprintIdKeys(previousKey, currentKey) < 0;
+  }
+
+  return current.base === previous.base + 1 && current.insert === null;
+}
+
 export function formatRoadmapSprintLabel(roadmap: RoadmapDefinition, id: SprintId): string {
   return `S${roadmapSprintKeyFromId(roadmap, id) ?? id}`;
 }
@@ -358,7 +371,6 @@ export function validateRoadmap(
   const warnings: RoadmapValidationWarning[] = [];
   const sprintIds = new Set(roadmap.sprints.map(s => roadmapSprintKey(roadmap, s)));
 
-  const orderOf = (id: SprintId): number => roadmapSprintOrderValue(roadmap, id);
   const labelOf = (id: SprintId): string => formatRoadmapSprintLabel(roadmap, id);
   // Canonical identity so 458.10 and 458.1 are distinct sprints with distinct
   // ticket-key prefixes (GH #635).
@@ -373,10 +385,7 @@ export function validateRoadmap(
   // Check: sprint numbering continuity
   const sortedIds = [...sprintIds].sort((a, b) => compareSprintIdKeys(a, b));
   for (let i = 1; i < sortedIds.length; i++) {
-    const prev = orderOf(sortedIds[i - 1]);
-    const current = orderOf(sortedIds[i]);
-    const allowedInsertedStep = current > prev && current <= Math.floor(prev) + 1;
-    if (!allowedInsertedStep && current !== prev + 1) {
+    if (!areAdjacentSprintKeys(sortedIds[i - 1], sortedIds[i])) {
       // A long-lived roadmap legitimately skips numbers as sprints are
       // absorbed, cancelled, or renumbered, so a numbering discontinuity is
       // informational rather than a structural error. Genuinely-structural
@@ -409,14 +418,14 @@ export function validateRoadmap(
       warnings.push({
         type: 'warning',
         sprint: sprint.id,
-        message: `${labelOf(sprint.id)} has ${sprint.tickets.length} tickets (recommended 3-4)`,
+        message: `${keyLabelOf(sprint)} has ${sprint.tickets.length} tickets (recommended 3-4)`,
       });
     }
     if (sprint.tickets.length > 4) {
       warnings.push({
         type: 'warning',
         sprint: sprint.id,
-        message: `${labelOf(sprint.id)} has ${sprint.tickets.length} tickets (recommended 3-4)`,
+        message: `${keyLabelOf(sprint)} has ${sprint.tickets.length} tickets (recommended 3-4)`,
       });
     }
 
@@ -428,7 +437,7 @@ export function validateRoadmap(
         errors.push({
           type: 'error',
           sprint: sprint.id,
-          message: `Ticket in ${labelOf(sprint.id)} is missing key/id`,
+          message: `Ticket in ${keyLabelOf(sprint)} is missing key/id`,
         });
         continue;
       }
@@ -477,7 +486,7 @@ export function validateRoadmap(
       errors.push({
         type: 'error',
         sprint: sprint.id,
-        message: `${labelOf(sprint.id)} has invalid par ${sprint.par} (must be 3, 4, or 5)`,
+        message: `${keyLabelOf(sprint)} has invalid par ${sprint.par} (must be 3, 4, or 5)`,
       });
     }
   }
@@ -519,7 +528,7 @@ export function validateRoadmap(
         warnings.push({
           type: 'warning',
           sprint: sprint.id,
-          message: `${labelOf(sprint.id)} has a scorecard but roadmap status is "${status ?? 'planned'}" — expected "complete"`,
+          message: `${keyLabelOf(sprint)} has a scorecard but roadmap status is "${status ?? 'planned'}" — expected "complete"`,
         });
       }
 
@@ -527,7 +536,7 @@ export function validateRoadmap(
         warnings.push({
           type: 'warning',
           sprint: sprint.id,
-          message: `${labelOf(sprint.id)} is marked "complete" in roadmap but no scorecard exists (phantom sprint)`,
+          message: `${keyLabelOf(sprint)} is marked "complete" in roadmap but no scorecard exists (phantom sprint)`,
         });
       }
     }
@@ -540,16 +549,21 @@ export function validateRoadmap(
     // bookkeeping, not a feature ship). Treat those terminal-but-not-complete
     // statuses as final rather than demanding "complete".
     const TERMINAL_NOT_COMPLETE = new Set(['superseded', 'skipped', 'cancelled', 'cancelled-absorbed', 'absorbed']);
+    const shippedSprintKeys = new Set(
+      [...shippedSprintIds]
+        .map(id => roadmapSprintKeyFromId(roadmap, id))
+        .filter((id): id is string => id !== null),
+    );
     for (const sprint of roadmap.sprints) {
       const status = (sprint as RoadmapSprint & { status?: string }).status;
       const key = roadmapSprintKey(roadmap, sprint);
-      const isShipped = shippedSprintIds.has(key) || shippedSprintIds.has(sprint.id);
+      const isShipped = shippedSprintKeys.has(key);
 
       if (isShipped && status !== 'complete' && !TERMINAL_NOT_COMPLETE.has(status ?? '')) {
         errors.push({
           type: 'error',
           sprint: sprint.id,
-          message: `${labelOf(sprint.id)} has shipped commits on main but status is "${status ?? 'planned'}" — expected "complete"`,
+          message: `${keyLabelOf(sprint)} has shipped commits on main but status is "${status ?? 'planned'}" — expected "complete"`,
         });
       }
 
@@ -557,7 +571,7 @@ export function validateRoadmap(
         warnings.push({
           type: 'warning',
           sprint: sprint.id,
-          message: `${labelOf(sprint.id)} is marked "complete" but no shipped commits found on main`,
+          message: `${keyLabelOf(sprint)} is marked "complete" but no shipped commits found on main`,
         });
       }
     }
@@ -926,8 +940,7 @@ export function formatStrategicContext(
   if (next) {
     const blockers = (next.depends_on ?? [])
       .filter(d => {
-        const depOrder = roadmapSprintOrderValue(roadmap, d);
-        const dep = roadmap.sprints.find(s => roadmapSprintOrderValue(roadmap, s.id) === depOrder);
+        const dep = findRoadmapSprint(roadmap, d);
         return !dep || (dep as RoadmapSprint & { status?: string }).status !== 'complete';
       });
     const status = blockers.length === 0

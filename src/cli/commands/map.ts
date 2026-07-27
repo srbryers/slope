@@ -66,6 +66,31 @@ interface ProjectIdentity {
   description: string | null;
 }
 
+function sprintCurrencyDeltaTenths(currentKey: string, mapKey: string): number {
+  const current = parseSprintId(currentKey);
+  const previous = parseSprintId(mapKey);
+  if (!current) return 0;
+
+  const rawDelta = previous
+    ? (current.base - previous.base) * 10
+      + (current.insert ?? 0)
+      - (previous.insert ?? 0)
+    : mapKey === '0'
+      ? current.base * 10 + (current.insert ?? 0)
+      : 0;
+  const comparison = compareSprintIdKeys(currentKey, mapKey);
+
+  if (comparison > 0) return Math.max(1, rawDelta);
+  if (comparison < 0) return Math.min(-1, rawDelta);
+  return 0;
+}
+
+function formatSprintCurrencyDelta(deltaTenths: number): string {
+  const whole = Math.trunc(deltaTenths / 10);
+  const fraction = Math.abs(deltaTenths % 10);
+  return fraction === 0 ? String(whole) : `${whole}.${fraction}`;
+}
+
 function readProjectIdentity(cwd: string): ProjectIdentity {
   const pkgPath = join(cwd, 'package.json');
   let name: string | null = null;
@@ -757,13 +782,14 @@ export function runStalenessCheck(cwd: string, config: SlopeConfig, mapContent: 
   // 3. Sprint currency
   const mapSprint = sprintIdKey(meta.sprint) ?? '0';
   const currentSprint = detectLatestSprint(config, cwd);
-  const sprintDelta = (parseSprintId(currentSprint)?.base ?? 0) - (parseSprintId(mapSprint)?.base ?? 0);
+  const sprintComparison = compareSprintIdKeys(currentSprint, mapSprint);
+  const sprintDeltaTenths = sprintCurrencyDeltaTenths(currentSprint, mapSprint);
   const currentSprintLabel = currentSprint;
   const mapSprintLabel = mapSprint;
-  const sprintDeltaLabel = String(sprintDelta);
-  if (sprintDelta > 3) {
+  const sprintDeltaLabel = formatSprintCurrencyDelta(sprintDeltaTenths);
+  if (sprintComparison > 0 && sprintDeltaTenths > 30) {
     results.push({ label: 'Sprint currency', status: 'stale', message: `Sprint ${currentSprintLabel} (map says ${mapSprintLabel}, +${sprintDeltaLabel} behind)` });
-  } else if (sprintDelta > 0 || compareSprintIdKeys(currentSprint, mapSprint) > 0) {
+  } else if (sprintComparison > 0) {
     results.push({ label: 'Sprint currency', status: 'warn', message: `Sprint ${currentSprintLabel} (map says ${mapSprintLabel}, +${sprintDeltaLabel})` });
   } else {
     results.push({ label: 'Sprint currency', status: 'ok', message: `Sprint ${currentSprintLabel} — current` });
