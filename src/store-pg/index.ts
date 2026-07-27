@@ -223,7 +223,38 @@ const MIGRATIONS: Array<{ version: number; sql: string }> = [
       CREATE INDEX IF NOT EXISTS idx_memories_weight ON memories(weight);
     `,
   },
+  {
+    // v6: canonical sprint identity (GH #659 / S265).
+    version: 6,
+    sql: `
+      ALTER TABLE claims
+        DROP CONSTRAINT IF EXISTS claims_project_id_sprint_number_scope_target_key;
+      ALTER TABLE claims
+        ALTER COLUMN sprint_number TYPE TEXT USING sprint_number::TEXT;
+      ALTER TABLE claims
+        ADD CONSTRAINT claims_project_id_sprint_number_scope_target_key
+        UNIQUE(project_id, sprint_number, scope, target);
+
+      ALTER TABLE scorecards DROP CONSTRAINT IF EXISTS scorecards_pkey;
+      ALTER TABLE scorecards
+        ALTER COLUMN sprint_number TYPE TEXT USING sprint_number::TEXT;
+      ALTER TABLE scorecards
+        ADD CONSTRAINT scorecards_pkey PRIMARY KEY(project_id, sprint_number);
+
+      DROP INDEX IF EXISTS idx_events_sprint;
+      ALTER TABLE events
+        ALTER COLUMN sprint_number TYPE TEXT USING sprint_number::TEXT;
+      CREATE INDEX idx_events_sprint ON events(sprint_number);
+
+      UPDATE workflow_executions
+      SET sprint_id = substring(btrim(sprint_id) FROM 2)
+      WHERE btrim(sprint_id) ~* '^s[0-9]+([.][0-9]+)?$';
+    `,
+  },
 ];
+
+/** Latest PostgreSQL schema version. */
+export const LATEST_PG_SCHEMA_VERSION = MIGRATIONS.length;
 
 export interface PostgresStoreOptions {
   connectionString?: string;
