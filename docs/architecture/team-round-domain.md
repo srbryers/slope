@@ -210,3 +210,181 @@ An implementation is conformant only if all of these hold:
 - Protected roadmap dispositions cannot be mistaken for round closure.
 - Team result selection never uses best-of-agent, alternate-shot, or duplicate
   per-agent scorecards.
+
+## Trust And Attribution Identities
+
+SLOPE MUST keep authentication, attribution, execution, role, authority, and
+visibility separate.
+
+| Field | Meaning | Trust property |
+|---|---|---|
+| `principal_id` | Authenticated human, service, or agent-controller identity | Root for authorization and independence checks |
+| `actor_id` | Durable performance identity attributed across rounds | Bound to one principal at an authoritative time |
+| `session_id` | Ephemeral process, conversation, or harness lifetime | Bound to a principal and actor for its lifetime |
+| `role` | Function performed for a round, attempt, or shot | Context only; grants no authority by itself |
+| `contributors` | Actors with material input to a shot owned by another actor | Attribution only; does not duplicate ownership |
+| `verifier` | Actor that evaluated specified evidence | Attribution plus policy result, subject to principal independence |
+| `authority` | Explicit capabilities granted in scope | Deny by default and never inferred from role text |
+| `visibility` | Explicit audience allowed to read a record or projection | Enforced by the store and filtered views |
+
+Names, model names, IDE names, branch names, worktree paths, role labels,
+session metadata, and user-supplied aliases are presentation data. They MUST
+NOT authenticate a principal, grant authority, prove independence, or merge
+handicap histories.
+
+### Principal
+
+`principal_id` is the stable trust root used for every authorization decision.
+The concrete authentication provider is outside this contract, but every
+identity-bearing mutation MUST include:
+
+- the authenticated `principal_id`
+- authentication assurance or provenance
+- the effective capability and its scope
+- the actor and session, when acting through them
+
+A deployment MAY have a local principal backed by an operating-system or
+repository credential. "Local" does not mean unauthenticated. Imported legacy
+data MAY use an explicitly unverified principal, but an unverified principal
+cannot authorize protected operations or satisfy independent verification.
+
+### Actor
+
+`actor_id` is the durable subject of shot attribution and descriptive handicap
+history. It is not a session, role, model name, or display alias.
+
+- One principal MAY control multiple actors for distinct durable identities.
+- An actor is bound to exactly one principal at an authoritative time.
+- Rebinding an actor requires an audited identity-transfer operation and MUST
+  NOT rewrite prior rounds.
+- Two actors controlled by the same principal remain separate attribution
+  identities but are not independent for verification policy.
+- Actor aliases MAY change without changing `actor_id`.
+
+Actor history is repository-scoped by default. Cross-repository aggregation
+MAY be added only with explicit namespace, consent, and provenance; matching
+display names are insufficient.
+
+### Session
+
+`session_id` identifies one ephemeral execution channel.
+
+- A session is bound to one principal and one actor for its lifetime.
+- A session MAY perform multiple roles over time, but each role assignment is
+  scoped and timestamped.
+- Restart, resume in a new harness, or a replacement worker creates a new
+  session unless continuity is cryptographically or transactionally proven by
+  the authentication layer.
+- Session expiry ends liveness, not historical attribution.
+- A new session for the same principal or actor cannot become an independent
+  verifier of that principal's work.
+
+Worktree and branch observations describe where a session acts. They do not
+replace the principal or actor binding.
+
+### Role
+
+`role` describes function, such as controller, implementer, reviewer, tester,
+or observer. It MUST be scoped to the round and, where necessary, the attempt,
+assignment, or shot.
+
+Role names:
+
+- MUST NOT grant capabilities
+- MUST NOT establish ownership
+- MUST NOT establish verifier independence
+- MUST NOT merge actor histories
+- MAY be used as a grouping dimension for descriptive metrics
+
+The role in force at the time of a shot is immutable evidence for that
+scorecard version even if the actor later changes roles.
+
+## Shot Parties
+
+Every canonical shot MUST identify one accountable owner:
+
+```text
+accountable_owner = {
+  principal_id,
+  actor_id,
+  session_id,
+  role
+}
+```
+
+Ownership transfers MUST be explicit and ordered. The final owner is
+accountable for the submitted shot outcome, while prior owners and handoffs
+remain in the evidence chain. A handoff MUST NOT erase authorship, hazards, or
+causation from an earlier attempt.
+
+`contributors` is a deduplicated set of material contributors. Each entry
+identifies principal, actor, session when known, role, contribution kind, and
+evidence reference. Contributor presence:
+
+- does not create another shot
+- does not split or multiply the team score
+- does not make the contributor the accountable owner
+- does make the contributor non-independent under policies that exclude
+  contributors from verification
+
+A verifier record identifies verifier principal, actor, session, policy,
+verdict, evidence references, and authoritative timestamp. Merely recording a
+verifier does not make verification valid; the workflow contract determines
+principal-aware independence and conflicts.
+
+## Authority
+
+Authority is an explicit, scoped capability decision. At minimum, the domain
+distinguishes capabilities to:
+
+- create or join a round
+- assign or accept work
+- mutate owned work
+- transfer ownership
+- record hazards or penalties
+- verify evidence
+- finalize a round
+- reopen a round
+- read, export, redact, or administer protected records
+
+Capabilities are evaluated for a `principal_id` over a project, sprint, round,
+attempt, ticket, resource, or record scope. An actor, session, or role MAY
+narrow the effective scope but MUST NOT broaden principal authority.
+
+Delegation MUST identify delegator principal, delegate principal, capability,
+scope, limits, expiry, and revocation state. Delegation cannot grant a
+capability the delegator does not possess. The S264.1 contract defines the
+enforcement and persistence model.
+
+## Visibility
+
+Every identity-bearing event and projection has an explicit visibility policy.
+The minimum audiences are:
+
+- `subject`: only the record subject and authorized administrators
+- `round`: participating principals for the round
+- `project`: authorized repository principals
+- `public`: explicitly exportable data
+
+More restrictive project policies MAY refine these audiences. Missing
+visibility is deny-by-default, not project-wide.
+
+Authorization applies to fields as well as records. A caller allowed to see
+team status is not automatically allowed to see private transcripts, secrets,
+raw tool payloads, principal credentials, or hidden evaluator evidence.
+Filtered projections MUST preserve enough provenance to distinguish redacted,
+missing, and nonexistent data.
+
+## Identity Invariants
+
+- Every accepted mutation resolves to an authenticated or explicitly legacy
+  principal.
+- Every attributed shot has one durable actor and one ephemeral session or an
+  explicit missing-session reason.
+- Every session remains bound to one principal and actor.
+- Role labels never grant authority or prove independence.
+- Authors, contributors, delegators, aliases, and sessions controlled by the
+  same principal remain non-independent where policy excludes that principal.
+- Visibility and authority are explicit, scoped, and independently evaluated.
+- Unknown identity data remains unknown; it is never coerced into a trusted
+  default.
