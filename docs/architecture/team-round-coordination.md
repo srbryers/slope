@@ -367,7 +367,12 @@ team_event_v1 = {
   visibility: {
     classification,
     policy_revision,
-    subject_ids[]
+    subjects: [{
+      subject_type,
+      subject_id,
+      membership_revision?,
+      history_mode?
+    }]
   },
   time: {
     occurred_at?,
@@ -386,7 +391,12 @@ team_event_v1 = {
   causation_id?,
   lease_proof?,
   payload_classification,
-  payload,
+  payload_storage: {
+    mode,
+    inline_payload?,
+    sealed_payload_ref?,
+    payload_commitment
+  },
   integrity: {
     previous_project_hash,
     previous_aggregate_hash,
@@ -410,13 +420,16 @@ team_event_v1 = {
 - `occurred_at` is evidence only. It cannot win ordering, extend a lease, or
   move an authorization decision backward in time.
 - `authorization` records the exact allow decision used for append.
-- `visibility` is an explicit allowlist. An empty `subject_ids` list does not
-  mean public.
+- `visibility` is an explicit typed allowlist. Group-like subjects pin a
+  membership revision and historical-access mode. An empty `subjects` list
+  does not mean public.
 - `correlation_id` groups one requested operation. `causation_id` names the
   direct accepted event that caused this event when one exists.
 - `lease_proof` is mandatory for protected resource mutations and absent only
   for event types whose policy declares no resource ownership requirement.
 - `payload_classification` cannot be weaker than any field in the payload.
+- Inline payload is allowed only for retention-safe fields. Restricted
+  removable content uses a sealed payload reference and immutable commitment.
 - `preconditions` names every additional aggregate version whose state was
   material to accepting the event. The list is canonicalized by aggregate type
   and ID before hashing.
@@ -1404,3 +1417,715 @@ The lease and recovery contract is complete when an implementer can answer:
   attempt?
 - What blocks requeue when an external side effect is uncertain?
 - When does work dead-letter, and can escalation silently grant authority?
+
+## Security Model
+
+### Protected Assets
+
+The security boundary protects:
+
+- project, sprint, round, attempt, assignment, shot, penalty, and scorecard
+  identity
+- capability and visibility policy
+- resource leases and fencing tokens
+- unpublished evidence and restricted diagnostics
+- accepted scorecard versions and exports
+- identity bindings and verifier evidence
+- event order, idempotency, causation, and integrity checkpoints
+
+### Adversaries And Failures
+
+The implementation assumes:
+
+- a client may forge actor, session, role, scope, time, event ID, version,
+  capability, visibility, or lease fields;
+- an authenticated principal may be curious, compromised, or malicious;
+- two aliases, actors, or sessions may resolve to one principal;
+- a worktree or process may use stale cached authority;
+- concurrent requests may race policy revocation, lease expiry, reopen, or
+  finalization;
+- payloads may accidentally contain credentials or private transcripts;
+- caches, cursors, diagnostics, metrics, and error text may leak hidden
+  existence;
+- an adapter or compatibility method may bypass the canonical append path;
+- a database operator may corrupt partial state.
+
+A database administrator who can rewrite the complete ledger, projections,
+keys, and every independent checkpoint is outside the tamper-prevention
+guarantee. Independently anchored checkpoints can make that attack detectable.
+
+Authentication provider compromise, host compromise, and malicious external
+tools require deployment controls beyond this contract. They do not relax
+store-side authorization, filtering, or audit requirements.
+
+## Deny-By-Default Capabilities
+
+### Capability Grant
+
+Authority is represented by immutable grant and revocation events:
+
+```text
+capability_grant_v1 = {
+  project_id,
+  grant_id,
+  principal_id,
+  capability,
+  scope: {
+    subject_type,
+    subject_id,
+    constraints
+  },
+  issued_by_principal_id,
+  issued_at,
+  not_before?,
+  expires_at?,
+  delegable,
+  policy_revision,
+  grant_event_id
+}
+```
+
+A request is allowed only when an active grant matches principal, capability,
+subject, operation constraints, store time, and policy revision. Missing,
+unknown, malformed, expired, revoked, or ambiguous grants deny.
+
+Role, actor alias, model, session, branch, worktree, environment variable,
+display name, or client-provided group does not grant capability.
+
+Group or team authority is permitted only through a store-verified membership
+projection whose membership event, grant, scope, and effective sequence are
+recorded in the authorization decision.
+
+### Trust Bootstrap
+
+A new project has no implicit administrator. Bootstrap is a one-time
+store-initialization ceremony:
+
+1. create or verify stable project identity;
+2. authenticate one provider principal through an installation-local trusted
+   channel;
+3. write the genesis project, identity-policy, capability-policy, visibility,
+   resource-policy, and integrity checkpoint records;
+4. issue an enumerated bootstrap administration grant;
+5. close the bootstrap token and channel permanently.
+
+The bootstrap manifest, principal binding, policy revisions, and checkpoint
+hash are displayed for operator confirmation and recorded in project evidence.
+
+Bootstrap MUST NOT derive administrator identity from `$USER`, role text,
+repository ownership, Git author, branch, worktree path, or the first remote
+request. An existing project refuses bootstrap unless an authorized recovery
+policy proves the prior trust root unavailable.
+
+Migration from a store without principal identity requires an explicit
+operator-supplied mapping and migration manifest. Ambiguous rows remain
+quarantined; they do not inherit the bootstrap grant.
+
+Trust-root recovery and key rotation are policy events requiring the dedicated
+recovery capability, bounded scope, distinct approval, prior checkpoint
+verification, and immediate revocation of superseded authentication contexts.
+Recovery cannot create a new project identity over existing history.
+
+### Capability Registry
+
+Version 1 defines at least:
+
+| Capability | Protected operation | Required scope |
+|---|---|---|
+| `round.read` | Read filtered round state | project, sprint, or round |
+| `round.open` | Create canonical round | sprint |
+| `round.append_evidence` | Add score-affecting evidence | round and ticket or shot |
+| `round.finalize` | Enter finalizing and publish close | round |
+| `round.reopen` | Audited reopen and correction scope | round |
+| `assignment.manage` | Create, cancel, or reassign work | round and ticket |
+| `assignment.act` | Accept, block, or complete assigned work | assignment |
+| `lease.acquire` | Request protected resource ownership | resource subject |
+| `lease.renew_own` | Renew an owned lease | lease and resource subject |
+| `lease.release_own` | Release or abandon an owned lease | lease and resource subject |
+| `lease.revoke` | Revoke or fence another owner | resource subject |
+| `verification.request` | Request independent verification | round and shot or scorecard |
+| `verification.record` | Record verifier evidence | verification target |
+| `scorecard.read_draft` | Read filtered mutable scorecard | round |
+| `scorecard.read_published` | Read an immutable version | round and version |
+| `scorecard.export` | Create a redacted durable export | round and version |
+| `event.read_filtered` | Query filtered ledger events | declared subject scope |
+| `recovery.manage` | Requeue or dead-letter recovery | recovery item |
+| `redaction.request` | Request content redaction | event or payload object |
+| `redaction.approve` | Approve high-impact redaction | redaction request |
+| `retention.apply` | Materialize due retention policy | policy scope |
+| `policy.manage` | Grant, revoke, or activate policy | policy subject |
+| `integrity.verify` | Run protected integrity verification | project |
+| `integrity.repair` | Append a forward repair | project and incident |
+
+An implementation MAY split capabilities more finely. It MUST NOT combine them
+into a broad role that silently grants more authority.
+
+`round.read` does not imply raw event, draft scorecard, export, or restricted
+diagnostic access. `round.finalize` does not imply reopen. `lease.acquire` does
+not imply revoke. `policy.manage` does not imply integrity repair.
+
+### Scope And Constraints
+
+Capability scope uses canonical typed subject identity. A grant may constrain:
+
+- sprint, round, round epoch, attempt, assignment, ticket, shot, or penalty
+- resource type, namespace, key pattern, and access mode
+- maximum lease TTL
+- event types and payload classifications
+- visibility classifications and subjects
+- scorecard version and export purpose
+- time window and maximum uses
+- required independent approval
+
+Wildcard scope is denied unless policy explicitly enables that exact wildcard
+for the issuing principal. A project-wide administrative bundle expands to
+enumerated capabilities and constraints; it is not an unlogged superuser bit.
+
+### Authorization Ordering
+
+Capability state is an authoritative synchronous projection.
+
+Append locks the active capability-policy row and relevant grant or revocation
+rows. A concurrent revocation is ordered before or after the mutation:
+
+- if revocation commits first, the mutation denies;
+- if the authorized mutation commits first, it remains valid and the later
+  revocation affects subsequent operations.
+
+Cached grants cannot authorize append. A cache may accelerate a negative or
+candidate lookup, but the transaction verifies active authority.
+
+### Delegation
+
+A delegable grant states which narrower capabilities and scopes may be issued.
+Delegation cannot:
+
+- exceed the parent capability or scope;
+- outlive the parent grant;
+- remove required approvals;
+- cross projects;
+- become delegable when the parent is not;
+- survive parent revocation.
+
+Every descendant decision records its grant chain. Revoking a parent makes all
+descendants ineffective at the same ordered policy transition.
+
+### Break Glass
+
+Break-glass authority is an explicit short-lived grant, not a hidden bypass.
+It requires:
+
+- a dedicated break-glass capability;
+- strong provider authentication;
+- incident or recovery reason;
+- minimal subject scope and expiry;
+- a distinct approving principal for reopen, broad export, redaction approval,
+  policy replacement, or integrity repair;
+- immediate audit and affected-party notification where visibility permits.
+
+Break glass cannot edit accepted events, reuse a fenced lease, skip integrity
+verification, invent verifier independence, or disclose secret payloads in
+audit output.
+
+## Visibility And Classification
+
+### Classifications
+
+Version 1 classifications are ordered:
+
+```text
+public < project < round < restricted < security
+```
+
+| Classification | Intended content | Default audience |
+|---|---|---|
+| `public` | Explicitly publishable result | Policy-declared public readers |
+| `project` | Ordinary project coordination | Authorized project principals |
+| `round` | Draft evidence and participant state | Authorized round subjects |
+| `restricted` | Private diagnostics or limited evidence | Explicit principal or group allowlist |
+| `security` | Policy, incident, redaction, or integrity detail | Explicit security capability |
+
+The default classification is `restricted`, not `project` or `public`.
+Projects may introduce stricter classes but cannot reorder built-in meaning
+without a new policy revision.
+
+Visibility subjects are typed. Supported subject types include principal,
+verified group, round participant, affected resource requester, and explicit
+observer grant. Role text alone is not a visibility subject.
+
+### Membership Semantics
+
+A group-like visibility subject records both `membership_revision` and one
+explicit history mode:
+
+- `event_members`: only principals who were verified members at event
+  acceptance are in the event allowlist;
+- `current_members`: current verified members may read historical events while
+  removed members lose access;
+- `event_and_current`: the viewer must have been a member at acceptance and
+  remain a current member.
+
+The default for `restricted` and `security` data is `event_and_current`. The
+default for ordinary `round` participant data is `event_members`; a later
+participant receives earlier context only through a separate capability and
+visibility grant.
+
+Historical `as_of` reads still evaluate the viewer's current authentication,
+capability, and revocation state. A past grant or membership cannot resurrect
+access revoked now.
+
+### Write-Time Enforcement
+
+Before append the store:
+
+1. validates every payload field against the registered classification schema;
+2. raises the event classification to the strictest contained field;
+3. canonicalizes and verifies visibility subjects;
+4. proves the writer may disclose each field to that subject set;
+5. rejects secret-bearing or disallowed payload content;
+6. records the exact visibility decision and policy revision.
+
+A writer cannot make evidence visible to a principal the writer is not
+authorized to inform.
+
+## Filtered Views
+
+### Query Request
+
+All ordinary reads use a filtered projection request:
+
+```text
+filtered_view_request_v1 = {
+  project_id,
+  viewer_authentication_context_id,
+  capability,
+  subject_scope,
+  purpose,
+  as_of_event_sequence?,
+  projection_name,
+  projection_schema_version,
+  cursor?
+}
+```
+
+Project and principal are derived from trusted authentication context. The
+client cannot query another project by changing `project_id`.
+
+`purpose` is a registered policy identifier, not free text. The viewer must
+hold a capability permitting that purpose and subject scope.
+
+The response identifies:
+
+- pinned as-of event sequence
+- projection and reducer revision
+- visibility policy revision
+- redaction and retention policy revision
+- filtered records
+- field-level redaction reasons safe for that viewer
+- viewer-bound next cursor
+
+### Row And Field Filtering
+
+The store applies both:
+
+- row-level visibility: whether the viewer may know the event or aggregate
+  exists;
+- field-level visibility: which permitted fields may be returned.
+
+Projection reducers keep sufficient classification metadata to filter each
+field. They MUST NOT flatten restricted content into an unlabeled string.
+
+Raw table access, unfiltered event lists, internal persistence records, and
+adapter-specific JSON are not ordinary application APIs.
+
+### Non-Enumeration
+
+For a viewer who cannot know an object exists:
+
+- missing and denied use the same external result;
+- error code, response shape, pagination count, timing bucket, cache behavior,
+  and diagnostic text avoid confirming existence;
+- idempotency, lease, conflict, and causation errors do not reveal hidden owner
+  or resource identity;
+- aggregate counts and queue positions include only visible records or an
+  explicitly policy-safe approximation.
+
+An affected requester may be told that a visible resource request is blocked
+without learning the hidden owner's identity or work.
+
+### Cursors And Caches
+
+Every cursor is opaque, integrity-protected, and bound to:
+
+- project and viewer principal
+- capability and subject scope
+- purpose
+- as-of event sequence
+- projection schema and reducer revision
+- visibility, redaction, and retention policy revisions
+- expiry
+
+Using a cursor under another principal, project, purpose, or policy revision
+fails without revealing the original scope.
+
+Cache keys include the same dimensions. An unfiltered cache entry MUST NOT be
+shared with a filtered reader. Grant revocation, visibility reduction,
+redaction, or retention activation invalidates affected cache generations.
+
+### Diagnostics And Observability
+
+Logs, traces, metrics, health output, exception messages, audit summaries, and
+review packets are filtered surfaces too.
+
+They use opaque identity where possible and MUST NOT include:
+
+- credentials or secret values
+- sealed payload plaintext
+- unrestricted tool arguments or output
+- private transcript content
+- hidden principal, actor, assignment, or resource names
+
+Operators with security capability may retrieve deeper diagnostics through an
+explicit filtered security view rather than ordinary process logs.
+
+## Secret Prevention And Payload Storage
+
+### Ingress
+
+Credentials, private keys, access tokens, session cookies, raw authentication
+headers, secret environment values, and unrestricted private transcripts are
+prohibited event payloads.
+
+Registered payload schemas use allowlisted fields and size bounds. Ingress
+scanning catches common credential forms and project-defined secret patterns
+before append. A detected secret causes rejection; the rejected raw value is
+not logged, hashed into a user-visible identifier, or copied into an incident.
+
+The incident may record secret category, source operation, affected project,
+and an opaque detection ID.
+
+### Inline And Sealed Payloads
+
+Retention-safe, non-secret payload fields may be stored inline in the immutable
+event.
+
+Allowed restricted content that must later be removable uses:
+
+- an immutable sealed payload reference in the event;
+- an immutable commitment and ciphertext digest;
+- encrypted ciphertext in protected payload storage;
+- a separately controlled data-encryption key;
+- classification, retention deadline, and visibility metadata.
+
+The event hash covers the reference, commitment, digest, and metadata, not
+plaintext. Decrypt capability is checked separately from event visibility.
+
+Essential lifecycle, ordering, authority, fencing, score impact, and integrity
+facts MUST be retained in non-secret canonical fields. A projection needed to
+authorize later writes cannot depend on decrypting content that policy permits
+to expire.
+
+### Canonical Cryptography
+
+Version 1 pins algorithms through the schema registry:
+
+- canonical serialization: UTF-8 JSON with deterministic object-key ordering,
+  normalized numbers, and no insignificant whitespace
+- event, response, ciphertext, checkpoint, and projection digest:
+  SHA-256 over domain-separated canonical bytes
+- restricted request and payload commitment: HMAC-SHA-256 with a
+  project-separated protected key and recorded key revision
+- sealed payload encryption: AES-256-GCM with a unique random nonce and
+  per-object data-encryption key wrapped by a managed key-encryption key
+
+Domain separation includes project ID, digest purpose, and schema revision.
+Plain SHA-256 of low-entropy restricted content is forbidden because it permits
+dictionary recovery.
+
+Integrity hashes are unkeyed so independent verifiers can recompute them.
+Restricted commitments are keyed so the ledger does not expose a plaintext
+guessing oracle.
+
+Events record algorithm and key revisions, never key material. Rotating an
+integrity algorithm, commitment key, or wrapping key is an authorized policy
+event:
+
+- old immutable events keep their original revision;
+- verifiers retain the algorithms and protected commitment keys needed for the
+  declared history window;
+- wrapping-key rotation rewraps data-encryption keys without changing event
+  commitments;
+- redaction destroys the target data-encryption key, not the commitment key;
+- key loss that prevents required verification marks integrity unhealthy and
+  cannot be papered over with a new key.
+
+## Redaction
+
+### Redaction Event
+
+Redaction is an append-only state transition:
+
+```text
+redaction_v1 = {
+  project_id,
+  redaction_id,
+  target_event_id,
+  target_payload_fields_or_ref,
+  reason_code,
+  requested_by_principal_id,
+  approved_by_principal_id?,
+  effective_event_sequence,
+  replacement_tombstone,
+  key_destruction_evidence?,
+  policy_revision
+}
+```
+
+It does not edit the target event, event hash, sequence, aggregate version,
+idempotency identity, or integrity chain.
+
+For sealed payload, redaction deletes ciphertext when permitted and destroys
+the data-encryption key. The immutable reference and commitment remain as an
+audit tombstone. For inline data that policy later decides should have been
+removable, the store cannot pretend deletion while preserving immutable bytes;
+that is a schema incident requiring forward migration and deployment review.
+
+### Protected Facts
+
+Redaction MUST NOT erase or change:
+
+- that an accepted event occurred
+- event sequence, aggregate version, correlation, or causation
+- capability decision and policy revision
+- lease epoch, fencing token, and ownership term identity
+- round epoch, close, reopen, or scorecard version
+- canonical shot, penalty, loss-component, or team-score effect
+- integrity commitments and checkpoints
+
+Personal display data is stored in a separable identity profile. Erasing that
+profile leaves an opaque principal or actor ID in immutable history without
+retaining the removed display mapping.
+
+### Score-Affecting Evidence
+
+If valid redaction removes evidence required to justify a currently accepted
+scorecard, policy must either:
+
+- retain a sufficient non-sensitive derived fact already committed before
+  close; or
+- audited-reopen the round, apply a scoped correction, and publish a new
+  scorecard version before the evidence becomes unavailable.
+
+Redaction itself cannot silently change a score.
+
+When law or incident response requires immediate destruction before
+reconciliation, the redaction transaction clears
+`accepted_scorecard_version`, marks the round `reconciliation_required`, and
+preserves the latest published version as stale historical evidence. A later
+audited reopen and close may establish a new accepted version. Current handicap
+and completion views exclude the round in the interim.
+
+## Retention
+
+### Default Policy
+
+The built-in safe default is:
+
+| Data | Default retention |
+|---|---|
+| Credentials, secrets, raw auth headers | Never accepted |
+| Unrestricted tool payloads and private transcripts | Never accepted |
+| Restricted removable diagnostics | 30 days |
+| Ordinary removable coordination content | 90 days |
+| Sealed payload ciphertext after redaction | Delete immediately |
+| Core event envelope and integrity facts | Project lifetime |
+| Capability, lease, idempotency, close, reopen, shot, penalty, and score facts | Project lifetime |
+| Published canonical scorecard bytes and checkpoint | Project lifetime |
+| Personal display profile | Account lifetime or stricter project policy |
+| Idempotency and redaction tombstones | Project lifetime |
+
+A checked-in project policy may shorten removable content retention and may
+lengthen it only with an explicit purpose, access scope, and maximum. Legal or
+organizational requirements may override durations through a versioned policy
+event.
+
+### Retention Application
+
+Retention deadlines are assigned at append from store time and pinned policy.
+A retention worker materializes due transitions, but read filtering treats
+content as expired at the deadline even before deletion runs.
+
+Retention application:
+
+- is capability checked and idempotent;
+- records affected references and policy, not removed plaintext;
+- invalidates filtered caches and cursors;
+- preserves commitments and essential facts;
+- verifies projections no longer depend on removed content;
+- reports deletion or key-destruction failure as a security incident.
+
+Retention failure fails closed for further disclosure of expired data. It does
+not rewrite event history.
+
+### Export
+
+Export requires `scorecard.export` or a more specific explicit capability. An
+export pins:
+
+- project, round, and immutable scorecard version
+- as-of event sequence
+- projection, reducer, visibility, redaction, and retention revisions
+- viewer principal and stated purpose
+- included classifications and redaction summary
+- export content hash and creation event
+
+Export runs from a filtered projection. Raw ledger dumps are security
+administration operations, not scorecard export.
+
+## Adversarial Enforcement Criteria
+
+S268 and S269 MUST ship automated evidence for every scenario below against
+both SQLite and PostgreSQL behavior.
+
+### Identity And Project Isolation
+
+1. A client-supplied project or principal ID cannot cross the authenticated
+   project boundary.
+2. Forged actor, session, role, or group fields cannot grant capability.
+3. Two actors or sessions bound to one principal remain one principal for
+   security and later verifier-independence checks.
+4. Equal event, idempotency, round, or resource labels in different projects do
+   not collide or leak.
+5. A legacy unverified event cannot authorize, verify, lease, reopen, or close.
+6. A second bootstrap attempt or environment-derived administrator is denied.
+
+### Append And Concurrency
+
+7. Two concurrent appends expecting one aggregate version produce one success
+   and one version conflict.
+8. Event, idempotency record, synchronous projections, cursor, outbox, and
+   integrity heads commit all-or-none under injected failure at each step.
+9. Rolled-back PostgreSQL append leaves no canonical sequence gap.
+10. Same-key exact retry returns one operation; changed payload, principal,
+    precondition, policy expectation, or lease proof conflicts.
+11. Capability revocation racing append has a serial order and never permits a
+    post-revocation stale-cache write.
+12. Audited reopen racing close cannot accept two scorecard versions or mutate
+    prior published bytes.
+
+### Leases And Recovery
+
+13. Client time cannot extend, renew, or revive a lease.
+14. Session heartbeat and status reads do not renew lease or session authority.
+15. A stale owner is rejected after release, expiry, revocation, policy fence,
+    transfer, or overlapping reacquisition.
+16. A renewal preserves epoch and token; reacquisition changes lease ID, raises
+    epoch, and raises fencing token.
+17. Multi-resource acquisition grants all-or-none and remains deadlock-free
+    under reversed client request order.
+18. Correct expiry and queue advancement do not depend on a sweeper.
+19. Recovery preserves accepted evidence, creates a new attempt, and cannot
+    duplicate shot or penalty identity.
+20. Unknown external side effect blocks automatic requeue.
+21. Retry exhaustion produces a redacted dead-letter and escalation without
+    granting authority.
+
+### Visibility And Privacy
+
+22. Hidden and nonexistent objects are indistinguishable in externally visible
+    error shape, count, cursor, cache, and bounded timing class.
+23. Viewer-bound cursor or cache material cannot be replayed by another
+    principal, project, purpose, or policy revision.
+24. Field-level restricted content never appears in a row-visible lower-trust
+    view.
+25. Historical reads cannot revive a currently revoked grant or membership.
+26. A later group or round member sees prior restricted content only under its
+    recorded history mode and an active current grant.
+27. Ordinary logs, metrics, health, exceptions, and review packets contain no
+    sealed plaintext or hidden identity.
+28. Credential fixtures are rejected before append and do not appear in event,
+    incident, log, or hash output.
+29. Restricted idempotency and payload commitments do not provide an offline
+    plaintext guessing oracle.
+30. Redaction leaves event and integrity hashes valid while plaintext becomes
+    unavailable.
+31. Retention expiry hides data before asynchronous deletion and fails closed
+    if deletion fails.
+32. A redaction or retention action cannot silently alter the accepted team
+    score.
+33. Immediate destruction of required evidence clears current scorecard
+    acceptance until reconciliation.
+34. Export contains only the authorized filtered scorecard and a pinned
+    redaction manifest.
+
+### Replay, Migration, And Bypass
+
+35. Full replay after redaction produces the same retained authoritative state
+    and deterministic tombstones.
+36. Unknown mandatory schema or broken hash chain stops authoritative replay
+    and append.
+37. Migration quarantine refuses ambiguous project, identity, idempotency, or
+    scorecard input.
+38. Compatibility methods cannot write sessions, claims, workflows,
+    scorecards, or events outside `append_team_event` after cutover.
+39. Direct adapter construction still resolves the repository-owned project
+    state and cannot create worktree-local authority.
+40. Policy downgrade cannot create a second resource namespace, expose prior
+    restricted content, or preserve incompatible live leases.
+
+### Test Methods
+
+Evidence includes:
+
+- shared adapter contract tests
+- transaction fault injection before every durable write
+- concurrent writer and policy-race tests
+- virtual authoritative clock tests
+- property tests for canonicalization, overlap, idempotency, and filtering
+- replay from genesis and verified snapshots
+- migration resume, divergence, and rollback tests
+- malicious request corpus and credential fixtures
+- cache and cursor confusion tests
+- full scorecard close and reopen replay
+
+Wall-clock sleeps, prompt compliance, client-hidden buttons, and manual log
+inspection are not sufficient enforcement evidence.
+
+## Downstream Ownership
+
+S268 implements:
+
+- canonical Team Round event envelope and existing-store migration
+- scorecard, shot, penalty, loss-component, and version schema
+- atomic append, idempotency, ordering, projection, replay, and integrity
+- exactly-once close and audited reopen mechanics
+- capability and filtered-view substrate required by finalization
+
+S269 implements:
+
+- typed resource canonicalization and conflict policy
+- renewable lease, epoch, fencing, queue, retry, dead-letter, and escalation
+- protected mutation lease proof
+- capability enforcement for resource and recovery operations
+- adversarial concurrency and stale-owner tests
+
+S270 and S271 consume this substrate. They MUST NOT add alternate identity,
+authorization, event, lease, or scorecard authorities.
+
+## S264.1-4 Acceptance Criteria
+
+The security contract is complete when an implementer can answer:
+
+- Which explicit capability authorizes every protected operation?
+- Can a role, alias, session, branch, worktree, or client group grant access?
+- How is a grant revocation ordered against an in-flight append?
+- Can a cursor, cache, count, error, or timing class disclose hidden existence?
+- Where is field-level classification retained for projection filtering?
+- Can credentials, raw tool payloads, or private transcripts enter the ledger?
+- How can removable restricted payload be destroyed without rewriting the event
+  hash chain?
+- Which immutable score and fencing facts can never be redacted?
+- What happens when evidence needed by an accepted scorecard must be removed?
+- When is expired data hidden if the retention worker is late?
+- What exact hostile tests must pass on SQLite and PostgreSQL before S268 or
+  S269 can ship?
