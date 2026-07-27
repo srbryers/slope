@@ -15,6 +15,9 @@
 // plain 245 could be S245 or S24.5) and lives in the roadmap layer
 // (isEncodedInsertedSprintInRoadmap / formatRoadmapSprintLabel).
 
+/** Transitional input type for APIs moving from numeric to canonical string ids. */
+export type SprintId = string | number;
+
 export interface SprintIdParts {
   /** Whole-sprint base, e.g. 458. */
   base: number;
@@ -32,7 +35,7 @@ export interface SprintIdParts {
  * A string is preserved exactly (after stripping a leading `S` and whitespace),
  * so trailing zeros survive. A number is rendered literally.
  */
-export function sprintIdKey(value: string | number): string | null {
+export function sprintIdKey(value: SprintId): string | null {
   if (typeof value === 'number') {
     if (!Number.isFinite(value) || value <= 0) return null;
     return String(value);
@@ -46,7 +49,7 @@ export function sprintIdKey(value: string | number): string | null {
 }
 
 /** Parse an authored sprint id (string or number) into canonical parts, or null. */
-export function parseSprintId(value: string | number): SprintIdParts | null {
+export function parseSprintId(value: SprintId): SprintIdParts | null {
   const key = sprintIdKey(value);
   if (key === null) return null;
 
@@ -89,7 +92,7 @@ export function compareSprintIdKeys(a: string, b: string): number {
 }
 
 /** True when two authored ids denote the same sprint (exact canonical match). */
-export function sprintIdsEqual(a: string | number, b: string | number): boolean {
+export function sprintIdsEqual(a: SprintId, b: SprintId): boolean {
   const ka = sprintIdKey(a);
   const kb = sprintIdKey(b);
   return ka !== null && ka === kb;

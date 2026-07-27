@@ -1,6 +1,8 @@
 // SLOPE — Sprint Lifecycle & Operational Performance Engine
 // ════════════════════════════════════════════════════════════
 
+import type { SprintId } from './sprint-id.js';
+
 // --- Core Scoring Enums ---
 
 /** Club selection declares approach complexity before starting a ticket */
@@ -247,7 +249,7 @@ export type ClaimScope = 'ticket' | 'area';
 /** A claim reserving a ticket or area for a player during a sprint */
 export interface SprintClaim {
   id: string;
-  sprint_number: number;
+  sprint_number: SprintId;
   player: string;
   target: string;
   scope: ClaimScope;
@@ -388,7 +390,7 @@ export interface SlopeEvent {
   type: EventType;
   timestamp: string;
   data: Record<string, unknown>;
-  sprint_number?: number;
+  sprint_number?: SprintId;
   ticket_key?: string;
 }
 

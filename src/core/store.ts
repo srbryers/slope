@@ -4,6 +4,12 @@
 import type { SprintClaim, GolfScorecard, SlopeEvent, WorkflowExecution, WorkflowStepResult } from './types.js';
 import type { CommonIssuesFile } from './briefing.js';
 import type { SprintRegistry } from './registry.js';
+import type { SprintId } from './sprint-id.js';
+
+/** Scorecard as persisted by a store during the 2.0 canonical-id transition. */
+export type StoredGolfScorecard = Omit<GolfScorecard, 'sprint_number'> & {
+  sprint_number: SprintId;
+};
 
 /** Aggregate row counts from the store — used by health checks and diagnostics. */
 export interface StoreStats {
@@ -50,11 +56,11 @@ export interface SlopeStore extends SprintRegistry {
   cleanStaleSessions(maxAgeMs: number): Promise<number>;
 
   // Claims (extends SprintRegistry.claim/release/list/get with additional methods)
-  getActiveClaims(sprintNumber?: number): Promise<SprintClaim[]>;
+  getActiveClaims(sprintNumber?: SprintId): Promise<SprintClaim[]>;
 
   // Scorecards
-  saveScorecard(card: GolfScorecard): Promise<void>;
-  listScorecards(filter?: { minSprint?: number; maxSprint?: number }): Promise<GolfScorecard[]>;
+  saveScorecard(card: StoredGolfScorecard): Promise<void>;
+  listScorecards(filter?: { minSprint?: SprintId; maxSprint?: SprintId }): Promise<StoredGolfScorecard[]>;
 
   // Common issues
   loadCommonIssues(): Promise<CommonIssuesFile>;
@@ -63,7 +69,7 @@ export interface SlopeStore extends SprintRegistry {
   // Events (session telemetry)
   insertEvent(event: Omit<SlopeEvent, 'id' | 'timestamp'>): Promise<SlopeEvent>;
   getEventsBySession(sessionId: string): Promise<SlopeEvent[]>;
-  getEventsBySprint(sprintNumber: number): Promise<SlopeEvent[]>;
+  getEventsBySprint(sprintNumber: SprintId): Promise<SlopeEvent[]>;
   getEventsByTicket(ticketKey: string): Promise<SlopeEvent[]>;
 
   // Testing sessions
