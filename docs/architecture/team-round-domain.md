@@ -60,16 +60,29 @@ Those details MUST preserve the invariants here.
 
 | Identity | Meaning | Lifetime | Cardinality |
 |---|---|---|---|
-| `sprint_key` | Canonical planned-work identity | Stable across the roadmap and every execution | One per planned sprint |
-| `round_id` | Logical scored execution of a sprint | Stable for the sprint, including retries and audited reopens | Exactly one canonical round per `sprint_key` |
+| `project_id` | Stable repository or project namespace | Stable across paths, worktrees, remotes, and store backends | One per configured project |
+| `sprint_key` | Canonical planned-work identity within a project | Stable across the roadmap and every execution | One per `(project_id, planned sprint)` |
+| `round_id` | Logical scored execution of a project sprint | Stable for the sprint, including retries and audited reopens | Exactly one canonical round per `(project_id, sprint_key)` |
 | `attempt_id` | One execution attempt within the round | Immutable after creation | One or more per round |
 | `scorecard_version` | Immutable published projection revision | Monotonically increases after each successful close | Zero while never closed, then `1..n` |
 | `shot_id` | Canonical unit of planned work and outcome evidence | Immutable | Exactly once in the canonical scorecard version |
 | `penalty_id` | Canonical team-level penalty identity | Immutable | Counted at most once in the team result |
 
+`project_id` is an opaque durable identifier, not a filesystem path, Git remote
+URL, repository display name, or PostgreSQL connection. Moving, forking, or
+renaming a checkout does not silently change it. Forking history into a distinct
+project requires an explicit new project identity and provenance link.
+
 SLOPE MUST use the canonical sprint-key representation delivered by the sprint
 identity migration. A display label, floating-point number, branch name, issue
 number, or roadmap position MUST NOT substitute for `sprint_key`.
+
+Every persisted or exported sprint, round, attempt, scorecard, shot, penalty,
+resource, and idempotency identity is scoped by `project_id`. Implementations
+MAY use globally unique opaque IDs, but uniqueness constraints and lookups MUST
+still include or verify the project namespace. Idempotency scope is at least
+`(project_id, operation kind, owning aggregate)`; S264.1 defines the complete
+scope for each event.
 
 `round_id` is stable across retries because retries are attempts at the same
 planned outcome. A new `attempt_id` MUST NOT create another scorecard or reset
@@ -109,8 +122,10 @@ closed --audited reopen--> open
 
 - Attempts, assignments, shots, hazards, penalties, and verification evidence
   MAY be added according to authority and visibility policy.
-- A scorecard view is a draft projection and has no published
-  `scorecard_version`.
+- The mutable `draft_scorecard` has no published `scorecard_version`.
+- If the round has been reopened, its immutable `latest_published_scorecard`
+  remains separately readable with `publication_status:
+  stale_due_to_reopen`.
 - A blocked or paused sprint remains open. Operational inactivity does not
   imply closure.
 
@@ -138,12 +153,33 @@ or absorbed do not mean `closed`. A round closes only through the finalization
 contract. A completed roadmap sprint MUST identify its closed round and
 published scorecard version.
 
+### Projection Read Semantics
+
+Every round read distinguishes:
+
+- `draft_scorecard`: mutable evidence projection for the current open or
+  finalizing epoch
+- `latest_published_scorecard`: highest successfully closed immutable version
+- `accepted_scorecard_version`: version eligible for current handicap and
+  completion projections, or `null` while never closed or reopened
+
+On first open, both published fields are absent. On close, the new immutable
+version becomes both latest-published and accepted. On reopen,
+`latest_published_scorecard` remains available for historical and audit reads,
+but `accepted_scorecard_version` becomes `null`; current handicap and completion
+views exclude that round until it closes again. An explicitly historical
+`as_of` query MAY select the version that was accepted at the requested time.
+
+Clients MUST NOT label the stale published version as the current scorecard
+during reopen. They present the open draft and the stale prior publication as
+separate objects.
+
 ## Exactly-Once Finalization
 
 Finalization MUST be enforced by the authoritative store, not by a CLI prompt
 or client convention.
 
-For one `(round_id, reopen_epoch)`:
+For one `(project_id, round_id, reopen_epoch)`:
 
 1. At most one finalization identity may publish `closed`.
 2. The operation reads all score-affecting evidence from one consistent
@@ -188,25 +224,47 @@ Reopen is exceptional and capability-gated. It MUST record:
 - authoritative timestamp
 
 Reopen changes the same round from `closed` to `open`; it does not delete or
-rewrite the prior scorecard. The prior version remains queryable and marked
-superseded only by the later published version. New scoring work occurs in a
-new attempt when execution is required.
+rewrite the prior scorecard. The prior version remains the
+`latest_published_scorecard`, is marked `stale_due_to_reopen`, and is no longer
+the accepted current scorecard. New scoring work occurs in a new attempt when
+execution is required.
+
+The authoritative reopen operation atomically:
+
+- changes round state to `open`
+- increments `reopen_epoch`
+- clears `accepted_scorecard_version`
+- clears completion eligibility for the project sprint
+- creates a fresh `draft_scorecard` based on the prior published version
+
+Roadmap and status reads MUST immediately present the sprint as reopened and
+not complete. A tracked roadmap source is a denormalized projection: its
+recoverable update to an in-progress disposition is part of the reopen
+operation and the operation MUST NOT report success until that write is
+durable. If reconciliation is interrupted, runtime reads remain governed by the
+authoritative reopened state and recovery must finish the tracked projection
+before further finalization.
 
 The next finalization applies exactly-once semantics within the new reopen
 epoch. Repeated reopen requests with the same identity are idempotent. A reopen
-request against a stale version or epoch fails.
+request against a stale version or epoch fails. Reclose atomically publishes
+the next version, restores `accepted_scorecard_version`, and restores roadmap
+completion eligibility before the tracked projection is reported complete.
 
 ## Lifecycle Invariants
 
 An implementation is conformant only if all of these hold:
 
-- There is never more than one canonical `round_id` for a `sprint_key`.
+- There is never more than one canonical `round_id` for a
+  `(project_id, sprint_key)`.
 - A retry cannot create a competing team scorecard.
 - A closed epoch has exactly one finalization identity and immutable projection
   hash.
 - Score-affecting late evidence cannot mutate a closed projection.
 - Reopen preserves every prior scorecard version and increments both epoch and
   published version monotonically.
+- Reopen separates the stale latest-published version from the current draft
+  and removes the round from current completion and handicap projections.
 - Protected roadmap dispositions cannot be mistaken for round closure.
 - Team result selection never uses best-of-agent, alternate-shot, or duplicate
   per-agent scorecards.
@@ -260,6 +318,14 @@ history. It is not a session, role, model name, or display alias.
 - Two actors controlled by the same principal remain separate attribution
   identities but are not independent for verification policy.
 - Actor aliases MAY change without changing `actor_id`.
+
+Actor creation records principal, reason, creation authority, and immutable
+lineage. Actors transition from `active` to `retired`; retirement never deletes
+history, and a retired identity cannot be silently reused. Creating or selecting
+a new actor MUST NOT reset the controlling principal's default performance
+history. Principal-level reports aggregate every actor controlled by that
+principal during the requested window, including retired actors, while
+actor-level reports remain available as narrower descriptive views.
 
 Actor history is repository-scoped by default. Cross-repository aggregation
 MAY be added only with explicit namespace, consent, and provenance; matching
@@ -361,13 +427,20 @@ enforcement and persistence model.
 Every identity-bearing event and projection has an explicit visibility policy.
 The minimum audiences are:
 
-- `subject`: only the record subject and authorized administrators
+- `subject`: principals explicitly listed in
+  `visibility_subject_principal_ids`, plus authorized administrators
 - `round`: participating principals for the round
 - `project`: authorized repository principals
 - `public`: explicitly exportable data
 
 More restrictive project policies MAY refine these audiences. Missing
 visibility is deny-by-default, not project-wide.
+
+For a record involving several actors or principals, subject visibility is not
+inferred from authorship, contribution, verification, or mention. The writer
+must supply the complete deduplicated subject-principal allowlist and possess
+authority to disclose the record to each member. Field-level policy may narrow
+that list further.
 
 Authorization applies to fields as well as records. A caller allowed to see
 team status is not automatically allowed to see private transcripts, secrets,
@@ -460,45 +533,98 @@ They do not answer:
 Selection into work is not random. Difficulty adjustment reduces obvious
 assignment-mix distortion but does not make the estimate causal.
 
-### Observation Unit
+### Disjoint Loss Ledger
 
-The primary observation is a canonical owned shot. For shot `i`:
+Every new-schema scorecard reconciles its score through immutable loss
+components. Each component has one `loss_component_id`, one scoring revision,
+one team loss value, and exactly one source identity:
+
+- `shot:<shot_id>:<component>` for intrinsic shot outcome loss
+- `penalty:<penalty_id>` for a score-affecting hazard or penalty
+- `round_adjustment:<adjustment_id>` for an explicit team-only judged
+  adjustment that cannot be assigned to a shot or penalty
 
 ```text
-observed_loss_i = versioned strokes or loss assigned by the scoring revision
-expected_loss_i = expected loss for the frozen difficulty stratum
-adjusted_loss_i = observed_loss_i - expected_loss_i
+score = par + sum(team_loss_component)
 ```
 
-The actor estimand is the weighted mean `adjusted_loss_i` for shots owned by the
-actor in the aggregation window. The role estimand uses shots performed in that
-role. Signed values MUST be retained: negative means better than the expected
-loss for the observed assignment mix, and positive means worse.
+A loss may appear under only one source identity. Intrinsic shot loss MUST
+exclude every loss represented by a `penalty_id`; attaching a penalty to a shot
+does not also make it shot loss. A round adjustment is excluded from actor and
+role estimates unless a later estimator revision defines an independently
+reviewed allocation rule.
 
-Reports MAY translate the adjusted estimate into a familiar handicap display,
-but MUST include the signed estimate, unit, scoring revision, difficulty
-revision, aggregation window, and denominator. A display clamp MUST NOT destroy
-the underlying signed value.
+The existing scorecard builder folds hazard penalties into score. Migration to
+the new schema MUST decompose that total into disjoint components without
+changing the accepted legacy score. If decomposition is impossible, the
+unexplained difference becomes an unattributed legacy round adjustment rather
+than a second shot or penalty loss.
+
+### Observation Unit
+
+The primary observation is an accountable ownership spell, not only the final
+completed shot. A spell begins when an actor accepts ownership of a shot and
+ends at accepted completion, explicit handoff, abandonment, or round close. It
+records one immutable `ownership_spell_id`, actor, role, session, shot,
+attempt, start and end evidence, and terminal disposition.
+
+For eligible spell `j`:
+
+```text
+observed_loss_j = disjoint loss components incurred during and attributed to the spell
+expected_loss_j = expected subsequent loss from the difficulty snapshot frozen at spell start
+adjusted_loss_j = observed_loss_j - expected_loss_j
+```
+
+The response contains only loss arising after the spell begins and before it
+ends. A prior owner's failures cannot be placed in a later owner's response.
+The final owner receives the intrinsic accepted-shot component; earlier owners
+retain any intrinsic or penalty components incurred during their spells.
+
+For actor `a` in window `W`, let `E(a,W)` be every eligible ownership spell the
+actor accepted in scorecard versions selected for that window. Version 1 uses
+equal exposure weights:
+
+```text
+w_j = 1
+theta(a,W) = sum(w_j * adjusted_loss_j) / sum(w_j), for every j in E(a,W)
+```
+
+The role estimand substitutes the role in force for each spell. No difficulty,
+outcome, duration, success, or confidence weighting is allowed in estimator
+version 1. A different weighting policy requires a new estimator revision and
+must publish its construction and normalization.
+
+Signed values MUST be retained: negative means better than expected for the
+observed exposure mix, and positive means worse. Reports MAY translate the
+estimate into a familiar handicap display, but MUST include the signed
+estimate, unit, scoring revision, difficulty revision, estimator revision,
+aggregation window, and denominator. A display clamp MUST NOT destroy the
+underlying signed value.
 
 Contributors MAY receive a separate contribution metric when evidence supports
-one. Contributor metrics are not actor ownership handicaps and MUST NOT be
-added to them.
+one. Contributor metrics are not ownership handicaps and MUST NOT be added to
+them.
 
 ### Difficulty
 
-Difficulty features MUST be frozen before the outcome is known and versioned.
-Permitted inputs include:
+Difficulty features for a spell MUST be versioned and frozen before the first
+outcome-bearing action in that spell. Permitted inputs include:
 
 - declared club and ticket complexity
 - sprint slope factors
 - planned dependency position and blast radius
 - predeclared risk areas and required review level
-- typed resource contention known at assignment time
-- ownership or handoff state known before work resumes
+- typed resource contention known when the spell starts
+- shot history and handoff state already observed before the new spell starts
 
-Outcome-derived values such as test failure count, observed hazards, final
-review findings, elapsed time after completion, or whether the shot landed
-cleanly MUST NOT be used as pre-outcome difficulty features.
+A later spell may condition on history known at its own start, including an
+earlier handoff, because its response contains only subsequent loss. That
+history MUST NOT adjust the full-shot response or any earlier spell.
+
+Outcome-derived values from within the current spell, such as test failures,
+observed hazards, final review findings, elapsed time after completion, or
+whether the shot landed cleanly, MUST NOT enter its difficulty snapshot.
 
 The difficulty model MUST publish:
 
@@ -507,44 +633,80 @@ The difficulty model MUST publish:
 - expected-loss unit
 - fallback behavior for unseen strata
 - calibration and reliability evidence
+- predictive uncertainty needed by the estimator
 
-If expected loss cannot be estimated reliably, the shot remains in raw and
-team summaries while its adjusted value is missing with a reason.
+If expected loss cannot be estimated reliably, the spell remains in exposure,
+raw, and team summaries while its adjusted value is missing with a reason.
 
-### Exposure
+### Exposure, Attrition, And Missing Outcomes
 
-The denominator MUST prevent completed-success-only selection.
+`E(a,W)` includes every ownership spell accepted by the actor in the selected
+rounds, including completed, handed-off, abandoned, retried, and unresolved
+spells. Removing a spell because another actor finished the shot, because its
+outcome is poor, or because required data is missing is prohibited.
 
-Exposure begins when accountable ownership is accepted. The actor and role
-reports include:
+Every spell receives one terminal disposition. For each required outcome,
+attribution, and difficulty value, the estimator stores observed state or a
+typed missing reason. Estimator version 1 follows these publication rules:
 
-- total accepted ownership exposures
-- canonical completed shots
-- handed-off, abandoned, retried, and unresolved exposures
-- identified, adjusted, and missing outcome counts
-- attribution and difficulty coverage
+1. The point estimate `theta(a,W)` is published only when every eligible spell
+   has an observed adjusted loss.
+2. If any eligible spell is missing, the point estimate is `unavailable`; an
+   observed-complete-case mean MAY be shown only as a diagnostic explicitly
+   labeled conditional on observed spells.
+3. The scoring revision MUST define finite pre-outcome lower and upper loss
+   bounds for each spell stratum. Missing spells remain in the denominator and
+   produce a sensitivity interval by substituting those bounds.
+4. If defensible bounds are unavailable, the sensitivity interval is also
+   `unavailable`.
+5. Outcome, identity, attribution, and difficulty coverage are reported
+   separately. Reliability cannot be high when any required coverage is below
+   100 percent in estimator version 1.
 
-An abandoned or handed-off exposure MUST NOT disappear because another actor
-finished the ticket. The final owner receives the accepted shot outcome; prior
-owners remain in a separately typed exposure or handoff measure. The scoring
-revision decides whether a failed attempt creates a canonical hazard or
-penalty, but the exposure record always remains.
+This strict first revision prevents successful-completion selection. A future
+imputation or inverse-observation estimator requires a new version, a
+predeclared missingness model, calibration evidence, and independent review.
 
 ### Window, Sample Size, And Uncertainty
+
+Current aggregation selects only `accepted_scorecard_version` for each round.
+An historical `as_of` aggregation pins the one version accepted at that time.
+Several versions of one reopened round MUST NOT enter the same aggregation.
+
+Estimator version 1 requires at least:
+
+- 20 eligible ownership spells
+- 5 distinct closed rounds
+
+Below either threshold, the result is `insufficient_data`, not zero. With equal
+weights, effective sample size is:
+
+```text
+n_eff = (sum(w_j) * sum(w_j)) / sum(w_j * w_j)
+```
 
 Every actor or role estimate MUST identify:
 
 - round and date window
-- raw sample count and effective sample size
-- minimum sample threshold
-- observed and eligible exposure counts
-- attribution, outcome, and difficulty coverage percentages
-- uncertainty method and interval
+- eligible spell count, observed spell count, and `n_eff`
+- distinct independent-round count and threshold
+- terminal-disposition counts
+- identity, attribution, outcome, and difficulty coverage percentages
+- point-estimate, sensitivity-interval, and reliability status
 - scoring, difficulty, and estimator revisions
 
-Below the minimum sample threshold, the result is `insufficient_data`; it is
-not zero. A report with poor coverage or calibration MUST be marked low
-reliability even when its sample count is large.
+When a point estimate is available, uncertainty uses a 95 percent
+round-clustered bootstrap with 2,000 resamples of rounds. Each resample includes
+all selected spells and shared penalty allocations from each sampled round.
+If the expected-loss model was fitted on the evaluated data, it is refitted in
+each resample. An externally fitted model contributes draws from its published
+predictive uncertainty. This propagates within-round dependence, shared
+penalties, and expected-loss uncertainty.
+
+If there are fewer than five independent rounds, the model cannot supply
+predictive uncertainty, or bootstrap computation fails, the uncertainty
+interval is `unavailable`, never zero-width. Reliability is low until every
+required interval and coverage field is available.
 
 Repository and operator views aggregate canonical rounds or actor estimates.
 They are reporting scopes, not player identities.
@@ -554,37 +716,53 @@ They are reporting scopes, not player identities.
 Every score-affecting penalty has one immutable `penalty_id`. Its record
 contains:
 
-- team-level stroke or loss impact and scoring revision
-- round, attempt, ticket, shot, and resource scope as applicable
+- team-level loss component and scoring revision
+- round, attempt, ticket, shot, ownership spell, and resource scope as
+  applicable
 - `caused_by` principals and actors, which MAY be shared or unknown
+- normalized descriptive allocation weights when causation is verified
 - `resolved_by` principals and actors
 - evidence references, confidence, and verification status
 - typed attribution missingness
 
-The canonical team score counts `penalty_id` at most once. Participant and role
-views reference the same penalty; they do not clone it.
+The canonical team score counts the `penalty:<penalty_id>` component at most
+once. Participant and role views reference the same component; they do not
+clone it.
+
+Verified `caused_by` allocation weights are non-negative and sum to exactly
+`1.0` across unique actor recipients. The allocated fraction enters each
+recipient's spell `observed_loss_j` once, using the role and spell in force when
+the causal action occurred. If causation is unknown, disputed, unverified, or
+cannot be mapped to an ownership spell, the full penalty remains in team score
+and is diagnostic-only for participant estimates.
 
 `caused_by` and `resolved_by` are independent:
 
 - A resolver MUST NOT inherit causal attribution.
 - A verifier MUST NOT inherit causal attribution.
-- Shared causation MAY use versioned allocation weights for descriptive
-  participant views, but those weights do not alter team impact.
+- Allocation weights do not alter full team impact.
 - Unknown causation remains unknown and lowers attribution coverage.
 - Disputed causation remains visibly disputed until resolved by policy.
+- A penalty already represented in `observed_loss_j` through its
+  `penalty_id` MUST NOT also appear in intrinsic shot loss.
 
-Participant penalty projections are non-additive. Summing actor or role
-penalty views is not a valid way to reproduce the team score because shared,
-unknown, and cross-role penalties overlap.
+Participant penalty projections are not a source for team scoring. Summing
+actor or role views is invalid because unattributed penalties, team-only round
+adjustments, overlapping role views, and missing data may remain.
 
 ## Measurement Invariants
 
-- Team score and team handicap derive only from canonical scorecard versions.
-- Every canonical shot and penalty affects team score at most once.
-- Actor and role estimates use accountable ownership and pre-outcome
-  difficulty, never display aliases or sessions as durable identity.
+- Current team score, team handicap, and participant estimates use at most one
+  accepted scorecard version per round.
+- Every score loss has one disjoint component identity; every canonical shot
+  and penalty affects team score at most once.
+- Actor and role estimates use all eligible accountable ownership spells and
+  spell-start difficulty, never display aliases or sessions as durable
+  identity.
 - Exposure includes incomplete and handed-off work instead of selecting only
   successful completions.
+- Missing exposure outcomes suppress the version 1 point estimate and remain in
+  sensitivity bounds.
 - Every estimate carries sample size, coverage, missingness, reliability, and
   uncertainty.
 - Unknown is never represented as zero.
@@ -599,18 +777,41 @@ scorecards.
 For a legacy scorecard:
 
 - The existing sprint identity is resolved to canonical `sprint_key`.
-- Import creates a stable repository-scoped `round_id`.
+- Import computes a canonical artifact hash and deterministic
+  `legacy_import_id` from `(project_id, sprint_key, artifact hash,
+  importer revision)`.
+- Import creates a deterministic `round_id` scoped by
+  `(project_id, sprint_key, legacy contract revision)`.
 - The existing top-level shots, par, score, score label, hazards, and penalties
   remain authoritative and MUST NOT be recomputed merely because the schema is
   imported.
-- `player`, when present, maps to one legacy actor identity with unverified
-  principal assurance until explicitly bound.
-- Every top-level shot maps to that actor when the scorecard unambiguously
-  represents one player.
+- The imported round is `closed` at `reopen_epoch: 0` with
+  `scorecard_version: 1`, its artifact content hash, and synthetic
+  `legacy_import` finalization evidence. Original scorecard date and
+  authoritative import time are stored separately.
+- `accepted_scorecard_version` and `latest_published_scorecard` both reference
+  version 1 after successful import.
+- `player`, when present, creates an artifact-scoped unverified actor identity.
+  The ID is derived from project, artifact hash, and the legacy player field,
+  so matching text in different rounds does not merge histories.
+- Every top-level shot maps to that artifact-scoped actor only when the
+  scorecard unambiguously represents one player.
 - Missing session, role, verifier, contributor, difficulty, and penalty
   attribution fields receive typed `not_recorded_legacy` missing reasons.
 - The imported scorecard remains immutable. Enrichment is a new projection or
   audited identity binding, not an edit to historical JSON.
+
+Import is idempotent for the same `legacy_import_id` and bytes. Before creating
+a round, the importer groups every discovered artifact by
+`(project_id, sprint_key)`:
+
+- Byte-identical artifacts collapse to one import.
+- Different canonical hashes are quarantined as
+  `legacy_import_conflict`; none becomes authoritative automatically.
+- Explicit conflict resolution records the selected artifact hash, rejecting
+  principal, reason, and authority evidence before import proceeds.
+- A later authenticated binding MAY link an artifact-scoped actor to a durable
+  actor through audited provenance. It does not rewrite the imported version.
 
 An existing single-player command MAY continue to omit explicit team options.
 The runtime supplies a one-participant Team Round from the authenticated
@@ -622,9 +823,11 @@ The current optional `agents[]` shape contains copied per-session shots and
 per-agent scores. It is not a second source of truth under this contract.
 
 - Top-level shots and score remain canonical.
-- An importer MAY derive unverified actor or role attribution only when a
-  one-to-one mapping from a copied legacy shot to one canonical shot is
-  provable.
+- An importer MAY derive role-only attribution when a one-to-one mapping from a
+  copied legacy shot to one canonical shot is provable.
+- `agents[]` alone MUST NOT produce `actor_id`. Actor attribution requires the
+  unambiguous artifact-scoped `player` identity or separately authenticated
+  binding evidence from the legacy session to a durable actor.
 - Ambiguous, duplicated, or conflicting mappings remain unknown and lower
   attribution coverage.
 - Legacy per-agent scores MAY be displayed as historical diagnostics but MUST
@@ -632,24 +835,39 @@ per-agent scores. It is not a second source of truth under this contract.
 - A legacy session ID MUST NOT be promoted to durable actor or principal
   identity.
 
-Phase 64 SHOULD introduce a new scorecard schema version that references
-canonical shot IDs from participant projections instead of copying shot
+S264.1 MUST define, and S268 MUST implement, the minimum canonical scorecard
+schema before deterministic projection or finalization ships. It includes
+`project_id`, canonical `sprint_key`, `round_id`, `attempt_id`,
+`reopen_epoch`, scorecard schema and published version, actor/principal/session
+and role identity required by each canonical shot, optional contributor and
+verifier references, authority and visibility scope, loss-component identities,
+content hash, and projection revision.
+Participant projections reference canonical shot IDs instead of copying shot
 records. Readers MUST continue to support legacy scorecards.
 
 ## Typed Shared Resources
 
 Parallel actors contend for more than files. A Team Round resource has a
-canonical descriptor:
+canonical subject identity:
 
 ```text
-resource = {
+resource_subject = {
+  project_id,
   resource_type,
   namespace,
-  resource_key,
-  conflict_mode,
-  project_policy_revision
+  resource_key
+}
+
+resource_request = {
+  resource_subject,
+  requested_access_mode,
+  evaluated_policy_revision
 }
 ```
+
+`requested_access_mode`, effective conflict behavior, and policy revision are
+not part of subject identity. Requests using different modes or policy
+revisions still collide on the same protected subject.
 
 Initial resource types are:
 
@@ -670,7 +888,8 @@ Resource ownership records identify:
 
 - authenticated principal, actor, session, round, and attempt
 - assignment or claim that requires the resource
-- requested access mode and effective conflict mode
+- canonical resource subject, requested mode, effective mode, and evaluated
+  policy revision
 - authoritative acquisition evidence
 - current lifecycle state
 
@@ -681,10 +900,19 @@ belong to the coordination contract. The domain invariants are:
 - An expired or superseded owner cannot remain authoritative.
 - Different resource types cannot collide by accidental string equality.
 - Equivalent resources cannot evade collision through alternate spelling.
-- Shared-read or project-managed modes require explicit policy; missing policy
-  defaults to exclusive or denied access.
+- Exclusive access conflicts with every other active mode on an overlapping
+  subject. Shared-read is compatible only with shared-read. Shared-write or
+  project-managed modes require an explicit cross-mode conflict matrix;
+  missing policy defaults to exclusive or denied access.
 - Ownership and allocation outcomes are visible to every authorized
   participant affected by the conflict.
+
+A policy revision cannot create a parallel ownership namespace. Before a new
+revision becomes active, the store re-evaluates every live ownership on
+affected subjects. Incompatible ownership is fenced, revoked, or transitioned
+under an audited rule before activation commits. Protected mutations present
+the currently active policy revision and fail when evaluated under a stale
+revision.
 
 SLOPE coordinates declared resource ownership. It does not automatically make
 an arbitrary development environment parallel-safe. A project MAY own port,
@@ -722,6 +950,8 @@ sources of truth.
 S264.1 must specify:
 
 - how the existing event store becomes the authoritative ledger
+- the minimum canonical scorecard identity/version schema that S268 implements
+  before deterministic projection and finalization
 - complete event envelopes and deterministic scorecard projection
 - atomic append, scoped idempotency, ordering, replay, and schema evolution
 - lease epochs, fencing, retries, recovery, and escalation
@@ -738,6 +968,13 @@ Phase 64 implementation must not weaken any invariant in this document. If an
 implementation constraint requires a semantic change, the contract and schema
 revision must change before code ships.
 
+S268 owns the minimum scorecard schema, identity fields, immutable projection,
+and finalization mechanics. S270 owns accountable attribution validation,
+ownership-spell and participant projections, descriptive estimators,
+missingness and reliability reporting, penalty attribution, and merge-safe
+learning. S270 MUST extend the S268 schema compatibly rather than introduce the
+identity or version fields finalization already hashes.
+
 ## Acceptance Criteria
 
 The S264 contract is complete when independent reviewers can answer all of the
@@ -745,10 +982,12 @@ following from this document without inventing policy:
 
 ### S264-1
 
+- What project namespace scopes every identity?
 - Which identifiers survive retries, closes, and reopens?
 - Can two finalizers publish competing scorecards?
 - What happens to late score-affecting evidence?
 - Does reopen preserve prior scorecard versions?
+- Which draft or published scorecard is authoritative during reopen?
 - Can a protected roadmap status silently close a round?
 
 ### S264-2
@@ -770,6 +1009,7 @@ following from this document without inventing policy:
 - Are difficulty features frozen before outcomes?
 - Do incomplete and handed-off exposures remain in denominators?
 - Are uncertainty, coverage, reliability, and missingness mandatory?
+- Can shot loss and penalty loss count the same event twice?
 - Can resolver credit inherit a penalty?
 
 ### S264-4
@@ -778,6 +1018,7 @@ following from this document without inventing policy:
 - Can ambiguous legacy agent data invent trusted ownership?
 - Are file, ticket, port, database, and service resources distinct typed
   subjects?
+- Can access mode or policy revision create a parallel resource identity?
 - Is project-owned development-state allocation an explicit boundary?
 - Are transport, crypto, chat, prompt-only trust, and alternate team scoring
   excluded as dependencies?

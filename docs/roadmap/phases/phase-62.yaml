@@ -245,7 +245,7 @@ sprints:
       - docs/architecture/team-round-coordination.md
     tickets:
       - key: S264.1-1
-        title: Define existing-event-store migration, source-of-truth authority, complete event envelope, scorecard projection, and deterministic replay (#669)
+        title: Define existing-event-store migration, source-of-truth authority, minimum canonical scorecard schema, complete event envelope, projection, and deterministic replay (#669)
         club: driver
         complexity: risky
         github_issue: 669
