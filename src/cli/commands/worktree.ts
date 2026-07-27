@@ -8,7 +8,7 @@ import { execFileSync, execSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, realpathSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
-import { checkConflicts } from '../../core/index.js';
+import { checkConflicts, sprintIdKey } from '../../core/index.js';
 import { QUIET_STDIO } from '../../core/process.js';
 import type { ClaimScope, SprintClaim } from '../../core/index.js';
 import { loadConfig } from '../config.js';
@@ -222,7 +222,12 @@ async function startCommand(args: string[]): Promise<void> {
     let claim: SprintClaim | null = null;
     if (flags.target) {
       const config = loadConfig(projectRoot);
-      const sprintNumber = flags.sprint ? parseInt(flags.sprint, 10) : inferSprintContext(projectRoot, config).sprint;
+      const sprintNumber = flags.sprint
+        ? sprintIdKey(flags.sprint)
+        : inferSprintContext(projectRoot, config).sprint;
+      if (!sprintNumber) {
+        throw new Error(`Invalid sprint id: ${flags.sprint}`);
+      }
       const scope = (flags.scope ?? 'ticket') as ClaimScope;
       const player = flags.player || process.env.USER || 'unknown';
       const pendingClaim: SprintClaim = {
@@ -458,7 +463,7 @@ Options:
     --ide=<id>           IDE/harness id (default: SLOPE_IDE or unknown)
     --target=<claim>     Optional ticket or area claim to register
     --scope=<scope>      Claim scope: ticket or area (default: ticket)
-    --sprint=<number>    Sprint number for optional claim
+    --sprint=<id>        Sprint id for optional claim
     --dry-run            Preview worktree/session/claim actions
 
   cleanup:

@@ -2,6 +2,7 @@ import {
   detectEscalation,
   buildEscalationEvent,
   checkConflicts,
+  sprintIdKey,
 } from '../../core/index.js';
 import type { EscalationResult } from '../../core/index.js';
 import { loadConfig } from '../config.js';
@@ -51,7 +52,7 @@ async function manualEscalation(
   const store = await resolveStore(cwd);
   try {
     const sessionId = flags['session-id'] ?? 'manual';
-    const sprintNumber = flags.sprint ? parseInt(flags.sprint, 10) : undefined;
+    const sprintNumber = parseOptionalSprint(flags.sprint);
     const reason = flags.reason;
 
     const escalation: EscalationResult = {
@@ -84,7 +85,7 @@ async function detectSwarmEscalations(
   const store = await resolveStore(cwd);
   try {
     const swarmId = flags.swarm;
-    const sprintNumber = flags.sprint ? parseInt(flags.sprint, 10) : undefined;
+    const sprintNumber = parseOptionalSprint(flags.sprint);
 
     const sessions = await store.getSessionsBySwarm(swarmId);
     if (sessions.length === 0) {
@@ -161,4 +162,11 @@ async function detectSwarmEscalations(
   } finally {
     store.close();
   }
+}
+
+function parseOptionalSprint(value: string | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  const sprint = sprintIdKey(value);
+  if (!sprint) throw new Error(`Invalid sprint id: ${value}`);
+  return sprint;
 }

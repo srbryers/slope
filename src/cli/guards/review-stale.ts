@@ -1,7 +1,7 @@
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { HookInput, GuardResult, Suggestion } from '../../core/index.js';
-import { loadConfig } from '../../core/index.js';
+import { compareSprintIdKeys, loadConfig, sprintIdKey } from '../../core/index.js';
 
 /**
  * Review-stale guard: fires on Stop.
@@ -15,16 +15,17 @@ export async function reviewStaleGuard(_input: HookInput, cwd: string): Promise<
   if (!existsSync(retrosDir)) return {};
 
   // Find scorecard files and check for matching reviews
-  const missingReviews: number[] = [];
+  const missingReviews: string[] = [];
   try {
     const files = readdirSync(retrosDir);
-    const scorecardPattern = /^sprint-(\d+)\.json$/;
+    const scorecardPattern = /^sprint-(\d+(?:\.\d+)?)\.json$/;
 
     for (const file of files) {
       const match = file.match(scorecardPattern);
       if (!match) continue;
 
-      const sprintNum = parseInt(match[1], 10);
+      const sprintNum = sprintIdKey(match[1]);
+      if (sprintNum === null) continue;
       const reviewPath = join(retrosDir, `sprint-${sprintNum}-review.md`);
       if (!existsSync(reviewPath)) {
         missingReviews.push(sprintNum);
@@ -37,7 +38,7 @@ export async function reviewStaleGuard(_input: HookInput, cwd: string): Promise<
   if (missingReviews.length === 0) return {};
 
   // Sort for consistent output
-  missingReviews.sort((a, b) => a - b);
+  missingReviews.sort(compareSprintIdKeys);
 
   const suggestion: Suggestion = {
     id: 'review-stale',

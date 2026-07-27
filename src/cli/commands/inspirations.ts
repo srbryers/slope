@@ -2,7 +2,7 @@
 
 import { existsSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { loadConfig, loadInspirations, validateInspirations, linkInspirationToSprint, deriveId } from '../../core/index.js';
+import { loadConfig, loadInspirations, validateInspirations, linkInspirationToSprint, deriveId, sprintIdKey } from '../../core/index.js';
 import type { InspirationsFile, InspirationStatus } from '../../core/index.js';
 
 function parseRepeatable(args: string[], flag: string): string[] {
@@ -112,9 +112,9 @@ function inspirationsLink(args: string[], inspirationsPath: string): void {
     process.exit(1);
   }
 
-  const sprint = parseInt(sprintStr, 10);
-  if (isNaN(sprint)) {
-    console.error(`Invalid sprint number: ${sprintStr}`);
+  const sprint = sprintIdKey(sprintStr);
+  if (!sprint) {
+    console.error(`Invalid sprint id: ${sprintStr}`);
     process.exit(1);
   }
 
@@ -146,7 +146,7 @@ slope inspirations — Track external OSS inspiration sources
 Usage:
   slope inspirations add --url=<url> --project=<name> --idea="idea" [--idea="another"] [--id=<id>]
   slope inspirations list [--status=<status>]
-  slope inspirations link --id=<id> --sprint=<N>
+  slope inspirations link --id=<id> --sprint=<ID>
 
 Tracks external projects and ideas adapted into SLOPE.
 Queryable via MCP: search({ module: 'inspirations' })
