@@ -1,0 +1,162 @@
+version: "1"
+phase:
+  name: Phase 64 — Team Round Collaboration Runtime
+  description: "Implement the SLOPE Team Round model specified in S264 after canonical sprint IDs ship in S267. The runtime uses the git common-dir store as a shared coordination ledger, keeps one authoritative team outcome with actor-attributed shots, and makes leases, callbacks, verification, learning, status, and evaluation first-class."
+  sprints:
+    - 268
+    - 269
+    - 270
+  status: planned
+  note: "Adopt the durable orchestration semantics observed in block/buzz without copying its Nostr transport, cryptographic identity, or chat-first product surface. SLOPE remains repository-native and keeps hard worktree and claim enforcement. Phase 64 follows the 2.0 sprint-id migration so every new coordination record starts with canonical identity."
+sprints:
+  - id: 268
+    theme: Coordination Ledger and Claim Leases
+    par: 5
+    slope: 5
+    type: major + coordination infrastructure
+    depends_on:
+      - 264
+      - 267
+    note: "Turn the shared common-dir store into the authoritative repo coordination ledger. Events must be idempotent and traceable; one claim or ticket serializes execution while non-overlapping claims can proceed in parallel; abandoned work recovers without manual database surgery."
+    research:
+      - docs/research/buzz-multiplayer-collaboration.md
+    tickets:
+      - key: S268-1
+        title: Add append-only idempotent coordination events with round, assignment, claim, correlation, and causation IDs
+        club: driver
+        complexity: risky
+        github_issue: 669
+      - key: S268-2
+        title: Implement renewable claim leases with heartbeat, TTL, expiry grace, abandonment, and cleanup
+        club: driver
+        complexity: risky
+        github_issue: 669
+        depends_on:
+          - S268-1
+      - key: S268-3
+        title: Serialize execution per claim while allowing fair parallel execution for non-overlapping claims
+        club: long_iron
+        complexity: moderate
+        github_issue: 669
+        depends_on:
+          - S268-1
+          - S268-2
+      - key: S268-4
+        title: Add retry, requeue, dead-letter, escalation, and stale-execution recovery semantics
+        club: long_iron
+        complexity: moderate
+        github_issue: 669
+        depends_on:
+          - S268-1
+          - S268-2
+      - key: S268-5
+        title: Prove coordination recovery and idempotency across worktrees, SQLite, and PostgreSQL
+        club: long_iron
+        complexity: moderate
+        github_issue: 669
+        depends_on:
+          - S268-2
+          - S268-3
+          - S268-4
+  - id: 269
+    theme: Team Round Attribution and Learning
+    par: 5
+    slope: 5
+    type: major + scoring model
+    depends_on:
+      - 268
+    note: "Preserve one team result while making individual contribution measurable. Actor attribution must survive session churn, cross-agent hazards must be counted once at team level, and concurrent learning updates must merge without losing another agent's evidence."
+    research:
+      - docs/research/buzz-multiplayer-collaboration.md
+    tickets:
+      - key: S269-1
+        title: Extend shots and agent breakdowns with actor, session, role, contributors, and verifier fields
+        club: driver
+        complexity: risky
+        github_issue: 669
+      - key: S269-2
+        title: Derive actor, role, and team handicaps from one Team Round without double-counting outcomes
+        club: driver
+        complexity: risky
+        github_issue: 669
+        depends_on:
+          - S269-1
+      - key: S269-3
+        title: Add caused-by and resolved-by attribution for cross-agent hazards and count each penalty once
+        club: long_iron
+        complexity: moderate
+        github_issue: 669
+        depends_on:
+          - S269-1
+          - S269-2
+      - key: S269-4
+        title: Replace whole-document common-issues writes with append-only reports or transactional per-pattern merges
+        club: driver
+        complexity: risky
+        github_issue: 669
+        depends_on:
+          - S268-1
+      - key: S269-5
+        title: Add migration and validation coverage for single-player compatibility, unknown metrics, zero values, and reliability
+        club: long_iron
+        complexity: moderate
+        github_issue: 669
+        depends_on:
+          - S269-1
+          - S269-2
+          - S269-3
+          - S269-4
+  - id: 270
+    theme: Multiplayer Status and Evaluation
+    par: 5
+    slope: 4
+    type: major + operating surface
+    depends_on:
+      - 269
+    note: "Make collaboration legible and testable. Assignments carry success criteria and mandatory completion or blocker callbacks; risky work records an independent verifier; status favors meaningful verb-object-outcome events; benchmark manifests pin every material input so team-versus-solo comparisons can be reproduced."
+    research:
+      - docs/research/buzz-multiplayer-collaboration.md
+    tickets:
+      - key: S270-1
+        title: Add assignment and handoff contracts with delegator, assignee, success criteria, and completion or blocker callbacks
+        club: long_iron
+        complexity: moderate
+        github_issue: 669
+      - key: S270-2
+        title: Add independent verifier gates and evidence for risky shots
+        club: long_iron
+        complexity: moderate
+        github_issue: 669
+        depends_on:
+          - S270-1
+      - key: S270-3
+        title: Build a semantic team status feed with verb-object-outcome activity and visible failure, idle, stale, and timeout states
+        club: long_iron
+        complexity: moderate
+        github_issue: 669
+        depends_on:
+          - S268-1
+          - S270-1
+      - key: S270-4
+        title: Separate controller, contributor, and observer authority from requester and team visibility
+        club: short_iron
+        complexity: standard
+        github_issue: 669
+        depends_on:
+          - S269-1
+      - key: S270-5
+        title: Add a reproducible multiplayer benchmark manifest for roster, models, harness, prompts, skills, settings, budgets, and prices
+        club: long_iron
+        complexity: moderate
+        github_issue: 669
+        depends_on:
+          - S269-2
+      - key: S270-6
+        title: Compare team and single-agent reward, cost, elapsed time, and coordination overhead and document non-goals
+        club: short_iron
+        complexity: standard
+        github_issue: 669
+        depends_on:
+          - S270-3
+          - S270-4
+          - S270-5
