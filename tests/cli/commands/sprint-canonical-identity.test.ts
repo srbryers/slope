@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { sprintCommand } from '../../../src/cli/commands/sprint.js';
+import { createSprintState, saveSprintState } from '../../../src/cli/sprint-state.js';
 import type { RoadmapDefinition } from '../../../src/core/index.js';
 import { createStore } from '../../../src/store/index.js';
 
@@ -196,5 +197,61 @@ describe('slope sprint canonical identity (S266 review)', () => {
       readFileSync(join(cwd, '.slope', 'sprint-state.json'), 'utf8'),
     );
     expect(state).toMatchObject({ sprint: '458.10', phase: 'implementing' });
+  });
+
+  it('preserves S458.10 in rollover audits and portable resume pointers', async () => {
+    const roadmapPath = join(cwd, 'docs', 'backlog', 'roadmap.json');
+    const roadmap = JSON.parse(readFileSync(roadmapPath, 'utf8')) as RoadmapDefinition;
+    roadmap.phases[0].sprints.push(459);
+    roadmap.phases[0].sprint_keys!.push('459');
+    roadmap.sprints.push({
+      id: 459,
+      theme: 'Sprint 459',
+      par: 3,
+      slope: 1,
+      type: 'feature',
+      status: 'planned',
+      depends_on: ['458.10'],
+      tickets: [],
+    });
+    writeFileSync(roadmapPath, JSON.stringify(roadmap, null, 2));
+
+    const state = createSprintState('458.10', 'complete');
+    for (const gate of Object.keys(state.gates) as Array<keyof typeof state.gates>) {
+      state.gates[gate] = true;
+    }
+    state.review_gates.code_review = {
+      provenance: 'independent_review',
+      reviewer: 'code-reviewer',
+      evidence: ['review:code'],
+    };
+    state.review_gates.architect_review = {
+      provenance: 'independent_review',
+      reviewer: 'architect-reviewer',
+      evidence: ['review:architecture'],
+    };
+    saveSprintState(cwd, state);
+
+    const output = await captureLog(() =>
+      sprintCommand(['rollover', '--from=458.10', '--to=459'])
+    );
+    expect(output).toContain('S458.10 -> S459');
+
+    const installed = JSON.parse(
+      readFileSync(join(cwd, '.slope', 'sprint-state.json'), 'utf8'),
+    );
+    const audit = JSON.parse(
+      readFileSync(join(cwd, installed.rollover.audit_path), 'utf8'),
+    );
+    expect(audit.request).toMatchObject({ from: '458.10', to: '459' });
+    expect(audit.from_sprint).toBe('458.10');
+
+    await captureLog(() =>
+      sprintCommand(['resume', '--write-pointer', '--sprint=458.10'])
+    );
+    const pointer = JSON.parse(
+      readFileSync(join(cwd, 'docs', 'backlog', '.sprint-active.json'), 'utf8'),
+    );
+    expect(pointer.sprint).toBe('458.10');
   });
 });

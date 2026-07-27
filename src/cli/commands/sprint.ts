@@ -39,7 +39,6 @@ import {
   formatSprintLabel,
   formatSprintNumber,
   formatRoadmapSprintLabel,
-  parseSprintNumber,
   roadmapSprintKey,
   sprintIdKey,
   sprintIdsEqual,
@@ -607,8 +606,8 @@ function rolloverCommand(args: string[], cwd: string): void {
     errors.push(`Unknown rollover option: ${arg}`);
   }
 
-  const from = fromValue ? parseSprintNumber(fromValue) : null;
-  const to = toValue ? parseSprintNumber(toValue) : null;
+  const from = fromValue ? sprintIdKey(fromValue) : null;
+  const to = toValue ? sprintIdKey(toValue) : null;
   if (from == null) errors.push('--from must be a positive sprint id');
   if (to == null) errors.push('--to must be a positive sprint id');
   if (reason && !force) errors.push('--reason is only valid with --force');
@@ -1713,7 +1712,7 @@ interface PortableResumeFlags {
   writePointer: boolean;
   force: boolean;
   dryRun: boolean;
-  sprint?: number;
+  sprint?: SprintId;
   phase?: SprintPhase;
   from?: string;
   output?: string;
@@ -1739,7 +1738,7 @@ function parsePortableResumeFlags(args: string[]): PortableResumeFlags {
   for (const arg of args) {
     if (arg.startsWith('--sprint=')) {
       const raw = arg.slice('--sprint='.length);
-      const sprint = parseSprintNumber(raw);
+      const sprint = sprintIdKey(raw);
       if (sprint) flags.sprint = sprint;
       else flags.invalidSprint = raw;
     } else if (arg.startsWith('--phase=')) {
@@ -1786,7 +1785,7 @@ async function portableResumeCommand(args: string[], cwd: string): Promise<void>
     const phase = flags.phase ?? current?.phase ?? 'implementing';
     const resumeClaims = await collectResumeClaimPointers(cwd, sprint);
     const pointer = buildSprintResumePointer(cwd, config, {
-      sprint: sprint as unknown as number,
+      sprint,
       phase,
       resumeClaims,
     });
