@@ -1006,6 +1006,32 @@ interface SprintStatusOptions {
   help: boolean;
 }
 
+interface WorkflowStatusProjection {
+  execution_id: string;
+  workflow: string;
+  sprint: string | null;
+  status: WorkflowExecution['status'];
+  phase: string | null;
+  step: string | null;
+  completed_steps: number;
+  started_at: string;
+  updated_at: string;
+}
+
+function projectWorkflowStatus(exec: WorkflowExecution): WorkflowStatusProjection {
+  return {
+    execution_id: exec.id,
+    workflow: exec.workflow_name,
+    sprint: exec.sprint_id ?? null,
+    status: exec.status,
+    phase: exec.current_phase ?? null,
+    step: exec.current_step ?? null,
+    completed_steps: exec.completed_steps.length,
+    started_at: exec.started_at,
+    updated_at: exec.updated_at,
+  };
+}
+
 function printSprintStatusUsage(): void {
   console.log(`
 slope sprint status [sprint_id] [--json]
@@ -1054,6 +1080,7 @@ async function statusCommand(
   if (!state) {
     if (json) {
       console.log(JSON.stringify({
+        mode: 'lifecycle',
         sprint: null,
         status: 'not_started',
         phase: null,
@@ -1087,6 +1114,7 @@ async function statusCommand(
 
   if (json) {
     console.log(JSON.stringify({
+      mode: 'lifecycle',
       sprint,
       status: derivedStatus,
       phase: state.phase,
@@ -1430,6 +1458,7 @@ async function workflowStatusCommand(args: string[], cwd: string): Promise<void>
         if (options.json) {
           console.log(JSON.stringify({
             mode: 'workflow',
+            kind: 'not_found',
             sprint: sprintArg,
             execution: null,
           }, null, 2));
@@ -1441,7 +1470,8 @@ async function workflowStatusCommand(args: string[], cwd: string): Promise<void>
       if (options.json) {
         console.log(JSON.stringify({
           mode: 'workflow',
-          execution: exec,
+          kind: 'execution',
+          execution: projectWorkflowStatus(exec),
         }, null, 2));
       } else {
         printExecution(exec);
@@ -1456,7 +1486,8 @@ async function workflowStatusCommand(args: string[], cwd: string): Promise<void>
       if (options.json) {
         console.log(JSON.stringify({
           mode: 'workflow',
-          executions: active,
+          kind: 'list',
+          executions: active.map(projectWorkflowStatus),
         }, null, 2));
       } else {
         console.log(`\n${active.length} active workflow execution(s):\n`);

@@ -190,6 +190,20 @@ describe.skipIf(!PG_URL)('PostgresSlopeStore', () => {
       expect(got!.target).toBe('TICK-1');
     });
 
+    it('excludes expired claims from active results while preserving history', async () => {
+      const sprint = uniqueSprint();
+      await store.claim({
+        sprint_number: sprint,
+        player: 'alice',
+        target: 'TICK-EXPIRED',
+        scope: 'ticket',
+        expires_at: new Date(Date.now() - 60_000).toISOString(),
+      });
+
+      expect(await store.getActiveClaims(sprint)).toEqual([]);
+      expect(await store.list(sprint)).toHaveLength(1);
+    });
+
     it('releases a claim', async () => {
       const sprint = uniqueSprint();
       const claim = await store.claim({ sprint_number: sprint, player: 'bob', target: 'X', scope: 'ticket' });

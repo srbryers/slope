@@ -275,6 +275,51 @@ describe('Claims', () => {
     expect(filtered).toHaveLength(1);
     expect(filtered[0].target).toBe('A');
   });
+
+  it('filters expired claims when active claims are scoped to a sprint', async () => {
+    await store.claim({
+      sprint_number: 1,
+      player: 'alice',
+      target: 'expired',
+      scope: 'ticket',
+      expires_at: '2020-01-01T00:00:00.000Z',
+    });
+    await store.claim({
+      sprint_number: 1,
+      player: 'alice',
+      target: 'current',
+      scope: 'ticket',
+      expires_at: '2099-01-01T00:00:00.000Z',
+    });
+
+    expect((await store.getActiveClaims(1)).map(claim => claim.target))
+      .toEqual(['current']);
+    expect(await store.list(1)).toHaveLength(2);
+  });
+
+  it('filters claims owned by a stale session without deleting history', async () => {
+    await store.registerSession({
+      session_id: 'stale-owner',
+      role: 'observer',
+      ide: 'test',
+    });
+    await store.claim({
+      sprint_number: 1,
+      player: 'alice',
+      target: 'stale-session-claim',
+      scope: 'ticket',
+      session_id: 'stale-owner',
+    });
+    const rawStore = store as unknown as {
+      db: { prepare: (sql: string) => { run: (...params: unknown[]) => unknown } };
+    };
+    rawStore.db.prepare(
+      'UPDATE sessions SET last_heartbeat_at = ? WHERE session_id = ?',
+    ).run('2020-01-01T00:00:00.000Z', 'stale-owner');
+
+    expect(await store.getActiveClaims(1)).toHaveLength(0);
+    expect(await store.list(1)).toHaveLength(1);
+  });
 });
 
 describe('Scorecards', () => {

@@ -283,9 +283,53 @@ describe('slope sprint status (workflow mode)', () => {
 
     expect(JSON.parse(output)).toEqual({
       mode: 'workflow',
+      kind: 'not_found',
       sprint: '999',
       execution: null,
     });
+  });
+
+  it('projects workflow JSON without persisted variables or definitions (#664)', async () => {
+    const store = createStore({ storePath: '.slope/slope.db', cwd: tmpDir });
+    await store.startExecution({
+      workflow_name: 'secret-workflow',
+      sprint_id: 'S-secret',
+      variables: {
+        api_token: 'super-secret-token',
+        sprint_id: 'S-secret',
+      },
+      definition_json: JSON.stringify({
+        secret: 'embedded-definition-secret',
+        phases: [],
+      }),
+      definition_hash: 'sensitive-definition-hash',
+      session_id: 'sensitive-session-id',
+    });
+    store.close();
+
+    const output = await captureLog(() =>
+      sprintCommand(['status', 'S-secret', '--json'])
+    );
+    const status = JSON.parse(output);
+
+    expect(status).toMatchObject({
+      mode: 'workflow',
+      kind: 'execution',
+      execution: {
+        workflow: 'secret-workflow',
+        sprint: 'S-secret',
+        status: 'running',
+        phase: null,
+        step: null,
+        completed_steps: 0,
+      },
+    });
+    expect(output).not.toContain('super-secret-token');
+    expect(output).not.toContain('embedded-definition-secret');
+    expect(output).not.toContain('sensitive-definition-hash');
+    expect(output).not.toContain('sensitive-session-id');
+    expect(output).not.toContain('variables');
+    expect(output).not.toContain('definition_json');
   });
 
   it('falls back to legacy status when no workflow executions exist', async () => {
@@ -951,6 +995,7 @@ describe('slope sprint status', () => {
     };
 
     expect(status).toMatchObject({
+      mode: 'lifecycle',
       sprint: '465',
       status: 'planning',
       phase: 'planning',
