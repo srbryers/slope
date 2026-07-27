@@ -265,6 +265,80 @@ const MIGRATIONS: Array<{ version: number; sql: string }> = [
       CREATE INDEX IF NOT EXISTS idx_memories_weight ON memories(weight);
     `,
   },
+  {
+    // v9: canonical sprint identity (GH #659 / S265).
+    // SQLite cannot alter a column's affinity, so preserve each row while
+    // recreating the three sprint-keyed tables with TEXT columns.
+    version: 9,
+    sql: `
+      ALTER TABLE claims RENAME TO claims_numeric_sprint;
+      CREATE TABLE claims (
+        id TEXT PRIMARY KEY,
+        session_id TEXT REFERENCES sessions(session_id) ON DELETE CASCADE,
+        sprint_number TEXT NOT NULL,
+        target TEXT NOT NULL,
+        player TEXT NOT NULL,
+        scope TEXT NOT NULL,
+        claimed_at TEXT NOT NULL,
+        expires_at TEXT,
+        notes TEXT,
+        metadata TEXT,
+        UNIQUE(sprint_number, scope, target)
+      );
+      INSERT INTO claims (
+        id, session_id, sprint_number, target, player, scope,
+        claimed_at, expires_at, notes, metadata
+      )
+      SELECT
+        id, session_id, CAST(sprint_number AS TEXT), target, player, scope,
+        claimed_at, expires_at, notes, metadata
+      FROM claims_numeric_sprint;
+      DROP TABLE claims_numeric_sprint;
+
+      ALTER TABLE scorecards RENAME TO scorecards_numeric_sprint;
+      CREATE TABLE scorecards (
+        sprint_number TEXT PRIMARY KEY,
+        data TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      INSERT INTO scorecards (sprint_number, data, created_at, updated_at)
+      SELECT CAST(sprint_number AS TEXT), data, created_at, updated_at
+      FROM scorecards_numeric_sprint;
+      DROP TABLE scorecards_numeric_sprint;
+
+      ALTER TABLE events RENAME TO events_numeric_sprint;
+      CREATE TABLE events (
+        id TEXT PRIMARY KEY,
+        session_id TEXT,
+        type TEXT NOT NULL,
+        timestamp TEXT NOT NULL,
+        data TEXT NOT NULL DEFAULT '{}',
+        sprint_number TEXT,
+        ticket_key TEXT
+      );
+      INSERT INTO events (
+        id, session_id, type, timestamp, data, sprint_number, ticket_key
+      )
+      SELECT
+        id, session_id, type, timestamp, data, CAST(sprint_number AS TEXT), ticket_key
+      FROM events_numeric_sprint;
+      DROP TABLE events_numeric_sprint;
+      CREATE INDEX idx_events_session ON events(session_id);
+      CREATE INDEX idx_events_sprint ON events(sprint_number);
+      CREATE INDEX idx_events_ticket ON events(ticket_key);
+      CREATE INDEX idx_events_type ON events(type);
+
+      UPDATE workflow_executions
+      SET sprint_id = substr(trim(sprint_id), 2)
+      WHERE lower(substr(trim(sprint_id), 1, 1)) = 's'
+        AND length(trim(sprint_id)) > 1
+        AND substr(trim(sprint_id), 2) NOT GLOB '*[^0-9.]*'
+        AND substr(trim(sprint_id), 2) NOT GLOB '*.*.*'
+        AND substr(trim(sprint_id), 2) NOT LIKE '.%'
+        AND substr(trim(sprint_id), 2) NOT LIKE '%.';
+    `,
+  },
 ];
 
 /** Latest schema version — total number of migrations available. */
@@ -353,11 +427,15 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
 
     const currentVersion = this.getSchemaVersionSync();
 
+    const applyMigration = this.db.transaction((migration: { version: number; sql: string }) => {
+      this.db.exec(migration.sql);
+      this.db.prepare('INSERT INTO schema_version (version, applied_at) VALUES (?, ?)')
+        .run(migration.version, nowISO());
+    });
+
     for (const migration of MIGRATIONS) {
       if (migration.version > currentVersion) {
-        this.db.exec(migration.sql);
-        this.db.prepare('INSERT INTO schema_version (version, applied_at) VALUES (?, ?)')
-          .run(migration.version, nowISO());
+        applyMigration(migration);
       }
     }
 
