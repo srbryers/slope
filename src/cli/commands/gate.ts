@@ -2,6 +2,7 @@ import {
   loadInitiative,
   recordReview,
   getReviewChecklist,
+  sprintIdKey,
 } from '../../core/index.js';
 import type { ReviewGate, ReviewType, ReviewChecklistType, ReviewRecord } from '../../core/index.js';
 
@@ -24,7 +25,7 @@ const VALID_REVIEWERS: ReadonlySet<string> = new Set(
 );
 
 interface PendingGate {
-  sprint: number;
+  sprint: string;
   gate: ReviewGate;
   required: string[];
   outstanding: string[];
@@ -87,6 +88,8 @@ function collectPendingGates(cwd: string): PendingGate[] {
   const out: PendingGate[] = [];
 
   for (const sprint of initiative.sprints) {
+    const sprintKey = sprintIdKey(sprint.sprint_number);
+    if (sprintKey === null) continue;
     if (sprint.phase === 'complete') continue;
 
     if (sprint.phase === 'plan_review' || sprint.phase === 'planning' || sprint.phase === 'pending') {
@@ -94,7 +97,7 @@ function collectPendingGates(cwd: string): PendingGate[] {
         rt => !sprint.plan_reviews.find((r: ReviewRecord) => r.reviewer === rt && r.completed),
       );
       if (outstanding.length > 0) {
-        out.push({ sprint: sprint.sprint_number, gate: 'plan', required: [...planRequired], outstanding });
+        out.push({ sprint: sprintKey, gate: 'plan', required: [...planRequired], outstanding });
       }
     }
 
@@ -103,7 +106,7 @@ function collectPendingGates(cwd: string): PendingGate[] {
         rt => !sprint.pr_reviews.find((r: ReviewRecord) => r.reviewer === rt && r.completed),
       );
       if (outstanding.length > 0) {
-        out.push({ sprint: sprint.sprint_number, gate: 'pr', required: [...prRequired], outstanding });
+        out.push({ sprint: sprintKey, gate: 'pr', required: [...prRequired], outstanding });
       }
     }
   }
@@ -193,8 +196,8 @@ function completeSubcommand(args: string[]): void {
     console.error(`Invalid reviewer: "${reviewer}". Valid: ${[...VALID_REVIEWERS].join(', ')}`);
     process.exit(1);
   }
-  const sprintNum = parseInt(sprintArg.slice('--sprint='.length), 10);
-  if (isNaN(sprintNum) || sprintNum <= 0) {
+  const sprintKey = sprintIdKey(sprintArg.slice('--sprint='.length));
+  if (sprintKey === null) {
     console.error('Invalid --sprint value');
     process.exit(1);
   }
@@ -205,8 +208,8 @@ function completeSubcommand(args: string[]): void {
   }
 
   try {
-    recordReview(process.cwd(), sprintNum, gate as ReviewGate, reviewer as ReviewType, findings);
-    console.log(`\n✓ Recorded ${gate} review: ${reviewer} (${findings} findings) for S${sprintNum}\n`);
+    recordReview(process.cwd(), sprintKey, gate as ReviewGate, reviewer as ReviewType, findings);
+    console.log(`\n✓ Recorded ${gate} review: ${reviewer} (${findings} findings) for S${sprintKey}\n`);
   } catch (err) {
     console.error(`\n✗ ${(err as Error).message}\n`);
     process.exit(1);
