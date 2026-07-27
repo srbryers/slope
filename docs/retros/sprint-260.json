@@ -1,0 +1,130 @@
+{
+  "sprint_number": 260,
+  "theme": "Late-July Issue Triage",
+  "par": 3,
+  "slope": 2,
+  "score": 3,
+  "score_label": "par",
+  "date": "2026-07-27",
+  "player": "codex",
+  "github_issues": [659, 663, 664, 665, 666, 667, 668, 669],
+  "shots": [
+    {
+      "ticket_key": "S260-1",
+      "title": "Pull and rebuild latest main, then enumerate open GitHub issues #659 and #663-#669",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Fast-forwarded main to 87d720f, rebuilt with pnpm install --frozen-lockfile and pnpm run build, verified the package version at 1.64.1, and refreshed the open GitHub issue list. The current open set is #659 and #663 through #669."
+    },
+    {
+      "ticket_key": "S260-2",
+      "title": "Triage #665-#669 into ordered parallel-agent coordination recovery sprints",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Added Phase 62 with the immediate recovery order: S261 fixes worktree store split-brain (#665/#667), S262 fixes session/status truth (#663/#664/#666), S263 scopes workflow execution gates (#668), and S264 captures the multi-agent round model decision (#669)."
+    },
+    {
+      "ticket_key": "S260-3",
+      "title": "Isolate #659 into a 2.0 canonical sprint-id store migration track",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Added Phase 63 as the separate 2.0.0 track for canonical string sprint ids: S265 migrates store schema identity, S266 carries the API/display/scorecard compatibility layer, and S267 packages migration guidance and release validation."
+    },
+    {
+      "ticket_key": "S260-4",
+      "title": "Validate modular roadmap sources, compiled projection, codebase map, and S260 focus",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "description": "auto-card only mapped the single roadmap triage commit to S260-1, so the generated scorecard had to be manually expanded to the four actual roadmap triage shots."
+        }
+      ],
+      "notes": "Ran roadmap validate-sources, roadmap compile --check, roadmap validate, map --check, and git diff --check after recompiling docs/backlog/roadmap.json. Warnings are standing historical roadmap warnings; the new S260-S267 plan adds no new ticket-count warning."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 1,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "wind",
+      "impact": "minor",
+      "description": "Upstream main had advanced to v1.64.1 with new roadmap phases through S259, so the triage started with a fast-forward pull, rebuild, and map refresh."
+    },
+    {
+      "type": "Pin",
+      "impact": "moderate",
+      "description": "The open issue batch mixed urgent worktree coordination bugs, status-surface regressions, stale workflow execution gating, product design, and a major store migration."
+    },
+    {
+      "type": "Rough",
+      "impact": "minor",
+      "description": "The repo still contains untracked local worktrees; they were intentionally left untouched and the underlying in-repo worktree hazard is covered by #667/S261."
+    }
+  ],
+  "special_plays": [
+    "Moved the actual implementation work one sprint later so S260 records the triage sprint rather than pretending the worktree-store fix shipped."
+  ],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "A triage sprint should be represented as its own completed sprint instead of closing the first implementation sprint before the implementation lands.",
+      "outcome": "S260 now records the triage/roadmap work, and S261 is the first implementation sprint for worktree store coordination."
+    },
+    {
+      "type": "lessons",
+      "description": "Worktree store split-brain is the lead issue because it undermines claims, guards, and the worktree discipline SLOPE asks agents to follow.",
+      "outcome": "Phase 62 starts with S261 for #665/#667 before moving to status truth, workflow gate scope, and multi-agent round semantics."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "build",
+      "description": "pnpm install --frozen-lockfile and pnpm run build passed after pulling v1.64.1.",
+      "status": "healthy"
+    },
+    {
+      "category": "slope",
+      "description": "roadmap validate-sources, roadmap compile --check, roadmap validate, map --check, and git diff --check passed after the S260-S267 roadmap update.",
+      "status": "healthy"
+    }
+  ],
+  "bunker_locations": [
+    "Auto-card maps one commit to one roadmap shot even when the commit subject references multiple ticket keys."
+  ],
+  "yardage_book_updates": [
+    "Roadmap source edits must land in docs/roadmap/phases/*.yaml and docs/roadmap/project.yaml, then regenerate docs/backlog/roadmap.json with slope roadmap compile."
+  ],
+  "course_management_notes": [
+    "Start S261 with the shared store/common-dir problem because it undermines the very worktree discipline SLOPE asks agents to follow.",
+    "Keep #659 on the 2.0.0 track; it is schema and identity migration work, not a v1.x patch."
+  ],
+  "slope_factors": [
+    "No production code changed in S260; validation was roadmap-source integrity, generated projection freshness, map currency, and whitespace."
+  ],
+  "review_findings": [],
+  "notes": "S260 triaged all current open GitHub issues into the roadmap. Phase 62 covers #663-#669 as the parallel-agent recovery train, while Phase 63 isolates #659 as the canonical sprint-id store migration and 2.0.0 release track.",
+  "_auto_generated": true,
+  "_commits": 1,
+  "_ci_signal": null,
+  "_pr_signal": null,
+  "_note": "Auto-generated from git, then manually expanded because one roadmap triage commit represented four S260 planning shots."
+}
