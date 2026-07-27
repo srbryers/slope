@@ -6,8 +6,8 @@
 
 import { execFileSync, execSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join, relative, resolve } from 'node:path';
+import { existsSync, mkdirSync } from 'node:fs';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { checkConflicts } from '../../core/index.js';
 import { QUIET_STDIO } from '../../core/process.js';
 import { STALE_SESSION_THRESHOLD_MS } from '../../core/constants.js';
@@ -140,28 +140,19 @@ function resolveDefaultBase(projectRoot: string): string {
   return 'HEAD';
 }
 
-function writeLinkedSlopeConfig(projectRoot: string, worktreePath: string): boolean {
-  const sourceConfigPath = join(projectRoot, '.slope', 'config.json');
-  if (!existsSync(sourceConfigPath)) return false;
+function isWithinPath(parent: string, target: string): boolean {
+  const rel = relative(resolve(parent), resolve(target));
+  return rel === '' || (rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel));
+}
 
-  const config = JSON.parse(readFileSync(sourceConfigPath, 'utf8')) as Record<string, unknown>;
-  const statePaths: Array<[string, string]> = [
-    ['store_path', '.slope/slope.db'],
-    ['commonIssuesPath', '.slope/common-issues.json'],
-  ];
-  for (const [key, fallback] of statePaths) {
-    const raw = config[key];
-    const configured = typeof raw === 'string' && raw.trim()
-      ? raw
-      : fallback;
-    const absoluteStatePath = resolve(projectRoot, configured);
-    config[key] = relative(worktreePath, absoluteStatePath);
-  }
+function warnForInRepoWorktree(projectRoot: string, worktreePath: string): void {
+  const managedRoot = join(projectRoot, '.slope', 'worktrees');
+  if (!isWithinPath(projectRoot, worktreePath) || isWithinPath(managedRoot, worktreePath)) return;
 
-  const targetConfigPath = join(worktreePath, '.slope', 'config.json');
-  mkdirSync(dirname(targetConfigPath), { recursive: true });
-  writeFileSync(targetConfigPath, JSON.stringify(config, null, 2) + '\n');
-  return true;
+  console.warn(
+    'Warning: Worktree path is inside the repository and may be discovered by parent test or format globs. ' +
+    'Prefer a sibling path or the managed .slope/worktrees directory.',
+  );
 }
 
 async function startCommand(args: string[]): Promise<void> {
@@ -182,6 +173,7 @@ async function startCommand(args: string[]): Promise<void> {
 
   const base = flags.base ?? resolveDefaultBase(projectRoot);
   const worktreePath = resolve(projectRoot, flags.path ?? join('.slope', 'worktrees', branchSlug(branch)));
+  warnForInRepoWorktree(projectRoot, worktreePath);
   if (existsSync(worktreePath)) {
     console.error(`Error: Worktree path already exists: ${worktreePath}`);
     process.exit(1);
@@ -200,7 +192,6 @@ async function startCommand(args: string[]): Promise<void> {
     cwd: projectRoot,
     stdio: 'pipe',
   });
-  const linkedConfig = writeLinkedSlopeConfig(projectRoot, worktreePath);
 
   const store = await resolveStore(projectRoot);
   try {
@@ -255,7 +246,7 @@ async function startCommand(args: string[]): Promise<void> {
     console.log(`  Branch:  ${branch}`);
     console.log(`  Base:    ${base}`);
     console.log(`  Session: ${session.session_id} [${session.role}] ${session.ide}`);
-    if (linkedConfig) console.log(`  Config:  linked .slope/config.json to primary state paths`);
+    console.log(`  State:   shared from primary checkout`);
     if (claim) console.log(`  Claim:   ${claim.target} (${claim.scope}) sprint ${claim.sprint_number}`);
     console.log(`\nNext:`);
     console.log(`  cd ${formatShellArg(worktreePath)}`);
