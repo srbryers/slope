@@ -1,7 +1,7 @@
 import { existsSync, realpathSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import type { HookInput, GuardResult, SlopeConfig, WorkflowExecution } from '../../core/index.js';
-import { formatSprintLabel, loadWorkflow, parseSprintNumber } from '../../core/index.js';
+import { formatSprintLabel, loadWorkflow, parseSprintNumber, resolveRepoStatePath } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { SqliteSlopeStore } from '../../store/index.js';
 import { inferSprintContext } from '../sprint-inference.js';
@@ -20,7 +20,7 @@ export async function workflowStepGateGuard(input: HookInput, cwd: string): Prom
   if (targetPath && !isWithinRepo(cwd, targetPath)) return {};
 
   const config = loadConfig(cwd);
-  const storePath = join(cwd, config.store_path ?? '.slope/slope.db');
+  const storePath = resolveRepoStatePath(cwd, config.store_path ?? '.slope/slope.db');
   if (!existsSync(storePath)) return {};
 
   // Note: opens SQLite on every invocation — heavier than file-based guards.

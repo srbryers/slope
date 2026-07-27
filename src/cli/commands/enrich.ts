@@ -7,6 +7,7 @@ import { loadConfig } from '../../core/config.js';
 import { hasEmbeddingSupport } from '../../core/embedding-store.js';
 import { loadScorecards } from '../../core/loader.js';
 import { enrichBacklog } from '../../core/enrich.js';
+import { resolveRepoStatePath } from '../../core/repo-state-scope.js';
 import { generatePrepPlan, formatPrepPlan } from '../../core/prep.js';
 import type { EmbeddingConfig } from '../../core/embedding.js';
 import { SqliteSlopeStore } from '../../store/index.js';
@@ -76,7 +77,7 @@ export async function enrichCommand(args: string[]): Promise<void> {
   };
 
   const storePath = config.store_path ?? '.slope/slope.db';
-  const store = new SqliteSlopeStore(isAbsolute(storePath) ? storePath : join(cwd, storePath));
+  const store = new SqliteSlopeStore(resolveRepoStatePath(cwd, storePath));
 
   try {
     if (!hasEmbeddingSupport(store)) {

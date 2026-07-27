@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execSync } from 'node:child_process';
@@ -8,6 +8,7 @@ import { resolveStore } from '../../../src/cli/store.js';
 
 let cwd: string;
 let originalCwd: string;
+let symlinkAlias: string | null;
 
 function setupRepo(): void {
   mkdirSync(join(cwd, '.slope'), { recursive: true });
@@ -37,18 +38,21 @@ describe('slope worktree start', () => {
     mkdirSync(cwd, { recursive: true });
     setupRepo();
     originalCwd = process.cwd();
+    symlinkAlias = null;
     process.chdir(cwd);
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
   afterEach(() => {
     process.chdir(originalCwd);
     vi.restoreAllMocks();
+    if (symlinkAlias) rmSync(symlinkAlias, { recursive: true, force: true });
     rmSync(cwd, { recursive: true, force: true });
   });
 
-  it('creates a persistent worktree, linked config, session, and optional claim', async () => {
+  it('creates a persistent worktree with shared state, session, and optional claim', async () => {
     await worktreeCommand([
       'start',
       '--branch=codex/worktree-start-test',
@@ -62,9 +66,7 @@ describe('slope worktree start', () => {
     const worktreePath = join(cwd, '.slope', 'worktrees', 'codex-worktree-start-test');
     expect(existsSync(worktreePath)).toBe(true);
 
-    const linkedConfig = JSON.parse(readFileSync(join(worktreePath, '.slope', 'config.json'), 'utf8'));
-    expect(resolve(worktreePath, linkedConfig.store_path)).toBe(join(cwd, '.slope', 'slope.db'));
-    expect(resolve(worktreePath, linkedConfig.commonIssuesPath)).toBe(join(cwd, '.slope', 'common-issues.json'));
+    expect(existsSync(join(worktreePath, '.slope'))).toBe(false);
 
     const store = await resolveStore(cwd);
     try {
@@ -99,5 +101,52 @@ describe('slope worktree start', () => {
 
     expect(existsSync(markerPath)).toBe(false);
     expect(existsSync(worktreePath)).toBe(true);
+  });
+
+  it('warns when an explicit worktree path is inside the repository', async () => {
+    await worktreeCommand([
+      'start',
+      '--branch=codex/in-repo-warning',
+      '--base=HEAD',
+      '--path=worktrees/in-repo-warning',
+      '--dry-run',
+    ]);
+
+    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('parent test or format globs'));
+  });
+
+  it('warns when a symlinked worktree path resolves inside the repository', async () => {
+    const inRepoRoot = join(cwd, 'worktrees');
+    mkdirSync(inRepoRoot, { recursive: true });
+    symlinkAlias = `${cwd}-alias`;
+    symlinkSync(inRepoRoot, symlinkAlias);
+
+    await worktreeCommand([
+      'start',
+      '--branch=codex/symlink-in-repo-warning',
+      '--base=HEAD',
+      `--path=${join(symlinkAlias, 'child')}`,
+      '--dry-run',
+    ]);
+
+    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('parent test or format globs'));
+  });
+
+  it('does not warn for managed or sibling worktree paths', async () => {
+    await worktreeCommand([
+      'start',
+      '--branch=codex/managed-no-warning',
+      '--base=HEAD',
+      '--dry-run',
+    ]);
+    await worktreeCommand([
+      'start',
+      '--branch=codex/sibling-no-warning',
+      '--base=HEAD',
+      `--path=${cwd}-sibling`,
+      '--dry-run',
+    ]);
+
+    expect(console.warn).not.toHaveBeenCalled();
   });
 });

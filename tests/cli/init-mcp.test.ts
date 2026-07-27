@@ -484,6 +484,51 @@ describe('init creates roadmap', () => {
     expect(content.phases).toHaveLength(1);
   });
 
+  it('initializes tracked and state artifacts at the git root from a descendant', async () => {
+    const descendant = join(tmpDir, 'src', 'nested');
+    mkdirSync(descendant, { recursive: true });
+    process.chdir(descendant);
+
+    try {
+      await initCommand(['--generic']);
+    } finally {
+      process.chdir(tmpDir);
+    }
+
+    expect(existsSync(join(tmpDir, '.slope', 'config.json'))).toBe(true);
+    expect(existsSync(join(tmpDir, 'docs', 'backlog', 'roadmap.json'))).toBe(true);
+    expect(existsSync(join(tmpDir, 'docs', 'retros'))).toBe(true);
+    expect(existsSync(join(tmpDir, 'CODEBASE.md'))).toBe(true);
+    expect(existsSync(join(descendant, '.slope'))).toBe(false);
+    expect(existsSync(join(descendant, 'docs'))).toBe(false);
+    expect(existsSync(join(descendant, 'CODEBASE.md'))).toBe(false);
+  });
+
+  it('keeps an explicitly configured nested project scoped below the git root', async () => {
+    const nestedProject = join(tmpDir, 'fixtures', 'standalone');
+    const descendant = join(nestedProject, 'src', 'nested');
+    mkdirSync(join(nestedProject, '.slope'), { recursive: true });
+    mkdirSync(descendant, { recursive: true });
+    writeFileSync(join(nestedProject, '.slope', 'config.json'), JSON.stringify({
+      store_path: '.slope/nested.db',
+    }));
+    process.chdir(descendant);
+
+    try {
+      await initCommand(['--generic']);
+    } finally {
+      process.chdir(tmpDir);
+    }
+
+    expect(existsSync(join(nestedProject, '.slope', 'config.json'))).toBe(true);
+    expect(existsSync(join(nestedProject, 'docs', 'backlog', 'roadmap.json'))).toBe(true);
+    expect(existsSync(join(nestedProject, 'docs', 'retros'))).toBe(true);
+    expect(existsSync(join(nestedProject, 'CODEBASE.md'))).toBe(true);
+    expect(existsSync(join(tmpDir, '.slope'))).toBe(false);
+    expect(existsSync(join(tmpDir, 'docs'))).toBe(false);
+    expect(existsSync(join(tmpDir, 'CODEBASE.md'))).toBe(false);
+  });
+
   it('does not overwrite existing roadmap.json', async () => {
     const backlogDir = join(tmpDir, 'docs', 'backlog');
     mkdirSync(backlogDir, { recursive: true });

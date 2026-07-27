@@ -4,6 +4,7 @@
 
 import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { resolveRepoSourceCwd, resolveRepoStatePath } from './repo-state-scope.js';
 import { createConfig } from './config.js';
 import type { SlopeConfig } from './config.js';
 import { validateInterviewAnswers, answersToInitInput } from './interview-engine.js';
@@ -164,6 +165,7 @@ export async function initFromAnswers(
 }
 
 export async function initFromInterview(cwd: string, input: InitInput): Promise<InitResult> {
+  cwd = resolveRepoSourceCwd(cwd);
   const errors = validateInitInput(input);
   if (errors.length > 0) {
     throw new Error(`Invalid init input:\n  - ${errors.join('\n  - ')}`);
@@ -208,7 +210,7 @@ export async function initFromInterview(cwd: string, input: InitInput): Promise<
   }
 
   // Create common issues
-  const commonIssuesPath = join(cwd, '.slope', 'common-issues.json');
+  const commonIssuesPath = resolveRepoStatePath(cwd, '.slope/common-issues.json');
   if (!existsSync(commonIssuesPath)) {
     writeFileSync(commonIssuesPath, JSON.stringify(EXAMPLE_COMMON_ISSUES, null, 2) + '\n');
     filesCreated.push(commonIssuesPath);
@@ -241,7 +243,7 @@ export async function initFromInterview(cwd: string, input: InitInput): Promise<
   }
 
   // Create sprint state (planning phase) so the project is "active" not "fresh"
-  const sprintStatePath = join(cwd, '.slope', 'sprint-state.json');
+  const sprintStatePath = resolveRepoStatePath(cwd, '.slope/sprint-state.json');
   if (!existsSync(sprintStatePath)) {
     const now = new Date().toISOString();
     writeFileSync(

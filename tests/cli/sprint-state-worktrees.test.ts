@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
@@ -33,6 +33,8 @@ describe('updateSprintPhaseForSprintAcrossWorktrees (GH #624)', () => {
     git(primary, ['config', 'user.email', 'test@example.com']);
     git(primary, ['config', 'user.name', 'Test User']);
     git(primary, ['commit', '--allow-empty', '-m', 'init']);
+    mkdirSync(join(primary, '.slope'), { recursive: true });
+    writeFileSync(join(primary, '.slope', 'config.json'), '{}\n');
   });
 
   afterEach(() => {
@@ -47,31 +49,28 @@ describe('updateSprintPhaseForSprintAcrossWorktrees (GH #624)', () => {
     return path;
   }
 
-  it('advances the sprint phase in a sibling worktree, not just the cwd', () => {
+  it('shares one sprint state across the primary and sibling worktree', () => {
     const feature = addWorktree('feature');
     seedSprintState(primary, 246, 'implementing');
-    seedSprintState(feature, 246, 'implementing');
 
     const results = updateSprintPhaseForSprintAcrossWorktrees(primary, 246, 'complete');
 
     expect(loadSprintState(feature)?.phase).toBe('complete');
     expect(loadSprintState(primary)?.phase).toBe('complete');
-    expect(results.filter(r => r.changed)).toHaveLength(2);
+    expect(results.filter(r => r.changed)).toHaveLength(1);
+    expect(existsSync(join(feature, '.slope', 'sprint-state.json'))).toBe(false);
   });
 
-  it('leaves a worktree holding a different sprint untouched and reports it', () => {
-    const other = addWorktree('other');
+  it('writes through the shared state owner when invoked from a worktree', () => {
+    const other = addWorktree('write-through');
     seedSprintState(primary, 246, 'implementing');
-    seedSprintState(other, 247, 'implementing');
+    const state = createSprintState(247);
+    state.phase = 'implementing';
+    saveSprintState(other, state);
 
-    const results = updateSprintPhaseForSprintAcrossWorktrees(primary, 246, 'complete');
-
-    // Unrelated in-flight work must never be clobbered.
-    expect(loadSprintState(other)?.phase).toBe('implementing');
-    expect(loadSprintState(primary)?.phase).toBe('complete');
-    const unmatched = results.filter(r => !r.matched);
-    expect(unmatched).toHaveLength(1);
-    expect(unmatched[0].changed).toBe(false);
+    expect(loadSprintState(primary)?.sprint).toBe(247);
+    expect(loadSprintState(other)?.sprint).toBe(247);
+    expect(existsSync(join(other, '.slope', 'sprint-state.json'))).toBe(false);
   });
 
   it('reports no results when no checkout holds sprint state', () => {
@@ -85,7 +84,6 @@ describe('updateSprintPhaseForSprintAcrossWorktrees (GH #624)', () => {
   it('works when invoked from the worktree rather than the primary checkout', () => {
     const feature = addWorktree('from-worktree');
     seedSprintState(primary, 246, 'implementing');
-    seedSprintState(feature, 246, 'implementing');
 
     updateSprintPhaseForSprintAcrossWorktrees(feature, 246, 'complete');
 

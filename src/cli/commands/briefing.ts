@@ -1,6 +1,6 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { DEFAULT_SKILLS_PATH, buildSkillBriefing, formatBriefing, parseRoadmap, castRoadmapStructure, getRole, hasRole, loadCustomRoles, filterScorecardsByPlayer, filterHazardsByVisibility, formatDeferredForBriefing, loadDeferred, computeHandicapCard, formatStrategicContext, loadSkillRegistry, parseSprintNumber, loadFindings, formatCodificationCandidatesForBriefing, collectOpenCodificationCandidates } from '../../core/index.js';
+import { DEFAULT_SKILLS_PATH, buildSkillBriefing, formatBriefing, parseRoadmap, castRoadmapStructure, getRole, hasRole, loadCustomRoles, filterScorecardsByPlayer, filterHazardsByVisibility, formatDeferredForBriefing, loadDeferred, computeHandicapCard, formatStrategicContext, loadSkillRegistry, parseSprintNumber, loadFindings, formatCodificationCandidatesForBriefing, collectOpenCodificationCandidates, resolveRepoStatePath } from '../../core/index.js';
 import type { CommonIssuesFile, SessionEntry, SprintClaim, RoadmapDefinition, SlopeEvent, RoleDefinition } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { loadScorecards } from '../loader.js';
@@ -17,7 +17,7 @@ export async function briefingCommand(args: string[]): Promise<void> {
   // Load common-issues
   let commonIssues: CommonIssuesFile;
   try {
-    commonIssues = JSON.parse(readFileSync(join(cwd, config.commonIssuesPath), 'utf8'));
+    commonIssues = JSON.parse(readFileSync(resolveRepoStatePath(cwd, config.commonIssuesPath), 'utf8'));
   } catch {
     commonIssues = { recurring_patterns: [] };
   }
@@ -25,7 +25,7 @@ export async function briefingCommand(args: string[]): Promise<void> {
   // Load last session
   let lastSession: SessionEntry | undefined;
   try {
-    const sessionsData = JSON.parse(readFileSync(join(cwd, config.sessionsPath), 'utf8'));
+    const sessionsData = JSON.parse(readFileSync(resolveRepoStatePath(cwd, config.sessionsPath), 'utf8'));
     const sessions = sessionsData.sessions;
     if (sessions && sessions.length > 0) {
       lastSession = sessions[sessions.length - 1];
@@ -120,7 +120,7 @@ export async function briefingCommand(args: string[]): Promise<void> {
     ? { categories: categories.length > 0 ? categories : undefined, keywords: keywords.length > 0 ? keywords : undefined }
     : undefined;
 
-  const skillRegistry = loadSkillRegistry(join(cwd, config.skillsPath ?? DEFAULT_SKILLS_PATH));
+  const skillRegistry = loadSkillRegistry(resolveRepoStatePath(cwd, config.skillsPath ?? DEFAULT_SKILLS_PATH));
 
   // Filter scorecards by player if requested
   const effectiveScorecards = playerFlag

@@ -1,9 +1,10 @@
 import { existsSync, copyFileSync, readFileSync } from 'node:fs';
-import { join, resolve, dirname } from 'node:path';
+import { join, dirname } from 'node:path';
 import { createRequire } from 'node:module';
 import type DatabaseConstructor from 'better-sqlite3';
 import type { Database as DatabaseType } from 'better-sqlite3';
 import { resolveStore, getStoreInfo } from '../store.js';
+import { resolveRepoStateCwd, resolveRepoStatePath } from '../../core/repo-state-scope.js';
 
 function parseArgs(args: string[]): Record<string, string> {
   const result: Record<string, string> = {};
@@ -213,14 +214,14 @@ async function backupStore(flags: Record<string, string>, cwd: string): Promise<
   }
 
   // SQLite backup
-  const dbPath = resolve(cwd, info.path ?? '.slope/slope.db');
+  const dbPath = resolveRepoStatePath(cwd, info.path ?? '.slope/slope.db');
   if (!existsSync(dbPath)) {
     console.error(`Error: Store not found at ${dbPath}`);
     process.exit(1);
   }
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').replace('T', '_').slice(0, 19);
-  const output = flags.output ?? join(cwd, `.slope/slope-backup-${timestamp}.db`);
+  const output = flags.output ?? join(resolveRepoStateCwd(cwd), `.slope/slope-backup-${timestamp}.db`);
 
   // Validate output path is writable
   try {
@@ -318,7 +319,7 @@ async function restoreStore(flags: Record<string, string>, cwd: string): Promise
     process.exit(1);
   }
 
-  const dbPath = resolve(cwd, info.path ?? '.slope/slope.db');
+  const dbPath = resolveRepoStatePath(cwd, info.path ?? '.slope/slope.db');
   const existed = existsSync(dbPath);
 
   // Ensure target directory exists

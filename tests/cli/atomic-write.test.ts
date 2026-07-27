@@ -33,8 +33,10 @@ afterEach(() => {
 
 function compileCliModules(moduleNames: string[]): string {
   const moduleDir = join(tmpDir, 'compiled-cli');
+  const coreDir = join(tmpDir, 'core');
   mkdirSync(moduleDir, { recursive: true });
-  writeFileSync(join(moduleDir, 'package.json'), JSON.stringify({ type: 'module' }));
+  mkdirSync(coreDir, { recursive: true });
+  writeFileSync(join(tmpDir, 'package.json'), JSON.stringify({ type: 'module' }));
 
   for (const moduleName of moduleNames) {
     const sourcePath = join(process.cwd(), 'src', 'cli', `${moduleName}.ts`);
@@ -47,6 +49,15 @@ function compileCliModules(moduleNames: string[]): string {
     });
     writeFileSync(join(moduleDir, `${moduleName}.js`), transpiled.outputText);
   }
+
+  const stateScopeSource = readFileSync(join(process.cwd(), 'src', 'core', 'repo-state-scope.ts'), 'utf8');
+  const stateScope = ts.transpileModule(stateScopeSource, {
+    compilerOptions: {
+      module: ts.ModuleKind.ES2022,
+      target: ts.ScriptTarget.ES2022,
+    },
+  });
+  writeFileSync(join(coreDir, 'repo-state-scope.js'), stateScope.outputText);
 
   return moduleDir;
 }

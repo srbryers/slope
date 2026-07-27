@@ -1,8 +1,15 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { HookInput, GuardResult, Suggestion } from '../../core/index.js';
-import { loadConfig, parseRoadmap, castRoadmapStructure, formatStrategicContext } from '../../core/index.js';
+import {
+  loadConfig,
+  parseRoadmap,
+  castRoadmapStructure,
+  formatStrategicContext,
+  resolveRepoStatePath,
+} from '../../core/index.js';
 import { inferSprintContext } from '../sprint-inference.js';
+import { resolveStore } from '../store.js';
 import {
   isActiveSprintState,
   isReviewGateName,
@@ -48,15 +55,14 @@ export async function sessionBriefingGuard(input: HookInput, cwd: string): Promi
 
     // Nudge if no workflow execution is active
     try {
-      const { SqliteSlopeStore } = await import('../../store/index.js');
-      const storePath = join(cwd, '.slope/slope.db');
-      if (existsSync(storePath)) {
-        const store = new SqliteSlopeStore(storePath);
+      const store = await resolveStore(cwd);
+      try {
         const executions = await store.listExecutions({ status: 'running' });
-        store.close();
         if (executions.length === 0) {
           lines.push('No workflow execution active. Consider: slope sprint run --workflow=sprint-standard --var sprint_id=S' + sprintState.sprint);
         }
+      } finally {
+        store.close();
       }
     } catch { /* store unavailable */ }
   } else if (isPlanning) {
@@ -89,20 +95,38 @@ export async function sessionBriefingGuard(input: HookInput, cwd: string): Promi
   } catch { /* roadmap unavailable */ }
 
   // Active claims
+  const activeClaimTargets = new Set<string>();
   try {
-    const claimsPath = join(cwd, '.slope', 'claims.json');
+    const store = await resolveStore(cwd);
+    try {
+      const claims = await store.getActiveClaims(sprintState?.sprint);
+      for (const claim of claims) activeClaimTargets.add(claim.target);
+    } finally {
+      store.close();
+    }
+  } catch { /* store claims unavailable */ }
+
+  try {
+    const claimsPath = resolveRepoStatePath(cwd, config.claimsPath ?? '.slope/claims.json');
     if (existsSync(claimsPath)) {
-      const claims = JSON.parse(readFileSync(claimsPath, 'utf8'));
-      if (Array.isArray(claims) && claims.length > 0) {
-        const targets = claims.map((c: { target?: string }) => c.target ?? 'unknown').join(', ');
-        lines.push(`Active claims: ${targets}`);
+      const raw = JSON.parse(readFileSync(claimsPath, 'utf8')) as {
+        claims?: Array<{ target?: string; sprint_number?: number }>;
+      } | Array<{ target?: string; sprint_number?: number }>;
+      const claims = Array.isArray(raw) ? raw : raw.claims ?? [];
+      for (const claim of claims) {
+        if (sprintState?.sprint !== undefined && claim.sprint_number !== sprintState.sprint) continue;
+        activeClaimTargets.add(claim.target ?? 'unknown');
       }
     }
-  } catch { /* claims unavailable */ }
+  } catch { /* file claims unavailable */ }
+
+  if (activeClaimTargets.size > 0) {
+    lines.push(`Active claims: ${[...activeClaimTargets].join(', ')}`);
+  }
 
   // Phase cleanup status
   try {
-    const cleanupPath = join(cwd, '.slope', 'phase-cleanup.json');
+    const cleanupPath = resolveRepoStatePath(cwd, '.slope/phase-cleanup.json');
     if (existsSync(cleanupPath)) {
       const cleanup = JSON.parse(readFileSync(cleanupPath, 'utf8'));
       if (cleanup.phases) {

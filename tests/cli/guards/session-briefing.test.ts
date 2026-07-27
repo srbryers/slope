@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { sessionBriefingGuard } from '../../../src/cli/guards/session-briefing.js';
 import { loadSessionState, setSessionMode, updateSessionState } from '../../../src/cli/session-state.js';
 import { createSprintState, saveSprintState } from '../../../src/cli/sprint-state.js';
+import { createStore } from '../../../src/store/index.js';
 import type { HookInput } from '../../../src/core/index.js';
 
 let tmpDir: string;
@@ -144,5 +145,30 @@ describe('sessionBriefingGuard', () => {
     const result = await sessionBriefingGuard(makeInput(), tmpDir);
 
     expect(result.suggestion?.context).toContain('[~] architect_review:independent_review_waived(required_downgrade)');
+  });
+
+  it('merges shared-store and legacy file claims for the active sprint', async () => {
+    saveSprintState(tmpDir, createSprintState(74, 'implementing'));
+    const store = createStore({ storePath: '.slope/slope.db', cwd: tmpDir });
+    await store.claim({
+      sprint_number: 74,
+      player: 'store-agent',
+      target: 'store-ticket',
+      scope: 'ticket',
+    });
+    store.close();
+    writeFileSync(join(tmpDir, '.slope', 'claims.json'), JSON.stringify({
+      claims: [
+        { sprint_number: 74, target: 'store-ticket' },
+        { sprint_number: 74, target: 'legacy-ticket' },
+        { sprint_number: 73, target: 'previous-sprint-ticket' },
+      ],
+    }));
+
+    const result = await sessionBriefingGuard(makeInput(), tmpDir);
+    const context = result.suggestion?.context ?? '';
+
+    expect(context).toContain('Active claims: store-ticket, legacy-ticket');
+    expect(context).not.toContain('previous-sprint-ticket');
   });
 });

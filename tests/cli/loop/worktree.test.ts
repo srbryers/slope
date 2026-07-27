@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { execSync, execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, copyFileSync, symlinkSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync } from 'node:fs';
 
 vi.mock('node:child_process', () => ({
   execSync: vi.fn(),
@@ -9,10 +8,6 @@ vi.mock('node:child_process', () => ({
 }));
 vi.mock('node:fs', () => ({
   existsSync: vi.fn(),
-  mkdirSync: vi.fn(),
-  copyFileSync: vi.fn(),
-  symlinkSync: vi.fn(),
-  readdirSync: vi.fn(() => []),
 }));
 
 import { createWorktree, removeWorktree, getHeadSha, countCommits, pushBranch, refreshIndex } from '../../../src/cli/loop/worktree.js';
@@ -60,24 +55,15 @@ describe('createWorktree', () => {
     );
   });
 
-  it('mirrors .slope/ dir into new worktree', () => {
-    (existsSync as ReturnType<typeof vi.fn>)
-      .mockReturnValueOnce(false)  // worktree path doesn't exist
-      .mockReturnValueOnce(true);  // .slope/ dir exists in main repo
+  it('does not mirror repository state into a new worktree', () => {
+    (existsSync as ReturnType<typeof vi.fn>).mockReturnValue(false);
     (execFileSync as ReturnType<typeof vi.fn>).mockReturnValue('');
     (execSync as ReturnType<typeof vi.fn>).mockReturnValue('');
-    (readdirSync as ReturnType<typeof vi.fn>).mockReturnValue([
-      { name: 'config.json', isFile: () => true },
-      { name: 'slope.db', isFile: () => true },
-      { name: 'hooks.json', isFile: () => true },
-      { name: 'handoffs', isFile: () => false }, // directory, should be skipped
-    ]);
+
     createWorktree('S-004', '/repo', mockLog);
-    expect(mkdirSync).toHaveBeenCalledWith(join('/repo', '.slope-loop-worktree-S-004', '.slope'), { recursive: true });
-    expect(copyFileSync).toHaveBeenCalledWith(join('/repo', '.slope', 'config.json'), join('/repo', '.slope-loop-worktree-S-004', '.slope', 'config.json'));
-    expect(copyFileSync).toHaveBeenCalledWith(join('/repo', '.slope', 'hooks.json'), join('/repo', '.slope-loop-worktree-S-004', '.slope', 'hooks.json'));
-    expect(symlinkSync).toHaveBeenCalledWith(join('/repo', '.slope', 'slope.db'), join('/repo', '.slope-loop-worktree-S-004', '.slope', 'slope.db'));
-    expect(mockLog.info).toHaveBeenCalledWith('Mirrored .slope/ config into worktree');
+
+    expect(existsSync).toHaveBeenCalledTimes(1);
+    expect(mockLog.info).not.toHaveBeenCalledWith(expect.stringContaining('Mirrored .slope'));
   });
 
   it('throws on worktree creation failure', () => {

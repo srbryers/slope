@@ -1,5 +1,4 @@
-import { join } from 'node:path';
-import type { SprintRegistry } from '../../core/index.js';
+import { resolveRepoStatePath, type SprintRegistry } from '../../core/index.js';
 import type { SlopeConfig } from '../config.js';
 import { FileRegistry } from './file-registry.js';
 import { ApiRegistry } from './api-registry.js';
@@ -15,7 +14,7 @@ export function createRegistry(config: SlopeConfig, cwd: string = process.cwd())
     }
     case 'file':
     default:
-      return new FileRegistry(join(cwd, config.claimsPath));
+      return new FileRegistry(resolveRepoStatePath(cwd, config.claimsPath));
   }
 }
 

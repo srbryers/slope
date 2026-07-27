@@ -20,7 +20,7 @@
  *   import { createSlopeToolsServer }     # programmatic
  */
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { join, dirname, relative } from 'node:path';
+import { basename, join, dirname, relative, resolve } from 'node:path';
 import { execFileSync, execSync } from 'node:child_process';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -30,7 +30,7 @@ import { SLOPE_REGISTRY, SLOPE_TYPES } from './registry.js';
 import type { FunctionRegistryEntry } from './registry.js';
 import { runInSandbox } from './sandbox.js';
 import type { SlopeStore, SlopeConfig } from '../core/index.js';
-import { checkConflicts, loadFlows, checkFlowStaleness, checkStoreHealth, METAPHOR_SCHEMA, listMetaphors, buildInterviewContext, generateInterviewSteps, loadConfig, parseTestPlan, getAreasNeedingTest, hasEmbeddingSupport, embed, deduplicateByFile, formatContextForAgent, WorkflowEngine, loadWorkflow, listWorkflows, resolveVariables } from '../core/index.js';
+import { checkConflicts, loadFlows, checkFlowStaleness, checkStoreHealth, METAPHOR_SCHEMA, listMetaphors, buildInterviewContext, generateInterviewSteps, loadConfig, parseTestPlan, getAreasNeedingTest, hasEmbeddingSupport, embed, deduplicateByFile, formatContextForAgent, WorkflowEngine, loadWorkflow, listWorkflows, resolveVariables, resolveRepoSourceCwd, resolveRepoStateCwd, resolveRepoStatePath } from '../core/index.js';
 import type { ContextResult } from '../core/index.js';
 import { gaming } from '../core/metaphors/gaming.js';
 import type { ClaimScope, FlowsFile, FlowDefinition } from '../core/index.js';
@@ -111,7 +111,7 @@ export function detectSetupHints(projectRoot: string): SetupHints {
   };
 
   // Check .slope/hooks.json for guard-* and lifecycle hook entries
-  const hooksPath = join(projectRoot, '.slope', 'hooks.json');
+  const hooksPath = resolveRepoStatePath(projectRoot, '.slope/hooks.json');
   if (existsSync(hooksPath)) {
     try {
       const hooksData = JSON.parse(readFileSync(hooksPath, 'utf-8'));
@@ -187,7 +187,20 @@ export function formatSearchResults(results: FunctionRegistryEntry[], useCompact
   return JSON.stringify(results, null, 2);
 }
 
-export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHints, storeType?: string, config?: SlopeConfig): McpServer {
+export function createSlopeToolsServer(
+  store?: SlopeStore,
+  setupHints?: SetupHints,
+  storeType?: string,
+  config?: SlopeConfig,
+  sourceRoot?: string,
+): McpServer {
+  const launchRoot = sourceRoot ?? process.cwd();
+  let serverRoot = resolveRepoSourceCwd(launchRoot);
+  try {
+    serverRoot = findProjectRoot(launchRoot);
+  } catch {
+    // An unconfigured repository still owns tracked artifacts at its git root.
+  }
   const server = new McpServer({
     name: 'slope-tools',
     version: '1.0.0',
@@ -204,7 +217,7 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
     async ({ query, module, compact }) => {
       // Map module — return codebase map content
       if (module === 'map') {
-        return { content: [{ type: 'text' as const, text: handleMapQuery(query) }] };
+        return { content: [{ type: 'text' as const, text: handleMapQuery(query, serverRoot) }] };
       }
       // Metaphor module — return schema, built-in list, and example
       if (module === 'metaphor') {
@@ -212,11 +225,11 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
       }
       // Init module — return interview step schema + agent workflow instructions
       if (module === 'init') {
-        return { content: [{ type: 'text' as const, text: handleInitQuery() }] };
+        return { content: [{ type: 'text' as const, text: handleInitQuery(serverRoot) }] };
       }
       // Flows module — return flow definitions
       if (module === 'flows') {
-        return { content: [{ type: 'text' as const, text: handleFlowsQuery(query) }] };
+        return { content: [{ type: 'text' as const, text: handleFlowsQuery(query, serverRoot) }] };
       }
       if (module === 'types') {
         return { content: [{ type: 'text' as const, text: SLOPE_TYPES }] };
@@ -258,7 +271,7 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
     },
     async ({ code }) => {
       try {
-        const { result, logs } = await runInSandbox(code, process.cwd());
+        const { result, logs } = await runInSandbox(code, serverRoot);
         const parts: Array<{ type: 'text'; text: string }> = [];
         if (logs.length > 0) {
           parts.push({ type: 'text' as const, text: '--- logs ---\n' + logs.join('\n') });
@@ -283,7 +296,7 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
     async ({ query, top, format }) => {
       const limit = top ?? 5;
       const outputFormat = format ?? 'snippets';
-      const cwd = process.cwd();
+      const cwd = serverRoot;
       let embeddingFailed = false;
 
       // Semantic path: embedding index available
@@ -435,17 +448,18 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
 
         let projectRoot: string;
         try {
-          projectRoot = findProjectRoot(process.cwd());
+          projectRoot = findProjectRoot(serverRoot);
         } catch {
-          projectRoot = process.cwd();
+          projectRoot = serverRoot;
         }
 
         // Clean up stale testing worktrees (best-effort)
-        const worktreeDir = join(projectRoot, '.claude', 'worktrees');
+        const worktreeDir = dirname(projectRoot);
+        const worktreePrefix = `${basename(projectRoot)}-testing-`;
         try {
           const { readdirSync, existsSync: dirExists } = await import('node:fs');
           if (dirExists(worktreeDir)) {
-            const entries = readdirSync(worktreeDir).filter(e => e.startsWith('testing-'));
+            const entries = readdirSync(worktreeDir).filter(e => e.startsWith(worktreePrefix));
             for (const entry of entries) {
               try {
                 // Check if branch is merged and no active session references it
@@ -460,7 +474,7 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
         // Create fresh worktree
         const timestamp = Date.now();
         const branchName = `testing/${timestamp}`;
-        const worktreePath = join(worktreeDir, `testing-${timestamp}`);
+        const worktreePath = resolveTestingWorktreePath(projectRoot, timestamp);
         try {
           // Ensure worktree parent directory exists
           const { mkdirSync: mkdirS } = await import('node:fs');
@@ -479,17 +493,6 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
           }
 
           execSync(`git worktree add ${JSON.stringify(worktreePath)} -b ${branchName} origin/${baseBranch}`, { cwd: projectRoot, timeout: 30000 });
-
-          // Mirror .slope config files (exclude DB files to avoid split-brain)
-          const slopeDir = join(projectRoot, '.slope');
-          const wtSlopeDir = join(worktreePath, '.slope');
-          const { cpSync } = await import('node:fs');
-          if (existsSync(slopeDir)) {
-            cpSync(slopeDir, wtSlopeDir, {
-              recursive: true,
-              filter: (src: string) => !src.match(/\.db(-wal|-shm)?$|\.db$/),
-            });
-          }
         } catch (err) {
           return {
             content: [{ type: 'text' as const, text: `Error creating testing worktree: ${err instanceof Error ? err.message : String(err)}` }],
@@ -647,7 +650,7 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
         let projectRoot: string;
         let testPlanUpdatePrompt = '';
         try {
-          projectRoot = findProjectRoot(process.cwd());
+          projectRoot = findProjectRoot(serverRoot);
           const config = loadConfig(projectRoot);
           if (config.testing?.teardown_steps) {
             teardownSteps = config.testing.teardown_steps.map(step =>
@@ -679,7 +682,7 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
             }
           }
         } catch {
-          projectRoot = process.cwd();
+          projectRoot = serverRoot;
         }
 
         // Worktree cleanup
@@ -759,9 +762,9 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
       async () => {
         let projectRoot: string;
         try {
-          projectRoot = findProjectRoot(process.cwd());
+          projectRoot = findProjectRoot(serverRoot);
         } catch {
-          projectRoot = process.cwd();
+          projectRoot = serverRoot;
         }
 
         const config = loadConfig(projectRoot);
@@ -810,7 +813,7 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
 
     /** Resolve project root, falling back to cwd */
     function safeProjectRoot(): string {
-      try { return findProjectRoot(process.cwd()); } catch { return process.cwd(); }
+      try { return findProjectRoot(serverRoot); } catch { return serverRoot; }
     }
 
     const workflowEngine = new WorkflowEngine();
@@ -1020,8 +1023,7 @@ function handleMetaphorQuery(): string {
 }
 
 /** Handle search({ module: 'map' }) — return codebase map content with optional section filtering */
-function handleMapQuery(query?: string): string {
-  const cwd = process.cwd();
+function handleMapQuery(query: string | undefined, cwd: string): string {
   const mapPath = join(cwd, 'CODEBASE.md');
 
   if (!existsSync(mapPath)) {
@@ -1072,21 +1074,20 @@ function handleMapQuery(query?: string): string {
 }
 
 /** Handle search({ module: 'flows' }) — return flow definitions with optional filtering */
-function handleFlowsQuery(query?: string): string {
-  const cwd = process.cwd();
+function handleFlowsQuery(query: string | undefined, sourceRoot: string): string {
+  let cwd = sourceRoot;
+  try {
+    cwd = findProjectRoot(cwd);
+  } catch {
+    // Keep the original cwd for graceful no-config fallback.
+  }
 
-  // Resolve flows path from config (config.json is already in .slope/)
   let flowsPath: string;
   try {
-    const configPath = join(cwd, '.slope', 'config.json');
-    if (existsSync(configPath)) {
-      const config = JSON.parse(readFileSync(configPath, 'utf8'));
-      flowsPath = join(cwd, config.flowsPath || '.slope/flows.json');
-    } else {
-      flowsPath = join(cwd, '.slope', 'flows.json');
-    }
+    const config = loadConfig(cwd);
+    flowsPath = resolveRepoStatePath(cwd, config.flowsPath || '.slope/flows.json');
   } catch {
-    flowsPath = join(cwd, '.slope', 'flows.json');
+    flowsPath = resolveRepoStatePath(cwd, '.slope/flows.json');
   }
 
   const flows = loadFlows(flowsPath);
@@ -1171,9 +1172,7 @@ function handleFlowsQuery(query?: string): string {
 }
 
 /** Handle search({ module: 'init' }) — return interview steps schema + agent workflow instructions */
-function handleInitQuery(): string {
-  const cwd = process.cwd();
-
+function handleInitQuery(cwd: string): string {
   // Metaphors are registered via the barrel import of core (listMetaphors, etc.)
   const ctx = buildInterviewContext(cwd);
   const steps = generateInterviewSteps(ctx);
@@ -1227,11 +1226,37 @@ function handleInitQuery(): string {
   return sections.join('\n');
 }
 
-/** Walk up directories looking for .slope/config.json */
-function findProjectRoot(startDir: string): string {
-  let dir = startDir;
+/** Find the active checkout root whose common-dir owner contains SLOPE state. */
+export function findProjectRoot(startDir: string): string {
+  let dir = resolve(startDir);
   while (true) {
-    if (existsSync(join(dir, '.slope', 'config.json'))) {
+    if (
+      existsSync(join(dir, '.slope', 'config.json')) &&
+      resolve(resolveRepoStateCwd(dir)) === resolve(dir)
+    ) {
+      return dir;
+    }
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+
+  try {
+    const worktreeRoot = execFileSync('git', ['rev-parse', '--show-toplevel'], {
+      cwd: startDir,
+      encoding: 'utf8',
+      stdio: QUIET_STDIO,
+    }).trim();
+    if (worktreeRoot && existsSync(resolveRepoStatePath(worktreeRoot, '.slope/config.json'))) {
+      return worktreeRoot;
+    }
+  } catch {
+    // Fall back to directory walking for non-git and fixture projects.
+  }
+
+  dir = resolve(startDir);
+  while (true) {
+    if (existsSync(resolveRepoStatePath(dir, '.slope/config.json'))) {
       return dir;
     }
     const parent = dirname(dir);
@@ -1242,24 +1267,30 @@ function findProjectRoot(startDir: string): string {
   }
 }
 
+/** Place generated testing worktrees beside the repository, outside parent globs. */
+export function resolveTestingWorktreePath(projectRoot: string, timestamp: number): string {
+  return join(dirname(resolve(projectRoot)), `${basename(resolve(projectRoot))}-testing-${timestamp}`);
+}
+
 async function main(): Promise<void> {
   let store: SlopeStore | undefined;
   let hints: SetupHints | undefined;
   let storeType: string | undefined;
   let slopeConfig: SlopeConfig | undefined;
+  let sourceRoot = resolveRepoSourceCwd(process.cwd());
   try {
     const { loadConfig } = await import('../core/index.js');
     const { createStore } = await import('../store/index.js');
-    const cwd = findProjectRoot(process.cwd());
-    const config = loadConfig(cwd);
+    sourceRoot = findProjectRoot(sourceRoot);
+    const config = loadConfig(sourceRoot);
     slopeConfig = config;
-    store = createStore({ storePath: config.store_path ?? '.slope/slope.db', cwd });
+    store = createStore({ storePath: config.store_path ?? '.slope/slope.db', cwd: sourceRoot });
     storeType = config.store ?? 'sqlite';
-    hints = detectSetupHints(cwd);
+    hints = detectSetupHints(sourceRoot);
   } catch {
     // No config or store — server runs without store tools
   }
-  const server = createSlopeToolsServer(store, hints, storeType, slopeConfig);
+  const server = createSlopeToolsServer(store, hints, storeType, slopeConfig, sourceRoot);
   const transport = new StdioServerTransport();
   await server.connect(transport);
 }

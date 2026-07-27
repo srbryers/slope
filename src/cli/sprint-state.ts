@@ -1,5 +1,6 @@
 import { readFileSync, existsSync, unlinkSync } from 'node:fs';
 import { isAbsolute, join } from 'node:path';
+import { resolveRepoStatePath } from '../core/repo-state-scope.js';
 import { atomicWriteFileSync, withFileLockSync } from './atomic-write.js';
 import { listRepoWorktrees } from './session-scope.js';
 
@@ -286,7 +287,7 @@ export function waivedReviewGateNames(state: SprintState): ReviewGateName[] {
 
 /** Load sprint state from .slope/sprint-state.json. Returns null if missing or malformed. */
 export function loadSprintState(cwd: string): SprintState | null {
-  const statePath = join(cwd, SPRINT_STATE_FILE);
+  const statePath = sprintStatePath(cwd);
   if (!existsSync(statePath)) return null;
   try {
     const raw = JSON.parse(readFileSync(statePath, 'utf8'));
@@ -390,7 +391,7 @@ export function isActiveSprintState(state: SprintState | null): state is SprintS
 }
 
 function sprintStatePath(cwd: string): string {
-  return join(cwd, SPRINT_STATE_FILE);
+  return resolveRepoStatePath(cwd, SPRINT_STATE_FILE);
 }
 
 function saveSprintStateUnlocked(filePath: string, state: SprintState, touchUpdatedAt = true): void {
@@ -576,8 +577,12 @@ export function updateSprintPhaseForSprintAcrossWorktrees(
   phase: SprintPhase,
 ): WorktreePhaseReconcile[] {
   const results: WorktreePhaseReconcile[] = [];
+  const inspected = new Set<string>();
   for (const root of listRepoWorktrees(cwd)) {
-    if (!existsSync(join(root, SPRINT_STATE_FILE))) continue;
+    const statePath = sprintStatePath(root);
+    if (inspected.has(statePath)) continue;
+    inspected.add(statePath);
+    if (!existsSync(statePath)) continue;
     try {
       const { matched, changed } = updateSprintPhaseForSprint(root, expectedSprint, phase);
       results.push({ path: root, matched, changed });

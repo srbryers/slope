@@ -289,6 +289,12 @@ export type {
 // Config
 export type { SlopeConfig } from './config.js';
 export { loadConfig, createConfig, saveConfig, resolveConfigPath } from './config.js';
+export {
+  resolvePrimaryCheckout,
+  resolveRepoSourceCwd,
+  resolveRepoStateCwd,
+  resolveRepoStatePath,
+} from './repo-state-scope.js';
 
 // Test Plan
 export { parseTestPlan, getTestPlanSummary, getAreasNeedingTest } from './test-plan.js';

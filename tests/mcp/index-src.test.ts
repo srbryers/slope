@@ -1,11 +1,15 @@
 import { describe, it, expect } from 'vitest';
-import { createSlopeToolsServer, SLOPE_MCP_TOOL_NAMES, detectSetupHints, buildSetupHint, formatSearchResults } from '../../src/mcp/index.js';
+import { execFileSync } from 'node:child_process';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { createSlopeToolsServer, SLOPE_MCP_TOOL_NAMES, detectSetupHints, buildSetupHint, findProjectRoot, formatSearchResults, resolveTestingWorktreePath } from '../../src/mcp/index.js';
 import type { SetupHints } from '../../src/mcp/index.js';
 import { SLOPE_REGISTRY, SLOPE_TYPES } from '../../src/mcp/registry.js';
 import { runInSandbox } from '../../src/mcp/sandbox.js';
-import { mkdtempSync, writeFileSync, mkdirSync, rmSync, readFileSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { resolveRepoSourceCwd } from '../../src/core/index.js';
 import type { SlopeStore, SlopeSession, SprintClaim, GolfScorecard } from '../../src/core/index.js';
 import type { CommonIssuesFile } from '../../src/core/index.js';
 
@@ -638,6 +642,117 @@ describe('detectSetupHints', () => {
     rmSync(tmp, { recursive: true, force: true });
   });
 });
+
+describe('MCP project and worktree scope', () => {
+  it('discovers a nested SLOPE project from a descendant directory', () => {
+    const outer = mkdtempSync(join(tmpdir(), 'slope-mcp-root-'));
+    const nested = join(outer, 'fixtures', 'project');
+    const descendant = join(nested, 'src', 'deeper');
+    mkdirSync(join(outer, '.slope'), { recursive: true });
+    mkdirSync(join(nested, '.slope'), { recursive: true });
+    mkdirSync(descendant, { recursive: true });
+    execFileSync('git', ['init', '-q'], { cwd: outer });
+    writeFileSync(join(outer, '.slope', 'config.json'), '{}');
+    writeFileSync(join(nested, '.slope', 'config.json'), '{}');
+
+    expect(findProjectRoot(descendant)).toBe(nested);
+
+    rmSync(outer, { recursive: true, force: true });
+  });
+
+  it('places generated testing worktrees beside the repository', () => {
+    const projectRoot = join(tmpdir(), 'slope-project');
+
+    expect(resolveTestingWorktreePath(projectRoot, 123))
+      .toBe(join(tmpdir(), 'slope-project-testing-123'));
+  });
+
+  it('runs source tools from the discovered root when launched in a descendant', async () => {
+    const project = mkdtempSync(join(tmpdir(), 'slope-mcp-source-root-'));
+    const descendant = join(project, 'src', 'nested');
+    mkdirSync(join(project, '.slope'), { recursive: true });
+    mkdirSync(descendant, { recursive: true });
+    writeFileSync(join(project, '.slope', 'config.json'), '{}');
+    writeFileSync(join(project, 'ROOT_MARKER.txt'), 'sandbox-source-root');
+    writeFileSync(join(project, 'CODEBASE.md'), '## Source Root Marker\nmap-source-root\n');
+    writeFileSync(join(project, 'src', 'marker.ts'), 'export const descendantSourceMarker = true;\n');
+
+    const sourceRoot = findProjectRoot(descendant);
+    const server = createSlopeToolsServer(undefined, undefined, undefined, undefined, sourceRoot);
+    const client = new Client({ name: 'source-root-test', version: '1.0.0' });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+
+    try {
+      const executeResult = await client.callTool({
+        name: 'execute',
+        arguments: { code: 'return readFile("ROOT_MARKER.txt");' },
+      });
+      expect(toolText(executeResult)).toContain('sandbox-source-root');
+
+      const contextResult = await client.callTool({
+        name: 'context_search',
+        arguments: { query: 'descendantSourceMarker', format: 'paths' },
+      });
+      expect(toolText(contextResult)).toContain('src/marker.ts');
+
+      const mapResult = await client.callTool({
+        name: 'search',
+        arguments: { module: 'map', query: 'Source Root' },
+      });
+      expect(toolText(mapResult)).toContain('map-source-root');
+    } finally {
+      await client.close();
+      await server.close();
+      rmSync(project, { recursive: true, force: true });
+    }
+  });
+
+  it('initializes all project artifacts at an unconfigured git root', async () => {
+    const project = mkdtempSync(join(tmpdir(), 'slope-mcp-unconfigured-root-'));
+    const descendant = join(project, 'src', 'nested');
+    mkdirSync(descendant, { recursive: true });
+    execFileSync('git', ['init', '-q'], { cwd: project });
+    const sourceRoot = resolveRepoSourceCwd(descendant);
+    const server = createSlopeToolsServer(undefined, undefined, undefined, undefined, sourceRoot);
+    const client = new Client({ name: 'unconfigured-root-test', version: '1.0.0' });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+
+    try {
+      const result = await client.callTool({
+        name: 'execute',
+        arguments: {
+          code: 'return await submitInitAnswers({ "project-name": "Rooted App", "metaphor": "golf" });',
+        },
+      });
+
+      expect(toolText(result)).toContain('"success": true');
+      expect(existsSync(join(project, '.slope', 'config.json'))).toBe(true);
+      expect(existsSync(join(project, 'docs', 'backlog', 'roadmap.json'))).toBe(true);
+      expect(existsSync(join(descendant, '.slope'))).toBe(false);
+      expect(existsSync(join(descendant, 'docs'))).toBe(false);
+    } finally {
+      await client.close();
+      await server.close();
+      rmSync(project, { recursive: true, force: true });
+    }
+  });
+});
+
+function toolText(result: { content: unknown[] }): string {
+  return result.content
+    .filter((item): item is { type: 'text'; text: string } => (
+      typeof item === 'object' &&
+      item !== null &&
+      (item as { type?: unknown }).type === 'text' &&
+      typeof (item as { text?: unknown }).text === 'string'
+    ))
+    .map(item => item.text)
+    .join('\n');
+}
 
 describe('buildSetupHint', () => {
   it('returns null when everything is set up', () => {

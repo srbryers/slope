@@ -1,6 +1,8 @@
 import { execSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from 'node:fs';
-import { join } from 'node:path';
+import { createHash } from 'node:crypto';
+import { dirname, resolve } from 'node:path';
+import { resolveRepoStateCwd, resolveRepoStatePath } from '../../core/index.js';
 
 /**
  * Check if HEAD is at or behind origin/main.
@@ -21,8 +23,42 @@ export function headIsOnMain(cwd: string): boolean {
 
 const BASELINES_DIR = '.slope/baselines';
 
+export interface GitStatusEntry {
+  status: string;
+  path: string;
+}
+
+export function parseGitStatusPorcelain(output: string): GitStatusEntry[] {
+  const content = output.trimEnd();
+  if (!content) return [];
+  return content
+    .split('\n')
+    .filter(Boolean)
+    .map(line => ({
+      status: line.slice(0, 2),
+      path: line.slice(3),
+    }));
+}
+
 function baselinePath(sessionId: string, cwd: string): string {
-  return join(cwd, BASELINES_DIR, `${sessionId}.txt`);
+  const stateCwd = resolveRepoStateCwd(cwd);
+  const worktreeRoot = gitTopLevel(cwd);
+  const suffix = resolve(worktreeRoot) === resolve(stateCwd)
+    ? ''
+    : `-${createHash('sha256').update(worktreeRoot).digest('hex').slice(0, 12)}`;
+  return resolveRepoStatePath(cwd, `${BASELINES_DIR}/${sessionId}${suffix}.txt`);
+}
+
+function gitTopLevel(cwd: string): string {
+  try {
+    return execSync('git rev-parse --show-toplevel', {
+      cwd,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim() || cwd;
+  } catch {
+    return cwd;
+  }
 }
 
 /**
@@ -35,8 +71,8 @@ export function recordBaseline(sessionId: string, cwd: string): boolean {
   if (existsSync(path)) return false;
 
   try {
-    const status = execSync('git status --porcelain', { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-    const dir = join(cwd, BASELINES_DIR);
+    const status = execSync('git status --porcelain=v1', { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trimEnd();
+    const dir = dirname(path);
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
     writeFileSync(path, status);
     return true;
@@ -55,9 +91,7 @@ export function loadBaseline(sessionId: string, cwd: string): Set<string> {
   if (!existsSync(path)) return new Set();
 
   try {
-    const content = readFileSync(path, 'utf8').trim();
-    if (!content) return new Set();
-    return new Set(content.split('\n').filter(Boolean).map(line => line.slice(3)));
+    return new Set(parseGitStatusPorcelain(readFileSync(path, 'utf8')).map(entry => entry.path));
   } catch {
     return new Set();
   }

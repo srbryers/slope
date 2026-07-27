@@ -2,7 +2,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { execSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, mkdirSync, existsSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, mkdirSync, existsSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -84,7 +84,8 @@ describe('slope interview CLI', () => {
 
     const last = JSON.parse(lines[lines.length - 1]);
     expect(last.type).toBe('complete');
-    expect(last.filesCreated).toContain(join(cwd, 'docs', 'backlog', 'roadmap.json'));
+    expect(last.filesCreated.map((path: string) => realpathSync(path)))
+      .toContain(realpathSync(join(cwd, 'docs', 'backlog', 'roadmap.json')));
   });
 
   it('agent mode rejects invalid JSON input', () => {

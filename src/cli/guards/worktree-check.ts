@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, writeFileSync, mkdirSync, unlinkSync } from 'node:fs';
-import { isAbsolute, join, relative, resolve } from 'node:path';
+import { existsSync, realpathSync, writeFileSync, mkdirSync, unlinkSync } from 'node:fs';
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createHash } from 'node:crypto';
 import type { HookInput, GuardResult } from '../../core/index.js';
@@ -426,10 +426,23 @@ function extractFilePath(input: HookInput): string | undefined {
 }
 
 function pathContains(root: string, filePath: string): boolean {
-  const absoluteFile = isAbsolute(filePath) ? filePath : resolve(filePath);
-  const absoluteRoot = resolve(root);
-  const rel = relative(absoluteRoot, absoluteFile);
+  const absoluteFile = isAbsolute(filePath) ? canonicalPath(filePath) : canonicalPath(resolve(filePath));
+  const rel = relative(canonicalPath(root), absoluteFile);
   return rel === '' || (!!rel && !rel.startsWith('..') && !isAbsolute(rel));
+}
+
+function canonicalPath(path: string): string {
+  let existing = resolve(path);
+  const tail: string[] = [];
+  while (!existsSync(existing) && dirname(existing) !== existing) {
+    tail.unshift(basename(existing));
+    existing = dirname(existing);
+  }
+  try {
+    return join(realpathSync(existing), ...tail);
+  } catch {
+    return resolve(path);
+  }
 }
 
 /**
@@ -450,7 +463,7 @@ function resolveTargetWorktree(
   if (!filePath || !isAbsolute(filePath)) return null;
 
   for (const worktree of worktrees) {
-    if (resolve(worktree.path) === resolve(cwd)) continue;
+    if (canonicalPath(worktree.path) === canonicalPath(cwd)) continue;
     if (pathContains(worktree.path, filePath)) return worktree.path;
   }
   return null;

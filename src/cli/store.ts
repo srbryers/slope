@@ -1,4 +1,5 @@
 import type { SlopeStore } from '../core/index.js';
+import { resolveRepoStateCwd } from '../core/index.js';
 import { loadConfig } from './config.js';
 
 /** Store info from config — no store connection required */
@@ -38,11 +39,12 @@ export function getStoreInfo(cwd: string = process.cwd()): StoreInfo {
 }
 
 export async function resolveStore(cwd: string = process.cwd()): Promise<SlopeStore> {
-  const config = loadConfig(cwd);
+  const stateCwd = resolveRepoStateCwd(cwd);
+  const config = loadConfig(stateCwd);
   const storeType = config.store ?? 'sqlite';
   if (storeType === 'sqlite') {
     const { createStore } = await import('../store/index.js');
-    return createStore({ storePath: config.store_path ?? '.slope/slope.db', cwd });
+    return createStore({ storePath: config.store_path ?? '.slope/slope.db', cwd: stateCwd });
   }
   if (storeType === 'postgres') {
     try {
@@ -61,5 +63,5 @@ export async function resolveStore(cwd: string = process.cwd()): Promise<SlopeSt
   }
   // Custom adapter: dynamic import of the store module
   const mod = await import(storeType);
-  return mod.createStore({ cwd, ...config });
+  return mod.createStore({ cwd: stateCwd, ...config });
 }
