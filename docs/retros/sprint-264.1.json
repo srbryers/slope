@@ -1,0 +1,253 @@
+{
+  "sprint_number": 264.1,
+  "player": "codex",
+  "theme": "Coordination Integrity and Security Contract",
+  "par": 4,
+  "slope": 5,
+  "score": 27,
+  "score_label": "triple_plus",
+  "date": "2026-07-27",
+  "shots": [
+    {
+      "ticket_key": "S264.1-1",
+      "title": "Define existing-event-store migration and replay authority",
+      "club": "driver",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "critical",
+          "description": "[architect review] Migration cutover lacked a durable physical write barrier against old processes.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "bunker",
+          "severity": "moderate",
+          "description": "[architect review] Legacy import lacked a deterministic total order and complete disposition rules.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "[architect review] PostgreSQL global keys and unscoped foreign keys conflicted with project isolation.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "[architect review] Finalization lacked explicit crash, abort, timeout, and recovery transitions.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "[architect review] Custom stores could bypass the coordination authority contract.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "bunker",
+          "severity": "critical",
+          "description": "[architect review] Migration barriers still depended on markers visible only to new processes.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "[architect review] The import plan omitted server-assigned fields required for deterministic hashes.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "water",
+          "severity": "major",
+          "description": "[security review] Cutover did not physically stop legacy writers or constrain custom adapters.",
+          "gotcha_id": "review:security"
+        },
+        {
+          "type": "water",
+          "severity": "moderate",
+          "description": "[security review] Legacy import ordering was not a complete deterministic total order.",
+          "gotcha_id": "review:security"
+        },
+        {
+          "type": "water",
+          "severity": "major",
+          "description": "[security review] An already connected old process could still mutate during migration.",
+          "gotcha_id": "review:security"
+        },
+        {
+          "type": "water",
+          "severity": "moderate",
+          "description": "[security review] Import order ranked time before dependency class and omitted exact timestamp normalization.",
+          "gotcha_id": "review:security"
+        }
+      ],
+      "notes": "Defined the existing event store as the sole execution ledger, with physical migration fencing, a complete canonical scorecard and event envelope, deterministic import, projection evolution, finalization recovery, and replay integrity."
+    },
+    {
+      "ticket_key": "S264.1-2",
+      "title": "Define atomic append, idempotency, ordering, and integrity",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "moderate",
+          "description": "[architect review] Canonical serialization and hash framing were underspecified.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "water",
+          "severity": "moderate",
+          "description": "[security review] Canonical serialization was too weak for portable integrity commitments.",
+          "gotcha_id": "review:security"
+        }
+      ],
+      "notes": "Defined project-scoped idempotency, exact retry and payload-conflict behavior, gap-free ordering, transactional projection updates, schema evolution, canonical serialization, and chained integrity commitments."
+    },
+    {
+      "ticket_key": "S264.1-3",
+      "title": "Define renewable leases, fencing, and recovery",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "[architect review] Atomic multi-resource lease grants were underspecified relative to one aggregate.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "[architect review] External fencing did not cover overlapping unequal protected subjects.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "water",
+          "severity": "major",
+          "description": "[security review] PostgreSQL lease acquisition could race when a conflict-domain row was absent.",
+          "gotcha_id": "review:security"
+        }
+      ],
+      "notes": "Defined authoritative database time, lease-request aggregates, atomic child leases, conflict-domain locks and token vectors, subject epochs, retry, requeue, dead-letter, escalation, and recovery policies."
+    },
+    {
+      "ticket_key": "S264.1-4",
+      "title": "Define capability, privacy, retention, and adversarial enforcement",
+      "club": "driver",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "[architect review] Emergency redaction lacked a defined finalized-round lifecycle transition.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "[architect review] Raw source hashes could disclose restricted legacy data.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "water",
+          "severity": "major",
+          "description": "[security review] Secret scanning covered payloads but not the complete caller request.",
+          "gotcha_id": "review:security"
+        },
+        {
+          "type": "water",
+          "severity": "major",
+          "description": "[security review] Cursor cryptography omitted a complete authenticated-encryption contract.",
+          "gotcha_id": "review:security"
+        },
+        {
+          "type": "water",
+          "severity": "major",
+          "description": "[security review] Redaction lacked separately authorized request, approval, and apply states.",
+          "gotcha_id": "review:security"
+        },
+        {
+          "type": "water",
+          "severity": "major",
+          "description": "[security review] Backup restore could reintroduce redacted data.",
+          "gotcha_id": "review:security"
+        },
+        {
+          "type": "water",
+          "severity": "major",
+          "description": "[security review] Cursor AES-GCM nonce uniqueness and issuance exhaustion were undefined.",
+          "gotcha_id": "review:security"
+        }
+      ],
+      "notes": "Defined deny-by-default capabilities, trust bootstrap and delegation, classification-aware filtered views, complete-request secret scanning, cursor encryption, redaction authorization, retention, restore safety, and 49 hostile scenarios."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 23,
+    "hazard_penalties": 22.5,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "type": "architecture",
+  "conditions": [
+    {
+      "type": "wind",
+      "impact": "major",
+      "description": "The contract governs concurrent multi-agent authority, durable migration, privacy, and recovery across SQLite, PostgreSQL, and custom adapters."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Coordination safety depends on one authoritative ledger, physical fencing, deterministic replay, and explicit capability and privacy boundaries.",
+      "outcome": "The contract now gives S268 and S269 implementable invariants and hostile acceptance tests."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "tests",
+      "description": "259 test files passed; 4,324 tests passed and 27 were skipped at exact contract commit 4082cbd.",
+      "status": "healthy"
+    },
+    {
+      "category": "build",
+      "description": "TypeScript typecheck and the root plus pi-extension production build passed on Node 22.",
+      "status": "healthy"
+    },
+    {
+      "category": "state",
+      "description": "The sprint tests, review provenance, and scorecard gates are persisted in SLOPE state.",
+      "status": "healthy"
+    }
+  ],
+  "bunker_locations": [
+    "Install physical database barriers before migration inventory and drain pre-fence transactions.",
+    "Materialize complete canonical import envelopes before append and quarantine ambiguous legacy rows.",
+    "Lock durable conflict-domain rows before granting leases, including absent-resource cases.",
+    "Keep secret and redaction commitments classification-safe and reconcile restores against external deletion truth."
+  ],
+  "yardage_book_updates": [
+    "Negotiate protocol versions and required capabilities before accepting a custom adapter.",
+    "Use RFC 8785 JCS with framed domain-separated integrity inputs.",
+    "Fence overlapping resource subjects with project grants and conflict-domain token vectors.",
+    "Bind encrypted cursors to principal, project, policy, query, visibility, expiry, and managed nonce state."
+  ],
+  "course_management_notes": [
+    "S264.2 can define the human and agent collaboration workflow on these authority, privacy, and replay invariants.",
+    "S268 owns the minimum canonical schema and transactional finalization implementation; S269 owns leases and capability enforcement.",
+    "Inspired by the multiplayer and shared-context patterns researched from https://github.com/block/buzz.",
+    "Skills used: slope-sprint-workflow and slope-api-reference."
+  ]
+}
