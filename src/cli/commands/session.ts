@@ -6,6 +6,7 @@ import {
   checkConflicts,
   currentGitBranch,
   observeSessionBranches,
+  resolveRepoSourceCwd,
   resolveRepoStateCwd,
 } from '../../core/index.js';
 import type { ObservedSlopeSession, SlopeSession } from '../../core/index.js';
@@ -43,6 +44,14 @@ function parseArgs(args: string[]): Record<string, string> {
     if (match) result[match[1]] = match[2];
   }
   return result;
+}
+
+function sameCheckout(left: string, right: string): boolean {
+  try {
+    return realpathSync(left) === realpathSync(right);
+  } catch {
+    return left === right;
+  }
 }
 
 function printSessionHelp(): void {
@@ -117,10 +126,13 @@ async function startSession(flags: Record<string, string>, cwd: string): Promise
   const store = await resolveStore(resolveSessionStoreCwd(cwd));
   try {
     const sessionId = flags['session-id'] || randomUUID();
-    const role = (flags.role ?? 'primary') as 'primary' | 'secondary' | 'observer';
+    const sourceCwd = resolveRepoSourceCwd(cwd);
+    const stateCwd = resolveRepoStateCwd(cwd);
+    const linkedCheckout = !sameCheckout(sourceCwd, stateCwd);
+    const role = (flags.role ?? (linkedCheckout ? 'secondary' : 'primary')) as 'primary' | 'secondary' | 'observer';
     const ide = flags.ide ?? 'unknown';
-    const branch = flags.branch ?? currentGitBranch(cwd);
-    const worktreePath = flags['worktree-path'];
+    const branch = flags.branch ?? currentGitBranch(sourceCwd);
+    const worktreePath = flags['worktree-path'] ?? (linkedCheckout ? sourceCwd : undefined);
     const swarmId = flags.swarm;
     const agentRole = flags['agent-role'];
 
@@ -266,9 +278,17 @@ async function heartbeat(flags: Record<string, string>, cwd: string): Promise<vo
 
     const sessions = await store.getActiveSessions();
     const session = sessions.find(candidate => candidate.session_id === sessionId);
-    const branch = currentGitBranch(session?.worktree_path ?? cwd);
-    if (branch) {
-      await store.updateSession(sessionId, { branch });
+    const sourceCwd = resolveRepoSourceCwd(cwd);
+    const stateCwd = resolveRepoStateCwd(cwd);
+    const linkedCheckout = !sameCheckout(sourceCwd, stateCwd);
+    const branch = currentGitBranch(session?.worktree_path ?? sourceCwd);
+    if (branch || (linkedCheckout && !session?.worktree_path)) {
+      await store.updateSession(sessionId, {
+        ...(branch ? { branch } : {}),
+        ...(linkedCheckout && !session?.worktree_path
+          ? { worktree_path: sourceCwd, role: 'secondary' as const }
+          : {}),
+      });
     } else {
       await store.updateHeartbeat(sessionId);
     }

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { sessionCommand } from '../../../src/cli/commands/session.js';
@@ -8,6 +8,7 @@ import { SqliteSlopeStore } from '../../../src/store/index.js';
 
 let tmpDir: string;
 let originalCwd: string;
+let linkedWorktree: string | undefined;
 
 function setupProject(dir: string): void {
   mkdirSync(join(dir, '.slope'), { recursive: true });
@@ -31,6 +32,10 @@ describe('slope session command', () => {
 
   afterEach(() => {
     process.chdir(originalCwd);
+    if (linkedWorktree) {
+      rmSync(linkedWorktree, { recursive: true, force: true });
+      linkedWorktree = undefined;
+    }
     rmSync(tmpDir, { recursive: true, force: true });
   });
 
@@ -180,5 +185,44 @@ describe('slope session command', () => {
     log.mockRestore();
     expect(logs.join('\n')).toContain('Branch: feature/listed');
     expect(logs.join('\n')).not.toContain('Branch: main');
+  });
+
+  it('reconciles an unscoped heartbeat into the linked worktree', async () => {
+    execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: tmpDir });
+    execFileSync('git', ['config', 'user.email', 'test@example.com'], { cwd: tmpDir });
+    execFileSync('git', ['config', 'user.name', 'Test User'], { cwd: tmpDir });
+    writeFileSync(join(tmpDir, 'README.md'), 'test\n');
+    execFileSync('git', ['add', 'README.md'], { cwd: tmpDir });
+    execFileSync('git', ['commit', '-q', '-m', 'init'], { cwd: tmpDir });
+    linkedWorktree = `${tmpDir}-linked`;
+    execFileSync('git', ['worktree', 'add', '-q', '-b', 'feature/linked', linkedWorktree], {
+      cwd: tmpDir,
+    });
+    const store = createStore();
+    try {
+      await store.registerSession({
+        session_id: 'linked-session',
+        role: 'primary',
+        ide: 'codex',
+        branch: 'main',
+      });
+    } finally {
+      store.close();
+    }
+    process.chdir(linkedWorktree);
+
+    await sessionCommand(['heartbeat', '--session-id=linked-session']);
+
+    const after = createStore();
+    try {
+      expect((await after.getActiveSessions())[0]).toMatchObject({
+        session_id: 'linked-session',
+        role: 'secondary',
+        branch: 'feature/linked',
+        worktree_path: realpathSync(linkedWorktree),
+      });
+    } finally {
+      after.close();
+    }
   });
 });
