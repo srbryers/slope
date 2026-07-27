@@ -1,0 +1,294 @@
+{
+  "version": 1,
+  "kind": "sprint_rollover",
+  "transition_id": "9b5ca03a52d3e2e7",
+  "from_sprint": 264,
+  "to_sprint": 264.1,
+  "from_label": "S264",
+  "to_label": "S264.1",
+  "recorded_at": "2026-07-27T18:32:52.266Z",
+  "actor": {
+    "name": "sebastianbryers",
+    "source": "env:USER"
+  },
+  "request": {
+    "from": 264,
+    "to": 264.1,
+    "force": false
+  },
+  "forced": false,
+  "eligibility": {
+    "from_terminal": true,
+    "target_dependency_eligible": true,
+    "blocking_dependencies": [],
+    "target_dependencies": [
+      264
+    ],
+    "completion_evidence": {
+      "roadmap_complete": [
+        61,
+        62,
+        63,
+        64,
+        65,
+        66,
+        67,
+        68,
+        69,
+        70,
+        71,
+        72,
+        73,
+        74,
+        75,
+        76,
+        77,
+        78,
+        79,
+        80,
+        81,
+        82,
+        83,
+        84,
+        86,
+        87,
+        88,
+        89,
+        90,
+        91,
+        92,
+        93,
+        94,
+        95,
+        96,
+        97,
+        98,
+        99,
+        100,
+        101,
+        102,
+        103,
+        104,
+        105,
+        106,
+        107,
+        108,
+        109,
+        110,
+        111,
+        112,
+        113,
+        114,
+        114.5,
+        115,
+        116,
+        117,
+        118,
+        119,
+        120,
+        121,
+        122,
+        123,
+        124,
+        125,
+        126,
+        127,
+        130,
+        131,
+        132,
+        133,
+        134,
+        135,
+        136,
+        137,
+        137.5,
+        138,
+        139,
+        140,
+        141,
+        142,
+        143,
+        143.5,
+        143.6,
+        143.7,
+        143.8,
+        143.9,
+        143.95,
+        143.97,
+        143.98,
+        143.99,
+        144,
+        145,
+        146,
+        146.1,
+        146.2,
+        146.3,
+        148,
+        149,
+        150,
+        151,
+        151.1,
+        152,
+        152.1,
+        153,
+        154,
+        216,
+        217,
+        218,
+        219,
+        220,
+        221,
+        222,
+        223,
+        224,
+        226,
+        227,
+        228,
+        229,
+        230,
+        231,
+        232,
+        233,
+        234,
+        235,
+        236,
+        241,
+        242,
+        243,
+        244,
+        246,
+        247,
+        248,
+        249,
+        250,
+        251,
+        252,
+        253,
+        254,
+        256,
+        258,
+        259,
+        260,
+        260.1,
+        261,
+        262,
+        263,
+        264
+      ],
+      "scorecards": [
+        264
+      ],
+      "local_terminal": [
+        264
+      ]
+    },
+    "scorecard_artifacts": [
+      {
+        "sprint": 264,
+        "path": "docs/retros/sprint-264.json",
+        "sha256": "212b60bfce94b3d56290163978561dc560222449d6ae0dc317e29c156cbf9311"
+      }
+    ],
+    "expected_next": 264.1
+  },
+  "roadmap": {
+    "path": "docs/backlog/roadmap.json",
+    "sha256": "993517b7a19edd6eb0b5fb04715db18bdd0ab03b51e0a61b85456d4e144d45cf",
+    "from_status": "complete"
+  },
+  "prior_state_sha256": "053ca709f3fa31e37d57db0ffa7ad48b74af152b46c89e741774b0bb63502f19",
+  "prior_state": {
+    "sprint": 264,
+    "phase": "complete",
+    "gates": {
+      "tests": true,
+      "code_review": true,
+      "architect_review": true,
+      "scorecard": true,
+      "review_md": true
+    },
+    "review_gates": {
+      "code_review": {
+        "provenance": "independent_review",
+        "evidence": [
+          "docs/retros/sprint-264-data-review.md"
+        ],
+        "reviewer": "019fa4c0-94e1-7cf1-b794-ccffd602fc34/Noether",
+        "verdict": "pass",
+        "updated_at": "2026-07-27T18:26:49.222Z"
+      },
+      "architect_review": {
+        "provenance": "independent_review",
+        "evidence": [
+          "docs/retros/sprint-264-architect-review.md"
+        ],
+        "reviewer": "019fa4c0-7b5d-76c2-a20a-069f0c8b1444/Feynman",
+        "verdict": "pass",
+        "updated_at": "2026-07-27T18:26:48.047Z"
+      }
+    },
+    "review_requirements": {
+      "code_review": {
+        "priority": "optional",
+        "reason": "Baseline code review",
+        "source": "review_recommend",
+        "updated_at": "2026-07-27T18:04:54.933Z"
+      },
+      "architect_review": {
+        "priority": "required",
+        "reason": "4 tickets warrants architectural review",
+        "source": "review_recommend",
+        "updated_at": "2026-07-27T18:04:54.933Z"
+      }
+    },
+    "started_at": "2026-07-27T17:58:30.781Z",
+    "updated_at": "2026-07-27T18:32:14.114Z",
+    "rollover": {
+      "transition_id": "612713d517f79fc0",
+      "from_sprint": 263,
+      "audit_path": "docs/retros/rollovers/sprint-263-to-264-588322dace57327e.json",
+      "recorded_at": "2026-07-27T17:58:30.781Z",
+      "forced": false
+    }
+  },
+  "next_state": {
+    "sprint": 264.1,
+    "phase": "planning",
+    "gates": {
+      "tests": false,
+      "code_review": false,
+      "architect_review": false,
+      "scorecard": false,
+      "review_md": false
+    },
+    "review_gates": {
+      "code_review": {
+        "provenance": "pending",
+        "evidence": []
+      },
+      "architect_review": {
+        "provenance": "pending",
+        "evidence": []
+      }
+    },
+    "review_requirements": {
+      "code_review": {
+        "priority": "unspecified"
+      },
+      "architect_review": {
+        "priority": "unspecified"
+      }
+    },
+    "started_at": "2026-07-27T18:32:52.266Z",
+    "updated_at": "2026-07-27T18:32:52.266Z",
+    "rollover": {
+      "transition_id": "9b5ca03a52d3e2e7",
+      "from_sprint": 264,
+      "audit_path": "docs/retros/rollovers/sprint-264-to-264.1-36a72a7e4cf831d8.json",
+      "recorded_at": "2026-07-27T18:32:52.266Z",
+      "forced": false
+    }
+  },
+  "claims_policy": "unchanged",
+  "sessions_policy": "unchanged"
+}
