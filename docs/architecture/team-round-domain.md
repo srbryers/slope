@@ -388,3 +388,205 @@ missing, and nonexistent data.
 - Visibility and authority are explicit, scoped, and independently evaluated.
 - Unknown identity data remains unknown; it is never coerced into a trusted
   default.
+
+## Canonical Team Score
+
+The canonical scorecard retains SLOPE's existing team-level interpretation:
+
+```text
+round_differential = score - par
+```
+
+The versioned scoring revision determines how misses, hazards, and penalties
+change `score`. Multiplayer participation does not change the formula:
+
+- The round has one `par`, one `score`, one `round_differential`, and one score
+  label.
+- Each canonical `shot_id` appears once in the top-level shot sequence.
+- A participant projection references canonical shot IDs; it MUST NOT copy
+  shots into a second scoring source.
+- Agent, actor, session, role, attempt, or assignment subtotals MUST NOT be
+  summed or selected to produce the team score.
+- A fourball best-of result, foursomes alternate-shot result, or scramble
+  best-attempt result is not a SLOPE Team Round.
+- Coordination events, token cost, elapsed time, handoff count, and queue time
+  are separate operating metrics and do not add strokes by default.
+
+The team handicap remains a rolling descriptive summary of canonical round
+differentials under a pinned handicap revision. Scorecards from different
+scoring revisions MUST either be migrated through an explicit compatibility
+rule or reported in separate strata.
+
+## Accountable Shot Ownership
+
+Each canonical shot contains:
+
+- one `shot_id` and ticket or planned-work reference
+- one accountable owner principal, actor, session, and role
+- zero or more contributors
+- zero or more ownership and attempt evidence references
+- pre-outcome difficulty features and their revision
+- observed result, hazards, penalties, and verification evidence
+- typed missingness for any required field that was not observed
+
+Accountable ownership is required for actor-level outcome estimation. A shot
+without trusted owner identity remains part of the team score but is excluded
+from identified actor estimates and lowers attribution coverage.
+
+Ownership is not authorship:
+
+- The accountable owner is responsible for the accepted outcome.
+- Contributors retain credit and conflict relationships.
+- Prior owners remain visible after a handoff.
+- A verifier does not become the owner by approving or correcting a shot.
+- A resolver does not inherit ownership of the miss that required resolution.
+
+## Descriptive Handicap Estimands
+
+Actor and role handicaps answer:
+
+> For the work this actor or role actually owned during the stated window, how
+> did observed scoring loss compare with the expected loss for the recorded
+> pre-outcome difficulty and exposure?
+
+They do not answer:
+
+- what would have happened if another actor received the same assignments
+- whether an actor or role caused the team result
+- whether a controller, contributor, verifier, or resolver deserves a share of
+  the team score
+- which model or orchestration topology is universally better
+
+Selection into work is not random. Difficulty adjustment reduces obvious
+assignment-mix distortion but does not make the estimate causal.
+
+### Observation Unit
+
+The primary observation is a canonical owned shot. For shot `i`:
+
+```text
+observed_loss_i = versioned strokes or loss assigned by the scoring revision
+expected_loss_i = expected loss for the frozen difficulty stratum
+adjusted_loss_i = observed_loss_i - expected_loss_i
+```
+
+The actor estimand is the weighted mean `adjusted_loss_i` for shots owned by the
+actor in the aggregation window. The role estimand uses shots performed in that
+role. Signed values MUST be retained: negative means better than the expected
+loss for the observed assignment mix, and positive means worse.
+
+Reports MAY translate the adjusted estimate into a familiar handicap display,
+but MUST include the signed estimate, unit, scoring revision, difficulty
+revision, aggregation window, and denominator. A display clamp MUST NOT destroy
+the underlying signed value.
+
+Contributors MAY receive a separate contribution metric when evidence supports
+one. Contributor metrics are not actor ownership handicaps and MUST NOT be
+added to them.
+
+### Difficulty
+
+Difficulty features MUST be frozen before the outcome is known and versioned.
+Permitted inputs include:
+
+- declared club and ticket complexity
+- sprint slope factors
+- planned dependency position and blast radius
+- predeclared risk areas and required review level
+- typed resource contention known at assignment time
+- ownership or handoff state known before work resumes
+
+Outcome-derived values such as test failure count, observed hazards, final
+review findings, elapsed time after completion, or whether the shot landed
+cleanly MUST NOT be used as pre-outcome difficulty features.
+
+The difficulty model MUST publish:
+
+- feature and model revision
+- training or calibration window
+- expected-loss unit
+- fallback behavior for unseen strata
+- calibration and reliability evidence
+
+If expected loss cannot be estimated reliably, the shot remains in raw and
+team summaries while its adjusted value is missing with a reason.
+
+### Exposure
+
+The denominator MUST prevent completed-success-only selection.
+
+Exposure begins when accountable ownership is accepted. The actor and role
+reports include:
+
+- total accepted ownership exposures
+- canonical completed shots
+- handed-off, abandoned, retried, and unresolved exposures
+- identified, adjusted, and missing outcome counts
+- attribution and difficulty coverage
+
+An abandoned or handed-off exposure MUST NOT disappear because another actor
+finished the ticket. The final owner receives the accepted shot outcome; prior
+owners remain in a separately typed exposure or handoff measure. The scoring
+revision decides whether a failed attempt creates a canonical hazard or
+penalty, but the exposure record always remains.
+
+### Window, Sample Size, And Uncertainty
+
+Every actor or role estimate MUST identify:
+
+- round and date window
+- raw sample count and effective sample size
+- minimum sample threshold
+- observed and eligible exposure counts
+- attribution, outcome, and difficulty coverage percentages
+- uncertainty method and interval
+- scoring, difficulty, and estimator revisions
+
+Below the minimum sample threshold, the result is `insufficient_data`; it is
+not zero. A report with poor coverage or calibration MUST be marked low
+reliability even when its sample count is large.
+
+Repository and operator views aggregate canonical rounds or actor estimates.
+They are reporting scopes, not player identities.
+
+## Penalty Identity And Attribution
+
+Every score-affecting penalty has one immutable `penalty_id`. Its record
+contains:
+
+- team-level stroke or loss impact and scoring revision
+- round, attempt, ticket, shot, and resource scope as applicable
+- `caused_by` principals and actors, which MAY be shared or unknown
+- `resolved_by` principals and actors
+- evidence references, confidence, and verification status
+- typed attribution missingness
+
+The canonical team score counts `penalty_id` at most once. Participant and role
+views reference the same penalty; they do not clone it.
+
+`caused_by` and `resolved_by` are independent:
+
+- A resolver MUST NOT inherit causal attribution.
+- A verifier MUST NOT inherit causal attribution.
+- Shared causation MAY use versioned allocation weights for descriptive
+  participant views, but those weights do not alter team impact.
+- Unknown causation remains unknown and lowers attribution coverage.
+- Disputed causation remains visibly disputed until resolved by policy.
+
+Participant penalty projections are non-additive. Summing actor or role
+penalty views is not a valid way to reproduce the team score because shared,
+unknown, and cross-role penalties overlap.
+
+## Measurement Invariants
+
+- Team score and team handicap derive only from canonical scorecard versions.
+- Every canonical shot and penalty affects team score at most once.
+- Actor and role estimates use accountable ownership and pre-outcome
+  difficulty, never display aliases or sessions as durable identity.
+- Exposure includes incomplete and handed-off work instead of selecting only
+  successful completions.
+- Every estimate carries sample size, coverage, missingness, reliability, and
+  uncertainty.
+- Unknown is never represented as zero.
+- Difficulty adjustment is descriptive and MUST NOT be presented as causal.
+- Coordination overhead remains separate from canonical score.
