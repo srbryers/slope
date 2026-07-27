@@ -321,11 +321,12 @@ describe('workflowStepGateGuard', () => {
     writeConfig();
     writeWorkflow('test-wf', 'command');
     const store = new SqliteSlopeStore(join(TMP, '.slope/slope.db'));
-    await createRunningExecution(store, 'test-wf', 'phase1', 'step1');
+    const execId = await createRunningExecution(store, 'test-wf', 'phase1', 'step1');
     store.close();
 
     const result = await workflowStepGateGuard(makeInput(), TMP);
     expect(result.decision).toBe('deny');
+    expect(result.blockReason).toContain(`blocked by execution ${execId} for S77`);
     expect(result.blockReason).toContain('command');
     expect(result.blockReason).toContain('not "agent_work"');
   });

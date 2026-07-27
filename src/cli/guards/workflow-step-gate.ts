@@ -63,6 +63,7 @@ export async function workflowStepGateGuard(input: HookInput, cwd: string): Prom
     return {
       decision: 'deny',
       blockReason: [
+        `SLOPE workflow-step-gate: blocked by execution ${exec.id} for ${sprintLabelForExecution(exec)} (${exec.workflow_name}).`,
         `SLOPE workflow-step-gate: Current step "${exec.current_step}" (phase: ${exec.current_phase}) is type "${stepType}", not "agent_work".`,
         `File edits are only allowed during agent_work steps.`,
         `Complete the current ${stepType} step first via \`slope sprint run\` or workflow MCP tools.`,
