@@ -131,7 +131,9 @@ export function createConfig(cwd: string = process.cwd()): string {
     mkdirSync(dir, { recursive: true });
   }
   const configPath = join(dir, CONFIG_FILE);
-  writeFileSync(configPath, JSON.stringify(DEFAULT_CONFIG, null, 2) + '\n');
+  if (!existsSync(configPath)) {
+    writeFileSync(configPath, JSON.stringify(DEFAULT_CONFIG, null, 2) + '\n');
+  }
   return configPath;
 }
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createSlopeToolsServer, SLOPE_MCP_TOOL_NAMES, detectSetupHints, buildSetupHint, formatSearchResults } from '../../src/mcp/index.js';
+import { createSlopeToolsServer, SLOPE_MCP_TOOL_NAMES, detectSetupHints, buildSetupHint, findProjectRoot, formatSearchResults, resolveTestingWorktreePath } from '../../src/mcp/index.js';
 import type { SetupHints } from '../../src/mcp/index.js';
 import { SLOPE_REGISTRY, SLOPE_TYPES } from '../../src/mcp/registry.js';
 import { runInSandbox } from '../../src/mcp/sandbox.js';
@@ -636,6 +636,30 @@ describe('detectSetupHints', () => {
     const hints = detectSetupHints(tmp);
     expect(hints.settingsConfigured).toBe(false);
     rmSync(tmp, { recursive: true, force: true });
+  });
+});
+
+describe('MCP project and worktree scope', () => {
+  it('discovers a nested SLOPE project from a descendant directory', () => {
+    const outer = mkdtempSync(join(tmpdir(), 'slope-mcp-root-'));
+    const nested = join(outer, 'fixtures', 'project');
+    const descendant = join(nested, 'src', 'deeper');
+    mkdirSync(join(outer, '.slope'), { recursive: true });
+    mkdirSync(join(nested, '.slope'), { recursive: true });
+    mkdirSync(descendant, { recursive: true });
+    writeFileSync(join(outer, '.slope', 'config.json'), '{}');
+    writeFileSync(join(nested, '.slope', 'config.json'), '{}');
+
+    expect(findProjectRoot(descendant)).toBe(nested);
+
+    rmSync(outer, { recursive: true, force: true });
+  });
+
+  it('places generated testing worktrees beside the repository', () => {
+    const projectRoot = join(tmpdir(), 'slope-project');
+
+    expect(resolveTestingWorktreePath(projectRoot, 123))
+      .toBe(join(tmpdir(), 'slope-project-testing-123'));
   });
 });
 

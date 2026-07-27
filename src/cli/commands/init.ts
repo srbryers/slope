@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
 import { createConfig } from '../config.js';
 import { formatNoGitModeWarning, requireGitWorkTreeOrExplicitNoGit } from '../git-preflight.js';
+import { resolveRepoStateCwd, resolveRepoStatePath } from '../../core/repo-state-scope.js';
 import { saveHooksConfig } from '../hooks-config.js';
 import { resolveMetaphor } from '../metaphor.js';
 import { detectPackageManager, createVision, analyzeStack, SLOPE_BIN_PREAMBLE, writeOrUpdateManagedScript, GUARD_DEFINITIONS, normalizeShellScriptLineEndings } from '../../core/index.js';
@@ -1120,6 +1121,7 @@ Options:
   --metaphor=<id>         Set metaphor theme, e.g. golf or gaming
   --auto-install          Add @slope-dev/slope as a dev dependency when possible
   --migrate               Upgrade an existing .slope/config.json in place
+  --force                 Reinitialize shared state when invoked from a linked worktree
   --allow-no-git, --no-git  Explicitly initialize without git-backed completion evidence
 
 Examples:
@@ -1165,6 +1167,17 @@ export async function initCommand(args: string[]): Promise<void> {
   const gitPreflight = requireGitWorkTreeOrExplicitNoGit('init', args, cwd);
   if (gitPreflight.degradedNoGitMode) {
     console.warn(formatNoGitModeWarning('init'));
+  }
+  const stateCwd = resolveRepoStateCwd(cwd);
+  const sharedConfigPath = resolveRepoStatePath(cwd, '.slope/config.json');
+  if (
+    stateCwd !== cwd &&
+    existsSync(sharedConfigPath) &&
+    !args.includes('--force') &&
+    !args.includes('--migrate')
+  ) {
+    console.error('Error: This linked worktree already shares SLOPE state from the primary checkout. Run init from the primary checkout, or pass --force to reinitialize shared state.');
+    process.exit(1);
   }
 
   // Interactive mode: prompt for project details, then exit
@@ -1220,7 +1233,7 @@ export async function initCommand(args: string[]): Promise<void> {
   const configPath = createConfig(cwd);
 
   // Scaffold .slope/workflows/ with built-in workflow stubs
-  const workflowsDir = join(cwd, '.slope', 'workflows');
+  const workflowsDir = join(stateCwd, '.slope', 'workflows');
   mkdirSync(workflowsDir, { recursive: true });
   const builtinDir = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'core', 'workflows');
   if (existsSync(builtinDir)) {
@@ -1272,7 +1285,7 @@ export async function initCommand(args: string[]): Promise<void> {
 
   // Handle --migrate flag: upgrade config from older SLOPE versions
   if (args.includes('--migrate')) {
-    const configPath = join(cwd, '.slope/config.json');
+    const configPath = join(stateCwd, '.slope/config.json');
     if (existsSync(configPath)) {
       try {
         const oldConfig = JSON.parse(readFileSync(configPath, 'utf8'));
@@ -1340,7 +1353,7 @@ export async function initCommand(args: string[]): Promise<void> {
     }
   }
 
-  const commonIssuesPath = join(cwd, '.slope', 'common-issues.json');
+  const commonIssuesPath = join(stateCwd, '.slope', 'common-issues.json');
   if (!existsSync(commonIssuesPath)) {
     writeFileSync(commonIssuesPath, JSON.stringify(EXAMPLE_COMMON_ISSUES, null, 2) + '\n');
     console.log(`  Created ${commonIssuesPath}`);
@@ -1356,11 +1369,11 @@ export async function initCommand(args: string[]): Promise<void> {
   }
 
   // Create SQLite store (replaces sessions.json and claims.json)
-  const dbPath = join(cwd, '.slope', 'slope.db');
+  const dbPath = join(stateCwd, '.slope', 'slope.db');
   if (!existsSync(dbPath)) {
     try {
       const { createStore } = await import('../../store/index.js');
-      const store = createStore({ storePath: '.slope/slope.db', cwd });
+      const store = createStore({ storePath: '.slope/slope.db', cwd: stateCwd });
       store.close();
       console.log(`  Created ${dbPath}`);
     } catch (err) {
@@ -1370,8 +1383,8 @@ export async function initCommand(args: string[]): Promise<void> {
 
   // Create plugin directories
   const pluginDirs = [
-    join(cwd, '.slope', 'plugins', 'metaphors'),
-    join(cwd, '.slope', 'plugins', 'guards'),
+    join(stateCwd, '.slope', 'plugins', 'metaphors'),
+    join(stateCwd, '.slope', 'plugins', 'guards'),
   ];
   for (const dir of pluginDirs) {
     if (!existsSync(dir)) {
@@ -1381,7 +1394,7 @@ export async function initCommand(args: string[]): Promise<void> {
   console.log(`  Created .slope/plugins/ directories`);
 
   // Create initial hooks config
-  saveHooksConfig(cwd, { installed: {} });
+  saveHooksConfig(stateCwd, { installed: {} });
   console.log(`  Created .slope/hooks.json`);
 
   for (const p of providers) {
@@ -1423,7 +1436,7 @@ export async function initCommand(args: string[]): Promise<void> {
       createVision({
         purpose: visionPurpose,
         priorities: visionPriorities.split(',').map(s => s.trim()).filter(Boolean),
-      }, cwd);
+      }, stateCwd);
       console.log('  Created .slope/vision.json');
     } catch (err) {
       console.error(`  Warning: Could not create vision: ${(err as Error).message}`);

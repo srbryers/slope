@@ -23,6 +23,23 @@ export function headIsOnMain(cwd: string): boolean {
 
 const BASELINES_DIR = '.slope/baselines';
 
+export interface GitStatusEntry {
+  status: string;
+  path: string;
+}
+
+export function parseGitStatusPorcelain(output: string): GitStatusEntry[] {
+  const content = output.trimEnd();
+  if (!content) return [];
+  return content
+    .split('\n')
+    .filter(Boolean)
+    .map(line => ({
+      status: line.slice(0, 2),
+      path: line.slice(3),
+    }));
+}
+
 function baselinePath(sessionId: string, cwd: string): string {
   const stateCwd = resolveRepoStateCwd(cwd);
   const worktreeRoot = gitTopLevel(cwd);
@@ -54,7 +71,7 @@ export function recordBaseline(sessionId: string, cwd: string): boolean {
   if (existsSync(path)) return false;
 
   try {
-    const status = execSync('git status --porcelain', { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trimEnd();
+    const status = execSync('git status --porcelain=v1', { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trimEnd();
     const dir = dirname(path);
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
     writeFileSync(path, status);
@@ -74,9 +91,7 @@ export function loadBaseline(sessionId: string, cwd: string): Set<string> {
   if (!existsSync(path)) return new Set();
 
   try {
-    const content = readFileSync(path, 'utf8').trimEnd();
-    if (!content) return new Set();
-    return new Set(content.split('\n').filter(Boolean).map(line => line.slice(3)));
+    return new Set(parseGitStatusPorcelain(readFileSync(path, 'utf8')).map(entry => entry.path));
   } catch {
     return new Set();
   }

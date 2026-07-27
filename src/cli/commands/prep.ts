@@ -5,6 +5,7 @@ import { loadConfig } from '../../core/config.js';
 import { hasEmbeddingSupport } from '../../core/embedding-store.js';
 import { loadScorecards } from '../../core/loader.js';
 import { generatePrepPlan, formatPrepPlan, resolveTicket, findSimilarTickets, extractHazards, formatLitePrepPlan } from '../../core/prep.js';
+import { resolveRepoStatePath } from '../../core/repo-state-scope.js';
 import type { EmbeddingConfig } from '../../core/embedding.js';
 import { SqliteSlopeStore } from '../../store/index.js';
 
@@ -82,7 +83,7 @@ export async function prepCommand(args: string[]): Promise<void> {
 
   // Open store
   const storePath = config.store_path ?? '.slope/slope.db';
-  const store = new SqliteSlopeStore(`${cwd}/${storePath}`);
+  const store = new SqliteSlopeStore(resolveRepoStatePath(cwd, storePath));
 
   try {
     if (!hasEmbeddingSupport(store)) {

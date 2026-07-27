@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execSync } from 'node:child_process';
 import { stopCheckGuard } from '../../../src/cli/guards/stop-check.js';
+import { recordBaseline } from '../../../src/cli/guards/git-utils.js';
 import type { HookInput } from '../../../src/core/index.js';
 
 let tmpDir: string;
@@ -49,6 +50,17 @@ describe('stop-check guard', () => {
     const result = await stopCheckGuard(makeStop(), tmpDir);
     expect(result.blockReason).toBeUndefined();
     expect(result.context).toContain('uncommitted');
+  });
+
+  it('does not treat an unstaged pre-session modification as a new session change', async () => {
+    writeFileSync(join(tmpDir, 'file.txt'), 'modified before session');
+    expect(recordBaseline('test-session', tmpDir)).toBe(true);
+
+    const result = await stopCheckGuard(makeStop(), tmpDir);
+
+    expect(result.blockReason).toBeUndefined();
+    expect(result.context).toContain('pre-existing dirty file');
+    expect(result.context).not.toContain('uncommitted change');
   });
 
   it('ignores untracked files (no warning)', async () => {

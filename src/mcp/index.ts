@@ -20,7 +20,7 @@
  *   import { createSlopeToolsServer }     # programmatic
  */
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { join, dirname, relative } from 'node:path';
+import { basename, join, dirname, relative, resolve } from 'node:path';
 import { execFileSync, execSync } from 'node:child_process';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -30,7 +30,7 @@ import { SLOPE_REGISTRY, SLOPE_TYPES } from './registry.js';
 import type { FunctionRegistryEntry } from './registry.js';
 import { runInSandbox } from './sandbox.js';
 import type { SlopeStore, SlopeConfig } from '../core/index.js';
-import { checkConflicts, loadFlows, checkFlowStaleness, checkStoreHealth, METAPHOR_SCHEMA, listMetaphors, buildInterviewContext, generateInterviewSteps, loadConfig, parseTestPlan, getAreasNeedingTest, hasEmbeddingSupport, embed, deduplicateByFile, formatContextForAgent, WorkflowEngine, loadWorkflow, listWorkflows, resolveVariables, resolveRepoStatePath } from '../core/index.js';
+import { checkConflicts, loadFlows, checkFlowStaleness, checkStoreHealth, METAPHOR_SCHEMA, listMetaphors, buildInterviewContext, generateInterviewSteps, loadConfig, parseTestPlan, getAreasNeedingTest, hasEmbeddingSupport, embed, deduplicateByFile, formatContextForAgent, WorkflowEngine, loadWorkflow, listWorkflows, resolveVariables, resolveRepoStateCwd, resolveRepoStatePath } from '../core/index.js';
 import type { ContextResult } from '../core/index.js';
 import { gaming } from '../core/metaphors/gaming.js';
 import type { ClaimScope, FlowsFile, FlowDefinition } from '../core/index.js';
@@ -441,11 +441,12 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
         }
 
         // Clean up stale testing worktrees (best-effort)
-        const worktreeDir = join(projectRoot, '.claude', 'worktrees');
+        const worktreeDir = dirname(projectRoot);
+        const worktreePrefix = `${basename(projectRoot)}-testing-`;
         try {
           const { readdirSync, existsSync: dirExists } = await import('node:fs');
           if (dirExists(worktreeDir)) {
-            const entries = readdirSync(worktreeDir).filter(e => e.startsWith('testing-'));
+            const entries = readdirSync(worktreeDir).filter(e => e.startsWith(worktreePrefix));
             for (const entry of entries) {
               try {
                 // Check if branch is merged and no active session references it
@@ -460,7 +461,7 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
         // Create fresh worktree
         const timestamp = Date.now();
         const branchName = `testing/${timestamp}`;
-        const worktreePath = join(worktreeDir, `testing-${timestamp}`);
+        const worktreePath = resolveTestingWorktreePath(projectRoot, timestamp);
         try {
           // Ensure worktree parent directory exists
           const { mkdirSync: mkdirS } = await import('node:fs');
@@ -479,17 +480,6 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
           }
 
           execSync(`git worktree add ${JSON.stringify(worktreePath)} -b ${branchName} origin/${baseBranch}`, { cwd: projectRoot, timeout: 30000 });
-
-          // Mirror .slope config files (exclude DB files to avoid split-brain)
-          const slopeDir = join(projectRoot, '.slope');
-          const wtSlopeDir = join(worktreePath, '.slope');
-          const { cpSync } = await import('node:fs');
-          if (existsSync(slopeDir)) {
-            cpSync(slopeDir, wtSlopeDir, {
-              recursive: true,
-              filter: (src: string) => !src.match(/\.db(-wal|-shm)?$|\.db$/),
-            });
-          }
         } catch (err) {
           return {
             content: [{ type: 'text' as const, text: `Error creating testing worktree: ${err instanceof Error ? err.message : String(err)}` }],
@@ -1228,6 +1218,19 @@ function handleInitQuery(): string {
 
 /** Find the active checkout root whose common-dir owner contains SLOPE state. */
 export function findProjectRoot(startDir: string): string {
+  let dir = resolve(startDir);
+  while (true) {
+    if (
+      existsSync(join(dir, '.slope', 'config.json')) &&
+      resolve(resolveRepoStateCwd(dir)) === resolve(dir)
+    ) {
+      return dir;
+    }
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+
   try {
     const worktreeRoot = execFileSync('git', ['rev-parse', '--show-toplevel'], {
       cwd: startDir,
@@ -1241,7 +1244,7 @@ export function findProjectRoot(startDir: string): string {
     // Fall back to directory walking for non-git and fixture projects.
   }
 
-  let dir = startDir;
+  dir = resolve(startDir);
   while (true) {
     if (existsSync(resolveRepoStatePath(dir, '.slope/config.json'))) {
       return dir;
@@ -1252,6 +1255,11 @@ export function findProjectRoot(startDir: string): string {
     }
     dir = parent;
   }
+}
+
+/** Place generated testing worktrees beside the repository, outside parent globs. */
+export function resolveTestingWorktreePath(projectRoot: string, timestamp: number): string {
+  return join(dirname(resolve(projectRoot)), `${basename(resolve(projectRoot))}-testing-${timestamp}`);
 }
 
 async function main(): Promise<void> {

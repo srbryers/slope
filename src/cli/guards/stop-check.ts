@@ -2,7 +2,7 @@ import { execSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { HookInput, GuardResult } from '../../core/index.js';
-import { headIsOnMain, loadBaseline, removeBaseline } from './git-utils.js';
+import { headIsOnMain, loadBaseline, parseGitStatusPorcelain, removeBaseline } from './git-utils.js';
 import { resolveStore } from '../store.js';
 import { resetWorktreeCheckState } from './worktree-check.js';
 
@@ -81,20 +81,18 @@ export async function stopCheckGuard(_input: HookInput, cwd: string): Promise<Gu
 
   // Check for uncommitted changes (excluding gitignored files)
   try {
-    const status = execSync('git status --porcelain', { cwd: gitDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-    if (status.length > 0) {
-      const lines = status.split('\n').filter(Boolean);
+    const status = execSync('git status --porcelain=v1', { cwd: gitDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+    const entries = parseGitStatusPorcelain(status);
+    if (entries.length > 0) {
 
       // Separate untracked (??) from modified/staged/deleted
       const untrackedPaths: string[] = [];
       const modifiedPaths: string[] = [];
-      for (const line of lines) {
-        const statusCode = line.slice(0, 2);
-        const path = line.slice(3);
-        if (statusCode === '??') {
-          untrackedPaths.push(path);
+      for (const entry of entries) {
+        if (entry.status === '??') {
+          untrackedPaths.push(entry.path);
         } else {
-          modifiedPaths.push(path);
+          modifiedPaths.push(entry.path);
         }
       }
 

@@ -70,13 +70,17 @@ describe('repository state scope', () => {
 
   it('keeps an explicitly nested SLOPE project locally scoped', () => {
     const nested = join(worktree, 'fixtures', 'standalone');
+    const descendant = join(nested, 'src', 'deeper');
     mkdirSync(join(nested, '.slope'), { recursive: true });
+    mkdirSync(descendant, { recursive: true });
     writeFileSync(join(nested, '.slope', 'config.json'), JSON.stringify({
       store_path: '.slope/nested.db',
     }));
 
     expect(resolveRepoStateCwd(nested)).toBe(nested);
+    expect(resolveRepoStateCwd(descendant)).toBe(nested);
     expect(loadConfig(nested).store_path).toBe('.slope/nested.db');
+    expect(loadConfig(descendant).store_path).toBe('.slope/nested.db');
   });
 
   it('opens the same SQLite store from the primary and linked worktree', async () => {

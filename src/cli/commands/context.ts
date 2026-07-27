@@ -6,6 +6,7 @@ import { loadConfig } from '../../core/config.js';
 import { embed } from '../../core/embedding-client.js';
 import { hasEmbeddingSupport } from '../../core/embedding-store.js';
 import { deduplicateByFile, formatContextForAgent } from '../../core/context.js';
+import { resolveRepoStatePath } from '../../core/repo-state-scope.js';
 import type { ContextResult } from '../../core/context.js';
 import type { EmbeddingConfig } from '../../core/embedding.js';
 import { SqliteSlopeStore } from '../../store/index.js';
@@ -144,7 +145,7 @@ export async function contextCommand(args: string[]): Promise<void> {
 
   // Open store
   const storePath = config.store_path ?? '.slope/slope.db';
-  const store = new SqliteSlopeStore(`${cwd}/${storePath}`);
+  const store = new SqliteSlopeStore(resolveRepoStatePath(cwd, storePath));
 
   try {
     if (!hasEmbeddingSupport(store)) {

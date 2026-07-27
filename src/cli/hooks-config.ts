@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname } from 'node:path';
+import { resolveRepoStatePath } from '../core/repo-state-scope.js';
 
 export interface HooksConfig {
   installed: Record<string, { provider: string; installed_at: string }>;
@@ -8,7 +9,7 @@ export interface HooksConfig {
 const HOOKS_CONFIG_FILE = '.slope/hooks.json';
 
 export function loadHooksConfig(cwd: string): HooksConfig {
-  const configPath = join(cwd, HOOKS_CONFIG_FILE);
+  const configPath = resolveRepoStatePath(cwd, HOOKS_CONFIG_FILE);
   if (!existsSync(configPath)) {
     return { installed: {} };
   }
@@ -20,7 +21,8 @@ export function loadHooksConfig(cwd: string): HooksConfig {
 }
 
 export function saveHooksConfig(cwd: string, config: HooksConfig): void {
-  const dir = join(cwd, '.slope');
+  const configPath = resolveRepoStatePath(cwd, HOOKS_CONFIG_FILE);
+  const dir = dirname(configPath);
   mkdirSync(dir, { recursive: true });
-  writeFileSync(join(cwd, HOOKS_CONFIG_FILE), JSON.stringify(config, null, 2) + '\n');
+  writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n');
 }

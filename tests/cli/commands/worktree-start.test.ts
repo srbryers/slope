@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { existsSync, mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execSync } from 'node:child_process';
@@ -8,6 +8,7 @@ import { resolveStore } from '../../../src/cli/store.js';
 
 let cwd: string;
 let originalCwd: string;
+let symlinkAlias: string | null;
 
 function setupRepo(): void {
   mkdirSync(join(cwd, '.slope'), { recursive: true });
@@ -37,6 +38,7 @@ describe('slope worktree start', () => {
     mkdirSync(cwd, { recursive: true });
     setupRepo();
     originalCwd = process.cwd();
+    symlinkAlias = null;
     process.chdir(cwd);
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -46,6 +48,7 @@ describe('slope worktree start', () => {
   afterEach(() => {
     process.chdir(originalCwd);
     vi.restoreAllMocks();
+    if (symlinkAlias) rmSync(symlinkAlias, { recursive: true, force: true });
     rmSync(cwd, { recursive: true, force: true });
   });
 
@@ -106,6 +109,23 @@ describe('slope worktree start', () => {
       '--branch=codex/in-repo-warning',
       '--base=HEAD',
       '--path=worktrees/in-repo-warning',
+      '--dry-run',
+    ]);
+
+    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('parent test or format globs'));
+  });
+
+  it('warns when a symlinked worktree path resolves inside the repository', async () => {
+    const inRepoRoot = join(cwd, 'worktrees');
+    mkdirSync(inRepoRoot, { recursive: true });
+    symlinkAlias = `${cwd}-alias`;
+    symlinkSync(inRepoRoot, symlinkAlias);
+
+    await worktreeCommand([
+      'start',
+      '--branch=codex/symlink-in-repo-warning',
+      '--base=HEAD',
+      `--path=${join(symlinkAlias, 'child')}`,
       '--dry-run',
     ]);
 

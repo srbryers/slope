@@ -7,6 +7,7 @@ import { loadConfig } from '../../core/config.js';
 import { chunkFile, shouldSkipFile } from '../../core/embedding.js';
 import { embedBatch } from '../../core/embedding-client.js';
 import { hasEmbeddingSupport } from '../../core/embedding-store.js';
+import { resolveRepoStatePath } from '../../core/repo-state-scope.js';
 import type { EmbeddingConfig, CodeChunk } from '../../core/embedding.js';
 import { SqliteSlopeStore } from '../../store/index.js';
 
@@ -80,7 +81,7 @@ export async function indexCommand(args: string[]): Promise<void> {
 
   // Resolve store
   const storePath = config.store_path ?? '.slope/slope.db';
-  const store = new SqliteSlopeStore(`${cwd}/${storePath}`);
+  const store = new SqliteSlopeStore(resolveRepoStatePath(cwd, storePath));
 
   try {
     if (!hasEmbeddingSupport(store)) {

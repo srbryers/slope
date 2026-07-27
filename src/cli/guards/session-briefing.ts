@@ -56,10 +56,13 @@ export async function sessionBriefingGuard(input: HookInput, cwd: string): Promi
     // Nudge if no workflow execution is active
     try {
       const store = await resolveStore(cwd);
-      const executions = await store.listExecutions({ status: 'running' });
-      store.close();
-      if (executions.length === 0) {
-        lines.push('No workflow execution active. Consider: slope sprint run --workflow=sprint-standard --var sprint_id=S' + sprintState.sprint);
+      try {
+        const executions = await store.listExecutions({ status: 'running' });
+        if (executions.length === 0) {
+          lines.push('No workflow execution active. Consider: slope sprint run --workflow=sprint-standard --var sprint_id=S' + sprintState.sprint);
+        }
+      } finally {
+        store.close();
       }
     } catch { /* store unavailable */ }
   } else if (isPlanning) {
@@ -92,28 +95,33 @@ export async function sessionBriefingGuard(input: HookInput, cwd: string): Promi
   } catch { /* roadmap unavailable */ }
 
   // Active claims
-  let loadedClaimsFromStore = false;
+  const activeClaimTargets = new Set<string>();
   try {
     const store = await resolveStore(cwd);
-    const claims = await store.getActiveClaims(sprintState?.sprint);
-    store.close();
-    loadedClaimsFromStore = true;
-    if (claims.length > 0) {
-      lines.push(`Active claims: ${claims.map(claim => claim.target).join(', ')}`);
-    }
-  } catch { /* fall through to the file registry */ }
-
-  if (!loadedClaimsFromStore) {
     try {
-      const claimsPath = resolveRepoStatePath(cwd, config.claimsPath ?? '.slope/claims.json');
-      if (existsSync(claimsPath)) {
-        const claims = JSON.parse(readFileSync(claimsPath, 'utf8'));
-        if (Array.isArray(claims) && claims.length > 0) {
-          const targets = claims.map((c: { target?: string }) => c.target ?? 'unknown').join(', ');
-          lines.push(`Active claims: ${targets}`);
-        }
+      const claims = await store.getActiveClaims(sprintState?.sprint);
+      for (const claim of claims) activeClaimTargets.add(claim.target);
+    } finally {
+      store.close();
+    }
+  } catch { /* store claims unavailable */ }
+
+  try {
+    const claimsPath = resolveRepoStatePath(cwd, config.claimsPath ?? '.slope/claims.json');
+    if (existsSync(claimsPath)) {
+      const raw = JSON.parse(readFileSync(claimsPath, 'utf8')) as {
+        claims?: Array<{ target?: string; sprint_number?: number }>;
+      } | Array<{ target?: string; sprint_number?: number }>;
+      const claims = Array.isArray(raw) ? raw : raw.claims ?? [];
+      for (const claim of claims) {
+        if (sprintState?.sprint !== undefined && claim.sprint_number !== sprintState.sprint) continue;
+        activeClaimTargets.add(claim.target ?? 'unknown');
       }
-    } catch { /* claims unavailable */ }
+    }
+  } catch { /* file claims unavailable */ }
+
+  if (activeClaimTargets.size > 0) {
+    lines.push(`Active claims: ${[...activeClaimTargets].join(', ')}`);
   }
 
   // Phase cleanup status

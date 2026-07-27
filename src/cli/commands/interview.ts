@@ -11,6 +11,7 @@ import type { MetaphorPreview } from '../../core/metaphor-preview.js';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { formatNoGitModeWarning, requireGitWorkTreeOrExplicitNoGit } from '../git-preflight.js';
+import { resolveRepoStatePath } from '../../core/repo-state-scope.js';
 
 // Ensure built-in metaphors are registered
 import '../../core/metaphors/index.js';
@@ -279,7 +280,7 @@ export async function interviewCommand(args: string[]): Promise<void> {
   }
 
   // Guard: if .slope/config.json already exists, warn but allow --force
-  const configPath = join(cwd, '.slope', 'config.json');
+  const configPath = resolveRepoStatePath(cwd, '.slope/config.json');
   const hasConfig = existsSync(configPath);
   if (hasConfig && !args.includes('--force')) {
     if (isAgent) {

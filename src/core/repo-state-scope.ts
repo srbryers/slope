@@ -31,6 +31,16 @@ export function resolvePrimaryCheckout(cwd: string): string | null {
 export function resolveRepoStateCwd(cwd: string = process.cwd()): string {
   const local = resolve(cwd);
   const gitTopLevel = safeGit(local, ['rev-parse', '--show-toplevel']);
+  const nearestProject = findNearestSlopeProject(local, gitTopLevel);
+  const primary = resolvePrimaryCheckout(local);
+
+  if (
+    nearestProject &&
+    (!gitTopLevel || !samePath(nearestProject, gitTopLevel) || !primary || samePath(primary, gitTopLevel))
+  ) {
+    return nearestProject;
+  }
+
   if (
     existsSync(join(local, '.slope')) &&
     (!gitTopLevel || !samePath(local, gitTopLevel))
@@ -38,7 +48,6 @@ export function resolveRepoStateCwd(cwd: string = process.cwd()): string {
     return local;
   }
 
-  const primary = resolvePrimaryCheckout(local);
   if (!primary || !existsSync(join(primary, '.slope', 'config.json'))) return local;
   return primary;
 }
@@ -71,5 +80,16 @@ function samePath(left: string, right: string): boolean {
     return realpathSync(left) === realpathSync(right);
   } catch {
     return resolve(left) === resolve(right);
+  }
+}
+
+function findNearestSlopeProject(start: string, gitTopLevel: string | null): string | null {
+  let dir = start;
+  while (true) {
+    if (existsSync(join(dir, '.slope', 'config.json'))) return dir;
+    if (gitTopLevel && samePath(dir, gitTopLevel)) return null;
+    const parent = dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
   }
 }

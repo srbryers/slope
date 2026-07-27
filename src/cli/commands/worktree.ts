@@ -6,8 +6,8 @@
 
 import { execFileSync, execSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync } from 'node:fs';
-import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { existsSync, mkdirSync, realpathSync } from 'node:fs';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { checkConflicts } from '../../core/index.js';
 import { QUIET_STDIO } from '../../core/process.js';
 import { STALE_SESSION_THRESHOLD_MS } from '../../core/constants.js';
@@ -141,8 +141,22 @@ function resolveDefaultBase(projectRoot: string): string {
 }
 
 function isWithinPath(parent: string, target: string): boolean {
-  const rel = relative(resolve(parent), resolve(target));
+  const rel = relative(canonicalPath(parent), canonicalPath(target));
   return rel === '' || (rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel));
+}
+
+function canonicalPath(path: string): string {
+  let existing = resolve(path);
+  const tail: string[] = [];
+  while (!existsSync(existing) && dirname(existing) !== existing) {
+    tail.unshift(basename(existing));
+    existing = dirname(existing);
+  }
+  try {
+    return join(realpathSync(existing), ...tail);
+  } catch {
+    return resolve(path);
+  }
 }
 
 function warnForInRepoWorktree(projectRoot: string, worktreePath: string): void {
