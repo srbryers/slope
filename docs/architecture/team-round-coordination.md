@@ -115,6 +115,70 @@ integrity checkpoints, and dead-letter entries are permitted. They are not
 alternate event sources and MUST be reconstructible from the canonical event
 ledger plus declared administrative policy.
 
+### Authority Generation And Physical Write Barrier
+
+The store persists a project-scoped monotonic `authority_generation`. Every
+canonical append request and adapter session pins the generation it observed.
+Append locks and compares the active value inside the transaction. A mismatch
+fails with `STORE_AUTHORITY_CHANGED`.
+
+Cutover increments the generation in the same transaction that accepts
+`store.authority_changed`, switches the mutation dispatch to canonical append,
+and activates the physical legacy-write barrier.
+
+Physical enforcement is adapter-specific but mandatory:
+
+- SQLite rebuilds mutable compatibility tables as read-only views or guarded
+  projections whose legacy write triggers abort. Canonical projection tables
+  are reachable only by the canonical store implementation.
+- PostgreSQL revokes application-role DML on ledger and projection tables and
+  exposes canonical append plus filtered read procedures. Compatibility names
+  are read-only views.
+- An adapter with equivalent database-enforced controls documents and tests
+  them in its conformance packet.
+
+An already-running old process therefore fails its next legacy DML or presents
+a stale authority generation. Observation mode compares readers; it does not
+leave a legacy writer enabled.
+
+Raw database owners and filesystem-level SQLite editors remain in the database
+administrator threat boundary. Ordinary SLOPE and custom adapter credentials
+MUST NOT have that authority.
+
+### Store Protocol Negotiation
+
+At resolution, every adapter reports a structured protocol descriptor:
+
+```text
+coordination_protocol = {
+  protocol_revision,
+  team_round_ledger_revision,
+  authority_generation,
+  project_scoped_keys,
+  canonical_append,
+  transactional_projections,
+  filtered_reads,
+  deterministic_replay,
+  authoritative_time,
+  lease_fencing,
+  redaction_retention
+}
+```
+
+S268 and later Team Round operations require compatible revisions and every
+listed capability. Missing, false, unknown, or stale descriptors fail closed
+with `STORE_PROTOCOL_UNSUPPORTED`.
+
+Dynamic custom stores do not inherit trust from implementing the legacy
+`SlopeStore` shape. Before cutover they may run only in explicit compatibility
+mode. After cutover they must implement the protocol descriptor, canonical
+append, filtered reads, replay verification, authority-generation check, and
+lease fencing, and pass the published adapter conformance suite.
+
+Self-reported support is not sufficient release evidence. Runtime negotiation
+prevents accidental old-adapter use; conformance tests and deployment policy
+establish that the implementation actually enforces the descriptor.
+
 ## Existing Store Migration
 
 ### Migration Identity
@@ -147,13 +211,23 @@ backfilled.
 
 ### Cutover Phases
 
+Before `inventory`, the adapter acquires its exclusive migration lock and
+persists `team_round_migration_mode = write_frozen`. Every legacy mutator and
+canonical append entry point checks that marker inside its write transaction.
+If an installed adapter cannot enforce the marker across every session, claim,
+workflow, scorecard, common-issue, and event writer, migration refuses to
+start.
+
+The write barrier remains active through `inventory`, `expand`, `backfill`, and
+`verify`. No delta may enter behind the inventory watermark. Read-only legacy
+views may remain available with an explicit maintenance and staleness marker.
+
 Migration proceeds through these durable phases:
 
 1. `inventory`
-   - Acquire the adapter migration lock.
+   - Verify the exclusive migration lock and durable write barrier.
    - Record source schema versions, project binding, row counts, content
      digests, and the maximum existing event position.
-   - Reject ordinary Team Round writes while inventory is open.
 2. `expand`
    - Add canonical envelope columns, append metadata, idempotency records,
      projection cursors, immutable scorecard-version storage, lease state, and
@@ -172,6 +246,8 @@ Migration proceeds through these durable phases:
    - Commit one `store.authority_changed` event naming the old and new read
      authorities, verified event position, manifest hash, and ledger revision.
    - Switch all mutation adapters to canonical append in the same transaction.
+   - Replace `write_frozen` with `canonical_only` in that transaction. A
+     legacy writer remains denied after the barrier is lifted.
 6. `observe`
    - Compare production reads against shadow replay for a bounded policy
      window.
@@ -183,6 +259,63 @@ Migration proceeds through these durable phases:
 A failed phase is resumable from its durable checkpoint. Re-running a completed
 phase with the same manifest is a no-op. Re-running it with different inputs is
 a conflict and requires a new migration attempt.
+
+If the process dies while frozen, restart verifies the manifest and resumes or
+explicitly rolls back before any writer is re-enabled. Merely deleting a lock
+file or restarting a process cannot clear the durable barrier.
+
+### Deterministic Import Plan
+
+Inventory materializes a canonical import plan before backfill. Every source
+row receives:
+
+- source-kind rank from this fixed order: project bootstrap, identity and
+  policy, session, claim, workflow execution, workflow step, scorecard, common
+  issue, telemetry event
+- canonical source table name
+- canonical source identity bytes
+- normalized source occurrence time or an explicit invalid-time sentinel
+- source-row SHA-256
+- deterministic destination event type, schema version, and event ID
+- disposition: import, quarantine, or superseded compatibility row
+
+Import order is the bytewise ascending tuple:
+
+```text
+(
+  normalized_source_time_or_sentinel,
+  source_kind_rank,
+  canonical_source_table_name,
+  canonical_source_identity_bytes,
+  source_row_sha256
+)
+```
+
+The comparison uses unsigned canonical UTF-8 bytes and numeric rank, never
+database collation or unordered query results. Equal tuples are a manifest
+conflict.
+
+Canonical import events receive contiguous project event sequences in that
+order. A resumed run reuses the same plan, IDs, sequences, hashes, and
+dispositions. Any source-row drift after inventory proves a broken write
+barrier and aborts migration.
+
+The signed migration manifest records every planned destination sequence plus
+the expected final project chain head, per-aggregate heads, and projection
+hashes. Verify compares computed values byte-for-byte before cutover.
+
+Legacy rows already occupying `events` are not left beside their canonical
+replacement. SQLite may transactionally rebuild the physical `events` table;
+PostgreSQL may rewrite rows into the expanded canonical shape. At verified
+cutover:
+
+- imported rows exist once in canonical envelope form;
+- quarantined rows exist only in the migration quarantine and are excluded from
+  ledger queries, project hash chains, and projections;
+- superseded legacy rows are inaccessible to ordinary store APIs;
+- a bounded observation archive may retain sealed source bytes by manifest
+  hash, then retention removes it;
+- no noncanonical row remains active in the authoritative `events` substrate.
 
 ### Current Event Rows
 
@@ -228,6 +361,39 @@ SQLite may rebuild a table transactionally to add constraints that SQLite
 cannot add in place. The replacement still becomes the existing canonical
 `events` substrate at cutover; two durable event tables MUST NOT remain active.
 
+### Project-Scoped Relational Rewrite
+
+Project scoping applies to physical constraints, not just query filters.
+Migration rebuilds every authoritative identity and relationship so its key
+includes `project_id`.
+
+At minimum this covers:
+
+- sessions and session references
+- events and event references
+- claims and lease ownership
+- scorecards and scorecard versions
+- common issues and learning
+- testing sessions and findings
+- workflow executions and step results
+- memories
+- idempotency, projections, outbox, quarantine, payload, and integrity rows
+
+PostgreSQL's current globally keyed `sessions.session_id` and `events.id`, and
+its child foreign keys that name only session or execution ID, MUST be replaced
+with composite project-scoped primary, unique, and foreign keys. SQLite gains
+the same logical constraints even though one repository owns its database
+path.
+
+Backfill joins parent and child on explicit project plus source identity. A
+child with no unique project-scoped parent is quarantined. No migration may
+attach it to the first matching global ID or the adapter's configured default
+project.
+
+Every post-cutover lookup and mutation includes the project predicate.
+Application-generated globally unique IDs MAY remain, but they do not replace
+the composite constraint.
+
 ### Rollback
 
 Before `store.authority_changed`, migration MAY roll back to the captured
@@ -267,8 +433,9 @@ canonical_scorecard_v1 = {
   },
   finalized: {
     principal_id,
-    actor_id,
-    session_id,
+    actor_id?,
+    session_id?,
+    authentication_context_id,
     accepted_at
   },
   scoring: {
@@ -446,12 +613,12 @@ Initial aggregate types are:
 
 | Aggregate | Representative events | Projection owner |
 |---|---|---|
-| `round` | opened, finalization_started, closed, reopened | round and scorecard |
+| `round` | opened, finalization_started, finalization_aborted, finalization_timed_out, closed, reopened | round and scorecard |
 | `attempt` | started, paused, abandoned, completed | attempt status |
 | `assignment` | created, accepted, blocked, completed | assignment status |
 | `shot` | evidence_added, ownership_changed, accepted | draft scorecard |
 | `penalty` | recorded, causation_linked, resolved | draft scorecard |
-| `resource_lease` | acquired, renewed, released, expired, fenced | lease view |
+| `lease_request` | requested, set_acquired, set_renewed, set_released, expired, fenced | lease and queue view |
 | `verification` | requested, recorded, revoked | verification view |
 | `learning` | observed, merged, redacted | common-issue view |
 | `store` | authority_changed, integrity_failed, repaired | store health |
@@ -529,6 +696,38 @@ canonical scorecard content and `content_hash`, including:
 Reopen replay preserves every earlier published version, makes accepted version
 null, increments round epoch, and starts a new draft. A later close publishes a
 new immutable version without mutating prior bytes.
+
+### Finalization Recovery
+
+Finalization is a persisted two-step round transition:
+
+1. `round.finalization_started` changes `open -> finalizing` and records
+   `finalization_id`, finalization epoch, owner principal, optional actor and
+   session, deadline from authoritative store time, policy revision, and the
+   aggregate preconditions to recheck.
+2. `round.closed` presents that identity and epoch, rechecks all close
+   invariants in one append transaction, publishes one immutable scorecard
+   version, and changes `finalizing -> closed`.
+
+Validation or projection failure emits `round.finalization_aborted` and changes
+`finalizing -> open` without publishing. A crashed owner leaves the term
+finalizing only until its deadline.
+
+At or after the deadline, any authorized recovery request may append
+`round.finalization_timed_out`, which changes `finalizing -> open` and fences
+the old finalization epoch. A new finalizer then starts a greater epoch.
+Correctness does not depend on a sweeper; close and new-start requests detect
+the expired term and return the required timeout transition as their next
+action.
+
+No takeover reuses the old finalization identity. An exact retry of an already
+accepted close returns the accepted scorecard through idempotency.
+
+Finalizer identity always records `principal_id` and
+`authentication_context_id`. `actor_id` and `session_id` are required for an
+agent- or human-initiated close. They may be absent only for a registered
+service principal holding a service-scoped finalization capability; absence
+never causes actor inference.
 
 ## S264.1-1 Acceptance Criteria
 
@@ -740,8 +939,8 @@ Examples:
 
 - `round.closed` locks the round, required assignments, verification state,
   accepted shots and penalties, and every live score-affecting lease.
-- `resource_lease.acquired` locks the canonical resource subject and overlapping
-  active lease subjects under the evaluated policy revision.
+- `lease_request.set_acquired` locks every canonical conflict domain and
+  overlapping active lease subject under the evaluated policy revision.
 - `shot.accepted` locks the round epoch, assignment, shot, and relevant lease.
 
 The accepted event records the checked versions. A concurrent change causes a
@@ -793,6 +992,11 @@ Batch append MAY be added later only if the batch has one idempotency identity,
 one authorization decision set, deterministic internal order, and all-or-none
 commit semantics. Version 1 does not infer a batch from multiple requests in
 one transport message.
+
+A single event may atomically transition several child entries owned by its
+one primary aggregate, such as a `lease_request` set. That is not batch append:
+there is one event ID, sequence, aggregate version, idempotency record, and
+payload schema.
 
 ## Schema Evolution
 
@@ -928,6 +1132,10 @@ Clients receive stable machine-readable errors:
 | `VISIBILITY_DENIED` | Requested input or result is not visible | No until policy changes |
 | `SCHEMA_UNSUPPORTED` | Event, payload, or projection revision is unknown | No until deploy changes |
 | `INTEGRITY_UNHEALTHY` | Trusted append preconditions cannot be established | No until repaired |
+| `STORE_AUTHORITY_CHANGED` | Caller or adapter pins a stale authority generation | Re-resolve store; never fall back |
+| `STORE_PROTOCOL_UNSUPPORTED` | Adapter lacks the required coordination protocol | No until adapter changes |
+| `TIME_AUTHORITY_UNHEALTHY` | Store time cannot safely grant or renew a lease | No until clock authority recovers |
+| `REDACTION_STATE_CONFLICT` | Approval, target, policy, or round state changed before apply | Re-read and request fresh review |
 | `STORE_BUSY` | Transaction did not begin or serialize | Retry same key |
 | `COMMIT_STATUS_UNKNOWN` | Client cannot tell whether commit completed | Retry same key |
 
@@ -962,12 +1170,17 @@ A protected resource ownership term is:
 ```text
 resource_lease_v1 = {
   project_id,
+  lease_request_id,
   lease_id,
   resource_subject,
   requested_access_mode,
   effective_access_mode,
   resource_policy_revision,
   conflict_set_revision,
+  fence_domains: [{
+    conflict_domain_id,
+    fencing_token
+  }],
   owner: {
     principal_id,
     actor_id,
@@ -978,7 +1191,7 @@ resource_lease_v1 = {
     assignment_id?
   },
   lease_epoch,
-  fencing_token,
+  grant_fencing_token,
   state,
   acquired_at,
   renewed_at,
@@ -998,12 +1211,26 @@ subject namespace.
 revoking, or fencing that term makes it permanently terminal. Reacquisition
 creates a new lease ID.
 
+`lease_request_id` is the primary aggregate identity for one atomic requested
+set. A client supplies a unique opaque request ID, and the idempotency scope
+binds it to the canonical request. A one-resource acquisition is a set of one.
+The server allocates child lease IDs only after locking the request aggregate
+and conflict domains.
+
 `lease_epoch` increases monotonically for each acquisition of the same canonical
 resource subject. Renewal does not change it.
 
-`fencing_token` increases monotonically across all lease grants within a
-project. A later grant for any overlapping subject therefore has a greater
-token than an earlier stale holder.
+`grant_fencing_token` increases monotonically across all lease grants within a
+project.
+
+Every canonical resource subject maps under its pinned conflict policy to one
+or more durable `conflict_domain_id` values. Any two subjects that may conflict
+MUST share at least one domain. A grant updates each domain watermark to its
+greater project grant token. This makes unequal overlapping subjects, including
+ancestor and descendant file areas, share a fencing authority.
+
+A policy revision whose overlap relation cannot produce this shared-domain
+property is invalid and cannot activate.
 
 ### Lease States
 
@@ -1026,7 +1253,7 @@ active.
 `expired` is a logical result of authoritative time, not merely a cleanup
 event. Once store time is at or after `expires_at`, the lease is inactive even
 if its projection still says active and no sweeper has emitted
-`resource_lease.expired`.
+`lease_request.entry_expired`.
 
 ### Ownership Binding
 
@@ -1037,7 +1264,7 @@ attempt, and assignment bind its intended execution context.
   cannot own or renew a lease.
 - A replacement session does not inherit a lease implicitly.
 - Transfer to another principal, actor, or session ends the old term and grants
-  a new term with a higher epoch and fencing token.
+  a new term with a higher epoch and grant fencing token.
 - A policy MAY authorize a designated controller service to renew on behalf of
   an owner, but the controller principal and delegation event are recorded.
 - Session liveness and lease ownership remain separate projections.
@@ -1102,6 +1329,7 @@ explicit capability-checked event with its own idempotency key.
 
 An acquisition request includes:
 
+- unique `lease_request_id`
 - canonical resource subject
 - requested access mode
 - expected resource-policy and conflict-set revisions
@@ -1109,8 +1337,15 @@ An acquisition request includes:
 - requested TTL
 - idempotency key and correlation ID
 
-The append transaction locks the requested subject and every active or waiting
-subject that overlaps under the pinned conflict policy.
+The append transaction locks the durable request row and every conflict-domain
+row for the requested subjects before inspecting active or waiting leases.
+Those rows exist before the first lease does, so PostgreSQL cannot admit an
+absent-row phantom race.
+
+Exact, prefix, range, and cross-mode overlap policies define a finite,
+deterministic set of conflict domains or use a serializable predicate strategy
+with equivalent first-acquisition exclusion. Merely locking currently existing
+lease rows is forbidden.
 
 Conflict evaluation uses:
 
@@ -1128,31 +1363,44 @@ denied or exclusive conflict. It never means compatible.
 When no incompatible active lease exists and the requester is next in queue,
 grant performs one atomic append:
 
-- allocate a new lease ID;
-- increment the subject lease epoch;
-- allocate the next project fencing token;
+- use `lease_request` as the primary aggregate;
+- allocate one child lease ID per requested subject;
+- increment each subject lease epoch;
+- allocate the next project grant fencing token;
+- update every affected conflict-domain watermark to that token;
 - pin effective mode and policy revisions;
 - calculate lease times from authoritative store time;
 - mark the request active;
 - remove or advance its queue entry;
-- emit `resource_lease.acquired`;
+- emit one `lease_request.set_acquired` event containing the canonical child
+  lease entries;
 - update the lease and queue projections.
 
-The grant response returns the exact lease proof. No client may construct or
+The grant response returns the exact lease proofs. No client may construct or
 increment an epoch or token.
 
 ### Atomic Multi-Resource Requests
 
-A task that needs multiple resources SHOULD request them as one sorted set.
+A task that needs multiple resources SHOULD request them as one
+`lease_request` aggregate containing a sorted set.
 The store canonicalizes and locks all conflict sets in resource-type,
 namespace, and resource-key order.
 
+One `lease_request.set_acquired` event creates every child lease entry and
+updates every affected subject and conflict-domain projection in the same
+append transaction. This is one event on one primary aggregate, not a
+multi-event batch.
+
 The set is granted all-or-none. Partial ownership is forbidden unless the
-request explicitly declares independently useful subsets and the workflow can
-release them safely.
+request explicitly uses separate lease-request aggregates for independently
+useful subsets and the workflow can release them safely.
 
 Waiting requests do not hold a subset while waiting for the rest. This avoids
 deadlock by construction.
+
+Renewal, release, abandonment, or fencing of child entries increments the
+owning lease-request aggregate version. An event may target a declared subset
+of entries, but all changed entries remain one atomic aggregate transition.
 
 ### Fairness
 
@@ -1171,10 +1419,12 @@ A renewal presents:
 ```text
 lease_proof = {
   project_id,
+  lease_request_id,
   lease_id,
   resource_subject,
   lease_epoch,
-  fencing_token,
+  grant_fencing_token,
+  fence_domains[],
   resource_policy_revision
 }
 ```
@@ -1185,7 +1435,8 @@ Renewal succeeds only when:
   delegation;
 - actor, session, round epoch, attempt, and assignment binding still match;
 - the lease is active and store time is before expiry;
-- lease epoch, fencing token, subject, mode, and policy revision exactly match;
+- lease epoch, grant token, every conflict-domain token, subject, mode, and
+  policy revision exactly match;
 - no policy activation has fenced the term;
 - the requested TTL is allowed.
 
@@ -1193,9 +1444,10 @@ The renewed expiry is `authoritative_store_time + ttl_seconds`, not the prior
 expiry plus TTL. Early renewals therefore cannot accumulate an unbounded future
 term.
 
-Renewal keeps the same lease ID, lease epoch, and fencing token. It appends one
-renewal event and atomically updates the expiry. An unknown commit result is
-resolved by retrying the same idempotency key.
+Renewal keeps the same lease ID, lease epoch, grant token, and conflict-domain
+tokens. It appends one event on the lease-request aggregate and atomically
+updates the expiry. An unknown commit result is resolved by retrying the same
+idempotency key.
 
 ## Fencing Protected Mutations
 
@@ -1204,7 +1456,7 @@ request hash. In the append transaction the store verifies:
 
 - exact active lease identity and ownership binding
 - store time strictly before expiry
-- exact current epoch and fencing token
+- exact current epoch, grant token, and conflict-domain token vector
 - compatible requested mutation mode
 - active resource and capability policy revisions
 - matching round epoch
@@ -1223,10 +1475,16 @@ are authoritative.
 
 For an external database, service, or allocator:
 
-- its adapter SHOULD pass the fencing token to a conditional-write interface
-  that rejects tokens below the greatest accepted token for that subject;
+- its adapter SHOULD pass the conflict-domain token vector to a
+  conditional-write interface that rejects a token below the greatest accepted
+  token for every relevant domain;
+- an adapter that accepts only one token MUST use one policy-declared enclosing
+  conflict domain shared by every subject that may overlap;
 - if the external system cannot fence, SLOPE coordinates intent but cannot
   claim exactly-once or stale-writer prevention for the external side effect;
+- if the adapter cannot represent the policy's overlap domains, every write
+  MUST revalidate through SLOPE immediately before the side effect and the
+  policy still reports external fencing as unsupported;
 - that limitation is declared in the resource policy and visible to affected
   participants;
 - secrets needed by an adapter remain outside event payloads.
@@ -1552,6 +1810,7 @@ Version 1 defines at least:
 | `recovery.manage` | Requeue or dead-letter recovery | recovery item |
 | `redaction.request` | Request content redaction | event or payload object |
 | `redaction.approve` | Approve high-impact redaction | redaction request |
+| `redaction.apply` | Apply an approved tombstone or key destruction | redaction request and target |
 | `retention.apply` | Materialize due retention policy | policy scope |
 | `policy.manage` | Grant, revoke, or activate policy | policy subject |
 | `integrity.verify` | Run protected integrity verification | project |
@@ -1768,6 +2027,24 @@ Every cursor is opaque, integrity-protected, and bound to:
 Using a cursor under another principal, project, purpose, or policy revision
 fails without revealing the original scope.
 
+Cursor plaintext is the JCS-canonical object containing every binding above,
+issued-at time, expiry, and a random cursor nonce. It is encrypted and
+authenticated with AES-256-GCM under a project-separated cursor key. The
+external cursor envelope contains only cursor format version, key revision,
+nonce, ciphertext, and authentication tag.
+
+Project, principal, hidden subject IDs, and purpose remain inside ciphertext.
+The AEAD additional authenticated data uses the cursor domain-separation frame
+and key revision. Verification checks tag, key revision, expiry, current
+authentication, current authorization, and every plaintext binding before
+using a cursor.
+
+Cursor keys are separate from payload, commitment, idempotency, and wrapping
+keys. Rotation retains old verification keys no longer than the maximum cursor
+lifetime. Bit flips, cross-binding substitution, replay after expiry, and use
+after visibility-policy invalidation fail with the same non-enumerating cursor
+error.
+
 Cache keys include the same dimensions. An unfiltered cache entry MUST NOT be
 shared with a filtered reader. Grant revocation, visibility reduction,
 redaction, or retention activation invalidates affected cache generations.
@@ -1794,12 +2071,28 @@ explicit filtered security view rather than ordinary process logs.
 
 Credentials, private keys, access tokens, session cookies, raw authentication
 headers, secret environment values, and unrestricted private transcripts are
-prohibited event payloads.
+prohibited in every caller-controlled request field, not only event payload.
 
-Registered payload schemas use allowlisted fields and size bounds. Ingress
-scanning catches common credential forms and project-defined secret patterns
-before append. A detected secret causes rejection; the rejected raw value is
-not logged, hashed into a user-visible identifier, or copied into an incident.
+Before logging, hashing, lookup, canonicalization output, or append, the trusted
+boundary validates field-specific grammar and size and scans:
+
+- idempotency key and operation ID
+- correlation and causation ID
+- aggregate and scope identifiers
+- ticket, shot, penalty, assignment, and lease-request ID
+- resource type, namespace, key, and mode
+- visibility subjects and purpose
+- actor/session attribution supplied by the client
+- every precondition, lease-proof field, and payload field
+
+Opaque identifiers have an ASCII grammar and bounded length. Typed resource
+keys and human text use their registered canonicalizer and size bound. A field
+whose legitimate grammar can resemble a credential is still secret-scanned and
+uses a sealed reference rather than an inline escape hatch.
+
+A detected secret causes rejection. The rejected raw value is not logged,
+placed in an error, hashed into a user-visible identifier, used as a lookup key,
+or copied into an incident.
 
 The incident may record secret category, source operation, affected project,
 and an opaque detection ID.
@@ -1829,16 +2122,43 @@ to expire.
 
 Version 1 pins algorithms through the schema registry:
 
-- canonical serialization: UTF-8 JSON with deterministic object-key ordering,
-  normalized numbers, and no insignificant whitespace
+- canonical serialization: RFC 8785 JSON Canonicalization Scheme (JCS) over
+  I-JSON-compatible input
 - event, response, ciphertext, checkpoint, and projection digest:
   SHA-256 over domain-separated canonical bytes
 - restricted request and payload commitment: HMAC-SHA-256 with a
   project-separated protected key and recorded key revision
+- filtered cursor confidentiality and integrity: AES-256-GCM with a
+  project-separated cursor key and recorded key revision
 - sealed payload encryption: AES-256-GCM with a unique random nonce and
   per-object data-encryption key wrapped by a managed key-encryption key
 
-Domain separation includes project ID, digest purpose, and schema revision.
+JCS input additionally obeys:
+
+- duplicate object keys, lone Unicode surrogates, NaN, infinity, and negative
+  zero are rejected;
+- event sequences, aggregate versions, epochs, fencing tokens, and other
+  potentially 64-bit integers are canonical unsigned decimal strings matching
+  `0|[1-9][0-9]*`;
+- other JSON numbers are safe integers only;
+- non-integer quantities use schema-defined decimal strings with fixed scale,
+  never binary floating point or exponent variants;
+- typed identity and resource strings complete their domain canonicalization
+  before JCS; arbitrary human text preserves its exact Unicode scalar sequence.
+
+Domain-separated digest input is:
+
+```text
+ASCII("SLOPE-TEAM-ROUND-V1") || 0x00 ||
+u32be(len(purpose))         || purpose_utf8 ||
+u32be(len(project_id))      || project_id_utf8 ||
+u32be(len(schema_revision)) || schema_revision_utf8 ||
+u32be(len(jcs_bytes))       || jcs_bytes
+```
+
+Every segment is length-prefixed and bounded below `2^32` bytes. Concatenating
+unframed strings is forbidden.
+
 Plain SHA-256 of low-entropy restricted content is forbidden because it permits
 dictionary recovery.
 
@@ -1859,11 +2179,24 @@ event:
 - key loss that prevents required verification marks integrity unhealthy and
   cannot be papered over with a new key.
 
+The conformance suite publishes cross-language and cross-adapter golden vectors
+for canonical bytes, each digest purpose, restricted commitments, cursor AEAD,
+and sealed payload metadata, including Unicode and numeric rejection cases.
+
 ## Redaction
 
-### Redaction Event
+### Redaction State Machine
 
-Redaction is an append-only state transition:
+Manual redaction is an append-only aggregate:
+
+```text
+requested -> approved -> applied
+    |            |       -> failed
+    +-> cancelled
+```
+
+Events are `redaction.requested`, `redaction.approved`,
+`redaction.applied`, `redaction.failed`, and `redaction.cancelled`.
 
 ```text
 redaction_v1 = {
@@ -1873,7 +2206,10 @@ redaction_v1 = {
   target_payload_fields_or_ref,
   reason_code,
   requested_by_principal_id,
+  approval_requirement,
   approved_by_principal_id?,
+  applied_by_principal_id?,
+  state,
   effective_event_sequence,
   replacement_tombstone,
   key_destruction_evidence?,
@@ -1881,8 +2217,28 @@ redaction_v1 = {
 }
 ```
 
-It does not edit the target event, event hash, sequence, aggregate version,
-idempotency identity, or integrity chain.
+Request requires `redaction.request`. Approval requires
+`redaction.approve`. Destruction or tombstone activation requires
+`redaction.apply` and reauthorizes the current request, target, approval,
+visibility, retention policy, scorecard dependency, and round state inside the
+apply transaction.
+
+Restricted or security content, identity-profile removal, broad subject scope,
+score-supporting evidence, and any redaction that changes current round
+acceptance require an approving principal distinct from requester and applier.
+Lower-risk project content may use a policy revision whose
+`approval_requirement = none`; the applied event records that explicit rule
+rather than an ambiguous absent approval.
+
+The applier cannot expand target fields beyond the approved request. Approval
+expiry, policy change, target change, or scorecard-state change returns the
+request to a non-applied conflict requiring fresh review.
+
+Failure records a redacted reason and leaves plaintext disclosure failed closed
+when destruction may have partially occurred.
+
+Applied redaction does not edit the target event, event hash, sequence,
+aggregate version, idempotency identity, or integrity chain.
 
 For sealed payload, redaction deletes ciphertext when permitted and destroys
 the data-encryption key. The immutable reference and commitment remain as an
@@ -1918,12 +2274,22 @@ scorecard, policy must either:
 
 Redaction itself cannot silently change a score.
 
-When law or incident response requires immediate destruction before
-reconciliation, the redaction transaction clears
-`accepted_scorecard_version`, marks the round `reconciliation_required`, and
-preserves the latest published version as stale historical evidence. A later
-audited reopen and close may establish a new accepted version. Current handicap
-and completion views exclude the round in the interim.
+When law or incident response requires immediate destruction before ordinary
+reconciliation, the first durable step is an authorized `round.reopened` event
+with reason `required_redaction`, the approved redaction request ID, and a
+correction scope covering the affected evidence. That ordinary audited reopen
+atomically changes `closed -> open`, increments round epoch, and clears
+`accepted_scorecard_version`.
+
+The redaction apply then verifies the open round and correction scope before
+destruction. The reopen requires `round.reopen`; application requires
+`redaction.apply`; the approved request binds both operation IDs and their
+causation. Possessing either capability alone is insufficient.
+
+Break-glass policy may expedite the two authorized operations but cannot
+introduce a fourth lifecycle state or clear acceptance outside audited reopen.
+The latest published version remains stale historical evidence, and current
+handicap and completion views exclude the open round until a later close.
 
 ## Retention
 
@@ -1966,6 +2332,44 @@ Retention application:
 
 Retention failure fails closed for further disclosure of expired data. It does
 not rewrite event history.
+
+### Backup And Restore
+
+Backups MUST NOT make destroyed or expired content recoverable to an ordinary
+reader.
+
+Per-object data-encryption keys are wrapped by a non-restorable managed key
+service; database backups contain only wrapped keys and ciphertext. Applied
+redaction destroys the key in that service and writes a tombstone to an
+independently durable deletion registry containing project ID, payload
+reference, commitment, redaction event ID, effective sequence, and policy
+revision. The registry stores no plaintext or decryptable key.
+
+The project authority generation and highest trusted integrity checkpoint are
+also recorded outside the restorable database boundary.
+
+A restored SQLite or PostgreSQL store starts isolated with all ordinary reads
+and writes disabled. Before activation it must:
+
+1. verify stable project identity and adapter protocol;
+2. prove restored authority generation is not ahead of or ambiguously forked
+   from the independently recorded generation;
+3. replay canonical archived events through at least the independent trusted
+   checkpoint and deletion-registry high-water mark;
+4. reconcile every redaction tombstone and KMS destruction state, deleting any
+   restored ciphertext whose key is destroyed;
+5. apply every retention deadline due at current authoritative store time;
+6. rebuild filtered projections and verify project and aggregate hash chains;
+7. issue a new, greater authority generation and `store.restored` event before
+   enabling canonical append.
+
+If the event archive cannot reach the trusted high-water mark, the restored
+copy remains a quarantined forensic snapshot. It cannot become the
+authoritative writer or serve payloads merely because its local schema and hash
+chain are internally consistent.
+
+Backup tooling, manual PostgreSQL restore, and SQLite file replacement all use
+this same activation gate. Schema-shape validation alone is insufficient.
 
 ### Export
 
@@ -2072,6 +2476,22 @@ both SQLite and PostgreSQL behavior.
     state and cannot create worktree-local authority.
 40. Policy downgrade cannot create a second resource namespace, expose prior
     restricted content, or preserve incompatible live leases.
+41. Concurrent first acquisition on absent rows produces one compatible result
+    for exact, prefix, range, and cross-mode overlap on both adapters.
+42. Credential fixtures in every caller-controlled identifier, scope,
+    visibility, lease-proof, and payload field are rejected before lookup,
+    hashing, or logging.
+43. Cursor bit flips, expiry replay, and cross-principal, project, purpose, and
+    policy substitution fail AEAD verification without existence disclosure.
+44. Redaction cannot skip required independent approval, self-approve,
+    over-expand its target, or apply after stale reauthorization.
+45. Restoring a backup before redaction or retention cannot decrypt, disclose,
+    or reactivate removed content and cannot lower authority generation.
+46. A custom or old adapter without the complete coordination protocol
+    descriptor cannot resolve for Team Round operations after cutover.
+47. RFC 8785 canonicalization and every domain-separated digest match published
+    golden vectors across SQLite, PostgreSQL, and an independent
+    implementation.
 
 ### Test Methods
 
