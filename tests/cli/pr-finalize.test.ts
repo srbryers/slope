@@ -110,6 +110,11 @@ describe('pr review workflow helpers (S94-5)', () => {
     });
   });
 
+  it('preserves canonical sprint selectors that share a numeric value', () => {
+    expect(parsePrReviewFlags(['--sprint=458.1']).sprint).toBe('458.1');
+    expect(parsePrReviewFlags(['--sprint=S458.10']).sprint).toBe('458.10');
+  });
+
   it.each([
     [['--pr=0'], '--pr must be a positive integer'],
     [['--pr=nope'], '--pr must be a positive integer'],
@@ -170,6 +175,7 @@ describe('pr review workflow helpers (S94-5)', () => {
     expect(plan.changedFiles).toEqual(['src/review.ts']);
     expect(plan.totalChangedFiles).toBe(2);
     expect(plan.reviewDiff).toBe(reviewDiff);
+    expect(plan.sprint).toBe('234');
   });
 });
 

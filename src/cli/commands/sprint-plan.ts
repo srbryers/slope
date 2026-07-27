@@ -7,9 +7,9 @@ import {
   loadScorecards,
   formatRoadmapSprintLabel,
   formatSprintNumber,
-  parseSprintNumber,
   roadmapSprintKey,
   roadmapSprintKeyFromId,
+  sprintIdKey,
 } from '../../core/index.js';
 import type { RoadmapDefinition, RoadmapSprint } from '../../core/index.js';
 import { loadConfig } from '../config.js';
@@ -42,7 +42,7 @@ export async function sprintPlanCommand(args: string[]): Promise<void> {
     process.exit(1);
   }
 
-  const sprintId = parseSprintNumber(sprintArg.slice('--sprint='.length));
+  const sprintId = sprintIdKey(sprintArg.slice('--sprint='.length));
   if (!sprintId) {
     console.error('Error: --sprint must be a positive sprint id, e.g. 114 or 114.5');
     process.exit(1);
