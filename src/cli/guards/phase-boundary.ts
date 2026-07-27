@@ -1,7 +1,16 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { HookInput, GuardResult, SprintId, Suggestion } from '../../core/index.js';
-import { castRoadmapStructure, loadConfig, loadScorecards, parseRoadmap, parseSprintNumber, roadmapSprintOrderValue } from '../../core/index.js';
+import type { HookInput, GuardResult, Suggestion } from '../../core/index.js';
+import {
+  castRoadmapStructure,
+  compareRoadmapSprintIds,
+  loadConfig,
+  loadScorecards,
+  parseRoadmap,
+  roadmapSprintKey,
+  roadmapSprintKeyFromId,
+  sprintIdKey,
+} from '../../core/index.js';
 import { isPhaseComplete, pendingPhaseGates } from '../phase-cleanup.js';
 
 /** Extract phase number from name like "Phase 7 — Helmsman 3D". Falls back to array index + 1. */
@@ -55,10 +64,15 @@ export async function phaseBoundaryGuard(input: HookInput, cwd: string): Promise
   // Build phase-to-number mapping (RoadmapPhase has name + sprints[], no id)
   const phaseNumbers = roadmap.phases.map((p, i) => extractPhaseNumber(p.name, i));
 
-  // Find which phase the target sprint belongs to
+  const targetKey = roadmapSprintKeyFromId(roadmap, targetSprint);
+  if (targetKey === null) return {};
+
+  // Find which phase the target sprint belongs to.
   let targetPhaseIdx = -1;
   for (let i = 0; i < roadmap.phases.length; i++) {
-    if (Array.isArray(roadmap.phases[i].sprints) && roadmap.phases[i].sprints.includes(targetSprint)) {
+    const phase = roadmap.phases[i];
+    const members = phase.sprint_keys ?? phase.sprints;
+    if (members.some(member => roadmapSprintKeyFromId(roadmap, member) === targetKey)) {
       targetPhaseIdx = i;
       break;
     }
@@ -84,18 +98,23 @@ export async function phaseBoundaryGuard(input: HookInput, cwd: string): Promise
   // S23.5) cannot skew the boundary, and only roadmap-member scorecards count
   // as evidence, so a stray high-numbered recovery scorecard cannot downgrade
   // every earlier boundary.
-  const orderOf = (id: SprintId): number => roadmapSprintOrderValue(roadmap, id);
-  const targetPhaseSprints = (roadmap.phases[targetPhaseIdx].sprints ?? [])
-    .filter((id): id is number => typeof id === 'number')
-    .map(orderOf);
-  const boundaryOrder = targetPhaseSprints.length > 0 ? Math.min(...targetPhaseSprints) : null;
-  if (boundaryOrder !== null) {
+  const targetPhaseSprints = (roadmap.phases[targetPhaseIdx].sprint_keys
+    ?? roadmap.phases[targetPhaseIdx].sprints)
+    .map(id => roadmapSprintKeyFromId(roadmap, id))
+    .filter((key): key is string => key !== null)
+    .sort((a, b) => compareRoadmapSprintIds(roadmap, a, b));
+  const boundaryKey = targetPhaseSprints[0] ?? null;
+  if (boundaryKey !== null) {
     try {
-      const roadmapOrdersAtOrPastBoundary = new Set(
-        roadmap.sprints.map(sprint => orderOf(sprint.id)).filter(order => order >= boundaryOrder),
+      const roadmapKeysAtOrPastBoundary = new Set(
+        roadmap.sprints
+          .map(sprint => roadmapSprintKey(roadmap, sprint))
+          .filter(key => compareRoadmapSprintIds(roadmap, key, boundaryKey) >= 0),
       );
-      const scorecardOrders = loadScorecards(config, cwd).map(card => orderOf(card.sprint_number));
-      if (scorecardOrders.some(order => roadmapOrdersAtOrPastBoundary.has(order))) {
+      const scorecardKeys = loadScorecards(config, cwd)
+        .map(card => roadmapSprintKeyFromId(roadmap, card.sprint_number))
+        .filter((key): key is string => key !== null);
+      if (scorecardKeys.some(key => roadmapKeysAtOrPastBoundary.has(key))) {
         const pendingGates = pendingPhaseGates(cwd, prevPhaseNum);
         return {
           context: [
@@ -117,7 +136,7 @@ export async function phaseBoundaryGuard(input: HookInput, cwd: string): Promise
   const suggestion: Suggestion = {
     id: 'phase-boundary',
     title: 'Phase Boundary',
-    context: `Phase ${prevPhaseNum} cleanup is incomplete. Complete these gates before starting Sprint ${targetSprint} (Phase ${targetPhaseNum}).`,
+    context: `Phase ${prevPhaseNum} cleanup is incomplete. Complete these gates before starting Sprint ${targetKey} (Phase ${targetPhaseNum}).`,
     options: [
       ...pending.map((gate, i) => ({
         id: `gate-${i}`,
@@ -154,7 +173,7 @@ function extractRelevantSlopeArgs(command: string): string[] | null {
   return null;
 }
 
-function targetSprintFromSlopeArgs(args: string[]): number | null {
+function targetSprintFromSlopeArgs(args: string[]): string | null {
   if (args[0] === 'sprint' && (args[1] === 'start' || args[1] === 'run')) {
     return targetSprintFromValues(args.slice(2), ['--sprint', '--target', '--ticket'], true);
   }
@@ -167,7 +186,7 @@ function targetSprintFromSlopeArgs(args: string[]): number | null {
   return null;
 }
 
-function targetSprintFromValues(args: string[], flags: string[], allowPositional: boolean): number | null {
+function targetSprintFromValues(args: string[], flags: string[], allowPositional: boolean): string | null {
   for (const flag of flags) {
     const value = flagValue(args, flag);
     const sprint = sprintFromValue(value);
@@ -192,11 +211,11 @@ function flagValue(args: string[], flag: string): string | undefined {
   return undefined;
 }
 
-function sprintFromValue(value: string | undefined): number | null {
+function sprintFromValue(value: string | undefined): string | null {
   if (!value) return null;
   const normalized = value.trim();
   const ticketMatch = normalized.match(/^S?(\d+(?:\.\d+)?)(?:-\d+)?$/i);
-  return parseSprintNumber(ticketMatch?.[1] ?? normalized);
+  return sprintIdKey(ticketMatch?.[1] ?? normalized);
 }
 
 function splitShellSegments(command: string): string[] {

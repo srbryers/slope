@@ -23,12 +23,12 @@ import {
 } from './sprint-id.js';
 import type { RoadmapDefinition } from './roadmap.js';
 import {
+  compareRoadmapSprintIds,
   formatRoadmapSprintLabel,
   formatStrategicContext,
   findRoadmapSprint,
   roadmapSprintKey,
   roadmapSprintKeyFromId,
-  roadmapSprintOrderValue,
 } from './roadmap.js';
 import type { SkillDefinition, SkillRegistryFile } from './skills.js';
 
@@ -292,12 +292,11 @@ function currentAssignmentEvidence(roadmap: RoadmapDefinition, sprint: SprintId)
 function sprintMentionPattern(roadmap: RoadmapDefinition, sprint: SprintId): RegExp {
   const row = roadmapSprintById(roadmap, sprint);
   const raw = String(sprint).replace('.', '\\.');
-  const order = String(roadmapSprintOrderValue(roadmap, sprint)).replace('.', '\\.');
   const label = formatRoadmapSprintLabel(
     roadmap,
     row ? roadmapSprintKey(roadmap, row) : sprint,
   ).slice(1).replace('.', '\\.');
-  const aliases = [...new Set([raw, order, label])].join('|');
+  const aliases = [...new Set([raw, label])].join('|');
   return new RegExp(`\\bS(?:${aliases})\\b`, 'i');
 }
 
@@ -390,9 +389,10 @@ function scopeBriefingHazards(
   if (!target) {
     return { shot_hazards: [], bunker_locations: [], suppressed_route_directives: 0 };
   }
-  const targetPhase = roadmapPhaseForSprint(roadmap, currentSprint);
-  const dependencyDepths = collectDependencyDepths(roadmap, currentSprint);
-  const assignment = currentAssignmentEvidence(roadmap, currentSprint);
+  const targetKey = roadmapSprintKey(roadmap, target);
+  const targetPhase = roadmapPhaseForSprint(roadmap, targetKey);
+  const dependencyDepths = collectDependencyDepths(roadmap, targetKey);
+  const assignment = currentAssignmentEvidence(roadmap, targetKey);
   let suppressed = 0;
 
   const provenanceFor = (sourceSprint: SprintId): BriefingHazardProvenance => {
@@ -400,19 +400,19 @@ function scopeBriefingHazards(
     const dependencyKey = roadmapSprintKeyFromId(roadmap, sourceSprint);
     const dependencyDepth = dependencyKey ? dependencyDepths.get(dependencyKey) : undefined;
     let relationship: BriefingHazardRelationship = 'historical';
-    if (roadmapIdsEqual(roadmap, sourceSprint, currentSprint)) relationship = 'active_sprint';
+    if (roadmapIdsEqual(roadmap, sourceSprint, targetKey)) relationship = 'active_sprint';
     else if (dependencyDepth === 1) relationship = 'direct_dependency';
     else if (dependencyDepth != null) relationship = 'transitive_dependency';
     else if (sourcePhase
       && targetPhase
       && sourcePhase === targetPhase
-      && roadmapSprintOrderValue(roadmap, sourceSprint) < roadmapSprintOrderValue(roadmap, target.id)) {
+      && compareRoadmapSprintIds(roadmap, sourceSprint, targetKey) < 0) {
       relationship = 'same_phase';
     }
     return {
       source_sprint: sourceSprint,
       source_phase: sourcePhase?.name,
-      target_sprint: roadmapSprintKey(roadmap, target),
+      target_sprint: targetKey,
       target_phase: targetPhase?.name,
       relationship,
       relevance: relationship === 'active_sprint' ? 'active' : 'historical',
@@ -421,9 +421,9 @@ function scopeBriefingHazards(
 
   const shotHazards: ScopedBriefingHazard[] = [];
   for (const hazard of index.shot_hazards) {
-    const scoped = roadmapIdsEqual(roadmap, hazard.sprint, target.id)
+    const scoped = roadmapIdsEqual(roadmap, hazard.sprint, targetKey)
       ? { description: hazard.description, suppressed: 0 }
-      : stripSupersededRouteDirectives(hazard.description, roadmap, target.id, assignment);
+      : stripSupersededRouteDirectives(hazard.description, roadmap, targetKey, assignment);
     suppressed += scoped.suppressed;
     if (!scoped.description) continue;
     shotHazards.push({ ...hazard, description: scoped.description, provenance: provenanceFor(hazard.sprint) });
@@ -431,9 +431,9 @@ function scopeBriefingHazards(
 
   const bunkerLocations: ScopedBriefingBunker[] = [];
   for (const bunker of index.bunker_locations) {
-    const scoped = roadmapIdsEqual(roadmap, bunker.sprint, target.id)
+    const scoped = roadmapIdsEqual(roadmap, bunker.sprint, targetKey)
       ? { description: bunker.location, suppressed: 0 }
-      : stripSupersededRouteDirectives(bunker.location, roadmap, target.id, assignment);
+      : stripSupersededRouteDirectives(bunker.location, roadmap, targetKey, assignment);
     suppressed += scoped.suppressed;
     if (!scoped.description) continue;
     bunkerLocations.push({ ...bunker, location: scoped.description, provenance: provenanceFor(bunker.sprint) });
@@ -577,7 +577,7 @@ export function buildSkillBriefing(opts: {
     : rawHazardIndex.bunker_locations;
   const recentHazards = [...relevantHazards]
     .sort((a, b) => roadmap
-      ? roadmapSprintOrderValue(roadmap, b.sprint) - roadmapSprintOrderValue(roadmap, a.sprint)
+      ? compareRoadmapSprintIds(roadmap, b.sprint, a.sprint)
       : compareSprintIdKeys(b.sprint, a.sprint))
     .slice(0, 20);
   const hazardText = normalizeSearchText([
@@ -783,7 +783,7 @@ export function formatBriefing(opts: {
           : `  [S${b.sprint}] ${b.location}`,
       })),
     ].sort((a, b) => roadmap
-      ? roadmapSprintOrderValue(roadmap, b.sprint) - roadmapSprintOrderValue(roadmap, a.sprint)
+      ? compareRoadmapSprintIds(roadmap, b.sprint, a.sprint)
       : compareSprintIdKeys(b.sprint, a.sprint));
 
     for (const entry of hazardLines.slice(0, DEFAULT_BRIEFING_HAZARD_LIMIT)) {
