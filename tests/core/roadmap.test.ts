@@ -18,6 +18,7 @@ import {
   isRoadmapSprintTerminal,
 } from '../../src/core/roadmap.js';
 import type { RoadmapDefinition, RoadmapSprint, RoadmapTicket } from '../../src/core/roadmap.js';
+import { extractSprintArtifactReferences } from '../../src/core/analyzers/git.js';
 
 // --- Test helpers ---
 
@@ -645,6 +646,26 @@ describe('validateRoadmap with scorecards', () => {
 // --- validateRoadmap with shipped sprint drift detection ---
 
 describe('validateRoadmap with shipped sprint IDs', () => {
+  it('does not treat a .10 artifact as shipped evidence for coexisting .1', () => {
+    const roadmap = makeRoadmap({
+      sprints: [
+        { ...makeSprint(458.1), id_key: '458.1', status: 'planned' } as RoadmapSprint,
+        { ...makeSprint(458.1), id_key: '458.10', status: 'skipped' } as RoadmapSprint,
+      ],
+      phases: [{
+        name: 'Canonical inserts',
+        sprints: [458.1, 458.1],
+        sprint_keys: ['458.1', '458.10'],
+      }],
+    });
+    const shipped = extractSprintArtifactReferences(['docs/retros/sprint-458.10.json']);
+
+    const result = validateRoadmap(roadmap, undefined, shipped);
+
+    const shippedErrors = result.errors.filter(error => error.message.includes('shipped commits'));
+    expect(shippedErrors).toHaveLength(0);
+  });
+
   it('errors when sprint shipped on main but status is null', () => {
     const roadmap = makeRoadmap({
       sprints: [

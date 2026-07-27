@@ -370,6 +370,60 @@ describe('slope roadmap validate-sources', () => {
 });
 
 describe('slope roadmap archive', () => {
+  it('validates coexisting .1 and .10 archive evidence by canonical key', () => {
+    const root = join(cwd, 'docs', 'roadmap');
+    mkdirSync(join(root, 'archive'), { recursive: true });
+    mkdirSync(join(cwd, 'docs', 'retros'), { recursive: true });
+    writeFileSync(join(root, 'project.yaml'), `
+version: 1
+name: Canonical Archive
+output: ../backlog/roadmap.json
+sources:
+  - path: archive/phase-01.yaml
+    kind: archive
+`);
+    writeFileSync(join(root, 'archive', 'phase-01.yaml'), `
+version: 1
+phase:
+  name: Phase 1
+  status: complete
+  sprints: ["458.1", "458.10"]
+sprints:
+  - id: "458.1"
+    theme: First insert
+    par: 3
+    slope: 1
+    type: feature
+    status: complete
+    tickets:
+      - {key: S458.1-1, title: T1, club: wedge, complexity: small}
+  - id: "458.10"
+    theme: Tenth insert
+    par: 3
+    slope: 1
+    type: feature
+    status: complete
+    tickets:
+      - {key: S458.10-1, title: T1, club: wedge, complexity: small}
+scorecards:
+  "458.1": docs/retros/sprint-458.1.json
+  "458.10": docs/retros/sprint-458.10.json
+`);
+    writeFileSync(join(cwd, 'docs', 'retros', 'sprint-458.1.json'), JSON.stringify({ sprint_number: '458.1' }));
+    writeFileSync(join(cwd, 'docs', 'retros', 'sprint-458.10.json'), JSON.stringify({ sprint_number: '458.10' }));
+
+    let store = loadRoadmapSourceStore(cwd);
+    let validation = validateRoadmapSourceStore(store, { checkProjection: false });
+    expect(validation.errors).toEqual([]);
+
+    writeFileSync(join(cwd, 'docs', 'retros', 'sprint-458.10.json'), JSON.stringify({ sprint_number: '458.1' }));
+    store = loadRoadmapSourceStore(cwd);
+    validation = validateRoadmapSourceStore(store, { checkProjection: false });
+    expect(validation.errors).toHaveLength(1);
+    expect(validation.errors[0].code).toBe('archive_scorecard_mismatch');
+    expect(validation.errors[0].message).toContain('Sprint S458.10');
+  });
+
   it('keeps dry-run read-only and moves a whole terminal phase without projection drift', async () => {
     const output = writeFixture();
     addPhaseOneArchiveEvidence();
@@ -549,6 +603,62 @@ sprints:
     expect(readFileSync(phasePath, 'utf8')).toContain('"458.1": docs/retros/sprint-458.1.json');
   });
 
+  it('completes .10 without matching or mutating coexisting .1', () => {
+    const root = join(cwd, 'docs', 'roadmap');
+    mkdirSync(join(root, 'phases'), { recursive: true });
+    writeFileSync(join(root, 'project.yaml'), `
+version: 1
+name: Canonical Roadmap
+output: ../backlog/roadmap.json
+sources:
+  - path: phases/phase-01.yaml
+    kind: phase
+`);
+    const phasePath = join(root, 'phases', 'phase-01.yaml');
+    writeFileSync(phasePath, `
+version: 1
+phase:
+  name: Phase 1
+  status: active
+  sprints: ["458.1", "458.10"]
+sprints:
+  - id: "458.1"
+    theme: First insert
+    par: 3
+    slope: 1
+    type: feature
+    status: complete
+    tickets:
+      - {key: S458.1-1, title: T1, club: wedge, complexity: small}
+  - id: "458.10"
+    theme: Tenth insert
+    par: 3
+    slope: 1
+    type: feature
+    status: planned
+    tickets:
+      - {key: S458.10-1, title: T1, club: wedge, complexity: small}
+scorecards:
+  "458.1": docs/retros/sprint-458.1.json
+`);
+
+    completeRoadmapSourceSprint(cwd, '458.10', {
+      scorecardPath: 'docs/retros/sprint-458.10.json',
+    });
+
+    const store = loadRoadmapSourceStore(cwd);
+    const statuses = new Map(store.sources[0].document.sprints.map(item => [item.id_key, item.status]));
+    expect(statuses.get('458.1')).toBe('complete');
+    expect(statuses.get('458.10')).toBe('complete');
+    expect(store.sources[0].document.scorecards).toEqual({
+      '458.1': 'docs/retros/sprint-458.1.json',
+      '458.10': 'docs/retros/sprint-458.10.json',
+    });
+    const sourceText = readFileSync(phasePath, 'utf8');
+    expect(sourceText).toContain('  - id: "458.1"\n    theme: First insert\n    par: 3\n    slope: 1\n    type: feature\n    status: complete');
+    expect(sourceText).toContain('  - id: "458.10"\n    theme: Tenth insert\n    par: 3\n    slope: 1\n    type: feature\n    status: complete');
+  });
+
   it('keeps adjacent decimal sprints untouched when re-reconciling an already complete sprint', () => {
     const phasePath = writeDecimalFixture({ base: 'complete', a: 'complete', b: 'planned' });
     writeFileSync(phasePath, `${readFileSync(phasePath, 'utf8')}scorecards:
@@ -613,7 +723,7 @@ sprints:
     expect(byId.get(235)).toBe('complete');
     expect(byId.get(23)).toBe('complete');
     expect(byId.get(24)).toBe('planned');
-    expect(store.sources[0].document.scorecards?.['235']).toBe('docs/retros/sprint-23.5.json');
+    expect(store.sources[0].document.scorecards?.['23.5']).toBe('docs/retros/sprint-23.5.json');
   });
 
   it('preserves authored formatting end to end — only the status and scorecard lines change (#615, #617)', () => {

@@ -8,6 +8,8 @@
  * source untouched. Callers verify the result semantically before writing.
  */
 
+import { sprintIdKey, type SprintId } from './sprint-id.js';
+
 export interface RoadmapSourceSprintTextPatch {
   /** New status value for the sprint entry, e.g. "complete". */
   status: string;
@@ -26,7 +28,7 @@ interface SprintEntryLocation {
   propertyIndent: string;
 }
 
-const ENTRY_ID_PATTERN = /^(\s*)- id:\s*([0-9][0-9.]*)\s*(#.*)?$/;
+const ENTRY_ID_PATTERN = /^(\s*)- id:\s*(?:(['"])([0-9]+(?:\.[0-9]+)?)\2|([0-9]+(?:\.[0-9]+)?))\s*(#.*)?$/;
 
 /**
  * Patch a sprint's status (and optionally its scorecards entry) in raw YAML
@@ -37,9 +39,11 @@ const ENTRY_ID_PATTERN = /^(\s*)- id:\s*([0-9][0-9.]*)\s*(#.*)?$/;
  */
 export function patchRoadmapSourceSprintText(
   source: string,
-  sprintId: number,
+  sprintId: SprintId,
   patch: RoadmapSourceSprintTextPatch,
 ): string | null {
+  const targetKey = sprintIdKey(sprintId);
+  if (targetKey === null) return null;
   const eol = source.includes('\r\n') ? '\r\n' : '\n';
   const lines = source.split(/\r?\n/);
   // A lossless round-trip is required before we can claim the edit is
@@ -48,7 +52,7 @@ export function patchRoadmapSourceSprintText(
 
   const section = findTopLevelSection(lines, 'sprints');
   if (!section) return null;
-  const location = locateSprintEntry(lines, section, sprintId);
+  const location = locateSprintEntry(lines, section, targetKey);
   if (!location) return null;
 
   patchStatusLine(lines, location, patch.status);
@@ -74,7 +78,7 @@ function findTopLevelSection(lines: string[], key: string): { start: number; end
 function locateSprintEntry(
   lines: string[],
   section: { start: number; end: number },
-  sprintId: number,
+  sprintKey: string,
 ): SprintEntryLocation | null {
   let entryIndent: string | null = null;
   const matches: number[] = [];
@@ -84,7 +88,8 @@ function locateSprintEntry(
     entryIndent ??= listItem[1];
     if (listItem[1] !== entryIndent) continue;
     const idMatch = ENTRY_ID_PATTERN.exec(lines[index]);
-    if (idMatch && idMatch[1] === entryIndent && Number(idMatch[2]) === sprintId) {
+    const authoredKey = idMatch?.[3] ?? idMatch?.[4];
+    if (idMatch && idMatch[1] === entryIndent && authoredKey === sprintKey) {
       matches.push(index);
     }
   }

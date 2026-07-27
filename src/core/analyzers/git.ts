@@ -1,5 +1,6 @@
 // SLOPE — Git History Analyzer: commits, contributors, cadence, branches, releases
 import { execSync } from 'node:child_process';
+import type { SprintId } from '../sprint-id.js';
 import type { GitProfile } from './types.js';
 
 function git(cmd: string, cwd: string): string {
@@ -112,12 +113,12 @@ export function extractSprintReferences(commitSubjects: string[]): Set<number> {
  *  (`Fix thing (#123)`) while the commit itself adds `docs/retros/sprint-N.json`
  *  or an inserted sprint artifact such as `docs/retros/sprint-143.5.json`.
  */
-export function extractSprintArtifactReferences(logLines: string[]): Set<number> {
-  const result = new Set<number>();
+export function extractSprintArtifactReferences(logLines: string[]): Set<string> {
+  const result = new Set<string>();
   const re = /^docs\/retros\/sprint-(\d+(?:\.\d+)?)(?:\.json|-review\.md)$/i;
   for (const line of logLines) {
     const m = line.trim().match(re);
-    if (m) result.add(parseFloat(m[1]));
+    if (m) result.add(m[1]);
   }
   return result;
 }
@@ -152,8 +153,8 @@ function isSlopeMetadataOnlyCommit(files: string[]): boolean {
   return files.length > 0 && files.every(isSlopeMetadataPath);
 }
 
-function extractShippedSprintReferences(commits: GitSprintCommit[]): Set<number> {
-  const result = new Set<number>();
+function extractShippedSprintReferences(commits: GitSprintCommit[]): Set<SprintId> {
+  const result = new Set<SprintId>();
 
   for (const commit of commits) {
     const artifactRefs = extractSprintArtifactReferences(commit.files);
@@ -161,7 +162,7 @@ function extractShippedSprintReferences(commits: GitSprintCommit[]): Set<number>
       ? new Set<number>()
       : extractSprintReferences([commit.subject]);
 
-    for (const ref of unionSets(artifactRefs, subjectRefs)) {
+    for (const ref of unionSets<SprintId>(artifactRefs, subjectRefs)) {
       result.add(ref);
     }
   }
@@ -203,7 +204,12 @@ export function findShippedSprintsOnMain(cwd: string, ref?: string): Set<number>
     // need to ship hundreds of sprints to exhaust this) and avoids slowing
     // session-end Stop hooks on deep-history repos.
     const log = git(`log ${r} --format=%x1e%s --name-only -n 1000`, cwd);
-    if (log) return extractShippedSprintReferences(parseSprintLog(log));
+    if (log) {
+      // Keep the legacy numeric signature until lifecycle consumers migrate to
+      // SprintId. Artifact members remain canonical strings at runtime so exact
+      // roadmap lookup cannot collapse .10 into .1.
+      return extractShippedSprintReferences(parseSprintLog(log)) as unknown as Set<number>;
+    }
   }
   return new Set();
 }
