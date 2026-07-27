@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { execFileSync } from 'node:child_process';
 import { createSlopeToolsServer, SLOPE_MCP_TOOL_NAMES, detectSetupHints, buildSetupHint, findProjectRoot, formatSearchResults, resolveTestingWorktreePath } from '../../src/mcp/index.js';
 import type { SetupHints } from '../../src/mcp/index.js';
 import { SLOPE_REGISTRY, SLOPE_TYPES } from '../../src/mcp/registry.js';
@@ -647,6 +648,7 @@ describe('MCP project and worktree scope', () => {
     mkdirSync(join(outer, '.slope'), { recursive: true });
     mkdirSync(join(nested, '.slope'), { recursive: true });
     mkdirSync(descendant, { recursive: true });
+    execFileSync('git', ['init', '-q'], { cwd: outer });
     writeFileSync(join(outer, '.slope', 'config.json'), '{}');
     writeFileSync(join(nested, '.slope', 'config.json'), '{}');
 
