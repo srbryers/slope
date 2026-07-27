@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { dirname } from 'node:path';
-import type { SprintClaim, SprintRegistry } from '../../core/index.js';
+import { sprintIdsEqual } from '../../core/index.js';
+import type { SprintClaim, SprintId, SprintRegistry } from '../../core/index.js';
 
 interface ClaimsFile {
   claims: SprintClaim[];
@@ -35,8 +36,8 @@ export class FileRegistry implements SprintRegistry {
     return true;
   }
 
-  async list(sprintNumber: number): Promise<SprintClaim[]> {
-    return this.readClaims().filter(c => c.sprint_number === sprintNumber);
+  async list(sprintNumber: SprintId): Promise<SprintClaim[]> {
+    return this.readClaims().filter(c => sprintIdsEqual(c.sprint_number, sprintNumber));
   }
 
   async get(id: string): Promise<SprintClaim | undefined> {

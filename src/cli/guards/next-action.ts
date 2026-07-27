@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, writeFileSync, renameSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import type { HookInput, GuardResult, SlopeConfig, Suggestion } from '../../core/index.js';
+import type { HookInput, GuardResult, SlopeConfig, SprintClaim, Suggestion } from '../../core/index.js';
 import { loadConfig, loadScorecards, detectLatestSprint, parseRoadmap, formatStrategicContext } from '../../core/index.js';
 import { resolveStore } from '../store.js';
 import { loadFindings } from '../commands/review-state.js';
@@ -75,7 +75,7 @@ export async function detectSprintState(cwd: string, sessionId?: string): Promis
   }
 
   // Try store for active testing session + claims (single connection)
-  let claimsFromStore: { sprint_number: number; target: string }[] | null = null;
+  let claimsFromStore: SprintClaim[] | null = null;
   try {
     const store = await resolveStore(cwd);
     try {
@@ -91,7 +91,7 @@ export async function detectSprintState(cwd: string, sessionId?: string): Promis
         ? allClaims.filter(c => c.session_id === sessionId)
         : allClaims;
       if (claims.length > 0) {
-        const sprintNumber = Math.max(...claims.map(c => c.sprint_number));
+        const sprintNumber = Math.max(...claims.map(c => Number(c.sprint_number)));
         return {
           type: 'mid-sprint',
           sprintNumber,

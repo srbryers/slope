@@ -10,7 +10,7 @@ import {
   resolveRepoSourceCwd,
   resolveRepoStateCwd,
 } from '../../core/index.js';
-import type { SlopeSession } from '../../core/index.js';
+import type { SlopeSession, SprintClaim } from '../../core/index.js';
 import { STALE_SESSION_THRESHOLD_MS } from '../../core/constants.js';
 import { resolveStore } from '../store.js';
 import { resolveSessionStoreCwd } from '../session-scope.js';
@@ -424,7 +424,7 @@ async function dashboardCommand(flags: Record<string, string>, cwd: string): Pro
     }
 
     // Collect claims across sessions
-    const allClaims: Array<{ target: string; scope: string; session_id?: string; player: string; sprint_number: number }> = [];
+    const allClaims: SprintClaim[] = [];
     const sprintNumbers = new Set<number>();
     for (const s of sessions) {
       const meta = s.metadata as Record<string, unknown> | undefined;

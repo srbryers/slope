@@ -1,4 +1,4 @@
-import type { SprintClaim, SprintRegistry } from '../../core/index.js';
+import type { SprintClaim, SprintId, SprintRegistry } from '../../core/index.js';
 
 /** @deprecated Use `SlopeStore` via `resolveStore()` instead. Will be removed in v1.1. */
 export class ApiRegistry implements SprintRegistry {
@@ -27,8 +27,8 @@ export class ApiRegistry implements SprintRegistry {
     return true;
   }
 
-  async list(sprintNumber: number): Promise<SprintClaim[]> {
-    const res = await fetch(`${this.baseUrl}/claims?sprint=${sprintNumber}`);
+  async list(sprintNumber: SprintId): Promise<SprintClaim[]> {
+    const res = await fetch(`${this.baseUrl}/claims?sprint=${encodeURIComponent(String(sprintNumber))}`);
     if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`);
     return res.json() as Promise<SprintClaim[]>;
   }
