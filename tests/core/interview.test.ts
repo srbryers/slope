@@ -39,6 +39,11 @@ describe('validateInitInput', () => {
     expect(errors).toEqual([]);
   });
 
+  it('accepts canonical and legacy numeric sprint ids', () => {
+    expect(validateInitInput({ projectName: 'app', currentSprint: '458.10' })).toEqual([]);
+    expect(validateInitInput({ projectName: 'app', currentSprint: 458.1 })).toEqual([]);
+  });
+
   it('rejects empty projectName', () => {
     const errors = validateInitInput({ projectName: '' });
     expect(errors).toContain('projectName is required and must be non-empty');
@@ -87,11 +92,11 @@ describe('validateInitInput', () => {
 
   it('rejects non-positive currentSprint', () => {
     expect(validateInitInput({ projectName: 'app', currentSprint: 0 }))
-      .toContain('currentSprint must be a positive integer');
+      .toContain('currentSprint must be a positive sprint id (for example 12 or 458.10)');
     expect(validateInitInput({ projectName: 'app', currentSprint: -1 }))
-      .toContain('currentSprint must be a positive integer');
-    expect(validateInitInput({ projectName: 'app', currentSprint: 1.5 }))
-      .toContain('currentSprint must be a positive integer');
+      .toContain('currentSprint must be a positive sprint id (for example 12 or 458.10)');
+    expect(validateInitInput({ projectName: 'app', currentSprint: 'not-a-sprint' }))
+      .toContain('currentSprint must be a positive sprint id (for example 12 or 458.10)');
   });
 
   it('collects multiple errors', () => {
@@ -144,7 +149,23 @@ describe('initFromInterview', () => {
     });
 
     const config = JSON.parse(readFileSync(result.configPath, 'utf8'));
-    expect(config.currentSprint).toBe(10);
+    const sprintState = JSON.parse(readFileSync(join(tmpDir, '.slope', 'sprint-state.json'), 'utf8'));
+    expect(config.currentSprint).toBe('10');
+    expect(sprintState.sprint).toBe('10');
+  });
+
+  it('preserves canonical currentSprint in config and sprint state', async () => {
+    const result = await initFromInterview(tmpDir, {
+      projectName: 'Inserted Sprint App',
+      currentSprint: '458.10',
+    });
+
+    const config = JSON.parse(readFileSync(result.configPath, 'utf8'));
+    const sprintState = JSON.parse(readFileSync(join(tmpDir, '.slope', 'sprint-state.json'), 'utf8'));
+    expect(config.currentSprint).toBe('458.10');
+    expect(config.currentSprint).not.toBe('458.1');
+    expect(sprintState.sprint).toBe('458.10');
+    expect(result.config.currentSprint).toBe('458.10');
   });
 
   it('sets team members in config', async () => {

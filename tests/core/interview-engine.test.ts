@@ -104,6 +104,21 @@ describe('validateInterviewAnswers', () => {
     expect(errors.some((e) => e.field === 'sprint-number')).toBe(true);
   });
 
+  it('accepts canonical sprint ids and rejects partial numeric parses', () => {
+    expect(validateInterviewAnswers({
+      'project-name': 'app',
+      'sprint-number': '458.10',
+    })).toEqual([]);
+
+    expect(validateInterviewAnswers({
+      'project-name': 'app',
+      'sprint-number': '458.10x',
+    })).toContainEqual({
+      field: 'sprint-number',
+      message: 'Must be a positive sprint id (for example 12 or 458.10)',
+    });
+  });
+
   it('rejects custom metaphor sentinel before config generation', () => {
     const errors = validateInterviewAnswers({
       'project-name': 'app',
@@ -130,8 +145,23 @@ describe('answersToInitInput', () => {
     expect(input.projectName).toBe('My App');
     expect(input.metaphor).toBe('gaming');
     expect(input.repoUrl).toBe('https://github.com/acme/app');
-    expect(input.currentSprint).toBe(5);
+    expect(input.currentSprint).toBe('5');
     expect(input.vision).toBe('Build something great');
+  });
+
+  it('preserves canonical sprint ids when transforming answers', () => {
+    const inserted = answersToInitInput({
+      'project-name': 'My App',
+      'sprint-number': '458.10',
+    });
+    const priorInsert = answersToInitInput({
+      'project-name': 'My App',
+      'sprint-number': '458.1',
+    });
+
+    expect(inserted.currentSprint).toBe('458.10');
+    expect(priorInsert.currentSprint).toBe('458.1');
+    expect(inserted.currentSprint).not.toBe(priorInsert.currentSprint);
   });
 
   it('parses team members string', () => {

@@ -7,6 +7,7 @@ import { execSync } from 'node:child_process';
 import { QUIET_STDIO } from './process.js';
 import type { InitInput } from './interview.js';
 import { shouldPersistInterviewMetaphor, validateInterviewMetaphorId } from './interview-metaphor.js';
+import { sprintIdKey } from './sprint-id.js';
 
 export interface DetectedInfo {
   projectName?: string;
@@ -171,11 +172,17 @@ export function validateInterviewAnswers(
   }
 
   // sprint-number validation (if provided)
-  const sprintStr = String(answers['sprint-number'] ?? '').trim();
+  const sprintValue = answers['sprint-number'];
+  const sprintStr = String(sprintValue ?? '').trim();
   if (sprintStr) {
-    const n = parseInt(sprintStr, 10);
-    if (isNaN(n) || n < 1 || !Number.isInteger(n)) {
-      errors.push({ field: 'sprint-number', message: 'Must be a positive integer' });
+    const sprint = typeof sprintValue === 'string' || typeof sprintValue === 'number'
+      ? sprintIdKey(sprintValue)
+      : null;
+    if (sprint === null) {
+      errors.push({
+        field: 'sprint-number',
+        message: 'Must be a positive sprint id (for example 12 or 458.10)',
+      });
     }
   }
 
@@ -196,10 +203,11 @@ export function answersToInitInput(answers: Record<string, unknown>): InitInput 
   const metaphor = String(answers['metaphor'] ?? '').trim();
   if (shouldPersistInterviewMetaphor(metaphor)) input.metaphor = metaphor;
 
-  const sprintStr = String(answers['sprint-number'] ?? '').trim();
-  if (sprintStr) {
-    const n = parseInt(sprintStr, 10);
-    if (!isNaN(n) && n >= 1) input.currentSprint = n;
+  const sprintValue = answers['sprint-number'];
+  const sprintStr = String(sprintValue ?? '').trim();
+  if (sprintStr && (typeof sprintValue === 'string' || typeof sprintValue === 'number')) {
+    const sprint = sprintIdKey(sprintValue);
+    if (sprint !== null) input.currentSprint = sprint;
   }
 
   const vision = String(answers['vision'] ?? '').trim();

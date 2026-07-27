@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import type { EscalationConfig } from './escalation.js';
 import type { PluginsConfig } from './plugins.js';
 import { resolveRepoStateCwd } from './repo-state-scope.js';
+import { sprintIdKey, type SprintId } from './sprint-id.js';
 
 export interface SlopeConfig {
   scorecardDir: string;
@@ -25,7 +26,7 @@ export interface SlopeConfig {
    *  review_md gate closes (case-insensitive substring match). */
   reviewRequiredSections?: string[];
   registryApiUrl?: string;
-  currentSprint?: number;
+  currentSprint?: SprintId;
   store?: string;
   store_path?: string;
   guidance?: {
@@ -118,8 +119,16 @@ export function loadConfig(cwd: string = process.cwd()): SlopeConfig {
     return { ...DEFAULT_CONFIG };
   }
   try {
-    const raw = JSON.parse(readFileSync(configPath, 'utf8'));
-    return { ...DEFAULT_CONFIG, ...raw };
+    const raw = JSON.parse(readFileSync(configPath, 'utf8')) as Record<string, unknown>;
+    const { currentSprint: rawCurrentSprint, ...rest } = raw;
+    const currentSprint = typeof rawCurrentSprint === 'string' || typeof rawCurrentSprint === 'number'
+      ? sprintIdKey(rawCurrentSprint)
+      : null;
+    return {
+      ...DEFAULT_CONFIG,
+      ...rest,
+      ...(currentSprint !== null ? { currentSprint } : {}),
+    } as SlopeConfig;
   } catch {
     return { ...DEFAULT_CONFIG };
   }
@@ -142,7 +151,15 @@ export function saveConfig(config: SlopeConfig, cwd: string = process.cwd()): st
   const dir = join(resolveRepoStateCwd(cwd), CONFIG_DIR);
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   const configPath = join(dir, CONFIG_FILE);
-  writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n');
+  const serialized: SlopeConfig = { ...config };
+  if (config.currentSprint !== undefined) {
+    const currentSprint = sprintIdKey(config.currentSprint);
+    if (currentSprint === null) {
+      throw new Error('currentSprint must be a positive sprint id (for example 12 or 458.10)');
+    }
+    serialized.currentSprint = currentSprint;
+  }
+  writeFileSync(configPath, JSON.stringify(serialized, null, 2) + '\n');
   return configPath;
 }
 
