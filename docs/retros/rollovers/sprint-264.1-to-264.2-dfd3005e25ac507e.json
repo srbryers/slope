@@ -1,0 +1,295 @@
+{
+  "version": 1,
+  "kind": "sprint_rollover",
+  "transition_id": "f5defb780f70adb1",
+  "from_sprint": 264.1,
+  "to_sprint": 264.2,
+  "from_label": "S264.1",
+  "to_label": "S264.2",
+  "recorded_at": "2026-07-27T19:21:14.277Z",
+  "actor": {
+    "name": "sebastianbryers",
+    "source": "env:USER"
+  },
+  "request": {
+    "from": 264.1,
+    "to": 264.2,
+    "force": false
+  },
+  "forced": false,
+  "eligibility": {
+    "from_terminal": true,
+    "target_dependency_eligible": true,
+    "blocking_dependencies": [],
+    "target_dependencies": [
+      264.1
+    ],
+    "completion_evidence": {
+      "roadmap_complete": [
+        61,
+        62,
+        63,
+        64,
+        65,
+        66,
+        67,
+        68,
+        69,
+        70,
+        71,
+        72,
+        73,
+        74,
+        75,
+        76,
+        77,
+        78,
+        79,
+        80,
+        81,
+        82,
+        83,
+        84,
+        86,
+        87,
+        88,
+        89,
+        90,
+        91,
+        92,
+        93,
+        94,
+        95,
+        96,
+        97,
+        98,
+        99,
+        100,
+        101,
+        102,
+        103,
+        104,
+        105,
+        106,
+        107,
+        108,
+        109,
+        110,
+        111,
+        112,
+        113,
+        114,
+        114.5,
+        115,
+        116,
+        117,
+        118,
+        119,
+        120,
+        121,
+        122,
+        123,
+        124,
+        125,
+        126,
+        127,
+        130,
+        131,
+        132,
+        133,
+        134,
+        135,
+        136,
+        137,
+        137.5,
+        138,
+        139,
+        140,
+        141,
+        142,
+        143,
+        143.5,
+        143.6,
+        143.7,
+        143.8,
+        143.9,
+        143.95,
+        143.97,
+        143.98,
+        143.99,
+        144,
+        145,
+        146,
+        146.1,
+        146.2,
+        146.3,
+        148,
+        149,
+        150,
+        151,
+        151.1,
+        152,
+        152.1,
+        153,
+        154,
+        216,
+        217,
+        218,
+        219,
+        220,
+        221,
+        222,
+        223,
+        224,
+        226,
+        227,
+        228,
+        229,
+        230,
+        231,
+        232,
+        233,
+        234,
+        235,
+        236,
+        241,
+        242,
+        243,
+        244,
+        246,
+        247,
+        248,
+        249,
+        250,
+        251,
+        252,
+        253,
+        254,
+        256,
+        258,
+        259,
+        260,
+        260.1,
+        261,
+        262,
+        263,
+        264,
+        264.1
+      ],
+      "scorecards": [
+        264.1
+      ],
+      "local_terminal": [
+        264.1
+      ]
+    },
+    "scorecard_artifacts": [
+      {
+        "sprint": 264.1,
+        "path": "docs/retros/sprint-264.1.json",
+        "sha256": "d5f0774f5ab157c6e48b9f1b36f97daac928af3960cd502cf3ab22620ed36cf5"
+      }
+    ],
+    "expected_next": 264.2
+  },
+  "roadmap": {
+    "path": "docs/backlog/roadmap.json",
+    "sha256": "02bb25d0077d3a55bcc366c26900b09d177f8831c518f4a254f623769d2b6f89",
+    "from_status": "complete"
+  },
+  "prior_state_sha256": "7291f13f79699e2b904bdbd4104093e6473432e161801706fff4c00ded9cc129",
+  "prior_state": {
+    "sprint": 264.1,
+    "phase": "complete",
+    "gates": {
+      "tests": true,
+      "code_review": true,
+      "architect_review": true,
+      "scorecard": true,
+      "review_md": true
+    },
+    "review_gates": {
+      "code_review": {
+        "provenance": "independent_review",
+        "evidence": [
+          "docs/retros/sprint-264.1-security-review.md"
+        ],
+        "reviewer": "019fa4e7-f701-7ee1-bf21-c52972a24b6a",
+        "verdict": "pass",
+        "updated_at": "2026-07-27T19:12:19.941Z"
+      },
+      "architect_review": {
+        "provenance": "independent_review",
+        "evidence": [
+          "docs/retros/sprint-264.1-architect-review.md"
+        ],
+        "reviewer": "019fa4e7-d932-7c73-967e-1da2becce245",
+        "verdict": "pass",
+        "updated_at": "2026-07-27T19:12:15.863Z"
+      }
+    },
+    "review_requirements": {
+      "code_review": {
+        "priority": "optional",
+        "reason": "Baseline code review",
+        "source": "review_recommend",
+        "updated_at": "2026-07-27T18:47:57.807Z"
+      },
+      "architect_review": {
+        "priority": "required",
+        "reason": "4 tickets warrants architectural review",
+        "source": "review_recommend",
+        "updated_at": "2026-07-27T18:47:57.807Z"
+      }
+    },
+    "started_at": "2026-07-27T18:32:52.266Z",
+    "updated_at": "2026-07-27T19:20:31.051Z",
+    "rollover": {
+      "transition_id": "9b5ca03a52d3e2e7",
+      "from_sprint": 264,
+      "audit_path": "docs/retros/rollovers/sprint-264-to-264.1-36a72a7e4cf831d8.json",
+      "recorded_at": "2026-07-27T18:32:52.266Z",
+      "forced": false
+    }
+  },
+  "next_state": {
+    "sprint": 264.2,
+    "phase": "planning",
+    "gates": {
+      "tests": false,
+      "code_review": false,
+      "architect_review": false,
+      "scorecard": false,
+      "review_md": false
+    },
+    "review_gates": {
+      "code_review": {
+        "provenance": "pending",
+        "evidence": []
+      },
+      "architect_review": {
+        "provenance": "pending",
+        "evidence": []
+      }
+    },
+    "review_requirements": {
+      "code_review": {
+        "priority": "unspecified"
+      },
+      "architect_review": {
+        "priority": "unspecified"
+      }
+    },
+    "started_at": "2026-07-27T19:21:14.277Z",
+    "updated_at": "2026-07-27T19:21:14.277Z",
+    "rollover": {
+      "transition_id": "f5defb780f70adb1",
+      "from_sprint": 264.1,
+      "audit_path": "docs/retros/rollovers/sprint-264.1-to-264.2-dfd3005e25ac507e.json",
+      "recorded_at": "2026-07-27T19:21:14.277Z",
+      "forced": false
+    }
+  },
+  "claims_policy": "unchanged",
+  "sessions_policy": "unchanged"
+}

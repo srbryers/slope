@@ -19,17 +19,17 @@ sprints:
     depends_on:
       - 264.2
       - 267
-    note: "Evolve the existing event store into the authoritative coordination ledger rather than create a parallel source of truth. The first schema includes the minimum canonical scorecard identity and version fields plus complete event identity and access scope, rejects idempotency conflicts, projects scorecard and status atomically, replays deterministically, and enforces capabilities and redaction in the store. S270 extends attribution and estimator projections without introducing fields that S268 finalization already hashes."
+    note: "Evolve the existing event store into the authoritative coordination ledger rather than create a parallel source of truth. The first schema includes the minimum canonical scorecard identity and version fields, assignment, callback-obligation, handoff, verification-epoch, contribution, and artifact-provenance aggregates, plus complete event identity and access scope. It rejects idempotency conflicts, projects scorecard and status atomically, replays deterministically, and enforces capabilities, verification-domain invalidation, and redaction in the store. S270 extends attribution and estimator projections without introducing fields that S268 finalization already hashes."
     research:
       - docs/research/buzz-multiplayer-collaboration.md
     tickets:
       - key: S268-1
-        title: Migrate the existing event store to a versioned coordination envelope and minimum canonical scorecard schema with project, round, attempt, scorecard, shot, penalty, loss-component, actor, session, role, contributor, verifier, authority, visibility, correlation, and causation identity
+        title: Migrate the existing event store to a versioned coordination envelope and minimum canonical scorecard schema with project, round, attempt, scorecard, shot, penalty, loss-component, assignment, callback-obligation, handoff, verification-epoch, contribution, artifact-provenance, actor, session, role, contributor, verifier, authority, visibility, correlation, and causation identity
         club: driver
         complexity: risky
         github_issue: 669
       - key: S268-2
-        title: Implement scoped idempotency keys, payload-conflict rejection, atomic append and projection, ordering, and schema evolution
+        title: Implement exact S264.1 idempotency, payload-conflict rejection, and version-2 one-event compound envelopes with the normative cycle-free digest DAG, owner/link bijection, per-affected-aggregate chain positions, singular-to-primary authorization equivalence, replayable per-operation and per-transition authorization sets, cross-adapter golden vectors, ordered locking, all-or-none reducers, contribution and verification-domain high-water marks, ordering, version-1-to-2 replay, and schema evolution
         club: driver
         complexity: risky
         github_issue: 669
@@ -44,13 +44,14 @@ sprints:
           - S268-1
           - S268-2
       - key: S268-4
-        title: Enforce deny-by-default capabilities, principal binding, filtered projections, redaction, retention, and adversarial bypass tests
+        title: Enforce deny-by-default capabilities, principal binding, authenticated artifact-producer provenance, atomic late-contribution approval invalidation, filtered projections, redaction, retention, and adversarial capability, authorization-substitution, and separation-of-duties bypass tests across compound recovery, waiver, and verification operations
         club: driver
         complexity: risky
         github_issue: 669
         depends_on:
           - S268-1
           - S268-2
+          - S268-3
   - id: 269
     theme: Fenced Leases and Shared Resources
     par: 4
@@ -123,7 +124,7 @@ sprints:
           - S270-1
           - S270-2
       - key: S270-4
-        title: Implement penalty causation, normalized allocation, non-additive participant diagnostics, and append-only or transactional merge-safe common-issues learning on canonical S268 penalty identity
+        title: Implement penalty causation, normalized allocation, non-additive participant diagnostics, and one-event append-only common-issues report acceptance with stable occurrence identity, concurrent creation domains, ordered multi-pattern merge and split, redirects, partitions, and replay on canonical S268 penalty identity
         club: driver
         complexity: risky
         github_issue: 669
@@ -134,7 +135,7 @@ sprints:
   - id: 271
     theme: Multiplayer Workflow and Status
     par: 4
-    slope: 4
+    slope: 5
     type: major + operating surface
     depends_on:
       - 270
@@ -143,21 +144,21 @@ sprints:
       - docs/research/buzz-multiplayer-collaboration.md
     tickets:
       - key: S271-1
-        title: Add assignment and handoff states with delegator, assignee, success criteria, correlation, and completion or blocker callbacks
-        club: long_iron
-        complexity: moderate
+        title: Add complete assignment and handoff revision state machines with delegator, assignee, immutable success criteria, correlation, execution-spell callback obligations, recipient-scoped delivery, cancellation, timeout, recovery, and hostile callback-handoff races
+        club: driver
+        complexity: risky
         github_issue: 669
       - key: S271-2
-        title: Enforce verifier independence across authors, contributors, delegators, sessions, aliases, and authenticated principals
+        title: Enforce verification-epoch, slot-decision, single-CAS timeout-disposition, and terminal timeout-escalation aggregate state with sequential and concurrent different-key race tests, producer-proven contribution closure, principal conflict roots, quorum reducer, appeal, waiver, invalidation, and independent verifier gates across authors, contributors, delegators, sessions, aliases, handoffs, and late-mutation races
         club: driver
         complexity: risky
         github_issue: 669
         depends_on:
           - S271-1
       - key: S271-3
-        title: Build a semantic verb-object-outcome feed with prominent blocker, failure, idle, stale, and timeout states
-        club: long_iron
-        complexity: moderate
+        title: Build a semantic verb-object-outcome feed with total facet and precedence derivation, worker aggregation, and prominent blocker, failure, starting, idle, stale, timeout, correction, waiver, and unknown states
+        club: driver
+        complexity: risky
         github_issue: 669
         depends_on:
           - S271-1
@@ -172,28 +173,28 @@ sprints:
   - id: 272
     theme: Multiplayer Benchmark Evaluation
     par: 4
-    slope: 4
+    slope: 5
     type: major + evaluation
     depends_on:
       - 271
-    note: "Evaluate team and single-agent execution reproducibly without leaking secrets or overclaiming causality. Manifests pin code, tasks, actors, models, harness, evaluator, environment, topology, prompts and skills by hash, generation and lifecycle settings, seeds and trials, budgets, prices, and raw evidence hashes."
+    note: "Evaluate team and single-agent execution reproducibly without leaking secrets or overclaiming causality. Manifests pin code, sampling frame and corpus draw, complete trial census, actors, models, harness, evaluator, environment, topology, prompts and skills by hash, generation and lifecycle settings, seeds and trials, aggregate arm budgets, prices, analysis executable and numeric semantics, and evidence roots. Campaign, trial, attempt, analysis-run, and report aggregates enforce capabilities, terminal accounting, invalidation, and deterministic replay."
     research:
       - docs/research/buzz-multiplayer-collaboration.md
     tickets:
       - key: S272-1
-        title: Add a benchmark manifest pinning task corpus, base commit, roster, models, harness, evaluator, environment, topology, prompts, skills, settings, seeds, and trials
+        title: Add a sealed benchmark manifest pinning sampling frame, corpus draw, base commit, roster, models, harness, evaluator, environment, topology, prompts, skills, settings, complete trial census, seeds, and deterministic compatibility for trial reuse
         club: driver
         complexity: risky
         github_issue: 669
       - key: S272-2
-        title: Pin timeout, retry, budget, and price policy plus content-addressed evidence with secret and PII redaction and retention rules
-        club: long_iron
-        complexity: moderate
+        title: Implement explicit capability-mapped and idempotent campaign, trial, and attempt lifecycles with atomic initial and retry attempt creation, separate fail and retry-allocation authorization obligations, fail-only, stale-allocation, substitution, separation-of-duties, and concurrent-retry tests, compound trial-attempt evidence, failure, timeout, cancellation, and retry reconciliation, recovery-authorized unverifiable outcomes, complete collection-closure reconciliation, aggregate arm budget, price, leakage and learning-quarantine policy, plus content-addressed redacted evidence
+        club: driver
+        complexity: risky
         github_issue: 669
         depends_on:
           - S272-1
       - key: S272-3
-        title: Compare canonical reward, cost, elapsed time, and separately reported coordination overhead across team and single-agent trials
+        title: Compare canonical reward, aggregate metered cost and elapsed time, failures and missingness, and separately reported coordination overhead across comparable team and single-agent trial blocks
         club: long_iron
         complexity: moderate
         github_issue: 669
@@ -201,10 +202,11 @@ sprints:
           - S272-1
           - S272-2
       - key: S272-4
-        title: Report sample size, coverage, uncertainty, missingness, reliability, and non-causal interpretation with reproducibility checks
-        club: short_iron
-        complexity: standard
+        title: Implement capability-gated analysis-run and independently verified versioned report lifecycles, complete compound campaign-invalidation child registries, canonical inclusion reducers, pinned RNG and numeric semantics, sample size, coverage, uncertainty, reliability, invalidation lineage, cross-adapter replay, and adversarial reproducibility checks
+        club: driver
+        complexity: risky
         github_issue: 669
         depends_on:
+          - S272-1
           - S272-2
           - S272-3
