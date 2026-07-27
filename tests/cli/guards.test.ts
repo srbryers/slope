@@ -727,6 +727,14 @@ describe('compactionGuard', () => {
     expect(data.timestamp).toBeDefined();
   });
 
+  it('preserves a trailing-zero sprint key in handoff state', async () => {
+    (mockConfig as Record<string, unknown>).currentSprint = '458.10';
+    await compactionGuard(makeInput({ session_id: 'canonical-sprint' }), tmpDir);
+
+    const data = JSON.parse(readFileSync(join(tmpDir, '.slope/handoffs', 'canonica.json'), 'utf8'));
+    expect(data.sprint.number).toBe('458.10');
+  });
+
   it('uses custom handoffsDir from config', async () => {
     mockConfig.guidance = { handoffsDir: '.custom-handoffs' };
     await compactionGuard(makeInput({ session_id: 'test-abcd1234' }), tmpDir);

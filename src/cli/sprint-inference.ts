@@ -39,7 +39,7 @@ export interface InferredSprintContext {
     reason: string;
   };
   staleConfigSprint?: {
-    sprint: number;
+    sprint: string;
     reason: string;
   };
 }
@@ -74,9 +74,10 @@ export function inferSprintContext(cwd: string = process.cwd(), config: SlopeCon
   }
 
   if (config.currentSprint && !staleConfigSprint) {
+    const configuredSprint = sprintIdKey(config.currentSprint)!;
     return {
-      sprint: String(config.currentSprint),
-      label: labelForSprint(config.currentSprint, roadmap),
+      sprint: configuredSprint,
+      label: labelForSprint(configuredSprint, roadmap),
       source: 'config',
       latestScorecard,
       latestScorecardLabel,
@@ -169,14 +170,15 @@ function activeStateCompletedByScorecards(
 }
 
 function configuredSprintCompletedByScorecards(
-  currentSprint: number | undefined,
+  currentSprint: SprintId | undefined,
   latestScorecard: SprintId,
   roadmap: RoadmapDefinition | null,
 ): InferredSprintContext['staleConfigSprint'] | null {
-  if (!currentSprint || sprintIdKey(latestScorecard) === null) return null;
-  if (compareSprintIdsForRoadmap(currentSprint, latestScorecard, roadmap) > 0) return null;
+  const sprint = currentSprint === undefined ? null : sprintIdKey(currentSprint);
+  if (sprint === null || sprintIdKey(latestScorecard) === null) return null;
+  if (compareSprintIdsForRoadmap(sprint, latestScorecard, roadmap) > 0) return null;
   return {
-    sprint: currentSprint,
+    sprint,
     reason: `completed scorecard evidence has advanced to ${labelForSprint(latestScorecard, roadmap)}`,
   };
 }

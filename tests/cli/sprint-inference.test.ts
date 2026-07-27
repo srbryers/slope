@@ -86,7 +86,7 @@ describe('inferSprintContext', () => {
       sprint: '444',
       phase: 'planning',
     });
-    expect(context.staleConfigSprint).toMatchObject({ sprint: 18 });
+    expect(context.staleConfigSprint).toMatchObject({ sprint: '18' });
   });
 
   it('prefers a ready focused successor over older pending backlog after the latest scorecard (#610)', () => {
@@ -130,5 +130,19 @@ describe('inferSprintContext', () => {
     expect(context.sprint).toBe('458.10');
     expect(context.label).toBe('S458.10');
     expect(context.source).toBe('sprint-state');
+  });
+
+  it('preserves a trailing-zero sprint from config', () => {
+    writeFileSync(join(tmpDir, '.slope', 'config.json'), JSON.stringify({
+      currentSprint: '458.10',
+      scorecardDir: 'docs/retros',
+      scorecardPattern: 'sprint-*.json',
+    }));
+
+    const context = inferSprintContext(tmpDir);
+
+    expect(context.sprint).toBe('458.10');
+    expect(context.label).toBe('S458.10');
+    expect(context.source).toBe('config');
   });
 });
