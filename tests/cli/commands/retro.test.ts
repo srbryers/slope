@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { mkdtempSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
 import { retroCommand } from '../../../src/cli/commands/retro.js';
 import { memoryCommand } from '../../../src/cli/commands/memory.js';
 import { searchMemories } from '../../../src/core/memory.js';
@@ -176,6 +177,31 @@ describe('retro post-merge CLI', () => {
       updated.close();
     }
   });
+
+  it('fails closeout explicitly when a custom store lacks atomic completion capability (#668)', async () => {
+    const adapterPath = join(cwd, 'custom-store.mjs');
+    writeFileSync(adapterPath, `
+export function createStore() {
+  return {
+    async listExecutions() { return []; },
+    close() {},
+  };
+}
+`);
+    writeFileSync(join(cwd, '.slope', 'config.json'), JSON.stringify({
+      store: pathToFileURL(adapterPath).href,
+    }));
+
+    const out = await captureLogs(() => retroCommand([
+      'post-merge',
+      '--sprint=137',
+      '--summary=custom adapter closeout',
+    ]));
+
+    expect(out.exitCode).toBe(1);
+    expect(out.stderr).toContain('completeRunningExecution@1');
+  });
+
 
   it('parses non-project category and weight prefixes without persisting prefix text', async () => {
     await captureLogs(() => retroCommand([

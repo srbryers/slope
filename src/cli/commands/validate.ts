@@ -110,7 +110,7 @@ export async function validateCommand(input?: string | string[]): Promise<void> 
     const completedRoadmapSprints = new Set<number>();
     reconciled = reconcileModularRoadmapSources(cwd, validScorecards, completedRoadmapSprints);
     if (reconciled && completedRoadmapSprints.size > 0) {
-      await reconcileValidatedWorkflowExecutions(cwd, completedRoadmapSprints);
+      reconciled = await reconcileValidatedWorkflowExecutions(cwd, completedRoadmapSprints);
     }
   } else if (readOnly) {
     // `validate` writes tracked files as a side effect: it marks the scorecard
@@ -125,7 +125,7 @@ export async function validateCommand(input?: string | string[]): Promise<void> 
   process.exit(allValid && registryAvailable && reconciled ? 0 : 1);
 }
 
-async function reconcileValidatedWorkflowExecutions(cwd: string, sprints: Iterable<number>): Promise<void> {
+async function reconcileValidatedWorkflowExecutions(cwd: string, sprints: Iterable<number>): Promise<boolean> {
   const invokingExecutionId = process.env[WORKFLOW_EXECUTION_ID_ENV]?.trim();
   const result = await reconcileWorkflowCloseout(cwd, sprints, {
     ...(invokingExecutionId ? { preserveExecutionIds: [invokingExecutionId] } : {}),
@@ -134,7 +134,11 @@ async function reconcileValidatedWorkflowExecutions(cwd: string, sprints: Iterab
   for (const exec of result.completed) {
     console.log(`  Workflow execution reconciled: ${sprintLabelForExecution(exec)} duplicate -> completed (${exec.id})`);
   }
-  if (result.warning) console.log(`  \u26A0 Workflow execution reconciliation skipped: ${result.warning}`);
+  if (result.warning) {
+    console.error(`  \u2717 Workflow execution reconciliation failed: ${result.warning}`);
+    return false;
+  }
+  return true;
 }
 
 /**

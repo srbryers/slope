@@ -538,7 +538,9 @@ async function postMergeSubcommand(args: string[]): Promise<void> {
     const workflowCloseout = await reconcileWorkflowCloseout(cwd, [retro.sprint]);
     completedWorkflowExecutions = workflowCloseout.completed.length;
     if (workflowCloseout.warning) {
-      console.error(`Warning: workflow execution closeout skipped: ${workflowCloseout.warning}`);
+      console.error(`Error: workflow execution closeout failed: ${workflowCloseout.warning}`);
+      process.exit(1);
+      return;
     }
   }
 

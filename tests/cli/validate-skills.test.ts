@@ -136,6 +136,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   delete process.env.SLOPE_WORKFLOW_EXECUTION_ID;
   if (existsSync(tmpDir)) rmSync(tmpDir, { recursive: true, force: true });
 });
@@ -230,6 +231,27 @@ describe('slope validate --skills', () => {
     try {
       await expect(updated.getExecution(invoking.id)).resolves.toMatchObject({ status: 'running' });
       await expect(updated.getExecution(duplicate.id)).resolves.toMatchObject({ status: 'completed' });
+    } finally {
+      updated.close();
+    }
+  });
+
+  it('preserves every newest execution tied at the same start timestamp (#668)', async () => {
+    const path = writeScorecard([], 348);
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-27T18:00:00.000Z'));
+    const store = new SqliteSlopeStore(join(tmpDir, '.slope', 'slope.db'));
+    const first = await store.startExecution({ workflow_name: 'sprint-standard', sprint_id: 'S348' });
+    const second = await store.startExecution({ workflow_name: 'sprint-standard', sprint_id: 'S348' });
+    store.close();
+    vi.useRealTimers();
+
+    await expect(validateCommand([path])).rejects.toThrow('process.exit(0)');
+
+    const updated = new SqliteSlopeStore(join(tmpDir, '.slope', 'slope.db'));
+    try {
+      await expect(updated.getExecution(first.id)).resolves.toMatchObject({ status: 'running' });
+      await expect(updated.getExecution(second.id)).resolves.toMatchObject({ status: 'running' });
     } finally {
       updated.close();
     }

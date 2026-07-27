@@ -40,7 +40,7 @@ export interface SprintStateRebindResult {
 }
 
 export async function completeWorkflowExecutionsForSprints(
-  store: Pick<SlopeStore, 'listExecutions' | 'completeRunningExecution'>,
+  store: Pick<SlopeStore, 'listExecutions'> & Partial<Pick<SlopeStore, 'completeRunningExecution'>>,
   sprints: Iterable<number>,
   options: {
     preserveExecutionIds?: Iterable<string>;
@@ -49,6 +49,9 @@ export async function completeWorkflowExecutionsForSprints(
 ): Promise<WorkflowExecution[]> {
   const targetSprints = new Set(sprints);
   if (targetSprints.size === 0) return [];
+  if (typeof store.completeRunningExecution !== 'function') {
+    throw new Error('Configured store does not support workflow closeout capability completeRunningExecution@1.');
+  }
 
   const preserveExecutionIds = new Set(options.preserveExecutionIds ?? []);
   const bySprint = new Map<number, WorkflowExecution[]>();
@@ -64,11 +67,14 @@ export async function completeWorkflowExecutionsForSprints(
   const completed: WorkflowExecution[] = [];
   for (const executions of bySprint.values()) {
     const explicitlyPreserved = executions.filter(exec => preserveExecutionIds.has(exec.id));
+    const newestStartedAt = options.preserveNewestPerSprint && explicitlyPreserved.length === 0
+      ? executions.reduce((latest, exec) => exec.started_at > latest ? exec.started_at : latest, '')
+      : null;
     const preserved = new Set(
       explicitlyPreserved.length > 0
         ? explicitlyPreserved.map(exec => exec.id)
-        : options.preserveNewestPerSprint && executions.length > 0
-          ? [executions[0].id]
+        : newestStartedAt
+          ? executions.filter(exec => exec.started_at === newestStartedAt).map(exec => exec.id)
           : [],
     );
 
