@@ -427,6 +427,34 @@ describe('reviewStateCommand', () => {
     });
   });
 
+  describe('deferred finding selectors', () => {
+    it('keeps trailing-zero target sprints distinct', async () => {
+      await runCommand([
+        'defer',
+        '--from=458.9',
+        '--to=458.1',
+        '--severity=medium',
+        '--description=Sprint .1 work',
+      ]);
+      await runCommand([
+        'defer',
+        '--from=458.9',
+        '--to=458.10',
+        '--severity=high',
+        '--description=Sprint .10 work',
+      ]);
+
+      const spy = vi.spyOn(console, 'log');
+      await runCommand(['deferred', '--sprint=458.10']);
+      const logged = spy.mock.calls.map(c => c[0]).join('\n');
+      spy.mockRestore();
+
+      expect(logged).toContain('Deferred findings for Sprint 458.10');
+      expect(logged).toContain('Sprint .10 work');
+      expect(logged).not.toContain('Sprint .1 work');
+    });
+  });
+
   describe('unknown subcommand', () => {
     it('errors on unknown subcommand', async () => {
       await expect(runCommand(['bogus']))

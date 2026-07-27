@@ -2,11 +2,36 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import type { CodificationCost, CodificationStatus, ReviewFinding } from './types.js';
+import {
+  compareSprintIdKeys,
+  sprintIdKey,
+  sprintIdsEqual,
+  type SprintId,
+} from './sprint-id.js';
 
 export const FINDINGS_FILE = '.slope/review-findings.json';
 
 export interface FindingsFile {
-  sprints: Record<number, ReviewFinding[]>;
+  sprints: Record<string, ReviewFinding[]>;
+}
+
+function normalizeSprintFindings(
+  sprints: Record<string, ReviewFinding[]>,
+): Record<string, ReviewFinding[]> {
+  const normalized: Record<string, ReviewFinding[]> = {};
+  for (const [writtenSprint, findings] of Object.entries(sprints)) {
+    const sprint = sprintIdKey(writtenSprint);
+    if (!sprint || !Array.isArray(findings)) continue;
+    normalized[sprint] = [...(normalized[sprint] ?? []), ...findings];
+  }
+  return normalized;
+}
+
+export function findingSprintKeys(data: FindingsFile): string[] {
+  return Object.keys(data.sprints)
+    .map(sprintIdKey)
+    .filter((sprint): sprint is string => sprint !== null)
+    .sort(compareSprintIdKeys);
 }
 
 export function loadFindings(cwd: string): FindingsFile | null {
@@ -14,13 +39,14 @@ export function loadFindings(cwd: string): FindingsFile | null {
   if (!existsSync(filePath)) return null;
   try {
     const raw = JSON.parse(readFileSync(filePath, 'utf8')) as {
-      sprint_number?: number;
+      sprint_number?: SprintId;
       findings?: ReviewFinding[];
-      sprints?: Record<number, ReviewFinding[]>;
+      sprints?: Record<string, ReviewFinding[]>;
     };
-    if (raw.sprints) return { sprints: raw.sprints };
+    if (raw.sprints) return { sprints: normalizeSprintFindings(raw.sprints) };
     if (raw.sprint_number != null && raw.findings) {
-      return { sprints: { [raw.sprint_number]: raw.findings } };
+      const sprint = sprintIdKey(raw.sprint_number);
+      return sprint ? { sprints: { [sprint]: raw.findings } } : null;
     }
     return null;
   } catch {
@@ -31,20 +57,25 @@ export function loadFindings(cwd: string): FindingsFile | null {
 export function saveFindings(cwd: string, data: FindingsFile): void {
   const dir = join(cwd, '.slope');
   mkdirSync(dir, { recursive: true });
-  writeFileSync(join(cwd, FINDINGS_FILE), JSON.stringify(data, null, 2) + '\n');
+  const normalized = { sprints: normalizeSprintFindings(data.sprints) };
+  writeFileSync(join(cwd, FINDINGS_FILE), JSON.stringify(normalized, null, 2) + '\n');
 }
 
 export function createFindingId(): string {
   return randomUUID();
 }
 
-export function displayFindingId(finding: ReviewFinding, sprint: number, index: number): string {
-  return finding.id ? finding.id.slice(0, 8) : `S${sprint}:${index + 1}`;
+export function displayFindingId(finding: ReviewFinding, sprint: SprintId, index: number): string {
+  const sprintKey = sprintIdKey(sprint) ?? String(sprint);
+  return finding.id ? finding.id.slice(0, 8) : `S${sprintKey}:${index + 1}`;
 }
 
-export function matchesFindingId(finding: ReviewFinding, sprint: number, index: number, id: string): boolean {
-  const fallbackId = `S${sprint}:${index + 1}`;
-  return finding.id === id || Boolean(finding.id?.startsWith(id)) || fallbackId === id;
+export function matchesFindingId(finding: ReviewFinding, sprint: SprintId, index: number, id: string): boolean {
+  const fallbackMatch = id.match(/^S(.+):([1-9]\d*)$/i);
+  const matchesFallback = fallbackMatch !== null
+    && Number(fallbackMatch[2]) === index + 1
+    && sprintIdsEqual(fallbackMatch[1], sprint);
+  return finding.id === id || Boolean(finding.id?.startsWith(id)) || matchesFallback;
 }
 
 export function isCodificationCandidate(finding: ReviewFinding): boolean {
@@ -65,14 +96,14 @@ export function formatCodificationMetadata(finding: ReviewFinding): string {
 }
 
 export function collectOpenCodificationCandidates(data: FindingsFile | null): Array<{
-  sprint: number;
+  sprint: string;
   index: number;
   finding: ReviewFinding;
 }> {
   if (!data) return [];
 
-  const candidates: Array<{ sprint: number; index: number; finding: ReviewFinding }> = [];
-  for (const sprint of Object.keys(data.sprints).map(Number).sort((a, b) => a - b)) {
+  const candidates: Array<{ sprint: string; index: number; finding: ReviewFinding }> = [];
+  for (const sprint of findingSprintKeys(data)) {
     const findings = data.sprints[sprint] ?? [];
     for (const [index, finding] of findings.entries()) {
       if (isOpenCodificationCandidate(finding)) {

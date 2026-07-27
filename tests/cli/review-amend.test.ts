@@ -3,8 +3,8 @@ import { mkdirSync, writeFileSync, rmSync, existsSync, readFileSync, mkdtempSync
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { buildScorecard } from '../../src/core/builder.js';
-import type { ShotRecord, GolfScorecard } from '../../src/core/types.js';
-import type { FindingsFile } from '../../src/cli/commands/review-state.js';
+import type { ShotRecord, GolfScorecard, ReviewFinding } from '../../src/core/types.js';
+import type { SprintId } from '../../src/core/index.js';
 
 let tmpDir: string;
 let origCwd: typeof process.cwd;
@@ -40,7 +40,7 @@ function makeShot(overrides: Partial<ShotRecord> = {}): ShotRecord {
   };
 }
 
-function setupScorecardAndFindings(sprintNumber: number, findings: FindingsFile['findings']): void {
+function setupScorecardAndFindings(sprintNumber: SprintId, findings: ReviewFinding[]): void {
   // Create config
   mkdirSync(join(tmpDir, '.slope'), { recursive: true });
   writeFileSync(join(tmpDir, '.slope/config.json'), JSON.stringify({ scorecardDir: 'docs/retros' }));
@@ -64,7 +64,7 @@ function setupScorecardAndFindings(sprintNumber: number, findings: FindingsFile[
   writeFileSync(join(retrosDir, `sprint-${sprintNumber}.json`), JSON.stringify(scorecard, null, 2));
 
   // Create findings
-  const findingsData: FindingsFile = { sprint_number: sprintNumber, findings };
+  const findingsData = { sprint_number: sprintNumber, findings };
   writeFileSync(join(tmpDir, '.slope/review-findings.json'), JSON.stringify(findingsData));
 }
 
@@ -225,5 +225,55 @@ describe('review amend', () => {
     // 4 shots + 0.5 + 0 + 0.5 + 0 + 0 = 5
     expect(amended.score).toBe(5);
     expect(amended.score_label).toBe('bogey');
+  });
+
+  it('amends and clears only the exact trailing-zero sprint identity', async () => {
+    mkdirSync(join(tmpDir, '.slope'), { recursive: true });
+    writeFileSync(join(tmpDir, '.slope/config.json'), JSON.stringify({ scorecardDir: 'docs/retros' }));
+    const retrosDir = join(tmpDir, 'docs', 'retros');
+    mkdirSync(retrosDir, { recursive: true });
+
+    for (const sprint of ['458.1', '458.10']) {
+      const scorecard = buildScorecard({
+        sprint_number: sprint,
+        theme: `Sprint ${sprint}`,
+        par: 3,
+        slope: 2,
+        date: '2026-07-27',
+        shots: [makeShot({ ticket_key: `S${sprint}-1`, title: `Sprint ${sprint} ticket` })],
+      });
+      writeFileSync(join(retrosDir, `sprint-${sprint}.json`), JSON.stringify(scorecard, null, 2));
+    }
+
+    writeFileSync(join(tmpDir, '.slope/review-findings.json'), JSON.stringify({
+      sprints: {
+        '458.1': [{
+          review_type: 'code',
+          ticket_key: 'S458.1-1',
+          severity: 'major',
+          description: 'Sibling finding',
+          resolved: true,
+        }],
+        '458.10': [{
+          review_type: 'architect',
+          ticket_key: 'S458.10-1',
+          severity: 'moderate',
+          description: 'Exact finding',
+          resolved: true,
+        }],
+      },
+    }));
+
+    await runCommand(['amend', '--sprint=458.10']);
+
+    const sibling = JSON.parse(readFileSync(join(retrosDir, 'sprint-458.1.json'), 'utf8')) as GolfScorecard;
+    const amended = JSON.parse(readFileSync(join(retrosDir, 'sprint-458.10.json'), 'utf8')) as GolfScorecard;
+    const remaining = JSON.parse(readFileSync(join(tmpDir, '.slope/review-findings.json'), 'utf8')) as {
+      sprints: Record<string, ReviewFinding[]>;
+    };
+    expect(sibling.shots[0].hazards).toHaveLength(0);
+    expect(amended.shots[0].hazards[0].description).toContain('Exact finding');
+    expect(remaining.sprints['458.1']).toHaveLength(1);
+    expect(remaining.sprints['458.10']).toBeUndefined();
   });
 });
