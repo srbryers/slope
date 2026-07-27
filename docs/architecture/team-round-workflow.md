@@ -101,10 +101,13 @@ owner_aggregate_type
 owner_aggregate_id
 owner_expected_version
 owner_next_version
+owner_transition
 affected_aggregates[]
 aggregate_chain_links[]
 authorization_set
 precondition_root
+body_commitment
+authorization_root
 transition_root
 aggregate_chain_root
 idempotency_key
@@ -154,6 +157,151 @@ chain-link vector. Per-aggregate replay discovers the event through this link,
 verifies prior and next versions and hashes, and advances once. Missing,
 duplicate, partial, or disagreeing links are integrity failure.
 
+### Version 2 Digest DAG
+
+Version 2 replaces the singular aggregate-chain derivation from S264.1 for
+compound events only. It retains the S264.1 canonical cryptography rules:
+RFC 8785 JCS, I-JSON restrictions, canonical unsigned decimal strings, and the
+length-framed domain separator. Every digest below uses SHA-256 with schema
+revision `team-round-compound-v2` and the stated purpose. The derivation is a
+directed acyclic graph:
+
+1. Form `canonical_body` from the complete accepted event envelope after
+   removing only `integrity.event_hash`, `body_commitment`,
+   `authorization_root`, `transition_root`, `aggregate_chain_root`,
+   every `aggregate_chain_links[].transition_commitment`, and every
+   `aggregate_chain_links[].next_aggregate_hash`, and every
+   `authorization_set[].target_transition_commitment`. The retained chain-link
+   skeleton includes aggregate identity, prior and next versions,
+   `prior_aggregate_hash`, and `aggregate_chain_position`. The retained
+   envelope includes `integrity.previous_project_hash`, the owner transition,
+   affected transition descriptors, authorization entries, request hash, and
+   every other S264.1 field.
+2. Compute `body_commitment =
+   H("compound-body-v2", JCS(canonical_body))`.
+3. Construct one canonical transition descriptor for `owner_transition` and
+   one for every `affected_aggregates` entry. Each descriptor contains
+   `operation_id`, aggregate type and ID, prior and next versions, prior and
+   next state, transition reason, transition-schema revision, and the
+   canonical payload-slice commitment. Compute each
+   `transition_commitment = H("compound-transition-v2",
+   JCS({body_commitment, transition_descriptor}))`.
+4. Populate each transition-target authorization entry with exactly one
+   matching step 3 `transition_commitment`, then compute authorization-entry
+   commitments and `authorization_root` as specified below.
+5. Compute `transition_root = H("compound-transition-root-v2",
+   JCS(transition_commitments))`, where the commitment array follows canonical
+   aggregate-key order.
+6. For each transition compute `next_aggregate_hash =
+   H("compound-aggregate-link-v2", JCS({body_commitment,
+   authorization_root, transition_commitment, event_id, event_sequence,
+   aggregate_type, aggregate_id, prior_version, next_version,
+   prior_aggregate_hash, aggregate_chain_position}))`.
+7. Compute `aggregate_chain_root = H("compound-aggregate-root-v2",
+   JCS(aggregate_chain_links))` over the complete link vector in canonical
+   aggregate-key order.
+8. Compute `integrity.event_hash = H("compound-event-v2",
+   JCS({body_commitment, authorization_root, transition_root,
+   aggregate_chain_root, previous_project_hash}))`.
+
+`H` means the S264.1 length-framed domain-separated SHA-256 construction, not
+string concatenation. The stored derived fields MUST equal these calculations.
+No derived field is an input to an earlier step, so the construction has no
+self-reference.
+
+`affected_aggregates` MUST exclude the owner and contain no repeated canonical
+aggregate key. `owner_transition` and `affected_aggregates` together form the
+transition set. There MUST be exactly one chain link and one
+`event_aggregate_link` for every transition, no extras, and each link identity,
+version pair, and transition commitment MUST match its descriptor.
+`aggregate_chain_position` is the aggregate's canonical `next_version`; the
+owner's legacy `integrity.previous_aggregate_hash` MUST equal the owner link's
+`prior_aggregate_hash`. For version 2, the owner and every affected aggregate
+advance to their link's `next_aggregate_hash`; `integrity.event_hash` advances
+the project chain and is not an aggregate-chain head. Substitution, reordering,
+duplication, omission, or owner/link disagreement fails before projection.
+
+Version 1 events replay under the S264.1 singular owner-chain rule and are never
+rewritten. Version 2 replay selects this DAG by both envelope and integrity
+protocol version. An unknown combination fails closed. Migration checkpoints
+pin the last version 1 project hash and aggregate heads; the first version 2
+event uses those prior hashes without synthesizing bridge events.
+
+### Replayable Authorization Set
+
+An authorization entry has this canonical schema:
+
+```text
+authorization_obligation_id
+target_kind                 # operation | transition
+target_operation_id
+target_aggregate_type?
+target_aggregate_id?
+target_transition_commitment?
+capability
+authority_role
+policy_revision
+policy_activation_sequence
+decision_id
+decision_revision
+decision_effect             # allow
+requesting_principal_id
+authorizing_principal_id
+authentication_context_id
+decision_context_hash
+separation_of_duties_rule?
+separation_of_duties_proof?
+```
+
+Each registered compound-event schema declares its complete authorization
+obligations: operation capabilities, per-transition capabilities, distinct
+authority roles, active policy revision, and separation-of-duties rules.
+`authorization_obligation_id` is the domain-separated commitment to the event
+schema revision, target kind and identity, capability, and authority role. An
+operation entry binds `target_operation_id` and its decision context to
+`body_commitment`. A transition entry additionally binds exactly one canonical
+`transition_commitment`. Recovery plus waiver, for example, requires distinct
+entries for the recovery operation and the waiver transition when policy
+declares separate authorities.
+
+For each entry compute:
+
+```text
+target_commitment =
+  body_commitment                                      # operation
+  H("compound-authorization-target-v2",
+    JCS({body_commitment, transition_commitment}))     # transition
+
+authorization_entry_commitment =
+  H("compound-authorization-entry-v2",
+    JCS({authorization_entry, target_commitment}))
+```
+
+Sort entries by target kind, canonical target identity, capability,
+authority role, and decision ID. Then compute:
+
+```text
+authorization_root =
+  H("compound-authorization-root-v2",
+    JCS(authorization_entry_commitments))
+```
+
+There MUST be a one-to-one match between declared authorization obligations
+and entries. The authoritative policy record at
+`policy_activation_sequence` must reproduce each allow decision and principal
+binding. Replay rejects a missing, duplicate, denied, stale, substituted,
+unrelated, ambiguously targeted, or separation-of-duties-invalid entry. A
+decision for one transition, operation, policy revision, principal, or
+authentication context cannot authorize another.
+
+S268-2 publishes cross-adapter golden vectors for the canonical body, every
+intermediate commitment, each chain link, both roots, and final event hash. The
+conformance corpus covers link and authorization substitution, reordering,
+duplication, omission, owner mismatch, version 1-to-2 replay, and digest-cycle
+regressions. S268-4 adds capability and separation-of-duties bypass attempts,
+including distinct recovery and waiver authorities, on SQLite, PostgreSQL, and
+an independent verifier.
+
 The compound event's idempotency identity follows S264.1:
 
 ```text
@@ -177,14 +325,19 @@ The initial compound events are:
   verification domain;
 - `verification.appeal_granted.v1`, owned by the verification family;
 - `verification.timeout_disposed.v1`, owned by the verification family;
+- `verification.escalation_disposed.v1` and
+  `verification.escalation_expired.v1`, owned by the verification escalation;
 - `learning.patterns_merged.v2` and `learning.pattern_split.v2`, owned by a
   learning-topology operation aggregate;
 - `learning.report_accepted.v2`, owned by the learning report aggregate;
 - `evaluation.evidence_verified.v2`,
   `evaluation.evidence_rejected.v2`, and
   `evaluation.evidence_unverifiable.v2`, owned by the trial aggregate;
-- campaign invalidation events when they transition current analysis and report
-  projections.
+- `evaluation.attempt_retryable_failed.v2`,
+  `evaluation.trial_failed.v2`, `evaluation.trial_timed_out.v2`, and
+  `evaluation.trial_cancelled.v2`, owned by the trial aggregate;
+- `evaluation.campaign_invalidated.v1`, owned by the campaign aggregate when it
+  transitions current analysis and report projections.
 
 ## Assignment Aggregate
 
@@ -1368,6 +1521,63 @@ delivery, target and contribution hashes, recovery count, retry limit,
 principal eligibility, waiver proof when applicable, and idempotency. The
 recovery principal cannot serve as a successor verifier unless independently
 eligible. No disposition resumes or rewrites the timed-out epoch.
+
+For `escalate`, `verification.timeout_disposed.v1` creates exactly one
+verification escalation aggregate keyed by:
+
+```text
+(project_id, verification_family_id, timed_out_epoch, escalation_id)
+```
+
+`escalation_id` is a server-assigned UUIDv7. A uniqueness constraint permits
+one escalation for a verification-family epoch. Its immutable opening payload
+binds the assignment revision, unchanged target and contribution hashes,
+timed-out epoch and decision root, recovery-policy revision, reason,
+requesting and recovery principals, open and disposition deadlines, required
+authorities, notification route, and canonical idempotency record.
+
+The escalation states are:
+
+```text
+open -> requeued
+     -> waived
+     -> abandoned
+     -> superseded
+```
+
+All states after `open` are terminal. An authorized escalation authority uses
+compound event `verification.escalation_disposed.v1` with one outcome:
+
+- `requeued`: transition the escalation to `requeued` and create gap-free
+  verification epoch `e + 1` in `requested` against unchanged bytes;
+- `waived`: transition it to `waived` and create epoch `e + 1` in `waived`,
+  with a distinct authorization entry from a policy-eligible waiver authority;
+- `abandoned`: transition it to `abandoned`, create no successor epoch, and
+  preserve the assignment's `verification_timed_out` composite outcome;
+- `superseded`: transition it to `superseded` only when a newer assignment
+  revision or target hash has already made the escalation inapplicable.
+
+The event requires `verification:escalation_dispose`; `requeued` also requires
+`verification:recover`, `waived` also requires `verification:waive`, and
+`superseded` also requires `verification:invalidate`. Required authorities and
+separation of duties use distinct replayable authorization-set entries.
+`verification.escalation_expired.v1` transitions overdue `open` to `abandoned`
+under the policy recovery principal with `verification:recover`; authoritative
+store time must be at or after the disposition deadline.
+
+Both events lock the escalation, verification family, assignment verification
+domain, and required conflict domains. They validate expected versions and the
+exact S264.1 idempotency identity before appending one transition set.
+Uniqueness plus the `open` precondition permits exactly one terminal
+disposition. Same-key retries return the accepted event; another key or outcome
+after terminal state conflicts without append. Replay requires every terminal
+escalation to have exactly one disposition, and requires each requeued or
+waived state to have exactly one matching successor-epoch transition in that
+same compound event.
+An `open` escalation observed after its deadline is deterministically
+`overdue`, blocks finalization that relies on the verification family, and must
+be terminalized by the next recovery sweep; replay does not invent an expiry
+event.
 
 ## Reverification
 
@@ -2678,7 +2888,7 @@ campaign version.
 | `analysis_pending` | `evaluation.campaign_completed.v1` | `complete` | `evaluation:complete` |
 | any non-terminal | `evaluation.campaign_failed.v1` | `failed` | `evaluation:fail` |
 | any non-terminal | `evaluation.campaign_cancelled.v1` | `cancelled` | `evaluation:cancel` |
-| any state | `evaluation.campaign_invalidated.v1` | `invalidated` | `evaluation:invalidate` |
+| any non-`invalidated` state | `evaluation.campaign_invalidated.v1` | `invalidated` | `evaluation:invalidate` |
 
 The store rejects execution for an unsealed manifest, append after terminal
 state except invalidation metadata, or analysis before collection closure.
@@ -2691,8 +2901,8 @@ decision, collection high-water mark, and integrity root. Planned, allocated,
 running, outcome-reported, or evidence-pending trials block closure.
 Every attempt must also be terminal and its state, evidence disposition,
 consumed budget, and terminal cause must reconcile to its trial through the
-same compound evidence or failure event. Any divergent or non-terminal attempt
-blocks closure.
+same compound evidence, failure, timeout, cancellation, or retry event. Any
+divergent or non-terminal attempt blocks closure.
 
 Campaign completion requires a current completed analysis run, independently
 verified and published report version, no unresolved integrity failure, and
@@ -2700,6 +2910,32 @@ all required policy-deviation dispositions. Compound campaign invalidation
 atomically transitions current analysis and report projections to invalidated
 in its transition set; no invalidated campaign report may remain current or
 exportable.
+
+`evaluation.campaign_invalidated.v1` is a campaign-owned compound event. Its
+payload contains a canonical child-disposition registry for the current
+analysis run and current report lineage. Each registry entry is exactly one of:
+
+- `transitioned`, with the child's prior state, expected version, and affected
+  transition to `invalidated`;
+- `already_invalidated`, with the child's current version and hash as a locked
+  precondition and no affected transition;
+- `absent`, with the canonical absent-row predicate and no affected
+  transition.
+
+For a present analysis run, `planned`, `running`, `completed`, `failed`, or
+`cancelled` transitions to `invalidated`. For a present report, `draft`,
+`generated`, `verified`, or `published` transitions to `invalidated`. No child
+resumes. The event locks the campaign and child lineages, validates the
+registry against authoritative current pointers, and includes one chain link
+for every `transitioned` child. It atomically clears publication, export,
+analysis-current, and report-current pointers.
+
+An already invalidated campaign accepts no new invalidation event: a retry
+under the original idempotency identity returns the original event, while a
+different key returns `already_invalidated` without append. Replay rejects an
+omitted current child, an invented absent child, a stale or extra registry
+entry, a present non-invalidated child without a transition, or any current or
+exportable analysis/report pointer remaining after invalidation.
 
 ### Trial Lifecycle
 
@@ -2737,9 +2973,9 @@ transitions are:
 | `evidence_verified` | `evaluation.trial_included.v1` | `included` | `evaluation:disposition` |
 | `evidence_verified` | `evaluation.trial_excluded.v1` | `excluded` | `evaluation:disposition` |
 | `planned` | `evaluation.trial_not_exposed.v1` | `not_exposed` | `evaluation:stop_rule` |
-| `allocated` or `running` | `evaluation.trial_failed.v1` | `failed` | `evaluation:fail` |
-| `allocated` or `running` | `evaluation.trial_timed_out.v1` | `timed_out` | `evaluation:fail` |
-| any non-terminal | `evaluation.trial_cancelled.v1` | `cancelled` | `evaluation:cancel` |
+| `allocated` or `running` | `evaluation.trial_failed.v2` | `failed` | `evaluation:fail` |
+| `allocated` or `running` | `evaluation.trial_timed_out.v2` | `timed_out` | `evaluation:fail` |
+| any non-terminal | `evaluation.trial_cancelled.v2` | `cancelled` | `evaluation:cancel` |
 
 Exclusion requires a sealed rule, evidence, and an independent disposition
 principal when policy requires it. A poor outcome, high cost, long duration,
@@ -2778,10 +3014,10 @@ planned -> running -> outcome_reported -> verified
 | `outcome_reported` | `evaluation.evidence_verified.v2` | `verified` | `evaluation:evidence_verify` | Evidence policy satisfied |
 | `outcome_reported` | `evaluation.evidence_rejected.v2` | `evidence_rejected` | `evaluation:evidence_verify` | Integrity or evidence policy rejected |
 | `outcome_reported` | `evaluation.evidence_unverifiable.v2` | `unverifiable` | `evaluation:evidence_verify` or `evaluation:evidence_recover` | Evidence unavailable, expired, redacted, or verification timed out |
-| `running` | `evaluation.attempt_retryable_failed.v1` | `retryable_failed` | `evaluation:fail` | Failure class retryable and attempts remain |
-| `running` | `evaluation.attempt_terminal_failed.v1` | `terminal_failed` | `evaluation:fail` | Non-retryable or attempts exhausted |
-| `running` | `evaluation.attempt_timed_out.v1` | `timed_out` | `evaluation:fail` | Authoritative lifecycle timeout |
-| any non-terminal | `evaluation.attempt_cancelled.v1` | `cancelled` | `evaluation:cancel` | Cancellation policy permits |
+| `running` | `evaluation.attempt_retryable_failed.v2` | `retryable_failed` | `evaluation:fail` | Failure class retryable and attempts remain |
+| `planned` or `running` | `evaluation.trial_failed.v2` | `terminal_failed` | `evaluation:fail` | Non-retryable or attempts exhausted |
+| `planned` or `running` | `evaluation.trial_timed_out.v2` | `timed_out` | `evaluation:fail` | Authoritative lifecycle timeout |
+| any non-terminal | `evaluation.trial_cancelled.v2` | `cancelled` | `evaluation:cancel` | Cancellation policy permits |
 
 Attempt terminal events preserve consumed resource and elapsed accounting.
 Retry creation locks trial, prior attempt, budget meter, and resource claims and
@@ -2793,6 +3029,38 @@ constrained to a policy-eligible evidence verifier.
 The three `evaluation.evidence_*.v2` events are trial-owned compound primary
 events that transition the current attempt and trial together with one event
 ID, project sequence, transition root, and both aggregate chain links.
+
+Failure, timeout, and cancellation use the same compound reconciliation rule:
+
+| Compound event | Trial transition | Current attempt transition |
+|---|---|---|
+| `evaluation.attempt_retryable_failed.v2` | `running` -> `running`, clear current-attempt pointer and record retry pending | `running` -> `retryable_failed` |
+| `evaluation.trial_failed.v2` | `allocated` or `running` -> `failed` | `planned` or `running` -> `terminal_failed` |
+| `evaluation.trial_timed_out.v2` | `allocated` or `running` -> `timed_out` | `planned` or `running` -> `timed_out` |
+| `evaluation.trial_cancelled.v2` | any non-terminal -> `cancelled` | current non-terminal -> `cancelled`, when one exists |
+
+The trial owns each event. The current attempt is an affected aggregate and
+advances in the same transition set. Retryable failure is the only terminal
+attempt disposition that leaves the trial active: it increments the trial
+attempts-consumed count, records the failed attempt as reconciled, clears the
+current pointer, and permits one later gap-free `evaluation.attempt_planned.v1`
+under the sealed retry and budget policy. A trial cannot have more than one
+current non-terminal attempt. Terminal trial failure and timeout require a
+current attempt. Cancellation MAY have no current non-terminal attempt. In
+that case the compound event records `attempt_disposition = absent` when no
+attempt exists, or `attempt_disposition = already_terminal` with the current
+attempt version and hash as a precondition, and has no attempt transition or
+link.
+
+Every compound terminal event records typed cause, attempt and trial prior
+states, consumed arm budget and resources, elapsed time, metric missingness,
+evidence availability, sealed loss-policy result, and the trial/attempt
+reconciliation root. Replay rejects a separate attempt-only terminal event,
+multiple terminal dispositions for one attempt, a terminal trial with a live
+attempt, a retry-pending trial without exactly one reconciled retryable
+failure, or a new attempt that exceeds the sealed limit. Collection closure
+recomputes the reconciliation root from these compound events and requires
+every attempt to appear exactly once.
 
 `evaluation:evidence_recover` is constrained to a registered recovery principal
 and may invoke only `evaluation.evidence_unverifiable.v2` after an authoritative
@@ -3290,10 +3558,12 @@ It binds:
 States are:
 
 ```text
-planned -> running -> completed
-                   \-> failed
-                   \-> cancelled
-completed -> invalidated
+planned
+running
+completed
+failed
+cancelled
+invalidated
 ```
 
 Transitions use `evaluation.analysis_planned.v1`,
@@ -3302,6 +3572,11 @@ Transitions use `evaluation.analysis_planned.v1`,
 `evaluation.analysis_invalidated.v1`. They require expected version,
 `evaluation:analyze` or `evaluation:invalidate`, separation-of-duties policy,
 and canonical idempotency.
+
+Direct `evaluation.analysis_invalidated.v1` and the analysis transition inside
+`evaluation.campaign_invalidated.v1` are legal from `planned`, `running`,
+`completed`, `failed`, or `cancelled`. The former is analysis-owned; the latter
+is campaign-owned and follows the compound child-disposition registry.
 
 ### Inclusion Set
 
@@ -3346,10 +3621,12 @@ invalidated
 | `draft` | `evaluation.report_generated.v1` | `generated` | `evaluation:analyze` |
 | `generated` | `evaluation.report_verified.v1` | `verified` | `evaluation:report_verify` |
 | `verified` | `evaluation.report_published.v1` | `published` | `evaluation:complete` |
-| `generated`, `verified`, or `published` | `evaluation.report_invalidated.v1` | `invalidated` | `evaluation:invalidate` |
+| `draft`, `generated`, `verified`, or `published` | `evaluation.report_invalidated.v1` | `invalidated` | `evaluation:invalidate` |
 
 A correction creates `report_version + 1`, references the invalidated version
 and analysis run, and replays from canonical inputs. No report state resumes.
+The same transition is legal as an affected transition of
+`evaluation.campaign_invalidated.v1`; it does not imply a child event.
 
 `evaluation:report_draft` is constrained to the registered analysis service
 principal for the completed analysis run. `evaluation:report_verify` is

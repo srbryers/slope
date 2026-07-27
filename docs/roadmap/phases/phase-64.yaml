@@ -29,7 +29,7 @@ sprints:
         complexity: risky
         github_issue: 669
       - key: S268-2
-        title: Implement exact S264.1 idempotency, payload-conflict rejection, version-2 one-event compound envelopes with per-affected-aggregate version and hash-chain links, ordered locking, all-or-none reducers, contribution and verification-domain high-water marks, ordering, and schema evolution
+        title: Implement exact S264.1 idempotency, payload-conflict rejection, and version-2 one-event compound envelopes with the normative cycle-free digest DAG, owner/link bijection, per-affected-aggregate chain positions, replayable per-operation and per-transition authorization sets, cross-adapter golden vectors, ordered locking, all-or-none reducers, contribution and verification-domain high-water marks, ordering, version-1-to-2 replay, and schema evolution
         club: driver
         complexity: risky
         github_issue: 669
@@ -44,7 +44,7 @@ sprints:
           - S268-1
           - S268-2
       - key: S268-4
-        title: Enforce deny-by-default capabilities, principal binding, authenticated artifact-producer provenance, atomic late-contribution approval invalidation, filtered projections, redaction, retention, and adversarial bypass tests
+        title: Enforce deny-by-default capabilities, principal binding, authenticated artifact-producer provenance, atomic late-contribution approval invalidation, filtered projections, redaction, retention, and adversarial capability, authorization-substitution, and separation-of-duties bypass tests across compound recovery, waiver, and verification operations
         club: driver
         complexity: risky
         github_issue: 669
@@ -149,7 +149,7 @@ sprints:
         complexity: risky
         github_issue: 669
       - key: S271-2
-        title: Enforce verification-epoch and slot-decision state, producer-proven contribution closure, principal conflict roots, quorum reducer, appeal, waiver, invalidation, and independent verifier gates across authors, contributors, delegators, sessions, aliases, handoffs, and late-mutation races
+        title: Enforce verification-epoch, slot-decision, and terminal timeout-escalation aggregate state, producer-proven contribution closure, principal conflict roots, quorum reducer, appeal, waiver, invalidation, and independent verifier gates across authors, contributors, delegators, sessions, aliases, handoffs, and late-mutation races
         club: driver
         complexity: risky
         github_issue: 669
@@ -187,7 +187,7 @@ sprints:
         complexity: risky
         github_issue: 669
       - key: S272-2
-        title: Implement explicit capability-mapped and idempotent campaign, trial, and attempt lifecycles with compound trial-attempt evidence disposition, recovery-authorized unverifiable outcomes, collection-closure attempt reconciliation, timeout, retry, aggregate arm budget, price, leakage and learning-quarantine policy, plus content-addressed redacted evidence
+        title: Implement explicit capability-mapped and idempotent campaign, trial, and attempt lifecycles with compound trial-attempt evidence, failure, timeout, cancellation, and retry reconciliation, recovery-authorized unverifiable outcomes, complete collection-closure reconciliation, aggregate arm budget, price, leakage and learning-quarantine policy, plus content-addressed redacted evidence
         club: driver
         complexity: risky
         github_issue: 669
@@ -202,7 +202,7 @@ sprints:
           - S272-1
           - S272-2
       - key: S272-4
-        title: Implement capability-gated analysis-run and independently verified versioned report lifecycles, canonical inclusion reducers, pinned RNG and numeric semantics, sample size, coverage, uncertainty, reliability, invalidation lineage, cross-adapter replay, and adversarial reproducibility checks
+        title: Implement capability-gated analysis-run and independently verified versioned report lifecycles, complete compound campaign-invalidation child registries, canonical inclusion reducers, pinned RNG and numeric semantics, sample size, coverage, uncertainty, reliability, invalidation lineage, cross-adapter replay, and adversarial reproducibility checks
         club: driver
         complexity: risky
         github_issue: 669
