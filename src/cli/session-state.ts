@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { createHash } from 'node:crypto';
+import { resolveRepoStatePath } from '../core/index.js';
 import { atomicWriteFileSync, withFileLockSync } from './atomic-write.js';
 import { isActiveSprintState, loadSprintState } from './sprint-state.js';
 
@@ -29,7 +29,7 @@ interface SessionState {
 
 /** Load consolidated session state. Returns empty object if missing/corrupt. */
 export function loadSessionState(cwd: string): SessionState {
-  const statePath = join(cwd, SESSION_STATE_FILE);
+  const statePath = sessionStatePath(cwd);
   if (!existsSync(statePath)) return {};
   try {
     return JSON.parse(readFileSync(statePath, 'utf8'));
@@ -39,7 +39,7 @@ export function loadSessionState(cwd: string): SessionState {
 }
 
 function sessionStatePath(cwd: string): string {
-  return join(cwd, SESSION_STATE_FILE);
+  return resolveRepoStatePath(cwd, SESSION_STATE_FILE);
 }
 
 function saveSessionStateUnlocked(filePath: string, state: SessionState): void {
@@ -130,13 +130,13 @@ interface ContextDedupState {
 }
 
 function loadDedupState(cwd: string): ContextDedupState | null {
-  const path = join(cwd, CONTEXT_DEDUP_FILE);
+  const path = dedupStatePath(cwd);
   if (!existsSync(path)) return null;
   try { return JSON.parse(readFileSync(path, 'utf8')); } catch { return null; }
 }
 
 function dedupStatePath(cwd: string): string {
-  return join(cwd, CONTEXT_DEDUP_FILE);
+  return resolveRepoStatePath(cwd, CONTEXT_DEDUP_FILE);
 }
 
 function saveDedupStateUnlocked(filePath: string, state: ContextDedupState): void {

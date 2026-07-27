@@ -30,7 +30,7 @@ import { SLOPE_REGISTRY, SLOPE_TYPES } from './registry.js';
 import type { FunctionRegistryEntry } from './registry.js';
 import { runInSandbox } from './sandbox.js';
 import type { SlopeStore, SlopeConfig } from '../core/index.js';
-import { checkConflicts, loadFlows, checkFlowStaleness, checkStoreHealth, METAPHOR_SCHEMA, listMetaphors, buildInterviewContext, generateInterviewSteps, loadConfig, parseTestPlan, getAreasNeedingTest, hasEmbeddingSupport, embed, deduplicateByFile, formatContextForAgent, WorkflowEngine, loadWorkflow, listWorkflows, resolveVariables } from '../core/index.js';
+import { checkConflicts, loadFlows, checkFlowStaleness, checkStoreHealth, METAPHOR_SCHEMA, listMetaphors, buildInterviewContext, generateInterviewSteps, loadConfig, parseTestPlan, getAreasNeedingTest, hasEmbeddingSupport, embed, deduplicateByFile, formatContextForAgent, WorkflowEngine, loadWorkflow, listWorkflows, resolveVariables, resolveRepoStatePath } from '../core/index.js';
 import type { ContextResult } from '../core/index.js';
 import { gaming } from '../core/metaphors/gaming.js';
 import type { ClaimScope, FlowsFile, FlowDefinition } from '../core/index.js';
@@ -111,7 +111,7 @@ export function detectSetupHints(projectRoot: string): SetupHints {
   };
 
   // Check .slope/hooks.json for guard-* and lifecycle hook entries
-  const hooksPath = join(projectRoot, '.slope', 'hooks.json');
+  const hooksPath = resolveRepoStatePath(projectRoot, '.slope/hooks.json');
   if (existsSync(hooksPath)) {
     try {
       const hooksData = JSON.parse(readFileSync(hooksPath, 'utf-8'));
@@ -1073,20 +1073,19 @@ function handleMapQuery(query?: string): string {
 
 /** Handle search({ module: 'flows' }) — return flow definitions with optional filtering */
 function handleFlowsQuery(query?: string): string {
-  const cwd = process.cwd();
+  let cwd = process.cwd();
+  try {
+    cwd = findProjectRoot(cwd);
+  } catch {
+    // Keep the original cwd for graceful no-config fallback.
+  }
 
-  // Resolve flows path from config (config.json is already in .slope/)
   let flowsPath: string;
   try {
-    const configPath = join(cwd, '.slope', 'config.json');
-    if (existsSync(configPath)) {
-      const config = JSON.parse(readFileSync(configPath, 'utf8'));
-      flowsPath = join(cwd, config.flowsPath || '.slope/flows.json');
-    } else {
-      flowsPath = join(cwd, '.slope', 'flows.json');
-    }
+    const config = loadConfig(cwd);
+    flowsPath = resolveRepoStatePath(cwd, config.flowsPath || '.slope/flows.json');
   } catch {
-    flowsPath = join(cwd, '.slope', 'flows.json');
+    flowsPath = resolveRepoStatePath(cwd, '.slope/flows.json');
   }
 
   const flows = loadFlows(flowsPath);
@@ -1227,11 +1226,24 @@ function handleInitQuery(): string {
   return sections.join('\n');
 }
 
-/** Walk up directories looking for .slope/config.json */
-function findProjectRoot(startDir: string): string {
+/** Find the active checkout root whose common-dir owner contains SLOPE state. */
+export function findProjectRoot(startDir: string): string {
+  try {
+    const worktreeRoot = execFileSync('git', ['rev-parse', '--show-toplevel'], {
+      cwd: startDir,
+      encoding: 'utf8',
+      stdio: QUIET_STDIO,
+    }).trim();
+    if (worktreeRoot && existsSync(resolveRepoStatePath(worktreeRoot, '.slope/config.json'))) {
+      return worktreeRoot;
+    }
+  } catch {
+    // Fall back to directory walking for non-git and fixture projects.
+  }
+
   let dir = startDir;
   while (true) {
-    if (existsSync(join(dir, '.slope', 'config.json'))) {
+    if (existsSync(resolveRepoStatePath(dir, '.slope/config.json'))) {
       return dir;
     }
     const parent = dirname(dir);

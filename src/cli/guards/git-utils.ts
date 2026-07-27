@@ -1,6 +1,8 @@
 import { execSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from 'node:fs';
-import { join } from 'node:path';
+import { createHash } from 'node:crypto';
+import { dirname, resolve } from 'node:path';
+import { resolveRepoStateCwd, resolveRepoStatePath } from '../../core/index.js';
 
 /**
  * Check if HEAD is at or behind origin/main.
@@ -22,7 +24,24 @@ export function headIsOnMain(cwd: string): boolean {
 const BASELINES_DIR = '.slope/baselines';
 
 function baselinePath(sessionId: string, cwd: string): string {
-  return join(cwd, BASELINES_DIR, `${sessionId}.txt`);
+  const stateCwd = resolveRepoStateCwd(cwd);
+  const worktreeRoot = gitTopLevel(cwd);
+  const suffix = resolve(worktreeRoot) === resolve(stateCwd)
+    ? ''
+    : `-${createHash('sha256').update(worktreeRoot).digest('hex').slice(0, 12)}`;
+  return resolveRepoStatePath(cwd, `${BASELINES_DIR}/${sessionId}${suffix}.txt`);
+}
+
+function gitTopLevel(cwd: string): string {
+  try {
+    return execSync('git rev-parse --show-toplevel', {
+      cwd,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim() || cwd;
+  } catch {
+    return cwd;
+  }
 }
 
 /**
@@ -36,7 +55,7 @@ export function recordBaseline(sessionId: string, cwd: string): boolean {
 
   try {
     const status = execSync('git status --porcelain', { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-    const dir = join(cwd, BASELINES_DIR);
+    const dir = dirname(path);
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
     writeFileSync(path, status);
     return true;
