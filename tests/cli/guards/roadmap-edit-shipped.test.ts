@@ -298,6 +298,57 @@ sources:
     expect(result).toEqual({});
   });
 
+  it('indexes coexisting decimal rows by canonical sprint key', async () => {
+    const roadmap = {
+      name: 'Canonical roadmap',
+      phases: [{
+        name: 'Decimal phase',
+        sprints: [458.1, 458.1],
+        sprint_keys: ['458.1', '458.10'],
+      }],
+      sprints: [
+        {
+          id: 458.1,
+          id_key: '458.1',
+          theme: 'Shipped first insert',
+          par: 3,
+          slope: 1,
+          type: 'feature',
+          status: 'complete',
+          tickets: [{ key: 'S458.1-1', title: 'Shipped', club: 'wedge', complexity: 'small' }],
+        },
+        {
+          id: 458.1,
+          id_key: '458.10',
+          theme: 'Planned tenth insert',
+          par: 3,
+          slope: 1,
+          type: 'feature',
+          status: 'planned',
+          tickets: [{ key: 'S458.10-1', title: 'Planned', club: 'wedge', complexity: 'small' }],
+        },
+      ],
+    };
+    const path = writeRoadmap(cwd, roadmap);
+    const plannedEdit = JSON.parse(JSON.stringify(roadmap));
+    plannedEdit.sprints[1].theme = 'Updated tenth insert';
+
+    expect(await roadmapEditShippedGuard(
+      writeInput(path, JSON.stringify(plannedEdit, null, 2)),
+      cwd,
+    )).toEqual({});
+
+    const shippedEdit = JSON.parse(JSON.stringify(roadmap));
+    shippedEdit.sprints[0].theme = 'Rewritten first insert';
+    const denied = await roadmapEditShippedGuard(
+      writeInput(path, JSON.stringify(shippedEdit, null, 2)),
+      cwd,
+    );
+    expect(denied.decision).toBe('deny');
+    expect(denied.blockReason).toContain('S458.1');
+    expect(denied.blockReason).not.toContain('S458.10: shipped sprint fields modified');
+  });
+
   it('blocks adding a ticket to a shipped sprint', async () => {
     const path = writeRoadmap(cwd, baseRoadmap());
     const next = baseRoadmap();

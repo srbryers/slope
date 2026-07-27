@@ -3,7 +3,9 @@ import type { ReviewType } from './types.js';
 
 import { readFileSync, writeFileSync, mkdirSync, rmSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { parseRoadmap } from './roadmap.js';
+import { findRoadmapSprint, parseRoadmap, roadmapSprintKey } from './roadmap.js';
+import { sprintIdKey } from './sprint-id.js';
+import type { SprintId } from './sprint-id.js';
 
 // --- Specialist Types (distinct from ReviewType) ---
 
@@ -44,7 +46,7 @@ export interface ReviewRecord {
 // --- Initiative Sprint Status ---
 
 export interface InitiativeSprintStatus {
-  sprint_number: number;
+  sprint_number: SprintId;
   phase: InitiativeSprintPhase;
   plan_reviews: ReviewRecord[];
   pr_reviews: ReviewRecord[];
@@ -71,7 +73,7 @@ export interface ReviewChecklistItem {
 }
 
 export interface ReviewChecklistContext {
-  sprint_number: number;
+  sprint_number: SprintId;
   ticket_count: number;
   slope: number;
   file_patterns: string[];
@@ -329,7 +331,19 @@ export function loadInitiative(cwd: string): InitiativeDefinition | null {
   if (!existsSync(filePath)) return null;
   const raw = readFileSync(filePath, 'utf8');
   try {
-    return JSON.parse(raw) as InitiativeDefinition;
+    const initiative = JSON.parse(raw) as Omit<InitiativeDefinition, 'sprints'> & {
+      sprints: Array<Omit<InitiativeSprintStatus, 'sprint_number'> & { sprint_number: SprintId }>;
+    };
+    return {
+      ...initiative,
+      sprints: initiative.sprints.map(sprint => {
+        const sprintKey = sprintIdKey(sprint.sprint_number);
+        if (sprintKey === null) {
+          throw new Error(`Invalid initiative sprint id: ${String(sprint.sprint_number)}`);
+        }
+        return { ...sprint, sprint_number: sprintKey };
+      }),
+    };
   } catch (err) {
     throw new Error(`Corrupted initiative file at ${INITIATIVE_FILE}: ${(err as Error).message}`);
   }
@@ -339,7 +353,17 @@ export function saveInitiative(cwd: string, initiative: InitiativeDefinition): v
   withLock(cwd, () => {
     const dir = dirname(join(cwd, INITIATIVE_FILE));
     mkdirSync(dir, { recursive: true });
-    writeFileSync(join(cwd, INITIATIVE_FILE), JSON.stringify(initiative, null, 2) + '\n');
+    const normalized = {
+      ...initiative,
+      sprints: initiative.sprints.map(sprint => {
+        const sprintKey = sprintIdKey(sprint.sprint_number);
+        if (sprintKey === null) {
+          throw new Error(`Invalid initiative sprint id: ${String(sprint.sprint_number)}`);
+        }
+        return { ...sprint, sprint_number: sprintKey };
+      }),
+    };
+    writeFileSync(join(cwd, INITIATIVE_FILE), JSON.stringify(normalized, null, 2) + '\n');
   });
 }
 
@@ -378,9 +402,10 @@ export function createInitiative(
   // Sync completion state: a sprint is complete if its scorecard exists
   const scorecardDir = join(cwd, 'docs/retros');
   const sprints: InitiativeSprintStatus[] = roadmap.sprints.map(s => {
-    const hasScorecard = existsSync(join(scorecardDir, `sprint-${s.id}.json`));
+    const sprintKey = roadmapSprintKey(roadmap, s);
+    const hasScorecard = existsSync(join(scorecardDir, `sprint-${sprintKey}.json`));
     return {
-      sprint_number: s.id,
+      sprint_number: sprintKey,
       phase: hasScorecard ? 'complete' as const : 'pending' as const,
       plan_reviews: [],
       pr_reviews: [],
@@ -403,20 +428,22 @@ export function createInitiative(
 
 export function advanceSprint(
   cwd: string,
-  sprintNumber: number,
+  sprintNumber: SprintId,
 ): { phase: InitiativeSprintPhase; previous: InitiativeSprintPhase } {
   const initiative = loadInitiative(cwd);
   if (!initiative) throw new Error('No initiative found. Run "slope initiative create" first.');
 
-  const sprint = initiative.sprints.find(s => s.sprint_number === sprintNumber);
-  if (!sprint) throw new Error(`Sprint ${sprintNumber} not found in initiative.`);
+  const sprintKey = sprintIdKey(sprintNumber);
+  if (sprintKey === null) throw new Error(`Invalid sprint id: ${String(sprintNumber)}`);
+  const sprint = initiative.sprints.find(s => s.sprint_number === sprintKey);
+  if (!sprint) throw new Error(`Sprint ${sprintKey} not found in initiative.`);
 
   const check = canAdvance(sprint, initiative.review_gates);
   if (!check.ok) throw new Error(check.reason);
 
   const previous = sprint.phase;
   const next = getNextPhase(sprint.phase);
-  if (!next) throw new Error(`Cannot advance sprint ${sprintNumber}: no next phase from "${sprint.phase}".`);
+  if (!next) throw new Error(`Cannot advance sprint ${sprintKey}: no next phase from "${sprint.phase}".`);
 
   // On transition to plan_review, populate expected review records if empty
   if (next === 'plan_review' && sprint.plan_reviews.length === 0) {
@@ -437,7 +464,7 @@ export function advanceSprint(
         const raw = JSON.parse(readFileSync(join(cwd, initiative.roadmap), 'utf8'));
         const { roadmap } = parseRoadmap(raw);
         if (roadmap) {
-          const roadmapSprint = roadmap.sprints.find(s => s.id === sprintNumber);
+          const roadmapSprint = findRoadmapSprint(roadmap, sprintKey);
           if (roadmapSprint) {
             const tickets = roadmapSprint.tickets.map(t => ({ title: t.title }));
             const specialists = selectSpecialists(tickets);
@@ -486,7 +513,7 @@ export function advanceSprint(
 
 export function recordReview(
   cwd: string,
-  sprintNumber: number,
+  sprintNumber: SprintId,
   gate: ReviewGate,
   reviewer: ReviewChecklistType,
   findingsCount: number = 0,
@@ -494,8 +521,10 @@ export function recordReview(
   const initiative = loadInitiative(cwd);
   if (!initiative) throw new Error('No initiative found. Run "slope initiative create" first.');
 
-  const sprint = initiative.sprints.find(s => s.sprint_number === sprintNumber);
-  if (!sprint) throw new Error(`Sprint ${sprintNumber} not found in initiative.`);
+  const sprintKey = sprintIdKey(sprintNumber);
+  if (sprintKey === null) throw new Error(`Invalid sprint id: ${String(sprintNumber)}`);
+  const sprint = initiative.sprints.find(s => s.sprint_number === sprintKey);
+  if (!sprint) throw new Error(`Sprint ${sprintKey} not found in initiative.`);
 
   // Validate gate matches current phase
   if (gate === 'plan' && sprint.phase !== 'plan_review') {

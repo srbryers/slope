@@ -12,6 +12,7 @@ import type {
   ReviewChecklistType,
   ReviewGate,
 } from '../../core/initiative.js';
+import { sprintIdKey } from '../../core/sprint-id.js';
 
 // --- Helpers ---
 
@@ -108,15 +109,15 @@ function advanceSubcommand(flags: Record<string, string>, cwd: string): void {
     process.exit(1);
   }
 
-  const sprintNumber = parseInt(sprintStr, 10);
-  if (isNaN(sprintNumber)) {
+  const sprintKey = sprintIdKey(sprintStr);
+  if (sprintKey === null) {
     console.error(`\n\u2717 Invalid sprint number: ${sprintStr}\n`);
     process.exit(1);
   }
 
   try {
-    const result = advanceSprint(cwd, sprintNumber);
-    console.log(`\n\u2713 Sprint ${sprintNumber}: ${result.previous} \u2192 ${result.phase}\n`);
+    const result = advanceSprint(cwd, sprintKey);
+    console.log(`\n\u2713 Sprint ${sprintKey}: ${result.previous} \u2192 ${result.phase}\n`);
   } catch (err) {
     console.error(`\n\u2717 ${(err as Error).message}\n`);
     process.exit(1);
@@ -148,8 +149,8 @@ function reviewSubcommand(flags: Record<string, string>, cwd: string): void {
     process.exit(1);
   }
 
-  const sprintNumber = parseInt(sprintStr, 10);
-  if (isNaN(sprintNumber)) {
+  const sprintKey = sprintIdKey(sprintStr);
+  if (sprintKey === null) {
     console.error(`\n\u2717 Invalid sprint number: ${sprintStr}\n`);
     process.exit(1);
   }
@@ -161,8 +162,8 @@ function reviewSubcommand(flags: Record<string, string>, cwd: string): void {
   }
 
   try {
-    recordReview(cwd, sprintNumber, gate, reviewer, findingsCount);
-    console.log(`\n\u2713 Recorded ${gate} review: ${reviewer} (${findingsCount} findings) for sprint ${sprintNumber}\n`);
+    recordReview(cwd, sprintKey, gate, reviewer, findingsCount);
+    console.log(`\n\u2713 Recorded ${gate} review: ${reviewer} (${findingsCount} findings) for sprint ${sprintKey}\n`);
   } catch (err) {
     console.error(`\n\u2717 ${(err as Error).message}\n`);
     process.exit(1);

@@ -3,7 +3,11 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync, readFileSync } from 'nod
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFileSync } from 'node:child_process';
-import { getVersionBumpStagePaths, versionCommand } from '../../src/cli/commands/version.js';
+import {
+  collectSlopeReleaseEvidence,
+  getVersionBumpStagePaths,
+  versionCommand,
+} from '../../src/cli/commands/version.js';
 
 let tmpDir: string;
 let originalCwd: string;
@@ -222,5 +226,57 @@ describe('versionCommand', () => {
     expect(text).toContain('SLOPE release evidence: minor');
     expect(text).toContain('S44 Command Cockpit (roadmap: cli product surface)');
     expect(text).toContain('Recommended: minor (1.5.0');
+  });
+
+  it('keeps coexisting decimal sprint release evidence distinct and ordered', () => {
+    writeJson('docs/backlog/roadmap.json', {
+      name: 'Canonical roadmap',
+      phases: [{
+        name: 'Decimal phase',
+        sprints: [458.1, 458.1],
+        sprint_keys: ['458.1', '458.10'],
+      }],
+      sprints: [
+        {
+          id: 458.1,
+          id_key: '458.1',
+          theme: 'First insert',
+          par: 3,
+          slope: 1,
+          type: 'cli product surface',
+          status: 'complete',
+          tickets: [{ key: 'S458.1-1', title: 'Ship first insert', club: 'wedge', complexity: 'small' }],
+        },
+        {
+          id: 458.1,
+          id_key: '458.10',
+          theme: 'Tenth insert',
+          par: 3,
+          slope: 1,
+          type: 'cli product surface',
+          status: 'complete',
+          tickets: [{ key: 'S458.10-1', title: 'Ship tenth insert', club: 'wedge', complexity: 'small' }],
+        },
+      ],
+    });
+    writeJson('docs/retros/sprint-458.1.json', {
+      sprint_number: '458.1',
+      theme: 'First insert',
+      type: 'cli product surface',
+    });
+    writeJson('docs/retros/sprint-458.10.json', {
+      sprint_number: '458.10',
+      theme: 'Tenth insert',
+      type: 'cli product surface',
+    });
+
+    const evidence = collectSlopeReleaseEvidence(tmpDir, [{
+      hash: '',
+      scope: 'release',
+      description: 'Ship S458.10 after S458.1',
+    }]);
+
+    expect(evidence.map(item => item.sprint)).toEqual(['458.1', '458.10']);
+    expect(evidence.map(item => item.theme)).toEqual(['First insert', 'Tenth insert']);
   });
 });
