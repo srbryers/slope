@@ -6,9 +6,10 @@ import { createSlopeToolsServer, SLOPE_MCP_TOOL_NAMES, detectSetupHints, buildSe
 import type { SetupHints } from '../../src/mcp/index.js';
 import { SLOPE_REGISTRY, SLOPE_TYPES } from '../../src/mcp/registry.js';
 import { runInSandbox } from '../../src/mcp/sandbox.js';
-import { mkdtempSync, writeFileSync, mkdirSync, rmSync, readFileSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { resolveRepoSourceCwd } from '../../src/core/index.js';
 import type { SlopeStore, SlopeSession, SprintClaim, GolfScorecard } from '../../src/core/index.js';
 import type { CommonIssuesFile } from '../../src/core/index.js';
 
@@ -701,6 +702,38 @@ describe('MCP project and worktree scope', () => {
         arguments: { module: 'map', query: 'Source Root' },
       });
       expect(toolText(mapResult)).toContain('map-source-root');
+    } finally {
+      await client.close();
+      await server.close();
+      rmSync(project, { recursive: true, force: true });
+    }
+  });
+
+  it('initializes all project artifacts at an unconfigured git root', async () => {
+    const project = mkdtempSync(join(tmpdir(), 'slope-mcp-unconfigured-root-'));
+    const descendant = join(project, 'src', 'nested');
+    mkdirSync(descendant, { recursive: true });
+    execFileSync('git', ['init', '-q'], { cwd: project });
+    const sourceRoot = resolveRepoSourceCwd(descendant);
+    const server = createSlopeToolsServer(undefined, undefined, undefined, undefined, sourceRoot);
+    const client = new Client({ name: 'unconfigured-root-test', version: '1.0.0' });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+
+    try {
+      const result = await client.callTool({
+        name: 'execute',
+        arguments: {
+          code: 'return await submitInitAnswers({ "project-name": "Rooted App", "metaphor": "golf" });',
+        },
+      });
+
+      expect(toolText(result)).toContain('"success": true');
+      expect(existsSync(join(project, '.slope', 'config.json'))).toBe(true);
+      expect(existsSync(join(project, 'docs', 'backlog', 'roadmap.json'))).toBe(true);
+      expect(existsSync(join(descendant, '.slope'))).toBe(false);
+      expect(existsSync(join(descendant, 'docs'))).toBe(false);
     } finally {
       await client.close();
       await server.close();

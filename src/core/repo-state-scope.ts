@@ -20,6 +20,12 @@ export function resolvePrimaryCheckout(cwd: string): string | null {
   return existsSync(primary) ? primary : null;
 }
 
+/** Resolve the checkout root that owns tracked project artifacts. */
+export function resolveRepoSourceCwd(cwd: string = process.cwd()): string {
+  const local = resolve(cwd);
+  return safeGit(local, ['rev-parse', '--show-toplevel']) ?? local;
+}
+
 /**
  * Resolve the checkout that owns ignored SLOPE repository state.
  *

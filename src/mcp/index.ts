@@ -30,7 +30,7 @@ import { SLOPE_REGISTRY, SLOPE_TYPES } from './registry.js';
 import type { FunctionRegistryEntry } from './registry.js';
 import { runInSandbox } from './sandbox.js';
 import type { SlopeStore, SlopeConfig } from '../core/index.js';
-import { checkConflicts, loadFlows, checkFlowStaleness, checkStoreHealth, METAPHOR_SCHEMA, listMetaphors, buildInterviewContext, generateInterviewSteps, loadConfig, parseTestPlan, getAreasNeedingTest, hasEmbeddingSupport, embed, deduplicateByFile, formatContextForAgent, WorkflowEngine, loadWorkflow, listWorkflows, resolveVariables, resolveRepoStateCwd, resolveRepoStatePath } from '../core/index.js';
+import { checkConflicts, loadFlows, checkFlowStaleness, checkStoreHealth, METAPHOR_SCHEMA, listMetaphors, buildInterviewContext, generateInterviewSteps, loadConfig, parseTestPlan, getAreasNeedingTest, hasEmbeddingSupport, embed, deduplicateByFile, formatContextForAgent, WorkflowEngine, loadWorkflow, listWorkflows, resolveVariables, resolveRepoSourceCwd, resolveRepoStateCwd, resolveRepoStatePath } from '../core/index.js';
 import type { ContextResult } from '../core/index.js';
 import { gaming } from '../core/metaphors/gaming.js';
 import type { ClaimScope, FlowsFile, FlowDefinition } from '../core/index.js';
@@ -194,7 +194,13 @@ export function createSlopeToolsServer(
   config?: SlopeConfig,
   sourceRoot?: string,
 ): McpServer {
-  const serverRoot = resolve(sourceRoot ?? process.cwd());
+  const launchRoot = sourceRoot ?? process.cwd();
+  let serverRoot = resolveRepoSourceCwd(launchRoot);
+  try {
+    serverRoot = findProjectRoot(launchRoot);
+  } catch {
+    // An unconfigured repository still owns tracked artifacts at its git root.
+  }
   const server = new McpServer({
     name: 'slope-tools',
     version: '1.0.0',
@@ -1271,7 +1277,7 @@ async function main(): Promise<void> {
   let hints: SetupHints | undefined;
   let storeType: string | undefined;
   let slopeConfig: SlopeConfig | undefined;
-  let sourceRoot = process.cwd();
+  let sourceRoot = resolveRepoSourceCwd(process.cwd());
   try {
     const { loadConfig } = await import('../core/index.js');
     const { createStore } = await import('../store/index.js');

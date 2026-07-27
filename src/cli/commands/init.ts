@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
 import { createConfig } from '../config.js';
 import { formatNoGitModeWarning, requireGitWorkTreeOrExplicitNoGit } from '../git-preflight.js';
-import { resolveRepoStateCwd, resolveRepoStatePath } from '../../core/repo-state-scope.js';
+import { resolveRepoSourceCwd, resolveRepoStateCwd, resolveRepoStatePath } from '../../core/repo-state-scope.js';
 import { saveHooksConfig } from '../hooks-config.js';
 import { resolveMetaphor } from '../metaphor.js';
 import { detectPackageManager, createVision, analyzeStack, SLOPE_BIN_PREAMBLE, writeOrUpdateManagedScript, GUARD_DEFINITIONS, normalizeShellScriptLineEndings } from '../../core/index.js';
@@ -1155,7 +1155,7 @@ async function runInteractiveInit(cwd: string, _args: string[]): Promise<void> {
 }
 
 export async function initCommand(args: string[]): Promise<void> {
-  const cwd = process.cwd();
+  const launchCwd = process.cwd();
 
   // Help must be read-only. Agents often probe commands with --help before
   // running setup, so short-circuit before any init side effects. (GH #402)
@@ -1164,10 +1164,13 @@ export async function initCommand(args: string[]): Promise<void> {
     return;
   }
 
-  const gitPreflight = requireGitWorkTreeOrExplicitNoGit('init', args, cwd);
+  const gitPreflight = requireGitWorkTreeOrExplicitNoGit('init', args, launchCwd);
   if (gitPreflight.degradedNoGitMode) {
     console.warn(formatNoGitModeWarning('init'));
   }
+  const cwd = gitPreflight.degradedNoGitMode
+    ? launchCwd
+    : resolveRepoSourceCwd(launchCwd);
   const stateCwd = resolveRepoStateCwd(cwd);
   const sharedConfigPath = resolveRepoStatePath(cwd, '.slope/config.json');
   if (
@@ -1446,7 +1449,7 @@ export async function initCommand(args: string[]): Promise<void> {
   // Auto-map: generate CODEBASE.md after all artifacts are created
   try {
     const { mapCommand } = await import('./map.js');
-    await mapCommand([]);
+    await mapCommand([], cwd);
     console.log('  Generated CODEBASE.md');
   } catch {
     // map command may not exist yet or may fail — non-fatal

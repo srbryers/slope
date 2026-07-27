@@ -850,8 +850,7 @@ function parseArgs(args: string[]): Record<string, string> {
   return result;
 }
 
-export async function mapCommand(args: string[]): Promise<void> {
-  const cwd = process.cwd();
+export async function mapCommand(args: string[], cwd: string = process.cwd()): Promise<void> {
   const flags = parseArgs(args);
   const config = loadConfig(cwd);
   const outputPath = flags.output || join(cwd, 'CODEBASE.md');

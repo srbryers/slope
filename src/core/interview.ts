@@ -4,7 +4,7 @@
 
 import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { resolveRepoStatePath } from './repo-state-scope.js';
+import { resolveRepoSourceCwd, resolveRepoStatePath } from './repo-state-scope.js';
 import { createConfig } from './config.js';
 import type { SlopeConfig } from './config.js';
 import { validateInterviewAnswers, answersToInitInput } from './interview-engine.js';
@@ -165,6 +165,7 @@ export async function initFromAnswers(
 }
 
 export async function initFromInterview(cwd: string, input: InitInput): Promise<InitResult> {
+  cwd = resolveRepoSourceCwd(cwd);
   const errors = validateInitInput(input);
   if (errors.length > 0) {
     throw new Error(`Invalid init input:\n  - ${errors.join('\n  - ')}`);
