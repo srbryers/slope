@@ -180,7 +180,7 @@ describe.skipIf(!PG_URL)('PostgresSlopeStore', () => {
       });
 
       expect(claim.id).toMatch(/^claim-/);
-      expect(claim.sprint_number).toBe(sprint);
+      expect(claim.sprint_number).toBe(String(sprint));
 
       const listed = await store.list(sprint);
       expect(listed).toHaveLength(1);
@@ -226,7 +226,7 @@ describe.skipIf(!PG_URL)('PostgresSlopeStore', () => {
       const sprint2 = uniqueSprint();
       await store.claim({ sprint_number: sprint1, player: 'alice', target: 'T-CROSS', scope: 'ticket' });
       const c2 = await store.claim({ sprint_number: sprint2, player: 'alice', target: 'T-CROSS', scope: 'ticket' });
-      expect(c2.sprint_number).toBe(sprint2);
+      expect(c2.sprint_number).toBe(String(sprint2));
     });
   });
 

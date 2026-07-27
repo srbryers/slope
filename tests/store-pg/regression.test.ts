@@ -40,7 +40,7 @@ describe('store-pg regression (no PG required)', () => {
     expect(params).toHaveLength(3);
     expect(params[0]).toBe('expiry-test');
     expect(params[1]).toMatch(/^\d{4}-\d{2}-\d{2}T/);
-    expect(params[2]).toBe(262);
+    expect(params[2]).toBe('262');
   });
 
   it('completes workflow execution only from running status', async () => {

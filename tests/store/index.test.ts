@@ -225,7 +225,7 @@ describe('Claims', () => {
     });
 
     expect(claim.id).toMatch(/^claim-/);
-    expect(claim.sprint_number).toBe(5);
+    expect(claim.sprint_number).toBe('5');
     expect(claim.player).toBe('alice');
     expect(claim.claimed_at).toBeTruthy();
 
@@ -261,7 +261,7 @@ describe('Claims', () => {
   it('allows same target in different sprints', async () => {
     await store.claim({ sprint_number: 1, player: 'alice', target: 'T-1', scope: 'ticket' });
     const c2 = await store.claim({ sprint_number: 2, player: 'alice', target: 'T-1', scope: 'ticket' });
-    expect(c2.sprint_number).toBe(2);
+    expect(c2.sprint_number).toBe('2');
   });
 
   it('getActiveClaims returns all or filtered by sprint', async () => {
@@ -350,8 +350,8 @@ describe('Scorecards', () => {
 
     const all = await store.listScorecards();
     expect(all).toHaveLength(2);
-    expect(all[0].sprint_number).toBe(3);
-    expect(all[1].sprint_number).toBe(5);
+    expect(all[0].sprint_number).toBe('3');
+    expect(all[1].sprint_number).toBe('5');
   });
 
   it('filters scorecards by min/max sprint', async () => {
@@ -361,7 +361,7 @@ describe('Scorecards', () => {
 
     const filtered = await store.listScorecards({ minSprint: 2, maxSprint: 4 });
     expect(filtered).toHaveLength(1);
-    expect(filtered[0].sprint_number).toBe(3);
+    expect(filtered[0].sprint_number).toBe('3');
   });
 
   it('upserts scorecards (same sprint overwrites)', async () => {
@@ -768,7 +768,7 @@ describe('Workflow Executions', () => {
 
     expect(exec.id).toMatch(/^wf-/);
     expect(exec.workflow_name).toBe('sprint-standard');
-    expect(exec.sprint_id).toBe('S42');
+    expect(exec.sprint_id).toBe('42');
     expect(exec.status).toBe('running');
     expect(exec.variables).toEqual({ sprint_id: 'S42', model: 'local' });
     expect(exec.completed_steps).toEqual([]);
@@ -785,7 +785,7 @@ describe('Workflow Executions', () => {
     await store.startExecution({ workflow_name: 'test', sprint_id: 'S99' });
     const exec = await store.getExecutionBySprint('S99');
     expect(exec).not.toBeNull();
-    expect(exec!.sprint_id).toBe('S99');
+    expect(exec!.sprint_id).toBe('99');
   });
 
   it('returns null for non-existent execution', async () => {
