@@ -30,9 +30,10 @@ events and their deterministic projections establish workflow truth.
 
 1. An assignment is a durable aggregate, not a chat message, prompt, claim, or
    process invocation.
-2. Every accepted assignment ends in exactly one terminal callback:
-   `completion_reported`, `blocker_reported`, `cancelled`, or `timed_out`.
-   Acknowledgment alone is never completion.
+2. Every started execution spell closes exactly one callback obligation with
+   `completion`, `blocker`, `handoff`, `cancel`, or `timeout`. Resumption or a
+   correction revision creates a new spell and obligation. Acknowledgment
+   alone is never completion.
 3. Success criteria are immutable after acceptance. A material change creates
    a superseding assignment revision that requires fresh acceptance.
 4. Handoff transfers accountable execution through an explicit offer and
@@ -199,29 +200,27 @@ change authorization, scoring, evidence, deadline, or verification semantics.
 
 ### States
 
-The authoritative assignment states are:
+Assignment work state and verification state are separate aggregates. The
+authoritative assignment-revision work states are:
 
 ```text
 created
 offered
 accepted
 in_progress
-blocker_reported
+blocked
 completion_reported
-verification_pending
-verified
-rejected
 cancelled
 timed_out
+superseded
 ```
 
-`created`, `offered`, `accepted`, `in_progress`, `blocker_reported`,
-`completion_reported`, `verification_pending`, and `rejected` are non-terminal.
-`verified`, `cancelled`, and `timed_out` are terminal for one assignment
-revision.
+`completion_reported`, `cancelled`, `timed_out`, and `superseded` are terminal
+for one immutable assignment revision. Verification never changes assignment
+work state. A rejected verification that requires changed output creates
+revision `n + 1`; a reverification of unchanged bytes creates a new
+verification epoch against the same completed revision.
 
-`rejected` means verification rejected the completion evidence and returned a
-bounded correction request. It does not mean the assignee rejected the offer.
 Offer refusal is `assignment.offer_declined.v1` and transitions the revision to
 `cancelled` with reason `assignee_declined`.
 
@@ -233,19 +232,85 @@ Offer refusal is `assignment.offer_declined.v1` and transitions the revision to
 | `offered` | `assignment.accepted.v1` | `accepted` | assignee |
 | `offered` | `assignment.offer_declined.v1` | `cancelled` | assignee |
 | `accepted` | `assignment.started.v1` | `in_progress` | assignee |
-| `in_progress` | `assignment.blocker_reported.v1` | `blocker_reported` | assignee |
-| `blocker_reported` | `assignment.resumed.v1` | `in_progress` | assignee |
+| `in_progress` | `assignment.blocker_reported.v1` | `blocked` | assignee |
+| `blocked` | `assignment.resumed.v1` | `in_progress` | assignee |
 | `in_progress` | `assignment.completion_reported.v1` | `completion_reported` | assignee |
-| `completion_reported` | `verification.requested.v1` | `verification_pending` | policy engine |
-| `verification_pending` | `verification.approved.v1` | `verified` | eligible verifier |
-| `verification_pending` | `verification.rejected.v1` | `rejected` | eligible verifier |
-| `rejected` | `assignment.resumed.v1` | `in_progress` | assignee |
 | any non-terminal | `assignment.cancelled.v1` | `cancelled` | authorized canceller |
-| `offered` or later non-terminal | `assignment.timed_out.v1` | `timed_out` | recovery service |
+| `offered`, `accepted`, `in_progress`, or `blocked` | `assignment.timed_out.v1` | `timed_out` | recovery service |
+| any non-terminal | `assignment.superseded.v1` | `superseded` | delegator or policy engine |
 
 The store rejects all other transitions. A caller cannot skip `accepted`, move
-directly from `in_progress` to `verified`, approve its own completion, resume a
-terminal revision, or mutate a superseded revision.
+directly from `in_progress` to a verified composite state, resume a terminal
+revision, or mutate a superseded revision.
+
+### Verification Aggregate States
+
+A verification aggregate is keyed by:
+
+```text
+(project_id, assignment_id, assignment_revision, verification_epoch)
+```
+
+`verification_epoch` is monotonic and gap-free for one completed revision. Its
+states are:
+
+```text
+not_required
+requested
+reserved
+active
+disputed
+approved
+rejected
+waived
+cancelled
+timed_out
+invalidated
+```
+
+`not_required`, `approved`, `rejected`, `waived`, `cancelled`, `timed_out`, and
+`invalidated` are terminal for one verification epoch. The legal transitions
+are:
+
+| From | Event | To | Authorized principal |
+|---|---|---|---|
+| absent | `verification.not_required.v1` | `not_required` | policy engine |
+| absent | `verification.requested.v1` | `requested` | policy engine |
+| `requested` | `verification.reserved.v1` | `reserved` | scheduler |
+| `reserved` | `verification.started.v1` | `active` | selected verifier |
+| `active` | `verification.approved.v1` | `approved` | eligible verifier |
+| `active` | `verification.rejected.v1` | `rejected` | eligible verifier |
+| `active` | `verification.disputed.v1` | `disputed` | quorum reducer |
+| `disputed` | `verification.approved.v1` | `approved` | quorum reducer |
+| `disputed` | `verification.rejected.v1` | `rejected` | quorum reducer |
+| `requested`, `reserved`, `active`, or `disputed` | `verification.waived.v1` | `waived` | waiver authority |
+| any non-terminal | `verification.cancelled.v1` | `cancelled` | authorized canceller |
+| `requested`, `reserved`, `active`, or `disputed` | `verification.timed_out.v1` | `timed_out` | recovery service |
+| `approved`, `waived`, or `not_required` | `verification.invalidated.v1` | `invalidated` | policy engine |
+
+An invalidated epoch never resumes. Reverification of unchanged completion
+bytes creates epoch `e + 1`. A rejection requiring any output, criterion,
+evidence, assignee, resource, or policy change creates assignment revision
+`r + 1`, which requires fresh acceptance and a new completion callback.
+
+### Composite Projection
+
+The operating projection combines assignment and current verification states
+without mutating either aggregate:
+
+| Assignment work | Current verification | Composite outcome |
+|---|---|---|
+| `completion_reported` | `not_required` | `complete_unverified` |
+| `completion_reported` | `requested`, `reserved`, `active`, or `disputed` | `verification_pending` |
+| `completion_reported` | `approved` | `verified` |
+| `completion_reported` | `waived` | `verified_with_waiver` |
+| `completion_reported` | `rejected` | `correction_required` |
+| `completion_reported` | `cancelled` | `verification_cancelled` |
+| `completion_reported` | `timed_out` | `verification_timed_out` |
+| `completion_reported` | `invalidated` | `reverification_required` |
+
+No-review completion is therefore explicit, disputes and waivers are declared,
+and invalidation cannot reverse an assignment terminal state.
 
 ### Acceptance
 
@@ -316,32 +381,57 @@ cycles rather than guessing an order.
 
 ### Callback Identity
 
-Every accepted revision reserves these callback keys:
+Each `assignment.started.v1` or `assignment.resumed.v1` event creates one
+execution spell and one monotonic callback obligation:
 
 ```text
-(project_id, assignment_id, assignment_revision, callback_kind)
+(project_id, assignment_id, assignment_revision,
+ execution_spell_id, callback_obligation_epoch)
 ```
 
-where `callback_kind` is `blocker`, `completion`, `cancel`, or `timeout`.
-The canonical append transaction enforces at most one accepted callback for a
-kind and exact-retry semantics for the same request hash.
+The store assigns `callback_obligation_id` as a UUIDv7 and enforces uniqueness
+for the tuple above. One obligation accepts exactly one disposition:
+
+```text
+blocker
+completion
+handoff
+cancel
+timeout
+```
+
+Disposition identity is:
+
+```text
+(project_id, callback_obligation_id)
+```
+
+The canonical append transaction uses compare-and-set from `open` to exactly
+one disposition. Competing blocker, completion, handoff, cancel, and timeout
+requests lock the obligation row; one wins and the rest receive
+`CALLBACK_OBLIGATION_CLOSED` with the winning event ID. Exact retries of the
+winning request return the prior result. A resume or correction revision
+creates a new execution spell, epoch, obligation ID, and idempotency scope.
 
 ## Mandatory Callbacks
 
 ### Callback Obligation
 
-Acceptance creates a durable callback obligation. The obligation remains open
-until one of these events is accepted:
+Starting or resuming an accepted assignment creates a durable callback
+obligation. The obligation remains open until one disposition event is
+accepted:
 
 - `assignment.blocker_reported.v1`;
 - `assignment.completion_reported.v1`;
+- `handoff.activated.v1`;
 - `assignment.cancelled.v1`;
 - `assignment.timed_out.v1`.
 
 An accepted blocker callback satisfies the current execution spell's
 obligation but does not terminate the assignment. Resumption creates a new
-obligation. Rejected verification followed by resumption also creates a new
-obligation.
+execution spell and obligation. Verification rejection cannot resume the
+terminal revision; correction creates and accepts a new assignment revision,
+whose start creates a new obligation.
 
 Process exit, session deletion, lease expiry, disconnected transport, chat
 silence, acknowledgment, status polling, or a pushed commit does not satisfy a
@@ -355,6 +445,7 @@ callback obligation.
 |---|---|
 | `assignment_id` / `revision` | Accepted assignment revision |
 | `execution_spell_id` | Spell being completed |
+| `callback_obligation_id` / `epoch` | Exact open obligation |
 | `assignee_principal_id` / `actor_id` | Authenticated reporter |
 | `criterion_results` | One typed result per criterion |
 | `evidence_refs` | Content-addressed, classified evidence references |
@@ -391,13 +482,22 @@ safe to release and authorized by policy.
 Callbacks are ledger appends, not best-effort notifications. Client delivery
 uses an outbox projection:
 
-1. the append transaction accepts the callback and enqueues notification work;
-2. notification workers deliver at least once;
-3. recipients acknowledge delivery with a projection-local receipt;
-4. duplicate delivery is suppressed by callback event ID;
-5. notification failure cannot erase or roll back the authoritative callback;
-6. dead-lettered delivery is visible to operators without changing assignment
-   state.
+1. the callback transaction snapshots policy-required recipient principal,
+   destination, and channel tuples;
+2. it creates one outbox row keyed by:
+
+   ```text
+   (project_id, callback_event_id, recipient_principal_id,
+    destination_id, channel)
+   ```
+
+3. notification workers deliver each row at least once;
+4. authenticated recipients acknowledge the exact row and callback hash;
+5. duplicate delivery is suppressed per row, never globally across recipients;
+6. retry count, next attempt, receipt, and dead letter are tracked per row;
+7. notification failure cannot erase or roll back the authoritative callback;
+8. recipient-scoped dead letters are visible to authorized operators without
+   changing assignment state or another recipient's delivery.
 
 ## Handoff
 
@@ -429,18 +529,38 @@ handoff offer.
 ### Handoff Rules
 
 1. The source principal appends `handoff.offered.v1`.
-2. The destination principal explicitly accepts the exact handoff hash.
-3. Acceptance proves destination capabilities and verifier implications.
-4. Activation atomically:
+2. The coordinator constructs assignment revision `r + 1` with the destination
+   assignee, remaining criteria, carried evidence, resources, deadline, budget,
+   and explicit `supersedes_revision=r`.
+3. The destination principal appends `handoff.accepted.v1`, binding the exact
+   handoff hash and proposed revision hash. This is consent to activate, not
+   yet execution authority.
+4. Acceptance proves destination capabilities and verifier implications.
+5. The source or an authorized recovery service invokes one activation
+   transaction with `handoff:activate`, the source obligation ID, source lease
+   token vector, accepted destination revision hash, and idempotency key.
+6. Activation locks assignment, handoff, source callback obligation, source
+   lease conflict domains, destination revision, and destination lease request
+   in canonical key order, then atomically:
+   - compare-and-sets the source obligation to disposition `handoff`;
    - fences the source execution spell;
-   - releases or transfers the protected lease set under S264.1 rules;
-   - records the source spell as handed off, not completed;
-   - creates or activates the destination execution spell;
-   - updates accountable ownership from the activation event forward.
-5. If any activation step fails, none become authoritative.
-6. The destination emits its own completion or blocker callback.
-7. Source and destination contribution history remain attached to the shot.
-8. Handoff never removes the delegator, source contributor, or destination
+   - releases source leases and grants destination leases with new epochs and
+     token vectors;
+   - transitions source revision `r` to `superseded`;
+   - appends and transitions revision `r + 1` through `created`, `offered`, and
+     `accepted` using the destination's preaccepted hash;
+   - starts the destination execution spell and callback obligation;
+   - records ownership effective at the activation project sequence;
+   - updates assignment, handoff, lease, callback, contribution, verifier, and
+     semantic-status projections.
+7. If any check or append fails, none become authoritative and the source
+   remains holder of its still-open obligation and leases.
+8. Exact activation retries return the original result. A competing source
+   callback or stale lease token loses with the recorded winning disposition.
+9. The destination emits its own completion, blocker, handoff, cancel, or
+   timeout disposition.
+10. Source and destination contribution history remain attached to the shot.
+11. Handoff never removes the delegator, source contributor, or destination
    contributor from verifier-conflict evaluation.
 
 Lease ownership is not edited in place. Transfer is a fenced release and
@@ -452,9 +572,14 @@ A partial handoff MUST identify a subset of criterion IDs and resource
 subjects. Overlapping responsibility is forbidden unless the assignment
 explicitly creates child assignments with non-conflicting resource lease sets.
 
-A split that changes the required outcome or evidence creates child
-assignments. The parent cannot verify until every required child reaches its
-policy-required terminal state.
+A split always creates child assignments with their own revisions, acceptance,
+execution spells, obligations, and lease sets. The parent records an immutable
+criterion-to-child map, required child composite outcomes, and evidence merge
+policy. Activation locks parent and children in canonical ID order. The parent
+cannot complete until every required child reaches its required composite
+outcome, every child callback obligation is closed, and evidence reconciliation
+passes. Child cancellation, timeout, waiver, or invalidation follows the
+parent's explicit reconciliation policy and is never treated as success.
 
 ### Abandonment
 
@@ -481,8 +606,12 @@ assignment revision. It atomically:
 - schedules cleanup or recovery items;
 - updates semantic status.
 
-Cancellation after `completion_reported` does not erase the completion. It
-records that verification was cancelled and why.
+Assignment cancellation is legal only before `completion_reported` and competes
+for the current callback obligation. After completion, an authorized caller
+may cancel only the current verification epoch through
+`verification.cancelled.v1`. That preserves completion bytes and projects
+`verification_cancelled`; it does not retroactively create an assignment
+callback or erase the completion.
 
 ### Timeout
 
@@ -557,11 +686,15 @@ Replay MUST prove:
    time;
 4. acceptance binds the exact material assignment hash;
 5. every execution spell starts with a valid lease token vector;
-6. every accepted spell has a terminal callback or remains visibly open;
-7. handoff activation fences the source before destination mutation;
-8. terminal revisions do not resume;
-9. child requirements reconcile to the parent;
-10. projections reproduce identical canonical bytes on every supported
+6. every started spell has one monotonic callback obligation that is either
+   visibly open or closed by exactly one disposition;
+7. blocker or correction resumption creates a new spell and obligation;
+8. handoff activation closes the source obligation, fences the source, creates
+   and accepts a successor revision, and starts the destination atomically;
+9. callback retry races reproduce one winning disposition;
+10. terminal revisions and verification epochs do not resume;
+11. child requirements reconcile to the parent;
+12. projections reproduce identical canonical bytes on every supported
     adapter.
 
 ## S264.2-1 Acceptance Criteria
@@ -573,7 +706,8 @@ S264.2-1 is complete when the contract:
 - defines every assignment and handoff state and legal transition;
 - binds acceptance and execution to immutable criteria, evidence, capability,
   lease, budget, and deadline snapshots;
-- requires completion or blocker callbacks and makes callback delivery durable;
+- requires one completion, blocker, handoff, cancel, or timeout disposition per
+  execution-spell obligation and makes recipient-scoped delivery durable;
 - distinguishes acknowledgment, liveness, lease renewal, semantic progress,
   and completion;
 - defines cancellation, timeout, abandonment, recovery, and replay behavior;
@@ -731,6 +865,43 @@ but a resolver cannot independently verify the same corrected outcome unless a
 policy explicitly permits a later independent review boundary and all
 resolver-produced evidence is independently re-established.
 
+### Producer Provenance Coverage
+
+Every `output_ref` and `evidence_ref` accepted by a completion callback points
+to an artifact record keyed by:
+
+```text
+(project_id, artifact_id, artifact_version)
+```
+
+The artifact record binds canonical content commitment, producer principal,
+actor and session, producing contribution event, source subjects, creation
+time, classification, visibility, and integrity metadata. Multi-producer
+artifacts bind an ordered producer set and one contribution event per producer.
+
+The completion transaction locks the assignment contribution domain and every
+referenced artifact version. It requires:
+
+1. verified integrity for each artifact;
+2. authenticated producer provenance for every byte or declared derivation;
+3. a contribution event causally preceding completion for every producer;
+4. exact equality between the artifact producer set and covered contribution
+   principals;
+5. no uncommitted output subject or unknown producer;
+6. a `contribution_high_water_mark` and `artifact_set_root` in the completion
+   event.
+
+Missing, hidden-but-uncommitted, unverifiable, externally unattributed, or
+unknown producer provenance sets conflict state to `unknown`. An
+`independent_principal` or stronger policy fails closed and cannot select or
+accept a verifier while conflict state is unknown.
+
+External artifacts require an authenticated importer principal and a signed or
+otherwise policy-verifiable producer assertion. When original producer
+identity remains unknown, the importer joins the conflict set and the
+independence policy decides whether the unknown original producer is
+tolerable; the default is not tolerable.
+
 ### Historical Conflict Snapshot
 
 `verification.requested.v1` freezes:
@@ -799,12 +970,39 @@ Verifier reservation is a protected resource lease on:
 verification:<project_id>:<assignment_id>:<revision>:<review_slot>
 ```
 
-The append transaction locks the verification aggregate, conflict snapshot,
-and slot. It rejects duplicate slot assignment, changed completion version,
-changed policy, or stale fencing tokens.
+All material mutations and release/finalization gates also lock:
+
+```text
+verification-domain:<project_id>:<assignment_id>:<revision>
+```
+
+The reservation transaction locks the verification domain, aggregate,
+conflict snapshot, and slot. It rejects duplicate slot assignment, changed
+completion version, changed policy, or stale fencing tokens.
 
 Multiple quorum slots MAY run concurrently. Their verifiers cannot share a
 conflict root with each other under `multi_principal_quorum`.
+
+### Late Contribution Atomicity
+
+A material artifact, evidence, contribution, principal-relationship,
+scorecard, criteria, or policy mutation affecting a completed revision MUST
+lock its verification domain before append. In one transaction it:
+
+1. validates mutation authority and fencing;
+2. increments the contribution or conflict epoch;
+3. appends the material mutation;
+4. transitions any current `approved`, `waived`, or `not_required`
+   verification epoch to `invalidated`;
+5. fences active verifier slots whose snapshot is stale;
+6. updates composite status to `reverification_required`;
+7. prevents release, finalization, export, or dependent completion from
+   consuming the old approval.
+
+Every dependent gate locks the same verification domain and revalidates target
+hash, contribution epoch, relationship-registry high-water mark, current
+verification epoch, and policy before its own commit. This closes the interval
+between a late mutation and invalidation.
 
 ## Verification Decision
 
@@ -860,7 +1058,8 @@ Quorum approval requires:
 - identical target, completion, criteria, policy, and conflict snapshot;
 - decisions within the policy's validity window.
 
-Conflicting quorum decisions transition to `verification_disputed`. An
+Conflicting quorum decisions transition the current verification epoch to
+`disputed`. An
 escalation policy may request another independent slot, return the assignment
 for correction, or require an authorized human decision. It cannot average
 away a failed required criterion.
@@ -880,10 +1079,11 @@ visibility
 classification
 ```
 
-Findings never embed unrestricted secrets. Resuming the original assignment
-creates a correction execution spell. All correcting principals join the
-contribution conflict set. A new completion event and fresh verification
-snapshot are required.
+Findings never embed unrestricted secrets. A correction creates assignment
+revision `r + 1`, references the rejected verification epoch and findings,
+requires fresh acceptance, and starts a new execution spell and callback
+obligation. All correcting principals join the contribution conflict set. A
+new completion event and verification epoch are required.
 
 ## Reverification
 
@@ -898,9 +1098,11 @@ Approval is invalidated by:
 - replay divergence;
 - an audited round reopen affecting the verified outcome.
 
-Invalidation appends `verification.invalidated.v1`, returns the assignment to
-`verification_pending` or `rejected` according to policy, and preserves the
-prior decision as history.
+Invalidation appends `verification.invalidated.v1` and preserves the completed
+assignment revision and prior decision as history. If target bytes remain
+unchanged, the policy engine creates verification epoch `e + 1`. If target
+bytes, criteria, assignee, evidence requirements, resources, or policy changed,
+it creates assignment revision `r + 1`. Neither terminal aggregate resumes.
 
 Non-material display corrections do not require reverification when their
 canonical target hash is unchanged.
@@ -957,9 +1159,9 @@ appends `verification.waived.v1` with:
 - expiry and required follow-up;
 - visibility and classification.
 
-The assignment terminal state is `verified_with_waiver`, distinct from
-`verified`. Reports, scorecards, release gates, and evaluation manifests retain
-that distinction.
+The composite outcome is `verified_with_waiver`, distinct from `verified`.
+Reports, scorecards, release gates, and evaluation manifests retain that
+distinction.
 
 Critical separation-of-duties actions cannot be waived by the delegator,
 assignee, author, contributor, or their conflict roots. Break-glass access may
@@ -1016,6 +1218,31 @@ Replay MUST prove:
 10. supported adapters reproduce identical eligibility and decision
     projections.
 
+## S264.2-2 Adversarial Criteria
+
+S271 implementation acceptance includes:
+
+1. two aliases, actors, sessions, roles, models, or worktrees controlled by one
+   principal cannot satisfy independent verification;
+2. transitive delegated control and service ownership collapse to one conflict
+   root;
+3. an unknown controller relationship fails closed at independent tiers;
+4. a hidden contributor remains conflicted without identity disclosure;
+5. revocation and principal split do not rewrite historical common control;
+6. duplicate quorum slots from one conflict root are rejected atomically;
+7. an artifact with missing or unverifiable producer provenance cannot enter an
+   independent completion snapshot;
+8. a contribution racing approval either precedes the decision and blocks it
+   or follows it and invalidates it in the mutation transaction;
+9. finalization, release, export, and dependent completion cannot consume an
+   invalidated or stale contribution epoch;
+10. redaction preserves conflict commitments and restore cannot revive a
+    removed producer identity as independent;
+11. verifier contribution after selection fences its slot and schedules a
+    replacement;
+12. waiver and break-glass results remain distinguishable from independent
+    approval in every projection and gate.
+
 ## S264.2-2 Acceptance Criteria
 
 S264.2-2 is complete when the contract:
@@ -1056,14 +1283,17 @@ The durable identities are:
 ```text
 learning_report_id
 pattern_id
+occurrence_id
 evidence_id
 pattern_version
 ```
 
 - `learning_report_id` is a server-assigned UUIDv7 for one immutable report.
 - `pattern_id` is a server-assigned durable UUIDv7 for one canonical pattern.
-- `evidence_id` is a classification-safe commitment to one evidence item under
-  the S264.1 integrity contract.
+- `occurrence_id` is a classification-safe commitment to the immutable source
+  event, artifact version, test execution, measurement, or incident occurrence.
+- `evidence_id` is a classification-safe commitment to one report's evidence
+  wrapper and provenance under the S264.1 integrity contract.
 - `pattern_version` is a gap-free positive integer for material canonical
   pattern revisions.
 
@@ -1100,21 +1330,26 @@ applies to the complete report request.
 Evidence is deduplicated by:
 
 ```text
-(project_id, evidence_id)
+(project_id, occurrence_id)
 ```
 
-The evidence commitment binds:
+`occurrence_id` excludes reporter, wrapper, and accepted time. It binds the
+canonical source identity and version, occurrence class, and content or sealed
+content commitment. Rewrapping, reimporting, or reporting the same source by
+another principal therefore cannot create another recurrence.
+
+The evidence wrapper is keyed by `(project_id, evidence_id)` and binds:
 
 - evidence class and schema version;
-- canonical content or sealed-object commitment;
-- source event, artifact, commit, test, or measurement identity;
+- canonical `occurrence_id`;
 - classification and visibility;
 - producer principal and actor;
 - observed and accepted times;
 - integrity algorithm and key version.
 
-Two reports referencing the same evidence ID add one evidence-set member, not
-two occurrences. Different evidence from the same sprint remains distinct.
+Two reports referencing the same occurrence add one recurrence-set member,
+even when their evidence wrapper, reporter, or acceptance time differs.
+Different source occurrences from the same sprint remain distinct.
 Redacted evidence retains a protected tombstone and keyed commitment so replay
 does not count it again after restore or re-import.
 
@@ -1149,7 +1384,8 @@ category
 title
 description
 prevention
-evidence_set
+occurrence_set
+evidence_wrapper_set
 report_set
 sprint_set
 ticket_set
@@ -1163,7 +1399,7 @@ classification
 visibility
 ```
 
-`recurrence_count` is the count of distinct qualifying evidence IDs after
+`recurrence_count` is the count of distinct qualifying occurrence IDs after
 policy filtering, not the number of writes, reports, reporters, retries, or
 array entries.
 
@@ -1196,10 +1432,11 @@ Adding a report to an existing pattern uses one append transaction:
 2. validate the report, evidence, and visibility;
 3. lock `(project_id, pattern_id)`;
 4. read current `pattern_version`;
-5. deduplicate report and evidence IDs;
+5. deduplicate report, occurrence, and evidence-wrapper IDs;
 6. append `learning.reported.v1`;
 7. append a material pattern revision event only when canonical fields change;
-8. update evidence, report, sprint, ticket, and reporter sets atomically;
+8. update occurrence, evidence-wrapper, report, sprint, ticket, and reporter
+   sets atomically;
 9. recompute recurrence and confidence under the pinned policy version;
 10. update learning and semantic-status projections;
 11. commit.
@@ -1207,11 +1444,108 @@ Adding a report to an existing pattern uses one append transaction:
 Concurrent writes retry against the new pattern version. They do not overwrite
 the entire projection. Exact retries return the prior accepted result.
 
+### Concurrent Pattern Creation
+
+Creating a null-candidate pattern first computes a versioned
+`candidate_domain_id` as a keyed commitment over project, category, normalized
+subject set, hazard class, and matching-policy fingerprint. The database has a
+durable conflict-domain row for every candidate domain, including when no
+pattern exists.
+
+The creation transaction locks the candidate-domain row, re-runs advisory
+matching at the current project high-water mark, and either:
+
+- routes the report to one current canonical pattern; or
+- appends `learning.pattern_created.v1` with a server-assigned pattern ID and
+  version `1`.
+
+Concurrent creators in the same domain serialize. Creators in different
+domains may still produce semantic duplicates; later authorized merge resolves
+them without losing reports. Candidate keys are matching and locking aids, not
+public identities or proof that patterns are equal.
+
+### Pattern Merge
+
+`learning.patterns_merged.v1` is the only authoritative multi-pattern merge.
+Its request contains:
+
+- two or more current canonical source pattern IDs;
+- expected version for every source;
+- candidate matching evidence and policy version;
+- authorized decision principal and `learning:merge` capability;
+- requested survivor or null;
+- idempotency key and canonical request hash.
+
+Unless a policy-protected survivor is explicitly required, the canonical
+survivor is the lexicographically smallest source `pattern_id`. The transaction:
+
+1. resolves every source through existing redirects and rejects duplicates or
+   cycles;
+2. locks candidate-domain and pattern rows in canonical byte order;
+3. rechecks expected versions, classification authority, and merge policy;
+4. unions report, occurrence, evidence-wrapper, sprint, ticket, and reporter
+   sets into survivor version `v + 1`;
+5. recomputes canonical fields, recurrence, confidence, and strictest
+   classification;
+6. transitions each losing pattern to `merged` with an immutable direct
+   redirect to the survivor;
+7. appends one merge event containing source versions, survivor bytes, set
+   roots, and redirect map;
+8. updates learning and status projections atomically.
+
+A report append resolves redirects while holding the destination pattern lock.
+If a merge wins first, the append targets the survivor. If an append wins
+first, the merge observes the incremented source version and must retry with
+the included report. No write lands on a losing pattern after redirect commit.
+
+### Pattern Split
+
+`learning.pattern_split.v1` contains:
+
+- one current source pattern and expected version;
+- two or more server-reserved child pattern IDs;
+- a total partition assigning every occurrence ID to exactly one child;
+- assignment of each report and evidence wrapper to one or more children
+  without changing occurrence count;
+- canonical fields for each child;
+- split evidence, reason, policy, decision principal, and
+  `learning:split` capability;
+- idempotency key and canonical request hash.
+
+The transaction locks the source, child IDs, and candidate domains in canonical
+byte order. It rejects missing or duplicate occurrence assignments, existing
+child aggregates, stale source version, merge redirects, and any mapping that
+would create a merge/split cycle. It appends all child version-1 patterns and
+the source `split` state atomically.
+
+New reports targeting the split source are rejected with safe child candidate
+references; the caller or deterministic matching policy must choose a child.
+A split never redirects all future writes to an arbitrary child.
+
+### Merge And Split Concurrency
+
+Multi-pattern operations share a project-scoped learning topology lock plus
+ordered pattern and candidate-domain locks. The topology version increments on
+every merge or split. Requests bind the expected topology version and all
+source versions.
+
+Concurrent overlapping merge/split operations cannot both commit. Disjoint
+operations may commit concurrently when adapter conformance proves equivalent
+serialization. Replay validates:
+
+- one terminal topology edge per source version;
+- direct merge redirects only toward a current canonical survivor;
+- no merge or split cycles;
+- total occurrence partitions;
+- stable set roots before and after topology changes;
+- every concurrently appended report reachable from exactly one current
+  canonical pattern.
+
 ### Deterministic Field Merge
 
 Set-valued fields use canonical set union over stable IDs. Times use minimum
 for first observation and maximum for last observation. Recurrence derives
-from the evidence set. Confidence derives from a versioned deterministic
+from the occurrence set. Confidence derives from a versioned deterministic
 policy.
 
 Canonical category, title, description, prevention, status, and classification
@@ -1286,7 +1620,7 @@ from a stale projection, backup, local worktree, or benchmark bundle.
 
 Replay MUST prove:
 
-1. each report and evidence ID contributes at most once;
+1. each report and occurrence ID contributes at most once to recurrence;
 2. report order does not change canonical set membership;
 3. material pattern versions are gap-free;
 4. stale-base canonical revisions never apply;
@@ -1435,25 +1769,72 @@ on an external dependency.
 
 ### Derived Operating States
 
-The operating states are:
+The projection first computes orthogonal facets:
 
-| State | Derivation |
-|---|---|
-| `queued` | Offered or schedulable, not accepted or started |
-| `working` | In progress with healthy lease and recent semantic progress |
-| `waiting` | Explicit blocker or declared dependency wait within policy |
-| `idle` | No active assignment or intentionally available |
-| `stale` | Active non-terminal work without required semantic progress or healthy liveness inside grace |
-| `timed_out` | Authoritative timeout event accepted |
-| `blocked` | Active blocker callback requires action |
-| `verification_pending` | Completion reported and review not terminal |
-| `complete` | Assignment verified or terminal under its policy |
-| `cancelled` | Cancellation accepted |
-| `dead_lettered` | Recovery exhausted and dead-letter event accepted |
-| `unknown` | Required source signal unavailable or inconsistent |
+```text
+work = created | offered | accepted | in_progress | blocked |
+       completion_reported | cancelled | timed_out | superseded
+verification = absent | not_required | pending | disputed | approved |
+               rejected | waived | cancelled | timed_out | invalidated
+lease = not_required | healthy | grace | expired | fenced | unknown
+session = not_required | healthy | grace | expired | unknown
+progress = not_due | recent | due | stale | unknown
+callback = absent | open | blocker | completion | handoff | cancel | timeout
+attention = none | watch | action | urgent
+```
+
+It then selects exactly one assignment operating state with this first-match
+precedence:
+
+| Rank | State | Deterministic predicate |
+|---|---|---|
+| 1 | `unknown` | Any policy-required source is unknown, integrity-invalid, or mutually inconsistent |
+| 2 | `dead_lettered` | Current recovery item has accepted dead-letter state |
+| 3 | `timed_out` | Assignment work is `timed_out` |
+| 4 | `cancelled` | Assignment work is `cancelled` |
+| 5 | `correction_required` | Work completed and current verification is `rejected` |
+| 6 | `reverification_required` | Work completed and verification is `invalidated` |
+| 7 | `verification_timed_out` | Work completed and verification is `timed_out` |
+| 8 | `verification_cancelled` | Work completed and verification is `cancelled` |
+| 9 | `blocked` | Current blocker requests an external action now |
+| 10 | `waiting` | Current blocker declares dependency wait with a future decision or retry deadline and no action due now |
+| 11 | `stale` | Active work has expired or fenced required lease, expired required session, overdue progress, or overdue open obligation inside recovery grace |
+| 12 | `starting` | Work is accepted, no spell has started, and dispatch grace has not expired |
+| 13 | `queued` | Work is created or offered and eligible to schedule |
+| 14 | `working` | Work is in progress, callback is open, required lease and session are healthy, and progress is not stale |
+| 15 | `verification_pending` | Work completed and verification is requested, reserved, active, or disputed |
+| 16 | `verified_with_waiver` | Work completed and verification is waived |
+| 17 | `complete` | Work completed and verification is approved or explicitly not required |
+| 18 | `idle` | No active assignment exists and availability policy says available |
+
+`complete` never includes cancelled, timed-out, dead-lettered, waived,
+invalidated, rejected, unknown, or superseded work. Superseded revisions are
+historical and do not become a current operating state unless no successor is
+visible, which is `unknown`.
 
 `stale` is a warning derived from policy and observations. `timed_out` is an
-authoritative workflow state. They are not interchangeable.
+authoritative workflow state. They are not interchangeable. Accepted but
+unstarted work is `starting`, not queued, working, or idle.
+
+### Worker Aggregation
+
+Worker status is derived after every visible assignment receives one state. It
+exposes state counts and a primary state selected by:
+
+1. highest attention among `unknown`, `dead_lettered`, `timed_out`, `blocked`,
+   `stale`, `correction_required`, and `reverification_required`;
+2. otherwise `working` when any assignment is working;
+3. otherwise `starting`, `verification_pending`, `waiting`, then `queued`;
+4. otherwise `verified_with_waiver` only as a historical attention item, not
+   worker health;
+5. otherwise `idle` when availability is known and no active assignment
+   exists;
+6. otherwise `unknown`.
+
+Ties use oldest unresolved attention time, then canonical project sequence,
+assignment ID, and revision. Completion of one assignment cannot hide another
+blocked or stale assignment. Hidden assignments participate in authoritative
+health before filtering but do not leak their identity.
 
 ### Semantic Progress
 
@@ -1586,6 +1967,26 @@ An observer gets no mutation capability. Seeing a blocker does not grant the
 ability to cancel, reassign, verify, redact, or inspect its restricted
 evidence.
 
+Health and attention are computed from the complete authoritative signal set
+before viewer filtering. Filtering never removes a hidden failure from the
+health calculation or renormalizes coverage over only visible signals.
+
+The viewer projection maps authoritative state to a policy-safe health class:
+
+```text
+healthy
+attention_required
+urgent_attention
+unknown
+```
+
+When hidden state affects health, the view may disclose only the safe class and
+an opaque authorized escalation route. Counts, denominators, timestamps,
+object classes, and reason codes are coarsened or withheld so they cannot
+enumerate hidden assignments. A viewer-specific `visible_coverage` MAY be
+reported separately, but it is never labeled total coverage or used to
+override authoritative health.
+
 ## Status Reliability
 
 Every derived status includes:
@@ -1600,9 +2001,10 @@ missing_reasons
 staleness
 ```
 
-Coverage is the fraction of required source classes observed, with numerator,
-denominator, and provenance. Unknown source health cannot be represented as
-100% coverage or a healthy worker.
+Authoritative coverage is the fraction of all policy-required source classes
+observed before filtering, with numerator, denominator, and provenance.
+Viewer-visible coverage is a separately named measure. Unknown source health
+cannot be represented as 100% coverage or a healthy worker.
 
 Projection divergence, unavailable store, failed integrity verification, or
 unsupported adapter capability yields `unknown` plus operator attention.
@@ -1615,7 +2017,9 @@ Implementation acceptance includes:
    both survive;
 2. exact retries do not increase recurrence;
 3. stale pattern revisions cannot overwrite a newer canonical prevention;
-4. merge then split deterministically preserves every evidence ID;
+4. concurrent create, merge, append, and split serialize deterministically,
+   preserve every occurrence and evidence-wrapper ID, and never create a
+   topology cycle;
 5. redacted evidence cannot revive after restore;
 6. resolver attribution does not receive the cause penalty;
 7. one thousand acknowledgments and lease renewals do not flood primary
@@ -1629,6 +2033,12 @@ Implementation acceptance includes:
 14. filtered status does not enumerate hidden objects or principals;
 15. cursor reuse across principals or policy versions fails;
 16. projection outage reports unknown rather than healthy or idle.
+17. accepted-but-unstarted work projects `starting` and becomes stale after
+    dispatch grace rather than appearing queued or working;
+18. cancellation, timeout, dead letter, waiver, invalidation, and hidden
+    failure cannot project `complete` or healthy;
+19. a hidden blocker changes the safe health class without leaking its count,
+    identity, object, or timestamp.
 
 ## S264.2-3 Acceptance Criteria
 
@@ -1636,7 +2046,8 @@ S264.2-3 is complete when the contract:
 
 - replaces whole-document learning writes with immutable reports and
   transactional per-pattern merges;
-- defines stable report, pattern, evidence, and version identities;
+- defines stable report, pattern, occurrence, evidence-wrapper, and version
+  identities;
 - defines deterministic field merges, conflict resolution, split, promotion,
   codification, redaction, retention, and replay;
 - defines verb-object-outcome activity with primary, secondary, and diagnostic
@@ -1748,7 +2159,23 @@ The canonical manifest is keyed by:
 
 Before execution, `evaluation.campaign_sealed.v1` commits to canonical manifest
 bytes. Sealing is irreversible for that version. Any material change creates a
-new campaign version and records whether prior trials are reusable.
+new campaign version.
+
+Every trial binds the exact `campaign_manifest_hash`. Prior trials are reusable
+only after `evaluation.trial_reuse_approved.v1` records a deterministic
+field-level compatibility result. Reuse is forbidden when any of these change:
+
+- estimand, outcome, inclusion, exclusion, missingness, retry, or stopping
+  policy;
+- task bytes, sampling frame, allocation, arm definition, roster, topology, or
+  budget treatment;
+- evaluator, success criteria, tools, environment, lifecycle, privacy, or
+  analysis semantics;
+- any input whose compatibility rule is absent or returns unknown.
+
+Compatibility rules are versioned manifest policy, not caller declarations.
+The decision records source and destination manifest hashes, field diff,
+rule-version results, deciding service principal, and provenance.
 
 ### Required Manifest Fields
 
@@ -1757,7 +2184,7 @@ The manifest pins:
 | Area | Required inputs |
 |---|---|
 | Question | Hypothesis, primary estimand, primary and secondary outcomes |
-| Corpus | Corpus ID, version, content hash, selection policy, task IDs |
+| Corpus | Corpus ID, version, sampling frame, eligibility rules, content hash, deterministic draw, exclusions, prior exposure, selection time, task IDs |
 | Repository | Remote identity, base commit, submodules, patches, dirty-state policy |
 | Roster | Principal, actor, role, model, provider, and controller identities |
 | Topology | Orchestrator graph, assignment policy, communication channels, parallelism |
@@ -1772,14 +2199,51 @@ The manifest pins:
 | Verification | Verifier policy, evaluator independence, evidence requirements |
 | Budgets | Token, cost, elapsed, tool-call, concurrency, and attempt limits |
 | Pricing | Currency, price table, effective time, discounts, rounding, missing-price policy |
-| Trials | Arm allocation, task order, seeds, trial count, blocking, randomization |
-| Analysis | Inclusion set, weighting, missingness, uncertainty, multiplicity policy |
+| Trials | Complete trial census, arm allocation, task order, seeds, trial count, blocking, randomization |
+| Analysis | Analysis executable hash, dependency lock, inclusion set, weighting, missingness, RNG, uncertainty, precision, rounding, ordering, multiplicity policy |
 | Privacy | Classification, visibility, redaction, retention, export, and deletion policy |
 | Integrity | Schema registry, algorithms, key versions, manifest hash, anchors |
 
 References use content-addressed safe locators. The manifest does not embed raw
 credentials, private transcripts, unrestricted prompts, hidden test answers,
 or full tool payloads.
+
+### Corpus Selection
+
+Before any campaign outcome is inspected, sealing commits to:
+
+- eligible sampling frame and its content root;
+- inclusion and exclusion rules;
+- deterministic draw algorithm and seed;
+- selected task IDs and selection timestamp;
+- task strata and weights;
+- prior model, prompt, operator, and evaluator exposure when known;
+- contamination and benchmark-familiarity assessment.
+
+Outcome-informed, manually favorable, convenience, or post hoc task selection
+is labeled `exploratory_corpus`. It cannot support a confirmatory superiority
+claim. An unknown prior-exposure record lowers reliability and is reported; it
+is not silently treated as no exposure.
+
+### Sealed Trial Census
+
+The manifest enumerates every planned trial:
+
+```text
+trial_id
+task_case_id
+comparison_block_id
+arm_id
+allocation_index
+seed
+planned_order
+required_disposition
+```
+
+The census root is part of the manifest hash. Trials cannot be added, removed,
+or reassigned after seal. A sequential stopping policy may mark pre-enumerated
+future trials `not_exposed` only through its sealed decision rule; it cannot
+delete them.
 
 ### Prompt And Skill Commitments
 
@@ -1832,6 +2296,28 @@ The environment commitment includes:
 Unpinned external services are declared dependencies with observed versions,
 response commitments, availability, and contamination risk.
 
+### Analysis Reproduction
+
+The sealed analysis specification commits to:
+
+- executable, container, or source-tree content hash;
+- dependency lock and resolved analysis-library hashes;
+- inclusion-set reducer and canonical sort order;
+- task, trial, arm, and missingness weighting;
+- RNG algorithm, seed derivation, and independent stream labels;
+- bootstrap, permutation, or interval algorithm and exact variant;
+- resampling unit, repetition count, confidence level, and multiplicity rule;
+- decimal or floating-point model, precision, platform constraints, and
+  treatment of non-finite values;
+- rounding mode and display precision;
+- canonical JSON and table serialization;
+- golden input and output vectors.
+
+Analysis execution that cannot reproduce the golden vectors on the declared
+platform is blocked. Cross-platform floating-point results may be reported as
+semantically equivalent only under an explicit tolerance policy; they cannot
+claim byte-identical replay.
+
 ## Campaign Lifecycle
 
 ### States
@@ -1844,6 +2330,7 @@ sealed
 scheduled
 running
 collecting
+collection_closed
 analysis_pending
 complete
 failed
@@ -1862,7 +2349,8 @@ campaign version.
 | `sealed` | `evaluation.campaign_scheduled.v1` | `scheduled` |
 | `scheduled` | `evaluation.campaign_started.v1` | `running` |
 | `running` | `evaluation.collection_started.v1` | `collecting` |
-| `collecting` | `evaluation.analysis_requested.v1` | `analysis_pending` |
+| `collecting` | `evaluation.collection_closed.v1` | `collection_closed` |
+| `collection_closed` | `evaluation.analysis_requested.v1` | `analysis_pending` |
 | `analysis_pending` | `evaluation.campaign_completed.v1` | `complete` |
 | any non-terminal | `evaluation.campaign_failed.v1` | `failed` |
 | any non-terminal | `evaluation.campaign_cancelled.v1` | `cancelled` |
@@ -1870,6 +2358,20 @@ campaign version.
 
 The store rejects execution for an unsealed manifest, append after terminal
 state except invalidation metadata, or analysis before collection closure.
+
+Collection closure locks the campaign and complete sealed trial census. It
+requires every planned trial to have one terminal disposition or a
+`not_exposed` disposition produced by the sealed stopping rule. It records
+trial-state counts, terminal-event IDs, census root, stopping-rule inputs and
+decision, collection high-water mark, and integrity root. Planned, allocated,
+running, outcome-reported, or evidence-pending trials block closure.
+
+Campaign completion requires a current completed analysis run, independently
+verified and published report version, no unresolved integrity failure, and
+all required policy-deviation dispositions. Campaign invalidation atomically
+invalidates current analysis and report projections or records why their
+separate invalidation transaction is recovery-pending; no invalidated campaign
+report may remain current or exportable.
 
 ### Trial Lifecycle
 
@@ -1886,12 +2388,101 @@ excluded
 failed
 timed_out
 cancelled
+not_exposed
 ```
 
-`included`, `excluded`, `failed`, `timed_out`, and `cancelled` are terminal for
-one trial. Exclusion requires a predeclared rule and evidence. A poor outcome,
-high cost, long duration, coordination failure, or timeout is not an exclusion
-reason unless the estimand explicitly says so.
+`included`, `excluded`, `failed`, `timed_out`, `cancelled`, and `not_exposed`
+are terminal for one trial. Legal transitions are:
+
+| From | Event | To | Capability |
+|---|---|---|---|
+| absent | `evaluation.trial_planned.v1` | `planned` | campaign sealer |
+| `planned` | `evaluation.trial_allocated.v1` | `allocated` | `evaluation:allocate` |
+| `allocated` | `evaluation.trial_started.v1` | `running` | `evaluation:execute` |
+| `running` | `evaluation.trial_outcome_reported.v1` | `outcome_reported` | trial assignee |
+| `outcome_reported` | `evaluation.trial_evidence_verified.v1` | `evidence_verified` | eligible evidence verifier |
+| `evidence_verified` | `evaluation.trial_included.v1` | `included` | `evaluation:disposition` |
+| `evidence_verified` | `evaluation.trial_excluded.v1` | `excluded` | `evaluation:disposition` |
+| `planned` | `evaluation.trial_not_exposed.v1` | `not_exposed` | stopping-rule service |
+| `allocated` or `running` | `evaluation.trial_failed.v1` | `failed` | recovery service |
+| `allocated` or `running` | `evaluation.trial_timed_out.v1` | `timed_out` | recovery service |
+| any non-terminal | `evaluation.trial_cancelled.v1` | `cancelled` | `evaluation:cancel` |
+
+Exclusion requires a sealed rule, evidence, and an independent disposition
+principal when policy requires it. A poor outcome, high cost, long duration,
+coordination failure, timeout, or unfavorable arm is not an exclusion reason.
+`failed`, `timed_out`, and `cancelled` remain terminal census dispositions and
+enter the primary estimand under its sealed loss rule.
+
+### Trial Attempt Lifecycle
+
+Attempts are keyed by:
+
+```text
+(project_id, trial_id, attempt_number)
+```
+
+`attempt_number` starts at `1` and is gap-free. States are:
+
+```text
+planned -> running -> outcome_reported -> verified
+                  \-> retryable_failed
+                  \-> terminal_failed
+                  \-> timed_out
+                  \-> cancelled
+```
+
+| From | Event | To | Guard |
+|---|---|---|---|
+| absent | `evaluation.attempt_planned.v1` | `planned` | Next gap-free number and sealed retry policy permits it |
+| `planned` | `evaluation.attempt_started.v1` | `running` | Trial running, assignment and leases valid |
+| `running` | `evaluation.attempt_outcome_reported.v1` | `outcome_reported` | Callback, scorecard, budget, and evidence roots present |
+| `outcome_reported` | `evaluation.attempt_verified.v1` | `verified` | Evidence policy satisfied |
+| `running` | `evaluation.attempt_retryable_failed.v1` | `retryable_failed` | Failure class retryable and attempts remain |
+| `running` | `evaluation.attempt_terminal_failed.v1` | `terminal_failed` | Non-retryable or attempts exhausted |
+| `running` | `evaluation.attempt_timed_out.v1` | `timed_out` | Authoritative lifecycle timeout |
+| any non-terminal | `evaluation.attempt_cancelled.v1` | `cancelled` | Authorized cancellation |
+
+Attempt terminal events preserve consumed resource and elapsed accounting.
+Retry creation locks trial, prior attempt, budget meter, and resource claims and
+cannot exceed the sealed limit.
+
+### Authorization And Idempotency
+
+Campaign policy binds principals or service-principal selectors for:
+
+```text
+evaluation:create
+evaluation:seal
+evaluation:schedule
+evaluation:execute
+evaluation:collect_close
+evaluation:analyze
+evaluation:complete
+evaluation:invalidate
+evaluation:allocate
+evaluation:evidence_verify
+evaluation:disposition
+evaluation:cancel
+evaluation:export
+```
+
+Sealing, evidence verification, trial disposition, analysis approval, and
+invalidation honor the configured separation-of-duties policy. Role labels do
+not grant capabilities.
+
+Every lifecycle mutation supplies expected aggregate version, manifest hash,
+capability, fencing tokens for protected resources, and an idempotency key
+scoped to:
+
+```text
+(project_id, aggregate_type, aggregate_id, aggregate_version,
+ event_type, idempotency_key)
+```
+
+Same-key different-payload requests fail. Terminal retries return the accepted
+event. Recovery can only create a policy-allowed next attempt or terminal
+disposition; it cannot reopen a terminal trial, attempt, campaign, or report.
 
 ### Attempt Policy
 
@@ -1939,6 +2530,42 @@ Differences in aggregate token, elapsed, cost, concurrency, or tool budgets are
 declared treatment components. Reports do not call arms "same budget" when
 only per-agent limits match and the team has multiple agents.
 
+### Arm Budget Accounting
+
+Each arm has one aggregate budget meter keyed by:
+
+```text
+(project_id, campaign_id, campaign_version, comparison_block_id, arm_id)
+```
+
+The meter includes, according to sealed attribution rules:
+
+- every worker and coordinator input, cached-input, reasoning, output, and
+  total token observation;
+- all retry and failed-attempt consumption;
+- verifier, evaluator, recovery, and orchestration usage;
+- tool and external service cost;
+- queue, active, and wall-clock elapsed time;
+- parallel compute and concurrency occupancy;
+- allocated share of a common rate-limit or service pool.
+
+Shared usage is allocated by a sealed deterministic rule and also reported
+unallocated when no reliable rule exists. Unknown shared use remains unknown.
+
+Protected mutations reserve budget before execution and settle observed usage
+afterward. A hard limit fences new work and follows the sealed failure rule;
+it does not discard the trial. A soft tolerance and measurement uncertainty
+are declared per metric.
+
+An estimand is labeled:
+
+- `topology_only` only when aggregate arm meters are comparable within every
+  sealed tolerance;
+- `joint_topology_budget` when budget differs by design;
+- `not_comparable` when an undeclared or unmeasured material mismatch occurs.
+
+Per-agent equality is never sufficient for `topology_only`.
+
 ### Blocking And Randomization
 
 Task case is the default comparison block. Arm order and seed assignment use a
@@ -1960,10 +2587,13 @@ The campaign declares whether agents or evaluators may observe:
 - benchmark exemplars;
 - learning projections produced by campaign trials.
 
-Training or common-issue updates produced during evaluation are isolated until
-the comparison block closes unless shared adaptation is itself the declared
-treatment. Cache keys, worktrees, databases, service state, and message channels
-must enforce that isolation.
+Training, memory, and common-issue updates produced during evaluation are
+quarantined from every campaign arm until campaign collection closes. They may
+enter later campaigns only after normal review and promotion. If carryover or
+online adaptation is the declared treatment, the sealed manifest defines which
+arm receives which learning, the causal ordering, delay, and comparison
+interpretation. Cache keys, worktrees, databases, service state, message
+channels, and learning projections must enforce that isolation.
 
 ### Sample Size
 
@@ -2264,6 +2894,131 @@ expiry.
 Public reports must not expose hidden task answers, private prompts, principal
 relationships, resource identifiers, or unbounded event payloads.
 
+## Analysis Run And Report Lifecycle
+
+### Analysis Run Identity
+
+An analysis execution is keyed by:
+
+```text
+(project_id, campaign_id, campaign_version, analysis_run_id)
+```
+
+It binds:
+
+- sealed manifest and analysis-spec hashes;
+- `evaluation.collection_closed.v1` event and collection high-water mark;
+- canonical trial census and terminal-disposition roots;
+- ordered trial evidence-bundle roots;
+- policy-deviation, redaction, deletion, and integrity-registry high-water
+  marks;
+- inclusion decision set and canonical root;
+- price tables and metric schema versions;
+- analysis executable, dependency lock, RNG streams, precision, rounding, and
+  serialization;
+- initiating and approving principals.
+
+States are:
+
+```text
+planned -> running -> completed
+                   \-> failed
+                   \-> cancelled
+completed -> invalidated
+```
+
+Transitions use `evaluation.analysis_planned.v1`,
+`evaluation.analysis_started.v1`, `evaluation.analysis_completed.v1`,
+`evaluation.analysis_failed.v1`, `evaluation.analysis_cancelled.v1`, and
+`evaluation.analysis_invalidated.v1`. They require expected version,
+`evaluation:analyze` or `evaluation:invalidate`, separation-of-duties policy,
+and canonical idempotency.
+
+### Inclusion Set
+
+The canonical inclusion set contains one row for every sealed trial ID, sorted
+by canonical trial bytes:
+
+```text
+trial_id
+terminal_disposition_event_id
+analysis_disposition
+rule_id
+metric_missingness
+evidence_bundle_root
+```
+
+`analysis_disposition` is `included`, `loss_assigned`, `not_exposed`, or
+`excluded_by_sealed_rule`. Omission is invalid. The reducer recomputes the set
+from the census and terminal events; callers cannot submit an arbitrary list.
+
+### Report Identity And States
+
+A report is keyed by:
+
+```text
+(project_id, campaign_id, campaign_version, report_id, report_version)
+```
+
+`report_id` is stable for one report lineage and `report_version` is gap-free.
+States are:
+
+```text
+draft
+generated
+verified
+published
+invalidated
+```
+
+| From | Event | To | Capability |
+|---|---|---|---|
+| absent | `evaluation.report_drafted.v1` | `draft` | analysis service |
+| `draft` | `evaluation.report_generated.v1` | `generated` | `evaluation:analyze` |
+| `generated` | `evaluation.report_verified.v1` | `verified` | independent report verifier |
+| `verified` | `evaluation.report_published.v1` | `published` | `evaluation:complete` |
+| `generated`, `verified`, or `published` | `evaluation.report_invalidated.v1` | `invalidated` | `evaluation:invalidate` |
+
+A correction creates `report_version + 1`, references the invalidated version
+and analysis run, and replays from canonical inputs. No report state resumes.
+
+### Canonical Reducer
+
+The report reducer consumes only:
+
+1. canonical sealed manifest bytes;
+2. collection-closure census and high-water mark;
+3. canonical inclusion rows;
+4. terminal trial and attempt events;
+5. verified evidence-bundle roots and metric observations;
+6. policy deviations, waivers, invalidations, redactions, and missingness;
+7. pinned pricing and analysis specification;
+8. exact analysis-run identity and golden-vector result.
+
+Inputs are sorted by domain-separated canonical keys and serialized with the
+S264.1 JCS and framing contract. Projection-local timestamps, database row
+order, wall-clock analysis start, host path, and viewer filtering do not enter
+canonical metric bytes.
+
+### Evaluation Replay Invariants
+
+Replay MUST prove:
+
+1. every sealed trial appears exactly once in the inclusion set;
+2. collection cannot close over a non-terminal unaccounted trial;
+3. every attempt is gap-free and reconciles to one trial terminal disposition;
+4. report versions are gap-free and preserve invalidation lineage;
+5. reducer inputs match their recorded high-water marks and set roots;
+6. task, arm, trial, metric, and table ordering is canonical;
+7. pinned RNG, precision, rounding, and interval algorithms reproduce golden
+   vectors and report bytes on supported platforms;
+8. failed, timed-out, cancelled, and not-exposed trials follow the sealed
+   estimand rather than disappearing;
+9. redaction and deletion state cannot revive evidence or silently change an
+   inclusion row;
+10. SQLite, PostgreSQL, and conforming custom adapters produce identical
+    inclusion and report bytes or explicitly fail byte-replay conformance.
+
 ## Evaluation Integrity And Invalidation
 
 A campaign or report is invalidated by:
@@ -2286,7 +3041,7 @@ gets a new report version; it does not rewrite the invalid report.
 
 ## Evaluation Report
 
-The canonical report contains:
+The canonical report version contains:
 
 1. campaign question, version, and manifest commitment;
 2. primary estimand and analysis population;
@@ -2329,6 +3084,21 @@ S272 implementation acceptance includes:
 19. replay produces identical inclusion and metric bytes across supported
     adapters;
 20. one favorable task cannot produce an unqualified superiority claim.
+21. collection closure fails while any sealed trial is planned, allocated,
+    running, outcome-reported, or evidence-pending;
+22. every sealed trial appears once in the canonical inclusion set;
+23. unauthorized sealing, allocation, disposition, analysis, completion,
+    invalidation, and export fail without partial writes;
+24. prior trials cannot be reused after an incompatible manifest field change;
+25. outcome-informed or convenience corpus selection is labeled exploratory;
+26. campaign-generated learning remains quarantined until collection closure;
+27. coordinator, retry, verifier, cached-token, and shared-service usage enters
+    the arm-level meter under sealed attribution;
+28. undeclared aggregate budget mismatch yields `not_comparable`;
+29. changed analysis code, RNG, interval variant, precision, rounding, sort
+    order, or dependency lock changes the analysis commitment and blocks stale
+    replay;
+30. corrected reports create a new version and retain invalidation lineage.
 
 ## S264.2-4 Acceptance Criteria
 
@@ -2338,8 +3108,12 @@ S264.2-4 is complete when the contract:
 - defines a sealed estimand and material manifest versioning;
 - pins corpus, repository, roster, topology, model, harness, prompt, skill,
   tools, environment, lifecycle, budget, pricing, privacy, and analysis inputs;
-- defines campaign and trial lifecycles, retry policy, leakage controls, and
-  comparable arms;
+- defines complete campaign, trial, attempt, analysis-run, and report
+  lifecycles with capabilities, idempotency, recovery, and terminal behavior;
+- seals the complete trial census and prevents collection closure over
+  unaccounted trials;
+- defines deterministic trial reuse, corpus selection, learning quarantine,
+  aggregate arm budgets, leakage controls, and comparable arms;
 - defines content-addressed trial evidence and independent evaluation;
 - separates outcome, canonical score, resource, coordination, and reliability
   metrics;
@@ -2347,6 +3121,8 @@ S264.2-4 is complete when the contract:
   uncertainty;
 - defines redaction, retention, restore, export, invalidation, and report
   contracts;
+- defines report identity, reducer inputs, inclusion canonicalization,
+  high-water marks, version lineage, and replay invariants;
 - assigns implementation to S272.
 
 ## Downstream Ownership
