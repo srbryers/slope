@@ -726,6 +726,16 @@ describe('Schema Migration', () => {
         '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z',
         'legacy-session', NULL, NULL
       );
+      INSERT INTO workflow_executions VALUES (
+        'trimmed-workflow', 'test', ' 458.10 ', NULL, NULL, 'running', '{}', '[]',
+        '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z',
+        'legacy-session', NULL, NULL
+      );
+      INSERT INTO workflow_executions VALUES (
+        'invalid-workflow', 'test', 'S0', NULL, NULL, 'running', '{}', '[]',
+        '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z',
+        'legacy-session', NULL, NULL
+      );
     `);
     db.close();
 
@@ -735,7 +745,9 @@ describe('Schema Migration', () => {
     expect((await upgraded.listScorecards()).map(card => card.sprint_number)).toEqual(['435', '458']);
     expect((await upgraded.getEventsBySprint('458'))[0].sprint_number).toBe('458');
     expect((await upgraded.getExecutionBySprint('458'))?.sprint_id).toBe('458');
+    expect((await upgraded.getExecutionBySprint('458.10'))?.sprint_id).toBe('458.10');
     expect((await upgraded.getExecutionBySprint('R1'))?.sprint_id).toBe('R1');
+    expect((await upgraded.getExecution('invalid-workflow'))?.sprint_id).toBe('S0');
     await expect(upgraded.claim({
       sprint_number: '458',
       player: 'bob',

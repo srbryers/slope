@@ -348,7 +348,16 @@ const MIGRATIONS: Array<{ version: number; sql: string }> = [
         AND substr(trim(sprint_id), 2) NOT GLOB '*[^0-9.]*'
         AND substr(trim(sprint_id), 2) NOT GLOB '*.*.*'
         AND substr(trim(sprint_id), 2) NOT LIKE '.%'
-        AND substr(trim(sprint_id), 2) NOT LIKE '%.';
+        AND substr(trim(sprint_id), 2) NOT LIKE '%.'
+        AND CAST(substr(trim(sprint_id), 2) AS REAL) > 0;
+      UPDATE workflow_executions
+      SET sprint_id = trim(sprint_id)
+      WHERE length(trim(sprint_id)) > 0
+        AND trim(sprint_id) NOT GLOB '*[^0-9.]*'
+        AND trim(sprint_id) NOT GLOB '*.*.*'
+        AND trim(sprint_id) NOT LIKE '.%'
+        AND trim(sprint_id) NOT LIKE '%.'
+        AND CAST(trim(sprint_id) AS REAL) > 0;
     `,
   },
 ];

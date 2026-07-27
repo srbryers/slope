@@ -262,7 +262,12 @@ const MIGRATIONS: Array<{ version: number; sql: string }> = [
 
       UPDATE workflow_executions
       SET sprint_id = substring(btrim(sprint_id) FROM 2)
-      WHERE btrim(sprint_id) ~* '^s[0-9]+([.][0-9]+)?$';
+      WHERE btrim(sprint_id) ~* '^s[0-9]+([.][0-9]+)?$'
+        AND substring(btrim(sprint_id) FROM 2)::NUMERIC > 0;
+      UPDATE workflow_executions
+      SET sprint_id = btrim(sprint_id)
+      WHERE btrim(sprint_id) ~ '^[0-9]+([.][0-9]+)?$'
+        AND btrim(sprint_id)::NUMERIC > 0;
     `,
   },
 ];

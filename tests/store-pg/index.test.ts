@@ -537,6 +537,16 @@ describe.skipIf(!PG_URL)('PostgresSlopeStore canonical sprint migration', () => 
           '{}', '[]', '2026-01-01T00:00:00.000Z',
           '2026-01-01T00:00:00.000Z', NULL, NULL, NULL
         );
+        INSERT INTO workflow_executions VALUES (
+          'trimmed-workflow', 'legacy', 'test', ' 458.10 ', NULL, NULL, 'running',
+          '{}', '[]', '2026-01-01T00:00:00.000Z',
+          '2026-01-01T00:00:00.000Z', NULL, NULL, NULL
+        );
+        INSERT INTO workflow_executions VALUES (
+          'invalid-workflow', 'legacy', 'test', 'S0', NULL, NULL, 'running',
+          '{}', '[]', '2026-01-01T00:00:00.000Z',
+          '2026-01-01T00:00:00.000Z', NULL, NULL, NULL
+        );
       `);
 
       const {
@@ -551,7 +561,9 @@ describe.skipIf(!PG_URL)('PostgresSlopeStore canonical sprint migration', () => 
       expect((await migrated.listScorecards()).map(card => card.sprint_number)).toEqual(['435', '458']);
       expect((await migrated.getEventsBySprint('458'))[0].sprint_number).toBe('458');
       expect((await migrated.getExecutionBySprint('458'))?.sprint_id).toBe('458');
+      expect((await migrated.getExecutionBySprint('458.10'))?.sprint_id).toBe('458.10');
       expect((await migrated.getExecutionBySprint('R1'))?.sprint_id).toBe('R1');
+      expect((await migrated.getExecution('invalid-workflow'))?.sprint_id).toBe('S0');
       await expect(migrated.claim({
         sprint_number: '458',
         player: 'bob',
