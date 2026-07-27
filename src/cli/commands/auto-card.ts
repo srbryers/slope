@@ -1,9 +1,9 @@
 import { execSync } from 'node:child_process';
 import { writeFileSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { buildScorecard, buildAgentBreakdowns, computeSlope, parseTestOutput, classifyShotFromSignals, buildGhCommand, parsePRJson, mergePRChecksWithCI, parseRoadmap, formatSprintNumber, parseSprintNumber } from '../../core/index.js';
+import { buildScorecard, buildAgentBreakdowns, computeSlope, parseTestOutput, classifyShotFromSignals, buildGhCommand, parsePRJson, mergePRChecksWithCI, parseRoadmap, formatSprintNumber, findRoadmapSprint, sprintIdKey, sprintIdsEqual } from '../../core/index.js';
 import { QUIET_STDIO } from '../../core/process.js';
-import type { ShotRecord, CISignal, PRSignal, ShotResult, AgentBreakdown, RoadmapDefinition } from '../../core/index.js';
+import type { ShotRecord, CISignal, PRSignal, ShotResult, AgentBreakdown, RoadmapDefinition, SprintId } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { resolveStore } from '../store.js';
 
@@ -47,7 +47,7 @@ function getCommits(since?: string, branch?: string): CommitInfo[] {
   });
 }
 
-function inferTicketKey(subject: string, index: number, sprintNumber: number): string {
+function inferTicketKey(subject: string, index: number, sprintNumber: SprintId): string {
   const ticketMatch = subject.match(/\b[A-Z]+-\d+\b/) ?? subject.match(/\bS\d+(?:\.\d+)?-\d+\b/i);
   if (ticketMatch) return ticketMatch[0];
   return `S${formatSprintNumber(sprintNumber)}-${index + 1}`;
@@ -74,20 +74,20 @@ function loadRoadmap(cwd: string): RoadmapDefinition | null {
  *  with a synthetic key (--include-untracked). (#352) */
 export function matchSprintTicket(
   subject: string,
-  sprintNumber: number,
+  sprintNumber: SprintId,
   allowedKeys: ReadonlyArray<string>,
   positionalCursor: { next: number },
 ): string | null {
   // 1. Explicit `S{N}-{M}` mention that's actually in this sprint
   const exact = subject.match(/\bS(\d+(?:\.\d+)?)-(\d+)\b/i);
-  const exactSprint = exact ? parseSprintNumber(exact[1]) : null;
-  if (exact && exactSprint === sprintNumber) {
+  const exactSprint = exact ? sprintIdKey(exact[1]) : null;
+  if (exact && exactSprint !== null && sprintIdsEqual(exactSprint, sprintNumber)) {
     const key = `S${formatSprintNumber(sprintNumber)}-${exact[2]}`;
     if (allowedKeys.includes(key)) return key;
   }
 
   // 2. Other-sprint key — definitely not ours, drop
-  if (exact && exactSprint !== sprintNumber) return null;
+  if (exact && (exactSprint === null || !sprintIdsEqual(exactSprint, sprintNumber))) return null;
 
   // 3. `(S{N})` umbrella — assume next un-assigned ticket from the sprint.
   // The negative lookahead blocks `-`, `.`, and digits after the sprint
@@ -117,13 +117,13 @@ export function matchSprintTicket(
   return null;
 }
 
-function isSprintScopedSubject(subject: string, sprintNumber: number): boolean {
+function isSprintScopedSubject(subject: string, sprintNumber: SprintId): boolean {
   const sprintToken = escapeRegex(formatSprintNumber(sprintNumber));
   return new RegExp(`[(\\s+]S${sprintToken}(?![-.\\d])`, 'i').test(subject)
     || isSprintWorkflowScope(subject, sprintNumber);
 }
 
-function isSprintWorkflowScope(subject: string, sprintNumber: number): boolean {
+function isSprintWorkflowScope(subject: string, sprintNumber: SprintId): boolean {
   const sprintToken = escapeRegex(formatSprintNumber(sprintNumber));
   return new RegExp(`\\bS${sprintToken}[-_](?:review|follow[-_]?up|closeout)\\b`, 'i').test(subject);
 }
@@ -152,8 +152,8 @@ export async function autoCardCommand(args: string[]): Promise<void> {
   const opts = parseArgs(args);
   const config = loadConfig();
 
-  const sprintNumber = parseSprintNumber(opts.sprint ?? '');
-  if (!sprintNumber) {
+  const sprintNumber = sprintIdKey(opts.sprint ?? '');
+  if (sprintNumber === null) {
     console.error('\nUsage: slope auto-card --sprint=<N> [--since=<date>] [--branch=<ref>] [--theme=<text>] [--player=<name>] [--test-output=<file>] [--pr=<number>] [--swarm=<id>] [--include-untracked] [--dry-run]\n');
     console.error('  --sprint             Sprint number (required)');
     console.error('  --since              Git log start date, e.g. "2026-02-20" (optional)');
@@ -170,7 +170,7 @@ export async function autoCardCommand(args: string[]): Promise<void> {
 
   const cwd = process.cwd();
   const roadmap = loadRoadmap(cwd);
-  const sprint = roadmap?.sprints.find(s => s.id === sprintNumber);
+  const sprint = roadmap ? findRoadmapSprint(roadmap, sprintNumber) : undefined;
   const includeUntracked = args.includes('--include-untracked');
 
   if (!sprint && !includeUntracked && !hasExplicitScanBound(opts)) {

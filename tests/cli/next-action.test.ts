@@ -92,9 +92,25 @@ describe('detectSprintState', () => {
     const state = await detectSprintState(tmpDir);
     expect(state.type).toBe('mid-sprint');
     if (state.type === 'mid-sprint') {
-      expect(state.sprintNumber).toBe(26);
+      expect(state.sprintNumber).toBe('26');
       expect(state.claimCount).toBe(2);
       expect(state.targets).toEqual(['S26-1', 'S26-2']);
+    }
+  });
+
+  it('selects S458.10 as the latest active claim without aliasing S458.1', async () => {
+    initSlopeDir();
+    mockStore.getActiveClaims.mockResolvedValue([
+      { id: '1', sprint_number: '458.1', player: 'alice', target: 'S458.1-1', scope: 'ticket', claimed_at: '' },
+      { id: '2', sprint_number: '458.10', player: 'alice', target: 'S458.10-1', scope: 'ticket', claimed_at: '' },
+    ]);
+    mockedResolveStore.mockResolvedValue(mockStore as never);
+
+    const state = await detectSprintState(tmpDir);
+    expect(state.type).toBe('mid-sprint');
+    if (state.type === 'mid-sprint') {
+      expect(state.sprintNumber).toBe('458.10');
+      expect(state.targets).toEqual(['S458.1-1', 'S458.10-1']);
     }
   });
 
@@ -108,8 +124,24 @@ describe('detectSprintState', () => {
     const state = await detectSprintState(tmpDir);
     expect(state.type).toBe('mid-sprint');
     if (state.type === 'mid-sprint') {
-      expect(state.sprintNumber).toBe(25);
+      expect(state.sprintNumber).toBe('25');
       expect(state.claimCount).toBe(1);
+    }
+  });
+
+  it('preserves S458.10 in filesystem fallback evidence', async () => {
+    initSlopeDir();
+    const claimsPath = join(tmpDir, '.slope', 'claims.json');
+    writeFileSync(claimsPath, JSON.stringify([
+      { sprint_number: '458.1', target: 'S458.1-1' },
+      { sprint_number: '458.10', target: 'S458.10-1' },
+    ]));
+
+    const state = await detectSprintState(tmpDir);
+    expect(state.type).toBe('mid-sprint');
+    if (state.type === 'mid-sprint') {
+      expect(state.sprintNumber).toBe('458.10');
+      expect(state.targets).toEqual(['S458.1-1', 'S458.10-1']);
     }
   });
 

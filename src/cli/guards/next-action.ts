@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync, renameSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import type { HookInput, GuardResult, SlopeConfig, SprintClaim, SprintId, Suggestion } from '../../core/index.js';
-import { loadConfig, loadScorecards, detectLatestSprint, nextCanonicalSprintId, parseRoadmap, formatStrategicContext } from '../../core/index.js';
+import { loadConfig, loadScorecards, detectLatestSprint, nextCanonicalSprintId, parseRoadmap, formatStrategicContext, latestSprintIdKey } from '../../core/index.js';
 import { resolveStore } from '../store.js';
 import { loadFindings } from '../commands/review-state.js';
 import { loadSprintState } from '../sprint-state.js';
@@ -91,7 +91,7 @@ export async function detectSprintState(cwd: string, sessionId?: string): Promis
         ? allClaims.filter(c => c.session_id === sessionId)
         : allClaims;
       if (claims.length > 0) {
-        const sprintNumber = Math.max(...claims.map(c => Number(c.sprint_number)));
+        const sprintNumber = latestSprintIdKey(claims.map(c => c.sprint_number));
         return {
           type: 'mid-sprint',
           sprintNumber,
@@ -110,7 +110,9 @@ export async function detectSprintState(cwd: string, sessionId?: string): Promis
       if (existsSync(claimsPath)) {
         const raw = JSON.parse(readFileSync(claimsPath, 'utf8'));
         if (Array.isArray(raw) && raw.length > 0) {
-          const sprintNumber = Math.max(...raw.map((c: { sprint_number?: number }) => c.sprint_number ?? 0));
+          const sprintNumber = latestSprintIdKey(
+            raw.map((c: { sprint_number?: SprintId }) => c.sprint_number ?? '0'),
+          );
           return {
             type: 'mid-sprint',
             sprintNumber,
