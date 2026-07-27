@@ -14,13 +14,14 @@
  * memory CLI command, briefing) keep working without `await`.
  */
 
-import { existsSync } from 'node:fs';
+import { existsSync, realpathSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 
 import type { MemoryBackend } from './memory-backend.js';
 import { JsonMemoryBackend } from './json-memory-backend.js';
 import { SqliteMemoryBackend } from '../store/sqlite-memory-backend.js';
+import { resolveRepoStateCwd } from './repo-state-scope.js';
 
 import type { Memory, MemoriesFile, MemoryCategory, MemorySource, MemorySearchOptions } from './memory-types.js';
 
@@ -80,22 +81,23 @@ export function clearMemoryBackendCache(): void {
 
 export function getMemoryBackend(cwd: string): MemoryBackend {
   const override = process.env.SLOPE_MEMORY_BACKEND;
+  const stateCwd = canonicalStateCwd(resolveRepoStateCwd(cwd));
   // Cache key includes the override so a test toggling the env between calls
   // doesn't get a stale instance.
-  const cacheKey = `${cwd}::${override ?? 'auto'}`;
+  const cacheKey = `${stateCwd}::${override ?? 'auto'}`;
   const cached = _backendCache.get(cacheKey);
   if (cached) return cached;
 
   if (override === 'json') {
-    const b = new JsonMemoryBackend(cwd);
+    const b = new JsonMemoryBackend(stateCwd);
     _backendCache.set(cacheKey, b);
     return b;
   }
 
-  const dbPath = join(cwd, '.slope', 'slope.db');
+  const dbPath = join(stateCwd, '.slope', 'slope.db');
   if (override === 'sqlite' || existsSync(dbPath)) {
     try {
-      const b = new SqliteMemoryBackend(cwd, dbPath);
+      const b = new SqliteMemoryBackend(stateCwd, dbPath);
       _backendCache.set(cacheKey, b);
       return b;
     } catch (err) {
@@ -109,9 +111,17 @@ export function getMemoryBackend(cwd: string): MemoryBackend {
     }
   }
 
-  const fallback = new JsonMemoryBackend(cwd);
+  const fallback = new JsonMemoryBackend(stateCwd);
   _backendCache.set(cacheKey, fallback);
   return fallback;
+}
+
+function canonicalStateCwd(cwd: string): string {
+  try {
+    return realpathSync(cwd);
+  } catch {
+    return cwd;
+  }
 }
 
 // ── Public API ─────────────────────────────────────────

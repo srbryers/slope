@@ -5,8 +5,15 @@ import { tmpdir } from 'node:os';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { recordBaseline, loadBaseline, removeBaseline } from '../../src/cli/guards/git-utils.js';
 import { sessionBriefingGuard } from '../../src/cli/guards/session-briefing.js';
+import { workflowStepGateGuard } from '../../src/cli/guards/workflow-step-gate.js';
 import { loadSessionState, updateSessionState } from '../../src/cli/session-state.js';
 import { createSprintState, saveSprintState } from '../../src/cli/sprint-state.js';
+import {
+  addMemory,
+  clearMemoryBackendCache,
+  searchMemories,
+} from '../../src/core/memory.js';
+import { loadWorkflow } from '../../src/core/workflow-loader.js';
 import { createStore } from '../../src/store/index.js';
 import { detectSetupHints, findProjectRoot } from '../../src/mcp/index.js';
 
@@ -19,6 +26,7 @@ function git(cwd: string, args: string[]): void {
 
 describe('cross-worktree state coordination', () => {
   beforeEach(() => {
+    clearMemoryBackendCache();
     primary = mkdtempSync(join(tmpdir(), 'slope-coordination-primary-'));
     worktree = `${primary}-worktree`;
     git(primary, ['init', '-q', '-b', 'main']);
@@ -57,6 +65,8 @@ describe('cross-worktree state coordination', () => {
   });
 
   afterEach(() => {
+    clearMemoryBackendCache();
+    delete process.env.SLOPE_MEMORY_BACKEND;
     rmSync(worktree, { recursive: true, force: true });
     rmSync(primary, { recursive: true, force: true });
   });
@@ -121,5 +131,61 @@ describe('cross-worktree state coordination', () => {
       lifecycleHooksInstalled: true,
       settingsConfigured: true,
     });
+  });
+
+  it('loads a primary custom workflow and keeps its guard active in a linked worktree', async () => {
+    const workflowDir = join(primary, '.slope', 'workflows');
+    mkdirSync(workflowDir, { recursive: true });
+    writeFileSync(join(workflowDir, 'custom-block.yaml'), [
+      "version: '1'",
+      'name: custom-block',
+      'phases:',
+      '  - id: phase1',
+      '    steps:',
+      '      - id: step1',
+      '        type: command',
+      '        command: echo test',
+    ].join('\n'));
+    expect(loadWorkflow('custom-block', worktree).name).toBe('custom-block');
+
+    const store = createStore({ storePath: '.slope/slope.db', cwd: primary });
+    const execution = await store.startExecution({
+      workflow_name: 'custom-block',
+      sprint_id: 'S261',
+      session_id: 'worktree-workflow',
+    });
+    await store.updateExecutionState(execution.id, 'phase1', 'step1');
+    store.close();
+
+    const result = await workflowStepGateGuard({
+      session_id: 'worktree-workflow',
+      hook_event_name: 'PreToolUse',
+      tool_name: 'Edit',
+      tool_input: { file_path: join(worktree, 'src', 'feature.ts') },
+    }, worktree);
+
+    expect(result.decision).toBe('deny');
+    expect(result.blockReason).toContain('type "command"');
+    expect(existsSync(join(worktree, '.slope'))).toBe(false);
+  });
+
+  it('uses the shared SQLite memory backend from a linked worktree', () => {
+    const store = createStore({ storePath: '.slope/slope.db', cwd: primary });
+    store.close();
+
+    addMemory(worktree, 'shared SQLite memory');
+
+    expect(searchMemories(primary).map(memory => memory.text)).toContain('shared SQLite memory');
+    expect(existsSync(join(worktree, '.slope'))).toBe(false);
+  });
+
+  it('uses the primary JSON memory fallback from a linked worktree', () => {
+    process.env.SLOPE_MEMORY_BACKEND = 'json';
+
+    addMemory(worktree, 'shared JSON memory');
+
+    expect(searchMemories(primary).map(memory => memory.text)).toContain('shared JSON memory');
+    expect(existsSync(join(primary, '.slope', 'memories.json'))).toBe(true);
+    expect(existsSync(join(worktree, '.slope'))).toBe(false);
   });
 });

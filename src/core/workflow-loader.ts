@@ -5,6 +5,7 @@ import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join, basename, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseWorkflow } from './workflow.js';
+import { resolveRepoStatePath } from './repo-state-scope.js';
 import type { WorkflowDefinition } from './workflow.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -34,7 +35,7 @@ function builtinDir(): string {
 
 /** Resolve the project workflows directory */
 function projectDir(cwd: string): string {
-  return join(cwd, '.slope', 'workflows');
+  return resolveRepoStatePath(cwd, '.slope/workflows');
 }
 
 /**
