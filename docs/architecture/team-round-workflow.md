@@ -84,6 +84,75 @@ accepted it are authoritative. "Principal" always means the authenticated
 durable principal defined by S264. "Actor" identifies attribution. A session is
 an ephemeral execution lifetime and never establishes independence.
 
+## Compound Primary Events
+
+S264.1 permits exactly one primary event per canonical append and does not
+provide batch append. Atomic workflow operations in this document therefore
+use one compound primary event, never a hidden event batch.
+
+A compound primary event owns a deterministic transition set:
+
+```text
+operation_id
+operation_type
+owner_aggregate_type
+owner_aggregate_id
+owner_expected_version
+owner_next_version
+affected_aggregates[]
+authorization_set
+precondition_root
+transition_root
+idempotency_key
+request_hash
+```
+
+Each `affected_aggregates` entry contains aggregate type and ID, expected and
+next version, prior and next state, and transition reason. Entries sort by
+domain-separated canonical aggregate key. The append transaction:
+
+1. authorizes the compound operation and every affected transition;
+2. locks the owner, affected aggregates, and conflict domains in canonical key
+   order;
+3. checks all versions, capabilities, fencing tokens, and preconditions;
+4. assigns one event ID and one project sequence;
+5. appends one compound primary event to its owner aggregate;
+6. advances affected aggregate version and state projections from the event's
+   transition set;
+7. updates all other synchronous projections;
+8. commits all or none.
+
+There are no implied child ledger events. Reducers treat the compound event as
+the authoritative cause for every listed transition. Replay validates the
+transition root, applies entries in canonical order at the primary event's
+project sequence, and rejects a partial, duplicated, unauthorized,
+version-skipping, or differently ordered transition set.
+
+The compound event's idempotency identity follows S264.1:
+
+```text
+(project_id, principal_id, operation_name,
+ aggregate_type, aggregate_id, idempotency_key)
+```
+
+Expected versions, affected transitions, capabilities, fencing tokens,
+manifest hashes, and all other preconditions belong in the canonical request
+hash, not the idempotency identity.
+
+The initial compound events are:
+
+- `handoff.activated.v2`, owned by the handoff aggregate;
+- `assignment.spell_recovered.v1`, owned by the assignment aggregate;
+- `assignment.reassigned_after_abandonment.v1`, owned by the assignment
+  aggregate;
+- `contribution.material_mutation_accepted.v2`, owned by the assignment
+  verification domain;
+- `verification.appeal_granted.v1`, owned by the verification family;
+- `learning.patterns_merged.v2` and `learning.pattern_split.v2`, owned by a
+  learning-topology operation aggregate;
+- campaign invalidation events when they transition current analysis and report
+  projections.
+
 ## Assignment Aggregate
 
 ### Identity
@@ -228,16 +297,17 @@ Offer refusal is `assignment.offer_declined.v1` and transitions the revision to
 
 | From | Event | To | Authorized principal |
 |---|---|---|---|
-| `created` | `assignment.offered.v1` | `offered` | delegator or scheduler |
-| `offered` | `assignment.accepted.v1` | `accepted` | assignee |
-| `offered` | `assignment.offer_declined.v1` | `cancelled` | assignee |
-| `accepted` | `assignment.started.v1` | `in_progress` | assignee |
-| `in_progress` | `assignment.blocker_reported.v1` | `blocked` | assignee |
-| `blocked` | `assignment.resumed.v1` | `in_progress` | assignee |
-| `in_progress` | `assignment.completion_reported.v1` | `completion_reported` | assignee |
-| any non-terminal | `assignment.cancelled.v1` | `cancelled` | authorized canceller |
-| `offered`, `accepted`, `in_progress`, or `blocked` | `assignment.timed_out.v1` | `timed_out` | recovery service |
-| any non-terminal | `assignment.superseded.v1` | `superseded` | delegator or policy engine |
+| `created` | `assignment.offered.v1` | `offered` | delegator or scheduler with `assignment:offer` |
+| `offered` | `assignment.accepted.v1` | `accepted` | assignee with `assignment:accept` |
+| `offered` | `assignment.offer_declined.v1` | `cancelled` | assignee with `assignment:accept` |
+| `accepted` | `assignment.started.v1` | `in_progress` | assignee with `assignment:execute` |
+| `in_progress` | `assignment.blocker_reported.v1` | `blocked` | assignee with `assignment:execute` |
+| `blocked` | `assignment.resumed.v1` | `in_progress` | assignee with `assignment:execute` |
+| `in_progress` | `assignment.spell_recovered.v1` | `in_progress` | recovery service with `assignment:recover` |
+| `in_progress` | `assignment.completion_reported.v1` | `completion_reported` | assignee with `assignment:execute` |
+| any non-terminal | `assignment.cancelled.v1` | `cancelled` | principal with `assignment:cancel` |
+| `offered`, `accepted`, `in_progress`, or `blocked` | `assignment.timed_out.v1` | `timed_out` | recovery service with `assignment:recover` |
+| any non-terminal | `assignment.superseded.v1` | `superseded` | delegator or policy engine with `assignment:supersede` |
 
 The store rejects all other transitions. A caller cannot skip `accepted`, move
 directly from `in_progress` to a verified composite state, resume a terminal
@@ -274,19 +344,18 @@ are:
 
 | From | Event | To | Authorized principal |
 |---|---|---|---|
-| absent | `verification.not_required.v1` | `not_required` | policy engine |
-| absent | `verification.requested.v1` | `requested` | policy engine |
-| `requested` | `verification.reserved.v1` | `reserved` | scheduler |
-| `reserved` | `verification.started.v1` | `active` | selected verifier |
-| `active` | `verification.approved.v1` | `approved` | eligible verifier |
-| `active` | `verification.rejected.v1` | `rejected` | eligible verifier |
-| `active` | `verification.disputed.v1` | `disputed` | quorum reducer |
-| `disputed` | `verification.approved.v1` | `approved` | quorum reducer |
-| `disputed` | `verification.rejected.v1` | `rejected` | quorum reducer |
-| `requested`, `reserved`, `active`, or `disputed` | `verification.waived.v1` | `waived` | waiver authority |
-| any non-terminal | `verification.cancelled.v1` | `cancelled` | authorized canceller |
-| `requested`, `reserved`, `active`, or `disputed` | `verification.timed_out.v1` | `timed_out` | recovery service |
-| `approved`, `waived`, or `not_required` | `verification.invalidated.v1` | `invalidated` | policy engine |
+| absent | `verification.not_required.v1` | `not_required` | policy engine with `verification:policy` |
+| absent | `verification.requested.v1` | `requested` | policy engine with `verification:request` |
+| `requested` | `verification.reserved.v1` | `reserved` | scheduler with `verification:reserve` |
+| `reserved` | `verification.started.v1` | `active` | selected verifier with `verification:execute` |
+| `active` | `verification.slot_decided.v1` | `active` | eligible slot verifier with `verification:decide` |
+| `active` | `verification.epoch_reduced.v1` | `approved`, `rejected`, or `disputed` | quorum reducer with `verification:reduce` |
+| `disputed` | `verification.slot_decided.v1` | `disputed` | eligible added-slot verifier with `verification:decide` |
+| `disputed` | `verification.epoch_reduced.v1` | `approved`, `rejected`, or `disputed` | quorum reducer with `verification:reduce` |
+| `requested`, `reserved`, `active`, or `disputed` | `verification.waived.v1` | `waived` | waiver authority with `verification:waive` |
+| any non-terminal | `verification.cancelled.v1` | `cancelled` | principal with `verification:cancel` |
+| `requested`, `reserved`, `active`, or `disputed` | `verification.timed_out.v1` | `timed_out` | recovery service with `verification:recover` |
+| `approved`, `waived`, or `not_required` | `verification.invalidated.v1` | `invalidated` | policy engine with `verification:invalidate` |
 
 An invalidated epoch never resumes. Reverification of unchanged completion
 bytes creates epoch `e + 1`. A rejection requiring any output, criterion,
@@ -346,8 +415,25 @@ Starting execution requires:
 
 The `assignment.started.v1` event records the session, actor, lease set,
 fencing tokens, tool-permission snapshot, environment reference, and
-authoritative start time. A restarted process creates a new execution spell
-under the same assignment revision; it never rewrites the prior spell.
+authoritative start time.
+
+A replacement process cannot call `assignment.started.v1` on `in_progress`.
+The recovery service uses compound primary event
+`assignment.spell_recovered.v1`. It requires an open old obligation, failed or
+expired session under policy, fenced or recoverable old leases, and
+`assignment:recover`. In one transition set it:
+
+- closes the old obligation with disposition `timeout` or `cancel` reason
+  `abandoned_process`;
+- fences old lease tokens;
+- grants new lease epochs and tokens;
+- creates the replacement execution spell and next callback-obligation epoch;
+- records carried and discarded state;
+- updates semantic progress and recovery projections.
+
+If any precondition fails, the old spell remains authoritative. Exact retries
+return the accepted recovery event. Replay proves one old disposition and one
+replacement obligation.
 
 ## Correlation And Causation
 
@@ -536,10 +622,11 @@ handoff offer.
    handoff hash and proposed revision hash. This is consent to activate, not
    yet execution authority.
 4. Acceptance proves destination capabilities and verifier implications.
-5. The source or an authorized recovery service invokes one activation
-   transaction with `handoff:activate`, the source obligation ID, source lease
-   token vector, accepted destination revision hash, and idempotency key.
-6. Activation locks assignment, handoff, source callback obligation, source
+5. The source or an authorized recovery service invokes compound primary event
+   `handoff.activated.v2` with `handoff:activate`, the source obligation ID,
+   source lease token vector, accepted destination revision hash, and
+   idempotency key.
+6. Its transition set locks assignment, handoff, source callback obligation, source
    lease conflict domains, destination revision, and destination lease request
    in canonical key order, then atomically:
    - compare-and-sets the source obligation to disposition `handoff`;
@@ -547,8 +634,9 @@ handoff offer.
    - releases source leases and grants destination leases with new epochs and
      token vectors;
    - transitions source revision `r` to `superseded`;
-   - appends and transitions revision `r + 1` through `created`, `offered`, and
-     `accepted` using the destination's preaccepted hash;
+   - initializes revision `r + 1` directly in `accepted` with transition reason
+     `preaccepted_handoff`, preserving the equivalent created, offered, and
+     accepted inputs in the compound event rather than emitting child events;
    - starts the destination execution spell and callback obligation;
    - records ownership effective at the activation project sequence;
    - updates assignment, handoff, lease, callback, contribution, verifier, and
@@ -583,13 +671,19 @@ parent's explicit reconciliation policy and is never treated as success.
 
 ### Abandonment
 
-A vanished source cannot offer a handoff. Recovery may:
+A vanished source cannot offer a handoff. Recovery either uses
+`assignment.spell_recovered.v1` for a policy-permitted replacement spell under
+the same assignee or compound primary event
+`assignment.reassigned_after_abandonment.v1`. Reassignment:
 
-1. expire and fence the source leases;
-2. append `assignment.timed_out.v1` for the abandoned spell;
-3. create a recovery assignment linked to the same correlation ID;
-4. carry forward only evidence that passes integrity and visibility checks;
-5. leave the original ownership spell missing, not zero-loss or completed.
+1. locks the old assignment, obligation, leases, recovery item, and reserved
+   successor revision;
+2. closes the old obligation with `timeout`, fences leases, and transitions the
+   old revision to `timed_out`;
+3. creates and accepts a successor revision for the destination principal;
+4. grants new lease epochs and starts its spell and obligation;
+5. carries forward only evidence that passes integrity and visibility checks;
+6. leaves the original ownership spell missing, not zero-loss or completed.
 
 ## Cancellation And Timeout
 
@@ -696,6 +790,32 @@ Replay MUST prove:
 11. child requirements reconcile to the parent;
 12. projections reproduce identical canonical bytes on every supported
     adapter.
+
+## S264.2-1 Adversarial Criteria
+
+S271 implementation acceptance includes:
+
+1. blocker, completion, handoff, cancel, and timeout racing one obligation
+   produce exactly one winning disposition;
+2. exact callback retry returns the accepted event and changed-payload retry
+   conflicts;
+3. blocker then resume creates a new spell and permits a later blocker;
+4. verification correction creates a successor assignment revision rather
+   than resuming completed work;
+5. handoff cannot activate without destination preacceptance and complete
+   transition-set authorization;
+6. handoff activation either closes the source, fences leases, accepts the
+   successor, and starts its obligation together or changes nothing;
+7. a dead process restart closes the old obligation before creating a
+   replacement spell;
+8. a stale source lease or callback cannot mutate after handoff or recovery;
+9. partial handoff cannot double-own one criterion or overlapping lease set;
+10. one callback fan-out reaches every required recipient independently and
+    dead-letters only the failing destination;
+11. cancellation after completion cannot fabricate another assignment
+    callback or erase completion;
+12. replay rejects partial compound transitions, duplicate dispositions, and
+    obligation-epoch gaps.
 
 ## S264.2-1 Acceptance Criteria
 
@@ -983,17 +1103,49 @@ completion version, changed policy, or stale fencing tokens.
 Multiple quorum slots MAY run concurrently. Their verifiers cannot share a
 conflict root with each other under `multi_principal_quorum`.
 
+### Verification Slot Aggregate
+
+Each slot is keyed by:
+
+```text
+(project_id, assignment_id, revision, verification_epoch, slot)
+```
+
+Its states are:
+
+```text
+reserved
+active
+approved
+rejected
+unable_to_verify
+cancelled
+timed_out
+invalidated
+```
+
+Only the selected eligible verifier may transition its `active` slot to
+`approved`, `rejected`, or `unable_to_verify` through
+`verification.slot_decided.v1`. Slot decisions are terminal and independently
+versioned. They never transition the verification epoch directly.
+
+Cancellation, timeout, late contribution, or changed conflict roots transition
+the affected slot to its matching terminal state under policy. Replacement
+uses a new slot identity or explicitly versioned replacement slot; it never
+rewrites a decision.
+
 ### Late Contribution Atomicity
 
 A material artifact, evidence, contribution, principal-relationship,
 scorecard, criteria, or policy mutation affecting a completed revision MUST
-lock its verification domain before append. In one transaction it:
+use compound primary event `contribution.material_mutation_accepted.v2`, owned
+by the assignment verification domain. Its one transition set:
 
 1. validates mutation authority and fencing;
 2. increments the contribution or conflict epoch;
-3. appends the material mutation;
+3. records the material mutation in the primary payload;
 4. transitions any current `approved`, `waived`, or `not_required`
-   verification epoch to `invalidated`;
+   verification epoch projection to `invalidated` without a child event;
 5. fences active verifier slots whose snapshot is stale;
 6. updates composite status to `reverification_required`;
 7. prevents release, finalization, export, or dependent completion from
@@ -1008,7 +1160,7 @@ between a late mutation and invalidation.
 
 ### Required Decision Envelope
 
-`verification.approved.v1` and `verification.rejected.v1` contain:
+`verification.slot_decided.v1` contains:
 
 | Field | Contract |
 |---|---|
@@ -1023,7 +1175,7 @@ between a late mutation and invalidation.
 | `method_results` | Required method outcomes |
 | `evidence_refs` | Content-addressed review evidence |
 | `finding_refs` | Typed findings, if any |
-| `decision` | `approve` or `reject` |
+| `decision` | `approve`, `reject`, or `unable_to_verify` |
 | `decided_at` | Authoritative store time |
 
 Criterion decisions are `satisfied`, `not_satisfied`, or `unable_to_verify`.
@@ -1032,7 +1184,7 @@ Approval is invalid when a required criterion is not satisfied or an
 
 ### Transaction Checks
 
-Before accepting a decision, the store rechecks:
+Before accepting a slot decision, the store rechecks:
 
 1. verifier identity and capability;
 2. current verifier lease and fencing token;
@@ -1050,7 +1202,12 @@ scheduled.
 
 ### Quorum
 
-Quorum approval requires:
+The quorum reducer is the only principal allowed to append
+`verification.epoch_reduced.v1`. It locks the verification domain, epoch, all
+required slots, contribution and relationship high-water marks, target, and
+policy. A one-slot policy still passes through this reducer.
+
+Epoch approval requires:
 
 - all required slots filled by mutually independent eligible roots;
 - the configured approval threshold;
@@ -1058,8 +1215,10 @@ Quorum approval requires:
 - identical target, completion, criteria, policy, and conflict snapshot;
 - decisions within the policy's validity window.
 
-Conflicting quorum decisions transition the current verification epoch to
-`disputed`. An
+The reducer records every slot version, decision, conflict root, threshold,
+target hash, unresolved-finding root, and reduction-policy version. It verifies
+root uniqueness and target equality atomically. Conflicting or insufficient
+slot decisions transition the current verification epoch to `disputed`. An
 escalation policy may request another independent slot, return the assignment
 for correction, or require an authorized human decision. It cannot average
 away a failed required criterion.
@@ -1084,6 +1243,28 @@ revision `r + 1`, references the rejected verification epoch and findings,
 requires fresh acceptance, and starts a new execution spell and callback
 obligation. All correcting principals join the contribution conflict set. A
 new completion event and verification epoch are required.
+
+### Decision Appeal
+
+When completion bytes, criteria, evidence, and contribution epoch are
+unchanged but a rejection is proven erroneous, compromised, procedurally
+invalid, or successfully appealed, an independent appeal authority with
+`verification:appeal` may append `verification.appeal_granted.v1`.
+
+The appeal event targets the verification family rather than mutating the
+rejected epoch. It records:
+
+- rejected epoch and decision roots;
+- unchanged completion, criteria, evidence, and contribution hashes;
+- appeal reason and supporting evidence;
+- appeal-authority principal and conflict root;
+- policy and separation-of-duties proof;
+- reserved next epoch `e + 1`.
+
+In one compound transition it preserves epoch `e` as rejected and creates epoch
+`e + 1` in `requested` against identical bytes. The appeal authority cannot
+serve as a new slot verifier unless independently eligible. Changed bytes or
+criteria are not appealable and require assignment revision `r + 1`.
 
 ## Reverification
 
@@ -1210,12 +1391,16 @@ Replay MUST prove:
 3. conflict roots are reconstructed from event-time principal relationships;
 4. authors, contributors, handoff parties, and prohibited delegators are
    excluded at the required tier;
-5. quorum roots are mutually independent;
-6. every decision covers required criteria and methods;
-7. late contributions and relationships trigger deterministic invalidation;
-8. waivers remain distinct from approval;
-9. redaction preserves conflict commitments;
-10. supported adapters reproduce identical eligibility and decision
+5. slot decisions are immutable and never directly approve an epoch;
+6. the quorum reducer proves threshold, root uniqueness, target equality, and
+   unresolved-finding policy even for one-slot review;
+7. every decision covers required criteria and methods;
+8. late contributions and relationships trigger deterministic invalidation;
+9. appeal preserves the rejected epoch and creates one gap-free successor
+   epoch against identical bytes;
+10. waivers remain distinct from approval;
+11. redaction preserves conflict commitments;
+12. supported adapters reproduce identical eligibility and decision
     projections.
 
 ## S264.2-2 Adversarial Criteria
@@ -1242,6 +1427,10 @@ S271 implementation acceptance includes:
     replacement;
 12. waiver and break-glass results remain distinguishable from independent
     approval in every projection and gate.
+13. a slot decision cannot approve an epoch until the quorum reducer validates
+    it, including a one-slot policy;
+14. successful appeal preserves the rejected epoch, requires independent
+    authority, and creates exactly one next epoch against unchanged bytes.
 
 ## S264.2-2 Acceptance Criteria
 
@@ -1466,7 +1655,10 @@ public identities or proof that patterns are equal.
 
 ### Pattern Merge
 
-`learning.patterns_merged.v1` is the only authoritative multi-pattern merge.
+Compound primary event `learning.patterns_merged.v2`, owned by a
+learning-topology operation aggregate, is the only authoritative multi-pattern
+merge. Source and survivor version changes are transition-set entries, not
+child ledger events.
 Its request contains:
 
 - two or more current canonical source pattern IDs;
@@ -1500,7 +1692,8 @@ the included report. No write lands on a losing pattern after redirect commit.
 
 ### Pattern Split
 
-`learning.pattern_split.v1` contains:
+Compound primary event `learning.pattern_split.v2`, owned by a
+learning-topology operation aggregate, contains:
 
 - one current source pattern and expected version;
 - two or more server-reserved child pattern IDs;
@@ -1515,8 +1708,9 @@ the included report. No write lands on a losing pattern after redirect commit.
 The transaction locks the source, child IDs, and candidate domains in canonical
 byte order. It rejects missing or duplicate occurrence assignments, existing
 child aggregates, stale source version, merge redirects, and any mapping that
-would create a merge/split cycle. It appends all child version-1 patterns and
-the source `split` state atomically.
+would create a merge/split cycle. It initializes all child version-1 patterns
+and the source `split` state as affected transitions of the one compound primary
+event; it emits no child pattern events.
 
 New reports targeting the split source are rejected with safe child candidate
 references; the caller or deterministic matching policy must choose a child.
@@ -1804,8 +1998,9 @@ precedence:
 | 14 | `working` | Work is in progress, callback is open, required lease and session are healthy, and progress is not stale |
 | 15 | `verification_pending` | Work completed and verification is requested, reserved, active, or disputed |
 | 16 | `verified_with_waiver` | Work completed and verification is waived |
-| 17 | `complete` | Work completed and verification is approved or explicitly not required |
-| 18 | `idle` | No active assignment exists and availability policy says available |
+| 17 | `complete_unverified` | Work completed and verification is explicitly not required |
+| 18 | `complete` | Work completed and verification is approved |
+| 19 | `idle` | No active assignment exists and availability policy says available |
 
 `complete` never includes cancelled, timed-out, dead-lettered, waived,
 invalidated, rejected, unknown, or superseded work. Superseded revisions are
@@ -1824,9 +2019,10 @@ exposes state counts and a primary state selected by:
 1. highest attention among `unknown`, `dead_lettered`, `timed_out`, `blocked`,
    `stale`, `correction_required`, and `reverification_required`;
 2. otherwise `working` when any assignment is working;
-3. otherwise `starting`, `verification_pending`, `waiting`, then `queued`;
-4. otherwise `verified_with_waiver` only as a historical attention item, not
-   worker health;
+3. otherwise `verification_timed_out`, `verification_cancelled`,
+   `verified_with_waiver`, or `complete_unverified` as distinct historical
+   attention states until policy acknowledgment or retention expiry;
+4. otherwise `starting`, `verification_pending`, `waiting`, then `queued`;
 5. otherwise `idle` when availability is known and no active assignment
    exists;
 6. otherwise `unknown`.
@@ -1834,7 +2030,11 @@ exposes state counts and a primary state selected by:
 Ties use oldest unresolved attention time, then canonical project sequence,
 assignment ID, and revision. Completion of one assignment cannot hide another
 blocked or stale assignment. Hidden assignments participate in authoritative
-health before filtering but do not leak their identity.
+health before filtering but do not leak their identity. Worker projections
+always retain counts for `complete`, `complete_unverified`,
+`verified_with_waiver`, `verification_timed_out`,
+`verification_cancelled`, correction, invalidation, cancellation, and timeout,
+even after the primary availability state returns to idle.
 
 ### Semantic Progress
 
@@ -2039,6 +2239,9 @@ Implementation acceptance includes:
     failure cannot project `complete` or healthy;
 19. a hidden blocker changes the safe health class without leaking its count,
     identity, object, or timestamp.
+20. no-review completion remains `complete_unverified`, and verification
+    timeout or cancellation remains visible before worker status can return to
+    idle.
 
 ## S264.2-3 Acceptance Criteria
 
@@ -2343,18 +2546,19 @@ campaign version.
 
 ### Legal Transitions
 
-| From | Event | To |
-|---|---|---|
-| `draft` | `evaluation.campaign_sealed.v1` | `sealed` |
-| `sealed` | `evaluation.campaign_scheduled.v1` | `scheduled` |
-| `scheduled` | `evaluation.campaign_started.v1` | `running` |
-| `running` | `evaluation.collection_started.v1` | `collecting` |
-| `collecting` | `evaluation.collection_closed.v1` | `collection_closed` |
-| `collection_closed` | `evaluation.analysis_requested.v1` | `analysis_pending` |
-| `analysis_pending` | `evaluation.campaign_completed.v1` | `complete` |
-| any non-terminal | `evaluation.campaign_failed.v1` | `failed` |
-| any non-terminal | `evaluation.campaign_cancelled.v1` | `cancelled` |
-| any state | `evaluation.campaign_invalidated.v1` | `invalidated` |
+| From | Event | To | Capability |
+|---|---|---|---|
+| absent | `evaluation.campaign_created.v1` | `draft` | `evaluation:create` |
+| `draft` | `evaluation.campaign_sealed.v1` | `sealed` | `evaluation:seal` |
+| `sealed` | `evaluation.campaign_scheduled.v1` | `scheduled` | `evaluation:schedule` |
+| `scheduled` | `evaluation.campaign_started.v1` | `running` | `evaluation:execute` |
+| `running` | `evaluation.collection_started.v1` | `collecting` | `evaluation:execute` |
+| `collecting` | `evaluation.collection_closed.v1` | `collection_closed` | `evaluation:collect_close` |
+| `collection_closed` | `evaluation.analysis_requested.v1` | `analysis_pending` | `evaluation:analyze` |
+| `analysis_pending` | `evaluation.campaign_completed.v1` | `complete` | `evaluation:complete` |
+| any non-terminal | `evaluation.campaign_failed.v1` | `failed` | `evaluation:fail` |
+| any non-terminal | `evaluation.campaign_cancelled.v1` | `cancelled` | `evaluation:cancel` |
+| any state | `evaluation.campaign_invalidated.v1` | `invalidated` | `evaluation:invalidate` |
 
 The store rejects execution for an unsealed manifest, append after terminal
 state except invalidation metadata, or analysis before collection closure.
@@ -2368,10 +2572,10 @@ running, outcome-reported, or evidence-pending trials block closure.
 
 Campaign completion requires a current completed analysis run, independently
 verified and published report version, no unresolved integrity failure, and
-all required policy-deviation dispositions. Campaign invalidation atomically
-invalidates current analysis and report projections or records why their
-separate invalidation transaction is recovery-pending; no invalidated campaign
-report may remain current or exportable.
+all required policy-deviation dispositions. Compound campaign invalidation
+atomically transitions current analysis and report projections to invalidated
+in its transition set; no invalidated campaign report may remain current or
+exportable.
 
 ### Trial Lifecycle
 
@@ -2389,30 +2593,38 @@ failed
 timed_out
 cancelled
 not_exposed
+evidence_rejected
+unverifiable
 ```
 
-`included`, `excluded`, `failed`, `timed_out`, `cancelled`, and `not_exposed`
-are terminal for one trial. Legal transitions are:
+`included`, `excluded`, `failed`, `timed_out`, `cancelled`, `not_exposed`,
+`evidence_rejected`, and `unverifiable` are terminal for one trial. Legal
+transitions are:
 
 | From | Event | To | Capability |
 |---|---|---|---|
-| absent | `evaluation.trial_planned.v1` | `planned` | campaign sealer |
+| absent | `evaluation.trial_planned.v1` | `planned` | `evaluation:seal` |
 | `planned` | `evaluation.trial_allocated.v1` | `allocated` | `evaluation:allocate` |
 | `allocated` | `evaluation.trial_started.v1` | `running` | `evaluation:execute` |
-| `running` | `evaluation.trial_outcome_reported.v1` | `outcome_reported` | trial assignee |
-| `outcome_reported` | `evaluation.trial_evidence_verified.v1` | `evidence_verified` | eligible evidence verifier |
+| `running` | `evaluation.trial_outcome_reported.v1` | `outcome_reported` | `evaluation:execute` |
+| `outcome_reported` | `evaluation.trial_evidence_verified.v1` | `evidence_verified` | `evaluation:evidence_verify` |
+| `outcome_reported` | `evaluation.trial_evidence_rejected.v1` | `evidence_rejected` | `evaluation:evidence_verify` |
+| `outcome_reported` | `evaluation.trial_unverifiable.v1` | `unverifiable` | `evaluation:evidence_verify` |
 | `evidence_verified` | `evaluation.trial_included.v1` | `included` | `evaluation:disposition` |
 | `evidence_verified` | `evaluation.trial_excluded.v1` | `excluded` | `evaluation:disposition` |
-| `planned` | `evaluation.trial_not_exposed.v1` | `not_exposed` | stopping-rule service |
-| `allocated` or `running` | `evaluation.trial_failed.v1` | `failed` | recovery service |
-| `allocated` or `running` | `evaluation.trial_timed_out.v1` | `timed_out` | recovery service |
+| `planned` | `evaluation.trial_not_exposed.v1` | `not_exposed` | `evaluation:stop_rule` |
+| `allocated` or `running` | `evaluation.trial_failed.v1` | `failed` | `evaluation:fail` |
+| `allocated` or `running` | `evaluation.trial_timed_out.v1` | `timed_out` | `evaluation:fail` |
 | any non-terminal | `evaluation.trial_cancelled.v1` | `cancelled` | `evaluation:cancel` |
 
 Exclusion requires a sealed rule, evidence, and an independent disposition
 principal when policy requires it. A poor outcome, high cost, long duration,
 coordination failure, timeout, or unfavorable arm is not an exclusion reason.
-`failed`, `timed_out`, and `cancelled` remain terminal census dispositions and
-enter the primary estimand under its sealed loss rule.
+`failed`, `timed_out`, `cancelled`, `evidence_rejected`, and `unverifiable`
+remain terminal census dispositions and enter the primary estimand under its
+sealed loss rule. Evidence terminal events record typed cause, consumed budget,
+metric missingness, evidence and integrity state, verifier or recovery
+provenance, and loss-policy result.
 
 ### Trial Attempt Lifecycle
 
@@ -2426,26 +2638,37 @@ Attempts are keyed by:
 
 ```text
 planned -> running -> outcome_reported -> verified
+                                      \-> evidence_rejected
+                                      \-> unverifiable
                   \-> retryable_failed
                   \-> terminal_failed
                   \-> timed_out
                   \-> cancelled
 ```
 
-| From | Event | To | Guard |
-|---|---|---|---|
-| absent | `evaluation.attempt_planned.v1` | `planned` | Next gap-free number and sealed retry policy permits it |
-| `planned` | `evaluation.attempt_started.v1` | `running` | Trial running, assignment and leases valid |
-| `running` | `evaluation.attempt_outcome_reported.v1` | `outcome_reported` | Callback, scorecard, budget, and evidence roots present |
-| `outcome_reported` | `evaluation.attempt_verified.v1` | `verified` | Evidence policy satisfied |
-| `running` | `evaluation.attempt_retryable_failed.v1` | `retryable_failed` | Failure class retryable and attempts remain |
-| `running` | `evaluation.attempt_terminal_failed.v1` | `terminal_failed` | Non-retryable or attempts exhausted |
-| `running` | `evaluation.attempt_timed_out.v1` | `timed_out` | Authoritative lifecycle timeout |
-| any non-terminal | `evaluation.attempt_cancelled.v1` | `cancelled` | Authorized cancellation |
+| From | Event | To | Capability | Guard |
+|---|---|---|---|---|
+| absent | `evaluation.attempt_planned.v1` | `planned` | `evaluation:allocate` | Next gap-free number and sealed retry policy permits it |
+| `planned` | `evaluation.attempt_started.v1` | `running` | `evaluation:execute` | Trial running, assignment and leases valid |
+| `running` | `evaluation.attempt_outcome_reported.v1` | `outcome_reported` | `evaluation:execute` | Callback, scorecard, budget, and evidence roots present |
+| `outcome_reported` | `evaluation.attempt_verified.v1` | `verified` | `evaluation:evidence_verify` | Evidence policy satisfied |
+| `outcome_reported` | `evaluation.attempt_evidence_rejected.v1` | `evidence_rejected` | `evaluation:evidence_verify` | Integrity or evidence policy rejected |
+| `outcome_reported` | `evaluation.attempt_unverifiable.v1` | `unverifiable` | `evaluation:evidence_verify` | Evidence unavailable, expired, redacted, or verification timed out |
+| `running` | `evaluation.attempt_retryable_failed.v1` | `retryable_failed` | `evaluation:fail` | Failure class retryable and attempts remain |
+| `running` | `evaluation.attempt_terminal_failed.v1` | `terminal_failed` | `evaluation:fail` | Non-retryable or attempts exhausted |
+| `running` | `evaluation.attempt_timed_out.v1` | `timed_out` | `evaluation:fail` | Authoritative lifecycle timeout |
+| any non-terminal | `evaluation.attempt_cancelled.v1` | `cancelled` | `evaluation:cancel` | Cancellation policy permits |
 
 Attempt terminal events preserve consumed resource and elapsed accounting.
 Retry creation locks trial, prior attempt, budget meter, and resource claims and
 cannot exceed the sealed limit.
+
+`evaluation:execute` is constrained to the allocated trial assignee principal
+or an explicitly authorized orchestrator. `evaluation:evidence_verify` is
+constrained to a policy-eligible evidence verifier.
+`evaluation:fail` and `evaluation:stop_rule` are constrained to registered
+recovery and stopping-rule service principals. These identities do not grant
+authority; the scoped capability and principal constraint must both pass.
 
 ### Authorization And Idempotency
 
@@ -2463,6 +2686,8 @@ evaluation:invalidate
 evaluation:allocate
 evaluation:evidence_verify
 evaluation:disposition
+evaluation:fail
+evaluation:stop_rule
 evaluation:cancel
 evaluation:export
 ```
@@ -2476,13 +2701,18 @@ capability, fencing tokens for protected resources, and an idempotency key
 scoped to:
 
 ```text
-(project_id, aggregate_type, aggregate_id, aggregate_version,
- event_type, idempotency_key)
+(project_id, principal_id, operation_name,
+ aggregate_type, aggregate_id, idempotency_key)
 ```
 
-Same-key different-payload requests fail. Terminal retries return the accepted
-event. Recovery can only create a policy-allowed next attempt or terminal
-disposition; it cannot reopen a terminal trial, attempt, campaign, or report.
+Expected aggregate version, event type, manifest hash, capabilities, fencing
+tokens, and transition preconditions are canonical request-hash fields. They
+are not idempotency identity. Reusing a key after a version change therefore
+returns the original exact result for the same request hash or
+`IDEMPOTENCY_PAYLOAD_CONFLICT` for a changed request. Terminal retries return
+the accepted event. Recovery can only create a policy-allowed next attempt or
+terminal disposition; it cannot reopen a terminal trial, attempt, campaign, or
+report.
 
 ### Attempt Policy
 
@@ -3099,6 +3329,13 @@ S272 implementation acceptance includes:
     order, or dependency lock changes the analysis commitment and blocks stale
     replay;
 30. corrected reports create a new version and retain invalidation lineage.
+31. reusing one evaluation idempotency key after an aggregate-version change
+    returns the original result or a payload conflict, never a fresh mutation;
+32. rejected, corrupt, redacted, retained-out, timed-out, or unverifiable
+    evidence reaches a typed terminal attempt and trial disposition with
+    consumed budget and sealed loss treatment;
+33. compound campaign invalidation cannot leave current analysis or report
+    state partially valid.
 
 ## S264.2-4 Acceptance Criteria
 
