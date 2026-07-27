@@ -55,7 +55,7 @@ function roadmap(extra: Record<string, unknown> = {}): string {
   }, null, 2)}\n`;
 }
 
-function validScorecard(sprint = 1): Record<string, unknown> {
+function validScorecard(sprint: string | number = 1): Record<string, unknown> {
   return {
     sprint_number: sprint,
     theme: 'History',
@@ -222,6 +222,47 @@ describe('slope roadmap migrate transaction', () => {
     expect(prepared.status).toBe('ready');
     if (prepared.status === 'ready') {
       expect(prepared.plan.sources.find(source => source.phase_name === 'History')?.classification).toBe('archive');
+    }
+  });
+
+  it('keeps coexisting inserted-sprint evidence identities distinct', () => {
+    const source = writeFixture();
+    writeFileSync(source, roadmap({
+      phases: [{ name: 'Inserted History', status: 'complete', sprints: [458.1] }],
+      sprints: [{
+        id: 458.1,
+        theme: 'Inserted History',
+        par: 3,
+        slope: 1,
+        type: 'feature',
+        status: 'complete',
+        tickets: [
+          { key: 'S458.1-1', title: 'One', club: 'wedge', complexity: 'small' },
+          { key: 'S458.1-2', title: 'Two', club: 'wedge', complexity: 'small' },
+          { key: 'S458.1-3', title: 'Three', club: 'wedge', complexity: 'small' },
+        ],
+      }],
+    }));
+    mkdirSync(join(cwd, 'docs', 'retros'), { recursive: true });
+    writeFileSync(
+      join(cwd, 'docs', 'retros', 'sprint-458.1.json'),
+      JSON.stringify(validScorecard('458.1'), null, 2),
+    );
+    writeFileSync(
+      join(cwd, 'docs', 'retros', 'sprint-458.10.json'),
+      JSON.stringify(validScorecard('458.10'), null, 2),
+    );
+
+    const prepared = prepareRoadmapSourceMigration({ cwd });
+
+    expect(prepared.status).toBe('ready');
+    if (prepared.status === 'ready') {
+      expect(prepared.plan.sources[0]).toMatchObject({
+        classification: 'archive',
+        scorecards: { '458.1': 'docs/retros/sprint-458.1.json' },
+      });
+      expect(prepared.evidenceArtifacts.map(artifact => artifact.path))
+        .toEqual(['docs/retros/sprint-458.1.json']);
     }
   });
 
