@@ -98,42 +98,35 @@ function selectWorkflowExecution(
   cwd: string,
   config: SlopeConfig,
 ): WorkflowExecution | null {
-  const sprintLabels = sprintLabelsForContext(cwd, config);
+  const sprintLabel = sprintLabelForContext(cwd, config);
   const sessionId = input.session_id?.trim();
-  if (sessionId && sprintLabels.length > 0) {
-    const bySessionAndSprint = active.find(exec =>
-      exec.session_id === sessionId && sprintLabels.some(label => executionMatchesSprint(exec, label)),
-    );
+  if (sprintLabel) {
+    const sprintExecutions = active.filter(exec => executionMatchesSprint(exec, sprintLabel));
+    const bySessionAndSprint = sessionId
+      ? sprintExecutions.find(exec => exec.session_id === sessionId)
+      : undefined;
     if (bySessionAndSprint) return bySessionAndSprint;
+    return sprintExecutions.length === 1 ? sprintExecutions[0] : null;
   }
 
-  for (const label of sprintLabels) {
-    const bySprint = active.find(exec => executionMatchesSprint(exec, label));
-    if (bySprint) return bySprint;
+  if (sessionId) {
+    const sessionExecutions = active.filter(exec => exec.session_id === sessionId);
+    if (sessionExecutions.length === 1) return sessionExecutions[0];
   }
 
-  if (sessionId && sprintLabels.length === 0) {
-    const bySession = active.find(exec => exec.session_id === sessionId);
-    if (bySession) return bySession;
-  }
-
-  if (sprintLabels.length > 0) return null;
   return active.length === 1 ? active[0] : null;
 }
 
-function sprintLabelsForContext(cwd: string, config: SlopeConfig): string[] {
-  const labels = new Set<string>();
-  const branchSprint = inferSprintFromBranch(cwd);
-  if (branchSprint !== null) labels.add(formatSprintLabel(branchSprint));
-
+function sprintLabelForContext(cwd: string, config: SlopeConfig): string | null {
   try {
     const inferred = inferSprintContext(cwd, config);
-    if (inferred.source !== 'initial') labels.add(inferred.label);
+    if (inferred.source !== 'initial') return inferred.label;
   } catch {
     // Sprint inference is advisory for this guard; ambiguity should fail open.
   }
 
-  return [...labels];
+  const branchSprint = inferSprintFromBranch(cwd);
+  return branchSprint === null ? null : formatSprintLabel(branchSprint);
 }
 
 function executionMatchesSprint(exec: WorkflowExecution, label: string): boolean {
