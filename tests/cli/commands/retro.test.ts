@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { mkdtempSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { retroCommand } from '../../../src/cli/commands/retro.js';
 import { memoryCommand } from '../../../src/cli/commands/memory.js';
 import { searchMemories } from '../../../src/core/memory.js';
@@ -42,16 +43,19 @@ async function captureLogs(fn: () => void | Promise<void>): Promise<{ stdout: st
 
 describe('retro post-merge CLI', () => {
   let cwd: string;
+  let linkedCwd: string | null;
   let origCwd: string;
 
   beforeEach(() => {
     cwd = createTempDir();
+    linkedCwd = null;
     origCwd = process.cwd();
     process.chdir(cwd);
   });
 
   afterEach(() => {
     process.chdir(origCwd);
+    if (linkedCwd && existsSync(linkedCwd)) rmSync(linkedCwd, { recursive: true, force: true });
     rmSync(cwd, { recursive: true, force: true });
   });
 
@@ -90,6 +94,34 @@ describe('retro post-merge CLI', () => {
     expect(memories).toHaveLength(4);
     expect(memories.some(m => m.category === 'project' && m.weight === 8 && m.text.includes('auto-retro'))).toBe(true);
     expect(memories.some(m => m.category === 'hazard' && m.text.includes('help flags'))).toBe(true);
+  });
+
+  it('writes linked-worktree retro evidence only to the repository state owner (#673)', async () => {
+    writeFileSync(join(cwd, '.slope', 'config.json'), '{}\n');
+    writeFileSync(join(cwd, 'README.md'), 'primary\n');
+    execFileSync('git', ['init'], { cwd, stdio: 'ignore' });
+    execFileSync('git', ['config', 'user.email', 'test@example.com'], { cwd });
+    execFileSync('git', ['config', 'user.name', 'Test User'], { cwd });
+    execFileSync('git', ['add', 'README.md'], { cwd });
+    execFileSync('git', ['commit', '-m', 'chore: initialize test repository'], { cwd, stdio: 'ignore' });
+    linkedCwd = join(tmpdir(), `${basename(cwd)}-linked`);
+    execFileSync('git', ['worktree', 'add', '-b', 'retro-linked', linkedCwd], { cwd, stdio: 'ignore' });
+    process.chdir(linkedCwd);
+
+    const out = await captureLogs(() => retroCommand([
+      'post-merge',
+      '--sprint=137',
+      '--pr=512',
+      '--summary=merged from linked worktree',
+      '--json',
+    ]));
+
+    const primaryPath = join(realpathSync(cwd), '.slope', 'retros', 'post-merge', 'sprint-137-pr-512.json');
+    const linkedPath = join(linkedCwd, '.slope', 'retros', 'post-merge', 'sprint-137-pr-512.json');
+    const payload = JSON.parse(out.stdout);
+    expect(payload.path).toBe(primaryPath);
+    expect(existsSync(primaryPath)).toBe(true);
+    expect(existsSync(linkedPath)).toBe(false);
   });
 
   it('reconciles matching local sprint state to complete after post-merge retro (#611)', async () => {

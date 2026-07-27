@@ -23,6 +23,7 @@ import {
   persistRetroMemories,
   parseSprintNumber,
   formatSprintLabel,
+  resolveRepoStateCwd,
 } from '../../core/index.js';
 import type {
   MemoryCategory,
@@ -448,7 +449,7 @@ Writes:
 
 function postMergeOutputPath(cwd: string, retro: PostMergeRetroResult): string {
   const prSuffix = retro.pr ? `-pr-${retro.pr}` : '';
-  return join(cwd, '.slope', 'retros', 'post-merge', `sprint-${retro.sprint}${prSuffix}.json`);
+  return join(resolveRepoStateCwd(cwd), '.slope', 'retros', 'post-merge', `sprint-${retro.sprint}${prSuffix}.json`);
 }
 
 function writePostMergeRetro(cwd: string, record: SavedPostMergeRetro): string {
