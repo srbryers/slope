@@ -115,7 +115,7 @@ runtime evidence.
 ## Verification
 
 The final adversarial review approved exact contract commit `3c5073c`. All 31
-security findings are recorded as resolved in the SLOPE review ledger. Modular
-roadmap source validation and compiled projection checks passed. The complete
-repository test, typecheck, and production-build gate is rerun on the final PR
-head before merge.
+security findings were recorded as resolved and are persisted as amended
+scorecard hazards. Modular roadmap source validation and compiled projection
+checks passed. The complete repository test, typecheck, and production-build
+gate is rerun on the final PR head before merge.
