@@ -39,7 +39,8 @@ export interface RoadmapSprint {
    * Canonical string id, present only when authored as a string to preserve an
    * exact suffix a number cannot hold (e.g. "458.10", distinct from 458.1). When
    * absent, identity derives from `id` via the roadmap-aware helpers. `id` remains
-   * the numeric mirror used for ordering arithmetic and the store (GH #635).
+   * a roadmap compatibility mirror and must not be used as identity (GH #635,
+   * #659).
    */
   id_key?: string;
   theme: string;         // e.g., "The Yardage Book"

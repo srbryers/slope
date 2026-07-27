@@ -317,6 +317,8 @@ orchestrate the rest of the CLI as execution primitives.
 
 Modular roadmap authoring is opt-in through `docs/roadmap/project.yaml`. Existing projects keep editing `docs/backlog/roadmap.json` directly. In modular mode that JSON is generated compatibility output: edit the YAML source bundle, then run `slope roadmap compile`.
 
+Sprint IDs use canonical string identity so values such as `458.1` and `458.10` remain distinct. The roadmap's numeric `id`/`sprints` fields are compatibility mirrors; use the canonical helpers and see [Canonical Sprint Identity](docs/architecture/sprint-identity.md).
+
 ### Review & Findings
 
 | Command | Description |
