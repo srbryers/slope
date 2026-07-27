@@ -8,7 +8,7 @@ import type DatabaseConstructor from 'better-sqlite3';
 import type { Database as DatabaseType } from 'better-sqlite3';
 import type { SprintClaim, GolfScorecard, SlopeEvent, EventType, WorkflowExecution, WorkflowStepResult, CompletedStep } from '../core/index.js';
 import type { CommonIssuesFile, StoreStats } from '../core/index.js';
-import { SlopeStoreError } from '../core/index.js';
+import { resolveRepoStateCwd, SlopeStoreError } from '../core/index.js';
 import type { SlopeStore, SlopeSession, SlopeSessionUpdate } from '../core/index.js';
 import type { EmbeddingStore, EmbeddingEntry, EmbeddingSearchResult, EmbeddingStats, IndexMeta } from '../core/embedding-store.js';
 
@@ -1081,6 +1081,8 @@ function rowToExecution(row: Record<string, unknown>): WorkflowExecution {
 
 /** Create a SlopeStore backed by SQLite */
 export function createStore(opts: { storePath: string; cwd?: string }): SlopeStore {
-  const fullPath = opts.cwd ? join(opts.cwd, opts.storePath) : opts.storePath;
+  const fullPath = opts.cwd
+    ? resolve(resolveRepoStateCwd(opts.cwd), opts.storePath)
+    : opts.storePath;
   return new SqliteSlopeStore(fullPath);
 }

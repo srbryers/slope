@@ -1,6 +1,9 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
-import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
+import { resolve } from 'node:path';
+import {
+  resolvePrimaryCheckout as resolvePrimaryCheckoutCore,
+  resolveRepoStateCwd,
+} from '../core/index.js';
 
 /**
  * Resolve the working directory whose store owns *session* coordination state.
@@ -19,10 +22,7 @@ import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
  * primary checkout has no `.slope/config.json`).
  */
 export function resolveSessionStoreCwd(cwd: string): string {
-  const primary = resolvePrimaryCheckout(cwd);
-  if (!primary) return cwd;
-  if (!existsSync(join(primary, '.slope', 'config.json'))) return cwd;
-  return primary;
+  return resolveRepoStateCwd(cwd);
 }
 
 /**
@@ -33,14 +33,7 @@ export function resolveSessionStoreCwd(cwd: string): string {
  * linked worktree. The primary checkout is that directory's parent.
  */
 export function resolvePrimaryCheckout(cwd: string): string | null {
-  const commonDir = safeGit(cwd, ['rev-parse', '--git-common-dir']);
-  if (!commonDir) return null;
-
-  const absolute = isAbsolute(commonDir) ? commonDir : resolve(cwd, commonDir);
-  if (basename(absolute) !== '.git') return null;
-
-  const root = dirname(absolute);
-  return existsSync(root) ? root : null;
+  return resolvePrimaryCheckoutCore(cwd);
 }
 
 /**

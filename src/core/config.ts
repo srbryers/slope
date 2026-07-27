@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { EscalationConfig } from './escalation.js';
 import type { PluginsConfig } from './plugins.js';
+import { resolveRepoStateCwd } from './repo-state-scope.js';
 
 export interface SlopeConfig {
   scorecardDir: string;
@@ -112,7 +113,7 @@ const CONFIG_DIR = '.slope';
 const CONFIG_FILE = 'config.json';
 
 export function loadConfig(cwd: string = process.cwd()): SlopeConfig {
-  const configPath = join(cwd, CONFIG_DIR, CONFIG_FILE);
+  const configPath = join(resolveRepoStateCwd(cwd), CONFIG_DIR, CONFIG_FILE);
   if (!existsSync(configPath)) {
     return { ...DEFAULT_CONFIG };
   }
@@ -125,7 +126,7 @@ export function loadConfig(cwd: string = process.cwd()): SlopeConfig {
 }
 
 export function createConfig(cwd: string = process.cwd()): string {
-  const dir = join(cwd, CONFIG_DIR);
+  const dir = join(resolveRepoStateCwd(cwd), CONFIG_DIR);
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true });
   }
@@ -136,7 +137,7 @@ export function createConfig(cwd: string = process.cwd()): string {
 
 /** Write a complete SlopeConfig to .slope/config.json. Expects a full config object (use loadConfig() to read-modify-write). */
 export function saveConfig(config: SlopeConfig, cwd: string = process.cwd()): string {
-  const dir = join(cwd, CONFIG_DIR);
+  const dir = join(resolveRepoStateCwd(cwd), CONFIG_DIR);
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   const configPath = join(dir, CONFIG_FILE);
   writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n');
