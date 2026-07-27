@@ -5,7 +5,7 @@
     "warning": "GENERATED FILE — do not edit. Edit the modular sources under docs/roadmap/ and re-run `slope roadmap compile`. Edits here are refused or discarded."
   },
   "name": "SLOPE Development Roadmap",
-  "description": "Forward-looking roadmap from S61+. Phases 1-9 (S1-S47) are complete. S48-S60 were hardening, guard enforcement, and process sprints. This roadmap covers adoption, observability, guard maturity, multi-project, loop evolution, and issue-driven recovery. S61-S64 reflect what actually shipped (themes diverged from original plan). Note: the actual S69 diverged from the planned Referee sprint — a carryover patch kit ran instead. The Referee work was rescheduled as S78. S75.5 (The Bug Clearing) added 2026-05-02 to clear accumulated CLI bugs from external repos. S132-S136 were backfilled from shipped scorecards on 2026-06-05; S137 adds post-merge retro tooling and durable memory, S137.5 addresses Windows suite portability for #509, S138-S144 triage open GitHub issues #499/#501/#502/#503/#505/#507/#510/#511/#512/#513/#514/#515/#516/#517/#518 into focused recovery sprints, S145 closed validation-signal regressions #519/#520, S146 cleaned stale roadmap state plus decimal sprint shipped-artifact warnings (#522), S146.1 cut the v1.58.1 patch release while repairing release-bump staging (#524/#528), active inserted sprint status (#525), and guard test isolation (#526), S146.2 closes the decimal post-merge retro gap (#529), S146.3 scopes workflow-step-gate to the relevant execution (#531), S147 was superseded by later human operating surface work, S148-S151.1 completed the human operating surface simplification and Windows git fixture hardening, S152 published v1.59.0, S152.1 completed roadmap interview discoverability across supported harness surfaces, S153 closed semver recommendation hardening for #550, S154 shipped roadmap/status integrity for #563/#567/#568, S216-S222 execute the open-issue recovery train for #552/#553/#556/#557/#558/#561/#562/#565/#566/#572/#573 plus the v1.60.0 release, S223 closes #575/#576, S224/S226/S227 plan the July 2026 review, workflow, MCP, roadmap, and review-output recovery batch for #578/#579/#580/#581/#582/#583, and S241-S245 (Phase 54) triage the mid-July issue batch #608/#611/#615/#616/#617/#618/#619/#620/#621 into themed recovery sprints.",
+  "description": "Forward-looking roadmap from S61+. Phases 1-9 (S1-S47) are complete. S48-S60 were hardening, guard enforcement, and process sprints. This roadmap covers adoption, observability, guard maturity, multi-project, loop evolution, and issue-driven recovery. S61-S64 reflect what actually shipped (themes diverged from original plan). Note: the actual S69 diverged from the planned Referee sprint — a carryover patch kit ran instead. The Referee work was rescheduled as S78. S75.5 (The Bug Clearing) added 2026-05-02 to clear accumulated CLI bugs from external repos. S132-S136 were backfilled from shipped scorecards on 2026-06-05; S137 adds post-merge retro tooling and durable memory, S137.5 addresses Windows suite portability for #509, S138-S144 triage open GitHub issues #499/#501/#502/#503/#505/#507/#510/#511/#512/#513/#514/#515/#516/#517/#518 into focused recovery sprints, S145 closed validation-signal regressions #519/#520, S146 cleaned stale roadmap state plus decimal sprint shipped-artifact warnings (#522), S146.1 cut the v1.58.1 patch release while repairing release-bump staging (#524/#528), active inserted sprint status (#525), and guard test isolation (#526), S146.2 closes the decimal post-merge retro gap (#529), S146.3 scopes workflow-step-gate to the relevant execution (#531), S147 was superseded by later human operating surface work, S148-S151.1 completed the human operating surface simplification and Windows git fixture hardening, S152 published v1.59.0, S152.1 completed roadmap interview discoverability across supported harness surfaces, S153 closed semver recommendation hardening for #550, S154 shipped roadmap/status integrity for #563/#567/#568, S216-S222 execute the open-issue recovery train for #552/#553/#556/#557/#558/#561/#562/#565/#566/#572/#573 plus the v1.60.0 release, S223 closes #575/#576, S224/S226/S227 plan the July 2026 review, workflow, MCP, roadmap, and review-output recovery batch for #578/#579/#580/#581/#582/#583, S241-S245 (Phase 54) triage the mid-July issue batch #608/#611/#615/#616/#617/#618/#619/#620/#621 into themed recovery sprints, and S260-S267 triage #659/#663/#664/#665/#666/#667/#668/#669 into parallel-agent recovery and the 2.0 sprint-id store migration track.",
   "phases": [
     {
       "name": "Phase 10 — Adoption & Onboarding",
@@ -526,6 +526,30 @@
       ],
       "status": "in_progress",
       "note": "A scorecard records how a sprint was played; it does not decide the sprint's disposition. Reconciliation must only promote to complete from an in-flight status and report a conflict otherwise, never overriding a deliberate absorbed/blocked/superseded/deferred/cancelled. Ships as a v1.64.1 patch — no schema change, no new commands."
+    },
+    {
+      "name": "Phase 62 — Parallel Agent Coordination Recovery",
+      "description": "Triage of the late-July multi-agent and status-surface issue batch (#663, #664, #665, #666, #667, #668, #669). The triage pass runs first so the roadmap records the open-issue ordering before implementation begins. Worktree store split-brain leads because it silently disables the coordination primitives and sprint guards in the path the collision guard mandates. Session/status truth comes next, then workflow execution scoping, then the product decision for what a multi-agent round means.",
+      "sprints": [
+        260,
+        261,
+        262,
+        263,
+        264
+      ],
+      "status": "in_progress",
+      "note": "Issue-driven recovery for #663-#669. Ordered by blast radius: S260 records the triage, #665/#667 make worktree sessions guard-blind and claim-blind, #666/#663/#664 make the status surface misleading for operators and agents, #668 gates fresh work on stale executions, and #669 is a deliberate product-model decision that should be made after the plumbing stops lying."
+    },
+    {
+      "name": "Phase 63 — Canonical Sprint ID Store Migration",
+      "description": "Major-release track for #659, the full canonical string sprint-id migration deliberately scoped out of Phase 60. The roadmap layer now preserves id_key; this phase moves the store, dependency resolution, display labels, and scorecard IO to the same canonical identity model.",
+      "sprints": [
+        265,
+        266,
+        267
+      ],
+      "status": "in_progress",
+      "note": "Keep #659 isolated from the immediate v1.x recovery train because it changes store schemas and release-policy treats that as a 2.0.0 major. Plan the migration in layers: schema first, then API/display/scorecard identity, then release packaging and migration notes."
     }
   ],
   "sprints": [
@@ -6754,6 +6778,370 @@
           "club": "wedge",
           "complexity": "small",
           "github_issue": 660
+        }
+      ]
+    },
+    {
+      "id": 260,
+      "status": "complete",
+      "theme": "Late-July Issue Triage",
+      "par": 3,
+      "slope": 2,
+      "type": "planning + roadmap triage",
+      "note": "Pull the latest upstream state, enumerate the open issue set, sort by blast radius and release risk, and commit the roadmap update before implementation starts.",
+      "tickets": [
+        {
+          "key": "S260-1",
+          "title": "Pull and rebuild latest main, then enumerate open GitHub issues",
+          "club": "wedge",
+          "complexity": "small"
+        },
+        {
+          "key": "S260-2",
+          "title": "Triage",
+          "club": "short_iron",
+          "complexity": "standard",
+          "depends_on": [
+            "S260-1"
+          ]
+        },
+        {
+          "key": "S260-3",
+          "title": "Isolate",
+          "club": "short_iron",
+          "complexity": "standard",
+          "depends_on": [
+            "S260-1"
+          ]
+        },
+        {
+          "key": "S260-4",
+          "title": "Validate modular roadmap sources, compiled projection, codebase map, and S260 focus",
+          "club": "wedge",
+          "complexity": "small",
+          "depends_on": [
+            "S260-2",
+            "S260-3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 261,
+      "theme": "Worktree Store Coordination",
+      "par": 5,
+      "slope": 5,
+      "type": "bugfix + multi-agent coordination",
+      "depends_on": [
+        260
+      ],
+      "note": "Fix #665/#667: the collision guard tells agents to enter a worktree, but a fresh worktree creates an isolated .slope store while MCP and parent sessions keep using the original store. That split-brain silently drops sprint-workflow guards, duplicates sprint state, and makes acquire_claim/check_conflicts return success with zero visible claims.",
+      "tickets": [
+        {
+          "key": "S261-1",
+          "title": "Resolve SLOPE state from the git common-dir owner so repo worktrees share one store (#665/#667)",
+          "club": "driver",
+          "complexity": "risky",
+          "github_issue": 667
+        },
+        {
+          "key": "S261-2",
+          "title": "Make hook briefing, guard baselines, session state, and MCP tools agree on the same store path inside worktrees (#665)",
+          "club": "driver",
+          "complexity": "risky",
+          "github_issue": 665,
+          "depends_on": [
+            "S261-1"
+          ]
+        },
+        {
+          "key": "S261-3",
+          "title": "Warn or refuse when an in-repo child worktree would be globbed by parent tooling (#667)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 667,
+          "depends_on": [
+            "S261-1"
+          ]
+        },
+        {
+          "key": "S261-4",
+          "title": "Add cross-worktree claim, briefing, and guard regressions proving claims coordinate and sprint context is not downgraded to adhoc (#665/#667)",
+          "club": "long_iron",
+          "complexity": "moderate",
+          "github_issue": 665,
+          "depends_on": [
+            "S261-1",
+            "S261-2"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 262,
+      "theme": "Session and Sprint Status Truth",
+      "par": 5,
+      "slope": 3,
+      "type": "bugfix + operator trust",
+      "depends_on": [
+        261
+      ],
+      "note": "Fix #666/#663/#664: session records present stale branch and duplicate primary roles as current truth; sprint begin persists a ticket claim that sprint status does not show; sprint status ignores --help, --json, and unknown flags. Each slice carries the regression coverage needed to make the main status surface trustworthy before expanding coordination semantics.",
+      "tickets": [
+        {
+          "key": "S262-1",
+          "title": "Refresh session branch on heartbeat and status reads, or label stored branch as branch-at-start with regression coverage (#666)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 666
+        },
+        {
+          "key": "S262-2",
+          "title": "Stop reporting every concurrent session as an equally meaningful primary in collision messages (#666)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 666,
+          "depends_on": [
+            "S262-1"
+          ]
+        },
+        {
+          "key": "S262-3",
+          "title": "Show active actor and ticket claims in slope sprint status after sprint begin with claim visibility tests (#663)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 663
+        },
+        {
+          "key": "S262-4",
+          "title": "Parse slope sprint status --help, reject unsupported flags, decide the --json contract, and cover Windows option parsing (#664)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 664
+        }
+      ]
+    },
+    {
+      "id": 263,
+      "theme": "Workflow Execution Scope Recovery",
+      "par": 4,
+      "slope": 3,
+      "type": "bugfix + guard reliability",
+      "depends_on": [
+        261
+      ],
+      "note": "Fix #668: workflow-step-gate can block a fresh sprint because an old execution for an already-merged sprint is still sitting at pre_shot. The guard should scope by active sprint and status, name the blocking execution when it must block, and close the lifecycle gap that leaves executions stale after scorecard/review validation.",
+      "tickets": [
+        {
+          "key": "S263-1",
+          "title": "Scope workflow-step-gate to the active sprint and ignore completed or merged sprint executions (#668)",
+          "club": "long_iron",
+          "complexity": "moderate",
+          "github_issue": 668
+        },
+        {
+          "key": "S263-2",
+          "title": "Include blocking sprint id and execution id in workflow-step-gate error output (#668)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 668,
+          "depends_on": [
+            "S263-1"
+          ]
+        },
+        {
+          "key": "S263-3",
+          "title": "Finalize or reconcile the current sprint execution when validation/review closes the sprint lifecycle (#668)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 668,
+          "depends_on": [
+            "S263-1"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 264,
+      "theme": "Multi-Agent Round Model",
+      "par": 4,
+      "slope": 3,
+      "type": "planning + product architecture",
+      "depends_on": [
+        261,
+        262,
+        263
+      ],
+      "note": "Resolve #669 as a product-model decision rather than letting implementation accidents define the handicap. Decide whether parallel agents are fourball, foursomes, scramble, or a SLOPE-specific hybrid; then turn that decision into scorecard, handicap, claim TTL, and distillation rules.",
+      "tickets": [
+        {
+          "key": "S264-1",
+          "title": "Decide the canonical multi-agent round format and document scorecard ownership semantics (#669)",
+          "club": "long_iron",
+          "complexity": "moderate",
+          "github_issue": 669
+        },
+        {
+          "key": "S264-2",
+          "title": "Define agent, operator, repo, and team handicap attribution for parallel sprint work (#669)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 669,
+          "depends_on": [
+            "S264-1"
+          ]
+        },
+        {
+          "key": "S264-3",
+          "title": "Specify claim TTL, abandoned-session handling, and cross-agent penalty attribution (#669)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 669,
+          "depends_on": [
+            "S264-1"
+          ]
+        },
+        {
+          "key": "S264-4",
+          "title": "Specify merge-safe distillation for common-issues across concurrent agents (#669)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 669,
+          "depends_on": [
+            "S264-1"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 265,
+      "theme": "Store Canonical Sprint IDs",
+      "par": 5,
+      "slope": 5,
+      "type": "major + schema migration",
+      "depends_on": [
+        264
+      ],
+      "note": "Start #659 at the data layer: SQLite and PG sprint identity columns must preserve canonical string ids so 458.10 and 458.1 cannot collide in scorecards, claims, events, or sprint mirrors.",
+      "tickets": [
+        {
+          "key": "S265-1",
+          "title": "Design SQLite and PG up-migrations from numeric sprint_number columns to canonical string sprint keys (#659)",
+          "club": "driver",
+          "complexity": "risky",
+          "github_issue": 659
+        },
+        {
+          "key": "S265-2",
+          "title": "Migrate scorecards, claims, events, and workflow execution sprint columns to canonical string keys (#659)",
+          "club": "driver",
+          "complexity": "risky",
+          "github_issue": 659,
+          "depends_on": [
+            "S265-1"
+          ]
+        },
+        {
+          "key": "S265-3",
+          "title": "Prove store round-trips keep 458.10 distinct from 458.1 in SQLite and PG (#659)",
+          "club": "long_iron",
+          "complexity": "moderate",
+          "github_issue": 659,
+          "depends_on": [
+            "S265-2"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 266,
+      "theme": "Canonical Sprint ID API and Display",
+      "par": 5,
+      "slope": 4,
+      "type": "major + compatibility",
+      "depends_on": [
+        265
+      ],
+      "note": "Complete #659 above the store: dependencies, labels, scorecard loading/writing, and public APIs must key by canonical sprint id while keeping any compatibility bridge explicit and documented.",
+      "tickets": [
+        {
+          "key": "S266-1",
+          "title": "Resolve depends_on by canonical sprint key rather than numeric mirror (#659)",
+          "club": "long_iron",
+          "complexity": "moderate",
+          "github_issue": 659
+        },
+        {
+          "key": "S266-2",
+          "title": "Thread sprint keys through formatRoadmapSprintLabel callers so display preserves S458.10 (#659)",
+          "club": "long_iron",
+          "complexity": "moderate",
+          "github_issue": 659,
+          "depends_on": [
+            "S266-1"
+          ]
+        },
+        {
+          "key": "S266-3",
+          "title": "Decide and implement scorecard sprint_number string versus dual-field compatibility (#659)",
+          "club": "driver",
+          "complexity": "risky",
+          "github_issue": 659,
+          "depends_on": [
+            "S265-2"
+          ]
+        },
+        {
+          "key": "S266-4",
+          "title": "Document id_key as sole identity or compatibility bridge after the 2.0 migration (#659)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 659,
+          "depends_on": [
+            "S266-1",
+            "S266-3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 267,
+      "theme": "Sprint ID 2.0 Release Train",
+      "par": 4,
+      "slope": 3,
+      "type": "release + migration",
+      "depends_on": [
+        266
+      ],
+      "note": "Prepare the 2.0.0 release train for #659 with migration notes, dry-run verification, downgrade/backup guidance, and npm/GitHub release validation.",
+      "tickets": [
+        {
+          "key": "S267-1",
+          "title": "Add migration notes, backup guidance, and compatibility caveats for the canonical sprint-id store migration (#659)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 659
+        },
+        {
+          "key": "S267-2",
+          "title": "Add a migration dry-run or doctor check that reports databases requiring sprint-id upgrade (#659)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 659,
+          "depends_on": [
+            "S267-1"
+          ]
+        },
+        {
+          "key": "S267-3",
+          "title": "Run the 2.0.0 release validation and verify npm/GitHub artifacts (#659)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 659,
+          "depends_on": [
+            "S267-1",
+            "S267-2"
+          ]
         }
       ]
     }
