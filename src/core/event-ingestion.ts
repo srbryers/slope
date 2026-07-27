@@ -3,6 +3,7 @@
 
 import type { SlopeStore } from './store.js';
 import type { SlopeEvent, EventType } from './types.js';
+import { sprintIdKey, type SprintId } from './sprint-id.js';
 
 const VALID_EVENT_TYPES: ReadonlySet<string> = new Set<EventType>([
   'failure', 'dead_end', 'scope_change', 'compaction', 'hazard', 'decision', 'standup',
@@ -43,8 +44,10 @@ export function validateEventPayload(data: unknown): { valid: boolean; errors: s
     errors.push('"session_id" must be a string if provided');
   }
 
-  if (obj.sprint_number !== undefined && typeof obj.sprint_number !== 'number') {
-    errors.push('"sprint_number" must be a number if provided');
+  if (obj.sprint_number !== undefined &&
+      ((typeof obj.sprint_number !== 'string' && typeof obj.sprint_number !== 'number') ||
+       sprintIdKey(obj.sprint_number as SprintId) === null)) {
+    errors.push('"sprint_number" must be a valid sprint id (string or number) if provided');
   }
 
   if (obj.ticket_key !== undefined && typeof obj.ticket_key !== 'string') {
@@ -86,7 +89,9 @@ export async function ingestEvents(
         type: obj.type as EventType,
         data: (obj.data as Record<string, unknown>) ?? {},
         session_id: obj.session_id as string | undefined,
-        sprint_number: obj.sprint_number as number | undefined,
+        sprint_number: obj.sprint_number === undefined
+          ? undefined
+          : sprintIdKey(obj.sprint_number as SprintId)!,
         ticket_key: obj.ticket_key as string | undefined,
       });
       inserted.push(event);

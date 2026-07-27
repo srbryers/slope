@@ -32,6 +32,15 @@ describe('validateEventPayload', () => {
     expect(result.errors).toEqual([]);
   });
 
+  it('accepts a canonical string sprint id', () => {
+    const result = validateEventPayload({
+      type: 'failure',
+      sprint_number: '458.10',
+    });
+    expect(result.valid).toBe(true);
+    expect(result.errors).toEqual([]);
+  });
+
   it('accepts minimal valid event (type only)', () => {
     const result = validateEventPayload({ type: 'decision' });
     expect(result.valid).toBe(true);
@@ -72,7 +81,7 @@ describe('validateEventPayload', () => {
     expect(result.valid).toBe(false);
   });
 
-  it('rejects non-number sprint_number', () => {
+  it('rejects an invalid sprint_number', () => {
     const result = validateEventPayload({ type: 'failure', sprint_number: 'five' });
     expect(result.valid).toBe(false);
   });
@@ -102,6 +111,18 @@ describe('ingestEvents', () => {
     // Verify in store
     const events = await store.getEventsBySprint(1);
     expect(events).toHaveLength(2);
+  });
+
+  it('preserves canonical sprint ids and normalizes legacy numbers', async () => {
+    const result = await ingestEvents(store, [
+      { type: 'failure', sprint_number: '458.10' },
+      { type: 'decision', sprint_number: 458 },
+    ]);
+
+    expect(result.errors).toEqual([]);
+    expect(result.inserted.map(event => event.sprint_number)).toEqual(['458.10', '458']);
+    expect(await store.getEventsBySprint('458.10')).toHaveLength(1);
+    expect(await store.getEventsBySprint('458')).toHaveLength(1);
   });
 
   it('reports validation errors with index', async () => {

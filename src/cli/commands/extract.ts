@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolveStore } from '../store.js';
-import type { EventType } from '../../core/index.js';
+import { sprintIdKey, type EventType, type SprintId } from '../../core/index.js';
 
 const VALID_EVENT_TYPES: EventType[] = ['failure', 'dead_end', 'scope_change', 'compaction', 'hazard', 'decision'];
 
@@ -16,7 +16,7 @@ function parseArgs(args: string[]): Record<string, string> {
 interface RawEvent {
   type: string;
   data?: Record<string, unknown>;
-  sprint_number?: number;
+  sprint_number?: string;
   ticket_key?: string;
 }
 
@@ -28,10 +28,18 @@ function validateEvent(raw: unknown, index: number): RawEvent {
   if (typeof obj.type !== 'string' || !VALID_EVENT_TYPES.includes(obj.type as EventType)) {
     throw new Error(`Event ${index}: invalid type "${obj.type}". Must be one of: ${VALID_EVENT_TYPES.join(', ')}`);
   }
+  const sprintNumber = obj.sprint_number === undefined
+    ? undefined
+    : (typeof obj.sprint_number === 'string' || typeof obj.sprint_number === 'number')
+      ? sprintIdKey(obj.sprint_number as SprintId)
+      : null;
+  if (sprintNumber === null) {
+    throw new Error(`Event ${index}: invalid sprint_number "${String(obj.sprint_number)}"`);
+  }
   return {
     type: obj.type as string,
     data: (typeof obj.data === 'object' && obj.data !== null ? obj.data : {}) as Record<string, unknown>,
-    sprint_number: typeof obj.sprint_number === 'number' ? obj.sprint_number : undefined,
+    sprint_number: sprintNumber,
     ticket_key: typeof obj.ticket_key === 'string' ? obj.ticket_key : undefined,
   };
 }
@@ -61,7 +69,12 @@ export async function extractCommand(args: string[]): Promise<void> {
 
   const sessionId = opts['session-id'];
   const filePath = opts['file'];
-  const sprintNumber = opts['sprint'] ? parseInt(opts['sprint'], 10) : undefined;
+  const sprintNumber = opts['sprint'] ? sprintIdKey(opts['sprint']) ?? undefined : undefined;
+  if (opts['sprint'] && sprintNumber === undefined) {
+    console.error(`Error: Invalid sprint id "${opts['sprint']}"`);
+    process.exit(1);
+    return;
+  }
 
   // Read input (file or stdin)
   let raw: string;
@@ -135,7 +148,7 @@ export async function extractCommand(args: string[]): Promise<void> {
 
   console.log(`\n  Extracted ${inserted} event(s): ${breakdown}`);
   if (sessionId) console.log(`  Session: ${sessionId}`);
-  if (sprintNumber) console.log(`  Sprint: ${sprintNumber}`);
+  if (sprintNumber !== undefined) console.log(`  Sprint: ${sprintNumber}`);
   console.log('');
 }
 
@@ -144,18 +157,18 @@ function printUsage(): void {
 slope extract — Extract structured events into the SLOPE store
 
 Usage:
-  slope extract --file=<path> [--session-id=<id>] [--sprint=<N>]
+  slope extract --file=<path> [--session-id=<id>] [--sprint=<id>]
   echo '[{"type":"failure","data":{"error":"build"}}]' | slope extract [--session-id=<id>]
 
 Options:
   --file=<path>       Read events from a JSON file
   --session-id=<id>   Associate events with a session
-  --sprint=<N>        Default sprint number for events without one
+  --sprint=<id>       Default sprint id for events without one
 
 Event format (JSON array or single object):
   { "type": "failure|dead_end|scope_change|compaction|hazard|decision",
     "data": { ... },
-    "sprint_number": 10,
+    "sprint_number": "10",
     "ticket_key": "S10-1" }
 `);
 }
