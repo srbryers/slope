@@ -412,12 +412,18 @@ describe('worktreeCheckGuard', () => {
     // config, which is what used to send the write to a worktree-local store.
     sentinelFiles.add('/repo');
     sentinelFiles.add(join('/repo', '.slope', 'config.json'));
+    sentinelFiles.add(join('/tmp/test', '.slope'));
     sentinelFiles.add(join('/tmp/test', '.slope', 'config.json'));
-    mockExecFileSync
-      .mockReturnValueOnce('../../.git' as never) // git-common-dir != '.git'
-      .mockReturnValueOnce('/repo/.git' as never) // session-scope: --git-common-dir
-      .mockReturnValueOnce('/tmp/test' as never) // git rev-parse --show-toplevel
-      .mockReturnValueOnce('fix/deadlock' as never); // branch
+    let commonDirCalls = 0;
+    mockExecFileSync.mockImplementation(((_command: string, args: string[]) => {
+      if (args.includes('--git-common-dir')) {
+        commonDirCalls++;
+        return commonDirCalls === 1 ? '../../.git' : '/repo/.git';
+      }
+      if (args.includes('--show-toplevel')) return '/tmp/test';
+      if (args.includes('--abbrev-ref')) return 'fix/deadlock';
+      return '';
+    }) as never);
 
     const result = await worktreeCheckGuard(makeInput(), '/tmp/test');
 
