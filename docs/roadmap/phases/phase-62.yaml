@@ -1,15 +1,16 @@
 version: "1"
 phase:
   name: Phase 62 — Parallel Agent Coordination Recovery
-  description: "Triage of the late-July multi-agent and status-surface issue batch (#663, #664, #665, #666, #667, #668, #669). The triage pass runs first so the roadmap records the open-issue ordering before implementation begins. Worktree store split-brain leads because it silently disables the coordination primitives and sprint guards in the path the collision guard mandates. Session/status truth comes next, then workflow execution scoping, then the product decision for what a multi-agent round means."
+  description: "Triage of the late-July multi-agent and status-surface issue batch (#663, #664, #665, #666, #667, #668, #669). The triage pass runs first so the roadmap records the open-issue ordering before implementation begins. A short inserted research sprint then translates lessons from block/buzz into SLOPE's roadmap without importing its transport or chat model. Worktree store split-brain leads implementation because it silently disables the coordination primitives and sprint guards in the path the collision guard mandates. Session/status truth comes next, then workflow execution scoping, then the formal SLOPE Team Round contract."
   sprints:
     - 260
+    - 260.1
     - 261
     - 262
     - 263
     - 264
   status: in_progress
-  note: "Issue-driven recovery for #663-#669. Ordered by blast radius: S260 records the triage, #665/#667 make worktree sessions guard-blind and claim-blind, #666/#663/#664 make the status surface misleading for operators and agents, #668 gates fresh work on stale executions, and #669 is a deliberate product-model decision that should be made after the plumbing stops lying."
+  note: "Issue-driven recovery for #663-#669. Ordered by blast radius: S260 records the triage, S260.1 captures Buzz-informed product and architecture lessons, #665/#667 make worktree sessions guard-blind and claim-blind, #666/#663/#664 make the status surface misleading for operators and agents, #668 gates fresh work on stale executions, and #669 formalizes the Team Round model after the plumbing stops lying."
 sprints:
   - id: 260
     status: complete
@@ -42,13 +43,50 @@ sprints:
         depends_on:
           - S260-2
           - S260-3
+  - id: 260.1
+    theme: Buzz Multiplayer Model Synthesis
+    par: 4
+    slope: 3
+    type: research + product architecture
+    depends_on:
+      - 260
+    note: "Inspect block/buzz as a collaboration reference, choose the SLOPE-native multiplayer model, and place the resulting identity, coordination, learning, status, and evaluation work into the delivery sequence. Preserve SLOPE's worktree and claim enforcement; do not adopt Nostr, crypto identity, or chat-first coordination as product dependencies."
+    research:
+      - docs/research/buzz-multiplayer-collaboration.md
+    expected_artifacts:
+      - docs/research/buzz-multiplayer-collaboration.md
+      - docs/roadmap/phases/phase-64.yaml
+    tickets:
+      - key: S260.1-1
+        title: Inspect block/buzz shared event log, agent pool, orchestration benchmark, and open collaboration gaps
+        club: short_iron
+        complexity: standard
+      - key: S260.1-2
+        title: Select the canonical SLOPE Team Round with one team outcome and actor-attributed shots
+        club: long_iron
+        complexity: moderate
+        depends_on:
+          - S260.1-1
+      - key: S260.1-3
+        title: Map identity, leases, callbacks, verification, learning, status, and evaluation into downstream sprints
+        club: short_iron
+        complexity: standard
+        depends_on:
+          - S260.1-1
+          - S260.1-2
+      - key: S260.1-4
+        title: Compile and validate roadmap sources, projection, map, and focused sprint contexts
+        club: wedge
+        complexity: small
+        depends_on:
+          - S260.1-3
   - id: 261
     theme: Worktree Store Coordination
     par: 5
     slope: 5
     type: bugfix + multi-agent coordination
     depends_on:
-      - 260
+      - 260.1
     note: "Fix #665/#667: the collision guard tells agents to enter a worktree, but a fresh worktree creates an isolated .slope store while MCP and parent sessions keep using the original store. That split-brain silently drops sprint-workflow guards, duplicates sprint state, and makes acquire_claim/check_conflicts return success with zero visible claims."
     tickets:
       - key: S261-1
@@ -79,13 +117,13 @@ sprints:
           - S261-1
           - S261-2
   - id: 262
-    theme: Session and Sprint Status Truth
+    theme: Actor, Session, and Sprint Status Truth
     par: 5
     slope: 3
     type: bugfix + operator trust
     depends_on:
       - 261
-    note: "Fix #666/#663/#664: session records present stale branch and duplicate primary roles as current truth; sprint begin persists a ticket claim that sprint status does not show; sprint status ignores --help, --json, and unknown flags. Each slice carries the regression coverage needed to make the main status surface trustworthy before expanding coordination semantics."
+    note: "Fix #666/#663/#664 while establishing the identity boundaries S264 will formalize: stable actor identity, ephemeral session identity, functional role, control authority, and observer visibility are separate concepts. Session records currently present stale branch and duplicate primary roles as current truth; sprint begin persists a ticket claim that sprint status does not show; sprint status ignores --help, --json, and unknown flags."
     tickets:
       - key: S262-1
         title: Refresh session branch on heartbeat and status reads, or label stored branch as branch-at-start with regression coverage (#666)
@@ -93,9 +131,9 @@ sprints:
         complexity: standard
         github_issue: 666
       - key: S262-2
-        title: Stop reporting every concurrent session as an equally meaningful primary in collision messages (#666)
-        club: short_iron
-        complexity: standard
+        title: Replace duplicate primary labels with explicit actor, session, role, control-authority, and observer-visibility semantics (#666)
+        club: long_iron
+        complexity: moderate
         github_issue: 666
         depends_on:
           - S262-1
@@ -138,37 +176,74 @@ sprints:
         depends_on:
           - S263-1
   - id: 264
-    theme: Multi-Agent Round Model
-    par: 4
-    slope: 3
+    theme: Team Round and Collaboration Model
+    par: 5
+    slope: 5
     type: planning + product architecture
     depends_on:
       - 261
       - 262
       - 263
-    note: "Resolve #669 as a product-model decision rather than letting implementation accidents define the handicap. Decide whether parallel agents are fourball, foursomes, scramble, or a SLOPE-specific hybrid; then turn that decision into scorecard, handicap, claim TTL, and distillation rules."
+    note: "Resolve #669 by formalizing a SLOPE Team Round: one sprint, one authoritative team scorecard and outcome, and actor-attributed shots. This is neither fourball nor scramble; individual handicap derives from attributed shots while team handicap measures delivery plus coordination overhead. Specify the coordination ledger and collaboration contracts without making Nostr, crypto identity, chat, or prompt-only shared-filesystem conventions product dependencies."
+    research:
+      - docs/research/buzz-multiplayer-collaboration.md
+    expected_artifacts:
+      - docs/architecture/team-round.md
     tickets:
       - key: S264-1
-        title: Decide the canonical multi-agent round format and document scorecard ownership semantics (#669)
+        title: Specify one authoritative SLOPE Team Round scorecard with actor-attributed shots and single-player compatibility (#669)
         club: long_iron
         complexity: moderate
         github_issue: 669
       - key: S264-2
-        title: Define agent, operator, repo, and team handicap attribution for parallel sprint work (#669)
-        club: short_iron
-        complexity: standard
+        title: Define actor, session, role, contributor, verifier, control-authority, and visibility identity fields (#669)
+        club: long_iron
+        complexity: moderate
         github_issue: 669
         depends_on:
           - S264-1
       - key: S264-3
-        title: Specify claim TTL, abandoned-session handling, and cross-agent penalty attribution (#669)
-        club: short_iron
-        complexity: standard
+        title: Define individual and team handicap derivation plus caused-by and resolved-by penalty attribution (#669)
+        club: long_iron
+        complexity: moderate
         github_issue: 669
         depends_on:
           - S264-1
+          - S264-2
       - key: S264-4
-        title: Specify merge-safe distillation for common-issues across concurrent agents (#669)
+        title: Specify an idempotent repo coordination event ledger and materialized status and scorecard views (#669)
+        club: driver
+        complexity: risky
+        github_issue: 669
+        depends_on:
+          - S264-1
+          - S264-2
+      - key: S264-5
+        title: Specify renewable claim leases, heartbeat and TTL, abandonment, requeue, retry, and escalation (#669)
+        club: long_iron
+        complexity: moderate
+        github_issue: 669
+        depends_on:
+          - S264-4
+      - key: S264-6
+        title: Specify assignment callbacks, handoffs, and independent verification for risky work (#669)
+        club: long_iron
+        complexity: moderate
+        github_issue: 669
+        depends_on:
+          - S264-4
+      - key: S264-7
+        title: Specify merge-safe learning, semantic team status, and reproducible multiplayer evaluation (#669)
+        club: long_iron
+        complexity: moderate
+        github_issue: 669
+        depends_on:
+          - S264-3
+          - S264-4
+          - S264-5
+          - S264-6
+      - key: S264-8
+        title: Record transport, crypto, chat-first, and prompt-only coordination non-goals (#669)
         club: wedge
         complexity: small
         github_issue: 669
