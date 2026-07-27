@@ -1,4 +1,4 @@
-import { checkConflicts, findShippedSprintsOnMain, formatSprintLabel, parseRoadmap, parseSprintNumber } from '../../core/index.js';
+import { checkConflicts, findShippedSprintsOnMain, formatObservedSessionBranch, formatSprintLabel, observeSessionBranches, parseRoadmap, parseSprintNumber, resolveRepoStateCwd } from '../../core/index.js';
 import type { SprintClaim, SlopeSession } from '../../core/index.js';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -72,7 +72,7 @@ export async function statusCommand(args: string[]): Promise<void> {
 
   const store = await resolveStore(cwd);
   try {
-    await showSwarmStatus(store, swarmId);
+    await showSwarmStatus(store, swarmId, cwd);
   } finally {
     store.close();
   }
@@ -173,8 +173,12 @@ async function showSwarmStatus(
     close: () => void;
   },
   swarmId: string,
+  cwd: string,
 ): Promise<void> {
-  const sessions = await store.getSessionsBySwarm(swarmId);
+  const sessions = observeSessionBranches(
+    await store.getSessionsBySwarm(swarmId),
+    resolveRepoStateCwd(cwd),
+  );
 
   console.log(`\nSwarm "${swarmId}" — Overview`);
   console.log('═'.repeat(40));
@@ -211,7 +215,7 @@ async function showSwarmStatus(
     const roleTag = s.agent_role ? ` (${s.agent_role})` : '';
 
     console.log(`  ${s.session_id}${roleTag}${statusTag}`);
-    console.log(`    IDE: ${s.ide}  Branch: ${s.branch ?? '-'}`);
+    console.log(`    IDE: ${s.ide}  ${formatObservedSessionBranch(s)}`);
     if (agentClaims.length > 0) {
       for (const c of agentClaims) {
         console.log(`    → ${c.target} (${c.scope})`);

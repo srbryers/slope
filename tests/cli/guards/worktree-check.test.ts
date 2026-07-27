@@ -124,6 +124,8 @@ describe('worktreeCheckGuard', () => {
     const result = await worktreeCheckGuard(makeInput(), '/tmp/test');
     expect(result.decision).toBe('deny');
     expect(result.blockReason).toContain('other-session');
+    expect(result.blockReason).toContain('current branch: feat/foo');
+    expect(result.blockReason).not.toContain('[primary]');
     expect(result.blockReason).toContain('slope worktree start');
     expect(result.blockReason).toContain('.slope/worktrees/<branch>');
     expect(result.blockReason).toContain("Avoid Claude Code's native .claude/worktrees/");
@@ -309,6 +311,8 @@ describe('worktreeCheckGuard', () => {
   });
 
   it('surfaces EnterWorktree guidance for existing matching worktrees (#499)', async () => {
+    sentinelFiles.add('/repo');
+    sentinelFiles.add('/repo/.slope/worktrees/existing-feature');
     const porcelainOutput = [
       'worktree /repo',
       'HEAD abc123',
@@ -373,9 +377,21 @@ describe('worktreeCheckGuard', () => {
   });
 
   it('allows when other session has worktree_path (isolated)', async () => {
+    sentinelFiles.add('/tmp/test');
+    sentinelFiles.add('/tmp/worktree');
     mockExecFileSync
       .mockReturnValueOnce('.git' as never)
-      .mockReturnValueOnce('feat/foo' as never);
+      .mockReturnValueOnce('feat/foo' as never)
+      .mockReturnValueOnce([
+        'worktree /tmp/test',
+        'HEAD abc123',
+        'branch refs/heads/feat/foo',
+        '',
+        'worktree /tmp/worktree',
+        'HEAD def456',
+        'branch refs/heads/feature/isolated',
+        '',
+      ].join('\n') as never);
 
     (mockStore.getActiveSessions as ReturnType<typeof vi.fn>).mockResolvedValue([
       makeSession({ session_id: 'test-session' }),
@@ -384,6 +400,88 @@ describe('worktreeCheckGuard', () => {
 
     const result = await worktreeCheckGuard(makeInput(), '/tmp/test');
     expect(result).toEqual({});
+  });
+
+  it('does not trust a prunable Git worktree registration', async () => {
+    sentinelFiles.add('/tmp/test');
+    sentinelFiles.add('/tmp/deleted-worktree');
+    mockExecFileSync
+      .mockReturnValueOnce('.git' as never)
+      .mockReturnValueOnce('feat/foo' as never)
+      .mockReturnValueOnce([
+        'worktree /tmp/test',
+        'HEAD abc123',
+        'branch refs/heads/feat/foo',
+        '',
+        'worktree /tmp/deleted-worktree',
+        'HEAD def456',
+        'branch refs/heads/feature/deleted',
+        'prunable gitdir file points to non-existent location',
+        '',
+      ].join('\n') as never);
+    (mockStore.getActiveSessions as ReturnType<typeof vi.fn>).mockResolvedValue([
+      makeSession({
+        session_id: 'test-session',
+        worktree_path: '/tmp/deleted-worktree',
+      }),
+      makeSession({ session_id: 'other-session' }),
+    ]);
+
+    const result = await worktreeCheckGuard(makeInput(), '/tmp/test');
+
+    expect(result.decision).toBe('deny');
+    expect(result.blockReason).toContain('other-session');
+  });
+
+  it('does not trust an unregistered stored worktree path', async () => {
+    mockExecFileSync
+      .mockReturnValueOnce('.git' as never)
+      .mockReturnValueOnce('feat/foo' as never)
+      .mockReturnValueOnce([
+        'worktree /tmp/test',
+        'HEAD abc123',
+        'branch refs/heads/feat/foo',
+        '',
+      ].join('\n') as never);
+    (mockStore.getActiveSessions as ReturnType<typeof vi.fn>).mockResolvedValue([
+      makeSession({
+        session_id: 'test-session',
+        worktree_path: '/tmp/not-a-worktree',
+      }),
+      makeSession({ session_id: 'other-session' }),
+    ]);
+
+    const result = await worktreeCheckGuard(makeInput(), '/tmp/test');
+
+    expect(result.decision).toBe('deny');
+    expect(result.blockReason).toContain('other-session');
+  });
+
+  it('does not treat the primary checkout as isolated when stored as a worktree path', async () => {
+    mockExecFileSync
+      .mockReturnValueOnce('.git' as never)
+      .mockReturnValueOnce('feat/foo' as never)
+      .mockReturnValueOnce([
+        'worktree /tmp/test',
+        'HEAD abc123',
+        'branch refs/heads/feat/foo',
+        '',
+      ].join('\n') as never);
+    (mockStore.getActiveSessions as ReturnType<typeof vi.fn>).mockResolvedValue([
+      makeSession({
+        session_id: 'test-session',
+        worktree_path: '/tmp/test',
+      }),
+      makeSession({
+        session_id: 'other-session',
+        worktree_path: '/tmp/test',
+      }),
+    ]);
+
+    const result = await worktreeCheckGuard(makeInput(), '/tmp/test');
+
+    expect(result.decision).toBe('deny');
+    expect(result.blockReason).toContain('other-session');
   });
 
   it('allows when current session is alone', async () => {
@@ -454,7 +552,7 @@ describe('worktreeCheckGuard', () => {
       .mockReturnValueOnce('.git' as never)
       .mockReturnValueOnce('feat/foo' as never);
 
-    (mockStore.cleanStaleSessions as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('db locked'));
+    (mockStore.getActiveSessions as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('db locked'));
 
     const result = await worktreeCheckGuard(makeInput(), '/tmp/test');
     expect(result).toEqual({});
@@ -474,7 +572,7 @@ describe('worktreeCheckGuard', () => {
     expect(result.decision).toBe('deny');
   });
 
-  it('cleans stale sessions before checking', async () => {
+  it('does not destructively prune stale sessions while checking', async () => {
     mockExecFileSync
       .mockReturnValueOnce('.git' as never)
       .mockReturnValueOnce('main' as never);
@@ -484,7 +582,7 @@ describe('worktreeCheckGuard', () => {
     ]);
 
     await worktreeCheckGuard(makeInput(), '/tmp/test');
-    expect(mockStore.cleanStaleSessions).toHaveBeenCalledWith(STALE_SESSION_THRESHOLD_MS);
+    expect(mockStore.cleanStaleSessions).not.toHaveBeenCalled();
   });
 
   it('ignores stale never-heartbeated sessions returned by the store (#502)', async () => {
@@ -529,7 +627,7 @@ describe('worktreeCheckGuard', () => {
       .mockReturnValueOnce('.git' as never)
       .mockReturnValueOnce('main' as never);
 
-    (mockStore.cleanStaleSessions as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('boom'));
+    (mockStore.getActiveSessions as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('boom'));
 
     await worktreeCheckGuard(makeInput(), '/tmp/test');
     expect(mockStore.close).toHaveBeenCalled();

@@ -5,7 +5,7 @@
  * 2. The core barrel export doesn't pull in pg
  * 3. The CLI resolveStore() still defaults to SQLite
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
 describe('store-pg regression (no PG required)', () => {
   it('core barrel export does not import pg', async () => {
@@ -22,6 +22,25 @@ describe('store-pg regression (no PG required)', () => {
     const mod = await import('../../src/store-pg/index.js');
     expect(mod.createPostgresStore).toBeDefined();
     expect(typeof mod.createPostgresStore).toBe('function');
+  });
+
+  it('compares text claim expiry with a bound ISO string', async () => {
+    const { PostgresSlopeStore } = await import('../../src/store-pg/index.js');
+    const query = vi.fn().mockResolvedValue({ rows: [] });
+    const store = new PostgresSlopeStore({
+      pool: { query } as never,
+      projectId: 'expiry-test',
+    });
+
+    await store.getActiveClaims(262);
+
+    const [sql, params] = query.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain('claims.expires_at > $2');
+    expect(sql).not.toContain('NOW()');
+    expect(params).toHaveLength(3);
+    expect(params[0]).toBe('expiry-test');
+    expect(params[1]).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(params[2]).toBe(262);
   });
 
   it('createPostgresStore fails with clear error when connection is refused', async () => {

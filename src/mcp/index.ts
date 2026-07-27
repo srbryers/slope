@@ -30,7 +30,7 @@ import { SLOPE_REGISTRY, SLOPE_TYPES } from './registry.js';
 import type { FunctionRegistryEntry } from './registry.js';
 import { runInSandbox } from './sandbox.js';
 import type { SlopeStore, SlopeConfig } from '../core/index.js';
-import { checkConflicts, loadFlows, checkFlowStaleness, checkStoreHealth, METAPHOR_SCHEMA, listMetaphors, buildInterviewContext, generateInterviewSteps, loadConfig, parseTestPlan, getAreasNeedingTest, hasEmbeddingSupport, embed, deduplicateByFile, formatContextForAgent, WorkflowEngine, loadWorkflow, listWorkflows, resolveVariables, resolveRepoSourceCwd, resolveRepoStateCwd, resolveRepoStatePath } from '../core/index.js';
+import { checkConflicts, loadFlows, checkFlowStaleness, checkStoreHealth, METAPHOR_SCHEMA, listMetaphors, buildInterviewContext, generateInterviewSteps, loadConfig, parseTestPlan, getAreasNeedingTest, hasEmbeddingSupport, embed, deduplicateByFile, formatContextForAgent, WorkflowEngine, loadWorkflow, listWorkflows, observeSessionBranches, resolveVariables, resolveRepoSourceCwd, resolveRepoStateCwd, resolveRepoStatePath } from '../core/index.js';
 import type { ContextResult } from '../core/index.js';
 import { gaming } from '../core/metaphors/gaming.js';
 import type { ClaimScope, FlowsFile, FlowDefinition } from '../core/index.js';
@@ -356,7 +356,10 @@ export function createSlopeToolsServer(
       'Show active SLOPE sessions and their claims.',
       {},
       async () => {
-        const sessions = await store.getActiveSessions();
+        const sessions = observeSessionBranches(
+          await store.getActiveSessions(),
+          resolveRepoStateCwd(serverRoot),
+        );
         const claims = await store.getActiveClaims();
         return {
           content: [{

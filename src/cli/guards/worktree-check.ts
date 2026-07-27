@@ -16,6 +16,7 @@ const FILE_PATH_KEYS = ['file_path', 'path'] as const;
 interface GitWorktreeInfo {
   path: string;
   branch?: string;
+  prunable?: boolean;
 }
 
 /** Get the sentinel file path for a session (persists across process invocations) */
@@ -93,9 +94,6 @@ export async function worktreeCheckGuard(input: HookInput, cwd: string): Promise
   }
 
   try {
-    // Clean stale sessions first to reduce false positives
-    await store.cleanStaleSessions(STALE_SESSION_THRESHOLD_MS);
-
     // Inspect existing sessions BEFORE registering. Registering first meant a
     // session that was about to be denied still got written as
     // `role: primary` on the launch-dir branch, leaving a phantom primary that
@@ -103,10 +101,21 @@ export async function worktreeCheckGuard(input: HookInput, cwd: string): Promise
     let active = await store.getActiveSessions();
     const existing = active.find(s => s.session_id === sessionId);
     const currentSwarmId = existing?.swarm_id;
+    let registeredWorktrees: GitWorktreeInfo[] | undefined;
+    const primaryCheckout = canonicalPath(cwd);
+    const hasRegisteredWorktree = (worktreePath: string | undefined): boolean => {
+      if (!worktreePath) return false;
+      const candidate = canonicalPath(worktreePath);
+      if (candidate === primaryCheckout) return false;
+      registeredWorktrees ??= listGitWorktreeInfo(cwd);
+      return registeredWorktrees.some(
+        worktree => canonicalPath(worktree.path) === candidate,
+      );
+    };
 
     // An already-registered worktree session is isolated by definition, even
     // when the hook payload still reports the launch directory (GH #630, #631).
-    if (existing?.worktree_path) {
+    if (hasRegisteredWorktree(existing?.worktree_path)) {
       writeFileSync(sentinel, new Date().toISOString());
       return {};
     }
@@ -117,7 +126,7 @@ export async function worktreeCheckGuard(input: HookInput, cwd: string): Promise
     const now = Date.now();
     const conflicting = others.filter(s =>
       !isStaleSession(s, now) &&
-      !s.worktree_path &&
+      !hasRegisteredWorktree(s.worktree_path) &&
       !(currentSwarmId && s.swarm_id === currentSwarmId),
     );
 
@@ -131,7 +140,7 @@ export async function worktreeCheckGuard(input: HookInput, cwd: string): Promise
       // session is already isolated. Trust where the work actually lands
       // (GH #630, #631). Checked here rather than earlier so the common pass
       // path spawns no extra git processes.
-      const worktrees = listGitWorktreeInfo(cwd);
+      const worktrees = registeredWorktrees ?? listGitWorktreeInfo(cwd);
       const targetWorktree = resolveTargetWorktree(input, cwd, worktrees);
       if (targetWorktree) {
         await reconcileWorktreeSession(input, cwd, sessionId, targetWorktree);
@@ -140,7 +149,7 @@ export async function worktreeCheckGuard(input: HookInput, cwd: string): Promise
       }
 
       const sessionList = conflicting
-        .map(s => `  - ${s.session_id} [${s.role}] ${s.ide} (branch: ${s.branch ?? '-'})`)
+        .map(s => `  - ${s.session_id} ${s.ide} (current branch: ${branch ?? '-'})`)
         .join('\n');
       const existingWorktreeGuidance = formatExistingWorktreeGuidance(cwd, input, conflicting, branch, worktrees);
       // Do NOT write sentinel — denied sessions should re-check next invocation
@@ -525,13 +534,15 @@ function listGitWorktreeInfo(cwd: string): GitWorktreeInfo[] {
         current = { path: line.slice('worktree '.length).trim() };
       } else if (current && line.startsWith('branch ')) {
         current.branch = line.slice('branch '.length).replace(/^refs\/heads\//, '').trim();
+      } else if (current && line.startsWith('prunable')) {
+        current.prunable = true;
       } else if (line === '' && current) {
         worktrees.push(current);
         current = null;
       }
     }
     if (current) worktrees.push(current);
-    return worktrees.filter(wt => wt.path);
+    return worktrees.filter(wt => wt.path && !wt.prunable && existsSync(wt.path));
   } catch {
     return [];
   }

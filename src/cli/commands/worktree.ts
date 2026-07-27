@@ -10,7 +10,6 @@ import { existsSync, mkdirSync, realpathSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { checkConflicts } from '../../core/index.js';
 import { QUIET_STDIO } from '../../core/process.js';
-import { STALE_SESSION_THRESHOLD_MS } from '../../core/constants.js';
 import type { ClaimScope, SprintClaim } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { inferSprintContext } from '../sprint-inference.js';
@@ -209,7 +208,6 @@ async function startCommand(args: string[]): Promise<void> {
 
   const store = await resolveStore(projectRoot);
   try {
-    await store.cleanStaleSessions(STALE_SESSION_THRESHOLD_MS);
     const sessionId = flags['session-id'] || randomUUID();
     const role = (flags.role ?? 'secondary') as 'primary' | 'secondary' | 'observer';
     const ide = flags.ide ?? process.env.SLOPE_IDE ?? 'unknown';

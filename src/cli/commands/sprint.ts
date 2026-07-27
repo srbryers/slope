@@ -28,7 +28,8 @@ import {
   type SprintState,
 } from '../sprint-state.js';
 import { WorkflowEngine, loadWorkflow, resolveVariables, validateWorkflow, loadConfig, parseRoadmap, castRoadmapStructure, formatSprintLabel, formatSprintNumber, formatRoadmapSprintLabel, parseSprintNumber } from '../../core/index.js';
-import type { RoadmapDefinition, WorkflowDefinition, WorkflowExecution } from '../../core/index.js';
+import type { RoadmapDefinition, SprintClaim, SlopeSession, WorkflowDefinition, WorkflowExecution } from '../../core/index.js';
+import { STALE_SESSION_THRESHOLD_MS } from '../../core/constants.js';
 import { createHash } from 'node:crypto';
 import { formatActorName, formatActorSource, formatConflictSummary, resolveActor } from '../actor.js';
 import {
@@ -1000,9 +1001,154 @@ function formatReviewGateStatus(state: SprintState, gate: ReviewGateName): strin
   }
 }
 
-function statusCommand(cwd: string): void {
+interface SprintStatusOptions {
+  sprintId?: string;
+  json: boolean;
+  help: boolean;
+}
+
+interface WorkflowStatusProjection {
+  execution_id: string;
+  workflow: string;
+  sprint: string | null;
+  status: WorkflowExecution['status'];
+  phase: string | null;
+  step: string | null;
+  completed_steps: number;
+  started_at: string;
+  updated_at: string;
+}
+
+type ClaimOwnerLiveness = 'live' | 'stale' | 'missing' | 'unscoped';
+
+interface SprintStatusClaimProjection {
+  player: string;
+  target: string;
+  scope: SprintClaim['scope'];
+  session_id: string | null;
+  owner_liveness: ClaimOwnerLiveness;
+}
+
+interface SprintStatusActorProjection {
+  player: string;
+  session_id: string | null;
+  liveness: ClaimOwnerLiveness;
+}
+
+function claimOwnerLiveness(
+  claim: SprintClaim,
+  sessions: Map<string, SlopeSession>,
+  now = Date.now(),
+): ClaimOwnerLiveness {
+  if (!claim.session_id) return 'unscoped';
+  const session = sessions.get(claim.session_id);
+  if (!session) return 'missing';
+  return now - new Date(session.last_heartbeat_at).getTime() > STALE_SESSION_THRESHOLD_MS
+    ? 'stale'
+    : 'live';
+}
+
+function projectSprintStatusClaims(
+  claims: SprintClaim[],
+  sessions: SlopeSession[],
+): {
+  claims: SprintStatusClaimProjection[];
+  actors: SprintStatusActorProjection[];
+} {
+  const sessionsById = new Map(sessions.map(session => [session.session_id, session]));
+  const now = Date.now();
+  const projected = claims.map(claim => ({
+    player: claim.player,
+    target: claim.target,
+    scope: claim.scope,
+    session_id: claim.session_id ?? null,
+    owner_liveness: claimOwnerLiveness(claim, sessionsById, now),
+  }));
+  const actors = new Map<string, SprintStatusActorProjection>();
+  for (const claim of projected) {
+    const key = `${claim.player}\0${claim.session_id ?? ''}`;
+    actors.set(key, {
+      player: claim.player,
+      session_id: claim.session_id,
+      liveness: claim.owner_liveness,
+    });
+  }
+  return { claims: projected, actors: [...actors.values()] };
+}
+
+function projectWorkflowStatus(exec: WorkflowExecution): WorkflowStatusProjection {
+  return {
+    execution_id: exec.id,
+    workflow: exec.workflow_name,
+    sprint: exec.sprint_id ?? null,
+    status: exec.status,
+    phase: exec.current_phase ?? null,
+    step: exec.current_step ?? null,
+    completed_steps: exec.completed_steps.length,
+    started_at: exec.started_at,
+    updated_at: exec.updated_at,
+  };
+}
+
+function printSprintStatusUsage(): void {
+  console.log(`
+slope sprint status [sprint_id] [--json]
+
+Show the active sprint lifecycle state and claims. When a sprint_id is
+provided, show its workflow execution instead.
+
+Options:
+  --json    Emit structured JSON
+  --help    Show this usage
+`);
+}
+
+function parseSprintStatusOptions(args: string[]): SprintStatusOptions {
+  let sprintId: string | undefined;
+  let json = false;
+  let help = false;
+
+  for (const arg of args) {
+    if (arg === '--json') {
+      json = true;
+    } else if (arg === '--help' || arg === '-h') {
+      help = true;
+    } else if (arg.startsWith('-')) {
+      console.error(`Error: Unknown option: ${arg}`);
+      console.error('Usage: slope sprint status [sprint_id] [--json]');
+      process.exit(1);
+    } else if (!sprintId) {
+      sprintId = arg;
+    } else {
+      console.error(`Error: Unexpected argument: ${arg}`);
+      console.error('Usage: slope sprint status [sprint_id] [--json]');
+      process.exit(1);
+    }
+  }
+
+  return { sprintId, json, help };
+}
+
+async function statusCommand(
+  cwd: string,
+  store: ReturnType<typeof getStore>,
+  json = false,
+): Promise<void> {
   const state = loadSprintState(cwd);
   if (!state) {
+    if (json) {
+      console.log(JSON.stringify({
+        mode: 'lifecycle',
+        sprint: null,
+        status: 'not_started',
+        phase: null,
+        gates: null,
+        review_gates: null,
+        actors: [],
+        claims: [],
+      }, null, 2));
+      return;
+    }
     console.log('No active sprint state.');
     return;
   }
@@ -1021,7 +1167,32 @@ function statusCommand(cwd: string): void {
   const phaseContext = closedOut
     ? complete ? ' (merged; all gates complete)' : ' (phase: complete)'
     : complete ? ' (all gates complete)' : ` (phase: ${state.phase})`;
-  console.log(`Sprint ${sprintNumberForCwd(cwd, state.sprint)} - status: ${derivedStatus}${phaseContext}`);
+  const sprint = sprintNumberForCwd(cwd, state.sprint);
+  const storedClaims = await store.getActiveClaims(state.sprint);
+  const { claims, actors } = projectSprintStatusClaims(
+    storedClaims,
+    await store.getActiveSessions(),
+  );
+  const pending = pendingGateNames(state);
+
+  if (json) {
+    console.log(JSON.stringify({
+      mode: 'lifecycle',
+      sprint,
+      status: derivedStatus,
+      phase: state.phase,
+      started_at: state.started_at,
+      updated_at: state.updated_at,
+      gates: state.gates,
+      review_gates: state.review_gates,
+      pending_gates: pending,
+      actors,
+      claims,
+    }, null, 2));
+    return;
+  }
+
+  console.log(`Sprint ${sprint} - status: ${derivedStatus}${phaseContext}`);
   console.log(`Started: ${state.started_at}`);
   console.log(`Updated: ${state.updated_at}`);
   console.log('');
@@ -1036,6 +1207,37 @@ function statusCommand(cwd: string): void {
     } else {
       const marker = done ? '[x]' : '[ ]';
       console.log(`  ${marker} ${gate}`);
+    }
+  }
+
+  console.log('\nActors:');
+  if (actors.length === 0) {
+    console.log('  none');
+  } else {
+    for (const actor of actors) {
+      const session = actor.session_id ? ` (session ${actor.session_id})` : '';
+      console.log(`  ${actor.player}: ${actor.liveness}${session}`);
+    }
+  }
+
+  console.log('\nActive claims:');
+  if (claims.length === 0) {
+    console.log('  none');
+  } else {
+    const claimsByPlayer = new Map<string, typeof claims>();
+    for (const claim of claims) {
+      const playerClaims = claimsByPlayer.get(claim.player) ?? [];
+      playerClaims.push(claim);
+      claimsByPlayer.set(claim.player, playerClaims);
+    }
+    for (const [player, playerClaims] of claimsByPlayer) {
+      console.log(`  ${player}:`);
+      for (const claim of playerClaims) {
+        const session = claim.session_id
+          ? ` (session ${claim.session_id}; owner ${claim.owner_liveness})`
+          : ' (unscoped owner)';
+        console.log(`    [${claim.scope}] ${claim.target}${session}`);
+      }
     }
   }
 
@@ -1316,7 +1518,12 @@ async function runWorkflowCommand(args: string[], cwd: string): Promise<void> {
 }
 
 async function workflowStatusCommand(args: string[], cwd: string): Promise<void> {
-  const sprintArg = args.find(a => !a.startsWith('--'));
+  const options = parseSprintStatusOptions(args);
+  if (options.help) {
+    printSprintStatusUsage();
+    return;
+  }
+  const sprintArg = options.sprintId;
   let store: ReturnType<typeof getStore> | null = null;
 
   try {
@@ -1324,20 +1531,45 @@ async function workflowStatusCommand(args: string[], cwd: string): Promise<void>
     if (sprintArg) {
       const exec = await store.getExecutionBySprint(sprintArg);
       if (!exec) {
-        console.log(`No active workflow execution for sprint ${sprintArg}.`);
+        if (options.json) {
+          console.log(JSON.stringify({
+            mode: 'workflow',
+            kind: 'not_found',
+            sprint: sprintArg,
+            execution: null,
+          }, null, 2));
+        } else {
+          console.log(`No active workflow execution for sprint ${sprintArg}.`);
+        }
         return;
       }
-      printExecution(exec);
+      if (options.json) {
+        console.log(JSON.stringify({
+          mode: 'workflow',
+          kind: 'execution',
+          execution: projectWorkflowStatus(exec),
+        }, null, 2));
+      } else {
+        printExecution(exec);
+      }
     } else {
       const active = await store.listExecutions({ status: 'running' });
       if (active.length === 0) {
         // Fall through to legacy status
-        statusCommand(cwd);
+        await statusCommand(cwd, store, options.json);
         return;
       }
-      console.log(`\n${active.length} active workflow execution(s):\n`);
-      for (const exec of active) {
-        printExecution(exec);
+      if (options.json) {
+        console.log(JSON.stringify({
+          mode: 'workflow',
+          kind: 'list',
+          executions: active.map(projectWorkflowStatus),
+        }, null, 2));
+      } else {
+        console.log(`\n${active.length} active workflow execution(s):\n`);
+        for (const exec of active) {
+          printExecution(exec);
+        }
       }
     }
   } catch (err) {
@@ -1991,7 +2223,8 @@ Legacy commands:
                                       Review gates require independent evidence, PR review evidence,
                                       required reviews need independent evidence or an explicit
                                       --waive-independent-review downgrade; optional reviews may use self_review
-  slope sprint status                Show sprint state and gates
+  slope sprint status [sprint_id] [--json]
+                                      Show sprint state, claims, or workflow progress
   slope sprint resume --portable [--from=path] [--force] [--dry-run]
                                       Reconstruct local sprint state from tracked artifacts
   slope sprint resume --write-pointer [--output=path]
@@ -2001,7 +2234,6 @@ Legacy commands:
 Workflow commands:
   slope sprint run <id> --workflow=<name> [--var k=v ...]   Start workflow execution
                                       tickets accepts a list/JSON array or count (tickets=3)
-  slope sprint status [sprint_id]    Show workflow execution progress
   slope sprint resume <sprint_id>    Resume a paused workflow execution
   slope sprint pause <sprint_id>     Pause a running workflow execution
   slope sprint context <sprint_id>   Show current workflow step and remaining work

@@ -504,12 +504,18 @@ export class PostgresSlopeStore implements SlopeStore {
   }
 
   async getActiveClaims(sprintNumber?: number): Promise<SprintClaim[]> {
-    if (sprintNumber !== undefined) {
-      return this.list(sprintNumber);
-    }
+    const now = nowISO();
+    const sprintClause = sprintNumber !== undefined ? 'AND claims.sprint_number = $3' : '';
     const result = await this.pool.query(
-      'SELECT * FROM claims WHERE project_id = $1 AND (expires_at IS NULL OR expires_at > NOW()) ORDER BY sprint_number, claimed_at',
-      [this.projectId],
+      `SELECT claims.*
+       FROM claims
+       WHERE claims.project_id = $1
+         AND (claims.expires_at IS NULL OR claims.expires_at > $2)
+         ${sprintClause}
+       ORDER BY claims.sprint_number, claims.claimed_at`,
+      sprintNumber !== undefined
+        ? [this.projectId, now, sprintNumber]
+        : [this.projectId, now],
     );
     return result.rows.map(rowToClaim);
   }

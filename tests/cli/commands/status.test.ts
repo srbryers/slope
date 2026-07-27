@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { execSync } from 'node:child_process';
 import { computeScorecardDrift, statusCommand } from '../../../src/cli/commands/status.js';
 import { createSprintState, saveSprintState } from '../../../src/cli/sprint-state.js';
+import { createStore } from '../../../src/store/index.js';
 
 let tmpDir: string;
 let originalCwd: string;
@@ -86,6 +87,33 @@ describe('slope status', () => {
 
     const output = consoleErrorSpy.mock.calls.map(call => String(call[0])).join('\n');
     expect(output).toContain('Error: --sprint must be a positive sprint id, e.g. 114 or 114.5');
+  });
+
+  it('marks stored swarm branches as start-time identity when the checkout is unregistered', async () => {
+    gitInit(tmpDir);
+    const unregistered = mkdtempSync(join(tmpdir(), 'slope-status-unregistered-'));
+    gitInit(unregistered);
+    execSync('git checkout -q -b secret/unrelated', { cwd: unregistered });
+
+    const store = createStore({ storePath: '.slope/slope.db', cwd: tmpDir });
+    await store.registerSession({
+      session_id: 'swarm-session',
+      role: 'observer',
+      ide: 'codex',
+      branch: 'main',
+      worktree_path: unregistered,
+      swarm_id: 'review-swarm',
+    });
+    store.close();
+
+    try {
+      const output = await captureLog(() => statusCommand(['--swarm=review-swarm']));
+
+      expect(output).toContain('Branch at start: main');
+      expect(output).not.toContain('secret/unrelated');
+    } finally {
+      rmSync(unregistered, { recursive: true, force: true });
+    }
   });
 
   it('filters scorecard drift to sprint ids present in the roadmap', () => {

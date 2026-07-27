@@ -2,11 +2,22 @@ import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { existsSync, realpathSync, writeFileSync, readFileSync, readdirSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { checkConflicts } from '../../core/index.js';
+import {
+  checkConflicts,
+  currentGitBranch,
+  formatObservedSessionBranch,
+  observeSessionBranches,
+  resolveRepoSourceCwd,
+  resolveRepoStateCwd,
+} from '../../core/index.js';
 import type { SlopeSession } from '../../core/index.js';
 import { STALE_SESSION_THRESHOLD_MS } from '../../core/constants.js';
 import { resolveStore } from '../store.js';
 import { resolveSessionStoreCwd } from '../session-scope.js';
+import {
+  reconcileSessionHeartbeat,
+  SessionCheckoutMismatchError,
+} from '../session-heartbeat.js';
 
 /** A session may only be ended by default when its recorded identity does not
  *  contradict this checkout — in a same-checkout swarm, "the single active
@@ -38,6 +49,14 @@ function parseArgs(args: string[]): Record<string, string> {
     if (match) result[match[1]] = match[2];
   }
   return result;
+}
+
+function sameCheckout(left: string, right: string): boolean {
+  try {
+    return realpathSync(left) === realpathSync(right);
+  } catch {
+    return left === right;
+  }
 }
 
 function printSessionHelp(): void {
@@ -112,14 +131,25 @@ async function startSession(flags: Record<string, string>, cwd: string): Promise
   const store = await resolveStore(resolveSessionStoreCwd(cwd));
   try {
     const sessionId = flags['session-id'] || randomUUID();
+    const sourceCwd = resolveRepoSourceCwd(cwd);
+    const stateCwd = resolveRepoStateCwd(cwd);
+    const linkedCheckout = !sameCheckout(sourceCwd, stateCwd);
     const role = (flags.role ?? 'primary') as 'primary' | 'secondary' | 'observer';
     const ide = flags.ide ?? 'unknown';
-    const branch = flags.branch;
-    const worktreePath = flags['worktree-path'];
+    const branch = flags.branch ?? currentGitBranch(sourceCwd);
+    const requestedWorktreePath = flags['worktree-path'];
+    if (
+      requestedWorktreePath &&
+      (!linkedCheckout || !sameCheckout(requestedWorktreePath, sourceCwd))
+    ) {
+      console.error(
+        'Error: --worktree-path must identify the current non-primary linked worktree.',
+      );
+      process.exit(1);
+    }
+    const worktreePath = linkedCheckout ? sourceCwd : undefined;
     const swarmId = flags.swarm;
     const agentRole = flags['agent-role'];
-
-    await store.cleanStaleSessions(STALE_SESSION_THRESHOLD_MS);
 
     const session = await store.registerSession({
       session_id: sessionId,
@@ -259,7 +289,15 @@ async function heartbeat(flags: Record<string, string>, cwd: string): Promise<vo
       process.exit(1);
     }
 
-    await store.updateHeartbeat(sessionId);
+    try {
+      await reconcileSessionHeartbeat(store, sessionId, cwd);
+    } catch (err) {
+      if (err instanceof SessionCheckoutMismatchError) {
+        console.error(`Error: ${err.message}`);
+        process.exit(1);
+      }
+      throw err;
+    }
     console.log(`Heartbeat updated for session ${sessionId}`);
   } finally {
     store.close();
@@ -295,9 +333,13 @@ async function listSessions(flags: Record<string, string>, cwd: string): Promise
   const store = await resolveStore(resolveSessionStoreCwd(cwd));
   try {
     const swarmId = flags.swarm;
-    const sessions = swarmId
+    const storedSessions = swarmId
       ? await store.getSessionsBySwarm(swarmId)
       : await store.getActiveSessions();
+    const sessions = observeSessionBranches(
+      storedSessions,
+      resolveRepoStateCwd(cwd),
+    );
 
     if (sessions.length === 0) {
       const label = swarmId ? `No sessions in swarm "${swarmId}"` : 'No active sessions';
@@ -318,7 +360,7 @@ async function listSessions(flags: Record<string, string>, cwd: string): Promise
       const swarmTag = s.swarm_id && !swarmId ? ` swarm:${s.swarm_id}` : '';
 
       console.log(`  ${s.session_id}${agentTag}${swarmTag}`);
-      console.log(`    Role: ${s.role}  IDE: ${s.ide}  Branch: ${s.branch ?? '-'}`);
+      console.log(`    Role: ${s.role}  IDE: ${s.ide}  ${formatObservedSessionBranch(s)}`);
       console.log(`    Started: ${s.started_at}  Heartbeat: ${s.last_heartbeat_at}`);
       if (sessionClaims.length > 0) {
         console.log(`    Claims: ${sessionClaims.length}`);
@@ -370,8 +412,10 @@ async function listSessions(flags: Record<string, string>, cwd: string): Promise
 async function dashboardCommand(flags: Record<string, string>, cwd: string): Promise<void> {
   const store = await resolveStore(resolveSessionStoreCwd(cwd));
   try {
-    await store.cleanStaleSessions(STALE_SESSION_THRESHOLD_MS);
-    const sessions = await store.getActiveSessions();
+    const sessions = observeSessionBranches(
+      await store.getActiveSessions(),
+      resolveRepoStateCwd(cwd),
+    );
     const now = Date.now();
 
     if (sessions.length === 0) {
@@ -420,10 +464,9 @@ async function dashboardCommand(flags: Record<string, string>, cwd: string): Pro
       const hbAge = Math.round((now - new Date(s.last_heartbeat_at).getTime()) / 60000);
       const isStale = (now - new Date(s.last_heartbeat_at).getTime()) > STALE_SESSION_THRESHOLD_MS;
       const roleTag = s.agent_role ? ` [${s.agent_role}]` : '';
-      const branchTag = s.branch ? ` on ${s.branch}` : '';
       const staleTag = isStale ? ` ${yellow}stale (${hbAge}m)${reset}` : ` ${gray}(${hbAge}m ago)${reset}`;
       const color = isStale ? yellow : green;
-      console.log(`  ${color}*${reset} ${s.session_id.slice(0, 12)}  ${s.role}${roleTag}${branchTag}${staleTag}`);
+      console.log(`  ${color}*${reset} ${s.session_id.slice(0, 12)}  ${s.role}${roleTag} ${formatObservedSessionBranch(s)}${staleTag}`);
       const myClaims = allClaims.filter(c => c.session_id === s.session_id);
       for (const c of myClaims) console.log(`    - ${c.scope}: ${c.target}`);
     };
