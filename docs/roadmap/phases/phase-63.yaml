@@ -1,13 +1,13 @@
 version: "1"
 phase:
   name: Phase 63 — Canonical Sprint ID Store Migration
-  description: "Major-release track for #659, the full canonical string sprint-id migration deliberately scoped out of Phase 60. The roadmap layer now preserves id_key; this phase moves the store, dependency resolution, display labels, and scorecard IO to the same canonical identity model."
+  description: "Major-release track for #659, the full canonical string sprint-id migration deliberately scoped out of Phase 60. The roadmap layer now preserves id_key; this phase moves the store, dependency resolution, display labels, and scorecard IO to the same canonical identity model before the Team Round runtime adds more identity-bearing coordination records."
   sprints:
     - 265
     - 266
     - 267
   status: in_progress
-  note: "Keep #659 isolated from the immediate v1.x recovery train because it changes store schemas and release-policy treats that as a 2.0.0 major. Plan the migration in layers: schema first, then API/display/scorecard identity, then release packaging and migration notes."
+  note: "Keep #659 isolated from the immediate v1.x recovery train because it changes store schemas and release-policy treats that as a 2.0.0 major. Plan the migration in layers: schema first, then API/display/scorecard identity, then release packaging and migration notes. Land canonical sprint keys before Phase 64 so the multiplayer ledger does not require a second identity migration."
 sprints:
   - id: 265
     theme: Store Canonical Sprint IDs
@@ -15,7 +15,7 @@ sprints:
     slope: 5
     type: major + schema migration
     depends_on:
-      - 264
+      - 264.2
     note: "Start #659 at the data layer: SQLite and PG sprint identity columns must preserve canonical string ids so 458.10 and 458.1 cannot collide in scorecards, claims, events, or sprint mirrors."
     tickets:
       - key: S265-1

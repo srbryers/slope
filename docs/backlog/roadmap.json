@@ -5,7 +5,7 @@
     "warning": "GENERATED FILE — do not edit. Edit the modular sources under docs/roadmap/ and re-run `slope roadmap compile`. Edits here are refused or discarded."
   },
   "name": "SLOPE Development Roadmap",
-  "description": "Forward-looking roadmap from S61+. Phases 1-9 (S1-S47) are complete. S48-S60 were hardening, guard enforcement, and process sprints. This roadmap covers adoption, observability, guard maturity, multi-project, loop evolution, and issue-driven recovery. S61-S64 reflect what actually shipped (themes diverged from original plan). Note: the actual S69 diverged from the planned Referee sprint — a carryover patch kit ran instead. The Referee work was rescheduled as S78. S75.5 (The Bug Clearing) added 2026-05-02 to clear accumulated CLI bugs from external repos. S132-S136 were backfilled from shipped scorecards on 2026-06-05; S137 adds post-merge retro tooling and durable memory, S137.5 addresses Windows suite portability for #509, S138-S144 triage open GitHub issues #499/#501/#502/#503/#505/#507/#510/#511/#512/#513/#514/#515/#516/#517/#518 into focused recovery sprints, S145 closed validation-signal regressions #519/#520, S146 cleaned stale roadmap state plus decimal sprint shipped-artifact warnings (#522), S146.1 cut the v1.58.1 patch release while repairing release-bump staging (#524/#528), active inserted sprint status (#525), and guard test isolation (#526), S146.2 closes the decimal post-merge retro gap (#529), S146.3 scopes workflow-step-gate to the relevant execution (#531), S147 was superseded by later human operating surface work, S148-S151.1 completed the human operating surface simplification and Windows git fixture hardening, S152 published v1.59.0, S152.1 completed roadmap interview discoverability across supported harness surfaces, S153 closed semver recommendation hardening for #550, S154 shipped roadmap/status integrity for #563/#567/#568, S216-S222 execute the open-issue recovery train for #552/#553/#556/#557/#558/#561/#562/#565/#566/#572/#573 plus the v1.60.0 release, S223 closes #575/#576, S224/S226/S227 plan the July 2026 review, workflow, MCP, roadmap, and review-output recovery batch for #578/#579/#580/#581/#582/#583, S241-S245 (Phase 54) triage the mid-July issue batch #608/#611/#615/#616/#617/#618/#619/#620/#621 into themed recovery sprints, and S260-S267 triage #659/#663/#664/#665/#666/#667/#668/#669 into parallel-agent recovery and the 2.0 sprint-id store migration track.",
+  "description": "Forward-looking roadmap from S61+. Phases 1-9 (S1-S47) are complete. S48-S60 were hardening, guard enforcement, and process sprints. This roadmap covers adoption, observability, guard maturity, multi-project, loop evolution, and issue-driven recovery. S61-S64 reflect what actually shipped (themes diverged from original plan). Note: the actual S69 diverged from the planned Referee sprint — a carryover patch kit ran instead. The Referee work was rescheduled as S78. S75.5 (The Bug Clearing) added 2026-05-02 to clear accumulated CLI bugs from external repos. S132-S136 were backfilled from shipped scorecards on 2026-06-05; S137 adds post-merge retro tooling and durable memory, S137.5 addresses Windows suite portability for #509, S138-S144 triage open GitHub issues #499/#501/#502/#503/#505/#507/#510/#511/#512/#513/#514/#515/#516/#517/#518 into focused recovery sprints, S145 closed validation-signal regressions #519/#520, S146 cleaned stale roadmap state plus decimal sprint shipped-artifact warnings (#522), S146.1 cut the v1.58.1 patch release while repairing release-bump staging (#524/#528), active inserted sprint status (#525), and guard test isolation (#526), S146.2 closes the decimal post-merge retro gap (#529), S146.3 scopes workflow-step-gate to the relevant execution (#531), S147 was superseded by later human operating surface work, S148-S151.1 completed the human operating surface simplification and Windows git fixture hardening, S152 published v1.59.0, S152.1 completed roadmap interview discoverability across supported harness surfaces, S153 closed semver recommendation hardening for #550, S154 shipped roadmap/status integrity for #563/#567/#568, S216-S222 execute the open-issue recovery train for #552/#553/#556/#557/#558/#561/#562/#565/#566/#572/#573 plus the v1.60.0 release, S223 closes #575/#576, S224/S226/S227 plan the July 2026 review, workflow, MCP, roadmap, and review-output recovery batch for #578/#579/#580/#581/#582/#583, S241-S245 (Phase 54) triage the mid-July issue batch #608/#611/#615/#616/#617/#618/#619/#620/#621 into themed recovery sprints, S260-S267 triage #659/#663/#664/#665/#666/#667/#668/#669 into parallel-agent recovery and the 2.0 sprint-id store migration track, and S268-S272 implement the Buzz-informed SLOPE Team Round coordination runtime after canonical sprint identity lands.",
   "phases": [
     {
       "name": "Phase 10 — Adoption & Onboarding",
@@ -529,27 +529,43 @@
     },
     {
       "name": "Phase 62 — Parallel Agent Coordination Recovery",
-      "description": "Triage of the late-July multi-agent and status-surface issue batch (#663, #664, #665, #666, #667, #668, #669). The triage pass runs first so the roadmap records the open-issue ordering before implementation begins. Worktree store split-brain leads because it silently disables the coordination primitives and sprint guards in the path the collision guard mandates. Session/status truth comes next, then workflow execution scoping, then the product decision for what a multi-agent round means.",
+      "description": "Triage of the late-July multi-agent and status-surface issue batch (#663, #664, #665, #666, #667, #668, #669). The triage pass runs first so the roadmap records the open-issue ordering before implementation begins. A short inserted research sprint then translates lessons from block/buzz into SLOPE's roadmap without importing its transport or chat model. Worktree store split-brain leads implementation because it silently disables the coordination primitives and sprint guards in the path the collision guard mandates. Session/status truth comes next, then workflow execution scoping, then the formal SLOPE Team Round contract.",
       "sprints": [
         260,
+        260.1,
         261,
         262,
         263,
-        264
+        264,
+        264.1,
+        264.2
       ],
       "status": "in_progress",
-      "note": "Issue-driven recovery for #663-#669. Ordered by blast radius: S260 records the triage, #665/#667 make worktree sessions guard-blind and claim-blind, #666/#663/#664 make the status surface misleading for operators and agents, #668 gates fresh work on stale executions, and #669 is a deliberate product-model decision that should be made after the plumbing stops lying."
+      "note": "Issue-driven recovery for #663-#669. Ordered by blast radius: S260 records the triage, S260.1 captures Buzz-informed product and architecture lessons, #665/#667 make worktree sessions guard-blind and claim-blind, #666/#663/#664 make the status surface misleading for operators and agents, #668 gates fresh work on stale executions, and #669 formalizes the Team Round model after the plumbing stops lying."
     },
     {
       "name": "Phase 63 — Canonical Sprint ID Store Migration",
-      "description": "Major-release track for #659, the full canonical string sprint-id migration deliberately scoped out of Phase 60. The roadmap layer now preserves id_key; this phase moves the store, dependency resolution, display labels, and scorecard IO to the same canonical identity model.",
+      "description": "Major-release track for #659, the full canonical string sprint-id migration deliberately scoped out of Phase 60. The roadmap layer now preserves id_key; this phase moves the store, dependency resolution, display labels, and scorecard IO to the same canonical identity model before the Team Round runtime adds more identity-bearing coordination records.",
       "sprints": [
         265,
         266,
         267
       ],
       "status": "in_progress",
-      "note": "Keep #659 isolated from the immediate v1.x recovery train because it changes store schemas and release-policy treats that as a 2.0.0 major. Plan the migration in layers: schema first, then API/display/scorecard identity, then release packaging and migration notes."
+      "note": "Keep #659 isolated from the immediate v1.x recovery train because it changes store schemas and release-policy treats that as a 2.0.0 major. Plan the migration in layers: schema first, then API/display/scorecard identity, then release packaging and migration notes. Land canonical sprint keys before Phase 64 so the multiplayer ledger does not require a second identity migration."
+    },
+    {
+      "name": "Phase 64 — Team Round Collaboration Runtime",
+      "description": "Implement the SLOPE Team Round contracts specified in S264-S264.2 after canonical sprint IDs ship in S267. The runtime evolves the existing event store into a shared coordination ledger, keeps one authoritative team score with actor-attributed evidence, and makes access control, fenced leases, typed resources, attribution, learning, workflow, status, and evaluation first-class.",
+      "sprints": [
+        268,
+        269,
+        270,
+        271,
+        272
+      ],
+      "status": "planned",
+      "note": "Adopt the durable orchestration semantics observed in block/buzz without copying its Nostr transport, cryptographic identity, or chat-first product surface. SLOPE remains repository-native and keeps hard worktree, store, and claim enforcement. Phase 64 follows the 2.0 sprint-id migration so every coordination record starts with canonical identity and the complete access envelope."
     }
   ],
   "sprints": [
@@ -6827,13 +6843,68 @@
       ]
     },
     {
+      "id": 260.1,
+      "status": "complete",
+      "theme": "Buzz Multiplayer Model Synthesis",
+      "par": 4,
+      "slope": 3,
+      "type": "research + product architecture",
+      "depends_on": [
+        260
+      ],
+      "note": "Inspect block/buzz as a collaboration reference, choose the SLOPE-native multiplayer model, and place the resulting identity, coordination, learning, status, and evaluation work into the delivery sequence. Preserve SLOPE's worktree and claim enforcement; do not adopt Nostr, crypto identity, or chat-first coordination as product dependencies.",
+      "research": [
+        "docs/research/buzz-multiplayer-collaboration.md"
+      ],
+      "expected_artifacts": [
+        "docs/research/buzz-multiplayer-collaboration.md",
+        "docs/roadmap/phases/phase-64.yaml"
+      ],
+      "tickets": [
+        {
+          "key": "S260.1-1",
+          "title": "Inspect block/buzz shared event log, agent pool, orchestration benchmark, and open collaboration gaps",
+          "club": "short_iron",
+          "complexity": "standard"
+        },
+        {
+          "key": "S260.1-2",
+          "title": "Select the canonical SLOPE Team Round with one team outcome and actor-attributed shots",
+          "club": "long_iron",
+          "complexity": "moderate",
+          "depends_on": [
+            "S260.1-1"
+          ]
+        },
+        {
+          "key": "S260.1-3",
+          "title": "Map identity, leases, callbacks, verification, learning, status, and evaluation into downstream sprints",
+          "club": "short_iron",
+          "complexity": "standard",
+          "depends_on": [
+            "S260.1-1",
+            "S260.1-2"
+          ]
+        },
+        {
+          "key": "S260.1-4",
+          "title": "Compile and validate roadmap sources, projection, map, and focused sprint contexts",
+          "club": "wedge",
+          "complexity": "small",
+          "depends_on": [
+            "S260.1-3"
+          ]
+        }
+      ]
+    },
+    {
       "id": 261,
       "theme": "Worktree Store Coordination",
       "par": 5,
       "slope": 5,
       "type": "bugfix + multi-agent coordination",
       "depends_on": [
-        260
+        260.1
       ],
       "note": "Fix #665/#667: the collision guard tells agents to enter a worktree, but a fresh worktree creates an isolated .slope store while MCP and parent sessions keep using the original store. That split-brain silently drops sprint-workflow guards, duplicates sprint state, and makes acquire_claim/check_conflicts return success with zero visible claims.",
       "tickets": [
@@ -6886,7 +6957,7 @@
       "depends_on": [
         261
       ],
-      "note": "Fix #666/#663/#664: session records present stale branch and duplicate primary roles as current truth; sprint begin persists a ticket claim that sprint status does not show; sprint status ignores --help, --json, and unknown flags. Each slice carries the regression coverage needed to make the main status surface trustworthy before expanding coordination semantics.",
+      "note": "Fix #666/#663/#664 at the current presentation and operator-trust boundary. Session records present stale branch and duplicate primary labels as current truth; sprint begin persists a ticket claim that sprint status does not show; sprint status ignores --help, --json, and unknown flags. Durable actor, authority, and visibility semantics remain an S264 contract so S262 does not accidentally freeze a partial identity schema.",
       "tickets": [
         {
           "key": "S262-1",
@@ -6897,7 +6968,7 @@
         },
         {
           "key": "S262-2",
-          "title": "Stop reporting every concurrent session as an equally meaningful primary in collision messages (#666)",
+          "title": "Disambiguate concurrent sessions in collision messages without treating primary as durable identity or authority (#666)",
           "club": "short_iron",
           "complexity": "standard",
           "github_issue": 666,
@@ -6963,29 +7034,35 @@
     },
     {
       "id": 264,
-      "theme": "Multi-Agent Round Model",
+      "theme": "Team Round Domain and Scoring Contract",
       "par": 4,
-      "slope": 3,
+      "slope": 4,
       "type": "planning + product architecture",
       "depends_on": [
         261,
         262,
         263
       ],
-      "note": "Resolve #669 as a product-model decision rather than letting implementation accidents define the handicap. Decide whether parallel agents are fourball, foursomes, scramble, or a SLOPE-specific hybrid; then turn that decision into scorecard, handicap, claim TTL, and distillation rules.",
+      "note": "Resolve the domain and scoring half of #669 by formalizing a SLOPE Team Round: one sprint, one canonical score-versus-par outcome, and actor-attributed shots. Actor and role handicaps are risk-adjusted descriptive estimates, not causal rankings; coordination overhead remains a separate metric unless a versioned composite is introduced later. Define round identity, lifecycle, finalization, identity trust, shared-resource ownership, and compatibility before the coordination protocol is specified.",
+      "research": [
+        "docs/research/buzz-multiplayer-collaboration.md"
+      ],
+      "expected_artifacts": [
+        "docs/architecture/team-round-domain.md"
+      ],
       "tickets": [
         {
           "key": "S264-1",
-          "title": "Decide the canonical multi-agent round format and document scorecard ownership semantics (#669)",
+          "title": "Define sprint key, round, attempt, scorecard version, lifecycle, exactly-once finalization, late events, and reopen policy (#669)",
           "club": "long_iron",
           "complexity": "moderate",
           "github_issue": 669
         },
         {
           "key": "S264-2",
-          "title": "Define agent, operator, repo, and team handicap attribution for parallel sprint work (#669)",
-          "club": "short_iron",
-          "complexity": "standard",
+          "title": "Define authenticated principal bindings for actor, session, role, contributors, verifier, authority, and visibility (#669)",
+          "club": "long_iron",
+          "complexity": "moderate",
           "github_issue": 669,
           "depends_on": [
             "S264-1"
@@ -6993,22 +7070,135 @@
         },
         {
           "key": "S264-3",
-          "title": "Specify claim TTL, abandoned-session handling, and cross-agent penalty attribution (#669)",
-          "club": "short_iron",
-          "complexity": "standard",
+          "title": "Define accountable shot ownership, descriptive handicap estimands, difficulty and exposure adjustment, uncertainty, and penalty identity (#669)",
+          "club": "long_iron",
+          "complexity": "moderate",
           "github_issue": 669,
           "depends_on": [
-            "S264-1"
+            "S264-1",
+            "S264-2"
           ]
         },
         {
           "key": "S264-4",
-          "title": "Specify merge-safe distillation for common-issues across concurrent agents (#669)",
-          "club": "wedge",
-          "complexity": "small",
+          "title": "Define single-player compatibility, typed shared-resource ownership, and transport, crypto, chat-first, and prompt-only non-goals (#669)",
+          "club": "short_iron",
+          "complexity": "standard",
           "github_issue": 669,
           "depends_on": [
-            "S264-1"
+            "S264-1",
+            "S264-2"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 264.1,
+      "theme": "Coordination Integrity and Security Contract",
+      "par": 4,
+      "slope": 5,
+      "type": "planning + system architecture",
+      "depends_on": [
+        264
+      ],
+      "note": "Specify the durable protocol for #669 before implementation: evolve the existing event store rather than create a competing ledger, define the complete versioned identity/access envelope, require transactional append and deterministic replay, fence stale lease holders, and enforce deny-by-default capabilities and redaction in the store rather than in prompts.",
+      "research": [
+        "docs/research/buzz-multiplayer-collaboration.md"
+      ],
+      "expected_artifacts": [
+        "docs/architecture/team-round-coordination.md"
+      ],
+      "tickets": [
+        {
+          "key": "S264.1-1",
+          "title": "Define existing-event-store migration, source-of-truth authority, complete event envelope, scorecard projection, and deterministic replay (#669)",
+          "club": "driver",
+          "complexity": "risky",
+          "github_issue": 669
+        },
+        {
+          "key": "S264.1-2",
+          "title": "Define idempotency scope and payload conflicts, atomic append and projection, ordering, schema evolution, and integrity checks (#669)",
+          "club": "long_iron",
+          "complexity": "moderate",
+          "github_issue": 669,
+          "depends_on": [
+            "S264.1-1"
+          ]
+        },
+        {
+          "key": "S264.1-3",
+          "title": "Define renewable leases with authoritative time, lease epochs, fencing, abandonment, retry, requeue, dead-letter, and escalation (#669)",
+          "club": "long_iron",
+          "complexity": "moderate",
+          "github_issue": 669,
+          "depends_on": [
+            "S264.1-1"
+          ]
+        },
+        {
+          "key": "S264.1-4",
+          "title": "Define deny-by-default capabilities, filtered views, redaction and retention, and adversarial enforcement criteria (#669)",
+          "club": "driver",
+          "complexity": "risky",
+          "github_issue": 669,
+          "depends_on": [
+            "S264.1-1",
+            "S264.1-2"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 264.2,
+      "theme": "Collaboration Workflow and Evaluation Contract",
+      "par": 4,
+      "slope": 4,
+      "type": "planning + product architecture",
+      "depends_on": [
+        264.1
+      ],
+      "note": "Complete #669 with the human and agent operating contract: assignments require callbacks, verifier independence is principal-aware, concurrent learning is merge-safe, activity is semantic, and evaluation pins every material input while protecting secrets and treating coordination overhead as a separate measure.",
+      "research": [
+        "docs/research/buzz-multiplayer-collaboration.md"
+      ],
+      "expected_artifacts": [
+        "docs/architecture/team-round-workflow.md"
+      ],
+      "tickets": [
+        {
+          "key": "S264.2-1",
+          "title": "Define assignment and handoff states, success criteria, correlation, and mandatory completion or blocker callbacks (#669)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 669
+        },
+        {
+          "key": "S264.2-2",
+          "title": "Define principal-aware verifier independence and conflict rules for authors, contributors, delegators, sessions, and aliases (#669)",
+          "club": "long_iron",
+          "complexity": "moderate",
+          "github_issue": 669,
+          "depends_on": [
+            "S264.2-1"
+          ]
+        },
+        {
+          "key": "S264.2-3",
+          "title": "Define merge-safe learning and verb-object-outcome status with visible blocker, idle, stale, and timeout states (#669)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 669
+        },
+        {
+          "key": "S264.2-4",
+          "title": "Define reproducible and redacted multiplayer evaluation inputs, lifecycle policy, evidence, metrics, and reliability (#669)",
+          "club": "long_iron",
+          "complexity": "moderate",
+          "github_issue": 669,
+          "depends_on": [
+            "S264.2-2",
+            "S264.2-3"
           ]
         }
       ]
@@ -7020,7 +7210,7 @@
       "slope": 5,
       "type": "major + schema migration",
       "depends_on": [
-        264
+        264.2
       ],
       "note": "Start #659 at the data layer: SQLite and PG sprint identity columns must preserve canonical string ids so 458.10 and 458.1 cannot collide in scorecards, claims, events, or sprint mirrors.",
       "tickets": [
@@ -7141,6 +7331,283 @@
           "depends_on": [
             "S267-1",
             "S267-2"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 268,
+      "theme": "Coordination Ledger and Access Control",
+      "par": 4,
+      "slope": 5,
+      "type": "major + coordination infrastructure",
+      "depends_on": [
+        264.2,
+        267
+      ],
+      "note": "Evolve the existing event store into the authoritative coordination ledger rather than create a parallel source of truth. The first schema includes complete identity and access scope, rejects idempotency conflicts, projects scorecard and status atomically, replays deterministically, and enforces capabilities and redaction in the store.",
+      "research": [
+        "docs/research/buzz-multiplayer-collaboration.md"
+      ],
+      "tickets": [
+        {
+          "key": "S268-1",
+          "title": "Migrate the existing event store to a versioned coordination envelope with round, attempt, actor, session, role, authority, visibility, correlation, and causation",
+          "club": "driver",
+          "complexity": "risky",
+          "github_issue": 669
+        },
+        {
+          "key": "S268-2",
+          "title": "Implement scoped idempotency keys, payload-conflict rejection, atomic append and projection, ordering, and schema evolution",
+          "club": "driver",
+          "complexity": "risky",
+          "github_issue": 669,
+          "depends_on": [
+            "S268-1"
+          ]
+        },
+        {
+          "key": "S268-3",
+          "title": "Implement deterministic replay and exactly-once Team Round finalization with explicit late-event and audited-reopen behavior",
+          "club": "driver",
+          "complexity": "risky",
+          "github_issue": 669,
+          "depends_on": [
+            "S268-1",
+            "S268-2"
+          ]
+        },
+        {
+          "key": "S268-4",
+          "title": "Enforce deny-by-default capabilities, principal binding, filtered projections, redaction, retention, and adversarial bypass tests",
+          "club": "driver",
+          "complexity": "risky",
+          "github_issue": 669,
+          "depends_on": [
+            "S268-1",
+            "S268-2"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 269,
+      "theme": "Fenced Leases and Shared Resources",
+      "par": 4,
+      "slope": 5,
+      "type": "major + concurrency control",
+      "depends_on": [
+        268
+      ],
+      "note": "Make claims recoverable without permitting stale writers. Acquire and renew use authoritative store time and monotonic lease epochs; every mutation presents a fencing token. Ticket, area, port, database, and service claims share one typed overlap model with fair queueing and durable recovery.",
+      "research": [
+        "docs/research/buzz-multiplayer-collaboration.md"
+      ],
+      "tickets": [
+        {
+          "key": "S269-1",
+          "title": "Implement transactional lease acquire and renew with authoritative time, monotonic epochs, fencing tokens, expiry grace, and stale-token rejection",
+          "club": "driver",
+          "complexity": "risky",
+          "github_issue": 669
+        },
+        {
+          "key": "S269-2",
+          "title": "Serialize execution per ticket or overlapping area while allowing fair parallel execution for non-overlapping claims",
+          "club": "driver",
+          "complexity": "risky",
+          "github_issue": 669,
+          "depends_on": [
+            "S269-1"
+          ]
+        },
+        {
+          "key": "S269-3",
+          "title": "Add typed claims for ports, local databases, and service instances with explicit project-owned configuration boundaries",
+          "club": "long_iron",
+          "complexity": "moderate",
+          "github_issue": 669,
+          "depends_on": [
+            "S269-1",
+            "S269-2"
+          ]
+        },
+        {
+          "key": "S269-4",
+          "title": "Add abandonment cleanup, retry, requeue, dead-letter, escalation, and cross-worktree SQLite and PostgreSQL recovery tests",
+          "club": "driver",
+          "complexity": "risky",
+          "github_issue": 669,
+          "depends_on": [
+            "S269-1",
+            "S269-2",
+            "S269-3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 270,
+      "theme": "Team Round Attribution and Learning",
+      "par": 4,
+      "slope": 5,
+      "type": "major + scoring model",
+      "depends_on": [
+        269
+      ],
+      "note": "Preserve one canonical score-versus-par result while making individual contribution measurable. Actor and role metrics are risk-adjusted descriptive estimates with explicit exposure and uncertainty; coordination overhead is reported separately; penalties and learning updates use stable identity so they cannot be double-counted or lost.",
+      "research": [
+        "docs/research/buzz-multiplayer-collaboration.md"
+      ],
+      "tickets": [
+        {
+          "key": "S270-1",
+          "title": "Extend shots and scorecards with accountable actor and role, principal-bound session, contributors, verifier, round, attempt, and version fields",
+          "club": "driver",
+          "complexity": "risky",
+          "github_issue": 669
+        },
+        {
+          "key": "S270-2",
+          "title": "Implement risk-adjusted descriptive actor and role handicaps with difficulty, exposure, aggregation window, minimum sample, and uncertainty",
+          "club": "driver",
+          "complexity": "risky",
+          "github_issue": 669,
+          "depends_on": [
+            "S270-1"
+          ]
+        },
+        {
+          "key": "S270-3",
+          "title": "Implement typed missingness, missing reason, provenance, sample count, coverage, and reliability without coercing unknown to zero",
+          "club": "long_iron",
+          "complexity": "moderate",
+          "github_issue": 669,
+          "depends_on": [
+            "S270-1",
+            "S270-2"
+          ]
+        },
+        {
+          "key": "S270-4",
+          "title": "Add unique penalty identity with non-additive team and actor projections plus append-only or transactional merge-safe common-issues learning",
+          "club": "driver",
+          "complexity": "risky",
+          "github_issue": 669,
+          "depends_on": [
+            "S270-1",
+            "S270-2",
+            "S270-3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 271,
+      "theme": "Multiplayer Workflow and Status",
+      "par": 4,
+      "slope": 4,
+      "type": "major + operating surface",
+      "depends_on": [
+        270
+      ],
+      "note": "Make collaboration legible and accountable. Assignments carry success criteria and mandatory callbacks, verifier independence follows authenticated principal relationships rather than labels, and status presents meaningful activity and failure while respecting filtered visibility.",
+      "research": [
+        "docs/research/buzz-multiplayer-collaboration.md"
+      ],
+      "tickets": [
+        {
+          "key": "S271-1",
+          "title": "Add assignment and handoff states with delegator, assignee, success criteria, correlation, and completion or blocker callbacks",
+          "club": "long_iron",
+          "complexity": "moderate",
+          "github_issue": 669
+        },
+        {
+          "key": "S271-2",
+          "title": "Enforce verifier independence across authors, contributors, delegators, sessions, aliases, and authenticated principals",
+          "club": "driver",
+          "complexity": "risky",
+          "github_issue": 669,
+          "depends_on": [
+            "S271-1"
+          ]
+        },
+        {
+          "key": "S271-3",
+          "title": "Build a semantic verb-object-outcome feed with prominent blocker, failure, idle, stale, and timeout states",
+          "club": "long_iron",
+          "complexity": "moderate",
+          "github_issue": 669,
+          "depends_on": [
+            "S271-1"
+          ]
+        },
+        {
+          "key": "S271-4",
+          "title": "Add controller, contributor, requester, and observer operating views backed by filtered ledger projections",
+          "club": "long_iron",
+          "complexity": "moderate",
+          "github_issue": 669,
+          "depends_on": [
+            "S271-2",
+            "S271-3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 272,
+      "theme": "Multiplayer Benchmark Evaluation",
+      "par": 4,
+      "slope": 4,
+      "type": "major + evaluation",
+      "depends_on": [
+        271
+      ],
+      "note": "Evaluate team and single-agent execution reproducibly without leaking secrets or overclaiming causality. Manifests pin code, tasks, actors, models, harness, evaluator, environment, topology, prompts and skills by hash, generation and lifecycle settings, seeds and trials, budgets, prices, and raw evidence hashes.",
+      "research": [
+        "docs/research/buzz-multiplayer-collaboration.md"
+      ],
+      "tickets": [
+        {
+          "key": "S272-1",
+          "title": "Add a benchmark manifest pinning task corpus, base commit, roster, models, harness, evaluator, environment, topology, prompts, skills, settings, seeds, and trials",
+          "club": "driver",
+          "complexity": "risky",
+          "github_issue": 669
+        },
+        {
+          "key": "S272-2",
+          "title": "Pin timeout, retry, budget, and price policy plus content-addressed evidence with secret and PII redaction and retention rules",
+          "club": "long_iron",
+          "complexity": "moderate",
+          "github_issue": 669,
+          "depends_on": [
+            "S272-1"
+          ]
+        },
+        {
+          "key": "S272-3",
+          "title": "Compare canonical reward, cost, elapsed time, and separately reported coordination overhead across team and single-agent trials",
+          "club": "long_iron",
+          "complexity": "moderate",
+          "github_issue": 669,
+          "depends_on": [
+            "S272-1",
+            "S272-2"
+          ]
+        },
+        {
+          "key": "S272-4",
+          "title": "Report sample size, coverage, uncertainty, missingness, reliability, and non-causal interpretation with reproducibility checks",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 669,
+          "depends_on": [
+            "S272-2",
+            "S272-3"
           ]
         }
       ]

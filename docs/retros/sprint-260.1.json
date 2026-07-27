@@ -1,0 +1,157 @@
+{
+  "sprint_number": 260.1,
+  "player": "codex",
+  "theme": "Buzz Multiplayer Model Synthesis",
+  "par": 4,
+  "slope": 3,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-07-27",
+  "type": "research + product architecture",
+  "github_issues": [
+    669
+  ],
+  "skills_used": [
+    "slope-sprint-workflow"
+  ],
+  "skills_recommended": [
+    "slope-sprint-workflow",
+    "slope-performance-analysis"
+  ],
+  "skill_gaps_found": [],
+  "shots": [
+    {
+      "ticket_key": "S260.1-1",
+      "title": "Inspect block/buzz shared event log, agent pool, orchestration benchmark, and open collaboration gaps",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Inspected Buzz at commit 87b3fcd3c0131683569dd4268b099d18b25dcd5e and recorded the transferable event-log, identity, concurrency, callback, verification, status, and evaluation patterns plus the transport, crypto, and chat-first boundaries SLOPE should not copy."
+    },
+    {
+      "ticket_key": "S260.1-2",
+      "title": "Select the canonical SLOPE Team Round with one team outcome and actor-attributed shots",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "description": "The first Team Round pass selected the right container but under-specified ledger authority, identity trust, lease fencing, access enforcement, statistical estimands, and benchmark reproducibility. Three independent review lanes requested changes, which were resolved before approval."
+        }
+      ],
+      "notes": "Selected one Team Round with one canonical score-versus-par outcome and actor-attributed evidence. Coordination overhead remains separate; actor and role handicaps are risk-adjusted descriptive estimates rather than causal rankings; single-player scorecards remain one-actor Team Rounds."
+    },
+    {
+      "ticket_key": "S260.1-3",
+      "title": "Map identity, leases, callbacks, verification, learning, status, and evaluation into downstream sprints",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Expanded S264-S264.2 into domain/scoring, integrity/security, and workflow/evaluation contracts; kept S265-S267 as the canonical sprint-id migration; added S268-S272 for ledger access control, fenced leases and typed resources, attribution and learning, multiplayer workflow and status, and reproducible evaluation."
+    },
+    {
+      "ticket_key": "S260.1-4",
+      "title": "Compile and validate roadmap sources, projection, map, and focused sprint contexts",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [],
+      "notes": "Compiled the compatibility projection and passed roadmap validate-sources, roadmap compile --check, map --check, focused contexts for S260.1/S264.1/S268/S272, and git diff --check. Independent architecture, security, and data/scoring re-reviews approved with no remaining blockers."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 1,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [
+    {
+      "type": "pin_position",
+      "impact": "moderate",
+      "description": "The source project is a collaboration system with transport, identity, and chat assumptions that do not directly fit SLOPE's repository-native enforcement model."
+    },
+    {
+      "type": "wind",
+      "impact": "moderate",
+      "description": "Issue #669 spans product metaphor, store authority, concurrency control, access boundaries, scoring methodology, operator surfaces, and evaluation reproducibility."
+    }
+  ],
+  "special_plays": [
+    "Used three independent review lanes and completed a changes-requested re-review loop before marking the roadmap sprint complete.",
+    "Split every new design and implementation sprint to four tickets, eliminating the validator's new ticket-count warnings."
+  ],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Renewable leases without epochs and fencing still permit stale writers after reassignment.",
+      "outcome": "S264.1 and S269 now require authoritative time, monotonic lease epochs, fencing tokens on protected writes, and stale-token rejection."
+    },
+    {
+      "type": "lessons",
+      "description": "Actor labels and session separation are not sufficient trust anchors for access control or independent verification.",
+      "outcome": "The roadmap binds actors and sessions to authenticated principals and defines verifier conflicts across authors, contributors, delegators, aliases, and sessions."
+    },
+    {
+      "type": "lessons",
+      "description": "Actor and role performance from non-random assignments cannot be treated as causal or inherently comparable.",
+      "outcome": "S264 and S270 define risk-adjusted descriptive estimands with exposure, difficulty, sample minimums, missingness, reliability, and uncertainty."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "roadmap",
+      "description": "roadmap validate-sources and roadmap compile --check passed with no new ticket-count warnings; remaining warnings are historical.",
+      "status": "healthy"
+    },
+    {
+      "category": "docs",
+      "description": "map --check and git diff --check passed; focused contexts for S260.1, S264.1, S268, and S272 showed the intended dependency and evidence chain.",
+      "status": "healthy"
+    },
+    {
+      "category": "review",
+      "description": "Independent architecture, security/risk, and data/scoring reviewers approved the review-fix commit with zero remaining blocking findings.",
+      "status": "healthy"
+    }
+  ],
+  "nineteenth_hole": {
+    "how_did_it_feel": "The Buzz comparison was useful once it stopped being a feature checklist and became a set of contracts SLOPE can enforce in its own domain.",
+    "advice_for_next_player": "Start S261 with the shared common-dir store recovery. Do not begin the Team Round schema before S264-S264.2 formalize the contracts and S267 lands canonical sprint identity.",
+    "what_surprised_you": "The reviewers converged on the same hidden fault line: identity, visibility, and lease expiry are harmless labels until the store makes them enforceable.",
+    "excited_about_next": "SLOPE now has a credible path from today's worktree claims to measurable, recoverable multiplayer rounds without weakening repository-native discipline."
+  },
+  "bunker_locations": [
+    "A renewable lease without a monotonic epoch and fencing token permits stale writes after reassignment.",
+    "A second coordination ledger beside the existing event store creates competing sources of truth and non-deterministic projections.",
+    "Actor or role labels cannot establish verifier independence; trust must resolve to an authenticated principal.",
+    "Actor and role handicaps from selected assignments are descriptive estimates, not causal rankings."
+  ],
+  "yardage_book_updates": [
+    "docs/research/buzz-multiplayer-collaboration.md records the Team Round decision, trust and integrity boundaries, scoring semantics, evaluation contract, and roadmap mapping.",
+    "Phase 62 now contains S264-S264.2 as separate domain/scoring, integrity/security, and workflow/evaluation contracts.",
+    "Phase 64 now contains S268-S272 with four tickets each for ledger access, fenced resources, attribution, workflow/status, and evaluation."
+  ],
+  "course_management_notes": [
+    "S261 remains the immediate next sprint because one common-dir store is the substrate every later coordination contract assumes.",
+    "S265 depends on S264.2, and S268 depends on both S264.2 and the S267 canonical sprint-id release.",
+    "Research commit: 43fd237. Team Round commit: c7221a2. Delivery-train commit: 7173c4c. Projection commit: 47655fa. Review-fix commit: 4d0feee."
+  ],
+  "slope_factors": [
+    "multi_agent",
+    "product_architecture",
+    "concurrency_control",
+    "access_control",
+    "scoring_methodology",
+    "independent_review"
+  ]
+}
