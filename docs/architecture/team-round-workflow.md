@@ -1649,3 +1649,776 @@ S264.2-3 is complete when the contract:
 - applies filtered views, stable ordering, encrypted cursors, and reliability
   metadata;
 - assigns merge-safe learning to S270 and callback/status enforcement to S271.
+
+## Multiplayer Evaluation
+
+### Goal
+
+Multiplayer evaluation estimates how a declared orchestration topology performs
+relative to a declared single-agent or alternative-team baseline on a pinned
+task population under comparable budgets, permissions, lifecycle rules, and
+measurement.
+
+It does not prove that every observed difference was caused by agent count, nor
+does it rank durable principals without the exposure, difficulty, uncertainty,
+and missingness rules from S264.
+
+### Evaluation Units
+
+The durable hierarchy is:
+
+```text
+evaluation_campaign
+  -> task_case
+    -> comparison_block
+      -> arm
+        -> trial
+          -> trial_attempt
+```
+
+- A campaign defines the question, population, arms, policies, and analysis.
+- A task case is one immutable task and repository starting state.
+- A comparison block groups trials intended to be compared under common task
+  and environment conditions.
+- An arm defines one roster and orchestration topology.
+- A trial is one predeclared draw for one arm and task case.
+- A trial attempt is an execution retry governed by the pinned retry policy.
+
+IDs are server-assigned UUIDv7 values scoped by `project_id`. Display names,
+task indexes, seeds, sprint keys, and arm labels are not identities.
+
+### Estimand
+
+Every campaign declares a primary estimand before execution. The default paired
+estimand is:
+
+```text
+mean over task cases of
+  (team trial outcome - solo trial outcome)
+```
+
+under the campaign's declared outcome scale and trial aggregation rule.
+
+The campaign must state:
+
+- target task population;
+- unit of assignment;
+- unit of analysis;
+- treatment arms;
+- primary outcome;
+- handling of retries, failures, timeouts, cancellation, and missing outcomes;
+- task and trial weighting;
+- paired or unpaired comparison;
+- aggregation across seeds and attempts;
+- uncertainty method;
+- minimum task, trial, and coverage thresholds.
+
+Changing the estimand after any unblinded outcome is observed creates a new
+campaign version and is labeled exploratory.
+
+### Canonical Team Score
+
+When an evaluation trial executes a Team Round, its canonical score is the one
+versioned scorecard outcome defined by S264. Evaluation does not select the best
+agent result, add actor handicaps, average participant scores, or count one
+shared penalty per participant.
+
+Task reward MAY be separate from the SLOPE score when the external benchmark
+defines one. Reports must label:
+
+- external task reward;
+- canonical SLOPE Team Round score;
+- coordination overhead;
+- cost;
+- elapsed time;
+- reliability and coverage.
+
+These values remain separate measures. A future composite requires a new
+versioned scoring contract and cannot rewrite prior reports.
+
+## Campaign Manifest
+
+### Manifest Identity And Seal
+
+The canonical manifest is keyed by:
+
+```text
+(project_id, campaign_id, campaign_version)
+```
+
+Before execution, `evaluation.campaign_sealed.v1` commits to canonical manifest
+bytes. Sealing is irreversible for that version. Any material change creates a
+new campaign version and records whether prior trials are reusable.
+
+### Required Manifest Fields
+
+The manifest pins:
+
+| Area | Required inputs |
+|---|---|
+| Question | Hypothesis, primary estimand, primary and secondary outcomes |
+| Corpus | Corpus ID, version, content hash, selection policy, task IDs |
+| Repository | Remote identity, base commit, submodules, patches, dirty-state policy |
+| Roster | Principal, actor, role, model, provider, and controller identities |
+| Topology | Orchestrator graph, assignment policy, communication channels, parallelism |
+| Harness | Harness code commit, image or environment hash, evaluator revision |
+| Models | Provider model IDs, model revisions when exposed, routing policy |
+| Generation | Temperature, top-p, seed policy, context and output limits |
+| Prompts | System, developer, persona, skill, template, and task prompt commitments |
+| Tools | Tool registry version, capability grants, network and filesystem policy |
+| Environment | OS, architecture, runtime, package manager, dependency lock hashes |
+| Services | Database, port, service, cache, and external API allocation policy |
+| Lifecycle | Timeout, retry, cancellation, handoff, blocker, recovery, and dead-letter policy |
+| Verification | Verifier policy, evaluator independence, evidence requirements |
+| Budgets | Token, cost, elapsed, tool-call, concurrency, and attempt limits |
+| Pricing | Currency, price table, effective time, discounts, rounding, missing-price policy |
+| Trials | Arm allocation, task order, seeds, trial count, blocking, randomization |
+| Analysis | Inclusion set, weighting, missingness, uncertainty, multiplicity policy |
+| Privacy | Classification, visibility, redaction, retention, export, and deletion policy |
+| Integrity | Schema registry, algorithms, key versions, manifest hash, anchors |
+
+References use content-addressed safe locators. The manifest does not embed raw
+credentials, private transcripts, unrestricted prompts, hidden test answers,
+or full tool payloads.
+
+### Prompt And Skill Commitments
+
+For each prompt, persona, skill, instruction bundle, or template, the manifest
+stores:
+
+- artifact class and version;
+- classification-safe content commitment;
+- safe repository or sealed-object reference;
+- producer and approval provenance;
+- normalization and hash algorithm;
+- effective order in the final instruction stack.
+
+Concatenating individual hashes is insufficient. The manifest commits to the
+ordered, framed instruction stack, including separators, roles, and expansion
+rules.
+
+### Model And Provider Identity
+
+The manifest distinguishes:
+
+```text
+requested_model_id
+resolved_model_id
+provider_revision
+routing_policy_version
+fallback_model_ids
+```
+
+When a provider does not expose an immutable revision, the field is
+`unknown` with provenance and the report lowers reproducibility confidence.
+It never substitutes the requested marketing name as a proven immutable
+revision.
+
+### Environment Reproduction
+
+The environment commitment includes:
+
+- repository tree and Git metadata required by the task;
+- dependency lockfiles and resolved artifact hashes;
+- container or machine image identity;
+- runtime and tool versions;
+- locale, timezone, clock policy, and relevant environment allowlist;
+- deterministic fixture, database, and service initialization;
+- network allowlist and external response capture policy;
+- CPU, memory, storage, and concurrency class;
+- cache warm or cold policy;
+- secret names and providers without secret values.
+
+Unpinned external services are declared dependencies with observed versions,
+response commitments, availability, and contamination risk.
+
+## Campaign Lifecycle
+
+### States
+
+Campaign states are:
+
+```text
+draft
+sealed
+scheduled
+running
+collecting
+analysis_pending
+complete
+failed
+cancelled
+invalidated
+```
+
+`complete`, `failed`, `cancelled`, and `invalidated` are terminal for one
+campaign version.
+
+### Legal Transitions
+
+| From | Event | To |
+|---|---|---|
+| `draft` | `evaluation.campaign_sealed.v1` | `sealed` |
+| `sealed` | `evaluation.campaign_scheduled.v1` | `scheduled` |
+| `scheduled` | `evaluation.campaign_started.v1` | `running` |
+| `running` | `evaluation.collection_started.v1` | `collecting` |
+| `collecting` | `evaluation.analysis_requested.v1` | `analysis_pending` |
+| `analysis_pending` | `evaluation.campaign_completed.v1` | `complete` |
+| any non-terminal | `evaluation.campaign_failed.v1` | `failed` |
+| any non-terminal | `evaluation.campaign_cancelled.v1` | `cancelled` |
+| any state | `evaluation.campaign_invalidated.v1` | `invalidated` |
+
+The store rejects execution for an unsealed manifest, append after terminal
+state except invalidation metadata, or analysis before collection closure.
+
+### Trial Lifecycle
+
+Trial states are:
+
+```text
+planned
+allocated
+running
+outcome_reported
+evidence_verified
+included
+excluded
+failed
+timed_out
+cancelled
+```
+
+`included`, `excluded`, `failed`, `timed_out`, and `cancelled` are terminal for
+one trial. Exclusion requires a predeclared rule and evidence. A poor outcome,
+high cost, long duration, coordination failure, or timeout is not an exclusion
+reason unless the estimand explicitly says so.
+
+### Attempt Policy
+
+Retry policy declares:
+
+- retryable failure classes;
+- maximum attempts;
+- whether state, context, or artifacts carry forward;
+- seed reuse or redraw;
+- budget accounting across attempts;
+- which attempt determines outcome;
+- how earlier attempts enter cost and reliability metrics.
+
+The default intention-to-treat policy counts all consumed cost and elapsed time
+and treats exhausted retry, timeout, and orchestration failure as outcomes
+under a predeclared loss rule. It never keeps only the best attempt.
+
+### Assignment And Lease Integration
+
+Every trial is a Team Round or single-player round using the same authoritative
+assignment, callback, lease, verifier, and finalization contracts. Trial
+orchestration cannot write directly to evaluation tables to fabricate progress
+or completion.
+
+Evaluation resources use typed claims for worktrees, ports, databases, service
+instances, caches, and rate-limit pools. Cross-arm contamination is an
+integrity failure, not ordinary noise.
+
+## Experimental Design
+
+### Comparable Arms
+
+Team and solo arms must share, unless the estimand explicitly varies them:
+
+- task cases and base commits;
+- allowed task information;
+- tool and network capabilities;
+- evaluator and success criteria;
+- environment resource class;
+- timeout and retry loss rules;
+- pricing basis;
+- evidence and privacy policy.
+
+Differences in aggregate token, elapsed, cost, concurrency, or tool budgets are
+declared treatment components. Reports do not call arms "same budget" when
+only per-agent limits match and the team has multiple agents.
+
+### Blocking And Randomization
+
+Task case is the default comparison block. Arm order and seed assignment use a
+pinned algorithm and recorded randomization seed generated before outcomes.
+
+When temporal provider drift is plausible, trials interleave arms within
+blocks. Running every solo trial before every team trial is not acceptable
+without an explicit time-trend model and residual-risk statement.
+
+### Leakage Prevention
+
+The campaign declares whether agents or evaluators may observe:
+
+- hidden tests;
+- prior arm outputs;
+- another trial's artifacts;
+- evaluator feedback;
+- corpus labels;
+- benchmark exemplars;
+- learning projections produced by campaign trials.
+
+Training or common-issue updates produced during evaluation are isolated until
+the comparison block closes unless shared adaptation is itself the declared
+treatment. Cache keys, worktrees, databases, service state, and message channels
+must enforce that isolation.
+
+### Sample Size
+
+The manifest records:
+
+- planned task-case count;
+- trials per arm and task;
+- minimum completed blocks;
+- minimum outcome and cost coverage;
+- minimum reliable sample for uncertainty;
+- stopping rule.
+
+Stopping after a favorable interim result is forbidden unless a sequential
+analysis rule and alpha-spending policy were sealed in advance.
+
+No fixed universal sample size proves multiplayer superiority. Reports show
+the observed sample and uncertainty and label underpowered comparisons.
+
+## Evidence Contract
+
+### Trial Evidence Bundle
+
+Each trial closes with a content-addressed bundle containing safe references
+or commitments for:
+
+- sealed campaign and arm manifest;
+- task case and repository state;
+- roster and resolved model identities;
+- assignment, lease, callback, handoff, and verification events;
+- tool calls and outputs allowed by retention policy;
+- code, artifact, test, and evaluator outputs;
+- token, cost, elapsed, queue, retry, and coordination measurements;
+- terminal reason and missingness;
+- scorecard and external reward versions;
+- integrity chain and projection high-water marks.
+
+Raw evidence remains in its classified store. Export bundles expose only
+authorized fields and commitments.
+
+### Evaluator Independence
+
+External or model-based evaluators are service principals subject to the same
+conflict-root and capability rules as other verifiers. An evaluated actor,
+orchestrator, prompt author where prohibited, or service under common control
+cannot satisfy an independent evaluator policy.
+
+When blinded evaluation is required, the evaluator receives arm-neutral
+artifact identifiers and no roster, topology, cost, or treatment labels.
+Unblinding is an auditable event after decisions are sealed.
+
+### Evidence Reliability
+
+Every evidence class records:
+
+```text
+observed_state
+value_or_commitment
+unit
+source
+collection_method
+collector_version
+observed_at
+sample_count
+coverage
+missing_reason
+reliability_class
+```
+
+Reliability classes are:
+
+```text
+verified
+observed
+estimated
+self_reported
+unknown
+```
+
+An estimated token count is not verified usage. A self-reported completion is
+not verified success. Unknown cost is not zero cost.
+
+## Metrics
+
+### Outcome Metrics
+
+Required outcome metrics are:
+
+- external task reward, when defined;
+- canonical Team Round score versus par;
+- required-criterion success rate;
+- verified completion rate;
+- failure, timeout, cancellation, dead-letter, and waiver rates.
+
+Reports show pre-review coding score separately from final review-amended SLOPE
+score when both are relevant. More thorough review must not be misreported as
+worse raw execution without that distinction.
+
+### Resource Metrics
+
+Required resource metrics are:
+
+- input, cached-input, output, reasoning, and total tokens when available;
+- monetary cost under observed and normalized price tables;
+- wall-clock elapsed time;
+- active compute time when observed;
+- queue and wait time;
+- tool-call counts by class;
+- peak and average parallelism;
+- attempt and retry counts.
+
+Price-normalized comparisons preserve raw usage and observed invoice cost.
+Historical reports are not rewritten when provider prices change.
+
+### Coordination Metrics
+
+Coordination overhead includes:
+
+- assignment creation and acceptance;
+- orchestration messages and callbacks;
+- handoffs;
+- lease waits and conflicts;
+- duplicate or abandoned work;
+- verification and correction;
+- recovery and escalation;
+- coordinator-only token, cost, and elapsed measurements.
+
+Each measure states whether it is directly observed, attributed by role,
+estimated, or unavailable. Coordination overhead remains separate from the
+canonical score and external reward.
+
+### Reliability Metrics
+
+Reports include:
+
+- metric coverage by arm and evidence class;
+- missing-reason distribution;
+- integrity verification rate;
+- evaluator agreement;
+- replay success rate;
+- manifest completeness;
+- provider-revision observability;
+- contamination and policy-deviation counts.
+
+A campaign cannot be labeled reproducible when required manifest fields are
+unknown or evidence cannot replay, even if task reward is complete.
+
+## Missingness And Failure
+
+### Typed Missing Reasons
+
+Missing reasons include:
+
+```text
+not_exposed
+not_supported
+permission_denied
+collector_failure
+provider_unavailable
+redacted
+retention_expired
+integrity_failure
+trial_failed
+trial_timed_out
+trial_cancelled
+not_applicable
+unknown
+```
+
+Missingness is stored per metric and trial. It cannot be collapsed into zero,
+false, success, or exclusion.
+
+### Failure Outcomes
+
+The campaign predeclares outcome values or bounds for failed, timed-out,
+cancelled, dead-lettered, and unverifiable trials. Sensitivity analysis reports
+reasonable alternative assignments when those choices materially affect the
+result.
+
+Complete-case analysis MAY appear as secondary analysis but cannot replace the
+primary estimand when completion differs by arm.
+
+### Policy Deviations
+
+Any unplanned change to prompt, model routing, tools, environment, retry,
+timeout, roster, topology, evaluator, pricing, or analysis appends
+`evaluation.policy_deviation.v1`.
+
+The deviation records affected trials and whether policy requires exclusion,
+separate stratum, sensitivity analysis, or campaign invalidation. Operators
+cannot silently patch the manifest after observing results.
+
+## Analysis And Uncertainty
+
+### Trial Aggregation
+
+Trial attempts aggregate under the sealed attempt policy. Multiple trials for
+one task aggregate first at task-case level so tasks with more retries or seeds
+do not gain accidental weight.
+
+The report shows:
+
+- arm-level task outcomes;
+- paired task differences where available;
+- aggregate point estimate;
+- uncertainty interval;
+- task, trial, attempt, and observed-metric counts;
+- coverage and missingness by arm.
+
+### Uncertainty
+
+The default uncertainty method resamples task-case comparison blocks, not
+individual agent messages, shots, tool calls, or retries. It preserves
+within-task dependence between arms and within-team dependence among actors.
+
+When the completed block count is too small for the configured bootstrap or
+interval method, the report provides descriptive ranges and labels inferential
+uncertainty unavailable. It does not print a misleading narrow interval.
+
+### Secondary Analysis
+
+Secondary analyses MAY examine:
+
+- reward-cost frontier;
+- reward-elapsed frontier;
+- coordination overhead by topology;
+- outcome by task class;
+- retry and failure mechanisms;
+- actor and role descriptive performance under S264 rules;
+- sensitivity to missing outcomes and price normalization.
+
+Multiplicity policy and exploratory labeling are required. Actor or role
+results are non-causal descriptive estimates and include exposure,
+difficulty, sample size, uncertainty, and missingness.
+
+### Claim Language
+
+Reports use language matching evidence:
+
+- "observed higher mean reward" for a point estimate;
+- "estimated difference with interval" when inferential requirements pass;
+- "inconclusive" when coverage, sample, reliability, or uncertainty is
+  insufficient;
+- "not comparable" when a material manifest or policy mismatch exists;
+- "invalidated" when integrity, leakage, or lifecycle rules fail.
+
+They do not claim "multiplayer is better" from one task, best-of attempts,
+complete cases only, overlapping uncertainty ignored, or unpriced team usage.
+
+## Privacy, Redaction, And Retention
+
+### Classification
+
+Campaign manifests, task cases, prompts, transcripts, tool evidence, scorecards,
+metrics, and reports each have classification and visibility. A derived report
+inherits the strictest contributing classification unless an approved
+declassification policy produces a safe aggregate.
+
+### Safe Manifest References
+
+Secrets are represented by provider and secret-name commitments, never values.
+Private prompts, transcripts, hidden tests, and tool payloads use sealed-object
+references and keyed commitments.
+
+Hashing low-entropy restricted values without a keyed commitment is forbidden
+because dictionary attacks could recover them.
+
+### Redaction
+
+Evaluation redaction uses S264.1 request, approval, apply, and failure states.
+It preserves:
+
+- campaign and trial existence where legally permitted;
+- protected metric missingness;
+- conflict and evidence commitments;
+- score-affecting correction history;
+- deletion registry and key-destruction state.
+
+Redaction that changes an outcome, verifier evidence, manifest input, or
+analysis set invalidates the affected report and triggers deterministic
+reanalysis or a documented inability to reproduce.
+
+### Retention
+
+The manifest pins retention by artifact class. Raw sensitive evidence MAY
+expire before aggregate reports only when the policy declares which future
+verification and reproduction claims will become unavailable.
+
+Restore reconciles against deletion registry, KMS state, and high-water marks
+before any evaluation artifact is served or reanalyzed.
+
+### Export
+
+Exports are capability-checked, filtered, integrity-protected, and
+content-addressed. An export records campaign version, viewer policy,
+projection high-water mark, included and omitted classes, redactions, and
+expiry.
+
+Public reports must not expose hidden task answers, private prompts, principal
+relationships, resource identifiers, or unbounded event payloads.
+
+## Evaluation Integrity And Invalidation
+
+A campaign or report is invalidated by:
+
+- manifest hash mismatch;
+- execution before seal;
+- unrecorded material policy change;
+- cross-arm state leakage;
+- evaluator conflict at a required independent tier;
+- fabricated or unreplayable terminal events;
+- omitted failed trials outside predeclared policy;
+- best-of attempt selection contrary to policy;
+- missing required price, cost, or budget inputs misrepresented as zero;
+- evidence chain failure;
+- restore of deleted or redacted evidence;
+- analysis code or inclusion set differing from the sealed manifest.
+
+Invalidation preserves all prior evidence and reason codes. A corrected analysis
+gets a new report version; it does not rewrite the invalid report.
+
+## Evaluation Report
+
+The canonical report contains:
+
+1. campaign question, version, and manifest commitment;
+2. primary estimand and analysis population;
+3. arm roster and topology descriptions safe for the viewer;
+4. task, trial, attempt, inclusion, failure, and missingness flow;
+5. primary and secondary outcome tables;
+6. cost, elapsed, token, retry, and coordination tables;
+7. reliability, coverage, and integrity tables;
+8. point estimates, uncertainty, and sensitivity analyses;
+9. deviations, waivers, redactions, and invalidations;
+10. content-addressed evidence and analysis references;
+11. explicit limitations and claim language.
+
+Every numeric table states unit, denominator, sample count, coverage, and
+price or policy version where applicable.
+
+## S264.2-4 Adversarial Criteria
+
+S272 implementation acceptance includes:
+
+1. changing one manifest byte after seal prevents trial start;
+2. requested and resolved model identities remain distinct;
+3. ordered instruction-stack commitments change when role order changes;
+4. a team with three per-agent budgets is not labeled equal-budget to one solo
+   budget;
+5. best-of retry selection is rejected;
+6. failed and timed-out trials remain in the primary analysis under policy;
+7. complete-case results cannot replace the sealed primary estimand;
+8. task-block bootstrap resamples tasks rather than messages or agents;
+9. insufficient blocks suppress inferential confidence;
+10. unknown token or price data remains unknown, not zero;
+11. raw and price-normalized cost remain separately reproducible;
+12. coordinator overhead does not alter canonical Team Round score;
+13. cross-arm cache, worktree, database, or message leakage invalidates trials;
+14. an evaluator under the author's conflict root cannot satisfy independence;
+15. restricted prompt commitments resist low-entropy dictionary recovery;
+16. redaction of outcome evidence invalidates and reanalyzes the report;
+17. restore cannot revive deleted trial evidence;
+18. filtered export omits hidden inputs while retaining integrity commitments;
+19. replay produces identical inclusion and metric bytes across supported
+    adapters;
+20. one favorable task cannot produce an unqualified superiority claim.
+
+## S264.2-4 Acceptance Criteria
+
+S264.2-4 is complete when the contract:
+
+- defines campaign, task, block, arm, trial, and attempt identities;
+- defines a sealed estimand and material manifest versioning;
+- pins corpus, repository, roster, topology, model, harness, prompt, skill,
+  tools, environment, lifecycle, budget, pricing, privacy, and analysis inputs;
+- defines campaign and trial lifecycles, retry policy, leakage controls, and
+  comparable arms;
+- defines content-addressed trial evidence and independent evaluation;
+- separates outcome, canonical score, resource, coordination, and reliability
+  metrics;
+- preserves typed missingness, failures, policy deviations, coverage, and
+  uncertainty;
+- defines redaction, retention, restore, export, invalidation, and report
+  contracts;
+- assigns implementation to S272.
+
+## Downstream Ownership
+
+### S265-S267
+
+These sprints land canonical sprint identity and migration prerequisites. They
+do not implement Team Round workflow behavior.
+
+### S268
+
+S268 owns principal and event schema required by this document, assignment and
+verification aggregate storage, deterministic projection support, filtered
+views, replay, finalization, privacy, redaction, retention, and restore
+foundations.
+
+### S269
+
+S269 owns protected-resource leases for assignments, handoffs, verifier slots,
+learning patterns, evaluation trials, ports, databases, worktrees, services,
+queues, and recovery.
+
+### S270
+
+S270 owns contributor and penalty attribution, actor and role descriptive
+projections, merge-safe learning reports, pattern merge and split, promotion,
+codification, and learning replay.
+
+### S271
+
+S271 owns assignment and handoff lifecycle, mandatory callbacks, principal-aware
+verifier gates, semantic activity, blocker and timeout operating views, noise
+collapse, and status reliability.
+
+### S272
+
+S272 owns sealed campaign manifests, trial orchestration, evidence bundles,
+team-versus-solo metrics, reliability, paired analysis, redacted reports, and
+evaluation replay.
+
+No downstream sprint may weaken an invariant here without a new versioned
+contract and migration.
+
+## Explicit Non-Goals
+
+This contract does not:
+
+- require Nostr, chat, or any particular transport;
+- treat model instances, sessions, roles, aliases, or worktrees as independent
+  principals;
+- make acknowledgments or heartbeats proof of progress;
+- permit prompts or client metadata to bypass store enforcement;
+- provide causal actor rankings from descriptive handicaps;
+- select the best agent or retry outcome;
+- fold coordination cost into the canonical score;
+- expose raw secrets, transcripts, hidden tests, or unrestricted tool output;
+- guarantee reproducibility when a provider hides material model revisions;
+- claim multiplayer superiority from inadequate or unreliable samples.
+
+## Contract Completion
+
+S264.2 is complete when:
+
+1. all four ticket acceptance criteria in this document are satisfied;
+2. the artifact remains consistent with S264 and S264.1;
+3. assignment, verifier, learning, status, and evaluation identities are
+   project-scoped and replayable;
+4. every state transition has an authoritative event, authorization boundary,
+   idempotency scope, and deterministic projection;
+5. privacy and non-enumeration apply to operating and benchmark views;
+6. unknown, missing, stale, timed-out, waived, and invalidated states remain
+   distinct from healthy, zero, verified, and complete;
+7. the adversarial criteria are assigned to S270-S272 implementation;
+8. issue #669 has a complete product and architecture answer without reopening
+   the settled Team Round scoring format.
