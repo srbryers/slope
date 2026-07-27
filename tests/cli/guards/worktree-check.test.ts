@@ -124,6 +124,8 @@ describe('worktreeCheckGuard', () => {
     const result = await worktreeCheckGuard(makeInput(), '/tmp/test');
     expect(result.decision).toBe('deny');
     expect(result.blockReason).toContain('other-session');
+    expect(result.blockReason).toContain('current branch: feat/foo');
+    expect(result.blockReason).not.toContain('[primary]');
     expect(result.blockReason).toContain('slope worktree start');
     expect(result.blockReason).toContain('.slope/worktrees/<branch>');
     expect(result.blockReason).toContain("Avoid Claude Code's native .claude/worktrees/");

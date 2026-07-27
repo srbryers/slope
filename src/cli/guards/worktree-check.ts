@@ -140,7 +140,7 @@ export async function worktreeCheckGuard(input: HookInput, cwd: string): Promise
       }
 
       const sessionList = conflicting
-        .map(s => `  - ${s.session_id} [${s.role}] ${s.ide} (branch: ${s.branch ?? '-'})`)
+        .map(s => `  - ${s.session_id} ${s.ide} (current branch: ${branch ?? '-'})`)
         .join('\n');
       const existingWorktreeGuidance = formatExistingWorktreeGuidance(cwd, input, conflicting, branch, worktrees);
       // Do NOT write sentinel — denied sessions should re-check next invocation
