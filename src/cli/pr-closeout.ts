@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { detectLatestSprint } from '../core/index.js';
+import { detectLatestSprint, sprintIdToNumber } from '../core/index.js';
 import { loadConfig } from './config.js';
 import { loadPrReviewState } from './pr-review-state.js';
 import { loadReviewState } from './commands/review-state.js';
@@ -225,7 +225,7 @@ function inferSprint(cwd: string): number | undefined {
   const state = loadSprintState(cwd);
   if (isActiveSprintState(state)) return state.sprint;
   const config = loadConfig(cwd);
-  return config.currentSprint ?? (detectLatestSprint(config, cwd) || undefined);
+  return config.currentSprint ?? sprintIdToNumber(detectLatestSprint(config, cwd)) ?? undefined;
 }
 
 function currentBranch(cwd: string): string | undefined {

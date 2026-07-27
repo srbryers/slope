@@ -995,6 +995,7 @@ type SpecialPlay = 'gimme' | 'mulligan' | 'provisional' | 'lay_up' | 'scramble';
 type MissDirection = 'long' | 'short' | 'left' | 'right';
 type ScoreLabel = 'eagle' | 'birdie' | 'par' | 'bogey' | 'double_bogey' | 'triple_plus';
 type SprintType = 'feature' | 'feedback' | 'infra' | 'bugfix' | 'research' | 'flow' | 'test-coverage' | 'audit';
+type SprintId = string | number;
 
 // ─── Record Types ───
 interface HazardHit { type: HazardType; description: string; gotcha_id?: string; }
@@ -1003,7 +1004,7 @@ interface ConditionRecord { type: ConditionType; description: string; impact: 'n
 
 // ─── Scoring Types ───
 interface HoleStats { fairways_hit: number; fairways_total: number; greens_in_regulation: number; greens_total: number; putts: number; penalties: number; hazards_hit: number; hazard_penalties: number; miss_directions: Record<MissDirection, number>; }
-interface HoleScore { sprint_number: number; theme: string; par: 3 | 4 | 5; slope: number; score: number; score_label: ScoreLabel; shots: ShotRecord[]; conditions: ConditionRecord[]; special_plays: SpecialPlay[]; stats: HoleStats; }
+interface HoleScore { sprint_number: string; theme: string; par: 3 | 4 | 5; slope: number; score: number; score_label: ScoreLabel; shots: ShotRecord[]; conditions: ConditionRecord[]; special_plays: SpecialPlay[]; stats: HoleStats; }
 
 // ─── Full Scorecard ───
 interface GolfScorecard extends HoleScore { type?: SprintType; player?: string; date: string; training?: TrainingSession[]; nutrition?: NutritionEntry[]; yardage_book_updates: string[]; bunker_locations: string[]; course_management_notes: string[]; nineteenth_hole?: NineteenthHole; }
@@ -1021,7 +1022,7 @@ interface SlopeConfig { scorecardDir: string; scorecardPattern: string; minSprin
 
 // ─── Store ───
 interface SlopeSession { session_id: string; role: 'primary' | 'secondary' | 'observer'; ide: string; worktree_path?: string; branch?: string; started_at: string; last_heartbeat_at: string; metadata?: Record<string, unknown>; agent_role?: string; swarm_id?: string; }
-interface SprintClaim { id: string; sprint_number: number; player: string; target: string; scope: ClaimScope; claimed_at: string; notes?: string; session_id?: string; expires_at?: string; metadata?: Record<string, unknown>; }
+interface SprintClaim { id: string; sprint_number: string; player: string; target: string; scope: ClaimScope; claimed_at: string; notes?: string; session_id?: string; expires_at?: string; metadata?: Record<string, unknown>; }
 
 // ─── Standup ───
 interface StandupReport { sessionId: string; agent_role?: string; ticketKey?: string; status: 'working' | 'blocked' | 'complete'; progress: string; blockers: string[]; decisions: string[]; handoffs: HandoffEntry[]; timestamp: string; }
@@ -1034,7 +1035,7 @@ interface RoleDefinition { id: string; name: string; description: string; focusA
 interface AgentBreakdown { session_id: string; agent_role: string; shots: ShotRecord[]; score: number; stats: HoleStats; }
 interface AgentShotInput { session_id: string; agent_role: string; shots: ShotRecord[]; }
 interface ScorecardShotInput { ticket_key?: string; ticket?: string; title?: string; club: ClubSelection; result: ShotResult; hazards?: Array<HazardHit | string>; provisional_declared?: boolean; notes?: string; }
-interface ScorecardInput { sprint_number: number; theme: string; par: 3 | 4 | 5; slope: number; date: string; shots: ScorecardShotInput[]; putts?: number; penalties?: number; score?: number; type?: SprintType; conditions?: ConditionRecord[]; special_plays?: SpecialPlay[]; training?: TrainingSession[]; nutrition?: NutritionEntry[]; nineteenth_hole?: NineteenthHole; bunker_locations?: string[]; yardage_book_updates?: string[]; course_management_notes?: string[]; agents?: AgentBreakdown[]; }
+interface ScorecardInput { sprint_number: SprintId; theme: string; par: 3 | 4 | 5; slope: number; date: string; shots: ScorecardShotInput[]; putts?: number; penalties?: number; score?: number; type?: SprintType; conditions?: ConditionRecord[]; special_plays?: SpecialPlay[]; training?: TrainingSession[]; nutrition?: NutritionEntry[]; nineteenth_hole?: NineteenthHole; bunker_locations?: string[]; yardage_book_updates?: string[]; course_management_notes?: string[]; agents?: AgentBreakdown[]; }
 
 // ─── Escalation ───
 type EscalationTrigger = 'blocker_timeout' | 'claim_conflict' | 'test_failure_cascade' | 'manual';

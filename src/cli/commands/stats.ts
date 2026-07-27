@@ -11,7 +11,9 @@ import {
   computeVelocity,
   listMetaphors,
   GUARD_DEFINITIONS,
+  latestSprintIdKey,
   loadConfig,
+  parseSprintId,
 } from '../../core/index.js';
 import type { GolfScorecard, RollingStats as CoreRollingStats, TrendPoint, VelocityReport } from '../../core/index.js';
 import { CLI_COMMAND_REGISTRY } from '../registry.js';
@@ -29,7 +31,7 @@ interface WebRollingStats {
 }
 
 interface ScorecardSummary {
-  sprint: number;
+  sprint: string;
   par: number;
   score: number;
   score_label: string;
@@ -37,7 +39,7 @@ interface ScorecardSummary {
 }
 
 interface LatestScorecard {
-  sprint: number;
+  sprint: string;
   par: number;
   score: number;
   score_label: string;
@@ -51,12 +53,12 @@ interface LatestScorecard {
 }
 
 interface HandicapMilestone {
-  sprint: number;
+  sprint: string;
   handicap: number;
 }
 
 interface SlopeStats {
-  sprints_completed: number;
+  sprints_completed: string;
   total_tests: number;
   cli_commands: number;
   guards: number;
@@ -145,7 +147,9 @@ function computeMilestones(scorecards: GolfScorecard[]): HandicapMilestone[] {
   // Sample at every 5th sprint, plus the latest
   for (let i = 0; i < scorecards.length; i++) {
     const sc = scorecards[i];
-    if ((sc.sprint_number % 5 === 0) || i === scorecards.length - 1) {
+    const parsedSprint = parseSprintId(sc.sprint_number);
+    if ((parsedSprint?.insert === null && parsedSprint.base % 5 === 0)
+      || i === scorecards.length - 1) {
       const window = scorecards.slice(0, i + 1);
       const card = computeHandicapCard(window);
       milestones.push({
@@ -168,9 +172,7 @@ export function computeSlopeStats(cwd: string = process.cwd()): SlopeStats {
   const recent = scorecards.slice(-5).reverse().map(toScorecardSummary);
 
   return {
-    sprints_completed: scorecards.length > 0
-      ? Math.max(...scorecards.map(s => s.sprint_number))
-      : 0,
+    sprints_completed: latestSprintIdKey(scorecards.map(s => s.sprint_number)),
     total_tests: countTestFiles(cwd),
     cli_commands: CLI_COMMAND_REGISTRY.length,
     guards: GUARD_DEFINITIONS.length,

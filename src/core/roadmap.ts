@@ -202,14 +202,13 @@ export function compareSprintIds(a: number, b: number): number {
 }
 
 /** Return the next canonical sprint id after a completed sprint/inserted sprint. */
-export function nextCanonicalSprintId(id: number): number {
-  if (isEncodedInsertedSprintId(id)) {
+export function nextCanonicalSprintId(id: SprintId): number {
+  if (typeof id === 'number' && isEncodedInsertedSprintId(id)) {
     return Math.floor(id / 10) + 1;
   }
-  if (!Number.isInteger(id)) {
-    return Math.floor(id) + 1;
-  }
-  return id + 1;
+  const parsed = parseSprintId(id);
+  if (!parsed) return 1;
+  return parsed.base + 1;
 }
 
 export const ROADMAP_TERMINAL_STATUSES = new Set([

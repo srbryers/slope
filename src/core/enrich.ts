@@ -34,7 +34,7 @@ export interface EnrichedTicket {
     related: string[];
   };
   estimated_tokens: number;
-  similar_tickets: Array<{ key: string; title: string; result: string; sprint: number }>;
+  similar_tickets: Array<{ key: string; title: string; result: string; sprint: string }>;
   hazards: string[];
 }
 

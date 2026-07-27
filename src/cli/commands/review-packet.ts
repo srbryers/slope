@@ -5,8 +5,10 @@ import { dirname, isAbsolute, join, relative } from 'node:path';
 import {
   detectLatestSprint,
   loadFindings,
-  parseSprintNumber,
+  sprintIdKey,
+  type ReviewFinding,
   type ReviewType,
+  type SprintId,
 } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 
@@ -22,7 +24,7 @@ const TOKEN_BUDGETS: Record<BudgetTier, number> = {
 };
 
 interface ReviewPacketOptions {
-  sprint?: number;
+  sprint?: SprintId;
   lane: ReviewLane;
   base?: string;
   head?: string;
@@ -50,7 +52,7 @@ function parseArgs(args: string[]): ReviewPacketOptions {
     throw new Error('--budget-tier must be focused, standard, deep, or exceptional');
   }
   const sprintRaw = flagValue(args, '--sprint');
-  const sprint = sprintRaw ? parseSprintNumber(sprintRaw) ?? undefined : undefined;
+  const sprint = sprintRaw ? sprintIdKey(sprintRaw) ?? undefined : undefined;
   if (sprintRaw && sprint == null) throw new Error('--sprint must be a valid sprint number');
   const exclude = args
     .filter(arg => arg.startsWith('--exclude-path='))
@@ -95,9 +97,9 @@ function utf8Prefix(value: string, maxBytes: number): { text: string; truncated:
   return { text: value.slice(0, end), truncated: true };
 }
 
-function unresolvedFindings(cwd: string, sprint: number, lane: ReviewLane): string[] {
+function unresolvedFindings(cwd: string, sprint: SprintId, lane: ReviewLane): string[] {
   const findings = loadFindings(cwd);
-  const sprintFindings = findings?.sprints?.[sprint] ?? [];
+  const sprintFindings = (findings?.sprints as Record<string, ReviewFinding[]> | undefined)?.[String(sprint)] ?? [];
   return sprintFindings
     .filter(finding => !finding.resolved && finding.review_type === lane)
     .map(finding => `${finding.id}: ${finding.description}`);
@@ -162,7 +164,7 @@ export function reviewPacketCommand(args: string[]): void {
   }
   const cwd = process.cwd();
   const packet = buildReviewPacket(cwd, options);
-  const sprint = packet.sprint as number;
+  const sprint = packet.sprint as SprintId;
   const head = String(packet.head).slice(0, 12).replace(/[^A-Za-z0-9_.-]/g, '');
   const out = options.out
     ? (isAbsolute(options.out) ? options.out : join(cwd, options.out))

@@ -329,7 +329,7 @@ describe('sandbox', () => {
     const { result } = await runInSandbox(code, process.cwd());
     const r = result as { valid: boolean; criticalPath: number[]; length: number };
     expect(r.valid).toBe(true);
-    expect(r.criticalPath).toEqual([1, 2]);
+    expect(r.criticalPath).toEqual(['1', '2']);
     expect(r.length).toBe(2);
   });
 

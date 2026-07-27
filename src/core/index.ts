@@ -820,6 +820,8 @@ export {
   parseSprintId,
   compareSprintIdKeys,
   sprintIdsEqual,
+  latestSprintIdKey,
+  sprintIdToNumber,
 } from './sprint-id.js';
 export type { SprintId, SprintIdParts } from './sprint-id.js';
 export type { GeneratedConfig } from './generators/config.js';

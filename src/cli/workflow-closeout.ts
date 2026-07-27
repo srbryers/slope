@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import { resolveRepoStatePath, type WorkflowExecution } from '../core/index.js';
+import { resolveRepoStatePath, type SprintId, type WorkflowExecution } from '../core/index.js';
 import { getStoreInfo, resolveStore } from './store.js';
 import { completeWorkflowExecutionsForSprints } from './workflow-resync.js';
 
@@ -12,7 +12,7 @@ export interface WorkflowCloseoutResult {
 
 export async function reconcileWorkflowCloseout(
   cwd: string,
-  sprints: Iterable<number>,
+  sprints: Iterable<SprintId>,
   options: {
     preserveExecutionIds?: Iterable<string>;
     preserveNewestPerSprint?: boolean;

@@ -6,10 +6,13 @@ import {
   extractSprintReferences,
   formatSprintLabel,
   formatSprintNumber,
+  latestSprintIdKey,
   loadScorecards,
   nextCanonicalSprintId,
   parseSprintNumber,
   sprintNumberFromScorecardFile,
+  roadmapSprintKey,
+  sprintIdsEqual,
   type RoadmapSprint,
   type SlopeConfig,
 } from '../core/index.js';
@@ -234,12 +237,12 @@ function inferPortableSprint(
   const roadmap = loadRoadmapForInference(cwd, config);
   const completed = new Set(loadScorecards(config, cwd).map(card => card.sprint_number));
   const roadmapSprint = roadmap?.sprints
-    .filter(sprint => !completed.has(sprint.id))
+    .filter(sprint => !completed.has(roadmapSprintKey(roadmap, sprint)))
     .find(sprint => (sprint as RoadmapSprint & { status?: string }).status !== 'complete' && (sprint as RoadmapSprint & { status?: string }).status !== 'superseded');
   if (roadmapSprint) return { sprint: roadmapSprint.id, source: 'roadmap' };
 
-  const latest = maxSprintByOrder([...completed]);
-  return { sprint: latest > 0 ? nextCanonicalSprintId(latest) : 1, source: 'scorecards' };
+  const latest = latestSprintIdKey([...completed]);
+  return { sprint: latest !== '0' ? nextCanonicalSprintId(latest) : 1, source: 'scorecards' };
 }
 
 function validatePointerForResume(cwd: string, config: SlopeConfig, pointer: SprintResumePointer, currentBranch?: string): string[] {
@@ -281,7 +284,8 @@ function collectResumeEvidence(cwd: string, config: SlopeConfig, sprint: number)
 
 function findScorecardForSprint(cwd: string, config: SlopeConfig, sprint: number): string | null {
   for (const file of discoverScorecardFiles(config, cwd)) {
-    if (sprintNumberFromScorecardFile(file, config) === sprint) {
+    const scorecardSprint = sprintNumberFromScorecardFile(file, config);
+    if (scorecardSprint !== null && sprintIdsEqual(scorecardSprint, sprint)) {
       return relative(cwd, file).replace(/\\/g, '/');
     }
   }

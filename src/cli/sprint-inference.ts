@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import {
   castRoadmapStructure,
   compareSprintIds,
+  compareSprintIdKeys,
   compareRoadmapSprintIds,
   detectLatestSprint,
   findRoadmapSprint,
@@ -17,6 +18,7 @@ import {
   parseRoadmap,
   roadmapSprintOrderValue,
   sprintOrderValue,
+  sprintIdKey,
 } from '../core/index.js';
 import type { RoadmapDefinition, RoadmapSprint, SlopeConfig, SprintId } from '../core/index.js';
 import { loadConfig } from './config.js';
@@ -26,7 +28,7 @@ export interface InferredSprintContext {
   sprint: number;
   label: string;
   source: 'sprint-state' | 'config' | 'roadmap' | 'scorecards' | 'initial';
-  latestScorecard: number;
+  latestScorecard: string;
   latestScorecardLabel: string;
   scorecardFallbackSprint?: number;
   scorecardFallbackLabel?: string;
@@ -104,7 +106,7 @@ export function inferSprintContext(cwd: string = process.cwd(), config: SlopeCon
       roadmap,
     )) ?? [];
 
-  const scorecardNext = latestScorecard > 0 ? nextCanonicalSprintId(latestScorecard) : 1;
+  const scorecardNext = latestScorecard !== '0' ? nextCanonicalSprintId(latestScorecard) : 1;
   const scorecardFallbackLabel = labelForSprint(scorecardNext, roadmap);
   const pending = choosePendingSprint(pendingSprints, latestScorecard, scorecardNext, roadmap, completedIds);
 
@@ -123,7 +125,7 @@ export function inferSprintContext(cwd: string = process.cwd(), config: SlopeCon
     };
   }
 
-  if (latestScorecard > 0) {
+  if (latestScorecard !== '0') {
     const sprint = scorecardNext;
     return {
       sprint,
@@ -142,7 +144,7 @@ export function inferSprintContext(cwd: string = process.cwd(), config: SlopeCon
     sprint: 1,
     label: 'S1',
     source: 'initial',
-    latestScorecard: 0,
+    latestScorecard: '0',
     latestScorecardLabel: 'S0',
     scorecardFallbackSprint: 1,
     scorecardFallbackLabel: 'S1',
@@ -153,11 +155,11 @@ export function inferSprintContext(cwd: string = process.cwd(), config: SlopeCon
 
 function activeStateCompletedByScorecards(
   sprintState: ReturnType<typeof loadSprintState>,
-  latestScorecard: number,
+  latestScorecard: SprintId,
   roadmap: RoadmapDefinition | null,
 ): InferredSprintContext['staleSprintState'] | null {
-  if (!isActiveSprintState(sprintState) || latestScorecard <= 0) return null;
-  if (orderForSprint(sprintState.sprint, roadmap) > orderForSprint(latestScorecard, roadmap)) return null;
+  if (!isActiveSprintState(sprintState) || sprintIdKey(latestScorecard) === null) return null;
+  if (compareSprintIdsForRoadmap(sprintState.sprint, latestScorecard, roadmap) > 0) return null;
   return {
     sprint: sprintState.sprint,
     phase: sprintState.phase,
@@ -167,11 +169,11 @@ function activeStateCompletedByScorecards(
 
 function configuredSprintCompletedByScorecards(
   currentSprint: number | undefined,
-  latestScorecard: number,
+  latestScorecard: SprintId,
   roadmap: RoadmapDefinition | null,
 ): InferredSprintContext['staleConfigSprint'] | null {
-  if (!currentSprint || latestScorecard <= 0) return null;
-  if (orderForSprint(currentSprint, roadmap) > orderForSprint(latestScorecard, roadmap)) return null;
+  if (!currentSprint || sprintIdKey(latestScorecard) === null) return null;
+  if (compareSprintIdsForRoadmap(currentSprint, latestScorecard, roadmap) > 0) return null;
   return {
     sprint: currentSprint,
     reason: `completed scorecard evidence has advanced to ${labelForSprint(latestScorecard, roadmap)}`,
@@ -180,30 +182,30 @@ function configuredSprintCompletedByScorecards(
 
 function choosePendingSprint(
   pendingSprints: RoadmapSprint[],
-  latestScorecard: number,
-  scorecardNext: number,
+  latestScorecard: SprintId,
+  scorecardNext: SprintId,
   roadmap: RoadmapDefinition | null,
   completedIds: Set<string>,
 ): RoadmapSprint | undefined {
   if (pendingSprints.length === 0) return undefined;
-  if (latestScorecard === 0) return pendingSprints[0];
+  if (latestScorecard === '0') return pendingSprints[0];
 
   const exactNext = pendingSprints.find(sprint =>
-    roadmapSprintKeyFromId(roadmap!, sprint.id) === roadmapSprintKeyFromId(roadmap!, scorecardNext)
+    roadmapSprintKey(roadmap!, sprint) === roadmapSprintKeyFromId(roadmap!, scorecardNext)
     && dependenciesAreComplete(sprint, completedIds, roadmap));
   if (exactNext) return exactNext;
 
   const nextOrder = orderForSprint(scorecardNext, roadmap);
   const insertedRecovery = pendingSprints.find(sprint =>
-    isInsertedSprintId(sprint.id, roadmap)
-    && orderForSprint(sprint.id, roadmap) <= nextOrder
+    isInsertedSprintId(roadmapSprintKey(roadmap!, sprint), roadmap)
+    && orderForSprint(roadmapSprintKey(roadmap!, sprint), roadmap) <= nextOrder
     && dependenciesAreComplete(sprint, completedIds, roadmap),
   );
   if (insertedRecovery) return insertedRecovery;
 
   const latestOrder = orderForSprint(latestScorecard, roadmap);
   const readySuccessor = pendingSprints.find(sprint =>
-    orderForSprint(sprint.id, roadmap) > latestOrder
+    orderForSprint(roadmapSprintKey(roadmap!, sprint), roadmap) > latestOrder
       && dependenciesAreComplete(sprint, completedIds, roadmap),
   );
   if (readySuccessor) return readySuccessor;
@@ -226,13 +228,15 @@ function dependenciesAreComplete(
   });
 }
 
-function isInsertedSprintId(id: number, roadmap: RoadmapDefinition | null): boolean {
-  return !Number.isInteger(id) || orderForSprint(id, roadmap) !== id;
+function isInsertedSprintId(id: SprintId, roadmap: RoadmapDefinition | null): boolean {
+  const key = sprintIdKey(id);
+  return key?.includes('.') === true
+    || (typeof id === 'number' && orderForSprint(id, roadmap) !== id);
 }
 
 function labelForSprint(id: SprintId, roadmap: RoadmapDefinition | null): string {
   if (Number(id) <= 0) return `S${id}`;
-  if (!roadmap) return formatSprintLabel(Number(id));
+  if (!roadmap) return `S${sprintIdKey(id) ?? id}`;
   const sprint = findRoadmapSprint(roadmap, id);
   return formatRoadmapSprintLabel(
     roadmap,
@@ -240,12 +244,19 @@ function labelForSprint(id: SprintId, roadmap: RoadmapDefinition | null): string
   );
 }
 
-function orderForSprint(id: number, roadmap: RoadmapDefinition | null): number {
-  return roadmap ? roadmapSprintOrderValue(roadmap, id) : sprintOrderValue(id);
+function orderForSprint(id: SprintId, roadmap: RoadmapDefinition | null): number {
+  if (roadmap) return roadmapSprintOrderValue(roadmap, id);
+  const key = sprintIdKey(id);
+  if (key === null) return 0;
+  const [base, insert = '0'] = key.split('.');
+  return Number(base) + Number(insert) / 1_000_000;
 }
 
 function compareSprintIdsForRoadmap(a: SprintId, b: SprintId, roadmap: RoadmapDefinition | null): number {
-  return roadmap ? compareRoadmapSprintIds(roadmap, a, b) : compareSprintIds(Number(a), Number(b));
+  if (roadmap) return compareRoadmapSprintIds(roadmap, a, b);
+  const aKey = sprintIdKey(a);
+  const bKey = sprintIdKey(b);
+  return aKey && bKey ? compareSprintIdKeys(aKey, bKey) : compareSprintIds(Number(a), Number(b));
 }
 
 export function maxSprintByOrder(ids: number[]): number {

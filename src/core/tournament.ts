@@ -11,6 +11,7 @@ import type {
   TournamentStats,
   TournamentHazard,
 } from './types.js';
+import { compareSprintIdKeys } from './sprint-id.js';
 
 const SCORE_ORDER: ScoreLabel[] = [
   'eagle', 'birdie', 'par',
@@ -27,7 +28,7 @@ export function buildTournamentReview(
   scorecards: GolfScorecard[],
   options?: { takeaways?: string[]; improvements?: string[]; reflection?: string },
 ): TournamentReview {
-  const sorted = [...scorecards].sort((a, b) => a.sprint_number - b.sprint_number);
+  const sorted = [...scorecards].sort((a, b) => compareSprintIdKeys(a.sprint_number, b.sprint_number));
 
   const sprints: TournamentSprintEntry[] = sorted.map((card) => {
     const landed = (card.shots ?? []).filter((s) => s.result === 'in_the_hole').length;
@@ -90,8 +91,8 @@ function computeScoring(sprints: TournamentSprintEntry[]): TournamentScoring {
     totalScore,
     differential: totalScore - totalPar,
     avgScoreLabel,
-    bestSprint: { sprintNumber: best?.sprintNumber ?? 0, label: best?.scoreLabel ?? 'par' },
-    worstSprint: { sprintNumber: worst?.sprintNumber ?? 0, label: worst?.scoreLabel ?? 'par' },
+    bestSprint: { sprintNumber: best?.sprintNumber ?? '0', label: best?.scoreLabel ?? 'par' },
+    worstSprint: { sprintNumber: worst?.sprintNumber ?? '0', label: worst?.scoreLabel ?? 'par' },
     sprintCount: sprints.length,
     ticketCount,
     ticketsLanded,

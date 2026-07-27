@@ -158,6 +158,26 @@ describe('computeStatsFromShots', () => {
 // --- buildScorecard ---
 
 describe('buildScorecard', () => {
+  it('canonicalizes numeric inputs and preserves authored trailing-zero keys', () => {
+    expect(buildScorecard({
+      sprint_number: 168,
+      theme: 'Numeric compatibility',
+      par: 3,
+      slope: 0,
+      date: '2026-02-19',
+      shots: [],
+    }).sprint_number).toBe('168');
+
+    expect(buildScorecard({
+      sprint_number: '458.10',
+      theme: 'Canonical identity',
+      par: 3,
+      slope: 0,
+      date: '2026-02-19',
+      shots: [],
+    }).sprint_number).toBe('458.10');
+  });
+
   it('computes score as par plus recorded penalties', () => {
     const card = buildScorecard({
       sprint_number: 168,

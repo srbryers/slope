@@ -19,6 +19,7 @@ import type {
 } from './types.js';
 import { computeScoreLabel } from './handicap.js';
 import { HAZARD_SEVERITY_PENALTIES } from './constants.js';
+import { sprintIdKey, type SprintId } from './sprint-id.js';
 
 // --- Helpers ---
 
@@ -174,7 +175,8 @@ function normalizeMissDirections(raw: unknown): Record<MissDirection, number> {
 
 /** Minimal input for building a scorecard — everything else is computed */
 export interface ScorecardInput {
-  sprint_number: number;
+  /** Numeric legacy inputs are accepted and canonicalized to a string. */
+  sprint_number: SprintId;
   theme: string;
   par: 3 | 4 | 5;
   slope: number;
@@ -222,7 +224,8 @@ export interface ScorecardInput {
  */
 export function buildScorecard(input: ScorecardInput): GolfScorecard {
   validateScorecardInput(input);
-  const shots = input.shots.map((shot, index) => normalizeScorecardShot(shot, input.sprint_number, index));
+  const sprintNumber = sprintIdKey(input.sprint_number)!;
+  const shots = input.shots.map((shot, index) => normalizeScorecardShot(shot, sprintNumber, index));
   const penalties = input.penalties ?? 0;
   const stats = computeStatsFromShots(shots, {
     putts: input.putts ?? 0,
@@ -238,7 +241,7 @@ export function buildScorecard(input: ScorecardInput): GolfScorecard {
   const score_label: ScoreLabel = computeScoreLabel(score, input.par);
 
   return {
-    sprint_number: input.sprint_number,
+    sprint_number: sprintNumber,
     ...(input.player ? { player: input.player } : {}),
     theme: input.theme,
     par: input.par,
@@ -268,8 +271,8 @@ export function buildScorecard(input: ScorecardInput): GolfScorecard {
 }
 
 function validateScorecardInput(input: ScorecardInput): void {
-  if (!Number.isFinite(input.sprint_number) || input.sprint_number <= 0) {
-    throw new Error('Scorecard sprint_number must be a positive number');
+  if (sprintIdKey(input.sprint_number) === null) {
+    throw new Error('Scorecard sprint_number must be a positive sprint id');
   }
   if (input.par !== 3 && input.par !== 4 && input.par !== 5) {
     throw new Error('Scorecard par must be 3, 4, or 5');
@@ -285,7 +288,7 @@ function validateScorecardInput(input: ScorecardInput): void {
   }
 }
 
-function normalizeScorecardShot(raw: ScorecardShotInput, sprintNumber: number, index: number): ShotRecord {
+function normalizeScorecardShot(raw: ScorecardShotInput, sprintNumber: SprintId, index: number): ShotRecord {
   if (!raw || typeof raw !== 'object') {
     throw new Error(`Scorecard shot ${index + 1} must be an object`);
   }

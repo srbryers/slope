@@ -2,7 +2,7 @@ import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import type { HookInput, GuardResult } from '../../core/index.js';
 import { loadConfig } from '../config.js';
-import { loadScorecards } from '../../core/index.js';
+import { compareSprintIdKeys, latestSprintIdKey, loadScorecards, sprintIdKey } from '../../core/index.js';
 import type { CommonIssuesFile, GolfScorecard } from '../../core/index.js';
 import { dedupGuardContext } from '../session-state.js';
 import { normalizeTouchedPath, resolveTouchedPaths } from './hook-input.js';
@@ -162,27 +162,27 @@ function resolveTouchedAreas(input: HookInput, cwd: string): string[] {
 function computeFreshWarnings(area: string, issues: CommonIssuesFile | null): string[] {
   if (!issues) return [];
 
-  const freshWarnings: Array<{ lastSprint: number; text: string }> = [];
+  const freshWarnings: Array<{ lastSprint: string; text: string }> = [];
 
   for (const pattern of issues.recurring_patterns) {
     // Check if pattern is relevant to this area
     const text = `${pattern.title} ${pattern.description} ${pattern.prevention}`.toLowerCase();
     if (areaMatchesText(area, text, { includeGenericSegments: true })) {
-      const lastSprint = Math.max(...pattern.sprints_hit);
+      const lastSprint = latestSprintIdKey(pattern.sprints_hit);
       freshWarnings.push({ lastSprint, text: `[${pattern.category}] ${pattern.title} (S${lastSprint}) — ${pattern.prevention.slice(0, 80)}` });
     }
   }
 
   // Sort by recency (most recent first)
-  freshWarnings.sort((a, b) => b.lastSprint - a.lastSprint);
+  freshWarnings.sort((a, b) => compareSprintIdKeys(b.lastSprint, a.lastSprint));
   return freshWarnings.map(w => w.text);
 }
 
 function computeScorecardWarnings(area: string, scorecards: GolfScorecard[]): string[] {
-  const warnings: Array<{ sprint: number; text: string }> = [];
+  const warnings: Array<{ sprint: string; text: string }> = [];
 
   for (const sc of scorecards) {
-    const sprint = sc.sprint_number ?? (sc as unknown as { sprint?: number }).sprint ?? 0;
+    const sprint = sprintIdKey(sc.sprint_number ?? (sc as unknown as { sprint?: number }).sprint ?? '') ?? '0';
 
     for (const shot of sc.shots ?? []) {
       for (const hazard of shot.hazards ?? []) {
@@ -208,7 +208,7 @@ function computeScorecardWarnings(area: string, scorecards: GolfScorecard[]): st
     }
   }
 
-  warnings.sort((a, b) => b.sprint - a.sprint);
+  warnings.sort((a, b) => compareSprintIdKeys(b.sprint, a.sprint));
 
   const seen = new Set<string>();
   const unique: string[] = [];

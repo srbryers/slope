@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
-import { formatSprintReview, compareSprintIds, normalizeScorecard, parseSprintNumber } from '../../core/index.js';
+import { compareSprintIdKeys, formatSprintReview, normalizeScorecard, sprintIdKey, sprintIdsEqual } from '../../core/index.js';
 import type { GolfScorecard } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { resolveMetaphor } from '../metaphor.js';
@@ -17,11 +17,11 @@ function discoverScorecardPaths(cwd: string, config: ReturnType<typeof loadConfi
   const regex = new RegExp(`^${escapeRegex(prefix)}(\\d+(?:\\.\\d+)?)${escapeRegex(suffix)}$`);
 
   return readdirSync(dir)
-    .map(file => ({ file, sprint: parseSprintNumber(file.match(regex)?.[1] ?? '') }))
-    .filter((entry): entry is { file: string; sprint: number } =>
-      entry.sprint != null && entry.sprint >= config.minSprint,
+    .map(file => ({ file, sprint: sprintIdKey(file.match(regex)?.[1] ?? '') }))
+    .filter((entry): entry is { file: string; sprint: string } =>
+      entry.sprint != null && compareSprintIdKeys(entry.sprint, String(config.minSprint)) >= 0,
     )
-    .sort((a, b) => compareSprintIds(a.sprint, b.sprint))
+    .sort((a, b) => compareSprintIdKeys(a.sprint, b.sprint))
     .map(entry => join(dir, entry.file));
 }
 
@@ -38,7 +38,7 @@ function resolveScorecardPath(
   if (path) return isAbsolute(path) ? path : resolve(cwd, path);
 
   if (sprintSelector) {
-    const sprint = parseSprintNumber(sprintSelector);
+    const sprint = sprintIdKey(sprintSelector);
     if (sprint == null) {
       console.error(`\nInvalid sprint selector: ${sprintSelector}\n`);
       process.exit(1);
@@ -179,7 +179,7 @@ export function reviewCommand(
   // must not mutate gate state at all — only a canonical-path run validates
   // what closeout will actually ship.
   const sprintState = loadSprintState(cwd);
-  if (outputPath === undefined && sprintState?.sprint === card.sprint_number) {
+  if (outputPath === undefined && sprintState && sprintIdsEqual(sprintState.sprint, card.sprint_number)) {
     // User-supplied config: tolerate any shape without crashing closeout.
     const configuredSections = config.reviewRequiredSections;
     if (configuredSections != null && !Array.isArray(configuredSections)) {

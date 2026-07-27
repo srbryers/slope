@@ -23,6 +23,7 @@ import {
   loadScorecards,
   discoverScorecardFiles,
   sprintNumberFromScorecardFile,
+  sprintIdKey,
   loadVision,
   parseSprintNumber,
   analyzeBacklog,
@@ -636,7 +637,7 @@ function completeSourcesSubcommand(flags: Record<string, string>, cwd: string): 
     process.exit(1);
     return;
   }
-  const sprint = parseSprintNumber(flags.sprint);
+  const sprint = sprintIdKey(flags.sprint);
   if (sprint == null) {
     console.error(`\nInvalid sprint number: ${flags.sprint || '(empty)'}`);
     console.error('Usage: slope roadmap complete --sprint=N [--source=<file>] [--scorecard=<path>] [--dry-run]\n');
@@ -663,7 +664,7 @@ function completeSourcesSubcommand(flags: Record<string, string>, cwd: string): 
       dryRun: flags['dry-run'] === 'true',
       force: true,
     });
-    const label = `S${formatSprintNumber(sprint)}`;
+    const label = `S${sprint}`;
     if (flags['dry-run'] === 'true') {
       console.log(`\nRoadmap complete dry run: ${label} in ${result.source}`);
       console.log(`  Would change source: ${result.changed ? 'yes' : 'no'}`);
@@ -1042,7 +1043,8 @@ function scorecardToSprint(card: GolfScorecard): RoadmapSprint {
   }));
 
   return {
-    id: card.sprint_number,
+    id: Number(card.sprint_number),
+    id_key: card.sprint_number,
     theme: card.theme,
     par: card.par as 3 | 4 | 5,
     slope: card.slope,
@@ -1112,7 +1114,7 @@ function syncSubcommand(flags: Record<string, string>, cwd: string): void {
     return; // unreachable but satisfies TS
   }
 
-  const existingById = new Map(roadmap.sprints.map(s => [s.id, s]));
+  const existingById = new Map(roadmap.sprints.map(s => [roadmapSprintKey(roadmap, s), s]));
   let updated = 0;
   let added = 0;
 

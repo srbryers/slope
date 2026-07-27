@@ -6,10 +6,8 @@ import type { CommonIssuesFile } from './briefing.js';
 import type { SprintRegistry } from './registry.js';
 import type { SprintId } from './sprint-id.js';
 
-/** Scorecard as persisted by a store during the 2.0 canonical-id transition. */
-export type StoredGolfScorecard = Omit<GolfScorecard, 'sprint_number'> & {
-  sprint_number: SprintId;
-};
+/** Canonical scorecard representation persisted by stores. */
+export type StoredGolfScorecard = GolfScorecard;
 
 /** Aggregate row counts from the store — used by health checks and diagnostics. */
 export interface StoreStats {

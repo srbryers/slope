@@ -13,6 +13,7 @@ import {
   buildLeaderboard,
   filterScorecardsByPlayer,
   computeGuardMetrics,
+  sprintIdKey,
 } from '../../core/index.js';
 import type { SlopeConfig, DashboardConfig } from '../../core/index.js';
 
@@ -116,8 +117,8 @@ export async function dashboardCommand(args: string[]): Promise<void> {
         res.end(JSON.stringify(leaderboard));
       } else if (pathname.startsWith('/api/sprint/') && req.method === 'GET') {
         const sprintStr = pathname.slice('/api/sprint/'.length);
-        const sprintNum = parseInt(sprintStr, 10);
-        if (isNaN(sprintNum)) {
+        const sprintNum = sprintIdKey(sprintStr);
+        if (sprintNum === null) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: 'Invalid sprint number' }));
           return;

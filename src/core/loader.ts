@@ -4,11 +4,12 @@ import type { ClubSelection, GolfScorecard, HazardHit, ShotRecord, ShotResult } 
 import type { SlopeConfig } from './config.js';
 import { computeStatsFromShots, normalizeStats } from './builder.js';
 import { computePar, computeScoreLabel } from './handicap.js';
-import { compareSprintIds, nextCanonicalSprintId } from './roadmap.js';
+import { nextCanonicalSprintId } from './roadmap.js';
+import { compareSprintIdKeys, sprintIdKey } from './sprint-id.js';
 
 type ScorecardCandidate = {
   path: string;
-  sprintNumber: number;
+  sprintNumber: string;
   priority: number;
   label: string;
 };
@@ -38,7 +39,7 @@ const LEGACY_RESULT_ALIASES: Record<string, ShotResult> = {
 export function loadScorecards(config: SlopeConfig, cwd: string = process.cwd()): GolfScorecard[] {
   const candidates = discoverScorecardCandidatesForConfig(config, cwd);
   const scorecards: GolfScorecard[] = [];
-  const loadedSprints = new Set<number>();
+  const loadedSprints = new Set<string>();
 
   for (const candidate of candidates) {
     if (loadedSprints.has(candidate.sprintNumber)) continue;
@@ -46,7 +47,8 @@ export function loadScorecards(config: SlopeConfig, cwd: string = process.cwd())
     try {
       const raw = JSON.parse(readFileSync(candidate.path, 'utf8'));
       const card = normalizeScorecard(raw);
-      if (card.sprint_number < config.minSprint || loadedSprints.has(card.sprint_number)) continue;
+      if (compareSprintIdKeys(card.sprint_number, String(config.minSprint)) < 0
+        || loadedSprints.has(card.sprint_number)) continue;
       scorecards.push(card);
       loadedSprints.add(card.sprint_number);
     } catch {
@@ -61,7 +63,7 @@ export function discoverScorecardFiles(config: SlopeConfig, cwd: string = proces
   return discoverScorecardCandidatesForConfig(config, cwd).map((candidate) => candidate.path);
 }
 
-export function sprintNumberFromScorecardFile(file: string, config: SlopeConfig): number | null {
+export function sprintNumberFromScorecardFile(file: string, config: SlopeConfig): string | null {
   const patternParts = config.scorecardPattern.split('*');
   const prefix = patternParts[0] ?? '';
   const suffix = patternParts[1] ?? '';
@@ -69,12 +71,12 @@ export function sprintNumberFromScorecardFile(file: string, config: SlopeConfig)
   const normalized = file.replace(/\\/g, '/');
   const filename = normalized.split('/').at(-1) ?? file;
   const topLevelMatch = filename.match(regex);
-  if (topLevelMatch?.[1]) return parseFloat(topLevelMatch[1]);
+  if (topLevelMatch?.[1]) return sprintIdKey(topLevelMatch[1]);
 
   const parts = normalized.split('/');
   const parent = parts.at(-2) ?? '';
   const nestedMatch = parent.match(/^s(?:print-)?(\d+(?:\.\d+)?)$/i);
-  if (filename === 'scorecard.json' && nestedMatch?.[1]) return parseFloat(nestedMatch[1]);
+  if (filename === 'scorecard.json' && nestedMatch?.[1]) return sprintIdKey(nestedMatch[1]);
   return null;
 }
 
@@ -91,13 +93,13 @@ function discoverScorecardCandidatesForConfig(config: SlopeConfig, cwd: string):
   const regex = new RegExp(`^${escapeRegex(prefix)}(\\d+(?:\\.\\d+)?)${escapeRegex(suffix)}$`);
 
   const candidates = discoverScorecardCandidates(dir, regex)
-    .filter((candidate) => candidate.sprintNumber >= config.minSprint)
+    .filter((candidate) => compareSprintIdKeys(candidate.sprintNumber, String(config.minSprint)) >= 0)
     .sort((a, b) => {
-      const bySprint = compareSprintIds(a.sprintNumber, b.sprintNumber);
+      const bySprint = compareSprintIdKeys(a.sprintNumber, b.sprintNumber);
       return bySprint === 0 ? a.priority - b.priority : bySprint;
     });
 
-  const loadedSprints = new Set<number>();
+  const loadedSprints = new Set<string>();
   const dedupedCandidates: ScorecardCandidate[] = [];
 
   for (const candidate of candidates) {
@@ -113,13 +115,13 @@ function discoverScorecardCandidatesForConfig(config: SlopeConfig, cwd: string):
  * Detect the latest sprint number from existing scorecards.
  * Returns 0 if no scorecards are found.
  */
-export function detectLatestSprint(config: SlopeConfig, cwd: string = process.cwd()): number {
+export function detectLatestSprint(config: SlopeConfig, cwd: string = process.cwd()): string {
   const cards = loadScorecards(config, cwd);
-  if (cards.length === 0) return 0;
+  if (cards.length === 0) return '0';
   return cards
     .map((c) => c.sprint_number)
-    .sort(compareSprintIds)
-    .at(-1) ?? 0;
+    .sort(compareSprintIdKeys)
+    .at(-1) ?? '0';
 }
 
 /**
@@ -128,7 +130,7 @@ export function detectLatestSprint(config: SlopeConfig, cwd: string = process.cw
 export function resolveCurrentSprint(config: SlopeConfig, cwd: string = process.cwd()): number {
   if (config.currentSprint) return config.currentSprint;
   const latest = detectLatestSprint(config, cwd);
-  return latest > 0 ? nextCanonicalSprintId(latest) : 1;
+  return latest !== '0' ? nextCanonicalSprintId(latest) : 1;
 }
 
 /**
@@ -141,7 +143,13 @@ export function normalizeScorecard(raw: Record<string, unknown>): GolfScorecard 
   const shotCount = shots.length;
 
   // Normalize sprint_number
-  card.sprint_number = card.sprint_number ?? card.sprint;
+  const sprintNumber = sprintIdKey(
+    card.sprint_number as string | number ?? card.sprint as string | number,
+  );
+  if (sprintNumber === null) {
+    throw new Error('Scorecard sprint_number must be a positive sprint id');
+  }
+  card.sprint_number = sprintNumber;
 
   if ((!Array.isArray(card.shots) || card.shots.length === 0) && shotCount > 0) {
     card.shots = shots;
@@ -252,7 +260,7 @@ function discoverScorecardCandidates(dir: string, regex: RegExp): ScorecardCandi
       if (!match) continue;
       candidates.push({
         path: join(dir, entry.name),
-        sprintNumber: parseFloat(match[1] ?? '0'),
+        sprintNumber: sprintIdKey(match[1] ?? '')!,
         priority: 0,
         label: entry.name,
       });
@@ -266,7 +274,7 @@ function discoverScorecardCandidates(dir: string, regex: RegExp): ScorecardCandi
     if (!existsSync(nestedPath)) continue;
     candidates.push({
       path: nestedPath,
-      sprintNumber: parseFloat(nestedMatch[1] ?? '0'),
+      sprintNumber: sprintIdKey(nestedMatch[1] ?? '')!,
       priority: 1,
       label: `${entry.name}/scorecard.json`,
     });

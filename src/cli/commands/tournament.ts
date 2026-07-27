@@ -1,6 +1,6 @@
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { buildTournamentReview, formatTournamentReview } from '../../core/index.js';
+import { buildTournamentReview, compareSprintIdKeys, formatTournamentReview, sprintIdKey } from '../../core/index.js';
 import type { GolfScorecard } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { loadScorecards } from '../loader.js';
@@ -38,13 +38,15 @@ export function tournamentCommand(args: string[]): void {
   let filtered: GolfScorecard[] = allCards;
 
   if (opts.sprints) {
-    const rangeMatch = opts.sprints.match(/^(\d+)-(\d+)$/);
+    const rangeMatch = opts.sprints.match(/^(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)$/);
     if (rangeMatch) {
-      const start = parseInt(rangeMatch[1], 10);
-      const end = parseInt(rangeMatch[2], 10);
-      filtered = allCards.filter((c) => c.sprint_number >= start && c.sprint_number <= end);
+      const start = sprintIdKey(rangeMatch[1])!;
+      const end = sprintIdKey(rangeMatch[2])!;
+      filtered = allCards.filter((c) =>
+        compareSprintIdKeys(c.sprint_number, start) >= 0
+        && compareSprintIdKeys(c.sprint_number, end) <= 0);
     } else {
-      const nums = new Set(opts.sprints.split(',').map((s) => parseInt(s.trim(), 10)));
+      const nums = new Set(opts.sprints.split(',').map(sprint => sprintIdKey(sprint) ?? sprint.trim()));
       filtered = allCards.filter((c) => nums.has(c.sprint_number));
     }
   }

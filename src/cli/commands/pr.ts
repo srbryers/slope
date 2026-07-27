@@ -1,7 +1,7 @@
 import { execSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { detectLatestSprint, loadConfig, normalizeScorecard, parseSprintNumber, recommendReviews } from '../../core/index.js';
+import { detectLatestSprint, loadConfig, normalizeScorecard, parseSprintNumber, recommendReviews, sprintIdToNumber } from '../../core/index.js';
 import type { ReviewRecommendation } from '../../core/index.js';
 import { reviewRunCommand } from './review-run.js';
 import {
@@ -219,7 +219,8 @@ function inferSprintNumber(explicit?: number): number | undefined {
   if (explicit && !isNaN(explicit)) return explicit;
   try {
     const config = loadConfig();
-    return config.currentSprint ?? (detectLatestSprint(config, process.cwd()) || undefined);
+    const latest = detectLatestSprint(config, process.cwd());
+    return config.currentSprint ?? sprintIdToNumber(latest) ?? undefined;
   } catch {
     return undefined;
   }

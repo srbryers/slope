@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { execSync } from 'node:child_process';
-import { loadConfig, loadScorecards, detectLatestSprint, formatSprintNumber, GUARD_DEFINITIONS, loadFlows, checkFlowStaleness, parseSprintNumber } from '../../core/index.js';
+import { compareSprintIdKeys, loadConfig, loadScorecards, detectLatestSprint, GUARD_DEFINITIONS, loadFlows, checkFlowStaleness, parseSprintId, sprintIdKey } from '../../core/index.js';
 import type { SlopeConfig } from '../../core/index.js';
 import { CLI_COMMAND_REGISTRY } from '../registry.js';
 import { SLOPE_REGISTRY } from '../../mcp/registry.js';
@@ -126,7 +126,7 @@ function countSourceFiles(root: string): { source: number; test: number } {
 interface MapMetadata {
   generated_at: string;
   git_sha: string;
-  sprint: number;
+  sprint: string;
   source_files: number;
   test_files: number;
   cli_commands: number;
@@ -755,15 +755,15 @@ export function runStalenessCheck(cwd: string, config: SlopeConfig, mapContent: 
   }
 
   // 3. Sprint currency
-  const mapSprint = parseSprintNumber(meta.sprint || '0') ?? 0;
+  const mapSprint = sprintIdKey(meta.sprint) ?? '0';
   const currentSprint = detectLatestSprint(config, cwd);
-  const sprintDelta = currentSprint - mapSprint;
-  const currentSprintLabel = formatSprintNumber(currentSprint);
-  const mapSprintLabel = formatSprintNumber(mapSprint);
-  const sprintDeltaLabel = formatSprintNumber(Number(sprintDelta.toFixed(6)));
+  const sprintDelta = (parseSprintId(currentSprint)?.base ?? 0) - (parseSprintId(mapSprint)?.base ?? 0);
+  const currentSprintLabel = currentSprint;
+  const mapSprintLabel = mapSprint;
+  const sprintDeltaLabel = String(sprintDelta);
   if (sprintDelta > 3) {
     results.push({ label: 'Sprint currency', status: 'stale', message: `Sprint ${currentSprintLabel} (map says ${mapSprintLabel}, +${sprintDeltaLabel} behind)` });
-  } else if (sprintDelta > 0) {
+  } else if (sprintDelta > 0 || compareSprintIdKeys(currentSprint, mapSprint) > 0) {
     results.push({ label: 'Sprint currency', status: 'warn', message: `Sprint ${currentSprintLabel} (map says ${mapSprintLabel}, +${sprintDeltaLabel})` });
   } else {
     results.push({ label: 'Sprint currency', status: 'ok', message: `Sprint ${currentSprintLabel} — current` });

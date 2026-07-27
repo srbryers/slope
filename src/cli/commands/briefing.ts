@@ -1,6 +1,6 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { DEFAULT_SKILLS_PATH, buildSkillBriefing, formatBriefing, parseRoadmap, castRoadmapStructure, getRole, hasRole, loadCustomRoles, filterScorecardsByPlayer, filterHazardsByVisibility, formatDeferredForBriefing, loadDeferred, computeHandicapCard, formatStrategicContext, loadSkillRegistry, parseSprintNumber, loadFindings, formatCodificationCandidatesForBriefing, collectOpenCodificationCandidates, resolveRepoStatePath } from '../../core/index.js';
+import { DEFAULT_SKILLS_PATH, buildSkillBriefing, compareSprintIdKeys, formatBriefing, parseRoadmap, castRoadmapStructure, getRole, hasRole, latestSprintIdKey, loadCustomRoles, filterScorecardsByPlayer, filterHazardsByVisibility, formatDeferredForBriefing, loadDeferred, computeHandicapCard, formatStrategicContext, loadSkillRegistry, parseSprintNumber, loadFindings, formatCodificationCandidatesForBriefing, collectOpenCodificationCandidates, resolveRepoStatePath } from '../../core/index.js';
 import type { CommonIssuesFile, SessionEntry, SprintClaim, RoadmapDefinition, SlopeEvent, RoleDefinition } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { loadScorecards } from '../loader.js';
@@ -141,7 +141,10 @@ export async function briefingCommand(args: string[]): Promise<void> {
     const gir = card.all_time.gir_pct.toFixed(0);
     const hazardCount = visibleIssues.recurring_patterns.length;
     const topHazards = visibleIssues.recurring_patterns
-      .sort((a, b) => Math.max(...b.sprints_hit) - Math.max(...a.sprints_hit))
+      .sort((a, b) => compareSprintIdKeys(
+        latestSprintIdKey(b.sprints_hit),
+        latestSprintIdKey(a.sprints_hit),
+      ))
       .slice(0, 3)
       .map(p => p.title)
       .join('; ');

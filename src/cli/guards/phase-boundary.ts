@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { HookInput, GuardResult, Suggestion } from '../../core/index.js';
+import type { HookInput, GuardResult, SprintId, Suggestion } from '../../core/index.js';
 import { castRoadmapStructure, loadConfig, loadScorecards, parseRoadmap, parseSprintNumber, roadmapSprintOrderValue } from '../../core/index.js';
 import { isPhaseComplete, pendingPhaseGates } from '../phase-cleanup.js';
 
@@ -84,7 +84,7 @@ export async function phaseBoundaryGuard(input: HookInput, cwd: string): Promise
   // S23.5) cannot skew the boundary, and only roadmap-member scorecards count
   // as evidence, so a stray high-numbered recovery scorecard cannot downgrade
   // every earlier boundary.
-  const orderOf = (id: number): number => roadmapSprintOrderValue(roadmap, id);
+  const orderOf = (id: SprintId): number => roadmapSprintOrderValue(roadmap, id);
   const targetPhaseSprints = (roadmap.phases[targetPhaseIdx].sprints ?? [])
     .filter((id): id is number => typeof id === 'number')
     .map(orderOf);

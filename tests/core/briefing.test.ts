@@ -212,7 +212,7 @@ describe('extractHazardIndex', () => {
     });
     const result = extractHazardIndex([card]);
     expect(result.shot_hazards).toHaveLength(1);
-    expect(result.shot_hazards[0].sprint).toBe(167);
+    expect(result.shot_hazards[0].sprint).toBe('167');
     expect(result.shot_hazards[0].ticket).toBe('S167-1');
     expect(result.shot_hazards[0].description).toBe('migration conflict');
   });
@@ -224,7 +224,7 @@ describe('extractHazardIndex', () => {
     });
     const result = extractHazardIndex([card]);
     expect(result.bunker_locations).toHaveLength(2);
-    expect(result.bunker_locations[0].sprint).toBe(167);
+    expect(result.bunker_locations[0].sprint).toBe('167');
     expect(result.bunker_locations[0].location).toBe('Watch out for X');
   });
 

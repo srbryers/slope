@@ -13,7 +13,13 @@ import { computeHandicapCard } from './handicap.js';
 import { computeDispersion } from './dispersion.js';
 import { generateTrainingPlan } from './advisor.js';
 import { checkConflicts } from './registry.js';
-import { compareSprintIdKeys, sprintIdKey, type SprintId } from './sprint-id.js';
+import {
+  compareSprintIdKeys,
+  latestSprintIdKey,
+  sprintIdKey,
+  sprintIdsEqual,
+  type SprintId,
+} from './sprint-id.js';
 import type { RoadmapDefinition } from './roadmap.js';
 import {
   formatRoadmapSprintLabel,
@@ -32,7 +38,7 @@ export interface RecurringPattern {
   id: number;
   title: string;
   category: string;
-  sprints_hit: number[];
+  sprints_hit: SprintId[];
   gotcha_refs: string[];
   description: string;
   prevention: string;
@@ -64,7 +70,7 @@ export interface BriefingFilter {
 
 /** A single hazard extracted from scorecards */
 export interface HazardEntry {
-  sprint: number;
+  sprint: string;
   ticket: string;
   type: string;
   description: string;
@@ -78,9 +84,9 @@ type BriefingHazardRelationship =
   | 'historical';
 
 interface BriefingHazardProvenance {
-  source_sprint: number;
+  source_sprint: SprintId;
   source_phase?: string;
-  target_sprint: number;
+  target_sprint: SprintId;
   target_phase?: string;
   relationship: BriefingHazardRelationship;
   relevance: 'active' | 'historical';
@@ -91,7 +97,7 @@ interface ScopedBriefingHazard extends HazardEntry {
 }
 
 interface ScopedBriefingBunker {
-  sprint: number;
+  sprint: string;
   location: string;
   provenance: BriefingHazardProvenance;
 }
@@ -160,9 +166,9 @@ export function filterCommonIssues(
 
   // Sort by most recent sprint hit (descending)
   results = [...results].sort((a, b) => {
-    const aMax = Math.max(...a.sprints_hit, 0);
-    const bMax = Math.max(...b.sprints_hit, 0);
-    return bMax - aMax;
+    const aMax = latestSprintIdKey(a.sprints_hit);
+    const bMax = latestSprintIdKey(b.sprints_hit);
+    return compareSprintIdKeys(bMax, aMax);
   });
 
   return results.slice(0, 10);
@@ -175,13 +181,13 @@ export function filterCommonIssues(
 export function extractHazardIndex(
   scorecards: GolfScorecard[],
   keyword?: string,
-): { shot_hazards: HazardEntry[]; bunker_locations: { sprint: number; location: string }[] } {
+): { shot_hazards: HazardEntry[]; bunker_locations: { sprint: string; location: string }[] } {
   const shotHazards: HazardEntry[] = [];
-  const bunkers: { sprint: number; location: string }[] = [];
+  const bunkers: { sprint: string; location: string }[] = [];
   const kw = keyword?.toLowerCase();
 
   for (const sc of scorecards) {
-    const sprintNum = sc.sprint_number ?? (sc as any).sprint;
+    const sprintNum = sprintIdKey(sc.sprint_number ?? (sc as any).sprint) ?? '0';
 
     for (const shot of sc.shots ?? []) {
       for (const h of shot.hazards ?? []) {
@@ -388,7 +394,7 @@ function scopeBriefingHazards(
   const assignment = currentAssignmentEvidence(roadmap, currentSprint);
   let suppressed = 0;
 
-  const provenanceFor = (sourceSprint: number): BriefingHazardProvenance => {
+  const provenanceFor = (sourceSprint: SprintId): BriefingHazardProvenance => {
     const sourcePhase = roadmapPhaseForSprint(roadmap, sourceSprint);
     const dependencyKey = roadmapSprintKeyFromId(roadmap, sourceSprint);
     const dependencyDepth = dependencyKey ? dependencyDepths.get(dependencyKey) : undefined;
@@ -405,7 +411,7 @@ function scopeBriefingHazards(
     return {
       source_sprint: sourceSprint,
       source_phase: sourcePhase?.name,
-      target_sprint: target.id,
+      target_sprint: roadmapSprintKey(roadmap, target),
       target_phase: targetPhase?.name,
       relationship,
       relevance: relationship === 'active_sprint' ? 'active' : 'historical',
@@ -571,7 +577,7 @@ export function buildSkillBriefing(opts: {
   const recentHazards = [...relevantHazards]
     .sort((a, b) => roadmap
       ? roadmapSprintOrderValue(roadmap, b.sprint) - roadmapSprintOrderValue(roadmap, a.sprint)
-      : b.sprint - a.sprint)
+      : compareSprintIdKeys(b.sprint, a.sprint))
     .slice(0, 20);
   const hazardText = normalizeSearchText([
     ...recentHazards.map(h => `${h.type} ${h.ticket} ${h.description}`),
@@ -584,7 +590,7 @@ export function buildSkillBriefing(opts: {
   const requestedScorecard = currentSprint != null
     ? scorecards.find(card => roadmap
       ? roadmapIdsEqual(roadmap, scorecardSprintNumber(card), currentSprint)
-      : scorecardSprintNumber(card) === currentSprint)
+      : sprintIdsEqual(scorecardSprintNumber(card), currentSprint))
     : undefined;
   const requestedSkillIds = collectRequestedScorecardSkillIds(requestedScorecard);
   const historicalSkillIds = collectScorecardSkillIds(scorecards);
@@ -732,7 +738,7 @@ export function formatBriefing(opts: {
   const scopedHazards = roadmap && currentSprint && roadmapSprintById(roadmap, currentSprint)
     ? scopeBriefingHazards(hazards, roadmap, currentSprint)
     : undefined;
-  let filteredBunkers: Array<{ sprint: number; location: string; provenance?: BriefingHazardProvenance }> =
+  let filteredBunkers: Array<{ sprint: string; location: string; provenance?: BriefingHazardProvenance }> =
     scopedHazards?.bunker_locations ?? hazards.bunker_locations;
   let filteredShotHazards: Array<HazardEntry & { provenance?: BriefingHazardProvenance }> =
     scopedHazards?.shot_hazards ?? hazards.shot_hazards;
@@ -765,19 +771,19 @@ export function formatBriefing(opts: {
     const hazardLines = [
       ...filteredShotHazards.map(h => ({
         sprint: h.sprint,
-        order: roadmap ? roadmapSprintOrderValue(roadmap, h.sprint) : h.sprint,
         line: scopedHazards && h.provenance
           ? `  ${formatBriefingHazardProvenance(h.provenance, roadmap!)} ${h.type}: ${h.description}`
           : `  [S${h.sprint}] ${h.type}: ${h.description}`,
       })),
       ...filteredBunkers.map(b => ({
         sprint: b.sprint,
-        order: roadmap ? roadmapSprintOrderValue(roadmap, b.sprint) : b.sprint,
         line: scopedHazards && b.provenance
           ? `  ${formatBriefingHazardProvenance(b.provenance, roadmap!)} bunker: ${b.location}`
           : `  [S${b.sprint}] ${b.location}`,
       })),
-    ].sort((a, b) => b.order - a.order);
+    ].sort((a, b) => roadmap
+      ? roadmapSprintOrderValue(roadmap, b.sprint) - roadmapSprintOrderValue(roadmap, a.sprint)
+      : compareSprintIdKeys(b.sprint, a.sprint));
 
     for (const entry of hazardLines.slice(0, DEFAULT_BRIEFING_HAZARD_LIMIT)) {
       lines.push(entry.line);
@@ -916,7 +922,7 @@ export function formatBriefing(opts: {
       : 'RECENT GOTCHAS';
     lines.push(`${label} (${filtered.length}/${commonIssues.recurring_patterns.length} patterns)`);
     for (const p of filtered) {
-      const lastHit = Math.max(...p.sprints_hit);
+      const lastHit = latestSprintIdKey(p.sprints_hit);
       const reporterTag = (p.reported_by && p.reported_by.length > 1) ? ` [${p.reported_by.length} reporters]` : '';
       lines.push(`  [${p.category}] ${p.title} (last: S${lastHit})${reporterTag}`);
       lines.push(`    Prevention: ${p.prevention.slice(0, 120)}${p.prevention.length > 120 ? '...' : ''}`);
@@ -1142,12 +1148,12 @@ function collectScorecardSkillIds(scorecards: GolfScorecard[]): Set<string> {
   return ids;
 }
 
-function scorecardSprintNumber(card: GolfScorecard): number {
-  return card.sprint_number ?? (card as { sprint?: number }).sprint ?? 0;
+function scorecardSprintNumber(card: GolfScorecard): string {
+  return sprintIdKey(card.sprint_number ?? (card as { sprint?: SprintId }).sprint ?? '') ?? '0';
 }
 
 function uniqueScorecards(cards: GolfScorecard[]): GolfScorecard[] {
-  const seen = new Set<number>();
+  const seen = new Set<string>();
   const unique: GolfScorecard[] = [];
   for (const card of cards) {
     const sprint = scorecardSprintNumber(card);

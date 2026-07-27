@@ -97,3 +97,20 @@ export function sprintIdsEqual(a: SprintId, b: SprintId): boolean {
   const kb = sprintIdKey(b);
   return ka !== null && ka === kb;
 }
+
+/** Return the greatest valid canonical key, or the supplied fallback. */
+export function latestSprintIdKey(values: SprintId[], fallback = '0'): string {
+  const keys = values
+    .map(sprintIdKey)
+    .filter((key): key is string => key !== null)
+    .sort(compareSprintIdKeys);
+  return keys.at(-1) ?? fallback;
+}
+
+/** Convert to the legacy numeric mirror only when the canonical key round-trips. */
+export function sprintIdToNumber(value: SprintId): number | null {
+  const key = sprintIdKey(value);
+  if (key === null) return null;
+  const numeric = Number(key);
+  return String(numeric) === key ? numeric : null;
+}

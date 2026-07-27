@@ -19,6 +19,7 @@ import {
   validateRoadmapSourceFederation,
   type LoadedRoadmapSource,
   type RoadmapDefinition,
+  type SprintId,
   type RoadmapSourceProject,
   type RoadmapSourceValidationResult,
 } from '../core/index.js';
@@ -241,7 +242,7 @@ function normalizeScorecardRef(path: string): string {
  * retain their canonical key while the numeric input remains a compatibility
  * lookup until scorecard/state callers migrate to SprintId. (#618, #659)
  */
-function findRoadmapSourceSprint(store: RoadmapSourceStore, sprint: number): RoadmapSourceSprintMatch {
+function findRoadmapSourceSprint(store: RoadmapSourceStore, sprint: SprintId): RoadmapSourceSprintMatch {
   const targetLabel = formatRoadmapSprintLabel(store.roadmap, sprint);
   const matches: RoadmapSourceSprintMatch[] = [];
   for (const source of store.sources) {
@@ -274,7 +275,7 @@ function findRoadmapSourceSprint(store: RoadmapSourceStore, sprint: number): Roa
 
 export function completeRoadmapSourceSprint(
   cwd: string,
-  sprint: number,
+  sprint: SprintId,
   options: { sourceFlag?: string; scorecardPath?: string; dryRun?: boolean; force?: boolean } = {},
 ): CompleteRoadmapSourceSprintResult {
   const initial = loadRoadmapSourceStore(cwd, options.sourceFlag);

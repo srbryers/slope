@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { loadScorecards, detectLatestSprint, discoverScorecardFiles, normalizeScorecard } from '../../src/core/loader.js';
+import { loadScorecards, detectLatestSprint, discoverScorecardFiles, normalizeScorecard, sprintNumberFromScorecardFile } from '../../src/core/loader.js';
 import type { SlopeConfig } from '../../src/core/config.js';
 
 const TMP = join(__dirname, '__loader_tmp__');
@@ -18,7 +18,7 @@ const baseConfig: SlopeConfig = {
   metaphor: 'golf',
 };
 
-function writeCard(dir: string, filename: string, sprintNumber: number): void {
+function writeCard(dir: string, filename: string, sprintNumber: string | number): void {
   const card = {
     sprint_number: sprintNumber,
     theme: `Sprint ${sprintNumber}`,
@@ -62,7 +62,7 @@ describe('loadScorecards — numeric sort', () => {
 
     const cards = loadScorecards(baseConfig, TMP);
     const numbers = cards.map(c => c.sprint_number);
-    expect(numbers).toEqual([2, 9, 20]);
+    expect(numbers).toEqual(['2', '9', '20']);
   });
 
   it('sorts double-digit sprints correctly', () => {
@@ -72,7 +72,7 @@ describe('loadScorecards — numeric sort', () => {
 
     const cards = loadScorecards(baseConfig, TMP);
     const numbers = cards.map(c => c.sprint_number);
-    expect(numbers).toEqual([1, 2, 3, 9, 10, 11, 20]);
+    expect(numbers).toEqual(['1', '2', '3', '9', '10', '11', '20']);
   });
 
   it('returns empty array for missing directory', () => {
@@ -88,7 +88,7 @@ describe('loadScorecards — numeric sort', () => {
 
     const cards = loadScorecards({ ...baseConfig, minSprint: 5 }, TMP);
     const numbers = cards.map(c => c.sprint_number);
-    expect(numbers).toEqual([5, 10]);
+    expect(numbers).toEqual(['5', '10']);
   });
 
   it('normalizes missing score fields to a neutral par score', () => {
@@ -132,7 +132,18 @@ describe('loadScorecards — numeric sort', () => {
     writeCard(retrosDir, 'sprint-43.5.json', 43.5);
 
     const cards = loadScorecards(baseConfig, TMP);
-    expect(cards.map(c => c.sprint_number)).toEqual([43.5, 44]);
+    expect(cards.map(c => c.sprint_number)).toEqual(['43.5', '44']);
+  });
+
+  it('keeps S458.10 distinct from S458.1 through filename and JSON round-trip', () => {
+    writeCard(retrosDir, 'sprint-458.10.json', '458.10');
+    writeCard(retrosDir, 'sprint-458.1.json', '458.1');
+    writeCard(retrosDir, 'sprint-458.9.json', '458.9');
+
+    const cards = loadScorecards(baseConfig, TMP);
+
+    expect(cards.map(card => card.sprint_number)).toEqual(['458.1', '458.9', '458.10']);
+    expect(sprintNumberFromScorecardFile('sprint-458.10.json', baseConfig)).toBe('458.10');
   });
 
   it('also loads nested sN/scorecard.json scorecards for repos that keep sprint artifacts together', () => {
@@ -141,7 +152,7 @@ describe('loadScorecards — numeric sort', () => {
     writeNestedCard(retrosDir, 's155', 155);
 
     const cards = loadScorecards(baseConfig, TMP);
-    expect(cards.map(c => c.sprint_number)).toEqual([103, 104, 155]);
+    expect(cards.map(c => c.sprint_number)).toEqual(['103', '104', '155']);
   });
 
   it('prefers configured top-level scorecards over nested duplicates for the same sprint', () => {
@@ -149,7 +160,7 @@ describe('loadScorecards — numeric sort', () => {
     writeNestedCard(retrosDir, 's104', 104);
 
     const cards = loadScorecards(baseConfig, TMP);
-    expect(cards.map(c => c.sprint_number)).toEqual([104]);
+    expect(cards.map(c => c.sprint_number)).toEqual(['104']);
     expect(cards).toHaveLength(1);
   });
 
@@ -182,7 +193,7 @@ describe('detectLatestSprint', () => {
     writeCard(retrosDir, 'sprint-2.json', 2);
 
     const latest = detectLatestSprint(baseConfig, TMP);
-    expect(latest).toBe(20);
+    expect(latest).toBe('20');
   });
 
   it('orders decimal inserted scorecards before the next canonical sprint', () => {
@@ -190,7 +201,7 @@ describe('detectLatestSprint', () => {
     writeCard(retrosDir, 'sprint-44.json', 44);
 
     const latest = detectLatestSprint(baseConfig, TMP);
-    expect(latest).toBe(44);
+    expect(latest).toBe('44');
   });
 
   it('detects latest sprint from nested sN/scorecard.json scorecards', () => {
@@ -198,11 +209,18 @@ describe('detectLatestSprint', () => {
     writeNestedCard(retrosDir, 's155', 155);
 
     const latest = detectLatestSprint(baseConfig, TMP);
-    expect(latest).toBe(155);
+    expect(latest).toBe('155');
   });
 
   it('returns 0 for no scorecards', () => {
     const latest = detectLatestSprint(baseConfig, TMP);
-    expect(latest).toBe(0);
+    expect(latest).toBe('0');
+  });
+
+  it('returns S458.10 after S458.9 without collapsing it to S458.1', () => {
+    writeCard(retrosDir, 'sprint-458.9.json', '458.9');
+    writeCard(retrosDir, 'sprint-458.10.json', '458.10');
+
+    expect(detectLatestSprint(baseConfig, TMP)).toBe('458.10');
   });
 });

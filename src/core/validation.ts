@@ -1,6 +1,7 @@
 import type { GolfScorecard, HazardSeverity, ShotResult } from './types.js';
 import { computeScoreLabel } from './handicap.js';
 import { normalizeStats } from './builder.js';
+import { sprintIdKey, type SprintId } from './sprint-id.js';
 
 // --- Validation-specific types ---
 
@@ -50,7 +51,7 @@ function isValidISODate(s: string): boolean {
  * Accepts either `sprint_number` (TypeScript type) or `sprint` (retro JSON field name).
  */
 export function validateScorecard(
-  card: GolfScorecard & { sprint?: number; completed_on?: string; started_on?: string },
+  card: GolfScorecard & { sprint?: SprintId; completed_on?: string; started_on?: string },
   options: ScorecardValidationOptions = {},
 ): ScorecardValidationResult {
   const errors: ScorecardValidationError[] = [];
@@ -78,7 +79,7 @@ export function validateScorecard(
   if (typeof effectiveDate !== 'string' || !isValidISODate(effectiveDate)) {
     errors.push({ code: 'INVALID_DATE', message: `date must be a valid ISO string (got "${effectiveDate}")`, field: 'date' });
   }
-  if (sprintNumber == null || typeof sprintNumber !== 'number' || sprintNumber <= 0) {
+  if (sprintNumber == null || sprintIdKey(sprintNumber) === null) {
     errors.push({ code: 'MISSING_SPRINT', message: 'sprint_number (or sprint) is required and must be > 0', field: 'sprint_number' });
   }
 

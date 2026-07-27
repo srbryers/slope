@@ -128,7 +128,7 @@ function sprintLabelForContext(cwd: string, config: SlopeConfig): string | null 
   }
 
   const branchSprint = inferSprintFromBranch(cwd);
-  if (branchSprint !== null) return formatSprintLabel(branchSprint);
+  if (branchSprint !== null) return `S${branchSprint}`;
   return inferred && inferred.source !== 'initial' ? inferred.label : null;
 }
 

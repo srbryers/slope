@@ -3,7 +3,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { isAbsolute, join, resolve } from 'node:path';
 import type { HookInput, GuardResult } from '../../core/index.js';
-import { formatSprintNumber, parseSprintNumber } from '../../core/index.js';
+import { formatSprintNumber, parseSprintNumber, sprintIdsEqual, sprintIdToNumber } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { loadPrReviewState } from '../pr-review-state.js';
 import { loadSprintState, loadSprintStateResult, mutateSprintState, updateGate, isSprintComplete, pendingGates } from '../sprint-state.js';
@@ -42,8 +42,8 @@ function checkStaleness(sprint: number, cwd: string): string | null {
     const branch = currentBranch(cwd);
     if (branch) {
       const branchSprint = inferSprintFromBranch(cwd);
-      if (branchSprint !== null && branchSprint !== sprint) {
-        return `Warning: sprint-state is for Sprint ${formatSprintNumber(sprint)} but branch "${branch}" suggests Sprint ${formatSprintNumber(branchSprint)}. Use audited sprint rollover; do not reset away the prior state.`;
+      if (branchSprint !== null && !sprintIdsEqual(branchSprint, sprint)) {
+        return `Warning: sprint-state is for Sprint ${formatSprintNumber(sprint)} but branch "${branch}" suggests Sprint ${branchSprint}. Use audited sprint rollover; do not reset away the prior state.`;
       }
     }
     // No sprint number in branch name — can't verify, don't warn
@@ -78,10 +78,14 @@ function handlePreToolUse(input: HookInput, cwd: string): GuardResult {
     lineageError = (error as Error).message;
   }
   const branchSprint = inferSprintFromBranch(guardCwd);
-  if (branchSprint !== null && branchSprint !== state.sprint) {
+  if (branchSprint !== null && !sprintIdsEqual(branchSprint, state.sprint)) {
     let recovery: string[];
     try {
-      const assessment = inspectSprintRollover(guardCwd, { from: state.sprint, to: branchSprint });
+      const branchSprintNumber = sprintIdToNumber(branchSprint);
+      if (branchSprintNumber === null) {
+        throw new Error(`Sprint ${branchSprint} cannot be represented by the legacy numeric sprint-state rollover contract.`);
+      }
+      const assessment = inspectSprintRollover(guardCwd, { from: state.sprint, to: branchSprintNumber });
       const blockers = assessment.issues.filter(issue => issue.code !== 'from_not_terminal');
       if (blockers.length === 0) {
         const base = `slope sprint rollover --from=${assessment.from_label.slice(1)} --to=${assessment.to_label.slice(1)}`;
@@ -102,7 +106,7 @@ function handlePreToolUse(input: HookInput, cwd: string): GuardResult {
       decision: 'deny',
       blockReason: [
         'SLOPE sprint-completion: branch and sprint-state disagree; refusing automatic rebind.',
-        `State: Sprint ${formatSprintNumber(state.sprint)}; branch suggests Sprint ${formatSprintNumber(branchSprint)}.`,
+        `State: Sprint ${formatSprintNumber(state.sprint)}; branch suggests Sprint ${branchSprint}.`,
         ...recovery,
       ].join('\n'),
     };

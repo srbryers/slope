@@ -15,6 +15,7 @@ import type {
   SlopeEvent,
 } from './types.js';
 import { computeAreaPerformance, computeDispersion } from './dispersion.js';
+import { compareSprintIdKeys, parseSprintId } from './sprint-id.js';
 
 // --- Module-private constants ---
 
@@ -470,7 +471,7 @@ export function generateTrainingPlan(input: TrainingPlanInput): TrainingRecommen
 
   // 4. Recurring hazards in 3+ consecutive sprints
   if (recentScorecards.length >= 3) {
-    const hazardTypesBySprint: Map<string, number[]> = new Map();
+    const hazardTypesBySprint: Map<string, string[]> = new Map();
     for (const sc of recentScorecards) {
       const sprintNum = sc.sprint_number;
       for (const shot of sc.shots ?? []) {
@@ -489,9 +490,11 @@ export function generateTrainingPlan(input: TrainingPlanInput): TrainingRecommen
     for (const [hazardType, sprints] of hazardTypesBySprint) {
       if (sprints.length >= 3) {
         // Check if they are consecutive (sorted sprints with gap <= 2)
-        const sorted = [...sprints].sort((a, b) => a - b);
+        const sorted = [...sprints].sort(compareSprintIdKeys);
         const lastThree = sorted.slice(-3);
-        const isConsecutive = lastThree[2] - lastThree[0] <= 4; // within 4 sprints
+        const firstBase = parseSprintId(lastThree[0])?.base ?? 0;
+        const lastBase = parseSprintId(lastThree[2])?.base ?? Number.POSITIVE_INFINITY;
+        const isConsecutive = lastBase - firstBase <= 4;
         if (isConsecutive) {
           recommendations.push({
             area: `Recurring hazard: ${hazardType}`,

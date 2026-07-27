@@ -6,8 +6,8 @@
  *     [--path=GLOB]... [--exclude-path=GLOB]... [--max-diff-bytes=N] [--json]
  */
 
-import { loadConfig, detectLatestSprint, parseSprintNumber } from '../../core/index.js';
-import type { ReviewRecommendation } from '../../core/index.js';
+import { loadConfig, detectLatestSprint, sprintIdKey } from '../../core/index.js';
+import type { ReviewRecommendation, SprintId } from '../../core/index.js';
 import {
   collectReviewDiff,
   DEFAULT_REVIEW_DIFF_BYTES,
@@ -25,7 +25,7 @@ export interface ReviewPrompt {
   prompt: string;
   context: {
     pr_number?: number;
-    sprint?: number;
+    sprint?: SprintId;
     changed_files: string[];
     total_changed_files: number;
     diff_lines: number;
@@ -51,7 +51,7 @@ export interface ReviewPrompt {
 export interface ReviewRunOptions {
   prNumber?: number;
   reviewType: 'architect' | 'code' | 'both';
-  sprint?: number;
+  sprint?: SprintId;
   json: boolean;
   scope: ReviewDiffScope;
 }
@@ -65,7 +65,7 @@ function positiveInteger(value: string, flag: string): number {
 export function parseReviewRunArgs(args: string[]): ReviewRunOptions {
   let prNumber: number | undefined;
   let reviewType: ReviewRunOptions['reviewType'] = 'both';
-  let sprint: number | undefined;
+  let sprint: SprintId | undefined;
   let json = false;
   let maxDiffBytes = DEFAULT_REVIEW_DIFF_BYTES;
   const include: string[] = [];
@@ -83,8 +83,8 @@ export function parseReviewRunArgs(args: string[]): ReviewRunOptions {
       }
       reviewType = value;
     } else if (arg.startsWith('--sprint=')) {
-      sprint = parseSprintNumber(arg.slice('--sprint='.length)) ?? undefined;
-      if (sprint == null || sprint <= 0) throw new Error('--sprint must be a positive sprint number.');
+      sprint = sprintIdKey(arg.slice('--sprint='.length)) ?? undefined;
+      if (sprint == null) throw new Error('--sprint must be a positive sprint id.');
     } else if (arg.startsWith('--path=')) {
       const value = arg.slice('--path='.length).trim();
       if (!value) throw new Error('--path requires a non-empty glob.');
@@ -164,7 +164,7 @@ function buildPrompt(
   type: 'architect' | 'code',
   review: ReviewDiffResult,
   scope: ReviewDiffScope,
-  sprint?: number,
+  sprint?: SprintId,
   reviewer?: ReviewerAgentSpec,
 ): string {
   const warnings = coverageWarnings(review);
@@ -223,7 +223,7 @@ function buildPrompt(
 function promptContext(
   review: ReviewDiffResult,
   scope: ReviewDiffScope,
-  sprint: number | undefined,
+  sprint: SprintId | undefined,
   reviewer: ReviewerAgentSpec | undefined,
 ): ReviewPrompt['context'] {
   return {

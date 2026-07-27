@@ -24,6 +24,7 @@ import {
 import type { GuardEffectivenessReport } from './analytics.js';
 import { extractPlayers } from './player.js';
 import { buildLeaderboard, renderLeaderboardHtml } from './leaderboard.js';
+import { compareSprintIdKeys } from './sprint-id.js';
 
 // --- Dashboard Config ---
 
@@ -42,7 +43,7 @@ export const DEFAULT_DASHBOARD_CONFIG: DashboardConfig = {
 // --- Heatmap Types ---
 
 export interface HeatmapCell {
-  sprintNumber: number;
+  sprintNumber: string;
   direction: MissDirection;
   count: number;
   intensity: number;
@@ -51,7 +52,7 @@ export interface HeatmapCell {
 export interface MissHeatmapData {
   cells: HeatmapCell[];
   maxCount: number;
-  sprints: number[];
+  sprints: string[];
   directions: MissDirection[];
 }
 
@@ -242,7 +243,7 @@ export function renderSprintTimeline(trend: SprintTrendEntry[], metaphor?: Metap
 
 export function computeMissHeatmap(scorecards: GolfScorecard[]): MissHeatmapData {
   const directions: MissDirection[] = ['long', 'short', 'left', 'right'];
-  const sorted = [...scorecards].sort((a, b) => a.sprint_number - b.sprint_number);
+  const sorted = [...scorecards].sort((a, b) => compareSprintIdKeys(a.sprint_number, b.sprint_number));
   const sprints = sorted.map(s => s.sprint_number);
 
   let maxCount = 0;

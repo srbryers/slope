@@ -3,11 +3,12 @@
 
 import type { GolfScorecard } from './types.js';
 import { normalizeStats } from './builder.js';
+import { compareSprintIdKeys } from './sprint-id.js';
 
 // --- T1: Handicap Trend ---
 
 export interface TrendPoint {
-  sprint: number;
+  sprint: string;
   handicap: number;       // cumulative avg(score - par) up to this sprint
   fairway_pct: number;    // cumulative fairways_hit / fairways_total * 100
   gir_pct: number;        // cumulative GIR / total * 100
@@ -20,7 +21,7 @@ export interface TrendPoint {
 export function computeHandicapTrend(scorecards: GolfScorecard[]): TrendPoint[] {
   if (scorecards.length === 0) return [];
 
-  const sorted = [...scorecards].sort((a, b) => a.sprint_number - b.sprint_number);
+  const sorted = [...scorecards].sort((a, b) => compareSprintIdKeys(a.sprint_number, b.sprint_number));
 
   let sumDiff = 0;
   let sumFairwaysHit = 0;
@@ -53,7 +54,7 @@ export function computeHandicapTrend(scorecards: GolfScorecard[]): TrendPoint[] 
 // --- T2: Sprint Velocity ---
 
 export interface VelocityPoint {
-  sprint: number;
+  sprint: string;
   tickets: number;         // shots.length
   par: number;
   score: number;
@@ -85,7 +86,7 @@ export function computeVelocity(scorecards: GolfScorecard[]): VelocityReport {
     };
   }
 
-  const sorted = [...scorecards].sort((a, b) => a.sprint_number - b.sprint_number);
+  const sorted = [...scorecards].sort((a, b) => compareSprintIdKeys(a.sprint_number, b.sprint_number));
 
   const points: VelocityPoint[] = sorted.map(sc => ({
     sprint: sc.sprint_number,
@@ -303,7 +304,7 @@ export function computeConvergence(scorecards: GolfScorecard[]): ConvergenceCard
     };
   }
 
-  const sorted = [...scorecards].sort((a, b) => a.sprint_number - b.sprint_number);
+  const sorted = [...scorecards].sort((a, b) => compareSprintIdKeys(a.sprint_number, b.sprint_number));
 
   // Compute per-sprint differentials (score - par)
   const diffs = sorted.map(s => s.score - s.par);

@@ -1,6 +1,7 @@
 import type { GolfScorecard, HandicapCard } from './types.js';
 import type { CommonIssuesFile, RecurringPattern } from './briefing.js';
 import { computeHandicapCard } from './handicap.js';
+import { compareSprintIdKeys, sprintIdKey } from './sprint-id.js';
 
 /** Default player name when scorecard has no player field */
 export const DEFAULT_PLAYER = 'default';
@@ -95,7 +96,8 @@ export function mergeHazardIndices(
     if (ex) {
       // Merge: union sprints, accumulate reporter
       const sprintSet = new Set([...ex.sprints_hit, ...np.sprints_hit]);
-      ex.sprints_hit = [...sprintSet].sort((a, b) => a - b);
+      ex.sprints_hit = [...sprintSet].sort((a, b) =>
+        compareSprintIdKeys(sprintIdKey(a) ?? String(a), sprintIdKey(b) ?? String(b)));
       const reporters = ex.reported_by ?? [];
       if (!reporters.includes(reporter)) {
         reporters.push(reporter);

@@ -4,6 +4,7 @@
 
 import type { SlopeEvent } from './types.js';
 import type { RecurringPattern, CommonIssuesFile } from './briefing.js';
+import { compareSprintIdKeys, sprintIdKey } from './sprint-id.js';
 
 /** Minimum sprint appearances to trigger promotion */
 const DEFAULT_PROMOTION_THRESHOLD = 2;
@@ -22,7 +23,7 @@ const EVENT_TYPE_TO_CATEGORY: Record<string, string> = {
 export interface EventCluster {
   type: string;
   area: string;
-  sprints: number[];
+  sprints: string[];
   events: SlopeEvent[];
   description: string;
 }
@@ -86,15 +87,15 @@ export function clusterEvents(events: SlopeEvent[]): EventCluster[] {
     const cluster = clusterMap.get(key)!;
     cluster.events.push(event);
 
-    const sprintNumber = event.sprint_number === undefined ? null : Number(event.sprint_number);
-    if (sprintNumber !== null && Number.isFinite(sprintNumber) && !cluster.sprints.includes(sprintNumber)) {
+    const sprintNumber = event.sprint_number === undefined ? null : sprintIdKey(event.sprint_number);
+    if (sprintNumber !== null && !cluster.sprints.includes(sprintNumber)) {
       cluster.sprints.push(sprintNumber);
     }
   }
 
   // Build descriptions from event data
   for (const cluster of clusterMap.values()) {
-    cluster.sprints.sort((a, b) => a - b);
+    cluster.sprints.sort(compareSprintIdKeys);
     cluster.description = buildClusterDescription(cluster);
   }
 
@@ -186,12 +187,16 @@ export function runPipeline(
 
     if (existing) {
       // Update sprints_hit on existing telemetry pattern
-      const newSprints = candidate.cluster.sprints.filter(
-        s => !existing.sprints_hit.includes(s),
+      const existingSprintKeys = new Set(
+        existing.sprints_hit
+          .map(sprintIdKey)
+          .filter((sprint): sprint is string => sprint !== null),
       );
+      const newSprints = candidate.cluster.sprints.filter(
+        sprint => !existingSprintKeys.has(sprint),
+      );
+      existing.sprints_hit = [...existingSprintKeys, ...newSprints].sort(compareSprintIdKeys);
       if (newSprints.length > 0) {
-        existing.sprints_hit.push(...newSprints);
-        existing.sprints_hit.sort((a, b) => a - b);
         existing.description = candidate.suggestedPattern.description;
         // Merge reported_by arrays (union, deduplicated)
         const candidateReporters = candidate.suggestedPattern.reported_by ?? [];

@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { HookInput, GuardResult } from '../../core/index.js';
-import { selectSpecialists } from '../../core/index.js';
+import { latestSprintIdKey, selectSpecialists } from '../../core/index.js';
 import type { CommonIssuesFile } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { initializeSprintState, loadSprintState, createSprintState } from '../sprint-state.js';
@@ -180,7 +180,7 @@ function loadRelevantGotchas(cwd: string, planContent: string): string[] {
       });
 
       if (isRelevant) {
-        const lastSprint = Math.max(...pattern.sprints_hit);
+        const lastSprint = latestSprintIdKey(pattern.sprints_hit);
         warnings.push(`[${pattern.category}] ${pattern.title} (last: S${lastSprint}) — ${pattern.prevention.slice(0, 100)}`);
       }
 
