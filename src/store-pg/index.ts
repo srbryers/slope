@@ -1017,6 +1017,8 @@ function rowToExecution(row: Record<string, unknown>): WorkflowExecution {
     started_at: row.started_at as string,
     updated_at: row.updated_at as string,
     session_id: (row.session_id as string | null) ?? undefined,
+    definition_json: (row.definition_json as string | null) ?? undefined,
+    definition_hash: (row.definition_hash as string | null) ?? undefined,
   };
 }
 
