@@ -283,9 +283,13 @@ function currentAssignmentEvidence(roadmap: RoadmapDefinition, sprint: number): 
 }
 
 function sprintMentionPattern(roadmap: RoadmapDefinition, sprint: number): RegExp {
+  const row = roadmapSprintById(roadmap, sprint);
   const raw = String(sprint).replace('.', '\\.');
   const order = String(roadmapSprintOrderValue(roadmap, sprint)).replace('.', '\\.');
-  const label = formatRoadmapSprintLabel(roadmap, sprint).slice(1).replace('.', '\\.');
+  const label = formatRoadmapSprintLabel(
+    roadmap,
+    row ? roadmapSprintKey(roadmap, row) : sprint,
+  ).slice(1).replace('.', '\\.');
   const aliases = [...new Set([raw, order, label])].join('|');
   return new RegExp(`\\bS(?:${aliases})\\b`, 'i');
 }

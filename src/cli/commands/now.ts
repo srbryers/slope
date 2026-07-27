@@ -1,4 +1,13 @@
-import { formatSprintLabel, formatRoadmapSprintLabel, formatSprintNumber, isRoadmapSprintPending, loadScorecards, parseSprintNumber } from '../../core/index.js';
+import {
+  findRoadmapSprint,
+  formatSprintLabel,
+  formatRoadmapSprintLabel,
+  formatSprintNumber,
+  isRoadmapSprintPending,
+  loadScorecards,
+  parseSprintNumber,
+  roadmapSprintKey,
+} from '../../core/index.js';
 import type { RoadmapDefinition, RoadmapSprint, RoadmapTicket, SprintClaim } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { inferSprintContext, loadRoadmapForInference } from '../sprint-inference.js';
@@ -99,13 +108,15 @@ async function buildNowSnapshot(cwd: string, flags: Record<string, string>): Pro
   }
   const sprint = parsedSprint;
   const roadmap = loadRoadmapForInference(cwd, config) ?? undefined;
+  const current = roadmap ? findRoadmapSprint(roadmap, sprint) : undefined;
   // Without roadmap evidence, an integer like 245 is ambiguous: it could be a
   // real S245 or the legacy encoding of S24.5. Prefer roadmap-aware labelling so
   // this repo's own S245 stops rendering as "S24.5" (GH #635).
-  const sprintLabel = roadmap ? formatRoadmapSprintLabel(roadmap, sprint) : formatSprintLabel(sprint);
+  const sprintLabel = roadmap
+    ? formatRoadmapSprintLabel(roadmap, current ? roadmapSprintKey(roadmap, current) : sprint)
+    : formatSprintLabel(sprint);
   const scorecards = loadScorecards(config, cwd);
   const completed = new Set(scorecards.map(card => card.sprint_number));
-  const current = roadmap?.sprints.find(s => s.id === sprint);
   const phase = roadmap ? formatPhaseProgress(roadmap, sprint, completed) : undefined;
   const state = loadSprintState(cwd);
 

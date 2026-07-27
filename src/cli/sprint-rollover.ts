@@ -296,8 +296,12 @@ export function assessSprintRollover(
   const toMatches = roadmapSprintsById(roadmap, input.to);
   const fromSprint = fromMatches.length === 1 ? fromMatches[0] : undefined;
   const toSprint = toMatches.length === 1 ? toMatches[0] : undefined;
-  const fromLabel = fromSprint ? formatRoadmapSprintLabel(roadmap, fromSprint.id) : `S${input.from}`;
-  const toLabel = toSprint ? formatRoadmapSprintLabel(roadmap, toSprint.id) : `S${input.to}`;
+  const fromLabel = fromSprint
+    ? formatRoadmapSprintLabel(roadmap, roadmapSprintKey(roadmap, fromSprint))
+    : `S${input.from}`;
+  const toLabel = toSprint
+    ? formatRoadmapSprintLabel(roadmap, roadmapSprintKey(roadmap, toSprint))
+    : `S${input.to}`;
   const terminal = Boolean(state && isSprintComplete(state));
   const issues: SprintRolloverIssue[] = [];
 
@@ -395,7 +399,7 @@ export function assessSprintRollover(
   } else if (toSprint && expectedNext && !roadmapIdsEqual(roadmap, toSprint.id, expectedNext.id)) {
     issues.push({
       code: 'target_not_next_eligible',
-      message: `${toLabel} is not the next dependency-eligible sprint; use ${formatRoadmapSprintLabel(roadmap, expectedNext.id)}.`,
+      message: `${toLabel} is not the next dependency-eligible sprint; use ${formatRoadmapSprintLabel(roadmap, roadmapSprintKey(roadmap, expectedNext))}.`,
     });
   }
 
@@ -410,7 +414,7 @@ export function assessSprintRollover(
     ...(reason ? { reason } : {}),
     ...(expectedNext ? {
       expected_next: roadmapSprintOrderValue(roadmap, expectedNext.id),
-      expected_next_label: formatRoadmapSprintLabel(roadmap, expectedNext.id),
+      expected_next_label: formatRoadmapSprintLabel(roadmap, roadmapSprintKey(roadmap, expectedNext)),
     } : {}),
     blocking_dependencies: blockers,
     blocking_dependency_labels: blockers.map(id => formatRoadmapSprintLabel(roadmap, id)),

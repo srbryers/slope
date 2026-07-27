@@ -933,7 +933,7 @@ export function formatStrategicContext(
     const status = blockers.length === 0
       ? 'ready'
       : `blocked by ${blockers.map(id => formatRoadmapSprintLabel(roadmap, id)).join(', ')}`;
-    lines.push(`Next: ${formatRoadmapSprintLabel(roadmap, next.id)}: ${next.theme} (${status})`);
+    lines.push(`Next: ${formatRoadmapSprintLabel(roadmap, roadmapSprintKey(roadmap, next))}: ${next.theme} (${status})`);
   }
 
   return lines.join('\n');

@@ -938,6 +938,29 @@ describe('formatStrategicContext next-sprint output', () => {
     const context = formatStrategicContext(roadmap, 9);
     expect(context).not.toContain('Next:');
   });
+
+  it('preserves the canonical key when the next sprint is S458.10', () => {
+    const roadmap = makeRoadmap({
+      sprints: [
+        makeSprint(458.9, { status: 'complete' }),
+        makeSprint(458.1, {
+          id_key: '458.10',
+          depends_on: ['458.9'],
+          theme: 'Canonical sprint',
+        }),
+      ],
+      phases: [{
+        name: 'P1',
+        sprints: [458.9, 458.1],
+        sprint_keys: ['458.9', '458.10'],
+      }],
+    });
+
+    const context = formatStrategicContext(roadmap, '458.9');
+
+    expect(context).toContain('Next: S458.10: Canonical sprint');
+    expect(context).not.toContain('Next: S458.1:');
+  });
 });
 
 describe('roadmap-aware sprint labelling (GH #635)', () => {

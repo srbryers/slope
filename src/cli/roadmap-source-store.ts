@@ -9,6 +9,7 @@ import {
   parseRoadmapSourceDocument,
   parseRoadmapSourceProject,
   parseSprintNumber,
+  roadmapSprintKey,
   roadmapSprintOrderValue,
   RoadmapSourceError,
   serializeRoadmapProjection,
@@ -236,17 +237,16 @@ function normalizeScorecardRef(path: string): string {
 }
 
 /**
- * Resolve a sprint number to the single source entry that owns it, comparing
- * by canonical sprint label so legacy encoded ids (235 ~ S23.5) still match
- * while decimal neighbours (458.1 vs 458.2) never do. Label comparison is
- * string-exact, so float representation drift cannot widen the match. (#618)
+ * Resolve a sprint number to the single source entry that owns it. Source rows
+ * retain their canonical key while the numeric input remains a compatibility
+ * lookup until scorecard/state callers migrate to SprintId. (#618, #659)
  */
 function findRoadmapSourceSprint(store: RoadmapSourceStore, sprint: number): RoadmapSourceSprintMatch {
   const targetLabel = formatRoadmapSprintLabel(store.roadmap, sprint);
   const matches: RoadmapSourceSprintMatch[] = [];
   for (const source of store.sources) {
     for (const item of source.document.sprints) {
-      if (formatRoadmapSprintLabel(store.roadmap, item.id) === targetLabel) {
+      if (formatRoadmapSprintLabel(store.roadmap, roadmapSprintKey(store.roadmap, item)) === targetLabel) {
         matches.push({ source, storedId: item.id, status: item.status });
       }
     }

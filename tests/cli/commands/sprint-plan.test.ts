@@ -96,6 +96,23 @@ describe('renderSprintPlan (GH #312)', () => {
     expect(md).toContain('- S114 (complete)');
   });
 
+  it('renders the canonical key when a numeric mirror cannot preserve trailing zeroes', () => {
+    const inserted = makeSprint(458.1, {
+      id_key: '458.10',
+      theme: 'Canonical identity',
+      tickets: [
+        makeTicket('S458.10-1'),
+        makeTicket('S458.10-2'),
+        makeTicket('S458.10-3'),
+      ],
+    });
+
+    const md = renderSprintPlan(inserted, makeRoadmap([inserted]), []);
+
+    expect(md).toContain('# Sprint 458.10 Plan — Canonical identity');
+    expect(md).not.toContain('# Sprint 458.1 Plan');
+  });
+
   it('marks pending dependencies', () => {
     const upstream = makeSprint(1); // no status
     const sprint = makeSprint(2, { depends_on: [1] });
