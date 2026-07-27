@@ -124,7 +124,8 @@ fails with `STORE_AUTHORITY_CHANGED`.
 
 Cutover increments the generation in the same transaction that accepts
 `store.authority_changed`, switches the mutation dispatch to canonical append,
-and activates the physical legacy-write barrier.
+and replaces the pre-inventory maintenance fence with the permanent
+canonical-only barrier.
 
 Physical enforcement is adapter-specific but mandatory:
 
@@ -212,11 +213,23 @@ backfilled.
 ### Cutover Phases
 
 Before `inventory`, the adapter acquires its exclusive migration lock and
-persists `team_round_migration_mode = write_frozen`. Every legacy mutator and
-canonical append entry point checks that marker inside its write transaction.
-If an installed adapter cannot enforce the marker across every session, claim,
-workflow, scorecard, common-issue, and event writer, migration refuses to
-start.
+installs a physical maintenance fence before persisting
+`team_round_migration_mode = write_frozen`.
+
+- SQLite obtains an exclusive database transaction, installs aborting write
+  triggers on every legacy mutable table, commits the fence, and verifies a
+  legacy DML probe fails before inventory begins.
+- PostgreSQL acquires the migration advisory lock, revokes application-role
+  DML, installs migration-mode guard triggers, and drains every transaction
+  that began before the fence generation before inventory begins.
+- Custom adapters install their conformance-tested equivalent and prove no
+  pre-fence writer remains.
+
+The adapter records the drained transaction boundary and fence generation in
+the migration manifest. If an installed adapter cannot physically enforce the
+fence across every session, claim, workflow, scorecard, common-issue, and event
+writer, or cannot drain pre-fence application transactions, migration refuses
+to start.
 
 The write barrier remains active through `inventory`, `expand`, `backfill`, and
 `verify`. No delta may enter behind the inventory watermark. Read-only legacy
@@ -227,7 +240,7 @@ Migration proceeds through these durable phases:
 1. `inventory`
    - Verify the exclusive migration lock and durable write barrier.
    - Record source schema versions, project binding, row counts, content
-     digests, and the maximum existing event position.
+     commitments, and the maximum existing event position.
 2. `expand`
    - Add canonical envelope columns, append metadata, idempotency records,
      projection cursors, immutable scorecard-version storage, lease state, and
@@ -269,25 +282,31 @@ file or restarting a process cannot clear the durable barrier.
 Inventory materializes a canonical import plan before backfill. Every source
 row receives:
 
+- dependency rank derived from declared parent and causation requirements
 - source-kind rank from this fixed order: project bootstrap, identity and
-  policy, session, claim, workflow execution, workflow step, scorecard, common
-  issue, telemetry event
+  policy, session, claim, workflow execution, workflow step, telemetry event,
+  scorecard, common issue
 - canonical source table name
 - canonical source identity bytes
 - normalized source occurrence time or an explicit invalid-time sentinel
-- source-row SHA-256
+- classification-safe source-row commitment and commitment-key revision
 - deterministic destination event type, schema version, and event ID
 - disposition: import, quarantine, or superseded compatibility row
+- complete destination envelope bytes, including pinned migration
+  `accepted_at`, migration principal and authentication context, authorization
+  and visibility decisions, policy revisions, idempotency fields, sequence,
+  aggregate version, prior hashes, and final event hash
 
 Import order is the bytewise ascending tuple:
 
 ```text
 (
-  normalized_source_time_or_sentinel,
+  dependency_rank,
   source_kind_rank,
+  normalized_source_time_or_sentinel,
   canonical_source_table_name,
   canonical_source_identity_bytes,
-  source_row_sha256
+  source_row_commitment
 )
 ```
 
@@ -295,14 +314,47 @@ The comparison uses unsigned canonical UTF-8 bytes and numeric rank, never
 database collation or unordered query results. Equal tuples are a manifest
 conflict.
 
+The import planner builds an acyclic dependency graph before assigning rank.
+Genesis, project, identity, and policy events have the first ranks. A claim
+follows its session, a workflow step follows its execution, and an imported
+scorecard close follows every imported evidence event it references. Each event
+may reference only a lower dependency rank or an earlier event in its own rank.
+A missing parent, cycle, or forward causation is quarantined.
+
+A valid source time is parsed as RFC 3339, converted to UTC, and encoded exactly
+as `YYYY-MM-DDTHH:mm:ss.SSSSSSSSSZ` with years `0001..9999` and nine fractional
+digits. Fractions are right-padded; precision beyond nanoseconds or an invalid
+calendar or offset is rejected as invalid time rather than rounded. The exact
+invalid sentinel is ASCII `~invalid-rfc3339-time~`, which sorts after every
+valid digit-leading timestamp within its dependency and source class.
+
 Canonical import events receive contiguous project event sequences in that
 order. A resumed run reuses the same plan, IDs, sequences, hashes, and
 dispositions. Any source-row drift after inventory proves a broken write
 barrier and aborts migration.
 
-The signed migration manifest records every planned destination sequence plus
-the expected final project chain head, per-aggregate heads, and projection
-hashes. Verify compares computed values byte-for-byte before cutover.
+Inventory pins one migration acceptance instant from authoritative store time.
+Backfill does not call the clock, allocate identity, or re-evaluate policy; it
+inserts the fully materialized planned envelope bytes.
+
+The signed migration manifest records every planned destination envelope and
+sequence plus the expected final project chain head, per-aggregate heads, and
+projection hashes. Verify compares computed values byte-for-byte before
+cutover.
+
+Before any source commitment or deterministic event ID is computed, the
+migration classifier applies the same full-row ingress classification used by
+canonical append:
+
+- retention-safe non-restricted rows use domain-separated SHA-256;
+- restricted rows use the project-separated HMAC-SHA-256 commitment and record
+  its key revision;
+- secret-bearing rows are quarantined without exposing raw value, plain digest,
+  or value-derived public identifier.
+
+Ordering compares commitment bytes regardless of algorithm. Manifests, event
+IDs, logs, and quarantine output never expose an unkeyed digest of restricted
+content.
 
 Legacy rows already occupying `events` are not left beside their canonical
 replacement. SQLite may transactionally rebuild the physical `events` table;
@@ -327,13 +379,13 @@ round, or attempt identity.
 Migration MUST import them as `legacy.telemetry_observed` evidence with:
 
 - deterministic canonical event ID derived from project ID, source adapter,
-  source table, legacy event ID, and source-row hash
+  source table, legacy event ID, and classification-safe source-row commitment
 - `trust = unverified_legacy`
 - no invented principal or actor
 - original timestamp preserved as `occurred_at`
 - migration acceptance time as `accepted_at`
 - original payload under a versioned legacy namespace
-- source row locator and source-row hash
+- source row locator and classification-safe source-row commitment
 
 Legacy telemetry MUST NOT acquire a lease, authorize a mutation, verify a shot,
 close a round, or establish actor handicap history.
@@ -2028,10 +2080,23 @@ Using a cursor under another principal, project, purpose, or policy revision
 fails without revealing the original scope.
 
 Cursor plaintext is the JCS-canonical object containing every binding above,
-issued-at time, expiry, and a random cursor nonce. It is encrypted and
+issued-at time, expiry, and cursor invocation identity. It is encrypted and
 authenticated with AES-256-GCM under a project-separated cursor key. The
 external cursor envelope contains only cursor format version, key revision,
 nonce, ciphertext, and authentication tag.
+
+Each key revision receives a 32-bit CSPRNG prefix at creation and a monotonic
+64-bit invocation counter held and incremented by the non-restorable managed
+key service. The 96-bit GCM nonce is:
+
+```text
+cursor_nonce = key_random_prefix_32 || u64be(invocation_counter)
+```
+
+Issuance is forbidden if the counter cannot be incremented atomically. A crash
+may skip a value but cannot reuse one. Backup restore cannot roll the counter
+back. The service rotates the cursor key before `2^32` invocations and refuses
+further issuance at that bound.
 
 Project, principal, hidden subject IDs, and purpose remain inside ciphertext.
 The AEAD additional authenticated data uses the cursor domain-separation frame
@@ -2492,6 +2557,12 @@ both SQLite and PostgreSQL behavior.
 47. RFC 8785 canonicalization and every domain-separated digest match published
     golden vectors across SQLite, PostgreSQL, and an independent
     implementation.
+48. Cursor nonce allocation remains unique under concurrency, crash, key
+    rotation, and database restore, and refuses issuance at the per-key
+    invocation bound.
+49. A legacy process connected before migration is denied every session, claim,
+    workflow, scorecard, common-issue, and event mutation during inventory,
+    expand, backfill, verify, cutover, and observe.
 
 ### Test Methods
 
