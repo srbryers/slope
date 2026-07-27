@@ -29,7 +29,7 @@ sprints:
         complexity: risky
         github_issue: 669
       - key: S268-2
-        title: Implement scoped idempotency keys, payload-conflict rejection, one-event compound primary transitions with ordered affected-aggregate locking and all-or-none reducers, contribution and verification-domain high-water marks, ordering, and schema evolution
+        title: Implement exact S264.1 idempotency, payload-conflict rejection, version-2 one-event compound envelopes with per-affected-aggregate version and hash-chain links, ordered locking, all-or-none reducers, contribution and verification-domain high-water marks, ordering, and schema evolution
         club: driver
         complexity: risky
         github_issue: 669
@@ -124,7 +124,7 @@ sprints:
           - S270-1
           - S270-2
       - key: S270-4
-        title: Implement penalty causation, normalized allocation, non-additive participant diagnostics, and append-only common-issues learning with stable occurrence identity, concurrent creation domains, ordered multi-pattern merge and split, redirects, partitions, and replay on canonical S268 penalty identity
+        title: Implement penalty causation, normalized allocation, non-additive participant diagnostics, and one-event append-only common-issues report acceptance with stable occurrence identity, concurrent creation domains, ordered multi-pattern merge and split, redirects, partitions, and replay on canonical S268 penalty identity
         club: driver
         complexity: risky
         github_issue: 669
@@ -187,7 +187,7 @@ sprints:
         complexity: risky
         github_issue: 669
       - key: S272-2
-        title: Implement explicit capability-mapped and idempotent campaign, trial, and attempt lifecycles with truthful evidence-rejected and unverifiable outcomes, collection-closure census guards, timeout, retry, aggregate arm budget, price, leakage and learning-quarantine policy, plus content-addressed redacted evidence
+        title: Implement explicit capability-mapped and idempotent campaign, trial, and attempt lifecycles with compound trial-attempt evidence disposition, recovery-authorized unverifiable outcomes, collection-closure attempt reconciliation, timeout, retry, aggregate arm budget, price, leakage and learning-quarantine policy, plus content-addressed redacted evidence
         club: driver
         complexity: risky
         github_issue: 669
@@ -202,7 +202,7 @@ sprints:
           - S272-1
           - S272-2
       - key: S272-4
-        title: Implement analysis-run and versioned report lifecycles, canonical inclusion reducers, pinned RNG and numeric semantics, sample size, coverage, uncertainty, reliability, invalidation lineage, cross-adapter replay, and adversarial reproducibility checks
+        title: Implement capability-gated analysis-run and independently verified versioned report lifecycles, canonical inclusion reducers, pinned RNG and numeric semantics, sample size, coverage, uncertainty, reliability, invalidation lineage, cross-adapter replay, and adversarial reproducibility checks
         club: driver
         complexity: risky
         github_issue: 669
