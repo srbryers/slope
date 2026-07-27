@@ -178,7 +178,7 @@ describe('retro post-merge CLI', () => {
     }
   });
 
-  it('fails closeout explicitly when a custom store lacks atomic completion capability (#668)', async () => {
+  it('allows no-op closeout when a custom store lacks atomic completion capability (#668)', async () => {
     const adapterPath = join(cwd, 'custom-store.mjs');
     writeFileSync(adapterPath, `
 export function createStore() {
@@ -198,10 +198,51 @@ export function createStore() {
       '--summary=custom adapter closeout',
     ]));
 
-    expect(out.exitCode).toBe(1);
-    expect(out.stderr).toContain('completeRunningExecution@1');
+    expect(out.exitCode).toBe(0);
+    expect(out.stderr).toBe('');
+    expect(existsSync(join(cwd, '.slope', 'retros', 'post-merge', 'sprint-137.json'))).toBe(true);
   });
 
+  it('fails before durable retro writes when custom store closeout needs atomic completion (#668)', async () => {
+    const adapterPath = join(cwd, 'custom-store.mjs');
+    writeFileSync(adapterPath, `
+export function createStore() {
+  return {
+    async listExecutions() {
+      return [{
+        id: 'legacy-running',
+        workflow_name: 'sprint-standard',
+        sprint_id: 'S137',
+        status: 'running',
+        phase: 'validation',
+        current_step: 'validate',
+        variables: {},
+        started_at: '2026-07-27T18:00:00.000Z',
+        updated_at: '2026-07-27T18:00:00.000Z'
+      }];
+    },
+    close() {},
+  };
+}
+`);
+    writeFileSync(join(cwd, '.slope', 'config.json'), JSON.stringify({
+      store: pathToFileURL(adapterPath).href,
+    }));
+    saveSprintState(cwd, createSprintState(137, 'scoring'));
+
+    const out = await captureLogs(() => retroCommand([
+      'post-merge',
+      '--sprint=137',
+      '--summary=custom adapter closeout',
+      '--learning=workflow:7:closeout should fail before evidence writes',
+    ]));
+
+    expect(out.exitCode).toBe(1);
+    expect(out.stderr).toContain('completeRunningExecution@1');
+    expect(loadSprintState(cwd)?.phase).toBe('scoring');
+    expect(existsSync(join(cwd, '.slope', 'retros', 'post-merge', 'sprint-137.json'))).toBe(false);
+    expect(searchMemories(cwd, { source: 'auto-retro' })).toHaveLength(0);
+  });
 
   it('parses non-project category and weight prefixes without persisting prefix text', async () => {
     await captureLogs(() => retroCommand([

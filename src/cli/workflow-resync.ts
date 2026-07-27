@@ -49,9 +49,6 @@ export async function completeWorkflowExecutionsForSprints(
 ): Promise<WorkflowExecution[]> {
   const targetSprints = new Set(sprints);
   if (targetSprints.size === 0) return [];
-  if (typeof store.completeRunningExecution !== 'function') {
-    throw new Error('Configured store does not support workflow closeout capability completeRunningExecution@1.');
-  }
 
   const preserveExecutionIds = new Set(options.preserveExecutionIds ?? []);
   const bySprint = new Map<number, WorkflowExecution[]>();
@@ -64,7 +61,7 @@ export async function completeWorkflowExecutionsForSprints(
     bySprint.set(sprint, executions);
   }
 
-  const completed: WorkflowExecution[] = [];
+  const pending: WorkflowExecution[] = [];
   for (const executions of bySprint.values()) {
     const explicitlyPreserved = executions.filter(exec => preserveExecutionIds.has(exec.id));
     const newestStartedAt = options.preserveNewestPerSprint && explicitlyPreserved.length === 0
@@ -80,8 +77,19 @@ export async function completeWorkflowExecutionsForSprints(
 
     for (const exec of executions) {
       if (preserved.has(exec.id)) continue;
-      if (await store.completeRunningExecution(exec.id)) completed.push(exec);
+      pending.push(exec);
     }
+  }
+
+  if (pending.length === 0) return [];
+  const completeRunningExecution = store.completeRunningExecution?.bind(store);
+  if (!completeRunningExecution) {
+    throw new Error('Configured store does not support workflow closeout capability completeRunningExecution@1.');
+  }
+
+  const completed: WorkflowExecution[] = [];
+  for (const exec of pending) {
+    if (await completeRunningExecution(exec.id)) completed.push(exec);
   }
   return completed;
 }

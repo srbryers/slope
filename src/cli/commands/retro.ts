@@ -516,6 +516,17 @@ async function postMergeSubcommand(args: string[]): Promise<void> {
     return;
   }
 
+  let completedWorkflowExecutions = 0;
+  if (!opts.dryRun) {
+    const workflowCloseout = await reconcileWorkflowCloseout(cwd, [retro.sprint]);
+    completedWorkflowExecutions = workflowCloseout.completed.length;
+    if (workflowCloseout.warning) {
+      console.error(`Error: workflow execution closeout failed: ${workflowCloseout.warning}`);
+      process.exit(1);
+      return;
+    }
+  }
+
   const dryRunMemory: ReturnType<typeof persistRetroMemories> = { added: [], skipped: [] };
   let memory: ReturnType<typeof persistRetroMemories>;
   try {
@@ -529,19 +540,11 @@ async function postMergeSubcommand(args: string[]): Promise<void> {
   const path = postMergeOutputPath(cwd, retro);
 
   let reconciled: WorktreePhaseReconcile[] = [];
-  let completedWorkflowExecutions = 0;
   if (!opts.dryRun) {
     writePostMergeRetro(cwd, record);
     // Reconcile every checkout, not just this one — sibling worktrees otherwise
     // keep reporting the merged sprint as in progress (GH #624).
     reconciled = updateSprintPhaseForSprintAcrossWorktrees(cwd, retro.sprint, 'complete');
-    const workflowCloseout = await reconcileWorkflowCloseout(cwd, [retro.sprint]);
-    completedWorkflowExecutions = workflowCloseout.completed.length;
-    if (workflowCloseout.warning) {
-      console.error(`Error: workflow execution closeout failed: ${workflowCloseout.warning}`);
-      process.exit(1);
-      return;
-    }
   }
 
   const payload = {
