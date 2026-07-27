@@ -1,0 +1,450 @@
+{
+  "sprint_number": 264.2,
+  "player": "codex",
+  "theme": "Collaboration Workflow and Evaluation Contract",
+  "par": 4,
+  "slope": 4,
+  "score": 78,
+  "score_label": "triple_plus",
+  "date": "2026-07-27",
+  "shots": [
+    {
+      "ticket_key": "S264.2-1",
+      "title": "Define assignment, callback, and handoff lifecycle",
+      "club": "driver",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "critical",
+          "description": "[architect review] Callback obligations lacked durable identity across repeated execution spells.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "bunker",
+          "severity": "critical",
+          "description": "[architect review] Handoff transitions violated immutable assignment revision and acceptance rules.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "bunker",
+          "severity": "critical",
+          "description": "[architect review] Compound workflow operations contradicted the one-primary-event append model.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "bunker",
+          "severity": "critical",
+          "description": "[architect review] Compound foreign-aggregate mutations lacked affected aggregate chain positions.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "bunker",
+          "severity": "critical",
+          "description": "[architect review] Idempotency was principal-scoped and omitted the required round_epoch.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "bunker",
+          "severity": "moderate",
+          "description": "[architect review] Callback recovery registry used inconsistent event versions and transitions.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "bunker",
+          "severity": "critical",
+          "description": "[architect review] Version 2 chain-link and event hashing was circular and non-deterministic.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "bunker",
+          "severity": "critical",
+          "description": "[architect review] Version 2 authorization sets could disagree with the S264.1 singular authorization.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "water",
+          "severity": "critical",
+          "description": "[security review] Callback completion was not unique per execution obligation.",
+          "gotcha_id": "review:security"
+        },
+        {
+          "type": "water",
+          "severity": "major",
+          "description": "[security review] Callback delivery idempotency did not include recipient and destination.",
+          "gotcha_id": "review:security"
+        },
+        {
+          "type": "water",
+          "severity": "critical",
+          "description": "[security review] Compound transitions contradicted the one-event integrity model.",
+          "gotcha_id": "review:security"
+        },
+        {
+          "type": "water",
+          "severity": "major",
+          "description": "[security review] Assignment restart and recovery path was undefined.",
+          "gotcha_id": "review:security"
+        },
+        {
+          "type": "water",
+          "severity": "major",
+          "description": "[security review] Idempotency identity was principal-scoped rather than conflict-checked.",
+          "gotcha_id": "review:security"
+        },
+        {
+          "type": "water",
+          "severity": "major",
+          "description": "[security review] Assignment compound transitions were missing from the strict transition registry.",
+          "gotcha_id": "review:security"
+        },
+        {
+          "type": "water",
+          "severity": "critical",
+          "description": "[security review] Version 2 per-aggregate hash construction was self-referential.",
+          "gotcha_id": "review:security"
+        },
+        {
+          "type": "water",
+          "severity": "major",
+          "description": "[security review] Authorization sets lacked replayable one-to-one transition binding.",
+          "gotcha_id": "review:security"
+        }
+      ],
+      "notes": "Defined immutable assignment revisions, execution spells, exactly-once callback dispositions, atomic handoff, recovery, and compound-event integrity."
+    },
+    {
+      "ticket_key": "S264.2-2",
+      "title": "Define independent verification workflow",
+      "club": "driver",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "critical",
+          "description": "[architect review] Verification lifecycle referenced undeclared states and allowed terminal reversal.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "bunker",
+          "severity": "critical",
+          "description": "[architect review] Contribution provenance could fail open when contributors were omitted.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "bunker",
+          "severity": "moderate",
+          "description": "[architect review] Quorum reducer lacked readiness and deterministic no-op behavior.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "[architect review] Verification timeout recovery had no legal terminal disposition path.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "[architect review] Verification timeout escalation lacked an enforceable terminal lifecycle.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "water",
+          "severity": "critical",
+          "description": "[security review] Late contribution mutation could race an existing approval.",
+          "gotcha_id": "review:security"
+        },
+        {
+          "type": "water",
+          "severity": "major",
+          "description": "[security review] Verifier independence lacked hostile conflict and bypass tests.",
+          "gotcha_id": "review:security"
+        },
+        {
+          "type": "water",
+          "severity": "critical",
+          "description": "[security review] Verifier slot decisions could directly approve an epoch without quorum reduction.",
+          "gotcha_id": "review:security"
+        },
+        {
+          "type": "water",
+          "severity": "major",
+          "description": "[security review] Unchanged-byte rejection had no independently authorized appeal path.",
+          "gotcha_id": "review:security"
+        },
+        {
+          "type": "water",
+          "severity": "major",
+          "description": "[security review] Quorum reducer could enter dispute before all required slots were ready.",
+          "gotcha_id": "review:security"
+        },
+        {
+          "type": "water",
+          "severity": "critical",
+          "description": "[security review] A timed-out verification epoch could receive multiple different-key semantic dispositions.",
+          "gotcha_id": "review:security"
+        }
+      ],
+      "notes": "Defined producer-proven contribution closure, verifier slots, quorum reduction, appeals, waivers, invalidation, timeout disposition, and terminal escalation."
+    },
+    {
+      "ticket_key": "S264.2-3",
+      "title": "Define merge-safe learning and semantic status",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "critical",
+          "description": "[architect review] Pattern merge and split lacked concurrency-safe atomic semantics.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "bunker",
+          "severity": "moderate",
+          "description": "[architect review] Status precedence was not total and omitted worker aggregation.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "bunker",
+          "severity": "moderate",
+          "description": "[architect review] Worker aggregation mishandled complete_unverified and verification terminal states.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "water",
+          "severity": "major",
+          "description": "[security review] Pattern merge and split did not preserve integrity under concurrency.",
+          "gotcha_id": "review:security"
+        },
+        {
+          "type": "water",
+          "severity": "major",
+          "description": "[security review] Learning recurrence could be inflated by duplicate evidence wrappers.",
+          "gotcha_id": "review:security"
+        },
+        {
+          "type": "water",
+          "severity": "major",
+          "description": "[security review] Status health could report healthy from an incomplete signal set.",
+          "gotcha_id": "review:security"
+        },
+        {
+          "type": "water",
+          "severity": "major",
+          "description": "[security review] Filtered status views could compute misleading coverage and health.",
+          "gotcha_id": "review:security"
+        },
+        {
+          "type": "water",
+          "severity": "critical",
+          "description": "[security review] Learning report acceptance still required a hidden event batch.",
+          "gotcha_id": "review:security"
+        },
+        {
+          "type": "water",
+          "severity": "major",
+          "description": "[security review] Historical completion could hide newer active work in status precedence.",
+          "gotcha_id": "review:security"
+        }
+      ],
+      "notes": "Defined stable occurrence identity, atomic learning acceptance and topology changes, total status precedence, safe health, and filtered operating views."
+    },
+    {
+      "ticket_key": "S264.2-4",
+      "title": "Define multiplayer evaluation contract",
+      "club": "driver",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "critical",
+          "description": "[architect review] Evaluation lifecycle and authorization contract was incomplete.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "bunker",
+          "severity": "moderate",
+          "description": "[architect review] Evaluation replay and report identity were undefined.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "bunker",
+          "severity": "moderate",
+          "description": "[architect review] Phase 64 did not assign all runtime ownership.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "bunker",
+          "severity": "critical",
+          "description": "[architect review] Evaluation idempotency incorrectly scoped identity by aggregate version.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "bunker",
+          "severity": "moderate",
+          "description": "[architect review] Evidence terminal states and capability boundaries were incomplete.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "bunker",
+          "severity": "moderate",
+          "description": "[architect review] Report lifecycle omitted explicit capability ownership.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "bunker",
+          "severity": "critical",
+          "description": "[architect review] Failed, timed-out, and cancelled attempts could not reconcile for collection closure.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "[architect review] Campaign invalidation lacked a complete analysis and report transition registry.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "[architect review] Trial failure and timeout allowed no-current-attempt gaps.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "water",
+          "severity": "critical",
+          "description": "[security review] Collection could close while unfavorable trials remained live.",
+          "gotcha_id": "review:security"
+        },
+        {
+          "type": "water",
+          "severity": "major",
+          "description": "[security review] Trial reuse lacked deterministic compatibility constraints.",
+          "gotcha_id": "review:security"
+        },
+        {
+          "type": "water",
+          "severity": "major",
+          "description": "[security review] Corpus selection permitted post-hoc cherry-picking.",
+          "gotcha_id": "review:security"
+        },
+        {
+          "type": "water",
+          "severity": "major",
+          "description": "[security review] Campaign learning could contaminate treatment during collection.",
+          "gotcha_id": "review:security"
+        },
+        {
+          "type": "water",
+          "severity": "major",
+          "description": "[security review] Arm budget accounting omitted coordination and retry boundaries.",
+          "gotcha_id": "review:security"
+        },
+        {
+          "type": "water",
+          "severity": "major",
+          "description": "[security review] Analysis reproducibility did not pin executable and numeric semantics.",
+          "gotcha_id": "review:security"
+        },
+        {
+          "type": "water",
+          "severity": "major",
+          "description": "[security review] Evaluation idempotency incorrectly included aggregate version in identity.",
+          "gotcha_id": "review:security"
+        },
+        {
+          "type": "water",
+          "severity": "major",
+          "description": "[security review] Evidence lifecycle had no complete terminal disposition path.",
+          "gotcha_id": "review:security"
+        },
+        {
+          "type": "water",
+          "severity": "major",
+          "description": "[security review] Evidence verification timeout had no recovery-authorized terminal path.",
+          "gotcha_id": "review:security"
+        },
+        {
+          "type": "water",
+          "severity": "major",
+          "description": "[security review] Trial and attempt terminal evidence states could diverge.",
+          "gotcha_id": "review:security"
+        },
+        {
+          "type": "water",
+          "severity": "critical",
+          "description": "[security review] Retry atomicity granted successor allocation authority to a failure-only principal.",
+          "gotcha_id": "review:security"
+        }
+      ],
+      "notes": "Defined sealed sampling and corpus selection, complete campaign and trial census, atomic attempt reconciliation, aggregate budgets, reproducible analysis, and independently verified reports."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 56,
+    "hazard_penalties": 74,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "type": "architecture",
+  "conditions": [
+    {
+      "type": "wind",
+      "impact": "major",
+      "description": "The contract governs multi-principal authority, concurrency, privacy, deterministic replay, and causal evaluation across the full Team Round workflow."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Collaboration correctness requires durable obligations, independent authority, one-event compound transitions, complete terminal accounting, and replayable evidence.",
+      "outcome": "The contract now gives S268-S272 explicit state machines, authorization boundaries, integrity formulas, and adversarial acceptance tests."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "tests",
+      "description": "259 test files passed; 4,324 tests passed and 27 were skipped. The complete gate is rerun on the final PR head.",
+      "status": "healthy"
+    },
+    {
+      "category": "build",
+      "description": "TypeScript typecheck and the root plus pi-extension production build passed on Node 22.",
+      "status": "healthy"
+    },
+    {
+      "category": "state",
+      "description": "All 56 independent review findings are recorded as resolved; architecture and security reviewers approved exact contract commit 3c5073c.",
+      "status": "healthy"
+    }
+  ],
+  "bunker_locations": [
+    "Keep callback identity tied to execution spells and close every obligation with one disposition.",
+    "Treat compound events as one append with cycle-free per-aggregate integrity and replayable authorization.",
+    "Require producer-proven contribution closure and principal-level verifier independence.",
+    "Seal evaluation sampling, budgets, terminal census, analysis semantics, and report verification before execution."
+  ],
+  "yardage_book_updates": [
+    "Separate assignment work, verification epoch, verifier slot, timeout disposition, and escalation aggregates.",
+    "Compute safe health from the complete authoritative signal set before filtering.",
+    "Use stable learning occurrence identity and one-event merge, split, and report acceptance.",
+    "Split failure classification from retry allocation even when the retry transition is atomic."
+  ],
+  "course_management_notes": [
+    "Phase 64 implementation is assigned across S268-S272 after the S267 canonical sprint identity migration.",
+    "Inspired by the multiplayer and shared-context patterns researched from https://github.com/block/buzz.",
+    "Skills used: slope-sprint-workflow, slope-api-reference, and slope-performance-analysis."
+  ]
+}
