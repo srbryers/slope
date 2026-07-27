@@ -182,6 +182,13 @@ describe('slope roadmap migrate transaction', () => {
     if (prepared.status === 'ready') {
       const projection = prepared.artifacts.find(artifact => artifact.role === 'projection');
       expect(projection?.sha256).toBe(prepared.plan.expected_projection_sha256);
+      expect(prepared.plan.normalized_roadmap.sprints[1].depends_on).toEqual(['1']);
+      expect(prepared.plan.audit).toContainEqual(expect.objectContaining({
+        path: '/sprints/1/depends_on',
+        rule: 'canonicalize_sprint_dependencies',
+        before: [1],
+        after: ['1'],
+      }));
     }
 
     const writes: string[] = [];

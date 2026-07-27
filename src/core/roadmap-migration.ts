@@ -13,6 +13,7 @@ import {
   serializeRoadmapProjection,
   type RoadmapSourceKind,
 } from './roadmap-sources.js';
+import { sprintIdKey } from './sprint-id.js';
 
 export type RoadmapMigrationClassification = 'archive' | 'live' | 'history_unverified' | 'backlog';
 
@@ -344,8 +345,11 @@ function validateTargetSprint(
   if (typeof sprint.type !== 'string' || !sprint.type.trim()) reject(`Sprint S${id} type must be a non-empty string.`);
   if (sprint.depends_on != null
     && (!Array.isArray(sprint.depends_on)
-      || sprint.depends_on.some(value => typeof value !== 'number' || !Number.isFinite(value) || value <= 0))) {
-    reject(`Sprint S${id} depends_on must contain positive numeric sprint IDs.`);
+      || sprint.depends_on.some(value => (
+        (typeof value !== 'number' && typeof value !== 'string')
+        || sprintIdKey(value) === null
+      )))) {
+    reject(`Sprint S${id} depends_on must contain valid sprint IDs.`);
   }
   for (const field of ['status', 'note', 'outcome', 'phase', 'wave']) {
     if (sprint[field] != null && typeof sprint[field] !== 'string') reject(`Sprint S${id} ${field} must be a string.`);
@@ -555,6 +559,23 @@ export function planRoadmapMigration(
         auditChange(audit, `/sprints/${sprintOffset}`, 'scalar_path_to_list', value, field, [value[field]]);
       } else if (value[field] != null && (!Array.isArray(value[field]) || (value[field] as unknown[]).some(item => typeof item !== 'string'))) {
         diagnostics.push({ severity: 'error', code: 'invalid_path_list', sprint: id, message: `Sprint S${id} ${field} must be a string or string array.` });
+      }
+    }
+    if (Array.isArray(value.depends_on)) {
+      const canonicalDependencies = value.depends_on.map(dependency => (
+        typeof dependency === 'number' || typeof dependency === 'string'
+          ? sprintIdKey(dependency)
+          : null
+      ));
+      if (canonicalDependencies.every((dependency): dependency is string => dependency !== null)) {
+        auditChange(
+          audit,
+          `/sprints/${sprintOffset}`,
+          'canonicalize_sprint_dependencies',
+          value,
+          'depends_on',
+          canonicalDependencies,
+        );
       }
     }
     if (value.tickets === null) auditChange(audit, `/sprints/${sprintOffset}`, 'null_tickets_to_empty', value, 'tickets', []);
