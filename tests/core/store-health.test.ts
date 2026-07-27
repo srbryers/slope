@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { SqliteSlopeStore } from '../../src/store/index.js';
+import { LATEST_SCHEMA_VERSION, SqliteSlopeStore } from '../../src/store/index.js';
 import { checkStoreHealth } from '../../src/core/store-health.js';
 
 let store: SqliteSlopeStore;
@@ -23,7 +23,7 @@ describe('checkStoreHealth', () => {
     const result = await checkStoreHealth(store, 'sqlite');
     expect(result.healthy).toBe(true);
     expect(result.type).toBe('sqlite');
-    expect(result.schemaVersion).toBe(8);
+    expect(result.schemaVersion).toBe(LATEST_SCHEMA_VERSION);
     expect(result.stats.sessions).toBe(0);
     expect(result.stats.claims).toBe(0);
     expect(result.stats.scorecards).toBe(0);

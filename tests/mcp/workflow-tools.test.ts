@@ -96,7 +96,7 @@ describe('Workflow MCP tool operations', () => {
       const updated = await store.getExecution(exec.id);
       expect(updated!.status).toBe('running');
       expect(updated!.completed_steps).toHaveLength(1);
-      expect(updated!.sprint_id).toBe('S42');
+      expect(updated!.sprint_id).toBe('42');
     });
 
     it('lists active executions', async () => {
