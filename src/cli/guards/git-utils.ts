@@ -54,7 +54,7 @@ export function recordBaseline(sessionId: string, cwd: string): boolean {
   if (existsSync(path)) return false;
 
   try {
-    const status = execSync('git status --porcelain', { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    const status = execSync('git status --porcelain', { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trimEnd();
     const dir = dirname(path);
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
     writeFileSync(path, status);
@@ -74,7 +74,7 @@ export function loadBaseline(sessionId: string, cwd: string): Set<string> {
   if (!existsSync(path)) return new Set();
 
   try {
-    const content = readFileSync(path, 'utf8').trim();
+    const content = readFileSync(path, 'utf8').trimEnd();
     if (!content) return new Set();
     return new Set(content.split('\n').filter(Boolean).map(line => line.slice(3)));
   } catch {
