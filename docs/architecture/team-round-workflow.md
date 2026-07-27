@@ -1033,3 +1033,619 @@ S264.2-2 is complete when the contract:
 - distinguishes waiver and break-glass from independent approval;
 - preserves privacy and non-enumeration while retaining conflict commitments;
 - assigns enforcement to S271 and principal/event storage to S268.
+
+## Merge-Safe Learning
+
+### Goal
+
+Concurrent Team Round participants must be able to report, corroborate,
+correct, and retire durable learnings without losing another participant's
+evidence. Learning is a ledger-derived projection, not a shared JSON document
+that one worktree replaces after another.
+
+The merge contract applies to common issues, yardage-book updates, bunker
+locations, training recommendations, post-merge memories, and future
+repository learning surfaces. Each surface may use a narrower schema, but it
+cannot weaken event identity, evidence deduplication, authorization,
+classification, or deterministic merge rules.
+
+### Learning Identities
+
+The durable identities are:
+
+```text
+learning_report_id
+pattern_id
+evidence_id
+pattern_version
+```
+
+- `learning_report_id` is a server-assigned UUIDv7 for one immutable report.
+- `pattern_id` is a server-assigned durable UUIDv7 for one canonical pattern.
+- `evidence_id` is a classification-safe commitment to one evidence item under
+  the S264.1 integrity contract.
+- `pattern_version` is a gap-free positive integer for material canonical
+  pattern revisions.
+
+Display titles, normalized descriptions, categories, filenames, sprint
+numbers, and local array positions are not identities.
+
+### Learning Report
+
+`learning.reported.v1` contains:
+
+| Field | Contract |
+|---|---|
+| `learning_report_id` | Immutable report identity |
+| `candidate_pattern_id` | Existing pattern or null for a new candidate |
+| `reporter_principal_id` / `actor_id` | Authenticated attribution |
+| `round_id` / `attempt_id` / `ticket_key` | Origin scope |
+| `category` | Versioned controlled vocabulary |
+| `observation` | What happened |
+| `impact` | Observable consequence |
+| `prevention` | Proposed future action |
+| `recurrence_claim` | `one_off`, `suspected`, or `confirmed` |
+| `evidence_refs` | Stable evidence IDs and safe references |
+| `related_pattern_ids` | Typed relationship candidates |
+| `classification` / `visibility` | S264.1 labels |
+| `correlation_id` / `caused_by_event_id` | Workflow provenance |
+| `reported_at` | Authoritative store time |
+
+The report MUST NOT contain raw credentials, unrestricted transcripts, hidden
+tool payloads, or another principal's private data. Secret ingress scanning
+applies to the complete report request.
+
+### Evidence Identity
+
+Evidence is deduplicated by:
+
+```text
+(project_id, evidence_id)
+```
+
+The evidence commitment binds:
+
+- evidence class and schema version;
+- canonical content or sealed-object commitment;
+- source event, artifact, commit, test, or measurement identity;
+- classification and visibility;
+- producer principal and actor;
+- observed and accepted times;
+- integrity algorithm and key version.
+
+Two reports referencing the same evidence ID add one evidence-set member, not
+two occurrences. Different evidence from the same sprint remains distinct.
+Redacted evidence retains a protected tombstone and keyed commitment so replay
+does not count it again after restore or re-import.
+
+### Candidate Matching
+
+Candidate matching is advisory. It MAY propose existing patterns using
+normalized text, tags, embeddings, file subjects, hazard types, or prior
+evidence, but it cannot merge patterns authoritatively.
+
+An authorized merge decision records:
+
+- candidate report IDs and pattern IDs;
+- matching algorithm and version;
+- feature or embedding references safe for the viewer;
+- confidence and threshold;
+- deciding principal or deterministic policy;
+- reason and evidence;
+- resulting canonical pattern ID.
+
+Low-confidence candidates remain separate. False merges are corrected by
+versioned split events; history is never deleted.
+
+### Canonical Pattern
+
+The pattern projection contains:
+
+```text
+pattern_id
+pattern_version
+status
+category
+title
+description
+prevention
+evidence_set
+report_set
+sprint_set
+ticket_set
+reporter_principal_set
+first_observed_at
+last_observed_at
+recurrence_count
+confidence
+codification_status
+classification
+visibility
+```
+
+`recurrence_count` is the count of distinct qualifying evidence IDs after
+policy filtering, not the number of writes, reports, reporters, retries, or
+array entries.
+
+### Pattern States
+
+Pattern states are:
+
+```text
+candidate
+active
+codification_proposed
+codification_in_progress
+paid_down
+wont_fix
+retired
+split
+merged
+```
+
+`merged` points to one canonical pattern. `split` points to resulting pattern
+versions and a deterministic evidence partition. `paid_down`, `wont_fix`, and
+`retired` do not prevent later evidence; new qualifying evidence triggers a
+policy-directed reopen proposal rather than silently changing status.
+
+### Transactional Merge
+
+Adding a report to an existing pattern uses one append transaction:
+
+1. authorize `learning:report`;
+2. validate the report, evidence, and visibility;
+3. lock `(project_id, pattern_id)`;
+4. read current `pattern_version`;
+5. deduplicate report and evidence IDs;
+6. append `learning.reported.v1`;
+7. append a material pattern revision event only when canonical fields change;
+8. update evidence, report, sprint, ticket, and reporter sets atomically;
+9. recompute recurrence and confidence under the pinned policy version;
+10. update learning and semantic-status projections;
+11. commit.
+
+Concurrent writes retry against the new pattern version. They do not overwrite
+the entire projection. Exact retries return the prior accepted result.
+
+### Deterministic Field Merge
+
+Set-valued fields use canonical set union over stable IDs. Times use minimum
+for first observation and maximum for last observation. Recurrence derives
+from the evidence set. Confidence derives from a versioned deterministic
+policy.
+
+Canonical category, title, description, prevention, status, and classification
+are not last-writer-wins registers. A conflict creates
+`learning.revision_proposed.v1`. Authorized resolution appends
+`learning.revision_accepted.v1` with:
+
+- base and proposed pattern versions;
+- changed fields and reasons;
+- supporting and dissenting evidence;
+- resolver principal and capability;
+- policy version;
+- resulting canonical bytes.
+
+If the base version is stale, resolution fails and must be rebased on the
+current version.
+
+### Attribution
+
+Every report retains its reporter. Pattern projection attribution is
+non-exclusive: it may list multiple reporters, affected actors, cause
+principals, and resolver principals.
+
+Cross-agent hazards use the canonical `penalty_id`, `caused_by`, and
+`resolved_by` rules from S264. Learning projections may reference that penalty
+once. They cannot copy the penalty per reporter, assign it to the resolver, or
+turn corroboration into another penalty.
+
+### Promotion And Codification
+
+Promotion to an active common issue uses a versioned policy with:
+
+- minimum distinct evidence count;
+- minimum independent sprint or round count;
+- evidence reliability requirement;
+- severity or impact threshold;
+- classification and visibility constraints;
+- allowed manual override authority.
+
+Codification records a target artifact or guard, responsible assignment,
+verification evidence, and outcome. Paying down a pattern requires evidence
+that the preventive mechanism exists and works; a commit message alone is not
+proof.
+
+### Offline And Cross-Worktree Reports
+
+A disconnected worktree MAY queue signed or authenticated report requests, but
+local queue order is not authority. On reconnect:
+
+1. validate project and principal binding;
+2. scan and authorize each complete request;
+3. append each report independently through canonical idempotency;
+4. preserve original observation time as an observation, not store order;
+5. assign authoritative project sequence at append;
+6. merge against current pattern versions;
+7. quarantine ambiguous or invalid reports.
+
+Copying `common-issues.json`, `.slope` state, or an entire projection between
+worktrees is forbidden.
+
+### Retention, Redaction, And Restore
+
+Learning reports and evidence follow the strictest input classification.
+Redaction is evented and preserves protected facts required for deduplication,
+conflict evaluation, and score integrity.
+
+Restore reconciles against the external deletion registry and high-water marks
+before rebuilding patterns. A deleted or redacted evidence item cannot revive
+from a stale projection, backup, local worktree, or benchmark bundle.
+
+### Learning Replay Invariants
+
+Replay MUST prove:
+
+1. each report and evidence ID contributes at most once;
+2. report order does not change canonical set membership;
+3. material pattern versions are gap-free;
+4. stale-base canonical revisions never apply;
+5. merge and split mappings are acyclic and deterministic;
+6. recurrence derives from qualifying evidence rather than write count;
+7. resolver attribution does not inherit cause or penalty;
+8. redacted evidence tombstones prevent revival and recounting;
+9. SQLite, PostgreSQL, and conforming custom adapters produce identical
+   canonical pattern bytes;
+10. no whole-document replacement is required for convergence.
+
+## Semantic Activity
+
+### Goal
+
+The primary activity surface answers:
+
+```text
+Who did what to which object, with what outcome, and what needs attention?
+```
+
+It does not present every storage read, heartbeat, notification receipt,
+acknowledgment, lease renewal, retry poll, or projection refresh as meaningful
+progress.
+
+### Activity Record
+
+`semantic_activity.v1` is a deterministic projection record with:
+
+| Field | Contract |
+|---|---|
+| `activity_id` | Stable projection identity derived from source event IDs |
+| `source_event_ids` | Ordered authoritative source events |
+| `principal_id` / `actor_id` / `role` | Visible attribution |
+| `verb` | Versioned semantic action |
+| `object_type` / `object_id` | Typed subject |
+| `outcome` | Versioned result |
+| `attention` | `none`, `watch`, `action`, or `urgent` |
+| `summary_code` | Localizable allowlisted code |
+| `safe_parameters` | Allowlisted display values |
+| `correlation_id` | Workflow grouping |
+| `occurred_at` | Source store time |
+| `project_sequence` | Stable total order |
+| `classification` / `visibility` | Access labels |
+
+Display prose is rendered from `summary_code` and allowlisted parameters.
+Untrusted event payload text is never interpolated directly into an operating
+view.
+
+### Verb Vocabulary
+
+The initial primary verbs are:
+
+```text
+assigned
+accepted
+started
+handed_off
+blocked
+resumed
+completed
+verification_requested
+approved
+rejected
+cancelled
+timed_out
+requeued
+dead_lettered
+escalated
+released
+merged
+redacted
+restored
+```
+
+Diagnostic verbs include:
+
+```text
+read
+polled
+acknowledged
+heartbeat_sent
+lease_renewed
+notification_retried
+projection_refreshed
+```
+
+Diagnostic verbs do not enter the primary feed unless their outcome creates a
+semantic failure, such as repeated renewal failure causing `stale` or a
+notification dead letter causing `action`.
+
+### Outcomes
+
+Primary outcomes are:
+
+```text
+succeeded
+failed
+blocked
+partial
+pending
+declined
+cancelled
+expired
+unknown
+```
+
+Outcome is not inferred from HTTP status, process exit alone, or presence of a
+message. It derives from accepted workflow state and typed evidence.
+
+### Activity Levels
+
+Activity is projected into:
+
+1. `primary`: state changes, outcomes, blockers, verification, timeout,
+   escalation, dead letter, and operator-relevant recovery;
+2. `secondary`: bounded progress milestones, handoff offers, queue movement,
+   and learning promotion;
+3. `diagnostic`: transport, polling, heartbeat, lease renewal, cache, and
+   delivery details.
+
+Authorized users may expand lower levels. Default status views show primary
+and attention-bearing secondary records.
+
+## Worker And Assignment Status
+
+### Orthogonal Signals
+
+The status engine keeps these signals separate:
+
+```text
+session_liveness
+lease_liveness
+assignment_state
+semantic_progress
+callback_obligation
+queue_state
+notification_delivery
+deadline_state
+```
+
+One signal never silently substitutes for another. A live session may hold an
+expired lease. A renewed lease may accompany no semantic progress. A completed
+callback may have a failed notification. A quiet worker may be validly waiting
+on an external dependency.
+
+### Derived Operating States
+
+The operating states are:
+
+| State | Derivation |
+|---|---|
+| `queued` | Offered or schedulable, not accepted or started |
+| `working` | In progress with healthy lease and recent semantic progress |
+| `waiting` | Explicit blocker or declared dependency wait within policy |
+| `idle` | No active assignment or intentionally available |
+| `stale` | Active non-terminal work without required semantic progress or healthy liveness inside grace |
+| `timed_out` | Authoritative timeout event accepted |
+| `blocked` | Active blocker callback requires action |
+| `verification_pending` | Completion reported and review not terminal |
+| `complete` | Assignment verified or terminal under its policy |
+| `cancelled` | Cancellation accepted |
+| `dead_lettered` | Recovery exhausted and dead-letter event accepted |
+| `unknown` | Required source signal unavailable or inconsistent |
+
+`stale` is a warning derived from policy and observations. `timed_out` is an
+authoritative workflow state. They are not interchangeable.
+
+### Semantic Progress
+
+Semantic progress events are allowlisted and versioned. They include:
+
+- assignment start;
+- criterion state change;
+- accepted artifact or code output;
+- typed test or measurement milestone;
+- handoff activation;
+- blocker or resumed callback;
+- completion callback;
+- verification decision;
+- recovery disposition.
+
+Reads, acknowledgments, chat messages, heartbeat, lease renewal, token usage,
+tool calls without accepted output, and repeated status text are not semantic
+progress.
+
+An adapter cannot declare arbitrary event types progress. Protocol negotiation
+pins the semantic mapping registry version.
+
+### Idle
+
+`idle` means no accepted active assignment and availability is not disabled.
+It is neutral, not a failure, timeout, or zero utilization. An operator may
+distinguish:
+
+- `available`;
+- `scheduled`;
+- `paused`;
+- `offline`;
+- `unknown`.
+
+These labels require their own evidence and visibility rules.
+
+### Stale
+
+Staleness uses authoritative store time and a versioned status policy:
+
+```text
+semantic_progress_due_at
+session_heartbeat_due_at
+lease_renewal_due_at
+grace_expires_at
+```
+
+The projection records which clock or signal is stale. A missing heartbeat
+cannot mark an assignment stale when the session is not required by policy.
+A blocker with a future retry time is `waiting`, not stale, until its decision
+or retry deadline passes.
+
+### Timeout
+
+Only `assignment.timed_out.v1` produces `timed_out`. The status evaluator may
+emit `timeout_due` attention before the recovery transaction, but clients
+cannot promote that warning to terminal state.
+
+### Blocker Prominence
+
+Blocker activity includes:
+
+- blocker class and safe summary;
+- affected object;
+- responsible decision or dependency owner when visible;
+- first observed and escalation times;
+- requested action;
+- lease-release and recovery state;
+- evidence reliability.
+
+Primary views sort `urgent` and `action` blockers ahead of routine progress
+within a bounded time horizon. Sorting never changes authoritative project
+sequence or hides older unresolved blockers.
+
+## Semantic Collapse And Noise Control
+
+Projection MAY collapse repetitive source events when:
+
+- all records share project, correlation, object, verb, outcome,
+  classification, and visible actor;
+- no record changes workflow state, attention, evidence, budget class, or
+  error class;
+- the collapse window and algorithm version are recorded;
+- source event IDs remain recoverable for authorized diagnostics.
+
+Examples:
+
+- twenty successful lease renewals become one diagnostic summary;
+- repeated identical polls do not enter primary activity;
+- one blocker plus five delivery retries remains one primary blocker and one
+  diagnostic delivery warning;
+- completion and later approval remain two primary outcomes.
+
+Collapse never combines different principals, hidden and visible records,
+distinct blockers, failed and successful outcomes, or events from different
+correlations.
+
+## Status Ordering And Pagination
+
+Primary activity uses:
+
+```text
+(project_sequence, event_id)
+```
+
+as canonical order. Attention views may rank unresolved urgency first but
+include canonical cursor position and event order.
+
+Cursors use the S264.1 encrypted, principal-bound query contract. A cursor
+cannot be replayed by another principal, against another visibility policy, or
+after its key or policy expiry.
+
+At one read high-water mark, pagination MUST return every visible activity
+record exactly once. Concurrent appends appear only after advancing the
+high-water mark or starting a new read.
+
+## Status Privacy
+
+Filtered views:
+
+- omit unauthorized assignments, actors, resources, evidence, and blockers;
+- replace restricted details only with policy-approved safe summaries;
+- do not reveal hidden object existence through counts, cursors, errors, cache
+  keys, or timing classes;
+- bind cached projections to principal, project, policy, query, visibility,
+  classification, and high-water mark;
+- keep raw diagnostic payloads out of public status serialization.
+
+An observer gets no mutation capability. Seeing a blocker does not grant the
+ability to cancel, reassign, verify, redact, or inspect its restricted
+evidence.
+
+## Status Reliability
+
+Every derived status includes:
+
+```text
+observed_state
+observed_at
+source_high_water_mark
+policy_version
+coverage
+missing_reasons
+staleness
+```
+
+Coverage is the fraction of required source classes observed, with numerator,
+denominator, and provenance. Unknown source health cannot be represented as
+100% coverage or a healthy worker.
+
+Projection divergence, unavailable store, failed integrity verification, or
+unsupported adapter capability yields `unknown` plus operator attention.
+
+## S264.2-3 Adversarial Criteria
+
+Implementation acceptance includes:
+
+1. two worktrees concurrently report different evidence to one pattern and
+   both survive;
+2. exact retries do not increase recurrence;
+3. stale pattern revisions cannot overwrite a newer canonical prevention;
+4. merge then split deterministically preserves every evidence ID;
+5. redacted evidence cannot revive after restore;
+6. resolver attribution does not receive the cause penalty;
+7. one thousand acknowledgments and lease renewals do not flood primary
+   activity;
+8. a blocker remains prominent despite notification retries;
+9. a live session with a fenced lease is not shown as working;
+10. a healthy lease without semantic progress becomes specifically stale;
+11. a declared dependency wait is not stale before its retry deadline;
+12. only an accepted timeout event produces terminal timeout;
+13. tied event times remain ordered by project sequence and event ID;
+14. filtered status does not enumerate hidden objects or principals;
+15. cursor reuse across principals or policy versions fails;
+16. projection outage reports unknown rather than healthy or idle.
+
+## S264.2-3 Acceptance Criteria
+
+S264.2-3 is complete when the contract:
+
+- replaces whole-document learning writes with immutable reports and
+  transactional per-pattern merges;
+- defines stable report, pattern, evidence, and version identities;
+- defines deterministic field merges, conflict resolution, split, promotion,
+  codification, redaction, retention, and replay;
+- defines verb-object-outcome activity with primary, secondary, and diagnostic
+  levels;
+- separates session, lease, workflow, progress, callback, queue, delivery, and
+  deadline signals;
+- gives blocker, idle, stale, timeout, unknown, and dead-letter states distinct
+  semantics;
+- defines semantic progress and bounded collapse without hiding failures;
+- applies filtered views, stable ordering, encrypted cursors, and reliability
+  metadata;
+- assigns merge-safe learning to S270 and callback/status enforcement to S271.
