@@ -1,0 +1,113 @@
+{
+  "sprint_number": 265,
+  "player": "codex",
+  "theme": "Store Canonical Sprint IDs",
+  "par": 5,
+  "slope": 5,
+  "score": 10,
+  "score_label": "triple_plus",
+  "date": "2026-07-27",
+  "shots": [
+    {
+      "ticket_key": "S265-1",
+      "title": "Design SQLite and PostgreSQL canonical sprint key migrations",
+      "club": "driver",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "critical",
+          "description": "[architect review] PostgreSQL v6 migration omitted workflow definition columns required by startExecution; fixture modeled columns that real v5 schemas lacked",
+          "gotcha_id": "review:architect"
+        }
+      ],
+      "notes": "Added atomic SQLite v9 and PostgreSQL v6 migrations from numeric sprint columns to canonical text keys."
+    },
+    {
+      "ticket_key": "S265-2",
+      "title": "Migrate store records and adapters to canonical sprint keys",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "critical",
+          "description": "[architect review] PostgreSQL rowToExecution omitted definition_json and definition_hash, preventing persisted workflow definitions from round-tripping",
+          "gotcha_id": "review:architect"
+        }
+      ],
+      "notes": "Canonicalized claims, scorecards, events, and workflow execution sprint identity at both adapter boundaries."
+    },
+    {
+      "ticket_key": "S265-3",
+      "title": "Prove distinct canonical sprint round-trips",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "moderate",
+          "description": "A build and test run were initially overlapped, causing transient dist rewrite failures before the gates were rerun sequentially."
+        }
+      ],
+      "notes": "Proved 458.1 and 458.10 remain distinct across SQLite and PostgreSQL, including rollback and structural migration guarantees."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 3,
+    "fairways_total": 3,
+    "greens_in_regulation": 3,
+    "greens_total": 3,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 3,
+    "hazard_penalties": 4.5,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "type": "infra",
+  "conditions": [
+    {
+      "type": "wind",
+      "impact": "major",
+      "description": "The sprint changed persistent identity across SQLite, PostgreSQL, core store contracts, and compatibility consumers."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Migration fixtures must begin from the exact prior production schema, and adapter reads must be audited alongside writes.",
+      "outcome": "The PostgreSQL fixture now mirrors v5, structural rollback is proven, and workflow definitions round-trip through both adapters."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "tests",
+      "description": "Local regression: 259 test files and 4,330 tests passed; PostgreSQL CI: 260 test files and 4,362 tests passed.",
+      "status": "healthy"
+    },
+    {
+      "category": "build",
+      "description": "Production build, TypeScript typecheck, CodeQL, and GitGuardian passed on the exact reviewed head.",
+      "status": "healthy"
+    }
+  ],
+  "bunker_locations": [
+    "Model the exact previous production schema in every migration fixture; target-schema columns can hide upgrade failures.",
+    "Audit store row mappers whenever schema writes add or restore fields.",
+    "Assert constraints, indexes, and foreign-key actions after table-rebuild migrations."
+  ],
+  "yardage_book_updates": [
+    "Use canonical text keys at SQL bind and row boundaries before comparing or sorting sprint identities.",
+    "Prove migration failure rolls back both schema changes and schema_version writes.",
+    "Exercise PostgreSQL migrations in hosted CI when a local PostgreSQL service is unavailable."
+  ],
+  "course_management_notes": [
+    "S266 must remove Number-based compatibility bridges so API and display consumers cannot collapse 458.10 into 458.1."
+  ]
+}
