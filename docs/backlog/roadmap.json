@@ -7596,7 +7596,7 @@
         },
         {
           "key": "S272-2",
-          "title": "Implement explicit capability-mapped and idempotent campaign, trial, and attempt lifecycles with atomic initial and retry attempt creation, compound trial-attempt evidence, failure, timeout, cancellation, and retry reconciliation, recovery-authorized unverifiable outcomes, complete collection-closure reconciliation, aggregate arm budget, price, leakage and learning-quarantine policy, plus content-addressed redacted evidence",
+          "title": "Implement explicit capability-mapped and idempotent campaign, trial, and attempt lifecycles with atomic initial and retry attempt creation, separate fail and retry-allocation authorization obligations, fail-only, stale-allocation, substitution, separation-of-duties, and concurrent-retry tests, compound trial-attempt evidence, failure, timeout, cancellation, and retry reconciliation, recovery-authorized unverifiable outcomes, complete collection-closure reconciliation, aggregate arm budget, price, leakage and learning-quarantine policy, plus content-addressed redacted evidence",
           "club": "driver",
           "complexity": "risky",
           "github_issue": 669,

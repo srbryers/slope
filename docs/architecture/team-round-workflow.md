@@ -3063,7 +3063,7 @@ planned -> running -> outcome_reported -> verified
 
 | From | Event | To | Capability | Guard |
 |---|---|---|---|---|
-| absent | `evaluation.trial_allocated.v2` or `evaluation.attempt_retryable_failed.v2` | `planned` | `evaluation:allocate` or `evaluation:fail` | Create attempt 1 or the next gap-free retry in the same trial-owned compound event |
+| absent | `evaluation.trial_allocated.v2` or `evaluation.attempt_retryable_failed.v2` | `planned` | `evaluation:allocate` or `evaluation:retry_allocate` | Create attempt 1 or the next gap-free retry in the same trial-owned compound event |
 | `planned` | `evaluation.attempt_started.v1` | `running` | `evaluation:execute` | Trial running, assignment and leases valid |
 | `running` | `evaluation.attempt_outcome_reported.v1` | `outcome_reported` | `evaluation:execute` | Callback, scorecard, budget, and evidence roots present |
 | `outcome_reported` | `evaluation.evidence_verified.v2` | `verified` | `evaluation:evidence_verify` | Evidence policy satisfied |
@@ -3080,6 +3080,13 @@ Initial allocation locks the trial, budget meter, and resource claims and uses
 with the trial's transition to `allocated`. Retry creation locks the trial,
 prior attempt, budget meter, and resource claims, cannot exceed the sealed
 limit, and occurs inside `evaluation.attempt_retryable_failed.v2`.
+That compound event carries two distinct authorization obligations:
+`evaluation:fail` authorizes classifying and terminalizing attempt `n`;
+`evaluation:retry_allocate` authorizes reserving budget and resources, creating
+attempt `n + 1`, and advancing the current-attempt pointer. A fail-only
+principal cannot allocate a retry. The two decisions may come from the same
+principal only when the sealed campaign policy permits it; otherwise their
+authorization-set entries must prove the configured separation of duties.
 
 `evaluation:execute` is constrained to the allocated trial assignee principal
 or an explicitly authorized orchestrator. `evaluation:evidence_verify` is
@@ -3136,6 +3143,8 @@ principal, missingness, consumed budget, verifier state, and provenance.
 `evaluation:fail` and `evaluation:stop_rule` are constrained to registered
 recovery and stopping-rule service principals. These identities do not grant
 authority; the scoped capability and principal constraint must both pass.
+`evaluation:retry_allocate` is constrained to a policy-eligible retry allocator
+and does not grant failure classification, execution, or evidence authority.
 
 ### Authorization And Idempotency
 
@@ -3153,6 +3162,7 @@ evaluation:report_verify
 evaluation:complete
 evaluation:invalidate
 evaluation:allocate
+evaluation:retry_allocate
 evaluation:evidence_verify
 evaluation:evidence_recover
 evaluation:disposition
@@ -3165,6 +3175,12 @@ evaluation:export
 Sealing, evidence verification, trial disposition, analysis approval, and
 invalidation honor the configured separation-of-duties policy. Role labels do
 not grant capabilities.
+
+S272-2 adversarial tests include fail-only retry attempts, stale allocator
+decisions, substitution between `evaluation:fail` and
+`evaluation:retry_allocate`, separation-of-duties bypass, budget exhaustion,
+and concurrent retry allocation. Every case must preserve one failed attempt,
+at most one gap-free successor, and all-or-none budget and pointer updates.
 
 Every lifecycle mutation supplies expected aggregate version, manifest hash,
 capability, fencing tokens for protected resources, and an idempotency key
