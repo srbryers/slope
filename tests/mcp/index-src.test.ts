@@ -552,6 +552,121 @@ describe('mock store tools', () => {
     expect(claim.target).toBe('T-2');
   });
 
+  it('preserves distinct canonical sprint identities through live claim tools', async () => {
+    const store = createMockStore();
+    const server = createSlopeToolsServer(store);
+    const client = new Client({ name: 'canonical-claim-test', version: '1.0.0' });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+
+    try {
+      const legacyResult = await client.callTool({
+        name: 'acquire_claim',
+        arguments: {
+          sessionId: 'session-legacy',
+          target: 'shared-target',
+          scope: 'ticket',
+          sprintNumber: 458.1,
+          player: 'alice',
+        },
+      });
+      const insertedResult = await client.callTool({
+        name: 'acquire_claim',
+        arguments: {
+          sessionId: 'session-inserted',
+          target: 'shared-target',
+          scope: 'ticket',
+          sprintNumber: 'S458.10',
+          player: 'bob',
+        },
+      });
+
+      expect(JSON.parse(toolText(legacyResult)).sprint_number).toBe('458.1');
+      expect(JSON.parse(toolText(insertedResult)).sprint_number).toBe('458.10');
+      expect(store.claims.map(claim => claim.sprint_number)).toEqual(['458.1', '458.10']);
+
+      for (const sprintNumber of ['458.1', '458.10']) {
+        const result = await client.callTool({
+          name: 'check_conflicts',
+          arguments: { sprintNumber },
+        });
+        expect(JSON.parse(toolText(result))).toEqual({ claims: 1, conflicts: [] });
+      }
+    } finally {
+      await client.close();
+      await server.close();
+    }
+  });
+
+  it('rejects invalid sprint identities on every direct MCP selector', async () => {
+    const store = createMockStore();
+    const server = createSlopeToolsServer(store);
+    const client = new Client({ name: 'invalid-sprint-test', version: '1.0.0' });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+
+    try {
+      const calls = [
+        {
+          name: 'acquire_claim',
+          arguments: {
+            sessionId: 'session-invalid',
+            target: 'T-1',
+            scope: 'ticket',
+            sprintNumber: '458.x',
+            player: 'alice',
+          },
+        },
+        {
+          name: 'check_conflicts',
+          arguments: { sprintNumber: '0' },
+        },
+        {
+          name: 'testing_session_start',
+          arguments: { sprint: '' },
+        },
+      ];
+
+      for (const call of calls) {
+        const result = await client.callTool(call);
+        expect(result.isError).toBe(true);
+        expect(toolText(result)).toContain('Invalid sprint ID');
+      }
+    } finally {
+      await client.close();
+      await server.close();
+    }
+  });
+
+  it('accepts a canonical testing-session sprint selector', async () => {
+    const store = createMockStore();
+    store.getActiveTestingSession = async () => ({
+      id: 'existing-session',
+      sprint: 458.1,
+      started_at: '2026-07-27T00:00:00.000Z',
+    });
+    const server = createSlopeToolsServer(store);
+    const client = new Client({ name: 'canonical-testing-session-test', version: '1.0.0' });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+
+    try {
+      const result = await client.callTool({
+        name: 'testing_session_start',
+        arguments: { sprint: 'S458.10' },
+      });
+      expect(result.isError).toBe(true);
+      expect(toolText(result)).toContain('Active testing session already exists');
+      expect(toolText(result)).not.toContain('Invalid sprint ID');
+    } finally {
+      await client.close();
+      await server.close();
+    }
+  });
+
   it('check_conflicts detects overlaps', async () => {
     const { checkConflicts } = await import('../../src/core/index.js');
     const store = createMockStore();
