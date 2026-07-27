@@ -12,6 +12,7 @@ import {
   renderSprintDetail,
   getMetaphor,
   DEFAULT_DASHBOARD_CONFIG,
+  sprintIdKey,
 } from '../../src/core/index.js';
 import { resolveDashboardConfig } from '../../src/cli/commands/dashboard.js';
 
@@ -97,7 +98,7 @@ describe('dashboard server integration', () => {
         res.end(JSON.stringify(data));
       } else if (pathname.startsWith('/api/sprint/') && req.method === 'GET') {
         const sprintStr = pathname.slice('/api/sprint/'.length);
-        const sprintNum = parseInt(sprintStr, 10);
+        const sprintNum = sprintIdKey(sprintStr);
         const card = scorecards.find(s => s.sprint_number === sprintNum);
         if (!card) {
           res.writeHead(404, { 'Content-Type': 'application/json' });
@@ -156,7 +157,7 @@ describe('dashboard server integration', () => {
     const res = await fetch(`${baseUrl}/api/sprint/1`);
     expect(res.status).toBe(200);
     const data = await res.json();
-    expect(data.sprint_number).toBe(1);
+    expect(data.sprint_number).toBe('1');
     expect(data.theme).toBe('Sprint 1');
   });
 

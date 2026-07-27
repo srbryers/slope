@@ -41,14 +41,14 @@ describe('SLOPE roadmap source federation dogfood', () => {
     );
   });
 
-  it('preserves the pre-federation historical sprint definitions byte-for-byte', () => {
+  it('preserves the canonicalized historical sprint definitions byte-for-byte', () => {
     const store = loadRoadmapSourceStore(process.cwd());
     const history = store.roadmap.sprints.filter(sprint => sprint.id <= 231);
     const digest = createHash('sha256').update(JSON.stringify(history)).digest('hex');
 
-    // Baseline: commit 2fd935d, immediately before the S232 source migration.
-    // Phase membership repairs are outside sprint definitions and intentionally
-    // do not alter this digest.
-    expect(digest).toBe('ad9a6e95a5ac63b7ad87fdb0303bbe47c27f3c8234055ed5fb6220c8cee2d218');
+    // Rebased in S266 when sprint dependencies became canonical strings.
+    // Phase membership repairs remain outside sprint definitions and do not
+    // alter this digest.
+    expect(digest).toBe('5b597bc5457d1129a70d7bf065f5034902a70e858c6254aa998c5f2c643ff520');
   });
 });

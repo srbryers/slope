@@ -208,7 +208,7 @@ describe('review path scope and patch coverage', () => {
     ])).toEqual({
       prNumber: 590,
       reviewType: 'code',
-      sprint: 234.5,
+      sprint: '234.5',
       json: true,
       scope: {
         include: ['src/**', 'tests/**'],

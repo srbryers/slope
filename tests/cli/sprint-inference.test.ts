@@ -81,7 +81,7 @@ describe('inferSprintContext', () => {
 
     expect(context.sprint).toBe(454);
     expect(context.source).toBe('scorecards');
-    expect(context.latestScorecard).toBe(453);
+    expect(context.latestScorecard).toBe('453');
     expect(context.staleSprintState).toMatchObject({
       sprint: 444,
       phase: 'planning',

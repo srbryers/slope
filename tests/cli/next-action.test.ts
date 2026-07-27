@@ -122,7 +122,7 @@ describe('detectSprintState', () => {
     const state = await detectSprintState(tmpDir);
     expect(state.type).toBe('needs-review');
     if (state.type === 'needs-review') {
-      expect(state.sprintNumber).toBe(26);
+      expect(state.sprintNumber).toBe('26');
     }
   });
 
