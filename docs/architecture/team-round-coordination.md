@@ -254,8 +254,6 @@ canonical_scorecard_v1 = {
   sprint_key,
   round_id,
   scorecard_version,
-  publication_status,
-  accepted,
   round_epoch,
   source_event_range: {
     first_event_sequence,
@@ -288,6 +286,19 @@ canonical_scorecard_v1 = {
 }
 ```
 
+Acceptance is a separate mutable round projection:
+
+```text
+round_scorecard_pointer_v1 = {
+  project_id,
+  round_id,
+  round_epoch,
+  round_state,
+  latest_published_scorecard_version?,
+  accepted_scorecard_version?
+}
+```
+
 Required identities and constraints:
 
 - `(project_id, sprint_key)` names one canonical round.
@@ -301,8 +312,9 @@ Required identities and constraints:
   verifier according to the domain contract.
 - Each loss component names exactly one of `shot_loss`, `penalty_loss`, or
   `round_adjustment` and references its canonical source identity.
-- `accepted` is true for at most one version of a round and false for every
-  version while the round is reopened.
+- `accepted_scorecard_version` names at most one immutable version and is null
+  while the round is reopened. Changing the pointer never changes published
+  scorecard bytes.
 - `content_hash` covers the canonical serialization of every field except
   itself.
 
@@ -325,6 +337,11 @@ team_event_v1 = {
     id,
     version
   },
+  preconditions: [{
+    aggregate_type,
+    aggregate_id,
+    expected_version
+  }],
   scope: {
     sprint_key?,
     round_id?,
@@ -371,6 +388,7 @@ team_event_v1 = {
   payload_classification,
   payload,
   integrity: {
+    previous_project_hash,
     previous_aggregate_hash,
     event_hash
   }
@@ -399,6 +417,9 @@ team_event_v1 = {
 - `lease_proof` is mandatory for protected resource mutations and absent only
   for event types whose policy declares no resource ownership requirement.
 - `payload_classification` cannot be weaker than any field in the payload.
+- `preconditions` names every additional aggregate version whose state was
+  material to accepting the event. The list is canonicalized by aggregate type
+  and ID before hashing.
 - Hashes use the contract canonical serialization and include all envelope
   fields except `integrity.event_hash`.
 
@@ -515,3 +536,406 @@ answer all of the following without inventing policy:
 - What happens when replay encounters an unknown event revision or integrity
   gap?
 - Can a reopened round mutate a prior published scorecard?
+
+## Idempotency Contract
+
+### Scope
+
+Every state-changing request carries a caller-generated idempotency key. The
+store records it under:
+
+```text
+idempotency_identity = {
+  project_id,
+  operation_kind,
+  primary_aggregate_type,
+  primary_aggregate_id,
+  round_epoch?,
+  idempotency_key
+}
+```
+
+The key is not scoped by session, process, worktree, branch, or transport.
+Retries from a replacement session controlled by the same authenticated
+principal therefore address the same operation.
+
+`round_epoch` is mandatory for score-affecting or authority-affecting round
+mutations. A key used before an audited reopen cannot alias an operation in the
+new epoch.
+
+The idempotency record stores:
+
+- idempotency identity
+- authenticated principal and attributed actor
+- canonical request hash
+- accepted event ID, event sequence, aggregate version, and response hash
+- result classification
+- first accepted store time
+
+### Canonical Request Hash
+
+The request hash covers all semantic mutation inputs:
+
+- event type and event schema version
+- primary aggregate and expected version
+- sorted cross-aggregate preconditions
+- complete scope including round epoch
+- authenticated principal and attributed actor
+- requested capability and any caller-supplied expected policy revision
+- visibility request
+- lease subject, lease epoch, and fencing token when required
+- correlation and causation IDs
+- payload classification and canonical payload
+
+It excludes transport retry count, connection identity, current session when a
+session is not semantically part of the event, and server-assigned event ID,
+sequence, aggregate version, and acceptance time.
+
+Changing any covered field while reusing the same idempotency identity is a
+payload conflict, even when the new request would otherwise be valid.
+
+### Retry Outcomes
+
+For an exact request hash match:
+
+- no event or projection is written;
+- the original accepted operation identity is returned;
+- the response is filtered under the caller's current visibility capability;
+- an expired lease does not retroactively invalidate the original accepted
+  operation;
+- the retry cannot refresh a lease or session heartbeat.
+
+A same-key request from a different principal is a conflict, not a second
+namespace. The store MUST NOT disclose the prior payload or actor unless the
+new caller can view the original event.
+
+For a request hash mismatch, the store returns
+`IDEMPOTENCY_PAYLOAD_CONFLICT` with the key scope and original operation ID only
+when visible. It MUST NOT append a compensating or conflict event as part of
+the failed mutation.
+
+Rejected requests do not normally consume a key. A policy MAY retain a bounded
+rejection fingerprint for abuse control, but that fingerprint cannot later be
+mistaken for an accepted operation.
+
+### Retention
+
+Accepted mutation keys are retained for the lifetime of the canonical ledger.
+If event payload retention removes protected data, the idempotency identity,
+request hash, event identity, and redacted result tombstone remain. A purged key
+MUST NOT become reusable.
+
+## Atomic Append And Projection
+
+### Append Request
+
+`append_team_event` accepts:
+
+```text
+append_request = {
+  event_type,
+  event_schema_version,
+  primary_aggregate,
+  expected_aggregate_version,
+  preconditions[],
+  scope,
+  actor_binding?,
+  requested_capability,
+  expected_policy_revisions?,
+  visibility,
+  idempotency_key,
+  correlation_id,
+  causation_id?,
+  lease_proof?,
+  payload_classification,
+  payload
+}
+```
+
+The caller does not supply project ID, principal ID, authentication context,
+acceptance time, event sequence, new aggregate version, active policy revision,
+policy decision ID, or event hashes. The trusted store boundary derives or
+assigns them. A caller MAY pin an expected policy revision as an optimistic
+precondition; omitting it means "evaluate the active revision."
+
+### Transaction Algorithm
+
+One append performs these steps in one database transaction:
+
+1. Authenticate the caller and derive project, principal, authentication
+   context, and permissible actor bindings.
+2. Parse the registered request schema and canonicalize identifiers, resource
+   subjects, preconditions, visibility, and payload.
+3. Acquire the project sequence row, idempotency identity, primary aggregate,
+   cross-aggregate preconditions, resource lease rows, and projection rows in a
+   deterministic lock order.
+4. Read authoritative store time and the active identity, capability,
+   visibility, resource-policy, event-schema, and projection revisions.
+5. Check for an existing idempotency record. Return an exact visible prior
+   result or fail on a request-hash conflict.
+6. Validate primary aggregate version, every precondition, lifecycle state,
+   round epoch, actor binding, correlation and causation, and lease proof.
+7. Evaluate the requested capability and requested visibility under the active
+   policy revisions. Denial aborts before event allocation.
+8. Allocate the next contiguous project event sequence and the next primary
+   aggregate version.
+9. Build and hash the complete canonical envelope.
+10. Insert the immutable event and accepted idempotency record.
+11. Apply every authoritative projection affected by that event, including
+    aggregate state, leases, draft or published scorecard, workflow
+    compatibility state, and projection cursor.
+12. Check declared invariants and write the new project and aggregate integrity
+    heads.
+13. Write any transactional outbox notification that external consumers need.
+14. Commit and return the accepted event identity plus a visibility-filtered
+    projection result.
+
+Failure before commit writes none of the event, idempotency record, projection
+changes, cursor, integrity head, or outbox notification.
+
+External API calls, Git operations, process signals, and network publication
+MUST NOT occur inside the transaction. They consume the committed outbox and
+report a later result as a causally linked event. An external side effect must
+have its own idempotency contract.
+
+### Adapter Equivalence
+
+SQLite SHOULD use an immediate write transaction so two writers cannot both
+validate the same aggregate version. PostgreSQL SHOULD use row locks plus
+serializable or equivalent conflict detection. These are implementation
+choices; both adapters MUST expose the same accepted, retry, conflict, and
+ordering outcomes.
+
+PostgreSQL native sequences are not sufficient for canonical
+`event_sequence`, because a rolled-back allocation can leave a gap. Each
+project uses a transactionally locked sequence row or an equivalent gap-free
+allocator updated in the append transaction.
+
+Serialization failures and busy-store conflicts MAY be retried internally.
+Every internal retry uses the original authenticated request and idempotency
+identity. A timeout whose commit outcome is unknown is reported as
+`COMMIT_STATUS_UNKNOWN`; the client resolves it by retrying the same request,
+never by changing the key.
+
+### Multi-Aggregate Invariants
+
+An event has one primary aggregate, but acceptance may depend on other
+aggregates. The append request names each material expected version in
+`preconditions`.
+
+Examples:
+
+- `round.closed` locks the round, required assignments, verification state,
+  accepted shots and penalties, and every live score-affecting lease.
+- `resource_lease.acquired` locks the canonical resource subject and overlapping
+  active lease subjects under the evaluated policy revision.
+- `shot.accepted` locks the round epoch, assignment, shot, and relevant lease.
+
+The accepted event records the checked versions. A concurrent change causes a
+version conflict and requires the caller to re-read and issue a new operation
+with a new idempotency key. Reusing the old key with changed preconditions is a
+payload conflict.
+
+### Projection Classes
+
+Authoritative projections needed to decide a later append are synchronous:
+
+- aggregate versions and lifecycle
+- identity bindings
+- capabilities and visibility policy revision
+- lease ownership and fencing
+- draft and accepted scorecard state
+- idempotency and integrity heads
+
+Search, analytics, reports, notifications, and other non-authoritative views
+MAY update asynchronously from the outbox. Their lag MUST be visible and they
+MUST NOT authorize a mutation or claim to be the accepted scorecard.
+
+## Ordering Contract
+
+The ledger exposes three distinct ordering relations:
+
+1. `event_sequence`: gap-free acceptance order within one project.
+2. `aggregate_version`: strict state-machine order within one aggregate.
+3. `causation_id`: explicit causal edge between accepted events.
+
+None substitutes for another.
+
+The project sequence is used for replay cursors, snapshots, and integrity
+checkpoints. It does not mean that unrelated aggregates causally depend on one
+another.
+
+The aggregate version is an optimistic concurrency token. The expected value
+must match exactly; last-writer-wins behavior is forbidden.
+
+Causation forms an acyclic graph:
+
+- the cause must exist in the same project;
+- it must have a lower event sequence;
+- the caller must be allowed to reference it;
+- a correlation group does not imply causation;
+- client timestamp order and arrival batch order do not create causal edges.
+
+Batch append MAY be added later only if the batch has one idempotency identity,
+one authorization decision set, deterministic internal order, and all-or-none
+commit semantics. Version 1 does not infer a batch from multiple requests in
+one transport message.
+
+## Schema Evolution
+
+### Registry
+
+The authoritative store maintains a versioned registry for:
+
+- envelope versions
+- event type and payload schema versions
+- identity, capability, visibility, and resource policy revisions
+- projection schema versions and reducer revisions
+- canonical serialization and hash revisions
+
+Every accepted event pins all revisions material to its interpretation. A
+mutable "current policy" pointer is not enough for replay.
+
+### Event Evolution
+
+- Existing event bytes are immutable.
+- Additive optional payload fields require a new event schema version when
+  their interpretation affects a projection.
+- A semantic rename, changed default, changed unit, changed identity, or
+  changed invariant requires a new version.
+- Breaking semantics SHOULD use a new event type.
+- Pure deterministic upcasters may translate an older payload into the current
+  reducer input. They cannot consult current policy or external state.
+- Downcasting authoritative events is forbidden.
+- Writers emit only versions enabled by the active store revision.
+- Readers required for migration and rollback remain able to process every
+  version in the declared compatibility window.
+
+An unknown mandatory event version halts the affected authoritative projection.
+It is never skipped as "forward compatible."
+
+### Projection Evolution
+
+A new projection schema is built side by side from a pinned event sequence:
+
+1. register schema and reducer revision;
+2. replay from genesis or a verified compatible snapshot;
+3. compare declared invariants and shared-field canonical hashes;
+4. catch up to one locked cutover sequence;
+5. atomically switch the active projection pointer;
+6. retain the prior reader for the rollback window.
+
+Append continues during a reader rollback only when both projection revisions
+understand the active event writer schema. Otherwise writes fail closed until a
+forward repair is deployed.
+
+### Policy Evolution
+
+Identity, capability, visibility, and resource policy changes are themselves
+authorized events. Activation records the new revision and effective project
+sequence.
+
+A resource-policy revision also follows the live-lease re-evaluation and
+fencing requirement in the Team Round domain contract. A visibility reduction
+invalidates affected caches and filtered-view cursors at activation.
+
+## Integrity Contract
+
+### Hash Chains
+
+Each event records:
+
+- `previous_project_hash`, chaining the gap-free project event order
+- `previous_aggregate_hash`, chaining the primary aggregate version
+- `event_hash`, covering the canonical envelope and both prior hashes
+
+The append transaction updates both integrity heads. Replay verifies both
+chains. The project chain detects deletion or reordering across aggregates; the
+aggregate chain localizes state-machine corruption.
+
+Hash chains detect accidental or unauthorized partial mutation relative to a
+trusted checkpoint. They do not prevent a database administrator who can
+rewrite the complete ledger and every checkpoint. The threat model MUST state
+that limitation.
+
+### Checkpoints And Anchors
+
+At configured sequence intervals and every round close, the store writes an
+integrity checkpoint containing:
+
+- project ID and event sequence
+- project integrity head
+- aggregate heads changed since the prior checkpoint
+- active schema and policy revisions
+- accepted scorecard version and content hash when closing a round
+- checkpoint creation principal and store time
+
+Round-close checkpoints are exported with the Git-tracked scorecard evidence.
+Deployments MAY sign checkpoints or anchor them in an independently protected
+system. Verification reports whether a checkpoint is local-only, signed, or
+externally anchored.
+
+### Constraints And Verification
+
+Store constraints MUST enforce at least:
+
+- unique `(project_id, event_id)`
+- unique `(project_id, event_sequence)`
+- unique `(project_id, aggregate_type, aggregate_id, aggregate_version)`
+- unique accepted idempotency identity
+- one accepted scorecard version per round
+- monotonic round epoch, aggregate version, lease epoch, and fencing token
+- referential validity for causation, scorecard source events, shots, penalties,
+  loss components, and lease proof
+
+An online verifier checks newly appended ranges. A full verifier replays from a
+trusted checkpoint or genesis into empty projections. Any mismatch:
+
+- marks affected authoritative projections unhealthy;
+- blocks score-affecting, lease, capability, export, and finalization writes;
+- preserves read access only through policy-filtered last-verified state;
+- emits an integrity incident without embedding secret payload;
+- requires an authorized forward repair or store restoration.
+
+No repair may edit an accepted event. A correction is a new event whose
+causation and administrative authority are explicit.
+
+## Append Error Taxonomy
+
+Clients receive stable machine-readable errors:
+
+| Error | Meaning | Retry |
+|---|---|---|
+| `IDEMPOTENCY_PAYLOAD_CONFLICT` | Same scoped key, different canonical request | No; new intent and key required |
+| `AGGREGATE_VERSION_CONFLICT` | Primary version changed | Re-read, then new key |
+| `PRECONDITION_CONFLICT` | Material dependent aggregate changed | Re-read, then new key |
+| `ROUND_EPOCH_STALE` | Request targets an earlier open/reopen epoch | No |
+| `LEASE_FENCED` | Lease epoch or fencing token is stale | No |
+| `CAPABILITY_DENIED` | Principal lacks requested authority | No until policy changes |
+| `VISIBILITY_DENIED` | Requested input or result is not visible | No until policy changes |
+| `SCHEMA_UNSUPPORTED` | Event, payload, or projection revision is unknown | No until deploy changes |
+| `INTEGRITY_UNHEALTHY` | Trusted append preconditions cannot be established | No until repaired |
+| `STORE_BUSY` | Transaction did not begin or serialize | Retry same key |
+| `COMMIT_STATUS_UNKNOWN` | Client cannot tell whether commit completed | Retry same key |
+
+Errors MUST NOT disclose hidden aggregate, event, principal, actor, or resource
+existence. A caller without visibility receives the policy's non-enumerating
+form.
+
+## S264.1-2 Acceptance Criteria
+
+The append and integrity contract is complete when an implementer can answer:
+
+- Which exact dimensions scope an idempotency key?
+- Can a replacement session retry an accepted operation?
+- What happens when the same key carries a different payload, actor,
+  precondition, policy revision, or fencing token?
+- Can append commit an event without all authoritative projections, or a
+  projection without its event?
+- Can a rolled-back PostgreSQL sequence allocation create a replay gap?
+- How are multi-aggregate preconditions locked and recorded?
+- Which views may lag and which must be transactional?
+- Can client time or sequence adjacency establish causation?
+- What happens when an event or projection schema is unknown?
+- Which integrity chains detect aggregate-local and cross-aggregate damage?
+- Can a repair mutate accepted event bytes?
