@@ -2,11 +2,13 @@
 // Implements SlopeStore backed by PostgreSQL with JSONB and multi-tenancy.
 // Requires the `pg` package: npm install pg
 
-import type { SprintClaim, GolfScorecard, SlopeEvent, EventType, WorkflowExecution, WorkflowStepResult, CompletedStep } from '../core/types.js';
+import type { SprintClaim, SlopeEvent, EventType, WorkflowExecution, WorkflowStepResult, CompletedStep } from '../core/types.js';
 import type { CommonIssuesFile } from '../core/briefing.js';
-import type { StoreStats } from '../core/store.js';
+import type { StoreStats, StoredGolfScorecard } from '../core/store.js';
 import { SlopeStoreError } from '../core/store.js';
 import type { SlopeStore, SlopeSession, SlopeSessionUpdate } from '../core/store.js';
+import { compareSprintIdKeys, sprintIdKey } from '../core/sprint-id.js';
+import type { SprintId } from '../core/sprint-id.js';
 // EmbeddingStore not implemented for PG — hasEmbeddingSupport() returns false.
 // Deferred to a future pgvector sprint.
 
@@ -21,6 +23,18 @@ function generateId(prefix: string): string {
 
 function nowISO(): string {
   return new Date().toISOString();
+}
+
+function canonicalSprintKey(value: SprintId): string {
+  const key = sprintIdKey(value);
+  if (key === null) {
+    throw new TypeError(`Invalid sprint id: ${String(value)}`);
+  }
+  return key;
+}
+
+function canonicalWorkflowSprintId(value: string | undefined): string | undefined {
+  return value === undefined ? undefined : sprintIdKey(value) ?? value;
 }
 
 /** Parse a JSONB column — PostgreSQL returns objects directly, SQLite returns strings */
@@ -481,6 +495,7 @@ export class PostgresSlopeStore implements SlopeStore {
       id: generateId('claim'),
       claimed_at: nowISO(),
       ...input,
+      sprint_number: canonicalSprintKey(input.sprint_number),
     };
 
     try {
@@ -518,10 +533,10 @@ export class PostgresSlopeStore implements SlopeStore {
     return (result.rowCount ?? 0) > 0;
   }
 
-  async list(sprintNumber: number): Promise<SprintClaim[]> {
+  async list(sprintNumber: SprintId): Promise<SprintClaim[]> {
     const result = await this.pool.query(
       'SELECT * FROM claims WHERE sprint_number = $1 AND project_id = $2 ORDER BY claimed_at',
-      [sprintNumber, this.projectId],
+      [canonicalSprintKey(sprintNumber), this.projectId],
     );
     return result.rows.map(rowToClaim);
   }
@@ -534,7 +549,7 @@ export class PostgresSlopeStore implements SlopeStore {
     return result.rows.length > 0 ? rowToClaim(result.rows[0]) : undefined;
   }
 
-  async getActiveClaims(sprintNumber?: number): Promise<SprintClaim[]> {
+  async getActiveClaims(sprintNumber?: SprintId): Promise<SprintClaim[]> {
     const now = nowISO();
     const sprintClause = sprintNumber !== undefined ? 'AND claims.sprint_number = $3' : '';
     const result = await this.pool.query(
@@ -543,47 +558,52 @@ export class PostgresSlopeStore implements SlopeStore {
        WHERE claims.project_id = $1
          AND (claims.expires_at IS NULL OR claims.expires_at > $2)
          ${sprintClause}
-       ORDER BY claims.sprint_number, claims.claimed_at`,
+       ORDER BY claims.claimed_at`,
       sprintNumber !== undefined
-        ? [this.projectId, now, sprintNumber]
+        ? [this.projectId, now, canonicalSprintKey(sprintNumber)]
         : [this.projectId, now],
     );
-    return result.rows.map(rowToClaim);
+    return result.rows.map(rowToClaim).sort((a, b) =>
+      compareSprintIdKeys(canonicalSprintKey(a.sprint_number), canonicalSprintKey(b.sprint_number))
+      || a.claimed_at.localeCompare(b.claimed_at));
   }
 
   // --- Scorecards ---
 
-  async saveScorecard(card: GolfScorecard): Promise<void> {
+  async saveScorecard(card: StoredGolfScorecard): Promise<void> {
     const now = nowISO();
+    const sprintKey = canonicalSprintKey(card.sprint_number);
+    const storedCard: StoredGolfScorecard = { ...card, sprint_number: sprintKey };
     await this.pool.query(`
       INSERT INTO scorecards (project_id, sprint_number, data, created_at, updated_at)
       VALUES ($1, $2, $3, $4, $5)
       ON CONFLICT(project_id, sprint_number) DO UPDATE SET data = EXCLUDED.data, updated_at = EXCLUDED.updated_at
-    `, [this.projectId, card.sprint_number, JSON.stringify(card), now, now]);
+    `, [this.projectId, sprintKey, JSON.stringify(storedCard), now, now]);
   }
 
-  async listScorecards(filter?: { minSprint?: number; maxSprint?: number }): Promise<GolfScorecard[]> {
-    let sql = 'SELECT data FROM scorecards WHERE project_id = $1';
-    const params: unknown[] = [this.projectId];
-    let idx = 2;
+  async listScorecards(filter?: { minSprint?: SprintId; maxSprint?: SprintId }): Promise<StoredGolfScorecard[]> {
+    const minSprint = filter?.minSprint === undefined ? null : canonicalSprintKey(filter.minSprint);
+    const maxSprint = filter?.maxSprint === undefined ? null : canonicalSprintKey(filter.maxSprint);
+    const result = await this.pool.query(
+      'SELECT sprint_number, data FROM scorecards WHERE project_id = $1',
+      [this.projectId],
+    );
 
-    if (filter?.minSprint !== undefined) {
-      sql += ` AND sprint_number >= $${idx}`;
-      params.push(filter.minSprint);
-      idx++;
-    }
-    if (filter?.maxSprint !== undefined) {
-      sql += ` AND sprint_number <= $${idx}`;
-      params.push(filter.maxSprint);
-      idx++;
-    }
-    sql += ' ORDER BY sprint_number';
-
-    const result = await this.pool.query(sql, params);
-    return result.rows.map(r => {
-      const data = r.data;
-      return (typeof data === 'string' ? JSON.parse(data) : data) as GolfScorecard;
-    });
+    return result.rows
+      .map(row => {
+        const data = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
+        return {
+          ...(data as Omit<StoredGolfScorecard, 'sprint_number'>),
+          sprint_number: canonicalSprintKey(row.sprint_number as string),
+        };
+      })
+      .filter(card => {
+        const key = canonicalSprintKey(card.sprint_number);
+        return (minSprint === null || compareSprintIdKeys(key, minSprint) >= 0)
+          && (maxSprint === null || compareSprintIdKeys(key, maxSprint) <= 0);
+      })
+      .sort((a, b) =>
+        compareSprintIdKeys(canonicalSprintKey(a.sprint_number), canonicalSprintKey(b.sprint_number)));
   }
 
   // --- Common Issues ---
@@ -614,6 +634,9 @@ export class PostgresSlopeStore implements SlopeStore {
       id: generateId('evt'),
       timestamp: nowISO(),
       ...event,
+      sprint_number: event.sprint_number === undefined
+        ? undefined
+        : canonicalSprintKey(event.sprint_number),
     };
 
     await this.pool.query(`
@@ -642,10 +665,10 @@ export class PostgresSlopeStore implements SlopeStore {
     return result.rows.map(rowToEvent);
   }
 
-  async getEventsBySprint(sprintNumber: number): Promise<SlopeEvent[]> {
+  async getEventsBySprint(sprintNumber: SprintId): Promise<SlopeEvent[]> {
     const result = await this.pool.query(
       'SELECT * FROM events WHERE sprint_number = $1 AND project_id = $2 ORDER BY timestamp',
-      [sprintNumber, this.projectId],
+      [canonicalSprintKey(sprintNumber), this.projectId],
     );
     return result.rows.map(rowToEvent);
   }
@@ -735,10 +758,11 @@ export class PostgresSlopeStore implements SlopeStore {
   async startExecution(params: { workflow_name: string; sprint_id?: string; variables?: Record<string, string>; session_id?: string; definition_json?: string; definition_hash?: string }): Promise<WorkflowExecution> {
     const id = generateId('wf');
     const now = nowISO();
+    const sprintId = canonicalWorkflowSprintId(params.sprint_id);
     const execution: WorkflowExecution = {
       id,
       workflow_name: params.workflow_name,
-      sprint_id: params.sprint_id,
+      sprint_id: sprintId,
       current_phase: undefined,
       current_step: undefined,
       status: 'running',
@@ -785,7 +809,7 @@ export class PostgresSlopeStore implements SlopeStore {
   async getExecutionBySprint(sprintId: string): Promise<WorkflowExecution | null> {
     const { rows } = await this.pool.query(
       "SELECT * FROM workflow_executions WHERE sprint_id = $1 AND project_id = $2 AND status NOT IN ('completed', 'failed') ORDER BY started_at DESC LIMIT 1",
-      [sprintId, this.projectId],
+      [canonicalWorkflowSprintId(sprintId), this.projectId],
     );
     return rows.length > 0 ? rowToExecution(rows[0]) : null;
   }
@@ -879,7 +903,7 @@ export class PostgresSlopeStore implements SlopeStore {
 
     if (filter?.sprint_id) {
       sql += ` AND sprint_id = $${idx}`;
-      params.push(filter.sprint_id);
+      params.push(canonicalWorkflowSprintId(filter.sprint_id));
       idx++;
     }
     if (filter?.status) {
@@ -936,7 +960,7 @@ function rowToSession(row: Record<string, unknown>): SlopeSession {
 function rowToClaim(row: Record<string, unknown>): SprintClaim {
   return {
     id: row.id as string,
-    sprint_number: row.sprint_number as number,
+    sprint_number: canonicalSprintKey(row.sprint_number as string),
     player: row.player as string,
     target: row.target as string,
     scope: row.scope as SprintClaim['scope'],
@@ -955,7 +979,9 @@ function rowToEvent(row: Record<string, unknown>): SlopeEvent {
     type: row.type as EventType,
     timestamp: row.timestamp as string,
     data: parseJsonColumn(row.data),
-    sprint_number: (row.sprint_number as number | null) ?? undefined,
+    sprint_number: row.sprint_number === null || row.sprint_number === undefined
+      ? undefined
+      : canonicalSprintKey(row.sprint_number as string),
     ticket_key: (row.ticket_key as string | null) ?? undefined,
   };
 }
@@ -972,7 +998,7 @@ function rowToExecution(row: Record<string, unknown>): WorkflowExecution {
   return {
     id: row.id as string,
     workflow_name: row.workflow_name as string,
-    sprint_id: (row.sprint_id as string | null) ?? undefined,
+    sprint_id: canonicalWorkflowSprintId((row.sprint_id as string | null) ?? undefined),
     current_phase: (row.current_phase as string | null) ?? undefined,
     current_step: (row.current_step as string | null) ?? undefined,
     status: row.status as WorkflowExecution['status'],
