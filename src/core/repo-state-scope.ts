@@ -20,10 +20,16 @@ export function resolvePrimaryCheckout(cwd: string): string | null {
   return existsSync(primary) ? primary : null;
 }
 
-/** Resolve the checkout root that owns tracked project artifacts. */
+/**
+ * Resolve the project root that owns tracked artifacts.
+ *
+ * An explicitly configured nested SLOPE project keeps its own tracked files.
+ * Otherwise, first-time initialization belongs to the current Git checkout.
+ */
 export function resolveRepoSourceCwd(cwd: string = process.cwd()): string {
   const local = resolve(cwd);
-  return safeGit(local, ['rev-parse', '--show-toplevel']) ?? local;
+  const gitTopLevel = safeGit(local, ['rev-parse', '--show-toplevel']);
+  return findNearestSlopeProject(local, gitTopLevel) ?? gitTopLevel ?? local;
 }
 
 /**

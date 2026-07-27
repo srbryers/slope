@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   loadConfig,
   resolvePrimaryCheckout,
+  resolveRepoSourceCwd,
   resolveRepoStateCwd,
   resolveRepoStatePath,
 } from '../../src/core/index.js';
@@ -79,6 +80,8 @@ describe('repository state scope', () => {
 
     expect(resolveRepoStateCwd(nested)).toBe(nested);
     expect(resolveRepoStateCwd(descendant)).toBe(nested);
+    expect(resolveRepoSourceCwd(nested)).toBe(nested);
+    expect(resolveRepoSourceCwd(descendant)).toBe(nested);
     expect(loadConfig(nested).store_path).toBe('.slope/nested.db');
     expect(loadConfig(descendant).store_path).toBe('.slope/nested.db');
   });
