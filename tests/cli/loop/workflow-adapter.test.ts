@@ -66,7 +66,7 @@ describe('WorkflowAdapter', () => {
     const exec = await adapter.start(TEST_SPRINT, tmpDir);
     expect(exec).not.toBeNull();
     expect(exec!.workflow_name).toBe('sprint-standard');
-    expect(exec!.sprint_id).toBe('S99');
+    expect(exec!.sprint_id).toBe('99');
     expect(adapter.executionId).toBeTruthy();
     expect(adapter.status).toBe('running');
   });

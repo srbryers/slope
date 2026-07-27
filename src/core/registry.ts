@@ -1,13 +1,15 @@
 // SLOPE — Sprint Claims Registry
 // Provides the SprintRegistry interface and pure conflict detection logic.
 
+import { sprintIdsEqual } from './sprint-id.js';
+import type { SprintId } from './sprint-id.js';
 import type { SprintClaim, SprintConflict } from './types.js';
 
 /** Async registry for managing sprint claims */
 export interface SprintRegistry {
   claim(claim: Omit<SprintClaim, 'id' | 'claimed_at'>): Promise<SprintClaim>;
   release(id: string): Promise<boolean>;
-  list(sprintNumber: number): Promise<SprintClaim[]>;
+  list(sprintNumber: SprintId): Promise<SprintClaim[]>;
   get(id: string): Promise<SprintClaim | undefined>;
 }
 
@@ -32,7 +34,7 @@ export function checkConflicts(claims: SprintClaim[]): SprintConflict[] {
 
       // Skip same player or different sprints
       if (a.player === b.player) continue;
-      if (a.sprint_number !== b.sprint_number) continue;
+      if (!sprintIdsEqual(a.sprint_number, b.sprint_number)) continue;
 
       let reason: string | null = null;
       let severity: 'overlap' | 'adjacent' | null = null;

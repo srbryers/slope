@@ -13,6 +13,7 @@ import { computeHandicapCard } from './handicap.js';
 import { computeDispersion } from './dispersion.js';
 import { generateTrainingPlan } from './advisor.js';
 import { checkConflicts } from './registry.js';
+import { compareSprintIdKeys, sprintIdKey } from './sprint-id.js';
 import type { RoadmapDefinition } from './roadmap.js';
 import {
   formatRoadmapSprintLabel,
@@ -836,7 +837,7 @@ export function formatBriefing(opts: {
   if (recentEvents && recentEvents.length > 0 && currentSprint) {
     const minSprint = currentSprint - eventRecencyWindow;
     const relevant = recentEvents.filter(e =>
-      e.sprint_number != null && e.sprint_number > minSprint,
+      e.sprint_number != null && Number(e.sprint_number) > minSprint,
     );
 
     if (relevant.length > 0) {
@@ -852,7 +853,10 @@ export function formatBriefing(opts: {
       lines.push('\u2500'.repeat(50));
       lines.push(`RECENT EVENTS (last ${eventRecencyWindow} sprints)`);
       for (const [type, events] of byType) {
-        const sprints = [...new Set(events.map(e => e.sprint_number))].sort((a, b) => (a ?? 0) - (b ?? 0));
+        const sprints = [...new Set(events.flatMap(e =>
+          e.sprint_number === undefined ? [] : [e.sprint_number],
+        ))].sort((a, b) =>
+          compareSprintIdKeys(sprintIdKey(a)!, sprintIdKey(b)!));
         const sprintList = sprints.map(s => `S${s}`).join(', ');
         const sample = events[0];
         const desc = (sample.data.error as string) ?? (sample.data.description as string) ?? (sample.data.area as string) ?? '';

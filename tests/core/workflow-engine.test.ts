@@ -90,7 +90,7 @@ describe('WorkflowEngine', () => {
         variables: { foo: 'bar' },
         session_id: 'sess-1',
       });
-      expect(exec.sprint_id).toBe('S42');
+      expect(exec.sprint_id).toBe('42');
       expect(exec.variables).toEqual({ foo: 'bar' });
       expect(exec.session_id).toBe('sess-1');
     });

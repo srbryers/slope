@@ -86,8 +86,9 @@ export function clusterEvents(events: SlopeEvent[]): EventCluster[] {
     const cluster = clusterMap.get(key)!;
     cluster.events.push(event);
 
-    if (event.sprint_number !== undefined && !cluster.sprints.includes(event.sprint_number)) {
-      cluster.sprints.push(event.sprint_number);
+    const sprintNumber = event.sprint_number === undefined ? null : Number(event.sprint_number);
+    if (sprintNumber !== null && Number.isFinite(sprintNumber) && !cluster.sprints.includes(sprintNumber)) {
+      cluster.sprints.push(sprintNumber);
     }
   }
 

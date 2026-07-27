@@ -194,7 +194,7 @@ describe('slope sprint run', () => {
       const exec = await store.getExecutionBySprint('S64');
       expect(exec).not.toBeNull();
       expect(exec!.variables.sprint_id).toBe('S64');
-      expect(exec!.sprint_id).toBe('S64');
+      expect(exec!.sprint_id).toBe('64');
     } finally {
       store.close();
     }
@@ -203,7 +203,7 @@ describe('slope sprint run', () => {
       sprintCommand(['status', 'S64'])
     );
     expect(output).toContain('Execution:');
-    expect(output).toContain('Sprint:    S64');
+    expect(output).toContain('Sprint:    64');
   });
 
   it('identifies the invoking execution to workflow command subprocesses (#668)', async () => {

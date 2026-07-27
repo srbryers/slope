@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { SqliteSlopeStore, createStore, LATEST_SCHEMA_VERSION, configureSqliteJournalMode, createSqliteStoreUnavailableError } from '../../src/store/index.js';
 import { SlopeStoreError, checkConflicts } from '../../src/core/index.js';
-import type { GolfScorecard } from '../../src/core/index.js';
+import type { GolfScorecard, StoredGolfScorecard } from '../../src/core/index.js';
 
 let store: SqliteSlopeStore;
 let tmpDir: string;
@@ -225,7 +225,7 @@ describe('Claims', () => {
     });
 
     expect(claim.id).toMatch(/^claim-/);
-    expect(claim.sprint_number).toBe(5);
+    expect(claim.sprint_number).toBe('5');
     expect(claim.player).toBe('alice');
     expect(claim.claimed_at).toBeTruthy();
 
@@ -261,7 +261,15 @@ describe('Claims', () => {
   it('allows same target in different sprints', async () => {
     await store.claim({ sprint_number: 1, player: 'alice', target: 'T-1', scope: 'ticket' });
     const c2 = await store.claim({ sprint_number: 2, player: 'alice', target: 'T-1', scope: 'ticket' });
-    expect(c2.sprint_number).toBe(2);
+    expect(c2.sprint_number).toBe('2');
+  });
+
+  it('keeps 458.10 claims distinct from 458.1', async () => {
+    await store.claim({ sprint_number: '458.1', player: 'alice', target: 'T-CANONICAL', scope: 'ticket' });
+    await store.claim({ sprint_number: '458.10', player: 'bob', target: 'T-CANONICAL', scope: 'ticket' });
+
+    expect((await store.list('458.1')).map(claim => claim.sprint_number)).toEqual(['458.1']);
+    expect((await store.list('458.10')).map(claim => claim.sprint_number)).toEqual(['458.10']);
   });
 
   it('getActiveClaims returns all or filtered by sprint', async () => {
@@ -350,8 +358,8 @@ describe('Scorecards', () => {
 
     const all = await store.listScorecards();
     expect(all).toHaveLength(2);
-    expect(all[0].sprint_number).toBe(3);
-    expect(all[1].sprint_number).toBe(5);
+    expect(all[0].sprint_number).toBe('3');
+    expect(all[1].sprint_number).toBe('5');
   });
 
   it('filters scorecards by min/max sprint', async () => {
@@ -361,7 +369,7 @@ describe('Scorecards', () => {
 
     const filtered = await store.listScorecards({ minSprint: 2, maxSprint: 4 });
     expect(filtered).toHaveLength(1);
-    expect(filtered[0].sprint_number).toBe(3);
+    expect(filtered[0].sprint_number).toBe('3');
   });
 
   it('upserts scorecards (same sprint overwrites)', async () => {
@@ -371,6 +379,26 @@ describe('Scorecards', () => {
     const all = await store.listScorecards();
     expect(all).toHaveLength(1);
     expect(all[0].theme).toBe('Updated');
+  });
+
+  it('round-trips and orders canonical inserted-sprint scorecards', async () => {
+    const sprintIds = ['458.11', '458.1', '458.10', '458.9'];
+    for (const sprintId of sprintIds) {
+      const card: StoredGolfScorecard = {
+        ...minimalCard,
+        sprint_number: sprintId,
+        theme: `Sprint ${sprintId}`,
+      };
+      await store.saveScorecard(card);
+    }
+
+    const cards = await store.listScorecards({ minSprint: '458.1', maxSprint: '458.11' });
+    expect(cards.map(card => card.sprint_number)).toEqual([
+      '458.1',
+      '458.9',
+      '458.10',
+      '458.11',
+    ]);
   });
 });
 
@@ -430,6 +458,14 @@ describe('Events', () => {
     expect(sprint3).toHaveLength(2);
     expect(sprint3[0].type).toBe('hazard');
     expect(sprint3[1].type).toBe('decision');
+  });
+
+  it('keeps 458.10 events distinct from 458.1', async () => {
+    await store.insertEvent({ type: 'decision', data: { sprint: '.1' }, sprint_number: '458.1' });
+    await store.insertEvent({ type: 'decision', data: { sprint: '.10' }, sprint_number: '458.10' });
+
+    expect((await store.getEventsBySprint('458.1')).map(event => event.sprint_number)).toEqual(['458.1']);
+    expect((await store.getEventsBySprint('458.10')).map(event => event.sprint_number)).toEqual(['458.10']);
   });
 
   it('retrieves events by ticket', async () => {
@@ -617,6 +653,185 @@ describe('Schema Migration', () => {
 
     upgraded.close();
   });
+
+  it('migrates numeric sprint rows to text without decoding ambiguous legacy keys', async () => {
+    const dbPath = join(tmpDir, 'v8-canonical-sprints.db');
+    const Database = require('better-sqlite3');
+    const db = new Database(dbPath);
+    db.pragma('foreign_keys = ON');
+    db.exec(`
+      CREATE TABLE schema_version (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL);
+      INSERT INTO schema_version VALUES (8, '2026-01-01T00:00:00.000Z');
+
+      CREATE TABLE sessions (
+        session_id TEXT PRIMARY KEY, role TEXT NOT NULL, ide TEXT NOT NULL,
+        worktree_path TEXT, branch TEXT, started_at TEXT NOT NULL,
+        last_heartbeat_at TEXT NOT NULL, metadata TEXT, agent_role TEXT, swarm_id TEXT
+      );
+      CREATE TABLE claims (
+        id TEXT PRIMARY KEY,
+        session_id TEXT REFERENCES sessions(session_id) ON DELETE CASCADE,
+        sprint_number INTEGER NOT NULL, target TEXT NOT NULL, player TEXT NOT NULL,
+        scope TEXT NOT NULL, claimed_at TEXT NOT NULL, expires_at TEXT,
+        notes TEXT, metadata TEXT, UNIQUE(sprint_number, scope, target)
+      );
+      CREATE TABLE scorecards (
+        sprint_number INTEGER PRIMARY KEY, data TEXT NOT NULL,
+        created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+      );
+      CREATE TABLE events (
+        id TEXT PRIMARY KEY, session_id TEXT, type TEXT NOT NULL,
+        timestamp TEXT NOT NULL, data TEXT NOT NULL DEFAULT '{}',
+        sprint_number INTEGER, ticket_key TEXT
+      );
+      CREATE INDEX idx_events_session ON events(session_id);
+      CREATE INDEX idx_events_sprint ON events(sprint_number);
+      CREATE INDEX idx_events_ticket ON events(ticket_key);
+      CREATE INDEX idx_events_type ON events(type);
+      CREATE TABLE workflow_executions (
+        id TEXT PRIMARY KEY, workflow_name TEXT NOT NULL, sprint_id TEXT,
+        current_phase TEXT, current_step TEXT, status TEXT NOT NULL DEFAULT 'running',
+        variables TEXT DEFAULT '{}', completed_steps TEXT DEFAULT '[]',
+        started_at TEXT NOT NULL, updated_at TEXT NOT NULL, session_id TEXT,
+        definition_json TEXT, definition_hash TEXT
+      );
+
+      INSERT INTO sessions VALUES (
+        'legacy-session', 'primary', 'vscode', NULL, 'main',
+        '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z', NULL, NULL, NULL
+      );
+      INSERT INTO claims VALUES (
+        'legacy-claim', 'legacy-session', 458, 'T-LEGACY', 'alice', 'ticket',
+        '2026-01-01T00:00:00.000Z', NULL, NULL, NULL
+      );
+      INSERT INTO scorecards VALUES (
+        458, '{"sprint_number":458,"theme":"legacy"}',
+        '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z'
+      );
+      INSERT INTO scorecards VALUES (
+        435, '{"sprint_number":435,"theme":"ambiguous legacy key"}',
+        '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z'
+      );
+      INSERT INTO events VALUES (
+        'legacy-event', 'legacy-session', 'decision',
+        '2026-01-01T00:00:00.000Z', '{}', 458, 'T-LEGACY'
+      );
+      INSERT INTO workflow_executions VALUES (
+        'legacy-workflow', 'test', 'S458', NULL, NULL, 'running', '{}', '[]',
+        '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z',
+        'legacy-session', NULL, NULL
+      );
+      INSERT INTO workflow_executions VALUES (
+        'non-sprint-workflow', 'test', 'R1', NULL, NULL, 'running', '{}', '[]',
+        '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z',
+        'legacy-session', NULL, NULL
+      );
+      INSERT INTO workflow_executions VALUES (
+        'trimmed-workflow', 'test', ' 458.10 ', NULL, NULL, 'running', '{}', '[]',
+        '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z',
+        'legacy-session', NULL, NULL
+      );
+      INSERT INTO workflow_executions VALUES (
+        'invalid-workflow', 'test', 'S0', NULL, NULL, 'running', '{}', '[]',
+        '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z',
+        'legacy-session', NULL, NULL
+      );
+    `);
+    db.close();
+
+    const upgraded = new SqliteSlopeStore(dbPath);
+    expect(await upgraded.getSchemaVersion()).toBe(LATEST_SCHEMA_VERSION);
+    expect((await upgraded.list('458'))[0].sprint_number).toBe('458');
+    expect((await upgraded.listScorecards()).map(card => card.sprint_number)).toEqual(['435', '458']);
+    expect((await upgraded.getEventsBySprint('458'))[0].sprint_number).toBe('458');
+    expect((await upgraded.getExecutionBySprint('458'))?.sprint_id).toBe('458');
+    expect((await upgraded.getExecutionBySprint('458.10'))?.sprint_id).toBe('458.10');
+    expect((await upgraded.getExecutionBySprint('R1'))?.sprint_id).toBe('R1');
+    expect((await upgraded.getExecution('invalid-workflow'))?.sprint_id).toBe('S0');
+    await expect(upgraded.claim({
+      sprint_number: '458',
+      player: 'bob',
+      target: 'T-LEGACY',
+      scope: 'ticket',
+    })).rejects.toMatchObject({ code: 'CLAIM_EXISTS' });
+    upgraded.close();
+
+    const inspected = new Database(dbPath, { readonly: true });
+    for (const table of ['claims', 'scorecards', 'events']) {
+      const sprintColumn = inspected.prepare(`PRAGMA table_info(${table})`).all()
+        .find((column: { name: string }) => column.name === 'sprint_number');
+      expect(sprintColumn.type).toBe('TEXT');
+    }
+    const eventIndexes = inspected.prepare(
+      "SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'events' ORDER BY name",
+    ).all().map((row: { name: string }) => row.name);
+    expect(eventIndexes).toEqual(expect.arrayContaining([
+      'idx_events_session',
+      'idx_events_sprint',
+      'idx_events_ticket',
+      'idx_events_type',
+    ]));
+    const claimForeignKeys = inspected.prepare('PRAGMA foreign_key_list(claims)').all();
+    expect(claimForeignKeys).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        table: 'sessions',
+        from: 'session_id',
+        to: 'session_id',
+        on_delete: 'CASCADE',
+      }),
+    ]));
+    inspected.close();
+  });
+
+  it('rolls back the canonical migration and version write on failure', () => {
+    const dbPath = join(tmpDir, 'v8-broken-canonical-sprints.db');
+    const Database = require('better-sqlite3');
+    const db = new Database(dbPath);
+    db.exec(`
+      CREATE TABLE schema_version (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL);
+      INSERT INTO schema_version VALUES (8, '2026-01-01T00:00:00.000Z');
+      CREATE TABLE sessions (
+        session_id TEXT PRIMARY KEY, role TEXT NOT NULL, ide TEXT NOT NULL,
+        started_at TEXT NOT NULL, last_heartbeat_at TEXT NOT NULL
+      );
+      CREATE TABLE claims (
+        id TEXT PRIMARY KEY, session_id TEXT, sprint_number INTEGER NOT NULL,
+        target TEXT NOT NULL, player TEXT NOT NULL, scope TEXT NOT NULL,
+        claimed_at TEXT NOT NULL, expires_at TEXT, notes TEXT, metadata TEXT,
+        UNIQUE(sprint_number, scope, target)
+      );
+      CREATE TABLE scorecards (
+        sprint_number INTEGER PRIMARY KEY, data TEXT NOT NULL,
+        created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+      );
+      INSERT INTO claims VALUES (
+        'claim-before-failure', NULL, 458, 'T-ROLLBACK', 'alice', 'ticket',
+        '2026-01-01T00:00:00.000Z', NULL, NULL, NULL
+      );
+      INSERT INTO scorecards VALUES (
+        458, '{"sprint_number":458}',
+        '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z'
+      );
+    `);
+    db.close();
+
+    expect(() => new SqliteSlopeStore(dbPath)).toThrow(/no such table: events/);
+
+    const inspected = new Database(dbPath, { readonly: true });
+    const version = inspected.prepare('SELECT MAX(version) AS version FROM schema_version').get();
+    expect(version.version).toBe(8);
+    for (const table of ['claims', 'scorecards']) {
+      const sprintColumn = inspected.prepare(`PRAGMA table_info(${table})`).all()
+        .find((column: { name: string }) => column.name === 'sprint_number');
+      expect(sprintColumn.type).toBe('INTEGER');
+    }
+    expect(inspected.prepare(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE '%numeric_sprint'",
+    ).all()).toEqual([]);
+    expect(inspected.prepare('SELECT sprint_number FROM claims').get()).toEqual({ sprint_number: 458 });
+    expect(inspected.prepare('SELECT sprint_number FROM scorecards').get()).toEqual({ sprint_number: 458 });
+    inspected.close();
+  });
 });
 
 describe('getStats', () => {
@@ -768,7 +983,7 @@ describe('Workflow Executions', () => {
 
     expect(exec.id).toMatch(/^wf-/);
     expect(exec.workflow_name).toBe('sprint-standard');
-    expect(exec.sprint_id).toBe('S42');
+    expect(exec.sprint_id).toBe('42');
     expect(exec.status).toBe('running');
     expect(exec.variables).toEqual({ sprint_id: 'S42', model: 'local' });
     expect(exec.completed_steps).toEqual([]);
@@ -785,7 +1000,15 @@ describe('Workflow Executions', () => {
     await store.startExecution({ workflow_name: 'test', sprint_id: 'S99' });
     const exec = await store.getExecutionBySprint('S99');
     expect(exec).not.toBeNull();
-    expect(exec!.sprint_id).toBe('S99');
+    expect(exec!.sprint_id).toBe('99');
+  });
+
+  it('keeps 458.10 workflow executions distinct from 458.1', async () => {
+    await store.startExecution({ workflow_name: 'test', sprint_id: 'S458.1' });
+    await store.startExecution({ workflow_name: 'test', sprint_id: 'S458.10' });
+
+    expect((await store.getExecutionBySprint('458.1'))?.sprint_id).toBe('458.1');
+    expect((await store.getExecutionBySprint('458.10'))?.sprint_id).toBe('458.10');
   });
 
   it('returns null for non-existent execution', async () => {

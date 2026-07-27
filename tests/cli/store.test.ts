@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { storeCommand } from '../../src/cli/commands/store.js';
 import { getStoreInfo } from '../../src/cli/store.js';
-import { SqliteSlopeStore } from '../../src/store/index.js';
+import { LATEST_SCHEMA_VERSION, SqliteSlopeStore } from '../../src/store/index.js';
 
 let tmpDir: string;
 let originalCwd: string;
@@ -109,7 +109,7 @@ describe('slope store status', () => {
 
     const parsed = JSON.parse(output);
     expect(parsed.type).toBe('sqlite');
-    expect(parsed.schemaVersion).toBe(8);
+    expect(parsed.schemaVersion).toBe(LATEST_SCHEMA_VERSION);
     expect(typeof parsed.sessions).toBe('number');
     expect(typeof parsed.claims).toBe('number');
     expect(typeof parsed.scorecards).toBe('number');
@@ -148,7 +148,7 @@ describe('slope store status', () => {
 });
 
 describe('slope store migrate status', () => {
-  it('shows version 8 and up to date', async () => {
+  it('shows the latest version and up to date', async () => {
     const logs: string[] = [];
     const spy = vi.spyOn(console, 'log').mockImplementation((...args) => { logs.push(args.join(' ')); });
 
@@ -157,8 +157,8 @@ describe('slope store migrate status', () => {
     const output = logs.join('\n');
     spy.mockRestore();
 
-    expect(output).toContain('Current schema version: 8');
-    expect(output).toContain('Total migrations:       8');
+    expect(output).toContain(`Current schema version: ${LATEST_SCHEMA_VERSION}`);
+    expect(output).toContain(`Total migrations:       ${LATEST_SCHEMA_VERSION}`);
     expect(output).toContain('up to date');
   });
 });

@@ -164,7 +164,7 @@ export type { SprintRegistry } from './registry.js';
 
 // Store
 export { SlopeStoreError } from './store.js';
-export type { SlopeStore, SlopeSession, SlopeSessionUpdate, StoreErrorCode, StoreStats } from './store.js';
+export type { SlopeStore, SlopeSession, SlopeSessionUpdate, StoreErrorCode, StoreStats, StoredGolfScorecard } from './store.js';
 
 // Store Health
 export { checkStoreHealth } from './store-health.js';
@@ -818,7 +818,7 @@ export {
   compareSprintIdKeys,
   sprintIdsEqual,
 } from './sprint-id.js';
-export type { SprintIdParts } from './sprint-id.js';
+export type { SprintId, SprintIdParts } from './sprint-id.js';
 export type { GeneratedConfig } from './generators/config.js';
 export type { GeneratedSprint } from './generators/first-sprint.js';
 

@@ -6,9 +6,9 @@ import { dirname, join, resolve } from 'node:path';
 import { createRequire } from 'node:module';
 import type DatabaseConstructor from 'better-sqlite3';
 import type { Database as DatabaseType } from 'better-sqlite3';
-import type { SprintClaim, GolfScorecard, SlopeEvent, EventType, WorkflowExecution, WorkflowStepResult, CompletedStep } from '../core/index.js';
+import type { SprintClaim, SlopeEvent, EventType, WorkflowExecution, WorkflowStepResult, CompletedStep, SprintId, StoredGolfScorecard } from '../core/index.js';
 import type { CommonIssuesFile, StoreStats } from '../core/index.js';
-import { resolveRepoStateCwd, SlopeStoreError } from '../core/index.js';
+import { compareSprintIdKeys, resolveRepoStateCwd, sprintIdKey, SlopeStoreError } from '../core/index.js';
 import type { SlopeStore, SlopeSession, SlopeSessionUpdate } from '../core/index.js';
 import type { EmbeddingStore, EmbeddingEntry, EmbeddingSearchResult, EmbeddingStats, IndexMeta } from '../core/embedding-store.js';
 
@@ -18,6 +18,18 @@ function generateId(prefix: string): string {
 
 function nowISO(): string {
   return new Date().toISOString();
+}
+
+function canonicalSprintKey(value: SprintId): string {
+  const key = sprintIdKey(value);
+  if (key === null) {
+    throw new TypeError(`Invalid sprint id: ${String(value)}`);
+  }
+  return key;
+}
+
+function canonicalWorkflowSprintId(value: string | undefined): string | undefined {
+  return value === undefined ? undefined : sprintIdKey(value) ?? value;
 }
 
 function loadDatabaseConstructor(): typeof DatabaseConstructor {
@@ -265,6 +277,89 @@ const MIGRATIONS: Array<{ version: number; sql: string }> = [
       CREATE INDEX IF NOT EXISTS idx_memories_weight ON memories(weight);
     `,
   },
+  {
+    // v9: canonical sprint identity (GH #659 / S265).
+    // SQLite cannot alter a column's affinity, so preserve each row while
+    // recreating the three sprint-keyed tables with TEXT columns.
+    version: 9,
+    sql: `
+      ALTER TABLE claims RENAME TO claims_numeric_sprint;
+      CREATE TABLE claims (
+        id TEXT PRIMARY KEY,
+        session_id TEXT REFERENCES sessions(session_id) ON DELETE CASCADE,
+        sprint_number TEXT NOT NULL,
+        target TEXT NOT NULL,
+        player TEXT NOT NULL,
+        scope TEXT NOT NULL,
+        claimed_at TEXT NOT NULL,
+        expires_at TEXT,
+        notes TEXT,
+        metadata TEXT,
+        UNIQUE(sprint_number, scope, target)
+      );
+      INSERT INTO claims (
+        id, session_id, sprint_number, target, player, scope,
+        claimed_at, expires_at, notes, metadata
+      )
+      SELECT
+        id, session_id, CAST(sprint_number AS TEXT), target, player, scope,
+        claimed_at, expires_at, notes, metadata
+      FROM claims_numeric_sprint;
+      DROP TABLE claims_numeric_sprint;
+
+      ALTER TABLE scorecards RENAME TO scorecards_numeric_sprint;
+      CREATE TABLE scorecards (
+        sprint_number TEXT PRIMARY KEY,
+        data TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      INSERT INTO scorecards (sprint_number, data, created_at, updated_at)
+      SELECT CAST(sprint_number AS TEXT), data, created_at, updated_at
+      FROM scorecards_numeric_sprint;
+      DROP TABLE scorecards_numeric_sprint;
+
+      ALTER TABLE events RENAME TO events_numeric_sprint;
+      CREATE TABLE events (
+        id TEXT PRIMARY KEY,
+        session_id TEXT,
+        type TEXT NOT NULL,
+        timestamp TEXT NOT NULL,
+        data TEXT NOT NULL DEFAULT '{}',
+        sprint_number TEXT,
+        ticket_key TEXT
+      );
+      INSERT INTO events (
+        id, session_id, type, timestamp, data, sprint_number, ticket_key
+      )
+      SELECT
+        id, session_id, type, timestamp, data, CAST(sprint_number AS TEXT), ticket_key
+      FROM events_numeric_sprint;
+      DROP TABLE events_numeric_sprint;
+      CREATE INDEX idx_events_session ON events(session_id);
+      CREATE INDEX idx_events_sprint ON events(sprint_number);
+      CREATE INDEX idx_events_ticket ON events(ticket_key);
+      CREATE INDEX idx_events_type ON events(type);
+
+      UPDATE workflow_executions
+      SET sprint_id = substr(trim(sprint_id), 2)
+      WHERE lower(substr(trim(sprint_id), 1, 1)) = 's'
+        AND length(trim(sprint_id)) > 1
+        AND substr(trim(sprint_id), 2) NOT GLOB '*[^0-9.]*'
+        AND substr(trim(sprint_id), 2) NOT GLOB '*.*.*'
+        AND substr(trim(sprint_id), 2) NOT LIKE '.%'
+        AND substr(trim(sprint_id), 2) NOT LIKE '%.'
+        AND CAST(substr(trim(sprint_id), 2) AS REAL) > 0;
+      UPDATE workflow_executions
+      SET sprint_id = trim(sprint_id)
+      WHERE length(trim(sprint_id)) > 0
+        AND trim(sprint_id) NOT GLOB '*[^0-9.]*'
+        AND trim(sprint_id) NOT GLOB '*.*.*'
+        AND trim(sprint_id) NOT LIKE '.%'
+        AND trim(sprint_id) NOT LIKE '%.'
+        AND CAST(trim(sprint_id) AS REAL) > 0;
+    `,
+  },
 ];
 
 /** Latest schema version — total number of migrations available. */
@@ -353,11 +448,15 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
 
     const currentVersion = this.getSchemaVersionSync();
 
+    const applyMigration = this.db.transaction((migration: { version: number; sql: string }) => {
+      this.db.exec(migration.sql);
+      this.db.prepare('INSERT INTO schema_version (version, applied_at) VALUES (?, ?)')
+        .run(migration.version, nowISO());
+    });
+
     for (const migration of MIGRATIONS) {
       if (migration.version > currentVersion) {
-        this.db.exec(migration.sql);
-        this.db.prepare('INSERT INTO schema_version (version, applied_at) VALUES (?, ?)')
-          .run(migration.version, nowISO());
+        applyMigration(migration);
       }
     }
 
@@ -503,6 +602,7 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
       id: generateId('claim'),
       claimed_at: nowISO(),
       ...input,
+      sprint_number: canonicalSprintKey(input.sprint_number),
     };
 
     try {
@@ -536,9 +636,9 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
     return result.changes > 0;
   }
 
-  async list(sprintNumber: number): Promise<SprintClaim[]> {
+  async list(sprintNumber: SprintId): Promise<SprintClaim[]> {
     const rows = this.db.prepare('SELECT * FROM claims WHERE sprint_number = ? ORDER BY claimed_at')
-      .all(sprintNumber) as Array<Record<string, unknown>>;
+      .all(canonicalSprintKey(sprintNumber)) as Array<Record<string, unknown>>;
     return rows.map(rowToClaim);
   }
 
@@ -547,7 +647,7 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
     return row ? rowToClaim(row) : undefined;
   }
 
-  async getActiveClaims(sprintNumber?: number): Promise<SprintClaim[]> {
+  async getActiveClaims(sprintNumber?: SprintId): Promise<SprintClaim[]> {
     const now = nowISO();
     const sprintClause = sprintNumber !== undefined ? 'AND claims.sprint_number = ?' : '';
     const sql = `
@@ -555,42 +655,48 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
       FROM claims
       WHERE (claims.expires_at IS NULL OR claims.expires_at > ?)
         ${sprintClause}
-      ORDER BY claims.sprint_number, claims.claimed_at
+      ORDER BY claims.claimed_at
     `;
     const params = sprintNumber !== undefined
-      ? [now, sprintNumber]
+      ? [now, canonicalSprintKey(sprintNumber)]
       : [now];
     const rows = this.db.prepare(sql).all(...params) as Array<Record<string, unknown>>;
-    return rows.map(rowToClaim);
+    return rows.map(rowToClaim).sort((a, b) =>
+      compareSprintIdKeys(canonicalSprintKey(a.sprint_number), canonicalSprintKey(b.sprint_number))
+      || a.claimed_at.localeCompare(b.claimed_at));
   }
 
   // --- Scorecards ---
 
-  async saveScorecard(card: GolfScorecard): Promise<void> {
+  async saveScorecard(card: StoredGolfScorecard): Promise<void> {
     const now = nowISO();
+    const sprintKey = canonicalSprintKey(card.sprint_number);
+    const storedCard: StoredGolfScorecard = { ...card, sprint_number: sprintKey };
     this.db.prepare(`
       INSERT INTO scorecards (sprint_number, data, created_at, updated_at)
       VALUES (?, ?, ?, ?)
       ON CONFLICT(sprint_number) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at
-    `).run(card.sprint_number, JSON.stringify(card), now, now);
+    `).run(sprintKey, JSON.stringify(storedCard), now, now);
   }
 
-  async listScorecards(filter?: { minSprint?: number; maxSprint?: number }): Promise<GolfScorecard[]> {
-    let sql = 'SELECT data FROM scorecards WHERE 1=1';
-    const params: unknown[] = [];
+  async listScorecards(filter?: { minSprint?: SprintId; maxSprint?: SprintId }): Promise<StoredGolfScorecard[]> {
+    const minSprint = filter?.minSprint === undefined ? null : canonicalSprintKey(filter.minSprint);
+    const maxSprint = filter?.maxSprint === undefined ? null : canonicalSprintKey(filter.maxSprint);
+    const rows = this.db.prepare('SELECT sprint_number, data FROM scorecards')
+      .all() as Array<{ sprint_number: string; data: string }>;
 
-    if (filter?.minSprint !== undefined) {
-      sql += ' AND sprint_number >= ?';
-      params.push(filter.minSprint);
-    }
-    if (filter?.maxSprint !== undefined) {
-      sql += ' AND sprint_number <= ?';
-      params.push(filter.maxSprint);
-    }
-    sql += ' ORDER BY sprint_number';
-
-    const rows = this.db.prepare(sql).all(...params) as Array<{ data: string }>;
-    return rows.map(r => JSON.parse(r.data) as GolfScorecard);
+    return rows
+      .map(row => ({
+        ...(JSON.parse(row.data) as Omit<StoredGolfScorecard, 'sprint_number'>),
+        sprint_number: canonicalSprintKey(row.sprint_number),
+      }))
+      .filter(card => {
+        const key = canonicalSprintKey(card.sprint_number);
+        return (minSprint === null || compareSprintIdKeys(key, minSprint) >= 0)
+          && (maxSprint === null || compareSprintIdKeys(key, maxSprint) <= 0);
+      })
+      .sort((a, b) =>
+        compareSprintIdKeys(canonicalSprintKey(a.sprint_number), canonicalSprintKey(b.sprint_number)));
   }
 
   // --- Common Issues ---
@@ -617,6 +723,9 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
       id: generateId('evt'),
       timestamp: nowISO(),
       ...event,
+      sprint_number: event.sprint_number === undefined
+        ? undefined
+        : canonicalSprintKey(event.sprint_number),
     };
 
     this.db.prepare(`
@@ -641,9 +750,9 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
     return rows.map(rowToEvent);
   }
 
-  async getEventsBySprint(sprintNumber: number): Promise<SlopeEvent[]> {
+  async getEventsBySprint(sprintNumber: SprintId): Promise<SlopeEvent[]> {
     const rows = this.db.prepare('SELECT * FROM events WHERE sprint_number = ? ORDER BY timestamp')
-      .all(sprintNumber) as Array<Record<string, unknown>>;
+      .all(canonicalSprintKey(sprintNumber)) as Array<Record<string, unknown>>;
     return rows.map(rowToEvent);
   }
 
@@ -720,10 +829,11 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
   async startExecution(params: { workflow_name: string; sprint_id?: string; variables?: Record<string, string>; session_id?: string; definition_json?: string; definition_hash?: string }): Promise<WorkflowExecution> {
     const id = generateId('wf');
     const now = nowISO();
+    const sprintId = canonicalWorkflowSprintId(params.sprint_id);
     const execution: WorkflowExecution = {
       id,
       workflow_name: params.workflow_name,
-      sprint_id: params.sprint_id,
+      sprint_id: sprintId,
       current_phase: undefined,
       current_step: undefined,
       status: 'running',
@@ -766,7 +876,7 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
   async getExecutionBySprint(sprintId: string): Promise<WorkflowExecution | null> {
     const row = this.db.prepare(
       "SELECT * FROM workflow_executions WHERE sprint_id = ? AND status NOT IN ('completed', 'failed') ORDER BY started_at DESC LIMIT 1"
-    ).get(sprintId) as Record<string, unknown> | undefined;
+    ).get(canonicalWorkflowSprintId(sprintId)) as Record<string, unknown> | undefined;
     return row ? rowToExecution(row) : null;
   }
 
@@ -852,7 +962,7 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
 
     if (filter?.sprint_id) {
       sql += ' AND sprint_id = ?';
-      params.push(filter.sprint_id);
+      params.push(canonicalWorkflowSprintId(filter.sprint_id));
     }
     if (filter?.status) {
       sql += ' AND status = ?';
@@ -1051,7 +1161,7 @@ function rowToSession(row: Record<string, unknown>): SlopeSession {
 function rowToClaim(row: Record<string, unknown>): SprintClaim {
   return {
     id: row.id as string,
-    sprint_number: row.sprint_number as number,
+    sprint_number: canonicalSprintKey(row.sprint_number as string),
     player: row.player as string,
     target: row.target as string,
     scope: row.scope as SprintClaim['scope'],
@@ -1070,7 +1180,9 @@ function rowToEvent(row: Record<string, unknown>): SlopeEvent {
     type: row.type as EventType,
     timestamp: row.timestamp as string,
     data: row.data ? JSON.parse(row.data as string) : {},
-    sprint_number: (row.sprint_number as number | null) ?? undefined,
+    sprint_number: row.sprint_number === null || row.sprint_number === undefined
+      ? undefined
+      : canonicalSprintKey(row.sprint_number as string),
     ticket_key: (row.ticket_key as string | null) ?? undefined,
   };
 }
@@ -1079,7 +1191,7 @@ function rowToExecution(row: Record<string, unknown>): WorkflowExecution {
   return {
     id: row.id as string,
     workflow_name: row.workflow_name as string,
-    sprint_id: (row.sprint_id as string | null) ?? undefined,
+    sprint_id: canonicalWorkflowSprintId((row.sprint_id as string | null) ?? undefined),
     current_phase: (row.current_phase as string | null) ?? undefined,
     current_step: (row.current_step as string | null) ?? undefined,
     status: row.status as WorkflowExecution['status'],
