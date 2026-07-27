@@ -87,14 +87,14 @@ export interface RoadmapDefinition {
 
 export interface RoadmapValidationError {
   type: 'error';
-  sprint?: number;
+  sprint?: SprintId;
   ticket?: string;
   message: string;
 }
 
 export interface RoadmapValidationWarning {
   type: 'warning';
-  sprint?: number;
+  sprint?: SprintId;
   ticket?: string;
   message: string;
 }
@@ -413,18 +413,19 @@ export function validateRoadmap(
   );
 
   for (const sprint of roadmap.sprints) {
+    const sprintKey = roadmapSprintKey(roadmap, sprint);
     // Check: ticket count (3-4 per sprint)
     if (sprint.tickets.length < 3) {
       warnings.push({
         type: 'warning',
-        sprint: sprint.id,
+        sprint: sprintKey,
         message: `${keyLabelOf(sprint)} has ${sprint.tickets.length} tickets (recommended 3-4)`,
       });
     }
     if (sprint.tickets.length > 4) {
       warnings.push({
         type: 'warning',
-        sprint: sprint.id,
+        sprint: sprintKey,
         message: `${keyLabelOf(sprint)} has ${sprint.tickets.length} tickets (recommended 3-4)`,
       });
     }
@@ -436,7 +437,7 @@ export function validateRoadmap(
       if (!ticketKey) {
         errors.push({
           type: 'error',
-          sprint: sprint.id,
+          sprint: sprintKey,
           message: `Ticket in ${keyLabelOf(sprint)} is missing key/id`,
         });
         continue;
@@ -445,7 +446,7 @@ export function validateRoadmap(
       if (!ticketKey.startsWith(expected)) {
         errors.push({
           type: 'error',
-          sprint: sprint.id,
+          sprint: sprintKey,
           ticket: ticketKey,
           message: `Ticket ${ticketKey} does not match sprint ${keyLabelOf(sprint)} (expected prefix ${expected})`,
         });
@@ -461,7 +462,7 @@ export function validateRoadmap(
         if (!allTicketKeys.has(dep)) {
           errors.push({
             type: 'error',
-            sprint: sprint.id,
+            sprint: sprintKey,
             ticket: ticketKey,
             message: `Ticket ${ticketKey} depends on ${dep} which does not exist in the roadmap`,
           });
@@ -475,7 +476,7 @@ export function validateRoadmap(
       if (depKey === null || !sprintIds.has(depKey)) {
         errors.push({
           type: 'error',
-          sprint: sprint.id,
+          sprint: sprintKey,
           message: `${labelOf(roadmapSprintKey(roadmap, sprint))} depends on ${labelOf(dep)} which does not exist in the roadmap`,
         });
       }
@@ -485,7 +486,7 @@ export function validateRoadmap(
     if (sprint.par < 3 || sprint.par > 5) {
       errors.push({
         type: 'error',
-        sprint: sprint.id,
+        sprint: sprintKey,
         message: `${keyLabelOf(sprint)} has invalid par ${sprint.par} (must be 3, 4, or 5)`,
       });
     }
@@ -527,7 +528,7 @@ export function validateRoadmap(
       if (hasScorecard && status !== 'complete') {
         warnings.push({
           type: 'warning',
-          sprint: sprint.id,
+          sprint: roadmapSprintKey(roadmap, sprint),
           message: `${keyLabelOf(sprint)} has a scorecard but roadmap status is "${status ?? 'planned'}" — expected "complete"`,
         });
       }
@@ -535,7 +536,7 @@ export function validateRoadmap(
       if (!hasScorecard && status === 'complete') {
         warnings.push({
           type: 'warning',
-          sprint: sprint.id,
+          sprint: roadmapSprintKey(roadmap, sprint),
           message: `${keyLabelOf(sprint)} is marked "complete" in roadmap but no scorecard exists (phantom sprint)`,
         });
       }
@@ -562,7 +563,7 @@ export function validateRoadmap(
       if (isShipped && status !== 'complete' && !TERMINAL_NOT_COMPLETE.has(status ?? '')) {
         errors.push({
           type: 'error',
-          sprint: sprint.id,
+          sprint: key,
           message: `${keyLabelOf(sprint)} has shipped commits on main but status is "${status ?? 'planned'}" — expected "complete"`,
         });
       }
@@ -570,7 +571,7 @@ export function validateRoadmap(
       if (!isShipped && status === 'complete') {
         warnings.push({
           type: 'warning',
-          sprint: sprint.id,
+          sprint: key,
           message: `${keyLabelOf(sprint)} is marked "complete" but no shipped commits found on main`,
         });
       }

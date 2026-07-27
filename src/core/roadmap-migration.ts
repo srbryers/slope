@@ -13,7 +13,7 @@ import {
   serializeRoadmapProjection,
   type RoadmapSourceKind,
 } from './roadmap-sources.js';
-import { sprintIdKey } from './sprint-id.js';
+import { sprintIdKey, type SprintId } from './sprint-id.js';
 
 export type RoadmapMigrationClassification = 'archive' | 'live' | 'history_unverified' | 'backlog';
 
@@ -56,7 +56,7 @@ export interface RoadmapMigrationDiagnostic {
   severity: 'error' | 'warning';
   code: string;
   message: string;
-  sprint?: number;
+  sprint?: SprintId;
   ticket?: string;
   phase_index?: number;
 }

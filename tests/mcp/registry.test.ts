@@ -129,5 +129,7 @@ describe('SLOPE_TYPES — canonical sprint identity', () => {
     expect(SLOPE_TYPES).toContain('type SprintIdInput = string | number;');
     expect(SLOPE_TYPES).toContain('sprint_number: SprintIdInput');
     expect(SLOPE_TYPES).toContain('interface SprintClaim { id: string; sprint_number: string;');
+    expect(SLOPE_TYPES).toContain('id_key?: string');
+    expect(SLOPE_TYPES).toContain('interface CriticalPathResult { path: string[];');
   });
 });

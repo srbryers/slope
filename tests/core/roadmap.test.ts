@@ -246,6 +246,8 @@ describe('validateRoadmap', () => {
     expect(messages).toContain('S458.10 is marked "complete" in roadmap but no scorecard exists (phantom sprint)');
     expect(messages).toContain('S458.10 is marked "complete" but no shipped commits found on main');
     expect(messages).not.toContain('S458.1 has invalid par 2 (must be 3, 4, or 5)');
+    expect(result.errors.find(issue => issue.message.includes('invalid par'))?.sprint).toBe('458.10');
+    expect(result.warnings.find(issue => issue.message.includes('2 tickets'))?.sprint).toBe('458.10');
   });
 
   it('warns on ticket count < 3', () => {
@@ -709,7 +711,7 @@ describe('validateRoadmap with shipped sprint IDs', () => {
     const result = validateRoadmap(roadmap, undefined, shipped);
     expect(
       result.errors.some(
-        e => e.sprint === 7 && e.message.includes('shipped commits') && e.message.includes('planned'),
+        e => e.sprint === '7' && e.message.includes('shipped commits') && e.message.includes('planned'),
       ),
     ).toBe(true);
   });
@@ -724,7 +726,7 @@ describe('validateRoadmap with shipped sprint IDs', () => {
     });
     const result = validateRoadmap(roadmap, undefined, new Set([7]));
     expect(
-      result.errors.some(e => e.sprint === 7 && e.message.includes('shipped commits')),
+      result.errors.some(e => e.sprint === '7' && e.message.includes('shipped commits')),
     ).toBe(true);
   });
 
@@ -751,7 +753,7 @@ describe('validateRoadmap with shipped sprint IDs', () => {
     const result = validateRoadmap(roadmap, undefined, new Set([8])); // 7 missing
     expect(
       result.warnings.some(
-        w => w.sprint === 7 && w.message.includes('no shipped commits'),
+        w => w.sprint === '7' && w.message.includes('no shipped commits'),
       ),
     ).toBe(true);
   });

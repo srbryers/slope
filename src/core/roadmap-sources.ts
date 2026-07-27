@@ -4,6 +4,7 @@ import { castRoadmapStructure, getRoadmapTicketKey, validateRoadmap } from './ro
 import { compareRoadmapSprintIds, describeSprintIdAmbiguity, roadmapSprintKey, roadmapSprintOrderValue } from './roadmap.js';
 import { sprintIdKey } from './sprint-id.js';
 import type { RoadmapDefinition, RoadmapPhase, RoadmapSprint } from './roadmap.js';
+import type { SprintId } from './sprint-id.js';
 
 export type RoadmapSourceKind = 'phase' | 'backlog' | 'archive';
 
@@ -37,7 +38,7 @@ export interface RoadmapSourceValidationIssue {
   code: string;
   message: string;
   source?: string;
-  sprint?: number;
+  sprint?: SprintId;
   ticket?: string;
 }
 

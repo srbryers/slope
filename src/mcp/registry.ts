@@ -206,7 +206,7 @@ export const SLOPE_REGISTRY: FunctionRegistryEntry[] = [
     name: 'formatStrategicContext',
     module: 'core',
     description: 'Formats concise strategic context for a sprint (3-5 lines for briefings).',
-    signature: 'formatStrategicContext(roadmap: RoadmapDefinition, currentSprint: number): string | null',
+    signature: 'formatStrategicContext(roadmap: RoadmapDefinition, currentSprint: SprintIdInput): string | null',
     example: 'const roadmap = loadRoadmap(); return formatStrategicContext(roadmap, 8);',
   },
 
@@ -1068,14 +1068,14 @@ interface TrainingPlanInput { handicap: HandicapCard; dispersion: DispersionRepo
 // ─── Roadmap ───
 type RoadmapClub = 'driver' | 'long_iron' | 'short_iron' | 'wedge' | 'putter';
 interface RoadmapTicket { key: string; id?: string; title: string; club: RoadmapClub; complexity: 'trivial' | 'small' | 'standard' | 'moderate' | 'multi_package' | 'multi-package' | 'risky'; depends_on?: string[]; github_issue?: number | number[]; }
-interface RoadmapSprint { id: number; theme: string; par: 3 | 4 | 5; slope: number; type: string; tickets: RoadmapTicket[]; depends_on?: number[]; }
-interface RoadmapPhase { name: string; sprints: number[]; }
+interface RoadmapSprint { id: number; id_key?: string; theme: string; par: 3 | 4 | 5; slope: number; type: string; tickets: RoadmapTicket[]; depends_on?: SprintIdInput[]; }
+interface RoadmapPhase { name: string; sprints: number[]; sprint_keys?: string[]; }
 interface RoadmapDefinition { name: string; description?: string; phases: RoadmapPhase[]; sprints: RoadmapSprint[]; }
 interface RoadmapValidationResult { valid: boolean; errors: RoadmapValidationError[]; warnings: RoadmapValidationWarning[]; }
-interface RoadmapValidationError { type: 'error'; sprint?: number; ticket?: string; message: string; }
-interface RoadmapValidationWarning { type: 'warning'; sprint?: number; ticket?: string; message: string; }
-interface CriticalPathResult { path: number[]; length: number; totalPar: number; }
-interface ParallelGroup { sprints: number[]; reason: string; }
+interface RoadmapValidationError { type: 'error'; sprint?: SprintId; ticket?: string; message: string; }
+interface RoadmapValidationWarning { type: 'warning'; sprint?: SprintId; ticket?: string; message: string; }
+interface CriticalPathResult { path: string[]; length: number; totalPar: number; }
+interface ParallelGroup { sprints: string[]; reason: string; }
 
 // ─── Player (Multi-Developer) ───
 interface PlayerHandicap { player: string; scorecardCount: number; handicapCard: HandicapCard; }
