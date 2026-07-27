@@ -78,13 +78,13 @@ describe('roadmap focus projection', () => {
       sprint_index: 5,
       sprint_count: 9,
     });
-    expect(focus?.dependencies.map(item => item.sprint.id)).toEqual([227, 220]);
+    expect(focus?.dependencies.map(item => item.sprint.id)).toEqual(['227', '220']);
     expect(focus?.dependencies.every(item => item.sprint.readiness === 'complete')).toBe(true);
-    expect(focus?.previous.map(item => item.sprint.id)).toEqual([225, 226]);
+    expect(focus?.previous.map(item => item.sprint.id)).toEqual(['225', '226']);
     expect(focus?.previous[0].sprint.label).toBe('S225');
     expect(focus?.previous[0].sprint.status).toBe('superseded');
     expect(focus?.previous[0].sprint.readiness).toBe('complete');
-    expect(focus?.successors.map(item => item.sprint.id)).toEqual([229, 230, 231]);
+    expect(focus?.successors.map(item => item.sprint.id)).toEqual(['229', '230', '231']);
     expect(focus?.successors.map(item => item.direct)).toEqual([true, true, false]);
     expect(focus?.successors[0].sprint.readiness).toBe('blocked');
     expect(focus?.successors[2].sprint.readiness).toBe('ready');

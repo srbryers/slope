@@ -1,10 +1,13 @@
 import {
+  findRoadmapSprint,
   formatRoadmapSprintLabel,
-  roadmapSprintOrderValue,
+  roadmapSprintKey,
+  roadmapSprintKeyFromId,
   type RoadmapDefinition,
   type RoadmapSprint,
   type RoadmapTicket,
 } from './roadmap.js';
+import { sprintIdKey, type SprintId } from './sprint-id.js';
 
 export const ROADMAP_FOCUS_LIMITS = Object.freeze({
   previous: 2,
@@ -16,7 +19,7 @@ export const ROADMAP_FOCUS_LIMITS = Object.freeze({
 export type RoadmapFocusRelation = 'dependency' | 'previous' | 'successor';
 
 export interface RoadmapFocusSprintSummary {
-  id: number;
+  id: string;
   label: string;
   theme: string;
   par: number;
@@ -24,7 +27,7 @@ export interface RoadmapFocusSprintSummary {
   type: string;
   status: string;
   readiness: 'complete' | 'ready' | 'blocked';
-  blocked_by: Array<{ id: number; label: string }>;
+  blocked_by: Array<{ id: string; label: string }>;
   note?: string;
 }
 
@@ -48,7 +51,7 @@ export interface RoadmapFocusNeighbor {
 }
 
 export interface RoadmapFocusHazard {
-  sprint: number;
+  sprint: SprintId;
   sprint_label: string;
   ticket?: string;
   type: string;
@@ -60,7 +63,7 @@ export interface RoadmapFocusEvidence {
   kind: 'roadmap' | 'scorecard' | 'review' | 'issue' | 'design' | 'other';
   label: string;
   ref: string;
-  sprint?: number;
+  sprint?: SprintId;
 }
 
 export interface RoadmapFocusResult {
@@ -90,10 +93,10 @@ export interface RoadmapFocusResult {
 }
 
 export interface RoadmapFocusOptions {
-  completedSprintIds?: Iterable<number>;
+  completedSprintIds?: Iterable<SprintId>;
   hazards?: RoadmapFocusHazard[];
   scorecards?: Array<{
-    sprint_number: number;
+    sprint_number: SprintId;
     shots?: Array<{
       ticket_key?: string;
       hazards?: Array<{ type?: string; severity?: string; description?: string }>;
@@ -112,28 +115,25 @@ const TERMINAL_STATUSES = new Set([
   'absorbed',
 ]);
 
-function equivalentSprintValue(roadmap: RoadmapDefinition, id: number): number {
-  return roadmapSprintOrderValue(roadmap, id);
-}
-
-function isComplete(roadmap: RoadmapDefinition, sprint: RoadmapSprint, completed: Set<number>): boolean {
-  const comparable = equivalentSprintValue(roadmap, sprint.id);
-  return completed.has(sprint.id)
-    || completed.has(comparable)
+function isComplete(roadmap: RoadmapDefinition, sprint: RoadmapSprint, completed: Set<string>): boolean {
+  return completed.has(roadmapSprintKey(roadmap, sprint))
     || TERMINAL_STATUSES.has(sprint.status ?? '');
 }
 
 function summarizeSprint(
   roadmap: RoadmapDefinition,
   sprint: RoadmapSprint,
-  completed: Set<number>,
+  completed: Set<string>,
 ): RoadmapFocusSprintSummary {
   const complete = isComplete(roadmap, sprint, completed);
   const blockedBy = complete
     ? []
     : (sprint.depends_on ?? []).filter(dependencyId => {
-      const dependency = roadmap.sprints.find(candidate => candidate.id === dependencyId);
-      return dependency ? !isComplete(roadmap, dependency, completed) : !completed.has(dependencyId);
+      const dependency = findRoadmapSprint(roadmap, dependencyId);
+      const dependencyKey = roadmapSprintKeyFromId(roadmap, dependencyId);
+      return dependency
+        ? !isComplete(roadmap, dependency, completed)
+        : dependencyKey === null || !completed.has(dependencyKey);
     });
   const authoredStatus = sprint.status ?? 'planned';
   const projectedStatus = TERMINAL_STATUSES.has(authoredStatus)
@@ -141,15 +141,18 @@ function summarizeSprint(
     : complete ? 'complete' : authoredStatus;
 
   return {
-    id: sprint.id,
-    label: formatRoadmapSprintLabel(roadmap, sprint.id),
+    id: roadmapSprintKey(roadmap, sprint),
+    label: formatRoadmapSprintLabel(roadmap, roadmapSprintKey(roadmap, sprint)),
     theme: sprint.theme,
     par: sprint.par,
     slope: sprint.slope,
     type: sprint.type,
     status: projectedStatus,
     readiness: complete ? 'complete' : blockedBy.length > 0 ? 'blocked' : 'ready',
-    blocked_by: blockedBy.map(id => ({ id, label: formatRoadmapSprintLabel(roadmap, id) })),
+    blocked_by: blockedBy.map(id => ({
+      id: roadmapSprintKeyFromId(roadmap, id) ?? String(id),
+      label: formatRoadmapSprintLabel(roadmap, id),
+    })),
     ...(sprint.note ? { note: sprint.note } : {}),
   };
 }
@@ -194,16 +197,15 @@ function uniqueEvidence(evidence: RoadmapFocusEvidence[]): RoadmapFocusEvidence[
 
 function scorecardHazards(
   roadmap: RoadmapDefinition,
-  contextSprintIds: number[],
+  contextSprintIds: string[],
   scorecards: RoadmapFocusOptions['scorecards'],
 ): RoadmapFocusHazard[] {
   if (!scorecards?.length) return [];
   const hazards: RoadmapFocusHazard[] = [];
 
   for (const roadmapSprintId of contextSprintIds) {
-    const comparable = equivalentSprintValue(roadmap, roadmapSprintId);
     const card = scorecards.find(candidate =>
-      candidate.sprint_number === roadmapSprintId || candidate.sprint_number === comparable,
+      roadmapSprintKeyFromId(roadmap, candidate.sprint_number) === roadmapSprintId,
     );
     if (!card) continue;
 
@@ -235,8 +237,9 @@ function scorecardHazards(
   return hazards;
 }
 
-function sprintEvidence(sprint: RoadmapSprint): RoadmapFocusEvidence[] {
+function sprintEvidence(roadmap: RoadmapDefinition, sprint: RoadmapSprint): RoadmapFocusEvidence[] {
   const evidence: RoadmapFocusEvidence[] = [];
+  const sprintKey = roadmapSprintKey(roadmap, sprint);
   for (const ticket of sprint.tickets) {
     if (ticket.github_issue == null) continue;
     const issues = Array.isArray(ticket.github_issue) ? ticket.github_issue : [ticket.github_issue];
@@ -245,18 +248,18 @@ function sprintEvidence(sprint: RoadmapSprint): RoadmapFocusEvidence[] {
         kind: 'issue',
         label: `GitHub issue #${issue}`,
         ref: `#${issue}`,
-        sprint: sprint.id,
+        sprint: sprintKey,
       });
     }
   }
   for (const ref of sprint.artifacts ?? []) {
-    evidence.push({ kind: 'other', label: 'Artifact', ref, sprint: sprint.id });
+    evidence.push({ kind: 'other', label: 'Artifact', ref, sprint: sprintKey });
   }
   for (const ref of sprint.expected_artifacts ?? []) {
-    evidence.push({ kind: 'other', label: 'Expected artifact', ref, sprint: sprint.id });
+    evidence.push({ kind: 'other', label: 'Expected artifact', ref, sprint: sprintKey });
   }
   for (const ref of sprint.research ?? []) {
-    evidence.push({ kind: 'design', label: 'Research', ref, sprint: sprint.id });
+    evidence.push({ kind: 'design', label: 'Research', ref, sprint: sprintKey });
   }
   return evidence;
 }
@@ -264,49 +267,62 @@ function sprintEvidence(sprint: RoadmapSprint): RoadmapFocusEvidence[] {
 /** Build a deterministic, bounded sprint context from any roadmap definition. */
 export function buildRoadmapFocus(
   roadmap: RoadmapDefinition,
-  sprintId: number,
+  sprintId: SprintId,
   options: RoadmapFocusOptions = {},
 ): RoadmapFocusResult | null {
-  const selected = roadmap.sprints.find(sprint => sprint.id === sprintId);
+  const selected = findRoadmapSprint(roadmap, sprintId);
   if (!selected) return null;
 
-  const completed = new Set(options.completedSprintIds ?? []);
-  const phase = roadmap.phases.find(candidate => candidate.sprints.includes(sprintId));
-  const phaseIndex = phase?.sprints.indexOf(sprintId) ?? -1;
+  const completed = new Set(
+    [...(options.completedSprintIds ?? [])]
+      .map(id => roadmapSprintKeyFromId(roadmap, id) ?? sprintIdKey(id))
+      .filter((id): id is string => id !== null),
+  );
+  const selectedKey = roadmapSprintKey(roadmap, selected);
+  const phase = roadmap.phases.find(candidate => {
+    const keys: SprintId[] = candidate.sprint_keys ?? candidate.sprints;
+    return keys.some(id => roadmapSprintKeyFromId(roadmap, id) === selectedKey);
+  });
+  const phaseKeys = (phase?.sprint_keys ?? phase?.sprints ?? [])
+    .map(id => roadmapSprintKeyFromId(roadmap, id))
+    .filter((id): id is string => id !== null);
+  const phaseIndex = phaseKeys.indexOf(selectedKey);
   const dependencies = (selected.depends_on ?? [])
-    .map(id => roadmap.sprints.find(sprint => sprint.id === id))
+    .map(id => findRoadmapSprint(roadmap, id))
     .filter((sprint): sprint is RoadmapSprint => sprint != null)
     .map(sprint => ({ relation: 'dependency' as const, direct: true, sprint: summarizeSprint(roadmap, sprint, completed) }));
   const dependencyIds = new Set(dependencies.map(dependency => dependency.sprint.id));
 
   const allPreviousIds = phaseIndex < 0
     ? []
-    : phase!.sprints.slice(0, phaseIndex).filter(id => !dependencyIds.has(id));
+    : phaseKeys.slice(0, phaseIndex).filter(id => !dependencyIds.has(id));
   const previousIds = allPreviousIds.slice(-ROADMAP_FOCUS_LIMITS.previous);
   const previous = previousIds
-    .map(id => roadmap.sprints.find(sprint => sprint.id === id))
+    .map(id => findRoadmapSprint(roadmap, id))
     .filter((sprint): sprint is RoadmapSprint => sprint != null)
     .map(sprint => ({ relation: 'previous' as const, direct: false, sprint: summarizeSprint(roadmap, sprint, completed) }));
 
-  const allSuccessorIds = phaseIndex < 0 ? [] : phase!.sprints.slice(phaseIndex + 1);
+  const allSuccessorIds = phaseIndex < 0 ? [] : phaseKeys.slice(phaseIndex + 1);
   const successorIds = allSuccessorIds.slice(0, ROADMAP_FOCUS_LIMITS.successors);
   const successors = successorIds
-    .map(id => roadmap.sprints.find(sprint => sprint.id === id))
+    .map(id => findRoadmapSprint(roadmap, id))
     .filter((sprint): sprint is RoadmapSprint => sprint != null)
     .map(sprint => ({
       relation: 'successor' as const,
-      direct: (sprint.depends_on ?? []).includes(sprintId),
+      direct: (sprint.depends_on ?? []).some(
+        id => roadmapSprintKeyFromId(roadmap, id) === selectedKey,
+      ),
       sprint: summarizeSprint(roadmap, sprint, completed),
     }));
 
   const phaseHazards: RoadmapFocusHazard[] = phase ? [] : [{
-    sprint: selected.id,
-    sprint_label: formatRoadmapSprintLabel(roadmap, selected.id),
+    sprint: selectedKey,
+    sprint_label: formatRoadmapSprintLabel(roadmap, selectedKey),
     type: 'roadmap_integrity',
     severity: 'moderate',
     description: 'Sprint is not assigned to a roadmap phase.',
   }];
-  const hazardContextIds = [selected.id, ...dependencies.map(item => item.sprint.id), ...previousIds];
+  const hazardContextIds = [selectedKey, ...dependencies.map(item => item.sprint.id), ...previousIds];
   const historicalHazards = scorecardHazards(roadmap, hazardContextIds, options.scorecards);
   const allHazards = uniqueHazards([...phaseHazards, ...(options.hazards ?? []), ...historicalHazards]);
   const hazards = allHazards.slice(0, ROADMAP_FOCUS_LIMITS.hazards);
@@ -315,7 +331,7 @@ export function buildRoadmapFocus(
   const ancillaryEvidence = suppliedEvidence.filter(item => item.kind !== 'roadmap');
   const allEvidence = uniqueEvidence([
     ...roadmapEvidence,
-    ...sprintEvidence(selected),
+    ...sprintEvidence(roadmap, selected),
     ...ancillaryEvidence,
   ]);
   const evidence = allEvidence.slice(0, ROADMAP_FOCUS_LIMITS.evidence);
@@ -335,7 +351,7 @@ export function buildRoadmapFocus(
       ...(phase.note ? { note: phase.note } : {}),
       ...(phase.description || phase.note ? { contract: phase.description ?? phase.note } : {}),
       sprint_index: phaseIndex + 1,
-      sprint_count: phase.sprints.length,
+      sprint_count: phaseKeys.length,
     } : null,
     dependencies,
     previous,

@@ -213,7 +213,7 @@ describe('agent status (GH #310)', () => {
     });
 
     const status = await collectAgentStatus(cwd);
-    expect(status.blockedBy).toEqual([7]);
+    expect(status.blockedBy).toEqual(['7']);
     expect(status.recommendedCommands).toContain('slope roadmap status');
   });
 

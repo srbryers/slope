@@ -13,11 +13,14 @@ import { computeHandicapCard } from './handicap.js';
 import { computeDispersion } from './dispersion.js';
 import { generateTrainingPlan } from './advisor.js';
 import { checkConflicts } from './registry.js';
-import { compareSprintIdKeys, sprintIdKey } from './sprint-id.js';
+import { compareSprintIdKeys, sprintIdKey, type SprintId } from './sprint-id.js';
 import type { RoadmapDefinition } from './roadmap.js';
 import {
   formatRoadmapSprintLabel,
   formatStrategicContext,
+  findRoadmapSprint,
+  roadmapSprintKey,
+  roadmapSprintKeyFromId,
   roadmapSprintOrderValue,
 } from './roadmap.js';
 import type { SkillDefinition, SkillRegistryFile } from './skills.js';
@@ -215,28 +218,33 @@ const ROUTE_STOP_WORDS = new Set([
   'work', 'would',
 ]);
 
-function roadmapIdsEqual(roadmap: RoadmapDefinition, left: number, right: number): boolean {
-  return roadmapSprintOrderValue(roadmap, left) === roadmapSprintOrderValue(roadmap, right);
+function roadmapIdsEqual(roadmap: RoadmapDefinition, left: SprintId, right: SprintId): boolean {
+  const leftKey = roadmapSprintKeyFromId(roadmap, left);
+  return leftKey !== null && leftKey === roadmapSprintKeyFromId(roadmap, right);
 }
 
-function roadmapSprintById(roadmap: RoadmapDefinition, sprint: number) {
-  return roadmap.sprints.find(candidate => roadmapIdsEqual(roadmap, candidate.id, sprint));
+function roadmapSprintById(roadmap: RoadmapDefinition, sprint: SprintId) {
+  return findRoadmapSprint(roadmap, sprint);
 }
 
-function roadmapPhaseForSprint(roadmap: RoadmapDefinition, sprint: number) {
-  return roadmap.phases.find(phase => phase.sprints.some(id => roadmapIdsEqual(roadmap, id, sprint)));
+function roadmapPhaseForSprint(roadmap: RoadmapDefinition, sprint: SprintId) {
+  const key = roadmapSprintKeyFromId(roadmap, sprint);
+  return roadmap.phases.find(phase =>
+    (phase.sprint_keys ?? phase.sprints.map(String))
+      .some(id => roadmapSprintKeyFromId(roadmap, id) === key));
 }
 
-function collectDependencyDepths(roadmap: RoadmapDefinition, sprint: number): Map<number, number> {
-  const depths = new Map<number, number>();
+function collectDependencyDepths(roadmap: RoadmapDefinition, sprint: SprintId): Map<string, number> {
+  const depths = new Map<string, number>();
   const root = roadmapSprintById(roadmap, sprint);
   const queue = (root?.depends_on ?? []).map(id => ({ id, depth: 1 }));
   while (queue.length > 0) {
     const current = queue.shift()!;
-    const order = roadmapSprintOrderValue(roadmap, current.id);
-    const previous = depths.get(order);
+    const key = roadmapSprintKeyFromId(roadmap, current.id);
+    if (key === null) continue;
+    const previous = depths.get(key);
     if (previous != null && previous <= current.depth) continue;
-    depths.set(order, current.depth);
+    depths.set(key, current.depth);
     const dependency = roadmapSprintById(roadmap, current.id);
     for (const nested of dependency?.depends_on ?? []) {
       queue.push({ id: nested, depth: current.depth + 1 });
@@ -378,7 +386,8 @@ function scopeBriefingHazards(
 
   const provenanceFor = (sourceSprint: number): BriefingHazardProvenance => {
     const sourcePhase = roadmapPhaseForSprint(roadmap, sourceSprint);
-    const dependencyDepth = dependencyDepths.get(roadmapSprintOrderValue(roadmap, sourceSprint));
+    const dependencyKey = roadmapSprintKeyFromId(roadmap, sourceSprint);
+    const dependencyDepth = dependencyKey ? dependencyDepths.get(dependencyKey) : undefined;
     let relationship: BriefingHazardRelationship = 'historical';
     if (roadmapIdsEqual(roadmap, sourceSprint, currentSprint)) relationship = 'active_sprint';
     else if (dependencyDepth === 1) relationship = 'direct_dependency';

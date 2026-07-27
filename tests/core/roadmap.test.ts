@@ -374,7 +374,7 @@ describe('computeCriticalPath', () => {
   it('computes a linear critical path', () => {
     const roadmap = makeRoadmap();
     const result = computeCriticalPath(roadmap);
-    expect(result.path).toEqual([7, 8, 9]);
+    expect(result.path).toEqual(['7', '8', '9']);
     expect(result.length).toBe(3);
     expect(result.totalPar).toBe(12); // 4 + 4 + 4
   });
@@ -390,7 +390,7 @@ describe('computeCriticalPath', () => {
       phases: [{ name: 'P1', sprints: [7, 8, 9, 10] }],
     });
     const result = computeCriticalPath(roadmap);
-    expect(result.path).toEqual([7, 8, 10]);
+    expect(result.path).toEqual(['7', '8', '10']);
     expect(result.length).toBe(3);
   });
 
@@ -400,9 +400,32 @@ describe('computeCriticalPath', () => {
       phases: [{ name: 'P1', sprints: [7] }],
     });
     const result = computeCriticalPath(roadmap);
-    expect(result.path).toEqual([7]);
+    expect(result.path).toEqual(['7']);
     expect(result.length).toBe(1);
     expect(result.totalPar).toBe(4);
+  });
+
+  it('resolves a dependency on 458.10 without aliasing 458.1', () => {
+    const insertedOne = makeSprint(458.1, { id_key: '458.1' });
+    const insertedTen = makeSprint(458.1, {
+      id_key: '458.10',
+      tickets: [
+        { key: 'S458.10-1', title: 'T1', club: 'wedge', complexity: 'small' },
+        { key: 'S458.10-2', title: 'T2', club: 'wedge', complexity: 'small' },
+        { key: 'S458.10-3', title: 'T3', club: 'wedge', complexity: 'small' },
+      ],
+    });
+    const successor = makeSprint(459, { depends_on: ['458.10'] });
+    const roadmap = makeRoadmap({
+      sprints: [insertedOne, insertedTen, successor],
+      phases: [{
+        name: 'P1',
+        sprints: [458.1, 458.1, 459],
+        sprint_keys: ['458.1', '458.10', '459'],
+      }],
+    });
+
+    expect(computeCriticalPath(roadmap).path).toEqual(['458.10', '459']);
   });
 
   it('handles all-independent sprints', () => {
@@ -429,7 +452,7 @@ describe('findParallelOpportunities', () => {
     });
     const groups = findParallelOpportunities(roadmap);
     expect(groups.length).toBe(1);
-    expect(groups[0].sprints).toEqual([7, 8]);
+    expect(groups[0].sprints).toEqual(['7', '8']);
   });
 
   it('returns empty when no parallel opportunities exist', () => {

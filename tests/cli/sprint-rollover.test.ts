@@ -176,7 +176,7 @@ describe('assessSprintRollover', () => {
     );
 
     expect(assessment.valid).toBe(false);
-    expect(assessment.blocking_dependencies).toEqual([10]);
+    expect(assessment.blocking_dependencies).toEqual(['10']);
     expect(assessment.issues.map(issue => issue.code)).toContain('target_dependency_blocked');
   });
 
@@ -191,7 +191,7 @@ describe('assessSprintRollover', () => {
     );
 
     expect(assessment.valid).toBe(false);
-    expect(assessment.blocking_dependencies).toEqual([10]);
+    expect(assessment.blocking_dependencies).toEqual(['10']);
   });
 
   it('matches legacy encoded and decimal sprint identities without relabeling canonical ids', () => {
@@ -397,11 +397,11 @@ describe('performSprintRollover audit recovery', () => {
         target_dependency_eligible: true,
         blocking_dependencies: [],
         expected_next: 11,
-        target_dependencies: [10],
+        target_dependencies: ['10'],
         completion_evidence: {
           roadmap_complete: [],
           scorecards: [],
-          local_terminal: [10],
+          local_terminal: ['10'],
         },
       },
     });
@@ -428,14 +428,14 @@ describe('performSprintRollover audit recovery', () => {
     const result = performSprintRollover(cwd, { from: 10, to: 11 }, actor);
 
     expect(result.record.eligibility).toMatchObject({
-      target_dependencies: [9, 10],
+      target_dependencies: ['9', '10'],
       completion_evidence: {
         roadmap_complete: [],
-        scorecards: [9],
-        local_terminal: [10],
+        scorecards: ['9'],
+        local_terminal: ['10'],
       },
       scorecard_artifacts: [expect.objectContaining({
-        sprint: 9,
+        sprint: '9',
         path: 'docs/retros/sprint-9.json',
       })],
     });

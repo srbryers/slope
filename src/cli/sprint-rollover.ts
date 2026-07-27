@@ -8,11 +8,15 @@ import {
   isRoadmapSprintPending,
   isRoadmapSprintTerminal,
   parseRoadmap,
+  roadmapSprintKey,
+  roadmapSprintKeyFromId,
   roadmapSprintOrderValue,
   sprintNumberFromScorecardFile,
+  sprintIdKey,
   validateScorecard,
   type RoadmapDefinition,
   type RoadmapSprint,
+  type SprintId,
 } from '../core/index.js';
 import { atomicWriteFileSync, withFileLockSync } from './atomic-write.js';
 import type { ResolvedActor } from './actor.js';
@@ -59,12 +63,12 @@ export interface SprintRolloverAssessment {
   reason?: string;
   expected_next?: number;
   expected_next_label?: string;
-  blocking_dependencies: number[];
+  blocking_dependencies: string[];
   blocking_dependency_labels: string[];
   completion_evidence: {
-    roadmap_complete: number[];
-    scorecards: number[];
-    local_terminal: number[];
+    roadmap_complete: SprintId[];
+    scorecards: SprintId[];
+    local_terminal: SprintId[];
   };
   issues: SprintRolloverIssue[];
   roadmap: RoadmapDefinition;
@@ -75,7 +79,7 @@ export interface SprintRolloverAssessment {
 }
 
 export interface SprintRolloverScorecardEvidence {
-  sprint: number;
+  sprint: SprintId;
   path: string;
   sha256: string;
 }
@@ -111,8 +115,8 @@ export interface SprintRolloverAuditRecord {
   eligibility: {
     from_terminal: boolean;
     target_dependency_eligible: boolean;
-    blocking_dependencies: number[];
-    target_dependencies: number[];
+    blocking_dependencies: string[];
+    target_dependencies: string[];
     completion_evidence: SprintRolloverAssessment['completion_evidence'];
     scorecard_artifacts: SprintRolloverScorecardEvidence[];
     /** Absent when no pending successor exists — e.g. an explicit rollover into
@@ -147,7 +151,7 @@ export class SprintRolloverError extends Error {
 }
 
 interface LoadedCompletionEvidence {
-  sprintIds: number[];
+  sprintIds: SprintId[];
   scorecards: SprintRolloverScorecardEvidence[];
 }
 
@@ -208,10 +212,11 @@ function loadRolloverRoadmap(cwd: string): { roadmap: RoadmapDefinition; path: s
 function loadCompletionEvidence(cwd: string): LoadedCompletionEvidence {
   const config = loadConfig(cwd);
   const scorecards: SprintRolloverScorecardEvidence[] = [];
-  const recorded = new Set<number>();
+  const recorded = new Set<string>();
   for (const discovered of discoverScorecardFiles(config, cwd)) {
     const fileSprint = sprintNumberFromScorecardFile(discovered, config);
-    if (fileSprint == null || recorded.has(fileSprint)) continue;
+    const fileSprintKey = fileSprint == null ? null : sprintIdKey(fileSprint);
+    if (fileSprintKey == null || recorded.has(fileSprintKey)) continue;
     const absolutePath = ensureTrackedPath(cwd, resolve(cwd, discovered));
     const source = readFileSync(absolutePath);
     let raw: Record<string, unknown>;
@@ -221,14 +226,14 @@ function loadCompletionEvidence(cwd: string): LoadedCompletionEvidence {
       continue;
     }
     const sprint = raw.sprint_number ?? raw.sprint;
-    if (sprint !== fileSprint
+    if (sprintIdKey(sprint as SprintId) !== fileSprintKey
       || !validateScorecard(raw as unknown as Parameters<typeof validateScorecard>[0]).valid) continue;
     scorecards.push({
-      sprint: fileSprint,
+      sprint: fileSprintKey,
       path: relative(cwd, absolutePath).replaceAll('\\', '/'),
       sha256: hashTrackedContent(source),
     });
-    recorded.add(fileSprint);
+    recorded.add(fileSprintKey);
   }
   return { sprintIds: [...recorded], scorecards };
 }
@@ -237,20 +242,20 @@ function effectiveCompletedOrders(
   roadmap: RoadmapDefinition,
   fromSprint: RoadmapSprint | undefined,
   fromTerminal: boolean,
-  completionEvidence: number[],
-): Set<number> {
-  const fromOrder = fromSprint ? roadmapSprintOrderValue(roadmap, fromSprint.id) : null;
+  completionEvidence: SprintId[],
+): Set<string> {
+  const fromKey = fromSprint ? roadmapSprintKey(roadmap, fromSprint) : null;
   const completed = new Set(
     roadmap.sprints
       .filter(sprint => sprint.status === 'complete'
-        && (fromTerminal || roadmapSprintOrderValue(roadmap, sprint.id) !== fromOrder))
-      .map(sprint => roadmapSprintOrderValue(roadmap, sprint.id)),
+        && (fromTerminal || roadmapSprintKey(roadmap, sprint) !== fromKey))
+      .map(sprint => roadmapSprintKey(roadmap, sprint)),
   );
   for (const sprint of completionEvidence) {
-    const order = roadmapSprintOrderValue(roadmap, sprint);
-    if (fromTerminal || order !== fromOrder) completed.add(order);
+    const key = roadmapSprintKeyFromId(roadmap, sprint);
+    if (key !== null && (fromTerminal || key !== fromKey)) completed.add(key);
   }
-  if (fromTerminal && fromSprint) completed.add(roadmapSprintOrderValue(roadmap, fromSprint.id));
+  if (fromTerminal && fromSprint) completed.add(roadmapSprintKey(roadmap, fromSprint));
   return completed;
 }
 
@@ -260,7 +265,7 @@ function boundedMessages(messages: string[], limit = 5): string {
   return `${shown.join('; ')}${omitted > 0 ? `; … ${omitted} additional issue(s) omitted` : ''}`;
 }
 
-function boundedSprintLabels(roadmap: RoadmapDefinition, ids: number[], limit = 5): string {
+function boundedSprintLabels(roadmap: RoadmapDefinition, ids: SprintId[], limit = 5): string {
   const shown = ids.slice(0, limit).map(id => formatRoadmapSprintLabel(roadmap, id));
   const omitted = ids.length - shown.length;
   return `${shown.join(', ')}${omitted > 0 ? `, … ${omitted} additional sprint(s)` : ''}`;
@@ -269,10 +274,12 @@ function boundedSprintLabels(roadmap: RoadmapDefinition, ids: number[], limit = 
 function dependencyBlockers(
   roadmap: RoadmapDefinition,
   sprint: RoadmapSprint,
-  completed: Set<number>,
-): number[] {
-  return (sprint.depends_on ?? []).filter(dependency =>
-    !completed.has(roadmapSprintOrderValue(roadmap, dependency)));
+  completed: Set<string>,
+): string[] {
+  return (sprint.depends_on ?? [])
+    .map(dependency => roadmapSprintKeyFromId(roadmap, dependency))
+    .filter((dependency): dependency is string =>
+      dependency !== null && !completed.has(dependency));
 }
 
 export function assessSprintRollover(
@@ -280,7 +287,7 @@ export function assessSprintRollover(
   roadmap: RoadmapDefinition,
   roadmapPath: string,
   input: SprintRolloverInput,
-  completionEvidence: number[] = [],
+  completionEvidence: SprintId[] = [],
   roadmapSha256 = '',
 ): SprintRolloverAssessment {
   const force = input.force === true;
@@ -340,19 +347,27 @@ export function assessSprintRollover(
   }
 
   const fromOrderForEvidence = fromSprint ? roadmapSprintOrderValue(roadmap, fromSprint.id) : Number.NEGATIVE_INFINITY;
-  const relevantDependencyOrders = new Set(roadmap.sprints
+  const relevantDependencyKeys = new Set(roadmap.sprints
     .filter(sprint => roadmapSprintOrderValue(roadmap, sprint.id) > fromOrderForEvidence)
     .flatMap(sprint => sprint.depends_on ?? [])
-    .map(id => roadmapSprintOrderValue(roadmap, id)));
+    .map(id => roadmapSprintKeyFromId(roadmap, id))
+    .filter((id): id is string => id !== null));
   const relevantCompletionEvidence = completionEvidence
-    .filter(id => relevantDependencyOrders.has(roadmapSprintOrderValue(roadmap, id)));
+    .filter(id => {
+      const key = roadmapSprintKeyFromId(roadmap, id);
+      return key !== null && relevantDependencyKeys.has(key);
+    });
   const completed = effectiveCompletedOrders(roadmap, fromSprint, terminal, relevantCompletionEvidence);
   const roadmapComplete = roadmap.sprints
     .filter(sprint => sprint.status === 'complete'
       && (terminal || !fromSprint
         || roadmapSprintOrderValue(roadmap, sprint.id) !== roadmapSprintOrderValue(roadmap, fromSprint.id)))
-    .map(sprint => roadmapSprintOrderValue(roadmap, sprint.id));
-  const scorecardCompletions = [...new Set(relevantCompletionEvidence.map(sprint => roadmapSprintOrderValue(roadmap, sprint)))];
+    .map(sprint => roadmapSprintKey(roadmap, sprint));
+  const scorecardCompletions = [...new Set(
+    relevantCompletionEvidence
+      .map(sprint => roadmapSprintKeyFromId(roadmap, sprint))
+      .filter((sprint): sprint is string => sprint !== null),
+  )];
   const fromOrder = fromSprint ? roadmapSprintOrderValue(roadmap, fromSprint.id) : Number.POSITIVE_INFINITY;
   const candidates = roadmap.sprints
     .filter(sprint => isRoadmapSprintPending(sprint) && roadmapSprintOrderValue(roadmap, sprint.id) > fromOrder)
@@ -397,12 +412,12 @@ export function assessSprintRollover(
       expected_next: roadmapSprintOrderValue(roadmap, expectedNext.id),
       expected_next_label: formatRoadmapSprintLabel(roadmap, expectedNext.id),
     } : {}),
-    blocking_dependencies: blockers.map(id => roadmapSprintOrderValue(roadmap, id)),
+    blocking_dependencies: blockers,
     blocking_dependency_labels: blockers.map(id => formatRoadmapSprintLabel(roadmap, id)),
     completion_evidence: {
       roadmap_complete: roadmapComplete,
       scorecards: scorecardCompletions,
-      local_terminal: terminal && fromSprint ? [roadmapSprintOrderValue(roadmap, fromSprint.id)] : [],
+      local_terminal: terminal && fromSprint ? [roadmapSprintKey(roadmap, fromSprint)] : [],
     },
     issues,
     roadmap,
@@ -522,7 +537,7 @@ function isCanonicalRolloverNextState(state: SprintState): boolean {
 function validScorecardArtifact(value: unknown): value is SprintRolloverScorecardEvidence {
   if (!value || typeof value !== 'object') return false;
   const artifact = value as Partial<SprintRolloverScorecardEvidence>;
-  return typeof artifact.sprint === 'number' && Number.isFinite(artifact.sprint) && artifact.sprint > 0
+  return sprintIdKey(artifact.sprint as SprintId) !== null
     && typeof artifact.path === 'string' && artifact.path.length > 0 && !isAbsolute(artifact.path)
     && typeof artifact.sha256 === 'string' && /^[a-f0-9]{64}$/.test(artifact.sha256);
 }
@@ -631,7 +646,8 @@ function buildAuditRecord(
       target_dependency_eligible: assessment.blocking_dependencies.length === 0,
       blocking_dependencies: assessment.blocking_dependencies,
       target_dependencies: (assessment.to_sprint?.depends_on ?? [])
-        .map(id => roadmapSprintOrderValue(assessment.roadmap, id)),
+        .map(id => roadmapSprintKeyFromId(assessment.roadmap, id))
+        .filter((id): id is string => id !== null),
       completion_evidence: assessment.completion_evidence,
       scorecard_artifacts: scorecards,
       ...(assessment.expected_next != null ? { expected_next: assessment.expected_next } : {}),
@@ -836,9 +852,13 @@ export function performSprintRollover(
 
       const recordedAt = new Date().toISOString();
       const nextState = createSprintState(assessment.to, 'planning');
-      const usedScorecardOrders = new Set(assessment.completion_evidence.scorecards);
+      const usedScorecardKeys = new Set(
+        assessment.completion_evidence.scorecards
+          .map(sprint => roadmapSprintKeyFromId(loaded.roadmap, sprint))
+          .filter((sprint): sprint is string => sprint !== null),
+      );
       const usedScorecards = completion.scorecards.filter(item =>
-        usedScorecardOrders.has(roadmapSprintOrderValue(loaded.roadmap, item.sprint)));
+        usedScorecardKeys.has(roadmapSprintKeyFromId(loaded.roadmap, item.sprint) ?? ''));
       const lineage: SprintRolloverLineage = {
         transition_id: '',
         from_sprint: assessment.from,

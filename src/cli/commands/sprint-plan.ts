@@ -1,6 +1,16 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
-import { parseRoadmap, extractHazardIndex, loadScorecards, formatSprintLabel, formatSprintNumber, parseSprintNumber } from '../../core/index.js';
+import {
+  parseRoadmap,
+  extractHazardIndex,
+  findRoadmapSprint,
+  loadScorecards,
+  formatRoadmapSprintLabel,
+  formatSprintNumber,
+  parseSprintNumber,
+  roadmapSprintKey,
+  roadmapSprintKeyFromId,
+} from '../../core/index.js';
 import type { RoadmapDefinition, RoadmapSprint } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 
@@ -59,9 +69,9 @@ export async function sprintPlanCommand(args: string[]): Promise<void> {
     process.exit(1);
   }
 
-  const sprint = roadmap.sprints.find(s => s.id === sprintId);
+  const sprint = findRoadmapSprint(roadmap, sprintId);
   if (!sprint) {
-    console.error(`Sprint ${formatSprintLabel(sprintId)} not found in roadmap.`);
+    console.error(`Sprint ${formatRoadmapSprintLabel(roadmap, sprintId)} not found in roadmap.`);
     process.exit(1);
   }
 
@@ -148,11 +158,12 @@ export function renderSprintPlan(
     const completedIds = new Set(
       roadmap.sprints
         .filter(s => (s as RoadmapSprint & { status?: string }).status === 'complete')
-        .map(s => s.id),
+        .map(s => roadmapSprintKey(roadmap, s)),
     );
     for (const d of sprint.depends_on) {
-      const status = completedIds.has(d) ? 'complete' : 'pending';
-      lines.push(`- ${formatSprintLabel(d)} (${status})`);
+      const key = roadmapSprintKeyFromId(roadmap, d);
+      const status = key !== null && completedIds.has(key) ? 'complete' : 'pending';
+      lines.push(`- ${formatRoadmapSprintLabel(roadmap, d)} (${status})`);
     }
     lines.push('');
   }

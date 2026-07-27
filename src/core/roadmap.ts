@@ -1,6 +1,9 @@
 // SLOPE — Roadmap: Strategic planning types and compute functions
 // Course-level methodology — vision → roadmap → review → iteration
 
+import { compareSprintIdKeys, parseSprintId, sprintIdKey } from './sprint-id.js';
+import type { SprintId } from './sprint-id.js';
+
 // --- Types ---
 
 /** Club selection for a roadmap ticket (mirrors core ClubSelection) */
@@ -44,7 +47,7 @@ export interface RoadmapSprint {
   slope: number;
   type: string;          // e.g., "architecture + methodology"
   tickets: RoadmapTicket[];
-  depends_on?: number[]; // sprint IDs this sprint depends on
+  depends_on?: SprintId[]; // canonical sprint IDs this sprint depends on
   status?: string;
   note?: string;
   outcome?: string;
@@ -287,16 +290,22 @@ export function isEncodedInsertedSprintInRoadmap(roadmap: RoadmapDefinition, id:
   return sprintIds.has(base) || sprintIds.has(base + 1);
 }
 
-export function roadmapSprintOrderValue(roadmap: RoadmapDefinition, id: number): number {
-  return isEncodedInsertedSprintInRoadmap(roadmap, id) ? sprintOrderValue(id) : id;
+export function roadmapSprintOrderValue(roadmap: RoadmapDefinition, id: SprintId): number {
+  const key = roadmapSprintKeyFromId(roadmap, id);
+  const parsed = key ? parseSprintId(key) : null;
+  if (!parsed) return typeof id === 'number' ? id : Number(id);
+  if (parsed.insert === null) return parsed.base;
+  return parsed.base + parsed.insert / (10 ** parsed.insertDigits!.length);
 }
 
-export function compareRoadmapSprintIds(roadmap: RoadmapDefinition, a: number, b: number): number {
-  return roadmapSprintOrderValue(roadmap, a) - roadmapSprintOrderValue(roadmap, b);
+export function compareRoadmapSprintIds(roadmap: RoadmapDefinition, a: SprintId, b: SprintId): number {
+  const ka = roadmapSprintKeyFromId(roadmap, a) ?? String(a);
+  const kb = roadmapSprintKeyFromId(roadmap, b) ?? String(b);
+  return compareSprintIdKeys(ka, kb);
 }
 
-export function formatRoadmapSprintLabel(roadmap: RoadmapDefinition, id: number): string {
-  return isEncodedInsertedSprintInRoadmap(roadmap, id) ? formatSprintLabel(id) : `S${id}`;
+export function formatRoadmapSprintLabel(roadmap: RoadmapDefinition, id: SprintId): string {
+  return `S${roadmapSprintKeyFromId(roadmap, id) ?? id}`;
 }
 
 /**
@@ -312,6 +321,29 @@ export function roadmapSprintKey(roadmap: RoadmapDefinition, sprint: RoadmapSpri
     : String(sprint.id);
 }
 
+/** Resolve a canonical sprint key from either a key or a legacy numeric mirror. */
+export function roadmapSprintKeyFromId(roadmap: RoadmapDefinition, id: SprintId): string | null {
+  const inputKey = sprintIdKey(id);
+  if (inputKey === null) return null;
+
+  const canonical = roadmap.sprints.find(sprint => roadmapSprintKey(roadmap, sprint) === inputKey);
+  if (canonical) return roadmapSprintKey(roadmap, canonical);
+
+  const mirror = roadmap.sprints.find(sprint => sprint.id === Number(inputKey));
+  return mirror ? roadmapSprintKey(roadmap, mirror) : inputKey;
+}
+
+/** Find one roadmap sprint by canonical key, with numeric mirrors as legacy input. */
+export function findRoadmapSprint(
+  roadmap: RoadmapDefinition,
+  id: SprintId,
+): RoadmapSprint | undefined {
+  const key = roadmapSprintKeyFromId(roadmap, id);
+  return key == null
+    ? undefined
+    : roadmap.sprints.find(sprint => roadmapSprintKey(roadmap, sprint) === key);
+}
+
 /** Validate a roadmap definition for structural correctness.
  *  Optionally cross-check sprint status against scorecards and/or shipped
  *  sprint commits on main when provided. Caller is responsible for collecting
@@ -319,15 +351,15 @@ export function roadmapSprintKey(roadmap: RoadmapDefinition, sprint: RoadmapSpri
  */
 export function validateRoadmap(
   roadmap: RoadmapDefinition,
-  scorecards?: { sprint_number: number }[],
-  shippedSprintIds?: Set<number>,
+  scorecards?: { sprint_number: SprintId }[],
+  shippedSprintIds?: ReadonlySet<SprintId>,
 ): RoadmapValidationResult {
   const errors: RoadmapValidationError[] = [];
   const warnings: RoadmapValidationWarning[] = [];
-  const sprintIds = new Set(roadmap.sprints.map(s => s.id));
+  const sprintIds = new Set(roadmap.sprints.map(s => roadmapSprintKey(roadmap, s)));
 
-  const orderOf = (id: number): number => roadmapSprintOrderValue(roadmap, id);
-  const labelOf = (id: number): string => formatRoadmapSprintLabel(roadmap, id);
+  const orderOf = (id: SprintId): number => roadmapSprintOrderValue(roadmap, id);
+  const labelOf = (id: SprintId): string => formatRoadmapSprintLabel(roadmap, id);
   // Canonical identity so 458.10 and 458.1 are distinct sprints with distinct
   // ticket-key prefixes (GH #635).
   const keyLabelOf = (sprint: RoadmapSprint): string => `S${roadmapSprintKey(roadmap, sprint)}`;
@@ -339,7 +371,7 @@ export function validateRoadmap(
   }
 
   // Check: sprint numbering continuity
-  const sortedIds = [...sprintIds].sort((a, b) => orderOf(a) - orderOf(b));
+  const sortedIds = [...sprintIds].sort((a, b) => compareSprintIdKeys(a, b));
   for (let i = 1; i < sortedIds.length; i++) {
     const prev = orderOf(sortedIds[i - 1]);
     const current = orderOf(sortedIds[i]);
@@ -430,11 +462,12 @@ export function validateRoadmap(
 
     // Check: sprint dependencies exist
     for (const dep of sprint.depends_on ?? []) {
-      if (!sprintIds.has(dep)) {
+      const depKey = roadmapSprintKeyFromId(roadmap, dep);
+      if (depKey === null || !sprintIds.has(depKey)) {
         errors.push({
           type: 'error',
           sprint: sprint.id,
-          message: `${labelOf(sprint.id)} depends on ${labelOf(dep)} which does not exist in the roadmap`,
+          message: `${labelOf(roadmapSprintKey(roadmap, sprint))} depends on ${labelOf(dep)} which does not exist in the roadmap`,
         });
       }
     }
@@ -460,8 +493,10 @@ export function validateRoadmap(
 
   // Check: phases reference valid sprint IDs
   for (const phase of roadmap.phases) {
-    for (const sid of phase.sprints) {
-      if (!sprintIds.has(sid)) {
+    const phaseSprintIds: SprintId[] = phase.sprint_keys ?? phase.sprints;
+    for (const sid of phaseSprintIds) {
+      const sidKey = roadmapSprintKeyFromId(roadmap, sid);
+      if (sidKey === null || !sprintIds.has(sidKey)) {
         errors.push({
           type: 'error',
           message: `Phase "${phase.name}" references ${labelOf(sid)} which does not exist`,
@@ -472,10 +507,12 @@ export function validateRoadmap(
 
   // Cross-validate sprint status against scorecards when provided
   if (scorecards) {
-    const scorecardSprintIds = new Set(scorecards.map(s => s.sprint_number));
+    const scorecardSprintIds = new Set(
+      scorecards.map(s => roadmapSprintKeyFromId(roadmap, s.sprint_number)),
+    );
 
     for (const sprint of roadmap.sprints) {
-      const hasScorecard = scorecardSprintIds.has(sprint.id);
+      const hasScorecard = scorecardSprintIds.has(roadmapSprintKey(roadmap, sprint));
       const status = (sprint as RoadmapSprint & { status?: string }).status;
 
       if (hasScorecard && status !== 'complete') {
@@ -505,7 +542,8 @@ export function validateRoadmap(
     const TERMINAL_NOT_COMPLETE = new Set(['superseded', 'skipped', 'cancelled', 'cancelled-absorbed', 'absorbed']);
     for (const sprint of roadmap.sprints) {
       const status = (sprint as RoadmapSprint & { status?: string }).status;
-      const isShipped = shippedSprintIds.has(sprint.id);
+      const key = roadmapSprintKey(roadmap, sprint);
+      const isShipped = shippedSprintIds.has(key) || shippedSprintIds.has(sprint.id);
 
       if (isShipped && status !== 'complete' && !TERMINAL_NOT_COMPLETE.has(status ?? '')) {
         errors.push({
@@ -531,30 +569,34 @@ export function validateRoadmap(
 // --- Dependency Graph ---
 
 /** Detect cycles in sprint dependency graph. Returns cycle path or null. */
-function detectCycle(sprints: RoadmapSprint[]): number[] | null {
-  const visited = new Set<number>();
-  const inStack = new Set<number>();
-  const parent = new Map<number, number>();
+function detectCycle(sprints: RoadmapSprint[]): string[] | null {
+  const roadmap = { name: '', phases: [], sprints };
+  const sprintMap = new Map(sprints.map(sprint => [roadmapSprintKey(roadmap, sprint), sprint]));
+  const visited = new Set<string>();
+  const inStack = new Set<string>();
+  const parent = new Map<string, string>();
 
-  function dfs(id: number): number[] | null {
+  function dfs(id: string): string[] | null {
     visited.add(id);
     inStack.add(id);
 
-    const sprint = sprints.find(s => s.id === id);
+    const sprint = sprintMap.get(id);
     for (const dep of sprint?.depends_on ?? []) {
-      if (!visited.has(dep)) {
-        parent.set(dep, id);
-        const result = dfs(dep);
+      const depKey = roadmapSprintKeyFromId(roadmap, dep);
+      if (depKey === null) continue;
+      if (!visited.has(depKey)) {
+        parent.set(depKey, id);
+        const result = dfs(depKey);
         if (result) return result;
-      } else if (inStack.has(dep)) {
+      } else if (inStack.has(depKey)) {
         // Build cycle path
-        const cycle: number[] = [dep];
+        const cycle: string[] = [depKey];
         let current = id;
-        while (current !== dep) {
+        while (current !== depKey) {
           cycle.push(current);
           current = parent.get(current)!;
         }
-        cycle.push(dep);
+        cycle.push(depKey);
         return cycle.reverse();
       }
     }
@@ -564,8 +606,9 @@ function detectCycle(sprints: RoadmapSprint[]): number[] | null {
   }
 
   for (const sprint of sprints) {
-    if (!visited.has(sprint.id)) {
-      const result = dfs(sprint.id);
+    const key = roadmapSprintKey(roadmap, sprint);
+    if (!visited.has(key)) {
+      const result = dfs(key);
       if (result) return result;
     }
   }
@@ -575,17 +618,17 @@ function detectCycle(sprints: RoadmapSprint[]): number[] | null {
 // --- Critical Path ---
 
 export interface CriticalPathResult {
-  path: number[];          // sprint IDs in order
+  path: string[];          // canonical sprint IDs in order
   length: number;          // number of sprints
   totalPar: number;        // sum of par values on the path
 }
 
 /** Compute the critical path (longest dependency chain) through the roadmap */
 export function computeCriticalPath(roadmap: RoadmapDefinition): CriticalPathResult {
-  const sprintMap = new Map(roadmap.sprints.map(s => [s.id, s]));
+  const sprintMap = new Map(roadmap.sprints.map(s => [roadmapSprintKey(roadmap, s), s]));
 
   // Compute longest path ending at each sprint via topological order
-  const longestTo = new Map<number, { length: number; path: number[] }>();
+  const longestTo = new Map<string, { length: number; path: string[] }>();
 
   // Topological sort
   const sorted = topologicalSort(roadmap.sprints);
@@ -597,9 +640,10 @@ export function computeCriticalPath(roadmap: RoadmapDefinition): CriticalPathRes
     if (deps.length === 0) {
       longestTo.set(id, { length: 1, path: [id] });
     } else {
-      let best = { length: 0, path: [] as number[] };
+      let best = { length: 0, path: [] as string[] };
       for (const dep of deps) {
-        const depPath = longestTo.get(dep);
+        const depKey = roadmapSprintKeyFromId(roadmap, dep);
+        const depPath = depKey ? longestTo.get(depKey) : undefined;
         if (depPath && depPath.length > best.length) {
           best = depPath;
         }
@@ -609,7 +653,7 @@ export function computeCriticalPath(roadmap: RoadmapDefinition): CriticalPathRes
   }
 
   // Find the overall longest path
-  let criticalPath = { length: 0, path: [] as number[] };
+  let criticalPath = { length: 0, path: [] as string[] };
   for (const entry of longestTo.values()) {
     if (entry.length > criticalPath.length) {
       criticalPath = entry;
@@ -629,28 +673,33 @@ export function computeCriticalPath(roadmap: RoadmapDefinition): CriticalPathRes
 }
 
 /** Topological sort of sprints by dependency order */
-function topologicalSort(sprints: RoadmapSprint[]): number[] {
-  const inDegree = new Map<number, number>();
-  const adjacency = new Map<number, number[]>();
+function topologicalSort(sprints: RoadmapSprint[]): string[] {
+  const roadmap = { name: '', phases: [], sprints };
+  const inDegree = new Map<string, number>();
+  const adjacency = new Map<string, string[]>();
 
   for (const sprint of sprints) {
-    inDegree.set(sprint.id, 0);
-    adjacency.set(sprint.id, []);
+    const key = roadmapSprintKey(roadmap, sprint);
+    inDegree.set(key, 0);
+    adjacency.set(key, []);
   }
 
   for (const sprint of sprints) {
+    const key = roadmapSprintKey(roadmap, sprint);
     for (const dep of sprint.depends_on ?? []) {
-      adjacency.get(dep)?.push(sprint.id);
-      inDegree.set(sprint.id, (inDegree.get(sprint.id) ?? 0) + 1);
+      const depKey = roadmapSprintKeyFromId(roadmap, dep);
+      if (depKey === null) continue;
+      adjacency.get(depKey)?.push(key);
+      inDegree.set(key, (inDegree.get(key) ?? 0) + 1);
     }
   }
 
-  const queue: number[] = [];
+  const queue: string[] = [];
   for (const [id, degree] of inDegree) {
     if (degree === 0) queue.push(id);
   }
 
-  const sorted: number[] = [];
+  const sorted: string[] = [];
   while (queue.length > 0) {
     const id = queue.shift()!;
     sorted.push(id);
@@ -667,7 +716,7 @@ function topologicalSort(sprints: RoadmapSprint[]): number[] {
 // --- Parallel Opportunities ---
 
 export interface ParallelGroup {
-  sprints: number[];       // sprint IDs that can run concurrently
+  sprints: string[];       // canonical sprint IDs that can run concurrently
   reason: string;
 }
 
@@ -677,7 +726,7 @@ export function findParallelOpportunities(roadmap: RoadmapDefinition): ParallelG
 
   // Group sprints by their dependency depth (level in the DAG)
   const depthMap = computeDepthMap(roadmap.sprints);
-  const byDepth = new Map<number, number[]>();
+  const byDepth = new Map<number, string[]>();
 
   for (const [id, depth] of depthMap) {
     if (!byDepth.has(depth)) byDepth.set(depth, []);
@@ -687,7 +736,7 @@ export function findParallelOpportunities(roadmap: RoadmapDefinition): ParallelG
   for (const [depth, ids] of byDepth) {
     if (ids.length > 1) {
       groups.push({
-        sprints: ids.sort((a, b) => a - b),
+        sprints: ids.sort(compareSprintIdKeys),
         reason: `Same dependency depth (${depth}) — no mutual dependencies`,
       });
     }
@@ -697,21 +746,25 @@ export function findParallelOpportunities(roadmap: RoadmapDefinition): ParallelG
 }
 
 /** Compute the depth (longest path from a root) of each sprint */
-function computeDepthMap(sprints: RoadmapSprint[]): Map<number, number> {
-  const depthMap = new Map<number, number>();
-  const sprintMap = new Map(sprints.map(s => [s.id, s]));
+function computeDepthMap(sprints: RoadmapSprint[]): Map<string, number> {
+  const roadmap = { name: '', phases: [], sprints };
+  const depthMap = new Map<string, number>();
+  const sprintMap = new Map(sprints.map(s => [roadmapSprintKey(roadmap, s), s]));
 
-  function getDepth(id: number): number {
+  function getDepth(id: string): number {
     if (depthMap.has(id)) return depthMap.get(id)!;
     const sprint = sprintMap.get(id);
     const deps = sprint?.depends_on ?? [];
-    const depth = deps.length === 0 ? 0 : Math.max(...deps.map(getDepth)) + 1;
+    const depKeys = deps
+      .map(dep => roadmapSprintKeyFromId(roadmap, dep))
+      .filter((dep): dep is string => dep !== null);
+    const depth = depKeys.length === 0 ? 0 : Math.max(...depKeys.map(getDepth)) + 1;
     depthMap.set(id, depth);
     return depth;
   }
 
   for (const sprint of sprints) {
-    getDepth(sprint.id);
+    getDepth(roadmapSprintKey(roadmap, sprint));
   }
 
   return depthMap;
@@ -783,15 +836,20 @@ export function formatRoadmapSummary(roadmap: RoadmapDefinition): string {
 
   // Phases
   for (const phase of roadmap.phases) {
-    const phaseSprintIds = phase.sprints;
-    const phaseSprints = roadmap.sprints.filter(s => phaseSprintIds.includes(s.id));
+    const phaseSprintIds: SprintId[] = phase.sprint_keys ?? phase.sprints;
+    const phaseSprintKeys = new Set(
+      phaseSprintIds.map(id => roadmapSprintKeyFromId(roadmap, id)),
+    );
+    const phaseSprints = roadmap.sprints.filter(
+      sprint => phaseSprintKeys.has(roadmapSprintKey(roadmap, sprint)),
+    );
     lines.push(`## ${phase.name}`);
     lines.push('');
     for (const sprint of phaseSprints) {
       const deps = sprint.depends_on?.length
-        ? ` (depends on: ${sprint.depends_on.map(formatSprintLabel).join(', ')})`
+        ? ` (depends on: ${sprint.depends_on.map(id => formatRoadmapSprintLabel(roadmap, id)).join(', ')})`
         : ' (no dependencies)';
-      lines.push(`- **${formatSprintLabel(sprint.id)}** — ${sprint.theme} | Par ${sprint.par} | ${sprint.tickets.length} tickets${deps}`);
+      lines.push(`- **${formatRoadmapSprintLabel(roadmap, roadmapSprintKey(roadmap, sprint))}** — ${sprint.theme} | Par ${sprint.par} | ${sprint.tickets.length} tickets${deps}`);
     }
     lines.push('');
   }
@@ -799,7 +857,7 @@ export function formatRoadmapSummary(roadmap: RoadmapDefinition): string {
   // Critical path
   lines.push('## Critical Path');
   lines.push('');
-  lines.push(`${criticalPath.path.map(formatSprintLabel).join(' → ')} (${criticalPath.length} sprints, par ${criticalPath.totalPar})`);
+  lines.push(`${criticalPath.path.map(id => formatRoadmapSprintLabel(roadmap, id)).join(' → ')} (${criticalPath.length} sprints, par ${criticalPath.totalPar})`);
   lines.push('');
 
   // Parallel opportunities
@@ -807,7 +865,7 @@ export function formatRoadmapSummary(roadmap: RoadmapDefinition): string {
     lines.push('## Parallel Opportunities');
     lines.push('');
     for (const group of parallelGroups) {
-      lines.push(`- ${group.sprints.map(formatSprintLabel).join(', ')}: ${group.reason}`);
+      lines.push(`- ${group.sprints.map(id => formatRoadmapSprintLabel(roadmap, id)).join(', ')}: ${group.reason}`);
     }
     lines.push('');
   }
@@ -826,26 +884,27 @@ export function formatRoadmapSummary(roadmap: RoadmapDefinition): string {
 /** Format strategic context for briefings — concise 3-5 line summary */
 export function formatStrategicContext(
   roadmap: RoadmapDefinition,
-  currentSprint: number,
+  currentSprint: SprintId,
 ): string | null {
-  const currentOrder = roadmapSprintOrderValue(roadmap, currentSprint);
-  const sprint = roadmap.sprints.find(s => roadmapSprintOrderValue(roadmap, s.id) === currentOrder);
+  const sprint = findRoadmapSprint(roadmap, currentSprint);
   if (!sprint) return null;
-  const resolvedSprint = sprint.id;
+  const resolvedSprint = roadmapSprintKey(roadmap, sprint);
 
   const criticalPath = computeCriticalPath(roadmap);
-  const onCriticalPath = criticalPath.path.some(id => roadmapSprintOrderValue(roadmap, id) === currentOrder);
+  const onCriticalPath = criticalPath.path.includes(resolvedSprint);
   const totalSprints = roadmap.sprints.length;
-  const sprintIndex = roadmap.sprints.findIndex(s => s.id === resolvedSprint) + 1;
+  const sprintIndex = roadmap.sprints.findIndex(s => roadmapSprintKey(roadmap, s) === resolvedSprint) + 1;
 
   // Find which phase this sprint belongs to
-  const phase = roadmap.phases.find(p =>
-    p.sprints.some(id => roadmapSprintOrderValue(roadmap, id) === currentOrder));
+  const phase = roadmap.phases.find(p => {
+    const keys: SprintId[] = p.sprint_keys ?? p.sprints;
+    return keys.some(id => roadmapSprintKeyFromId(roadmap, id) === resolvedSprint);
+  });
 
   // Find what depends on this sprint
   const dependents = roadmap.sprints
-    .filter(s => s.depends_on?.some(id => roadmapSprintOrderValue(roadmap, id) === currentOrder))
-    .map(s => formatRoadmapSprintLabel(roadmap, s.id));
+    .filter(s => s.depends_on?.some(id => roadmapSprintKeyFromId(roadmap, id) === resolvedSprint))
+    .map(s => formatRoadmapSprintLabel(roadmap, roadmapSprintKey(roadmap, s)));
 
   const lines: string[] = [];
   lines.push(`Sprint ${sprintIndex} of ${totalSprints} — ${formatRoadmapSprintLabel(roadmap, resolvedSprint)}: ${sprint.theme}`);
@@ -887,25 +946,33 @@ export function formatStrategicContext(
  */
 export function findNextPlannedSprint(
   roadmap: RoadmapDefinition,
-  currentSprint: number,
+  currentSprint: SprintId,
 ): RoadmapSprint | null {
-  const currentOrder = roadmapSprintOrderValue(roadmap, currentSprint);
+  const currentKey = roadmapSprintKeyFromId(roadmap, currentSprint);
+  if (currentKey === null) return null;
   const candidates = roadmap.sprints
     .filter(s => {
-      return isRoadmapSprintPending(s) && roadmapSprintOrderValue(roadmap, s.id) > currentOrder;
+      return isRoadmapSprintPending(s)
+        && compareSprintIdKeys(roadmapSprintKey(roadmap, s), currentKey) > 0;
     })
-    .sort((a, b) => compareRoadmapSprintIds(roadmap, a.id, b.id));
+    .sort((a, b) => compareSprintIdKeys(
+      roadmapSprintKey(roadmap, a),
+      roadmapSprintKey(roadmap, b),
+    ));
 
   if (candidates.length === 0) return null;
 
   const completedIds = new Set(
     roadmap.sprints
       .filter(s => (s as RoadmapSprint & { status?: string }).status === 'complete')
-      .map(s => roadmapSprintOrderValue(roadmap, s.id)),
+      .map(s => roadmapSprintKey(roadmap, s)),
   );
 
   // Prefer the lowest-id candidate whose dependencies are all complete
   const ready = candidates.find(s =>
-    (s.depends_on ?? []).every(d => completedIds.has(roadmapSprintOrderValue(roadmap, d))));
+    (s.depends_on ?? []).every(d => {
+      const key = roadmapSprintKeyFromId(roadmap, d);
+      return key !== null && completedIds.has(key);
+    }));
   return ready ?? candidates[0];
 }

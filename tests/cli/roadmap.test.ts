@@ -576,10 +576,10 @@ describe('slope roadmap focus', () => {
 
     expect(parsed.version).toBe(1);
     expect(parsed.roadmap).toEqual({ name: 'Test Roadmap' });
-    expect(parsed.sprint.id).toBe(8);
+    expect(parsed.sprint.id).toBe('8');
     expect(parsed.phase.name).toBe('Phase 1');
-    expect(parsed.dependencies.map((item: any) => item.sprint.id)).toEqual([7]);
-    expect(parsed.successors.map((item: any) => item.sprint.id)).toEqual([9]);
+    expect(parsed.dependencies.map((item: any) => item.sprint.id)).toEqual(['7']);
+    expect(parsed.successors.map((item: any) => item.sprint.id)).toEqual(['9']);
     expect(parsed.evidence).toContainEqual(expect.objectContaining({
       kind: 'roadmap',
       ref: 'docs/backlog/roadmap.json',
@@ -722,7 +722,7 @@ describe('slope roadmap focus', () => {
 
     await roadmapCommand(['focus', '--sprint=8', `--path=${path}`, '--json']);
 
-    expect(JSON.parse(consoleOutput.join('\n')).sprint.id).toBe(8);
+    expect(JSON.parse(consoleOutput.join('\n')).sprint.id).toBe('8');
     expect(readFileSync(path, 'utf8')).toBe(before);
   });
 });
