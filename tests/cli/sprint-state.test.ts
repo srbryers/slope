@@ -150,7 +150,7 @@ describe('saveSprintState', () => {
     saveSprintState(tmpDir, state);
     const loaded = loadSprintState(tmpDir);
     expect(loaded).not.toBeNull();
-    expect(loaded!.sprint).toBe(22);
+    expect(loaded!.sprint).toBe('22');
     expect(loaded!.phase).toBe('implementing');
     expect(loaded!.gates.tests).toBe(false);
     expect(loaded!.review_gates.code_review.provenance).toBe('pending');
@@ -161,7 +161,13 @@ describe('saveSprintState', () => {
     const state = createSprintState(114.5, 'planning');
     saveSprintState(tmpDir, state);
     const loaded = loadSprintState(tmpDir);
-    expect(loaded?.sprint).toBe(114.5);
+    expect(loaded?.sprint).toBe('114.5');
+  });
+
+  it('keeps trailing-zero inserted sprint ids distinct', () => {
+    saveSprintState(tmpDir, createSprintState('458.10', 'planning'));
+
+    expect(loadSprintState(tmpDir)?.sprint).toBe('458.10');
   });
 });
 

@@ -80,9 +80,9 @@ describe('sprint id formatting', () => {
   });
 
   it('computes the next canonical sprint after inserted sprint ids', () => {
-    expect(nextCanonicalSprintId(114)).toBe(115);
-    expect(nextCanonicalSprintId(114.5)).toBe(115);
-    expect(nextCanonicalSprintId(435)).toBe(44);
+    expect(nextCanonicalSprintId(114)).toBe('115');
+    expect(nextCanonicalSprintId(114.5)).toBe('115');
+    expect(nextCanonicalSprintId(435)).toBe('44');
   });
 });
 
@@ -215,6 +215,37 @@ describe('validateRoadmap', () => {
     const result = validateRoadmap(roadmap);
     expect(result.valid).toBe(false);
     expect(result.errors.some(e => e.message.includes('Duplicate'))).toBe(true);
+  });
+
+  it('keeps S458.1 and S458.10 distinct in continuity and diagnostics', () => {
+    const insertedOne = makeSprint(458.1, { id_key: '458.1', status: 'complete' });
+    const insertedTen = makeSprint(458.1, {
+      id_key: '458.10',
+      par: 2 as 3,
+      status: 'complete',
+      tickets: [
+        { key: 'S458.10-1', title: 'T1', club: 'wedge', complexity: 'small' },
+        { key: 'S458.10-2', title: 'T2', club: 'wedge', complexity: 'small' },
+      ],
+    });
+    const roadmap = makeRoadmap({
+      sprints: [insertedOne, insertedTen],
+      phases: [{
+        name: 'P1',
+        sprints: [458.1, 458.1],
+        sprint_keys: ['458.1', '458.10'],
+      }],
+    });
+
+    const result = validateRoadmap(roadmap, [], new Set());
+    const messages = [...result.errors, ...result.warnings].map(issue => issue.message);
+
+    expect(messages).not.toContain('Sprint numbering gap: S458.1 → S458.10');
+    expect(messages).toContain('S458.10 has 2 tickets (recommended 3-4)');
+    expect(messages).toContain('S458.10 has invalid par 2 (must be 3, 4, or 5)');
+    expect(messages).toContain('S458.10 is marked "complete" in roadmap but no scorecard exists (phantom sprint)');
+    expect(messages).toContain('S458.10 is marked "complete" but no shipped commits found on main');
+    expect(messages).not.toContain('S458.1 has invalid par 2 (must be 3, 4, or 5)');
   });
 
   it('warns on ticket count < 3', () => {
@@ -981,6 +1012,35 @@ describe('formatStrategicContext next-sprint output', () => {
 
     expect(context).toContain('Next: S458.10: Canonical sprint');
     expect(context).not.toContain('Next: S458.1:');
+  });
+
+  it('does not use S458.1 status to satisfy an S458.10 dependency', () => {
+    const roadmap = makeRoadmap({
+      sprints: [
+        makeSprint(458.1, { id_key: '458.1', status: 'complete' }),
+        makeSprint(458.1, {
+          id_key: '458.10',
+          status: 'planned',
+          tickets: [
+            { key: 'S458.10-1', title: 'T1', club: 'wedge', complexity: 'small' },
+            { key: 'S458.10-2', title: 'T2', club: 'wedge', complexity: 'small' },
+            { key: 'S458.10-3', title: 'T3', club: 'wedge', complexity: 'small' },
+            { key: 'S458.10-4', title: 'T4', club: 'wedge', complexity: 'small' },
+          ],
+        }),
+        makeSprint(459, { depends_on: ['458.10'], theme: 'Canonical successor' }),
+      ],
+      phases: [{
+        name: 'P1',
+        sprints: [458.1, 458.1, 459],
+        sprint_keys: ['458.1', '458.10', '459'],
+      }],
+    });
+
+    const context = formatStrategicContext(roadmap, '458.10');
+
+    expect(context).toContain('Next: S459: Canonical successor (blocked by S458.10)');
+    expect(context).not.toContain('Canonical successor (ready)');
   });
 });
 

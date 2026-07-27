@@ -330,7 +330,7 @@ describe('claimRequiredGuard', () => {
 
       expect(result.decision).toBeUndefined();
       expect(result.context).toContain('Detected likely sprint context: S43.5');
-      expect(result.context).toContain('slope sprint start --number=435 --phase=implementing');
+      expect(result.context).toContain('slope sprint start --number=43.5 --phase=implementing');
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }

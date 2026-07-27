@@ -18,6 +18,7 @@ import {
   withRoadmapProjectionMarker,
   ROADMAP_PROJECTION_MARKER_KEY,
 } from '../../src/core/index.js';
+import type { RoadmapDefinition } from '../../src/core/index.js';
 
 let cwd: string;
 let originalCwd: string;
@@ -1137,6 +1138,30 @@ describe('projection divergence ignores phase renames (GH #637 follow-up)', () =
     });
 
     expect(findRoadmapProjectionDivergence(disk, compiled)).toBeNull();
+  });
+
+  it('keeps canonical trailing-zero sprint identities distinct', () => {
+    const canonical = {
+      name: 'canonical',
+      phases: [{
+        name: 'Inserted',
+        sprints: [458.1, 458.1],
+        sprint_keys: ['458.1', '458.10'],
+      }],
+      sprints: [
+        { id: 458.1, id_key: '458.1', theme: 'First', par: 3, slope: 1, type: 'feature', tickets: [] },
+        { id: 458.1, id_key: '458.10', theme: 'Tenth', par: 3, slope: 1, type: 'feature', tickets: [] },
+      ],
+    } satisfies RoadmapDefinition;
+    const disk = JSON.stringify({
+      phases: [{ name: 'Inserted', sprints: [458.1, 458.1], sprint_keys: ['458.1', '458.10'] }],
+      sprints: [
+        { id: 458.1, id_key: '458.1' },
+        { id: 458.1, id_key: '458.10' },
+      ],
+    });
+
+    expect(findRoadmapProjectionDivergence(disk, canonical)).toBeNull();
   });
 
   it('still reports a phase whose sprints exist only in the projection', () => {

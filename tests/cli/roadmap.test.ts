@@ -303,6 +303,35 @@ describe('slope roadmap review', () => {
     expect(output).toContain('Club distribution');
   });
 
+  it('uses id_key in architect-review diagnostics', () => {
+    const roadmap = makeRoadmapJson({
+      phases: [{
+        name: 'Canonical IDs',
+        sprints: [458.1],
+        sprint_keys: ['458.10'],
+      }],
+      sprints: [{
+        id: 458.1,
+        id_key: '458.10',
+        theme: 'Exact label',
+        par: 3,
+        slope: 1,
+        type: 'repair',
+        tickets: [
+          { key: 'S458.10-1', title: 'T1', club: 'wedge', complexity: 'small' },
+          { key: 'S458.10-2', title: 'T2', club: 'wedge', complexity: 'small' },
+        ],
+      }],
+    });
+    writeRoadmap(tmpDir, roadmap);
+
+    roadmapCommand(['review']);
+
+    const output = consoleOutput.join('\n');
+    expect(output).toContain('S458.10 has 2 tickets');
+    expect(output).not.toContain('S458.1 has 2 tickets');
+  });
+
   it('reports parallel opportunities with branching roadmap', () => {
     const roadmap = makeRoadmapJson({
       sprints: [
@@ -674,6 +703,55 @@ describe('slope roadmap focus', () => {
     expect(JSON.parse(consoleOutput.join('\n')).sprint.label).toBe('S225');
   });
 
+  it('attributes focused scorecard evidence to S458.10 without aliasing S458.1', async () => {
+    const canonicalSprint = (key: '458.1' | '458.10', theme: string) => ({
+      id: 458.1,
+      id_key: key,
+      theme,
+      par: 3 as const,
+      slope: 1,
+      type: 'repair',
+      tickets: [1, 2, 3].map(number => ({
+        key: `S${key}-${number}`,
+        title: `T${number}`,
+        club: 'wedge' as const,
+        complexity: 'small' as const,
+      })),
+    });
+    const roadmap = makeRoadmapJson({
+      phases: [
+        { name: 'First insert', sprints: [458.1], sprint_keys: ['458.1'] },
+        { name: 'Tenth insert', sprints: [458.1], sprint_keys: ['458.10'] },
+      ],
+      sprints: [
+        canonicalSprint('458.1', 'First'),
+        canonicalSprint('458.10', 'Tenth'),
+      ],
+    });
+    writeRoadmap(tmpDir, roadmap);
+    writeConfig(tmpDir, { scorecardDir: 'docs/retros', scorecardPattern: 'sprint-*.json', minSprint: 1 });
+    mkdirSync(join(tmpDir, 'docs', 'retros'), { recursive: true });
+    for (const key of ['458.1', '458.10']) {
+      writeFileSync(join(tmpDir, 'docs', 'retros', `sprint-${key}.json`), JSON.stringify({
+        sprint_number: key,
+        par: 3,
+        score: 3,
+        shots: [],
+      }));
+    }
+
+    await roadmapCommand(['focus', '--sprint=458.10', '--json']);
+    const parsed = JSON.parse(consoleOutput.join('\n'));
+    const scorecardEvidence = parsed.evidence.filter((item: { kind: string }) =>
+      item.kind === 'scorecard');
+
+    expect(parsed.sprint).toMatchObject({ id: '458.10', label: 'S458.10' });
+    expect(scorecardEvidence).toEqual([expect.objectContaining({
+      sprint: '458.10',
+      ref: 'docs/retros/sprint-458.10.json',
+    })]);
+  });
+
   it('matches encoded roadmap IDs to decimal scorecard completion and evidence', async () => {
     const roadmap = makeRoadmapJson({
       phases: [{ name: 'Encoded', sprints: [43, 435, 44] }],
@@ -703,12 +781,12 @@ describe('slope roadmap focus', () => {
     expect(parsed.sprint).toMatchObject({ label: 'S43.5', status: 'complete', readiness: 'complete' });
     expect(parsed.evidence).toContainEqual(expect.objectContaining({
       kind: 'scorecard',
-      sprint: 435,
+      sprint: '43.5',
       ref: 'docs/retros/sprint-43.5.json',
     }));
     expect(parsed.evidence).toContainEqual(expect.objectContaining({
       kind: 'review',
-      sprint: 435,
+      sprint: '43.5',
       ref: 'docs/retros/sprint-43.5-review.md',
     }));
   });

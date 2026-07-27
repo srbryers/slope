@@ -119,7 +119,7 @@ describe('assessSprintRollover', () => {
 
     expect(assessment.valid).toBe(true);
     expect(assessment.from_terminal).toBe(true);
-    expect(assessment.expected_next).toBe(11);
+    expect(assessment.expected_next).toBe('11');
     expect(assessment.blocking_dependencies).toEqual([]);
     expect(assessment.issues).toEqual([]);
   });
@@ -214,7 +214,7 @@ describe('assessSprintRollover', () => {
     );
 
     expect(assessment.valid).toBe(true);
-    expect(assessment.from).toBe(43.5);
+    expect(assessment.from).toBe('43.5');
     expect(assessment.from_label).toBe('S43.5');
     expect(assessment.to_label).toBe('S44');
   });
@@ -241,6 +241,57 @@ describe('assessSprintRollover', () => {
 
     expect(assessment.valid).toBe(false);
     expect(assessment.issues.map(issue => issue.code)).toContain('from_roadmap_ambiguous');
+  });
+
+  it('orders S458.10 after S458.1 without sharing dependency evidence', () => {
+    const canonicalSprint = (
+      key: '458.1' | '458.10',
+      status: string,
+      dependsOn: Array<string | number> = [],
+    ): RoadmapSprint => ({
+      id: 458.1,
+      id_key: key,
+      theme: `Sprint ${key}`,
+      par: 3,
+      slope: 1,
+      type: 'architecture',
+      status,
+      depends_on: dependsOn,
+      tickets: [1, 2, 3].map(number => ({
+        key: `S${key}-${number}`,
+        title: `T${number}`,
+        club: 'wedge',
+        complexity: 'small',
+      })),
+    });
+    const definition: RoadmapDefinition = {
+      name: 'Canonical inserted sprints',
+      phases: [{
+        name: 'Recovery',
+        sprints: [458.1, 458.1, 459],
+        sprint_keys: ['458.1', '458.10', '459'],
+      }],
+      sprints: [
+        canonicalSprint('458.1', 'active'),
+        canonicalSprint('458.10', 'planned', ['458.1']),
+        { ...sprint(459), depends_on: ['458.10'] },
+      ],
+    };
+
+    const assessment = assessSprintRollover(
+      terminalState(458.1),
+      definition,
+      'docs/backlog/roadmap.json',
+      { from: 458.1, to: 459 },
+      ['458.1'],
+    );
+
+    expect(assessment.from_label).toBe('S458.1');
+    expect(assessment.expected_next_label).toBe('S458.10');
+    expect(assessment.blocking_dependencies).toEqual(['458.10']);
+    expect(assessment.issues.map(issue => issue.code)).not.toContain('from_roadmap_ambiguous');
+    expect(assessment.issues.map(issue => issue.code)).toContain('target_dependency_blocked');
+    expect(assessment.issues.map(issue => issue.code)).toContain('target_not_next_eligible');
   });
 
   it.each([
@@ -377,26 +428,26 @@ describe('performSprintRollover audit recovery', () => {
     expect(result.state).toEqual(diskAudit.next_state);
     expect(persisted).toEqual(diskAudit.next_state);
     expect(persisted).toMatchObject({
-      sprint: 11,
+      sprint: '11',
       phase: 'planning',
       rollover: {
         transition_id: diskAudit.transition_id,
-        from_sprint: 10,
+        from_sprint: '10',
         audit_path: result.audit_path,
         forced: false,
       },
     });
     expect(diskAudit).toMatchObject({
       kind: 'sprint_rollover',
-      from_sprint: 10,
-      to_sprint: 11,
+      from_sprint: '10',
+      to_sprint: '11',
       claims_policy: 'unchanged',
       sessions_policy: 'unchanged',
       eligibility: {
         from_terminal: true,
         target_dependency_eligible: true,
         blocking_dependencies: [],
-        expected_next: 11,
+        expected_next: '11',
         target_dependencies: ['10'],
         completion_evidence: {
           roadmap_complete: [],
@@ -405,7 +456,7 @@ describe('performSprintRollover audit recovery', () => {
         },
       },
     });
-    expect(diskAudit.prior_state.sprint).toBe(10);
+    expect(diskAudit.prior_state.sprint).toBe('10');
   });
 
   it('records the dependency and scorecard evidence used for target eligibility', () => {
@@ -544,7 +595,7 @@ describe('performSprintRollover audit recovery', () => {
     saveSprintState(cwd, terminalState());
     performSprintRollover(cwd, { from: 10, to: 11 }, actor);
     const state = loadSprintState(cwd)!;
-    state.rollover!.from_sprint = 999;
+    state.rollover!.from_sprint = '999';
     saveSprintState(cwd, state);
 
     expect(() => performSprintRollover(cwd, { from: 10, to: 11 }, actor)).toThrow(/lineage/i);

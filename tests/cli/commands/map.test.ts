@@ -324,6 +324,38 @@ describe('slope map in a non-SLOPE repo (#351)', () => {
     }
   });
 
+  it('treats S458.10 as later than S458.1 in sprint currency', () => {
+    const cwd = setupNonSlopeRepo({ name: 'canonical-sprint-tool' });
+    try {
+      const head = execSync('git rev-parse HEAD', { cwd, encoding: 'utf8' }).trim();
+      writeFileSync(join(cwd, 'CODEBASE.md'), [
+        '---',
+        `generated_at: "${new Date().toISOString()}"`,
+        `git_sha: "${head}"`,
+        'sprint: "458.1"',
+        'source_files: 0',
+        'test_files: 0',
+        'flows: 0',
+        '---',
+        '# Current map',
+        '',
+      ].join('\n'));
+      writeFileSync(join(cwd, 'docs', 'retros', 'sprint-458.10.json'), JSON.stringify({
+        sprint_number: '458.10',
+        par: 3,
+        score: 3,
+        shots: [],
+      }));
+
+      const output = runSlopeMap(cwd, ['--check'], { encoding: 'utf8' }) as string;
+
+      expect(output).toContain('Sprint currency: Sprint 458.10 (map says 458.1, +0.9)');
+      expect(output).not.toContain('Sprint 458.10 — current');
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
   it('uses directory basename when package.json is missing entirely', () => {
     const cwd = mkdtempSync(join(tmpdir(), 'slope-map-bare-'));
     try {

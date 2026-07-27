@@ -86,7 +86,7 @@ describe('retro post-merge CLI', () => {
     expect(existsSync(path)).toBe(true);
 
     const record = JSON.parse(readFileSync(path, 'utf8'));
-    expect(record.retro.sprint).toBe(137);
+    expect(record.retro.sprint).toBe('137');
     expect(record.retro.pr).toBe(512);
     expect(record.retro.outcome).toBe('follow_up');
     expect(record.memory.planned).toBe(4);
@@ -296,7 +296,7 @@ export function createStore() {
     expect(existsSync(path)).toBe(true);
 
     const record = JSON.parse(readFileSync(path, 'utf8'));
-    expect(record.retro.sprint).toBe(146.1);
+    expect(record.retro.sprint).toBe('146.1');
     expect(record.retro.pr).toBe(527);
 
     const memories = searchMemories(cwd, { source: 'auto-retro' });

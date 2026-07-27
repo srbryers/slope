@@ -122,3 +122,12 @@ describe('SLOPE_TYPES — PR signal types', () => {
     expect(SLOPE_TYPES).toContain('pr?: PRSignal');
   });
 });
+
+describe('SLOPE_TYPES — canonical sprint identity', () => {
+  it('distinguishes canonical output ids from transitional inputs', () => {
+    expect(SLOPE_TYPES).toContain('type SprintId = string;');
+    expect(SLOPE_TYPES).toContain('type SprintIdInput = string | number;');
+    expect(SLOPE_TYPES).toContain('sprint_number: SprintIdInput');
+    expect(SLOPE_TYPES).toContain('interface SprintClaim { id: string; sprint_number: string;');
+  });
+});

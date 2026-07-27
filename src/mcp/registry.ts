@@ -141,7 +141,7 @@ export const SLOPE_REGISTRY: FunctionRegistryEntry[] = [
     name: 'extractHazardIndex',
     module: 'core',
     description: 'Extracts all hazards from scorecards into a flat searchable index.',
-    signature: 'extractHazardIndex(scorecards: GolfScorecard[], keyword?: string): { shot_hazards: HazardEntry[]; bunker_locations: { sprint: number; location: string }[] }',
+    signature: 'extractHazardIndex(scorecards: GolfScorecard[], keyword?: string): { shot_hazards: HazardEntry[]; bunker_locations: { sprint: string; location: string }[] }',
     example: 'const cards = loadScorecards(); return extractHazardIndex(cards, "deploy");',
   },
   {
@@ -995,7 +995,8 @@ type SpecialPlay = 'gimme' | 'mulligan' | 'provisional' | 'lay_up' | 'scramble';
 type MissDirection = 'long' | 'short' | 'left' | 'right';
 type ScoreLabel = 'eagle' | 'birdie' | 'par' | 'bogey' | 'double_bogey' | 'triple_plus';
 type SprintType = 'feature' | 'feedback' | 'infra' | 'bugfix' | 'research' | 'flow' | 'test-coverage' | 'audit';
-type SprintId = string | number;
+type SprintId = string;
+type SprintIdInput = string | number;
 
 // ─── Record Types ───
 interface HazardHit { type: HazardType; description: string; gotcha_id?: string; }
@@ -1035,7 +1036,7 @@ interface RoleDefinition { id: string; name: string; description: string; focusA
 interface AgentBreakdown { session_id: string; agent_role: string; shots: ShotRecord[]; score: number; stats: HoleStats; }
 interface AgentShotInput { session_id: string; agent_role: string; shots: ShotRecord[]; }
 interface ScorecardShotInput { ticket_key?: string; ticket?: string; title?: string; club: ClubSelection; result: ShotResult; hazards?: Array<HazardHit | string>; provisional_declared?: boolean; notes?: string; }
-interface ScorecardInput { sprint_number: SprintId; theme: string; par: 3 | 4 | 5; slope: number; date: string; shots: ScorecardShotInput[]; putts?: number; penalties?: number; score?: number; type?: SprintType; conditions?: ConditionRecord[]; special_plays?: SpecialPlay[]; training?: TrainingSession[]; nutrition?: NutritionEntry[]; nineteenth_hole?: NineteenthHole; bunker_locations?: string[]; yardage_book_updates?: string[]; course_management_notes?: string[]; agents?: AgentBreakdown[]; }
+interface ScorecardInput { sprint_number: SprintIdInput; theme: string; par: 3 | 4 | 5; slope: number; date: string; shots: ScorecardShotInput[]; putts?: number; penalties?: number; score?: number; type?: SprintType; conditions?: ConditionRecord[]; special_plays?: SpecialPlay[]; training?: TrainingSession[]; nutrition?: NutritionEntry[]; nineteenth_hole?: NineteenthHole; bunker_locations?: string[]; yardage_book_updates?: string[]; course_management_notes?: string[]; agents?: AgentBreakdown[]; }
 
 // ─── Escalation ───
 type EscalationTrigger = 'blocker_timeout' | 'claim_conflict' | 'test_failure_cascade' | 'manual';

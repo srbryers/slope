@@ -27,7 +27,7 @@ describe('inferSprintContext', () => {
 
     const context = inferSprintContext(tmpDir);
 
-    expect(context.sprint).toBe(74);
+    expect(context.sprint).toBe('74');
     expect(context.source).toBe('sprint-state');
   });
 
@@ -36,7 +36,7 @@ describe('inferSprintContext', () => {
 
     const context = inferSprintContext(tmpDir);
 
-    expect(context.sprint).toBe(18);
+    expect(context.sprint).toBe('18');
     expect(context.source).toBe('config');
   });
 
@@ -61,7 +61,7 @@ describe('inferSprintContext', () => {
 
     const context = inferSprintContext(tmpDir);
 
-    expect(context.sprint).toBe(18);
+    expect(context.sprint).toBe('18');
     expect(context.source).toBe('config');
   });
 
@@ -79,11 +79,11 @@ describe('inferSprintContext', () => {
 
     const context = inferSprintContext(tmpDir);
 
-    expect(context.sprint).toBe(454);
+    expect(context.sprint).toBe('454');
     expect(context.source).toBe('scorecards');
     expect(context.latestScorecard).toBe('453');
     expect(context.staleSprintState).toMatchObject({
-      sprint: 444,
+      sprint: '444',
       phase: 'planning',
     });
     expect(context.staleConfigSprint).toMatchObject({ sprint: 18 });
@@ -117,8 +117,18 @@ describe('inferSprintContext', () => {
 
     const context = inferSprintContext(tmpDir);
 
-    expect(context.sprint).toBe(456);
+    expect(context.sprint).toBe('456');
     expect(context.source).toBe('roadmap');
     expect(context.roadmapSprint?.theme).toBe('Ready successor');
+  });
+
+  it('preserves a trailing-zero sprint from active state', () => {
+    saveSprintState(tmpDir, createSprintState('458.10', 'planning'));
+
+    const context = inferSprintContext(tmpDir);
+
+    expect(context.sprint).toBe('458.10');
+    expect(context.label).toBe('S458.10');
+    expect(context.source).toBe('sprint-state');
   });
 });

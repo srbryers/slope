@@ -571,12 +571,20 @@ export function findRoadmapProjectionDivergence(
 
   const disk = parsed as { phases?: unknown; sprints?: unknown };
 
-  const compiledSprints = new Set((compiled.sprints ?? []).map(sprint => String(sprint.id)));
+  const compiledSprints = new Set(
+    (compiled.sprints ?? []).map(sprint => roadmapSprintKey(compiled, sprint)),
+  );
   const diskSprints = Array.isArray(disk.sprints) ? disk.sprints : [];
   const sprints = diskSprints
-    .map(sprint => (sprint && typeof sprint === 'object' ? (sprint as { id?: unknown }).id : undefined))
-    .filter(id => id != null)
-    .map(id => String(id))
+    .map(sprint => {
+      if (!sprint || typeof sprint !== 'object') return null;
+      const row = sprint as { id?: unknown; id_key?: unknown };
+      if (typeof row.id_key === 'string') return sprintIdKey(row.id_key);
+      return typeof row.id === 'string' || typeof row.id === 'number'
+        ? sprintIdKey(row.id)
+        : null;
+    })
+    .filter((id): id is string => id !== null)
     .filter(id => !compiledSprints.has(id));
 
   const compiledPhases = new Set((compiled.phases ?? []).map(phase => phase.name));
@@ -592,7 +600,11 @@ export function findRoadmapProjectionDivergence(
     .filter(phase => {
       const ids = Array.isArray(phase.sprints) ? phase.sprints : [];
       if (ids.length === 0) return true;
-      return ids.some(id => id != null && !compiledSprints.has(String(id)));
+      return ids.some(id => {
+        if (id == null || (typeof id !== 'string' && typeof id !== 'number')) return false;
+        const key = sprintIdKey(id);
+        return key !== null && !compiledSprints.has(key);
+      });
     })
     .map(phase => phase.name as string);
 
