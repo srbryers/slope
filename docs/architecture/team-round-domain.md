@@ -590,3 +590,194 @@ unknown, and cross-role penalties overlap.
 - Unknown is never represented as zero.
 - Difficulty adjustment is descriptive and MUST NOT be presented as causal.
 - Coordination overhead remains separate from canonical score.
+
+## Single-Player Compatibility
+
+Version 1 Team Rounds are a strict generalization of existing single-player
+scorecards.
+
+For a legacy scorecard:
+
+- The existing sprint identity is resolved to canonical `sprint_key`.
+- Import creates a stable repository-scoped `round_id`.
+- The existing top-level shots, par, score, score label, hazards, and penalties
+  remain authoritative and MUST NOT be recomputed merely because the schema is
+  imported.
+- `player`, when present, maps to one legacy actor identity with unverified
+  principal assurance until explicitly bound.
+- Every top-level shot maps to that actor when the scorecard unambiguously
+  represents one player.
+- Missing session, role, verifier, contributor, difficulty, and penalty
+  attribution fields receive typed `not_recorded_legacy` missing reasons.
+- The imported scorecard remains immutable. Enrichment is a new projection or
+  audited identity binding, not an edit to historical JSON.
+
+An existing single-player command MAY continue to omit explicit team options.
+The runtime supplies a one-participant Team Round from the authenticated
+principal and active actor/session bindings.
+
+### Legacy `agents` Breakdowns
+
+The current optional `agents[]` shape contains copied per-session shots and
+per-agent scores. It is not a second source of truth under this contract.
+
+- Top-level shots and score remain canonical.
+- An importer MAY derive unverified actor or role attribution only when a
+  one-to-one mapping from a copied legacy shot to one canonical shot is
+  provable.
+- Ambiguous, duplicated, or conflicting mappings remain unknown and lower
+  attribution coverage.
+- Legacy per-agent scores MAY be displayed as historical diagnostics but MUST
+  NOT contribute to team score or the new actor estimand.
+- A legacy session ID MUST NOT be promoted to durable actor or principal
+  identity.
+
+Phase 64 SHOULD introduce a new scorecard schema version that references
+canonical shot IDs from participant projections instead of copying shot
+records. Readers MUST continue to support legacy scorecards.
+
+## Typed Shared Resources
+
+Parallel actors contend for more than files. A Team Round resource has a
+canonical descriptor:
+
+```text
+resource = {
+  resource_type,
+  namespace,
+  resource_key,
+  conflict_mode,
+  project_policy_revision
+}
+```
+
+Initial resource types are:
+
+| Type | Example key | Default conflict model |
+|---|---|---|
+| `ticket` | canonical ticket key | one accountable owner |
+| `file_area` | canonical repository path or declared area | overlap-aware exclusive writer |
+| `tcp_port` | host scope plus port | exclusive allocator |
+| `udp_port` | host scope plus port | exclusive allocator |
+| `local_database` | provider plus canonical instance name | project policy |
+| `service_instance` | service plus environment or instance name | project policy |
+| `custom` | namespaced project-defined key | explicitly declared |
+
+Free-form labels MUST NOT establish conflict identity. Canonicalization and
+overlap rules are versioned project policy.
+
+Resource ownership records identify:
+
+- authenticated principal, actor, session, round, and attempt
+- assignment or claim that requires the resource
+- requested access mode and effective conflict mode
+- authoritative acquisition evidence
+- current lifecycle state
+
+Lease duration, renewal, epochs, fencing, fairness, abandonment, and recovery
+belong to the coordination contract. The domain invariants are:
+
+- A protected mutation identifies the resource ownership it relies on.
+- An expired or superseded owner cannot remain authoritative.
+- Different resource types cannot collide by accidental string equality.
+- Equivalent resources cannot evade collision through alternate spelling.
+- Shared-read or project-managed modes require explicit policy; missing policy
+  defaults to exclusive or denied access.
+- Ownership and allocation outcomes are visible to every authorized
+  participant affected by the conflict.
+
+SLOPE coordinates declared resource ownership. It does not automatically make
+an arbitrary development environment parallel-safe. A project MAY own port,
+database, or service allocation through checked-in configuration; SLOPE then
+records and enforces the declared allocation boundary.
+
+## Explicit Non-Goals
+
+The Team Round contract does not require or adopt:
+
+- Nostr or any other specific network transport
+- wallets, public-key identity, cryptocurrency, or blockchain settlement as a
+  product prerequisite
+- chat messages as the coordination database
+- prompt-only conventions as access control, locking, attribution, or state
+  synchronization
+- role names, actor aliases, model names, or session labels as trust boundaries
+- one scorecard per agent, best-of-agent selection, alternate-shot scoring, or
+  scramble scoring
+- causal ranking from observational actor or role estimates
+- additive participant projections that reproduce the team score
+- client-only authorization, redaction, or visibility filtering
+- a second coordination ledger alongside the existing event store
+- automatic management of undeclared ports, databases, processes, or external
+  services
+- raw secret, credential, private transcript, or unrestricted tool-payload
+  storage in scorecards
+
+SLOPE MAY expose chat, transport, or cryptographic integrations later. Such
+integrations are adapters to the same repository-native contract, not alternate
+sources of truth.
+
+## Downstream Contract Ownership
+
+S264.1 must specify:
+
+- how the existing event store becomes the authoritative ledger
+- complete event envelopes and deterministic scorecard projection
+- atomic append, scoped idempotency, ordering, replay, and schema evolution
+- lease epochs, fencing, retries, recovery, and escalation
+- deny-by-default capabilities, filtered views, redaction, and retention
+
+S264.2 must specify:
+
+- assignment, handoff, callback, and blocker states
+- principal-aware verifier independence and conflict rules
+- merge-safe learning and semantic activity status
+- reproducible, redacted team-versus-solo evaluation
+
+Phase 64 implementation must not weaken any invariant in this document. If an
+implementation constraint requires a semantic change, the contract and schema
+revision must change before code ships.
+
+## Acceptance Criteria
+
+The S264 contract is complete when independent reviewers can answer all of the
+following from this document without inventing policy:
+
+### S264-1
+
+- Which identifiers survive retries, closes, and reopens?
+- Can two finalizers publish competing scorecards?
+- What happens to late score-affecting evidence?
+- Does reopen preserve prior scorecard versions?
+- Can a protected roadmap status silently close a round?
+
+### S264-2
+
+- Which identity authenticates a mutation and which identity receives
+  attribution?
+- Can role, alias, session, branch, or worktree labels grant authority?
+- Can two actors or sessions controlled by one principal verify each other
+  independently?
+- How are contributors, verifiers, authority, and visibility represented
+  without duplicating ownership?
+
+### S264-3
+
+- Is there exactly one team score and one canonical copy of each shot and
+  penalty?
+- What population and observation unit does an actor or role estimate
+  describe?
+- Are difficulty features frozen before outcomes?
+- Do incomplete and handed-off exposures remain in denominators?
+- Are uncertainty, coverage, reliability, and missingness mandatory?
+- Can resolver credit inherit a penalty?
+
+### S264-4
+
+- Does a legacy single-player score remain unchanged?
+- Can ambiguous legacy agent data invent trusted ownership?
+- Are file, ticket, port, database, and service resources distinct typed
+  subjects?
+- Is project-owned development-state allocation an explicit boundary?
+- Are transport, crypto, chat, prompt-only trust, and alternate team scoring
+  excluded as dependencies?
