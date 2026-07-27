@@ -16,6 +16,7 @@ import { checkConflicts } from './registry.js';
 import {
   compareSprintIdKeys,
   latestSprintIdKey,
+  parseSprintId,
   sprintIdKey,
   sprintIdsEqual,
   type SprintId,
@@ -273,7 +274,7 @@ function normalizeAssignmentPhrase(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 }
 
-function currentAssignmentEvidence(roadmap: RoadmapDefinition, sprint: number): CurrentAssignmentEvidence {
+function currentAssignmentEvidence(roadmap: RoadmapDefinition, sprint: SprintId): CurrentAssignmentEvidence {
   const row = roadmapSprintById(roadmap, sprint);
   const values = [
     row?.theme,
@@ -288,7 +289,7 @@ function currentAssignmentEvidence(roadmap: RoadmapDefinition, sprint: number): 
   };
 }
 
-function sprintMentionPattern(roadmap: RoadmapDefinition, sprint: number): RegExp {
+function sprintMentionPattern(roadmap: RoadmapDefinition, sprint: SprintId): RegExp {
   const row = roadmapSprintById(roadmap, sprint);
   const raw = String(sprint).replace('.', '\\.');
   const order = String(roadmapSprintOrderValue(roadmap, sprint)).replace('.', '\\.');
@@ -344,7 +345,7 @@ function splitHazardClauses(description: string): string[] {
 function stripSupersededRouteDirectives(
   description: string,
   roadmap: RoadmapDefinition,
-  targetSprint: number,
+  targetSprint: SprintId,
   assignment: CurrentAssignmentEvidence,
 ): { description: string; suppressed: number } {
   const mention = sprintMentionPattern(roadmap, targetSprint);
@@ -383,7 +384,7 @@ function stripSupersededRouteDirectives(
 function scopeBriefingHazards(
   index: ReturnType<typeof extractHazardIndex>,
   roadmap: RoadmapDefinition,
-  currentSprint: number,
+  currentSprint: SprintId,
 ): ScopedBriefingHazardIndex {
   const target = roadmapSprintById(roadmap, currentSprint);
   if (!target) {
@@ -541,7 +542,7 @@ export function buildSkillBriefing(opts: {
   commonIssues: CommonIssuesFile;
   filter?: BriefingFilter;
   roadmap?: RoadmapDefinition;
-  currentSprint?: number;
+  currentSprint?: SprintId;
   claims?: SprintClaim[];
   changedFiles?: string[];
   maxRecommendations?: number;
@@ -635,7 +636,7 @@ export function formatBriefing(opts: {
   includeTraining?: boolean;
   claims?: SprintClaim[];
   roadmap?: RoadmapDefinition;
-  currentSprint?: number;
+  currentSprint?: SprintId;
   metaphor?: MetaphorDefinition;
   role?: RoleDefinition;
   recentEvents?: SlopeEvent[];
@@ -854,10 +855,15 @@ export function formatBriefing(opts: {
 
   // Section 2.75: Recent events from telemetry
   if (recentEvents && recentEvents.length > 0 && currentSprint) {
-    const minSprint = currentSprint - eventRecencyWindow;
-    const relevant = recentEvents.filter(e =>
-      e.sprint_number != null && Number(e.sprint_number) > minSprint,
-    );
+    const currentParts = parseSprintId(currentSprint);
+    const minBase = (currentParts?.base ?? 1) - eventRecencyWindow;
+    const relevant = recentEvents.filter(e => {
+      if (e.sprint_number == null) return false;
+      const eventParts = parseSprintId(e.sprint_number);
+      return eventParts !== null
+        && eventParts.base > minBase
+        && compareSprintIdKeys(eventParts.key, currentParts?.key ?? String(currentSprint)) <= 0;
+    });
 
     if (relevant.length > 0) {
       // Group by type for compact display

@@ -2,8 +2,15 @@ import { execSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { isAbsolute, join, resolve } from 'node:path';
-import type { HookInput, GuardResult } from '../../core/index.js';
-import { formatSprintNumber, parseSprintNumber, sprintIdsEqual, sprintIdToNumber } from '../../core/index.js';
+import type { HookInput, GuardResult, SprintId } from '../../core/index.js';
+import {
+  findRoadmapSprint,
+  formatSprintNumber,
+  parseRoadmap,
+  roadmapSprintKey,
+  sprintIdKey,
+  sprintIdsEqual,
+} from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { loadPrReviewState } from '../pr-review-state.js';
 import { loadSprintState, loadSprintStateResult, mutateSprintState, updateGate, isSprintComplete, pendingGates } from '../sprint-state.js';
@@ -37,7 +44,7 @@ export async function sprintCompletionGuard(input: HookInput, cwd: string): Prom
 }
 
 /** Check if sprint-state matches the current branch. Returns a warning string or null. */
-function checkStaleness(sprint: number, cwd: string): string | null {
+function checkStaleness(sprint: SprintId, cwd: string): string | null {
   try {
     const branch = currentBranch(cwd);
     if (branch) {
@@ -81,11 +88,7 @@ function handlePreToolUse(input: HookInput, cwd: string): GuardResult {
   if (branchSprint !== null && !sprintIdsEqual(branchSprint, state.sprint)) {
     let recovery: string[];
     try {
-      const branchSprintNumber = sprintIdToNumber(branchSprint);
-      if (branchSprintNumber === null) {
-        throw new Error(`Sprint ${branchSprint} cannot be represented by the legacy numeric sprint-state rollover contract.`);
-      }
-      const assessment = inspectSprintRollover(guardCwd, { from: state.sprint, to: branchSprintNumber });
+      const assessment = inspectSprintRollover(guardCwd, { from: state.sprint, to: branchSprint });
       const blockers = assessment.issues.filter(issue => issue.code !== 'from_not_terminal');
       if (blockers.length === 0) {
         const base = `slope sprint rollover --from=${assessment.from_label.slice(1)} --to=${assessment.to_label.slice(1)}`;
@@ -421,7 +424,7 @@ function reviewGateEvidenceInstructions(): string[] {
 }
 
 /** Check if a scorecard file exists for the given sprint. */
-function scorecardExists(sprint: number, cwd: string): boolean {
+function scorecardExists(sprint: SprintId, cwd: string): boolean {
   const config = loadConfig(cwd);
   const pattern = config.scorecardPattern.replaceAll('*', String(sprint));
   const scorecardPath = join(cwd, config.scorecardDir, pattern);
@@ -503,21 +506,34 @@ function handleValidateSuccess(input: HookInput, cwd: string): GuardResult {
   try {
     const raw = JSON.parse(readFileSync(roadmapPath, 'utf8'));
     if (!raw || !Array.isArray(raw.sprints)) return {};
+    const parsed = parseRoadmap(raw).roadmap;
+    if (!parsed) return {};
 
-    const sprint = raw.sprints.find((s: { id: number }) => s.id === state.sprint);
+    const parsedSprint = findRoadmapSprint(parsed, state.sprint);
+    if (!parsedSprint) return {};
+    const sprintKey = roadmapSprintKey(parsed, parsedSprint);
+    const sprintIndex = parsed.sprints.indexOf(parsedSprint);
+    const sprint = raw.sprints[sprintIndex];
     if (!sprint || sprint.status === 'complete') return {};
 
     sprint.status = 'complete';
 
     // Also update phase status if all sprints in a phase are now complete
     if (Array.isArray(raw.phases)) {
-      for (const phase of raw.phases) {
-        if (!Array.isArray(phase.sprints) || !phase.sprints.includes(state.sprint)) continue;
-        const allComplete = phase.sprints.every((sid: number) => {
-          const s = raw.sprints.find((sp: { id: number }) => sp.id === sid);
-          return s?.status === 'complete';
+      for (let phaseIndex = 0; phaseIndex < parsed.phases.length; phaseIndex++) {
+        const parsedPhase = parsed.phases[phaseIndex];
+        const phaseKeys = (parsedPhase.sprint_keys ?? parsedPhase.sprints.map(String))
+          .map(id => findRoadmapSprint(parsed, id))
+          .filter((row): row is NonNullable<typeof row> => row !== undefined)
+          .map(row => roadmapSprintKey(parsed, row));
+        if (!phaseKeys.includes(sprintKey)) continue;
+        const allComplete = phaseKeys.every(key => {
+          const row = findRoadmapSprint(parsed, key);
+          if (!row) return false;
+          return raw.sprints[parsed.sprints.indexOf(row)]?.status === 'complete';
         });
-        if (allComplete && phase.status !== 'complete') {
+        const phase = raw.phases[phaseIndex];
+        if (allComplete && phase?.status !== 'complete') {
           phase.status = 'complete';
         }
       }
@@ -530,9 +546,9 @@ function handleValidateSuccess(input: HookInput, cwd: string): GuardResult {
   }
 }
 
-function reviewTargetSprint(segment: string, cwd: string): number | null {
+function reviewTargetSprint(segment: string, cwd: string): string | null {
   const selector = segment.match(/--sprint(?:=|\s+)(S?\d+(?:\.\d+)?)/i)?.[1];
-  if (selector) return parseSprintNumber(selector);
+  if (selector) return sprintIdKey(selector);
 
   const pathMatch = segment.match(/\bslope\s+review\s+(?:"([^"]+)"|'([^']+)'|([^\s;&|]+))/);
   const path = pathMatch?.[1] ?? pathMatch?.[2] ?? pathMatch?.[3];
@@ -540,7 +556,7 @@ function reviewTargetSprint(segment: string, cwd: string): number | null {
 
   try {
     const raw = JSON.parse(readFileSync(isAbsolute(path) ? path : resolve(cwd, path), 'utf8'));
-    return parseSprintNumber(String(raw.sprint_number ?? ''));
+    return sprintIdKey(String(raw.sprint_number ?? ''));
   } catch {
     return null;
   }
@@ -556,7 +572,7 @@ function handleReviewCompletion(input: HookInput, cwd: string, segment: string):
   if (!state) return {};
 
   const targetSprint = reviewTargetSprint(segment, cwd);
-  if (targetSprint != null && targetSprint !== state.sprint) {
+  if (targetSprint != null && !sprintIdsEqual(targetSprint, state.sprint)) {
     return {
       context: `SLOPE: Historical Sprint ${formatSprintNumber(targetSprint)} review generated — active Sprint ${formatSprintNumber(state.sprint)} review gate unchanged.`,
     };
@@ -576,11 +592,11 @@ function handleReviewCompletion(input: HookInput, cwd: string, segment: string):
   return { context: lines.join('\n') };
 }
 
-function missingPrReviewWarning(cwd: string, sprint: number): string | null {
+function missingPrReviewWarning(cwd: string, sprint: SprintId): string | null {
   const branch = currentBranch(cwd);
   const reviews = loadPrReviewState(cwd).reviews;
   const matching = reviews.filter(review =>
-    review.sprint === sprint
+    (review.sprint !== undefined && sprintIdsEqual(review.sprint, sprint))
     || (branch && review.branch === branch),
   );
 

@@ -4,6 +4,7 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { sprintIdKey, sprintIdsEqual, type SprintId } from './sprint-id.js';
 
 // --- Types ---
 
@@ -12,8 +13,8 @@ export type DeferredStatus = 'open' | 'resolved' | 'wontfix';
 
 export interface DeferredFinding {
   id: string;
-  source_sprint: number;
-  target_sprint: number | null;
+  source_sprint: SprintId;
+  target_sprint: SprintId | null;
   severity: DeferredSeverity;
   description: string;
   category?: string;
@@ -62,8 +63,8 @@ export function saveDeferred(cwd: string, findings: DeferredFinding[]): void {
 export function createDeferred(
   cwd: string,
   opts: {
-    source_sprint: number;
-    target_sprint?: number | null;
+    source_sprint: SprintId;
+    target_sprint?: SprintId | null;
     severity: DeferredSeverity;
     description: string;
     category?: string;
@@ -133,21 +134,22 @@ export function listDeferred(
 /** Format deferred findings for briefing output. */
 export function formatDeferredForBriefing(
   findings: DeferredFinding[],
-  sprint: number,
+  sprint: SprintId,
 ): string[] {
+  const sprintKey = sprintIdKey(sprint) ?? String(sprint);
   const targeted = findings.filter(
-    f => f.status === 'open' && f.target_sprint === sprint,
+    f => f.status === 'open' && f.target_sprint !== null && sprintIdsEqual(f.target_sprint, sprint),
   );
 
   if (targeted.length === 0) return [];
 
   const lines: string[] = [];
-  lines.push(`DEFERRED FINDINGS (${targeted.length} open for Sprint ${sprint}):`);
+  lines.push(`DEFERRED FINDINGS (${targeted.length} open for Sprint ${sprintKey}):`);
 
   for (const f of targeted) {
     const cat = f.category ? ` (${f.category})` : '';
     lines.push(
-      `  - [${f.severity.toUpperCase()}] S${f.source_sprint} → S${sprint}: ${f.description}${cat}`,
+      `  - [${f.severity.toUpperCase()}] S${f.source_sprint} → S${sprintKey}: ${f.description}${cat}`,
     );
   }
 

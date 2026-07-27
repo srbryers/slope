@@ -1,7 +1,13 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { HookInput, GuardResult } from '../../core/index.js';
-import { findShippedSprintsOnMain } from '../../core/index.js';
+import {
+  compareSprintIdKeys,
+  findShippedSprintsOnMain,
+  parseRoadmap,
+  roadmapSprintKey,
+  sprintIdKey,
+} from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { pendingPrCloseouts, pendingPrReviews } from '../pr-review-state.js';
 import type { PrReviewRecord } from '../pr-review-state.js';
@@ -57,20 +63,24 @@ export async function postHoleEnforcementGuard(_input: HookInput, cwd: string): 
   const sprints = (parsed as { sprints?: unknown[] })?.sprints;
   if (!Array.isArray(sprints)) return {};
 
-  const statusById = new Map<number, string | null>();
-  for (const s of sprints) {
-    const id = (s as { id?: unknown })?.id;
-    const status = (s as { status?: unknown })?.status;
-    if (typeof id === 'number') {
-      statusById.set(id, typeof status === 'string' ? status : null);
-    }
+  const roadmap = parseRoadmap(parsed).roadmap;
+  const statusById = new Map<string, string | null>();
+  for (const sprint of roadmap?.sprints ?? []) {
+    statusById.set(
+      roadmapSprintKey(roadmap!, sprint),
+      typeof sprint.status === 'string' ? sprint.status : null,
+    );
   }
 
-  type Drift = { sprint: number; issues: string[] };
+  type Drift = { sprint: string; issues: string[] };
   const shipped = findShippedSprintsOnMain(cwd);
   const drifts: Drift[] = [];
   if (shipped.size > 0) {
-    for (const id of [...shipped].sort((a, b) => b - a)) {
+    const shippedKeys = [...shipped]
+      .map(sprintIdKey)
+      .filter((id): id is string => id !== null)
+      .sort((a, b) => compareSprintIdKeys(b, a));
+    for (const id of shippedKeys) {
       const status = statusById.get(id);
       // Replace EVERY '*' so patterns with multiple wildcards are sanitized
       // (CodeQL js/incomplete-sanitization): single .replace() leaves later
@@ -103,7 +113,7 @@ export async function postHoleEnforcementGuard(_input: HookInput, cwd: string): 
   return { context: message };
 }
 
-function formatCloseoutDriftMessage(drifts: Array<{ sprint: number; issues: string[] }>): string {
+function formatCloseoutDriftMessage(drifts: Array<{ sprint: string; issues: string[] }>): string {
   const shown = drifts.slice(0, 5);
   const remainder = drifts.length - shown.length;
   const lines = [

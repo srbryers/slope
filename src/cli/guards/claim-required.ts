@@ -1,7 +1,7 @@
 import { execSync } from 'node:child_process';
 import { dirname, isAbsolute, relative, resolve } from 'node:path';
-import { formatSprintLabel } from '../../core/index.js';
-import type { HookInput, GuardResult, SprintClaim } from '../../core/index.js';
+import { formatSprintLabel, sprintIdKey } from '../../core/index.js';
+import type { HookInput, GuardResult, SprintClaim, SprintId } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { inferSprintContext } from '../sprint-inference.js';
 import { loadSprintState } from '../sprint-state.js';
@@ -168,7 +168,7 @@ export async function claimRequiredGuard(input: HookInput, cwd: string): Promise
     };
 }
 
-function inferMissingSprintHint(cwd: string): { sprint: number; label: string; source: string } | null {
+function inferMissingSprintHint(cwd: string): { sprint: string; label: string; source: string } | null {
   try {
     const inferred = inferSprintContext(cwd);
     if (inferred.source === 'roadmap') {
@@ -199,11 +199,10 @@ function readGit(cwd: string, command: string): string {
   }
 }
 
-function parseSprintReference(text: string): number | null {
+function parseSprintReference(text: string): string | null {
   const match = text.match(/\bS(\d+(?:\.\d+)?)\b/i);
   if (!match) return null;
-  const sprint = Number.parseFloat(match[1]);
-  return Number.isFinite(sprint) && sprint > 0 ? sprint : null;
+  return sprintIdKey(match[1]);
 }
 
 function getImplementationWritePolicy(cwd: string): ImplementationWritePolicy {
@@ -317,7 +316,7 @@ export function claimOverlapsPath(
 async function detectCrossSessionOverlap(
   input: HookInput,
   cwd: string,
-  sprintNumber: number,
+  sprintNumber: SprintId,
 ): Promise<string | null> {
   const relativePaths = resolveTouchedPaths(input)
     .map(filePath => normalizeTouchedPath(filePath, cwd))
@@ -352,7 +351,7 @@ async function detectCrossSessionOverlap(
   return null;
 }
 
-async function loadSprintClaims(cwd: string, sprintNumber: number): Promise<SprintClaim[]> {
+async function loadSprintClaims(cwd: string, sprintNumber: SprintId): Promise<SprintClaim[]> {
   let store: Awaited<ReturnType<typeof resolveStore>> | null = null;
   try {
     store = await resolveStore(cwd);
@@ -363,4 +362,3 @@ async function loadSprintClaims(cwd: string, sprintNumber: number): Promise<Spri
     store?.close();
   }
 }
-

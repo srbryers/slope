@@ -1,6 +1,7 @@
 import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import type { HookInput, GuardResult } from '../../core/index.js';
+import type { HookInput, GuardResult, SprintId } from '../../core/index.js';
+import { sprintIdsEqual } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import type { SlopeConfig } from '../config.js';
 import { loadSprintState } from '../sprint-state.js';
@@ -14,7 +15,7 @@ import { normalizeTouchedPath, resolveTouchedPaths } from './hook-input.js';
 interface DriftStateEntry {
   file: string;
   claimedAreas: string;
-  sprint: number;
+  sprint: SprintId;
   timestamp: number;
 }
 
@@ -46,11 +47,11 @@ function saveDriftState(cwd: string, state: DriftState): void {
 }
 
 /** Prune entries from old sprints AND older than 7 days */
-function pruneState(state: DriftState, currentSprint: number): DriftState {
+function pruneState(state: DriftState, currentSprint: SprintId): DriftState {
   const cutoff = Date.now() - MAX_AGE_MS;
   return {
     entries: state.entries.filter(
-      e => e.sprint === currentSprint || e.timestamp > cutoff,
+      e => sprintIdsEqual(e.sprint, currentSprint) || e.timestamp > cutoff,
     ),
   };
 }
@@ -136,7 +137,7 @@ export async function scopeDriftGuard(input: HookInput, cwd: string): Promise<Gu
   }
 }
 
-function resolveCurrentSprint(cwd: string, config: SlopeConfig): number | undefined {
+function resolveCurrentSprint(cwd: string, config: SlopeConfig): SprintId | undefined {
   const sprintState = loadSprintState(cwd);
   return sprintState?.sprint ?? config.currentSprint;
 }

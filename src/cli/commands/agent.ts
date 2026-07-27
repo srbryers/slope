@@ -34,7 +34,7 @@ export interface AgentStatus {
   _version: number;
   vision: 'present' | 'missing';
   roadmap: 'valid' | 'invalid' | 'missing';
-  currentSprint: number | null;
+  currentSprint: string | null;
   /** Sprint phase (sprint-state) OR initiative gate phase. 'pr_review' and
    *  'plan_review' come from the initiative subsystem; the others come from
    *  sprint-state.json. 'unknown' = no state on disk. */
@@ -82,7 +82,7 @@ Usage:
 Output fields (status):
   vision               'present' | 'missing'
   roadmap              'valid' | 'invalid' | 'missing'
-  currentSprint        number | null
+  currentSprint        string | null
   phase                planning | reviewing | implementing | scoring | complete | unknown
   activeClaims         ticket keys currently claimed
   nextTicket           recommended next ticket key
@@ -130,7 +130,7 @@ export async function collectAgentStatus(cwd: string): Promise<AgentStatus> {
   // Current sprint — sprint-state.json wins; otherwise infer from roadmap
   // pending work before falling back to scorecards (#364).
   const sprintState = loadSprintState(cwd);
-  let currentSprint: number | null = sprintState?.sprint ?? null;
+  let currentSprint: string | null = sprintState?.sprint ?? null;
   if (currentSprint == null) {
     try {
       const inferred = inferSprintContext(cwd, config);
@@ -267,7 +267,7 @@ function computeBlockers(
 function recommendCommands(state: {
   vision: AgentStatus['vision'];
   roadmap: AgentStatus['roadmap'];
-  currentSprint: number | null;
+  currentSprint: string | null;
   phase: AgentStatus['phase'];
   activeClaims: string[];
   nextTicket: string | null;
@@ -362,7 +362,9 @@ async function nextMdSubcommand(args: string[]): Promise<void> {
     if (existsSync(roadmapPath)) {
       const raw = JSON.parse(readFileSync(roadmapPath, 'utf8'));
       const parsed = parseRoadmap(raw);
-      const sprint = parsed.roadmap?.sprints.find(s => s.id === status.currentSprint);
+      const sprint = parsed.roadmap && status.currentSprint
+        ? findRoadmapSprint(parsed.roadmap, status.currentSprint)
+        : undefined;
       sprintTheme = sprint?.theme;
     }
   } catch { /* best-effort */ }

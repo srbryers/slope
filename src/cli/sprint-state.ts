@@ -1,6 +1,7 @@
 import { readFileSync, existsSync, unlinkSync } from 'node:fs';
 import { isAbsolute, join } from 'node:path';
 import { resolveRepoStatePath } from '../core/repo-state-scope.js';
+import { sprintIdKey, sprintIdsEqual, type SprintId } from '../core/index.js';
 import { atomicWriteFileSync, withFileLockSync } from './atomic-write.js';
 import { listRepoWorktrees } from './session-scope.js';
 
@@ -72,7 +73,8 @@ const GATE_LABELS: Record<GateName, string> = {
 
 /** Sprint state persisted to .slope/sprint-state.json */
 export interface SprintState {
-  sprint: number;
+  /** Canonical sprint key. Legacy numeric files normalize at load time. */
+  sprint: string;
   phase: SprintPhase;
   gates: Record<GateName, boolean>;
   review_gates: Record<ReviewGateName, ReviewGateState>;
@@ -84,7 +86,7 @@ export interface SprintState {
 
 export interface SprintRolloverLineage {
   transition_id: string;
-  from_sprint: number;
+  from_sprint: string;
   audit_path: string;
   recorded_at: string;
   forced: boolean;
@@ -291,8 +293,8 @@ export function loadSprintState(cwd: string): SprintState | null {
   if (!existsSync(statePath)) return null;
   try {
     const raw = JSON.parse(readFileSync(statePath, 'utf8'));
-    // Validate shape
-    if (typeof raw.sprint !== 'number' || typeof raw.phase !== 'string' || typeof raw.gates !== 'object') {
+    const sprint = sprintIdKey(raw.sprint as SprintId);
+    if (sprint === null || typeof raw.phase !== 'string' || typeof raw.gates !== 'object') {
       return null;
     }
     // Validate all 5 gate keys exist and are booleans
@@ -303,6 +305,13 @@ export function loadSprintState(cwd: string): SprintState | null {
     }
     return {
       ...raw,
+      sprint,
+      ...(raw.rollover ? {
+        rollover: {
+          ...raw.rollover,
+          from_sprint: sprintIdKey(raw.rollover.from_sprint as SprintId),
+        },
+      } : {}),
       review_gates: normalizeReviewGates(raw.review_gates),
       review_requirements: normalizeReviewRequirements(raw.review_requirements),
     } as SprintState;
@@ -323,7 +332,7 @@ function validEvidenceTimestamp(value: unknown): value is string {
 export function isValidSprintStateEvidence(value: unknown): value is SprintState {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const state = value as Partial<SprintState>;
-  if (typeof state.sprint !== 'number' || !Number.isFinite(state.sprint) || state.sprint <= 0
+  if (typeof state.sprint !== 'string' || sprintIdKey(state.sprint) === null
     || typeof state.phase !== 'string' || !isSprintPhase(state.phase)
     || !validEvidenceTimestamp(state.started_at) || !validEvidenceTimestamp(state.updated_at)
     || !state.gates || typeof state.gates !== 'object') return false;
@@ -362,7 +371,7 @@ export function isValidSprintStateEvidence(value: unknown): value is SprintState
     const lineage = state.rollover;
     const portablePath = typeof lineage.audit_path === 'string' ? lineage.audit_path.replaceAll('\\', '/') : '';
     if (typeof lineage.transition_id !== 'string' || !/^[a-f0-9]{16}$/.test(lineage.transition_id)
-      || typeof lineage.from_sprint !== 'number' || !Number.isFinite(lineage.from_sprint) || lineage.from_sprint <= 0
+      || typeof lineage.from_sprint !== 'string' || sprintIdKey(lineage.from_sprint) === null
       || !portablePath || isAbsolute(portablePath) || portablePath.split('/').includes('..')
       || !validEvidenceTimestamp(lineage.recorded_at)
       || typeof lineage.forced !== 'boolean'
@@ -498,12 +507,12 @@ export function replaceSprintState(
 /** Persist review priorities inferred by `slope review recommend` for the matching active sprint. */
 export function updateReviewRequirements(
   cwd: string,
-  sprint: number,
+  sprint: SprintId,
   inputs: ReviewGateRequirementInput[],
 ): boolean {
   let updated = false;
   const state = mutateSprintState(cwd, current => {
-    if (current.sprint !== sprint) return false;
+    if (!sprintIdsEqual(current.sprint, sprint)) return false;
     current.review_requirements ??= createDefaultReviewRequirements();
     const now = new Date().toISOString();
     for (const input of inputs) {
@@ -537,13 +546,13 @@ export interface ConditionalSprintPhaseUpdate {
 /** Update phase only if the state still represents the observed sprint. */
 export function updateSprintPhaseForSprint(
   cwd: string,
-  expectedSprint: number,
+  expectedSprint: SprintId,
   phase: SprintPhase,
 ): ConditionalSprintPhaseUpdate {
   let matched = false;
   let changed = false;
   const state = mutateSprintState(cwd, current => {
-    if (current.sprint !== expectedSprint) return false;
+    if (!sprintIdsEqual(current.sprint, expectedSprint)) return false;
     matched = true;
     if (current.phase === phase) return false;
     current.phase = phase;
@@ -573,7 +582,7 @@ export interface WorktreePhaseReconcile {
  */
 export function updateSprintPhaseForSprintAcrossWorktrees(
   cwd: string,
-  expectedSprint: number,
+  expectedSprint: SprintId,
   phase: SprintPhase,
 ): WorktreePhaseReconcile[] {
   const results: WorktreePhaseReconcile[] = [];
@@ -614,10 +623,12 @@ export function pendingGates(state: SprintState): string[] {
 }
 
 /** Create a fresh sprint state with all gates false. */
-export function createSprintState(sprint: number, phase: SprintPhase = 'planning'): SprintState {
+export function createSprintState(sprint: SprintId, phase: SprintPhase = 'planning'): SprintState {
+  const sprintKey = sprintIdKey(sprint);
+  if (sprintKey === null) throw new Error(`Invalid sprint id: ${String(sprint)}`);
   const now = new Date().toISOString();
   return {
-    sprint,
+    sprint: sprintKey,
     phase,
     gates: {
       tests: false,

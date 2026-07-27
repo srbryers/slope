@@ -2,6 +2,7 @@
 // Structured format for agent status reports in multi-agent sprints.
 
 import type { SlopeEvent, SprintClaim } from './types.js';
+import type { SprintId } from './sprint-id.js';
 
 /** Structured standup report — platform-agnostic agent status format */
 export interface StandupReport {
@@ -20,7 +21,7 @@ export interface StandupReport {
 /** Repo-derived context that makes a standup usable as an actual wrap:
  *  sprint + scorecard state, branch + commits, and transcript volume. (#619) */
 export interface StandupContext {
-  sprint?: number;
+  sprint?: SprintId;
   scorecard?: 'present' | 'missing';
   branch?: string;
   commits?: { count: number; latest?: string };

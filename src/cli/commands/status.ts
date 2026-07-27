@@ -1,5 +1,16 @@
-import { checkConflicts, findShippedSprintsOnMain, formatObservedSessionBranch, formatSprintLabel, observeSessionBranches, parseRoadmap, parseSprintNumber, resolveRepoStateCwd } from '../../core/index.js';
-import type { SprintClaim, SlopeSession } from '../../core/index.js';
+import {
+  checkConflicts,
+  compareSprintIdKeys,
+  findShippedSprintsOnMain,
+  formatObservedSessionBranch,
+  formatSprintLabel,
+  observeSessionBranches,
+  parseRoadmap,
+  resolveRepoStateCwd,
+  roadmapSprintKey,
+  sprintIdKey,
+} from '../../core/index.js';
+import type { SprintClaim, SlopeSession, SprintId } from '../../core/index.js';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { loadConfig } from '../config.js';
@@ -42,8 +53,8 @@ function parseArgs(args: string[]): Record<string, string> {
   return result;
 }
 
-function resolveSprint(flags: Record<string, string>, cwd: string): number | null {
-  if (flags.sprint) return parseSprintNumber(flags.sprint);
+function resolveSprint(flags: Record<string, string>, cwd: string): string | null {
+  if (flags.sprint) return sprintIdKey(flags.sprint);
   const config = loadConfig(cwd);
   return inferSprintContext(cwd, config).sprint;
 }
@@ -78,7 +89,7 @@ export async function statusCommand(args: string[]): Promise<void> {
   }
 }
 
-async function showSprintStatus(store: { list: (n: number) => Promise<SprintClaim[]>; close: () => void }, sprintNumber: number): Promise<void> {
+async function showSprintStatus(store: { list: (n: SprintId) => Promise<SprintClaim[]>; close: () => void }, sprintNumber: SprintId): Promise<void> {
   const claims = await store.list(sprintNumber);
 
   console.log(`\n${formatSprintLabel(sprintNumber)} — Course Status`);
@@ -133,15 +144,19 @@ async function showSprintStatus(store: { list: (n: number) => Promise<SprintClai
 
 /** Detect shipped sprints with no scorecard on disk. Used by status to
  *  surface the "post-hole skipped" pattern (#318). */
-export function computeScorecardDrift(cwd: string): { missing: number[] } {
+export function computeScorecardDrift(cwd: string): { missing: string[] } {
   try {
     const config = loadConfig(cwd);
     const retroDir = join(cwd, config.scorecardDir);
     const pattern = config.scorecardPattern;
     const shipped = findShippedSprintsOnMain(cwd);
     const roadmapIds = loadRoadmapSprintIds(cwd, config.roadmapPath);
-    const missing: number[] = [];
-    for (const id of [...shipped].sort((a, b) => a - b)) {
+    const missing: string[] = [];
+    const shippedKeys = [...shipped]
+      .map(sprintIdKey)
+      .filter((id): id is string => id !== null)
+      .sort(compareSprintIdKeys);
+    for (const id of shippedKeys) {
       if (roadmapIds && !roadmapIds.has(id)) continue;
       const scorecardPath = join(retroDir, pattern.replaceAll('*', String(id)));
       if (!existsSync(scorecardPath)) missing.push(id);
@@ -152,14 +167,14 @@ export function computeScorecardDrift(cwd: string): { missing: number[] } {
   }
 }
 
-function loadRoadmapSprintIds(cwd: string, roadmapPath: string): Set<number> | null {
+function loadRoadmapSprintIds(cwd: string, roadmapPath: string): Set<string> | null {
   try {
     const path = join(cwd, roadmapPath);
     if (!existsSync(path)) return null;
     const parsed = parseRoadmap(JSON.parse(readFileSync(path, 'utf8')));
     const roadmap = parsed.roadmap;
     if (!roadmap) return null;
-    return new Set(roadmap.sprints.map(s => s.id));
+    return new Set(roadmap.sprints.map(s => roadmapSprintKey(roadmap, s)));
   } catch {
     return null;
   }
@@ -168,7 +183,7 @@ function loadRoadmapSprintIds(cwd: string, roadmapPath: string): Set<number> | n
 async function showSwarmStatus(
   store: {
     getSessionsBySwarm: (id: string) => Promise<SlopeSession[]>;
-    getActiveClaims: (n?: number) => Promise<SprintClaim[]>;
+    getActiveClaims: (n?: SprintId) => Promise<SprintClaim[]>;
     getEventsBySession: (id: string) => Promise<{ type: string }[]>;
     close: () => void;
   },

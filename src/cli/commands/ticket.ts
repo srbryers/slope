@@ -1,7 +1,13 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { formatSprintLabel, parseRoadmap } from '../../core/index.js';
+import {
+  findRoadmapSprint,
+  formatSprintLabel,
+  parseRoadmap,
+  roadmapSprintKey,
+  sprintIdKey,
+} from '../../core/index.js';
 import type { RoadmapDefinition } from '../../core/index.js';
 import { formatActorName, formatActorSource, resolveActor } from '../actor.js';
 import { loadConfig } from '../config.js';
@@ -82,14 +88,14 @@ async function doneSubcommand(args: string[]): Promise<void> {
   // Resolve current sprint — sprint state wins; otherwise match the roadmap
   // ticket before falling back to the display label in S{N}-... keys.
   const state = loadSprintState(cwd);
-  let sprintNumber: number | null = state?.sprint ?? null;
+  let sprintNumber: string | null = state?.sprint ?? null;
   if (sprintNumber == null && roadmap) {
     const roadmapSprint = roadmap.sprints.find(s => s.tickets.some(t => t.key === ticketKey));
-    if (roadmapSprint) sprintNumber = roadmapSprint.id;
+    if (roadmapSprint) sprintNumber = roadmapSprintKey(roadmap, roadmapSprint);
   }
   if (sprintNumber == null) {
     const m = ticketKey.match(/^S(\d+(?:\.\d+)?)-/i);
-    if (m) sprintNumber = parseFloat(m[1]);
+    if (m) sprintNumber = sprintIdKey(m[1]);
   }
   if (sprintNumber == null) {
     console.error(`Could not resolve sprint for ticket ${ticketKey}.`);
@@ -99,7 +105,7 @@ async function doneSubcommand(args: string[]): Promise<void> {
 
   // 1. Verify ticket exists in roadmap (best-effort — warn but don't block)
   if (roadmap) {
-    const sprint = roadmap.sprints.find(s => s.id === sprintNumber);
+    const sprint = findRoadmapSprint(roadmap, sprintNumber);
     const ticketDefined = sprint?.tickets.some(t => t.key === ticketKey);
     if (!ticketDefined) {
       console.warn(`Warning: ticket ${ticketKey} not found in roadmap ${formatSprintLabel(sprintNumber)}. Continuing anyway.`);

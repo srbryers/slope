@@ -1,4 +1,4 @@
-import { checkConflicts, parseSprintNumber } from '../../core/index.js';
+import { checkConflicts, sprintIdKey } from '../../core/index.js';
 import { formatActorName, formatActorSource, formatConflictSummary, resolveActor } from '../actor.js';
 import { loadConfig } from '../config.js';
 import { inferSprintContext } from '../sprint-inference.js';
@@ -76,9 +76,9 @@ async function listClaims(flags: Record<string, string>, cwd: string, showAll: b
   }
 }
 
-function resolveSprint(flags: Record<string, string>, cwd: string): number {
+function resolveSprint(flags: Record<string, string>, cwd: string): string {
   if (flags.sprint) {
-    const sprint = parseSprintNumber(flags.sprint);
+    const sprint = sprintIdKey(flags.sprint);
     if (!sprint) {
       console.error('Error: --sprint must be a positive sprint id, e.g. 114 or 114.5');
       process.exit(1);

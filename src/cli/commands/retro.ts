@@ -20,10 +20,12 @@ import {
   castRoadmapStructure,
   buildPostMergeRetro,
   buildRetroMemoryPlans,
+  compareSprintIdKeys,
+  findRoadmapSprint,
   persistRetroMemories,
-  parseSprintNumber,
   formatSprintLabel,
   resolveRepoStateCwd,
+  sprintIdKey,
 } from '../../core/index.js';
 import type {
   MemoryCategory,
@@ -39,7 +41,7 @@ import { reconcileWorkflowCloseout } from '../workflow-closeout.js';
 import type { WorktreePhaseReconcile } from '../sprint-state.js';
 
 interface BackfillOptions {
-  sprint?: number;
+  sprint?: string;
   allMissing?: boolean;
   dryRun?: boolean;
 }
@@ -50,7 +52,7 @@ interface ParsedArgs {
 }
 
 interface PostMergeOptions {
-  sprint?: number;
+  sprint?: string;
   pr?: number;
   outcome?: RetroOutcome;
   mergedAt?: string;
@@ -124,7 +126,10 @@ Limitations:
 function parseFlags(args: string[]): BackfillOptions {
   const opts: BackfillOptions = {};
   for (const a of args) {
-    if (a.startsWith('--sprint=')) opts.sprint = parseInt(a.slice('--sprint='.length), 10);
+    if (a.startsWith('--sprint=')) {
+      const sprint = sprintIdKey(a.slice('--sprint='.length));
+      if (sprint !== null) opts.sprint = sprint;
+    }
     else if (a === '--all-missing') opts.allMissing = true;
     else if (a === '--dry-run') opts.dryRun = true;
   }
@@ -202,9 +207,9 @@ function positiveInteger(value: string | undefined, label: string): number | und
   return parsed;
 }
 
-function positiveSprintNumber(value: string | undefined, label: string): number | undefined {
+function positiveSprintNumber(value: string | undefined, label: string): string | undefined {
   if (value === undefined) return undefined;
-  const parsed = parseSprintNumber(value);
+  const parsed = sprintIdKey(value);
   if (parsed === null) {
     throw new TypeError(`${label} must be a positive sprint id, e.g. 137 or 146.1.`);
   }
@@ -291,11 +296,11 @@ interface SprintCommit {
 /** Find commits on main referencing a specific sprint. Matches the same
  *  patterns as findShippedSprintsOnMain but returns the actual commits.
  *  Used to build per-shot data for the backfilled scorecard. */
-function commitsForSprint(cwd: string, sprintId: number): SprintCommit[] {
+function commitsForSprint(cwd: string, sprintId: string): SprintCommit[] {
   const ref = git('symbolic-ref --short refs/remotes/origin/HEAD', cwd) || 'main';
   // Pattern matches feat(SXX), (SXX), feat(SXX-N), feat(SXX+SYY) — same shapes
   // findShippedSprintsOnMain detects.
-  const pattern = `[(+]S${sprintId}[+):-]`;
+  const pattern = `[(+]S${sprintId.replace('.', '\\.')}[+):-]`;
   const log = git(`log -E --grep="${pattern}" --format="%H|%aI|%s" -n 100 ${ref}`, cwd);
   if (!log) return [];
   return log.split('\n').filter(Boolean).map(line => {
@@ -317,7 +322,7 @@ function loadRoadmap(cwd: string): RoadmapDefinition | null {
 }
 
 interface BackfillResult {
-  sprint: number;
+  sprint: string;
   path: string;
   shots: number;
   par: number;
@@ -326,10 +331,10 @@ interface BackfillResult {
   reason?: string;
 }
 
-function inferTicketKey(subject: string, idx: number, sprintId: number): string {
+function inferTicketKey(subject: string, idx: number, sprintId: string): string {
   // Try to extract S{N}-{M} or S{N}-T{M} from the subject
-  const m = subject.match(/S(\d+)-(T?\d+)/i);
-  if (m && parseInt(m[1], 10) === sprintId) {
+  const m = subject.match(/S(\d+(?:\.\d+)?)-(T?\d+)/i);
+  if (m && sprintIdKey(m[1]) === sprintId) {
     return `S${sprintId}-${m[2]}`;
   }
   return `S${sprintId}-${idx + 1}`;
@@ -344,15 +349,17 @@ function inferClub(filesChanged: number): string {
 
 export function buildBackfillScorecard(
   cwd: string,
-  sprintId: number,
+  sprintIdInput: string | number,
   roadmap: RoadmapDefinition | null,
 ): { scorecard: Record<string, unknown> | null; reason?: string } {
+  const sprintId = sprintIdKey(sprintIdInput);
+  if (sprintId === null) return { scorecard: null, reason: 'invalid sprint id' };
   const commits = commitsForSprint(cwd, sprintId);
   if (commits.length === 0) {
     return { scorecard: null, reason: 'no commits found' };
   }
 
-  const sprint = roadmap?.sprints.find(s => s.id === sprintId);
+  const sprint = roadmap ? findRoadmapSprint(roadmap, sprintId) : undefined;
   const par = (sprint?.par ?? 4) as 3 | 4 | 5;
   const slope = sprint?.slope ?? 1;
   const theme = (sprint as RoadmapSprint & { theme?: string })?.theme
@@ -411,7 +418,7 @@ export function buildBackfillScorecard(
   return { scorecard };
 }
 
-function extractThemeFromCommits(commits: SprintCommit[], sprintId: number): string {
+function extractThemeFromCommits(commits: SprintCommit[], sprintId: string): string {
   // Use the most likely "umbrella" commit subject — usually the last (PR
   // merge commit) since git log is reversed to oldest-first; but for
   // squash-merges that's the only commit. Strip the conventional prefix.
@@ -582,7 +589,7 @@ async function postMergeSubcommand(args: string[]): Promise<void> {
  * how a stale worktree could report the sprint still in progress right after a
  * "successful" closeout (GH #624).
  */
-function formatPhaseReconcile(results: WorktreePhaseReconcile[], sprint: number): string {
+function formatPhaseReconcile(results: WorktreePhaseReconcile[], sprint: string): string {
   if (results.length === 0) return 'no sprint state found to reconcile';
 
   const changed = results.filter(r => r.changed);
@@ -619,12 +626,16 @@ async function backfillSubcommand(args: string[]): Promise<void> {
   const roadmap = loadRoadmap(cwd);
 
   // Resolve target sprint list
-  const targets: number[] = [];
+  const targets: string[] = [];
   if (opts.sprint) {
     targets.push(opts.sprint);
   } else {
     const shipped = findShippedSprintsOnMain(cwd);
-    for (const id of [...shipped].sort((a, b) => a - b)) {
+    const shippedKeys = [...shipped]
+      .map(sprintIdKey)
+      .filter((id): id is string => id !== null)
+      .sort(compareSprintIdKeys);
+    for (const id of shippedKeys) {
       const path = join(retroDir, pattern.replaceAll('*', String(id)));
       if (!existsSync(path)) targets.push(id);
     }

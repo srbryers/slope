@@ -25,16 +25,16 @@ import { loadConfig } from './config.js';
 import { isActiveSprintState, loadSprintState } from './sprint-state.js';
 
 export interface InferredSprintContext {
-  sprint: number;
+  sprint: string;
   label: string;
   source: 'sprint-state' | 'config' | 'roadmap' | 'scorecards' | 'initial';
   latestScorecard: string;
   latestScorecardLabel: string;
-  scorecardFallbackSprint?: number;
+  scorecardFallbackSprint?: string;
   scorecardFallbackLabel?: string;
   roadmapSprint?: RoadmapSprint;
   staleSprintState?: {
-    sprint: number;
+    sprint: string;
     phase: string;
     reason: string;
   };
@@ -75,7 +75,7 @@ export function inferSprintContext(cwd: string = process.cwd(), config: SlopeCon
 
   if (config.currentSprint && !staleConfigSprint) {
     return {
-      sprint: config.currentSprint,
+      sprint: String(config.currentSprint),
       label: labelForSprint(config.currentSprint, roadmap),
       source: 'config',
       latestScorecard,
@@ -106,14 +106,15 @@ export function inferSprintContext(cwd: string = process.cwd(), config: SlopeCon
       roadmap,
     )) ?? [];
 
-  const scorecardNext = latestScorecard !== '0' ? nextCanonicalSprintId(latestScorecard) : 1;
+  const scorecardNext = latestScorecard !== '0' ? nextCanonicalSprintId(latestScorecard) : '1';
   const scorecardFallbackLabel = labelForSprint(scorecardNext, roadmap);
   const pending = choosePendingSprint(pendingSprints, latestScorecard, scorecardNext, roadmap, completedIds);
 
   if (pending) {
+    const pendingKey = roadmapSprintKey(roadmap!, pending);
     return {
-      sprint: pending.id,
-      label: labelForSprint(roadmapSprintKey(roadmap!, pending), roadmap),
+      sprint: pendingKey,
+      label: labelForSprint(pendingKey, roadmap),
       source: 'roadmap',
       latestScorecard,
       latestScorecardLabel,
@@ -141,12 +142,12 @@ export function inferSprintContext(cwd: string = process.cwd(), config: SlopeCon
   }
 
   return {
-    sprint: 1,
+    sprint: '1',
     label: 'S1',
     source: 'initial',
     latestScorecard: '0',
     latestScorecardLabel: 'S0',
-    scorecardFallbackSprint: 1,
+    scorecardFallbackSprint: '1',
     scorecardFallbackLabel: 'S1',
     ...(staleSprintState ? { staleSprintState } : {}),
     ...(staleConfigSprint ? { staleConfigSprint } : {}),
