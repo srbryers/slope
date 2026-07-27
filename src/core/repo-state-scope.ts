@@ -57,7 +57,7 @@ export function resolveRepoStateCwd(cwd: string = process.cwd()): string {
     return local;
   }
 
-  if (!primary || !primaryIsSlopeProject) return local;
+  if (!primary || !primaryIsSlopeProject) return gitTopLevel ?? local;
   return primary;
 }
 

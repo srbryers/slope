@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { execFileSync } from 'node:child_process';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { createSlopeToolsServer, SLOPE_MCP_TOOL_NAMES, detectSetupHints, buildSetupHint, findProjectRoot, formatSearchResults, resolveTestingWorktreePath } from '../../src/mcp/index.js';
 import type { SetupHints } from '../../src/mcp/index.js';
 import { SLOPE_REGISTRY, SLOPE_TYPES } from '../../src/mcp/registry.js';
@@ -663,7 +665,61 @@ describe('MCP project and worktree scope', () => {
     expect(resolveTestingWorktreePath(projectRoot, 123))
       .toBe(join(tmpdir(), 'slope-project-testing-123'));
   });
+
+  it('runs source tools from the discovered root when launched in a descendant', async () => {
+    const project = mkdtempSync(join(tmpdir(), 'slope-mcp-source-root-'));
+    const descendant = join(project, 'src', 'nested');
+    mkdirSync(join(project, '.slope'), { recursive: true });
+    mkdirSync(descendant, { recursive: true });
+    writeFileSync(join(project, '.slope', 'config.json'), '{}');
+    writeFileSync(join(project, 'ROOT_MARKER.txt'), 'sandbox-source-root');
+    writeFileSync(join(project, 'CODEBASE.md'), '## Source Root Marker\nmap-source-root\n');
+    writeFileSync(join(project, 'src', 'marker.ts'), 'export const descendantSourceMarker = true;\n');
+
+    const sourceRoot = findProjectRoot(descendant);
+    const server = createSlopeToolsServer(undefined, undefined, undefined, undefined, sourceRoot);
+    const client = new Client({ name: 'source-root-test', version: '1.0.0' });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+
+    try {
+      const executeResult = await client.callTool({
+        name: 'execute',
+        arguments: { code: 'return readFile("ROOT_MARKER.txt");' },
+      });
+      expect(toolText(executeResult)).toContain('sandbox-source-root');
+
+      const contextResult = await client.callTool({
+        name: 'context_search',
+        arguments: { query: 'descendantSourceMarker', format: 'paths' },
+      });
+      expect(toolText(contextResult)).toContain('src/marker.ts');
+
+      const mapResult = await client.callTool({
+        name: 'search',
+        arguments: { module: 'map', query: 'Source Root' },
+      });
+      expect(toolText(mapResult)).toContain('map-source-root');
+    } finally {
+      await client.close();
+      await server.close();
+      rmSync(project, { recursive: true, force: true });
+    }
+  });
 });
+
+function toolText(result: { content: unknown[] }): string {
+  return result.content
+    .filter((item): item is { type: 'text'; text: string } => (
+      typeof item === 'object' &&
+      item !== null &&
+      (item as { type?: unknown }).type === 'text' &&
+      typeof (item as { text?: unknown }).text === 'string'
+    ))
+    .map(item => item.text)
+    .join('\n');
+}
 
 describe('buildSetupHint', () => {
   it('returns null when everything is set up', () => {

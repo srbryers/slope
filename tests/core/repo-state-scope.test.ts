@@ -104,8 +104,11 @@ describe('repository state scope', () => {
   it('falls back to the local cwd when the primary is not SLOPE-enabled', () => {
     rmSync(join(primary, '.slope'), { recursive: true, force: true });
     const descendant = join(worktree, 'src', 'nested');
-    mkdirSync(join(worktree, '.slope'), { recursive: true });
     mkdirSync(descendant, { recursive: true });
+
+    expect(realpathSync(resolveRepoStateCwd(descendant))).toBe(realpathSync(worktree));
+
+    mkdirSync(join(worktree, '.slope'), { recursive: true });
     writeFileSync(join(worktree, '.slope', 'config.json'), JSON.stringify({
       store_path: '.slope/worktree-only.db',
     }));

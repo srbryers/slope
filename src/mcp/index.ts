@@ -187,7 +187,14 @@ export function formatSearchResults(results: FunctionRegistryEntry[], useCompact
   return JSON.stringify(results, null, 2);
 }
 
-export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHints, storeType?: string, config?: SlopeConfig): McpServer {
+export function createSlopeToolsServer(
+  store?: SlopeStore,
+  setupHints?: SetupHints,
+  storeType?: string,
+  config?: SlopeConfig,
+  sourceRoot?: string,
+): McpServer {
+  const serverRoot = resolve(sourceRoot ?? process.cwd());
   const server = new McpServer({
     name: 'slope-tools',
     version: '1.0.0',
@@ -204,7 +211,7 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
     async ({ query, module, compact }) => {
       // Map module — return codebase map content
       if (module === 'map') {
-        return { content: [{ type: 'text' as const, text: handleMapQuery(query) }] };
+        return { content: [{ type: 'text' as const, text: handleMapQuery(query, serverRoot) }] };
       }
       // Metaphor module — return schema, built-in list, and example
       if (module === 'metaphor') {
@@ -212,11 +219,11 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
       }
       // Init module — return interview step schema + agent workflow instructions
       if (module === 'init') {
-        return { content: [{ type: 'text' as const, text: handleInitQuery() }] };
+        return { content: [{ type: 'text' as const, text: handleInitQuery(serverRoot) }] };
       }
       // Flows module — return flow definitions
       if (module === 'flows') {
-        return { content: [{ type: 'text' as const, text: handleFlowsQuery(query) }] };
+        return { content: [{ type: 'text' as const, text: handleFlowsQuery(query, serverRoot) }] };
       }
       if (module === 'types') {
         return { content: [{ type: 'text' as const, text: SLOPE_TYPES }] };
@@ -258,7 +265,7 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
     },
     async ({ code }) => {
       try {
-        const { result, logs } = await runInSandbox(code, process.cwd());
+        const { result, logs } = await runInSandbox(code, serverRoot);
         const parts: Array<{ type: 'text'; text: string }> = [];
         if (logs.length > 0) {
           parts.push({ type: 'text' as const, text: '--- logs ---\n' + logs.join('\n') });
@@ -283,7 +290,7 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
     async ({ query, top, format }) => {
       const limit = top ?? 5;
       const outputFormat = format ?? 'snippets';
-      const cwd = process.cwd();
+      const cwd = serverRoot;
       let embeddingFailed = false;
 
       // Semantic path: embedding index available
@@ -435,9 +442,9 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
 
         let projectRoot: string;
         try {
-          projectRoot = findProjectRoot(process.cwd());
+          projectRoot = findProjectRoot(serverRoot);
         } catch {
-          projectRoot = process.cwd();
+          projectRoot = serverRoot;
         }
 
         // Clean up stale testing worktrees (best-effort)
@@ -637,7 +644,7 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
         let projectRoot: string;
         let testPlanUpdatePrompt = '';
         try {
-          projectRoot = findProjectRoot(process.cwd());
+          projectRoot = findProjectRoot(serverRoot);
           const config = loadConfig(projectRoot);
           if (config.testing?.teardown_steps) {
             teardownSteps = config.testing.teardown_steps.map(step =>
@@ -669,7 +676,7 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
             }
           }
         } catch {
-          projectRoot = process.cwd();
+          projectRoot = serverRoot;
         }
 
         // Worktree cleanup
@@ -749,9 +756,9 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
       async () => {
         let projectRoot: string;
         try {
-          projectRoot = findProjectRoot(process.cwd());
+          projectRoot = findProjectRoot(serverRoot);
         } catch {
-          projectRoot = process.cwd();
+          projectRoot = serverRoot;
         }
 
         const config = loadConfig(projectRoot);
@@ -800,7 +807,7 @@ export function createSlopeToolsServer(store?: SlopeStore, setupHints?: SetupHin
 
     /** Resolve project root, falling back to cwd */
     function safeProjectRoot(): string {
-      try { return findProjectRoot(process.cwd()); } catch { return process.cwd(); }
+      try { return findProjectRoot(serverRoot); } catch { return serverRoot; }
     }
 
     const workflowEngine = new WorkflowEngine();
@@ -1010,8 +1017,7 @@ function handleMetaphorQuery(): string {
 }
 
 /** Handle search({ module: 'map' }) — return codebase map content with optional section filtering */
-function handleMapQuery(query?: string): string {
-  const cwd = process.cwd();
+function handleMapQuery(query: string | undefined, cwd: string): string {
   const mapPath = join(cwd, 'CODEBASE.md');
 
   if (!existsSync(mapPath)) {
@@ -1062,8 +1068,8 @@ function handleMapQuery(query?: string): string {
 }
 
 /** Handle search({ module: 'flows' }) — return flow definitions with optional filtering */
-function handleFlowsQuery(query?: string): string {
-  let cwd = process.cwd();
+function handleFlowsQuery(query: string | undefined, sourceRoot: string): string {
+  let cwd = sourceRoot;
   try {
     cwd = findProjectRoot(cwd);
   } catch {
@@ -1160,9 +1166,7 @@ function handleFlowsQuery(query?: string): string {
 }
 
 /** Handle search({ module: 'init' }) — return interview steps schema + agent workflow instructions */
-function handleInitQuery(): string {
-  const cwd = process.cwd();
-
+function handleInitQuery(cwd: string): string {
   // Metaphors are registered via the barrel import of core (listMetaphors, etc.)
   const ctx = buildInterviewContext(cwd);
   const steps = generateInterviewSteps(ctx);
@@ -1267,19 +1271,20 @@ async function main(): Promise<void> {
   let hints: SetupHints | undefined;
   let storeType: string | undefined;
   let slopeConfig: SlopeConfig | undefined;
+  let sourceRoot = process.cwd();
   try {
     const { loadConfig } = await import('../core/index.js');
     const { createStore } = await import('../store/index.js');
-    const cwd = findProjectRoot(process.cwd());
-    const config = loadConfig(cwd);
+    sourceRoot = findProjectRoot(sourceRoot);
+    const config = loadConfig(sourceRoot);
     slopeConfig = config;
-    store = createStore({ storePath: config.store_path ?? '.slope/slope.db', cwd });
+    store = createStore({ storePath: config.store_path ?? '.slope/slope.db', cwd: sourceRoot });
     storeType = config.store ?? 'sqlite';
-    hints = detectSetupHints(cwd);
+    hints = detectSetupHints(sourceRoot);
   } catch {
     // No config or store — server runs without store tools
   }
-  const server = createSlopeToolsServer(store, hints, storeType, slopeConfig);
+  const server = createSlopeToolsServer(store, hints, storeType, slopeConfig, sourceRoot);
   const transport = new StdioServerTransport();
   await server.connect(transport);
 }
