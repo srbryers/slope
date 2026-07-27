@@ -939,3 +939,468 @@ The append and integrity contract is complete when an implementer can answer:
 - What happens when an event or projection schema is unknown?
 - Which integrity chains detect aggregate-local and cross-aggregate damage?
 - Can a repair mutate accepted event bytes?
+
+## Resource Lease Model
+
+### Lease Record
+
+A protected resource ownership term is:
+
+```text
+resource_lease_v1 = {
+  project_id,
+  lease_id,
+  resource_subject,
+  requested_access_mode,
+  effective_access_mode,
+  resource_policy_revision,
+  conflict_set_revision,
+  owner: {
+    principal_id,
+    actor_id,
+    session_id,
+    round_id,
+    round_epoch,
+    attempt_id,
+    assignment_id?
+  },
+  lease_epoch,
+  fencing_token,
+  state,
+  acquired_at,
+  renewed_at,
+  renew_by,
+  expires_at,
+  ttl_seconds,
+  acquisition_event_id,
+  latest_renewal_event_id?
+}
+```
+
+`resource_subject` is the mode-independent typed identity defined by the Team
+Round domain contract. Access mode and policy revision MUST NOT create another
+subject namespace.
+
+`lease_id` identifies one ownership term. Releasing, abandoning, expiring,
+revoking, or fencing that term makes it permanently terminal. Reacquisition
+creates a new lease ID.
+
+`lease_epoch` increases monotonically for each acquisition of the same canonical
+resource subject. Renewal does not change it.
+
+`fencing_token` increases monotonically across all lease grants within a
+project. A later grant for any overlapping subject therefore has a greater
+token than an earlier stale holder.
+
+### Lease States
+
+```text
+requested -> waiting -> active -> released
+                       |       -> abandoned
+                       |       -> expired
+                       |       -> revoked
+                       +       -> fenced
+
+requested -> denied
+waiting   -> cancelled
+waiting   -> timed_out
+waiting   -> dead_lettered
+```
+
+Only `active` authorizes a protected mutation. Terminal states never return to
+active.
+
+`expired` is a logical result of authoritative time, not merely a cleanup
+event. Once store time is at or after `expires_at`, the lease is inactive even
+if its projection still says active and no sweeper has emitted
+`resource_lease.expired`.
+
+### Ownership Binding
+
+The authenticated principal owns lease authority. Actor, session, round,
+attempt, and assignment bind its intended execution context.
+
+- A role, alias, model name, branch, worktree, process ID, or display label
+  cannot own or renew a lease.
+- A replacement session does not inherit a lease implicitly.
+- Transfer to another principal, actor, or session ends the old term and grants
+  a new term with a higher epoch and fencing token.
+- A policy MAY authorize a designated controller service to renew on behalf of
+  an owner, but the controller principal and delegation event are recorded.
+- Session liveness and lease ownership remain separate projections.
+
+## Authoritative Lease Time
+
+### Store Time
+
+Lease decisions use `authoritative_store_time`, read inside the append
+transaction. Client time, event `occurred_at`, session heartbeat time, Git time,
+and process uptime are never lease authority.
+
+Each project persists a nondecreasing time floor:
+
+```text
+authoritative_store_time =
+  max(adapter_database_utc_time, persisted_project_time_floor)
+```
+
+The append transaction updates the floor. If the database clock moves backward,
+time does not reverse. Expiry may pause until the clock catches up, which is a
+liveness degradation rather than an unsafe extension based on client input.
+
+If configured clock-skew or time-stall bounds are exceeded:
+
+- new lease grants and renewals fail with `TIME_AUTHORITY_UNHEALTHY`;
+- existing leases cannot be extended;
+- protected writes remain valid only while the persisted floor is strictly
+  before their recorded expiry;
+- status and escalation views report the time-authority incident.
+
+SQLite derives database time while holding its immediate write transaction.
+PostgreSQL derives time from the database server in the transaction. Application
+host clocks MUST NOT be substituted.
+
+### Default Timing Policy
+
+The version 1 default policy is:
+
+```text
+ttl_seconds = 300
+renewal_cadence_seconds = 60
+renewal_grace_seconds = 60
+waiting_timeout_seconds = 900
+recovery_retry_limit = 3
+```
+
+Projects MAY select another checked-in policy revision within implementation
+limits. The event records the effective values.
+
+`renew_by = expires_at - renewal_grace_seconds`. Renewal before `renew_by` is
+healthy. Renewal from `renew_by` up to but not including `expires_at` is
+accepted but emits a late-renewal diagnostic. At or after `expires_at`, renewal
+is rejected and the owner must reacquire.
+
+A session heartbeat MUST NOT renew a resource lease. A lease renewal is an
+explicit capability-checked event with its own idempotency key.
+
+## Lease Acquisition
+
+### Conflict Evaluation
+
+An acquisition request includes:
+
+- canonical resource subject
+- requested access mode
+- expected resource-policy and conflict-set revisions
+- owner binding and round epoch
+- requested TTL
+- idempotency key and correlation ID
+
+The append transaction locks the requested subject and every active or waiting
+subject that overlaps under the pinned conflict policy.
+
+Conflict evaluation uses:
+
+1. canonical type-specific subject equality and overlap;
+2. the cross-mode compatibility matrix;
+3. active lease state at authoritative store time;
+4. policy activation fencing;
+5. deterministic queue order.
+
+Missing type canonicalization, overlap behavior, or cross-mode policy means
+denied or exclusive conflict. It never means compatible.
+
+### Grant
+
+When no incompatible active lease exists and the requester is next in queue,
+grant performs one atomic append:
+
+- allocate a new lease ID;
+- increment the subject lease epoch;
+- allocate the next project fencing token;
+- pin effective mode and policy revisions;
+- calculate lease times from authoritative store time;
+- mark the request active;
+- remove or advance its queue entry;
+- emit `resource_lease.acquired`;
+- update the lease and queue projections.
+
+The grant response returns the exact lease proof. No client may construct or
+increment an epoch or token.
+
+### Atomic Multi-Resource Requests
+
+A task that needs multiple resources SHOULD request them as one sorted set.
+The store canonicalizes and locks all conflict sets in resource-type,
+namespace, and resource-key order.
+
+The set is granted all-or-none. Partial ownership is forbidden unless the
+request explicitly declares independently useful subsets and the workflow can
+release them safely.
+
+Waiting requests do not hold a subset while waiting for the rest. This avoids
+deadlock by construction.
+
+### Fairness
+
+Within one policy priority class, incompatible waiting requests are ordered by
+their accepted request event sequence. Policy may define bounded priority
+classes and deterministic aging, but a client cannot self-assign priority.
+
+Bypassing an earlier waiter requires a recorded policy reason, proves the
+earlier request is non-conflicting or ineligible, and remains visible to the
+affected requester.
+
+## Lease Renewal
+
+A renewal presents:
+
+```text
+lease_proof = {
+  project_id,
+  lease_id,
+  resource_subject,
+  lease_epoch,
+  fencing_token,
+  resource_policy_revision
+}
+```
+
+Renewal succeeds only when:
+
+- the authenticated principal owns the lease or has recorded renewal
+  delegation;
+- actor, session, round epoch, attempt, and assignment binding still match;
+- the lease is active and store time is before expiry;
+- lease epoch, fencing token, subject, mode, and policy revision exactly match;
+- no policy activation has fenced the term;
+- the requested TTL is allowed.
+
+The renewed expiry is `authoritative_store_time + ttl_seconds`, not the prior
+expiry plus TTL. Early renewals therefore cannot accumulate an unbounded future
+term.
+
+Renewal keeps the same lease ID, lease epoch, and fencing token. It appends one
+renewal event and atomically updates the expiry. An unknown commit result is
+resolved by retrying the same idempotency key.
+
+## Fencing Protected Mutations
+
+Every protected mutation includes the complete lease proof in its canonical
+request hash. In the append transaction the store verifies:
+
+- exact active lease identity and ownership binding
+- store time strictly before expiry
+- exact current epoch and fencing token
+- compatible requested mutation mode
+- active resource and capability policy revisions
+- matching round epoch
+- no later overlapping lease that fences the presented term
+
+Failure returns `LEASE_FENCED` or the non-enumerating policy equivalent before
+event allocation.
+
+Checking only `lease_id`, `expires_at`, session liveness, or a boolean
+"claimed" flag is insufficient.
+
+### External Resources
+
+For a protected mutation performed by SLOPE, the store check and event append
+are authoritative.
+
+For an external database, service, or allocator:
+
+- its adapter SHOULD pass the fencing token to a conditional-write interface
+  that rejects tokens below the greatest accepted token for that subject;
+- if the external system cannot fence, SLOPE coordinates intent but cannot
+  claim exactly-once or stale-writer prevention for the external side effect;
+- that limitation is declared in the resource policy and visible to affected
+  participants;
+- secrets needed by an adapter remain outside event payloads.
+
+Opening a TCP port or process that cannot consume a fencing token may still be
+coordinated through exclusive allocation. The lease does not make the process
+itself transactional.
+
+## Release, Abandonment, And Expiry
+
+### Release
+
+An owner releases work it completed or no longer needs. Release is idempotent,
+terminal, and immediately makes the subject eligible for the next compatible
+waiter. Release does not erase activity, evidence, shots, hazards, or penalties.
+
+### Abandonment
+
+An owner emits abandonment when it knows the execution cannot continue.
+Abandonment records:
+
+- reason code and redacted detail
+- last safe workflow state
+- accepted output and evidence references
+- uncertain external side effects
+- recoverability classification
+- causal assignment and attempt
+
+Abandonment terminates the lease immediately. It does not mark work successful
+or turn an incomplete ownership spell into observed zero loss.
+
+### Expiry
+
+Expiry requires no owner event. Any append that observes store time at or after
+expiry treats the lease as inactive and may atomically materialize the expiry
+event before evaluating the queue.
+
+A sweeper MAY materialize expiries proactively. Correctness MUST NOT depend on
+the sweeper running.
+
+Session loss, heartbeat staleness, process exit, worktree deletion, or network
+disconnect may trigger an early recovery warning. They do not themselves prove
+lease expiry or authorize reassignment before an explicit revoke policy or TTL.
+
+### Revocation And Fencing
+
+Revocation before expiry requires a specific administrative capability and
+reason. Policy activation may fence incompatible terms under its recorded
+transition rule.
+
+Both operations:
+
+- terminate the old term;
+- preserve its epoch and token in history;
+- notify every affected visible participant;
+- require later ownership to use a new lease and greater fencing token.
+
+Administrative urgency cannot mutate or reuse the old lease.
+
+## Retry, Requeue, And Recovery
+
+### Failure Classification
+
+Recovery classifies the failed operation:
+
+| Class | Examples | Default action |
+|---|---|---|
+| `transient_store` | busy, serialization, temporary connection | Retry same operation and idempotency key |
+| `unknown_commit` | response lost after possible commit | Resolve with same idempotency key |
+| `execution_transient` | worker crash, bounded tool outage | Abandon attempt, requeue work |
+| `execution_permanent` | invalid input, unsupported task contract | Dead-letter |
+| `policy_denied` | missing capability or visibility | Escalate; do not retry automatically |
+| `integrity_or_schema` | corrupt chain, unknown mandatory version | Stop affected work and escalate |
+| `external_uncertain` | side effect may have happened | Reconcile before requeue |
+
+Lease-operation retry and work retry are different. Store retry preserves the
+same operation identity. Work retry creates a new attempt and new lease term
+while retaining the same round and assignment lineage.
+
+### Recovery Item
+
+```text
+recovery_item_v1 = {
+  project_id,
+  recovery_id,
+  round_id,
+  assignment_id,
+  prior_attempt_id,
+  prior_lease_ids[],
+  failure_event_id,
+  classification,
+  retry_count,
+  retry_limit,
+  available_at,
+  state,
+  reconciliation_required,
+  dead_letter_reason?
+}
+```
+
+Requeue is an event, not a mutable queue overwrite. It preserves causation to
+the failure and prior attempt.
+
+### Requeue
+
+Requeue requires:
+
+- every prior required lease is terminal or fenced;
+- uncertain external side effects are reconciled or explicitly contained;
+- accepted shot, penalty, and evidence IDs are known and cannot be duplicated;
+- retry count and age remain within policy;
+- assignment policy permits another attempt.
+
+The new execution gets a new `attempt_id`. Resource acquisition gets new lease
+IDs, epochs, and fencing tokens. Prior accepted evidence remains immutable.
+
+`available_at` is assigned from authoritative store time plus the versioned
+backoff policy. Optional jitter is derived deterministically from recovery ID
+and retry count and is persisted in the event.
+
+### Dead Letter
+
+A recovery item enters `dead_lettered` when:
+
+- retry limit or maximum recovery age is exceeded;
+- failure is permanent;
+- integrity or schema safety cannot be established;
+- external effects remain irreconcilably uncertain;
+- required identity or authority cannot be reconstructed.
+
+Dead-letter records contain reason code, redacted diagnostic, failure and
+attempt lineage, retry history, affected resource subjects, and required
+operator capability. They MUST NOT copy secret payloads.
+
+Dead-letter is terminal for that recovery item. An authorized operator may
+create a new recovery item with explicit causation and remediation evidence;
+they do not reopen or edit the dead-letter row.
+
+### Escalation
+
+Escalation is an append event and filtered projection visible to authorized
+operators and affected participants. It includes:
+
+- severity and reason
+- blocked round, assignment, and resource subjects
+- current owner and waiter identities only where visible
+- deadline or service objective
+- safe available actions
+- evidence and dead-letter references
+
+Escalation does not grant capability, steal a lease, count a shot, waive
+verification, or close a round. An operator action still uses the ordinary
+capability, idempotency, append, and fencing contract.
+
+## Lease Observability
+
+Authorized status views distinguish:
+
+- active and healthy
+- active in renewal grace
+- logically expired but not yet materialized
+- waiting with queue position and blocking subject
+- abandoned and recovery pending
+- fenced or revoked
+- timed out
+- dead-lettered
+- time-authority unhealthy
+
+The view shows authoritative store time and projection cursor. It does not
+refresh heartbeat or lease state merely by reading.
+
+Hidden principals or resources use redacted, non-enumerating blockers while
+still telling an affected requester that its request cannot proceed.
+
+## S264.1-3 Acceptance Criteria
+
+The lease and recovery contract is complete when an implementer can answer:
+
+- Which identity owns a lease and can a role or replacement session inherit it?
+- Which clock decides expiry, and what happens when that clock moves backward?
+- Do heartbeat or status reads renew a lease?
+- Which values change on renewal versus reacquisition?
+- Can a stale holder write after another actor receives an overlapping subject?
+- How are multi-resource deadlocks prevented?
+- Does correctness depend on an expiry sweeper?
+- Can a crashed worker erase accepted evidence or create a second scorecard?
+- When does retry preserve an idempotency key and when does it create a new
+  attempt?
+- What blocks requeue when an external side effect is uncertain?
+- When does work dead-letter, and can escalation silently grant authority?
