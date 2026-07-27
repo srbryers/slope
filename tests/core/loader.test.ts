@@ -1,7 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { loadScorecards, detectLatestSprint, discoverScorecardFiles, normalizeScorecard, sprintNumberFromScorecardFile } from '../../src/core/loader.js';
+import {
+  loadScorecards,
+  detectLatestSprint,
+  discoverScorecardFiles,
+  normalizeScorecard,
+  resolveCurrentSprint,
+  sprintNumberFromScorecardFile,
+} from '../../src/core/loader.js';
 import type { SlopeConfig } from '../../src/core/config.js';
 
 const TMP = join(__dirname, '__loader_tmp__');
@@ -18,10 +25,15 @@ const baseConfig: SlopeConfig = {
   metaphor: 'golf',
 };
 
-function writeCard(dir: string, filename: string, sprintNumber: string | number): void {
+function writeCard(
+  dir: string,
+  filename: string,
+  sprintNumber: string | number,
+  theme = `Sprint ${sprintNumber}`,
+): void {
   const card = {
     sprint_number: sprintNumber,
-    theme: `Sprint ${sprintNumber}`,
+    theme,
     par: 4,
     slope: 1,
     score: 4,
@@ -38,10 +50,15 @@ function writeCard(dir: string, filename: string, sprintNumber: string | number)
   writeFileSync(join(dir, filename), JSON.stringify(card));
 }
 
-function writeNestedCard(retrosDir: string, dirname: string, sprintNumber: number): void {
+function writeNestedCard(
+  retrosDir: string,
+  dirname: string,
+  sprintNumber: string | number,
+  theme?: string,
+): void {
   const nestedDir = join(retrosDir, dirname);
   mkdirSync(nestedDir, { recursive: true });
-  writeCard(nestedDir, 'scorecard.json', sprintNumber);
+  writeCard(nestedDir, 'scorecard.json', sprintNumber, theme);
 }
 
 describe('loadScorecards — numeric sort', () => {
@@ -144,6 +161,33 @@ describe('loadScorecards — numeric sort', () => {
 
     expect(cards.map(card => card.sprint_number)).toEqual(['458.1', '458.9', '458.10']);
     expect(sprintNumberFromScorecardFile('sprint-458.10.json', baseConfig)).toBe('458.10');
+  });
+
+  it('uses exact filenames to recover canonical IDs lost from numeric JSON bodies', () => {
+    writeCard(retrosDir, 'sprint-458.1.json', 458.1);
+    writeCard(retrosDir, 'sprint-458.10.json', 458.1);
+
+    expect(loadScorecards(baseConfig, TMP).map(card => card.sprint_number))
+      .toEqual(['458.1', '458.10']);
+  });
+
+  it('keeps exact candidates when another filename points at their body identity', () => {
+    writeCard(retrosDir, 'sprint-458.1.json', '458.10', 'Mismatched filename');
+    writeCard(retrosDir, 'sprint-458.10.json', '458.10', 'Exact filename');
+    writeNestedCard(retrosDir, 's458.1', '458.1', 'Exact nested filename');
+
+    const cards = loadScorecards(baseConfig, TMP);
+
+    expect(cards.map(card => card.sprint_number)).toEqual(['458.1', '458.10']);
+    expect(cards.map(card => card.theme)).toEqual(['Exact nested filename', 'Exact filename']);
+  });
+
+  it('recovers a legacy encoded numeric body when the filename supplies S43.5', () => {
+    writeCard(retrosDir, 'sprint-43.5.json', 435);
+
+    expect(loadScorecards(baseConfig, TMP).map(card => card.sprint_number)).toEqual(['43.5']);
+    expect(detectLatestSprint(baseConfig, TMP)).toBe('43.5');
+    expect(resolveCurrentSprint(baseConfig, TMP)).toBe('44');
   });
 
   it('also loads nested sN/scorecard.json scorecards for repos that keep sprint artifacts together', () => {
