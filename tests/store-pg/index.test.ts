@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll } from 'vitest';
 import { SlopeStoreError, checkConflicts } from '../../src/core/index.js';
-import type { GolfScorecard, SlopeStore } from '../../src/core/index.js';
+import type { GolfScorecard, SlopeStore, StoredGolfScorecard } from '../../src/core/index.js';
+import type { Pool } from 'pg';
 
 // Skip entire suite if no PG connection available
 const PG_URL = process.env.SLOPE_TEST_PG_URL;
@@ -228,6 +229,14 @@ describe.skipIf(!PG_URL)('PostgresSlopeStore', () => {
       const c2 = await store.claim({ sprint_number: sprint2, player: 'alice', target: 'T-CROSS', scope: 'ticket' });
       expect(c2.sprint_number).toBe(String(sprint2));
     });
+
+    it('keeps 458.10 claims distinct from 458.1', async () => {
+      await store.claim({ sprint_number: '458.1', player: 'alice', target: 'T-CANONICAL', scope: 'ticket' });
+      await store.claim({ sprint_number: '458.10', player: 'bob', target: 'T-CANONICAL', scope: 'ticket' });
+
+      expect((await store.list('458.1')).map(claim => claim.sprint_number)).toEqual(['458.1']);
+      expect((await store.list('458.10')).map(claim => claim.sprint_number)).toEqual(['458.10']);
+    });
   });
 
   describe('Scorecards', () => {
@@ -270,6 +279,26 @@ describe.skipIf(!PG_URL)('PostgresSlopeStore', () => {
       const all = await store.listScorecards({ minSprint: sprint, maxSprint: sprint });
       expect(all).toHaveLength(1);
       expect(all[0].theme).toBe('Updated');
+    });
+
+    it('round-trips and orders canonical inserted-sprint scorecards', async () => {
+      const sprintIds = ['458.11', '458.1', '458.10', '458.9'];
+      for (const sprintId of sprintIds) {
+        const card: StoredGolfScorecard = {
+          ...makeCard(458),
+          sprint_number: sprintId,
+          theme: `Sprint ${sprintId}`,
+        };
+        await store.saveScorecard(card);
+      }
+
+      const cards = await store.listScorecards({ minSprint: '458.1', maxSprint: '458.11' });
+      expect(cards.map(card => card.sprint_number)).toEqual([
+        '458.1',
+        '458.9',
+        '458.10',
+        '458.11',
+      ]);
     });
   });
 
@@ -361,6 +390,14 @@ describe.skipIf(!PG_URL)('PostgresSlopeStore', () => {
       expect(events).toHaveLength(2);
     });
 
+    it('keeps 458.10 events distinct from 458.1', async () => {
+      await store.insertEvent({ type: 'decision', data: { sprint: '.1' }, sprint_number: '458.1' });
+      await store.insertEvent({ type: 'decision', data: { sprint: '.10' }, sprint_number: '458.10' });
+
+      expect((await store.getEventsBySprint('458.1')).map(event => event.sprint_number)).toEqual(['458.1']);
+      expect((await store.getEventsBySprint('458.10')).map(event => event.sprint_number)).toEqual(['458.10']);
+    });
+
     it('retrieves events by ticket', async () => {
       const ticket = `T-${Date.now()}`;
       await store.insertEvent({ type: 'scope_change', data: { reason: 'expanded' }, ticket_key: ticket });
@@ -387,4 +424,173 @@ describe.skipIf(!PG_URL)('PostgresSlopeStore', () => {
       expect(event.session_id).toBe('no-such-session-pg');
     });
   });
+
+  describe('Workflow Executions', () => {
+    it('keeps 458.10 workflow executions distinct from 458.1', async () => {
+      await store.startExecution({ workflow_name: 'test', sprint_id: 'S458.1' });
+      await store.startExecution({ workflow_name: 'test', sprint_id: 'S458.10' });
+
+      expect((await store.getExecutionBySprint('458.1'))?.sprint_id).toBe('458.1');
+      expect((await store.getExecutionBySprint('458.10'))?.sprint_id).toBe('458.10');
+    });
+  });
+});
+
+describe.skipIf(!PG_URL)('PostgresSlopeStore canonical sprint migration', () => {
+  it('upgrades numeric v5 rows to text while preserving constraints and ambiguous keys', async () => {
+    const pgModule = await import('pg');
+    const PgPool = pgModule.default?.Pool ?? pgModule.Pool;
+    const schema = `s265_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const adminPool = new PgPool({ connectionString: PG_URL });
+    let schemaPool: Pool | null = null;
+
+    try {
+      await adminPool.query(`CREATE SCHEMA "${schema}"`);
+      const schemaUrl = new URL(PG_URL!);
+      schemaUrl.searchParams.set('options', `-c search_path=${schema}`);
+      schemaPool = new PgPool({ connectionString: schemaUrl.toString() });
+
+      await schemaPool.query(`
+        CREATE TABLE schema_version (
+          version INTEGER PRIMARY KEY,
+          applied_at TEXT NOT NULL
+        );
+        INSERT INTO schema_version VALUES (5, '2026-01-01T00:00:00.000Z');
+
+        CREATE TABLE claims (
+          id TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL DEFAULT 'default',
+          session_id TEXT,
+          sprint_number INTEGER NOT NULL,
+          target TEXT NOT NULL,
+          player TEXT NOT NULL,
+          scope TEXT NOT NULL,
+          claimed_at TEXT NOT NULL,
+          expires_at TEXT,
+          notes TEXT,
+          metadata JSONB,
+          UNIQUE(project_id, sprint_number, scope, target)
+        );
+        CREATE INDEX idx_claims_project ON claims(project_id);
+
+        CREATE TABLE scorecards (
+          project_id TEXT NOT NULL DEFAULT 'default',
+          sprint_number INTEGER NOT NULL,
+          data JSONB NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          PRIMARY KEY(project_id, sprint_number)
+        );
+
+        CREATE TABLE events (
+          id TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL DEFAULT 'default',
+          session_id TEXT,
+          type TEXT NOT NULL,
+          timestamp TEXT NOT NULL,
+          data JSONB NOT NULL DEFAULT '{}',
+          sprint_number INTEGER,
+          ticket_key TEXT
+        );
+        CREATE INDEX idx_events_sprint ON events(sprint_number);
+
+        CREATE TABLE workflow_executions (
+          id TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL DEFAULT 'default',
+          workflow_name TEXT NOT NULL,
+          sprint_id TEXT,
+          current_phase TEXT,
+          current_step TEXT,
+          status TEXT NOT NULL DEFAULT 'running',
+          variables JSONB DEFAULT '{}',
+          completed_steps JSONB DEFAULT '[]',
+          started_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          session_id TEXT,
+          definition_json TEXT,
+          definition_hash TEXT
+        );
+
+        INSERT INTO claims VALUES (
+          'legacy-claim', 'legacy', NULL, 458, 'T-LEGACY', 'alice', 'ticket',
+          '2026-01-01T00:00:00.000Z', NULL, NULL, NULL
+        );
+        INSERT INTO scorecards VALUES (
+          'legacy', 458, '{"sprint_number":458,"theme":"legacy"}',
+          '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z'
+        );
+        INSERT INTO scorecards VALUES (
+          'legacy', 435, '{"sprint_number":435,"theme":"ambiguous legacy key"}',
+          '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z'
+        );
+        INSERT INTO events VALUES (
+          'legacy-event', 'legacy', NULL, 'decision',
+          '2026-01-01T00:00:00.000Z', '{}', 458, 'T-LEGACY'
+        );
+        INSERT INTO workflow_executions VALUES (
+          'legacy-workflow', 'legacy', 'test', 'S458', NULL, NULL, 'running',
+          '{}', '[]', '2026-01-01T00:00:00.000Z',
+          '2026-01-01T00:00:00.000Z', NULL, NULL, NULL
+        );
+        INSERT INTO workflow_executions VALUES (
+          'non-sprint-workflow', 'legacy', 'test', 'R1', NULL, NULL, 'running',
+          '{}', '[]', '2026-01-01T00:00:00.000Z',
+          '2026-01-01T00:00:00.000Z', NULL, NULL, NULL
+        );
+      `);
+
+      const {
+        LATEST_PG_SCHEMA_VERSION,
+        PostgresSlopeStore,
+      } = await import('../../src/store-pg/index.js');
+      const migrated = new PostgresSlopeStore({ pool: schemaPool, projectId: 'legacy' });
+      await migrated.migrate();
+
+      expect(await migrated.getSchemaVersion()).toBe(LATEST_PG_SCHEMA_VERSION);
+      expect((await migrated.list('458'))[0].sprint_number).toBe('458');
+      expect((await migrated.listScorecards()).map(card => card.sprint_number)).toEqual(['435', '458']);
+      expect((await migrated.getEventsBySprint('458'))[0].sprint_number).toBe('458');
+      expect((await migrated.getExecutionBySprint('458'))?.sprint_id).toBe('458');
+      expect((await migrated.getExecutionBySprint('R1'))?.sprint_id).toBe('R1');
+      await expect(migrated.claim({
+        sprint_number: '458',
+        player: 'bob',
+        target: 'T-LEGACY',
+        scope: 'ticket',
+      })).rejects.toMatchObject({ code: 'CLAIM_EXISTS' });
+
+      const columns = await schemaPool.query(`
+        SELECT table_name, data_type
+        FROM information_schema.columns
+        WHERE table_schema = $1
+          AND column_name = 'sprint_number'
+          AND table_name IN ('claims', 'scorecards', 'events')
+        ORDER BY table_name
+      `, [schema]);
+      expect(columns.rows).toEqual([
+        { table_name: 'claims', data_type: 'text' },
+        { table_name: 'events', data_type: 'text' },
+        { table_name: 'scorecards', data_type: 'text' },
+      ]);
+
+      const constraints = await schemaPool.query(`
+        SELECT table_name, constraint_type
+        FROM information_schema.table_constraints
+        WHERE table_schema = $1
+          AND (
+            (table_name = 'claims' AND constraint_type = 'UNIQUE')
+            OR (table_name = 'scorecards' AND constraint_type = 'PRIMARY KEY')
+          )
+        ORDER BY table_name
+      `, [schema]);
+      expect(constraints.rows).toEqual([
+        { table_name: 'claims', constraint_type: 'UNIQUE' },
+        { table_name: 'scorecards', constraint_type: 'PRIMARY KEY' },
+      ]);
+    } finally {
+      await schemaPool?.end();
+      await adminPool.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);
+      await adminPool.end();
+    }
+  }, 15_000);
 });
