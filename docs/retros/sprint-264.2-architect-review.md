@@ -104,7 +104,7 @@ liveness concerns until the runtime and recovery sweeper are tested.
 ## Verification
 
 The final architecture review approved exact contract commit `3c5073c`. All 25
-architecture findings are recorded as resolved in the SLOPE review ledger.
-Modular roadmap source validation and compiled projection checks passed. The
-complete repository test, typecheck, and production-build gate is rerun on the
-final PR head before merge.
+architecture findings were recorded as resolved and are persisted as amended
+scorecard hazards. Modular roadmap source validation and compiled projection
+checks passed. The complete repository test, typecheck, and production-build
+gate is rerun on the final PR head before merge.
