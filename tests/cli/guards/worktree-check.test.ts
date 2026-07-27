@@ -377,7 +377,17 @@ describe('worktreeCheckGuard', () => {
   it('allows when other session has worktree_path (isolated)', async () => {
     mockExecFileSync
       .mockReturnValueOnce('.git' as never)
-      .mockReturnValueOnce('feat/foo' as never);
+      .mockReturnValueOnce('feat/foo' as never)
+      .mockReturnValueOnce([
+        'worktree /tmp/test',
+        'HEAD abc123',
+        'branch refs/heads/feat/foo',
+        '',
+        'worktree /tmp/worktree',
+        'HEAD def456',
+        'branch refs/heads/feature/isolated',
+        '',
+      ].join('\n') as never);
 
     (mockStore.getActiveSessions as ReturnType<typeof vi.fn>).mockResolvedValue([
       makeSession({ session_id: 'test-session' }),
@@ -386,6 +396,30 @@ describe('worktreeCheckGuard', () => {
 
     const result = await worktreeCheckGuard(makeInput(), '/tmp/test');
     expect(result).toEqual({});
+  });
+
+  it('does not trust an unregistered stored worktree path', async () => {
+    mockExecFileSync
+      .mockReturnValueOnce('.git' as never)
+      .mockReturnValueOnce('feat/foo' as never)
+      .mockReturnValueOnce([
+        'worktree /tmp/test',
+        'HEAD abc123',
+        'branch refs/heads/feat/foo',
+        '',
+      ].join('\n') as never);
+    (mockStore.getActiveSessions as ReturnType<typeof vi.fn>).mockResolvedValue([
+      makeSession({
+        session_id: 'test-session',
+        worktree_path: '/tmp/not-a-worktree',
+      }),
+      makeSession({ session_id: 'other-session' }),
+    ]);
+
+    const result = await worktreeCheckGuard(makeInput(), '/tmp/test');
+
+    expect(result.decision).toBe('deny');
+    expect(result.blockReason).toContain('other-session');
   });
 
   it('allows when current session is alone', async () => {

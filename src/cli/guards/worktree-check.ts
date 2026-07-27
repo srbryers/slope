@@ -103,10 +103,18 @@ export async function worktreeCheckGuard(input: HookInput, cwd: string): Promise
     let active = await store.getActiveSessions();
     const existing = active.find(s => s.session_id === sessionId);
     const currentSwarmId = existing?.swarm_id;
+    let registeredWorktrees: GitWorktreeInfo[] | undefined;
+    const hasRegisteredWorktree = (worktreePath: string | undefined): boolean => {
+      if (!worktreePath) return false;
+      registeredWorktrees ??= listGitWorktreeInfo(cwd);
+      return registeredWorktrees.some(
+        worktree => canonicalPath(worktree.path) === canonicalPath(worktreePath),
+      );
+    };
 
     // An already-registered worktree session is isolated by definition, even
     // when the hook payload still reports the launch directory (GH #630, #631).
-    if (existing?.worktree_path) {
+    if (hasRegisteredWorktree(existing?.worktree_path)) {
       writeFileSync(sentinel, new Date().toISOString());
       return {};
     }
@@ -117,7 +125,7 @@ export async function worktreeCheckGuard(input: HookInput, cwd: string): Promise
     const now = Date.now();
     const conflicting = others.filter(s =>
       !isStaleSession(s, now) &&
-      !s.worktree_path &&
+      !hasRegisteredWorktree(s.worktree_path) &&
       !(currentSwarmId && s.swarm_id === currentSwarmId),
     );
 
@@ -131,7 +139,7 @@ export async function worktreeCheckGuard(input: HookInput, cwd: string): Promise
       // session is already isolated. Trust where the work actually lands
       // (GH #630, #631). Checked here rather than earlier so the common pass
       // path spawns no extra git processes.
-      const worktrees = listGitWorktreeInfo(cwd);
+      const worktrees = registeredWorktrees ?? listGitWorktreeInfo(cwd);
       const targetWorktree = resolveTargetWorktree(input, cwd, worktrees);
       if (targetWorktree) {
         await reconcileWorktreeSession(input, cwd, sessionId, targetWorktree);

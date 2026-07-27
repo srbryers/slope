@@ -8,7 +8,7 @@ import { SqliteSlopeStore } from '../../../src/store/index.js';
 
 let tmpDir: string;
 let originalCwd: string;
-let linkedWorktree: string | undefined;
+const linkedWorktrees: string[] = [];
 
 function setupProject(dir: string): void {
   mkdirSync(join(dir, '.slope'), { recursive: true });
@@ -32,9 +32,8 @@ describe('slope session command', () => {
 
   afterEach(() => {
     process.chdir(originalCwd);
-    if (linkedWorktree) {
-      rmSync(linkedWorktree, { recursive: true, force: true });
-      linkedWorktree = undefined;
+    for (const worktree of linkedWorktrees.splice(0)) {
+      rmSync(worktree, { recursive: true, force: true });
     }
     rmSync(tmpDir, { recursive: true, force: true });
   });
@@ -194,7 +193,8 @@ describe('slope session command', () => {
     writeFileSync(join(tmpDir, 'README.md'), 'test\n');
     execFileSync('git', ['add', 'README.md'], { cwd: tmpDir });
     execFileSync('git', ['commit', '-q', '-m', 'init'], { cwd: tmpDir });
-    linkedWorktree = `${tmpDir}-linked`;
+    const linkedWorktree = `${tmpDir}-linked`;
+    linkedWorktrees.push(linkedWorktree);
     execFileSync('git', ['worktree', 'add', '-q', '-b', 'feature/linked', linkedWorktree], {
       cwd: tmpDir,
     });
@@ -202,7 +202,7 @@ describe('slope session command', () => {
     try {
       await store.registerSession({
         session_id: 'linked-session',
-        role: 'primary',
+        role: 'observer',
         ide: 'codex',
         branch: 'main',
       });
@@ -217,9 +217,58 @@ describe('slope session command', () => {
     try {
       expect((await after.getActiveSessions())[0]).toMatchObject({
         session_id: 'linked-session',
-        role: 'secondary',
+        role: 'observer',
         branch: 'feature/linked',
         worktree_path: realpathSync(linkedWorktree),
+      });
+    } finally {
+      after.close();
+    }
+  });
+
+  it('rejects a heartbeat from a checkout other than the recorded worktree', async () => {
+    execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: tmpDir });
+    execFileSync('git', ['config', 'user.email', 'test@example.com'], { cwd: tmpDir });
+    execFileSync('git', ['config', 'user.name', 'Test User'], { cwd: tmpDir });
+    writeFileSync(join(tmpDir, 'README.md'), 'test\n');
+    execFileSync('git', ['add', 'README.md'], { cwd: tmpDir });
+    execFileSync('git', ['commit', '-q', '-m', 'init'], { cwd: tmpDir });
+    const linkedWorktree = `${tmpDir}-scoped`;
+    linkedWorktrees.push(linkedWorktree);
+    execFileSync('git', ['worktree', 'add', '-q', '-b', 'feature/scoped', linkedWorktree], {
+      cwd: tmpDir,
+    });
+    const store = createStore();
+    let beforeHeartbeat = '';
+    try {
+      const session = await store.registerSession({
+        session_id: 'scoped-session',
+        role: 'observer',
+        ide: 'codex',
+        branch: 'feature/scoped',
+        worktree_path: realpathSync(linkedWorktree),
+      });
+      beforeHeartbeat = session.last_heartbeat_at;
+    } finally {
+      store.close();
+    }
+    const exit = vi.spyOn(process, 'exit').mockImplementation(((code?: number) => {
+      throw new Error(`process.exit(${code ?? 0})`);
+    }) as never);
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(sessionCommand(['heartbeat', '--session-id=scoped-session']))
+      .rejects.toThrow('process.exit(1)');
+
+    error.mockRestore();
+    exit.mockRestore();
+    const after = createStore();
+    try {
+      expect((await after.getActiveSessions())[0]).toMatchObject({
+        branch: 'feature/scoped',
+        role: 'observer',
+        worktree_path: realpathSync(linkedWorktree),
+        last_heartbeat_at: beforeHeartbeat,
       });
     } finally {
       after.close();

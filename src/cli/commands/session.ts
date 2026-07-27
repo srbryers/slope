@@ -5,14 +5,19 @@ import { join } from 'node:path';
 import {
   checkConflicts,
   currentGitBranch,
+  formatObservedSessionBranch,
   observeSessionBranches,
   resolveRepoSourceCwd,
   resolveRepoStateCwd,
 } from '../../core/index.js';
-import type { ObservedSlopeSession, SlopeSession } from '../../core/index.js';
+import type { SlopeSession } from '../../core/index.js';
 import { STALE_SESSION_THRESHOLD_MS } from '../../core/constants.js';
 import { resolveStore } from '../store.js';
 import { resolveSessionStoreCwd } from '../session-scope.js';
+import {
+  reconcileSessionHeartbeat,
+  SessionCheckoutMismatchError,
+} from '../session-heartbeat.js';
 
 /** A session may only be ended by default when its recorded identity does not
  *  contradict this checkout — in a same-checkout swarm, "the single active
@@ -129,7 +134,7 @@ async function startSession(flags: Record<string, string>, cwd: string): Promise
     const sourceCwd = resolveRepoSourceCwd(cwd);
     const stateCwd = resolveRepoStateCwd(cwd);
     const linkedCheckout = !sameCheckout(sourceCwd, stateCwd);
-    const role = (flags.role ?? (linkedCheckout ? 'secondary' : 'primary')) as 'primary' | 'secondary' | 'observer';
+    const role = (flags.role ?? 'primary') as 'primary' | 'secondary' | 'observer';
     const ide = flags.ide ?? 'unknown';
     const branch = flags.branch ?? currentGitBranch(sourceCwd);
     const worktreePath = flags['worktree-path'] ?? (linkedCheckout ? sourceCwd : undefined);
@@ -276,21 +281,14 @@ async function heartbeat(flags: Record<string, string>, cwd: string): Promise<vo
       process.exit(1);
     }
 
-    const sessions = await store.getActiveSessions();
-    const session = sessions.find(candidate => candidate.session_id === sessionId);
-    const sourceCwd = resolveRepoSourceCwd(cwd);
-    const stateCwd = resolveRepoStateCwd(cwd);
-    const linkedCheckout = !sameCheckout(sourceCwd, stateCwd);
-    const branch = currentGitBranch(session?.worktree_path ?? sourceCwd);
-    if (branch || (linkedCheckout && !session?.worktree_path)) {
-      await store.updateSession(sessionId, {
-        ...(branch ? { branch } : {}),
-        ...(linkedCheckout && !session?.worktree_path
-          ? { worktree_path: sourceCwd, role: 'secondary' as const }
-          : {}),
-      });
-    } else {
-      await store.updateHeartbeat(sessionId);
+    try {
+      await reconcileSessionHeartbeat(store, sessionId, cwd);
+    } catch (err) {
+      if (err instanceof SessionCheckoutMismatchError) {
+        console.error(`Error: ${err.message}`);
+        process.exit(1);
+      }
+      throw err;
     }
     console.log(`Heartbeat updated for session ${sessionId}`);
   } finally {
@@ -354,7 +352,7 @@ async function listSessions(flags: Record<string, string>, cwd: string): Promise
       const swarmTag = s.swarm_id && !swarmId ? ` swarm:${s.swarm_id}` : '';
 
       console.log(`  ${s.session_id}${agentTag}${swarmTag}`);
-      console.log(`    Role: ${s.role}  IDE: ${s.ide}  ${formatBranchStatus(s)}`);
+      console.log(`    Role: ${s.role}  IDE: ${s.ide}  ${formatObservedSessionBranch(s)}`);
       console.log(`    Started: ${s.started_at}  Heartbeat: ${s.last_heartbeat_at}`);
       if (sessionClaims.length > 0) {
         console.log(`    Claims: ${sessionClaims.length}`);
@@ -399,16 +397,6 @@ async function listSessions(flags: Record<string, string>, cwd: string): Promise
   } finally {
     store.close();
   }
-}
-
-function formatBranchStatus(session: ObservedSlopeSession): string {
-  if (session.branch_source === 'current') {
-    return `Branch: ${session.branch ?? '-'}`;
-  }
-  if (session.branch_source === 'at_start') {
-    return `Branch at start: ${session.branch}`;
-  }
-  return 'Branch: unknown';
 }
 
 // ── T4: Dashboard ────────────────────────────────────
@@ -469,10 +457,9 @@ async function dashboardCommand(flags: Record<string, string>, cwd: string): Pro
       const hbAge = Math.round((now - new Date(s.last_heartbeat_at).getTime()) / 60000);
       const isStale = (now - new Date(s.last_heartbeat_at).getTime()) > STALE_SESSION_THRESHOLD_MS;
       const roleTag = s.agent_role ? ` [${s.agent_role}]` : '';
-      const branchTag = s.branch ? ` on ${s.branch}` : '';
       const staleTag = isStale ? ` ${yellow}stale (${hbAge}m)${reset}` : ` ${gray}(${hbAge}m ago)${reset}`;
       const color = isStale ? yellow : green;
-      console.log(`  ${color}*${reset} ${s.session_id.slice(0, 12)}  ${s.role}${roleTag}${branchTag}${staleTag}`);
+      console.log(`  ${color}*${reset} ${s.session_id.slice(0, 12)}  ${s.role}${roleTag} ${formatObservedSessionBranch(s)}${staleTag}`);
       const myClaims = allClaims.filter(c => c.session_id === s.session_id);
       for (const c of myClaims) console.log(`    - ${c.scope}: ${c.target}`);
     };

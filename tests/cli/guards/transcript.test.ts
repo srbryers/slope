@@ -1,8 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { existsSync, rmSync, readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { transcriptGuard } from '../../../src/cli/guards/transcript.js';
 import type { HookInput } from '../../../src/core/guard.js';
+import { SqliteSlopeStore } from '../../../src/store/index.js';
 
 const TEST_DIR = join(process.cwd(), '.test-guard-transcripts');
 const TRANSCRIPTS_DIR = join(TEST_DIR, '.slope', 'transcripts');
@@ -190,8 +193,67 @@ describe('transcriptGuard', () => {
       vi.restoreAllMocks();
     });
 
+    it('reconciles linked worktree identity through the routine heartbeat', async () => {
+      const primary = mkdtempSync(join(tmpdir(), 'slope-transcript-primary-'));
+      const linked = `${primary}-linked`;
+      try {
+        mkdirSync(join(primary, '.slope'), { recursive: true });
+        writeFileSync(join(primary, '.slope', 'config.json'), JSON.stringify({
+          store_path: '.slope/slope.db',
+        }));
+        execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: primary });
+        execFileSync('git', ['config', 'user.email', 'test@example.com'], { cwd: primary });
+        execFileSync('git', ['config', 'user.name', 'Test User'], { cwd: primary });
+        writeFileSync(join(primary, 'README.md'), 'test\n');
+        execFileSync('git', ['add', 'README.md'], { cwd: primary });
+        execFileSync('git', ['commit', '-q', '-m', 'init'], { cwd: primary });
+        execFileSync('git', ['worktree', 'add', '-q', '-b', 'feature/transcript', linked], {
+          cwd: primary,
+        });
+        const store = new SqliteSlopeStore(join(primary, '.slope', 'slope.db'));
+        try {
+          await store.registerSession({
+            session_id: 'transcript-linked',
+            role: 'observer',
+            ide: 'claude-code',
+            branch: 'main',
+          });
+        } finally {
+          store.close();
+        }
+
+        await transcriptGuard(makeInput({
+          session_id: 'transcript-linked',
+          cwd: linked,
+        }), linked);
+
+        const after = new SqliteSlopeStore(join(primary, '.slope', 'slope.db'));
+        try {
+          expect((await after.getActiveSessions())[0]).toMatchObject({
+            role: 'observer',
+            branch: 'feature/transcript',
+            worktree_path: realpathSync(linked),
+          });
+        } finally {
+          after.close();
+        }
+      } finally {
+        rmSync(linked, { recursive: true, force: true });
+        rmSync(primary, { recursive: true, force: true });
+      }
+    });
+
     it('calls updateHeartbeat after transcript append', async () => {
+      const isolatedCwd = mkdtempSync(join(tmpdir(), 'slope-transcript-heartbeat-'));
       const mockStore = {
+        getActiveSessions: vi.fn().mockResolvedValue([{
+          session_id: 'test-sess-1',
+          role: 'primary',
+          ide: 'test',
+          started_at: '2026-07-27T00:00:00.000Z',
+          last_heartbeat_at: '2026-07-27T00:00:00.000Z',
+        }]),
+        updateSession: vi.fn(),
         updateHeartbeat: vi.fn().mockResolvedValue(undefined),
         close: vi.fn(),
       };
@@ -205,10 +267,14 @@ describe('transcriptGuard', () => {
       }));
 
       const { transcriptGuard: guardWithMock } = await import('../../../src/cli/guards/transcript.js');
-      await guardWithMock(makeInput(), TEST_DIR);
+      try {
+        await guardWithMock(makeInput({ cwd: isolatedCwd }), isolatedCwd);
 
-      expect(mockStore.updateHeartbeat).toHaveBeenCalledWith('test-sess-1');
-      expect(mockStore.close).toHaveBeenCalled();
+        expect(mockStore.updateHeartbeat).toHaveBeenCalledWith('test-sess-1');
+        expect(mockStore.close).toHaveBeenCalled();
+      } finally {
+        rmSync(isolatedCwd, { recursive: true, force: true });
+      }
     });
 
     it('heartbeat failure does not block transcript', async () => {

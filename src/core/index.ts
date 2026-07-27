@@ -291,6 +291,7 @@ export type { SlopeConfig } from './config.js';
 export { loadConfig, createConfig, saveConfig, resolveConfigPath } from './config.js';
 export {
   currentGitBranch,
+  formatObservedSessionBranch,
   observeSessionBranches,
 } from './session-branch.js';
 export type {

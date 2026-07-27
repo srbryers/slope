@@ -4,6 +4,7 @@ import { appendTurn } from '../../core/transcript.js';
 import type { ToolCallSummary, TranscriptLine } from '../../core/types.js';
 import { loadConfig } from '../config.js';
 import { resolveStore } from '../store.js';
+import { reconcileSessionHeartbeat } from '../session-heartbeat.js';
 
 /**
  * Summarize tool_input params into a short string for the transcript.
@@ -85,7 +86,7 @@ export async function transcriptGuard(input: HookInput, cwd: string): Promise<Gu
     try {
       const store = await resolveStore(cwd);
       try {
-        await store.updateHeartbeat(input.session_id);
+        await reconcileSessionHeartbeat(store, input.session_id, cwd);
       } finally {
         try { store.close(); } catch { /* ignore */ }
       }

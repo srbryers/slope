@@ -56,4 +56,21 @@ describe('session branch observation', () => {
       }),
     ]);
   });
+
+  it('does not inspect a stored path outside the repository worktree set', () => {
+    const project = mkdtempSync(join(tmpdir(), 'slope-session-project-'));
+    const unrelated = mkdtempSync(join(tmpdir(), 'slope-session-unrelated-'));
+    roots.push(project, unrelated);
+    execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: project });
+    execFileSync('git', ['init', '-q', '-b', 'secret/branch'], { cwd: unrelated });
+
+    expect(observeSessionBranches([
+      session({ worktree_path: unrelated }),
+    ], project)).toEqual([
+      expect.objectContaining({
+        branch: 'main',
+        branch_source: 'at_start',
+      }),
+    ]);
+  });
 });
