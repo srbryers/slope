@@ -135,6 +135,44 @@ describe('slope session command', () => {
     }
   });
 
+  it('does not release stale-owned claims during ordinary session start', async () => {
+    const store = createStore();
+    try {
+      await store.registerSession({
+        session_id: 'stale-owner',
+        role: 'observer',
+        ide: 'codex',
+      });
+      await store.claim({
+        sprint_number: 262,
+        player: 'stale-agent',
+        target: 'S262-stale',
+        scope: 'ticket',
+        session_id: 'stale-owner',
+      });
+      const rawStore = store as unknown as {
+        db: { prepare: (sql: string) => { run: (...params: unknown[]) => unknown } };
+      };
+      rawStore.db.prepare(
+        'UPDATE sessions SET last_heartbeat_at = ? WHERE session_id = ?',
+      ).run('2020-01-01T00:00:00.000Z', 'stale-owner');
+    } finally {
+      store.close();
+    }
+
+    await sessionCommand(['start', '--session-id=new-session', '--ide=codex']);
+
+    const after = createStore();
+    try {
+      expect((await after.getActiveSessions()).map(session => session.session_id))
+        .toEqual(expect.arrayContaining(['stale-owner', 'new-session']));
+      expect((await after.getActiveClaims(262)).map(claim => claim.target))
+        .toEqual(['S262-stale']);
+    } finally {
+      after.close();
+    }
+  });
+
   it('refreshes the stored branch when heartbeat runs after checkout', async () => {
     execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: tmpDir });
     const store = createStore();

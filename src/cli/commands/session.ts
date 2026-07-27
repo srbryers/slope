@@ -151,8 +151,6 @@ async function startSession(flags: Record<string, string>, cwd: string): Promise
     const swarmId = flags.swarm;
     const agentRole = flags['agent-role'];
 
-    await store.cleanStaleSessions(STALE_SESSION_THRESHOLD_MS);
-
     const session = await store.registerSession({
       session_id: sessionId,
       role,
@@ -414,7 +412,6 @@ async function listSessions(flags: Record<string, string>, cwd: string): Promise
 async function dashboardCommand(flags: Record<string, string>, cwd: string): Promise<void> {
   const store = await resolveStore(resolveSessionStoreCwd(cwd));
   try {
-    await store.cleanStaleSessions(STALE_SESSION_THRESHOLD_MS);
     const sessions = observeSessionBranches(
       await store.getActiveSessions(),
       resolveRepoStateCwd(cwd),
