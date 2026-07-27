@@ -189,6 +189,7 @@ sprints:
         depends_on:
           - S263-3
   - id: 264
+    status: complete
     theme: Team Round Domain and Scoring Contract
     par: 4
     slope: 4
@@ -245,7 +246,7 @@ sprints:
       - docs/architecture/team-round-coordination.md
     tickets:
       - key: S264.1-1
-        title: Define existing-event-store migration, source-of-truth authority, complete event envelope, scorecard projection, and deterministic replay (#669)
+        title: Define existing-event-store migration, source-of-truth authority, minimum canonical scorecard schema, complete event envelope, projection, and deterministic replay (#669)
         club: driver
         complexity: risky
         github_issue: 669
@@ -315,3 +316,4 @@ scorecards:
   "261": docs/retros/sprint-261.json
   "262": docs/retros/sprint-262.json
   "263": docs/retros/sprint-263.json
+  "264": docs/retros/sprint-264.json

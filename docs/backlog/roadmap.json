@@ -7047,6 +7047,7 @@
     },
     {
       "id": 264,
+      "status": "complete",
       "theme": "Team Round Domain and Scoring Contract",
       "par": 4,
       "slope": 4,
@@ -7124,7 +7125,7 @@
       "tickets": [
         {
           "key": "S264.1-1",
-          "title": "Define existing-event-store migration, source-of-truth authority, complete event envelope, scorecard projection, and deterministic replay (#669)",
+          "title": "Define existing-event-store migration, source-of-truth authority, minimum canonical scorecard schema, complete event envelope, projection, and deterministic replay (#669)",
           "club": "driver",
           "complexity": "risky",
           "github_issue": 669
@@ -7358,14 +7359,14 @@
         264.2,
         267
       ],
-      "note": "Evolve the existing event store into the authoritative coordination ledger rather than create a parallel source of truth. The first schema includes complete identity and access scope, rejects idempotency conflicts, projects scorecard and status atomically, replays deterministically, and enforces capabilities and redaction in the store.",
+      "note": "Evolve the existing event store into the authoritative coordination ledger rather than create a parallel source of truth. The first schema includes the minimum canonical scorecard identity and version fields plus complete event identity and access scope, rejects idempotency conflicts, projects scorecard and status atomically, replays deterministically, and enforces capabilities and redaction in the store. S270 extends attribution and estimator projections without introducing fields that S268 finalization already hashes.",
       "research": [
         "docs/research/buzz-multiplayer-collaboration.md"
       ],
       "tickets": [
         {
           "key": "S268-1",
-          "title": "Migrate the existing event store to a versioned coordination envelope with round, attempt, actor, session, role, authority, visibility, correlation, and causation",
+          "title": "Migrate the existing event store to a versioned coordination envelope and minimum canonical scorecard schema with project, round, attempt, scorecard, shot, penalty, loss-component, actor, session, role, contributor, verifier, authority, visibility, correlation, and causation identity",
           "club": "driver",
           "complexity": "risky",
           "github_issue": 669
@@ -7382,7 +7383,7 @@
         },
         {
           "key": "S268-3",
-          "title": "Implement deterministic replay and exactly-once Team Round finalization with explicit late-event and audited-reopen behavior",
+          "title": "Implement deterministic draft and published scorecard projection, replay, and exactly-once Team Round finalization with explicit late-event and audited-reopen behavior",
           "club": "driver",
           "complexity": "risky",
           "github_issue": 669,
@@ -7476,7 +7477,7 @@
       "tickets": [
         {
           "key": "S270-1",
-          "title": "Extend shots and scorecards with accountable actor and role, principal-bound session, contributors, verifier, round, attempt, and version fields",
+          "title": "Implement accountable actor, contributor, verifier, ownership-spell, and participant attribution projections on the canonical S268 scorecard schema",
           "club": "driver",
           "complexity": "risky",
           "github_issue": 669
@@ -7504,7 +7505,7 @@
         },
         {
           "key": "S270-4",
-          "title": "Add unique penalty identity with non-additive team and actor projections plus append-only or transactional merge-safe common-issues learning",
+          "title": "Implement penalty causation, normalized allocation, non-additive participant diagnostics, and append-only or transactional merge-safe common-issues learning on canonical S268 penalty identity",
           "club": "driver",
           "complexity": "risky",
           "github_issue": 669,

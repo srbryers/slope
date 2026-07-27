@@ -1,0 +1,213 @@
+{
+  "sprint_number": 264,
+  "player": "codex",
+  "theme": "Team Round Domain and Scoring Contract",
+  "par": 4,
+  "slope": 4,
+  "score": 19,
+  "score_label": "triple_plus",
+  "date": "2026-07-27",
+  "shots": [
+    {
+      "ticket_key": "S264-1",
+      "title": "Define the Team Round lifecycle and finalization model",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "[architect review] Round uniqueness and idempotency lacked a stable project namespace",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "[architect review] Reopen semantics did not identify which scorecard version remained authoritative",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "[architect review] Reopen correction_scope was recorded but not enforced on mutations or the final delta",
+          "gotcha_id": "review:architect"
+        }
+      ],
+      "notes": "Defined project-scoped round and attempt identity, immutable scorecard versions, exact finalization, audited reopen, late-evidence handling, and correction-scope enforcement."
+    },
+    {
+      "ticket_key": "S264-2",
+      "title": "Define principals, actors, sessions, roles, authority, and visibility",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Separated durable principals and actors from sessions and roles, with explicit authority, visibility allowlists, retirement, and anti-history-reset constraints."
+    },
+    {
+      "ticket_key": "S264-3",
+      "title": "Define Team Round scoring estimands and uncertainty",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "[architect review] Handoff abandonment and unresolved ownership spells could be interpreted as observed zero loss",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "[architect review] Canonical penalty identity was scheduled after the schema needed for finalization",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "rough",
+          "severity": "major",
+          "description": "[ml-engineer review] Completed-shot selection conflicted with an estimand whose denominator includes every accepted exposure",
+          "gotcha_id": "review:ml-engineer"
+        },
+        {
+          "type": "rough",
+          "severity": "major",
+          "description": "[ml-engineer review] Post-outcome handoff state could leak the response into difficulty adjustment",
+          "gotcha_id": "review:ml-engineer"
+        },
+        {
+          "type": "rough",
+          "severity": "major",
+          "description": "[ml-engineer review] Shot loss and penalty loss could count the same failure twice",
+          "gotcha_id": "review:ml-engineer"
+        },
+        {
+          "type": "rough",
+          "severity": "moderate",
+          "description": "[ml-engineer review] Estimator weights and clustered uncertainty were underspecified",
+          "gotcha_id": "review:ml-engineer"
+        },
+        {
+          "type": "rough",
+          "severity": "major",
+          "description": "[ml-engineer review] Unattributed penalties could bias an actor or role handicap downward",
+          "gotcha_id": "review:ml-engineer"
+        },
+        {
+          "type": "rough",
+          "severity": "major",
+          "description": "[ml-engineer review] The expected-loss model could learn the evaluated identity or response",
+          "gotcha_id": "review:ml-engineer"
+        },
+        {
+          "type": "rough",
+          "severity": "moderate",
+          "description": "[ml-engineer review] Five rounds were insufficient for ordinary cluster-bootstrap inference",
+          "gotcha_id": "review:ml-engineer"
+        },
+        {
+          "type": "rough",
+          "severity": "moderate",
+          "description": "[ml-engineer review] External predictive uncertainty could double-count aleatoric outcome variance",
+          "gotcha_id": "review:ml-engineer"
+        }
+      ],
+      "notes": "Defined ownership-spell estimands over accepted exposures, a disjoint loss ledger, missingness rules, identity-safe adjustment, and round-cluster inference thresholds."
+    },
+    {
+      "ticket_key": "S264-4",
+      "title": "Define compatibility and shared-resource boundaries",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "[architect review] Shared-resource identity mixed the protected subject with access mode and policy",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "bunker",
+          "severity": "moderate",
+          "description": "[architect review] Legacy import did not deterministically reconstruct lifecycle or identity",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "[architect review] The minimum canonical scorecard schema was scheduled after the finalization implementation that depends on it",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "rough",
+          "severity": "moderate",
+          "description": "[ml-engineer review] Legacy agents role labels could not safely establish actor identity",
+          "gotcha_id": "review:ml-engineer"
+        }
+      ],
+      "notes": "Defined typed resource subjects, cross-mode conflict fencing, deterministic legacy import, and schema ownership across S268 and S270."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 17,
+    "hazard_penalties": 14.5,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "type": "architecture",
+  "conditions": [
+    {
+      "type": "wind",
+      "impact": "major",
+      "description": "The contract governs multi-agent identity, shared-resource authority, finalization, and statistical attribution across later implementation sprints."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "A multiplayer scoring contract must separate lifecycle truth, identity truth, and statistical estimands before implementation begins.",
+      "outcome": "The roadmap now assigns the minimum canonical schema before finalization and keeps attribution models downstream of accepted evidence."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "tests",
+      "description": "259 test files passed; 4,324 tests passed and 27 were skipped.",
+      "status": "healthy"
+    },
+    {
+      "category": "build",
+      "description": "TypeScript typecheck and the root plus pi-extension production build passed on Node 22.",
+      "status": "healthy"
+    },
+    {
+      "category": "state",
+      "description": "The primary sprint-state SHA-256 remained unchanged across the complete test suite.",
+      "status": "healthy"
+    }
+  ],
+  "bunker_locations": [
+    "Namespace every Team Round identity and idempotency key by stable project identity.",
+    "Keep resource subject identity independent from access mode and policy so cross-mode overlap cannot bypass coordination.",
+    "Do not treat incomplete, handed-off, retried, or unresolved ownership spells as observed zero loss.",
+    "Train difficulty adjustment outside the evaluated identity and round response."
+  ],
+  "yardage_book_updates": [
+    "Pin accepted scorecard and as-of versions before computing any Team Round estimate.",
+    "Keep shot loss, penalty loss, and round adjustments disjoint.",
+    "Require correction_scope enforcement on every reopened mutation and on the final delta.",
+    "Assign the minimum canonical scorecard and penalty identity schema to S268 before finalization."
+  ],
+  "course_management_notes": [
+    "S264.1 should turn this domain contract into the coordination and security contract without reopening the settled scoring estimand."
+  ]
+}
