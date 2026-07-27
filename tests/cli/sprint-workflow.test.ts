@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { sprintCommand } from '../../src/cli/commands/sprint.js';
 import { createStore } from '../../src/store/index.js';
-import type { RoadmapDefinition } from '../../src/core/index.js';
+import type { RoadmapDefinition, SprintId } from '../../src/core/index.js';
 import { WorkflowEngine, loadWorkflow, resolveVariables } from '../../src/core/index.js';
 import { findStaleWorkflowExecutions, scorecardExistsForSprint } from '../../src/cli/workflow-resync.js';
 
@@ -137,7 +137,7 @@ phases:
 `);
 }
 
-function initGitForSprint(sprint: number): void {
+function initGitForSprint(sprint: SprintId): void {
   execFileSync('git', ['init'], { cwd: tmpDir, stdio: 'ignore' });
   execFileSync('git', ['config', 'user.email', 'test@example.com'], { cwd: tmpDir });
   execFileSync('git', ['config', 'user.name', 'Test User'], { cwd: tmpDir });
@@ -629,8 +629,28 @@ describe('slope sprint workflow cleanup', () => {
     }
 
     const state = JSON.parse(readFileSync(join(tmpDir, '.slope', 'sprint-state.json'), 'utf8'));
-    expect(state.sprint).toBe(66);
+    expect(state.sprint).toBe('66');
     expect(state.phase).toBe('implementing');
+  });
+
+  it('keeps an inserted sprint ending in zero distinct during resync', async () => {
+    initGitForSprint('458.10');
+    writeProjectWorkflow('decimal-resync');
+    const execId = await startWorkflow('S458.10', 'decimal-resync');
+
+    const store = createStore({ storePath: '.slope/slope.db', cwd: tmpDir });
+    try {
+      await store.updateExecutionState(execId, 'pre_hole', 'verify_previous');
+    } finally {
+      store.close();
+    }
+
+    const output = await captureLog(() => sprintCommand(['workflow', 'resync']));
+    const state = JSON.parse(readFileSync(join(tmpDir, '.slope', 'sprint-state.json'), 'utf8'));
+
+    expect(output).toContain('Fast-forwarded S458.10');
+    expect(state).toMatchObject({ sprint: '458.10', phase: 'implementing' });
+    expect(state.sprint).not.toBe('458.1');
   });
 });
 
@@ -1190,5 +1210,18 @@ describe('workflow resync scorecard lookup', () => {
     writeFileSync(join(tmpDir, 'docs', 'retros', 'sprint-143.99-S143.99.json'), '{}');
 
     expect(scorecardExistsForSprint(tmpDir, 143.99)).toBe(true);
+  });
+
+  it('does not alias scorecard identity 458.10 to 458.1', () => {
+    writeFileSync(join(tmpDir, '.slope', 'config.json'), JSON.stringify({
+      scorecardDir: 'docs/retros',
+      scorecardPattern: 'sprint-*.json',
+      minSprint: 1,
+    }));
+    mkdirSync(join(tmpDir, 'docs', 'retros'), { recursive: true });
+    writeFileSync(join(tmpDir, 'docs', 'retros', 'sprint-458.10.json'), '{}');
+
+    expect(scorecardExistsForSprint(tmpDir, '458.10')).toBe(true);
+    expect(scorecardExistsForSprint(tmpDir, '458.1')).toBe(false);
   });
 });

@@ -3,20 +3,20 @@ import { dirname, isAbsolute, join, relative } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import {
   discoverScorecardFiles,
-  extractSprintReferences,
   formatSprintLabel,
   formatSprintNumber,
   latestSprintIdKey,
   loadScorecards,
   nextCanonicalSprintId,
-  parseSprintNumber,
-  sprintNumberFromScorecardFile,
   roadmapSprintKey,
+  sprintIdKey,
   sprintIdsEqual,
+  sprintNumberFromScorecardFile,
   type RoadmapSprint,
   type SlopeConfig,
+  type SprintId,
 } from '../core/index.js';
-import { loadRoadmapForInference, maxSprintByOrder } from './sprint-inference.js';
+import { loadRoadmapForInference } from './sprint-inference.js';
 import { isSprintPhase, type SprintPhase } from './sprint-state.js';
 
 export const RESUME_POINTER_SCHEMA = 'slope.sprint_resume_pointer.v1';
@@ -39,7 +39,7 @@ export interface SprintResumeClaimPointer {
 
 export interface SprintResumePointer {
   schema: typeof RESUME_POINTER_SCHEMA;
-  sprint: number;
+  sprint: string;
   phase: SprintPhase;
   source_branch?: string;
   source_commit?: string;
@@ -51,7 +51,7 @@ export interface SprintResumePointer {
 }
 
 export interface PortableResumePlan {
-  sprint: number;
+  sprint: string;
   phase: SprintPhase;
   source: 'pointer' | 'explicit' | 'branch' | 'git' | 'roadmap' | 'scorecards';
   pointerPath?: string;
@@ -64,7 +64,7 @@ export interface PortableResumePlan {
 }
 
 export interface PortableResumeOptions {
-  sprint?: number;
+  sprint?: SprintId;
   phase?: SprintPhase;
   from?: string;
   force?: boolean;
@@ -104,19 +104,23 @@ export function isCommitAncestor(cwd: string, maybeAncestor: string): boolean {
   }
 }
 
-export function sprintFromBranchName(branch: string | null): number | null {
+export function sprintFromBranchName(branch: string | null): string | null {
   if (!branch) return null;
   const match = branch.match(/(?:^|[\/_-])S?(\d+(?:\.\d+)?)(?=$|[\/_-])/i);
-  return match ? parseSprintNumber(match[1]) : null;
+  return match ? sprintIdKey(match[1]) : null;
 }
 
-export function sprintFromRecentGitHistory(cwd: string): number | null {
+export function sprintFromRecentGitHistory(cwd: string): string | null {
   try {
     const subjects = execFileSync('git', ['log', '--format=%s', '-n', '30'], { cwd, encoding: 'utf8', timeout: 3000 })
       .split('\n')
       .filter(Boolean);
-    const refs = [...extractSprintReferences(subjects)];
-    return refs.length > 0 ? refs[0] : null;
+    for (const subject of subjects) {
+      const match = subject.match(/\bS(\d+(?:\.\d+)?)(?:-\d+)?(?![\d.])/i);
+      const sprint = match ? sprintIdKey(match[1]) : null;
+      if (sprint !== null) return sprint;
+    }
+    return null;
   } catch {
     return null;
   }
@@ -125,12 +129,15 @@ export function sprintFromRecentGitHistory(cwd: string): number | null {
 export function loadSprintResumePointer(cwd: string, pointerPath = defaultResumePointerPath(cwd)): SprintResumePointer | null {
   if (!existsSync(pointerPath)) return null;
   try {
-    const raw = JSON.parse(readFileSync(pointerPath, 'utf8')) as Partial<SprintResumePointer>;
+    const raw = JSON.parse(readFileSync(pointerPath, 'utf8')) as Partial<SprintResumePointer> & { sprint?: unknown };
     if (raw.schema !== RESUME_POINTER_SCHEMA) return null;
-    if (typeof raw.sprint !== 'number' || !raw.phase || !isSprintPhase(raw.phase)) return null;
+    const sprint = typeof raw.sprint === 'string' || typeof raw.sprint === 'number'
+      ? sprintIdKey(raw.sprint)
+      : null;
+    if (sprint === null || !raw.phase || !isSprintPhase(raw.phase)) return null;
     return {
       schema: RESUME_POINTER_SCHEMA,
-      sprint: raw.sprint,
+      sprint,
       phase: raw.phase,
       source_branch: typeof raw.source_branch === 'string' ? raw.source_branch : undefined,
       source_commit: typeof raw.source_commit === 'string' ? raw.source_commit : undefined,
@@ -168,16 +175,18 @@ function normalizeResumeClaimPointer(claim: SprintResumeClaimPointer): SprintRes
 export function buildSprintResumePointer(
   cwd: string,
   config: SlopeConfig,
-  input: { sprint: number; phase: SprintPhase; resumeClaims?: SprintResumeClaimPointer[] },
+  input: { sprint: SprintId; phase: SprintPhase; resumeClaims?: SprintResumeClaimPointer[] },
 ): SprintResumePointer {
+  const sprint = sprintIdKey(input.sprint);
+  if (sprint === null) throw new Error(`Invalid sprint id: ${String(input.sprint)}`);
   return {
     schema: RESUME_POINTER_SCHEMA,
-    sprint: input.sprint,
+    sprint,
     phase: input.phase,
     source_branch: currentGitBranch(cwd) ?? undefined,
     source_commit: currentGitCommit(cwd) ?? undefined,
     generated_at: new Date().toISOString(),
-    evidence: collectResumeEvidence(cwd, config, input.sprint),
+    evidence: collectResumeEvidence(cwd, config, sprint),
     resume_claims: input.resumeClaims ?? [],
     local_only_excluded: LOCAL_ONLY_EXCLUDED,
     unsafe_to_auto_resume_if: UNSAFE_TO_AUTO_RESUME_IF,
@@ -185,8 +194,10 @@ export function buildSprintResumePointer(
 }
 
 export function writeSprintResumePointer(cwd: string, pointer: SprintResumePointer, outputPath = defaultResumePointerPath(cwd)): string {
+  const sprint = sprintIdKey(pointer.sprint);
+  if (sprint === null) throw new Error(`Invalid sprint id: ${String(pointer.sprint)}`);
   mkdirSync(dirname(outputPath), { recursive: true });
-  writeFileSync(outputPath, JSON.stringify(pointer, null, 2) + '\n', 'utf8');
+  writeFileSync(outputPath, JSON.stringify({ ...pointer, sprint }, null, 2) + '\n', 'utf8');
   return relative(cwd, outputPath).replace(/\\/g, '/');
 }
 
@@ -224,8 +235,11 @@ function inferPortableSprint(
   config: SlopeConfig,
   options: PortableResumeOptions,
   pointer: SprintResumePointer | null,
-): { sprint: number; source: PortableResumePlan['source'] } {
-  if (options.sprint) return { sprint: options.sprint, source: 'explicit' };
+): { sprint: string; source: PortableResumePlan['source'] } {
+  if (options.sprint !== undefined) {
+    const sprint = sprintIdKey(options.sprint);
+    if (sprint !== null) return { sprint, source: 'explicit' };
+  }
   if (pointer) return { sprint: pointer.sprint, source: 'pointer' };
 
   const branchSprint = sprintFromBranchName(currentGitBranch(cwd));
@@ -236,13 +250,15 @@ function inferPortableSprint(
 
   const roadmap = loadRoadmapForInference(cwd, config);
   const completed = new Set(loadScorecards(config, cwd).map(card => card.sprint_number));
-  const roadmapSprint = roadmap?.sprints
-    .filter(sprint => !completed.has(roadmapSprintKey(roadmap, sprint)))
-    .find(sprint => (sprint as RoadmapSprint & { status?: string }).status !== 'complete' && (sprint as RoadmapSprint & { status?: string }).status !== 'superseded');
-  if (roadmapSprint) return { sprint: roadmapSprint.id, source: 'roadmap' };
+  if (roadmap) {
+    const roadmapSprint = roadmap.sprints
+      .filter(sprint => !completed.has(roadmapSprintKey(roadmap, sprint)))
+      .find(sprint => (sprint as RoadmapSprint & { status?: string }).status !== 'complete' && (sprint as RoadmapSprint & { status?: string }).status !== 'superseded');
+    if (roadmapSprint) return { sprint: roadmapSprintKey(roadmap, roadmapSprint), source: 'roadmap' };
+  }
 
   const latest = latestSprintIdKey([...completed]);
-  return { sprint: latest !== '0' ? nextCanonicalSprintId(latest) : 1, source: 'scorecards' };
+  return { sprint: latest !== '0' ? nextCanonicalSprintId(latest) : '1', source: 'scorecards' };
 }
 
 function validatePointerForResume(cwd: string, config: SlopeConfig, pointer: SprintResumePointer, currentBranch?: string): string[] {
@@ -262,7 +278,11 @@ function validatePointerForResume(cwd: string, config: SlopeConfig, pointer: Spr
   }
 
   const roadmap = loadRoadmapForInference(cwd, config);
-  const sprint = roadmap?.sprints.find(s => s.id === pointer.sprint) as (RoadmapSprint & { status?: string }) | undefined;
+  const sprint = roadmap
+    ? roadmap.sprints.find(s =>
+      sprintIdsEqual(roadmapSprintKey(roadmap, s), pointer.sprint)
+    ) as (RoadmapSprint & { status?: string }) | undefined
+    : undefined;
   if (sprint?.status === 'complete' && pointer.phase !== 'complete') {
     unsafe.push(`pointer phase ${pointer.phase} conflicts with completed roadmap sprint ${formatSprintLabel(pointer.sprint)}`);
   }
@@ -270,7 +290,7 @@ function validatePointerForResume(cwd: string, config: SlopeConfig, pointer: Spr
   return unsafe;
 }
 
-function collectResumeEvidence(cwd: string, config: SlopeConfig, sprint: number): Record<string, string> {
+function collectResumeEvidence(cwd: string, config: SlopeConfig, sprint: SprintId): Record<string, string> {
   const evidence: Record<string, string> = {};
   if (existsSync(join(cwd, config.roadmapPath))) {
     evidence.roadmap = `${config.roadmapPath}#${formatSprintLabel(sprint)}`;
@@ -282,7 +302,7 @@ function collectResumeEvidence(cwd: string, config: SlopeConfig, sprint: number)
   return evidence;
 }
 
-function findScorecardForSprint(cwd: string, config: SlopeConfig, sprint: number): string | null {
+function findScorecardForSprint(cwd: string, config: SlopeConfig, sprint: SprintId): string | null {
   for (const file of discoverScorecardFiles(config, cwd)) {
     const scorecardSprint = sprintNumberFromScorecardFile(file, config);
     if (scorecardSprint !== null && sprintIdsEqual(scorecardSprint, sprint)) {

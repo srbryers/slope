@@ -13,7 +13,6 @@ import {
   roadmapSprintKey,
   sprintIdKey,
   sprintIdsEqual,
-  sprintIdToNumber,
   type RoadmapSprint,
   type SprintId,
   type WorkflowDefinition,
@@ -37,8 +36,8 @@ export interface WorkflowResyncResult {
 }
 
 export interface SprintStateRebindResult {
-  sprint: number;
-  previousSprint?: number;
+  sprint: string;
+  previousSprint?: string;
   rebound: boolean;
   reason?: string;
 }
@@ -266,9 +265,8 @@ export async function reconcileWorkflowExecutions(
     const target = workflowFastForwardTarget(cwd, exec);
     if (!target) continue;
     await store.updateExecutionState(exec.id, target.phase, target.step);
-    const sprint = sprintNumberFromId(exec.sprint_id);
-    const stateSprint = sprint === null ? null : sprintIdToNumber(sprint);
-    if (stateSprint !== null) syncSprintStateWithWorkflowPhase(cwd, stateSprint, target.phase);
+    const sprint = sprintNumberForExecution(exec);
+    if (sprint !== null) syncSprintStateWithWorkflowPhase(cwd, sprint, target.phase);
     fastForwarded.push({ exec, ...target });
   }
 
@@ -296,7 +294,7 @@ function workflowFastForwardTarget(cwd: string, exec: WorkflowExecution): { phas
   const sprint = sprintNumberForExecution(exec);
   if (sprint === null) return null;
   const branchSprint = inferSprintFromBranch(cwd);
-  if (branchSprint !== sprint) return null;
+  if (branchSprint === null || !sprintIdsEqual(branchSprint, sprint)) return null;
   if (!hasSprintCommits(cwd, sprint)) return null;
 
   const def = loadExecutionWorkflow(exec, cwd);
@@ -341,7 +339,7 @@ function workflowPosition(def: WorkflowDefinition, phaseId: string | undefined, 
   return -1;
 }
 
-function isStaleSprintStateForBranch(cwd: string, stateSprint: number, branchSprint: SprintId): boolean {
+function isStaleSprintStateForBranch(cwd: string, stateSprint: SprintId, branchSprint: SprintId): boolean {
   const stateKey = sprintIdKey(stateSprint)!;
   const branchKey = sprintIdKey(branchSprint)!;
   if (compareSprintIdKeys(stateKey, branchKey) < 0) return true;
@@ -373,23 +371,25 @@ function sprintPhaseForWorkflowPhase(workflowPhase: string): SprintPhase | null 
   }
 }
 
-function syncSprintStateWithWorkflowPhase(cwd: string, sprint: number, workflowPhase: string): void {
+function syncSprintStateWithWorkflowPhase(cwd: string, sprint: SprintId, workflowPhase: string): void {
   const nextPhase = sprintPhaseForWorkflowPhase(workflowPhase);
   if (!nextPhase) return;
+  const sprintKey = sprintIdKey(sprint);
+  if (sprintKey === null) return;
 
   const existing = loadSprintState(cwd);
   if (!existing) {
-    initializeSprintState(cwd, createSprintState(sprint, nextPhase));
+    initializeSprintState(cwd, createSprintState(sprintKey, nextPhase));
     return;
   }
-  if (existing.sprint !== sprint) {
+  if (!sprintIdsEqual(existing.sprint, sprintKey)) {
     return;
   }
   if (existing.phase === 'complete') return;
   if (SPRINT_PHASE_ORDER[nextPhase] <= SPRINT_PHASE_ORDER[existing.phase]) return;
 
   mutateSprintState(cwd, current => {
-    if (current.sprint !== sprint || current.phase === 'complete') return false;
+    if (!sprintIdsEqual(current.sprint, sprintKey) || current.phase === 'complete') return false;
     if (SPRINT_PHASE_ORDER[nextPhase] <= SPRINT_PHASE_ORDER[current.phase]) return false;
     current.phase = nextPhase;
     return true;
