@@ -2,8 +2,13 @@ import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { existsSync, realpathSync, writeFileSync, readFileSync, readdirSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { checkConflicts } from '../../core/index.js';
-import type { SlopeSession } from '../../core/index.js';
+import {
+  checkConflicts,
+  currentGitBranch,
+  observeSessionBranches,
+  resolveRepoStateCwd,
+} from '../../core/index.js';
+import type { ObservedSlopeSession, SlopeSession } from '../../core/index.js';
 import { STALE_SESSION_THRESHOLD_MS } from '../../core/constants.js';
 import { resolveStore } from '../store.js';
 import { resolveSessionStoreCwd } from '../session-scope.js';
@@ -114,7 +119,7 @@ async function startSession(flags: Record<string, string>, cwd: string): Promise
     const sessionId = flags['session-id'] || randomUUID();
     const role = (flags.role ?? 'primary') as 'primary' | 'secondary' | 'observer';
     const ide = flags.ide ?? 'unknown';
-    const branch = flags.branch;
+    const branch = flags.branch ?? currentGitBranch(cwd);
     const worktreePath = flags['worktree-path'];
     const swarmId = flags.swarm;
     const agentRole = flags['agent-role'];
@@ -259,7 +264,14 @@ async function heartbeat(flags: Record<string, string>, cwd: string): Promise<vo
       process.exit(1);
     }
 
-    await store.updateHeartbeat(sessionId);
+    const sessions = await store.getActiveSessions();
+    const session = sessions.find(candidate => candidate.session_id === sessionId);
+    const branch = currentGitBranch(session?.worktree_path ?? cwd);
+    if (branch) {
+      await store.updateSession(sessionId, { branch });
+    } else {
+      await store.updateHeartbeat(sessionId);
+    }
     console.log(`Heartbeat updated for session ${sessionId}`);
   } finally {
     store.close();
@@ -295,9 +307,13 @@ async function listSessions(flags: Record<string, string>, cwd: string): Promise
   const store = await resolveStore(resolveSessionStoreCwd(cwd));
   try {
     const swarmId = flags.swarm;
-    const sessions = swarmId
+    const storedSessions = swarmId
       ? await store.getSessionsBySwarm(swarmId)
       : await store.getActiveSessions();
+    const sessions = observeSessionBranches(
+      storedSessions,
+      resolveRepoStateCwd(cwd),
+    );
 
     if (sessions.length === 0) {
       const label = swarmId ? `No sessions in swarm "${swarmId}"` : 'No active sessions';
@@ -318,7 +334,7 @@ async function listSessions(flags: Record<string, string>, cwd: string): Promise
       const swarmTag = s.swarm_id && !swarmId ? ` swarm:${s.swarm_id}` : '';
 
       console.log(`  ${s.session_id}${agentTag}${swarmTag}`);
-      console.log(`    Role: ${s.role}  IDE: ${s.ide}  Branch: ${s.branch ?? '-'}`);
+      console.log(`    Role: ${s.role}  IDE: ${s.ide}  ${formatBranchStatus(s)}`);
       console.log(`    Started: ${s.started_at}  Heartbeat: ${s.last_heartbeat_at}`);
       if (sessionClaims.length > 0) {
         console.log(`    Claims: ${sessionClaims.length}`);
@@ -365,13 +381,26 @@ async function listSessions(flags: Record<string, string>, cwd: string): Promise
   }
 }
 
+function formatBranchStatus(session: ObservedSlopeSession): string {
+  if (session.branch_source === 'current') {
+    return `Branch: ${session.branch ?? '-'}`;
+  }
+  if (session.branch_source === 'at_start') {
+    return `Branch at start: ${session.branch}`;
+  }
+  return 'Branch: unknown';
+}
+
 // ── T4: Dashboard ────────────────────────────────────
 
 async function dashboardCommand(flags: Record<string, string>, cwd: string): Promise<void> {
   const store = await resolveStore(resolveSessionStoreCwd(cwd));
   try {
     await store.cleanStaleSessions(STALE_SESSION_THRESHOLD_MS);
-    const sessions = await store.getActiveSessions();
+    const sessions = observeSessionBranches(
+      await store.getActiveSessions(),
+      resolveRepoStateCwd(cwd),
+    );
     const now = Date.now();
 
     if (sessions.length === 0) {

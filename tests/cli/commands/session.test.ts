@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -128,5 +129,56 @@ describe('slope session command', () => {
     } finally {
       after.close();
     }
+  });
+
+  it('refreshes the stored branch when heartbeat runs after checkout', async () => {
+    execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: tmpDir });
+    const store = createStore();
+    try {
+      await store.registerSession({
+        session_id: 'branch-session',
+        role: 'primary',
+        ide: 'codex',
+        branch: 'main',
+      });
+    } finally {
+      store.close();
+    }
+    execFileSync('git', ['checkout', '-q', '-b', 'feature/current'], { cwd: tmpDir });
+
+    await sessionCommand(['heartbeat', '--session-id=branch-session']);
+
+    const after = createStore();
+    try {
+      expect((await after.getActiveSessions())[0].branch).toBe('feature/current');
+    } finally {
+      after.close();
+    }
+  });
+
+  it('shows the live branch on session list without trusting the stored branch', async () => {
+    execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: tmpDir });
+    const store = createStore();
+    try {
+      await store.registerSession({
+        session_id: 'listed-session',
+        role: 'primary',
+        ide: 'codex',
+        branch: 'main',
+      });
+    } finally {
+      store.close();
+    }
+    execFileSync('git', ['checkout', '-q', '-b', 'feature/listed'], { cwd: tmpDir });
+    const logs: string[] = [];
+    const log = vi.spyOn(console, 'log').mockImplementation((...args) => {
+      logs.push(args.join(' '));
+    });
+
+    await sessionCommand(['list']);
+
+    log.mockRestore();
+    expect(logs.join('\n')).toContain('Branch: feature/listed');
+    expect(logs.join('\n')).not.toContain('Branch: main');
   });
 });

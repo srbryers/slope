@@ -509,6 +509,42 @@ describe('mock store tools', () => {
     expect(claims).toHaveLength(1);
   });
 
+  it('session_status labels an observed checkout branch as current', async () => {
+    const project = mkdtempSync(join(tmpdir(), 'slope-mcp-session-branch-'));
+    execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: project });
+    execFileSync('git', ['checkout', '-q', '-b', 'feature/status'], { cwd: project });
+    const store = createMockStore();
+    await store.registerSession({
+      session_id: 'branch-status',
+      role: 'primary',
+      ide: 'claude-code',
+      branch: 'main',
+    });
+    const server = createSlopeToolsServer(store, undefined, undefined, undefined, project);
+    const client = new Client({ name: 'session-branch-test', version: '1.0.0' });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+
+    try {
+      const result = await client.callTool({
+        name: 'session_status',
+        arguments: {},
+      });
+      const parsed = JSON.parse(toolText(result)) as {
+        sessions: Array<{ branch: string; branch_source: string }>;
+      };
+      expect(parsed.sessions[0]).toMatchObject({
+        branch: 'feature/status',
+        branch_source: 'current',
+      });
+    } finally {
+      await client.close();
+      await server.close();
+      rmSync(project, { recursive: true, force: true });
+    }
+  });
+
   it('acquire_claim creates claim in mock', async () => {
     const store = createMockStore();
     const claim = await store.claim({ sprint_number: 1, player: 'bob', target: 'T-2', scope: 'ticket' });
