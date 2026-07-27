@@ -5,11 +5,9 @@ import {
   validateRoadmap,
   castRoadmapStructure,
   findShippedSprintsOnMain,
-  compareSprintIds,
   computeCriticalPath,
   findParallelOpportunities,
   findRoadmapSprint,
-  formatSprintNumber,
   formatRoadmapSummary,
   formatStrategicContext,
   buildRoadmapFocus,
@@ -23,8 +21,9 @@ import {
   discoverScorecardFiles,
   sprintNumberFromScorecardFile,
   sprintIdKey,
+  latestSprintIdKey,
+  nextCanonicalSprintId,
   loadVision,
-  parseSprintNumber,
   analyzeBacklog,
   mergeBacklogs,
   runAnalyzers,
@@ -107,7 +106,7 @@ function blockedByForSprint(
 function statusLabelForSprint(
   roadmap: RoadmapDefinition,
   sprint: RoadmapSprint,
-  currentSprint: number,
+  currentSprint: SprintId,
   completedSprints: Set<string>,
 ): string {
   const explicitStatus = getRoadmapStatus(sprint);
@@ -125,7 +124,7 @@ function statusLabelForSprint(
   return '\u25CB pending';
 }
 
-function phaseForSprint(roadmap: RoadmapDefinition, sprintId: number) {
+function phaseForSprint(roadmap: RoadmapDefinition, sprintId: SprintId) {
   const key = roadmapSprintKeyFromId(roadmap, sprintId);
   return roadmap.phases.find(phase => {
     const ids = phase.sprint_keys ?? phase.sprints.map(String);
@@ -204,14 +203,14 @@ function resolveSprint(
   cwd: string,
   roadmap?: RoadmapDefinition,
   scorecards: GolfScorecard[] = [],
-): number {
+): string {
   if (flags.sprint) {
-    const parsed = parseSprintNumber(flags.sprint);
+    const parsed = sprintIdKey(flags.sprint);
     if (parsed == null) {
       console.error(`\nInvalid sprint number: ${flags.sprint}\n`);
       process.exit(1);
     }
-    return parsed;
+    return roadmap ? roadmapSprintKeyFromId(roadmap, parsed) ?? parsed : parsed;
   }
 
   const completedSprints = new Set(
@@ -223,17 +222,18 @@ function resolveSprint(
   if (roadmapCurrent != null) return roadmapCurrent;
 
   const config = loadConfig(cwd);
-  if (config.currentSprint && config.currentSprint > 0) return config.currentSprint;
-  if (scorecards.length === 0) return 1;
-  const sprintNumbers = scorecards.map(s => s.sprint_number).filter(n => typeof n === 'number' && n > 0);
-  if (sprintNumbers.length === 0) return 1;
-  return Math.max(...sprintNumbers) + 1;
+  const configured = config.currentSprint == null ? null : sprintIdKey(config.currentSprint);
+  if (configured != null) {
+    return roadmap ? roadmapSprintKeyFromId(roadmap, configured) ?? configured : configured;
+  }
+  const latest = latestSprintIdKey(scorecards.map(s => s.sprint_number), '');
+  return latest ? nextCanonicalSprintId(latest) : '1';
 }
 
 function resolveRoadmapCurrentSprint(
   roadmap: RoadmapDefinition | undefined,
   completedSprints: Set<string>,
-): number | null {
+): string | null {
   const candidates = roadmap?.sprints
     .filter(sprint => isRoadmapSprintPending(sprint)
       && !completedSprints.has(roadmapSprintKey(roadmap, sprint)))
@@ -246,7 +246,7 @@ function resolveRoadmapCurrentSprint(
   if (candidates.length === 0) return null;
 
   const active = candidates.find(sprint => getRoadmapStatus(sprint) === 'active');
-  return (active ?? candidates[0]).id;
+  return roadmapSprintKey(roadmap!, active ?? candidates[0]);
 }
 
 // --- Subcommands ---
@@ -583,7 +583,7 @@ function focusSubcommand(flags: Record<string, string>, cwd: string): void {
   const config = loadConfig(cwd);
   const scorecards = loadScorecards(config, cwd);
   const completedSprintIds = scorecards.map(card => card.sprint_number);
-  const hazards: RoadmapFocusHazard[] = roadmapRealityIssues(buildRoadmapReality(cwd, roadmap), selected.id)
+  const hazards: RoadmapFocusHazard[] = roadmapRealityIssues(buildRoadmapReality(cwd, roadmap), selectedKey)
     .map(issue => ({
       sprint: selectedKey,
       sprint_label: formatRoadmapSprintLabel(roadmap, selectedKey),
@@ -839,7 +839,7 @@ function archiveSourcesSubcommand(flags: Record<string, string>, cwd: string): v
     process.exit(1);
     return;
   }
-  const through = parseSprintNumber(flags.through);
+  const through = sprintIdKey(flags.through);
   if (through == null) {
     console.error(`\nInvalid archive boundary: ${flags.through || '(empty)'}\n`);
     process.exit(1);
@@ -848,8 +848,11 @@ function archiveSourcesSubcommand(flags: Record<string, string>, cwd: string): v
 
   try {
     const store = loadRoadmapSourceStore(cwd, flags.source);
+    assertCanonicalArchiveBoundary(store, through);
     const projectionBefore = existsSync(store.outputPath) ? readFileSync(store.outputPath, 'utf8') : null;
-    const plan = planRoadmapSourceArchive(store, through);
+    // The source-store API is still typed with its legacy numeric boundary, but
+    // it accepts SprintId at runtime through roadmap-aware ordering.
+    const plan = planRoadmapSourceArchive(store, through as unknown as number);
     console.log(`\nRoadmap archive through Sprint ${through}:`);
     if (plan.moves.length === 0) {
       console.log('  No complete live phases are eligible.\n');
@@ -874,9 +877,27 @@ function archiveSourcesSubcommand(flags: Record<string, string>, cwd: string): v
   }
 }
 
+function assertCanonicalArchiveBoundary(
+  store: ReturnType<typeof loadRoadmapSourceStore>,
+  through: SprintId,
+): void {
+  for (const source of store.sources) {
+    if (source.entry.kind !== 'phase') continue;
+    const sprintIds: SprintId[] = source.document.phase.sprint_keys
+      ?? source.document.phase.sprints;
+    const comparisons = sprintIds
+      .map(id => compareRoadmapSprintIds(store.roadmap, id, through));
+    if (comparisons.some(value => value <= 0) && comparisons.some(value => value > 0)) {
+      throw new Error(
+        `--through would split phase "${source.document.phase.name}"; archive whole phases only`,
+      );
+    }
+  }
+}
+
 function printFullRoadmapStatus(
   roadmap: RoadmapDefinition,
-  currentSprint: number,
+  currentSprint: SprintId,
   completedSprints: Set<string>,
 ): void {
   console.log(`\n# Roadmap Status — ${roadmap.name}`);
@@ -952,7 +973,7 @@ function printFullRoadmapStatus(
 
 function printCompactRoadmapStatus(
   roadmap: RoadmapDefinition,
-  currentSprint: number,
+  currentSprint: SprintId,
   completedSprints: Set<string>,
   cwd: string,
 ): void {

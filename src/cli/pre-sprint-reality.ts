@@ -7,6 +7,8 @@ import {
   formatSprintLabel,
   loadScorecards,
   parseRoadmap,
+  roadmapSprintKeyFromId,
+  sprintIdKey,
   validateRoadmap,
 } from '../core/index.js';
 import type {
@@ -14,6 +16,7 @@ import type {
   RoadmapValidationError,
   RoadmapValidationResult,
   RoadmapValidationWarning,
+  SprintId,
 } from '../core/index.js';
 import { loadConfig } from './config.js';
 
@@ -72,21 +75,25 @@ export function loadRoadmapReality(cwd: string): RoadmapReality {
   }
 }
 
-export function roadmapRealityIssues(reality: RoadmapReality, sprint?: number): RoadmapIssue[] {
+export function roadmapRealityIssues(reality: RoadmapReality, sprint?: SprintId): RoadmapIssue[] {
   const validation = reality.validation;
   if (!validation) return [];
+  const selectedKey = sprint == null ? null : roadmapRealitySprintKey(reality, sprint);
 
   return [...validation.errors, ...validation.warnings]
     .filter(isRealityIssue)
-    .filter(issue => sprint == null || issue.sprint === sprint);
+    .filter(issue => selectedKey == null || (
+      issue.sprint != null
+      && roadmapRealitySprintKey(reality, issue.sprint) === selectedKey
+    ));
 }
 
-export function blockingRoadmapIssuesForSprint(reality: RoadmapReality, sprint: number): RoadmapIssue[] {
+export function blockingRoadmapIssuesForSprint(reality: RoadmapReality, sprint: SprintId): RoadmapIssue[] {
   return roadmapRealityIssues(reality, sprint)
     .filter(issue => /has shipped commits on main|has a scorecard/.test(issue.message));
 }
 
-export function formatRoadmapRealitySection(reality: RoadmapReality, sprint?: number, limit = 8): string[] {
+export function formatRoadmapRealitySection(reality: RoadmapReality, sprint?: SprintId, limit = 8): string[] {
   const issues = roadmapRealityIssues(reality, sprint);
   if (issues.length === 0) return [];
 
@@ -101,6 +108,12 @@ export function formatRoadmapRealitySection(reality: RoadmapReality, sprint?: nu
     lines.push(`  ... ${issues.length - shown.length} more roadmap reality issue(s)`);
   }
   return lines;
+}
+
+function roadmapRealitySprintKey(reality: RoadmapReality, sprint: SprintId): string | null {
+  return reality.roadmap
+    ? roadmapSprintKeyFromId(reality.roadmap, sprint)
+    : sprintIdKey(sprint);
 }
 
 export function collectSiblingWorktreeReality(cwd: string, baseRef?: string): WorktreeReality[] {

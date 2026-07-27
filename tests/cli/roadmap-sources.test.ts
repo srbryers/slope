@@ -371,6 +371,69 @@ describe('slope roadmap validate-sources', () => {
 });
 
 describe('slope roadmap archive', () => {
+  it('keeps a canonical .10 archive boundary distinct from .1', async () => {
+    const root = join(cwd, 'docs', 'roadmap');
+    mkdirSync(join(root, 'phases'), { recursive: true });
+    mkdirSync(join(cwd, 'docs', 'retros'), { recursive: true });
+    writeFileSync(join(root, 'project.yaml'), `
+version: 1
+name: Canonical Archive
+output: ../backlog/roadmap.json
+sources:
+  - path: phases/canonical.yaml
+    kind: phase
+`);
+    writeFileSync(join(root, 'phases', 'canonical.yaml'), `
+version: 1
+phase:
+  name: Canonical inserts
+  status: complete
+  sprints: ["458.1", "458.10"]
+sprints:
+  - id: "458.1"
+    theme: First insert
+    par: 3
+    slope: 1
+    type: feature
+    status: complete
+    tickets:
+      - {key: S458.1-1, title: T1, club: wedge, complexity: small}
+      - {key: S458.1-2, title: T2, club: wedge, complexity: small}
+      - {key: S458.1-3, title: T3, club: wedge, complexity: small}
+  - id: "458.10"
+    theme: Tenth insert
+    par: 3
+    slope: 1
+    type: feature
+    status: complete
+    tickets:
+      - {key: S458.10-1, title: T1, club: wedge, complexity: small}
+      - {key: S458.10-2, title: T2, club: wedge, complexity: small}
+      - {key: S458.10-3, title: T3, club: wedge, complexity: small}
+scorecards:
+  "458.1": docs/retros/sprint-458.1.json
+  "458.10": docs/retros/sprint-458.10.json
+`);
+    writeFileSync(join(cwd, 'docs', 'retros', 'sprint-458.1.json'), JSON.stringify({ sprint_number: '458.1' }));
+    writeFileSync(join(cwd, 'docs', 'retros', 'sprint-458.10.json'), JSON.stringify({ sprint_number: '458.10' }));
+    await roadmapCommand(['compile']);
+
+    logs = [];
+    errors = [];
+    const codes = mockExit();
+    await expect(roadmapCommand(['archive', '--through=458.1', '--dry-run']))
+      .rejects.toThrow('process.exit(1)');
+    expect(codes).toEqual([1]);
+    expect(errors.join('\n')).toContain('split phase "Canonical inserts"');
+
+    logs = [];
+    errors = [];
+    await roadmapCommand(['archive', '--through=458.10', '--dry-run']);
+    expect(logs.join('\n')).toContain('Roadmap archive through Sprint 458.10');
+    expect(logs.join('\n')).toContain('phases/canonical.yaml -> archive/canonical.yaml');
+    expect(errors).toEqual([]);
+  });
+
   it('validates coexisting .1 and .10 archive evidence by canonical key', () => {
     const root = join(cwd, 'docs', 'roadmap');
     mkdirSync(join(root, 'archive'), { recursive: true });

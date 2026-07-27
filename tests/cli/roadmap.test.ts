@@ -573,6 +573,43 @@ describe('slope roadmap status', () => {
     expect(output).toContain('S9');
     expect(output).toContain('active');
   });
+
+  it('keeps canonical trailing-zero status selectors distinct', () => {
+    const canonicalSprint = (key: '458.1' | '458.10', theme: string) => ({
+      id: 458.1,
+      id_key: key,
+      theme,
+      par: 3 as const,
+      slope: 1,
+      type: 'repair',
+      status: 'planned',
+      tickets: [1, 2, 3].map(number => ({
+        key: `S${key}-${number}`,
+        title: `T${number}`,
+        club: 'wedge' as const,
+        complexity: 'small' as const,
+      })),
+    });
+    writeRoadmap(tmpDir, makeRoadmapJson({
+      phases: [{
+        name: 'Canonical inserts',
+        sprints: [458.1, 458.1],
+        sprint_keys: ['458.1', '458.10'],
+      }],
+      sprints: [
+        canonicalSprint('458.1', 'First insert'),
+        canonicalSprint('458.10', 'Tenth insert'),
+      ],
+    }));
+    writeConfig(tmpDir);
+
+    roadmapCommand(['status', '--sprint=458.10', '--full']);
+
+    const lines = consoleOutput.join('\n').split('\n');
+    expect(lines).toContain('Current sprint: S458.10');
+    expect(lines.find(line => line.trimStart().startsWith('S458.1 '))).toContain('\u25CB pending');
+    expect(lines.find(line => line.trimStart().startsWith('S458.10 '))).toContain('\u25B6 active');
+  });
 });
 
 describe('slope roadmap focus', () => {
@@ -750,6 +787,13 @@ describe('slope roadmap focus', () => {
       sprint: '458.10',
       ref: 'docs/retros/sprint-458.10.json',
     })]);
+    expect(parsed.hazards.filter((hazard: { type: string }) =>
+      hazard.type === 'roadmap_reality')).toEqual([
+      expect.objectContaining({
+        sprint: '458.10',
+        description: expect.stringContaining('S458.10 has a scorecard'),
+      }),
+    ]);
   });
 
   it('matches encoded roadmap IDs to decimal scorecard completion and evidence', async () => {
