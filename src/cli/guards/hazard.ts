@@ -1,9 +1,10 @@
 import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import type { HookInput, GuardResult } from '../../core/index.js';
+import type { HookInput, GuardResult, SprintId } from '../../core/index.js';
 import { loadConfig } from '../config.js';
-import { compareSprintIdKeys, latestSprintIdKey, loadScorecards, sprintIdKey } from '../../core/index.js';
+import { compareSprintIdKeys, latestSprintIdKey, loadScorecards, sprintIdKey, sprintIdsEqual } from '../../core/index.js';
 import type { CommonIssuesFile, GolfScorecard } from '../../core/index.js';
+import { loadSprintState } from '../sprint-state.js';
 import { dedupGuardContext } from '../session-state.js';
 import { normalizeTouchedPath, resolveTouchedPaths } from './hook-input.js';
 
@@ -12,7 +13,7 @@ import { normalizeTouchedPath, resolveTouchedPaths } from './hook-input.js';
 interface HazardStateEntry {
   area: string;
   warnings: string[];
-  sprint: number;
+  sprint: SprintId;
   timestamp: number;
 }
 
@@ -45,11 +46,11 @@ function saveHazardState(cwd: string, state: HazardState): void {
 }
 
 /** Prune entries from old sprints AND older than 7 days */
-function pruneState(state: HazardState, currentSprint: number): HazardState {
+function pruneState(state: HazardState, currentSprint: SprintId): HazardState {
   const cutoff = Date.now() - MAX_AGE_MS;
   return {
     entries: state.entries.filter(
-      e => e.sprint === currentSprint || e.timestamp > cutoff,
+      e => sprintIdsEqual(e.sprint, currentSprint) || e.timestamp > cutoff,
     ),
   };
 }
@@ -66,7 +67,7 @@ export async function hazardGuard(input: HookInput, cwd: string): Promise<GuardR
   if (areas.length === 0) return { metricReason: 'no-file-path' };
 
   const config = loadConfig(cwd);
-  const currentSprint = config.currentSprint ?? 0;
+  const currentSprint = loadSprintState(cwd)?.sprint ?? config.currentSprint ?? '0';
 
   // Load and prune disk state
   let state = loadHazardState(cwd);

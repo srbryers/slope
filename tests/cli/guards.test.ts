@@ -56,7 +56,7 @@ function applyPatchCommand(path: string): string {
   ].join('\n');
 }
 
-function writeSprintState(sprint: number): void {
+function writeSprintState(sprint: string | number): void {
   mkdirSync(join(tmpDir, '.slope'), { recursive: true });
   writeFileSync(join(tmpDir, '.slope/sprint-state.json'), JSON.stringify({
     sprint,
@@ -481,6 +481,35 @@ describe('hazardGuard', () => {
       tmpDir,
     );
     expect(result).toEqual({ metricReason: 'state-unavailable' });
+  });
+
+  it('keeps an old cache entry only for the exact canonical sprint key', async () => {
+    mkdirSync(join(tmpDir, '.slope/guard-state'), { recursive: true });
+    writeSprintState('458.10');
+    writeFileSync(join(tmpDir, '.slope/guard-state/hazard.json'), JSON.stringify({
+      entries: [{
+        area: 'packages/core/src',
+        warnings: ['[testing] Canonical sprint warning'],
+        sprint: '458.10',
+        timestamp: Date.now() - (8 * 24 * 60 * 60 * 1000),
+      }],
+    }));
+
+    const matching = await hazardGuard(
+      makeInput({ tool_input: { file_path: join(tmpDir, 'packages/core/src/foo.ts') } }),
+      tmpDir,
+    );
+    expect(matching.context).toContain('Canonical sprint warning');
+
+    writeSprintState('458.1');
+    const different = await hazardGuard(
+      makeInput({
+        session_id: 'other-session',
+        tool_input: { file_path: join(tmpDir, 'packages/core/src/foo.ts') },
+      }),
+      tmpDir,
+    );
+    expect(different).toEqual({ metricReason: 'state-unavailable' });
   });
 });
 

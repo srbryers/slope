@@ -311,6 +311,20 @@ describe('reviewTierGuard', () => {
     expect(state.started_at).toBeDefined();
   });
 
+  it('preserves a trailing-zero sprint key when initializing sprint state', async () => {
+    const planPath = writePlan([
+      '# Sprint 458.10 Plan',
+      '### S458.10-1: First ticket',
+      '### S458.10-2: Second ticket',
+      '### S458.10-3: Third ticket',
+    ].join('\n'));
+
+    await reviewTierGuard(makeInput(planPath), TMP);
+
+    const state = JSON.parse(readFileSync(join(TMP, '.slope', 'sprint-state.json'), 'utf8'));
+    expect(state.sprint).toBe('458.10');
+  });
+
   it('does not overwrite review-state.json when re-fired with same tier', async () => {
     const planPath = writePlan([
       '# Sprint Plan',
