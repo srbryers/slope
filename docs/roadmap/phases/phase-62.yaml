@@ -9,6 +9,8 @@ phase:
     - 262
     - 263
     - 264
+    - 264.1
+    - 264.2
   status: in_progress
   note: "Issue-driven recovery for #663-#669. Ordered by blast radius: S260 records the triage, S260.1 captures Buzz-informed product and architecture lessons, #665/#667 make worktree sessions guard-blind and claim-blind, #666/#663/#664 make the status surface misleading for operators and agents, #668 gates fresh work on stale executions, and #669 formalizes the Team Round model after the plumbing stops lying."
 sprints:
@@ -117,13 +119,13 @@ sprints:
           - S261-1
           - S261-2
   - id: 262
-    theme: Actor, Session, and Sprint Status Truth
+    theme: Session and Sprint Status Truth
     par: 5
     slope: 3
     type: bugfix + operator trust
     depends_on:
       - 261
-    note: "Fix #666/#663/#664 while establishing the identity boundaries S264 will formalize: stable actor identity, ephemeral session identity, functional role, control authority, and observer visibility are separate concepts. Session records currently present stale branch and duplicate primary roles as current truth; sprint begin persists a ticket claim that sprint status does not show; sprint status ignores --help, --json, and unknown flags."
+    note: "Fix #666/#663/#664 at the current presentation and operator-trust boundary. Session records present stale branch and duplicate primary labels as current truth; sprint begin persists a ticket claim that sprint status does not show; sprint status ignores --help, --json, and unknown flags. Durable actor, authority, and visibility semantics remain an S264 contract so S262 does not accidentally freeze a partial identity schema."
     tickets:
       - key: S262-1
         title: Refresh session branch on heartbeat and status reads, or label stored branch as branch-at-start with regression coverage (#666)
@@ -131,9 +133,9 @@ sprints:
         complexity: standard
         github_issue: 666
       - key: S262-2
-        title: Replace duplicate primary labels with explicit actor, session, role, control-authority, and observer-visibility semantics (#666)
-        club: long_iron
-        complexity: moderate
+        title: Disambiguate concurrent sessions in collision messages without treating primary as durable identity or authority (#666)
+        club: short_iron
+        complexity: standard
         github_issue: 666
         depends_on:
           - S262-1
@@ -176,34 +178,34 @@ sprints:
         depends_on:
           - S263-1
   - id: 264
-    theme: Team Round and Collaboration Model
-    par: 5
-    slope: 5
+    theme: Team Round Domain and Scoring Contract
+    par: 4
+    slope: 4
     type: planning + product architecture
     depends_on:
       - 261
       - 262
       - 263
-    note: "Resolve #669 by formalizing a SLOPE Team Round: one sprint, one authoritative team scorecard and outcome, and actor-attributed shots. This is neither fourball nor scramble; individual handicap derives from attributed shots while team handicap measures delivery plus coordination overhead. Specify the coordination ledger and collaboration contracts without making Nostr, crypto identity, chat, or prompt-only shared-filesystem conventions product dependencies."
+    note: "Resolve the domain and scoring half of #669 by formalizing a SLOPE Team Round: one sprint, one canonical score-versus-par outcome, and actor-attributed shots. Actor and role handicaps are risk-adjusted descriptive estimates, not causal rankings; coordination overhead remains a separate metric unless a versioned composite is introduced later. Define round identity, lifecycle, finalization, identity trust, shared-resource ownership, and compatibility before the coordination protocol is specified."
     research:
       - docs/research/buzz-multiplayer-collaboration.md
     expected_artifacts:
-      - docs/architecture/team-round.md
+      - docs/architecture/team-round-domain.md
     tickets:
       - key: S264-1
-        title: Specify one authoritative SLOPE Team Round scorecard with actor-attributed shots and single-player compatibility (#669)
+        title: Define sprint key, round, attempt, scorecard version, lifecycle, exactly-once finalization, late events, and reopen policy (#669)
         club: long_iron
         complexity: moderate
         github_issue: 669
       - key: S264-2
-        title: Define actor, session, role, contributor, verifier, control-authority, and visibility identity fields (#669)
+        title: Define authenticated principal bindings for actor, session, role, contributors, verifier, authority, and visibility (#669)
         club: long_iron
         complexity: moderate
         github_issue: 669
         depends_on:
           - S264-1
       - key: S264-3
-        title: Define individual and team handicap derivation plus caused-by and resolved-by penalty attribution (#669)
+        title: Define accountable shot ownership, descriptive handicap estimands, difficulty and exposure adjustment, uncertainty, and penalty identity (#669)
         club: long_iron
         complexity: moderate
         github_issue: 669
@@ -211,43 +213,90 @@ sprints:
           - S264-1
           - S264-2
       - key: S264-4
-        title: Specify an idempotent repo coordination event ledger and materialized status and scorecard views (#669)
-        club: driver
-        complexity: risky
+        title: Define single-player compatibility, typed shared-resource ownership, and transport, crypto, chat-first, and prompt-only non-goals (#669)
+        club: short_iron
+        complexity: standard
         github_issue: 669
         depends_on:
           - S264-1
           - S264-2
-      - key: S264-5
-        title: Specify renewable claim leases, heartbeat and TTL, abandonment, requeue, retry, and escalation (#669)
+  - id: 264.1
+    theme: Coordination Integrity and Security Contract
+    par: 4
+    slope: 5
+    type: planning + system architecture
+    depends_on:
+      - 264
+    note: "Specify the durable protocol for #669 before implementation: evolve the existing event store rather than create a competing ledger, define the complete versioned identity/access envelope, require transactional append and deterministic replay, fence stale lease holders, and enforce deny-by-default capabilities and redaction in the store rather than in prompts."
+    research:
+      - docs/research/buzz-multiplayer-collaboration.md
+    expected_artifacts:
+      - docs/architecture/team-round-coordination.md
+    tickets:
+      - key: S264.1-1
+        title: Define existing-event-store migration, source-of-truth authority, complete event envelope, scorecard projection, and deterministic replay (#669)
+        club: driver
+        complexity: risky
+        github_issue: 669
+      - key: S264.1-2
+        title: Define idempotency scope and payload conflicts, atomic append and projection, ordering, schema evolution, and integrity checks (#669)
         club: long_iron
         complexity: moderate
         github_issue: 669
         depends_on:
-          - S264-4
-      - key: S264-6
-        title: Specify assignment callbacks, handoffs, and independent verification for risky work (#669)
+          - S264.1-1
+      - key: S264.1-3
+        title: Define renewable leases with authoritative time, lease epochs, fencing, abandonment, retry, requeue, dead-letter, and escalation (#669)
         club: long_iron
         complexity: moderate
         github_issue: 669
         depends_on:
-          - S264-4
-      - key: S264-7
-        title: Specify merge-safe learning, semantic team status, and reproducible multiplayer evaluation (#669)
+          - S264.1-1
+      - key: S264.1-4
+        title: Define deny-by-default capabilities, filtered views, redaction and retention, and adversarial enforcement criteria (#669)
+        club: driver
+        complexity: risky
+        github_issue: 669
+        depends_on:
+          - S264.1-1
+          - S264.1-2
+  - id: 264.2
+    theme: Collaboration Workflow and Evaluation Contract
+    par: 4
+    slope: 4
+    type: planning + product architecture
+    depends_on:
+      - 264.1
+    note: "Complete #669 with the human and agent operating contract: assignments require callbacks, verifier independence is principal-aware, concurrent learning is merge-safe, activity is semantic, and evaluation pins every material input while protecting secrets and treating coordination overhead as a separate measure."
+    research:
+      - docs/research/buzz-multiplayer-collaboration.md
+    expected_artifacts:
+      - docs/architecture/team-round-workflow.md
+    tickets:
+      - key: S264.2-1
+        title: Define assignment and handoff states, success criteria, correlation, and mandatory completion or blocker callbacks (#669)
+        club: short_iron
+        complexity: standard
+        github_issue: 669
+      - key: S264.2-2
+        title: Define principal-aware verifier independence and conflict rules for authors, contributors, delegators, sessions, and aliases (#669)
         club: long_iron
         complexity: moderate
         github_issue: 669
         depends_on:
-          - S264-3
-          - S264-4
-          - S264-5
-          - S264-6
-      - key: S264-8
-        title: Record transport, crypto, chat-first, and prompt-only coordination non-goals (#669)
-        club: wedge
-        complexity: small
+          - S264.2-1
+      - key: S264.2-3
+        title: Define merge-safe learning and verb-object-outcome status with visible blocker, idle, stale, and timeout states (#669)
+        club: short_iron
+        complexity: standard
+        github_issue: 669
+      - key: S264.2-4
+        title: Define reproducible and redacted multiplayer evaluation inputs, lifecycle policy, evidence, metrics, and reliability (#669)
+        club: long_iron
+        complexity: moderate
         github_issue: 669
         depends_on:
-          - S264-1
+          - S264.2-2
+          - S264.2-3
 scorecards:
   "260": docs/retros/sprint-260.json

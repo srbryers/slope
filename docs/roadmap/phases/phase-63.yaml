@@ -15,7 +15,7 @@ sprints:
     slope: 5
     type: major + schema migration
     depends_on:
-      - 264
+      - 264.2
     note: "Start #659 at the data layer: SQLite and PG sprint identity columns must preserve canonical string ids so 458.10 and 458.1 cannot collide in scorecards, claims, events, or sprint mirrors."
     tickets:
       - key: S265-1
