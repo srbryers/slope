@@ -187,9 +187,9 @@ describe('modular roadmap federation validation', () => {
 
     expect(result.valid).toBe(false);
     expect(result.errors).toEqual(expect.arrayContaining([
-      expect.objectContaining({ code: 'duplicate_sprint', sprint: 7, source: 'backlog/deferred.yaml' }),
-      expect.objectContaining({ code: 'duplicate_ticket', ticket: 'S7-1' }),
-      expect.objectContaining({ code: 'multiple_phase_membership', sprint: 7 }),
+      expect.objectContaining({ code: 'duplicate_sprint', sprint: '7', source: 'backlog/deferred.yaml' }),
+      expect.objectContaining({ code: 'duplicate_ticket', sprint: '7', ticket: 'S7-1' }),
+      expect.objectContaining({ code: 'multiple_phase_membership', sprint: '7' }),
     ]));
   });
 
@@ -202,8 +202,8 @@ describe('modular roadmap federation validation', () => {
     );
 
     expect(result.errors).toEqual(expect.arrayContaining([
-      expect.objectContaining({ code: 'missing_sprint_definition', sprint: 99 }),
-      expect.objectContaining({ code: 'orphan_sprint_definition', sprint: 7 }),
+      expect.objectContaining({ code: 'missing_sprint_definition', sprint: '99' }),
+      expect.objectContaining({ code: 'orphan_sprint_definition', sprint: '7' }),
     ]));
   });
 

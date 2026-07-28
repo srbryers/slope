@@ -287,14 +287,14 @@ describe('findShippedSprintsOnMain', () => {
 
     // Helper resolves main → master → HEAD
     const result = findShippedSprintsOnMain(tmpDir);
-    expect(result).toEqual(new Set([70, 71, 77]));
+    expect(result).toEqual(new Set(['70', '71', '77']));
   });
 
   it('honors explicit ref argument', () => {
     gitInit(tmpDir);
     gitCommit(tmpDir, 'feat(S99): only on HEAD');
 
-    expect(findShippedSprintsOnMain(tmpDir, 'HEAD')).toEqual(new Set([99]));
+    expect(findShippedSprintsOnMain(tmpDir, 'HEAD')).toEqual(new Set(['99']));
   });
 
   it('detects shipped sprints from scorecard artifacts in squash merge commits', () => {

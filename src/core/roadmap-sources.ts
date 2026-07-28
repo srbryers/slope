@@ -711,32 +711,32 @@ export function validateRoadmapSourceFederation(
     }
 
     for (const sprint of source.document.sprints) {
-      const key = defKey(sprint);
-      const priorSprint = sprintDefinitions.get(key);
+      const sprintKey = defKey(sprint);
+      const priorSprint = sprintDefinitions.get(sprintKey);
       if (priorSprint) {
         errors.push({
           code: 'duplicate_sprint',
           source: label,
-          sprint: key,
-          message: `Sprint S${key} is also defined in ${priorSprint}.`,
+          sprint: sprintKey,
+          message: `Sprint S${sprintKey} is also defined in ${priorSprint}.`,
         });
       } else {
-        sprintDefinitions.set(key, label);
+        sprintDefinitions.set(sprintKey, label);
       }
       for (const ticket of sprint.tickets) {
-        const key = getRoadmapTicketKey(ticket);
-        if (!key) continue;
-        const priorTicket = ticketDefinitions.get(key);
+        const ticketKey = getRoadmapTicketKey(ticket);
+        if (!ticketKey) continue;
+        const priorTicket = ticketDefinitions.get(ticketKey);
         if (priorTicket) {
           errors.push({
             code: 'duplicate_ticket',
             source: label,
-            sprint: key,
-            ticket: key,
-            message: `Ticket ${key} is also defined in ${priorTicket}.`,
+            sprint: sprintKey,
+            ticket: ticketKey,
+            message: `Ticket ${ticketKey} is also defined in ${priorTicket}.`,
           });
         } else {
-          ticketDefinitions.set(key, label);
+          ticketDefinitions.set(ticketKey, label);
         }
       }
     }
