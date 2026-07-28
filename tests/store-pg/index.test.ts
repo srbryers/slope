@@ -1,6 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll } from 'vitest';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll, vi } from 'vitest';
 import { SlopeStoreError, checkConflicts } from '../../src/core/index.js';
 import type { GolfScorecard, SlopeStore, StoredGolfScorecard } from '../../src/core/index.js';
+import { storeCommand } from '../../src/cli/commands/store.js';
 import type { Pool } from 'pg';
 
 // Skip entire suite if no PG connection available
@@ -576,6 +580,61 @@ describe.skipIf(!PG_URL)('PostgresSlopeStore canonical sprint migration', () => 
           'T-LEGACY', '2026-01-01T00:00:00.000Z'
         );
       `);
+
+      const doctorCwd = mkdtempSync(join(tmpdir(), 'slope-pg-doctor-'));
+      const originalCwd = process.cwd();
+      const logs: string[] = [];
+      mkdirSync(join(doctorCwd, '.slope'), { recursive: true });
+      writeFileSync(join(doctorCwd, '.slope', 'config.json'), JSON.stringify({
+        store: 'postgres',
+        postgres: {
+          connectionString: schemaUrl.toString(),
+          projectId: 'legacy',
+        },
+      }));
+      const logSpy = vi.spyOn(console, 'log').mockImplementation((...args) => {
+        logs.push(args.join(' '));
+      });
+      try {
+        process.chdir(doctorCwd);
+        await storeCommand(['migrate', 'doctor', '--json']);
+      } finally {
+        process.chdir(originalCwd);
+        logSpy.mockRestore();
+        rmSync(doctorCwd, { recursive: true, force: true });
+      }
+
+      const doctorReport = JSON.parse(logs.join('\n')) as {
+        status: string;
+        currentSchemaVersion: number;
+        targetSchemaVersion: number;
+        pendingMigrations: number;
+        identityColumns: Array<{ actualType: string; ok: boolean }>;
+      };
+      expect(doctorReport.status).toBe('upgrade_required');
+      expect(doctorReport.currentSchemaVersion).toBe(5);
+      expect(doctorReport.targetSchemaVersion).toBe(7);
+      expect(doctorReport.pendingMigrations).toBe(2);
+      expect(doctorReport.identityColumns).toHaveLength(4);
+      expect(doctorReport.identityColumns.every(column => column.actualType === 'integer' && !column.ok)).toBe(true);
+
+      const versionBeforeMigration = await schemaPool.query<{ version: number }>(
+        'SELECT MAX(version) AS version FROM schema_version',
+      );
+      expect(versionBeforeMigration.rows[0]?.version).toBe(5);
+      const typesBeforeMigration = await schemaPool.query<{ data_type: string }>(`
+        SELECT data_type
+        FROM information_schema.columns
+        WHERE table_schema = current_schema()
+          AND (
+            (table_name = 'claims' AND column_name = 'sprint_number')
+            OR (table_name = 'scorecards' AND column_name = 'sprint_number')
+            OR (table_name = 'events' AND column_name = 'sprint_number')
+            OR (table_name = 'testing_sessions' AND column_name = 'sprint')
+          )
+      `);
+      expect(typesBeforeMigration.rows).toHaveLength(4);
+      expect(typesBeforeMigration.rows.every(row => row.data_type === 'integer')).toBe(true);
 
       const {
         LATEST_PG_SCHEMA_VERSION,

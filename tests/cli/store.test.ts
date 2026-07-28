@@ -3,7 +3,8 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync } from 'node:
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
-import { storeCommand } from '../../src/cli/commands/store.js';
+import Database from 'better-sqlite3';
+import { assessMigrationDoctor, storeCommand } from '../../src/cli/commands/store.js';
 import { getStoreInfo } from '../../src/cli/store.js';
 import { LATEST_SCHEMA_VERSION, SqliteSlopeStore } from '../../src/store/index.js';
 
@@ -160,6 +161,175 @@ describe('slope store migrate status', () => {
     expect(output).toContain(`Current schema version: ${LATEST_SCHEMA_VERSION}`);
     expect(output).toContain(`Total migrations:       ${LATEST_SCHEMA_VERSION}`);
     expect(output).toContain('up to date');
+  });
+});
+
+describe('slope store migrate doctor', () => {
+  function legacyColumnTypes(type: string): Map<string, string> {
+    return new Map([
+      ['claims.sprint_number', type],
+      ['scorecards.sprint_number', type],
+      ['events.sprint_number', type],
+      ['testing_sessions.sprint', type],
+    ]);
+  }
+
+  it('reports an absent SQLite store without creating it', async () => {
+    const dbPath = join(tmpDir, '.slope', 'slope.db');
+    const logs: string[] = [];
+    const spy = vi.spyOn(console, 'log').mockImplementation((...args) => { logs.push(args.join(' ')); });
+
+    await storeCommand(['migrate', 'doctor', '--json']);
+
+    spy.mockRestore();
+    const report = JSON.parse(logs.join('\n'));
+    expect(report).toMatchObject({
+      type: 'sqlite',
+      initialized: false,
+      currentSchemaVersion: 0,
+      targetSchemaVersion: LATEST_SCHEMA_VERSION,
+      pendingMigrations: 0,
+      migrationRequired: false,
+      status: 'not_initialized',
+      readOnly: true,
+    });
+    expect(existsSync(dbPath)).toBe(false);
+  });
+
+  it('reports an existing SQLite file without schema metadata as inconsistent', async () => {
+    const dbPath = join(tmpDir, '.slope', 'slope.db');
+    const db = new Database(dbPath);
+    db.exec('CREATE TABLE unrelated (id INTEGER PRIMARY KEY)');
+    db.close();
+    const logs: string[] = [];
+    const spy = vi.spyOn(console, 'log').mockImplementation((...args) => { logs.push(args.join(' ')); });
+
+    await storeCommand(['migrate', 'doctor', '--json']);
+
+    spy.mockRestore();
+    const report = JSON.parse(logs.join('\n'));
+    expect(report).toMatchObject({
+      initialized: false,
+      status: 'inconsistent',
+      migrationRequired: false,
+      issues: ['SQLite store exists but schema_version is missing'],
+      readOnly: true,
+    });
+    const inspected = new Database(dbPath, { readonly: true });
+    expect(inspected.prepare(
+      "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name",
+    ).all()).toEqual([{ name: 'unrelated' }]);
+    inspected.close();
+  });
+
+  it('reports a current SQLite store as ready', async () => {
+    const dbPath = join(tmpDir, '.slope', 'slope.db');
+    const store = new SqliteSlopeStore(dbPath);
+    store.close();
+    const logs: string[] = [];
+    const spy = vi.spyOn(console, 'log').mockImplementation((...args) => { logs.push(args.join(' ')); });
+
+    await storeCommand(['migrate', 'doctor', '--json']);
+
+    spy.mockRestore();
+    const report = JSON.parse(logs.join('\n'));
+    expect(report).toMatchObject({
+      initialized: true,
+      currentSchemaVersion: LATEST_SCHEMA_VERSION,
+      targetSchemaVersion: LATEST_SCHEMA_VERSION,
+      pendingMigrations: 0,
+      migrationRequired: false,
+      status: 'ready',
+    });
+    expect(report.identityColumns).toHaveLength(4);
+    expect(report.identityColumns.every((column: { ok: boolean }) => column.ok)).toBe(true);
+  });
+
+  it('reports a legacy SQLite store without applying its migrations', async () => {
+    const dbPath = join(tmpDir, '.slope', 'slope.db');
+    const db = new Database(dbPath);
+    db.exec(`
+      CREATE TABLE schema_version (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL);
+      INSERT INTO schema_version (version, applied_at) VALUES (8, '2026-01-01T00:00:00Z');
+      CREATE TABLE claims (sprint_number INTEGER NOT NULL);
+      CREATE TABLE scorecards (sprint_number INTEGER PRIMARY KEY);
+      CREATE TABLE events (sprint_number INTEGER);
+      CREATE TABLE testing_sessions (sprint INTEGER);
+    `);
+    db.close();
+    const logs: string[] = [];
+    const spy = vi.spyOn(console, 'log').mockImplementation((...args) => { logs.push(args.join(' ')); });
+
+    await storeCommand(['migrate', 'doctor', '--json']);
+
+    spy.mockRestore();
+    const report = JSON.parse(logs.join('\n'));
+    expect(report).toMatchObject({
+      currentSchemaVersion: 8,
+      targetSchemaVersion: LATEST_SCHEMA_VERSION,
+      pendingMigrations: 2,
+      migrationRequired: true,
+      status: 'upgrade_required',
+      readOnly: true,
+    });
+    expect(report.issues).toHaveLength(4);
+
+    const inspected = new Database(dbPath, { readonly: true });
+    expect(inspected.prepare('SELECT MAX(version) AS version FROM schema_version').get()).toEqual({ version: 8 });
+    const claimColumn = inspected.prepare('PRAGMA table_info(claims)').all()
+      .find((column: unknown) => (column as { name: string }).name === 'sprint_number') as { type: string };
+    expect(claimColumn.type).toBe('INTEGER');
+    inspected.close();
+  });
+
+  it('prints backup guidance and a read-only guarantee for pending migrations', async () => {
+    const dbPath = join(tmpDir, '.slope', 'slope.db');
+    const db = new Database(dbPath);
+    db.exec(`
+      CREATE TABLE schema_version (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL);
+      INSERT INTO schema_version (version, applied_at) VALUES (8, '2026-01-01T00:00:00Z');
+    `);
+    db.close();
+    const logs: string[] = [];
+    const spy = vi.spyOn(console, 'log').mockImplementation((...args) => { logs.push(args.join(' ')); });
+
+    await storeCommand(['migrate', 'doctor']);
+
+    spy.mockRestore();
+    const output = logs.join('\n');
+    expect(output).toContain('Sprint ID migration doctor (read-only)');
+    expect(output).toContain('Status:                 upgrade required');
+    expect(output).toContain('create a verified backup');
+    expect(output).toContain('No migrations were run.');
+  });
+
+  it('classifies PostgreSQL metadata against its own schema target', () => {
+    const pending = assessMigrationDoctor({
+      type: 'postgres',
+      initialized: true,
+      currentSchemaVersion: 5,
+      targetSchemaVersion: 7,
+      columnTypes: legacyColumnTypes('integer'),
+    });
+    expect(pending).toMatchObject({
+      type: 'postgres',
+      pendingMigrations: 2,
+      migrationRequired: true,
+      status: 'upgrade_required',
+    });
+
+    const ready = assessMigrationDoctor({
+      type: 'postgres',
+      initialized: true,
+      currentSchemaVersion: 7,
+      targetSchemaVersion: 7,
+      columnTypes: legacyColumnTypes('text'),
+    });
+    expect(ready).toMatchObject({
+      pendingMigrations: 0,
+      migrationRequired: false,
+      status: 'ready',
+    });
   });
 });
 

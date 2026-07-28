@@ -346,6 +346,7 @@ Sprint IDs use canonical string identity so values such as `458.1` and `458.10` 
 | `npx slope extract --file=<path>` | Extract events into store |
 | `npx slope distill` | Promote patterns to common issues |
 | `npx slope store health\|backup\|restore` | Store diagnostics and management |
+| `npx slope store migrate doctor [--json]` | Inspect sprint ID migration readiness without changing the store |
 | `npx slope flows init\|list\|check` | Manage user flow definitions |
 
 ## Metaphors
