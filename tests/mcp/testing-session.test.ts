@@ -38,8 +38,16 @@ describe('Testing Session — Store', () => {
     expect(active).not.toBeNull();
     expect(active!.worktree_path).toBe('/tmp/testing-123');
     expect(active!.branch_name).toBe('testing/123');
-    expect(active!.sprint).toBe(60);
+    expect(active!.sprint).toBe('60');
     expect(active!.purpose).toBe('Test login');
+  });
+
+  it('preserves canonical sprint ids with trailing zeroes', async () => {
+    await store.createTestingSession({ sprint: 'S458.10' });
+
+    const active = await store.getActiveTestingSession();
+    expect(active?.sprint).toBe('458.10');
+    expect(active?.sprint).not.toBe('458.1');
   });
 
   it('returns null when no active session', async () => {

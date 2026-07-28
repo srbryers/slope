@@ -1,8 +1,8 @@
 import { execSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { detectLatestSprint, loadConfig, normalizeScorecard, parseSprintNumber, recommendReviews } from '../../core/index.js';
-import type { ReviewRecommendation } from '../../core/index.js';
+import { detectLatestSprint, loadConfig, normalizeScorecard, recommendReviews, sprintIdKey } from '../../core/index.js';
+import type { ReviewRecommendation, SprintId } from '../../core/index.js';
 import { reviewRunCommand } from './review-run.js';
 import {
   collectReviewDiff,
@@ -43,7 +43,7 @@ interface FinalizeOptions {
 
 export interface PrReviewOptions {
   pr?: number;
-  sprint?: number;
+  sprint?: SprintId;
   type?: 'architect' | 'code' | 'both';
   json?: boolean;
   paths?: string[];
@@ -53,7 +53,7 @@ export interface PrReviewOptions {
 
 export interface PrReviewPlan {
   pr: number;
-  sprint?: number;
+  sprint?: string;
   ticketCount: number;
   slope: number;
   changedFiles: string[];
@@ -169,8 +169,8 @@ export function parsePrReviewFlags(args: string[]): PrReviewOptions {
       if (!Number.isSafeInteger(value) || value <= 0) throw new Error('--pr must be a positive integer.');
       opts.pr = value;
     } else if (a.startsWith('--sprint=')) {
-      const value = parseSprintNumber(a.slice('--sprint='.length));
-      if (value == null || value <= 0) throw new Error('--sprint must be a positive sprint number.');
+      const value = sprintIdKey(a.slice('--sprint='.length));
+      if (value == null) throw new Error('--sprint must be a positive sprint number.');
       opts.sprint = value;
     } else if (a.startsWith('--type=')) {
       const type = a.slice('--type='.length);
@@ -215,17 +215,18 @@ function currentBranch(): string | undefined {
   return branch || undefined;
 }
 
-function inferSprintNumber(explicit?: number): number | undefined {
-  if (explicit && !isNaN(explicit)) return explicit;
+function inferSprintId(explicit?: SprintId): string | undefined {
+  if (explicit !== undefined) return sprintIdKey(explicit) ?? undefined;
   try {
     const config = loadConfig();
-    return config.currentSprint ?? (detectLatestSprint(config, process.cwd()) || undefined);
+    const latest = detectLatestSprint(config, process.cwd());
+    return sprintIdKey(config.currentSprint ?? latest) ?? undefined;
   } catch {
     return undefined;
   }
 }
 
-function loadSprintReviewSignals(sprint?: number): { ticketCount: number; slope: number } {
+function loadSprintReviewSignals(sprint?: string): { ticketCount: number; slope: number } {
   if (!sprint) return { ticketCount: 1, slope: 1 };
   try {
     const config = loadConfig();
@@ -276,7 +277,7 @@ export async function planPrReview(
     throw error;
   }
 
-  const sprint = inferSprintNumber(opts.sprint);
+  const sprint = inferSprintId(opts.sprint);
   const { ticketCount, slope } = loadSprintReviewSignals(sprint);
   const changedFiles = reviewDiff.files.map(file => file.filename);
   const hasNewInfra = changedFiles.some(p => /(\.sql|migration|schema|infra|terraform|k8s|deploy)/i.test(p));

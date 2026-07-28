@@ -13,6 +13,7 @@ import { computeHandicapCard } from './handicap.js';
 import { computeDispersion, computeAreaPerformance } from './dispersion.js';
 import { computeHandicapTrend, computeVelocity } from './analytics.js';
 import { normalizeStats } from './builder.js';
+import { compareSprintIdKeys } from './sprint-id.js';
 import {
   background, text as textColor, border, status, chart, semantic,
   fontFamily, fontSize, fontWeight, spacing, radius, layout,
@@ -34,7 +35,7 @@ export interface ReportData {
 }
 
 export interface SprintTrendEntry {
-  sprintNumber: number;
+  sprintNumber: string;
   theme: string;
   par: number;
   score: number;
@@ -54,7 +55,7 @@ export interface NutritionTrendEntry {
 // --- Data Computation ---
 
 export function buildReportData(scorecards: GolfScorecard[]): ReportData {
-  const sorted = [...scorecards].sort((a, b) => a.sprint_number - b.sprint_number);
+  const sorted = [...scorecards].sort((a, b) => compareSprintIdKeys(a.sprint_number, b.sprint_number));
 
   const handicapCard = computeHandicapCard(sorted);
   const dispersion = computeDispersion(sorted);

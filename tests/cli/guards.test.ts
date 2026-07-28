@@ -56,7 +56,7 @@ function applyPatchCommand(path: string): string {
   ].join('\n');
 }
 
-function writeSprintState(sprint: number): void {
+function writeSprintState(sprint: string | number): void {
   mkdirSync(join(tmpDir, '.slope'), { recursive: true });
   writeFileSync(join(tmpDir, '.slope/sprint-state.json'), JSON.stringify({
     sprint,
@@ -482,6 +482,35 @@ describe('hazardGuard', () => {
     );
     expect(result).toEqual({ metricReason: 'state-unavailable' });
   });
+
+  it('keeps an old cache entry only for the exact canonical sprint key', async () => {
+    mkdirSync(join(tmpDir, '.slope/guard-state'), { recursive: true });
+    writeSprintState('458.10');
+    writeFileSync(join(tmpDir, '.slope/guard-state/hazard.json'), JSON.stringify({
+      entries: [{
+        area: 'packages/core/src',
+        warnings: ['[testing] Canonical sprint warning'],
+        sprint: '458.10',
+        timestamp: Date.now() - (8 * 24 * 60 * 60 * 1000),
+      }],
+    }));
+
+    const matching = await hazardGuard(
+      makeInput({ tool_input: { file_path: join(tmpDir, 'packages/core/src/foo.ts') } }),
+      tmpDir,
+    );
+    expect(matching.context).toContain('Canonical sprint warning');
+
+    writeSprintState('458.1');
+    const different = await hazardGuard(
+      makeInput({
+        session_id: 'other-session',
+        tool_input: { file_path: join(tmpDir, 'packages/core/src/foo.ts') },
+      }),
+      tmpDir,
+    );
+    expect(different).toEqual({ metricReason: 'state-unavailable' });
+  });
 });
 
 describe('commitNudgeGuard', () => {
@@ -696,6 +725,14 @@ describe('compactionGuard', () => {
     const data = JSON.parse(readFileSync(handoffPath, 'utf8'));
     expect(data.session_id).toBe('test-abcd1234-rest');
     expect(data.timestamp).toBeDefined();
+  });
+
+  it('preserves a trailing-zero sprint key in handoff state', async () => {
+    (mockConfig as Record<string, unknown>).currentSprint = '458.10';
+    await compactionGuard(makeInput({ session_id: 'canonical-sprint' }), tmpDir);
+
+    const data = JSON.parse(readFileSync(join(tmpDir, '.slope/handoffs', 'canonica.json'), 'utf8'));
+    expect(data.sprint.number).toBe('458.10');
   });
 
   it('uses custom handoffsDir from config', async () => {

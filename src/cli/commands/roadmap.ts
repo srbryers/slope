@@ -5,22 +5,25 @@ import {
   validateRoadmap,
   castRoadmapStructure,
   findShippedSprintsOnMain,
-  compareSprintIds,
   computeCriticalPath,
   findParallelOpportunities,
-  formatSprintNumber,
+  findRoadmapSprint,
   formatRoadmapSummary,
   formatStrategicContext,
   buildRoadmapFocus,
   formatRoadmapFocus,
   formatRoadmapSprintLabel,
-  roadmapSprintOrderValue,
+  roadmapSprintKey,
+  roadmapSprintKeyFromId,
+  compareRoadmapSprintIds,
   isRoadmapSprintPending,
   loadScorecards,
   discoverScorecardFiles,
   sprintNumberFromScorecardFile,
+  sprintIdKey,
+  latestSprintIdKey,
+  nextCanonicalSprintId,
   loadVision,
-  parseSprintNumber,
   analyzeBacklog,
   mergeBacklogs,
   runAnalyzers,
@@ -37,6 +40,7 @@ import type {
   GolfScorecard,
   RoadmapFocusEvidence,
   RoadmapFocusHazard,
+  SprintId,
 } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { buildRoadmapReality, formatRoadmapRealitySection, roadmapRealityIssues } from '../pre-sprint-reality.js';
@@ -76,31 +80,41 @@ function getRoadmapStatus(sprint: RoadmapSprint): string | undefined {
   return (sprint as RoadmapSprint & { status?: string }).status;
 }
 
-function isTerminalRoadmapSprint(sprint: RoadmapSprint, completedSprints: Set<number>): boolean {
-  return completedSprints.has(sprint.id) || TERMINAL_ROADMAP_STATUSES.has(getRoadmapStatus(sprint) ?? '');
+function isTerminalRoadmapSprint(
+  roadmap: RoadmapDefinition,
+  sprint: RoadmapSprint,
+  completedSprints: Set<string>,
+): boolean {
+  return completedSprints.has(roadmapSprintKey(roadmap, sprint))
+    || TERMINAL_ROADMAP_STATUSES.has(getRoadmapStatus(sprint) ?? '');
 }
 
 function blockedByForSprint(
   roadmap: RoadmapDefinition,
   sprint: RoadmapSprint,
-  completedSprints: Set<number>,
-): number[] {
+  completedSprints: Set<string>,
+): string[] {
   return (sprint.depends_on ?? []).filter(dep => {
-    const dependency = roadmap.sprints.find(s => s.id === dep);
-    return dependency ? !isTerminalRoadmapSprint(dependency, completedSprints) : !completedSprints.has(dep);
-  });
+    const dependency = findRoadmapSprint(roadmap, dep);
+    const key = roadmapSprintKeyFromId(roadmap, dep);
+    return dependency
+      ? !isTerminalRoadmapSprint(roadmap, dependency, completedSprints)
+      : key === null || !completedSprints.has(key);
+  }).map(dep => roadmapSprintKeyFromId(roadmap, dep) ?? String(dep));
 }
 
 function statusLabelForSprint(
   roadmap: RoadmapDefinition,
   sprint: RoadmapSprint,
-  currentSprint: number,
-  completedSprints: Set<number>,
+  currentSprint: SprintId,
+  completedSprints: Set<string>,
 ): string {
   const explicitStatus = getRoadmapStatus(sprint);
-  const isCompleted = completedSprints.has(sprint.id) || explicitStatus === 'complete';
+  const isCompleted = completedSprints.has(roadmapSprintKey(roadmap, sprint))
+    || explicitStatus === 'complete';
   const isSuperseded = explicitStatus === 'superseded';
-  const isCurrent = sprint.id === currentSprint;
+  const isCurrent = roadmapSprintKey(roadmap, sprint)
+    === roadmapSprintKeyFromId(roadmap, currentSprint);
   const blockedBy = blockedByForSprint(roadmap, sprint, completedSprints);
 
   if (isSuperseded) return '\u21B7 superseded';
@@ -110,22 +124,35 @@ function statusLabelForSprint(
   return '\u25CB pending';
 }
 
-function phaseForSprint(roadmap: RoadmapDefinition, sprintId: number): { name: string; sprints: number[] } | undefined {
-  return roadmap.phases.find(phase => phase.sprints?.includes(sprintId));
+function phaseForSprint(roadmap: RoadmapDefinition, sprintId: SprintId) {
+  const key = roadmapSprintKeyFromId(roadmap, sprintId);
+  return roadmap.phases.find(phase => {
+    const ids = phase.sprint_keys ?? phase.sprints.map(String);
+    return ids.some(id => roadmapSprintKeyFromId(roadmap, id) === key);
+  });
 }
 
 function formatPhaseProgress(
   roadmap: RoadmapDefinition,
-  phase: { name: string; sprints: number[] },
-  completedSprints: Set<number>,
+  phase: RoadmapDefinition['phases'][number],
+  completedSprints: Set<string>,
 ): string {
-  const phaseSprints = roadmap.sprints.filter(s => phase.sprints.includes(s.id));
-  const completed = phaseSprints.filter(s => isTerminalRoadmapSprint(s, completedSprints)).length;
+  const phaseKeys = new Set(
+    (phase.sprint_keys ?? phase.sprints.map(String))
+      .map(id => roadmapSprintKeyFromId(roadmap, id)),
+  );
+  const phaseSprints = roadmap.sprints.filter(
+    sprint => phaseKeys.has(roadmapSprintKey(roadmap, sprint)),
+  );
+  const completed = phaseSprints.filter(
+    sprint => isTerminalRoadmapSprint(roadmap, sprint, completedSprints),
+  ).length;
   return `${phase.name || 'Unnamed Phase'} (${completed}/${phaseSprints.length})`;
 }
 
 function sortedRoadmapSprints(roadmap: RoadmapDefinition): RoadmapSprint[] {
-  return [...roadmap.sprints].sort((a, b) => compareSprintIds(a.id, b.id));
+  return [...roadmap.sprints].sort((a, b) =>
+    compareRoadmapSprintIds(roadmap, roadmapSprintKey(roadmap, a), roadmapSprintKey(roadmap, b)));
 }
 
 function resolveRoadmapPath(flags: Record<string, string>, cwd: string): string {
@@ -176,40 +203,50 @@ function resolveSprint(
   cwd: string,
   roadmap?: RoadmapDefinition,
   scorecards: GolfScorecard[] = [],
-): number {
+): string {
   if (flags.sprint) {
-    const parsed = parseSprintNumber(flags.sprint);
+    const parsed = sprintIdKey(flags.sprint);
     if (parsed == null) {
       console.error(`\nInvalid sprint number: ${flags.sprint}\n`);
       process.exit(1);
     }
-    return parsed;
+    return roadmap ? roadmapSprintKeyFromId(roadmap, parsed) ?? parsed : parsed;
   }
 
-  const completedSprints = new Set(scorecards.map(s => s.sprint_number));
+  const completedSprints = new Set(
+    scorecards
+      .map(s => roadmap ? roadmapSprintKeyFromId(roadmap, s.sprint_number) : String(s.sprint_number))
+      .filter((key): key is string => key !== null),
+  );
   const roadmapCurrent = resolveRoadmapCurrentSprint(roadmap, completedSprints);
   if (roadmapCurrent != null) return roadmapCurrent;
 
   const config = loadConfig(cwd);
-  if (config.currentSprint && config.currentSprint > 0) return config.currentSprint;
-  if (scorecards.length === 0) return 1;
-  const sprintNumbers = scorecards.map(s => s.sprint_number).filter(n => typeof n === 'number' && n > 0);
-  if (sprintNumbers.length === 0) return 1;
-  return Math.max(...sprintNumbers) + 1;
+  const configured = config.currentSprint == null ? null : sprintIdKey(config.currentSprint);
+  if (configured != null) {
+    return roadmap ? roadmapSprintKeyFromId(roadmap, configured) ?? configured : configured;
+  }
+  const latest = latestSprintIdKey(scorecards.map(s => s.sprint_number), '');
+  return latest ? nextCanonicalSprintId(latest) : '1';
 }
 
 function resolveRoadmapCurrentSprint(
   roadmap: RoadmapDefinition | undefined,
-  completedSprints: Set<number>,
-): number | null {
+  completedSprints: Set<string>,
+): string | null {
   const candidates = roadmap?.sprints
-    .filter(sprint => isRoadmapSprintPending(sprint) && !completedSprints.has(sprint.id))
-    .sort((a, b) => compareSprintIds(a.id, b.id)) ?? [];
+    .filter(sprint => isRoadmapSprintPending(sprint)
+      && !completedSprints.has(roadmapSprintKey(roadmap, sprint)))
+    .sort((a, b) => compareRoadmapSprintIds(
+      roadmap,
+      roadmapSprintKey(roadmap, a),
+      roadmapSprintKey(roadmap, b),
+    )) ?? [];
 
   if (candidates.length === 0) return null;
 
   const active = candidates.find(sprint => getRoadmapStatus(sprint) === 'active');
-  return (active ?? candidates[0]).id;
+  return roadmapSprintKey(roadmap!, active ?? candidates[0]);
 }
 
 // --- Subcommands ---
@@ -308,11 +345,12 @@ function reviewSubcommand(flags: Record<string, string>, cwd: string): void {
     // Flag outliers
     for (const sprint of roadmap.sprints) {
       const ticketCount = sprint.tickets?.length ?? 0;
+      const sprintLabel = formatRoadmapSprintLabel(roadmap, roadmapSprintKey(roadmap, sprint));
       if (ticketCount > 4) {
-        console.log(`  \u26A0 S${sprint.id} has ${ticketCount} tickets (over recommended 4)`);
+        console.log(`  \u26A0 ${sprintLabel} has ${ticketCount} tickets (over recommended 4)`);
       }
       if (ticketCount < 3) {
-        console.log(`  \u26A0 S${sprint.id} has ${ticketCount} tickets (under recommended 3)`);
+        console.log(`  \u26A0 ${sprintLabel} has ${ticketCount} tickets (under recommended 3)`);
       }
     }
 
@@ -340,9 +378,10 @@ function reviewSubcommand(flags: Record<string, string>, cwd: string): void {
   // Identify bottlenecks (sprints on critical path with many dependents)
   const criticalSet = new Set(criticalPath.path);
   for (const id of criticalPath.path) {
-    const dependents = roadmap.sprints.filter(s => s.depends_on?.includes(id));
+    const dependents = roadmap.sprints.filter(s =>
+      s.depends_on?.some(dep => roadmapSprintKeyFromId(roadmap, dep) === id));
     if (dependents.length > 1) {
-      console.log(`  \u26A0 S${id} is a bottleneck — ${dependents.length} sprints depend on it`);
+      console.log(`  \u26A0 ${formatRoadmapSprintLabel(roadmap, id)} is a bottleneck — ${dependents.length} sprints depend on it`);
     }
   }
 
@@ -362,9 +401,11 @@ function reviewSubcommand(flags: Record<string, string>, cwd: string): void {
   console.log('\n## Dependency Analysis');
   for (const sprint of roadmap.sprints) {
     const fanIn = sprint.depends_on?.length ?? 0;
-    const fanOut = roadmap.sprints.filter(s => s.depends_on?.includes(sprint.id)).length;
+    const sprintKey = roadmapSprintKey(roadmap, sprint);
+    const fanOut = roadmap.sprints.filter(s =>
+      s.depends_on?.some(dep => roadmapSprintKeyFromId(roadmap, dep) === sprintKey)).length;
     if (fanIn > 2 || fanOut > 2) {
-      console.log(`  S${sprint.id}: fan-in=${fanIn} fan-out=${fanOut}${fanIn > 2 ? ' (high fan-in)' : ''}${fanOut > 2 ? ' (high fan-out)' : ''}`);
+      console.log(`  ${formatRoadmapSprintLabel(roadmap, sprintKey)}: fan-in=${fanIn} fan-out=${fanOut}${fanIn > 2 ? ' (high fan-in)' : ''}${fanOut > 2 ? ' (high fan-out)' : ''}`);
     }
   }
 
@@ -386,7 +427,11 @@ function statusSubcommand(flags: Record<string, string>, cwd: string): void {
   const config = loadConfig(cwd);
   const scorecards = loadScorecards(config, cwd);
   const currentSprint = resolveSprint(flags, cwd, roadmap, scorecards);
-  const completedSprints = new Set(scorecards.map(s => s.sprint_number));
+  const completedSprints = new Set(
+    scorecards
+      .map(s => roadmapSprintKeyFromId(roadmap, s.sprint_number))
+      .filter((key): key is string => key !== null),
+  );
 
   if (flags.full === 'true' || flags.history === 'true') {
     printFullRoadmapStatus(roadmap, currentSprint, completedSprints);
@@ -411,13 +456,14 @@ function displayPath(cwd: string, path: string): string {
 function roadmapSourceEvidence(
   cwd: string,
   flags: Record<string, string>,
-  sprintId: number,
+  sprintId: SprintId,
 ): RoadmapFocusEvidence[] {
+  const inputKey = sprintIdKey(sprintId) ?? String(sprintId);
   const projection: RoadmapFocusEvidence = {
     kind: 'roadmap',
     label: 'Roadmap source',
     ref: displayPath(cwd, resolveRoadmapPath(flags, cwd)),
-    sprint: sprintId,
+    sprint: inputKey,
   };
 
   // An explicit --path overrides federation: report exactly what was read.
@@ -425,28 +471,30 @@ function roadmapSourceEvidence(
 
   try {
     const store = loadRoadmapSourceStore(cwd);
+    const canonicalKey = roadmapSprintKeyFromId(store.roadmap, sprintId) ?? inputKey;
     const owner = store.sources.find(source =>
-      source.document.sprints.some(sprint => sprint.id === sprintId));
+      source.document.sprints.some(sprint =>
+        roadmapSprintKey(store.roadmap, sprint) === canonicalKey));
 
     const evidence: RoadmapFocusEvidence[] = [{
       kind: 'roadmap',
       label: 'Roadmap source (canonical manifest)',
       ref: displayPath(cwd, store.manifestPath),
-      sprint: sprintId,
+      sprint: canonicalKey,
     }];
     if (owner?.absolutePath) {
       evidence.push({
         kind: 'roadmap',
         label: `Owning source bundle (${owner.entry.kind})`,
         ref: displayPath(cwd, owner.absolutePath),
-        sprint: sprintId,
+        sprint: canonicalKey,
       });
     }
     evidence.push({
       kind: 'roadmap',
       label: 'Compatibility projection (generated, read-only)',
       ref: displayPath(cwd, store.outputPath),
-      sprint: sprintId,
+      sprint: canonicalKey,
     });
     return evidence;
   } catch {
@@ -457,29 +505,36 @@ function roadmapSourceEvidence(
 
 function focusEvidence(
   roadmap: RoadmapDefinition,
-  sprintId: number,
+  sprintId: SprintId,
   flags: Record<string, string>,
   cwd: string,
 ): RoadmapFocusEvidence[] {
   const config = loadConfig(cwd);
   const evidence: RoadmapFocusEvidence[] = roadmapSourceEvidence(cwd, flags, sprintId);
-  const selected = roadmap.sprints.find(sprint => sprint.id === sprintId);
-  const phase = roadmap.phases.find(candidate => candidate.sprints.includes(sprintId));
-  const phaseIndex = phase?.sprints.indexOf(sprintId) ?? -1;
-  const contextIds = new Set([
-    sprintId,
-    ...(selected?.depends_on ?? []),
-    ...(phaseIndex < 0 ? [] : phase!.sprints.slice(Math.max(0, phaseIndex - 2), phaseIndex)),
+  const selected = findRoadmapSprint(roadmap, sprintId);
+  if (!selected) return evidence;
+  const selectedKey = roadmapSprintKey(roadmap, selected);
+  const phase = roadmap.phases.find(candidate => {
+    const keys = candidate.sprint_keys ?? candidate.sprints;
+    return keys.some(id => roadmapSprintKeyFromId(roadmap, id) === selectedKey);
+  });
+  const phaseKeys = (phase?.sprint_keys ?? phase?.sprints ?? [])
+    .map(id => roadmapSprintKeyFromId(roadmap, id))
+    .filter((id): id is string => id !== null);
+  const phaseIndex = phaseKeys.indexOf(selectedKey);
+  const contextKeys = new Set<string>([
+    selectedKey,
+    ...(selected.depends_on ?? [])
+      .map(id => roadmapSprintKeyFromId(roadmap, id))
+      .filter((id): id is string => id !== null),
+    ...(phaseIndex < 0 ? [] : phaseKeys.slice(Math.max(0, phaseIndex - 2), phaseIndex)),
   ]);
-  const contextByValue = new Map(
-    [...contextIds].map(id => [roadmapSprintOrderValue(roadmap, id), id]),
-  );
 
   for (const path of discoverScorecardFiles(config, cwd)) {
     const scorecardSprint = sprintNumberFromScorecardFile(path, config);
     if (scorecardSprint == null) continue;
-    const roadmapSprintId = contextByValue.get(roadmapSprintOrderValue(roadmap, scorecardSprint));
-    if (roadmapSprintId == null) continue;
+    const roadmapSprintId = roadmapSprintKeyFromId(roadmap, scorecardSprint);
+    if (roadmapSprintId == null || !contextKeys.has(roadmapSprintId)) continue;
     evidence.push({
       kind: 'scorecard',
       label: `${formatRoadmapSprintLabel(roadmap, roadmapSprintId)} scorecard`,
@@ -508,7 +563,7 @@ function focusSubcommand(flags: Record<string, string>, cwd: string): void {
     process.exit(1);
     return;
   }
-  const sprintId = parseSprintNumber(flags.sprint);
+  const sprintId = sprintIdKey(flags.sprint);
   if (sprintId == null) {
     console.error(`\nInvalid sprint number: ${flags.sprint || '(empty)'}`);
     console.error('Usage: slope roadmap focus --sprint=N [--path=<file>] [--json]\n');
@@ -518,25 +573,32 @@ function focusSubcommand(flags: Record<string, string>, cwd: string): void {
 
   const roadmap = loadRoadmapFile(flags, cwd);
   if (!roadmap) { process.exit(1); return; }
+  const selected = findRoadmapSprint(roadmap, sprintId);
+  if (!selected) {
+    console.error(`\nSprint ${formatRoadmapSprintLabel(roadmap, sprintId)} was not found in the roadmap.\n`);
+    process.exit(1);
+    return;
+  }
+  const selectedKey = roadmapSprintKey(roadmap, selected);
   const config = loadConfig(cwd);
   const scorecards = loadScorecards(config, cwd);
   const completedSprintIds = scorecards.map(card => card.sprint_number);
-  const hazards: RoadmapFocusHazard[] = roadmapRealityIssues(buildRoadmapReality(cwd, roadmap), sprintId)
+  const hazards: RoadmapFocusHazard[] = roadmapRealityIssues(buildRoadmapReality(cwd, roadmap), selectedKey)
     .map(issue => ({
-      sprint: sprintId,
-      sprint_label: formatRoadmapSprintLabel(roadmap, sprintId),
+      sprint: selectedKey,
+      sprint_label: formatRoadmapSprintLabel(roadmap, selectedKey),
       type: 'roadmap_reality',
       severity: issue.type === 'error' ? 'major' : 'minor',
       description: issue.message,
     }));
-  const focus = buildRoadmapFocus(roadmap, sprintId, {
+  const focus = buildRoadmapFocus(roadmap, selectedKey, {
     completedSprintIds,
     hazards,
     scorecards,
-    evidence: focusEvidence(roadmap, sprintId, flags, cwd),
+    evidence: focusEvidence(roadmap, selectedKey, flags, cwd),
   });
   if (!focus) {
-    console.error(`\nSprint ${formatRoadmapSprintLabel(roadmap, sprintId)} was not found in the roadmap.\n`);
+    console.error(`\nSprint ${formatRoadmapSprintLabel(roadmap, selectedKey)} was not found in the roadmap.\n`);
     process.exit(1);
     return;
   }
@@ -594,7 +656,7 @@ function completeSourcesSubcommand(flags: Record<string, string>, cwd: string): 
     process.exit(1);
     return;
   }
-  const sprint = parseSprintNumber(flags.sprint);
+  const sprint = sprintIdKey(flags.sprint);
   if (sprint == null) {
     console.error(`\nInvalid sprint number: ${flags.sprint || '(empty)'}`);
     console.error('Usage: slope roadmap complete --sprint=N [--source=<file>] [--scorecard=<path>] [--dry-run]\n');
@@ -621,7 +683,7 @@ function completeSourcesSubcommand(flags: Record<string, string>, cwd: string): 
       dryRun: flags['dry-run'] === 'true',
       force: true,
     });
-    const label = `S${formatSprintNumber(sprint)}`;
+    const label = `S${sprint}`;
     if (flags['dry-run'] === 'true') {
       console.log(`\nRoadmap complete dry run: ${label} in ${result.source}`);
       console.log(`  Would change source: ${result.changed ? 'yes' : 'no'}`);
@@ -777,8 +839,8 @@ function archiveSourcesSubcommand(flags: Record<string, string>, cwd: string): v
     process.exit(1);
     return;
   }
-  const through = parseSprintNumber(flags.through);
-  if (through == null) {
+  const requestedThrough = sprintIdKey(flags.through);
+  if (requestedThrough == null) {
     console.error(`\nInvalid archive boundary: ${flags.through || '(empty)'}\n`);
     process.exit(1);
     return;
@@ -786,6 +848,8 @@ function archiveSourcesSubcommand(flags: Record<string, string>, cwd: string): v
 
   try {
     const store = loadRoadmapSourceStore(cwd, flags.source);
+    const through = roadmapSprintKeyFromId(store.roadmap, requestedThrough) ?? requestedThrough;
+    assertCanonicalArchiveBoundary(store, through);
     const projectionBefore = existsSync(store.outputPath) ? readFileSync(store.outputPath, 'utf8') : null;
     const plan = planRoadmapSourceArchive(store, through);
     console.log(`\nRoadmap archive through Sprint ${through}:`);
@@ -812,10 +876,28 @@ function archiveSourcesSubcommand(flags: Record<string, string>, cwd: string): v
   }
 }
 
+function assertCanonicalArchiveBoundary(
+  store: ReturnType<typeof loadRoadmapSourceStore>,
+  through: SprintId,
+): void {
+  for (const source of store.sources) {
+    if (source.entry.kind !== 'phase') continue;
+    const sprintIds = source.document.phase.sprint_keys
+      ?? source.document.phase.sprints;
+    const comparisons = sprintIds
+      .map(id => compareRoadmapSprintIds(store.roadmap, id, through));
+    if (comparisons.some(value => value <= 0) && comparisons.some(value => value > 0)) {
+      throw new Error(
+        `--through would split phase "${source.document.phase.name}"; archive whole phases only`,
+      );
+    }
+  }
+}
+
 function printFullRoadmapStatus(
   roadmap: RoadmapDefinition,
-  currentSprint: number,
-  completedSprints: Set<number>,
+  currentSprint: SprintId,
+  completedSprints: Set<string>,
 ): void {
   console.log(`\n# Roadmap Status — ${roadmap.name}`);
   console.log('\u2550'.repeat(40));
@@ -830,20 +912,33 @@ function printFullRoadmapStatus(
       continue;
     }
 
-    const phaseSprints = roadmap.sprints.filter(s => phase.sprints.includes(s.id));
-    const completed = phaseSprints.filter(s => isTerminalRoadmapSprint(s, completedSprints)).length;
+    const phaseKeys = new Set(
+      (phase.sprint_keys ?? phase.sprints.map(String))
+        .map(id => roadmapSprintKeyFromId(roadmap, id)),
+    );
+    const phaseSprints = roadmap.sprints.filter(
+      sprint => phaseKeys.has(roadmapSprintKey(roadmap, sprint)),
+    );
+    const completed = phaseSprints.filter(
+      sprint => isTerminalRoadmapSprint(roadmap, sprint, completedSprints),
+    ).length;
     console.log(`## ${phase.name || 'Unnamed Phase'} (${completed}/${phaseSprints.length})`);
 
     for (const sprint of phaseSprints) {
       const explicitStatus = getRoadmapStatus(sprint);
-      const isCompleted = completedSprints.has(sprint.id) || explicitStatus === 'complete';
+      const isCompleted = completedSprints.has(roadmapSprintKey(roadmap, sprint))
+        || explicitStatus === 'complete';
       const isSuperseded = explicitStatus === 'superseded';
-      const isCurrent = sprint.id === currentSprint;
+      const isCurrent = roadmapSprintKey(roadmap, sprint)
+        === roadmapSprintKeyFromId(roadmap, currentSprint);
 
       // Check if blocked: all dependencies must be completed
       const blockedBy = (sprint.depends_on ?? []).filter(dep => {
-        const dependency = roadmap.sprints.find(s => s.id === dep);
-        return dependency ? !isTerminalRoadmapSprint(dependency, completedSprints) : !completedSprints.has(dep);
+        const dependency = findRoadmapSprint(roadmap, dep);
+        const key = roadmapSprintKeyFromId(roadmap, dep);
+        return dependency
+          ? !isTerminalRoadmapSprint(roadmap, dependency, completedSprints)
+          : key === null || !completedSprints.has(key);
       });
       const isBlocked = !isCompleted && !isSuperseded && blockedBy.length > 0;
 
@@ -861,7 +956,7 @@ function printFullRoadmapStatus(
       }
 
       const theme = sprint.theme || 'Untitled Sprint';
-      console.log(`  ${formatRoadmapSprintLabel(roadmap, sprint.id)} ${theme.padEnd(30)} ${status}`);
+      console.log(`  ${formatRoadmapSprintLabel(roadmap, roadmapSprintKey(roadmap, sprint))} ${theme.padEnd(30)} ${status}`);
     }
     console.log('');
   }
@@ -877,18 +972,20 @@ function printFullRoadmapStatus(
 
 function printCompactRoadmapStatus(
   roadmap: RoadmapDefinition,
-  currentSprint: number,
-  completedSprints: Set<number>,
+  currentSprint: SprintId,
+  completedSprints: Set<string>,
   cwd: string,
 ): void {
-  const current = roadmap.sprints.find(s => s.id === currentSprint);
+  const current = findRoadmapSprint(roadmap, currentSprint);
   const currentLabel = current
-    ? `${formatRoadmapSprintLabel(roadmap, current.id)} ${current.theme || 'Untitled Sprint'}`
+    ? `${formatRoadmapSprintLabel(roadmap, roadmapSprintKey(roadmap, current))} ${current.theme || 'Untitled Sprint'}`
     : `${formatRoadmapSprintLabel(roadmap, currentSprint)} (not found in roadmap)`;
   const currentIsPending = current ? isRoadmapSprintPending(current) : false;
   const currentPhase = phaseForSprint(roadmap, currentSprint);
   const pendingAfterCurrent = sortedRoadmapSprints(roadmap)
-    .filter(s => isRoadmapSprintPending(s) && s.id !== currentSprint && compareSprintIds(s.id, currentSprint) > 0);
+    .filter(s => isRoadmapSprintPending(s)
+      && roadmapSprintKey(roadmap, s) !== roadmapSprintKeyFromId(roadmap, currentSprint)
+      && compareRoadmapSprintIds(roadmap, roadmapSprintKey(roadmap, s), currentSprint) > 0);
   const nextReady = pendingAfterCurrent.find(s => blockedByForSprint(roadmap, s, completedSprints).length === 0);
   const upcoming = pendingAfterCurrent.slice(0, DEFAULT_UPCOMING_LIMIT);
   const realityLines = formatRoadmapRealitySection(buildRoadmapReality(cwd, roadmap), undefined, 5).slice(1);
@@ -909,10 +1006,10 @@ function printCompactRoadmapStatus(
   if (!current) {
     console.log(`  ${formatRoadmapSprintLabel(roadmap, currentSprint)} is not defined in the roadmap.`);
   } else {
-    console.log(`  ${formatRoadmapSprintLabel(roadmap, current.id)} ${current.theme || 'Untitled Sprint'} - ${statusLabelForSprint(roadmap, current, currentSprint, completedSprints)}`);
+    console.log(`  ${formatRoadmapSprintLabel(roadmap, roadmapSprintKey(roadmap, current))} ${current.theme || 'Untitled Sprint'} - ${statusLabelForSprint(roadmap, current, currentSprint, completedSprints)}`);
     if ((current.depends_on ?? []).length > 0) {
       const deps = current.depends_on!.map(dep => {
-        const sprint = roadmap.sprints.find(s => s.id === dep);
+        const sprint = findRoadmapSprint(roadmap, dep);
         if (!sprint) return `${formatRoadmapSprintLabel(roadmap, dep)} missing`;
         return `${formatRoadmapSprintLabel(roadmap, dep)} ${statusLabelForSprint(roadmap, sprint, currentSprint, completedSprints).replace(/^[^\w]+ /, '')}`;
       });
@@ -925,7 +1022,7 @@ function printCompactRoadmapStatus(
 
   console.log('\nNext ready:');
   if (nextReady) {
-    console.log(`  ${formatRoadmapSprintLabel(roadmap, nextReady.id)} ${nextReady.theme || 'Untitled Sprint'} - ${statusLabelForSprint(roadmap, nextReady, currentSprint, completedSprints)}`);
+    console.log(`  ${formatRoadmapSprintLabel(roadmap, roadmapSprintKey(roadmap, nextReady))} ${nextReady.theme || 'Untitled Sprint'} - ${statusLabelForSprint(roadmap, nextReady, currentSprint, completedSprints)}`);
   } else {
     console.log('  None yet');
   }
@@ -935,7 +1032,7 @@ function printCompactRoadmapStatus(
     console.log('  None');
   } else {
     for (const sprint of upcoming) {
-      console.log(`  ${formatRoadmapSprintLabel(roadmap, sprint.id)} ${sprint.theme || 'Untitled Sprint'} - ${statusLabelForSprint(roadmap, sprint, currentSprint, completedSprints)}`);
+      console.log(`  ${formatRoadmapSprintLabel(roadmap, roadmapSprintKey(roadmap, sprint))} ${sprint.theme || 'Untitled Sprint'} - ${statusLabelForSprint(roadmap, sprint, currentSprint, completedSprints)}`);
     }
   }
 
@@ -946,7 +1043,7 @@ function printCompactRoadmapStatus(
     const first = current.tickets[0];
     console.log(`  Work ${first.key}: ${first.title}`);
   } else if (nextReady) {
-    console.log(`  Start ${formatRoadmapSprintLabel(roadmap, nextReady.id)}: ${nextReady.theme || 'Untitled Sprint'}`);
+    console.log(`  Start ${formatRoadmapSprintLabel(roadmap, roadmapSprintKey(roadmap, nextReady))}: ${nextReady.theme || 'Untitled Sprint'}`);
   } else {
     console.log('  No roadmap action is currently ready.');
   }
@@ -985,7 +1082,8 @@ function scorecardToSprint(card: GolfScorecard): RoadmapSprint {
   }));
 
   return {
-    id: card.sprint_number,
+    id: Number(card.sprint_number),
+    id_key: card.sprint_number,
     theme: card.theme,
     par: card.par as 3 | 4 | 5,
     slope: card.slope,
@@ -1055,7 +1153,7 @@ function syncSubcommand(flags: Record<string, string>, cwd: string): void {
     return; // unreachable but satisfies TS
   }
 
-  const existingById = new Map(roadmap.sprints.map(s => [s.id, s]));
+  const existingById = new Map(roadmap.sprints.map(s => [roadmapSprintKey(roadmap, s), s]));
   let updated = 0;
   let added = 0;
 
@@ -1081,8 +1179,11 @@ function syncSubcommand(flags: Record<string, string>, cwd: string): void {
     }
   }
 
-  // Sort sprints by id
-  roadmap.sprints.sort((a, b) => a.id - b.id);
+  roadmap.sprints.sort((a, b) => compareRoadmapSprintIds(
+    roadmap,
+    roadmapSprintKey(roadmap, a),
+    roadmapSprintKey(roadmap, b),
+  ));
 
   // Build output
   const output = JSON.stringify(roadmap, null, 2) + '\n';

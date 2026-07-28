@@ -1,9 +1,10 @@
 import { isAbsolute, posix } from 'node:path';
 import { parseDocument } from 'yaml';
 import { castRoadmapStructure, getRoadmapTicketKey, validateRoadmap } from './roadmap.js';
-import { compareRoadmapSprintIds, describeSprintIdAmbiguity, roadmapSprintKey, roadmapSprintOrderValue } from './roadmap.js';
+import { compareRoadmapSprintIds, describeSprintIdAmbiguity, roadmapSprintKey } from './roadmap.js';
 import { sprintIdKey } from './sprint-id.js';
 import type { RoadmapDefinition, RoadmapPhase, RoadmapSprint } from './roadmap.js';
+import type { SprintId } from './sprint-id.js';
 
 export type RoadmapSourceKind = 'phase' | 'backlog' | 'archive';
 
@@ -37,7 +38,7 @@ export interface RoadmapSourceValidationIssue {
   code: string;
   message: string;
   source?: string;
-  sprint?: number;
+  sprint?: SprintId;
   ticket?: string;
 }
 
@@ -308,9 +309,8 @@ export function parseRoadmapSourceDocument(
     if (typeof sprint.type !== 'string' || !sprint.type.trim()) {
       throw new RoadmapSourceError(`sprints[${sprintIndex}].type must be a non-empty string`, sourcePath);
     }
-    // depends_on may reference a canonical string id (e.g. "458.10"); coerce to
-    // the numeric mirror. Distinctness between coexisting 458.1 and 458.10 in a
-    // dependency uses the numeric mirror, the same boundary as the store (GH #635).
+    // Dependencies retain their canonical key so coexisting 458.1 and 458.10
+    // remain distinct throughout source validation and the compiled projection.
     if (sprint.depends_on != null) {
       if (!Array.isArray(sprint.depends_on)) {
         throw new RoadmapSourceError(`sprints[${sprintIndex}].depends_on must be a sequence of sprint IDs`, sourcePath);
@@ -320,7 +320,7 @@ export function parseRoadmapSourceDocument(
         if (key === null) {
           throw new RoadmapSourceError(`sprints[${sprintIndex}].depends_on[${i}] is not a valid sprint id`, sourcePath);
         }
-        sprint.depends_on[i] = Number(key);
+        sprint.depends_on[i] = key;
       }
     }
     for (const field of ['status', 'note', 'outcome', 'phase', 'wave'] as const) {
@@ -476,7 +476,11 @@ export function compileRoadmapSources(
     phases: ordered.map(source => clonePhase(source.document.phase)),
     sprints: ordered.flatMap(source => source.document.sprints.map(cloneSprint)),
   };
-  roadmap.sprints.sort((a, b) => compareRoadmapSprintIds(roadmap, a.id, b.id));
+  roadmap.sprints.sort((a, b) => compareRoadmapSprintIds(
+    roadmap,
+    roadmapSprintKey(roadmap, a),
+    roadmapSprintKey(roadmap, b),
+  ));
   return roadmap;
 }
 
@@ -572,12 +576,20 @@ export function findRoadmapProjectionDivergence(
 
   const disk = parsed as { phases?: unknown; sprints?: unknown };
 
-  const compiledSprints = new Set((compiled.sprints ?? []).map(sprint => String(sprint.id)));
+  const compiledSprints = new Set(
+    (compiled.sprints ?? []).map(sprint => roadmapSprintKey(compiled, sprint)),
+  );
   const diskSprints = Array.isArray(disk.sprints) ? disk.sprints : [];
   const sprints = diskSprints
-    .map(sprint => (sprint && typeof sprint === 'object' ? (sprint as { id?: unknown }).id : undefined))
-    .filter(id => id != null)
-    .map(id => String(id))
+    .map(sprint => {
+      if (!sprint || typeof sprint !== 'object') return null;
+      const row = sprint as { id?: unknown; id_key?: unknown };
+      if (typeof row.id_key === 'string') return sprintIdKey(row.id_key);
+      return typeof row.id === 'string' || typeof row.id === 'number'
+        ? sprintIdKey(row.id)
+        : null;
+    })
+    .filter((id): id is string => id !== null)
     .filter(id => !compiledSprints.has(id));
 
   const compiledPhases = new Set((compiled.phases ?? []).map(phase => phase.name));
@@ -593,7 +605,11 @@ export function findRoadmapProjectionDivergence(
     .filter(phase => {
       const ids = Array.isArray(phase.sprints) ? phase.sprints : [];
       if (ids.length === 0) return true;
-      return ids.some(id => id != null && !compiledSprints.has(String(id)));
+      return ids.some(id => {
+        if (id == null || (typeof id !== 'string' && typeof id !== 'number')) return false;
+        const key = sprintIdKey(id);
+        return key !== null && !compiledSprints.has(key);
+      });
     })
     .map(phase => phase.name as string);
 
@@ -672,7 +688,7 @@ export function validateRoadmapSourceFederation(
         errors.push({
           code: 'missing_sprint_definition',
           source: label,
-          sprint: Number(key),
+          sprint: key,
           message: `Phase membership S${key} has no sprint definition in the same bundle.`,
         });
       }
@@ -682,7 +698,7 @@ export function validateRoadmapSourceFederation(
         errors.push({
           code: 'orphan_sprint_definition',
           source: label,
-          sprint: Number(key),
+          sprint: key,
           message: `Sprint S${key} is defined but missing from phase.sprints in the same bundle.`,
         });
       }
@@ -695,32 +711,32 @@ export function validateRoadmapSourceFederation(
     }
 
     for (const sprint of source.document.sprints) {
-      const key = defKey(sprint);
-      const priorSprint = sprintDefinitions.get(key);
+      const sprintKey = defKey(sprint);
+      const priorSprint = sprintDefinitions.get(sprintKey);
       if (priorSprint) {
         errors.push({
           code: 'duplicate_sprint',
           source: label,
-          sprint: sprint.id,
-          message: `Sprint S${key} is also defined in ${priorSprint}.`,
+          sprint: sprintKey,
+          message: `Sprint S${sprintKey} is also defined in ${priorSprint}.`,
         });
       } else {
-        sprintDefinitions.set(key, label);
+        sprintDefinitions.set(sprintKey, label);
       }
       for (const ticket of sprint.tickets) {
-        const key = getRoadmapTicketKey(ticket);
-        if (!key) continue;
-        const priorTicket = ticketDefinitions.get(key);
+        const ticketKey = getRoadmapTicketKey(ticket);
+        if (!ticketKey) continue;
+        const priorTicket = ticketDefinitions.get(ticketKey);
         if (priorTicket) {
           errors.push({
             code: 'duplicate_ticket',
             source: label,
-            sprint: sprint.id,
-            ticket: key,
-            message: `Ticket ${key} is also defined in ${priorTicket}.`,
+            sprint: sprintKey,
+            ticket: ticketKey,
+            message: `Ticket ${ticketKey} is also defined in ${priorTicket}.`,
           });
         } else {
-          ticketDefinitions.set(key, label);
+          ticketDefinitions.set(ticketKey, label);
         }
       }
     }
@@ -730,7 +746,7 @@ export function validateRoadmapSourceFederation(
     if (memberships.length > 1) {
       errors.push({
         code: 'multiple_phase_membership',
-        sprint: Number(key),
+        sprint: key,
         message: `Sprint S${key} belongs to multiple phase bundles: ${memberships.join(', ')}.`,
       });
     }
@@ -747,7 +763,7 @@ export function validateRoadmapSourceFederation(
       errors.push({
         code: 'logical_sprint_collision',
         source: sprintDefinitions.get(defKey(sprint)),
-        sprint: sprint.id,
+        sprint: key,
         message: `Sprint S${key} and Sprint S${prior.key} resolve to the same roadmap identity (${key}); first defined in ${prior.source ?? 'unknown source'}.`,
       });
     } else {

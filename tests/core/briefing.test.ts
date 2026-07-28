@@ -212,7 +212,7 @@ describe('extractHazardIndex', () => {
     });
     const result = extractHazardIndex([card]);
     expect(result.shot_hazards).toHaveLength(1);
-    expect(result.shot_hazards[0].sprint).toBe(167);
+    expect(result.shot_hazards[0].sprint).toBe('167');
     expect(result.shot_hazards[0].ticket).toBe('S167-1');
     expect(result.shot_hazards[0].description).toBe('migration conflict');
   });
@@ -224,7 +224,7 @@ describe('extractHazardIndex', () => {
     });
     const result = extractHazardIndex([card]);
     expect(result.bunker_locations).toHaveLength(2);
-    expect(result.bunker_locations[0].sprint).toBe(167);
+    expect(result.bunker_locations[0].sprint).toBe('167');
     expect(result.bunker_locations[0].location).toBe('Watch out for X');
   });
 
@@ -1251,6 +1251,93 @@ describe('formatBriefing — replanned hazard provenance', () => {
     expect(output).toContain('direct dependency history for S43.5');
     expect(output).toContain('S43.5: Roadmap context compiler');
     expect(output).toContain('Next: S44: Successor');
+  });
+
+  it('does not treat S458.1 as an identity alias for S458.10', () => {
+    const roadmap: RoadmapDefinition = {
+      name: 'Canonical Roadmap',
+      phases: [{
+        name: 'Phase 458',
+        sprints: [458.1, 458.9, 458.1],
+        sprint_keys: ['458.1', '458.9', '458.10'],
+      }],
+      sprints: [
+        {
+          id: 458.1, id_key: '458.1', theme: 'First insert', par: 3, slope: 1, type: 'feature',
+          tickets: [{ key: 'S458.1-1', title: 'First', club: 'wedge', complexity: 'small' }],
+        },
+        {
+          id: 458.9, id_key: '458.9', theme: 'Dependency', par: 3, slope: 1, type: 'feature',
+          tickets: [{ key: 'S458.9-1', title: 'Dependency', club: 'wedge', complexity: 'small' }],
+        },
+        {
+          id: 458.1, id_key: '458.10', theme: 'Tenth insert', par: 3, slope: 1, type: 'feature',
+          depends_on: ['458.9'],
+          tickets: [{ key: 'S458.10-1', title: 'Tenth', club: 'wedge', complexity: 'small' }],
+        },
+      ],
+    };
+    const output = formatBriefing({
+      scorecards: [makeCard({
+        sprint_number: '458.9',
+        shots: [makeShot({
+          ticket_key: 'S458.9-1',
+          hazards: [{
+            type: 'rough',
+            description: 'S458.1 routes to preserved history. Keep this exact identity evidence.',
+          }],
+        })],
+      })],
+      commonIssues: makeIssues([]),
+      roadmap,
+      currentSprint: '458.10',
+    });
+
+    expect(output).toContain('S458.1 routes to preserved history.');
+    expect(output).not.toContain('Suppressed');
+  });
+
+  it('orders canonical same-base hazards without collapsing .1 and .10', () => {
+    const roadmap: RoadmapDefinition = {
+      name: 'Canonical Hazard Order',
+      phases: [{
+        name: 'Phase 458',
+        sprints: [458.1, 458.1, 459],
+        sprint_keys: ['458.1', '458.10', '459'],
+      }],
+      sprints: [
+        {
+          id: 458.1, id_key: '458.1', theme: 'First', par: 3, slope: 1, type: 'feature',
+          tickets: [{ key: 'S458.1-1', title: 'First', club: 'wedge', complexity: 'small' }],
+        },
+        {
+          id: 458.1, id_key: '458.10', theme: 'Tenth', par: 3, slope: 1, type: 'feature',
+          tickets: [{ key: 'S458.10-1', title: 'Tenth', club: 'wedge', complexity: 'small' }],
+        },
+        {
+          id: 459, id_key: '459', theme: 'Current', par: 3, slope: 1, type: 'feature',
+          depends_on: ['458.1', '458.10'],
+          tickets: [{ key: 'S459-1', title: 'Current', club: 'wedge', complexity: 'small' }],
+        },
+      ],
+    };
+    const output = formatBriefing({
+      scorecards: [
+        makeCard({
+          sprint_number: '458.1',
+          shots: [makeShot({ ticket_key: 'S458.1-1', hazards: [{ type: 'rough', description: 'FIRST_INSERT_HAZARD' }] })],
+        }),
+        makeCard({
+          sprint_number: '458.10',
+          shots: [makeShot({ ticket_key: 'S458.10-1', hazards: [{ type: 'rough', description: 'TENTH_INSERT_HAZARD' }] })],
+        }),
+      ],
+      commonIssues: makeIssues([]),
+      roadmap,
+      currentSprint: '459',
+    });
+
+    expect(output.indexOf('TENTH_INSERT_HAZARD')).toBeLessThan(output.indexOf('FIRST_INSERT_HAZARD'));
   });
 
   it('uses canonical decimal identity for roadmap and requested-scorecard skills', () => {

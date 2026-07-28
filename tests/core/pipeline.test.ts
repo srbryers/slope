@@ -32,7 +32,7 @@ describe('clusterEvents', () => {
 
     const coreCluster = clusters.find(c => c.area === 'packages/core/src');
     expect(coreCluster).toBeDefined();
-    expect(coreCluster!.sprints).toEqual([1, 2]);
+    expect(coreCluster!.sprints).toEqual(['1', '2']);
     expect(coreCluster!.events).toHaveLength(2);
   });
 
@@ -45,7 +45,7 @@ describe('clusterEvents', () => {
     const clusters = clusterEvents(events);
     expect(clusters).toHaveLength(1);
     expect(clusters[0].area).toBe('testing');
-    expect(clusters[0].sprints).toEqual([1, 2]);
+    expect(clusters[0].sprints).toEqual(['1', '2']);
   });
 
   it('falls back to ticket prefix for area', () => {
@@ -73,7 +73,7 @@ describe('clusterEvents', () => {
     ];
 
     const clusters = clusterEvents(events);
-    expect(clusters[0].sprints).toEqual([3]);
+    expect(clusters[0].sprints).toEqual(['3']);
     expect(clusters[0].events).toHaveLength(3);
   });
 
@@ -238,7 +238,7 @@ describe('runPipeline', () => {
 
     // Should update the existing pattern, not add a new one
     expect(issues.recurring_patterns).toHaveLength(1);
-    expect(issues.recurring_patterns[0].sprints_hit).toContain(3);
+    expect(issues.recurring_patterns[0].sprints_hit).toContain('3');
     expect(result.promoted).toBe(1);
   });
 

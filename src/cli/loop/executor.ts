@@ -16,6 +16,7 @@ import { loadConfig } from '../../core/config.js';
 import type { SlopeConfig } from '../../core/config.js';
 import { loadScorecards } from '../../core/loader.js';
 import { computeHandicapCard } from '../../core/handicap.js';
+import { sprintIdKey } from '../../core/sprint-id.js';
 import type { LoopConfig, BacklogSprint, BacklogTicket, TicketResult, SprintResult, ExecutionContext } from './types.js';
 import type { Logger } from './logger.js';
 
@@ -166,13 +167,16 @@ export async function runSprint(flags: Record<string, string>, cwd: string): Pro
               execFileSync('pnpm', ['slope', 'review', 'findings', 'clear'], { cwd: worktreeCwd, stdio: 'pipe' });
             } catch { /* ok */ }
 
-            const sprintNum = extractSprintNum(worktreeCwd);
-            const findingCount = runStructuralReview(pr.number, sprint.id, sprintNum, worktreeCwd, log);
+            const sprintKey = extractSprintId(worktreeCwd);
+            const findingCount = sprintKey === null
+              ? 0
+              : runStructuralReview(pr.number, sprint.id, sprintKey, worktreeCwd, log);
+            if (sprintKey === null) log.warn('Structural review skipped: next sprint identity was unavailable');
             log.info(`Structural review: ${findingCount} finding(s)`);
 
-            if (findingCount > 0) {
+            if (findingCount > 0 && sprintKey !== null) {
               try {
-                execFileSync('pnpm', ['slope', 'review', 'amend', `--sprint=${sprintNum}`], { cwd: worktreeCwd, stdio: 'pipe' });
+                execFileSync('pnpm', ['slope', 'review', 'amend', `--sprint=${sprintKey}`], { cwd: worktreeCwd, stdio: 'pipe' });
                 log.info('Scorecard amended with review findings');
               } catch {
                 log.warn('Scorecard amendment failed');
@@ -506,16 +510,15 @@ export function saveResult(result: SprintResult, cwd: string, config: LoopConfig
 function generateScorecard(sprint: BacklogSprint, branch: string, cwd: string, log: Logger): void {
   try {
     const nextOutput = execFileSync('pnpm', ['slope', 'next'], { cwd, encoding: 'utf8' });
-    const match = nextOutput.match(/Next sprint: S(\d+)/);
-    const sprintNum = match?.[1] ?? '0';
-    if (parseInt(sprintNum, 10) > 0) {
+    const sprintId = extractNextSprintId(nextOutput);
+    if (sprintId !== null) {
       execFileSync('pnpm', [
         'slope', 'auto-card',
-        `--sprint=${sprintNum}`,
+        `--sprint=${sprintId}`,
         `--theme=${sprint.title}`,
         `--branch=main..${branch}`,
       ], { cwd, stdio: 'pipe' });
-      log.info(`Auto-card generated for sprint ${sprintNum}`);
+      log.info(`Auto-card generated for sprint ${sprintId}`);
     }
   } catch {
     log.warn('Auto-card generation failed');
@@ -523,14 +526,18 @@ function generateScorecard(sprint: BacklogSprint, branch: string, cwd: string, l
   try { execFileSync('pnpm', ['slope', 'review'], { cwd, stdio: 'pipe' }); } catch { /* ok */ }
 }
 
-function extractSprintNum(cwd: string): number {
+function extractSprintId(cwd: string): string | null {
   try {
     const output = execFileSync('pnpm', ['slope', 'next'], { cwd, encoding: 'utf8' });
-    const match = output.match(/Next sprint: S(\d+)/);
-    return parseInt(match?.[1] ?? '0', 10);
+    return extractNextSprintId(output);
   } catch {
-    return 0;
+    return null;
   }
+}
+
+export function extractNextSprintId(output: string): string | null {
+  const match = output.match(/Next sprint:\s*S(\d+(?:\.\d+)?)/i);
+  return match ? sprintIdKey(match[1]) : null;
 }
 
 // ── Layer 3: Sprint-level SLOPE orchestration ──────────────────────

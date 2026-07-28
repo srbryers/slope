@@ -1,7 +1,12 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { detectLatestSprint } from '../core/index.js';
+import {
+  detectLatestSprint,
+  sprintIdKey,
+  sprintIdsEqual,
+  type SprintId,
+} from '../core/index.js';
 import { loadConfig } from './config.js';
 import { loadPrReviewState } from './pr-review-state.js';
 import { loadReviewState } from './commands/review-state.js';
@@ -37,7 +42,7 @@ export type PrReviewerBotStatus = 'unknown' | 'pending' | 'settled';
 export type PrCloseoutSettlementStatus = 'missing' | 'pending' | 'settled';
 
 export interface PrCloseoutStatus {
-  sprint?: number;
+  sprint?: string;
   branch?: string;
   scorecardPath?: string;
   scorecardExists: boolean;
@@ -81,10 +86,12 @@ export function branchSizeWarnings(size: BranchSize, policy: PrCloseoutPolicy): 
   return warnings;
 }
 
-export function buildPrCloseoutStatus(cwd: string, opts: { sprint?: number; pr?: number } = {}): PrCloseoutStatus {
+export function buildPrCloseoutStatus(cwd: string, opts: { sprint?: SprintId; pr?: number } = {}): PrCloseoutStatus {
   const config = loadConfig(cwd);
   const policy = closeoutPolicy(cwd);
-  const sprint = opts.sprint ?? inferSprint(cwd);
+  const sprint = opts.sprint === undefined
+    ? inferSprint(cwd)
+    : sprintIdKey(opts.sprint) ?? undefined;
   const branch = currentBranch(cwd);
   const pr = currentPr(opts.pr);
   const base = pr?.baseRefName ? `origin/${pr.baseRefName}` : inferBaseRef(cwd);
@@ -221,11 +228,12 @@ function formatBranchSize(size: BranchSize): string {
   return `${commits}, ${files}${size.base ? ` vs ${size.base}` : ''}`;
 }
 
-function inferSprint(cwd: string): number | undefined {
+function inferSprint(cwd: string): string | undefined {
   const state = loadSprintState(cwd);
   if (isActiveSprintState(state)) return state.sprint;
   const config = loadConfig(cwd);
-  return config.currentSprint ?? (detectLatestSprint(config, cwd) || undefined);
+  const inferred = config.currentSprint ?? detectLatestSprint(config, cwd);
+  return inferred == null ? undefined : sprintIdKey(inferred) ?? undefined;
 }
 
 function currentBranch(cwd: string): string | undefined {
@@ -544,7 +552,7 @@ function collectBranchSize(cwd: string, base: string | undefined): BranchSize {
   return size;
 }
 
-function resolvePrReviewStatus(cwd: string, input: { pr?: number; sprint?: number; branch?: string }): 'missing' | 'pending' | 'reviewed' {
+function resolvePrReviewStatus(cwd: string, input: { pr?: number; sprint?: SprintId; branch?: string }): 'missing' | 'pending' | 'reviewed' {
   const matching = matchingPrReviews(cwd, input);
   if (matching.some(review => review.status === 'reviewed')) return 'reviewed';
   if (matching.some(review => review.status === 'pending')) {
@@ -558,18 +566,21 @@ function completedReviewRounds(cwd: string): boolean {
   return Boolean(state && state.rounds_completed >= state.rounds_required);
 }
 
-function resolvePrCloseoutSettlement(cwd: string, input: { pr?: number; sprint?: number; branch?: string }): PrCloseoutSettlementStatus {
+function resolvePrCloseoutSettlement(cwd: string, input: { pr?: number; sprint?: SprintId; branch?: string }): PrCloseoutSettlementStatus {
   const matching = matchingPrReviews(cwd, input);
   if (matching.some(review => review.closeout_status === 'settled')) return 'settled';
   if (matching.length > 0) return 'pending';
   return 'missing';
 }
 
-function matchingPrReviews(cwd: string, input: { pr?: number; sprint?: number; branch?: string }) {
+function matchingPrReviews(cwd: string, input: { pr?: number; sprint?: SprintId; branch?: string }) {
   const reviews = loadPrReviewState(cwd).reviews;
-  return reviews.filter(review =>
-    (input.pr != null && review.pr === input.pr)
-    || (input.sprint != null && review.sprint === input.sprint)
-    || (input.branch != null && review.branch === input.branch),
-  );
+  return reviews.filter(review => {
+    if (input.sprint != null && review.sprint != null && !sprintIdsEqual(review.sprint, input.sprint)) {
+      return false;
+    }
+    return (input.pr != null && review.pr === input.pr)
+      || (input.sprint != null && review.sprint != null && sprintIdsEqual(review.sprint, input.sprint))
+      || (input.branch != null && review.branch === input.branch);
+  });
 }

@@ -102,6 +102,35 @@ describe('MCP_TOOL_REGISTRY', () => {
       }
     }
   });
+
+  it('publishes canonical sprint selector contracts', () => {
+    const acquire = MCP_TOOL_REGISTRY.find(tool => tool.name === 'acquire_claim');
+    const conflicts = MCP_TOOL_REGISTRY.find(tool => tool.name === 'check_conflicts');
+    const testing = MCP_TOOL_REGISTRY.find(tool => tool.name === 'testing_session_start');
+
+    expect(acquire?.params.map(param => param.name)).toEqual([
+      'sessionId',
+      'target',
+      'scope',
+      'sprintNumber',
+      'player',
+    ]);
+    expect(acquire?.params.find(param => param.name === 'sprintNumber')?.type).toBe('string | number');
+    expect(conflicts?.params.find(param => param.name === 'sprintNumber')?.type).toBe('string | number');
+    expect(testing?.params.find(param => param.name === 'sprint')?.type).toBe('string | number');
+
+    expect(SLOPE_REGISTRY.find(entry => entry.name === 'acquire_claim')?.signature)
+      .toContain('sprintNumber: SprintIdInput');
+    expect(SLOPE_REGISTRY.find(entry => entry.name === 'check_conflicts')?.signature)
+      .toContain('sprintNumber?: SprintIdInput');
+    expect(SLOPE_REGISTRY.find(entry => entry.name === 'testing_session_start')?.signature)
+      .toContain('sprint?: SprintIdInput');
+    expect(SLOPE_REGISTRY.find(entry => entry.name === 'buildEscalationEvent')?.signature)
+      .toContain('sprintNumber?: SprintIdInput');
+    expect(SLOPE_REGISTRY.find(entry => entry.name === 'linkInspirationToSprint')?.signature)
+      .toContain('sprint: SprintIdInput');
+    expect(SLOPE_TYPES).toContain('currentSprint?: SprintId');
+  });
 });
 
 describe('SLOPE_TYPES — PR signal types', () => {
@@ -120,5 +149,21 @@ describe('SLOPE_TYPES — PR signal types', () => {
   it('includes CombinedSignals with pr field', () => {
     expect(SLOPE_TYPES).toContain('CombinedSignals');
     expect(SLOPE_TYPES).toContain('pr?: PRSignal');
+  });
+});
+
+describe('SLOPE_TYPES — canonical sprint identity', () => {
+  it('distinguishes canonical output ids from transitional inputs', () => {
+    expect(SLOPE_TYPES).toContain('type SprintId = string;');
+    expect(SLOPE_TYPES).toContain('type SprintIdInput = string | number;');
+    expect(SLOPE_TYPES).toContain('sprint_number: SprintIdInput');
+    expect(SLOPE_TYPES).toContain('interface SprintClaim { id: string; sprint_number: SprintId;');
+    expect(SLOPE_TYPES).toContain('interface SlopeEvent { id: string;');
+    expect(SLOPE_TYPES).toContain('sprint_number?: SprintId;');
+    expect(SLOPE_TYPES).toContain('sprints_hit: SprintId[];');
+    expect(SLOPE_TYPES).toContain('interface TournamentSprintEntry { sprintNumber: SprintId;');
+    expect(SLOPE_TYPES).toContain('bestSprint: { sprintNumber: SprintId;');
+    expect(SLOPE_TYPES).toContain('id_key?: string');
+    expect(SLOPE_TYPES).toContain('interface CriticalPathResult { path: string[];');
   });
 });

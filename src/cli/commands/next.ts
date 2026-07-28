@@ -14,7 +14,7 @@ export function nextCommand(args: string[] = []): void {
   const since = formatLocalDate(daysAgo(1));
 
   console.log('');
-  if (context.latestScorecard === 0) {
+  if (context.latestScorecard === '0') {
     console.log(`  No scorecards found. Next sprint: ${context.label}`);
   } else {
     console.log(`  Latest scorecard: ${context.latestScorecardLabel}`);
@@ -25,7 +25,7 @@ export function nextCommand(args: string[] = []): void {
     console.log(`  (set explicitly in .slope/config.json)`);
   } else if (context.source === 'roadmap') {
     console.log(`  (selected from pending roadmap sprint${context.roadmapSprint?.theme ? `: ${context.roadmapSprint.theme}` : ''})`);
-    if (context.latestScorecard > 0 && context.sprint !== nextCanonicalSprintId(context.latestScorecard)) {
+    if (context.latestScorecard !== '0' && context.sprint !== nextCanonicalSprintId(context.latestScorecard)) {
       console.log(`  (roadmap state overrides scorecard fallback to ${context.scorecardFallbackLabel ?? formatSprintLabel(nextCanonicalSprintId(context.latestScorecard))})`);
     }
   } else {

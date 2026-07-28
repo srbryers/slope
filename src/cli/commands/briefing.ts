@@ -1,6 +1,6 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { DEFAULT_SKILLS_PATH, buildSkillBriefing, formatBriefing, parseRoadmap, castRoadmapStructure, getRole, hasRole, loadCustomRoles, filterScorecardsByPlayer, filterHazardsByVisibility, formatDeferredForBriefing, loadDeferred, computeHandicapCard, formatStrategicContext, loadSkillRegistry, parseSprintNumber, loadFindings, formatCodificationCandidatesForBriefing, collectOpenCodificationCandidates, resolveRepoStatePath } from '../../core/index.js';
+import { DEFAULT_SKILLS_PATH, buildSkillBriefing, compareSprintIdKeys, formatBriefing, parseRoadmap, castRoadmapStructure, getRole, hasRole, latestSprintIdKey, loadCustomRoles, filterScorecardsByPlayer, filterHazardsByVisibility, formatDeferredForBriefing, loadDeferred, computeHandicapCard, formatStrategicContext, loadSkillRegistry, parseSprintId, sprintIdKey, loadFindings, formatCodificationCandidatesForBriefing, collectOpenCodificationCandidates, resolveRepoStatePath } from '../../core/index.js';
 import type { CommonIssuesFile, SessionEntry, SprintClaim, RoadmapDefinition, SlopeEvent, RoleDefinition } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { loadScorecards } from '../loader.js';
@@ -36,7 +36,7 @@ export async function briefingCommand(args: string[]): Promise<void> {
   const categories: string[] = [];
   const keywords: string[] = [];
   let includeTraining = true;
-  let sprintFlag: number | undefined;
+  let sprintFlag: string | undefined;
   let roleFlag: string | undefined;
   let playerFlag: string | undefined;
   let personalFlag = false;
@@ -47,7 +47,7 @@ export async function briefingCommand(args: string[]): Promise<void> {
     } else if (arg.startsWith('--keywords=')) {
       keywords.push(...arg.slice('--keywords='.length).split(',').map(s => s.trim()).filter(Boolean));
     } else if (arg.startsWith('--sprint=')) {
-      const parsed = parseSprintNumber(arg.slice('--sprint='.length));
+      const parsed = sprintIdKey(arg.slice('--sprint='.length));
       if (!parsed) {
         console.error('Error: --sprint must be a positive sprint id, e.g. 114 or 114.5');
         process.exit(1);
@@ -79,7 +79,7 @@ export async function briefingCommand(args: string[]): Promise<void> {
   }
 
   // Resolve sprint number
-  let sprintNumber: number;
+  let sprintNumber: string;
   if (sprintFlag) {
     sprintNumber = sprintFlag;
   } else {
@@ -92,10 +92,17 @@ export async function briefingCommand(args: string[]): Promise<void> {
   try {
     const store = await resolveStore(cwd);
     claims = await store.list(sprintNumber);
-    // Load events from recent sprints (current + previous window)
+    // Load events from recent sprint bases plus the exact canonical target.
     const eventWindow = 5;
-    for (let s = Math.max(1, sprintNumber - eventWindow); s <= sprintNumber; s++) {
-      const sprintEvents = await store.getEventsBySprint(s);
+    const parts = parseSprintId(sprintNumber);
+    const eventSprintKeys = new Set<string>([sprintNumber]);
+    if (parts) {
+      for (let s = Math.max(1, parts.base - eventWindow); s <= parts.base; s++) {
+        eventSprintKeys.add(String(s));
+      }
+    }
+    for (const sprintKey of eventSprintKeys) {
+      const sprintEvents = await store.getEventsBySprint(sprintKey);
       recentEvents.push(...sprintEvents);
     }
     store.close();
@@ -141,7 +148,10 @@ export async function briefingCommand(args: string[]): Promise<void> {
     const gir = card.all_time.gir_pct.toFixed(0);
     const hazardCount = visibleIssues.recurring_patterns.length;
     const topHazards = visibleIssues.recurring_patterns
-      .sort((a, b) => Math.max(...b.sprints_hit) - Math.max(...a.sprints_hit))
+      .sort((a, b) => compareSprintIdKeys(
+        latestSprintIdKey(b.sprints_hit),
+        latestSprintIdKey(a.sprints_hit),
+      ))
       .slice(0, 3)
       .map(p => p.title)
       .join('; ');

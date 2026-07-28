@@ -77,7 +77,8 @@ export interface HoleStats {
 
 /** Core score data for a sprint */
 export interface HoleScore {
-  sprint_number: number;
+  /** Canonical sprint key, preserving identities such as "458.10". */
+  sprint_number: string;
   theme: string;
   par: 3 | 4 | 5;
   slope: number;
@@ -297,7 +298,7 @@ export interface TournamentReview {
 }
 
 export interface TournamentSprintEntry {
-  sprintNumber: number;
+  sprintNumber: string;
   theme: string;
   par: number;
   slope: number;
@@ -312,8 +313,8 @@ export interface TournamentScoring {
   totalScore: number;
   differential: number;
   avgScoreLabel: string;
-  bestSprint: { sprintNumber: number; label: ScoreLabel };
-  worstSprint: { sprintNumber: number; label: ScoreLabel };
+  bestSprint: { sprintNumber: string; label: ScoreLabel };
+  worstSprint: { sprintNumber: string; label: ScoreLabel };
   sprintCount: number;
   ticketCount: number;
   ticketsLanded: number;
@@ -331,7 +332,7 @@ export interface TournamentStats {
 
 export interface TournamentHazard {
   gotchaId: string;
-  sprint: number;
+  sprint: string;
   area: string;
   description: string;
 }

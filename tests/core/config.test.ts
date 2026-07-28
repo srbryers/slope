@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, readFileSync, existsSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, existsSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { saveConfig, loadConfig } from '../../src/core/config.js';
@@ -45,6 +45,25 @@ describe('saveConfig', () => {
 
     const loaded = loadConfig(tmpDir);
     expect(loaded.metaphor).toBe('tennis');
-    expect(loaded.currentSprint).toBe(5);
+    expect(loaded.currentSprint).toBe('5');
+  });
+
+  it('normalizes legacy numeric currentSprint values when loading', () => {
+    const slopeDir = join(tmpDir, '.slope');
+    mkdirSync(slopeDir, { recursive: true });
+    writeFileSync(join(slopeDir, 'config.json'), JSON.stringify({ currentSprint: 458.1 }));
+
+    expect(loadConfig(tmpDir).currentSprint).toBe('458.1');
+  });
+
+  it('preserves distinct canonical sprint ids when saving and loading', () => {
+    const config = loadConfig(tmpDir);
+    config.currentSprint = '458.10';
+    const configPath = saveConfig(config, tmpDir);
+
+    const written = JSON.parse(readFileSync(configPath, 'utf8'));
+    expect(written.currentSprint).toBe('458.10');
+    expect(loadConfig(tmpDir).currentSprint).toBe('458.10');
+    expect(loadConfig(tmpDir).currentSprint).not.toBe('458.1');
   });
 });

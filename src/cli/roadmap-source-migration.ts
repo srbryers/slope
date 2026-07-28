@@ -13,13 +13,15 @@ import {
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { parseDocument, stringify } from 'yaml';
 import {
+  compareSprintIdKeys,
   discoverScorecardFiles,
   normalizeDiagnosticPath,
   normalizeScorecard,
   parseRoadmapSourceDocument,
   parseRoadmapSourceProject,
-  parseSprintNumber,
   serializeRoadmapProjection,
+  sprintIdKey,
+  sprintIdsEqual,
   validateRoadmapSourceFederation,
   validateScorecard,
   type GolfScorecard,
@@ -277,10 +279,11 @@ function collectScorecardEvidence(
 } {
   const selected = new Map<string, { evidence: RoadmapMigrationScorecardEvidence; artifact?: MigrationEvidenceArtifact }>();
   const inspect = (candidate: string, expectedSprint?: string): { sprint?: string; evidence: RoadmapMigrationScorecardEvidence; artifact?: MigrationEvidenceArtifact } => {
+    const expectedSprintKey = expectedSprint == null ? undefined : sprintIdKey(expectedSprint) ?? undefined;
     const absolutePath = ensureWithin(cwd, resolve(cwd, candidate), 'scorecard evidence path');
     const path = portablePath(cwd, absolutePath);
     if (!existsSync(absolutePath)) {
-      return { sprint: expectedSprint, evidence: { path, valid: false, reason: 'scorecard evidence file does not exist' } };
+      return { sprint: expectedSprintKey, evidence: { path, valid: false, reason: 'scorecard evidence file does not exist' } };
     }
     const bytes = readFileSync(absolutePath);
     const artifact = { path, absolutePath, sha256: sha256(bytes), textSha256: textSha256(bytes) };
@@ -288,20 +291,20 @@ function collectScorecardEvidence(
     try {
       raw = JSON.parse(bytes.toString('utf8')) as Record<string, unknown>;
     } catch {
-      return { sprint: expectedSprint, evidence: { path, valid: false, reason: 'scorecard evidence is not valid JSON' }, artifact };
+      return { sprint: expectedSprintKey, evidence: { path, valid: false, reason: 'scorecard evidence is not valid JSON' }, artifact };
     }
-    const sprint = parseSprintNumber(raw.sprint_number as string | number ?? raw.sprint as string | number);
-    const sprintKey = expectedSprint ?? (sprint == null ? undefined : String(sprint));
-    if (!sprintKey) return { evidence: { path, valid: false, reason: 'scorecard evidence has no sprint number' }, artifact };
+    const scorecardSprintKey = sprintIdKey(raw.sprint_number as string | number ?? raw.sprint as string | number);
+    const evidenceSprintKey = expectedSprintKey ?? scorecardSprintKey ?? undefined;
+    if (!evidenceSprintKey) return { evidence: { path, valid: false, reason: 'scorecard evidence has no sprint number' }, artifact };
     const validation = validateScorecard(normalizeScorecard(raw) as GolfScorecard);
-    const sprintMatches = sprint != null && Number(sprintKey) === sprint;
+    const sprintMatches = scorecardSprintKey != null && sprintIdsEqual(evidenceSprintKey, scorecardSprintKey);
     const valid = validation.valid && sprintMatches;
-    return { sprint: sprintKey, artifact, evidence: {
+    return { sprint: evidenceSprintKey, artifact, evidence: {
       path,
       valid,
       ...(!valid ? {
         reason: !sprintMatches
-          ? `scorecard records ${String(raw.sprint_number ?? raw.sprint ?? 'no sprint')} instead of Sprint ${sprintKey}`
+          ? `scorecard records ${String(raw.sprint_number ?? raw.sprint ?? 'no sprint')} instead of Sprint ${evidenceSprintKey}`
           : validation.errors.slice(0, 3).map(issue => issue.message).join('; '),
       } : {}),
     } };
@@ -312,12 +315,13 @@ function collectScorecardEvidence(
     const inspected = inspect(discovered);
     if (inspected.sprint) selected.set(inspected.sprint, { evidence: inspected.evidence, artifact: inspected.artifact });
   }
-  for (const [sprint, path] of Object.entries(explicit).sort(([left], [right]) => Number(left) - Number(right))) {
+  for (const [sprint, path] of Object.entries(explicit).sort(([left], [right]) => compareSprintIdKeys(left, right))) {
     const inspected = inspect(path, sprint);
-    if (inspected.artifact) selected.set(sprint, { evidence: inspected.evidence, artifact: inspected.artifact });
-    else selected.delete(sprint);
+    const sprintKey = sprintIdKey(sprint) ?? sprint;
+    if (inspected.artifact) selected.set(sprintKey, { evidence: inspected.evidence, artifact: inspected.artifact });
+    else selected.delete(sprintKey);
   }
-  const evidence = Object.fromEntries([...selected.entries()].sort(([left], [right]) => Number(left) - Number(right))
+  const evidence = Object.fromEntries([...selected.entries()].sort(([left], [right]) => compareSprintIdKeys(left, right))
     .map(([sprint, item]) => [sprint, item.evidence]));
   const artifactsByPath = new Map<string, MigrationEvidenceArtifact>();
   for (const item of selected.values()) if (item.artifact) artifactsByPath.set(item.artifact.path, item.artifact);

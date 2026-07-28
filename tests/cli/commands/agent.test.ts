@@ -100,7 +100,7 @@ describe('agent status (GH #310)', () => {
 
     const status = await collectAgentStatus(cwd);
     expect(status.roadmap).toBe('valid');
-    expect(status.currentSprint).toBe(8);
+    expect(status.currentSprint).toBe('8');
     expect(status.phase).toBe('planning');
     expect(status.nextTicket).toBe('S8-1');
     expect(status.requiredGates).toEqual(['tests', 'code_review', 'architect_review', 'scorecard', 'review_md']);
@@ -138,10 +138,10 @@ describe('agent status (GH #310)', () => {
     }));
 
     const status = await collectAgentStatus(cwd);
-    expect(status.currentSprint).toBe(435);
+    expect(status.currentSprint).toBe('43.5');
     expect(status.phase).toBe('unknown');
     expect(status.nextTicket).toBe('S43.5-1');
-    expect(status.recommendedCommands).toContain('slope sprint start --number=435');
+    expect(status.recommendedCommands).toContain('slope sprint start --number=43.5');
   });
 
   it('clears blockedBy when upstream sprint has a scorecard but no roadmap status field (#356)', async () => {
@@ -213,7 +213,7 @@ describe('agent status (GH #310)', () => {
     });
 
     const status = await collectAgentStatus(cwd);
-    expect(status.blockedBy).toEqual([7]);
+    expect(status.blockedBy).toEqual(['7']);
     expect(status.recommendedCommands).toContain('slope roadmap status');
   });
 
@@ -470,7 +470,7 @@ describe('agent status (GH #310)', () => {
     });
 
     const status = await collectAgentStatus(cwd);
-    expect(status.currentSprint).toBe(999);
+    expect(status.currentSprint).toBe('999');
     expect(status.nextTicket).toBeNull();
   });
 });

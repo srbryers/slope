@@ -1,9 +1,10 @@
 import { createHash } from 'node:crypto';
+import type { SprintId } from './sprint-id.js';
 
 export interface IssueScoutEvidence {
   source: string;
   sourcePath?: string;
-  sprint?: number;
+  sprint?: SprintId;
   command?: string;
   quote: string;
   details?: Record<string, unknown>;

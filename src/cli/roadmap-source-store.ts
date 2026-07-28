@@ -3,13 +3,14 @@ import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:pat
 import { stringify } from 'yaml';
 import {
   compileRoadmapSources,
+  compareRoadmapSprintIds,
   formatRoadmapSprintLabel,
   normalizeDiagnosticPath,
   normalizeRoadmapSourcePath,
   parseRoadmapSourceDocument,
   parseRoadmapSourceProject,
-  parseSprintNumber,
-  roadmapSprintOrderValue,
+  roadmapSprintKey,
+  roadmapSprintKeyFromId,
   RoadmapSourceError,
   serializeRoadmapProjection,
   findRoadmapProjectionDivergence,
@@ -18,6 +19,7 @@ import {
   validateRoadmapSourceFederation,
   type LoadedRoadmapSource,
   type RoadmapDefinition,
+  type SprintId,
   type RoadmapSourceProject,
   type RoadmapSourceValidationResult,
 } from '../core/index.js';
@@ -215,8 +217,10 @@ const PROMOTABLE_TO_COMPLETE = new Set(['', 'planned', 'active', 'in_progress', 
 
 interface RoadmapSourceSprintMatch {
   source: LoadedRoadmapSource;
-  /** The sprint id exactly as stored in the owning source (may be a legacy encoded id). */
-  storedId: number;
+  /** Canonical roadmap identity, preserving exact suffixes such as ".10". */
+  storedKey: string;
+  /** Exact authored scalar used to target the owning YAML entry surgically. */
+  authoredId: string;
   status?: string;
 }
 
@@ -236,18 +240,24 @@ function normalizeScorecardRef(path: string): string {
 }
 
 /**
- * Resolve a sprint number to the single source entry that owns it, comparing
- * by canonical sprint label so legacy encoded ids (235 ~ S23.5) still match
- * while decimal neighbours (458.1 vs 458.2) never do. Label comparison is
- * string-exact, so float representation drift cannot widen the match. (#618)
+ * Resolve a sprint number to the single source entry that owns it. Source rows
+ * retain their canonical key while the numeric input remains a compatibility
+ * lookup until scorecard/state callers migrate to SprintId. (#618, #659)
  */
-function findRoadmapSourceSprint(store: RoadmapSourceStore, sprint: number): RoadmapSourceSprintMatch {
+function findRoadmapSourceSprint(store: RoadmapSourceStore, sprint: SprintId): RoadmapSourceSprintMatch {
+  const targetKey = roadmapSprintKeyFromId(store.roadmap, sprint);
   const targetLabel = formatRoadmapSprintLabel(store.roadmap, sprint);
   const matches: RoadmapSourceSprintMatch[] = [];
   for (const source of store.sources) {
     for (const item of source.document.sprints) {
-      if (formatRoadmapSprintLabel(store.roadmap, item.id) === targetLabel) {
-        matches.push({ source, storedId: item.id, status: item.status });
+      const storedKey = roadmapSprintKey(store.roadmap, item);
+      if (targetKey !== null && storedKey === targetKey) {
+        matches.push({
+          source,
+          storedKey,
+          authoredId: item.id_key ?? String(item.id),
+          status: item.status,
+        });
       }
     }
   }
@@ -263,7 +273,7 @@ function findRoadmapSourceSprint(store: RoadmapSourceStore, sprint: number): Roa
     );
   }
   if (matches.length > 1) {
-    const locations = matches.map(match => `${match.source.entry.path} (id: ${match.storedId})`).join(', ');
+    const locations = matches.map(match => `${match.source.entry.path} (id: ${match.authoredId})`).join(', ');
     throw new RoadmapSourceError(
       `Sprint ${targetLabel} resolves to ${matches.length} roadmap source entries (${locations}); refusing to reconcile an ambiguous identity.`,
       store.manifestPath,
@@ -274,7 +284,7 @@ function findRoadmapSourceSprint(store: RoadmapSourceStore, sprint: number): Roa
 
 export function completeRoadmapSourceSprint(
   cwd: string,
-  sprint: number,
+  sprint: SprintId,
   options: { sourceFlag?: string; scorecardPath?: string; dryRun?: boolean; force?: boolean } = {},
 ): CompleteRoadmapSourceSprintResult {
   const initial = loadRoadmapSourceStore(cwd, options.sourceFlag);
@@ -302,7 +312,7 @@ export function completeRoadmapSourceSprint(
 
   const changed = authoredStatus !== 'complete'
     || Boolean(options.scorecardPath
-      && owner.document.scorecards?.[String(initialMatch.storedId)] !== normalizeScorecardRef(options.scorecardPath));
+      && owner.document.scorecards?.[initialMatch.storedKey] !== normalizeScorecardRef(options.scorecardPath));
 
   if (options.dryRun) {
     return { source: sourceLabel, projection: 'unchanged', changed };
@@ -338,11 +348,11 @@ export function completeRoadmapSourceSprint(
       };
     }
 
-    const storedId = freshMatch.storedId;
-    const scorecardKey = String(storedId);
+    const storedKey = freshMatch.storedKey;
+    const scorecardKey = storedKey;
     const normalizedScorecard = options.scorecardPath ? normalizeScorecardRef(options.scorecardPath) : undefined;
     const originalText = readFileSync(freshOwner.absolutePath, 'utf8');
-    const patchedText = patchRoadmapSourceSprintText(originalText, storedId, {
+    const patchedText = patchRoadmapSourceSprintText(originalText, freshMatch.authoredId, {
       status: 'complete',
       ...(normalizedScorecard ? { scorecardKey, scorecardPath: normalizedScorecard } : {}),
     });
@@ -350,7 +360,7 @@ export function completeRoadmapSourceSprint(
       version: freshOwner.document.version,
       phase: freshOwner.document.phase,
       sprints: freshOwner.document.sprints.map(item =>
-        item.id === storedId ? { ...item, status: 'complete' } : item,
+        roadmapSprintKey(fresh.roadmap, item) === storedKey ? { ...item, status: 'complete' } : item,
       ),
       ...(freshOwner.document.scorecards || normalizedScorecard ? {
         scorecards: {
@@ -464,13 +474,14 @@ export function validateRoadmapSourceStore(
   if (checkArchiveEvidence) {
     for (const source of store.sources.filter(candidate => candidate.entry.kind === 'archive')) {
       for (const sprint of source.document.sprints.filter(candidate => candidate.status === 'complete')) {
-        const scorecardRef = source.document.scorecards?.[String(sprint.id)];
+        const sprintKey = roadmapSprintKey(store.roadmap, sprint);
+        const scorecardRef = source.document.scorecards?.[sprintKey];
         if (!scorecardRef) {
           result.errors.push({
             code: 'archive_scorecard_missing',
             source: source.entry.path,
-            sprint: sprint.id,
-            message: `Archived complete Sprint S${sprint.id} has no scorecard link.`,
+            sprint: sprintKey,
+            message: `Archived complete Sprint S${sprintKey} has no scorecard link.`,
           });
           continue;
         }
@@ -479,13 +490,13 @@ export function validateRoadmapSourceStore(
           scorecardPath = ensureWithin(
             store.cwd,
             resolve(store.cwd, ...scorecardRef.split('/')),
-            `scorecard path for S${sprint.id}`,
+            `scorecard path for S${sprintKey}`,
           );
         } catch (error) {
           result.errors.push({
             code: 'archive_scorecard_unsafe',
             source: source.entry.path,
-            sprint: sprint.id,
+            sprint: sprintKey,
             message: (error as Error).message,
           });
           continue;
@@ -494,31 +505,29 @@ export function validateRoadmapSourceStore(
           result.errors.push({
             code: 'archive_scorecard_not_found',
             source: source.entry.path,
-            sprint: sprint.id,
+            sprint: sprintKey,
             message: `Archived scorecard does not exist: ${normalizeDiagnosticPath(scorecardRef)}.`,
           });
           continue;
         }
         try {
           const raw = JSON.parse(readFileSync(scorecardPath, 'utf8')) as { sprint_number?: unknown };
-          const scorecardSprint = parseSprintNumber(raw.sprint_number as string | number);
-          const expected = roadmapSprintOrderValue(store.roadmap, sprint.id);
-          const actual = scorecardSprint == null
-            ? null
-            : roadmapSprintOrderValue(store.roadmap, scorecardSprint);
-          if (actual !== expected) {
+          const scorecardSprint = typeof raw.sprint_number === 'string' || typeof raw.sprint_number === 'number'
+            ? roadmapSprintKeyFromId(store.roadmap, raw.sprint_number)
+            : null;
+          if (scorecardSprint !== sprintKey) {
             result.errors.push({
               code: 'archive_scorecard_mismatch',
               source: source.entry.path,
-              sprint: sprint.id,
-              message: `Scorecard ${normalizeDiagnosticPath(scorecardRef)} records ${String(raw.sprint_number)} instead of Sprint S${sprint.id}.`,
+              sprint: sprintKey,
+              message: `Scorecard ${normalizeDiagnosticPath(scorecardRef)} records ${String(raw.sprint_number)} instead of Sprint S${sprintKey}.`,
             });
           }
         } catch (error) {
           result.errors.push({
             code: 'archive_scorecard_invalid',
             source: source.entry.path,
-            sprint: sprint.id,
+            sprint: sprintKey,
             message: `Could not parse ${normalizeDiagnosticPath(scorecardRef)}: ${(error as Error).message}`,
           });
         }
@@ -548,7 +557,7 @@ export interface RoadmapSourceArchiveMove {
 }
 
 export interface RoadmapSourceArchivePlan {
-  through: number;
+  through: SprintId;
   moves: RoadmapSourceArchiveMove[];
   project: RoadmapSourceProject;
   manifestYaml: string;
@@ -570,17 +579,18 @@ function assertIndependentArchiveDestination(fromAbsolute: string, toAbsolute: s
 
 export function planRoadmapSourceArchive(
   store: RoadmapSourceStore,
-  through: number,
+  through: SprintId,
 ): RoadmapSourceArchivePlan {
-  const throughOrder = roadmapSprintOrderValue(store.roadmap, through);
   const moves: RoadmapSourceArchiveMove[] = [];
   const nextEntries = store.project.sources.map(entry => ({ ...entry }));
 
   for (const [index, source] of store.sources.entries()) {
     if (source.entry.kind !== 'phase') continue;
-    const sprintOrders = source.document.phase.sprints.map(id => roadmapSprintOrderValue(store.roadmap, id));
-    const includesAtOrBefore = sprintOrders.some(order => order <= throughOrder);
-    const includesAfter = sprintOrders.some(order => order > throughOrder);
+    const sprintIds = source.document.phase.sprint_keys
+      ?? source.document.phase.sprints;
+    const comparisons = sprintIds.map(id => compareRoadmapSprintIds(store.roadmap, id, through));
+    const includesAtOrBefore = comparisons.some(comparison => comparison <= 0);
+    const includesAfter = comparisons.some(comparison => comparison > 0);
     if (includesAtOrBefore && includesAfter) {
       throw new RoadmapSourceError(
         `--through would split phase "${source.document.phase.name}"; archive whole phases only`,

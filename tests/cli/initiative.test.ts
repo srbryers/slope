@@ -174,6 +174,47 @@ describe('slope initiative advance', () => {
     await expect(runInitiativeCommand(['advance', '--sprint=1'])).rejects.toThrow('process.exit');
     expect(consoleErrors.join('\n')).toContain('not complete');
   });
+
+  it('selects a trailing-zero sprint without advancing its numeric alias', async () => {
+    writeFileSync(
+      join(tmpDir, 'docs', 'backlog', 'roadmap.json'),
+      JSON.stringify({
+        name: 'Canonical Initiative',
+        phases: [{
+          name: 'Decimal phase',
+          sprints: [458.1, 458.1],
+          sprint_keys: ['458.1', '458.10'],
+        }],
+        sprints: [
+          {
+            id: 458.1,
+            id_key: '458.1',
+            theme: 'First insert',
+            par: 3,
+            slope: 1,
+            type: 'feature',
+            tickets: [{ key: 'S458.1-1', title: 'First insert', club: 'wedge', complexity: 'small' }],
+          },
+          {
+            id: 458.1,
+            id_key: '458.10',
+            theme: 'Tenth insert',
+            par: 3,
+            slope: 1,
+            type: 'feature',
+            tickets: [{ key: 'S458.10-1', title: 'Tenth insert', club: 'wedge', complexity: 'small' }],
+          },
+        ],
+      }, null, 2),
+    );
+    await runInitiativeCommand(['create', '--name=Test', '--roadmap=docs/backlog/roadmap.json']);
+    await runInitiativeCommand(['advance', '--sprint=458.10']);
+
+    const initiative = loadInitiative(tmpDir)!;
+    expect(initiative.sprints.find(sprint => sprint.sprint_number === '458.1')!.phase).toBe('pending');
+    expect(initiative.sprints.find(sprint => sprint.sprint_number === '458.10')!.phase).toBe('planning');
+    expect(consoleOutput.join('\n')).toContain('Sprint 458.10');
+  });
 });
 
 describe('slope initiative review', () => {
@@ -187,7 +228,7 @@ describe('slope initiative review', () => {
     expect(consoleOutput.join('\n')).toContain('Recorded plan review: architect');
 
     const initiative = loadInitiative(tmpDir)!;
-    const sprint = initiative.sprints.find(s => s.sprint_number === 1)!;
+    const sprint = initiative.sprints.find(s => s.sprint_number === '1')!;
     const arch = sprint.plan_reviews.find(r => r.reviewer === 'architect')!;
     expect(arch.completed).toBe(true);
     expect(arch.findings_count).toBe(2);

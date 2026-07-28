@@ -59,6 +59,15 @@ function compileCliModules(moduleNames: string[]): string {
   });
   writeFileSync(join(coreDir, 'repo-state-scope.js'), stateScope.outputText);
 
+  const sprintIdSource = readFileSync(join(process.cwd(), 'src', 'core', 'sprint-id.ts'), 'utf8');
+  const sprintId = ts.transpileModule(sprintIdSource, {
+    compilerOptions: {
+      module: ts.ModuleKind.ES2022,
+      target: ts.ScriptTarget.ES2022,
+    },
+  });
+  writeFileSync(join(coreDir, 'sprint-id.js'), sprintId.outputText);
+
   return moduleDir;
 }
 

@@ -86,7 +86,7 @@ function writeRoadmap(sprint: number, status = 'planned'): void {
 function writePointer(overrides: Record<string, unknown> = {}): void {
   writeFileSync(join(tmpDir, 'docs', 'backlog', '.sprint-active.json'), JSON.stringify({
     schema: RESUME_POINTER_SCHEMA,
-    sprint: 177,
+    sprint: '177',
     phase: 'implementing',
     source_branch: 'feature/S177-3',
     source_commit: headSha(),
@@ -107,7 +107,7 @@ describe('portable sprint resume (#507)', () => {
 
     expect(output).toContain('Portable sprint resume complete');
     const state = loadSprintState(tmpDir);
-    expect(state).toMatchObject({ sprint: 177, phase: 'implementing' });
+    expect(state).toMatchObject({ sprint: '177', phase: 'implementing' });
     expect(existsSync(join(tmpDir, '.slope', 'session-state.json'))).toBe(false);
     expect(existsSync(join(tmpDir, '.slope', 'guard-metrics.jsonl'))).toBe(false);
     expect(existsSync(join(tmpDir, '.slope', 'baselines'))).toBe(false);
@@ -138,7 +138,7 @@ describe('portable sprint resume (#507)', () => {
     }
 
     await captureLog(() => sprintCommand(['resume', '--portable', '--force']));
-    expect(loadSprintState(tmpDir)).toMatchObject({ sprint: 177, phase: 'implementing' });
+    expect(loadSprintState(tmpDir)).toMatchObject({ sprint: '177', phase: 'implementing' });
   });
 
   it('writes a tracked pointer from current local state and active claims', async () => {
@@ -161,7 +161,7 @@ describe('portable sprint resume (#507)', () => {
 
     expect(output).toContain('Sprint resume pointer written');
     expect(pointer.schema).toBe(RESUME_POINTER_SCHEMA);
-    expect(pointer.sprint).toBe(177);
+    expect(pointer.sprint).toBe('177');
     expect(pointer.source_branch).toBe('feature/S177-3');
     expect(pointer.local_only_excluded).toContain('slope.db');
     expect(pointer.resume_claims).toEqual([
@@ -201,7 +201,7 @@ describe('portable sprint resume (#507)', () => {
     }
 
     expect(errors).toContain('slope sprint resume --portable --sprint=177 --phase=scoring --from=docs/backlog/.sprint-active.json --force');
-    expect(loadSprintState(tmpDir)?.sprint).toBe(176);
+    expect(loadSprintState(tmpDir)?.sprint).toBe('176');
   });
 
   it('can dry-run from branch inference when no pointer exists', async () => {
@@ -212,5 +212,25 @@ describe('portable sprint resume (#507)', () => {
     expect(output).toContain('Source: branch');
     expect(output).toContain('Dry run');
     expect(loadSprintState(tmpDir)).toBeNull();
+  });
+
+  it('persists 458.10 as a canonical string without aliasing 458.1', async () => {
+    saveSprintState(tmpDir, createSprintState('458.10', 'implementing'));
+
+    const output = await captureLog(() => sprintCommand(['resume', '--write-pointer']));
+    const pointer = JSON.parse(readFileSync(join(tmpDir, 'docs', 'backlog', '.sprint-active.json'), 'utf8'));
+
+    expect(output).toContain('S458.10');
+    expect(pointer.sprint).toBe('458.10');
+    expect(pointer.sprint).not.toBe('458.1');
+  });
+
+  it('preserves 458.10 during branch-based portable inference', async () => {
+    execFileSync('git', ['checkout', '-q', '-b', 'feature/S458.10-3'], { cwd: tmpDir });
+
+    const output = await captureLog(() => sprintCommand(['resume', '--portable', '--dry-run']));
+
+    expect(output).toContain('Sprint: S458.10');
+    expect(output).not.toContain('Sprint: S458.1\n');
   });
 });

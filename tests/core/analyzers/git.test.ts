@@ -250,15 +250,16 @@ describe('extractSprintArtifactReferences', () => {
       'docs/retros/sprint-99.json',
       'docs/retros/sprint-100-review.md',
       'docs/backlog/roadmap.json',
-    ])).toEqual(new Set([99, 100]));
+    ])).toEqual(new Set(['99', '100']));
   });
 
-  it('extracts inserted decimal sprint ids from scorecard and review artifact paths', () => {
+  it('preserves exact inserted sprint keys from scorecard and review artifact paths', () => {
     expect(extractSprintArtifactReferences([
       'docs/retros/sprint-143.5.json',
       'docs/retros/sprint-143.95-review.md',
+      'docs/retros/sprint-143.10.json',
       'docs/retros/sprint-144.json',
-    ])).toEqual(new Set([143.5, 143.95, 144]));
+    ])).toEqual(new Set(['143.5', '143.95', '143.10', '144']));
   });
 });
 
@@ -286,14 +287,14 @@ describe('findShippedSprintsOnMain', () => {
 
     // Helper resolves main → master → HEAD
     const result = findShippedSprintsOnMain(tmpDir);
-    expect(result).toEqual(new Set([70, 71, 77]));
+    expect(result).toEqual(new Set(['70', '71', '77']));
   });
 
   it('honors explicit ref argument', () => {
     gitInit(tmpDir);
     gitCommit(tmpDir, 'feat(S99): only on HEAD');
 
-    expect(findShippedSprintsOnMain(tmpDir, 'HEAD')).toEqual(new Set([99]));
+    expect(findShippedSprintsOnMain(tmpDir, 'HEAD')).toEqual(new Set(['99']));
   });
 
   it('detects shipped sprints from scorecard artifacts in squash merge commits', () => {
@@ -305,7 +306,7 @@ describe('findShippedSprintsOnMain', () => {
       'Fix session state source-of-truth drift (#391)',
     );
 
-    expect(findShippedSprintsOnMain(tmpDir, 'HEAD')).toEqual(new Set([99]));
+    expect(findShippedSprintsOnMain(tmpDir, 'HEAD')).toEqual(new Set(['99']));
   });
 
   it('detects inserted decimal sprints from scorecard artifacts in squash merge commits', () => {
@@ -317,7 +318,21 @@ describe('findShippedSprintsOnMain', () => {
       'Fix decimal sprint status parsing (#511)',
     );
 
-    expect(findShippedSprintsOnMain(tmpDir, 'HEAD')).toEqual(new Set([143.5]));
+    expect(findShippedSprintsOnMain(tmpDir, 'HEAD')).toEqual(new Set(['143.5']));
+  });
+
+  it('keeps coexisting .1 and .10 artifact evidence distinct', () => {
+    gitInit(tmpDir);
+    gitCommitFiles(
+      tmpDir,
+      [
+        ['docs/retros/sprint-458.1.json', JSON.stringify({ sprint_number: '458.1' })],
+        ['docs/retros/sprint-458.10.json', JSON.stringify({ sprint_number: '458.10' })],
+      ],
+      'Publish canonical sprint scorecards (#659)',
+    );
+
+    expect(findShippedSprintsOnMain(tmpDir, 'HEAD')).toEqual(new Set(['458.1', '458.10']));
   });
 
   it('does not attribute SLOPE-only post-merge metadata commits to next planned sprint refs (#563)', () => {
@@ -333,7 +348,7 @@ describe('findShippedSprintsOnMain', () => {
       'docs(S13): post-merge housekeeping',
     );
 
-    expect(findShippedSprintsOnMain(tmpDir, 'HEAD')).toEqual(new Set([12]));
+    expect(findShippedSprintsOnMain(tmpDir, 'HEAD')).toEqual(new Set(['12']));
   });
 
   it('does not mark sprint scoping commits as shipped work', () => {

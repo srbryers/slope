@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { sprintIdsEqual } from '../../core/index.js';
-import type { SprintClaim, SprintId, SprintRegistry } from '../../core/index.js';
+import { sprintIdKey, sprintIdsEqual } from '../../core/index.js';
+import type { SprintClaim, SprintClaimInput, SprintIdInput, SprintRegistry } from '../../core/index.js';
 
 interface ClaimsFile {
   claims: SprintClaim[];
@@ -15,10 +15,13 @@ export class FileRegistry implements SprintRegistry {
     this.filePath = filePath;
   }
 
-  async claim(input: Omit<SprintClaim, 'id' | 'claimed_at'>): Promise<SprintClaim> {
+  async claim(input: SprintClaimInput): Promise<SprintClaim> {
     const claims = this.readClaims();
+    const sprint = sprintIdKey(input.sprint_number);
+    if (sprint === null) throw new TypeError(`Invalid sprint id: ${String(input.sprint_number)}`);
     const claim: SprintClaim = {
       ...input,
+      sprint_number: sprint,
       id: `claim-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       claimed_at: new Date().toISOString(),
     };
@@ -36,7 +39,7 @@ export class FileRegistry implements SprintRegistry {
     return true;
   }
 
-  async list(sprintNumber: SprintId): Promise<SprintClaim[]> {
+  async list(sprintNumber: SprintIdInput): Promise<SprintClaim[]> {
     return this.readClaims().filter(c => sprintIdsEqual(c.sprint_number, sprintNumber));
   }
 
@@ -48,7 +51,11 @@ export class FileRegistry implements SprintRegistry {
     if (!existsSync(this.filePath)) return [];
     try {
       const data: ClaimsFile = JSON.parse(readFileSync(this.filePath, 'utf8'));
-      return Array.isArray(data.claims) ? data.claims : [];
+      if (!Array.isArray(data.claims)) return [];
+      return data.claims.flatMap((claim) => {
+        const sprint = sprintIdKey(claim.sprint_number);
+        return sprint === null ? [] : [{ ...claim, sprint_number: sprint }];
+      });
     } catch {
       return [];
     }

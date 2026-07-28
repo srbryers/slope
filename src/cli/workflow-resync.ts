@@ -5,13 +5,16 @@ import { loadConfig } from './config.js';
 import { createSprintState, initializeSprintState, loadSprintState, mutateSprintState, type SprintPhase } from './sprint-state.js';
 import {
   castRoadmapStructure,
-  formatSprintLabel,
-  formatSprintNumber,
+  compareSprintIdKeys,
+  latestSprintIdKey,
   loadScorecards,
   loadWorkflow,
   parseRoadmap,
-  parseSprintNumber,
+  roadmapSprintKey,
+  sprintIdKey,
+  sprintIdsEqual,
   type RoadmapSprint,
+  type SprintId,
   type WorkflowDefinition,
   type WorkflowExecution,
 } from '../core/index.js';
@@ -33,25 +36,27 @@ export interface WorkflowResyncResult {
 }
 
 export interface SprintStateRebindResult {
-  sprint: number;
-  previousSprint?: number;
+  sprint: string;
+  previousSprint?: string;
   rebound: boolean;
   reason?: string;
 }
 
 export async function completeWorkflowExecutionsForSprints(
   store: Pick<SlopeStore, 'listExecutions'> & Partial<Pick<SlopeStore, 'completeRunningExecution'>>,
-  sprints: Iterable<number>,
+  sprints: Iterable<SprintId>,
   options: {
     preserveExecutionIds?: Iterable<string>;
     preserveNewestPerSprint?: boolean;
   } = {},
 ): Promise<WorkflowExecution[]> {
-  const targetSprints = new Set(sprints);
+  const targetSprints = new Set(
+    [...sprints].map(sprintIdKey).filter((sprint): sprint is string => sprint !== null),
+  );
   if (targetSprints.size === 0) return [];
 
   const preserveExecutionIds = new Set(options.preserveExecutionIds ?? []);
-  const bySprint = new Map<number, WorkflowExecution[]>();
+  const bySprint = new Map<string, WorkflowExecution[]>();
   const running = await store.listExecutions({ status: 'running' });
   for (const exec of running) {
     const sprint = sprintNumberForExecution(exec);
@@ -94,12 +99,12 @@ export async function completeWorkflowExecutionsForSprints(
   return completed;
 }
 
-export function inferSprintFromBranch(cwd: string): number | null {
+export function inferSprintFromBranch(cwd: string): string | null {
   const branch = currentBranch(cwd);
   if (!branch) return null;
   const match = branch.match(/(?:^|[-/])s(?:print-?)?(\d+(?:\.\d+)?)/i);
   if (!match) return null;
-  return parseSprintNumber(match[1]) ?? null;
+  return sprintIdKey(match[1]);
 }
 
 export function currentBranch(cwd: string): string | null {
@@ -114,13 +119,12 @@ export function currentBranch(cwd: string): string | null {
   }
 }
 
-export function sprintNumberFromId(sprintId: string | undefined): number | null {
+export function sprintNumberFromId(sprintId: string | undefined): string | null {
   if (!sprintId) return null;
-  const normalized = sprintId.replace(/^S/i, '');
-  return parseSprintNumber(normalized) ?? null;
+  return sprintIdKey(sprintId);
 }
 
-export function sprintNumberForExecution(exec: Pick<WorkflowExecution, 'sprint_id' | 'variables'>): number | null {
+export function sprintNumberForExecution(exec: Pick<WorkflowExecution, 'sprint_id' | 'variables'>): string | null {
   for (const candidate of sprintIdCandidates(exec)) {
     const sprint = sprintNumberFromId(candidate);
     if (sprint !== null) return sprint;
@@ -130,7 +134,7 @@ export function sprintNumberForExecution(exec: Pick<WorkflowExecution, 'sprint_i
 
 export function sprintLabelForExecution(exec: Pick<WorkflowExecution, 'id' | 'sprint_id' | 'variables'>): string {
   const sprint = sprintNumberForExecution(exec);
-  return sprint === null ? (exec.sprint_id ?? exec.id) : formatSprintLabel(sprint);
+  return sprint === null ? (exec.sprint_id ?? exec.id) : `S${sprint}`;
 }
 
 function sprintIdCandidates(exec: Pick<WorkflowExecution, 'sprint_id' | 'variables'>): string[] {
@@ -143,13 +147,13 @@ function sprintIdCandidates(exec: Pick<WorkflowExecution, 'sprint_id' | 'variabl
   return candidates.filter((value): value is string => typeof value === 'string' && value.trim().length > 0);
 }
 
-export function scorecardExistsForSprint(cwd: string, sprint: number): boolean {
+export function scorecardExistsForSprint(cwd: string, sprint: SprintId): boolean {
   const config = loadConfig(cwd);
-  const pattern = config.scorecardPattern.replaceAll('*', formatSprintNumber(sprint));
+  const pattern = config.scorecardPattern.replaceAll('*', sprintIdKey(sprint) ?? String(sprint));
   return existsSync(join(cwd, config.scorecardDir, pattern));
 }
 
-export function completedRoadmapSprintIds(cwd: string, config = loadConfig(cwd)): Set<number> {
+export function completedRoadmapSprintIds(cwd: string, config = loadConfig(cwd)): Set<string> {
   if (!config.roadmapPath) return new Set();
   const roadmapPath = join(cwd, config.roadmapPath);
   if (!existsSync(roadmapPath)) return new Set();
@@ -164,7 +168,7 @@ export function completedRoadmapSprintIds(cwd: string, config = loadConfig(cwd))
           const status = (sprint as RoadmapSprint & { status?: string }).status;
           return status === 'complete' || status === 'superseded';
         })
-        .map(sprint => sprint.id),
+        .map(sprint => roadmapSprintKey(roadmap, sprint)),
     );
   } catch {
     return new Set();
@@ -177,7 +181,7 @@ export async function findStaleWorkflowExecutions(
   options: {
     staleAgeMs?: number;
     now?: Date;
-    branchSprint?: number | null;
+    branchSprint?: SprintId | null;
     includeNewerRunning?: boolean;
     currentSessionId?: string;
     deadSessionGraceMs?: number;
@@ -199,8 +203,8 @@ export async function findStaleWorkflowExecutions(
   const running = await store.listExecutions({ status: 'running' });
   const runningSprints = running
     .map(exec => sprintNumberForExecution(exec))
-    .filter((sprint): sprint is number => sprint !== null);
-  const newestRunningSprint = runningSprints.length > 0 ? Math.max(...runningSprints) : null;
+    .filter((sprint): sprint is string => sprint !== null);
+  const newestRunningSprint = runningSprints.length > 0 ? latestSprintIdKey(runningSprints) : null;
   const branchSprint = options.branchSprint === undefined ? inferSprintFromBranch(cwd) : options.branchSprint;
   const includeNewerRunning = options.includeNewerRunning ?? true;
   const staleAgeMs = options.staleAgeMs ?? DEFAULT_STALE_WORKFLOW_AGE_MS;
@@ -213,8 +217,14 @@ export async function findStaleWorkflowExecutions(
     const reasons: string[] = [];
     if (scorecardSprintIds.has(sprint)) reasons.push('scorecard exists');
     if (roadmapDoneIds.has(sprint)) reasons.push('roadmap complete/superseded');
-    if (branchSprint !== null && sprint < branchSprint) reasons.push(`branch is on newer sprint S${formatSprintNumber(branchSprint)}`);
-    if (includeNewerRunning && newestRunningSprint !== null && sprint < newestRunningSprint) reasons.push(`newer running sprint S${formatSprintNumber(newestRunningSprint)} exists`);
+    const branchSprintKey = branchSprint === null ? null : sprintIdKey(branchSprint);
+    if (branchSprintKey !== null && compareSprintIdKeys(sprint, branchSprintKey) < 0) {
+      reasons.push(`branch is on newer sprint S${branchSprintKey}`);
+    }
+    if (includeNewerRunning && newestRunningSprint !== null
+      && compareSprintIdKeys(sprint, newestRunningSprint) < 0) {
+      reasons.push(`newer running sprint S${newestRunningSprint} exists`);
+    }
     if (isOlderThan(exec.updated_at || exec.started_at, now, staleAgeMs)) reasons.push(`older than ${Math.round(staleAgeMs / (24 * 60 * 60 * 1000))} days`);
     // Dead-session evidence applies only when session tracking is in use
     // (at least one active session), never to the invoking session's own
@@ -255,7 +265,7 @@ export async function reconcileWorkflowExecutions(
     const target = workflowFastForwardTarget(cwd, exec);
     if (!target) continue;
     await store.updateExecutionState(exec.id, target.phase, target.step);
-    const sprint = sprintNumberFromId(exec.sprint_id);
+    const sprint = sprintNumberForExecution(exec);
     if (sprint !== null) syncSprintStateWithWorkflowPhase(cwd, sprint, target.phase);
     fastForwarded.push({ exec, ...target });
   }
@@ -269,14 +279,14 @@ export function reconcileSprintStateForBranch(cwd: string): SprintStateRebindRes
 
   const state = loadSprintState(cwd);
   if (!state) return null;
-  if (state.sprint === branchSprint) return { sprint: state.sprint, rebound: false };
+  if (sprintIdsEqual(state.sprint, branchSprint)) return { sprint: state.sprint, rebound: false };
   if (!isStaleSprintStateForBranch(cwd, state.sprint, branchSprint)) return null;
 
   return {
     sprint: state.sprint,
     previousSprint: state.sprint,
     rebound: false,
-    reason: `branch suggests S${formatSprintNumber(branchSprint)}; audited rollover is required`,
+    reason: `branch suggests S${branchSprint}; audited rollover is required`,
   };
 }
 
@@ -284,7 +294,7 @@ function workflowFastForwardTarget(cwd: string, exec: WorkflowExecution): { phas
   const sprint = sprintNumberForExecution(exec);
   if (sprint === null) return null;
   const branchSprint = inferSprintFromBranch(cwd);
-  if (branchSprint !== sprint) return null;
+  if (branchSprint === null || !sprintIdsEqual(branchSprint, sprint)) return null;
   if (!hasSprintCommits(cwd, sprint)) return null;
 
   const def = loadExecutionWorkflow(exec, cwd);
@@ -329,10 +339,12 @@ function workflowPosition(def: WorkflowDefinition, phaseId: string | undefined, 
   return -1;
 }
 
-function isStaleSprintStateForBranch(cwd: string, stateSprint: number, branchSprint: number): boolean {
-  if (stateSprint < branchSprint) return true;
+function isStaleSprintStateForBranch(cwd: string, stateSprint: SprintId, branchSprint: SprintId): boolean {
+  const stateKey = sprintIdKey(stateSprint)!;
+  const branchKey = sprintIdKey(branchSprint)!;
+  if (compareSprintIdKeys(stateKey, branchKey) < 0) return true;
   if (scorecardExistsForSprint(cwd, stateSprint)) return true;
-  return completedRoadmapSprintIds(cwd).has(stateSprint);
+  return completedRoadmapSprintIds(cwd).has(stateKey);
 }
 
 const SPRINT_PHASE_ORDER: Record<SprintPhase, number> = {
@@ -359,33 +371,35 @@ function sprintPhaseForWorkflowPhase(workflowPhase: string): SprintPhase | null 
   }
 }
 
-function syncSprintStateWithWorkflowPhase(cwd: string, sprint: number, workflowPhase: string): void {
+function syncSprintStateWithWorkflowPhase(cwd: string, sprint: SprintId, workflowPhase: string): void {
   const nextPhase = sprintPhaseForWorkflowPhase(workflowPhase);
   if (!nextPhase) return;
+  const sprintKey = sprintIdKey(sprint);
+  if (sprintKey === null) return;
 
   const existing = loadSprintState(cwd);
   if (!existing) {
-    initializeSprintState(cwd, createSprintState(sprint, nextPhase));
+    initializeSprintState(cwd, createSprintState(sprintKey, nextPhase));
     return;
   }
-  if (existing.sprint !== sprint) {
+  if (!sprintIdsEqual(existing.sprint, sprintKey)) {
     return;
   }
   if (existing.phase === 'complete') return;
   if (SPRINT_PHASE_ORDER[nextPhase] <= SPRINT_PHASE_ORDER[existing.phase]) return;
 
   mutateSprintState(cwd, current => {
-    if (current.sprint !== sprint || current.phase === 'complete') return false;
+    if (!sprintIdsEqual(current.sprint, sprintKey) || current.phase === 'complete') return false;
     if (SPRINT_PHASE_ORDER[nextPhase] <= SPRINT_PHASE_ORDER[current.phase]) return false;
     current.phase = nextPhase;
     return true;
   });
 }
 
-function hasSprintCommits(cwd: string, sprint: number): boolean {
+function hasSprintCommits(cwd: string, sprint: SprintId): boolean {
   const subjects = gitLogSubjects(cwd, ['origin/main..HEAD']);
   const scan = subjects.length > 0 ? subjects : gitLogSubjects(cwd, ['-n', '25']);
-  const sprintLabel = escapeRegExp(formatSprintNumber(sprint));
+  const sprintLabel = escapeRegExp(sprintIdKey(sprint) ?? String(sprint));
   const re = new RegExp(`(?:^|\\b|[(/_-])S?${sprintLabel}(?:\\b|[-:_)]|$)`, 'i');
   return scan.some(subject => re.test(subject));
 }

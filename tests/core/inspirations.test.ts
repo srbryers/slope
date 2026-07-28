@@ -67,6 +67,22 @@ describe('parseInspirations', () => {
     expect(result.inspirations[0].id).toBe('test');
   });
 
+  it('normalizes legacy numeric sprint links without collapsing canonical strings', () => {
+    const result = parseInspirations(JSON.stringify(makeFile({
+      inspirations: [{
+        id: 'test',
+        source_url: 'https://github.com/test/test',
+        project_name: 'Test',
+        ideas: ['idea one'],
+        status: 'backlogged',
+        linked_sprints: [65, '458.1', '458.10'],
+        added_at: '2024-01-01T00:00:00Z',
+      }] as unknown as InspirationsFile['inspirations'],
+    })));
+
+    expect(result.inspirations[0].linked_sprints).toEqual(['65', '458.1', '458.10']);
+  });
+
   it('throws on invalid version', () => {
     expect(() => parseInspirations(JSON.stringify({ version: '99', inspirations: [] }))).toThrow('Unsupported');
   });
@@ -172,31 +188,46 @@ describe('linkInspirationToSprint', () => {
     });
     writeFile(file);
     const result = linkInspirationToSprint(inspirationsPath, 'test', 65);
-    expect(result.inspirations[0].linked_sprints).toEqual([65]);
+    expect(result.inspirations[0].linked_sprints).toEqual(['65']);
   });
 
   it('is idempotent — no duplicate sprint links', () => {
     const file = makeFile({
       inspirations: [{
         id: 'test', source_url: 'https://x', project_name: 'Test',
-        ideas: ['idea'], status: 'backlogged', linked_sprints: [65], added_at: '2024-01-01',
+        ideas: ['idea'], status: 'backlogged', linked_sprints: ['65'], added_at: '2024-01-01',
       }],
     });
     writeFile(file);
     const result = linkInspirationToSprint(inspirationsPath, 'test', 65);
-    expect(result.inspirations[0].linked_sprints).toEqual([65]);
+    expect(result.inspirations[0].linked_sprints).toEqual(['65']);
   });
 
   it('sorts sprint numbers', () => {
     const file = makeFile({
       inspirations: [{
         id: 'test', source_url: 'https://x', project_name: 'Test',
-        ideas: ['idea'], status: 'backlogged', linked_sprints: [70], added_at: '2024-01-01',
+        ideas: ['idea'], status: 'backlogged', linked_sprints: ['70'], added_at: '2024-01-01',
       }],
     });
     writeFile(file);
     const result = linkInspirationToSprint(inspirationsPath, 'test', 65);
-    expect(result.inspirations[0].linked_sprints).toEqual([65, 70]);
+    expect(result.inspirations[0].linked_sprints).toEqual(['65', '70']);
+  });
+
+  it('keeps 458.1 and 458.10 as distinct ordered sprint links', () => {
+    const file = makeFile({
+      inspirations: [{
+        id: 'test', source_url: 'https://x', project_name: 'Test',
+        ideas: ['idea'], status: 'backlogged', linked_sprints: [], added_at: '2024-01-01',
+      }],
+    });
+    writeFile(file);
+
+    linkInspirationToSprint(inspirationsPath, 'test', '458.10');
+    const result = linkInspirationToSprint(inspirationsPath, 'test', '458.1');
+
+    expect(result.inspirations[0].linked_sprints).toEqual(['458.1', '458.10']);
   });
 
   it('throws if file missing', () => {
@@ -219,6 +250,6 @@ describe('linkInspirationToSprint', () => {
     writeFile(file);
     linkInspirationToSprint(inspirationsPath, 'test', 42);
     const reloaded = JSON.parse(readFileSync(inspirationsPath, 'utf8'));
-    expect(reloaded.inspirations[0].linked_sprints).toEqual([42]);
+    expect(reloaded.inspirations[0].linked_sprints).toEqual(['42']);
   });
 });

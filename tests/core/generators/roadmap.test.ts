@@ -170,7 +170,7 @@ describe('generateRoadmap', () => {
     // Sprint 2 should depend on Sprint 1 at the sprint level
     const sprint2 = result.sprints.find(s => s.theme === 'Sprint 2');
     expect(sprint2).toBeDefined();
-    expect(sprint2!.depends_on).toContain(result.sprints[0].id);
+    expect(sprint2!.depends_on).toContain(String(result.sprints[0].id));
 
     // The ticket should NOT have intra-sprint depends_on (it's cross-sprint)
     expect(sprint2!.tickets[0].depends_on).toBeUndefined();

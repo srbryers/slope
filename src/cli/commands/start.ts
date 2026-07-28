@@ -1,4 +1,4 @@
-import { formatSprintNumber, parseSprintNumber } from '../../core/index.js';
+import { formatSprintNumber, sprintIdKey } from '../../core/index.js';
 import { briefingCommand } from './briefing.js';
 import { sprintCommand } from './sprint.js';
 import { loadConfig } from '../config.js';
@@ -14,9 +14,9 @@ function parseArgs(args: string[]): Record<string, string> {
   return result;
 }
 
-function resolveSprint(flags: Record<string, string>): number {
+function resolveSprint(flags: Record<string, string>): string {
   if (flags.sprint) {
-    const parsed = parseSprintNumber(flags.sprint);
+    const parsed = sprintIdKey(flags.sprint);
     if (parsed == null) {
       console.error(`Invalid sprint number: ${flags.sprint}`);
       process.exit(1);

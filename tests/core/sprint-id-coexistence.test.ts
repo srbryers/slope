@@ -76,6 +76,13 @@ describe('canonical sprint ids coexist through compile (GH #635)', () => {
     expect(new Set(keys).size).toBe(ids.length);
   });
 
+  it('sorts reverse-authored .10 and .1 by their exact canonical keys', () => {
+    const { project, source } = buildSource(['458.10', '458.1']);
+    const roadmap = compileRoadmapSources(project, [source]);
+
+    expect(roadmap.sprints.map(sprint => sprint.id_key)).toEqual(['458.1', '458.10']);
+  });
+
   it('still rejects two sprints with the same canonical key', () => {
     const { project, source } = buildSource(['458.10', '458.10']);
     const validation = validateRoadmapSourceFederation(project, [source]);
@@ -119,6 +126,30 @@ describe('authoring a canonical sprint id (GH #635)', () => {
       doc('"458.10"', ['    depends_on: ["458.9"]']),
       'phases/phase-99.yaml',
     );
-    expect(parsed.sprints[0].depends_on).toEqual([458.9]);
+    expect(parsed.sprints[0].depends_on).toEqual(['458.9']);
+  });
+
+  it('keeps a dependency on 458.10 distinct from 458.1', () => {
+    const parsed = parseRoadmapSourceDocument([
+      'version: "1"',
+      'phase:',
+      '  name: Phase 99',
+      '  sprints: ["458.1", "458.10", 459]',
+      'sprints:',
+      sprintBlock('458.1'),
+      sprintBlock('458.10'),
+      '  - id: 459',
+      '    theme: T',
+      '    par: 3',
+      '    slope: 1',
+      '    type: feature',
+      '    status: planned',
+      '    depends_on: ["458.10"]',
+      '    tickets:',
+      '      - {key: S459-1, title: T1, club: wedge, complexity: small}',
+      '',
+    ].join(LF), 'phases/phase-99.yaml');
+
+    expect(parsed.sprints[2].depends_on).toEqual(['458.10']);
   });
 });

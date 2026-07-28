@@ -30,13 +30,27 @@ import { SLOPE_REGISTRY, SLOPE_TYPES } from './registry.js';
 import type { FunctionRegistryEntry } from './registry.js';
 import { runInSandbox } from './sandbox.js';
 import type { SlopeStore, SlopeConfig } from '../core/index.js';
-import { checkConflicts, loadFlows, checkFlowStaleness, checkStoreHealth, METAPHOR_SCHEMA, listMetaphors, buildInterviewContext, generateInterviewSteps, loadConfig, parseTestPlan, getAreasNeedingTest, hasEmbeddingSupport, embed, deduplicateByFile, formatContextForAgent, WorkflowEngine, loadWorkflow, listWorkflows, observeSessionBranches, resolveVariables, resolveRepoSourceCwd, resolveRepoStateCwd, resolveRepoStatePath } from '../core/index.js';
+import { checkConflicts, loadFlows, checkFlowStaleness, checkStoreHealth, METAPHOR_SCHEMA, listMetaphors, buildInterviewContext, generateInterviewSteps, loadConfig, parseTestPlan, getAreasNeedingTest, hasEmbeddingSupport, embed, deduplicateByFile, formatContextForAgent, WorkflowEngine, loadWorkflow, listWorkflows, observeSessionBranches, resolveVariables, resolveRepoSourceCwd, resolveRepoStateCwd, resolveRepoStatePath, sprintIdKey } from '../core/index.js';
 import type { ContextResult } from '../core/index.js';
 import { gaming } from '../core/metaphors/gaming.js';
 import type { ClaimScope, FlowsFile, FlowDefinition } from '../core/index.js';
 
 /** Tool names exposed by this MCP server (for tests and tool discovery). */
 export const SLOPE_MCP_TOOL_NAMES = ['search', 'execute', 'context_search', 'session_status', 'acquire_claim', 'check_conflicts', 'store_status', 'testing_session_start', 'testing_session_finding', 'testing_session_end', 'testing_session_status', 'testing_plan_status', 'workflow_next', 'workflow_complete', 'workflow_status'] as const;
+
+const canonicalSprintIdSchema = z
+  .union([z.string(), z.number()])
+  .transform((value, context) => {
+    const sprint = sprintIdKey(value);
+    if (sprint === null) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Invalid sprint ID',
+      });
+      return z.NEVER;
+    }
+    return sprint;
+  });
 
 function toRepoPath(path: string): string {
   return path.replace(/\\/g, '/');
@@ -377,7 +391,7 @@ export function createSlopeToolsServer(
         sessionId: z.string().describe('Session ID to associate with the claim'),
         target: z.string().describe('Ticket key or area path to claim'),
         scope: z.enum(['ticket', 'area']).describe('Claim scope: ticket or area'),
-        sprintNumber: z.number().describe('Sprint number'),
+        sprintNumber: canonicalSprintIdSchema.describe('Canonical sprint ID (string preferred; legacy numbers accepted)'),
         player: z.string().describe('Player name'),
       },
       async ({ sessionId, target, scope, sprintNumber, player }) => {
@@ -401,7 +415,7 @@ export function createSlopeToolsServer(
       'check_conflicts',
       'Detect overlapping and adjacent conflicts among sprint claims.',
       {
-        sprintNumber: z.number().optional().describe('Optional sprint number to filter claims'),
+        sprintNumber: canonicalSprintIdSchema.optional().describe('Optional canonical sprint ID to filter claims'),
       },
       async ({ sprintNumber }) => {
         const claims = await store.getActiveClaims(sprintNumber);
@@ -437,7 +451,7 @@ export function createSlopeToolsServer(
       'Start a manual testing session. Creates a fresh git worktree for testing, returns setup steps from config. Only one active session allowed at a time.',
       {
         purpose: z.string().optional().describe('Purpose or focus area for this testing session'),
-        sprint: z.number().optional().describe('Associated sprint number'),
+        sprint: canonicalSprintIdSchema.optional().describe('Associated canonical sprint ID'),
       },
       async ({ purpose, sprint }) => {
         // Check for existing active session

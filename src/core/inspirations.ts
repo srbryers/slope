@@ -3,6 +3,8 @@
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { mkdirSync } from 'node:fs';
+import { compareSprintIdKeys, sprintIdKey } from './sprint-id.js';
+import type { SprintId, SprintIdInput } from './sprint-id.js';
 
 /** Status of an inspiration entry */
 export type InspirationStatus = 'backlogged' | 'planned' | 'implemented' | 'rejected';
@@ -16,7 +18,7 @@ export interface InspirationEntry {
   status: InspirationStatus;
   rejected_reason?: string;
   tags?: string[];
-  linked_sprints: number[];
+  linked_sprints: string[];
   added_at: string;
   notes?: string;
 }
@@ -67,6 +69,16 @@ export function parseInspirations(json: string): InspirationsFile {
     if (!Array.isArray(entry.linked_sprints)) {
       throw new Error(`Inspiration "${entry.id}": must have a "linked_sprints" array`);
     }
+    entry.linked_sprints = entry.linked_sprints.map((sprint: unknown) => {
+      if (typeof sprint !== 'string' && typeof sprint !== 'number') {
+        throw new Error(`Inspiration "${entry.id}": linked sprint ids must be strings or numbers`);
+      }
+      const sprintKey = sprintIdKey(sprint);
+      if (!sprintKey) {
+        throw new Error(`Inspiration "${entry.id}": invalid linked sprint id "${sprint}"`);
+      }
+      return sprintKey;
+    });
   }
 
   return raw as InspirationsFile;
@@ -118,13 +130,13 @@ export function deriveId(projectName: string): string {
 }
 
 /**
- * Link an inspiration to a sprint number. Idempotent — no error if already linked.
+ * Link an inspiration to a sprint id. Idempotent — no error if already linked.
  * Writes the updated file back to disk.
  */
 export function linkInspirationToSprint(
   inspirationsPath: string,
   inspirationId: string,
-  sprintNumber: number,
+  sprintNumber: SprintIdInput,
 ): InspirationsFile {
   const file = loadInspirations(inspirationsPath);
   if (!file) {
@@ -136,9 +148,14 @@ export function linkInspirationToSprint(
     throw new Error(`Inspiration "${inspirationId}" not found`);
   }
 
-  if (!entry.linked_sprints.includes(sprintNumber)) {
-    entry.linked_sprints.push(sprintNumber);
-    entry.linked_sprints.sort((a, b) => a - b);
+  const sprintKey = sprintIdKey(sprintNumber);
+  if (!sprintKey) {
+    throw new Error(`Invalid sprint id: ${sprintNumber}`);
+  }
+
+  if (!entry.linked_sprints.includes(sprintKey)) {
+    entry.linked_sprints.push(sprintKey);
+    entry.linked_sprints.sort(compareSprintIdKeys);
   }
 
   file.last_updated = new Date().toISOString();

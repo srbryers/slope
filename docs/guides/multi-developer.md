@@ -24,7 +24,7 @@ Add `"player": "name"` to each scorecard:
 
 ```json
 {
-  "sprint_number": 20,
+  "sprint_number": "20",
   "player": "alice",
   "theme": "Multi-Developer",
   ...

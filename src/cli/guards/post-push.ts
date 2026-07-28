@@ -1,7 +1,11 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { HookInput, GuardResult, Suggestion } from '../../core/index.js';
-import { loadConfig, parseRoadmap } from '../../core/index.js';
+import type { HookInput, GuardResult, SprintId, Suggestion } from '../../core/index.js';
+import {
+  loadConfig,
+  parseRoadmap,
+  roadmapSprintKeyFromId,
+} from '../../core/index.js';
 import { loadSprintState } from '../sprint-state.js';
 import { loadSessionState, updateSessionState } from '../session-state.js';
 import { isPhaseComplete } from '../phase-cleanup.js';
@@ -104,11 +108,15 @@ export async function postPushGuard(input: HookInput, cwd: string): Promise<Guar
         const raw = JSON.parse(readFileSync(roadmapPath, 'utf8'));
         const { roadmap } = parseRoadmap(raw);
         if (roadmap?.phases) {
+          const currentKey = roadmapSprintKeyFromId(roadmap, sprintState.sprint);
           for (let i = 0; i < roadmap.phases.length; i++) {
             const phase = roadmap.phases[i];
-            if (Array.isArray(phase.sprints) && phase.sprints.includes(sprintState.sprint)) {
+            const phaseKeys = (phase.sprint_keys ?? phase.sprints.map(String))
+              .map(id => roadmapSprintKeyFromId(roadmap, id))
+              .filter((id): id is string => id !== null);
+            if (currentKey !== null && phaseKeys.includes(currentKey)) {
               // Current sprint is in this phase — check if all sprints in phase have scorecards
-              const allDone = phase.sprints.every((sn: number) =>
+              const allDone = phaseKeys.every(sn =>
                 existsSync(join(cwd, config.scorecardDir, `sprint-${sn}.json`)),
               );
               const phaseMatch = phase.name.match(/Phase\s+(\d+)/i);
@@ -137,7 +145,7 @@ export async function postPushGuard(input: HookInput, cwd: string): Promise<Guar
   return { suggestion };
 }
 
-async function countSprintClaims(cwd: string, sprintNumber: number): Promise<number> {
+async function countSprintClaims(cwd: string, sprintNumber: SprintId): Promise<number> {
   let store: Awaited<ReturnType<typeof resolveStore>> | null = null;
   try {
     store = await resolveStore(cwd);

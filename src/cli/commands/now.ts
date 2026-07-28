@@ -1,12 +1,21 @@
-import { formatSprintLabel, formatRoadmapSprintLabel, formatSprintNumber, isRoadmapSprintPending, loadScorecards, parseSprintNumber } from '../../core/index.js';
-import type { RoadmapDefinition, RoadmapSprint, RoadmapTicket, SprintClaim } from '../../core/index.js';
+import {
+  findRoadmapSprint,
+  formatRoadmapSprintLabel,
+  isRoadmapSprintPending,
+  loadScorecards,
+  roadmapSprintKey,
+  roadmapSprintKeyFromId,
+  sprintIdKey,
+  sprintIdsEqual,
+} from '../../core/index.js';
+import type { RoadmapDefinition, RoadmapSprint, RoadmapTicket, SprintClaim, SprintId } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { inferSprintContext, loadRoadmapForInference } from '../sprint-inference.js';
 import { isRequiredReviewGate, isReviewGateSatisfied, loadSprintState, pendingGates, waivedReviewGateNames, type ReviewGateName } from '../sprint-state.js';
 import { resolveStore } from '../store.js';
 
 interface NowSnapshot {
-  sprint: number;
+  sprint: SprintId;
   sprintLabel: string;
   source: string;
   roadmap?: {
@@ -39,26 +48,38 @@ function parseArgs(args: string[]): Record<string, string> {
   return result;
 }
 
-function sprintStatus(sprint: RoadmapSprint | undefined, completed: Set<number>, currentSprint: number): string {
+function sprintStatus(
+  roadmap: RoadmapDefinition,
+  sprint: RoadmapSprint | undefined,
+  completed: Set<string>,
+  currentSprint: SprintId,
+): string {
   if (!sprint) return 'not in roadmap';
   const explicit = (sprint as RoadmapSprint & { status?: string }).status;
   if (explicit === 'superseded') return 'superseded';
-  if (explicit === 'complete' || completed.has(sprint.id)) return 'complete';
-  if (sprint.id === currentSprint) return 'active';
+  if (explicit === 'complete' || completed.has(roadmapSprintKey(roadmap, sprint))) return 'complete';
+  if (roadmapSprintKey(roadmap, sprint) === roadmapSprintKeyFromId(roadmap, currentSprint)) return 'active';
   if (isRoadmapSprintPending(sprint)) return 'pending';
   return explicit ?? 'unknown';
 }
 
-function isTerminal(sprint: RoadmapSprint, completed: Set<number>): boolean {
+function isTerminal(roadmap: RoadmapDefinition, sprint: RoadmapSprint, completed: Set<string>): boolean {
   const explicit = (sprint as RoadmapSprint & { status?: string }).status;
-  return explicit === 'complete' || explicit === 'superseded' || completed.has(sprint.id);
+  return explicit === 'complete'
+    || explicit === 'superseded'
+    || completed.has(roadmapSprintKey(roadmap, sprint));
 }
 
-function formatPhaseProgress(roadmap: RoadmapDefinition, sprint: number, completed: Set<number>): { name: string; progress: string } | undefined {
-  const phase = roadmap.phases.find(p => p.sprints.includes(sprint));
+function formatPhaseProgress(roadmap: RoadmapDefinition, sprint: SprintId, completed: Set<string>): { name: string; progress: string } | undefined {
+  const sprintKey = roadmapSprintKeyFromId(roadmap, sprint);
+  const phase = roadmap.phases.find(p =>
+    (p.sprint_keys ?? p.sprints.map(String))
+      .some(id => roadmapSprintKeyFromId(roadmap, id) === sprintKey));
   if (!phase) return undefined;
-  const phaseSprints = roadmap.sprints.filter(s => phase.sprints.includes(s.id));
-  const completedCount = phaseSprints.filter(s => isTerminal(s, completed)).length;
+  const phaseKeys = new Set((phase.sprint_keys ?? phase.sprints.map(String))
+    .map(id => roadmapSprintKeyFromId(roadmap, id)));
+  const phaseSprints = roadmap.sprints.filter(s => phaseKeys.has(roadmapSprintKey(roadmap, s)));
+  const completedCount = phaseSprints.filter(s => isTerminal(roadmap, s, completed)).length;
   return {
     name: phase.name,
     progress: `${completedCount}/${phaseSprints.length}`,
@@ -93,19 +114,21 @@ function buildNextAction(snapshot: Omit<NowSnapshot, 'nextAction'>): string {
 async function buildNowSnapshot(cwd: string, flags: Record<string, string>): Promise<NowSnapshot> {
   const config = loadConfig(cwd);
   const inferred = inferSprintContext(cwd, config);
-  const parsedSprint = flags.sprint ? parseSprintNumber(flags.sprint) : inferred.sprint;
+  const parsedSprint = flags.sprint ? sprintIdKey(flags.sprint) : inferred.sprint;
   if (parsedSprint == null) {
     throw new Error(`Invalid sprint number: ${flags.sprint}`);
   }
   const sprint = parsedSprint;
   const roadmap = loadRoadmapForInference(cwd, config) ?? undefined;
+  const current = roadmap ? findRoadmapSprint(roadmap, sprint) : undefined;
   // Without roadmap evidence, an integer like 245 is ambiguous: it could be a
   // real S245 or the legacy encoding of S24.5. Prefer roadmap-aware labelling so
   // this repo's own S245 stops rendering as "S24.5" (GH #635).
-  const sprintLabel = roadmap ? formatRoadmapSprintLabel(roadmap, sprint) : formatSprintLabel(sprint);
+  const sprintLabel = roadmap
+    ? formatRoadmapSprintLabel(roadmap, current ? roadmapSprintKey(roadmap, current) : sprint)
+    : `S${sprintIdKey(sprint) ?? sprint}`;
   const scorecards = loadScorecards(config, cwd);
   const completed = new Set(scorecards.map(card => card.sprint_number));
-  const current = roadmap?.sprints.find(s => s.id === sprint);
   const phase = roadmap ? formatPhaseProgress(roadmap, sprint, completed) : undefined;
   const state = loadSprintState(cwd);
 
@@ -126,9 +149,9 @@ async function buildNowSnapshot(cwd: string, flags: Record<string, string>): Pro
       theme: current?.theme,
       phase: phase?.name,
       phaseProgress: phase?.progress,
-      status: sprintStatus(current, completed, sprint),
+      status: sprintStatus(roadmap, current, completed, sprint),
     } : undefined,
-    sprintState: state?.sprint === sprint ? {
+    sprintState: state && sprintIdsEqual(state.sprint, sprint) ? {
       phase: state.phase,
       pendingGates: pendingGates(state),
       requiredReviewsPending: (['code_review', 'architect_review'] as ReviewGateName[])
@@ -167,7 +190,7 @@ function printNowSnapshot(snapshot: NowSnapshot): void {
   if (snapshot.nextTicket && snapshot.nextAction.startsWith('Start ')) {
     console.log(`Start: slope start --ticket=${snapshot.nextTicket.key}`);
   }
-  console.log(`More: slope roadmap status --sprint=${formatSprintNumber(snapshot.sprint)}\n`);
+  console.log(`More: slope roadmap status --sprint=${snapshot.sprint}\n`);
 }
 
 function printUsage(): void {

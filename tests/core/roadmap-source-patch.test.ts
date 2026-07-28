@@ -42,6 +42,39 @@ scorecards:
 `;
 
 describe('patchRoadmapSourceSprintText', () => {
+  it('matches quoted canonical ids exactly when .1 and .10 coexist', () => {
+    const doc = `version: 1
+phase:
+  name: P
+  sprints: ["458.1", "458.10"]
+sprints:
+  - id: "458.1"
+    theme: First insert
+    par: 3
+    slope: 1
+    type: feature
+    status: planned
+    tickets: []
+  - id: "458.10"
+    theme: Tenth insert
+    par: 3
+    slope: 1
+    type: feature
+    status: planned
+    tickets: []
+`;
+
+    const patched = patchRoadmapSourceSprintText(doc, '458.10', {
+      status: 'complete',
+      scorecardKey: '458.10',
+      scorecardPath: 'docs/retros/sprint-458.10.json',
+    });
+
+    expect(patched).toContain('  - id: "458.1"\n    theme: First insert\n    par: 3\n    slope: 1\n    type: feature\n    status: planned');
+    expect(patched).toContain('  - id: "458.10"\n    theme: Tenth insert\n    par: 3\n    slope: 1\n    type: feature\n    status: complete');
+    expect(patched).toContain('  "458.10": docs/retros/sprint-458.10.json');
+  });
+
   it('changes only the targeted status line and scorecards entry', () => {
     const patched = patchRoadmapSourceSprintText(DOC, 458.1, {
       status: 'complete',

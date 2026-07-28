@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { sessionCommand } from '../../../src/cli/commands/session.js';
@@ -334,6 +334,90 @@ describe('slope session command', () => {
         worktree_path: realpathSync(linkedWorktree),
         last_heartbeat_at: beforeHeartbeat,
       });
+    } finally {
+      after.close();
+    }
+  });
+
+  it('keeps 458.10 session coordination distinct from 458.1', async () => {
+    const store = createStore();
+    try {
+      await store.registerSession({
+        session_id: 'canonical-source',
+        role: 'primary',
+        ide: 'codex',
+        metadata: { sprint: '458.10' },
+      });
+      await store.registerSession({
+        session_id: 'canonical-target',
+        role: 'secondary',
+        ide: 'codex',
+        metadata: { sprint: '458.10' },
+      });
+      await store.claim({
+        sprint_number: '458.1',
+        player: 'agent',
+        target: 'S458.1-1',
+        scope: 'ticket',
+        session_id: 'canonical-source',
+      });
+      await store.claim({
+        sprint_number: '458.10',
+        player: 'agent',
+        target: 'S458.10-1',
+        scope: 'ticket',
+        session_id: 'canonical-source',
+      });
+    } finally {
+      store.close();
+    }
+
+    const logs: string[] = [];
+    const log = vi.spyOn(console, 'log').mockImplementation((...args) => {
+      logs.push(args.join(' '));
+    });
+
+    await sessionCommand(['plan', '--sprint=458.10', '--json=true']);
+    const plan = JSON.parse(logs.at(-1) ?? '{}') as {
+      sprint?: string;
+      assignments?: Array<{ target: string }>;
+    };
+    expect(plan.sprint).toBe('458.10');
+    expect(plan.assignments?.map(claim => claim.target)).toEqual(['S458.10-1']);
+
+    logs.length = 0;
+    await sessionCommand(['dashboard', '--json=true']);
+    const dashboard = JSON.parse(logs.at(-1) ?? '{}') as {
+      claims?: Array<{ target: string }>;
+    };
+    expect(dashboard.claims?.map(claim => claim.target)).toEqual(['S458.10-1']);
+
+    logs.length = 0;
+    await sessionCommand([
+      'assign',
+      '--ticket=S458.10-2',
+      '--agent=canonical-target',
+      '--sprint=458.10',
+    ]);
+    await sessionCommand([
+      'handoff',
+      '--from=canonical-source',
+      '--to=canonical-target',
+    ]);
+    log.mockRestore();
+
+    const handoff = JSON.parse(readFileSync(
+      join(tmpDir, '.slope', 'handoffs', 'transfer-canonica-canonica.json'),
+      'utf8',
+    )) as { claims: Array<{ target: string }> };
+    expect(handoff.claims.map(claim => claim.target)).toEqual(['S458.10-1']);
+
+    const after = createStore();
+    try {
+      expect((await after.list('458.10')).map(claim => claim.target))
+        .toEqual(['S458.10-1', 'S458.10-2']);
+      expect((await after.list('458.1')).map(claim => claim.target))
+        .toEqual(['S458.1-1']);
     } finally {
       after.close();
     }

@@ -75,7 +75,7 @@ const DEFAULT_GATES: ReviewGateConfig = {
 
 function makeSprint(overrides: Partial<InitiativeSprintStatus> = {}): InitiativeSprintStatus {
   return {
-    sprint_number: 1,
+    sprint_number: '1',
     phase: 'pending',
     plan_reviews: [],
     pr_reviews: [],
@@ -375,9 +375,72 @@ describe('initiative file I/O', () => {
     );
     expect(initiative.name).toBe('Test Initiative');
     expect(initiative.sprints).toHaveLength(2);
-    expect(initiative.sprints[0].sprint_number).toBe(1);
+    expect(initiative.sprints[0].sprint_number).toBe('1');
     expect(initiative.sprints[0].phase).toBe('pending');
     expect(initiative.review_gates.plan.required).toContain('architect');
+  });
+
+  it('keeps coexisting decimal sprint identities distinct', () => {
+    const roadmap = {
+      name: 'Canonical Initiative',
+      phases: [{
+        name: 'Decimal phase',
+        sprints: [458.1, 458.1],
+        sprint_keys: ['458.1', '458.10'],
+      }],
+      sprints: [
+        {
+          id: 458.1,
+          id_key: '458.1',
+          theme: 'First insert',
+          par: 3,
+          slope: 1,
+          type: 'feature',
+          tickets: [{ key: 'S458.1-1', title: 'First insert work', club: 'wedge', complexity: 'small' }],
+        },
+        {
+          id: 458.1,
+          id_key: '458.10',
+          theme: 'Tenth insert',
+          par: 3,
+          slope: 1,
+          type: 'feature',
+          tickets: [{ key: 'S458.10-1', title: 'Tenth insert work', club: 'wedge', complexity: 'small' }],
+        },
+      ],
+    };
+    writeFileSync(
+      join(TEST_DIR, 'docs', 'backlog', 'roadmap.json'),
+      JSON.stringify(roadmap, null, 2),
+    );
+
+    const initiative = createInitiative(
+      'Canonical Initiative',
+      '',
+      'docs/backlog/roadmap.json',
+      TEST_DIR,
+    );
+    expect(initiative.sprints.map(sprint => sprint.sprint_number)).toEqual(['458.1', '458.10']);
+
+    advanceSprint(TEST_DIR, '458.10');
+    const updated = loadInitiative(TEST_DIR)!;
+    expect(updated.sprints.find(sprint => sprint.sprint_number === '458.1')!.phase).toBe('pending');
+    expect(updated.sprints.find(sprint => sprint.sprint_number === '458.10')!.phase).toBe('planning');
+  });
+
+  it('normalizes legacy numeric initiative state when loading', () => {
+    writeFileSync(
+      join(TEST_DIR, '.slope', 'initiative.json'),
+      JSON.stringify({
+        name: 'Legacy',
+        description: '',
+        roadmap: 'docs/backlog/roadmap.json',
+        review_gates: DEFAULT_GATES,
+        sprints: [{ ...makeSprint(), sprint_number: 12 }],
+      }),
+    );
+
+    expect(loadInitiative(TEST_DIR)!.sprints[0].sprint_number).toBe('12');
   });
 
   it('createInitiative throws for invalid roadmap path', () => {
@@ -421,7 +484,7 @@ describe('advanceSprint', () => {
     advanceSprint(TEST_DIR, 1); // planning → plan_review
 
     const initiative = loadInitiative(TEST_DIR)!;
-    const sprint = initiative.sprints.find(s => s.sprint_number === 1)!;
+    const sprint = initiative.sprints.find(s => s.sprint_number === '1')!;
     expect(sprint.phase).toBe('plan_review');
     expect(sprint.plan_reviews.length).toBeGreaterThan(0);
     // Should have architect (required) + auto-selected specialist
@@ -465,7 +528,7 @@ describe('recordReview', () => {
   it('records a plan review completion', () => {
     recordReview(TEST_DIR, 1, 'plan', 'architect', 3);
     const initiative = loadInitiative(TEST_DIR)!;
-    const sprint = initiative.sprints.find(s => s.sprint_number === 1)!;
+    const sprint = initiative.sprints.find(s => s.sprint_number === '1')!;
     const archReview = sprint.plan_reviews.find(r => r.reviewer === 'architect')!;
     expect(archReview.completed).toBe(true);
     expect(archReview.findings_count).toBe(3);
@@ -474,7 +537,7 @@ describe('recordReview', () => {
   it('adds new reviewer if not in existing records', () => {
     recordReview(TEST_DIR, 1, 'plan', 'security', 1);
     const initiative = loadInitiative(TEST_DIR)!;
-    const sprint = initiative.sprints.find(s => s.sprint_number === 1)!;
+    const sprint = initiative.sprints.find(s => s.sprint_number === '1')!;
     const secReview = sprint.plan_reviews.find(r => r.reviewer === 'security');
     expect(secReview).toBeDefined();
     expect(secReview!.completed).toBe(true);
@@ -483,7 +546,7 @@ describe('recordReview', () => {
   it('throws when recording plan review in wrong phase', () => {
     // Complete all plan reviews first
     const initiative = loadInitiative(TEST_DIR)!;
-    const sprint = initiative.sprints.find(s => s.sprint_number === 1)!;
+    const sprint = initiative.sprints.find(s => s.sprint_number === '1')!;
     for (const r of sprint.plan_reviews) r.completed = true;
     saveInitiative(TEST_DIR, initiative);
 
@@ -507,14 +570,14 @@ describe('getNextSprint', () => {
       roadmap: 'r.json',
       review_gates: DEFAULT_GATES,
       sprints: [
-        makeSprint({ sprint_number: 1, phase: 'complete' }),
-        makeSprint({ sprint_number: 2, phase: 'planning' }),
-        makeSprint({ sprint_number: 3, phase: 'pending' }),
+        makeSprint({ sprint_number: '1', phase: 'complete' }),
+        makeSprint({ sprint_number: '2', phase: 'planning' }),
+        makeSprint({ sprint_number: '3', phase: 'pending' }),
       ],
     };
     const next = getNextSprint(initiative);
     expect(next).not.toBeNull();
-    expect(next!.sprint_number).toBe(2);
+    expect(next!.sprint_number).toBe('2');
   });
 
   it('returns null when all sprints complete', () => {
@@ -524,8 +587,8 @@ describe('getNextSprint', () => {
       roadmap: 'r.json',
       review_gates: DEFAULT_GATES,
       sprints: [
-        makeSprint({ sprint_number: 1, phase: 'complete' }),
-        makeSprint({ sprint_number: 2, phase: 'complete' }),
+        makeSprint({ sprint_number: '1', phase: 'complete' }),
+        makeSprint({ sprint_number: '2', phase: 'complete' }),
       ],
     };
     expect(getNextSprint(initiative)).toBeNull();
@@ -542,10 +605,10 @@ describe('formatInitiativeStatus', () => {
       roadmap: 'docs/backlog/roadmap.json',
       review_gates: DEFAULT_GATES,
       sprints: [
-        makeSprint({ sprint_number: 1, phase: 'plan_review', plan_reviews: [
+        makeSprint({ sprint_number: '1', phase: 'plan_review', plan_reviews: [
           { reviewer: 'architect', completed: true, findings_count: 2, reviewer_mode: 'manual' },
         ] }),
-        makeSprint({ sprint_number: 2, phase: 'pending' }),
+        makeSprint({ sprint_number: '2', phase: 'pending' }),
       ],
     };
     const output = formatInitiativeStatus(initiative);

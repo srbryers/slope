@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { HookInput, GuardResult } from '../../core/index.js';
-import { selectSpecialists } from '../../core/index.js';
+import { latestSprintIdKey, selectSpecialists, sprintIdKey } from '../../core/index.js';
 import type { CommonIssuesFile } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { initializeSprintState, loadSprintState, createSprintState } from '../sprint-state.js';
@@ -133,11 +133,10 @@ export async function reviewTierGuard(input: HookInput, cwd: string): Promise<Gu
 
   // Create sprint-state if it doesn't already exist
   if (!loadSprintState(cwd)) {
-    // Try to extract sprint number from plan content
-    const sprintMatch = plan.content.match(/Sprint\s+(\d+)/i);
-    const sprintNumber = sprintMatch ? parseInt(sprintMatch[1], 10) : 0;
-    if (sprintNumber > 0) {
-      initializeSprintState(cwd, createSprintState(sprintNumber, 'planning'));
+    const sprintMatch = plan.content.match(/Sprint\s+(S?\d+(?:\.\d+)?)/i);
+    const sprint = sprintMatch ? sprintIdKey(sprintMatch[1]) : null;
+    if (sprint) {
+      initializeSprintState(cwd, createSprintState(sprint, 'planning'));
     }
   }
 
@@ -180,7 +179,7 @@ function loadRelevantGotchas(cwd: string, planContent: string): string[] {
       });
 
       if (isRelevant) {
-        const lastSprint = Math.max(...pattern.sprints_hit);
+        const lastSprint = latestSprintIdKey(pattern.sprints_hit);
         warnings.push(`[${pattern.category}] ${pattern.title} (last: S${lastSprint}) — ${pattern.prevention.slice(0, 100)}`);
       }
 

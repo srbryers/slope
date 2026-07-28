@@ -149,7 +149,7 @@ After all tickets are done, create a scorecard JSON file. Here's a complete exam
 
 ```json
 {
-  "sprint_number": 5,
+  "sprint_number": "5",
   "theme": "User Authentication",
   "par": 4,
   "slope": 1,
@@ -363,7 +363,7 @@ Guards will:
 
 | Field            | Type     | Description                                    |
 |------------------|----------|------------------------------------------------|
-| `sprint_number`  | number   | Sprint identifier                              |
+| `sprint_number`  | string   | Canonical sprint identifier                    |
 | `theme`          | string   | Sprint theme/name                              |
 | `par`            | number   | Expected baseline (3, 4, or 5)                 |
 | `slope`          | number   | Difficulty rating (count of slope factors)      |

@@ -78,6 +78,45 @@ function writeModernRoadmap(): void {
 }
 
 describe('phaseBoundaryGuard', () => {
+  it('blocks canonical trailing-zero sprints using authoritative phase keys', async () => {
+    mkdirSync(join(tmpDir, 'docs', 'backlog'), { recursive: true });
+    writeFileSync(join(tmpDir, 'docs', 'backlog', 'roadmap.json'), JSON.stringify({
+      name: 'Canonical',
+      phases: [
+        { name: 'Phase 1', sprints: [458.1], sprint_keys: ['458.1'] },
+        { name: 'Phase 2', sprints: [458.1], sprint_keys: ['458.10'] },
+      ],
+      sprints: [
+        {
+          id: 458.1,
+          id_key: '458.1',
+          theme: 'Prior',
+          par: 3,
+          slope: 1,
+          type: 'feature',
+          tickets: [{ id: 'S458.1-1', title: 'one', club: 'wedge', complexity: 'small' }],
+        },
+        {
+          id: 458.1,
+          id_key: '458.10',
+          theme: 'Target',
+          par: 3,
+          slope: 1,
+          type: 'feature',
+          tickets: [{ id: 'S458.10-1', title: 'one', club: 'wedge', complexity: 'small' }],
+        },
+      ],
+    }));
+
+    const result = await phaseBoundaryGuard(
+      makeInput('slope sprint start --sprint=458.10'),
+      tmpDir,
+    );
+
+    expect(result.decision).toBe('deny');
+    expect(result.suggestion?.context).toContain('Sprint 458.10');
+  });
+
   it('blocks actual slope sprint starts when the previous phase is incomplete', async () => {
     writeRoadmap();
 

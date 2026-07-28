@@ -8,8 +8,9 @@ import {
   extractRelevantHandoffs,
   aggregateStandups,
   formatTeamStandup,
+  sprintIdKey,
 } from '../../core/index.js';
-import type { SlopeEvent, SprintClaim, StandupContext, StandupReport } from '../../core/index.js';
+import type { SlopeEvent, SprintClaim, SprintId, StandupContext, StandupReport } from '../../core/index.js';
 import { readTranscript } from '../../core/transcript.js';
 import { loadConfig } from '../config.js';
 import { inferSprintContext } from '../sprint-inference.js';
@@ -21,7 +22,7 @@ function gatherStandupContext(
   cwd: string,
   config: ReturnType<typeof loadConfig>,
   sessionId: string,
-  sprintNumber: number | undefined,
+  sprintNumber: SprintId | undefined,
   sessionStartedAt: string | undefined,
 ): StandupContext {
   const context: StandupContext = {};
@@ -95,7 +96,7 @@ export async function standupCommand(args: string[]): Promise<void> {
   let sessionId: string | undefined;
   let ingestPath: string | undefined;
   let roleId: string | undefined;
-  let sprintNumber: number | undefined;
+  let sprintNumber: string | undefined;
 
   let aggregate = false;
 
@@ -109,7 +110,12 @@ export async function standupCommand(args: string[]): Promise<void> {
     } else if (arg.startsWith('--role=')) {
       roleId = arg.slice('--role='.length).trim();
     } else if (arg.startsWith('--sprint=')) {
-      sprintNumber = parseInt(arg.slice('--sprint='.length), 10);
+      const sprint = sprintIdKey(arg.slice('--sprint='.length));
+      if (sprint === null) {
+        console.error('Error: --sprint must be a positive sprint id, e.g. 114 or 114.5');
+        process.exit(1);
+      }
+      sprintNumber = sprint;
     } else if (arg === '--aggregate') {
       aggregate = true;
     }
@@ -120,7 +126,7 @@ export async function standupCommand(args: string[]): Promise<void> {
   try {
     if (aggregate) {
       // Aggregate mode: load all standup events for current sprint
-      const sprint = sprintNumber ?? config.currentSprint ?? 1;
+      const sprint = sprintNumber ?? config.currentSprint ?? '1';
       const events = await store.getEventsBySprint(sprint);
 
       // Filter to standup events and parse them
@@ -203,7 +209,7 @@ export async function standupCommand(args: string[]): Promise<void> {
 
       // Load session events and claims
       const events = await store.getEventsBySession(sessionId);
-      const sprint = sprintNumber ?? config.currentSprint ?? 1;
+      const sprint = sprintNumber ?? config.currentSprint ?? '1';
       const claims = await store.getActiveClaims(sprint);
 
       // Find agent_role from session

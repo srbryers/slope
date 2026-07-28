@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { extractCommand } from '../../src/cli/commands/extract.js';
+import { SqliteSlopeStore } from '../../src/store/index.js';
 
 let tmpDir: string;
 let originalCwd: string;
@@ -85,6 +86,47 @@ describe('slope extract --file', () => {
 
     expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Sprint: 10'));
     consoleSpy.mockRestore();
+  });
+
+  it('preserves a canonical sprint id from --sprint', async () => {
+    const eventsFile = join(tmpDir, 'events.json');
+    writeFileSync(eventsFile, JSON.stringify([
+      { type: 'compaction', data: { tokens: 50000 } },
+    ]));
+
+    const consoleSpy = vi.spyOn(console, 'log');
+    await extractCommand(['--file=' + eventsFile, '--sprint=458.10']);
+
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Sprint: 458.10'));
+    consoleSpy.mockRestore();
+
+    const store = new SqliteSlopeStore(join(tmpDir, '.slope', 'slope.db'));
+    try {
+      const events = await store.getEventsBySprint('458.10');
+      expect(events).toHaveLength(1);
+      expect(events[0].sprint_number).toBe('458.10');
+    } finally {
+      store.close();
+    }
+  });
+
+  it('preserves a canonical sprint_number from a JSON event', async () => {
+    const eventsFile = join(tmpDir, 'events.json');
+    writeFileSync(eventsFile, JSON.stringify({
+      type: 'decision',
+      sprint_number: '458.10',
+    }));
+
+    await extractCommand(['--file=' + eventsFile]);
+
+    const store = new SqliteSlopeStore(join(tmpDir, '.slope', 'slope.db'));
+    try {
+      const events = await store.getEventsBySprint('458.10');
+      expect(events).toHaveLength(1);
+      expect(events[0].sprint_number).toBe('458.10');
+    } finally {
+      store.close();
+    }
   });
 
   it('rejects invalid event type', async () => {

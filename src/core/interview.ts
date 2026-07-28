@@ -9,6 +9,7 @@ import { createConfig } from './config.js';
 import type { SlopeConfig } from './config.js';
 import { validateInterviewAnswers, answersToInitInput } from './interview-engine.js';
 import { validateInterviewMetaphorId } from './interview-metaphor.js';
+import { sprintIdKey, type SprintId } from './sprint-id.js';
 
 /** Core input — what initFromInterview() actually needs */
 export interface InitInput {
@@ -20,7 +21,7 @@ export interface InitInput {
   techStack?: string[];
   vision?: string;
   priorities?: string[];
-  currentSprint?: number;
+  currentSprint?: SprintId;
 }
 
 /** Result of initFromInterview() */
@@ -63,8 +64,8 @@ export function validateInitInput(input: InitInput): string[] {
   }
 
   if (input.currentSprint !== undefined) {
-    if (!Number.isInteger(input.currentSprint) || input.currentSprint < 1) {
-      errors.push('currentSprint must be a positive integer');
+    if (sprintIdKey(input.currentSprint) === null) {
+      errors.push('currentSprint must be a positive sprint id (for example 12 or 458.10)');
     }
   }
 
@@ -170,6 +171,9 @@ export async function initFromInterview(cwd: string, input: InitInput): Promise<
   if (errors.length > 0) {
     throw new Error(`Invalid init input:\n  - ${errors.join('\n  - ')}`);
   }
+  const currentSprint = input.currentSprint === undefined
+    ? null
+    : sprintIdKey(input.currentSprint);
 
   const filesCreated: string[] = [];
 
@@ -186,8 +190,8 @@ export async function initFromInterview(cwd: string, input: InitInput): Promise<
   if (input.metaphor) {
     configData.metaphor = input.metaphor;
   }
-  if (input.currentSprint) {
-    configData.currentSprint = input.currentSprint;
+  if (currentSprint !== null) {
+    configData.currentSprint = currentSprint;
   }
   if (input.teamMembers && Object.keys(input.teamMembers).length > 0) {
     configData.team = {
@@ -249,7 +253,7 @@ export async function initFromInterview(cwd: string, input: InitInput): Promise<
     writeFileSync(
       sprintStatePath,
       JSON.stringify({
-        sprint: input.currentSprint ?? 1,
+        sprint: currentSprint ?? '1',
         phase: 'planning',
         gates: {},
         started_at: now,

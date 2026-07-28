@@ -1,7 +1,7 @@
 import { existsSync, realpathSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import type { HookInput, GuardResult, SlopeConfig, WorkflowExecution } from '../../core/index.js';
-import { formatSprintLabel, loadWorkflow, parseSprintNumber, resolveRepoStatePath } from '../../core/index.js';
+import { loadWorkflow, resolveRepoStatePath, sprintIdKey } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { SqliteSlopeStore } from '../../store/index.js';
 import { inferSprintContext } from '../sprint-inference.js';
@@ -128,7 +128,7 @@ function sprintLabelForContext(cwd: string, config: SlopeConfig): string | null 
   }
 
   const branchSprint = inferSprintFromBranch(cwd);
-  if (branchSprint !== null) return formatSprintLabel(branchSprint);
+  if (branchSprint !== null) return `S${branchSprint}`;
   return inferred && inferred.source !== 'initial' ? inferred.label : null;
 }
 
@@ -144,8 +144,7 @@ function sprintIdsMatch(left: string | undefined, right: string): boolean {
 
 function normalizeSprintLabel(value: string | undefined): string | null {
   if (!value) return null;
-  const parsed = parseSprintNumber(value);
-  return parsed === null ? value.trim().toUpperCase() : formatSprintLabel(parsed).toUpperCase();
+  return sprintIdKey(value);
 }
 
 function noMatchingExecutionContext(active: WorkflowExecution[]): string {

@@ -2,6 +2,7 @@ import { loadConfig } from '../config.js';
 import { loadScorecards } from '../loader.js';
 import { formatActorName, formatActorSource, resolveActor } from '../actor.js';
 import { resolveStore } from '../store.js';
+import { sprintIdKey, type SprintId } from '../../core/index.js';
 
 function parseArgs(args: string[]): Record<string, string> {
   const result: Record<string, string> = {};
@@ -12,15 +13,14 @@ function parseArgs(args: string[]): Record<string, string> {
   return result;
 }
 
-function resolveSprintRange(flags: Record<string, string>, cwd: string): number[] {
+function resolveSprintRange(flags: Record<string, string>, cwd: string): SprintId[] | null {
   const config = loadConfig(cwd);
-  if (flags.sprint) return [parseInt(flags.sprint, 10)];
+  if (flags.sprint) {
+    const sprint = sprintIdKey(flags.sprint);
+    return sprint ? [sprint] : [];
+  }
   if (config.currentSprint) return [config.currentSprint];
-  const scorecards = loadScorecards(config, cwd);
-  if (scorecards.length === 0) return [1];
-  const maxSprint = Math.max(...scorecards.map(s => s.sprint_number));
-  // Check the current and next sprint (most likely locations)
-  return Array.from({ length: maxSprint + 1 }, (_, i) => i + 1);
+  return null;
 }
 
 export async function releaseCommand(args: string[]): Promise<void> {
@@ -46,9 +46,10 @@ export async function releaseCommand(args: string[]): Promise<void> {
     const player = actor.name;
     const playerDisplay = formatActorName(actor);
     const sprints = resolveSprintRange(flags, cwd);
+    const allClaims = sprints === null ? await store.getActiveClaims() : null;
 
-    for (const sprint of sprints) {
-      const claims = await store.list(sprint);
+    for (const sprint of sprints ?? [null]) {
+      const claims = sprint === null ? allClaims ?? [] : await store.list(sprint);
       const match = claims.find(c => c.target === flags.target && c.player === player);
       if (match) {
         const released = await store.release(match.id);

@@ -142,8 +142,20 @@ describe('handleCheckRunWebhook', () => {
       { sprintNumber: 5, sessionId: 'sess-1' },
     );
 
-    expect(result.event!.sprint_number).toBe(5);
+    expect(result.event!.sprint_number).toBe('5');
     expect(result.event!.session_id).toBe('sess-1');
+  });
+
+  it('preserves a trailing-zero sprint id', () => {
+    const result = handleCheckRunWebhook(
+      {
+        action: 'completed',
+        check_run: { name: 'tests', status: 'completed', conclusion: 'success' },
+      },
+      { sprintNumber: '458.10' },
+    );
+
+    expect(result.event!.sprint_number).toBe('458.10');
   });
 
   it('handles missing check_run', () => {
@@ -208,6 +220,23 @@ describe('handleWorkflowRunWebhook', () => {
     });
 
     expect(result.ciSignal).toBeNull();
+  });
+
+  it('keeps decimal sprint aliases distinct', () => {
+    const payload = {
+      action: 'completed',
+      workflow_run: {
+        name: 'CI',
+        status: 'completed',
+        conclusion: 'success',
+      },
+    };
+
+    const first = handleWorkflowRunWebhook(payload, { sprintNumber: '458.1' });
+    const tenth = handleWorkflowRunWebhook(payload, { sprintNumber: '458.10' });
+
+    expect(first.event!.sprint_number).toBe('458.1');
+    expect(tenth.event!.sprint_number).toBe('458.10');
   });
 
   it('handles missing workflow_run', () => {

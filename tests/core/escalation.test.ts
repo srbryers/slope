@@ -282,7 +282,7 @@ describe('buildEscalationEvent', () => {
 
     expect(event.type).toBe('hazard');
     expect(event.session_id).toBe('sess-1');
-    expect(event.sprint_number).toBe(15);
+    expect(event.sprint_number).toBe('15');
     expect(event.data.escalation_trigger).toBe('blocker_timeout');
     expect(event.data.escalation_severity).toBe('warning');
     expect(event.data.description).toBe('Agent blocked for 20m');
@@ -302,5 +302,20 @@ describe('buildEscalationEvent', () => {
 
     expect(event.data.agent_role).toBeUndefined();
     expect(event.sprint_number).toBeUndefined();
+  });
+
+  it('preserves distinct canonical decimal sprint ids', () => {
+    const escalation = {
+      trigger: 'manual' as const,
+      severity: 'warning' as const,
+      description: 'Canonical identity check',
+      actions: ['log_event' as const],
+    };
+
+    const first = buildEscalationEvent(escalation, 'first', '458.1');
+    const tenth = buildEscalationEvent(escalation, 'tenth', '458.10');
+
+    expect(first.sprint_number).toBe('458.1');
+    expect(tenth.sprint_number).toBe('458.10');
   });
 });

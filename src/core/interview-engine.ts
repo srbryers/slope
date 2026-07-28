@@ -7,11 +7,13 @@ import { execSync } from 'node:child_process';
 import { QUIET_STDIO } from './process.js';
 import type { InitInput } from './interview.js';
 import { shouldPersistInterviewMetaphor, validateInterviewMetaphorId } from './interview-metaphor.js';
+import { compareSprintIdKeys, sprintIdKey } from './sprint-id.js';
+import type { SprintId } from './sprint-id.js';
 
 export interface DetectedInfo {
   projectName?: string;
   repoUrl?: string;
-  existingSprintNumber?: number;
+  existingSprintId?: SprintId;
   detectedPlatforms: string[];
   techStack?: string[];
 }
@@ -73,21 +75,23 @@ export function runLightweightDetection(cwd: string): DetectedInfo {
     // No git repo or no remote — skip
   }
 
-  // 3. Find highest sprint number from docs/retros/sprint-*.json
+  // 3. Find highest canonical sprint id from docs/retros/sprint-*.json
   try {
     const retrosDir = join(cwd, 'docs', 'retros');
     if (existsSync(retrosDir)) {
       const files = readdirSync(retrosDir);
-      let highest = 0;
+      let highest: SprintId | undefined;
       for (const f of files) {
-        const match = f.match(/^sprint-(\d+)\.json$/);
+        const match = f.match(/^sprint-(\d+(?:\.\d+)?)\.json$/);
         if (match) {
-          const n = parseInt(match[1], 10);
-          if (n > highest) highest = n;
+          const sprint = sprintIdKey(match[1]);
+          if (sprint !== null && (highest === undefined || compareSprintIdKeys(sprint, highest) > 0)) {
+            highest = sprint;
+          }
         }
       }
-      if (highest > 0) {
-        detected.existingSprintNumber = highest;
+      if (highest !== undefined) {
+        detected.existingSprintId = highest;
       }
     }
   } catch {
@@ -171,11 +175,17 @@ export function validateInterviewAnswers(
   }
 
   // sprint-number validation (if provided)
-  const sprintStr = String(answers['sprint-number'] ?? '').trim();
+  const sprintValue = answers['sprint-number'];
+  const sprintStr = String(sprintValue ?? '').trim();
   if (sprintStr) {
-    const n = parseInt(sprintStr, 10);
-    if (isNaN(n) || n < 1 || !Number.isInteger(n)) {
-      errors.push({ field: 'sprint-number', message: 'Must be a positive integer' });
+    const sprint = typeof sprintValue === 'string' || typeof sprintValue === 'number'
+      ? sprintIdKey(sprintValue)
+      : null;
+    if (sprint === null) {
+      errors.push({
+        field: 'sprint-number',
+        message: 'Must be a positive sprint id (for example 12 or 458.10)',
+      });
     }
   }
 
@@ -196,10 +206,11 @@ export function answersToInitInput(answers: Record<string, unknown>): InitInput 
   const metaphor = String(answers['metaphor'] ?? '').trim();
   if (shouldPersistInterviewMetaphor(metaphor)) input.metaphor = metaphor;
 
-  const sprintStr = String(answers['sprint-number'] ?? '').trim();
-  if (sprintStr) {
-    const n = parseInt(sprintStr, 10);
-    if (!isNaN(n) && n >= 1) input.currentSprint = n;
+  const sprintValue = answers['sprint-number'];
+  const sprintStr = String(sprintValue ?? '').trim();
+  if (sprintStr && (typeof sprintValue === 'string' || typeof sprintValue === 'number')) {
+    const sprint = sprintIdKey(sprintValue);
+    if (sprint !== null) input.currentSprint = sprint;
   }
 
   const vision = String(answers['vision'] ?? '').trim();

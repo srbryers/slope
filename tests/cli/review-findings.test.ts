@@ -29,7 +29,7 @@ async function runCommand(args: string[]) {
   return reviewStateCommand(args);
 }
 
-function writeRoadmap(sprints: Array<{ id: number; slope: number; tickets: string[] }>): void {
+function writeRoadmap(sprints: Array<{ id: number; id_key?: string; slope: number; tickets: string[] }>): void {
   const dir = join(tmpDir, 'docs', 'backlog');
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, 'roadmap.json'), JSON.stringify({
@@ -37,13 +37,14 @@ function writeRoadmap(sprints: Array<{ id: number; slope: number; tickets: strin
     phases: [],
     sprints: sprints.map(sprint => ({
       id: sprint.id,
-      theme: `Sprint ${sprint.id}`,
+      id_key: sprint.id_key,
+      theme: `Sprint ${sprint.id_key ?? sprint.id}`,
       par: 4,
       slope: sprint.slope,
       type: 'bug fix',
       status: 'planned',
       tickets: sprint.tickets.map((title, index) => ({
-        key: `S${sprint.id}-${index + 1}`,
+        key: `S${sprint.id_key ?? sprint.id}-${index + 1}`,
         title,
         club: 'wedge',
         complexity: 'small',
@@ -92,6 +93,34 @@ describe('loadFindings', () => {
     writeFileSync(join(tmpDir, '.slope/review-findings.json'), JSON.stringify(legacy));
     const loaded = loadFindings(tmpDir);
     expect(loaded).toEqual({ sprints: { 33: legacy.findings } });
+  });
+
+  it('keeps trailing-zero sprint identities distinct', () => {
+    mkdirSync(join(tmpDir, '.slope'), { recursive: true });
+    const sprintOne = [{
+      review_type: 'code',
+      ticket_key: 'S458.1-1',
+      severity: 'minor',
+      description: 'Sprint .1 finding',
+      resolved: false,
+    }];
+    const sprintTen = [{
+      review_type: 'architect',
+      ticket_key: 'S458.10-1',
+      severity: 'major',
+      description: 'Sprint .10 finding',
+      resolved: false,
+    }];
+    writeFileSync(join(tmpDir, '.slope/review-findings.json'), JSON.stringify({
+      sprints: {
+        '458.1': sprintOne,
+        '458.10': sprintTen,
+      },
+    }));
+
+    const loaded = loadFindings(tmpDir)!;
+    expect(loaded.sprints['458.1']).toEqual(sprintOne);
+    expect(loaded.sprints['458.10']).toEqual(sprintTen);
   });
 
   it('returns null for malformed JSON', () => {
@@ -213,6 +242,23 @@ describe('review recommend', () => {
 
     expect(logged).toContain('Recommended reviews for Sprint 88 (2 tickets, slope 2)');
     expect(logged).not.toContain('Sprint 29');
+  });
+
+  it('records review requirements for a canonical trailing-zero sprint', async () => {
+    writeRoadmap([
+      { id: 458.1, id_key: '458.10', slope: 3, tickets: ['Canonical review target'] },
+    ]);
+    saveSprintState(tmpDir, createSprintState('458.10', 'implementing'));
+
+    const spy = vi.spyOn(console, 'log');
+    await runCommand(['recommend', '--sprint=458.10']);
+    const logged = spy.mock.calls.map(c => c[0]).join('\n');
+    spy.mockRestore();
+
+    expect(logged).toContain('Recommended reviews for Sprint 458.10');
+    expect(logged).toContain('Review requirements recorded in Sprint 458.10 state');
+    expect(loadSprintState(tmpDir)?.sprint).toBe('458.10');
+    expect(loadSprintState(tmpDir)?.review_requirements?.code_review).toBeDefined();
   });
 
   it('outputs no recommendations when no plan', async () => {
@@ -389,6 +435,34 @@ describe('review findings add', () => {
     expect(data!.sprints[34][0].ticket_key).toBe('S34-1');
   });
 
+  it('adds trailing-zero sprint findings without aliasing the numeric sibling', async () => {
+    mkdirSync(join(tmpDir, '.slope'), { recursive: true });
+    writeFileSync(join(tmpDir, '.slope/review-findings.json'), JSON.stringify({
+      sprints: {
+        '458.1': [{
+          review_type: 'code',
+          ticket_key: 'S458.1-1',
+          severity: 'minor',
+          description: 'Existing .1 finding',
+          resolved: false,
+        }],
+      },
+    }));
+
+    await runCommand([
+      'findings', 'add',
+      '--type=architect',
+      '--ticket=S458.10-1',
+      '--description=New .10 finding',
+      '--sprint=458.10',
+    ]);
+
+    const data = loadFindings(tmpDir)!;
+    expect(data.sprints['458.1']).toHaveLength(1);
+    expect(data.sprints['458.10']).toHaveLength(1);
+    expect(data.sprints['458.10'][0].ticket_key).toBe('S458.10-1');
+  });
+
   it('errors with missing required args', async () => {
     await expect(runCommand(['findings', 'add', '--type=architect']))
       .rejects.toThrow('process.exit(1)');
@@ -469,6 +543,37 @@ describe('review findings list', () => {
     spy.mockRestore();
 
     expect(logged).toContain('No findings for Sprint 99');
+  });
+
+  it('filters trailing-zero sprint findings by exact canonical identity', async () => {
+    mkdirSync(join(tmpDir, '.slope'), { recursive: true });
+    writeFileSync(join(tmpDir, '.slope/review-findings.json'), JSON.stringify({
+      sprints: {
+        '458.1': [{
+          review_type: 'code',
+          ticket_key: 'S458.1-1',
+          severity: 'minor',
+          description: 'Only sprint .1',
+          resolved: false,
+        }],
+        '458.10': [{
+          review_type: 'architect',
+          ticket_key: 'S458.10-1',
+          severity: 'major',
+          description: 'Only sprint .10',
+          resolved: false,
+        }],
+      },
+    }));
+
+    const spy = vi.spyOn(console, 'log');
+    await runCommand(['findings', 'list', '--sprint=458.10']);
+    const logged = spy.mock.calls.map(c => c[0]).join('\n');
+    spy.mockRestore();
+
+    expect(logged).toContain('Sprint 458.10 findings');
+    expect(logged).toContain('Only sprint .10');
+    expect(logged).not.toContain('S458.1-1');
   });
 
   it('shows codification metadata for recurring workaround findings', async () => {
@@ -633,6 +738,33 @@ describe('review findings resolve', () => {
 
     await expect(runCommand(['findings', 'resolve', '12345678']))
       .rejects.toThrow('process.exit(1)');
+  });
+
+  it('resolves a fallback finding id against the exact canonical sprint', async () => {
+    mkdirSync(join(tmpDir, '.slope'), { recursive: true });
+    const candidate = (description: string) => ({
+      review_type: 'workaround' as const,
+      ticket_key: 'workaround',
+      severity: 'major' as const,
+      description,
+      resolved: false,
+      recurs: true,
+      cost: 's' as const,
+      codification_status: 'open' as const,
+    });
+    writeFileSync(join(tmpDir, '.slope/review-findings.json'), JSON.stringify({
+      sprints: {
+        '458.1': [candidate('Sprint .1 candidate')],
+        '458.10': [candidate('Sprint .10 candidate')],
+      },
+    }));
+
+    await runCommand(['findings', 'resolve', 'S458.10:1']);
+
+    const data = loadFindings(tmpDir)!;
+    expect(data.sprints['458.1'][0].resolved).toBe(false);
+    expect(data.sprints['458.10'][0].resolved).toBe(true);
+    expect(data.sprints['458.10'][0].codification_status).toBe('paid_down');
   });
 });
 

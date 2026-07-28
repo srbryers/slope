@@ -4,6 +4,8 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { parseTestOutput } from './ci-signals.js';
 import type { SlopeEvent, CISignal } from './types.js';
+import { sprintIdKey } from './sprint-id.js';
+import type { SprintId } from './sprint-id.js';
 
 export interface WebhookResult {
   /** Ready for store.insertEvent() — null if event not relevant */
@@ -45,8 +47,11 @@ export function validateGitHubWebhookSignature(
  */
 export function handleCheckRunWebhook(
   payload: unknown,
-  opts?: { sprintNumber?: number; sessionId?: string },
+  opts?: { sprintNumber?: SprintId; sessionId?: string },
 ): WebhookResult {
+  const sprintKey = opts?.sprintNumber === undefined
+    ? undefined
+    : sprintIdKey(opts.sprintNumber) ?? undefined;
   const data = payload as Record<string, unknown>;
   const action = (data.action as string) ?? 'unknown';
   const checkRun = data.check_run as Record<string, unknown> | undefined;
@@ -91,7 +96,7 @@ export function handleCheckRunWebhook(
     type: conclusion === 'failure' ? 'failure' : 'decision',
     data: eventData,
     session_id: opts?.sessionId,
-    sprint_number: opts?.sprintNumber,
+    sprint_number: sprintKey,
   };
 
   return {
@@ -107,8 +112,11 @@ export function handleCheckRunWebhook(
  */
 export function handleWorkflowRunWebhook(
   payload: unknown,
-  opts?: { sprintNumber?: number; sessionId?: string },
+  opts?: { sprintNumber?: SprintId; sessionId?: string },
 ): WebhookResult {
+  const sprintKey = opts?.sprintNumber === undefined
+    ? undefined
+    : sprintIdKey(opts.sprintNumber) ?? undefined;
   const data = payload as Record<string, unknown>;
   const action = (data.action as string) ?? 'unknown';
   const workflowRun = data.workflow_run as Record<string, unknown> | undefined;
@@ -142,7 +150,7 @@ export function handleWorkflowRunWebhook(
     type: conclusion === 'failure' ? 'failure' : 'decision',
     data: eventData,
     session_id: opts?.sessionId,
-    sprint_number: opts?.sprintNumber,
+    sprint_number: sprintKey,
   };
 
   return {

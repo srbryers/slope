@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync, renameSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import type { HookInput, GuardResult, SlopeConfig, SprintClaim, Suggestion } from '../../core/index.js';
-import { loadConfig, loadScorecards, detectLatestSprint, parseRoadmap, formatStrategicContext } from '../../core/index.js';
+import type { HookInput, GuardResult, SlopeConfig, SprintClaim, SprintId, Suggestion } from '../../core/index.js';
+import { loadConfig, loadScorecards, detectLatestSprint, nextCanonicalSprintId, parseRoadmap, formatStrategicContext, latestSprintIdKey } from '../../core/index.js';
 import { resolveStore } from '../store.js';
 import { loadFindings } from '../commands/review-state.js';
 import { loadSprintState } from '../sprint-state.js';
@@ -9,10 +9,10 @@ import { getActiveWorktrees } from './git-utils.js';
 
 /** Sprint state types for next-action detection */
 type SprintState =
-  | { type: 'mid-sprint'; sprintNumber: number; claimCount: number; targets: string[] }
-  | { type: 'sprint-complete'; sprintNumber: number }
-  | { type: 'needs-review'; sprintNumber: number }
-  | { type: 'needs-amend'; sprintNumber: number; findingCount: number }
+  | { type: 'mid-sprint'; sprintNumber: SprintId; claimCount: number; targets: string[] }
+  | { type: 'sprint-complete'; sprintNumber: SprintId }
+  | { type: 'needs-review'; sprintNumber: SprintId }
+  | { type: 'needs-amend'; sprintNumber: SprintId; findingCount: number }
   | { type: 'testing-active' }
   | { type: 'between-sprints'; roadmapContext?: string }
   | { type: 'worktrees-active'; worktreeCount: number; branches: string[] };
@@ -91,7 +91,7 @@ export async function detectSprintState(cwd: string, sessionId?: string): Promis
         ? allClaims.filter(c => c.session_id === sessionId)
         : allClaims;
       if (claims.length > 0) {
-        const sprintNumber = Math.max(...claims.map(c => Number(c.sprint_number)));
+        const sprintNumber = latestSprintIdKey(claims.map(c => c.sprint_number));
         return {
           type: 'mid-sprint',
           sprintNumber,
@@ -110,7 +110,9 @@ export async function detectSprintState(cwd: string, sessionId?: string): Promis
       if (existsSync(claimsPath)) {
         const raw = JSON.parse(readFileSync(claimsPath, 'utf8'));
         if (Array.isArray(raw) && raw.length > 0) {
-          const sprintNumber = Math.max(...raw.map((c: { sprint_number?: number }) => c.sprint_number ?? 0));
+          const sprintNumber = latestSprintIdKey(
+            raw.map((c: { sprint_number?: SprintId }) => c.sprint_number ?? '0'),
+          );
           return {
             type: 'mid-sprint',
             sprintNumber,
@@ -133,12 +135,12 @@ export async function detectSprintState(cwd: string, sessionId?: string): Promis
   const latestScoredSprint = detectLatestSprint(config, cwd);
 
   // If no claims and no scorecards, we're between sprints
-  if (latestScoredSprint === 0 && (claimsFromStore === null || claimsFromStore.length === 0)) {
-    return buildBetweenSprints(config, cwd, 0);
+  if (latestScoredSprint === '0' && (claimsFromStore === null || claimsFromStore.length === 0)) {
+    return buildBetweenSprints(config, cwd, '0');
   }
 
   // Check if the latest sprint has a review
-  if (latestScoredSprint > 0) {
+  if (latestScoredSprint !== '0') {
     const retrosDir = join(cwd, config.scorecardDir);
     const reviewPath = join(retrosDir, `sprint-${latestScoredSprint}-review.md`);
     if (!existsSync(reviewPath)) {
@@ -147,7 +149,7 @@ export async function detectSprintState(cwd: string, sessionId?: string): Promis
 
     // Check if findings exist but scorecard hasn't been amended
     const findingsData = loadFindings(cwd);
-    const sprintFindings = findingsData?.sprints[latestScoredSprint] ?? [];
+    const sprintFindings = (findingsData?.sprints as Record<string, unknown[]> | undefined)?.[latestScoredSprint] ?? [];
     if (sprintFindings.length > 0) {
       try {
         // Check if scorecard already has review hazards
@@ -174,7 +176,7 @@ export async function detectSprintState(cwd: string, sessionId?: string): Promis
 }
 
 /** Build between-sprints state with optional roadmap context */
-function buildBetweenSprints(config: SlopeConfig, cwd: string, latestSprint: number): SprintState {
+function buildBetweenSprints(config: SlopeConfig, cwd: string, latestSprint: SprintId): SprintState {
   let roadmapContext: string | undefined;
   try {
     if (config.roadmapPath) {
@@ -183,7 +185,7 @@ function buildBetweenSprints(config: SlopeConfig, cwd: string, latestSprint: num
         const raw = JSON.parse(readFileSync(roadmapFile, 'utf8'));
         const { roadmap } = parseRoadmap(raw);
         if (roadmap) {
-          const nextSprint = latestSprint + 1;
+          const nextSprint = latestSprint === '0' ? '1' : nextCanonicalSprintId(latestSprint);
           const ctx = formatStrategicContext(roadmap, nextSprint);
           if (ctx) roadmapContext = ctx;
         }

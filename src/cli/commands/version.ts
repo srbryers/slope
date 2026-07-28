@@ -3,7 +3,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 import { QUIET_STDIO } from '../../core/process.js';
-import type { ChangelogChange, RoadmapDefinition, RoadmapSprint } from '../../core/index.js';
+import { compareSprintIdKeys, roadmapSprintKey, sprintIdKey } from '../../core/index.js';
+import type { ChangelogChange, RoadmapDefinition, RoadmapSprint, SprintId } from '../../core/index.js';
 
 /**
  * slope version bump [<version>] [--dry-run]
@@ -249,7 +250,7 @@ type EvidenceSource = 'roadmap' | 'scorecard';
 
 export interface VersionReleaseEvidence {
   source: EvidenceSource;
-  sprint: number;
+  sprint: string;
   theme: string;
   tier: VersionTier;
   reason: string;
@@ -267,8 +268,8 @@ function maxTier(a: VersionTier, b: VersionTier): VersionTier {
   return TIER_RANK[b] > TIER_RANK[a] ? b : a;
 }
 
-function sprintFileId(sprint: number): string {
-  return Number.isInteger(sprint) ? String(sprint) : String(sprint);
+function sprintFileId(sprint: SprintId): string {
+  return sprintIdKey(sprint) ?? String(sprint);
 }
 
 function readJsonFile<T>(path: string): T | null {
@@ -280,22 +281,23 @@ function readJsonFile<T>(path: string): T | null {
   }
 }
 
-function loadRoadmapSprints(cwd: string): Map<number, RoadmapSprint & { status?: string; note?: string }> {
+function loadRoadmapSprints(cwd: string): Map<string, RoadmapSprint & { status?: string; note?: string }> {
   const roadmap = readJsonFile<RoadmapDefinition>(join(cwd, 'docs', 'backlog', 'roadmap.json'));
-  const sprints = new Map<number, RoadmapSprint & { status?: string; note?: string }>();
+  const sprints = new Map<string, RoadmapSprint & { status?: string; note?: string }>();
+  if (!roadmap) return sprints;
   for (const sprint of roadmap?.sprints ?? []) {
-    sprints.set(sprint.id, sprint as RoadmapSprint & { status?: string; note?: string });
+    sprints.set(roadmapSprintKey(roadmap, sprint), sprint as RoadmapSprint & { status?: string; note?: string });
   }
   return sprints;
 }
 
-function extractSprintIdsFromText(text: string | undefined): Set<number> {
-  const ids = new Set<number>();
+function extractSprintIdsFromText(text: string | undefined): Set<string> {
+  const ids = new Set<string>();
   if (!text) return ids;
 
   for (const match of text.matchAll(SPRINT_REF_RE)) {
-    const id = Number(match[1]);
-    if (Number.isFinite(id)) ids.add(id);
+    const sprintKey = sprintIdKey(match[1]);
+    if (sprintKey !== null) ids.add(sprintKey);
   }
 
   return ids;
@@ -354,8 +356,8 @@ function roadmapEvidenceText(sprint: (RoadmapSprint & { note?: string }) | undef
 
 function releaseEvidenceForSprint(
   cwd: string,
-  sprintId: number,
-  roadmapSprints: Map<number, RoadmapSprint & { status?: string; note?: string }>,
+  sprintId: string,
+  roadmapSprints: Map<string, RoadmapSprint & { status?: string; note?: string }>,
 ): VersionReleaseEvidence | null {
   const roadmapSprint = roadmapSprints.get(sprintId);
   const scorecard = readJsonFile<Record<string, unknown>>(join(cwd, 'docs', 'retros', `sprint-${sprintFileId(sprintId)}.json`));
@@ -387,7 +389,7 @@ export function collectSlopeReleaseEvidence(
   changes: Pick<ChangelogChange, 'hash' | 'description' | 'scope'>[],
 ): VersionReleaseEvidence[] {
   const roadmapSprints = loadRoadmapSprints(cwd);
-  const sprintIds = new Set<number>();
+  const sprintIds = new Set<string>();
 
   for (const change of changes) {
     for (const id of extractSprintIdsFromText(change.description)) sprintIds.add(id);
@@ -399,13 +401,13 @@ export function collectSlopeReleaseEvidence(
     for (const file of commitChangedFiles(cwd, change.hash)) {
       const scorecardMatch = file.match(SCORECARD_PATH_RE);
       if (!scorecardMatch) continue;
-      const id = Number(scorecardMatch[1]);
-      if (Number.isFinite(id)) sprintIds.add(id);
+      const sprintKey = sprintIdKey(scorecardMatch[1]);
+      if (sprintKey !== null) sprintIds.add(sprintKey);
     }
   }
 
-  const evidence = new Map<number, VersionReleaseEvidence>();
-  for (const sprintId of [...sprintIds].sort((a, b) => a - b)) {
+  const evidence = new Map<string, VersionReleaseEvidence>();
+  for (const sprintId of [...sprintIds].sort(compareSprintIdKeys)) {
     const item = releaseEvidenceForSprint(cwd, sprintId, roadmapSprints);
     if (item) evidence.set(sprintId, item);
   }

@@ -8,7 +8,7 @@ function makeTmpDir(): string {
   return mkdtempSync(join(tmpdir(), 'slope-stats-'));
 }
 
-function writeScorecard(dir: string, sprint: number, score: number, par: number): void {
+function writeScorecard(dir: string, sprint: string | number, score: number, par: number): void {
   const retrosDir = join(dir, 'docs', 'retros');
   mkdirSync(retrosDir, { recursive: true });
   writeFileSync(join(retrosDir, `sprint-${sprint}.json`), JSON.stringify({
@@ -68,7 +68,7 @@ describe('computeSlopeStats', () => {
   it('returns zero stats when no scorecards exist', () => {
     writeConfig(tmpDir);
     const stats = computeSlopeStats(tmpDir);
-    expect(stats.sprints_completed).toBe(0);
+    expect(stats.sprints_completed).toBe('0');
     expect(stats.recent_scorecards).toHaveLength(0);
     expect(stats.latest_scorecard).toBeNull();
     expect(stats.handicap.all_time.handicap).toBe(0);
@@ -81,10 +81,10 @@ describe('computeSlopeStats', () => {
     writeScorecard(tmpDir, 3, 5, 4);
 
     const stats = computeSlopeStats(tmpDir);
-    expect(stats.sprints_completed).toBe(3);
+    expect(stats.sprints_completed).toBe('3');
     expect(stats.recent_scorecards).toHaveLength(3);
     expect(stats.latest_scorecard).not.toBeNull();
-    expect(stats.latest_scorecard!.sprint).toBe(3);
+    expect(stats.latest_scorecard!.sprint).toBe('3');
   });
 
   it('produces the correct SlopeStats shape', () => {
@@ -94,7 +94,7 @@ describe('computeSlopeStats', () => {
     const stats = computeSlopeStats(tmpDir);
 
     // Top-level fields
-    expect(typeof stats.sprints_completed).toBe('number');
+    expect(typeof stats.sprints_completed).toBe('string');
     expect(typeof stats.total_tests).toBe('number');
     expect(typeof stats.cli_commands).toBe('number');
     expect(typeof stats.guards).toBe('number');
@@ -122,7 +122,7 @@ describe('computeSlopeStats', () => {
     expect(Array.isArray(stats.recent_scorecards)).toBe(true);
     if (stats.recent_scorecards.length > 0) {
       const sc = stats.recent_scorecards[0];
-      expect(typeof sc.sprint).toBe('number');
+      expect(typeof sc.sprint).toBe('string');
       expect(typeof sc.par).toBe('number');
       expect(typeof sc.score).toBe('number');
       expect(typeof sc.score_label).toBe('string');
@@ -149,7 +149,7 @@ describe('computeSlopeStats', () => {
     const stats = computeSlopeStats(tmpDir);
     expect(stats.recent_scorecards).toHaveLength(5);
     // Most recent first
-    expect(stats.recent_scorecards[0].sprint).toBe(8);
+    expect(stats.recent_scorecards[0].sprint).toBe('8');
   });
 
   it('computes handicap milestones at every 5th sprint', () => {
@@ -159,9 +159,21 @@ describe('computeSlopeStats', () => {
     }
     const stats = computeSlopeStats(tmpDir);
     const milestoneNumbers = stats.handicap_milestones.map(m => m.sprint);
-    expect(milestoneNumbers).toContain(5);
-    expect(milestoneNumbers).toContain(10);
-    expect(milestoneNumbers).toContain(12); // latest
+    expect(milestoneNumbers).toContain('5');
+    expect(milestoneNumbers).toContain('10');
+    expect(milestoneNumbers).toContain('12'); // latest
+  });
+
+  it('preserves distinct inserted sprint identities in public stats', () => {
+    writeConfig(tmpDir);
+    writeScorecard(tmpDir, '458.1', 4, 4);
+    writeScorecard(tmpDir, '458.10', 3, 4);
+
+    const stats = computeSlopeStats(tmpDir);
+
+    expect(stats.sprints_completed).toBe('458.10');
+    expect(stats.recent_scorecards.map(card => card.sprint)).toEqual(['458.10', '458.1']);
+    expect(stats.latest_scorecard?.sprint).toBe('458.10');
   });
 
   it('counts cli_commands from registry', () => {

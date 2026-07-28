@@ -2,7 +2,7 @@ import { execSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { QUIET_STDIO } from '../../core/process.js';
-import type { HookInput, GuardResult } from '../../core/index.js';
+import type { HookInput, GuardResult, SprintId } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { resolveStore } from '../store.js';
 
@@ -16,7 +16,7 @@ interface HandoffData {
     recent_commits: string[];
   };
   sprint?: {
-    number?: number;
+    number?: SprintId;
   };
   claims?: Array<{ target: string; scope: string; player: string }>;
   review?: {

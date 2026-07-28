@@ -195,6 +195,23 @@ describe('workflowStepGateGuard', () => {
     expect(result.blockReason).toBeUndefined();
   });
 
+  it('keeps trailing-zero sprint executions distinct', async () => {
+    writeConfig();
+    saveSprintState(TMP, createSprintState('458.10', 'implementing'));
+    writeWorkflow('current-wf', 'agent_work');
+    writeWorkflow('other-insert-wf', 'command');
+    const store = new SqliteSlopeStore(join(TMP, '.slope/slope.db'));
+    await createRunningExecution(store, 'current-wf', 'phase1', 'step1', { sprintId: 'S458.10' });
+    await waitForTimestampTick();
+    await createRunningExecution(store, 'other-insert-wf', 'phase1', 'step1', { sprintId: 'S458.1' });
+    store.close();
+
+    const result = await workflowStepGateGuard(makeInput(), TMP);
+
+    expect(result.decision).toBeUndefined();
+    expect(result.blockReason).toBeUndefined();
+  });
+
   it('uses matching session execution instead of unrelated active[0] (#531)', async () => {
     writeConfig();
     writeWorkflow('session-wf', 'agent_work');

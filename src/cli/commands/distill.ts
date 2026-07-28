@@ -1,5 +1,5 @@
 import { resolveStore } from '../store.js';
-import { runPipeline } from '../../core/index.js';
+import { runPipeline, sprintIdKey } from '../../core/index.js';
 
 function parseArgs(args: string[]): Record<string, string> {
   const result: Record<string, string> = {};
@@ -21,7 +21,10 @@ export async function distillCommand(args: string[]): Promise<void> {
   const auto = opts['auto'] === 'true' || args.includes('--auto');
   const dryRun = opts['dry-run'] === 'true' || args.includes('--dry-run');
   const threshold = opts['threshold'] ? parseInt(opts['threshold'], 10) : undefined;
-  const sprintNumber = opts['sprint'] ? parseInt(opts['sprint'], 10) : undefined;
+  const sprintNumber = opts['sprint'] ? sprintIdKey(opts['sprint']) : undefined;
+  if (opts['sprint'] && !sprintNumber) {
+    throw new Error(`Invalid sprint id: ${opts['sprint']}`);
+  }
 
   const store = await resolveStore();
 
@@ -31,22 +34,7 @@ export async function distillCommand(args: string[]): Promise<void> {
     if (sprintNumber) {
       events = await store.getEventsBySprint(sprintNumber);
     } else {
-      // Get all events across all sprints
-      const allEvents: typeof events = [];
-      const stats = await store.getStats();
-      if (stats.events > 0) {
-        // Use a more efficient approach - get events without sprint filtering
-        // This avoids the arbitrary 1-100 loop
-        for (let s = 1; s <= 200; s++) {
-          const sprintEvents = await store.getEventsBySprint(s);
-          if (sprintEvents.length === 0) {
-            // No more events in higher sprint numbers
-            break;
-          }
-          allEvents.push(...sprintEvents);
-        }
-      }
-      events = allEvents;
+      events = await store.getAllEvents();
     }
 
     if (events.length === 0) {
@@ -97,12 +85,12 @@ function printUsage(): void {
 slope distill — Analyze events and promote recurring patterns to common issues
 
 Usage:
-  slope distill [--auto] [--dry-run] [--sprint=<N>] [--threshold=<N>]
+  slope distill [--auto] [--dry-run] [--sprint=<ID>] [--threshold=<N>]
 
 Options:
   --auto           Automatically promote candidates to common issues
   --dry-run        Show candidates without writing changes
-  --sprint=<N>     Analyze events from a specific sprint only
+  --sprint=<ID>    Analyze events from a specific sprint only
   --threshold=<N>  Minimum sprint appearances to promote (default: 2)
 `);
 }

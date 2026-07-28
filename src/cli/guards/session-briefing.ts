@@ -7,6 +7,7 @@ import {
   castRoadmapStructure,
   formatStrategicContext,
   resolveRepoStatePath,
+  sprintIdsEqual,
 } from '../../core/index.js';
 import { inferSprintContext } from '../sprint-inference.js';
 import { resolveStore } from '../store.js';
@@ -110,11 +111,13 @@ export async function sessionBriefingGuard(input: HookInput, cwd: string): Promi
     const claimsPath = resolveRepoStatePath(cwd, config.claimsPath ?? '.slope/claims.json');
     if (existsSync(claimsPath)) {
       const raw = JSON.parse(readFileSync(claimsPath, 'utf8')) as {
-        claims?: Array<{ target?: string; sprint_number?: number }>;
-      } | Array<{ target?: string; sprint_number?: number }>;
+        claims?: Array<{ target?: string; sprint_number?: string | number }>;
+      } | Array<{ target?: string; sprint_number?: string | number }>;
       const claims = Array.isArray(raw) ? raw : raw.claims ?? [];
       for (const claim of claims) {
-        if (sprintState?.sprint !== undefined && claim.sprint_number !== sprintState.sprint) continue;
+        if (sprintState?.sprint !== undefined
+          && claim.sprint_number !== undefined
+          && !sprintIdsEqual(claim.sprint_number, sprintState.sprint)) continue;
         activeClaimTargets.add(claim.target ?? 'unknown');
       }
     }

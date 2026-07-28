@@ -160,7 +160,7 @@ export type {
 
 // Registry
 export { checkConflicts } from './registry.js';
-export type { SprintRegistry } from './registry.js';
+export type { SprintClaimInput, SprintRegistry } from './registry.js';
 
 // Store
 export { SlopeStoreError } from './store.js';
@@ -194,6 +194,9 @@ export {
   formatStrategicContext,
   formatSprintLabel,
   formatRoadmapSprintLabel,
+  findRoadmapSprint,
+  roadmapSprintKey,
+  roadmapSprintKeyFromId,
   formatSprintNumber,
   nextCanonicalSprintId,
   parseSprintNumber,
@@ -817,8 +820,10 @@ export {
   parseSprintId,
   compareSprintIdKeys,
   sprintIdsEqual,
+  latestSprintIdKey,
+  sprintIdToNumber,
 } from './sprint-id.js';
-export type { SprintId, SprintIdParts } from './sprint-id.js';
+export type { SprintId, SprintIdInput, SprintIdParts } from './sprint-id.js';
 export type { GeneratedConfig } from './generators/config.js';
 export type { GeneratedSprint } from './generators/first-sprint.js';
 

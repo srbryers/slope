@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { execSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
-import { renderSprintPlan } from '../../../src/cli/commands/sprint-plan.js';
+import { renderSprintPlan, sprintPlanCommand } from '../../../src/cli/commands/sprint-plan.js';
 import type { RoadmapDefinition, RoadmapSprint, RoadmapTicket } from '../../../src/core/index.js';
 
 const REPO_ROOT = resolve(__dirname, '..', '..', '..');
@@ -94,6 +94,23 @@ describe('renderSprintPlan (GH #312)', () => {
     expect(md).toContain('# Sprint 114.5 Plan — Skill-aware briefing');
     expect(md).toContain('| S114.5-1 | Title for S114.5-1 |');
     expect(md).toContain('- S114 (complete)');
+  });
+
+  it('renders the canonical key when a numeric mirror cannot preserve trailing zeroes', () => {
+    const inserted = makeSprint(458.1, {
+      id_key: '458.10',
+      theme: 'Canonical identity',
+      tickets: [
+        makeTicket('S458.10-1'),
+        makeTicket('S458.10-2'),
+        makeTicket('S458.10-3'),
+      ],
+    });
+
+    const md = renderSprintPlan(inserted, makeRoadmap([inserted]), []);
+
+    expect(md).toContain('# Sprint 458.10 Plan — Canonical identity');
+    expect(md).not.toContain('# Sprint 458.1 Plan');
   });
 
   it('marks pending dependencies', () => {
@@ -212,6 +229,53 @@ describe('slope sprint plan --output (#341)', () => {
       });
       expect(existsSync(join(cwd, 'custom', 'plan.md'))).toBe(true);
     } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('selects 458.10 without aliasing 458.1', async () => {
+    const cwd = setupRepoForCli();
+    const originalCwd = process.cwd();
+    try {
+      writeFileSync(join(cwd, 'docs', 'backlog', 'roadmap.json'), JSON.stringify({
+        name: 'Canonical selectors',
+        phases: [{
+          name: 'P1',
+          sprints: [458.1, 458.1],
+          sprint_keys: ['458.1', '458.10'],
+        }],
+        sprints: [
+          {
+            id: 458.1,
+            id_key: '458.1',
+            theme: 'First insert',
+            par: 4,
+            slope: 1,
+            type: 'feature',
+            tickets: [{ key: 'S458.1-1', title: 'first', club: 'wedge', complexity: 'small' }],
+          },
+          {
+            id: 458.1,
+            id_key: '458.10',
+            theme: 'Tenth insert',
+            par: 4,
+            slope: 1,
+            type: 'feature',
+            tickets: [{ key: 'S458.10-1', title: 'tenth', club: 'wedge', complexity: 'small' }],
+          },
+        ],
+      }));
+      process.chdir(cwd);
+
+      await sprintPlanCommand(['--sprint=458.10']);
+
+      const canonicalPath = join(cwd, 'docs', 'backlog', 'sprint-458.10-plan.md');
+      expect(existsSync(canonicalPath)).toBe(true);
+      expect(readFileSync(canonicalPath, 'utf8')).toContain('# Sprint 458.10 Plan — Tenth insert');
+      expect(readFileSync(canonicalPath, 'utf8')).not.toContain('First insert');
+      expect(existsSync(join(cwd, 'docs', 'backlog', 'sprint-458.1-plan.md'))).toBe(false);
+    } finally {
+      process.chdir(originalCwd);
       rmSync(cwd, { recursive: true, force: true });
     }
   });

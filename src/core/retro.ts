@@ -1,5 +1,6 @@
 import { addMemory, searchMemories } from './memory.js';
 import type { Memory, MemoryCategory } from './memory-types.js';
+import { sprintIdKey, type SprintId } from './sprint-id.js';
 
 export type RetroOutcome = 'success' | 'mixed' | 'follow_up';
 
@@ -16,7 +17,7 @@ export interface RetroLearning {
 }
 
 export interface PostMergeRetroInput {
-  sprint: number;
+  sprint: SprintId;
   pr?: number;
   outcome?: RetroOutcome;
   mergedAt?: string;
@@ -28,7 +29,7 @@ export interface PostMergeRetroInput {
 }
 
 export interface PostMergeRetroResult {
-  sprint: number;
+  sprint: string;
   pr?: number;
   outcome: RetroOutcome;
   mergedAt: string;
@@ -51,10 +52,12 @@ export interface PersistRetroMemoriesResult {
   skipped: RetroMemoryPlan[];
 }
 
-function assertSprint(value: number): void {
-  if (!Number.isFinite(value) || value <= 0) {
+function assertSprint(value: SprintId): string {
+  const sprint = sprintIdKey(value);
+  if (sprint === null) {
     throw new TypeError(`Invalid sprint number: ${value}`);
   }
+  return sprint;
 }
 
 function clampWeight(weight: number | undefined, fallback: number): number {
@@ -85,7 +88,7 @@ export function normalizeRetroLearning(input: RetroLearningInput): RetroLearning
 }
 
 export function buildPostMergeRetro(input: PostMergeRetroInput): PostMergeRetroResult {
-  assertSprint(input.sprint);
+  const sprint = assertSprint(input.sprint);
   const hazards = normalizeTexts(input.hazards);
   const followUps = normalizeTexts(input.followUps);
   const learnings = (input.learnings ?? []).map(normalizeRetroLearning);
@@ -94,7 +97,7 @@ export function buildPostMergeRetro(input: PostMergeRetroInput): PostMergeRetroR
     ?? (followUps.length > 0 ? 'follow_up' : hazards.length > 0 ? 'mixed' : 'success');
 
   return {
-    sprint: input.sprint,
+    sprint,
     ...(input.pr !== undefined ? { pr: input.pr } : {}),
     outcome,
     mergedAt: input.mergedAt ?? new Date().toISOString(),

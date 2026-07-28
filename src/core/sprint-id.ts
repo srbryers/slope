@@ -15,8 +15,11 @@
 // plain 245 could be S245 or S24.5) and lives in the roadmap layer
 // (isEncodedInsertedSprintInRoadmap / formatRoadmapSprintLabel).
 
-/** Transitional input type for APIs moving from numeric to canonical string ids. */
-export type SprintId = string | number;
+/** Canonical sprint identity used by persisted records and public outputs. */
+export type SprintId = string;
+
+/** Compatibility input accepted only at documented read boundaries. */
+export type SprintIdInput = SprintId | number;
 
 export interface SprintIdParts {
   /** Whole-sprint base, e.g. 458. */
@@ -26,7 +29,7 @@ export interface SprintIdParts {
   /** Exact fractional digits as authored ("10", "5"), or null. Preserves 458.10 vs 458.1. */
   insertDigits: string | null;
   /** Canonical string key: "458", "458.10", "143.5". */
-  key: string;
+  key: SprintId;
 }
 
 /**
@@ -35,7 +38,7 @@ export interface SprintIdParts {
  * A string is preserved exactly (after stripping a leading `S` and whitespace),
  * so trailing zeros survive. A number is rendered literally.
  */
-export function sprintIdKey(value: SprintId): string | null {
+export function sprintIdKey(value: SprintIdInput): SprintId | null {
   if (typeof value === 'number') {
     if (!Number.isFinite(value) || value <= 0) return null;
     return String(value);
@@ -49,7 +52,7 @@ export function sprintIdKey(value: SprintId): string | null {
 }
 
 /** Parse an authored sprint id (string or number) into canonical parts, or null. */
-export function parseSprintId(value: SprintId): SprintIdParts | null {
+export function parseSprintId(value: SprintIdInput): SprintIdParts | null {
   const key = sprintIdKey(value);
   if (key === null) return null;
 
@@ -73,7 +76,7 @@ export function parseSprintId(value: SprintId): SprintIdParts | null {
  * give). Distinct keys with the same numeric value (.5 vs .05) break the tie by
  * their digit string so ordering stays total.
  */
-export function compareSprintIdKeys(a: string, b: string): number {
+export function compareSprintIdKeys(a: SprintIdInput, b: SprintIdInput): number {
   const pa = parseSprintId(a);
   const pb = parseSprintId(b);
   if (!pa || !pb) return a < b ? -1 : a > b ? 1 : 0;
@@ -92,8 +95,25 @@ export function compareSprintIdKeys(a: string, b: string): number {
 }
 
 /** True when two authored ids denote the same sprint (exact canonical match). */
-export function sprintIdsEqual(a: SprintId, b: SprintId): boolean {
+export function sprintIdsEqual(a: SprintIdInput, b: SprintIdInput): boolean {
   const ka = sprintIdKey(a);
   const kb = sprintIdKey(b);
   return ka !== null && ka === kb;
+}
+
+/** Return the greatest valid canonical key, or the supplied fallback. */
+export function latestSprintIdKey(values: SprintIdInput[], fallback: SprintId = '0'): SprintId {
+  const keys = values
+    .map(sprintIdKey)
+    .filter((key): key is string => key !== null)
+    .sort(compareSprintIdKeys);
+  return keys.at(-1) ?? fallback;
+}
+
+/** Convert to the legacy numeric mirror only when the canonical key round-trips. */
+export function sprintIdToNumber(value: SprintIdInput): number | null {
+  const key = sprintIdKey(value);
+  if (key === null) return null;
+  const numeric = Number(key);
+  return String(numeric) === key ? numeric : null;
 }

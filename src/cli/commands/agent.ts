@@ -4,6 +4,9 @@ import {
   parseRoadmap,
   loadScorecards,
   formatSprintLabel,
+  findRoadmapSprint,
+  roadmapSprintKey,
+  roadmapSprintKeyFromId,
 } from '../../core/index.js';
 import type { RoadmapDefinition, RoadmapSprint } from '../../core/index.js';
 import { loadConfig } from '../config.js';
@@ -24,21 +27,21 @@ import { resolveStore } from '../store.js';
 /** AgentStatus schema version. Bumped when the JSON shape changes in a
  *  breaking way — agents consuming this should check `_version` and refuse
  *  unknown values rather than risk silent misinterpretation. */
-export const AGENT_STATUS_VERSION = 1;
+export const AGENT_STATUS_VERSION = 2;
 
 export interface AgentStatus {
   /** Schema version — bumped on breaking changes to the JSON shape. */
   _version: number;
   vision: 'present' | 'missing';
   roadmap: 'valid' | 'invalid' | 'missing';
-  currentSprint: number | null;
+  currentSprint: string | null;
   /** Sprint phase (sprint-state) OR initiative gate phase. 'pr_review' and
    *  'plan_review' come from the initiative subsystem; the others come from
    *  sprint-state.json. 'unknown' = no state on disk. */
   phase: 'planning' | 'plan_review' | 'reviewing' | 'implementing' | 'scoring' | 'pr_review' | 'complete' | 'unknown';
   activeClaims: string[];
   nextTicket: string | null;
-  blockedBy: number[];
+  blockedBy: string[];
   requiredGates: string[];
   recommendedCommands: string[];
 }
@@ -79,7 +82,7 @@ Usage:
 Output fields (status):
   vision               'present' | 'missing'
   roadmap              'valid' | 'invalid' | 'missing'
-  currentSprint        number | null
+  currentSprint        string | null
   phase                planning | reviewing | implementing | scoring | complete | unknown
   activeClaims         ticket keys currently claimed
   nextTicket           recommended next ticket key
@@ -127,7 +130,7 @@ export async function collectAgentStatus(cwd: string): Promise<AgentStatus> {
   // Current sprint — sprint-state.json wins; otherwise infer from roadmap
   // pending work before falling back to scorecards (#364).
   const sprintState = loadSprintState(cwd);
-  let currentSprint: number | null = sprintState?.sprint ?? null;
+  let currentSprint: string | null = sprintState?.sprint ?? null;
   if (currentSprint == null) {
     try {
       const inferred = inferSprintContext(cwd, config);
@@ -175,15 +178,18 @@ export async function collectAgentStatus(cwd: string): Promise<AgentStatus> {
   // looking at the roadmap status field, which isn't auto-updated when a
   // sprint closes, so it kept reporting stale `blockedBy: [N]` even after
   // the upstream sprint was completed.
-  const completedSprintIds = new Set<number>();
+  const completedSprintIds = new Set<string>();
   for (const s of roadmap?.sprints ?? []) {
     if ((s as RoadmapSprint & { status?: string }).status === 'complete') {
-      completedSprintIds.add(s.id);
+      completedSprintIds.add(roadmapSprintKey(roadmap!, s));
     }
   }
   try {
     for (const card of loadScorecards(config, cwd)) {
-      completedSprintIds.add(card.sprint_number);
+      const key = roadmap
+        ? roadmapSprintKeyFromId(roadmap, card.sprint_number)
+        : String(card.sprint_number);
+      if (key !== null) completedSprintIds.add(key);
     }
   } catch {
     // scorecards optional — keep going with whatever the roadmap had
@@ -194,9 +200,9 @@ export async function collectAgentStatus(cwd: string): Promise<AgentStatus> {
   //   2. The first ticket that is neither claimed by anyone nor already done — #348
   //   3. null when the sprint is exhausted
   let nextTicket: string | null = null;
-  let blockedBy: number[] = [];
+  let blockedBy: string[] = [];
   if (roadmap && currentSprint != null) {
-    const sprint = roadmap.sprints.find(s => s.id === currentSprint);
+    const sprint = findRoadmapSprint(roadmap, currentSprint);
     if (sprint) {
       const claimed = new Set(activeClaims);
       const inFlight = sprint.tickets.find(t => claimed.has(t.key));
@@ -206,7 +212,7 @@ export async function collectAgentStatus(cwd: string): Promise<AgentStatus> {
         const next = sprint.tickets.find(t => !claimed.has(t.key) && !completedTickets.has(t.key));
         nextTicket = next?.key ?? null;
       }
-      blockedBy = computeBlockers(sprint, completedSprintIds);
+      blockedBy = computeBlockers(roadmap, sprint, completedSprintIds);
     }
   }
 
@@ -247,18 +253,25 @@ export async function collectAgentStatus(cwd: string): Promise<AgentStatus> {
  *  in the completed-sprint set. The set is built by the caller from BOTH
  *  roadmap `status: complete` AND scorecards on disk — matching the
  *  source of truth `slope roadmap status` already uses (#356). */
-function computeBlockers(sprint: RoadmapSprint, completedSprintIds: Set<number>): number[] {
-  return (sprint.depends_on ?? []).filter(d => !completedSprintIds.has(d));
+function computeBlockers(
+  roadmap: RoadmapDefinition,
+  sprint: RoadmapSprint,
+  completedSprintIds: Set<string>,
+): string[] {
+  return (sprint.depends_on ?? [])
+    .map(dependency => roadmapSprintKeyFromId(roadmap, dependency))
+    .filter((dependency): dependency is string =>
+      dependency !== null && !completedSprintIds.has(dependency));
 }
 
 function recommendCommands(state: {
   vision: AgentStatus['vision'];
   roadmap: AgentStatus['roadmap'];
-  currentSprint: number | null;
+  currentSprint: string | null;
   phase: AgentStatus['phase'];
   activeClaims: string[];
   nextTicket: string | null;
-  blockedBy: number[];
+  blockedBy: string[];
   requiredGates: string[];
   sprintState: ReturnType<typeof loadSprintState>;
 }): string[] {
@@ -349,7 +362,9 @@ async function nextMdSubcommand(args: string[]): Promise<void> {
     if (existsSync(roadmapPath)) {
       const raw = JSON.parse(readFileSync(roadmapPath, 'utf8'));
       const parsed = parseRoadmap(raw);
-      const sprint = parsed.roadmap?.sprints.find(s => s.id === status.currentSprint);
+      const sprint = parsed.roadmap && status.currentSprint
+        ? findRoadmapSprint(parsed.roadmap, status.currentSprint)
+        : undefined;
       sprintTheme = sprint?.theme;
     }
   } catch { /* best-effort */ }
@@ -392,7 +407,7 @@ export function renderAgentMarkdown(
   if (s.blockedBy.length > 0) {
     lines.push('## Blocked');
     lines.push('');
-    lines.push(`This sprint is blocked by: ${s.blockedBy.map(formatSprintLabel).join(', ')}`);
+    lines.push(`This sprint is blocked by: ${s.blockedBy.map(id => `S${id}`).join(', ')}`);
     lines.push('');
     lines.push('Resolve those before proceeding here.');
     lines.push('');
@@ -439,7 +454,7 @@ function printHumanStatus(s: AgentStatus): void {
   lines.push(`  Claims:        ${s.activeClaims.length > 0 ? s.activeClaims.join(', ') : 'none'}`);
   lines.push(`  Next ticket:   ${s.nextTicket ?? '—'}`);
   if (s.blockedBy.length > 0) {
-    lines.push(`  Blocked by:    ${s.blockedBy.map(formatSprintLabel).join(', ')}`);
+    lines.push(`  Blocked by:    ${s.blockedBy.map(id => `S${id}`).join(', ')}`);
   }
   if (s.requiredGates.length > 0) {
     lines.push(`  Pending gates: ${s.requiredGates.join(', ')}`);

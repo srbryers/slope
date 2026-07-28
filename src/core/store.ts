@@ -4,12 +4,10 @@
 import type { SprintClaim, GolfScorecard, SlopeEvent, WorkflowExecution, WorkflowStepResult } from './types.js';
 import type { CommonIssuesFile } from './briefing.js';
 import type { SprintRegistry } from './registry.js';
-import type { SprintId } from './sprint-id.js';
+import type { SprintIdInput } from './sprint-id.js';
 
-/** Scorecard as persisted by a store during the 2.0 canonical-id transition. */
-export type StoredGolfScorecard = Omit<GolfScorecard, 'sprint_number'> & {
-  sprint_number: SprintId;
-};
+/** Canonical scorecard representation persisted by stores. */
+export type StoredGolfScorecard = GolfScorecard;
 
 /** Aggregate row counts from the store — used by health checks and diagnostics. */
 export interface StoreStats {
@@ -56,11 +54,11 @@ export interface SlopeStore extends SprintRegistry {
   cleanStaleSessions(maxAgeMs: number): Promise<number>;
 
   // Claims (extends SprintRegistry.claim/release/list/get with additional methods)
-  getActiveClaims(sprintNumber?: SprintId): Promise<SprintClaim[]>;
+  getActiveClaims(sprintNumber?: SprintIdInput): Promise<SprintClaim[]>;
 
   // Scorecards
   saveScorecard(card: StoredGolfScorecard): Promise<void>;
-  listScorecards(filter?: { minSprint?: SprintId; maxSprint?: SprintId }): Promise<StoredGolfScorecard[]>;
+  listScorecards(filter?: { minSprint?: SprintIdInput; maxSprint?: SprintIdInput }): Promise<StoredGolfScorecard[]>;
 
   // Common issues
   loadCommonIssues(): Promise<CommonIssuesFile>;
@@ -68,14 +66,15 @@ export interface SlopeStore extends SprintRegistry {
 
   // Events (session telemetry)
   insertEvent(event: Omit<SlopeEvent, 'id' | 'timestamp'>): Promise<SlopeEvent>;
+  getAllEvents(): Promise<SlopeEvent[]>;
   getEventsBySession(sessionId: string): Promise<SlopeEvent[]>;
-  getEventsBySprint(sprintNumber: SprintId): Promise<SlopeEvent[]>;
+  getEventsBySprint(sprintNumber: SprintIdInput): Promise<SlopeEvent[]>;
   getEventsByTicket(ticketKey: string): Promise<SlopeEvent[]>;
 
   // Testing sessions
-  createTestingSession(session: { branch?: string; sprint?: number; purpose?: string; worktree_path?: string; branch_name?: string }): Promise<{ id: string; started_at: string }>;
+  createTestingSession(session: { branch?: string; sprint?: SprintIdInput; purpose?: string; worktree_path?: string; branch_name?: string }): Promise<{ id: string; started_at: string }>;
   endTestingSession(sessionId: string): Promise<{ ended_at: string; finding_count: number; worktree_path?: string; branch_name?: string }>;
-  getActiveTestingSession(): Promise<{ id: string; branch?: string; sprint?: number; purpose?: string; worktree_path?: string; branch_name?: string; started_at: string } | null>;
+  getActiveTestingSession(): Promise<{ id: string; branch?: string; sprint?: string; purpose?: string; worktree_path?: string; branch_name?: string; started_at: string } | null>;
   addTestingFinding(finding: { session_id: string; description: string; severity?: string; ticket?: string }): Promise<{ id: string }>;
   getTestingFindings(sessionId: string): Promise<Array<{ id: string; description: string; severity: string; ticket?: string; created_at: string }>>;
 

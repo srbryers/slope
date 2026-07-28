@@ -30,6 +30,25 @@ describe('loadDeferred', () => {
     fs.writeFileSync(join(tmpDir, '.slope', 'deferred-findings.json'), 'bad json');
     expect(loadDeferred(tmpDir)).toEqual([]);
   });
+
+  it('normalizes numeric sprint ids from legacy files', () => {
+    const fs = require('node:fs');
+    fs.writeFileSync(join(tmpDir, '.slope', 'deferred-findings.json'), JSON.stringify({
+      findings: [{
+        id: 'legacy',
+        source_sprint: 16,
+        target_sprint: 21,
+        severity: 'medium',
+        description: 'legacy',
+        status: 'open',
+        created_at: '2026-01-01T00:00:00.000Z',
+      }],
+    }));
+
+    expect(loadDeferred(tmpDir)).toEqual([
+      expect.objectContaining({ source_sprint: '16', target_sprint: '21' }),
+    ]);
+  });
 });
 
 describe('createDeferred', () => {
@@ -43,8 +62,8 @@ describe('createDeferred', () => {
     });
 
     expect(finding.id).toBeTruthy();
-    expect(finding.source_sprint).toBe(16);
-    expect(finding.target_sprint).toBe(21);
+    expect(finding.source_sprint).toBe('16');
+    expect(finding.target_sprint).toBe('21');
     expect(finding.severity).toBe('medium');
     expect(finding.status).toBe('open');
     expect(finding.category).toBe('architecture');
@@ -148,7 +167,25 @@ describe('listDeferred', () => {
   it('filters by target sprint', () => {
     const results = listDeferred(tmpDir, { sprint: 21 });
     expect(results).toHaveLength(2);
-    expect(results.every(f => f.target_sprint === 21)).toBe(true);
+    expect(results.every(f => f.target_sprint === '21')).toBe(true);
+  });
+
+  it('keeps canonical dotted sprint ids distinct', () => {
+    createDeferred(tmpDir, {
+      source_sprint: '458.1',
+      target_sprint: '458.1',
+      severity: 'medium',
+      description: 'first insert',
+    });
+    createDeferred(tmpDir, {
+      source_sprint: '458.10',
+      target_sprint: '458.10',
+      severity: 'medium',
+      description: 'tenth insert',
+    });
+
+    expect(listDeferred(tmpDir, { sprint: 'S458.10' }).map(f => f.description))
+      .toEqual(['tenth insert']);
   });
 
   it('filters by status', () => {

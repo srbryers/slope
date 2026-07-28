@@ -105,7 +105,7 @@ describe('slope now', () => {
     const output = await captureLog(() => nowCommand(['--json']));
     const parsed = JSON.parse(output);
 
-    expect(parsed.sprint).toBe(151);
+    expect(parsed.sprint).toBe('151');
     expect(parsed.roadmap.theme).toBe('Skill-First Human Cockpit');
     expect(parsed.nextTicket.key).toBe('S151-1');
   });

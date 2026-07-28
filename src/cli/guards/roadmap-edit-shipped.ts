@@ -1,7 +1,14 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { extname, relative, resolve } from 'node:path';
 import type { HookInput, GuardResult } from '../../core/index.js';
-import { loadConfig, parseRoadmapSourceDocument, parseRoadmapSourceProject } from '../../core/index.js';
+import type { RoadmapDefinition, RoadmapSourceDocument } from '../../core/index.js';
+import {
+  castRoadmapStructure,
+  loadConfig,
+  parseRoadmapSourceDocument,
+  parseRoadmapSourceProject,
+  roadmapSprintKey,
+} from '../../core/index.js';
 import { getApplyPatchText, resolveTouchedPaths, toAbsoluteTouchedPath } from './hook-input.js';
 
 const DEFAULT_ROADMAP_PATH = 'docs/backlog/roadmap.json';
@@ -87,26 +94,31 @@ export async function roadmapEditShippedGuard(input: HookInput, cwd: string): Pr
 
   if (!Array.isArray(current.sprints) || !Array.isArray(next.sprints)) return {};
 
-  const nextById = new Map<number, unknown>();
-  for (const s of next.sprints) {
-    const id = (s as { id?: unknown })?.id;
-    if (typeof id === 'number') nextById.set(id, s);
-  }
+  const currentRoadmap = castRoadmapStructure(current);
+  if (!currentRoadmap) return {};
+  const nextRoadmap = castRoadmapStructure(next);
+  const nextByKey = nextRoadmap
+    ? new Map(
+      nextRoadmap.sprints.map((sprint, index) => [
+        roadmapSprintKey(nextRoadmap, sprint),
+        next.sprints![index],
+      ]),
+    )
+    : new Map<string, unknown>();
 
   const violations: string[] = [];
-  for (const cur of current.sprints) {
-    const c = cur as { id?: unknown; status?: unknown };
-    if (c?.status !== 'complete') continue;
-    const id = c.id;
-    if (typeof id !== 'number') continue;
+  for (const [index, sprint] of currentRoadmap.sprints.entries()) {
+    if (sprint.status !== 'complete') continue;
+    const cur = current.sprints[index];
+    const sprintKey = roadmapSprintKey(currentRoadmap, sprint);
 
-    const nxt = nextById.get(id);
+    const nxt = nextByKey.get(sprintKey);
     if (nxt === undefined) {
-      violations.push(`S${id}: removed (was status:complete)`);
+      violations.push(`S${sprintKey}: removed (was status:complete)`);
       continue;
     }
     if (!deepEqual(cur, nxt)) {
-      violations.push(`S${id}: shipped sprint fields modified`);
+      violations.push(`S${sprintKey}: shipped sprint fields modified`);
     }
   }
 
@@ -151,9 +163,10 @@ function protectModularManifest(
       const path = resolve(sourceRoot, ...entry.path.split('/'));
       if (!existsSync(path)) continue;
       const source = parseRoadmapSourceDocument(readFileSync(path, 'utf8'), path);
+      const roadmap = sourceRoadmap(source);
       const completed = source.sprints
         .filter(sprint => TERMINAL_SOURCE_STATUSES.has(sprint.status ?? ''))
-        .map(sprint => `S${sprint.id}`);
+        .map(sprint => `S${roadmapSprintKey(roadmap, sprint)}`);
       if (completed.length > 0) {
         violations.push(`${entry.path} moved, removed, or reordered with shipped history (${completed.join(', ')})`);
       }
@@ -195,11 +208,15 @@ function protectModularSource(input: HookInput, sourcePath: string, cwd: string)
   }
   try {
     const next = parseRoadmapSourceDocument(wouldBeContent, sourcePath);
-    const nextById = new Map(next.sprints.map(sprint => [sprint.id, sprint]));
+    const currentRoadmap = sourceRoadmap(current);
+    const nextRoadmap = sourceRoadmap(next);
+    const nextByKey = new Map(
+      next.sprints.map(sprint => [roadmapSprintKey(nextRoadmap, sprint), sprint]),
+    );
     const violations = current.sprints
       .filter(sprint => TERMINAL_SOURCE_STATUSES.has(sprint.status ?? ''))
-      .filter(sprint => !deepEqual(sprint, nextById.get(sprint.id)))
-      .map(sprint => `S${sprint.id}: shipped source fields modified or removed`);
+      .filter(sprint => !deepEqual(sprint, nextByKey.get(roadmapSprintKey(currentRoadmap, sprint))))
+      .map(sprint => `S${roadmapSprintKey(currentRoadmap, sprint)}: shipped source fields modified or removed`);
     if (violations.length === 0) return {};
     return {
       decision: 'deny',
@@ -213,16 +230,25 @@ function protectModularSource(input: HookInput, sourcePath: string, cwd: string)
     };
   } catch (error) {
     const terminal = current.sprints.filter(sprint => TERMINAL_SOURCE_STATUSES.has(sprint.status ?? ''));
+    const roadmap = sourceRoadmap(current);
     if (terminal.length === 0) return {};
     return {
       decision: 'deny',
       blockReason: [
         'SLOPE: Cannot delete or replace terminal modular roadmap history with invalid YAML.',
-        `Protected sprints: ${terminal.map(sprint => `S${sprint.id}`).join(', ')}`,
+        `Protected sprints: ${terminal.map(sprint => `S${roadmapSprintKey(roadmap, sprint)}`).join(', ')}`,
         `Validation error: ${(error as Error).message}`,
       ].join('\n'),
     };
   }
+}
+
+function sourceRoadmap(source: RoadmapSourceDocument): RoadmapDefinition {
+  return {
+    name: source.phase.name,
+    phases: [source.phase],
+    sprints: source.sprints,
+  };
 }
 
 function resolveWouldBeContent(

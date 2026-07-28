@@ -44,8 +44,15 @@ describe('post-merge retro memory contract', () => {
       learnings: [{ text: 'Decimal sprint retros should persist' }],
     });
 
-    expect(retro.sprint).toBe(146.1);
+    expect(retro.sprint).toBe('146.1');
     expect(buildRetroMemoryPlans(retro)[0].text).toContain('S146.1 PR #527');
+  });
+
+  it('preserves trailing-zero sprint ids in retro evidence', () => {
+    const retro = buildPostMergeRetro({ sprint: '458.10', summary: 'canonical closeout' });
+
+    expect(retro.sprint).toBe('458.10');
+    expect(buildRetroMemoryPlans(retro)[0].text).toContain('S458.10');
   });
 
   it('turns retro results into durable memory plans', () => {

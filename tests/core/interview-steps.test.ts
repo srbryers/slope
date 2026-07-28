@@ -36,9 +36,17 @@ describe('generateInterviewSteps', () => {
   });
 
   it('pre-fills sprintNumber from existing retros', () => {
-    const steps = generateInterviewSteps(makeCtx({ existingSprintNumber: 5 }));
+    const steps = generateInterviewSteps(makeCtx({ existingSprintId: '5' }));
     const sprintStep = steps.find((s) => s.id === 'sprint-number');
     expect(sprintStep?.default).toBe('6');
+  });
+
+  it('advances from a dotted canonical sprint without numeric coercion', () => {
+    const steps = generateInterviewSteps(makeCtx({ existingSprintId: '458.10' }));
+    const sprintStep = steps.find((s) => s.id === 'sprint-number');
+
+    expect(sprintStep?.default).toBe('459');
+    expect(sprintStep?.validate?.('458.10')).toBeNull();
   });
 
   it('defaults sprint to 1 when no retros exist', () => {

@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { execSync } from 'node:child_process';
-import { loadConfig, loadScorecards, detectLatestSprint, formatSprintNumber, GUARD_DEFINITIONS, loadFlows, checkFlowStaleness, parseSprintNumber } from '../../core/index.js';
+import { compareSprintIdKeys, loadConfig, loadScorecards, detectLatestSprint, GUARD_DEFINITIONS, loadFlows, checkFlowStaleness, parseSprintId, sprintIdKey } from '../../core/index.js';
 import type { SlopeConfig } from '../../core/index.js';
 import { CLI_COMMAND_REGISTRY } from '../registry.js';
 import { SLOPE_REGISTRY } from '../../mcp/registry.js';
@@ -66,6 +66,31 @@ interface ProjectIdentity {
   description: string | null;
 }
 
+function sprintCurrencyDeltaTenths(currentKey: string, mapKey: string): number {
+  const current = parseSprintId(currentKey);
+  const previous = parseSprintId(mapKey);
+  if (!current) return 0;
+
+  const rawDelta = previous
+    ? (current.base - previous.base) * 10
+      + (current.insert ?? 0)
+      - (previous.insert ?? 0)
+    : mapKey === '0'
+      ? current.base * 10 + (current.insert ?? 0)
+      : 0;
+  const comparison = compareSprintIdKeys(currentKey, mapKey);
+
+  if (comparison > 0) return Math.max(1, rawDelta);
+  if (comparison < 0) return Math.min(-1, rawDelta);
+  return 0;
+}
+
+function formatSprintCurrencyDelta(deltaTenths: number): string {
+  const whole = Math.trunc(deltaTenths / 10);
+  const fraction = Math.abs(deltaTenths % 10);
+  return fraction === 0 ? String(whole) : `${whole}.${fraction}`;
+}
+
 function readProjectIdentity(cwd: string): ProjectIdentity {
   const pkgPath = join(cwd, 'package.json');
   let name: string | null = null;
@@ -126,7 +151,7 @@ function countSourceFiles(root: string): { source: number; test: number } {
 interface MapMetadata {
   generated_at: string;
   git_sha: string;
-  sprint: number;
+  sprint: string;
   source_files: number;
   test_files: number;
   cli_commands: number;
@@ -755,15 +780,16 @@ export function runStalenessCheck(cwd: string, config: SlopeConfig, mapContent: 
   }
 
   // 3. Sprint currency
-  const mapSprint = parseSprintNumber(meta.sprint || '0') ?? 0;
+  const mapSprint = sprintIdKey(meta.sprint) ?? '0';
   const currentSprint = detectLatestSprint(config, cwd);
-  const sprintDelta = currentSprint - mapSprint;
-  const currentSprintLabel = formatSprintNumber(currentSprint);
-  const mapSprintLabel = formatSprintNumber(mapSprint);
-  const sprintDeltaLabel = formatSprintNumber(Number(sprintDelta.toFixed(6)));
-  if (sprintDelta > 3) {
+  const sprintComparison = compareSprintIdKeys(currentSprint, mapSprint);
+  const sprintDeltaTenths = sprintCurrencyDeltaTenths(currentSprint, mapSprint);
+  const currentSprintLabel = currentSprint;
+  const mapSprintLabel = mapSprint;
+  const sprintDeltaLabel = formatSprintCurrencyDelta(sprintDeltaTenths);
+  if (sprintComparison > 0 && sprintDeltaTenths > 30) {
     results.push({ label: 'Sprint currency', status: 'stale', message: `Sprint ${currentSprintLabel} (map says ${mapSprintLabel}, +${sprintDeltaLabel} behind)` });
-  } else if (sprintDelta > 0) {
+  } else if (sprintComparison > 0) {
     results.push({ label: 'Sprint currency', status: 'warn', message: `Sprint ${currentSprintLabel} (map says ${mapSprintLabel}, +${sprintDeltaLabel})` });
   } else {
     results.push({ label: 'Sprint currency', status: 'ok', message: `Sprint ${currentSprintLabel} — current` });

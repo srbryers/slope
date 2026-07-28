@@ -460,6 +460,15 @@ describe('Events', () => {
     expect(sprint3[1].type).toBe('decision');
   });
 
+  it('retrieves all events without requiring scorecard sprint discovery', async () => {
+    await store.insertEvent({ type: 'decision', data: { scope: 'active' }, sprint_number: '458.10' });
+    await store.insertEvent({ type: 'hazard', data: { scope: 'unscoped' } });
+
+    const events = await store.getAllEvents();
+
+    expect(events.map(event => event.data.scope)).toEqual(['active', 'unscoped']);
+  });
+
   it('keeps 458.10 events distinct from 458.1', async () => {
     await store.insertEvent({ type: 'decision', data: { sprint: '.1' }, sprint_number: '458.1' });
     await store.insertEvent({ type: 'decision', data: { sprint: '.10' }, sprint_number: '458.10' });
@@ -695,6 +704,18 @@ describe('Schema Migration', () => {
         started_at TEXT NOT NULL, updated_at TEXT NOT NULL, session_id TEXT,
         definition_json TEXT, definition_hash TEXT
       );
+      CREATE TABLE testing_sessions (
+        id TEXT PRIMARY KEY, branch TEXT, sprint INTEGER, purpose TEXT,
+        worktree_path TEXT, branch_name TEXT, started_at TEXT NOT NULL,
+        ended_at TEXT, status TEXT NOT NULL DEFAULT 'active'
+      );
+      CREATE TABLE testing_findings (
+        id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL REFERENCES testing_sessions(id) ON DELETE CASCADE,
+        description TEXT NOT NULL, severity TEXT NOT NULL DEFAULT 'medium',
+        ticket TEXT, created_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_testing_findings_session ON testing_findings(session_id);
 
       INSERT INTO sessions VALUES (
         'legacy-session', 'primary', 'vscode', NULL, 'main',
@@ -736,6 +757,14 @@ describe('Schema Migration', () => {
         '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z',
         'legacy-session', NULL, NULL
       );
+      INSERT INTO testing_sessions VALUES (
+        'legacy-testing', 'main', 458, 'legacy test', NULL, NULL,
+        '2026-01-01T00:00:00.000Z', NULL, 'active'
+      );
+      INSERT INTO testing_findings VALUES (
+        'legacy-finding', 'legacy-testing', 'legacy finding', 'high',
+        'T-LEGACY', '2026-01-01T00:00:00.000Z'
+      );
     `);
     db.close();
 
@@ -748,6 +777,16 @@ describe('Schema Migration', () => {
     expect((await upgraded.getExecutionBySprint('458.10'))?.sprint_id).toBe('458.10');
     expect((await upgraded.getExecutionBySprint('R1'))?.sprint_id).toBe('R1');
     expect((await upgraded.getExecution('invalid-workflow'))?.sprint_id).toBe('S0');
+    expect(await upgraded.getActiveTestingSession()).toMatchObject({
+      id: 'legacy-testing',
+      sprint: '458',
+    });
+    expect(await upgraded.getTestingFindings('legacy-testing')).toEqual([
+      expect.objectContaining({
+        id: 'legacy-finding',
+        ticket: 'T-LEGACY',
+      }),
+    ]);
     await expect(upgraded.claim({
       sprint_number: '458',
       player: 'bob',
@@ -762,6 +801,9 @@ describe('Schema Migration', () => {
         .find((column: { name: string }) => column.name === 'sprint_number');
       expect(sprintColumn.type).toBe('TEXT');
     }
+    const testingSprintColumn = inspected.prepare('PRAGMA table_info(testing_sessions)').all()
+      .find((column: { name: string }) => column.name === 'sprint');
+    expect(testingSprintColumn.type).toBe('TEXT');
     const eventIndexes = inspected.prepare(
       "SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'events' ORDER BY name",
     ).all().map((row: { name: string }) => row.name);
@@ -780,6 +822,19 @@ describe('Schema Migration', () => {
         on_delete: 'CASCADE',
       }),
     ]));
+    expect(inspected.prepare('PRAGMA foreign_key_list(testing_findings)').all()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          table: 'testing_sessions',
+          from: 'session_id',
+          to: 'id',
+          on_delete: 'CASCADE',
+        }),
+      ]),
+    );
+    expect(inspected.prepare(
+      "SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'testing_findings'",
+    ).all()).toEqual(expect.arrayContaining([{ name: 'idx_testing_findings_session' }]));
     inspected.close();
   });
 

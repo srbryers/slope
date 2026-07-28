@@ -13,7 +13,7 @@ import {
   planPrReview,
 } from '../../src/cli/commands/pr.js';
 import { branchSizeWarnings, buildPrCloseoutStatus, canSettlePrCloseout, formatPrCloseoutStatus, hasSuccessfulCodeRabbitStatus, isBlockedCodeRabbitComment } from '../../src/cli/pr-closeout.js';
-import { recordPrReviewPromptsGenerated } from '../../src/cli/pr-review-state.js';
+import { recordPrReviewComplete, recordPrReviewPromptsGenerated } from '../../src/cli/pr-review-state.js';
 import { saveReviewState } from '../../src/cli/commands/review-state.js';
 
 describe('extractIssueRefs (GH #321)', () => {
@@ -110,6 +110,11 @@ describe('pr review workflow helpers (S94-5)', () => {
     });
   });
 
+  it('preserves canonical sprint selectors that share a numeric value', () => {
+    expect(parsePrReviewFlags(['--sprint=458.1']).sprint).toBe('458.1');
+    expect(parsePrReviewFlags(['--sprint=S458.10']).sprint).toBe('458.10');
+  });
+
   it.each([
     [['--pr=0'], '--pr must be a positive integer'],
     [['--pr=nope'], '--pr must be a positive integer'],
@@ -170,6 +175,7 @@ describe('pr review workflow helpers (S94-5)', () => {
     expect(plan.changedFiles).toEqual(['src/review.ts']);
     expect(plan.totalChangedFiles).toBe(2);
     expect(plan.reviewDiff).toBe(reviewDiff);
+    expect(plan.sprint).toBe('234');
   });
 });
 
@@ -183,7 +189,7 @@ describe('pr closeout status helpers (S130)', () => {
 
   it('formats missing PR review as a closeout blocker', () => {
     const output = formatPrCloseoutStatus({
-      sprint: 130,
+      sprint: '130',
       branch: 'feat/closeout',
       scorecardPath: '/repo/docs/retros/sprint-130.json',
       scorecardExists: true,
@@ -213,7 +219,7 @@ describe('pr closeout status helpers (S130)', () => {
 
   it('requires checks and review threads to settle before closeout can settle', () => {
     const status = {
-      sprint: 130,
+      sprint: '130',
       branch: 'feat/closeout',
       scorecardPath: '/repo/docs/retros/sprint-130.json',
       scorecardExists: true,
@@ -255,7 +261,7 @@ describe('pr closeout status helpers (S130)', () => {
 
   it('blocks settlement when reviewer bot review is rate limited', () => {
     const status = {
-      sprint: 130,
+      sprint: '130',
       branch: 'feat/closeout',
       scorecardPath: '/repo/docs/retros/sprint-130.json',
       scorecardExists: true,
@@ -332,6 +338,36 @@ describe('pr closeout status helpers (S130)', () => {
       });
 
       expect(buildPrCloseoutStatus(cwd, { sprint: 130 }).prReview).toBe('reviewed');
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  }, 15000);
+
+  it('matches closeout artifacts and reviews by exact canonical sprint identity', () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'slope-pr-closeout-identity-'));
+    try {
+      mkdirSync(join(cwd, '.slope'), { recursive: true });
+      mkdirSync(join(cwd, 'docs', 'retros'), { recursive: true });
+      writeFileSync(join(cwd, '.slope', 'config.json'), JSON.stringify({
+        scorecardDir: 'docs/retros',
+        scorecardPattern: 'sprint-*.json',
+      }));
+      writeFileSync(join(cwd, 'docs', 'retros', 'sprint-458.10.json'), '{}');
+      writeFileSync(join(cwd, 'docs', 'retros', 'sprint-458.10-review.md'), '# Review\n');
+      recordPrReviewPromptsGenerated(cwd, { pr: 1, sprint: '458.1', reviewType: 'code' });
+
+      const before = buildPrCloseoutStatus(cwd, { sprint: '458.10' });
+      expect(before).toMatchObject({
+        sprint: '458.10',
+        scorecardExists: true,
+        sprintReviewExists: true,
+        prReview: 'missing',
+      });
+
+      recordPrReviewComplete(cwd, { pr: 2, sprint: '458.10', reviewType: 'code' });
+      const after = buildPrCloseoutStatus(cwd, { sprint: '458.10' });
+      expect(after.prReview).toBe('reviewed');
+      expect(after.sprint).not.toBe('458.1');
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }

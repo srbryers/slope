@@ -27,7 +27,7 @@ export interface PrepPlan {
     key: string;
     title: string;
     result: string;
-    sprint: number;
+    sprint: string;
   }>;
 
   hazards: string[];
@@ -206,11 +206,11 @@ export function findSimilarTickets(
   title: string,
   scorecards: GolfScorecard[],
   maxResults = 3,
-): Array<{ key: string; title: string; result: string; sprint: number }> {
+): Array<{ key: string; title: string; result: string; sprint: string }> {
   const titleTokens = new Set(tokenize(title));
   if (titleTokens.size === 0) return [];
 
-  const scored: Array<{ key: string; title: string; result: string; sprint: number; overlap: number }> = [];
+  const scored: Array<{ key: string; title: string; result: string; sprint: string; overlap: number }> = [];
 
   for (const card of scorecards) {
     for (const shot of card.shots) {
@@ -357,7 +357,7 @@ export async function generatePrepPlan(opts: {
 export function formatLitePrepPlan(
   ticketId: string,
   title: string,
-  similarTickets: Array<{ key: string; title: string; result: string; sprint: number }>,
+  similarTickets: Array<{ key: string; title: string; result: string; sprint: string }>,
   hazards: string[],
 ): string {
   const lines: string[] = [];

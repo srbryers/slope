@@ -86,6 +86,25 @@ describe('slope worktree start', () => {
     }
   });
 
+  it('preserves canonical sprint identity for an optional claim', async () => {
+    await worktreeCommand([
+      'start',
+      '--branch=codex/worktree-canonical-sprint',
+      '--base=HEAD',
+      '--target=458.10-1',
+      '--sprint=458.10',
+    ]);
+
+    const store = await resolveStore(cwd);
+    try {
+      expect((await store.getActiveClaims('458.10')).map(claim => claim.sprint_number))
+        .toEqual(['458.10']);
+      expect(await store.getActiveClaims('458.1')).toEqual([]);
+    } finally {
+      store.close();
+    }
+  });
+
   it('passes worktree paths as process arguments instead of shell fragments', async () => {
     const markerPath = join(cwd, 'shell-injection-marker');
     const worktreePath = join(cwd, '.slope', 'worktrees', 'safe-$(touch shell-injection-marker)');

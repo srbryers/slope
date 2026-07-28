@@ -60,6 +60,18 @@ describe('matchSprintTicket (#352 helper)', () => {
     expect(matchSprintTicket('feat(S114.5): umbrella decimal', 114.5, decimalKeys, cursor)).toBe('S114.5-1');
     expect(matchSprintTicket('feat(S114-1): previous sprint', 114.5, decimalKeys, cursor)).toBeNull();
   });
+
+  it('keeps S458.10 distinct from S458.1', () => {
+    const keys = ['S458.10-1', 'S458.10-2'];
+    const cursor = { next: 0 };
+
+    expect(matchSprintTicket('feat(S458.10-2): exact tenth insert', '458.10', keys, cursor))
+      .toBe('S458.10-2');
+    expect(matchSprintTicket('feat(S458.1-1): first insert', '458.10', keys, cursor))
+      .toBeNull();
+    expect(matchSprintTicket('fix(S458.10-review): closeout', '458.10', keys, cursor))
+      .toBe('S458.10-1');
+  });
 });
 
 function setupRepoWithRoadmap(): string {
@@ -87,6 +99,54 @@ function setupRepoWithRoadmap(): string {
         { key: 'S1-3', title: 'third', club: 'wedge', complexity: 'small' },
       ],
     }],
+  }));
+  execSync('git init -q', { cwd: dir });
+  execSync('git config user.email t@t', { cwd: dir });
+  execSync('git config user.name t', { cwd: dir });
+  return dir;
+}
+
+function setupRepoWithCanonicalRoadmap(): string {
+  const dir = mkdtempSync(join(tmpdir(), 'slope-auto-card-canonical-'));
+  mkdirSync(join(dir, '.slope'), { recursive: true });
+  mkdirSync(join(dir, 'docs', 'backlog'), { recursive: true });
+  mkdirSync(join(dir, 'docs', 'retros'), { recursive: true });
+  writeFileSync(join(dir, '.slope', 'config.json'), JSON.stringify({
+    roadmapPath: 'docs/backlog/roadmap.json',
+    scorecardDir: 'docs/retros',
+    scorecardPattern: 'sprint-*.json',
+  }));
+  writeFileSync(join(dir, 'docs', 'backlog', 'roadmap.json'), JSON.stringify({
+    name: 'Canonical Test',
+    phases: [{
+      name: 'P1',
+      sprints: [458.1, 458.1],
+      sprint_keys: ['458.1', '458.10'],
+    }],
+    sprints: [
+      {
+        id: 458.1,
+        id_key: '458.1',
+        theme: 'First insert',
+        par: 3,
+        slope: 1,
+        type: 'feature',
+        tickets: [
+          { key: 'S458.1-1', title: 'first insert', club: 'wedge', complexity: 'small' },
+        ],
+      },
+      {
+        id: 458.1,
+        id_key: '458.10',
+        theme: 'Tenth insert',
+        par: 3,
+        slope: 1,
+        type: 'feature',
+        tickets: [
+          { key: 'S458.10-1', title: 'tenth insert', club: 'wedge', complexity: 'small' },
+        ],
+      },
+    ],
   }));
   execSync('git init -q', { cwd: dir });
   execSync('git config user.email t@t', { cwd: dir });
@@ -246,6 +306,25 @@ describe('slope auto-card --dry-run roadmap filtering (#352)', () => {
       const card = JSON.parse(result.stdout.trim());
       expect(card.shots.length).toBe(1);
       expect(card.shots[0].ticket_key).toBe('S2-1'); // legacy positional
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('generates an explicit S458.10 card without accepting S458.1 evidence', () => {
+    const cwd = setupRepoWithCanonicalRoadmap();
+    try {
+      commitWith(cwd, 'feat(S458.1-1): first insert');
+      commitWith(cwd, 'feat(S458.10-1): tenth insert');
+
+      const result = runAutoCard(cwd, ['--sprint=458.10', '--dry-run']);
+      expect(result.status).toBe(0);
+      const card = JSON.parse(result.stdout.trim());
+
+      expect(card.sprint_number).toBe('458.10');
+      expect(card.shots.map((shot: { ticket_key: string }) => shot.ticket_key))
+        .toEqual(['S458.10-1']);
+      expect(result.stderr).toContain('feat(S458.1-1): first insert');
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }

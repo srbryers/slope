@@ -6,7 +6,7 @@ import { dirname, join, resolve } from 'node:path';
 import { createRequire } from 'node:module';
 import type DatabaseConstructor from 'better-sqlite3';
 import type { Database as DatabaseType } from 'better-sqlite3';
-import type { SprintClaim, SlopeEvent, EventType, WorkflowExecution, WorkflowStepResult, CompletedStep, SprintId, StoredGolfScorecard } from '../core/index.js';
+import type { SprintClaim, SprintClaimInput, SlopeEvent, EventType, WorkflowExecution, WorkflowStepResult, CompletedStep, SprintId, SprintIdInput, StoredGolfScorecard } from '../core/index.js';
 import type { CommonIssuesFile, StoreStats } from '../core/index.js';
 import { compareSprintIdKeys, resolveRepoStateCwd, sprintIdKey, SlopeStoreError } from '../core/index.js';
 import type { SlopeStore, SlopeSession, SlopeSessionUpdate } from '../core/index.js';
@@ -20,7 +20,7 @@ function nowISO(): string {
   return new Date().toISOString();
 }
 
-function canonicalSprintKey(value: SprintId): string {
+function canonicalSprintKey(value: SprintIdInput): string {
   const key = sprintIdKey(value);
   if (key === null) {
     throw new TypeError(`Invalid sprint id: ${String(value)}`);
@@ -360,6 +360,55 @@ const MIGRATIONS: Array<{ version: number; sql: string }> = [
         AND CAST(trim(sprint_id) AS REAL) > 0;
     `,
   },
+  {
+    // v10: testing-session sprint identity (GH #659 / S266).
+    // Rebuild both related tables so the findings foreign key follows the
+    // replacement TEXT-backed testing_sessions table.
+    version: 10,
+    sql: `
+      ALTER TABLE testing_findings RENAME TO testing_findings_numeric_sprint;
+      DROP INDEX IF EXISTS idx_testing_findings_session;
+      ALTER TABLE testing_sessions RENAME TO testing_sessions_numeric_sprint;
+
+      CREATE TABLE testing_sessions (
+        id TEXT PRIMARY KEY,
+        branch TEXT,
+        sprint TEXT,
+        purpose TEXT,
+        worktree_path TEXT,
+        branch_name TEXT,
+        started_at TEXT NOT NULL,
+        ended_at TEXT,
+        status TEXT NOT NULL DEFAULT 'active'
+      );
+      INSERT INTO testing_sessions (
+        id, branch, sprint, purpose, worktree_path, branch_name,
+        started_at, ended_at, status
+      )
+      SELECT
+        id, branch, CAST(sprint AS TEXT), purpose, worktree_path, branch_name,
+        started_at, ended_at, status
+      FROM testing_sessions_numeric_sprint;
+
+      CREATE TABLE testing_findings (
+        id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL REFERENCES testing_sessions(id) ON DELETE CASCADE,
+        description TEXT NOT NULL,
+        severity TEXT NOT NULL DEFAULT 'medium',
+        ticket TEXT,
+        created_at TEXT NOT NULL
+      );
+      INSERT INTO testing_findings (
+        id, session_id, description, severity, ticket, created_at
+      )
+      SELECT id, session_id, description, severity, ticket, created_at
+      FROM testing_findings_numeric_sprint;
+
+      DROP TABLE testing_findings_numeric_sprint;
+      DROP TABLE testing_sessions_numeric_sprint;
+      CREATE INDEX idx_testing_findings_session ON testing_findings(session_id);
+    `,
+  },
 ];
 
 /** Latest schema version — total number of migrations available. */
@@ -597,7 +646,7 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
 
   // --- Claims (SprintRegistry + extensions) ---
 
-  async claim(input: Omit<SprintClaim, 'id' | 'claimed_at'>): Promise<SprintClaim> {
+  async claim(input: SprintClaimInput): Promise<SprintClaim> {
     const claim: SprintClaim = {
       id: generateId('claim'),
       claimed_at: nowISO(),
@@ -636,7 +685,7 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
     return result.changes > 0;
   }
 
-  async list(sprintNumber: SprintId): Promise<SprintClaim[]> {
+  async list(sprintNumber: SprintIdInput): Promise<SprintClaim[]> {
     const rows = this.db.prepare('SELECT * FROM claims WHERE sprint_number = ? ORDER BY claimed_at')
       .all(canonicalSprintKey(sprintNumber)) as Array<Record<string, unknown>>;
     return rows.map(rowToClaim);
@@ -647,7 +696,7 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
     return row ? rowToClaim(row) : undefined;
   }
 
-  async getActiveClaims(sprintNumber?: SprintId): Promise<SprintClaim[]> {
+  async getActiveClaims(sprintNumber?: SprintIdInput): Promise<SprintClaim[]> {
     const now = nowISO();
     const sprintClause = sprintNumber !== undefined ? 'AND claims.sprint_number = ?' : '';
     const sql = `
@@ -679,7 +728,7 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
     `).run(sprintKey, JSON.stringify(storedCard), now, now);
   }
 
-  async listScorecards(filter?: { minSprint?: SprintId; maxSprint?: SprintId }): Promise<StoredGolfScorecard[]> {
+  async listScorecards(filter?: { minSprint?: SprintIdInput; maxSprint?: SprintIdInput }): Promise<StoredGolfScorecard[]> {
     const minSprint = filter?.minSprint === undefined ? null : canonicalSprintKey(filter.minSprint);
     const maxSprint = filter?.maxSprint === undefined ? null : canonicalSprintKey(filter.maxSprint);
     const rows = this.db.prepare('SELECT sprint_number, data FROM scorecards')
@@ -750,7 +799,13 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
     return rows.map(rowToEvent);
   }
 
-  async getEventsBySprint(sprintNumber: SprintId): Promise<SlopeEvent[]> {
+  async getAllEvents(): Promise<SlopeEvent[]> {
+    const rows = this.db.prepare('SELECT * FROM events ORDER BY timestamp')
+      .all() as Array<Record<string, unknown>>;
+    return rows.map(rowToEvent);
+  }
+
+  async getEventsBySprint(sprintNumber: SprintIdInput): Promise<SlopeEvent[]> {
     const rows = this.db.prepare('SELECT * FROM events WHERE sprint_number = ? ORDER BY timestamp')
       .all(canonicalSprintKey(sprintNumber)) as Array<Record<string, unknown>>;
     return rows.map(rowToEvent);
@@ -764,13 +819,14 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
 
   // --- Testing Sessions ---
 
-  async createTestingSession(session: { branch?: string; sprint?: number; purpose?: string; worktree_path?: string; branch_name?: string }): Promise<{ id: string; started_at: string }> {
+  async createTestingSession(session: { branch?: string; sprint?: SprintIdInput; purpose?: string; worktree_path?: string; branch_name?: string }): Promise<{ id: string; started_at: string }> {
     const id = generateId('tsess');
     const started_at = nowISO();
+    const sprint = session.sprint === undefined ? null : canonicalSprintKey(session.sprint);
     this.db.prepare(`
       INSERT INTO testing_sessions (id, branch, sprint, purpose, worktree_path, branch_name, started_at, status)
       VALUES (?, ?, ?, ?, ?, ?, ?, 'active')
-    `).run(id, session.branch ?? null, session.sprint ?? null, session.purpose ?? null, session.worktree_path ?? null, session.branch_name ?? null, started_at);
+    `).run(id, session.branch ?? null, sprint, session.purpose ?? null, session.worktree_path ?? null, session.branch_name ?? null, started_at);
     return { id, started_at };
   }
 
@@ -790,13 +846,13 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
     };
   }
 
-  async getActiveTestingSession(): Promise<{ id: string; branch?: string; sprint?: number; purpose?: string; worktree_path?: string; branch_name?: string; started_at: string } | null> {
+  async getActiveTestingSession(): Promise<{ id: string; branch?: string; sprint?: string; purpose?: string; worktree_path?: string; branch_name?: string; started_at: string } | null> {
     const row = this.db.prepare('SELECT * FROM testing_sessions WHERE status = ? ORDER BY started_at DESC LIMIT 1').get('active') as Record<string, unknown> | undefined;
     if (!row) return null;
     return {
       id: row.id as string,
       branch: (row.branch as string | null) ?? undefined,
-      sprint: (row.sprint as number | null) ?? undefined,
+      sprint: row.sprint == null ? undefined : canonicalSprintKey(row.sprint as SprintId),
       purpose: (row.purpose as string | null) ?? undefined,
       worktree_path: (row.worktree_path as string | null) ?? undefined,
       branch_name: (row.branch_name as string | null) ?? undefined,

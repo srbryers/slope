@@ -71,6 +71,30 @@ describe('roadmap migration mapping', () => {
 });
 
 describe('roadmap migration ownership planning', () => {
+  it('keeps canonical companion keys distinct when numeric mirrors collide', () => {
+    const first = sprint(458.1, {
+      id_key: '458.1',
+      tickets: [ticket('S458.1-1'), ticket('S458.1-2'), ticket('S458.1-3')],
+    });
+    const tenth = sprint(458.1, {
+      id_key: '458.10',
+      tickets: [ticket('S458.10-1'), ticket('S458.10-2'), ticket('S458.10-3')],
+    });
+    const source = roadmap(
+      [{ name: 'Inserted', sprints: [458.1, 458.1], sprint_keys: ['458.1', '458.10'] }],
+      [first, tenth],
+    );
+
+    const plan = planRoadmapMigration(source);
+
+    expect(plan.applicable).toBe(true);
+    expect(plan.diagnostics).not.toContainEqual(expect.objectContaining({
+      code: 'duplicate_sprint_definition',
+    }));
+    expect(plan.normalized_roadmap.sprints.map(item => item.id_key)).toEqual(['458.1', '458.10']);
+    expect(plan.sources[0].sprints.map(item => item.id_key)).toEqual(['458.1', '458.10']);
+  });
+
   it('reports orphans and duplicate owners without guessing', () => {
     const source = roadmap(
       [{ name: 'Umbrella', sprints: [1] }, { name: 'Subphase', sprints: [1] }],

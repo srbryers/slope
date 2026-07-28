@@ -1,7 +1,8 @@
 import type { ReviewRecommendation, ReviewType } from '../core/types.js';
+import type { SprintId } from '../core/sprint-id.js';
 
 export interface ReviewerAgentContext {
-  sprintNumber?: number;
+  sprintNumber?: SprintId;
   theme?: string;
   filePatterns?: string[];
   artifacts?: string[];

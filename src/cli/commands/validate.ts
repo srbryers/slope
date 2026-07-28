@@ -4,8 +4,8 @@ import {
   DEFAULT_SKILLS_PATH,
   discoverScorecardFiles,
   loadSkillRegistry,
-  parseSprintNumber,
   skillIds,
+  sprintIdKey,
   sprintNumberFromScorecardFile,
   validateScorecard,
 } from '../../core/index.js';
@@ -14,7 +14,7 @@ import { updateGate } from '../sprint-state.js';
 import { completeRoadmapSourceSprint } from '../roadmap-source-store.js';
 import { sprintLabelForExecution } from '../workflow-resync.js';
 import { reconcileWorkflowCloseout, WORKFLOW_EXECUTION_ID_ENV } from '../workflow-closeout.js';
-import type { RoadmapSourceError } from '../../core/index.js';
+import type { RoadmapSourceError, SprintId } from '../../core/index.js';
 
 export async function validateCommand(input?: string | string[]): Promise<void> {
   const args = Array.isArray(input) ? input : input ? [input] : [];
@@ -63,7 +63,7 @@ export async function validateCommand(input?: string | string[]): Promise<void> 
   }
 
   let allValid = true;
-  const validScorecards: Array<{ sprint: number; path: string }> = [];
+  const validScorecards: Array<{ sprint: SprintId; path: string }> = [];
 
   for (const file of files) {
     let raw: any;
@@ -82,13 +82,15 @@ export async function validateCommand(input?: string | string[]): Promise<void> 
 
     if (result.valid && result.warnings.length === 0) {
       console.log(`\u2713 ${sprintLabel}: Valid (no errors, no warnings)`);
-      if (typeof card.sprint_number === 'number') validScorecards.push({ sprint: card.sprint_number, path: file });
+      const sprint = sprintIdKey(card.sprint_number as string | number);
+      if (sprint) validScorecards.push({ sprint, path: file });
     } else if (result.valid) {
       console.log(`\u2713 ${sprintLabel}: Valid (${result.warnings.length} warning${result.warnings.length === 1 ? '' : 's'})`);
       for (const w of result.warnings) {
         console.log(`  \u26A0 [${w.code}] ${w.message}`);
       }
-      if (typeof card.sprint_number === 'number') validScorecards.push({ sprint: card.sprint_number, path: file });
+      const sprint = sprintIdKey(card.sprint_number as string | number);
+      if (sprint) validScorecards.push({ sprint, path: file });
     } else {
       console.log(`\u2717 ${sprintLabel}: INVALID (${result.errors.length} error${result.errors.length === 1 ? '' : 's'}, ${result.warnings.length} warning${result.warnings.length === 1 ? '' : 's'})`);
       for (const e of result.errors) {
@@ -107,7 +109,7 @@ export async function validateCommand(input?: string | string[]): Promise<void> 
   let reconciled = true;
   if (allValid && registryAvailable && !readOnly) {
     updateGate(cwd, 'scorecard', true);
-    const completedRoadmapSprints = new Set<number>();
+    const completedRoadmapSprints = new Set<SprintId>();
     reconciled = reconcileModularRoadmapSources(cwd, validScorecards, completedRoadmapSprints);
     if (reconciled && completedRoadmapSprints.size > 0) {
       reconciled = await reconcileValidatedWorkflowExecutions(cwd, completedRoadmapSprints);
@@ -125,7 +127,7 @@ export async function validateCommand(input?: string | string[]): Promise<void> 
   process.exit(allValid && registryAvailable && reconciled ? 0 : 1);
 }
 
-async function reconcileValidatedWorkflowExecutions(cwd: string, sprints: Iterable<number>): Promise<boolean> {
+async function reconcileValidatedWorkflowExecutions(cwd: string, sprints: Iterable<SprintId>): Promise<boolean> {
   const invokingExecutionId = process.env[WORKFLOW_EXECUTION_ID_ENV]?.trim();
   const result = await reconcileWorkflowCloseout(cwd, sprints, {
     ...(invokingExecutionId ? { preserveExecutionIds: [invokingExecutionId] } : {}),
@@ -150,8 +152,8 @@ async function reconcileValidatedWorkflowExecutions(cwd: string, sprints: Iterab
  */
 export function reconcileModularRoadmapSources(
   cwd: string,
-  scorecards: Array<{ sprint: number; path: string }>,
-  completedSprints: Set<number> = new Set(),
+  scorecards: Array<{ sprint: SprintId; path: string }>,
+  completedSprints: Set<SprintId> = new Set(),
 ): boolean {
   if (!existsSync(join(cwd, 'docs', 'roadmap', 'project.yaml'))) {
     for (const scorecard of scorecards) completedSprints.add(scorecard.sprint);
@@ -192,13 +194,13 @@ export function reconcileModularRoadmapSources(
   return ok;
 }
 
-function parseRequestedSprint(args: string[], sprintArgIndex: number): number | null {
+function parseRequestedSprint(args: string[], sprintArgIndex: number): string | null {
   if (sprintArgIndex < 0) return null;
   const arg = args[sprintArgIndex];
   const raw = arg.startsWith('--sprint=')
     ? arg.slice('--sprint='.length)
     : args[sprintArgIndex + 1];
-  const sprint = parseSprintNumber(raw ?? '');
+  const sprint = sprintIdKey(raw ?? '');
   if (sprint == null) {
     console.error('Error: --sprint must be a valid sprint number.');
     process.exit(1);

@@ -243,7 +243,7 @@ Scorecards are JSON files in `docs/retros/`. Here's a minimal example:
 
 ```json
 {
-  "sprint_number": 5,
+  "sprint_number": "5",
   "theme": "User Authentication",
   "par": 4,
   "slope": 1,

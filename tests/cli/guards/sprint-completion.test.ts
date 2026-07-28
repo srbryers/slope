@@ -232,7 +232,7 @@ describe('sprint-completion guard', () => {
       expect(result.blockReason).toContain('slope sprint rollover --from=65 --to=66 --force --reason="<why>"');
 
       const state = loadSprintState(tmpDir)!;
-      expect(state.sprint).toBe(65);
+      expect(state.sprint).toBe('65');
       expect(state.phase).toBe('implementing');
     });
 
@@ -247,7 +247,7 @@ describe('sprint-completion guard', () => {
       expect(result.blockReason).toContain('Rollover is not currently eligible');
       expect(result.blockReason).toContain('S66 is blocked by S65');
       expect(result.blockReason).not.toContain('--force --reason');
-      expect(loadSprintState(tmpDir)?.sprint).toBe(65);
+      expect(loadSprintState(tmpDir)?.sprint).toBe('65');
     });
 
     it('blocks PR creation when rollover-linked state loses its audit', async () => {

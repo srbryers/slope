@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { sprintCommand } from '../../src/cli/commands/sprint.js';
 import { createStore } from '../../src/store/index.js';
-import type { RoadmapDefinition } from '../../src/core/index.js';
+import type { RoadmapDefinition, SprintId } from '../../src/core/index.js';
 import { WorkflowEngine, loadWorkflow, resolveVariables } from '../../src/core/index.js';
 import { findStaleWorkflowExecutions, scorecardExistsForSprint } from '../../src/cli/workflow-resync.js';
 
@@ -137,7 +137,7 @@ phases:
 `);
 }
 
-function initGitForSprint(sprint: number): void {
+function initGitForSprint(sprint: SprintId): void {
   execFileSync('git', ['init'], { cwd: tmpDir, stdio: 'ignore' });
   execFileSync('git', ['config', 'user.email', 'test@example.com'], { cwd: tmpDir });
   execFileSync('git', ['config', 'user.name', 'Test User'], { cwd: tmpDir });
@@ -269,7 +269,7 @@ describe('slope sprint run', () => {
     );
 
     const state = JSON.parse(readFileSync(join(tmpDir, '.slope', 'sprint-state.json'), 'utf8'));
-    expect(state.sprint).toBe(98);
+    expect(state.sprint).toBe('98');
     expect(state.phase).toBe('implementing');
   });
 });
@@ -629,8 +629,28 @@ describe('slope sprint workflow cleanup', () => {
     }
 
     const state = JSON.parse(readFileSync(join(tmpDir, '.slope', 'sprint-state.json'), 'utf8'));
-    expect(state.sprint).toBe(66);
+    expect(state.sprint).toBe('66');
     expect(state.phase).toBe('implementing');
+  });
+
+  it('keeps an inserted sprint ending in zero distinct during resync', async () => {
+    initGitForSprint('458.10');
+    writeProjectWorkflow('decimal-resync');
+    const execId = await startWorkflow('S458.10', 'decimal-resync');
+
+    const store = createStore({ storePath: '.slope/slope.db', cwd: tmpDir });
+    try {
+      await store.updateExecutionState(execId, 'pre_hole', 'verify_previous');
+    } finally {
+      store.close();
+    }
+
+    const output = await captureLog(() => sprintCommand(['workflow', 'resync']));
+    const state = JSON.parse(readFileSync(join(tmpDir, '.slope', 'sprint-state.json'), 'utf8'));
+
+    expect(output).toContain('Fast-forwarded S458.10');
+    expect(state).toMatchObject({ sprint: '458.10', phase: 'implementing' });
+    expect(state.sprint).not.toBe('458.1');
   });
 });
 
@@ -794,7 +814,7 @@ describe('slope sprint phase', () => {
     const state = JSON.parse(readFileSync(join(tmpDir, '.slope', 'sprint-state.json'), 'utf8'));
 
     expect(output).toContain('Sprint 114.5 started');
-    expect(state.sprint).toBe(114.5);
+    expect(state.sprint).toBe('114.5');
   });
 
   it('starts and reports canonical roadmap S455 instead of legacy encoded S45.5 (#605)', async () => {
@@ -816,7 +836,7 @@ describe('slope sprint phase', () => {
     expect(status).not.toContain('Sprint 45.5');
     expect(status).toContain('Active claims:');
     expect(status).toContain('[ticket] S455-1');
-    expect(state.sprint).toBe(455);
+    expect(state.sprint).toBe('455');
   });
 
   it('updates an existing sprint state phase', async () => {
@@ -916,7 +936,7 @@ describe('slope sprint rollover', () => {
     expect(output).toContain('Rollover recorded: S98 -> S99');
     expect(output).toContain('Prior state archived; claims and sessions unchanged.');
     expect(output).toContain('Next: slope sprint begin --sprint=99 --ticket=<key>');
-    expect(state).toMatchObject({ sprint: 99, phase: 'planning' });
+    expect(state).toMatchObject({ sprint: '99', phase: 'planning' });
     expect(readFileSync(join(tmpDir, state.rollover.audit_path), 'utf8')).toContain('"kind": "sprint_rollover"');
   });
 
@@ -979,7 +999,7 @@ describe('slope sprint rollover', () => {
     }
 
     expect(errors).toContain('rollover lineage audit is missing');
-    expect(JSON.parse(readFileSync(statePath, 'utf8')).sprint).toBe(99);
+    expect(JSON.parse(readFileSync(statePath, 'utf8')).sprint).toBe('99');
   });
 });
 
@@ -1155,7 +1175,7 @@ describe('slope sprint (help)', () => {
 
     expect(output).toContain('slope sprint reset');
     expect(output).toContain('Clear sprint state');
-    expect(state.sprint).toBe(160);
+    expect(state.sprint).toBe('160');
     expect(state.phase).toBe('implementing');
   });
 
@@ -1174,7 +1194,7 @@ describe('slope sprint (help)', () => {
     }
 
     const state = JSON.parse(readFileSync(join(tmpDir, '.slope', 'sprint-state.json'), 'utf8'));
-    expect(state.sprint).toBe(160);
+    expect(state.sprint).toBe('160');
     expect(state.phase).toBe('implementing');
   });
 });
@@ -1190,5 +1210,18 @@ describe('workflow resync scorecard lookup', () => {
     writeFileSync(join(tmpDir, 'docs', 'retros', 'sprint-143.99-S143.99.json'), '{}');
 
     expect(scorecardExistsForSprint(tmpDir, 143.99)).toBe(true);
+  });
+
+  it('does not alias scorecard identity 458.10 to 458.1', () => {
+    writeFileSync(join(tmpDir, '.slope', 'config.json'), JSON.stringify({
+      scorecardDir: 'docs/retros',
+      scorecardPattern: 'sprint-*.json',
+      minSprint: 1,
+    }));
+    mkdirSync(join(tmpDir, 'docs', 'retros'), { recursive: true });
+    writeFileSync(join(tmpDir, 'docs', 'retros', 'sprint-458.10.json'), '{}');
+
+    expect(scorecardExistsForSprint(tmpDir, '458.10')).toBe(true);
+    expect(scorecardExistsForSprint(tmpDir, '458.1')).toBe(false);
   });
 });

@@ -3,6 +3,8 @@
 
 import type { SlopeEvent, SprintClaim, SprintConflict } from './types.js';
 import type { StandupReport } from './standup.js';
+import { sprintIdKey } from './sprint-id.js';
+import type { SprintId } from './sprint-id.js';
 
 /** Escalation trigger types */
 export type EscalationTrigger = 'blocker_timeout' | 'claim_conflict' | 'test_failure_cascade' | 'manual';
@@ -138,8 +140,9 @@ export function detectEscalation(opts: {
 export function buildEscalationEvent(
   escalation: EscalationResult,
   sessionId: string,
-  sprintNumber?: number,
+  sprintNumber?: SprintId,
 ): Omit<SlopeEvent, 'id' | 'timestamp'> {
+  const sprintKey = sprintNumber === undefined ? undefined : sprintIdKey(sprintNumber) ?? undefined;
   return {
     session_id: sessionId,
     type: 'hazard',
@@ -150,6 +153,6 @@ export function buildEscalationEvent(
       actions: escalation.actions,
       ...(escalation.agent_role ? { agent_role: escalation.agent_role } : {}),
     },
-    sprint_number: sprintNumber,
+    sprint_number: sprintKey,
   };
 }

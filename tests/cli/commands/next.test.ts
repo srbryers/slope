@@ -201,8 +201,8 @@ describe('slope next', () => {
     expect(output).toContain('Latest scorecard: S99');
     expect(output).toContain('Next sprint: S43.5');
     expect(output).toContain('roadmap state overrides scorecard fallback to S100');
-    expect(output).toContain('slope briefing --sprint=435');
-    expect(output).toMatch(/slope auto-card --sprint=435 --since="\d{4}-\d{2}-\d{2}"/);
+    expect(output).toContain('slope briefing --sprint=43.5');
+    expect(output).toMatch(/slope auto-card --sprint=43\.5 --since="\d{4}-\d{2}-\d{2}"/);
     expect(output).not.toContain('date -d yesterday');
   });
 

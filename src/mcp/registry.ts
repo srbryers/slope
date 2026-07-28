@@ -141,7 +141,7 @@ export const SLOPE_REGISTRY: FunctionRegistryEntry[] = [
     name: 'extractHazardIndex',
     module: 'core',
     description: 'Extracts all hazards from scorecards into a flat searchable index.',
-    signature: 'extractHazardIndex(scorecards: GolfScorecard[], keyword?: string): { shot_hazards: HazardEntry[]; bunker_locations: { sprint: number; location: string }[] }',
+    signature: 'extractHazardIndex(scorecards: GolfScorecard[], keyword?: string): { shot_hazards: HazardEntry[]; bunker_locations: { sprint: string; location: string }[] }',
     example: 'const cards = loadScorecards(); return extractHazardIndex(cards, "deploy");',
   },
   {
@@ -206,7 +206,7 @@ export const SLOPE_REGISTRY: FunctionRegistryEntry[] = [
     name: 'formatStrategicContext',
     module: 'core',
     description: 'Formats concise strategic context for a sprint (3-5 lines for briefings).',
-    signature: 'formatStrategicContext(roadmap: RoadmapDefinition, currentSprint: number): string | null',
+    signature: 'formatStrategicContext(roadmap: RoadmapDefinition, currentSprint: SprintIdInput): string | null',
     example: 'const roadmap = loadRoadmap(); return formatStrategicContext(roadmap, 8);',
   },
 
@@ -307,7 +307,7 @@ export const SLOPE_REGISTRY: FunctionRegistryEntry[] = [
     name: 'buildEscalationEvent',
     module: 'core',
     description: 'Creates a hazard event from an escalation result, suitable for store.insertEvent().',
-    signature: 'buildEscalationEvent(escalation: EscalationResult, sessionId: string, sprintNumber?: number): Omit<SlopeEvent, "id" | "timestamp">',
+    signature: 'buildEscalationEvent(escalation: EscalationResult, sessionId: string, sprintNumber?: SprintIdInput): Omit<SlopeEvent, "id" | "timestamp">',
     example: 'const event = buildEscalationEvent(escalation, "sess-1", 15);',
   },
   {
@@ -611,7 +611,7 @@ export const SLOPE_REGISTRY: FunctionRegistryEntry[] = [
     name: 'acquire_claim',
     module: 'store',
     description: 'Direct MCP tool: Claims a ticket or area for the current sprint via SlopeStore. Not available inside execute().',
-    signature: 'acquire_claim(sessionId: string, target: string, scope: ClaimScope, sprintNumber: number, player: string): SprintClaim',
+    signature: 'acquire_claim(sessionId: string, target: string, scope: ClaimScope, sprintNumber: SprintIdInput, player: string): SprintClaim',
     example: '// Called via MCP tool, not directly',
     availability: 'mcp_tool',
   },
@@ -619,7 +619,7 @@ export const SLOPE_REGISTRY: FunctionRegistryEntry[] = [
     name: 'check_conflicts',
     module: 'store',
     description: 'Direct MCP tool: Detects overlapping and adjacent conflicts among active claims. Not available inside execute().',
-    signature: 'check_conflicts(sprintNumber?: number): { claims: number; conflicts: SprintConflict[] }',
+    signature: 'check_conflicts(sprintNumber?: SprintIdInput): { claims: number; conflicts: SprintConflict[] }',
     example: '// Called via MCP tool, not directly',
     availability: 'mcp_tool',
   },
@@ -798,9 +798,9 @@ export const SLOPE_REGISTRY: FunctionRegistryEntry[] = [
   {
     name: 'linkInspirationToSprint',
     module: 'inspirations',
-    description: 'Link an inspiration entry to a sprint number. Idempotent — no error if already linked. Writes to disk.',
-    signature: 'linkInspirationToSprint(path: string, id: string, sprint: number): InspirationsFile',
-    example: 'return linkInspirationToSprint(".slope/inspirations.json", "gitnexus", 65);',
+    description: 'Link an inspiration entry to a canonical sprint ID. Idempotent — no error if already linked. Writes to disk.',
+    signature: 'linkInspirationToSprint(path: string, id: string, sprint: SprintIdInput): InspirationsFile',
+    example: 'return linkInspirationToSprint(".slope/inspirations.json", "gitnexus", "458.10");',
   },
   {
     name: 'deriveId',
@@ -900,7 +900,7 @@ export const SLOPE_REGISTRY: FunctionRegistryEntry[] = [
     name: 'testing_session_start',
     module: 'testing',
     description: 'Direct MCP tool: Start a manual testing session. Creates a git worktree, returns setup steps from config. One active session at a time. Not available inside execute().',
-    signature: 'testing_session_start({ purpose?: string, sprint?: number })',
+    signature: 'testing_session_start({ purpose?: string, sprint?: SprintIdInput })',
     example: 'Call via MCP: testing_session_start({ purpose: "Test checkout flow" })',
     availability: 'mcp_tool',
   },
@@ -995,6 +995,10 @@ type SpecialPlay = 'gimme' | 'mulligan' | 'provisional' | 'lay_up' | 'scramble';
 type MissDirection = 'long' | 'short' | 'left' | 'right';
 type ScoreLabel = 'eagle' | 'birdie' | 'par' | 'bogey' | 'double_bogey' | 'triple_plus';
 type SprintType = 'feature' | 'feedback' | 'infra' | 'bugfix' | 'research' | 'flow' | 'test-coverage' | 'audit';
+type SprintId = string;
+type SprintIdInput = string | number;
+type ClaimScope = 'ticket' | 'area';
+type EventType = 'failure' | 'dead_end' | 'scope_change' | 'compaction' | 'hazard' | 'decision' | 'standup';
 
 // ─── Record Types ───
 interface HazardHit { type: HazardType; description: string; gotcha_id?: string; }
@@ -1003,7 +1007,7 @@ interface ConditionRecord { type: ConditionType; description: string; impact: 'n
 
 // ─── Scoring Types ───
 interface HoleStats { fairways_hit: number; fairways_total: number; greens_in_regulation: number; greens_total: number; putts: number; penalties: number; hazards_hit: number; hazard_penalties: number; miss_directions: Record<MissDirection, number>; }
-interface HoleScore { sprint_number: number; theme: string; par: 3 | 4 | 5; slope: number; score: number; score_label: ScoreLabel; shots: ShotRecord[]; conditions: ConditionRecord[]; special_plays: SpecialPlay[]; stats: HoleStats; }
+interface HoleScore { sprint_number: SprintId; theme: string; par: 3 | 4 | 5; slope: number; score: number; score_label: ScoreLabel; shots: ShotRecord[]; conditions: ConditionRecord[]; special_plays: SpecialPlay[]; stats: HoleStats; }
 
 // ─── Full Scorecard ───
 interface GolfScorecard extends HoleScore { type?: SprintType; player?: string; date: string; training?: TrainingSession[]; nutrition?: NutritionEntry[]; yardage_book_updates: string[]; bunker_locations: string[]; course_management_notes: string[]; nineteenth_hole?: NineteenthHole; }
@@ -1017,11 +1021,14 @@ interface DispersionReport { total_shots: number; total_misses: number; miss_rat
 interface AreaReport { by_sprint_type: Record<string, { count: number; avg_score_vs_par: number; fairway_pct: number; gir_pct: number }>; by_club: Record<string, { count: number; in_the_hole_rate: number; miss_rate: number }>; par_performance: Record<number, { count: number; avg_score_vs_par: number; over_par_rate: number }>; }
 
 // ─── Config & Loader ───
-interface SlopeConfig { scorecardDir: string; scorecardPattern: string; minSprint: number; commonIssuesPath: string; sessionsPath: string; registry: 'file' | 'api'; claimsPath: string; registryApiUrl?: string; currentSprint?: number; store?: string; store_path?: string; }
+interface SlopeConfig { scorecardDir: string; scorecardPattern: string; minSprint: number; commonIssuesPath: string; sessionsPath: string; registry: 'file' | 'api'; claimsPath: string; registryApiUrl?: string; currentSprint?: SprintId; store?: string; store_path?: string; }
 
 // ─── Store ───
 interface SlopeSession { session_id: string; role: 'primary' | 'secondary' | 'observer'; ide: string; worktree_path?: string; branch?: string; started_at: string; last_heartbeat_at: string; metadata?: Record<string, unknown>; agent_role?: string; swarm_id?: string; }
-interface SprintClaim { id: string; sprint_number: number; player: string; target: string; scope: ClaimScope; claimed_at: string; notes?: string; session_id?: string; expires_at?: string; metadata?: Record<string, unknown>; }
+interface SprintClaim { id: string; sprint_number: SprintId; player: string; target: string; scope: ClaimScope; claimed_at: string; notes?: string; session_id?: string; expires_at?: string; metadata?: Record<string, unknown>; }
+
+// ─── Events ───
+interface SlopeEvent { id: string; session_id?: string; type: EventType; timestamp: string; data: Record<string, unknown>; sprint_number?: SprintId; ticket_key?: string; }
 
 // ─── Standup ───
 interface StandupReport { sessionId: string; agent_role?: string; ticketKey?: string; status: 'working' | 'blocked' | 'complete'; progress: string; blockers: string[]; decisions: string[]; handoffs: HandoffEntry[]; timestamp: string; }
@@ -1034,7 +1041,7 @@ interface RoleDefinition { id: string; name: string; description: string; focusA
 interface AgentBreakdown { session_id: string; agent_role: string; shots: ShotRecord[]; score: number; stats: HoleStats; }
 interface AgentShotInput { session_id: string; agent_role: string; shots: ShotRecord[]; }
 interface ScorecardShotInput { ticket_key?: string; ticket?: string; title?: string; club: ClubSelection; result: ShotResult; hazards?: Array<HazardHit | string>; provisional_declared?: boolean; notes?: string; }
-interface ScorecardInput { sprint_number: number; theme: string; par: 3 | 4 | 5; slope: number; date: string; shots: ScorecardShotInput[]; putts?: number; penalties?: number; score?: number; type?: SprintType; conditions?: ConditionRecord[]; special_plays?: SpecialPlay[]; training?: TrainingSession[]; nutrition?: NutritionEntry[]; nineteenth_hole?: NineteenthHole; bunker_locations?: string[]; yardage_book_updates?: string[]; course_management_notes?: string[]; agents?: AgentBreakdown[]; }
+interface ScorecardInput { sprint_number: SprintIdInput; theme: string; par: 3 | 4 | 5; slope: number; date: string; shots: ScorecardShotInput[]; putts?: number; penalties?: number; score?: number; type?: SprintType; conditions?: ConditionRecord[]; special_plays?: SpecialPlay[]; training?: TrainingSession[]; nutrition?: NutritionEntry[]; nineteenth_hole?: NineteenthHole; bunker_locations?: string[]; yardage_book_updates?: string[]; course_management_notes?: string[]; agents?: AgentBreakdown[]; }
 
 // ─── Escalation ───
 type EscalationTrigger = 'blocker_timeout' | 'claim_conflict' | 'test_failure_cascade' | 'manual';
@@ -1066,14 +1073,14 @@ interface TrainingPlanInput { handicap: HandicapCard; dispersion: DispersionRepo
 // ─── Roadmap ───
 type RoadmapClub = 'driver' | 'long_iron' | 'short_iron' | 'wedge' | 'putter';
 interface RoadmapTicket { key: string; id?: string; title: string; club: RoadmapClub; complexity: 'trivial' | 'small' | 'standard' | 'moderate' | 'multi_package' | 'multi-package' | 'risky'; depends_on?: string[]; github_issue?: number | number[]; }
-interface RoadmapSprint { id: number; theme: string; par: 3 | 4 | 5; slope: number; type: string; tickets: RoadmapTicket[]; depends_on?: number[]; }
-interface RoadmapPhase { name: string; sprints: number[]; }
+interface RoadmapSprint { id: number; id_key?: string; theme: string; par: 3 | 4 | 5; slope: number; type: string; tickets: RoadmapTicket[]; depends_on?: SprintIdInput[]; }
+interface RoadmapPhase { name: string; sprints: number[]; sprint_keys?: string[]; }
 interface RoadmapDefinition { name: string; description?: string; phases: RoadmapPhase[]; sprints: RoadmapSprint[]; }
 interface RoadmapValidationResult { valid: boolean; errors: RoadmapValidationError[]; warnings: RoadmapValidationWarning[]; }
-interface RoadmapValidationError { type: 'error'; sprint?: number; ticket?: string; message: string; }
-interface RoadmapValidationWarning { type: 'warning'; sprint?: number; ticket?: string; message: string; }
-interface CriticalPathResult { path: number[]; length: number; totalPar: number; }
-interface ParallelGroup { sprints: number[]; reason: string; }
+interface RoadmapValidationError { type: 'error'; sprint?: SprintId; ticket?: string; message: string; }
+interface RoadmapValidationWarning { type: 'warning'; sprint?: SprintId; ticket?: string; message: string; }
+interface CriticalPathResult { path: string[]; length: number; totalPar: number; }
+interface ParallelGroup { sprints: string[]; reason: string; }
 
 // ─── Player (Multi-Developer) ───
 interface PlayerHandicap { player: string; scorecardCount: number; handicapCard: HandicapCard; }
@@ -1086,15 +1093,15 @@ interface FlowDefinition { id: string; title: string; description: string; entry
 interface FlowsFile { version: '1'; last_generated: string; flows: FlowDefinition[]; }
 
 // ─── Briefing ───
-interface RecurringPattern { id: number; title: string; category: string; sprints_hit: number[]; gotcha_refs: string[]; description: string; prevention: string; reported_by?: string[]; }
+interface RecurringPattern { id: number; title: string; category: string; sprints_hit: SprintId[]; gotcha_refs: string[]; description: string; prevention: string; reported_by?: string[]; }
 interface CommonIssuesFile { recurring_patterns: RecurringPattern[]; }
 interface SessionEntry { id: number; date: string; sprint: string; summary: string; where_left_off: string; }
 interface BriefingFilter { categories?: string[]; keywords?: string[]; }
 
 // ─── Tournament ───
 interface TournamentReview { id: string; name: string; dateRange: { start: string; end: string }; sprints: TournamentSprintEntry[]; scoring: TournamentScoring; stats: TournamentStats; hazardIndex: TournamentHazard[]; clubPerformance: Record<string, { attempts: number; inTheHole: number; avgScore: number }>; takeaways: string[]; improvements: string[]; reflection?: string; }
-interface TournamentSprintEntry { sprintNumber: number; theme: string; par: number; slope: number; score: number; scoreLabel: ScoreLabel; ticketCount: number; ticketsLanded: number; }
-interface TournamentScoring { totalPar: number; totalScore: number; differential: number; avgScoreLabel: string; bestSprint: { sprintNumber: number; label: ScoreLabel }; worstSprint: { sprintNumber: number; label: ScoreLabel }; sprintCount: number; ticketCount: number; ticketsLanded: number; landingRate: number; }
+interface TournamentSprintEntry { sprintNumber: SprintId; theme: string; par: number; slope: number; score: number; scoreLabel: ScoreLabel; ticketCount: number; ticketsLanded: number; }
+interface TournamentScoring { totalPar: number; totalScore: number; differential: number; avgScoreLabel: string; bestSprint: { sprintNumber: SprintId; label: ScoreLabel }; worstSprint: { sprintNumber: SprintId; label: ScoreLabel }; sprintCount: number; ticketCount: number; ticketsLanded: number; landingRate: number; }
 
 // ─── Analyzers ───
 type AnalyzerName = 'stack' | 'structure' | 'git' | 'testing' | 'ci' | 'docs';
@@ -1170,10 +1177,11 @@ export const MCP_TOOL_REGISTRY: readonly McpToolMeta[] = [
     name: 'acquire_claim',
     desc: 'Claim a ticket or area for the current sprint',
     params: [
-      { name: 'target', type: 'string', desc: 'File or directory to claim', required: true },
-      { name: 'scope', type: 'string', desc: 'Claim scope (file, directory, module, ticket)' },
-      { name: 'ticket', type: 'string', desc: 'Ticket key (e.g. S48-1)' },
-      { name: 'sprint', type: 'number', desc: 'Sprint number' },
+      { name: 'sessionId', type: 'string', desc: 'Session ID to associate with the claim', required: true },
+      { name: 'target', type: 'string', desc: 'Ticket key or area path to claim', required: true },
+      { name: 'scope', type: '"ticket" | "area"', desc: 'Claim scope', required: true },
+      { name: 'sprintNumber', type: 'string | number', desc: 'Canonical sprint ID; legacy numbers accepted', required: true },
+      { name: 'player', type: 'string', desc: 'Player name', required: true },
     ],
     requiresStore: true,
   },
@@ -1181,7 +1189,7 @@ export const MCP_TOOL_REGISTRY: readonly McpToolMeta[] = [
     name: 'check_conflicts',
     desc: 'Detect overlapping and adjacent conflicts among active claims',
     params: [
-      { name: 'sprint', type: 'number', desc: 'Filter to a specific sprint' },
+      { name: 'sprintNumber', type: 'string | number', desc: 'Canonical sprint ID filter; legacy numbers accepted' },
     ],
     requiresStore: true,
   },
@@ -1196,7 +1204,7 @@ export const MCP_TOOL_REGISTRY: readonly McpToolMeta[] = [
     desc: 'Start a manual testing session with git worktree isolation',
     params: [
       { name: 'purpose', type: 'string', desc: 'Purpose of the testing session' },
-      { name: 'sprint', type: 'number', desc: 'Sprint number' },
+      { name: 'sprint', type: 'string | number', desc: 'Canonical sprint ID; legacy numbers accepted' },
     ],
     requiresStore: true,
   },

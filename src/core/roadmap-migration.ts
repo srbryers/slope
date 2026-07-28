@@ -13,6 +13,7 @@ import {
   serializeRoadmapProjection,
   type RoadmapSourceKind,
 } from './roadmap-sources.js';
+import { compareSprintIdKeys, sprintIdKey, type SprintId } from './sprint-id.js';
 
 export type RoadmapMigrationClassification = 'archive' | 'live' | 'history_unverified' | 'backlog';
 
@@ -55,7 +56,7 @@ export interface RoadmapMigrationDiagnostic {
   severity: 'error' | 'warning';
   code: string;
   message: string;
-  sprint?: number;
+  sprint?: SprintId;
   ticket?: string;
   phase_index?: number;
 }
@@ -184,15 +185,43 @@ function pointerPart(value: string): string {
   return value.replace(/~/g, '~0').replace(/\//g, '~1');
 }
 
-function sprintKey(value: number): string {
-  return Number.isInteger(value) ? String(value) : String(value);
+function sprintKey(value: number): SprintId {
+  return String(value);
 }
 
-function parsePositiveSprintKey(value: string, label: string): number {
-  if (!/^\d+(?:\.\d+)?$/.test(value) || Number(value) <= 0) {
+function parsePositiveSprintKey(value: string, label: string): SprintId {
+  const key = sprintIdKey(value);
+  if (key === null) {
     throw new RoadmapMigrationError(`${label} key must be a positive sprint ID: ${value}`);
   }
-  return Number(value);
+  return key;
+}
+
+function migrationSprintKey(sprint: Record<string, unknown>): SprintId | null {
+  const mirror = typeof sprint.id === 'number' ? sprint.id : null;
+  if (mirror === null || !Number.isFinite(mirror) || mirror <= 0) return null;
+  if (sprint.id_key === undefined) return sprintKey(mirror);
+  if (typeof sprint.id_key !== 'string') return null;
+  const key = sprintIdKey(sprint.id_key);
+  return key !== null && Number(key) === mirror ? key : null;
+}
+
+function phaseMembershipKeys(phase: Record<string, unknown>): SprintId[] {
+  const mirrors = phase.sprints as number[];
+  if (phase.sprint_keys === undefined) return mirrors.map(sprintKey);
+  if (!Array.isArray(phase.sprint_keys) || phase.sprint_keys.length !== mirrors.length) {
+    throw new RoadmapMigrationError('phase sprint_keys must be an array aligned with phase.sprints');
+  }
+  return phase.sprint_keys.map((value, index) => {
+    if (typeof value !== 'string') {
+      throw new RoadmapMigrationError('phase sprint_keys must contain canonical sprint IDs');
+    }
+    const key = sprintIdKey(value);
+    if (key === null || Number(key) !== mirrors[index]) {
+      throw new RoadmapMigrationError(`phase sprint_keys entry ${value} does not match numeric mirror ${mirrors[index]}`);
+    }
+    return key;
+  });
 }
 
 function rejectUnknownKeys(record: Record<string, unknown>, allowed: Set<string>, label: string): void {
@@ -211,8 +240,8 @@ export function parseRoadmapMigrationMapping(input: unknown): RoadmapMigrationMa
   const ownership: RoadmapMigrationMapping['ownership'] = {};
   if (input.ownership != null) {
     if (!isRecord(input.ownership)) throw new RoadmapMigrationError('migration mapping ownership must be an object');
-    for (const [id, raw] of Object.entries(input.ownership).sort(([a], [b]) => Number(a) - Number(b))) {
-      parsePositiveSprintKey(id, 'ownership');
+    for (const [id, raw] of Object.entries(input.ownership).sort(([a], [b]) => compareSprintIdKeys(a, b))) {
+      const key = parsePositiveSprintKey(id, 'ownership');
       if (!isRecord(raw)) throw new RoadmapMigrationError(`ownership.${id} must be an object`);
       rejectUnknownKeys(raw, new Set(['phase_index', 'phase_name']), `ownership.${id}`);
       if (!Number.isInteger(raw.phase_index) || Number(raw.phase_index) <= 0) {
@@ -221,7 +250,7 @@ export function parseRoadmapMigrationMapping(input: unknown): RoadmapMigrationMa
       if (raw.phase_name != null && (typeof raw.phase_name !== 'string' || !raw.phase_name.trim())) {
         throw new RoadmapMigrationError(`ownership.${id}.phase_name must be a non-empty string when present`);
       }
-      ownership[id] = {
+      ownership[key] = {
         phase_index: Number(raw.phase_index),
         ...(raw.phase_name ? { phase_name: raw.phase_name.trim() } : {}),
       };
@@ -258,10 +287,10 @@ export function parseRoadmapMigrationMapping(input: unknown): RoadmapMigrationMa
   const scorecards: Record<string, string> = {};
   if (input.scorecards != null) {
     if (!isRecord(input.scorecards)) throw new RoadmapMigrationError('migration mapping scorecards must be an object');
-    for (const [id, path] of Object.entries(input.scorecards).sort(([a], [b]) => Number(a) - Number(b))) {
-      parsePositiveSprintKey(id, 'scorecards');
+    for (const [id, path] of Object.entries(input.scorecards).sort(([a], [b]) => compareSprintIdKeys(a, b))) {
+      const key = parsePositiveSprintKey(id, 'scorecards');
       if (typeof path !== 'string' || !path.trim()) throw new RoadmapMigrationError(`scorecards.${id} must be a non-empty path`);
-      scorecards[id] = normalizeRoadmapSourcePath(path, `scorecards.${id}`);
+      scorecards[key] = normalizeRoadmapSourcePath(path, `scorecards.${id}`);
     }
   }
 
@@ -300,7 +329,7 @@ function targetSchemaError(
 
 function validateTargetTicket(
   ticket: Record<string, unknown>,
-  sprint: number,
+  sprint: SprintId,
   diagnostics: RoadmapMigrationDiagnostic[],
 ): boolean {
   const key = getRoadmapTicketKey(ticket) ?? undefined;
@@ -333,10 +362,11 @@ function validateTargetSprint(
   diagnostics: RoadmapMigrationDiagnostic[],
 ): boolean {
   const id = sprint.id as number;
+  const key = migrationSprintKey(sprint) ?? sprintKey(id);
   let valid = true;
   const reject = (message: string): void => {
     valid = false;
-    targetSchemaError(diagnostics, message, { sprint: id });
+    targetSchemaError(diagnostics, message, { sprint: key });
   };
   if (typeof sprint.theme !== 'string' || !sprint.theme.trim()) reject(`Sprint S${id} theme must be a non-empty string.`);
   if (![3, 4, 5].includes(sprint.par as number)) reject(`Sprint S${id} par must be 3, 4, or 5.`);
@@ -344,8 +374,11 @@ function validateTargetSprint(
   if (typeof sprint.type !== 'string' || !sprint.type.trim()) reject(`Sprint S${id} type must be a non-empty string.`);
   if (sprint.depends_on != null
     && (!Array.isArray(sprint.depends_on)
-      || sprint.depends_on.some(value => typeof value !== 'number' || !Number.isFinite(value) || value <= 0))) {
-    reject(`Sprint S${id} depends_on must contain positive numeric sprint IDs.`);
+      || sprint.depends_on.some(value => (
+        (typeof value !== 'number' && typeof value !== 'string')
+        || sprintIdKey(value) === null
+      )))) {
+    reject(`Sprint S${id} depends_on must contain valid sprint IDs.`);
   }
   for (const field of ['status', 'note', 'outcome', 'phase', 'wave']) {
     if (sprint[field] != null && typeof sprint[field] !== 'string') reject(`Sprint S${id} ${field} must be a string.`);
@@ -363,7 +396,7 @@ function validateTargetSprint(
   for (const ticket of sprint.tickets) {
     if (!isRecord(ticket)) {
       reject(`Sprint S${id} tickets must contain mappings.`);
-    } else if (!validateTargetTicket(ticket, id, diagnostics)) {
+    } else if (!validateTargetTicket(ticket, key, diagnostics)) {
       valid = false;
     }
   }
@@ -393,7 +426,7 @@ function normalizeTicket(
   audit: RoadmapMigrationAuditEntry[],
   diagnostics: RoadmapMigrationDiagnostic[],
   unresolved: RoadmapMigrationUnresolvedRepair[],
-  sprint: number,
+  sprint: SprintId,
 ): void {
   const key = getRoadmapTicketKey(ticket);
   if (!key) {
@@ -503,42 +536,55 @@ export function planRoadmapMigration(
   const phases = clone(parsed.phases) as unknown[];
   const sprints = clone(parsed.sprints) as unknown[];
   const phaseRecords: Record<string, unknown>[] = [];
-  const memberships = new Map<number, number[]>();
+  const memberships = new Map<SprintId, number[]>();
   let targetShapeValid = !invalidDescription;
 
   for (const [phaseOffset, value] of phases.entries()) {
     if (!isRecord(value) || typeof value.name !== 'string' || !value.name.trim() || !Array.isArray(value.sprints)) {
       throw new RoadmapMigrationError(`phases[${phaseOffset}] must have a non-empty name and sprint array`);
     }
-    const seen = new Set<number>();
     for (const id of value.sprints) {
       if (typeof id !== 'number' || !Number.isFinite(id) || id <= 0) {
         throw new RoadmapMigrationError(`phases[${phaseOffset}].sprints contains an invalid sprint ID`);
       }
-      if (!seen.has(id)) {
-        const owners = memberships.get(id) ?? [];
+    }
+    const membershipKeys = phaseMembershipKeys(value);
+    const seen = new Set<SprintId>();
+    const retainedMirrors: number[] = [];
+    const retainedKeys: SprintId[] = [];
+    for (const [index, key] of membershipKeys.entries()) {
+      if (!seen.has(key)) {
+        const owners = memberships.get(key) ?? [];
         owners.push(phaseOffset + 1);
-        memberships.set(id, owners);
-        seen.add(id);
+        memberships.set(key, owners);
+        seen.add(key);
+        retainedMirrors.push(value.sprints[index] as number);
+        retainedKeys.push(key);
       }
     }
-    if (seen.size !== value.sprints.length) {
-      auditChange(audit, `/phases/${phaseOffset}`, 'deduplicate_local_membership', value, 'sprints', [...seen]);
+    if (seen.size !== membershipKeys.length) {
+      auditChange(audit, `/phases/${phaseOffset}`, 'deduplicate_local_membership', value, 'sprints', retainedMirrors);
+      if (value.sprint_keys !== undefined) {
+        auditChange(audit, `/phases/${phaseOffset}`, 'deduplicate_local_membership', value, 'sprint_keys', retainedKeys);
+      }
     }
     if (!validateTargetPhase(value, phaseOffset + 1, diagnostics)) targetShapeValid = false;
     phaseRecords.push(value);
   }
 
   const sprintRecords: Record<string, unknown>[] = [];
-  const definitions = new Map<number, Record<string, unknown>>();
-  const originalSprintIndex = new Map<number, number>();
+  const definitions = new Map<SprintId, Record<string, unknown>>();
+  const originalSprintIndex = new Map<SprintId, number>();
   const usedTicketRepairs = new Set<string>();
   const ticketKeys = new Set<string>();
   for (const [sprintOffset, value] of sprints.entries()) {
     if (!isRecord(value) || typeof value.id !== 'number' || !Number.isFinite(value.id) || value.id <= 0) {
       throw new RoadmapMigrationError(`sprints[${sprintOffset}] must be an object with a positive numeric id`);
     }
-    const id = value.id;
+    const id = migrationSprintKey(value);
+    if (id === null) {
+      throw new RoadmapMigrationError(`sprints[${sprintOffset}] has an invalid id_key or mismatched numeric mirror`);
+    }
     if (definitions.has(id)) {
       diagnostics.push({ severity: 'error', code: 'duplicate_sprint_definition', sprint: id, message: `Sprint S${id} is defined more than once.` });
       continue;
@@ -555,6 +601,23 @@ export function planRoadmapMigration(
         auditChange(audit, `/sprints/${sprintOffset}`, 'scalar_path_to_list', value, field, [value[field]]);
       } else if (value[field] != null && (!Array.isArray(value[field]) || (value[field] as unknown[]).some(item => typeof item !== 'string'))) {
         diagnostics.push({ severity: 'error', code: 'invalid_path_list', sprint: id, message: `Sprint S${id} ${field} must be a string or string array.` });
+      }
+    }
+    if (Array.isArray(value.depends_on)) {
+      const canonicalDependencies = value.depends_on.map(dependency => (
+        typeof dependency === 'number' || typeof dependency === 'string'
+          ? sprintIdKey(dependency)
+          : null
+      ));
+      if (canonicalDependencies.every((dependency): dependency is string => dependency !== null)) {
+        auditChange(
+          audit,
+          `/sprints/${sprintOffset}`,
+          'canonicalize_sprint_dependencies',
+          value,
+          'depends_on',
+          canonicalDependencies,
+        );
       }
     }
     if (value.tickets === null) auditChange(audit, `/sprints/${sprintOffset}`, 'null_tickets_to_empty', value, 'tickets', []);
@@ -576,15 +639,15 @@ export function planRoadmapMigration(
     sprintRecords.push(value);
   }
 
-  for (const [id, owners] of [...memberships.entries()].sort(([a], [b]) => a - b)) {
+  for (const [id] of [...memberships.entries()].sort(([a], [b]) => compareSprintIdKeys(a, b))) {
     if (!definitions.has(id)) diagnostics.push({ severity: 'error', code: 'missing_sprint_definition', sprint: id, message: `Phase membership S${id} has no sprint definition.` });
   }
 
-  const ownerBySprint = new Map<number, number>();
+  const ownerBySprint = new Map<SprintId, number>();
   const usedOwnership = new Set<string>();
-  const orderedDefinitionIds = [...definitions.keys()].sort((a, b) => a - b);
+  const orderedDefinitionIds = [...definitions.keys()].sort(compareSprintIdKeys);
   for (const id of orderedDefinitionIds) {
-    const key = sprintKey(id);
+    const key = id;
     const owners = memberships.get(id) ?? [];
     if (owners.length === 1) {
       ownerBySprint.set(id, owners[0]);
@@ -617,10 +680,10 @@ export function planRoadmapMigration(
     usedOwnership.add(key);
   }
 
-  for (const [id] of Object.entries(options.mapping?.ownership ?? {}).sort(([a], [b]) => Number(a) - Number(b))) {
-    if (!definitions.has(Number(id))) diagnostics.push({ severity: 'error', code: 'stale_ownership_mapping', sprint: Number(id), message: `Ownership mapping references undefined Sprint S${id}.` });
-    else if (!usedOwnership.has(id) && (memberships.get(Number(id))?.length ?? 0) !== 1) {
-      diagnostics.push({ severity: 'error', code: 'unused_ownership_mapping', sprint: Number(id), message: `Ownership mapping for S${id} could not be applied.` });
+  for (const [id] of Object.entries(options.mapping?.ownership ?? {}).sort(([a], [b]) => compareSprintIdKeys(a, b))) {
+    if (!definitions.has(id)) diagnostics.push({ severity: 'error', code: 'stale_ownership_mapping', sprint: id, message: `Ownership mapping references undefined Sprint S${id}.` });
+    else if (!usedOwnership.has(id) && (memberships.get(id)?.length ?? 0) !== 1) {
+      diagnostics.push({ severity: 'error', code: 'unused_ownership_mapping', sprint: id, message: `Ownership mapping for S${id} could not be applied.` });
     }
   }
   for (const ticket of Object.keys(options.mapping?.ticket_repairs ?? {}).sort((a, b) => a < b ? -1 : a > b ? 1 : 0)) {
@@ -632,12 +695,16 @@ export function planRoadmapMigration(
   }
 
   for (const [phaseOffset, phase] of phaseRecords.entries()) {
-    const before = [...(phase.sprints as number[])];
-    const retained = before.filter(id => ownerBySprint.get(id) === phaseOffset + 1);
+    const beforeKeys = phaseMembershipKeys(phase);
+    const retainedKeys = beforeKeys.filter(id => ownerBySprint.get(id) === phaseOffset + 1);
     for (const id of orderedDefinitionIds) {
-      if (ownerBySprint.get(id) === phaseOffset + 1 && !retained.includes(id)) retained.push(id);
+      if (ownerBySprint.get(id) === phaseOffset + 1 && !retainedKeys.includes(id)) retainedKeys.push(id);
     }
-    auditChange(audit, `/phases/${phaseOffset}`, 'repair_phase_ownership', phase, 'sprints', retained);
+    const retainedMirrors = retainedKeys.map(id => definitions.get(id)!.id as number);
+    auditChange(audit, `/phases/${phaseOffset}`, 'repair_phase_ownership', phase, 'sprints', retainedMirrors);
+    if (phase.sprint_keys !== undefined || retainedKeys.some((id, index) => id !== sprintKey(retainedMirrors[index]))) {
+      auditChange(audit, `/phases/${phaseOffset}`, 'repair_phase_ownership', phase, 'sprint_keys', retainedKeys);
+    }
   }
 
   const preliminary: RoadmapDefinition = {
@@ -646,12 +713,15 @@ export function planRoadmapMigration(
     phases: phaseRecords as unknown as RoadmapPhase[],
     sprints: sprintRecords as unknown as RoadmapSprint[],
   };
-  const originalOrder = preliminary.sprints.map(sprint => sprint.id);
+  const originalOrder = preliminary.sprints.map(sprint => migrationSprintKey(sprint as unknown as Record<string, unknown>) ?? sprintKey(sprint.id));
   const canResolveEncodedIdentity = preliminary.sprints.every(sprint => Array.isArray(sprint.tickets));
   preliminary.sprints.sort((a, b) => canResolveEncodedIdentity
-    ? compareRoadmapSprintIds(preliminary, a.id, b.id)
+    ? compareSprintIdKeys(
+      migrationSprintKey(a as unknown as Record<string, unknown>) ?? sprintKey(a.id),
+      migrationSprintKey(b as unknown as Record<string, unknown>) ?? sprintKey(b.id),
+    )
     : a.id - b.id);
-  const sortedOrder = preliminary.sprints.map(sprint => sprint.id);
+  const sortedOrder = preliminary.sprints.map(sprint => migrationSprintKey(sprint as unknown as Record<string, unknown>) ?? sprintKey(sprint.id));
   if (JSON.stringify(originalOrder) !== JSON.stringify(sortedOrder)) {
     audit.push({ path: '/sprints', rule: 'compiler_sprint_order', before: originalOrder, after: sortedOrder });
   }
@@ -678,32 +748,34 @@ export function planRoadmapMigration(
   }
 
   const evidence = { ...(options.evidence ?? {}) };
-  for (const [id, path] of Object.entries(options.mapping?.scorecards ?? {}).sort(([a], [b]) => Number(a) - Number(b))) {
-    const sprint = definitions.get(Number(id));
+  for (const [id, path] of Object.entries(options.mapping?.scorecards ?? {}).sort(([a], [b]) => compareSprintIdKeys(a, b))) {
+    const sprint = definitions.get(id);
     const card = evidence[id];
     if (!sprint) {
-      diagnostics.push({ severity: 'error', code: 'stale_scorecard_mapping', sprint: Number(id), message: `Scorecard mapping references undefined Sprint S${id}.` });
+      diagnostics.push({ severity: 'error', code: 'stale_scorecard_mapping', sprint: id, message: `Scorecard mapping references undefined Sprint S${id}.` });
     } else if (sprint.status !== 'complete') {
-      diagnostics.push({ severity: 'error', code: 'unused_scorecard_mapping', sprint: Number(id), message: `Scorecard mapping for S${id} is unused because the sprint is not complete.` });
+      diagnostics.push({ severity: 'error', code: 'unused_scorecard_mapping', sprint: id, message: `Scorecard mapping for S${id} is unused because the sprint is not complete.` });
     } else if (!card) {
-      diagnostics.push({ severity: 'error', code: 'unverified_scorecard_mapping', sprint: Number(id), message: `Scorecard mapping for S${id} has no verified filesystem evidence.` });
+      diagnostics.push({ severity: 'error', code: 'unverified_scorecard_mapping', sprint: id, message: `Scorecard mapping for S${id} has no verified filesystem evidence.` });
     } else if (card.path.replace(/\\/g, '/') !== path) {
-      diagnostics.push({ severity: 'error', code: 'scorecard_mapping_mismatch', sprint: Number(id), message: `Scorecard mapping for S${id} does not match verified evidence path ${card.path.replace(/\\/g, '/')}.` });
+      diagnostics.push({ severity: 'error', code: 'scorecard_mapping_mismatch', sprint: id, message: `Scorecard mapping for S${id} does not match verified evidence path ${card.path.replace(/\\/g, '/')}.` });
     } else if (!card.valid) {
-      diagnostics.push({ severity: 'error', code: 'invalid_scorecard_mapping', sprint: Number(id), message: `Scorecard mapping for S${id} failed evidence validation${card.reason ? `: ${card.reason}` : '.'}` });
+      diagnostics.push({ severity: 'error', code: 'invalid_scorecard_mapping', sprint: id, message: `Scorecard mapping for S${id} failed evidence validation${card.reason ? `: ${card.reason}` : '.'}` });
     }
   }
   const width = Math.max(3, String(phaseRecords.length).length);
   const sources: RoadmapMigrationSourcePlan[] = phaseRecords.map((phase, offset) => {
     const index = offset + 1;
-    const owned = preliminary.sprints.filter(sprint => ownerBySprint.get(sprint.id) === index);
+    const owned = preliminary.sprints.filter(sprint => ownerBySprint.get(
+      migrationSprintKey(sprint as unknown as Record<string, unknown>) ?? sprintKey(sprint.id),
+    ) === index);
     const reasons: string[] = [];
     const phaseTerminal = ROADMAP_TERMINAL_STATUSES.has(String(phase.status ?? ''));
     if (!phaseTerminal) reasons.push(`phase status "${String(phase.status ?? 'unset')}" is not terminal`);
     const nonterminal = owned.filter(sprint => !ROADMAP_TERMINAL_STATUSES.has(sprint.status ?? ''));
-    if (nonterminal.length > 0) reasons.push(`nonterminal sprints: ${nonterminal.map(sprint => `S${sprint.id}`).join(', ')}`);
-    const unverified = owned.filter(sprint => sprint.status === 'complete' && !evidence[sprintKey(sprint.id)]?.valid);
-    if (unverified.length > 0) reasons.push(`complete sprints without valid scorecard evidence: ${unverified.map(sprint => `S${sprint.id}`).join(', ')}`);
+    if (nonterminal.length > 0) reasons.push(`nonterminal sprints: ${nonterminal.map(sprint => `S${migrationSprintKey(sprint as unknown as Record<string, unknown>) ?? sprint.id}`).join(', ')}`);
+    const unverified = owned.filter(sprint => sprint.status === 'complete' && !evidence[migrationSprintKey(sprint as unknown as Record<string, unknown>) ?? sprintKey(sprint.id)]?.valid);
+    if (unverified.length > 0) reasons.push(`complete sprints without valid scorecard evidence: ${unverified.map(sprint => `S${migrationSprintKey(sprint as unknown as Record<string, unknown>) ?? sprint.id}`).join(', ')}`);
     const override = options.mapping?.phase_kinds[String(index)];
     let classification: RoadmapMigrationClassification;
     if (override === 'backlog') classification = 'backlog';
@@ -716,8 +788,9 @@ export function planRoadmapMigration(
     else classification = 'history_unverified';
     const scorecards: Record<string, string> = {};
     for (const sprint of owned) {
-      const card = evidence[sprintKey(sprint.id)];
-      if (sprint.status === 'complete' && card?.valid) scorecards[sprintKey(sprint.id)] = card.path.replace(/\\/g, '/');
+      const key = migrationSprintKey(sprint as unknown as Record<string, unknown>) ?? sprintKey(sprint.id);
+      const card = evidence[key];
+      if (sprint.status === 'complete' && card?.valid) scorecards[key] = card.path.replace(/\\/g, '/');
     }
     return {
       phase_index: index,

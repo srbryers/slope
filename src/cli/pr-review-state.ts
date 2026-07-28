@@ -1,11 +1,12 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { sprintIdsEqual, type SprintId } from '../core/index.js';
 
 const PR_REVIEW_STATE_FILE = '.slope/pr-reviews.json';
 
 export interface PrReviewRecord {
   pr: number;
-  sprint?: number;
+  sprint?: SprintId;
   branch?: string;
   status: 'pending' | 'reviewed';
   closeout_status?: 'pending' | 'settled';
@@ -58,7 +59,7 @@ function savePrReviewState(cwd: string, state: PrReviewState): void {
   renameSync(tmpPath, filePath);
 }
 
-export function recordPrReviewPending(cwd: string, input: { pr: number; sprint?: number; branch?: string }): void {
+export function recordPrReviewPending(cwd: string, input: { pr: number; sprint?: SprintId; branch?: string }): void {
   const state = loadPrReviewState(cwd);
   const now = new Date().toISOString();
   const existing = state.reviews.find(review => review.pr === input.pr);
@@ -84,7 +85,7 @@ export function recordPrReviewPending(cwd: string, input: { pr: number; sprint?:
 
 export function recordPrReviewPromptsGenerated(
   cwd: string,
-  input: { pr: number; sprint?: number; branch?: string; reviewType?: 'architect' | 'code' | 'both' },
+  input: { pr: number; sprint?: SprintId; branch?: string; reviewType?: 'architect' | 'code' | 'both' },
 ): void {
   const state = loadPrReviewState(cwd);
   const now = new Date().toISOString();
@@ -115,7 +116,7 @@ export function recordPrReviewPromptsGenerated(
 
 export function recordPrReviewComplete(
   cwd: string,
-  input: { pr: number; sprint?: number; branch?: string; reviewType?: 'architect' | 'code' | 'both' },
+  input: { pr: number; sprint?: SprintId; branch?: string; reviewType?: 'architect' | 'code' | 'both' },
 ): void {
   const state = loadPrReviewState(cwd);
   const now = new Date().toISOString();
@@ -146,7 +147,7 @@ export function recordPrReviewComplete(
 
 export function recordPrCloseoutSettled(
   cwd: string,
-  input: { pr: number; sprint?: number; branch?: string },
+  input: { pr: number; sprint?: SprintId; branch?: string },
 ): void {
   const state = loadPrReviewState(cwd);
   const now = new Date().toISOString();
@@ -173,17 +174,17 @@ export function recordPrCloseoutSettled(
   savePrReviewState(cwd, state);
 }
 
-export function pendingPrReviews(cwd: string, sprint?: number): PrReviewRecord[] {
+export function pendingPrReviews(cwd: string, sprint?: SprintId): PrReviewRecord[] {
   return loadPrReviewState(cwd).reviews
     .filter(review => review.status === 'pending')
-    .filter(review => sprint == null || review.sprint == null || review.sprint === sprint)
+    .filter(review => sprint == null || review.sprint == null || sprintIdsEqual(review.sprint, sprint))
     .sort((a, b) => b.pr - a.pr);
 }
 
-export function pendingPrCloseouts(cwd: string, sprint?: number): PrReviewRecord[] {
+export function pendingPrCloseouts(cwd: string, sprint?: SprintId): PrReviewRecord[] {
   return loadPrReviewState(cwd).reviews
     .filter(review => review.status === 'reviewed')
     .filter(review => review.closeout_status === 'pending')
-    .filter(review => sprint == null || review.sprint == null || review.sprint === sprint)
+    .filter(review => sprint == null || review.sprint == null || sprintIdsEqual(review.sprint, sprint))
     .sort((a, b) => b.pr - a.pr);
 }

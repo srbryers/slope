@@ -141,6 +141,6 @@ describe('slope status', () => {
     gitCommit(tmpDir, 'feat(S194-5): historical import-era work');
     gitCommit(tmpDir, 'feat(S7): current roadmap work');
 
-    expect(computeScorecardDrift(tmpDir).missing).toEqual([7]);
+    expect(computeScorecardDrift(tmpDir).missing).toEqual(['7']);
   });
 });

@@ -67,7 +67,7 @@ describe('buildBackfillScorecard (#318)', () => {
 
     expect(result.scorecard).not.toBeNull();
     const card = result.scorecard as Record<string, unknown>;
-    expect(card.sprint_number).toBe(1);
+    expect(card.sprint_number).toBe('1');
     expect(card.par).toBe(4);
     expect(card.slope).toBe(1);
     expect(card.theme).toBe('First Sprint');

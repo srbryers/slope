@@ -2,6 +2,7 @@ import { execSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseRoadmap } from '../../core/index.js';
+import type { SprintId } from '../../core/index.js';
 import { resolveActor } from '../actor.js';
 import { loadConfig } from '../config.js';
 import { loadSprintState, pendingGates } from '../sprint-state.js';
@@ -133,12 +134,12 @@ function checkSprintState(cwd: string): CommitReadyCheck {
   return { name: 'sprint', ok: true, severity: 'info', reason: `S${state.sprint} (phase: ${state.phase})` };
 }
 
-function extractSprintNumber(cwd: string): number | null {
+function extractSprintNumber(cwd: string): string | null {
   const state = loadSprintState(cwd);
   return state?.sprint ?? null;
 }
 
-async function checkActiveClaim(cwd: string, sprintNumber: number | null): Promise<CommitReadyCheck> {
+async function checkActiveClaim(cwd: string, sprintNumber: SprintId | null): Promise<CommitReadyCheck> {
   if (sprintNumber == null) {
     return {
       name: 'claim',

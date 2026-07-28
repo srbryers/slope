@@ -2,7 +2,15 @@ import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdirSync } from '
 import { join } from 'node:path';
 import type { CodificationCost, CodificationStatus, ReviewFinding, ReviewRecommendation, ReviewType, HazardSeverity } from '../../core/types.js';
 import { recommendReviews, amendScorecardWithFindings } from '../../core/review.js';
-import { loadConfig, detectLatestSprint, normalizeScorecard, parseSprintNumber } from '../../core/index.js';
+import {
+  findRoadmapSprint,
+  loadConfig,
+  detectLatestSprint,
+  normalizeScorecard,
+  roadmapSprintKey,
+  sprintIdKey,
+  sprintIdsEqual,
+} from '../../core/index.js';
 import { createDeferred, listDeferred, resolveDeferred } from '../../core/deferred.js';
 import type { DeferredSeverity } from '../../core/deferred.js';
 import { HAZARD_SEVERITY_PENALTIES } from '../../core/constants.js';
@@ -11,6 +19,7 @@ import {
   FINDINGS_FILE,
   createFindingId,
   displayFindingId,
+  findingSprintKeys,
   formatCodificationMetadata,
   isCodificationCandidate,
   loadFindings,
@@ -19,7 +28,7 @@ import {
 } from '../../core/findings.js';
 export { loadFindings } from '../../core/findings.js';
 export type { FindingsFile } from '../../core/findings.js';
-import type { RoadmapSprint, SlopeConfig } from '../../core/index.js';
+import type { RoadmapSprint, SlopeConfig, SprintId } from '../../core/index.js';
 import { findPlanContent, countTickets, countPackageRefs } from '../guards/plan-analysis.js';
 import { inferSprintContext, loadRoadmapForInference } from '../sprint-inference.js';
 import { isActiveSprintState, loadSprintState, updateReviewRequirements, type ReviewGateRequirementInput } from '../sprint-state.js';
@@ -176,17 +185,22 @@ interface ReviewRecommendationContext {
   ticketCount: number;
   slope: number;
   filePatterns: string[];
-  sprintNumber: number;
+  sprintNumber: SprintId;
   hasNewInfra: boolean;
   theme?: string;
   artifacts?: string[];
   hazards?: string[];
 }
 
-function parseSprintArg(args: string[]): number | null {
+function parseSprintArg(args: string[]): string | null {
   const sprintArg = args.find(a => a.startsWith('--sprint='));
   if (!sprintArg) return null;
-  return parseSprintNumber(sprintArg.slice('--sprint='.length));
+  const sprint = sprintIdKey(sprintArg.slice('--sprint='.length));
+  if (!sprint) {
+    console.error('Error: --sprint must be a positive sprint id.');
+    process.exit(1);
+  }
+  return sprint;
 }
 
 function hasLocalSlopeContext(cwd: string, config: SlopeConfig): boolean {
@@ -225,7 +239,7 @@ function recommendationFromPlan(content: string): ReviewRecommendationContext {
   return {
     ticketCount: countTickets(content),
     slope: slopeMatch ? parseInt(slopeMatch[1], 10) : 0,
-    sprintNumber: sprintMatch ? parseSprintNumber(sprintMatch[1]) ?? 0 : 0,
+    sprintNumber: sprintMatch ? sprintIdKey(sprintMatch[1]) ?? '0' : '0',
     filePatterns,
     theme: titleMatch?.[1],
     artifacts: filePatterns,
@@ -234,13 +248,16 @@ function recommendationFromPlan(content: string): ReviewRecommendationContext {
   };
 }
 
-function recommendationFromRoadmapSprint(sprint: RoadmapSprint): ReviewRecommendationContext {
+function recommendationFromRoadmapSprint(
+  sprint: RoadmapSprint,
+  sprintNumber: SprintId = sprint.id_key ?? String(sprint.id),
+): ReviewRecommendationContext {
   const stringValues = collectStringValues(sprint);
   const filePatterns = stringValues.filter(value => /[/.]/.test(value));
   return {
     ticketCount: sprint.tickets?.length ?? 0,
     slope: sprint.slope ?? 0,
-    sprintNumber: sprint.id,
+    sprintNumber,
     filePatterns,
     theme: sprint.theme,
     artifacts: filePatterns.length > 0 ? filePatterns : sprint.tickets?.map(ticket => `${ticket.key}: ${ticket.title}`),
@@ -264,12 +281,17 @@ function recommendationFromScorecard(card: GolfScorecard): ReviewRecommendationC
   };
 }
 
-function recommendationFromSprint(cwd: string, config: SlopeConfig, sprintNumber: number): ReviewRecommendationContext | null {
+function recommendationFromSprint(cwd: string, config: SlopeConfig, sprintNumber: SprintId): ReviewRecommendationContext | null {
   const roadmap = loadRoadmapForInference(cwd, config);
-  const roadmapSprint = roadmap?.sprints.find(sprint => sprint.id === sprintNumber);
-  if (roadmapSprint) return recommendationFromRoadmapSprint(roadmapSprint);
+  const roadmapSprint = roadmap ? findRoadmapSprint(roadmap, sprintNumber) : undefined;
+  if (roadmapSprint) {
+    return recommendationFromRoadmapSprint(
+      roadmapSprint,
+      roadmapSprintKey(roadmap!, roadmapSprint),
+    );
+  }
 
-  const scorecardPath = join(cwd, config.scorecardDir, `sprint-${sprintNumber}.json`);
+  const scorecardPath = join(cwd, config.scorecardDir, `sprint-${sprintIdKey(sprintNumber) ?? sprintNumber}.json`);
   if (existsSync(scorecardPath)) {
     try {
       const card = normalizeScorecard(JSON.parse(readFileSync(scorecardPath, 'utf8')));
@@ -326,7 +348,7 @@ function inferRecommendationContext(args: string[], cwd: string): ReviewRecommen
     ticketCount: 0,
     slope: 0,
     filePatterns: [],
-    sprintNumber: 0,
+    sprintNumber: '0',
     artifacts: [],
     hazards: [],
     hasNewInfra: false,
@@ -338,11 +360,12 @@ function recommendCommand(args: string[], cwd: string): void {
   const recs = recommendReviews(context);
 
   const requirementInputs = reviewRequirementInputs(recs);
-  const recorded = context.sprintNumber > 0
-    ? updateReviewRequirements(cwd, context.sprintNumber, requirementInputs)
+  const stateSprint = sprintIdKey(context.sprintNumber);
+  const recorded = stateSprint
+    ? updateReviewRequirements(cwd, stateSprint, requirementInputs)
     : false;
 
-  const sprintLabel = context.sprintNumber > 0 ? ` for Sprint ${context.sprintNumber}` : '';
+  const sprintLabel = sprintIdKey(context.sprintNumber) ? ` for Sprint ${context.sprintNumber}` : '';
   console.log(`Recommended reviews${sprintLabel} (${context.ticketCount} ticket${context.ticketCount !== 1 ? 's' : ''}, slope ${context.slope}):\n`);
   console.log('  Type           Priority      Reason');
   for (const rec of recs) {
@@ -355,7 +378,7 @@ function recommendCommand(args: string[], cwd: string): void {
   }
 
   const reviewerAgents = buildReviewerAgentSpecs(recs, {
-    sprintNumber: context.sprintNumber > 0 ? context.sprintNumber : undefined,
+    sprintNumber: sprintIdKey(context.sprintNumber) ? context.sprintNumber : undefined,
     theme: context.theme,
     filePatterns: context.filePatterns,
     artifacts: context.artifacts,
@@ -468,15 +491,27 @@ function findingsAddCommand(args: string[], cwd: string): void {
   const ticketKey = ticketArg ? ticketArg.slice('--ticket='.length) : 'workaround';
   const description = descArg.slice('--description='.length);
 
-  // Determine sprint number
-  let sprintNumber = 0;
+  // Determine canonical sprint identity.
+  let sprintNumber: string;
   if (sprintArg) {
-    sprintNumber = parseSprintNumber(sprintArg.slice('--sprint='.length)) ?? 0;
+    const parsed = sprintIdKey(sprintArg.slice('--sprint='.length));
+    if (!parsed) {
+      console.error('Error: --sprint must be a positive sprint id.');
+      process.exit(1);
+    }
+    sprintNumber = parsed;
   } else {
     try {
       const config = loadConfig(cwd);
       sprintNumber = detectLatestSprint(config, cwd);
-    } catch { /* fallback to 0 */ }
+    } catch {
+      console.error('Error: Could not determine a sprint. Use --sprint=N to specify.');
+      process.exit(1);
+    }
+    if (!sprintIdKey(sprintNumber)) {
+      console.error('Error: No scorecards found. Use --sprint=N to specify.');
+      process.exit(1);
+    }
   }
 
   const finding: ReviewFinding = {
@@ -527,7 +562,11 @@ function findingsListCommand(args: string[], cwd: string): void {
   }
 
   if (sprintArg) {
-    const requestedSprint = parseSprintNumber(sprintArg.slice('--sprint='.length)) ?? 0;
+    const requestedSprint = sprintIdKey(sprintArg.slice('--sprint='.length));
+    if (!requestedSprint) {
+      console.error('Error: --sprint must be a positive sprint id.');
+      process.exit(1);
+    }
     const sprintFindings = filterFindingsForList(data.sprints[requestedSprint] ?? [], codificationStatus);
     if (!sprintFindings || sprintFindings.length === 0) {
       console.log(`No findings for Sprint ${requestedSprint}.`);
@@ -545,7 +584,7 @@ function findingsListCommand(args: string[], cwd: string): void {
     }
   } else {
     // Show all findings grouped by sprint
-    const sprintKeys = Object.keys(data.sprints).map(Number).sort((a, b) => a - b);
+    const sprintKeys = findingSprintKeys(data);
     let printed = false;
     for (const sprint of sprintKeys) {
       const sprintFindings = filterFindingsForList(data.sprints[sprint] ?? [], codificationStatus);
@@ -601,7 +640,7 @@ function findingsResolveCommand(args: string[], cwd: string): void {
   }
 
   const now = new Date().toISOString();
-  for (const sprint of Object.keys(data.sprints).map(Number).sort((a, b) => a - b)) {
+  for (const sprint of findingSprintKeys(data)) {
     const findings = data.sprints[sprint] ?? [];
     for (const [index, finding] of findings.entries()) {
       if (!matchesFindingId(finding, sprint, index, id)) continue;
@@ -685,13 +724,18 @@ function amendCommand(args: string[], cwd: string): void {
     process.exit(1);
   }
 
-  // Determine sprint number
-  let sprintNumber: number;
+  // Determine canonical sprint identity.
+  let sprintNumber: string;
   if (sprintArg) {
-    sprintNumber = parseSprintNumber(sprintArg.slice('--sprint='.length)) ?? 0;
+    const parsed = sprintIdKey(sprintArg.slice('--sprint='.length));
+    if (!parsed) {
+      console.error('Error: --sprint must be a positive sprint id.');
+      process.exit(1);
+    }
+    sprintNumber = parsed;
   } else {
     sprintNumber = detectLatestSprint(config, cwd);
-    if (sprintNumber === 0) {
+    if (!sprintIdKey(sprintNumber)) {
       console.error('Error: No scorecards found. Use --sprint=N to specify.');
       process.exit(1);
     }
@@ -983,15 +1027,15 @@ export async function reviewStateCommand(args: string[]): Promise<void> {
 // --- Deferred Findings CLI ---
 
 function deferCommand(args: string[], cwd: string): void {
-  let from: number | undefined;
-  let to: number | undefined;
+  let from: string | undefined;
+  let to: string | undefined;
   let severity: DeferredSeverity = 'medium';
   let description = '';
   let category: string | undefined;
 
   for (const arg of args) {
-    if (arg.startsWith('--from=')) from = parseSprintNumber(arg.slice('--from='.length)) ?? undefined;
-    else if (arg.startsWith('--to=')) to = parseSprintNumber(arg.slice('--to='.length)) ?? undefined;
+    if (arg.startsWith('--from=')) from = sprintIdKey(arg.slice('--from='.length)) ?? undefined;
+    else if (arg.startsWith('--to=')) to = sprintIdKey(arg.slice('--to='.length)) ?? undefined;
     else if (arg.startsWith('--severity=')) severity = arg.slice('--severity='.length) as DeferredSeverity;
     else if (arg.startsWith('--description=')) description = arg.slice('--description='.length);
     else if (arg.startsWith('--category=')) category = arg.slice('--category='.length);
@@ -1030,18 +1074,19 @@ function deferCommand(args: string[], cwd: string): void {
 }
 
 function deferredCommand(args: string[], cwd: string): void {
-  let sprint: number | undefined;
+  let sprint: string | undefined;
   let status: string | undefined;
 
   for (const arg of args) {
-    if (arg.startsWith('--sprint=')) sprint = parseSprintNumber(arg.slice('--sprint='.length)) ?? undefined;
+    if (arg.startsWith('--sprint=')) sprint = sprintIdKey(arg.slice('--sprint='.length)) ?? undefined;
     else if (arg.startsWith('--status=')) status = arg.slice('--status='.length);
   }
 
   const findings = listDeferred(cwd, {
-    sprint,
     status: status as 'open' | 'resolved' | 'wontfix' | undefined,
-  });
+  }).filter(finding => sprint === undefined || (
+    finding.target_sprint !== null && sprintIdsEqual(finding.target_sprint, sprint)
+  ));
 
   if (findings.length === 0) {
     const filter = sprint ? ` targeting Sprint ${sprint}` : '';

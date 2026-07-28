@@ -11,6 +11,7 @@ import { loadConfig } from './config.js';
 import { computeHandicapCard } from './handicap.js';
 import type { GolfScorecard, HandicapCard } from './types.js';
 import type { CommonIssuesFile, RecurringPattern } from './briefing.js';
+import { compareSprintIdKeys } from './sprint-id.js';
 
 // ── Types ───────────────────────────────────────────
 
@@ -32,7 +33,7 @@ export interface RepoHandicap {
   path: string;
   handicap: HandicapCard;
   sprint_count: number;
-  latest_sprint?: number;
+  latest_sprint?: string;
 }
 
 export interface OrgHandicap {
@@ -104,7 +105,7 @@ export function computeOrgHandicap(orgConfig: OrgConfig, baseCwd: string = proce
       allCards.push(...tagged);
 
       if (cards.length > 0) {
-        const sorted = [...cards].sort((a, b) => a.sprint_number - b.sprint_number);
+        const sorted = [...cards].sort((a, b) => compareSprintIdKeys(a.sprint_number, b.sprint_number));
         perRepo.push({
           repo: repo.name,
           path: repoPath,

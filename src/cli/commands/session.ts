@@ -9,6 +9,7 @@ import {
   observeSessionBranches,
   resolveRepoSourceCwd,
   resolveRepoStateCwd,
+  sprintIdKey,
 } from '../../core/index.js';
 import type { SlopeSession, SprintClaim } from '../../core/index.js';
 import { STALE_SESSION_THRESHOLD_MS } from '../../core/constants.js';
@@ -49,6 +50,11 @@ function parseArgs(args: string[]): Record<string, string> {
     if (match) result[match[1]] = match[2];
   }
   return result;
+}
+
+function canonicalSprintIdentity(value: unknown): string | undefined {
+  if (typeof value !== 'string' && typeof value !== 'number') return undefined;
+  return sprintIdKey(value) ?? undefined;
 }
 
 function sameCheckout(left: string, right: string): boolean {
@@ -425,10 +431,11 @@ async function dashboardCommand(flags: Record<string, string>, cwd: string): Pro
 
     // Collect claims across sessions
     const allClaims: SprintClaim[] = [];
-    const sprintNumbers = new Set<number>();
+    const sprintNumbers = new Set<string>();
     for (const s of sessions) {
       const meta = s.metadata as Record<string, unknown> | undefined;
-      if (meta?.sprint) sprintNumbers.add(Number(meta.sprint));
+      const sprint = canonicalSprintIdentity(meta?.sprint);
+      if (sprint) sprintNumbers.add(sprint);
     }
     for (const sn of sprintNumbers) {
       const claims = await store.list(sn);
@@ -525,7 +532,7 @@ async function handoffCommand(flags: Record<string, string>, cwd: string): Promi
     if (!fromSession) { console.error(`Source session not found: ${from}`); process.exit(1); }
 
     const meta = fromSession.metadata as Record<string, unknown> | undefined;
-    const sprintNumber = meta?.sprint ? Number(meta.sprint) : undefined;
+    const sprintNumber = canonicalSprintIdentity(meta?.sprint);
     const claims = sprintNumber ? await store.list(sprintNumber) : [];
     const fromClaims = claims.filter(c => c.session_id === fromSession.session_id);
 
@@ -561,7 +568,7 @@ async function assignCommand(flags: Record<string, string>, cwd: string): Promis
     if (!target) { console.error(`Agent session not found: ${agent}`); process.exit(1); }
 
     const meta = target.metadata as Record<string, unknown> | undefined;
-    const sprintNumber = flags.sprint ? Number(flags.sprint) : (meta?.sprint ? Number(meta.sprint) : undefined);
+    const sprintNumber = canonicalSprintIdentity(flags.sprint ?? meta?.sprint);
     if (!sprintNumber) { console.error('Sprint number required (--sprint=N).'); process.exit(1); }
 
     // Pre-flight conflict check
@@ -596,7 +603,7 @@ async function planCommand(flags: Record<string, string>, cwd: string): Promise<
     if (sessions.length === 0) { console.log('\nNo active sessions.\n'); return; }
 
     const firstMeta = sessions.find(s => (s.metadata as Record<string, unknown>)?.sprint)?.metadata as Record<string, unknown> | undefined;
-    const sprintNumber = flags.sprint ? Number(flags.sprint) : (firstMeta?.sprint ? Number(firstMeta.sprint) : undefined);
+    const sprintNumber = canonicalSprintIdentity(flags.sprint ?? firstMeta?.sprint);
     if (!sprintNumber) { console.log('\nNo sprint context. Use --sprint=N.\n'); return; }
 
     const claims = await store.list(sprintNumber);
