@@ -1,0 +1,304 @@
+{
+  "version": 1,
+  "kind": "sprint_rollover",
+  "transition_id": "dd3f302024cf4684",
+  "from_sprint": "266",
+  "to_sprint": "267",
+  "from_label": "S266",
+  "to_label": "S267",
+  "recorded_at": "2026-07-28T22:14:04.197Z",
+  "actor": {
+    "name": "sebastianbryers",
+    "source": "env:USER"
+  },
+  "request": {
+    "from": "266",
+    "to": "267",
+    "force": false
+  },
+  "forced": false,
+  "eligibility": {
+    "from_terminal": true,
+    "target_dependency_eligible": true,
+    "blocking_dependencies": [],
+    "target_dependencies": [
+      "266"
+    ],
+    "completion_evidence": {
+      "roadmap_complete": [
+        "61",
+        "62",
+        "63",
+        "64",
+        "65",
+        "66",
+        "67",
+        "68",
+        "69",
+        "70",
+        "71",
+        "72",
+        "73",
+        "74",
+        "75",
+        "76",
+        "77",
+        "78",
+        "79",
+        "80",
+        "81",
+        "82",
+        "83",
+        "84",
+        "86",
+        "87",
+        "88",
+        "89",
+        "90",
+        "91",
+        "92",
+        "93",
+        "94",
+        "95",
+        "96",
+        "97",
+        "98",
+        "99",
+        "100",
+        "101",
+        "102",
+        "103",
+        "104",
+        "105",
+        "106",
+        "107",
+        "108",
+        "109",
+        "110",
+        "111",
+        "112",
+        "113",
+        "114",
+        "114.5",
+        "115",
+        "116",
+        "117",
+        "118",
+        "119",
+        "120",
+        "121",
+        "122",
+        "123",
+        "124",
+        "125",
+        "126",
+        "127",
+        "130",
+        "131",
+        "132",
+        "133",
+        "134",
+        "135",
+        "136",
+        "137",
+        "137.5",
+        "138",
+        "139",
+        "140",
+        "141",
+        "142",
+        "143",
+        "143.5",
+        "143.6",
+        "143.7",
+        "143.8",
+        "143.9",
+        "143.95",
+        "143.97",
+        "143.98",
+        "143.99",
+        "144",
+        "145",
+        "146",
+        "146.1",
+        "146.2",
+        "146.3",
+        "148",
+        "149",
+        "150",
+        "151",
+        "151.1",
+        "152",
+        "152.1",
+        "153",
+        "154",
+        "216",
+        "217",
+        "218",
+        "219",
+        "220",
+        "221",
+        "222",
+        "223",
+        "224",
+        "226",
+        "227",
+        "228",
+        "229",
+        "230",
+        "231",
+        "232",
+        "233",
+        "234",
+        "235",
+        "236",
+        "241",
+        "242",
+        "243",
+        "244",
+        "246",
+        "247",
+        "248",
+        "249",
+        "250",
+        "251",
+        "252",
+        "253",
+        "254",
+        "256",
+        "258",
+        "259",
+        "260",
+        "260.1",
+        "261",
+        "262",
+        "263",
+        "264",
+        "264.1",
+        "264.2",
+        "265",
+        "266"
+      ],
+      "scorecards": [
+        "264.2",
+        "266"
+      ],
+      "local_terminal": [
+        "266"
+      ]
+    },
+    "scorecard_artifacts": [
+      {
+        "sprint": "264.2",
+        "path": "docs/retros/sprint-264.2.json",
+        "sha256": "29d40189950587d55533d76d318dc1ba44c14e6deb6646077f6b46fe53f60ba6"
+      },
+      {
+        "sprint": "266",
+        "path": "docs/retros/sprint-266.json",
+        "sha256": "86b40a6d0732efd54d5658c6ff8c630dc0dc4d73a2d3f2f5335a900e1a313222"
+      }
+    ],
+    "expected_next": "267"
+  },
+  "roadmap": {
+    "path": "docs/backlog/roadmap.json",
+    "sha256": "8a49ae18463f3c0cd49bc7a2905650f31a1f210bc367f477f293b46cff7d8995",
+    "from_status": "complete"
+  },
+  "prior_state_sha256": "faf1ed3b6de7b02a4774a0c99361bbc5119712edc8ad832d5b89aee35b6386b9",
+  "prior_state": {
+    "sprint": "266",
+    "phase": "complete",
+    "gates": {
+      "tests": true,
+      "code_review": true,
+      "architect_review": true,
+      "scorecard": true,
+      "review_md": true
+    },
+    "review_gates": {
+      "code_review": {
+        "provenance": "independent_review",
+        "evidence": [
+          "docs/retros/sprint-266-code-review.md"
+        ],
+        "reviewer": "Mencius (019fa8ea-a6aa-7313-89a0-452a246d0d00)",
+        "verdict": "pass",
+        "updated_at": "2026-07-28T13:39:59.361Z"
+      },
+      "architect_review": {
+        "provenance": "independent_review",
+        "evidence": [
+          "docs/retros/sprint-266-architect-review.md"
+        ],
+        "reviewer": "Mencius (019fa8ea-a6aa-7313-89a0-452a246d0d00)",
+        "verdict": "pass",
+        "updated_at": "2026-07-28T13:39:59.147Z"
+      }
+    },
+    "review_requirements": {
+      "code_review": {
+        "priority": "optional",
+        "reason": "Baseline code review",
+        "source": "review_recommend",
+        "updated_at": "2026-07-28T13:26:49.604Z"
+      },
+      "architect_review": {
+        "priority": "required",
+        "reason": "4 tickets warrants architectural review",
+        "source": "review_recommend",
+        "updated_at": "2026-07-28T13:26:49.604Z"
+      }
+    },
+    "started_at": "2026-07-27T21:31:22.054Z",
+    "updated_at": "2026-07-28T13:48:45.390Z",
+    "rollover": {
+      "transition_id": "0a20370b4c5b7a60",
+      "from_sprint": "265",
+      "audit_path": "docs/retros/rollovers/sprint-265-to-266-67a54cd0136a428e.json",
+      "recorded_at": "2026-07-27T21:31:22.054Z",
+      "forced": false
+    }
+  },
+  "next_state": {
+    "sprint": "267",
+    "phase": "planning",
+    "gates": {
+      "tests": false,
+      "code_review": false,
+      "architect_review": false,
+      "scorecard": false,
+      "review_md": false
+    },
+    "review_gates": {
+      "code_review": {
+        "provenance": "pending",
+        "evidence": []
+      },
+      "architect_review": {
+        "provenance": "pending",
+        "evidence": []
+      }
+    },
+    "review_requirements": {
+      "code_review": {
+        "priority": "unspecified"
+      },
+      "architect_review": {
+        "priority": "unspecified"
+      }
+    },
+    "started_at": "2026-07-28T22:14:04.197Z",
+    "updated_at": "2026-07-28T22:14:04.197Z",
+    "rollover": {
+      "transition_id": "dd3f302024cf4684",
+      "from_sprint": "266",
+      "audit_path": "docs/retros/rollovers/sprint-266-to-267-4f40e3b7c3b343ce.json",
+      "recorded_at": "2026-07-28T22:14:04.197Z",
+      "forced": false
+    }
+  },
+  "claims_policy": "unchanged",
+  "sessions_policy": "unchanged"
+}
