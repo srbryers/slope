@@ -392,6 +392,7 @@ Published as [`@slope-dev/slope`](https://www.npmjs.com/package/@slope-dev/slope
 - **[Framework Reference](docs/framework.md)** — full scoring system specification
 - **[Dashboard Guide](docs/guides/dashboard.md)** — live performance dashboard
 - **[Multi-Developer Guide](docs/guides/multi-developer.md)** — team handicap and leaderboard
+- **[Sprint ID 2.0 Migration](docs/guides/sprint-id-2-migration.md)** — backup, upgrade, compatibility, and downgrade guidance
 - **[Cline Setup](docs/guides/cline-setup.md)** — Cline-specific MCP configuration
 - **[Scorecard Template](docs/scorecard-template.md)** — field-by-field reference
 
