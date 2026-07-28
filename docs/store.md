@@ -127,7 +127,7 @@ The `checkStoreHealth()` function runs `getSchemaVersion()` and `getStats()`, ca
 import { checkStoreHealth } from '@slope-dev/slope';
 
 const result = await checkStoreHealth(store, 'sqlite');
-// { healthy: true, type: 'sqlite', schemaVersion: 3, stats: {...}, errors: [] }
+// { healthy: true, type: 'sqlite', schemaVersion: 10, stats: {...}, errors: [] }
 ```
 
 ## PostgreSQL Hardening

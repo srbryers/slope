@@ -261,7 +261,7 @@ const SPRINT_REF_RE = /\bS(\d+(?:\.\d+)?)(?:-\d+)?\b/g;
 const SCORECARD_PATH_RE = /(?:^|[/\\])docs[/\\]retros[/\\]sprint-(\d+(?:\.\d+)?)\.json$/;
 const GIT_HASH_RE = /^[a-f0-9]{7,40}$/i;
 const FEATURE_EVIDENCE_RE = /\b(feature|product surface|cli surface|human surface|user-facing|new command|cockpit|onboarding|plugin|adapter)\b/i;
-const BREAKING_EVIDENCE_RE = /\bbreaking\b/i;
+const BREAKING_EVIDENCE_RE = /\b(breaking|schema[_ -]migration|store[_ -]migration)\b/i;
 const PATCH_ONLY_TYPE_RE = /\b(bugfix|fix|planning|test|release|docs|documentation|chore)\b/i;
 
 function maxTier(a: VersionTier, b: VersionTier): VersionTier {

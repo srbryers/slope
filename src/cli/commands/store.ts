@@ -6,6 +6,7 @@ import type { Database as DatabaseType } from 'better-sqlite3';
 import { resolveStore, getStoreInfo } from '../store.js';
 import { loadConfig } from '../config.js';
 import { resolveRepoStateCwd, resolveRepoStatePath } from '../../core/repo-state-scope.js';
+import { migrationHistoryIssues } from '../../core/store.js';
 
 type MigrationDoctorStatus = 'not_initialized' | 'upgrade_required' | 'ready' | 'inconsistent';
 
@@ -257,6 +258,7 @@ export function assessMigrationDoctor(input: {
   currentSchemaVersion: number;
   targetSchemaVersion: number;
   columnTypes: Map<string, string>;
+  appliedVersions?: readonly number[];
 }): MigrationDoctorReport {
   const identityColumns: MigrationColumn[] = input.initialized
     ? SPRINT_IDENTITY_COLUMNS.map(({ table, column }) => {
@@ -273,7 +275,10 @@ export function assessMigrationDoctor(input: {
   const pendingMigrations = input.initialized
     ? Math.max(0, input.targetSchemaVersion - input.currentSchemaVersion)
     : 0;
-  const issues: string[] = [];
+  const historyIssues = input.appliedVersions
+    ? migrationHistoryIssues(input.appliedVersions, input.targetSchemaVersion)
+    : [];
+  const issues: string[] = [...historyIssues];
   for (const check of identityColumns) {
     if (!check.ok) {
       issues.push(`${check.table}.${check.column} is ${check.actualType ?? 'missing'}; expected TEXT`);
@@ -282,7 +287,11 @@ export function assessMigrationDoctor(input: {
 
   let status: MigrationDoctorStatus;
   if (!input.initialized) status = 'not_initialized';
-  else if (input.currentSchemaVersion > input.targetSchemaVersion || (pendingMigrations === 0 && issues.length > 0)) {
+  else if (
+    historyIssues.length > 0
+    || input.currentSchemaVersion > input.targetSchemaVersion
+    || (pendingMigrations === 0 && issues.length > 0)
+  ) {
     status = 'inconsistent';
   } else if (pendingMigrations > 0 || issues.length > 0) {
     status = 'upgrade_required';
@@ -397,9 +406,10 @@ async function inspectSqliteMigration(cwd: string): Promise<MigrationDoctorRepor
         issues: ['SQLite store exists but schema_version is missing'],
       };
     }
-    const currentSchemaVersion = hasVersionTable
-      ? ((db.prepare('SELECT MAX(version) AS version FROM schema_version').get() as { version?: number | null } | undefined)?.version ?? 0)
-      : 0;
+    const appliedVersions = (db.prepare(
+      'SELECT version FROM schema_version ORDER BY version',
+    ).all() as Array<{ version: number }>).map(row => row.version);
+    const currentSchemaVersion = appliedVersions.at(-1) ?? 0;
     const columnTypes = new Map<string, string>();
     for (const { table, column } of SPRINT_IDENTITY_COLUMNS) {
       const rows = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string; type: string }>;
@@ -413,6 +423,7 @@ async function inspectSqliteMigration(cwd: string): Promise<MigrationDoctorRepor
       currentSchemaVersion,
       targetSchemaVersion: target,
       columnTypes,
+      appliedVersions,
     });
   } finally {
     db.close();
@@ -445,11 +456,13 @@ async function inspectPostgresMigration(cwd: string): Promise<MigrationDoctorRep
     `);
     const initialized = Boolean(versionTable.rows[0]?.present);
     let currentSchemaVersion = 0;
+    let appliedVersions: number[] = [];
     if (initialized) {
-      const version = await pool.query<{ version: number | null }>(
-        'SELECT MAX(version) AS version FROM schema_version',
+      const version = await pool.query<{ version: number }>(
+        'SELECT version FROM schema_version ORDER BY version',
       );
-      currentSchemaVersion = version.rows[0]?.version ?? 0;
+      appliedVersions = version.rows.map(row => row.version);
+      currentSchemaVersion = appliedVersions.at(-1) ?? 0;
     }
     const columnTypes = new Map<string, string>();
     if (initialized) {
@@ -470,6 +483,7 @@ async function inspectPostgresMigration(cwd: string): Promise<MigrationDoctorRep
       currentSchemaVersion,
       targetSchemaVersion: target,
       columnTypes,
+      appliedVersions,
     });
   } finally {
     await pool.end();

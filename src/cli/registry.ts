@@ -495,6 +495,10 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
       { name: 'status', desc: 'Show store type, schema version, and stats', flags: [
         { flag: '--json', desc: 'Output as JSON' },
       ]},
+      { name: 'migrate status', desc: 'Open the store and show its schema version' },
+      { name: 'migrate doctor', desc: 'Inspect migration readiness without changing the store', flags: [
+        { flag: '--json', desc: 'Output as JSON' },
+      ]},
       { name: 'backup', desc: 'Back up the store', flags: [
         { flag: '--output=<path>', desc: 'Backup output path' },
       ]},

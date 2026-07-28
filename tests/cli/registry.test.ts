@@ -75,6 +75,13 @@ describe('CLI_COMMAND_REGISTRY', () => {
     ]);
   });
 
+  it('registers the read-only store migration doctor', () => {
+    const store = CLI_COMMAND_REGISTRY.find(entry => entry.cmd === 'store');
+    const doctor = store?.subcommands?.find(subcommand => subcommand.name === 'migrate doctor');
+
+    expect(doctor?.flags?.map(flag => flag.flag)).toEqual(['--json']);
+  });
+
   it('registry + internal modules matches the actual command files on disk', () => {
     const commandsDir = join(__dirname, '../../src/cli/commands');
     const files = readdirSync(commandsDir)

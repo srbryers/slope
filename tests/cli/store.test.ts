@@ -245,12 +245,59 @@ describe('slope store migrate doctor', () => {
     expect(report.identityColumns.every((column: { ok: boolean }) => column.ok)).toBe(true);
   });
 
+  it('reports a gapped SQLite migration history as inconsistent without changing it', async () => {
+    const dbPath = join(tmpDir, '.slope', 'slope.db');
+    const db = new Database(dbPath);
+    db.exec(`
+      CREATE TABLE schema_version (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL);
+      WITH RECURSIVE versions(version) AS (
+        SELECT 1
+        UNION ALL
+        SELECT version + 1 FROM versions WHERE version < 8
+      )
+      INSERT INTO schema_version
+      SELECT version, '2026-01-01T00:00:00Z' FROM versions;
+      INSERT INTO schema_version VALUES (10, '2026-01-10T00:00:00Z');
+      CREATE TABLE claims (sprint_number TEXT NOT NULL);
+      CREATE TABLE scorecards (sprint_number TEXT PRIMARY KEY);
+      CREATE TABLE events (sprint_number TEXT);
+      CREATE TABLE testing_sessions (sprint TEXT);
+    `);
+    db.close();
+    const logs: string[] = [];
+    const spy = vi.spyOn(console, 'log').mockImplementation((...args) => { logs.push(args.join(' ')); });
+
+    await storeCommand(['migrate', 'doctor', '--json']);
+
+    spy.mockRestore();
+    const report = JSON.parse(logs.join('\n'));
+    expect(report).toMatchObject({
+      currentSchemaVersion: 10,
+      pendingMigrations: 0,
+      migrationRequired: false,
+      status: 'inconsistent',
+      readOnly: true,
+    });
+    expect(report.issues).toContain('schema_version is missing migration(s): 9');
+
+    const inspected = new Database(dbPath, { readonly: true });
+    expect(inspected.prepare('SELECT version FROM schema_version ORDER BY version').all())
+      .toEqual([1, 2, 3, 4, 5, 6, 7, 8, 10].map(version => ({ version })));
+    inspected.close();
+  });
+
   it('reports a legacy SQLite store without applying its migrations', async () => {
     const dbPath = join(tmpDir, '.slope', 'slope.db');
     const db = new Database(dbPath);
     db.exec(`
       CREATE TABLE schema_version (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL);
-      INSERT INTO schema_version (version, applied_at) VALUES (8, '2026-01-01T00:00:00Z');
+      WITH RECURSIVE versions(version) AS (
+        SELECT 1
+        UNION ALL
+        SELECT version + 1 FROM versions WHERE version < 8
+      )
+      INSERT INTO schema_version
+      SELECT version, '2026-01-01T00:00:00Z' FROM versions;
       CREATE TABLE claims (sprint_number INTEGER NOT NULL);
       CREATE TABLE scorecards (sprint_number INTEGER PRIMARY KEY);
       CREATE TABLE events (sprint_number INTEGER);
@@ -287,7 +334,13 @@ describe('slope store migrate doctor', () => {
     const db = new Database(dbPath);
     db.exec(`
       CREATE TABLE schema_version (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL);
-      INSERT INTO schema_version (version, applied_at) VALUES (8, '2026-01-01T00:00:00Z');
+      WITH RECURSIVE versions(version) AS (
+        SELECT 1
+        UNION ALL
+        SELECT version + 1 FROM versions WHERE version < 8
+      )
+      INSERT INTO schema_version
+      SELECT version, '2026-01-01T00:00:00Z' FROM versions;
     `);
     db.close();
     const logs: string[] = [];
@@ -330,6 +383,20 @@ describe('slope store migrate doctor', () => {
       migrationRequired: false,
       status: 'ready',
     });
+
+    const gapped = assessMigrationDoctor({
+      type: 'postgres',
+      initialized: true,
+      currentSchemaVersion: 7,
+      targetSchemaVersion: 7,
+      columnTypes: legacyColumnTypes('text'),
+      appliedVersions: [1, 2, 3, 5, 6, 7],
+    });
+    expect(gapped).toMatchObject({
+      migrationRequired: false,
+      status: 'inconsistent',
+    });
+    expect(gapped.issues).toContain('schema_version is missing migration(s): 4');
   });
 });
 

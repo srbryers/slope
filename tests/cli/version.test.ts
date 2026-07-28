@@ -161,6 +161,33 @@ describe('versionCommand', () => {
     expect(text).toContain('Recommendation raised above commit-subject tier');
   });
 
+  it('raises recommendation to major for shipped schema migration evidence', async () => {
+    gitInit();
+    gitCommit('chore: initial release');
+    git(['tag', 'v1.0.0']);
+
+    writeJson('docs/retros/sprint-267.json', {
+      sprint_number: '267',
+      theme: 'Sprint ID 2.0 Release Train',
+      type: 'release + migration',
+      shots: [{
+        ticket_key: 'S267-1',
+        title: 'Ship the canonical sprint identity store migration',
+      }],
+      slope_factors: ['schema_migration'],
+    });
+    gitCommit('docs(S267): close release train');
+
+    await versionCommand(['recommend']);
+    const text = output();
+
+    expect(text).toContain('Conventional commit tier: patch');
+    expect(text).toContain('SLOPE release evidence: major');
+    expect(text).toContain('S267 Sprint ID 2.0 Release Train');
+    expect(text).toContain('Recommended: major (1.5.0');
+    expect(text).toContain('Recommendation raised above commit-subject tier');
+  });
+
   it('does not raise recommendation from planned roadmap feature work without shipped evidence', async () => {
     gitInit();
     gitCommit('chore: initial release');

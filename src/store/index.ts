@@ -10,6 +10,7 @@ import type { SprintClaim, SprintClaimInput, SlopeEvent, EventType, WorkflowExec
 import type { CommonIssuesFile, StoreStats } from '../core/index.js';
 import { compareSprintIdKeys, resolveRepoStateCwd, sprintIdKey, SlopeStoreError } from '../core/index.js';
 import type { SlopeStore, SlopeSession, SlopeSessionUpdate } from '../core/index.js';
+import { assertMigrationHistory } from '../core/store.js';
 import type { EmbeddingStore, EmbeddingEntry, EmbeddingSearchResult, EmbeddingStats, IndexMeta } from '../core/embedding-store.js';
 
 function generateId(prefix: string): string {
@@ -495,7 +496,11 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
       );
     `);
 
-    const currentVersion = this.getSchemaVersionSync();
+    const appliedVersions = (this.db.prepare(
+      'SELECT version FROM schema_version ORDER BY version',
+    ).all() as Array<{ version: number }>).map(row => row.version);
+    assertMigrationHistory(appliedVersions, LATEST_SCHEMA_VERSION);
+    const currentVersion = appliedVersions.at(-1) ?? 0;
 
     const applyMigration = this.db.transaction((migration: { version: number; sql: string }) => {
       this.db.exec(migration.sql);
