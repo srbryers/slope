@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -51,7 +51,7 @@ describe('slope gate (GH #313)', () => {
   it('status shows pending plan and pr gates', () => {
     const cwd = setupRepoWithInitiative();
     try {
-      const out = execSync(`node ${SLOPE_BIN} gate status`, {
+      const out = execFileSync(process.execPath, [SLOPE_BIN, 'gate', 'status'], {
         cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'],
       });
       expect(out).toContain('S1 plan: architect');
@@ -65,7 +65,7 @@ describe('slope gate (GH #313)', () => {
   it('status --json emits machine-readable pending list', () => {
     const cwd = setupRepoWithInitiative();
     try {
-      const out = execSync(`node ${SLOPE_BIN} gate status --json`, {
+      const out = execFileSync(process.execPath, [SLOPE_BIN, 'gate', 'status', '--json'], {
         cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'],
       });
       const parsed = JSON.parse(out);
@@ -84,7 +84,7 @@ describe('slope gate (GH #313)', () => {
     // Doesn't need an initiative — checklist data is static
     const cwd = mkdtempSync(join(tmpdir(), 'slope-gate-'));
     try {
-      const out = execSync(`node ${SLOPE_BIN} gate checklist plan architect`, {
+      const out = execFileSync(process.execPath, [SLOPE_BIN, 'gate', 'checklist', 'plan', 'architect'], {
         cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'],
       });
       expect(out).toContain('# architect — plan review checklist');
@@ -97,13 +97,13 @@ describe('slope gate (GH #313)', () => {
   it('complete records the review and updates state', () => {
     const cwd = setupRepoWithInitiative();
     try {
-      const out = execSync(`node ${SLOPE_BIN} gate complete plan architect --sprint=1`, {
+      const out = execFileSync(process.execPath, [SLOPE_BIN, 'gate', 'complete', 'plan', 'architect', '--sprint=1'], {
         cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'],
       });
       expect(out).toContain('Recorded plan review: architect');
 
       // Status should now show S1 plan complete (no longer in pending list)
-      const status = execSync(`node ${SLOPE_BIN} gate status --json`, {
+      const status = execFileSync(process.execPath, [SLOPE_BIN, 'gate', 'status', '--json'], {
         cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'],
       });
       const parsed = JSON.parse(status);
@@ -134,7 +134,7 @@ describe('slope gate (GH #313)', () => {
       ];
       writeFileSync(initiativePath, JSON.stringify(initiative));
 
-      execSync(`node ${SLOPE_BIN} gate complete plan architect --sprint=458.10`, {
+      execFileSync(process.execPath, [SLOPE_BIN, 'gate', 'complete', 'plan', 'architect', '--sprint=458.10'], {
         cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'],
       });
 
@@ -154,7 +154,7 @@ describe('slope gate (GH #313)', () => {
       let exitCode = 0;
       let stderr = '';
       try {
-        execSync(`node ${SLOPE_BIN} gate complete bogus architect --sprint=1`, {
+        execFileSync(process.execPath, [SLOPE_BIN, 'gate', 'complete', 'bogus', 'architect', '--sprint=1'], {
           cwd, stdio: ['pipe', 'pipe', 'pipe'],
         });
       } catch (err: unknown) {
@@ -175,7 +175,7 @@ describe('slope gate (GH #313)', () => {
       let exitCode = 0;
       let stderr = '';
       try {
-        execSync(`node ${SLOPE_BIN} gate complete plan bogus --sprint=1`, {
+        execFileSync(process.execPath, [SLOPE_BIN, 'gate', 'complete', 'plan', 'bogus', '--sprint=1'], {
           cwd, stdio: ['pipe', 'pipe', 'pipe'],
         });
       } catch (err: unknown) {
