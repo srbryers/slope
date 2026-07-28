@@ -508,6 +508,28 @@ describe.skipIf(!PG_URL)('PostgresSlopeStore canonical sprint migration', () => 
           updated_at TEXT NOT NULL,
           session_id TEXT
         );
+        CREATE TABLE testing_sessions (
+          id TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL DEFAULT 'default',
+          branch TEXT,
+          sprint INTEGER,
+          purpose TEXT,
+          worktree_path TEXT,
+          branch_name TEXT,
+          started_at TEXT NOT NULL,
+          ended_at TEXT,
+          status TEXT NOT NULL DEFAULT 'active'
+        );
+        CREATE INDEX idx_testing_sessions_project ON testing_sessions(project_id);
+        CREATE TABLE testing_findings (
+          id TEXT PRIMARY KEY,
+          session_id TEXT NOT NULL REFERENCES testing_sessions(id) ON DELETE CASCADE,
+          description TEXT NOT NULL,
+          severity TEXT NOT NULL DEFAULT 'medium',
+          ticket TEXT,
+          created_at TEXT NOT NULL
+        );
+        CREATE INDEX idx_testing_findings_session ON testing_findings(session_id);
 
         INSERT INTO claims VALUES (
           'legacy-claim', 'legacy', NULL, 458, 'T-LEGACY', 'alice', 'ticket',
@@ -545,6 +567,14 @@ describe.skipIf(!PG_URL)('PostgresSlopeStore canonical sprint migration', () => 
           '{}', '[]', '2026-01-01T00:00:00.000Z',
           '2026-01-01T00:00:00.000Z', NULL
         );
+        INSERT INTO testing_sessions VALUES (
+          'legacy-testing', 'legacy', 'main', 458, 'legacy test', NULL, NULL,
+          '2026-01-01T00:00:00.000Z', NULL, 'active'
+        );
+        INSERT INTO testing_findings VALUES (
+          'legacy-finding', 'legacy-testing', 'legacy finding', 'high',
+          'T-LEGACY', '2026-01-01T00:00:00.000Z'
+        );
       `);
 
       const {
@@ -562,6 +592,16 @@ describe.skipIf(!PG_URL)('PostgresSlopeStore canonical sprint migration', () => 
       expect((await migrated.getExecutionBySprint('458.10'))?.sprint_id).toBe('458.10');
       expect((await migrated.getExecutionBySprint('R1'))?.sprint_id).toBe('R1');
       expect((await migrated.getExecution('invalid-workflow'))?.sprint_id).toBe('S0');
+      expect(await migrated.getActiveTestingSession()).toMatchObject({
+        id: 'legacy-testing',
+        sprint: '458',
+      });
+      expect(await migrated.getTestingFindings('legacy-testing')).toEqual([
+        expect.objectContaining({
+          id: 'legacy-finding',
+          ticket: 'T-LEGACY',
+        }),
+      ]);
       const execution = await migrated.startExecution({
         workflow_name: 'snapshot',
         sprint_id: '458.10',
@@ -592,6 +632,14 @@ describe.skipIf(!PG_URL)('PostgresSlopeStore canonical sprint migration', () => 
         { table_name: 'events', data_type: 'text' },
         { table_name: 'scorecards', data_type: 'text' },
       ]);
+      const testingSprintColumn = await schemaPool.query(`
+        SELECT data_type
+        FROM information_schema.columns
+        WHERE table_schema = $1
+          AND table_name = 'testing_sessions'
+          AND column_name = 'sprint'
+      `, [schema]);
+      expect(testingSprintColumn.rows).toEqual([{ data_type: 'text' }]);
 
       const workflowColumns = await schemaPool.query(`
         SELECT column_name, data_type

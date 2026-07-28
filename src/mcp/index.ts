@@ -530,7 +530,7 @@ export function createSlopeToolsServer(
           purpose,
           worktree_path: worktreePath,
           branch_name: branchName,
-        } as unknown as Parameters<SlopeStore['createTestingSession']>[0]);
+        });
 
         // Load config for setup steps + test plan
         let setupSteps: string[] = [];

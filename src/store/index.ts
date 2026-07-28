@@ -360,6 +360,55 @@ const MIGRATIONS: Array<{ version: number; sql: string }> = [
         AND CAST(trim(sprint_id) AS REAL) > 0;
     `,
   },
+  {
+    // v10: testing-session sprint identity (GH #659 / S266).
+    // Rebuild both related tables so the findings foreign key follows the
+    // replacement TEXT-backed testing_sessions table.
+    version: 10,
+    sql: `
+      ALTER TABLE testing_findings RENAME TO testing_findings_numeric_sprint;
+      DROP INDEX IF EXISTS idx_testing_findings_session;
+      ALTER TABLE testing_sessions RENAME TO testing_sessions_numeric_sprint;
+
+      CREATE TABLE testing_sessions (
+        id TEXT PRIMARY KEY,
+        branch TEXT,
+        sprint TEXT,
+        purpose TEXT,
+        worktree_path TEXT,
+        branch_name TEXT,
+        started_at TEXT NOT NULL,
+        ended_at TEXT,
+        status TEXT NOT NULL DEFAULT 'active'
+      );
+      INSERT INTO testing_sessions (
+        id, branch, sprint, purpose, worktree_path, branch_name,
+        started_at, ended_at, status
+      )
+      SELECT
+        id, branch, CAST(sprint AS TEXT), purpose, worktree_path, branch_name,
+        started_at, ended_at, status
+      FROM testing_sessions_numeric_sprint;
+
+      CREATE TABLE testing_findings (
+        id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL REFERENCES testing_sessions(id) ON DELETE CASCADE,
+        description TEXT NOT NULL,
+        severity TEXT NOT NULL DEFAULT 'medium',
+        ticket TEXT,
+        created_at TEXT NOT NULL
+      );
+      INSERT INTO testing_findings (
+        id, session_id, description, severity, ticket, created_at
+      )
+      SELECT id, session_id, description, severity, ticket, created_at
+      FROM testing_findings_numeric_sprint;
+
+      DROP TABLE testing_findings_numeric_sprint;
+      DROP TABLE testing_sessions_numeric_sprint;
+      CREATE INDEX idx_testing_findings_session ON testing_findings(session_id);
+    `,
+  },
 ];
 
 /** Latest schema version — total number of migrations available. */
@@ -770,13 +819,14 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
 
   // --- Testing Sessions ---
 
-  async createTestingSession(session: { branch?: string; sprint?: number; purpose?: string; worktree_path?: string; branch_name?: string }): Promise<{ id: string; started_at: string }> {
+  async createTestingSession(session: { branch?: string; sprint?: SprintId; purpose?: string; worktree_path?: string; branch_name?: string }): Promise<{ id: string; started_at: string }> {
     const id = generateId('tsess');
     const started_at = nowISO();
+    const sprint = session.sprint === undefined ? null : canonicalSprintKey(session.sprint);
     this.db.prepare(`
       INSERT INTO testing_sessions (id, branch, sprint, purpose, worktree_path, branch_name, started_at, status)
       VALUES (?, ?, ?, ?, ?, ?, ?, 'active')
-    `).run(id, session.branch ?? null, session.sprint ?? null, session.purpose ?? null, session.worktree_path ?? null, session.branch_name ?? null, started_at);
+    `).run(id, session.branch ?? null, sprint, session.purpose ?? null, session.worktree_path ?? null, session.branch_name ?? null, started_at);
     return { id, started_at };
   }
 
@@ -796,13 +846,13 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
     };
   }
 
-  async getActiveTestingSession(): Promise<{ id: string; branch?: string; sprint?: number; purpose?: string; worktree_path?: string; branch_name?: string; started_at: string } | null> {
+  async getActiveTestingSession(): Promise<{ id: string; branch?: string; sprint?: string; purpose?: string; worktree_path?: string; branch_name?: string; started_at: string } | null> {
     const row = this.db.prepare('SELECT * FROM testing_sessions WHERE status = ? ORDER BY started_at DESC LIMIT 1').get('active') as Record<string, unknown> | undefined;
     if (!row) return null;
     return {
       id: row.id as string,
       branch: (row.branch as string | null) ?? undefined,
-      sprint: (row.sprint as number | null) ?? undefined,
+      sprint: row.sprint == null ? undefined : canonicalSprintKey(row.sprint as SprintId),
       purpose: (row.purpose as string | null) ?? undefined,
       worktree_path: (row.worktree_path as string | null) ?? undefined,
       branch_name: (row.branch_name as string | null) ?? undefined,

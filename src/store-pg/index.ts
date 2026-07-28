@@ -275,6 +275,14 @@ const MIGRATIONS: Array<{ version: number; sql: string }> = [
         AND btrim(sprint_id)::NUMERIC > 0;
     `,
   },
+  {
+    // v7: testing-session sprint identity (GH #659 / S266).
+    version: 7,
+    sql: `
+      ALTER TABLE testing_sessions
+        ALTER COLUMN sprint TYPE TEXT USING sprint::TEXT;
+    `,
+  },
 ];
 
 /** Latest PostgreSQL schema version. */
@@ -701,13 +709,14 @@ export class PostgresSlopeStore implements SlopeStore {
 
   // --- Testing Sessions ---
 
-  async createTestingSession(session: { branch?: string; sprint?: number; purpose?: string; worktree_path?: string; branch_name?: string }): Promise<{ id: string; started_at: string }> {
+  async createTestingSession(session: { branch?: string; sprint?: SprintId; purpose?: string; worktree_path?: string; branch_name?: string }): Promise<{ id: string; started_at: string }> {
     const id = generateId('tsess');
     const started_at = nowISO();
+    const sprint = session.sprint === undefined ? null : canonicalSprintKey(session.sprint);
     await this.pool.query(`
       INSERT INTO testing_sessions (id, project_id, branch, sprint, purpose, worktree_path, branch_name, started_at, status)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'active')
-    `, [id, this.projectId, session.branch ?? null, session.sprint ?? null, session.purpose ?? null, session.worktree_path ?? null, session.branch_name ?? null, started_at]);
+    `, [id, this.projectId, session.branch ?? null, sprint, session.purpose ?? null, session.worktree_path ?? null, session.branch_name ?? null, started_at]);
     return { id, started_at };
   }
 
@@ -730,7 +739,7 @@ export class PostgresSlopeStore implements SlopeStore {
     };
   }
 
-  async getActiveTestingSession(): Promise<{ id: string; branch?: string; sprint?: number; purpose?: string; worktree_path?: string; branch_name?: string; started_at: string } | null> {
+  async getActiveTestingSession(): Promise<{ id: string; branch?: string; sprint?: string; purpose?: string; worktree_path?: string; branch_name?: string; started_at: string } | null> {
     const { rows } = await this.pool.query(
       'SELECT * FROM testing_sessions WHERE status = $1 AND project_id = $2 ORDER BY started_at DESC LIMIT 1',
       ['active', this.projectId],
@@ -740,7 +749,7 @@ export class PostgresSlopeStore implements SlopeStore {
     return {
       id: row.id,
       branch: row.branch ?? undefined,
-      sprint: row.sprint ?? undefined,
+      sprint: row.sprint == null ? undefined : canonicalSprintKey(row.sprint as SprintId),
       purpose: row.purpose ?? undefined,
       worktree_path: row.worktree_path ?? undefined,
       branch_name: row.branch_name ?? undefined,
