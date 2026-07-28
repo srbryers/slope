@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { mkdtempSync, mkdirSync, rmSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { FileRegistry } from '../../src/cli/registries/file-registry.js';
 
@@ -19,6 +19,26 @@ afterEach(() => {
 });
 
 describe('FileRegistry', () => {
+  it('normalizes legacy inputs and preserves canonical trailing zeroes', async () => {
+    const legacy = await registry.claim({
+      sprint_number: 65,
+      player: 'alice',
+      target: 'T-65',
+      scope: 'ticket',
+    });
+    const canonical = await registry.claim({
+      sprint_number: 'S458.10',
+      player: 'alice',
+      target: 'T-458.10',
+      scope: 'ticket',
+    });
+
+    expect(legacy.sprint_number).toBe('65');
+    expect(canonical.sprint_number).toBe('458.10');
+    expect((await registry.list('458.1')).map(claim => claim.target)).toEqual([]);
+    expect((await registry.list('458.10')).map(claim => claim.target)).toEqual(['T-458.10']);
+  });
+
   it('creates a claim and returns it with id and timestamp', async () => {
     const claim = await registry.claim({
       sprint_number: 2,
@@ -28,7 +48,7 @@ describe('FileRegistry', () => {
     });
 
     expect(claim.id).toMatch(/^claim-\d+-[a-z0-9]{6}$/);
-    expect(claim.sprint_number).toBe(2);
+    expect(claim.sprint_number).toBe('2');
     expect(claim.player).toBe('alice');
     expect(claim.target).toBe('S2-1');
     expect(claim.scope).toBe('ticket');
@@ -122,5 +142,21 @@ describe('FileRegistry', () => {
       scope: 'ticket',
     });
     expect(claim.player).toBe('alice');
+  });
+
+  it('normalizes numeric claims loaded from the legacy file format', async () => {
+    mkdirSync(dirname(claimsPath), { recursive: true });
+    writeFileSync(claimsPath, JSON.stringify({
+      claims: [{
+        id: 'legacy',
+        sprint_number: 65,
+        player: 'alice',
+        target: 'T-65',
+        scope: 'ticket',
+        claimed_at: '2026-01-01T00:00:00.000Z',
+      }],
+    }));
+
+    expect(await registry.get('legacy')).toMatchObject({ sprint_number: '65' });
   });
 });

@@ -36,7 +36,17 @@ describe('runLightweightDetection', () => {
     writeFileSync(join(retrosDir, 'sprint-7.json'), '{}');
     writeFileSync(join(retrosDir, 'sprint-1.json'), '{}');
     const info = runLightweightDetection(tmpDir);
-    expect(info.existingSprintNumber).toBe(7);
+    expect(info.existingSprintId).toBe('7');
+  });
+
+  it('detects and orders canonical dotted sprint ids from retros', () => {
+    const retrosDir = join(tmpDir, 'docs', 'retros');
+    mkdirSync(retrosDir, { recursive: true });
+    writeFileSync(join(retrosDir, 'sprint-458.9.json'), '{}');
+    writeFileSync(join(retrosDir, 'sprint-458.10.json'), '{}');
+    writeFileSync(join(retrosDir, 'sprint-458.1.json'), '{}');
+
+    expect(runLightweightDetection(tmpDir).existingSprintId).toBe('458.10');
   });
 
   it('handles missing package.json gracefully', () => {
@@ -62,7 +72,7 @@ describe('runLightweightDetection', () => {
     const retrosDir = join(tmpDir, 'docs', 'retros');
     mkdirSync(retrosDir, { recursive: true });
     const info = runLightweightDetection(tmpDir);
-    expect(info.existingSprintNumber).toBeUndefined();
+    expect(info.existingSprintId).toBeUndefined();
   });
 
   it('detects tech stack from dependencies', () => {

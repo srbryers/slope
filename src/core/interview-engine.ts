@@ -7,12 +7,13 @@ import { execSync } from 'node:child_process';
 import { QUIET_STDIO } from './process.js';
 import type { InitInput } from './interview.js';
 import { shouldPersistInterviewMetaphor, validateInterviewMetaphorId } from './interview-metaphor.js';
-import { sprintIdKey } from './sprint-id.js';
+import { compareSprintIdKeys, sprintIdKey } from './sprint-id.js';
+import type { SprintId } from './sprint-id.js';
 
 export interface DetectedInfo {
   projectName?: string;
   repoUrl?: string;
-  existingSprintNumber?: number;
+  existingSprintId?: SprintId;
   detectedPlatforms: string[];
   techStack?: string[];
 }
@@ -74,21 +75,23 @@ export function runLightweightDetection(cwd: string): DetectedInfo {
     // No git repo or no remote — skip
   }
 
-  // 3. Find highest sprint number from docs/retros/sprint-*.json
+  // 3. Find highest canonical sprint id from docs/retros/sprint-*.json
   try {
     const retrosDir = join(cwd, 'docs', 'retros');
     if (existsSync(retrosDir)) {
       const files = readdirSync(retrosDir);
-      let highest = 0;
+      let highest: SprintId | undefined;
       for (const f of files) {
-        const match = f.match(/^sprint-(\d+)\.json$/);
+        const match = f.match(/^sprint-(\d+(?:\.\d+)?)\.json$/);
         if (match) {
-          const n = parseInt(match[1], 10);
-          if (n > highest) highest = n;
+          const sprint = sprintIdKey(match[1]);
+          if (sprint !== null && (highest === undefined || compareSprintIdKeys(sprint, highest) > 0)) {
+            highest = sprint;
+          }
         }
       }
-      if (highest > 0) {
-        detected.existingSprintNumber = highest;
+      if (highest !== undefined) {
+        detected.existingSprintId = highest;
       }
     }
   } catch {

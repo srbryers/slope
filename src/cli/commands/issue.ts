@@ -16,6 +16,7 @@ import {
   mergeIssueScoutState,
   parseIssueScoutState,
   renderIssueScoutDigest,
+  sprintIdKey,
 } from '../../core/index.js';
 import type {
   ExistingIssue,
@@ -23,6 +24,7 @@ import type {
   IssueScoutEvidence,
   IssueScoutState,
   IssueScoutStateRecord,
+  SprintId,
 } from '../../core/index.js';
 
 interface ParsedIssueArgs {
@@ -392,17 +394,15 @@ function makeEvidence(
   };
 }
 
-function extractSprint(text: string, value?: Record<string, unknown>): number | undefined {
+function extractSprint(text: string, value?: Record<string, unknown>): SprintId | undefined {
   const raw = value?.sprint ?? value?.sprint_number ?? value?.sprintNumber;
-  if (typeof raw === 'number') return raw;
-  if (typeof raw === 'string') {
-    const parsed = Number(raw.replace(/^S/i, ''));
-    if (Number.isFinite(parsed)) return parsed;
+  if (typeof raw === 'number' || typeof raw === 'string') {
+    const sprint = sprintIdKey(raw);
+    if (sprint !== null) return sprint;
   }
   const match = /\bS(\d+(?:\.\d+)?)\b/i.exec(text);
   if (!match) return undefined;
-  const sprint = Number(match[1]);
-  return Number.isFinite(sprint) ? sprint : undefined;
+  return sprintIdKey(match[1]) ?? undefined;
 }
 
 function extractCommand(text: string): string | undefined {

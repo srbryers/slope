@@ -2,7 +2,7 @@
 // Course-level methodology — vision → roadmap → review → iteration
 
 import { compareSprintIdKeys, parseSprintId, sprintIdKey } from './sprint-id.js';
-import type { SprintId } from './sprint-id.js';
+import type { SprintId, SprintIdInput } from './sprint-id.js';
 
 // --- Types ---
 
@@ -48,7 +48,7 @@ export interface RoadmapSprint {
   slope: number;
   type: string;          // e.g., "architecture + methodology"
   tickets: RoadmapTicket[];
-  depends_on?: SprintId[]; // canonical sprint IDs this sprint depends on
+  depends_on?: SprintIdInput[]; // canonical strings; legacy numeric inputs accepted while reading
   status?: string;
   note?: string;
   outcome?: string;
@@ -125,7 +125,7 @@ export function sprintOrderValue(id: number): number {
 }
 
 /** Format the numeric portion of a sprint id for human-facing output. */
-export function formatSprintNumber(id: SprintId): string {
+export function formatSprintNumber(id: SprintIdInput): string {
   if (typeof id === 'string') return sprintIdKey(id) ?? id;
   if (isEncodedInsertedSprintId(id)) {
     return `${Math.floor(id / 10)}.${id % 10}`;
@@ -134,7 +134,7 @@ export function formatSprintNumber(id: SprintId): string {
 }
 
 /** Format a full sprint label, e.g. S95 or S43.5. */
-export function formatSprintLabel(id: SprintId): string {
+export function formatSprintLabel(id: SprintIdInput): string {
   return `S${formatSprintNumber(id)}`;
 }
 
@@ -204,7 +204,7 @@ export function compareSprintIds(a: number, b: number): number {
 }
 
 /** Return the next canonical sprint id after a completed sprint/inserted sprint. */
-export function nextCanonicalSprintId(id: SprintId): string {
+export function nextCanonicalSprintId(id: SprintIdInput): string {
   if (typeof id === 'number' && isEncodedInsertedSprintId(id)) {
     return String(Math.floor(id / 10) + 1);
   }
@@ -291,7 +291,7 @@ export function isEncodedInsertedSprintInRoadmap(roadmap: RoadmapDefinition, id:
   return sprintIds.has(base) || sprintIds.has(base + 1);
 }
 
-export function roadmapSprintOrderValue(roadmap: RoadmapDefinition, id: SprintId): number {
+export function roadmapSprintOrderValue(roadmap: RoadmapDefinition, id: SprintIdInput): number {
   const key = roadmapSprintKeyFromId(roadmap, id);
   const parsed = key ? parseSprintId(key) : null;
   if (!parsed) return typeof id === 'number' ? id : Number(id);
@@ -299,7 +299,7 @@ export function roadmapSprintOrderValue(roadmap: RoadmapDefinition, id: SprintId
   return parsed.base + parsed.insert / (10 ** parsed.insertDigits!.length);
 }
 
-export function compareRoadmapSprintIds(roadmap: RoadmapDefinition, a: SprintId, b: SprintId): number {
+export function compareRoadmapSprintIds(roadmap: RoadmapDefinition, a: SprintIdInput, b: SprintIdInput): number {
   const ka = roadmapSprintKeyFromId(roadmap, a) ?? String(a);
   const kb = roadmapSprintKeyFromId(roadmap, b) ?? String(b);
   return compareSprintIdKeys(ka, kb);
@@ -317,7 +317,7 @@ function areAdjacentSprintKeys(previousKey: string, currentKey: string): boolean
   return current.base === previous.base + 1 && current.insert === null;
 }
 
-export function formatRoadmapSprintLabel(roadmap: RoadmapDefinition, id: SprintId): string {
+export function formatRoadmapSprintLabel(roadmap: RoadmapDefinition, id: SprintIdInput): string {
   return `S${roadmapSprintKeyFromId(roadmap, id) ?? id}`;
 }
 
@@ -335,7 +335,7 @@ export function roadmapSprintKey(roadmap: RoadmapDefinition, sprint: RoadmapSpri
 }
 
 /** Resolve a canonical sprint key from either a key or a legacy numeric mirror. */
-export function roadmapSprintKeyFromId(roadmap: RoadmapDefinition, id: SprintId): string | null {
+export function roadmapSprintKeyFromId(roadmap: RoadmapDefinition, id: SprintIdInput): string | null {
   const inputKey = sprintIdKey(id);
   if (inputKey === null) return null;
 
@@ -349,7 +349,7 @@ export function roadmapSprintKeyFromId(roadmap: RoadmapDefinition, id: SprintId)
 /** Find one roadmap sprint by canonical key, with numeric mirrors as legacy input. */
 export function findRoadmapSprint(
   roadmap: RoadmapDefinition,
-  id: SprintId,
+  id: SprintIdInput,
 ): RoadmapSprint | undefined {
   const key = roadmapSprintKeyFromId(roadmap, id);
   return key == null
@@ -364,14 +364,14 @@ export function findRoadmapSprint(
  */
 export function validateRoadmap(
   roadmap: RoadmapDefinition,
-  scorecards?: { sprint_number: SprintId }[],
-  shippedSprintIds?: ReadonlySet<SprintId>,
+  scorecards?: { sprint_number: SprintIdInput }[],
+  shippedSprintIds?: ReadonlySet<SprintIdInput>,
 ): RoadmapValidationResult {
   const errors: RoadmapValidationError[] = [];
   const warnings: RoadmapValidationWarning[] = [];
   const sprintIds = new Set(roadmap.sprints.map(s => roadmapSprintKey(roadmap, s)));
 
-  const labelOf = (id: SprintId): string => formatRoadmapSprintLabel(roadmap, id);
+  const labelOf = (id: SprintIdInput): string => formatRoadmapSprintLabel(roadmap, id);
   // Canonical identity so 458.10 and 458.1 are distinct sprints with distinct
   // ticket-key prefixes (GH #635).
   const keyLabelOf = (sprint: RoadmapSprint): string => `S${roadmapSprintKey(roadmap, sprint)}`;
@@ -503,7 +503,7 @@ export function validateRoadmap(
 
   // Check: phases reference valid sprint IDs
   for (const phase of roadmap.phases) {
-    const phaseSprintIds: SprintId[] = phase.sprint_keys ?? phase.sprints;
+    const phaseSprintIds: SprintIdInput[] = phase.sprint_keys ?? phase.sprints;
     for (const sid of phaseSprintIds) {
       const sidKey = roadmapSprintKeyFromId(roadmap, sid);
       if (sidKey === null || !sprintIds.has(sidKey)) {
@@ -851,7 +851,7 @@ export function formatRoadmapSummary(roadmap: RoadmapDefinition): string {
 
   // Phases
   for (const phase of roadmap.phases) {
-    const phaseSprintIds: SprintId[] = phase.sprint_keys ?? phase.sprints;
+    const phaseSprintIds: SprintIdInput[] = phase.sprint_keys ?? phase.sprints;
     const phaseSprintKeys = new Set(
       phaseSprintIds.map(id => roadmapSprintKeyFromId(roadmap, id)),
     );
@@ -899,7 +899,7 @@ export function formatRoadmapSummary(roadmap: RoadmapDefinition): string {
 /** Format strategic context for briefings — concise 3-5 line summary */
 export function formatStrategicContext(
   roadmap: RoadmapDefinition,
-  currentSprint: SprintId,
+  currentSprint: SprintIdInput,
 ): string | null {
   const sprint = findRoadmapSprint(roadmap, currentSprint);
   if (!sprint) return null;
@@ -912,7 +912,7 @@ export function formatStrategicContext(
 
   // Find which phase this sprint belongs to
   const phase = roadmap.phases.find(p => {
-    const keys: SprintId[] = p.sprint_keys ?? p.sprints;
+    const keys: SprintIdInput[] = p.sprint_keys ?? p.sprints;
     return keys.some(id => roadmapSprintKeyFromId(roadmap, id) === resolvedSprint);
   });
 
@@ -960,7 +960,7 @@ export function formatStrategicContext(
  */
 export function findNextPlannedSprint(
   roadmap: RoadmapDefinition,
-  currentSprint: SprintId,
+  currentSprint: SprintIdInput,
 ): RoadmapSprint | null {
   const currentKey = roadmapSprintKeyFromId(roadmap, currentSprint);
   if (currentKey === null) return null;

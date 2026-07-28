@@ -480,7 +480,7 @@ export function validateRoadmapSourceStore(
           result.errors.push({
             code: 'archive_scorecard_missing',
             source: source.entry.path,
-            sprint: sprint.id,
+            sprint: sprintKey,
             message: `Archived complete Sprint S${sprintKey} has no scorecard link.`,
           });
           continue;
@@ -496,7 +496,7 @@ export function validateRoadmapSourceStore(
           result.errors.push({
             code: 'archive_scorecard_unsafe',
             source: source.entry.path,
-            sprint: sprint.id,
+            sprint: sprintKey,
             message: (error as Error).message,
           });
           continue;
@@ -505,7 +505,7 @@ export function validateRoadmapSourceStore(
           result.errors.push({
             code: 'archive_scorecard_not_found',
             source: source.entry.path,
-            sprint: sprint.id,
+            sprint: sprintKey,
             message: `Archived scorecard does not exist: ${normalizeDiagnosticPath(scorecardRef)}.`,
           });
           continue;
@@ -519,7 +519,7 @@ export function validateRoadmapSourceStore(
             result.errors.push({
               code: 'archive_scorecard_mismatch',
               source: source.entry.path,
-              sprint: sprint.id,
+              sprint: sprintKey,
               message: `Scorecard ${normalizeDiagnosticPath(scorecardRef)} records ${String(raw.sprint_number)} instead of Sprint S${sprintKey}.`,
             });
           }
@@ -527,7 +527,7 @@ export function validateRoadmapSourceStore(
           result.errors.push({
             code: 'archive_scorecard_invalid',
             source: source.entry.path,
-            sprint: sprint.id,
+            sprint: sprintKey,
             message: `Could not parse ${normalizeDiagnosticPath(scorecardRef)}: ${(error as Error).message}`,
           });
         }
@@ -586,7 +586,7 @@ export function planRoadmapSourceArchive(
 
   for (const [index, source] of store.sources.entries()) {
     if (source.entry.kind !== 'phase') continue;
-    const sprintIds: SprintId[] = source.document.phase.sprint_keys
+    const sprintIds = source.document.phase.sprint_keys
       ?? source.document.phase.sprints;
     const comparisons = sprintIds.map(id => compareRoadmapSprintIds(store.roadmap, id, through));
     const includesAtOrBefore = comparisons.some(comparison => comparison <= 0);

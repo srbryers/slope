@@ -7,7 +7,7 @@ import { describe, it, expect } from 'vitest';
  * We also test isShuttingDown (the only pure exported function).
  */
 
-import { isShuttingDown, buildPrompt, saveResult } from '../../../src/cli/loop/executor.js';
+import { isShuttingDown, buildPrompt, extractNextSprintId, saveResult } from '../../../src/cli/loop/executor.js';
 import type { BacklogTicket, SprintResult, LoopConfig } from '../../../src/cli/loop/types.js';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -16,6 +16,14 @@ import { join } from 'node:path';
 describe('isShuttingDown', () => {
   it('returns false initially', () => {
     expect(isShuttingDown()).toBe(false);
+  });
+});
+
+describe('extractNextSprintId', () => {
+  it('preserves dotted sprint identities with trailing zeroes', () => {
+    expect(extractNextSprintId('Next sprint: S458.10\nTheme: Canonical IDs')).toBe('458.10');
+    expect(extractNextSprintId('Next sprint: S458.1')).toBe('458.1');
+    expect(extractNextSprintId('No sprint available')).toBeNull();
   });
 });
 

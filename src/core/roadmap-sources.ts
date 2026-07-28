@@ -688,7 +688,7 @@ export function validateRoadmapSourceFederation(
         errors.push({
           code: 'missing_sprint_definition',
           source: label,
-          sprint: Number(key),
+          sprint: key,
           message: `Phase membership S${key} has no sprint definition in the same bundle.`,
         });
       }
@@ -698,7 +698,7 @@ export function validateRoadmapSourceFederation(
         errors.push({
           code: 'orphan_sprint_definition',
           source: label,
-          sprint: Number(key),
+          sprint: key,
           message: `Sprint S${key} is defined but missing from phase.sprints in the same bundle.`,
         });
       }
@@ -717,7 +717,7 @@ export function validateRoadmapSourceFederation(
         errors.push({
           code: 'duplicate_sprint',
           source: label,
-          sprint: sprint.id,
+          sprint: key,
           message: `Sprint S${key} is also defined in ${priorSprint}.`,
         });
       } else {
@@ -731,7 +731,7 @@ export function validateRoadmapSourceFederation(
           errors.push({
             code: 'duplicate_ticket',
             source: label,
-            sprint: sprint.id,
+            sprint: key,
             ticket: key,
             message: `Ticket ${key} is also defined in ${priorTicket}.`,
           });
@@ -746,7 +746,7 @@ export function validateRoadmapSourceFederation(
     if (memberships.length > 1) {
       errors.push({
         code: 'multiple_phase_membership',
-        sprint: Number(key),
+        sprint: key,
         message: `Sprint S${key} belongs to multiple phase bundles: ${memberships.join(', ')}.`,
       });
     }
@@ -763,7 +763,7 @@ export function validateRoadmapSourceFederation(
       errors.push({
         code: 'logical_sprint_collision',
         source: sprintDefinitions.get(defKey(sprint)),
-        sprint: sprint.id,
+        sprint: key,
         message: `Sprint S${key} and Sprint S${prior.key} resolve to the same roadmap identity (${key}); first defined in ${prior.source ?? 'unknown source'}.`,
       });
     } else {

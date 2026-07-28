@@ -1,6 +1,8 @@
 import { execSync, execFileSync } from 'node:child_process';
 import type { LoopConfig, TicketResult } from './types.js';
 import type { Logger } from './logger.js';
+import { sprintIdKey } from '../../core/sprint-id.js';
+import type { SprintIdInput } from '../../core/sprint-id.js';
 
 export interface PrInfo {
   url: string;
@@ -98,10 +100,15 @@ ${ticketLines}
 export function runStructuralReview(
   prNumber: number,
   sprintId: string,
-  sprintNum: number,
+  sprintInput: SprintIdInput,
   cwd: string,
   log: Logger,
 ): number {
+  const sprint = sprintIdKey(sprintInput);
+  if (sprint === null) {
+    log.warn(`Structural review skipped: invalid sprint identity ${String(sprintInput)}`);
+    return 0;
+  }
   let findingCount = 0;
 
   let diff: string;
@@ -138,14 +145,14 @@ export function runStructuralReview(
   // Check 1: Type escapes
   const typeEscapes = addedLines.filter(l => /as any|@ts-ignore|@ts-expect-error/.test(l)).length;
   if (typeEscapes > 0) {
-    addFinding('code', sprintId, sprintNum, 'minor', `${typeEscapes} type escape(s) found (as any / @ts-ignore)`, cwd, log);
+    addFinding('code', sprintId, sprint, 'minor', `${typeEscapes} type escape(s) found (as any / @ts-ignore)`, cwd, log);
     findingCount++;
   }
 
   // Check 2: Console.log in production code (excludes test files)
   const prodConsoleLogs = prodAddedLines.filter(l => /console\.log/.test(l)).length;
   if (prodConsoleLogs > 0) {
-    addFinding('code', sprintId, sprintNum, 'minor', `${prodConsoleLogs} console.log statement(s) in production code`, cwd, log);
+    addFinding('code', sprintId, sprint, 'minor', `${prodConsoleLogs} console.log statement(s) in production code`, cwd, log);
     findingCount++;
   }
 
@@ -158,14 +165,14 @@ export function runStructuralReview(
     }
   }
   if (untestedCount > 0) {
-    addFinding('code', sprintId, sprintNum, 'moderate', `${untestedCount} source file(s) changed without corresponding test changes`, cwd, log);
+    addFinding('code', sprintId, sprint, 'moderate', `${untestedCount} source file(s) changed without corresponding test changes`, cwd, log);
     findingCount++;
   }
 
   // Check 4: Security-sensitive file changes
   const securityFiles = changedFiles.filter(f => /auth\/|oauth|jwt|secret|crypto|password|credential/i.test(f));
   if (securityFiles.length > 0) {
-    addFinding('security', sprintId, sprintNum, 'moderate', `${securityFiles.length} security-sensitive file(s) changed`, cwd, log);
+    addFinding('security', sprintId, sprint, 'moderate', `${securityFiles.length} security-sensitive file(s) changed`, cwd, log);
     findingCount++;
   }
 
@@ -179,7 +186,7 @@ export function runStructuralReview(
     if (filesJson) {
       const largeCount = filesJson.split('\n').filter(Boolean).length;
       if (largeCount > 0) {
-        addFinding('architect', sprintId, sprintNum, 'minor', `${largeCount} file(s) with >500 lines added`, cwd, log);
+        addFinding('architect', sprintId, sprint, 'minor', `${largeCount} file(s) with >500 lines added`, cwd, log);
         findingCount++;
       }
     }
@@ -191,7 +198,7 @@ export function runStructuralReview(
 function addFinding(
   type: string,
   sprintId: string,
-  sprintNum: number,
+  sprint: string,
   severity: string,
   description: string,
   cwd: string,
@@ -204,7 +211,7 @@ function addFinding(
       `--ticket=${sprintId}-0`,
       `--severity=${severity}`,
       `--description=${description}`,
-      `--sprint=${String(sprintNum)}`,
+      `--sprint=${sprint}`,
     ], { cwd, stdio: 'pipe' });
   } catch {
     log.warn(`Failed to add finding: ${description}`);

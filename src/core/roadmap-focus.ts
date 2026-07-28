@@ -280,7 +280,7 @@ export function buildRoadmapFocus(
   );
   const selectedKey = roadmapSprintKey(roadmap, selected);
   const phase = roadmap.phases.find(candidate => {
-    const keys: SprintId[] = candidate.sprint_keys ?? candidate.sprints;
+    const keys = candidate.sprint_keys ?? candidate.sprints;
     return keys.some(id => roadmapSprintKeyFromId(roadmap, id) === selectedKey);
   });
   const phaseKeys = (phase?.sprint_keys ?? phase?.sprints ?? [])

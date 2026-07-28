@@ -248,7 +248,10 @@ function recommendationFromPlan(content: string): ReviewRecommendationContext {
   };
 }
 
-function recommendationFromRoadmapSprint(sprint: RoadmapSprint, sprintNumber: SprintId = sprint.id): ReviewRecommendationContext {
+function recommendationFromRoadmapSprint(
+  sprint: RoadmapSprint,
+  sprintNumber: SprintId = sprint.id_key ?? String(sprint.id),
+): ReviewRecommendationContext {
   const stringValues = collectStringValues(sprint);
   const filePatterns = stringValues.filter(value => /[/.]/.test(value));
   return {

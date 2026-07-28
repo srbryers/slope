@@ -798,9 +798,9 @@ export const SLOPE_REGISTRY: FunctionRegistryEntry[] = [
   {
     name: 'linkInspirationToSprint',
     module: 'inspirations',
-    description: 'Link an inspiration entry to a sprint number. Idempotent — no error if already linked. Writes to disk.',
-    signature: 'linkInspirationToSprint(path: string, id: string, sprint: number): InspirationsFile',
-    example: 'return linkInspirationToSprint(".slope/inspirations.json", "gitnexus", 65);',
+    description: 'Link an inspiration entry to a canonical sprint ID. Idempotent — no error if already linked. Writes to disk.',
+    signature: 'linkInspirationToSprint(path: string, id: string, sprint: SprintIdInput): InspirationsFile',
+    example: 'return linkInspirationToSprint(".slope/inspirations.json", "gitnexus", "458.10");',
   },
   {
     name: 'deriveId',
@@ -1021,7 +1021,7 @@ interface DispersionReport { total_shots: number; total_misses: number; miss_rat
 interface AreaReport { by_sprint_type: Record<string, { count: number; avg_score_vs_par: number; fairway_pct: number; gir_pct: number }>; by_club: Record<string, { count: number; in_the_hole_rate: number; miss_rate: number }>; par_performance: Record<number, { count: number; avg_score_vs_par: number; over_par_rate: number }>; }
 
 // ─── Config & Loader ───
-interface SlopeConfig { scorecardDir: string; scorecardPattern: string; minSprint: number; commonIssuesPath: string; sessionsPath: string; registry: 'file' | 'api'; claimsPath: string; registryApiUrl?: string; currentSprint?: number; store?: string; store_path?: string; }
+interface SlopeConfig { scorecardDir: string; scorecardPattern: string; minSprint: number; commonIssuesPath: string; sessionsPath: string; registry: 'file' | 'api'; claimsPath: string; registryApiUrl?: string; currentSprint?: SprintId; store?: string; store_path?: string; }
 
 // ─── Store ───
 interface SlopeSession { session_id: string; role: 'primary' | 'secondary' | 'observer'; ide: string; worktree_path?: string; branch?: string; started_at: string; last_heartbeat_at: string; metadata?: Record<string, unknown>; agent_role?: string; swarm_id?: string; }

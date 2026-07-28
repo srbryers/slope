@@ -118,6 +118,29 @@ describe('slope issue command', () => {
     expect(digest).toContain('requested decision: approve fix, defer, or reject');
   });
 
+  it('preserves canonical sprint ids in collected evidence', async () => {
+    const sourcePath = writeCommonIssues(cwd);
+    const source = JSON.parse(readFileSync(sourcePath, 'utf8'));
+    source.recurring_patterns.push({
+      title: 'Canonical review artifact follow-up',
+      sprint: 'S458.10',
+      command: 'slope review --sprint=458.10',
+      evidence: 'slope review for S458.10 left the canonical review markdown missing.',
+    });
+    writeFileSync(sourcePath, JSON.stringify(source, null, 2));
+
+    const output = await captureLogs(() =>
+      issueCommand(['scout', '--source=.slope/common-issues.json', '--dry-run', '--json'])
+    );
+    const payload = JSON.parse(output);
+    const evidence = payload.candidates.flatMap((candidate: { evidence: Array<{ sprint?: string }> }) =>
+      candidate.evidence
+    );
+
+    expect(evidence.some((item: { sprint?: string }) => item.sprint === '458.10')).toBe(true);
+    expect(evidence.some((item: { sprint?: string }) => item.sprint === '458.1')).toBe(false);
+  });
+
   it('writes scout JSON output without dumping the full payload to stdout', async () => {
     writeCommonIssues(cwd);
     const outputPath = join(cwd, '.slope', 'candidates.json');

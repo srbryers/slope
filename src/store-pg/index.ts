@@ -3,12 +3,13 @@
 // Requires the `pg` package: npm install pg
 
 import type { SprintClaim, SlopeEvent, EventType, WorkflowExecution, WorkflowStepResult, CompletedStep } from '../core/types.js';
+import type { SprintClaimInput } from '../core/registry.js';
 import type { CommonIssuesFile } from '../core/briefing.js';
 import type { StoreStats, StoredGolfScorecard } from '../core/store.js';
 import { SlopeStoreError } from '../core/store.js';
 import type { SlopeStore, SlopeSession, SlopeSessionUpdate } from '../core/store.js';
 import { compareSprintIdKeys, sprintIdKey } from '../core/sprint-id.js';
-import type { SprintId } from '../core/sprint-id.js';
+import type { SprintId, SprintIdInput } from '../core/sprint-id.js';
 // EmbeddingStore not implemented for PG — hasEmbeddingSupport() returns false.
 // Deferred to a future pgvector sprint.
 
@@ -25,7 +26,7 @@ function nowISO(): string {
   return new Date().toISOString();
 }
 
-function canonicalSprintKey(value: SprintId): string {
+function canonicalSprintKey(value: SprintIdInput): string {
   const key = sprintIdKey(value);
   if (key === null) {
     throw new TypeError(`Invalid sprint id: ${String(value)}`);
@@ -508,7 +509,7 @@ export class PostgresSlopeStore implements SlopeStore {
 
   // --- Claims (SprintRegistry + extensions) ---
 
-  async claim(input: Omit<SprintClaim, 'id' | 'claimed_at'>): Promise<SprintClaim> {
+  async claim(input: SprintClaimInput): Promise<SprintClaim> {
     const claim: SprintClaim = {
       id: generateId('claim'),
       claimed_at: nowISO(),
@@ -551,7 +552,7 @@ export class PostgresSlopeStore implements SlopeStore {
     return (result.rowCount ?? 0) > 0;
   }
 
-  async list(sprintNumber: SprintId): Promise<SprintClaim[]> {
+  async list(sprintNumber: SprintIdInput): Promise<SprintClaim[]> {
     const result = await this.pool.query(
       'SELECT * FROM claims WHERE sprint_number = $1 AND project_id = $2 ORDER BY claimed_at',
       [canonicalSprintKey(sprintNumber), this.projectId],
@@ -567,7 +568,7 @@ export class PostgresSlopeStore implements SlopeStore {
     return result.rows.length > 0 ? rowToClaim(result.rows[0]) : undefined;
   }
 
-  async getActiveClaims(sprintNumber?: SprintId): Promise<SprintClaim[]> {
+  async getActiveClaims(sprintNumber?: SprintIdInput): Promise<SprintClaim[]> {
     const now = nowISO();
     const sprintClause = sprintNumber !== undefined ? 'AND claims.sprint_number = $3' : '';
     const result = await this.pool.query(
@@ -599,7 +600,7 @@ export class PostgresSlopeStore implements SlopeStore {
     `, [this.projectId, sprintKey, JSON.stringify(storedCard), now, now]);
   }
 
-  async listScorecards(filter?: { minSprint?: SprintId; maxSprint?: SprintId }): Promise<StoredGolfScorecard[]> {
+  async listScorecards(filter?: { minSprint?: SprintIdInput; maxSprint?: SprintIdInput }): Promise<StoredGolfScorecard[]> {
     const minSprint = filter?.minSprint === undefined ? null : canonicalSprintKey(filter.minSprint);
     const maxSprint = filter?.maxSprint === undefined ? null : canonicalSprintKey(filter.maxSprint);
     const result = await this.pool.query(
@@ -691,7 +692,7 @@ export class PostgresSlopeStore implements SlopeStore {
     return result.rows.map(rowToEvent);
   }
 
-  async getEventsBySprint(sprintNumber: SprintId): Promise<SlopeEvent[]> {
+  async getEventsBySprint(sprintNumber: SprintIdInput): Promise<SlopeEvent[]> {
     const result = await this.pool.query(
       'SELECT * FROM events WHERE sprint_number = $1 AND project_id = $2 ORDER BY timestamp',
       [canonicalSprintKey(sprintNumber), this.projectId],
@@ -709,7 +710,7 @@ export class PostgresSlopeStore implements SlopeStore {
 
   // --- Testing Sessions ---
 
-  async createTestingSession(session: { branch?: string; sprint?: SprintId; purpose?: string; worktree_path?: string; branch_name?: string }): Promise<{ id: string; started_at: string }> {
+  async createTestingSession(session: { branch?: string; sprint?: SprintIdInput; purpose?: string; worktree_path?: string; branch_name?: string }): Promise<{ id: string; started_at: string }> {
     const id = generateId('tsess');
     const started_at = nowISO();
     const sprint = session.sprint === undefined ? null : canonicalSprintKey(session.sprint);

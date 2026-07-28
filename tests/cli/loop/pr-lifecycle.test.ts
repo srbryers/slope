@@ -119,6 +119,23 @@ describe('runStructuralReview', () => {
     expect(count).toBeGreaterThanOrEqual(1);
   });
 
+  it('routes findings to the exact canonical sprint id', () => {
+    const diff = [
+      'diff --git a/src/foo.ts b/src/foo.ts',
+      '+const x = y as any;',
+    ].join('\n');
+    (execFileSync as ReturnType<typeof vi.fn>)
+      .mockReturnValueOnce(diff)
+      .mockReturnValue('');
+
+    runStructuralReview(42, 'S458.10', 'S458.10', '/repo', mockLog);
+
+    const findingCall = (execFileSync as ReturnType<typeof vi.fn>).mock.calls
+      .filter(call => call[0] === 'pnpm' && Array.isArray(call[1]) && call[1].includes('add'))
+      .at(-1);
+    expect(findingCall?.[1]).toContain('--sprint=458.10');
+  });
+
   it('returns 0 when diff fetch fails', () => {
     (execFileSync as ReturnType<typeof vi.fn>).mockImplementation(() => { throw new Error('fail'); });
     const count = runStructuralReview(42, 'S-1', 1, '/repo', mockLog);

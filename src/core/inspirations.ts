@@ -4,7 +4,7 @@ import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { mkdirSync } from 'node:fs';
 import { compareSprintIdKeys, sprintIdKey } from './sprint-id.js';
-import type { SprintId } from './sprint-id.js';
+import type { SprintId, SprintIdInput } from './sprint-id.js';
 
 /** Status of an inspiration entry */
 export type InspirationStatus = 'backlogged' | 'planned' | 'implemented' | 'rejected';
@@ -136,7 +136,7 @@ export function deriveId(projectName: string): string {
 export function linkInspirationToSprint(
   inspirationsPath: string,
   inspirationId: string,
-  sprintNumber: SprintId,
+  sprintNumber: SprintIdInput,
 ): InspirationsFile {
   const file = loadInspirations(inspirationsPath);
   if (!file) {

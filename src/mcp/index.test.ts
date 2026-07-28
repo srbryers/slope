@@ -3,6 +3,7 @@ import { createSlopeToolsServer, SLOPE_MCP_TOOL_NAMES, detectSetupHints, buildSe
 import type { SetupHints } from './index.js';
 import { SLOPE_REGISTRY, SLOPE_TYPES } from './registry.js';
 import { runInSandbox } from './sandbox.js';
+import { sprintIdKey, sprintIdsEqual } from '../core/index.js';
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -39,7 +40,14 @@ function createMockStore(): SlopeStore & { sessions: SlopeSession[]; claims: Spr
     async updateHeartbeat() {},
     async cleanStaleSessions() { return 0; },
     async claim(input) {
-      const claim: SprintClaim = { ...input, id: `claim-${Date.now()}`, claimed_at: new Date().toISOString() };
+      const sprint = sprintIdKey(input.sprint_number);
+      if (sprint === null) throw new Error('invalid sprint');
+      const claim: SprintClaim = {
+        ...input,
+        sprint_number: sprint,
+        id: `claim-${Date.now()}`,
+        claimed_at: new Date().toISOString(),
+      };
       claims.push(claim);
       return claim;
     },
@@ -49,9 +57,9 @@ function createMockStore(): SlopeStore & { sessions: SlopeSession[]; claims: Spr
       claims.splice(idx, 1);
       return true;
     },
-    async list(n) { return claims.filter(c => c.sprint_number === n); },
+    async list(n) { return claims.filter(c => sprintIdsEqual(c.sprint_number, n)); },
     async get(id) { return claims.find(c => c.id === id); },
-    async getActiveClaims(n) { return n !== undefined ? claims.filter(c => c.sprint_number === n) : [...claims]; },
+    async getActiveClaims(n) { return n !== undefined ? claims.filter(c => sprintIdsEqual(c.sprint_number, n)) : [...claims]; },
     async saveScorecard() {},
     async listScorecards() { return []; },
     async loadCommonIssues() { return { recurring_patterns: [] }; },

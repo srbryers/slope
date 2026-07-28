@@ -20,6 +20,7 @@ import {
   sprintIdKey,
   sprintIdsEqual,
   type SprintId,
+  type SprintIdInput,
 } from './sprint-id.js';
 import type { RoadmapDefinition } from './roadmap.js';
 import {
@@ -225,16 +226,16 @@ const ROUTE_STOP_WORDS = new Set([
   'work', 'would',
 ]);
 
-function roadmapIdsEqual(roadmap: RoadmapDefinition, left: SprintId, right: SprintId): boolean {
+function roadmapIdsEqual(roadmap: RoadmapDefinition, left: SprintIdInput, right: SprintIdInput): boolean {
   const leftKey = roadmapSprintKeyFromId(roadmap, left);
   return leftKey !== null && leftKey === roadmapSprintKeyFromId(roadmap, right);
 }
 
-function roadmapSprintById(roadmap: RoadmapDefinition, sprint: SprintId) {
+function roadmapSprintById(roadmap: RoadmapDefinition, sprint: SprintIdInput) {
   return findRoadmapSprint(roadmap, sprint);
 }
 
-function roadmapPhaseForSprint(roadmap: RoadmapDefinition, sprint: SprintId) {
+function roadmapPhaseForSprint(roadmap: RoadmapDefinition, sprint: SprintIdInput) {
   const key = roadmapSprintKeyFromId(roadmap, sprint);
   return roadmap.phases.find(phase =>
     (phase.sprint_keys ?? phase.sprints.map(String))

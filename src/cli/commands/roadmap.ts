@@ -515,7 +515,7 @@ function focusEvidence(
   if (!selected) return evidence;
   const selectedKey = roadmapSprintKey(roadmap, selected);
   const phase = roadmap.phases.find(candidate => {
-    const keys: SprintId[] = candidate.sprint_keys ?? candidate.sprints;
+    const keys = candidate.sprint_keys ?? candidate.sprints;
     return keys.some(id => roadmapSprintKeyFromId(roadmap, id) === selectedKey);
   });
   const phaseKeys = (phase?.sprint_keys ?? phase?.sprints ?? [])
@@ -882,7 +882,7 @@ function assertCanonicalArchiveBoundary(
 ): void {
   for (const source of store.sources) {
     if (source.entry.kind !== 'phase') continue;
-    const sprintIds: SprintId[] = source.document.phase.sprint_keys
+    const sprintIds = source.document.phase.sprint_keys
       ?? source.document.phase.sprints;
     const comparisons = sprintIds
       .map(id => compareRoadmapSprintIds(store.roadmap, id, through));

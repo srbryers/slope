@@ -158,9 +158,11 @@ function extractShippedSprintReferences(commits: GitSprintCommit[]): Set<SprintI
 
   for (const commit of commits) {
     const artifactRefs = extractSprintArtifactReferences(commit.files);
-    const subjectRefs = isSlopeMetadataOnlyCommit(commit.files)
-      ? new Set<number>()
-      : extractSprintReferences([commit.subject]);
+    const subjectRefs = new Set<SprintId>(
+      isSlopeMetadataOnlyCommit(commit.files)
+        ? []
+        : [...extractSprintReferences([commit.subject])].map(String),
+    );
 
     for (const ref of unionSets<SprintId>(artifactRefs, subjectRefs)) {
       result.add(ref);
@@ -193,7 +195,7 @@ const SAFE_REF_RE = /^[A-Za-z0-9/_.+-]+$/;
  *  shell command — refs containing whitespace, semicolons, backticks, etc.
  *  short-circuit to an empty set rather than risk a shell injection.
  */
-export function findShippedSprintsOnMain(cwd: string, ref?: string): Set<number> {
+export function findShippedSprintsOnMain(cwd: string, ref?: string): Set<SprintId> {
   const isGit = git('rev-parse --is-inside-work-tree', cwd);
   if (isGit !== 'true') return new Set();
 
@@ -205,10 +207,7 @@ export function findShippedSprintsOnMain(cwd: string, ref?: string): Set<number>
     // session-end Stop hooks on deep-history repos.
     const log = git(`log ${r} --format=%x1e%s --name-only -n 1000`, cwd);
     if (log) {
-      // Keep the legacy numeric signature until lifecycle consumers migrate to
-      // SprintId. Artifact members remain canonical strings at runtime so exact
-      // roadmap lookup cannot collapse .10 into .1.
-      return extractShippedSprintReferences(parseSprintLog(log)) as unknown as Set<number>;
+      return extractShippedSprintReferences(parseSprintLog(log));
     }
   }
   return new Set();

@@ -412,10 +412,10 @@ function resolveDependencies(
   allIssues: GitHubIssue[],
 ): void {
   // Build a lookup from ticket key to sprint id for cross-sprint deps
-  const keyToSprint = new Map<string, number>();
+  const keyToSprint = new Map<string, string>();
   for (const sprint of sprints) {
     for (const ticket of sprint.tickets) {
-      keyToSprint.set(ticket.key, sprint.id);
+      keyToSprint.set(ticket.key, sprint.id_key ?? String(sprint.id));
     }
   }
 
@@ -444,7 +444,7 @@ function resolveDependencies(
           deps.push(depKey);
         } else if (depSprint !== undefined) {
           // Cross-sprint dependency — add at sprint level
-          const sprint = sprints.find(s => s.id === thisSprint);
+          const sprint = sprints.find(s => (s.id_key ?? String(s.id)) === thisSprint);
           if (sprint && !(sprint.depends_on ?? []).includes(depSprint)) {
             sprint.depends_on = [...(sprint.depends_on ?? []), depSprint];
           }

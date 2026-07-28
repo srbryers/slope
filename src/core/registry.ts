@@ -2,14 +2,18 @@
 // Provides the SprintRegistry interface and pure conflict detection logic.
 
 import { sprintIdsEqual } from './sprint-id.js';
-import type { SprintId } from './sprint-id.js';
+import type { SprintIdInput } from './sprint-id.js';
 import type { SprintClaim, SprintConflict } from './types.js';
+
+export type SprintClaimInput =
+  Omit<SprintClaim, 'id' | 'claimed_at' | 'sprint_number'>
+  & { sprint_number: SprintIdInput };
 
 /** Async registry for managing sprint claims */
 export interface SprintRegistry {
-  claim(claim: Omit<SprintClaim, 'id' | 'claimed_at'>): Promise<SprintClaim>;
+  claim(claim: SprintClaimInput): Promise<SprintClaim>;
   release(id: string): Promise<boolean>;
-  list(sprintNumber: SprintId): Promise<SprintClaim[]>;
+  list(sprintNumber: SprintIdInput): Promise<SprintClaim[]>;
   get(id: string): Promise<SprintClaim | undefined>;
 }
 

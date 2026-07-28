@@ -6,7 +6,7 @@ import { dirname, join, resolve } from 'node:path';
 import { createRequire } from 'node:module';
 import type DatabaseConstructor from 'better-sqlite3';
 import type { Database as DatabaseType } from 'better-sqlite3';
-import type { SprintClaim, SlopeEvent, EventType, WorkflowExecution, WorkflowStepResult, CompletedStep, SprintId, StoredGolfScorecard } from '../core/index.js';
+import type { SprintClaim, SprintClaimInput, SlopeEvent, EventType, WorkflowExecution, WorkflowStepResult, CompletedStep, SprintId, SprintIdInput, StoredGolfScorecard } from '../core/index.js';
 import type { CommonIssuesFile, StoreStats } from '../core/index.js';
 import { compareSprintIdKeys, resolveRepoStateCwd, sprintIdKey, SlopeStoreError } from '../core/index.js';
 import type { SlopeStore, SlopeSession, SlopeSessionUpdate } from '../core/index.js';
@@ -20,7 +20,7 @@ function nowISO(): string {
   return new Date().toISOString();
 }
 
-function canonicalSprintKey(value: SprintId): string {
+function canonicalSprintKey(value: SprintIdInput): string {
   const key = sprintIdKey(value);
   if (key === null) {
     throw new TypeError(`Invalid sprint id: ${String(value)}`);
@@ -646,7 +646,7 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
 
   // --- Claims (SprintRegistry + extensions) ---
 
-  async claim(input: Omit<SprintClaim, 'id' | 'claimed_at'>): Promise<SprintClaim> {
+  async claim(input: SprintClaimInput): Promise<SprintClaim> {
     const claim: SprintClaim = {
       id: generateId('claim'),
       claimed_at: nowISO(),
@@ -685,7 +685,7 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
     return result.changes > 0;
   }
 
-  async list(sprintNumber: SprintId): Promise<SprintClaim[]> {
+  async list(sprintNumber: SprintIdInput): Promise<SprintClaim[]> {
     const rows = this.db.prepare('SELECT * FROM claims WHERE sprint_number = ? ORDER BY claimed_at')
       .all(canonicalSprintKey(sprintNumber)) as Array<Record<string, unknown>>;
     return rows.map(rowToClaim);
@@ -696,7 +696,7 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
     return row ? rowToClaim(row) : undefined;
   }
 
-  async getActiveClaims(sprintNumber?: SprintId): Promise<SprintClaim[]> {
+  async getActiveClaims(sprintNumber?: SprintIdInput): Promise<SprintClaim[]> {
     const now = nowISO();
     const sprintClause = sprintNumber !== undefined ? 'AND claims.sprint_number = ?' : '';
     const sql = `
@@ -728,7 +728,7 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
     `).run(sprintKey, JSON.stringify(storedCard), now, now);
   }
 
-  async listScorecards(filter?: { minSprint?: SprintId; maxSprint?: SprintId }): Promise<StoredGolfScorecard[]> {
+  async listScorecards(filter?: { minSprint?: SprintIdInput; maxSprint?: SprintIdInput }): Promise<StoredGolfScorecard[]> {
     const minSprint = filter?.minSprint === undefined ? null : canonicalSprintKey(filter.minSprint);
     const maxSprint = filter?.maxSprint === undefined ? null : canonicalSprintKey(filter.maxSprint);
     const rows = this.db.prepare('SELECT sprint_number, data FROM scorecards')
@@ -805,7 +805,7 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
     return rows.map(rowToEvent);
   }
 
-  async getEventsBySprint(sprintNumber: SprintId): Promise<SlopeEvent[]> {
+  async getEventsBySprint(sprintNumber: SprintIdInput): Promise<SlopeEvent[]> {
     const rows = this.db.prepare('SELECT * FROM events WHERE sprint_number = ? ORDER BY timestamp')
       .all(canonicalSprintKey(sprintNumber)) as Array<Record<string, unknown>>;
     return rows.map(rowToEvent);
@@ -819,7 +819,7 @@ export class SqliteSlopeStore implements SlopeStore, EmbeddingStore {
 
   // --- Testing Sessions ---
 
-  async createTestingSession(session: { branch?: string; sprint?: SprintId; purpose?: string; worktree_path?: string; branch_name?: string }): Promise<{ id: string; started_at: string }> {
+  async createTestingSession(session: { branch?: string; sprint?: SprintIdInput; purpose?: string; worktree_path?: string; branch_name?: string }): Promise<{ id: string; started_at: string }> {
     const id = generateId('tsess');
     const started_at = nowISO();
     const sprint = session.sprint === undefined ? null : canonicalSprintKey(session.sprint);

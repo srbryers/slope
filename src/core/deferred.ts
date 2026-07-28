@@ -4,7 +4,7 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { sprintIdKey, sprintIdsEqual, type SprintId } from './sprint-id.js';
+import { sprintIdKey, sprintIdsEqual, type SprintId, type SprintIdInput } from './sprint-id.js';
 
 // --- Types ---
 
@@ -44,7 +44,21 @@ export function loadDeferred(cwd: string): DeferredFinding[] {
   if (!existsSync(filePath)) return [];
   try {
     const raw = JSON.parse(readFileSync(filePath, 'utf8')) as DeferredFindingsFile;
-    return Array.isArray(raw.findings) ? raw.findings : [];
+    if (!Array.isArray(raw.findings)) return [];
+    return raw.findings.flatMap((finding) => {
+      const sourceSprint = sprintIdKey(finding.source_sprint);
+      const targetSprint = finding.target_sprint === null
+        ? null
+        : sprintIdKey(finding.target_sprint);
+      if (sourceSprint === null || (finding.target_sprint !== null && targetSprint === null)) {
+        return [];
+      }
+      return [{
+        ...finding,
+        source_sprint: sourceSprint,
+        target_sprint: targetSprint,
+      }];
+    });
   } catch {
     return [];
   }
@@ -63,19 +77,24 @@ export function saveDeferred(cwd: string, findings: DeferredFinding[]): void {
 export function createDeferred(
   cwd: string,
   opts: {
-    source_sprint: SprintId;
-    target_sprint?: SprintId | null;
+    source_sprint: SprintIdInput;
+    target_sprint?: SprintIdInput | null;
     severity: DeferredSeverity;
     description: string;
     category?: string;
   },
 ): DeferredFinding {
   const findings = loadDeferred(cwd);
+  const sourceSprint = sprintIdKey(opts.source_sprint);
+  const targetSprint = opts.target_sprint == null ? null : sprintIdKey(opts.target_sprint);
+  if (sourceSprint === null || (opts.target_sprint != null && targetSprint === null)) {
+    throw new TypeError('Deferred finding requires valid sprint ids');
+  }
 
   const finding: DeferredFinding = {
     id: randomUUID(),
-    source_sprint: opts.source_sprint,
-    target_sprint: opts.target_sprint ?? null,
+    source_sprint: sourceSprint,
+    target_sprint: targetSprint,
     severity: opts.severity,
     description: opts.description,
     category: opts.category,
@@ -109,7 +128,7 @@ export function resolveDeferred(
 export function listDeferred(
   cwd: string,
   opts?: {
-    sprint?: number;
+    sprint?: SprintIdInput;
     status?: DeferredStatus;
     severity?: DeferredSeverity;
   },
@@ -117,7 +136,8 @@ export function listDeferred(
   let findings = loadDeferred(cwd);
 
   if (opts?.sprint != null) {
-    findings = findings.filter(f => f.target_sprint === opts.sprint);
+    const sprint = opts.sprint;
+    findings = findings.filter(f => f.target_sprint !== null && sprintIdsEqual(f.target_sprint, sprint));
   }
 
   if (opts?.status) {
@@ -134,7 +154,7 @@ export function listDeferred(
 /** Format deferred findings for briefing output. */
 export function formatDeferredForBriefing(
   findings: DeferredFinding[],
-  sprint: SprintId,
+  sprint: SprintIdInput,
 ): string[] {
   const sprintKey = sprintIdKey(sprint) ?? String(sprint);
   const targeted = findings.filter(

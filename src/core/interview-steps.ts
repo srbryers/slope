@@ -5,6 +5,8 @@ import type { InterviewContext } from './interview-engine.js';
 import { validateInterviewMetaphorId } from './interview-metaphor.js';
 import { listMetaphors } from './metaphor.js';
 import { buildAllPreviews } from './metaphor-preview.js';
+import { nextCanonicalSprintId } from './roadmap.js';
+import { sprintIdKey } from './sprint-id.js';
 
 export type StepType = 'text' | 'select' | 'multiselect' | 'confirm';
 
@@ -82,8 +84,8 @@ export function generateInterviewSteps(ctx: InterviewContext): InterviewStep[] {
   });
 
   // 4. Sprint number
-  const defaultSprint = detected.existingSprintNumber
-    ? String(detected.existingSprintNumber + 1)
+  const defaultSprint = detected.existingSprintId
+    ? nextCanonicalSprintId(detected.existingSprintId)
     : '1';
   steps.push({
     id: 'sprint-number',
@@ -95,9 +97,9 @@ export function generateInterviewSteps(ctx: InterviewContext): InterviewStep[] {
     validate: (v) => {
       const s = String(v ?? '').trim();
       if (!s) return null;
-      const n = parseInt(s, 10);
-      if (isNaN(n) || n < 1 || !Number.isInteger(n)) return 'Must be a positive integer';
-      return null;
+      return sprintIdKey(s) === null
+        ? 'Must be a positive sprint id (for example 12 or 458.10)'
+        : null;
     },
   });
 

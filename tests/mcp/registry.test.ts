@@ -127,6 +127,9 @@ describe('MCP_TOOL_REGISTRY', () => {
       .toContain('sprint?: SprintIdInput');
     expect(SLOPE_REGISTRY.find(entry => entry.name === 'buildEscalationEvent')?.signature)
       .toContain('sprintNumber?: SprintIdInput');
+    expect(SLOPE_REGISTRY.find(entry => entry.name === 'linkInspirationToSprint')?.signature)
+      .toContain('sprint: SprintIdInput');
+    expect(SLOPE_TYPES).toContain('currentSprint?: SprintId');
   });
 });
 

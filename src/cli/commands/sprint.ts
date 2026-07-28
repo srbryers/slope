@@ -511,8 +511,8 @@ function requireMatchingSprintOrRollover(
   let assessment: SprintRolloverAssessment;
   try {
     assessment = inspectSprintRollover(cwd, {
-      from: state.sprint as unknown as number,
-      to: requestedSprint as unknown as number,
+      from: state.sprint,
+      to: requestedSprint,
     });
   } catch (error) {
     console.error(`Refusing to ${action}: ${(error as Error).message}`);

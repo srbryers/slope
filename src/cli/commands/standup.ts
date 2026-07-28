@@ -126,7 +126,7 @@ export async function standupCommand(args: string[]): Promise<void> {
   try {
     if (aggregate) {
       // Aggregate mode: load all standup events for current sprint
-      const sprint = sprintNumber ?? config.currentSprint ?? 1;
+      const sprint = sprintNumber ?? config.currentSprint ?? '1';
       const events = await store.getEventsBySprint(sprint);
 
       // Filter to standup events and parse them
@@ -209,7 +209,7 @@ export async function standupCommand(args: string[]): Promise<void> {
 
       // Load session events and claims
       const events = await store.getEventsBySession(sessionId);
-      const sprint = sprintNumber ?? config.currentSprint ?? 1;
+      const sprint = sprintNumber ?? config.currentSprint ?? '1';
       const claims = await store.getActiveClaims(sprint);
 
       // Find agent_role from session

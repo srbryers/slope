@@ -136,7 +136,7 @@ export async function detectSprintState(cwd: string, sessionId?: string): Promis
 
   // If no claims and no scorecards, we're between sprints
   if (latestScoredSprint === '0' && (claimsFromStore === null || claimsFromStore.length === 0)) {
-    return buildBetweenSprints(config, cwd, 0);
+    return buildBetweenSprints(config, cwd, '0');
   }
 
   // Check if the latest sprint has a review
@@ -185,7 +185,7 @@ function buildBetweenSprints(config: SlopeConfig, cwd: string, latestSprint: Spr
         const raw = JSON.parse(readFileSync(roadmapFile, 'utf8'));
         const { roadmap } = parseRoadmap(raw);
         if (roadmap) {
-          const nextSprint = latestSprint === '0' ? 1 : nextCanonicalSprintId(latestSprint);
+          const nextSprint = latestSprint === '0' ? '1' : nextCanonicalSprintId(latestSprint);
           const ctx = formatStrategicContext(roadmap, nextSprint);
           if (ctx) roadmapContext = ctx;
         }

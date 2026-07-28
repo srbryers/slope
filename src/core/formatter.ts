@@ -8,6 +8,7 @@ import type {
   TrainingRecommendation,
 } from './types.js';
 import type { MetaphorDefinition } from './metaphor.js';
+import type { SprintIdInput } from './sprint-id.js';
 import { normalizeStats } from './builder.js';
 import { normalizeScorecardShots } from './loader.js';
 
@@ -86,7 +87,7 @@ function safeBunkerLabel(b: unknown): string {
  * If omitted, skips the infrastructure section entirely.
  */
 export function formatSprintReview(
-  card: GolfScorecard & { sprint?: number },
+  card: GolfScorecard & { sprint?: SprintIdInput },
   projectStats?: ProjectStats,
   deltas?: ProjectStatsDelta,
   mode: ReviewMode = 'technical',
@@ -312,7 +313,7 @@ export function formatAdvisorReport(input: AdvisorReportInput, metaphor?: Metaph
 // --- Plain mode formatter ---
 
 function formatPlainReview(
-  card: GolfScorecard & { sprint?: number },
+  card: GolfScorecard & { sprint?: SprintIdInput },
   projectStats?: ProjectStats,
   deltas?: ProjectStatsDelta,
 ): string {
