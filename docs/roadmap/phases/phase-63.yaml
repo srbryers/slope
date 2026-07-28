@@ -39,6 +39,7 @@ sprints:
         depends_on:
           - S265-2
   - id: 266
+    status: complete
     theme: Canonical Sprint ID API and Display
     par: 5
     slope: 4
@@ -105,3 +106,4 @@ sprints:
           - S267-2
 scorecards:
   "265": docs/retros/sprint-265.json
+  "266": docs/retros/sprint-266.json
