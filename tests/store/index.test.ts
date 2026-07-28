@@ -563,6 +563,25 @@ describe('Schema Migration', () => {
     s2.close();
   });
 
+  it('refuses to skip a gap in migration history', () => {
+    const dbPath = join(tmpDir, 'gapped-history.db');
+    const Database = require('better-sqlite3');
+    const db = new Database(dbPath);
+    db.exec(`
+      CREATE TABLE schema_version (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL);
+      INSERT INTO schema_version VALUES (1, '2025-01-01T00:00:00.000Z');
+      INSERT INTO schema_version VALUES (3, '2025-01-03T00:00:00.000Z');
+    `);
+    db.close();
+
+    expect(() => new SqliteSlopeStore(dbPath)).toThrow(/missing migration\(s\): 2/);
+
+    const inspected = new Database(dbPath, { readonly: true });
+    expect(inspected.prepare('SELECT version FROM schema_version ORDER BY version').all())
+      .toEqual([{ version: 1 }, { version: 3 }]);
+    inspected.close();
+  });
+
   it('migrates v1 database to v2 on reopen', async () => {
     // Create a v1-only database by manually setting up tables
     const dbPath = join(tmpDir, 'v1.db');
@@ -670,7 +689,13 @@ describe('Schema Migration', () => {
     db.pragma('foreign_keys = ON');
     db.exec(`
       CREATE TABLE schema_version (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL);
-      INSERT INTO schema_version VALUES (8, '2026-01-01T00:00:00.000Z');
+      WITH RECURSIVE versions(version) AS (
+        SELECT 1
+        UNION ALL
+        SELECT version + 1 FROM versions WHERE version < 8
+      )
+      INSERT INTO schema_version
+      SELECT version, '2026-01-01T00:00:00.000Z' FROM versions;
 
       CREATE TABLE sessions (
         session_id TEXT PRIMARY KEY, role TEXT NOT NULL, ide TEXT NOT NULL,
@@ -844,7 +869,13 @@ describe('Schema Migration', () => {
     const db = new Database(dbPath);
     db.exec(`
       CREATE TABLE schema_version (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL);
-      INSERT INTO schema_version VALUES (8, '2026-01-01T00:00:00.000Z');
+      WITH RECURSIVE versions(version) AS (
+        SELECT 1
+        UNION ALL
+        SELECT version + 1 FROM versions WHERE version < 8
+      )
+      INSERT INTO schema_version
+      SELECT version, '2026-01-01T00:00:00.000Z' FROM versions;
       CREATE TABLE sessions (
         session_id TEXT PRIMARY KEY, role TEXT NOT NULL, ide TEXT NOT NULL,
         started_at TEXT NOT NULL, last_heartbeat_at TEXT NOT NULL

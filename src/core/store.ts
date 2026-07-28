@@ -43,6 +43,51 @@ export class SlopeStoreError extends Error {
   }
 }
 
+export function migrationHistoryIssues(
+  appliedVersions: readonly number[],
+  targetVersion: number,
+): string[] {
+  const issues: string[] = [];
+  const seen = new Set<number>();
+
+  for (const version of appliedVersions) {
+    if (!Number.isSafeInteger(version) || version < 1) {
+      issues.push(`schema_version contains invalid version ${String(version)}`);
+      continue;
+    }
+    if (seen.has(version)) {
+      issues.push(`schema_version contains duplicate version ${version}`);
+    }
+    seen.add(version);
+  }
+
+  const validVersions = [...seen].sort((a, b) => a - b);
+  const currentVersion = validVersions.at(-1) ?? 0;
+  if (currentVersion > targetVersion) {
+    issues.push(`schema_version ${currentVersion} is newer than supported target ${targetVersion}`);
+  }
+
+  const missing: number[] = [];
+  for (let version = 1; version <= Math.min(currentVersion, targetVersion); version++) {
+    if (!seen.has(version)) missing.push(version);
+  }
+  if (missing.length > 0) {
+    issues.push(`schema_version is missing migration(s): ${missing.join(', ')}`);
+  }
+
+  return issues;
+}
+
+export function assertMigrationHistory(
+  appliedVersions: readonly number[],
+  targetVersion: number,
+): void {
+  const issues = migrationHistoryIssues(appliedVersions, targetVersion);
+  if (issues.length > 0) {
+    throw new Error(`Invalid migration history: ${issues.join('; ')}`);
+  }
+}
+
 export interface SlopeStore extends SprintRegistry {
   // Sessions
   registerSession(session: Omit<SlopeSession, 'started_at' | 'last_heartbeat_at'>): Promise<SlopeSession>;

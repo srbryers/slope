@@ -76,6 +76,7 @@ sprints:
           - S266-1
           - S266-3
   - id: 267
+    status: complete
     theme: Sprint ID 2.0 Release Train
     par: 4
     slope: 3
@@ -107,3 +108,4 @@ sprints:
 scorecards:
   "265": docs/retros/sprint-265.json
   "266": docs/retros/sprint-266.json
+  "267": docs/retros/sprint-267.json

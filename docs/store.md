@@ -34,7 +34,15 @@ Migrations run automatically when the store is opened. Each migration is applied
 - **SQLite:** Migrations run synchronously in the constructor.
 - **PostgreSQL:** Migrations use a transaction-scoped advisory lock (`pg_advisory_xact_lock`) for concurrency safety. Multiple agents can safely open the store simultaneously.
 
-Current schema version: **3** (sessions, claims, scorecards, common issues, events, swarm support).
+Current schema versions:
+
+- **SQLite 10:** canonical string sprint identity across claims, scorecards,
+  events, workflow executions, and testing sessions.
+- **PostgreSQL 7:** the equivalent canonical identity migrations under an
+  advisory-locked transaction.
+
+See [Sprint ID 2.0 Migration](guides/sprint-id-2-migration.md) before upgrading
+an existing store.
 
 ## CLI Commands
 
@@ -46,7 +54,7 @@ Show store type, schema version, and row counts:
 $ slope store status
 Store type:     sqlite
 Path:           .slope/slope.db
-Schema version: 3
+Schema version: 10
 Sessions:       2
 Claims:         5
 Scorecards:     12
@@ -58,7 +66,7 @@ Use `--json` for machine-readable output:
 
 ```
 $ slope store status --json
-{"type":"sqlite","path":".slope/slope.db","schemaVersion":3,"sessions":2,...}
+{"type":"sqlite","path":".slope/slope.db","schemaVersion":10,"sessions":2,...}
 ```
 
 ### `slope store migrate status`
@@ -67,10 +75,14 @@ Show current schema version and whether migrations are pending:
 
 ```
 $ slope store migrate status
-Current schema version: 3
-Total migrations:       3
+Current schema version: 10
+Total migrations:       10
 Status:                 up to date
 ```
+
+Use `slope store migrate doctor` before opening an existing store with a new
+major version. Unlike ordinary store commands, the doctor inspects schema
+metadata without applying pending migrations.
 
 ### `slope store backup`
 
@@ -115,7 +127,7 @@ The `checkStoreHealth()` function runs `getSchemaVersion()` and `getStats()`, ca
 import { checkStoreHealth } from '@slope-dev/slope';
 
 const result = await checkStoreHealth(store, 'sqlite');
-// { healthy: true, type: 'sqlite', schemaVersion: 3, stats: {...}, errors: [] }
+// { healthy: true, type: 'sqlite', schemaVersion: 10, stats: {...}, errors: [] }
 ```
 
 ## PostgreSQL Hardening

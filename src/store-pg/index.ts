@@ -6,7 +6,7 @@ import type { SprintClaim, SlopeEvent, EventType, WorkflowExecution, WorkflowSte
 import type { SprintClaimInput } from '../core/registry.js';
 import type { CommonIssuesFile } from '../core/briefing.js';
 import type { StoreStats, StoredGolfScorecard } from '../core/store.js';
-import { SlopeStoreError } from '../core/store.js';
+import { assertMigrationHistory, SlopeStoreError } from '../core/store.js';
 import type { SlopeStore, SlopeSession, SlopeSessionUpdate } from '../core/store.js';
 import { compareSprintIdKeys, sprintIdKey } from '../core/sprint-id.js';
 import type { SprintId, SprintIdInput } from '../core/sprint-id.js';
@@ -334,8 +334,12 @@ export class PostgresSlopeStore implements SlopeStore {
         )
       `);
 
-      const result = await client.query('SELECT MAX(version) as v FROM schema_version');
-      const currentVersion: number = result.rows[0]?.v ?? 0;
+      const result = await client.query<{ version: number }>(
+        'SELECT version FROM schema_version ORDER BY version',
+      );
+      const appliedVersions = result.rows.map(row => row.version);
+      assertMigrationHistory(appliedVersions, LATEST_PG_SCHEMA_VERSION);
+      const currentVersion = appliedVersions.at(-1) ?? 0;
 
       for (const migration of MIGRATIONS) {
         if (migration.version > currentVersion) {

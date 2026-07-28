@@ -1,0 +1,97 @@
+{
+  "sprint_number": "267",
+  "player": "codex",
+  "theme": "Sprint ID 2.0 Release Train",
+  "par": 4,
+  "slope": 3,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-07-28",
+  "shots": [
+    {
+      "ticket_key": "S267-1",
+      "title": "Document the Sprint ID 2.0 migration and recovery path",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Added backup, upgrade, compatibility, verification, and restore guidance for SQLite and PostgreSQL operators."
+    },
+    {
+      "ticket_key": "S267-2",
+      "title": "Add a read-only sprint migration doctor",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "Added SQLite and PostgreSQL metadata inspection with human and JSON output, malformed-store handling, and proof that legacy stores remain unchanged."
+    },
+    {
+      "ticket_key": "S267-3",
+      "title": "Validate the 2.0.0 release candidate",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [],
+      "notes": "Typecheck, build, package dry-run, docs, map, roadmap, and 4,447 tests passed. Durable schema-migration evidence raises the release recommendation from the conventional minor tier to major."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 3,
+    "fairways_total": 3,
+    "greens_in_regulation": 3,
+    "greens_total": 3,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 0,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "type": "release + migration",
+  "conditions": [
+    {
+      "type": "wind",
+      "impact": "moderate",
+      "description": "The release changes persisted sprint identity and therefore requires an operator-visible backup and recovery path."
+    }
+  ],
+  "special_plays": [],
+  "training": [
+    {
+      "type": "lessons",
+      "description": "Release-tier heuristics cannot infer every breaking operational contract from commit prefixes.",
+      "outcome": "The checked-in release policy and issue contract override the minor heuristic and require 2.0.0 for the store migration."
+    }
+  ],
+  "nutrition": [
+    {
+      "category": "tests",
+      "description": "Full suite: 264 test files passed, 2 skipped; 4,447 tests passed, 34 skipped. The 33 PostgreSQL integration tests remain delegated to CI when SLOPE_TEST_PG_URL is available.",
+      "status": "healthy"
+    },
+    {
+      "category": "build",
+      "description": "Typecheck, production build, docs check, map check, roadmap source/projection validation, diff check, and npm package dry-run passed.",
+      "status": "healthy"
+    }
+  ],
+  "bunker_locations": [
+    "Treat a required store schema migration as a major release even when conventional commit analysis recommends a minor.",
+    "A migration doctor must inspect metadata without constructing the normal store because normal store construction applies migrations.",
+    "Release documentation must distinguish automatic upgrade from restore-based downgrade; 1.x writers cannot safely coexist after migration."
+  ],
+  "yardage_book_updates": [
+    "Run slope store migrate doctor before any ordinary 2.0 command when upgrading an existing project.",
+    "Verify a backup and stop all 1.x writers before opening the store with 2.0.",
+    "Use backend-specific schema targets when reporting migration status."
+  ],
+  "course_management_notes": [
+    "Merge S267 before the version-only PR so the 2.0.0 package contains the migration guide and doctor.",
+    "After the version PR and main CI pass, create GitHub release v2.0.0 to trigger trusted npm publishing, then verify both artifacts and close #659."
+  ],
+  "slope_factors": [
+    "schema_migration"
+  ]
+}

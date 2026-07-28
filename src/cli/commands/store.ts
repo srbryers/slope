@@ -4,7 +4,42 @@ import { createRequire } from 'node:module';
 import type DatabaseConstructor from 'better-sqlite3';
 import type { Database as DatabaseType } from 'better-sqlite3';
 import { resolveStore, getStoreInfo } from '../store.js';
+import { loadConfig } from '../config.js';
 import { resolveRepoStateCwd, resolveRepoStatePath } from '../../core/repo-state-scope.js';
+import { migrationHistoryIssues } from '../../core/store.js';
+
+type MigrationDoctorStatus = 'not_initialized' | 'upgrade_required' | 'ready' | 'inconsistent';
+
+interface MigrationColumn {
+  table: string;
+  column: string;
+  actualType: string | null;
+  expectedType: 'TEXT';
+  ok: boolean;
+}
+
+export interface MigrationDoctorReport {
+  type: string;
+  path?: string;
+  sanitizedUrl?: string;
+  projectId?: string;
+  initialized: boolean;
+  currentSchemaVersion: number;
+  targetSchemaVersion: number;
+  pendingMigrations: number;
+  migrationRequired: boolean;
+  status: MigrationDoctorStatus;
+  identityColumns: MigrationColumn[];
+  issues: string[];
+  readOnly: true;
+}
+
+const SPRINT_IDENTITY_COLUMNS = [
+  { table: 'claims', column: 'sprint_number' },
+  { table: 'scorecards', column: 'sprint_number' },
+  { table: 'events', column: 'sprint_number' },
+  { table: 'testing_sessions', column: 'sprint' },
+] as const;
 
 function parseArgs(args: string[]): Record<string, string> {
   const result: Record<string, string> = {};
@@ -93,7 +128,7 @@ export async function storeCommand(args: string[]): Promise<void> {
       await storeStatus(flags, cwd);
       break;
     case 'migrate':
-      await migrateStatus(args.slice(1), cwd);
+      await migrateCommand(args.slice(1), cwd);
       break;
     case 'backup':
       await backupStore(flags, cwd);
@@ -107,7 +142,8 @@ slope store — Store diagnostics and management
 
 Usage:
   slope store status [--json]        Show store type, schema version, and stats
-  slope store migrate status         Show current schema version
+  slope store migrate status         Open the store and show its schema version
+  slope store migrate doctor [--json] Inspect migration readiness without applying it
   slope store backup [--output=<p>]  Back up the store
   slope store restore --from=<path>  Restore from a backup
 `);
@@ -171,14 +207,19 @@ async function storeStatus(flags: Record<string, string>, cwd: string): Promise<
   }
 }
 
-async function migrateStatus(args: string[], cwd: string): Promise<void> {
+async function migrateCommand(args: string[], cwd: string): Promise<void> {
   const sub = args[0];
+  if (sub === 'doctor') {
+    await migrationDoctor(parseArgs(args.slice(1)), cwd);
+    return;
+  }
   if (sub !== 'status') {
     console.log(`
 slope store migrate — Migration management
 
 Usage:
-  slope store migrate status    Show current schema version and available migrations
+  slope store migrate status         Open the store and show its schema version
+  slope store migrate doctor [--json] Inspect migration readiness without applying it
 `);
     if (sub) process.exit(1);
     return;
@@ -187,17 +228,265 @@ Usage:
   const store = await resolveStore(cwd);
   try {
     const version = await store.getSchemaVersion();
-    const { LATEST_SCHEMA_VERSION } = await import('../../store/index.js');
+    const targetVersion = await targetSchemaVersion(getStoreInfo(cwd).type);
     console.log(`\nCurrent schema version: ${version}`);
-    console.log(`Total migrations:       ${LATEST_SCHEMA_VERSION}`);
-    if (version >= LATEST_SCHEMA_VERSION) {
+    console.log(`Total migrations:       ${targetVersion}`);
+    if (version >= targetVersion) {
       console.log(`Status:                 up to date`);
     } else {
-      console.log(`Status:                 ${LATEST_SCHEMA_VERSION - version} migration(s) pending`);
+      console.log(`Status:                 ${targetVersion - version} migration(s) pending`);
     }
     console.log('');
   } finally {
     store.close();
+  }
+}
+
+async function targetSchemaVersion(type: string): Promise<number> {
+  if (type === 'postgres') {
+    const { LATEST_PG_SCHEMA_VERSION } = await import('../../store-pg/index.js');
+    return LATEST_PG_SCHEMA_VERSION;
+  }
+  const { LATEST_SCHEMA_VERSION } = await import('../../store/index.js');
+  return LATEST_SCHEMA_VERSION;
+}
+
+export function assessMigrationDoctor(input: {
+  type: string;
+  info?: { path?: string; sanitizedUrl?: string; projectId?: string };
+  initialized: boolean;
+  currentSchemaVersion: number;
+  targetSchemaVersion: number;
+  columnTypes: Map<string, string>;
+  appliedVersions?: readonly number[];
+}): MigrationDoctorReport {
+  const identityColumns: MigrationColumn[] = input.initialized
+    ? SPRINT_IDENTITY_COLUMNS.map(({ table, column }) => {
+        const actualType = input.columnTypes.get(`${table}.${column}`) ?? null;
+        return {
+          table,
+          column,
+          actualType,
+          expectedType: 'TEXT',
+          ok: actualType?.toUpperCase() === 'TEXT',
+        };
+      })
+    : [];
+  const pendingMigrations = input.initialized
+    ? Math.max(0, input.targetSchemaVersion - input.currentSchemaVersion)
+    : 0;
+  const historyIssues = input.appliedVersions
+    ? migrationHistoryIssues(input.appliedVersions, input.targetSchemaVersion)
+    : [];
+  const issues: string[] = [...historyIssues];
+  for (const check of identityColumns) {
+    if (!check.ok) {
+      issues.push(`${check.table}.${check.column} is ${check.actualType ?? 'missing'}; expected TEXT`);
+    }
+  }
+
+  let status: MigrationDoctorStatus;
+  if (!input.initialized) status = 'not_initialized';
+  else if (
+    historyIssues.length > 0
+    || input.currentSchemaVersion > input.targetSchemaVersion
+    || (pendingMigrations === 0 && issues.length > 0)
+  ) {
+    status = 'inconsistent';
+  } else if (pendingMigrations > 0 || issues.length > 0) {
+    status = 'upgrade_required';
+  } else {
+    status = 'ready';
+  }
+
+  return {
+    type: input.type,
+    ...input.info,
+    initialized: input.initialized,
+    currentSchemaVersion: input.currentSchemaVersion,
+    targetSchemaVersion: input.targetSchemaVersion,
+    pendingMigrations,
+    migrationRequired: status === 'upgrade_required',
+    status,
+    identityColumns,
+    issues,
+    readOnly: true,
+  };
+}
+
+async function migrationDoctor(flags: Record<string, string>, cwd: string): Promise<void> {
+  const info = getStoreInfo(cwd);
+  const report = info.type === 'postgres'
+    ? await inspectPostgresMigration(cwd)
+    : info.type === 'sqlite'
+      ? await inspectSqliteMigration(cwd)
+      : {
+          ...info,
+          initialized: false,
+          currentSchemaVersion: 0,
+          targetSchemaVersion: 0,
+          pendingMigrations: 0,
+          migrationRequired: false,
+          status: 'inconsistent' as const,
+          identityColumns: [],
+          issues: [`Migration doctor does not support custom store type "${info.type}"`],
+          readOnly: true as const,
+        };
+
+  if (flags.json === 'true') {
+    console.log(JSON.stringify(report));
+    return;
+  }
+
+  console.log('\nSprint ID migration doctor (read-only)');
+  console.log(`Store type:             ${report.type}`);
+  if (report.path) console.log(`Path:                   ${report.path}`);
+  if (report.sanitizedUrl) console.log(`URL:                    ${report.sanitizedUrl}`);
+  if (report.projectId) console.log(`Project ID:             ${report.projectId}`);
+  console.log(`Initialized:            ${report.initialized ? 'yes' : 'no'}`);
+  console.log(`Current schema version: ${report.currentSchemaVersion}`);
+  console.log(`Target schema version:  ${report.targetSchemaVersion}`);
+  console.log(`Pending migrations:     ${report.pendingMigrations}`);
+  console.log(`Status:                 ${report.status.replaceAll('_', ' ')}`);
+  if (report.identityColumns.length > 0) {
+    console.log('Sprint identity columns:');
+    for (const check of report.identityColumns) {
+      console.log(`  ${check.ok ? '[ok]' : '[!!]'} ${check.table}.${check.column}: ${check.actualType ?? 'missing'}`);
+    }
+  }
+  if (report.issues.length > 0) {
+    console.log('Issues:');
+    for (const issue of report.issues) console.log(`  - ${issue}`);
+  }
+  if (report.migrationRequired) {
+    console.log('Action: create a verified backup, stop old writers, then open the store with SLOPE 2.0.');
+  } else if (report.status === 'not_initialized') {
+    console.log('Action: no existing SLOPE schema requires migration.');
+  } else if (report.status === 'ready') {
+    console.log('Action: no sprint identity migration is pending.');
+  } else {
+    console.log('Action: inspect or restore the store before allowing writes.');
+  }
+  console.log('No migrations were run.\n');
+}
+
+async function inspectSqliteMigration(cwd: string): Promise<MigrationDoctorReport> {
+  const info = getStoreInfo(cwd);
+  const target = await targetSchemaVersion('sqlite');
+  const dbPath = resolveRepoStatePath(cwd, info.path ?? '.slope/slope.db');
+  if (!existsSync(dbPath)) {
+    return assessMigrationDoctor({
+      type: 'sqlite',
+      info: { path: dbPath },
+      initialized: false,
+      currentSchemaVersion: 0,
+      targetSchemaVersion: target,
+      columnTypes: new Map(),
+    });
+  }
+
+  const Database = loadDatabaseConstructor();
+  const db = new Database(dbPath, { readonly: true });
+  try {
+    const hasVersionTable = Boolean(db.prepare(
+      "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'schema_version'",
+    ).get());
+    if (!hasVersionTable) {
+      const report = assessMigrationDoctor({
+        type: 'sqlite',
+        info: { path: dbPath },
+        initialized: false,
+        currentSchemaVersion: 0,
+        targetSchemaVersion: target,
+        columnTypes: new Map(),
+      });
+      return {
+        ...report,
+        status: 'inconsistent',
+        issues: ['SQLite store exists but schema_version is missing'],
+      };
+    }
+    const appliedVersions = (db.prepare(
+      'SELECT version FROM schema_version ORDER BY version',
+    ).all() as Array<{ version: number }>).map(row => row.version);
+    const currentSchemaVersion = appliedVersions.at(-1) ?? 0;
+    const columnTypes = new Map<string, string>();
+    for (const { table, column } of SPRINT_IDENTITY_COLUMNS) {
+      const rows = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string; type: string }>;
+      const match = rows.find(row => row.name === column);
+      if (match) columnTypes.set(`${table}.${column}`, match.type);
+    }
+    return assessMigrationDoctor({
+      type: 'sqlite',
+      info: { path: dbPath },
+      initialized: hasVersionTable,
+      currentSchemaVersion,
+      targetSchemaVersion: target,
+      columnTypes,
+      appliedVersions,
+    });
+  } finally {
+    db.close();
+  }
+}
+
+async function inspectPostgresMigration(cwd: string): Promise<MigrationDoctorReport> {
+  const stateCwd = resolveRepoStateCwd(cwd);
+  const config = loadConfig(stateCwd);
+  const info = getStoreInfo(stateCwd);
+  const target = await targetSchemaVersion('postgres');
+  const connectionString = config.postgres?.connectionString;
+  if (!connectionString) {
+    throw new Error('PostgreSQL migration doctor requires postgres.connectionString in .slope/config.json');
+  }
+
+  let PgPool: typeof import('pg').Pool;
+  try {
+    ({ Pool: PgPool } = await import('pg'));
+  } catch {
+    throw new Error('PostgreSQL migration doctor requires the "pg" package. Run: npm install pg');
+  }
+  const pool = new PgPool({ connectionString, max: 1 });
+  try {
+    const versionTable = await pool.query<{ present: boolean }>(`
+      SELECT EXISTS (
+        SELECT 1 FROM information_schema.tables
+        WHERE table_schema = current_schema() AND table_name = 'schema_version'
+      ) AS present
+    `);
+    const initialized = Boolean(versionTable.rows[0]?.present);
+    let currentSchemaVersion = 0;
+    let appliedVersions: number[] = [];
+    if (initialized) {
+      const version = await pool.query<{ version: number }>(
+        'SELECT version FROM schema_version ORDER BY version',
+      );
+      appliedVersions = version.rows.map(row => row.version);
+      currentSchemaVersion = appliedVersions.at(-1) ?? 0;
+    }
+    const columnTypes = new Map<string, string>();
+    if (initialized) {
+      const columns = await pool.query<{ table_name: string; column_name: string; data_type: string }>(`
+        SELECT table_name, column_name, data_type
+        FROM information_schema.columns
+        WHERE table_schema = current_schema()
+          AND table_name = ANY($1::text[])
+      `, [[...new Set(SPRINT_IDENTITY_COLUMNS.map(item => item.table))]]);
+      for (const row of columns.rows) {
+        columnTypes.set(`${row.table_name}.${row.column_name}`, row.data_type);
+      }
+    }
+    return assessMigrationDoctor({
+      type: 'postgres',
+      info: { sanitizedUrl: info.sanitizedUrl, projectId: info.projectId },
+      initialized,
+      currentSchemaVersion,
+      targetSchemaVersion: target,
+      columnTypes,
+      appliedVersions,
+    });
+  } finally {
+    await pool.end();
   }
 }
 

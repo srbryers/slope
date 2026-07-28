@@ -346,6 +346,7 @@ Sprint IDs use canonical string identity so values such as `458.1` and `458.10` 
 | `npx slope extract --file=<path>` | Extract events into store |
 | `npx slope distill` | Promote patterns to common issues |
 | `npx slope store health\|backup\|restore` | Store diagnostics and management |
+| `npx slope store migrate doctor [--json]` | Inspect sprint ID migration readiness without changing the store |
 | `npx slope flows init\|list\|check` | Manage user flow definitions |
 
 ## Metaphors
@@ -392,6 +393,7 @@ Published as [`@slope-dev/slope`](https://www.npmjs.com/package/@slope-dev/slope
 - **[Framework Reference](docs/framework.md)** — full scoring system specification
 - **[Dashboard Guide](docs/guides/dashboard.md)** — live performance dashboard
 - **[Multi-Developer Guide](docs/guides/multi-developer.md)** — team handicap and leaderboard
+- **[Sprint ID 2.0 Migration](docs/guides/sprint-id-2-migration.md)** — backup, upgrade, compatibility, and downgrade guidance
 - **[Cline Setup](docs/guides/cline-setup.md)** — Cline-specific MCP configuration
 - **[Scorecard Template](docs/scorecard-template.md)** — field-by-field reference
 

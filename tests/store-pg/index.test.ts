@@ -1,6 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll } from 'vitest';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll, vi } from 'vitest';
 import { SlopeStoreError, checkConflicts } from '../../src/core/index.js';
 import type { GolfScorecard, SlopeStore, StoredGolfScorecard } from '../../src/core/index.js';
+import { storeCommand } from '../../src/cli/commands/store.js';
 import type { Pool } from 'pg';
 
 // Skip entire suite if no PG connection available
@@ -455,7 +459,9 @@ describe.skipIf(!PG_URL)('PostgresSlopeStore canonical sprint migration', () => 
           version INTEGER PRIMARY KEY,
           applied_at TEXT NOT NULL
         );
-        INSERT INTO schema_version VALUES (5, '2026-01-01T00:00:00.000Z');
+        INSERT INTO schema_version
+        SELECT version, '2026-01-01T00:00:00.000Z'
+        FROM generate_series(1, 5) AS version;
 
         CREATE TABLE claims (
           id TEXT PRIMARY KEY,
@@ -577,6 +583,61 @@ describe.skipIf(!PG_URL)('PostgresSlopeStore canonical sprint migration', () => 
         );
       `);
 
+      const doctorCwd = mkdtempSync(join(tmpdir(), 'slope-pg-doctor-'));
+      const originalCwd = process.cwd();
+      const logs: string[] = [];
+      mkdirSync(join(doctorCwd, '.slope'), { recursive: true });
+      writeFileSync(join(doctorCwd, '.slope', 'config.json'), JSON.stringify({
+        store: 'postgres',
+        postgres: {
+          connectionString: schemaUrl.toString(),
+          projectId: 'legacy',
+        },
+      }));
+      const logSpy = vi.spyOn(console, 'log').mockImplementation((...args) => {
+        logs.push(args.join(' '));
+      });
+      try {
+        process.chdir(doctorCwd);
+        await storeCommand(['migrate', 'doctor', '--json']);
+      } finally {
+        process.chdir(originalCwd);
+        logSpy.mockRestore();
+        rmSync(doctorCwd, { recursive: true, force: true });
+      }
+
+      const doctorReport = JSON.parse(logs.join('\n')) as {
+        status: string;
+        currentSchemaVersion: number;
+        targetSchemaVersion: number;
+        pendingMigrations: number;
+        identityColumns: Array<{ actualType: string; ok: boolean }>;
+      };
+      expect(doctorReport.status).toBe('upgrade_required');
+      expect(doctorReport.currentSchemaVersion).toBe(5);
+      expect(doctorReport.targetSchemaVersion).toBe(7);
+      expect(doctorReport.pendingMigrations).toBe(2);
+      expect(doctorReport.identityColumns).toHaveLength(4);
+      expect(doctorReport.identityColumns.every(column => column.actualType === 'integer' && !column.ok)).toBe(true);
+
+      const versionBeforeMigration = await schemaPool.query<{ version: number }>(
+        'SELECT MAX(version) AS version FROM schema_version',
+      );
+      expect(versionBeforeMigration.rows[0]?.version).toBe(5);
+      const typesBeforeMigration = await schemaPool.query<{ data_type: string }>(`
+        SELECT data_type
+        FROM information_schema.columns
+        WHERE table_schema = current_schema()
+          AND (
+            (table_name = 'claims' AND column_name = 'sprint_number')
+            OR (table_name = 'scorecards' AND column_name = 'sprint_number')
+            OR (table_name = 'events' AND column_name = 'sprint_number')
+            OR (table_name = 'testing_sessions' AND column_name = 'sprint')
+          )
+      `);
+      expect(typesBeforeMigration.rows).toHaveLength(4);
+      expect(typesBeforeMigration.rows.every(row => row.data_type === 'integer')).toBe(true);
+
       const {
         LATEST_PG_SCHEMA_VERSION,
         PostgresSlopeStore,
@@ -684,6 +745,77 @@ describe.skipIf(!PG_URL)('PostgresSlopeStore canonical sprint migration', () => 
     }
   }, 15_000);
 
+  it('reports and refuses a gap in PostgreSQL migration history without changing it', async () => {
+    const pgModule = await import('pg');
+    const PgPool = pgModule.default?.Pool ?? pgModule.Pool;
+    const schema = `s267_gap_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const adminPool = new PgPool({ connectionString: PG_URL });
+    let schemaPool: Pool | null = null;
+
+    try {
+      await adminPool.query(`CREATE SCHEMA "${schema}"`);
+      const schemaUrl = new URL(PG_URL!);
+      schemaUrl.searchParams.set('options', `-c search_path=${schema}`);
+      schemaPool = new PgPool({ connectionString: schemaUrl.toString() });
+      await schemaPool.query(`
+        CREATE TABLE schema_version (
+          version INTEGER PRIMARY KEY,
+          applied_at TEXT NOT NULL
+        );
+        INSERT INTO schema_version VALUES
+          (1, '2026-01-01T00:00:00.000Z'),
+          (3, '2026-01-03T00:00:00.000Z');
+        CREATE TABLE claims (sprint_number TEXT NOT NULL);
+        CREATE TABLE scorecards (sprint_number TEXT PRIMARY KEY);
+        CREATE TABLE events (sprint_number TEXT);
+        CREATE TABLE testing_sessions (sprint TEXT);
+      `);
+
+      const doctorCwd = mkdtempSync(join(tmpdir(), 'slope-pg-gap-doctor-'));
+      const originalCwd = process.cwd();
+      const logs: string[] = [];
+      mkdirSync(join(doctorCwd, '.slope'), { recursive: true });
+      writeFileSync(join(doctorCwd, '.slope', 'config.json'), JSON.stringify({
+        store: 'postgres',
+        postgres: {
+          connectionString: schemaUrl.toString(),
+          projectId: 'gap-test',
+        },
+      }));
+      const logSpy = vi.spyOn(console, 'log').mockImplementation((...args) => {
+        logs.push(args.join(' '));
+      });
+      try {
+        process.chdir(doctorCwd);
+        await storeCommand(['migrate', 'doctor', '--json']);
+      } finally {
+        process.chdir(originalCwd);
+        logSpy.mockRestore();
+        rmSync(doctorCwd, { recursive: true, force: true });
+      }
+
+      const doctorReport = JSON.parse(logs.join('\n')) as {
+        status: string;
+        issues: string[];
+      };
+      expect(doctorReport.status).toBe('inconsistent');
+      expect(doctorReport.issues).toContain('schema_version is missing migration(s): 2');
+
+      const { PostgresSlopeStore } = await import('../../src/store-pg/index.js');
+      const migrated = new PostgresSlopeStore({ pool: schemaPool, projectId: 'gap-test' });
+      await expect(migrated.migrate()).rejects.toThrow(/missing migration\(s\): 2/);
+
+      const versions = await schemaPool.query<{ version: number }>(
+        'SELECT version FROM schema_version ORDER BY version',
+      );
+      expect(versions.rows).toEqual([{ version: 1 }, { version: 3 }]);
+    } finally {
+      await schemaPool?.end();
+      await adminPool.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);
+      await adminPool.end();
+    }
+  }, 15_000);
+
   it('rolls back schema and version changes when the canonical migration fails', async () => {
     const pgModule = await import('pg');
     const PgPool = pgModule.default?.Pool ?? pgModule.Pool;
@@ -702,7 +834,9 @@ describe.skipIf(!PG_URL)('PostgresSlopeStore canonical sprint migration', () => 
           version INTEGER PRIMARY KEY,
           applied_at TEXT NOT NULL
         );
-        INSERT INTO schema_version VALUES (5, '2026-01-01T00:00:00.000Z');
+        INSERT INTO schema_version
+        SELECT version, '2026-01-01T00:00:00.000Z'
+        FROM generate_series(1, 5) AS version;
 
         CREATE TABLE claims (
           id TEXT PRIMARY KEY,
