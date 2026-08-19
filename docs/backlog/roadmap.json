@@ -529,7 +529,7 @@
     },
     {
       "name": "Phase 62 — Guard and Signal Precision",
-      "description": "Triage of the nine open GitHub issues as of 2026-08-19. Five were verified against v1.64.1 and only four carry live defects: #683 (worktree-merge guard matches raw command text, blocks unrelated commands and corrupts data it rewrites), #687 (shipped-commit detection reads the local trunk ref, which is stale in every worktree), #689 (slope review accepts only the --sprint=N equals form), and the residual half of #685 (the exported validateRoadmap throws on a sprint with no tickets key even though the CLI path normalizes it). #684, #686, #688 and #690 already reproduce clean and need regression tests before they are closed.",
+      "description": "Triage of the eight open GitHub issues as of 2026-08-19, each re-verified against the v1.64.1 build. Four carry live defects: #683 (worktree-merge guard matches raw command text, blocks unrelated commands and corrupts the data it rewrites), #687 (shipped-commit detection reads the local trunk ref, which is stale in every worktree), #689 (slope review accepts only the --sprint=N equals form; the space and positional forms fall through to the path argument), and the residual half of #685 (the exported validateRoadmap throws on a sprint with no tickets key even though the CLI path normalizes it first). #684, #686, #688 and #690 already reproduce clean and need only regression tests before they close.",
       "sprints": [
         260,
         261,
