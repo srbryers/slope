@@ -5,6 +5,7 @@ import {
   validateRoadmap,
   castRoadmapStructure,
   findShippedSprintsOnMain,
+  resolveTrunkRef,
   compareSprintIds,
   computeCriticalPath,
   findParallelOpportunities,
@@ -227,6 +228,8 @@ function validateSubcommand(flags: Record<string, string>, cwd: string): void {
   // numbering issues. Only skip if the JSON has no name/sprints/phases at all.
   const roadmap = parsed.roadmap ?? castRoadmapStructure(raw);
 
+  const trunk = resolveTrunkRef(cwd);
+
   if (roadmap) {
     const config = loadConfig(cwd);
     const scorecards = loadScorecards(config, cwd).map(s => ({ sprint_number: s.sprint_number }));
@@ -236,6 +239,14 @@ function validateSubcommand(flags: Record<string, string>, cwd: string): void {
 
   console.log(`\nRoadmap: ${path}`);
   console.log('\u2550'.repeat(40));
+
+  // A stale local trunk is what makes shipped-commit detection meaningless,
+  // so say which ref was scanned when the two have diverged (#687).
+  if (trunk.behind > 0 && trunk.localRef) {
+    console.log(
+      `\n\u2139 Scanned ${trunk.ref} \u2014 local ${trunk.localRef} is ${trunk.behind} commit${trunk.behind === 1 ? '' : 's'} behind it.`,
+    );
+  }
 
   if (validation.valid) {
     console.log('\n\u2713 Roadmap is valid');

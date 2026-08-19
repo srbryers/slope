@@ -185,18 +185,105 @@ function unionSets<T>(...sets: Set<T>[]): Set<T> {
  */
 const SAFE_REF_RE = /^[A-Za-z0-9/_.+-]+$/;
 
-/** Detect sprint IDs with shipped commits on the given ref (default: main).
- *  Falls back to `master` then `HEAD` if main is unavailable. Returns an empty
- *  set on any git failure so callers can run validation without a working repo.
- *  Refs are validated against SAFE_REF_RE before being interpolated into the
- *  shell command — refs containing whitespace, semicolons, backticks, etc.
- *  short-circuit to an empty set rather than risk a shell injection.
+/** Where the trunk ref used for shipped-commit detection came from. */
+export type TrunkRefSource = 'explicit' | 'upstream' | 'remote-head' | 'local' | 'head';
+
+export interface TrunkResolution {
+  /** The ref to scan, or null when no candidate resolved. */
+  ref: string | null;
+  source: TrunkRefSource;
+  /** The local trunk branch, when one exists. */
+  localRef: string | null;
+  /** Commits the local trunk is behind the resolved remote ref. */
+  behind: number;
+}
+
+const LOCAL_TRUNK_CANDIDATES = ['main', 'master'];
+
+/** True when `ref` exists in this repository. */
+function refExists(ref: string, cwd: string): boolean {
+  if (!SAFE_REF_RE.test(ref)) return false;
+  return git(`rev-parse --verify --quiet ${ref}`, cwd) !== '';
+}
+
+/** Resolve the trunk ref to scan for shipped commits.
+ *
+ *  Prefers the remote-tracking ref over the local branch. A git worktree never
+ *  fast-forwards its local `main`, so scanning the local ref reports every
+ *  recently-merged sprint as unshipped — and worktrees are the recommended way
+ *  to run parallel sprints here, so the check was always-on-and-wrong in
+ *  exactly the workflow SLOPE encourages (#687).
+ *
+ *  Order: the local trunk's configured upstream, then the remote's recorded
+ *  default branch, then the local branch, then `HEAD`.
+ */
+export function resolveTrunkRef(cwd: string, explicit?: string): TrunkResolution {
+  if (explicit) {
+    return { ref: explicit, source: 'explicit', localRef: null, behind: 0 };
+  }
+
+  const localRef = LOCAL_TRUNK_CANDIDATES.find(ref => refExists(ref, cwd)) ?? null;
+
+  // 1. The local trunk's configured upstream (`origin/main` for most repos).
+  let remoteRef: string | null = null;
+  if (localRef) {
+    const upstream = git(`rev-parse --abbrev-ref --symbolic-full-name ${localRef}@{upstream}`, cwd);
+    if (upstream && refExists(upstream, cwd)) remoteRef = upstream;
+  }
+
+  // 2. The remote's default branch, for a trunk with no upstream configured.
+  if (!remoteRef) {
+    const head = git('symbolic-ref --short refs/remotes/origin/HEAD', cwd);
+    if (head && refExists(head, cwd)) remoteRef = head;
+  }
+
+  if (remoteRef) {
+    // Divergence is itself the condition that makes the check meaningless,
+    // so report it rather than silently scanning the newer ref.
+    let behind = 0;
+    if (localRef) {
+      const count = git(`rev-list --count ${localRef}..${remoteRef}`, cwd);
+      behind = Number.parseInt(count, 10) || 0;
+    }
+    return {
+      ref: remoteRef,
+      source: remoteRef.endsWith('/HEAD') ? 'remote-head' : 'upstream',
+      localRef,
+      behind,
+    };
+  }
+
+  if (localRef) return { ref: localRef, source: 'local', localRef, behind: 0 };
+  return { ref: refExists('HEAD', cwd) ? 'HEAD' : null, source: 'head', localRef: null, behind: 0 };
+}
+
+/** Detect sprint IDs with shipped commits on the trunk.
+ *  Resolves the trunk via `resolveTrunkRef`, preferring the remote-tracking
+ *  ref so a stale local branch in a worktree does not hide merged work (#687).
+ *  Returns an empty set on any git failure so callers can run validation
+ *  without a working repo. Refs are validated against SAFE_REF_RE before being
+ *  interpolated into the shell command — refs containing whitespace,
+ *  semicolons, backticks, etc. short-circuit to an empty set rather than risk
+ *  a shell injection.
  */
 export function findShippedSprintsOnMain(cwd: string, ref?: string): Set<number> {
   const isGit = git('rev-parse --is-inside-work-tree', cwd);
   if (isGit !== 'true') return new Set();
 
-  const candidates = ref ? [ref] : ['main', 'master', 'HEAD'];
+  // An explicit ref is honoured alone — never widened to the defaults, so an
+  // unsafe ref short-circuits to an empty set instead of silently scanning
+  // some other branch.
+  if (ref) return scanRefs([ref], cwd);
+
+  const resolved = resolveTrunkRef(cwd);
+  // Keep the historical fallbacks after the resolved ref: a repo with neither
+  // a remote nor a local trunk still scans HEAD rather than reporting nothing.
+  const candidates = [resolved.ref, 'main', 'master', 'HEAD'].filter((r): r is string => r != null);
+  return scanRefs(candidates, cwd);
+}
+
+/** Scan the first usable ref for sprint references. */
+function scanRefs(candidates: string[], cwd: string): Set<number> {
   for (const r of candidates) {
     if (!SAFE_REF_RE.test(r)) continue; // skip unsafe refs silently
     // Cap at 1000 commits — plenty for sprint references (a project would
