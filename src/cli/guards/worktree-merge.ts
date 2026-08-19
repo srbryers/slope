@@ -22,9 +22,13 @@ export async function worktreeMergeGuard(input: HookInput, cwd: string): Promise
   const command = (input.tool_input?.command as string) ?? '';
 
   // Only fire when the flag is genuinely an argument of a `gh pr merge`.
-  const merge = parseShellCommands(command).find(cmd => commandMatches(cmd, ['gh', 'pr', 'merge']));
-  if (!merge) return {};
-  const flag = findFlagToken(merge, DELETE_BRANCH_FLAGS);
+  // Check EVERY merge in the invocation, not just the first: merging a
+  // stacked-PR set runs several in one command and it is typically the last
+  // that carries the flag, which a first-match lookup would miss entirely.
+  const flag = parseShellCommands(command)
+    .filter(cmd => commandMatches(cmd, ['gh', 'pr', 'merge']))
+    .map(cmd => findFlagToken(cmd, DELETE_BRANCH_FLAGS))
+    .find((token): token is NonNullable<typeof token> => token != null);
   if (!flag) return {};
 
   // Check if we're in a worktree (not the main working tree)

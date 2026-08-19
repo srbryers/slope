@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execSync } from 'node:child_process';
@@ -23,6 +23,11 @@ function initRepo(cwd: string): void {
 
 function commit(cwd: string, message: string): void {
   execSync(`git commit -m "${message}" --allow-empty`, { cwd, stdio: 'pipe' });
+}
+
+/** Commit already-staged changes, so the commit carries real file paths. */
+function commit2(cwd: string, message: string): void {
+  execSync(`git commit -m "${message}"`, { cwd, stdio: 'pipe' });
 }
 
 describe('resolveTrunkRef (#687)', () => {
@@ -101,6 +106,89 @@ describe('resolveTrunkRef (#687)', () => {
     expect(resolved.ref).toBe('main');
     expect(resolved.source).toBe('explicit');
     expect(findShippedSprintsOnMain(clone, 'main')).toEqual(new Set());
+  });
+});
+
+describe('local trunk ahead of the remote (#687)', () => {
+  // Found by independent review: scanning the remote makes local-only commits
+  // invisible. `behind` alone cannot express that, so a sprint committed to
+  // the local trunk and never pushed silently stopped reading as shipped with
+  // no diagnostic anywhere.
+  let root: string;
+  let origin: string;
+  let clone: string;
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'slope-ahead-'));
+    origin = join(root, 'origin');
+    clone = join(root, 'clone');
+    mkdirSync(origin);
+    execSync(`git init --bare -b main "${origin}"`, { stdio: 'pipe' });
+
+    const seed = join(root, 'seed');
+    mkdirSync(seed);
+    initRepo(seed);
+    commit(seed, 'chore: seed');
+    run(`git remote add origin "${origin}"`, seed);
+    commit(seed, 'feat(S100-1): pushed work');
+    run('git push -u origin main', seed);
+
+    execSync(`git clone "${origin}" "${clone}"`, { stdio: 'pipe' });
+    run('git config user.email "test@test.com"', clone);
+    run('git config user.name "Test User"', clone);
+    run('git config commit.gpgsign false', clone);
+    // Commit to local main only — never pushed.
+    commit(clone, 'feat(S200-1): local-only work');
+  });
+
+  afterEach(() => {
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('reports how far the local trunk is ahead', () => {
+    const resolved = resolveTrunkRef(clone);
+    expect(resolved.ref).toBe('origin/main');
+    expect(resolved.behind).toBe(0);
+    expect(resolved.ahead).toBe(1);
+  });
+
+  it('scans the remote, so local-only sprints are excluded but the divergence is reported', () => {
+    expect(findShippedSprintsOnMain(clone)).toEqual(new Set([100]));
+    expect(resolveTrunkRef(clone).ahead).toBeGreaterThan(0);
+  });
+});
+
+describe('shipped detection ignores modular roadmap sources (#686)', () => {
+  // The docs/roadmap/**.yaml rule lives in isSlopeMetadataPath, which is
+  // reached only through the unexported commit walker — the subject-level
+  // tests never touch it, so this needs a real commit that changes only a
+  // phase file.
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'slope-meta-'));
+    initRepo(tmpDir);
+    commit(tmpDir, 'chore: seed');
+    mkdirSync(join(tmpDir, 'docs', 'roadmap', 'phases'), { recursive: true });
+    mkdirSync(join(tmpDir, 'src'), { recursive: true });
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('does not count an implementation-typed commit that only edits a phase YAML', () => {
+    writeFileSync(join(tmpDir, 'docs/roadmap/phases/phase-99.yaml'), 'version: "1"\n');
+    run('git add -A', tmpDir);
+    commit2(tmpDir, 'feat(S500): scope the phase');
+    expect(findShippedSprintsOnMain(tmpDir)).toEqual(new Set());
+  });
+
+  it('still counts the same commit subject when it touches real source', () => {
+    writeFileSync(join(tmpDir, 'src/thing.ts'), 'export const x = 1;\n');
+    run('git add -A', tmpDir);
+    commit2(tmpDir, 'feat(S500): build the thing');
+    expect(findShippedSprintsOnMain(tmpDir)).toEqual(new Set([500]));
   });
 });
 

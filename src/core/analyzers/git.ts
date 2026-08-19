@@ -201,6 +201,10 @@ export interface TrunkResolution {
   localRef: string | null;
   /** Commits the local trunk is behind the resolved remote ref. */
   behind: number;
+  /** Commits the local trunk has that the resolved remote ref does not.
+   *  Scanning the remote makes these invisible, so a sprint committed to the
+   *  local trunk and never pushed silently stops reading as shipped. */
+  ahead: number;
 }
 
 const LOCAL_TRUNK_CANDIDATES = ['main', 'master'];
@@ -224,42 +228,46 @@ function refExists(ref: string, cwd: string): boolean {
  */
 export function resolveTrunkRef(cwd: string, explicit?: string): TrunkResolution {
   if (explicit) {
-    return { ref: explicit, source: 'explicit', localRef: null, behind: 0 };
+    return { ref: explicit, source: 'explicit', localRef: null, behind: 0, ahead: 0 };
   }
 
   const localRef = LOCAL_TRUNK_CANDIDATES.find(ref => refExists(ref, cwd)) ?? null;
 
   // 1. The local trunk's configured upstream (`origin/main` for most repos).
   let remoteRef: string | null = null;
+  let source: TrunkRefSource = 'upstream';
   if (localRef) {
     const upstream = git(`rev-parse --abbrev-ref --symbolic-full-name ${localRef}@{upstream}`, cwd);
     if (upstream && refExists(upstream, cwd)) remoteRef = upstream;
   }
 
   // 2. The remote's default branch, for a trunk with no upstream configured.
+  // `symbolic-ref --short` resolves to the TARGET (`origin/main`), so the
+  // source has to be recorded here — the returned ref never ends in `/HEAD`.
   if (!remoteRef) {
     const head = git('symbolic-ref --short refs/remotes/origin/HEAD', cwd);
-    if (head && refExists(head, cwd)) remoteRef = head;
+    if (head && refExists(head, cwd)) {
+      remoteRef = head;
+      source = 'remote-head';
+    }
   }
 
   if (remoteRef) {
-    // Divergence is itself the condition that makes the check meaningless,
-    // so report it rather than silently scanning the newer ref.
+    // Divergence is itself the condition that makes the check meaningless, so
+    // report it rather than silently scanning a different ref. Both
+    // directions matter: behind means the local trunk hides merged work,
+    // ahead means scanning the remote hides local-only work.
     let behind = 0;
+    let ahead = 0;
     if (localRef) {
-      const count = git(`rev-list --count ${localRef}..${remoteRef}`, cwd);
-      behind = Number.parseInt(count, 10) || 0;
+      behind = Number.parseInt(git(`rev-list --count ${localRef}..${remoteRef}`, cwd), 10) || 0;
+      ahead = Number.parseInt(git(`rev-list --count ${remoteRef}..${localRef}`, cwd), 10) || 0;
     }
-    return {
-      ref: remoteRef,
-      source: remoteRef.endsWith('/HEAD') ? 'remote-head' : 'upstream',
-      localRef,
-      behind,
-    };
+    return { ref: remoteRef, source, localRef, behind, ahead };
   }
 
-  if (localRef) return { ref: localRef, source: 'local', localRef, behind: 0 };
-  return { ref: refExists('HEAD', cwd) ? 'HEAD' : null, source: 'head', localRef: null, behind: 0 };
+  if (localRef) return { ref: localRef, source: 'local', localRef, behind: 0, ahead: 0 };
+  return { ref: refExists('HEAD', cwd) ? 'HEAD' : null, source: 'head', localRef: null, behind: 0, ahead: 0 };
 }
 
 /** Detect sprint IDs with shipped commits on the trunk.

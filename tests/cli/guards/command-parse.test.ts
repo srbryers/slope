@@ -48,6 +48,63 @@ describe('parseShellCommands', () => {
     expect(values('grep x <<< "some text"')).toEqual([['grep', 'x', '<<<', 'some text']]);
   });
 
+  // Found by independent review of #692. `.trim()` on the terminator closed
+  // the heredoc on an INDENTED BODY line, putting the rest of the document
+  // back into the token stream — the exact #683 false positive this module
+  // exists to remove. bash strips leading TABS only, and only for `<<-`.
+  it('does not close a heredoc on an indented body line', () => {
+    const command = "cat <<'EOF' > n.md\nnote\n   EOF\ngh pr merge 117 --delete-branch\nEOF";
+    expect(values(command)).toEqual([['cat', '>', 'n.md']]);
+  });
+
+  it('does not close a heredoc on a terminator with a trailing space', () => {
+    const command = "cat <<'EOF' > n.md\nEOF \ngh pr merge 117 --delete-branch\nEOF";
+    expect(values(command)).toEqual([['cat', '>', 'n.md']]);
+  });
+
+  it('strips leading tabs for <<- but not for <<', () => {
+    expect(values('cat <<-EOF\n\tbody\n\tEOF\ntrue')).toEqual([['cat'], ['true']]);
+    // Plain `<<` must NOT accept a tab-indented terminator.
+    expect(values('cat <<EOF\n\tbody\n\tEOF\ntrue')).toEqual([['cat']]);
+  });
+
+  // Found by independent review of #692. Without `\r` in the delimiter break
+  // set, a CRLF invocation yields the delimiter `EOF\r`, which no body line
+  // matches, so the parser swallowed the rest of the command and every guard
+  // built on it silently stopped protecting. This repo runs on Windows.
+  it('handles CRLF heredocs, quoted and unquoted', () => {
+    const crlf = "cat > n.md <<'EOF'\r\nbody\r\nEOF\r\ngh pr merge 117 --delete-branch\r\n";
+    expect(values(crlf)).toEqual([
+      ['cat', '>', 'n.md'],
+      ['gh', 'pr', 'merge', '117', '--delete-branch'],
+    ]);
+    const crlfBare = 'cat > n.md <<EOF\r\nbody\r\nEOF\r\ngh pr merge 117 -d\r\n';
+    expect(values(crlfBare)).toEqual([
+      ['cat', '>', 'n.md'],
+      ['gh', 'pr', 'merge', '117', '-d'],
+    ]);
+  });
+
+  // A backslash only escapes shell-special characters. Treating it as a
+  // universal escape collapsed `C:\Users\me\wt` to `C:Usersmewt`, and guards
+  // resolve `cd` targets from these tokens — so they silently pointed at the
+  // wrong directory. Caught by two pre-existing sprint-completion tests.
+  it('keeps Windows paths intact inside double quotes', () => {
+    expect(values('cd "C:\\Users\\me\\wt" && npx vitest')).toEqual([
+      ['cd', 'C:\\Users\\me\\wt'],
+      ['npx', 'vitest'],
+    ]);
+  });
+
+  it('keeps a backslash literal before an ordinary character when unquoted', () => {
+    expect(values('cd C:\\Users\\me')).toEqual([['cd', 'C:\\Users\\me']]);
+  });
+
+  it('still honours a backslash before a shell-special character', () => {
+    expect(values('echo a\\ b')).toEqual([['echo', 'a b']]);
+    expect(values('echo "a\\"b"')).toEqual([['echo', 'a"b']]);
+  });
+
   it('records byte spans that map back to the original text', () => {
     const command = 'gh pr merge 117 --squash --delete-branch';
     const [cmd] = parseShellCommands(command);

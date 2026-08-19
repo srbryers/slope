@@ -162,7 +162,9 @@ describe('reviewStateCommand', () => {
       try {
         await runCommand(['--help']);
         const helpText = log.mock.calls.map(c => c[0] as string).join('\n');
-        expect(helpText).toMatch(/slope review \[scorecard\.json \| --sprint=N\]/);
+        // Usage now advertises the space and bare-positional selector forms
+        // that #689 added alongside the original `--sprint=N`.
+        expect(helpText).toMatch(/slope review \[scorecard\.json \| N \| --sprint N\]/);
         expect(helpText).toContain('multiple scorecards');
         expect(helpText).toMatch(/slope review <subcommand>/);
         expect(helpText).toContain('Format sprint retrospective markdown');

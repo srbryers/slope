@@ -138,5 +138,26 @@ describe('worktreeMergeGuard', () => {
       const result = await worktreeMergeGuard(makeInput('gh pr merge 117 -d'), '/tmp/test');
       expect(result.blockReason).toContain('`-d`');
     });
+
+    // Found by independent review of #692: `.find()` inspected only the FIRST
+    // gh pr merge, so a stacked-PR set whose last merge carries the flag
+    // fell through. The pre-#683 regex caught this, so it was a regression.
+    it('checks every merge in the invocation, not just the first', async () => {
+      mockWorktree();
+      const result = await worktreeMergeGuard(
+        makeInput('gh pr merge 100 --squash && gh pr merge 101 --squash --delete-branch'),
+        '/tmp/test',
+      );
+      expect(result.decision).toBe('deny');
+      expect(result.blockReason).toContain('gh pr merge 100 --squash && gh pr merge 101 --squash');
+    });
+
+    it('does not fire when no merge in the set carries the flag', async () => {
+      const result = await worktreeMergeGuard(
+        makeInput('gh pr merge 100 --squash && gh pr merge 101 --squash'),
+        '/tmp/test',
+      );
+      expect(result).toEqual({});
+    });
   });
 });

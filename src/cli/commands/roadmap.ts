@@ -240,12 +240,15 @@ function validateSubcommand(flags: Record<string, string>, cwd: string): void {
   console.log(`\nRoadmap: ${path}`);
   console.log('\u2550'.repeat(40));
 
-  // A stale local trunk is what makes shipped-commit detection meaningless,
-  // so say which ref was scanned when the two have diverged (#687).
-  if (trunk.behind > 0 && trunk.localRef) {
-    console.log(
-      `\n\u2139 Scanned ${trunk.ref} \u2014 local ${trunk.localRef} is ${trunk.behind} commit${trunk.behind === 1 ? '' : 's'} behind it.`,
-    );
+  // A diverged trunk is what makes shipped-commit detection meaningless, so
+  // say which ref was scanned whenever the two differ (#687). Both directions
+  // matter: behind means the local ref would have hidden merged work, ahead
+  // means the scanned remote hides local-only commits.
+  if (trunk.localRef && (trunk.behind > 0 || trunk.ahead > 0)) {
+    const parts: string[] = [];
+    if (trunk.behind > 0) parts.push(`${trunk.behind} behind`);
+    if (trunk.ahead > 0) parts.push(`${trunk.ahead} ahead (not scanned \u2014 push to include)`);
+    console.log(`\n\u2139 Scanned ${trunk.ref} \u2014 local ${trunk.localRef} is ${parts.join(', ')}.`);
   }
 
   if (validation.valid) {

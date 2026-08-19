@@ -9,6 +9,7 @@ import { loadPrReviewState } from '../pr-review-state.js';
 import { loadSprintState, loadSprintStateResult, mutateSprintState, updateGate, isSprintComplete, pendingGates } from '../sprint-state.js';
 import { inspectSprintRollover, verifySprintRolloverLineage } from '../sprint-rollover.js';
 import { inferSprintFromBranch } from '../workflow-resync.js';
+import { shellCommandSegments, commandMatches, type ParsedCommand } from './command-parse.js';
 
 /**
  * Sprint-completion guard: enforces post-implementation gates.
@@ -162,6 +163,7 @@ interface ShellCommandSegment {
   cwd: string;
   segment: string;
   words: string[];
+  command: ParsedCommand;
 }
 
 function prCreateCommandContext(input: HookInput, cwd: string): { cwd: string } | null {
@@ -175,8 +177,10 @@ function commandSegments(input: HookInput, cwd: string): ShellCommandSegment[] {
 
   const segments: ShellCommandSegment[] = [];
   let commandCwd = toolInputCwd(input, cwd);
-  for (const segment of splitShellSegments(command)) {
-    const words = tokenizeShellWords(segment);
+  // shellCommandSegments skips heredoc bodies. The previous splitter did not,
+  // so a heredoc line reading `gh pr merge …` was treated as a real merge and
+  // this guard rewrote .slope/sprint-state.json from document prose (#683).
+  for (const { text: segment, words, command: parsed } of shellCommandSegments(command)) {
     if (words.length === 0) continue;
 
     const cdTarget = cdCommandTarget(words);
@@ -185,7 +189,7 @@ function commandSegments(input: HookInput, cwd: string): ShellCommandSegment[] {
       continue;
     }
 
-    segments.push({ cwd: commandCwd, segment, words });
+    segments.push({ cwd: commandCwd, segment, words, command: parsed });
   }
 
   return segments;
@@ -267,73 +271,28 @@ function skipGhGlobalFlags(words: string[], start: number): number {
   return i;
 }
 
-function splitShellSegments(command: string): string[] {
-  const segments: string[] = [];
-  let current = '';
-  let quote: '"' | "'" | null = null;
 
-  for (let i = 0; i < command.length; i++) {
-    const char = command[i];
-    if (char === '\\' && quote !== "'") {
-      current += char;
-      if (i + 1 < command.length) current += command[++i];
-      continue;
-    }
-    if ((char === '"' || char === "'") && (!quote || quote === char)) {
-      quote = quote ? null : char;
-      current += char;
-      continue;
-    }
-    if (!quote && (char === ';' || char === '\n' || char === '&' || char === '|')) {
-      if (current.trim()) segments.push(current.trim());
-      current = '';
-      if ((char === '&' && command[i + 1] === '&') || (char === '|' && command[i + 1] === '|')) i++;
-      continue;
-    }
-    current += char;
+
+
+/** `slope review <these>` manage review state; they do not generate the
+ *  review markdown, so they must not satisfy the review_md gate. */
+const REVIEW_STATE_SUBCOMMANDS = new Set([
+  'start', 'round', 'status', 'reset', 'recommend',
+  'findings', 'amend', 'defer', 'deferred', 'resolve', 'run',
+]);
+
+/** Index of the `slope` subcommand within `words`, or -1 when the command is
+ *  not a slope invocation. Handles the runner spellings the CLI is reached
+ *  through: `slope`, `npx slope`, `pnpm exec slope`, `env FOO=1 slope`. */
+function skipSlopeExecutable(words: string[]): number {
+  let i = skipCommandPrefix(words, 0);
+  if (words[i] === 'npx' || words[i] === 'bunx') i++;
+  else if (['pnpm', 'npm', 'yarn', 'bun'].includes(words[i] ?? '')) {
+    i++;
+    if (words[i] === 'exec' || words[i] === 'run') i++;
   }
-
-  if (current.trim()) segments.push(current.trim());
-  return segments;
-}
-
-function tokenizeShellWords(segment: string): string[] {
-  const words: string[] = [];
-  let current = '';
-  let quote: '"' | "'" | null = null;
-
-  for (let i = 0; i < segment.length; i++) {
-    const char = segment[i];
-    if (char === '\\' && quote !== "'") {
-      const next = segment[i + 1];
-      if (next && isEscapedShellChar(next)) {
-        current += next;
-        i++;
-      } else {
-        current += char;
-      }
-      continue;
-    }
-    if ((char === '"' || char === "'") && (!quote || quote === char)) {
-      quote = quote ? null : char;
-      continue;
-    }
-    if (!quote && /\s/.test(char)) {
-      if (current) {
-        words.push(current);
-        current = '';
-      }
-      continue;
-    }
-    current += char;
-  }
-
-  if (current) words.push(current);
-  return words;
-}
-
-function isEscapedShellChar(char: string): boolean {
-  return ['\\', '"', "'", ' ', '$', '`', '&', '|', ';', '\n', '\r'].includes(char);
+  if (words[i] !== 'slope') return -1;
+  return i + 1;
 }
 
 function skipCommandPrefix(words: string[], start: number): number {
@@ -429,29 +388,38 @@ function handlePostToolUse(input: HookInput, cwd: string): GuardResult {
   const segments = commandSegments(input, cwd);
   if (segments.length === 0) return {};
 
+  // These transitions WRITE state (sprint phase, roadmap, gates), so they
+  // match on argv words rather than segment text: a quoted argument naming a
+  // command must never be able to advance the sprint.
+  const isSlopeSubcommand = (words: string[], subcommand: string): boolean => {
+    const i = skipSlopeExecutable(words);
+    return i !== -1 && words[i] === subcommand;
+  };
+
   // Detect PR merge → transition to scoring phase
-  const prMergeCommand = segments.find(({ segment }) => /gh\s+pr\s+merge/.test(segment));
+  const prMergeCommand = segments.find(({ command }) => commandMatches(command, ['gh', 'pr', 'merge']));
   if (prMergeCommand) {
     return handlePrMerge(input, prMergeCommand.cwd);
   }
 
   // Detect slope validate success → auto-update roadmap
-  const validateCommand = segments.find(({ segment }) => /\bslope\s+validate\b/.test(segment));
+  const validateCommand = segments.find(({ words }) => isSlopeSubcommand(words, 'validate'));
   if (validateCommand) {
     return handleValidateSuccess(input, validateCommand.cwd);
   }
 
   // Detect slope review completion → mark review_md gate
-  const reviewCommand = segments.find(({ segment }) =>
-    /\bslope\s+review\b/.test(segment)
-    && !/\bslope\s+review\s+(start|round|status|reset|recommend|findings|amend|defer|deferred|resolve)\b/.test(segment),
-  );
+  const reviewCommand = segments.find(({ words }) => {
+    if (!isSlopeSubcommand(words, 'review')) return false;
+    const next = words[skipSlopeExecutable(words) + 1];
+    return next === undefined || !REVIEW_STATE_SUBCOMMANDS.has(next);
+  });
   if (reviewCommand) {
     return handleReviewCompletion(input, reviewCommand.cwd, reviewCommand.segment);
   }
 
   // Detect slope auto-card completion → suggest validate next
-  const autoCardCommand = segments.find(({ segment }) => /\bslope\s+auto-card\b/.test(segment));
+  const autoCardCommand = segments.find(({ words }) => isSlopeSubcommand(words, 'auto-card'));
   if (autoCardCommand) {
     return handleAutoCardCompletion(input, autoCardCommand.cwd);
   }

@@ -27,6 +27,16 @@ export interface ParsedCommand {
 
 const SEPARATOR_CHARS = new Set([';', '|', '&', '\n']);
 
+/** Characters a backslash actually escapes. A backslash before anything else
+ *  stays literal — POSIX says so inside double quotes, and it is what keeps a
+ *  Windows path (`cd "C:\Users\me\wt"`) intact rather than collapsing it to
+ *  `C:Usersmewt`. Guards resolve `cd` targets from these tokens, so eating
+ *  the separators silently pointed them at the wrong directory. */
+const DOUBLE_QUOTE_ESCAPABLE = new Set(['$', '`', '"', '\\', '\n']);
+const UNQUOTED_ESCAPABLE = new Set([
+  '\\', '"', "'", ' ', '$', '`', '&', '|', ';', '\n', '\r', '<', '>', '(', ')',
+]);
+
 /** Segment a shell invocation into commands and argv tokens.
  *
  *  Quoting, backslash escapes and heredoc bodies are all honoured, so text
@@ -47,7 +57,7 @@ export function parseShellCommands(command: string): ParsedCommand[] {
   let quoted = false;
 
   // Heredoc delimiters seen on the current line, awaiting their body.
-  const pendingHeredocs: string[] = [];
+  const pendingHeredocs: PendingHeredoc[] = [];
 
   function endToken(end: number): void {
     if (start === -1) return;
@@ -87,8 +97,13 @@ export function parseShellCommands(command: string): ParsedCommand[] {
         continue;
       }
       beginToken(i);
-      value += command[i + 1];
-      i += 2;
+      if (UNQUOTED_ESCAPABLE.has(command[i + 1])) {
+        value += command[i + 1];
+        i += 2;
+      } else {
+        value += ch;
+        i++;
+      }
       continue;
     }
 
@@ -146,8 +161,13 @@ function readQuoted(command: string, open: number, quote: string, emit: (s: stri
   while (i < command.length) {
     const ch = command[i];
     if (ch === '\\' && quote === '"' && i + 1 < command.length) {
-      emit(command[i + 1]);
-      i += 2;
+      if (DOUBLE_QUOTE_ESCAPABLE.has(command[i + 1])) {
+        emit(command[i + 1]);
+        i += 2;
+      } else {
+        emit(ch);
+        i++;
+      }
       continue;
     }
     if (ch === quote) return i + 1;
@@ -157,11 +177,19 @@ function readQuoted(command: string, open: number, quote: string, emit: (s: stri
   return i;
 }
 
+/** A heredoc opener awaiting its body. */
+interface PendingHeredoc {
+  delimiter: string;
+  /** `<<-` strips leading TABS (never spaces) from the terminator. */
+  stripTabs: boolean;
+}
+
 /** Read the delimiter word of a heredoc opener at `<<`, pushing it onto
  *  `pending`. Returns the offset just past the delimiter. */
-function readHeredocDelimiter(command: string, at: number, pending: string[]): number {
+function readHeredocDelimiter(command: string, at: number, pending: PendingHeredoc[]): number {
   let i = at + 2;
-  if (command[i] === '-') i++;
+  const stripTabs = command[i] === '-';
+  if (stripTabs) i++;
   while (i < command.length && (command[i] === ' ' || command[i] === '\t')) i++;
 
   let delimiter = '';
@@ -171,28 +199,38 @@ function readHeredocDelimiter(command: string, at: number, pending: string[]): n
       i = readQuoted(command, i, ch, s => { delimiter += s; });
       continue;
     }
-    if (ch === ' ' || ch === '\t' || ch === '\n' || SEPARATOR_CHARS.has(ch)) break;
+    // `\r` must break the delimiter: on a CRLF invocation the opener would
+    // otherwise yield `EOF\r`, which no body line ever matches, and the
+    // parser would swallow the rest of the command — silently disarming
+    // every guard built on it. This repo runs on Windows.
+    if (ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r' || SEPARATOR_CHARS.has(ch)) break;
     delimiter += ch;
     i++;
   }
 
-  if (delimiter.length > 0) pending.push(delimiter);
+  if (delimiter.length > 0) pending.push({ delimiter, stripTabs });
   return i;
 }
 
 /** Skip heredoc bodies starting at `from`, one per queued delimiter. Returns
  *  the offset of the first character that is command text again. */
-function skipHeredocBodies(command: string, from: number, pending: string[]): number {
+function skipHeredocBodies(command: string, from: number, pending: PendingHeredoc[]): number {
   let i = from;
   while (pending.length > 0) {
-    const delimiter = pending.shift() as string;
+    const { delimiter, stripTabs } = pending.shift() as PendingHeredoc;
     let closed = false;
     while (i < command.length) {
       let lineEnd = command.indexOf('\n', i);
       if (lineEnd === -1) lineEnd = command.length;
-      // `<<-` strips leading tabs from the terminator; stripping them
-      // unconditionally only makes the terminator easier to find.
-      const line = command.slice(i, lineEnd).replace(/^\t+/, '').trim();
+      // The terminator must match the raw line. Trimming it would close the
+      // heredoc on an indented BODY line, which puts the rest of the document
+      // back into the token stream — reintroducing the #683 false positive
+      // this module exists to remove, and making the guard's suggested
+      // rewrite edit the document body. Only `<<-` strips, only tabs, only
+      // leading. A trailing `\r` is a line ending, not content.
+      let line = command.slice(i, lineEnd);
+      if (line.endsWith('\r')) line = line.slice(0, -1);
+      if (stripTabs) line = line.replace(/^\t+/, '');
       i = lineEnd + 1;
       if (line === delimiter) {
         closed = true;
@@ -204,6 +242,35 @@ function skipHeredocBodies(command: string, from: number, pending: string[]): nu
     if (!closed) return command.length;
   }
   return Math.min(i, command.length);
+}
+
+/** One command plus the raw source text it came from. */
+export interface CommandSegment {
+  /** The original text of this command, spanning its first to last token. */
+  text: string;
+  /** Unquoted argv words, in order. */
+  words: string[];
+  command: ParsedCommand;
+}
+
+/** Segment an invocation into commands with their source text and argv words.
+ *
+ *  The drop-in replacement for the hand-rolled `splitShellSegments` +
+ *  `tokenizeShellWords` pairs that several guards carried. Those split on
+ *  quote-aware separators but knew nothing about heredocs, so every line of a
+ *  heredoc BODY became its own "command" — which let documentation about a
+ *  command trigger guards that act on it (#683).
+ */
+export function shellCommandSegments(command: string): CommandSegment[] {
+  return parseShellCommands(command).map(cmd => {
+    const first = cmd.tokens[0];
+    const last = cmd.tokens[cmd.tokens.length - 1];
+    return {
+      text: command.slice(first.start, last.end),
+      words: cmd.tokens.map(token => token.value),
+      command: cmd,
+    };
+  });
 }
 
 /** True when `cmd` invokes the given program and subcommand path, e.g.

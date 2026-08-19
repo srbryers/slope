@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import type { HookInput, GuardResult, Suggestion } from '../../core/index.js';
 import { castRoadmapStructure, loadConfig, loadScorecards, parseRoadmap, parseSprintNumber, roadmapSprintOrderValue } from '../../core/index.js';
 import { isPhaseComplete, pendingPhaseGates } from '../phase-cleanup.js';
+import { shellCommandSegments } from './command-parse.js';
 
 /** Extract phase number from name like "Phase 7 — Helmsman 3D". Falls back to array index + 1. */
 function extractPhaseNumber(name: string, index: number): number {
@@ -140,8 +141,9 @@ export async function phaseBoundaryGuard(input: HookInput, cwd: string): Promise
 }
 
 function extractRelevantSlopeArgs(command: string): string[] | null {
-  for (const segment of splitShellSegments(command)) {
-    const words = tokenizeShellWords(segment);
+  // shellCommandSegments skips heredoc bodies and flags quoted tokens, so
+  // documentation about a command can no longer read as the command (#683).
+  for (const { words } of shellCommandSegments(command)) {
     const slopeIndex = findSlopeExecutableIndex(words);
     if (slopeIndex < 0) continue;
 
@@ -199,64 +201,7 @@ function sprintFromValue(value: string | undefined): number | null {
   return parseSprintNumber(ticketMatch?.[1] ?? normalized);
 }
 
-function splitShellSegments(command: string): string[] {
-  const segments: string[] = [];
-  let current = '';
-  let quote: '"' | "'" | null = null;
 
-  for (let i = 0; i < command.length; i++) {
-    const char = command[i];
-    if (char === '\\' && quote !== "'") {
-      current += char;
-      if (i + 1 < command.length) current += command[++i];
-      continue;
-    }
-    if ((char === '"' || char === "'") && (!quote || quote === char)) {
-      quote = quote ? null : char;
-      current += char;
-      continue;
-    }
-    if (!quote && (char === ';' || char === '\n' || char === '&' || char === '|')) {
-      if (current.trim()) segments.push(current.trim());
-      current = '';
-      if ((char === '&' && command[i + 1] === '&') || (char === '|' && command[i + 1] === '|')) i++;
-      continue;
-    }
-    current += char;
-  }
-
-  if (current.trim()) segments.push(current.trim());
-  return segments;
-}
-
-function tokenizeShellWords(segment: string): string[] {
-  const words: string[] = [];
-  let current = '';
-  let quote: '"' | "'" | null = null;
-
-  for (let i = 0; i < segment.length; i++) {
-    const char = segment[i];
-    if (char === '\\' && quote !== "'") {
-      if (i + 1 < segment.length) current += segment[++i];
-      continue;
-    }
-    if ((char === '"' || char === "'") && (!quote || quote === char)) {
-      quote = quote ? null : char;
-      continue;
-    }
-    if (!quote && /\s/.test(char)) {
-      if (current) {
-        words.push(current);
-        current = '';
-      }
-      continue;
-    }
-    current += char;
-  }
-
-  if (current) words.push(current);
-  return words;
-}
 
 function findSlopeExecutableIndex(words: string[]): number {
   let i = 0;
