@@ -144,6 +144,11 @@ function parseSprintLog(raw: string): GitSprintCommit[] {
 function isSlopeMetadataPath(file: string): boolean {
   const normalized = file.replace(/\\/g, '/');
   return normalized === 'docs/backlog/roadmap.json'
+    // Modular roadmap sources: a project that authors through
+    // docs/roadmap/**.yaml gets the same treatment as one still editing the
+    // single generated projection, so a roadmap-only commit never reads as a
+    // sprint shipping (#686).
+    || /^docs\/roadmap\/.+\.ya?ml$/i.test(normalized)
     || /^docs\/retros\/sprint-\d+(?:\.\d+)?(?:\.json|-review\.md)$/i.test(normalized)
     || /^\.slope\/retros\/post-merge\/sprint-\d+(?:\.\d+)?(?:-pr-\d+)?\.json$/i.test(normalized);
 }

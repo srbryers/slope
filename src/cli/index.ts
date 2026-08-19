@@ -19,7 +19,7 @@
 import { initCommand } from './commands/init.js';
 import { cardCommand } from './commands/card.js';
 import { validateCommand } from './commands/validate.js';
-import { reviewCommand } from './commands/review.js';
+import { reviewCommand, parseReviewArgs } from './commands/review.js';
 import { briefingCommand } from './commands/briefing.js';
 import { planCommand } from './commands/plan.js';
 import { classifyCommand } from './commands/classify.js';
@@ -128,16 +128,10 @@ switch (subcommand) {
     if (shouldRouteToReviewState(reviewArgs)) {
       reviewStateCommand(reviewArgs).catch(reportCliError);
     } else {
-      const plainFlag = reviewArgs.includes('--plain');
-      const metaphorArg = reviewArgs.find((a: string) => a.startsWith('--metaphor='));
-      const metaphorVal = metaphorArg?.slice('--metaphor='.length);
-      const outputArg = reviewArgs.find((a: string) => a.startsWith('--output='));
-      const outputPath = reviewArgs.includes('--stdout') ? null : outputArg?.slice('--output='.length);
-      const sprintArg = reviewArgs.find((a: string) => a.startsWith('--sprint='));
-      const sprintSelector = sprintArg?.slice('--sprint='.length);
-      const path = reviewArgs.find((a: string) => !a.startsWith('--'));
-      const force = reviewArgs.includes('--force');
-      reviewCommand(path, plainFlag ? 'plain' : undefined, metaphorVal, outputPath, sprintSelector, { force });
+      const parsed = parseReviewArgs(reviewArgs);
+      reviewCommand(parsed.path, parsed.mode, parsed.metaphor, parsed.outputPath, parsed.sprintSelector, {
+        force: parsed.force,
+      });
     }
     break;
   }

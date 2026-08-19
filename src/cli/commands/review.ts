@@ -110,6 +110,65 @@ export function repairMojibake(text: string): string {
   return MOJIBAKE_REPAIRS.reduce((current, [pattern, replacement]) => current.replace(pattern, replacement), text);
 }
 
+/** A bare sprint selector: `259`, `S259`, `146.1`. */
+const SPRINT_SELECTOR_RE = /^S?\d+(?:\.\d+)?$/i;
+
+export interface ParsedReviewArgs {
+  path?: string;
+  sprintSelector?: string;
+  mode?: string;
+  metaphor?: string;
+  /** `null` means --stdout; `undefined` means the default output path. */
+  outputPath?: string | null;
+  force: boolean;
+}
+
+/** Parse `slope review` arguments.
+ *
+ *  Accepts `--sprint=N`, `--sprint N` and a bare positional `N`. Only the
+ *  equals form used to work: with the other two the number fell through to
+ *  the path argument and was reported as `Failed to parse <cwd>/N` (#689).
+ */
+export function parseReviewArgs(args: string[]): ParsedReviewArgs {
+  const metaphorArg = args.find(a => a.startsWith('--metaphor='));
+  const outputArg = args.find(a => a.startsWith('--output='));
+
+  let sprintSelector: string | undefined;
+  // Index of an argument consumed as a flag's value, so it is not also
+  // read as the positional path.
+  let consumedValue = -1;
+
+  const equalsForm = args.find(a => a.startsWith('--sprint='));
+  if (equalsForm) {
+    sprintSelector = equalsForm.slice('--sprint='.length);
+  } else {
+    const flagAt = args.indexOf('--sprint');
+    const value = flagAt === -1 ? undefined : args[flagAt + 1];
+    if (value != null && !value.startsWith('--')) {
+      sprintSelector = value;
+      consumedValue = flagAt + 1;
+    }
+  }
+
+  let path = args.find((a, i) => !a.startsWith('--') && i !== consumedValue);
+
+  // A bare number is a sprint, not a file. Anything else stays a path, so
+  // `slope review docs/retros/sprint-259.json` is unaffected.
+  if (sprintSelector === undefined && path !== undefined && SPRINT_SELECTOR_RE.test(path)) {
+    sprintSelector = path;
+    path = undefined;
+  }
+
+  return {
+    path,
+    sprintSelector,
+    mode: args.includes('--plain') ? 'plain' : undefined,
+    metaphor: metaphorArg?.slice('--metaphor='.length),
+    outputPath: args.includes('--stdout') ? null : outputArg?.slice('--output='.length),
+    force: args.includes('--force'),
+  };
+}
+
 export function reviewCommand(
   path?: string,
   mode?: string,

@@ -322,6 +322,19 @@ export function validateRoadmap(
   scorecards?: { sprint_number: number }[],
   shippedSprintIds?: Set<number>,
 ): RoadmapValidationResult {
+  // A sprint authored without a `tickets` key used to throw "Cannot read
+  // properties of undefined (reading 'map')" — a schema validator crashing on
+  // the very violation it exists to detect, with no sprint id in the message
+  // (#685). parseRoadmap already fills this in, so the CLI was safe and only
+  // direct API callers hit it; normalize here so both paths agree that a
+  // missing key means no tickets, exactly like an explicit `[]`.
+  if (roadmap.sprints.some(s => !Array.isArray(s.tickets))) {
+    roadmap = {
+      ...roadmap,
+      sprints: roadmap.sprints.map(s => (Array.isArray(s.tickets) ? s : { ...s, tickets: [] })),
+    };
+  }
+
   const errors: RoadmapValidationError[] = [];
   const warnings: RoadmapValidationWarning[] = [];
   const sprintIds = new Set(roadmap.sprints.map(s => s.id));

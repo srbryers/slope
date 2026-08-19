@@ -895,7 +895,7 @@ reviewed commit to the fix commit. The output path can be cited in
       break;
     default:
       console.log(`Usage:
-  slope review [scorecard.json | --sprint=N] [--plain] [--metaphor=<name>]
+  slope review [scorecard.json | N | --sprint N] [--plain] [--metaphor=<name>]
   slope review <subcommand> [options]
 
 Retrospective:
