@@ -577,6 +577,16 @@
       ],
       "status": "in_progress",
       "note": "Verification, not assumption, set this scope. Each issue was re-run against the 1.64.1 build rather than triaged from its text: #684's exact scorecard shape now reports 100% (3/3); #686 and #690's commit subjects all extract clean through the isSlopeMetadataOnlyCommit and isPlanningOnlyBareReference filters added in #521/#523; #688's two counters were unified on countMapMetadataFiles in fbcee82. The common thread in what remains is the same defect in three places — a signal derived from text or a ref that was never parsed for meaning."
+    },
+    {
+      "name": "Phase 66 — Reviewer Selection",
+      "description": "Fix #693: SLOPE decides which reviewer lanes a change needs but not how much model to spend on them, and it exempts docs-only work from review entirely — including the roadmap and architecture docs that most need an architect. Reviewer selection is the one part of SLOPE that does not tier its compute, while slope loop has routed by club and complexity for many sprints. Close both halves so review depth is never left to operator judgement under deadline.",
+      "sprints": [
+        273,
+        274
+      ],
+      "status": "planned",
+      "note": "Deliberately reuses slope loop's existing routing vocabulary rather than inventing a second tiering scheme — two independent notions of 'how expensive is this work' would drift apart. Scoped to selection and reporting only: the harness still spawns the reviewer agents, so this ships a better recommendation, not an execution engine. Everything stays overridable, because the operator sometimes knows a diff is riskier than its signals suggest. Both gaps were re-verified against v2.0.0 before scoping — ReviewerAgentSpec (src/cli/reviewer-agents.ts:12) still carries no tier, and detectTier (src/cli/commands/review-state.ts:77) still returns skip with 0 rounds for docs-only work."
     }
   ],
   "sprints": [
@@ -7774,6 +7784,102 @@
             "S272-1",
             "S272-2",
             "S272-3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 273,
+      "theme": "Tiered Reviewer Selection",
+      "par": 4,
+      "slope": 3,
+      "type": "feature",
+      "status": "planned",
+      "github_issues": [
+        693
+      ],
+      "note": "ReviewerAgentSpec carries id, name, lane, priority, scope, focus, evidence and prompt — nothing about how expensive the reviewer should be, so a retroactive scorecard check and a 291-line hand-written shell tokenizer produce specs of identical weight. Derive a tier from the signals the lane recommendation already reads (ticket count, club, complexity, changed-file count, whether the diff touches guards, schema or security-sensitive paths) and name it in the printed prompt.",
+      "tickets": [
+        {
+          "key": "S273-1",
+          "title": "Add a model tier to ReviewerAgentSpec and thread it through buildReviewerAgentSpecs (#693)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 693
+        },
+        {
+          "key": "S273-2",
+          "title": "Derive the tier from existing review signals, reusing slope loop's routing vocabulary rather than a second scheme (#693)",
+          "club": "long_iron",
+          "complexity": "moderate",
+          "github_issue": 693,
+          "depends_on": [
+            "S273-1"
+          ]
+        },
+        {
+          "key": "S273-3",
+          "title": "Name the recommended model in slope review recommend and slope pr review output (#693)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 693,
+          "depends_on": [
+            "S273-1"
+          ]
+        },
+        {
+          "key": "S273-4",
+          "title": "Keep the tier overridable with --model, so the operator can escalate a diff whose signals understate it (#693)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 693,
+          "depends_on": [
+            "S273-2"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 274,
+      "theme": "Review Exemption Correctness",
+      "par": 4,
+      "slope": 3,
+      "type": "bugfix + safety",
+      "status": "planned",
+      "github_issues": [
+        693
+      ],
+      "depends_on": [
+        "273"
+      ],
+      "note": "detectTier returns tier 'skip' with 0 rounds for docs-only or zero-ticket work. In this repo docs are not prose: docs/roadmap/**.yaml IS the roadmap, and a phase file defines sprint scope, dependency edges, par and slope for everything downstream. A wrong dependency edge authored as 'docs' is precisely what an architect review catches, and it is currently waved through. Replace the blanket exemption with a content check; keep a genuine README or changelog edit cheap.",
+      "tickets": [
+        {
+          "key": "S274-1",
+          "title": "Replace the blanket isResearchOrDocs skip with a check on what the docs change actually touches (#693)",
+          "club": "long_iron",
+          "complexity": "moderate",
+          "github_issue": 693
+        },
+        {
+          "key": "S274-2",
+          "title": "Force an architect lane when a change touches or describes roadmap or architecture content (#693)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 693,
+          "depends_on": [
+            "S274-1"
+          ]
+        },
+        {
+          "key": "S274-3",
+          "title": "Give genuinely inert docs changes a minimal tight-scope reviewer instead of no reviewer (#693)",
+          "club": "wedge",
+          "complexity": "small",
+          "github_issue": 693,
+          "depends_on": [
+            "S274-1",
+            "S273-2"
           ]
         }
       ]
