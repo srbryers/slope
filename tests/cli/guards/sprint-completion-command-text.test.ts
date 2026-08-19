@@ -93,4 +93,37 @@ describe('sprintCompletionGuard command-text precision (#683)', () => {
     await sprintCompletionGuard(makeInput('git fetch && gh pr merge 12 --squash', cwd), cwd);
     expect(readPhase(cwd)).toBe('scoring');
   });
+
+  it('sees through gh global flags on the merge', async () => {
+    await sprintCompletionGuard(makeInput('gh -R srbryers/slope pr merge 12 --squash', cwd), cwd);
+    expect(readPhase(cwd)).toBe('scoring');
+  });
+
+  // The `tests` gate is one of the five handlePreToolUse checks before it
+  // allows `gh pr create`, so a falsely-set gate lets a PR through.
+  describe('tests gate', () => {
+    const readGates = () =>
+      JSON.parse(readFileSync(join(cwd, '.slope', 'sprint-state.json'), 'utf8')).gates;
+
+    it('does not mark the tests gate from a quoted argument', async () => {
+      await sprintCompletionGuard(makeInput('gh issue create --body "npx vitest run fails"', cwd), cwd);
+      expect(readGates().tests).toBe(false);
+    });
+
+    it('does not mark the tests gate from a heredoc body', async () => {
+      const command = ["cat <<'EOF' > n.md", 'run npx vitest run to test', 'EOF'].join('\n');
+      await sprintCompletionGuard(makeInput(command, cwd), cwd);
+      expect(readGates().tests).toBe(false);
+    });
+
+    it('still marks the tests gate on a genuine run', async () => {
+      await sprintCompletionGuard(makeInput('npx vitest run', cwd), cwd);
+      expect(readGates().tests).toBe(true);
+    });
+
+    it('still marks the tests gate for bun test and pnpm test', async () => {
+      await sprintCompletionGuard(makeInput('bun test', cwd), cwd);
+      expect(readGates().tests).toBe(true);
+    });
+  });
 });

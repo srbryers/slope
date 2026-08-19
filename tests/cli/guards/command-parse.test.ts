@@ -40,8 +40,29 @@ describe('parseShellCommands', () => {
     expect(values('cat <<-EOF\n\tbody line\n\tEOF\ntrue')).toEqual([['cat'], ['true']]);
   });
 
-  it('treats an unterminated heredoc as swallowing the rest, like the shell', () => {
-    expect(values("cat <<'EOF'\nnever closed\n")).toEqual([['cat']]);
+  // A guard must not silently see nothing. An unterminated heredoc usually
+  // means the `<<` was never an opener — `echo $((1 << 3))`, a
+  // `--pretty=format:%h<<%s` argument — and discarding the remainder made
+  // guards fail OPEN on whatever followed. Deliberate divergence from the
+  // shell, which would swallow it.
+  it('hands the remainder back when a heredoc is never terminated', () => {
+    expect(values("cat <<'EOF'\nnever closed\n")).toEqual([['cat'], ['never', 'closed']]);
+  });
+
+  it('does not lose a command after arithmetic that looks like a heredoc', () => {
+    // `3))` is consumed as the would-be heredoc delimiter, but the command on
+    // the next line survives — which is the property guards depend on.
+    expect(values('echo $((1 << 3))\nslope sprint start --sprint=2')).toEqual([
+      ['echo', '$((1'],
+      ['slope', 'sprint', 'start', '--sprint=2'],
+    ]);
+  });
+
+  it('does not lose a command after a << inside an argument value', () => {
+    expect(values('git log --pretty=format:%h<<%s\nslope claim --target=core')).toEqual([
+      ['git', 'log', '--pretty=format:%h'],
+      ['slope', 'claim', '--target=core'],
+    ]);
   });
 
   it('does not treat a herestring as a heredoc', () => {
@@ -64,8 +85,11 @@ describe('parseShellCommands', () => {
 
   it('strips leading tabs for <<- but not for <<', () => {
     expect(values('cat <<-EOF\n\tbody\n\tEOF\ntrue')).toEqual([['cat'], ['true']]);
-    // Plain `<<` must NOT accept a tab-indented terminator.
-    expect(values('cat <<EOF\n\tbody\n\tEOF\ntrue')).toEqual([['cat']]);
+    // Plain `<<` must NOT accept a tab-indented terminator, so this heredoc
+    // never closes and the body is handed back rather than discarded.
+    expect(values('cat <<EOF\n\tbody\n\tEOF\ntrue')).toEqual([
+      ['cat'], ['body'], ['EOF'], ['true'],
+    ]);
   });
 
   // Found by independent review of #692. Without `\r` in the delimiter break

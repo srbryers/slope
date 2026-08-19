@@ -141,8 +141,10 @@ export async function phaseBoundaryGuard(input: HookInput, cwd: string): Promise
 }
 
 function extractRelevantSlopeArgs(command: string): string[] | null {
-  // shellCommandSegments skips heredoc bodies and flags quoted tokens, so
-  // documentation about a command can no longer read as the command (#683).
+  // shellCommandSegments skips heredoc bodies, so documentation about a
+  // command no longer reads as the command (#683). Note this consumes only
+  // `words`, so a quoted `"slope" sprint start` still matches — same as the
+  // tokenizer it replaced.
   for (const { words } of shellCommandSegments(command)) {
     const slopeIndex = findSlopeExecutableIndex(words);
     if (slopeIndex < 0) continue;

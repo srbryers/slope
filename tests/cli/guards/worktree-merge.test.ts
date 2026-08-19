@@ -153,11 +153,25 @@ describe('worktreeMergeGuard', () => {
     });
 
     it('does not fire when no merge in the set carries the flag', async () => {
+      // mockWorktree() is required: without it execSync returns undefined,
+      // .trim() throws, and the catch returns {} — so the assertion would
+      // hold no matter what the flag lookup did.
+      mockWorktree();
       const result = await worktreeMergeGuard(
         makeInput('gh pr merge 100 --squash && gh pr merge 101 --squash'),
         '/tmp/test',
       );
       expect(result).toEqual({});
+    });
+
+    it('sees through gh global flags to the merge subcommand', async () => {
+      mockWorktree();
+      const result = await worktreeMergeGuard(
+        makeInput('gh -R srbryers/slope pr merge 692 --squash --delete-branch'),
+        '/tmp/test',
+      );
+      expect(result.decision).toBe('deny');
+      expect(result.blockReason).toContain('gh -R srbryers/slope pr merge 692 --squash');
     });
   });
 });

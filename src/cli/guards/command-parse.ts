@@ -237,9 +237,12 @@ function skipHeredocBodies(command: string, from: number, pending: PendingHeredo
         break;
       }
     }
-    // An unterminated heredoc swallows the rest of the input, which is the
-    // same thing the shell would do.
-    if (!closed) return command.length;
+    // An unterminated heredoc means the `<<` probably was not an opener at
+    // all — `echo $((1 << 3))`, a `--pretty=format:%h<<%s` argument. The shell
+    // would swallow the rest of the input; a guard must not, because
+    // discarding the remainder makes it silently see nothing and fail OPEN on
+    // whatever followed. Hand the text back to the tokenizer instead.
+    if (!closed) return from;
   }
   return Math.min(i, command.length);
 }
@@ -277,14 +280,37 @@ export function shellCommandSegments(command: string): CommandSegment[] {
  *  `commandMatches(cmd, ['gh', 'pr', 'merge'])`. Leading `env`-style variable
  *  assignments (`FOO=bar gh pr merge`) are skipped. Quoted words do not count
  *  as the program name, so text inside a string never matches. */
-export function commandMatches(cmd: ParsedCommand, path: string[]): boolean {
-  const words = argvWords(cmd);
+export function commandMatches(
+  cmd: ParsedCommand,
+  path: string[],
+  options: { skipGhGlobalFlags?: boolean } = {},
+): boolean {
+  let words = argvWords(cmd);
+  // `gh -R owner/repo pr merge` is the same command as `gh pr merge`; without
+  // this the global flags push the subcommand out of position and the guard
+  // silently does not fire.
+  if (options.skipGhGlobalFlags && words[0]?.value === 'gh' && !words[0].quoted) {
+    words = [words[0], ...skipGhGlobalFlagTokens(words.slice(1))];
+  }
   if (words.length < path.length) return false;
   for (let i = 0; i < path.length; i++) {
     const token = words[i];
     if (token.quoted || token.value !== path[i]) return false;
   }
   return true;
+}
+
+/** `gh` global flags that consume the following word as their value. */
+const GH_GLOBAL_FLAGS_WITH_VALUE = new Set(['-R', '--repo', '--hostname', '--config']);
+
+function skipGhGlobalFlagTokens(words: CommandToken[]): CommandToken[] {
+  let i = 0;
+  while (words[i] != null && !words[i].quoted && words[i].value.startsWith('-')) {
+    const flag = words[i].value;
+    if (flag === '--') return words.slice(i + 1);
+    i += GH_GLOBAL_FLAGS_WITH_VALUE.has(flag) ? 2 : 1;
+  }
+  return words.slice(i);
 }
 
 /** Every command in `command` that invokes the given program and subcommand

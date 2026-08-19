@@ -26,7 +26,7 @@ export async function worktreeMergeGuard(input: HookInput, cwd: string): Promise
   // stacked-PR set runs several in one command and it is typically the last
   // that carries the flag, which a first-match lookup would miss entirely.
   const flag = parseShellCommands(command)
-    .filter(cmd => commandMatches(cmd, ['gh', 'pr', 'merge']))
+    .filter(cmd => commandMatches(cmd, ['gh', 'pr', 'merge'], { skipGhGlobalFlags: true }))
     .map(cmd => findFlagToken(cmd, DELETE_BRANCH_FLAGS))
     .find((token): token is NonNullable<typeof token> => token != null);
   if (!flag) return {};
