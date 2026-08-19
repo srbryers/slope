@@ -1,0 +1,110 @@
+version: "1"
+phase:
+  name: Phase 65 — Guard and Signal Precision
+  description: "Triage of the eight open GitHub issues as of 2026-08-19, each re-verified against the build at the time (v1.64.1) and re-confirmed still live on v2.0 main before rebasing. Four carry live defects: #683 (worktree-merge guard matches raw command text, blocks unrelated commands and corrupts the data it rewrites), #687 (shipped-commit detection reads the local trunk ref, which is stale in every worktree), #689 (slope review accepts only the --sprint=N equals form; the space and positional forms fall through to the path argument), and the residual half of #685 (the exported validateRoadmap throws on a sprint with no tickets key even though the CLI path normalizes it first). #684, #686, #688 and #690 already reproduce clean and need only regression tests before they close."
+  sprints:
+    - 267.1
+    - 267.2
+    - 267.3
+  status: in_progress
+  note: "Verification, not assumption, set this scope. Each issue was re-run against the 1.64.1 build rather than triaged from its text: #684's exact scorecard shape now reports 100% (3/3); #686 and #690's commit subjects all extract clean through the isSlopeMetadataOnlyCommit and isPlanningOnlyBareReference filters added in #521/#523; #688's two counters were unified on countMapMetadataFiles in fbcee82. The common thread in what remains is the same defect in three places — a signal derived from text or a ref that was never parsed for meaning."
+sprints:
+  - id: 267.1
+    theme: Command-Text Guard Precision
+    par: 4
+    slope: 4
+    type: bugfix + safety
+    status: complete
+    note: "worktreeMergeGuard tests two regexes against the raw Bash invocation, so any command carrying the flag as data matches — a gh issue create body, a heredoc writing documentation about the gotcha, a commit message. Worse, the deny message's suggested replacement is produced by a non-global replace over that same raw text, so following the guard's advice silently edits prose instead of fixing a command. The -d alternative is unanchored, so `cut -d= -f2-` matches and is rewritten to `cut= -f2-`. Reported hit 5x in one session; the guard blocked the filing of its own bug report twice."
+    tickets:
+      - key: S267.1-1
+        title: Parse the invocation into discrete commands and match the flag only when it is an argument of gh pr merge (#683)
+        club: long_iron
+        complexity: moderate
+        github_issue: 683
+      - key: S267.1-2
+        title: Exclude heredoc bodies and quoted string literals from guard command matching (#683)
+        club: long_iron
+        complexity: moderate
+        github_issue: 683
+        depends_on:
+          - S267.1-1
+      - key: S267.1-3
+        title: "Anchor the -d short flag to an argument position and make the suggested rewrite byte-identical apart from the removed flag (#683)"
+        club: short_iron
+        complexity: standard
+        github_issue: 683
+        depends_on:
+          - S267.1-1
+      - key: S267.1-4
+        title: Audit the remaining Bash PreToolUse guards for the same raw-substring match and fix any that share it (#683)
+        club: short_iron
+        complexity: standard
+        github_issue: 683
+        depends_on:
+          - S267.1-1
+  - id: 267.2
+    theme: Trunk Resolution in Worktrees
+    par: 4
+    slope: 4
+    type: bugfix + data integrity
+    status: complete
+    depends_on:
+      - 267.1
+    note: "findShippedSprintsOnMain resolves the trunk as ['main','master','HEAD'] — all local refs. A git worktree never fast-forwards its local main, so a merged sprint reads as unshipped and the check fires on exactly the workflow SLOPE recommends for parallel sprints. Blast radius is wider than the filed issue: four call sites consume it (roadmap validate, slope status, slope retro, and the post-hole-enforcement guard), so all four mis-report in a worktree. Prefer the configured upstream or refs/remotes/<remote>/HEAD, fall back to local only when no remote exists."
+    tickets:
+      - key: S267.2-1
+        title: Resolve the trunk to the remote-tracking ref with a documented fallback to the local ref (#687)
+        club: long_iron
+        complexity: risky
+        github_issue: 687
+      - key: S267.2-2
+        title: Warn when the local and remote-tracking trunk diverge, since that is the condition that makes the check meaningless (#687)
+        club: wedge
+        complexity: small
+        github_issue: 687
+        depends_on:
+          - S267.2-1
+      - key: S267.2-3
+        title: Cover the four shipped-commit consumers with worktree fixtures so status, retro, validate and the guard agree (#687)
+        club: short_iron
+        complexity: standard
+        github_issue: 687
+        depends_on:
+          - S267.2-1
+  - id: 267.3
+    theme: Selector and Validation Hygiene
+    par: 4
+    slope: 2
+    type: bugfix + test coverage
+    status: complete
+    depends_on:
+      - 267.2
+    note: "The small residue, plus the tests that let four issues close honestly. slope review parses only --sprint=N: with --sprint 259 the flag is skipped and 259 falls through to the positional path argument, producing 'Failed to parse <cwd>/259'. The exported validateRoadmap still throws on a sprint with no tickets key — the CLI is safe because parseRoadmap normalizes first, so only direct API callers hit it. isSlopeMetadataPath still allowlists only docs/backlog/roadmap.json, not the modular docs/roadmap/**.yaml sources this project moved to, so a feat(Sxx) commit touching only phase YAML would count as shipped."
+    tickets:
+      - key: S267.3-1
+        title: "Accept --sprint N and a bare positional sprint number in slope review, not only --sprint=N (#689)"
+        club: short_iron
+        complexity: standard
+        github_issue: 689
+      - key: S267.3-2
+        title: Tolerate a missing tickets key at the validateRoadmap API boundary instead of throwing (#685)
+        club: wedge
+        complexity: small
+        github_issue: 685
+      - key: S267.3-3
+        title: Extend the shipped-commit metadata allowlist to the modular docs/roadmap sources (#686)
+        club: wedge
+        complexity: small
+        github_issue: 686
+      - key: S267.3-4
+        title: Lock the verified-fixed signal regressions with tests so #684/#686/#688/#690 can close (#684)
+        club: short_iron
+        complexity: standard
+        github_issue: 684
+        depends_on:
+          - S267.3-3
+scorecards:
+  "267.1": docs/retros/sprint-267.1.json
+  "267.2": docs/retros/sprint-267.2.json
+  "267.3": docs/retros/sprint-267.3.json

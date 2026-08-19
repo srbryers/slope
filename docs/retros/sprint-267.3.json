@@ -1,0 +1,89 @@
+{
+  "sprint_number": 267.3,
+  "theme": "Selector and Validation Hygiene",
+  "par": 4,
+  "slope": 2,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-08-19",
+  "github_issues": [
+    689,
+    685,
+    686,
+    684,
+    688,
+    690
+  ],
+  "shots": [
+    {
+      "ticket_key": "S267.3-1",
+      "title": "Accept --sprint N and a bare positional sprint number in slope review, not only --sprint=N (#689)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "The trigger was one line in src/cli/index.ts: sprintArg matched only args starting with '--sprint=', so with `--sprint 259` the flag was skipped and 259 became the first non-dash arg, i.e. the path — hence 'Failed to parse <cwd>/259'. Extracted parseReviewArgs into review.ts so the parsing is unit-testable without running the CLI; it consumes a space-separated flag value and treats a bare S?N(.N) positional as a selector, leaving real paths alone."
+    },
+    {
+      "ticket_key": "S267.3-2",
+      "title": "Tolerate a missing tickets key at the validateRoadmap API boundary instead of throwing (#685)",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "description": "The issue reported this as a CLI crash, but the CLI path was already fixed: parseRoadmap normalizes `tickets ?? []` (commit 400b422, fix(S147-533)). Only direct API callers still threw. Verifying against the current build before writing code changed the scope from a hunt across four commands to one guard clause."
+        }
+      ],
+      "notes": "validateRoadmap shallow-clones the roadmap when any sprint lacks a tickets array, so a missing key behaves exactly like an explicit [] — the option the issue preferred, and the one that matches what the CLI already did. Deliberately does NOT emit an extra error: parseRoadmap fills the key in first, so an error here would fire only for API callers and make the two paths disagree. The caller's object is left untouched."
+    },
+    {
+      "ticket_key": "S267.3-3",
+      "title": "Extend the shipped-commit metadata allowlist to the modular docs/roadmap sources (#686)",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [],
+      "notes": "Found while verifying #686, not in the issue: isSlopeMetadataPath allowlisted docs/backlog/roadmap.json but not docs/roadmap/**.yaml, which is where this project now authors its roadmap. A conventional-commit implementation type touching only phase YAML would still have counted as shipping. The subject-level filters (isPlanningOnlyBareReference, range detection) already caught every subject in the issue, so this was the remaining file-level hole."
+    },
+    {
+      "ticket_key": "S267.3-4",
+      "title": "Lock the verified-fixed signal regressions with tests so #684/#686/#688/#690 can close (#684)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "[code review] Two tests were non-discriminating: the #686 path allowlist was exercised only through a function that never reaches it, and a worktree-merge test omitted the worktree mock so its assertion held regardless of the code under test.",
+          "gotcha_id": "review:code"
+        }
+      ],
+      "notes": "tests/core/issue-regressions.test.ts pins the reported SYMPTOM of each issue rather than the implementation: #684's exact scorecard shape renders 100% (3/3) and never '(0/0)'; every commit subject quoted in #686 and #690 extracts to an empty set while real feat(S80)/(S80-2) commits still ship; #688's staleness check reports OK against the count the map itself writes. These four were fixed in earlier sprints with no test holding the symptom, so they could have regressed silently."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 2,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [],
+  "special_plays": [],
+  "bunker_locations": [
+    "src/cli/index.ts flag parsing is per-command and ad hoc: several commands match only the '--flag=value' spelling, so the space-separated form silently falls through to a positional. Worth auditing the other commands for the same gap.",
+    "Verify a reported bug against the current build before scoping work on it. Four of the eight open issues were already fixed and one was half-fixed; triaging from issue text alone would have produced three unnecessary sprints."
+  ],
+  "yardage_book_updates": [],
+  "course_management_notes": [],
+  "review_findings": [],
+  "notes": "Closes the Phase 65 residue. #689 and #685 were both half-fixed already — #689's --help and equals form worked, #685's CLI path was safe — so the live surface was much smaller than filed, and the sprint spent its remaining budget on the regression tests that let #684, #686, #688 and #690 close honestly. Independent review found two of those tests non-discriminating: the #686 path allowlist was only reached through a function that never touches it, so it passed with the diff reverted. Both replaced with real git fixtures. Suite 4346 passing, typecheck clean, map regenerated."
+}

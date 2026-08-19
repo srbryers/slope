@@ -1,0 +1,367 @@
+{
+  "version": 1,
+  "kind": "sprint_rollover",
+  "transition_id": "0eb9fed509f76e34",
+  "from_sprint": "260",
+  "to_sprint": "267.1",
+  "from_label": "S260",
+  "to_label": "S267.1",
+  "recorded_at": "2026-08-19T11:00:19.459Z",
+  "actor": {
+    "name": "srbry",
+    "source": "env:USERNAME"
+  },
+  "request": {
+    "from": "260",
+    "to": "267.1",
+    "force": true,
+    "reason": "Phase 62 (S260-S262) was authored against v1.64.1 while main advanced to v2.0.0. Sprints 260-262 and phases 62-64 were already taken, so the same work was rebased onto v2.0 and renumbered as decimal inserts after S267, the last complete sprint. Same tickets, scorecards and review evidence; new ids."
+  },
+  "forced": true,
+  "reason": "Phase 62 (S260-S262) was authored against v1.64.1 while main advanced to v2.0.0. Sprints 260-262 and phases 62-64 were already taken, so the same work was rebased onto v2.0 and renumbered as decimal inserts after S267, the last complete sprint. Same tickets, scorecards and review evidence; new ids.",
+  "eligibility": {
+    "from_terminal": true,
+    "target_dependency_eligible": true,
+    "blocking_dependencies": [],
+    "target_dependencies": [],
+    "completion_evidence": {
+      "roadmap_complete": [
+        "61",
+        "62",
+        "63",
+        "64",
+        "65",
+        "66",
+        "67",
+        "68",
+        "69",
+        "70",
+        "71",
+        "72",
+        "73",
+        "74",
+        "75",
+        "76",
+        "77",
+        "78",
+        "79",
+        "80",
+        "81",
+        "82",
+        "83",
+        "84",
+        "86",
+        "87",
+        "88",
+        "89",
+        "90",
+        "91",
+        "92",
+        "93",
+        "94",
+        "95",
+        "96",
+        "97",
+        "98",
+        "99",
+        "100",
+        "101",
+        "102",
+        "103",
+        "104",
+        "105",
+        "106",
+        "107",
+        "108",
+        "109",
+        "110",
+        "111",
+        "112",
+        "113",
+        "114",
+        "114.5",
+        "115",
+        "116",
+        "117",
+        "118",
+        "119",
+        "120",
+        "121",
+        "122",
+        "123",
+        "124",
+        "125",
+        "126",
+        "127",
+        "130",
+        "131",
+        "132",
+        "133",
+        "134",
+        "135",
+        "136",
+        "137",
+        "137.5",
+        "138",
+        "139",
+        "140",
+        "141",
+        "142",
+        "143",
+        "143.5",
+        "143.6",
+        "143.7",
+        "143.8",
+        "143.9",
+        "143.95",
+        "143.97",
+        "143.98",
+        "143.99",
+        "144",
+        "145",
+        "146",
+        "146.1",
+        "146.2",
+        "146.3",
+        "148",
+        "149",
+        "150",
+        "151",
+        "151.1",
+        "152",
+        "152.1",
+        "153",
+        "154",
+        "216",
+        "217",
+        "218",
+        "219",
+        "220",
+        "221",
+        "222",
+        "223",
+        "224",
+        "226",
+        "227",
+        "228",
+        "229",
+        "230",
+        "231",
+        "232",
+        "233",
+        "234",
+        "235",
+        "236",
+        "241",
+        "242",
+        "243",
+        "244",
+        "246",
+        "247",
+        "248",
+        "249",
+        "250",
+        "251",
+        "252",
+        "253",
+        "254",
+        "256",
+        "258",
+        "259",
+        "260",
+        "260.1",
+        "261",
+        "262",
+        "263",
+        "264",
+        "264.1",
+        "264.2",
+        "265",
+        "266",
+        "267"
+      ],
+      "scorecards": [
+        "260",
+        "260.1",
+        "261",
+        "262",
+        "263",
+        "264",
+        "264.1",
+        "264.2",
+        "265",
+        "266",
+        "267",
+        "267.1",
+        "267.2"
+      ],
+      "local_terminal": [
+        "260"
+      ]
+    },
+    "scorecard_artifacts": [
+      {
+        "sprint": "260",
+        "path": "docs/retros/sprint-260.json",
+        "sha256": "03cd0fd9896fe21f2fb704807e6c5999d4598d67655d2b521f9384352f3f0004"
+      },
+      {
+        "sprint": "260.1",
+        "path": "docs/retros/sprint-260.1.json",
+        "sha256": "7c34e63273a2b245a008a3a163a223de2ebc4fc89b086a22f01591e743c43fae"
+      },
+      {
+        "sprint": "261",
+        "path": "docs/retros/sprint-261.json",
+        "sha256": "02099e4476e22632ed72c23aca77b43cffdd6783f6c52c9bfa52372f1c1140a7"
+      },
+      {
+        "sprint": "262",
+        "path": "docs/retros/sprint-262.json",
+        "sha256": "1a1398c591f8c4e981a69ce9e54d22cf73720b2400ead12952a7b0190d29472a"
+      },
+      {
+        "sprint": "263",
+        "path": "docs/retros/sprint-263.json",
+        "sha256": "0aef07a43f36c343e80180ce37fc1f542671ec13df50603d2ca9db9634f23fc7"
+      },
+      {
+        "sprint": "264",
+        "path": "docs/retros/sprint-264.json",
+        "sha256": "212b60bfce94b3d56290163978561dc560222449d6ae0dc317e29c156cbf9311"
+      },
+      {
+        "sprint": "264.1",
+        "path": "docs/retros/sprint-264.1.json",
+        "sha256": "d5f0774f5ab157c6e48b9f1b36f97daac928af3960cd502cf3ab22620ed36cf5"
+      },
+      {
+        "sprint": "264.2",
+        "path": "docs/retros/sprint-264.2.json",
+        "sha256": "29d40189950587d55533d76d318dc1ba44c14e6deb6646077f6b46fe53f60ba6"
+      },
+      {
+        "sprint": "265",
+        "path": "docs/retros/sprint-265.json",
+        "sha256": "2ce6f6845389368feee64fd6eb5469cd6bf86c047b1630d691a9fa722c794ed0"
+      },
+      {
+        "sprint": "266",
+        "path": "docs/retros/sprint-266.json",
+        "sha256": "86b40a6d0732efd54d5658c6ff8c630dc0dc4d73a2d3f2f5335a900e1a313222"
+      },
+      {
+        "sprint": "267",
+        "path": "docs/retros/sprint-267.json",
+        "sha256": "de626ebc26280fa28d74f174516098fb85d3f14fa59a09cf63b848e17c622719"
+      },
+      {
+        "sprint": "267.1",
+        "path": "docs/retros/sprint-267.1.json",
+        "sha256": "11c948d0f56f3e607cad57042ef9d179659f166b7bdf852d564620eb6edbcf07"
+      },
+      {
+        "sprint": "267.2",
+        "path": "docs/retros/sprint-267.2.json",
+        "sha256": "c6201ecacaad48e3e6aa6229aa06bce030a21ba5522b81a63c7ad515bf440fdf"
+      }
+    ],
+    "expected_next": "267.1"
+  },
+  "roadmap": {
+    "path": "docs/backlog/roadmap.json",
+    "sha256": "4c5d9ac1c1c8166fed0bc1d578c42a2e9d159bc2c38c6a35e52d7a5fd20834ae",
+    "from_status": "complete",
+    "to_status": "planned"
+  },
+  "prior_state_sha256": "94caa4d656fda5cf43aee1e0f6a8b1a4e78157104ab4d2e342d2ae747c35013f",
+  "prior_state": {
+    "sprint": "260",
+    "phase": "scoring",
+    "gates": {
+      "tests": true,
+      "code_review": true,
+      "architect_review": true,
+      "scorecard": true,
+      "review_md": true
+    },
+    "review_gates": {
+      "code_review": {
+        "provenance": "independent_review",
+        "evidence": [
+          "docs/retros/sprint-260-code-review.md"
+        ],
+        "reviewer": "code-implementation-correctness-reviewer",
+        "verdict": "pass",
+        "updated_at": "2026-08-19T10:20:22.321Z"
+      },
+      "architect_review": {
+        "provenance": "independent_review",
+        "evidence": [
+          "docs/retros/sprint-260-architect-review.md"
+        ],
+        "reviewer": "workflow-architecture-reviewer",
+        "verdict": "pass",
+        "updated_at": "2026-08-19T10:20:22.537Z"
+      }
+    },
+    "review_requirements": {
+      "code_review": {
+        "priority": "unspecified"
+      },
+      "architect_review": {
+        "priority": "unspecified"
+      }
+    },
+    "started_at": "2026-08-19T08:51:48.357Z",
+    "updated_at": "2026-08-19T10:57:55.315Z",
+    "rollover": {
+      "transition_id": "829e38f38671fa83",
+      "from_sprint": "259",
+      "audit_path": "docs/retros/rollovers/sprint-259-to-260-392b4705333e9498.json",
+      "recorded_at": "2026-08-19T08:51:48.357Z",
+      "forced": false
+    }
+  },
+  "next_state": {
+    "sprint": "267.1",
+    "phase": "planning",
+    "gates": {
+      "tests": false,
+      "code_review": false,
+      "architect_review": false,
+      "scorecard": false,
+      "review_md": false
+    },
+    "review_gates": {
+      "code_review": {
+        "provenance": "pending",
+        "evidence": []
+      },
+      "architect_review": {
+        "provenance": "pending",
+        "evidence": []
+      }
+    },
+    "review_requirements": {
+      "code_review": {
+        "priority": "unspecified"
+      },
+      "architect_review": {
+        "priority": "unspecified"
+      }
+    },
+    "started_at": "2026-08-19T11:00:19.459Z",
+    "updated_at": "2026-08-19T11:00:19.459Z",
+    "rollover": {
+      "transition_id": "0eb9fed509f76e34",
+      "from_sprint": "260",
+      "audit_path": "docs/retros/rollovers/sprint-260-to-267.1-d5023b299657de11.json",
+      "recorded_at": "2026-08-19T11:00:19.459Z",
+      "forced": true,
+      "reason": "Phase 62 (S260-S262) was authored against v1.64.1 while main advanced to v2.0.0. Sprints 260-262 and phases 62-64 were already taken, so the same work was rebased onto v2.0 and renumbered as decimal inserts after S267, the last complete sprint. Same tickets, scorecards and review evidence; new ids."
+    }
+  },
+  "claims_policy": "unchanged",
+  "sessions_policy": "unchanged"
+}

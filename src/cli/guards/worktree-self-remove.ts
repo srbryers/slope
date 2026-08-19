@@ -1,6 +1,7 @@
 import { execSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { QUIET_STDIO } from '../../core/process.js';
+import { findCommands, positionalArgs } from './command-parse.js';
 import type { HookInput, GuardResult } from '../../core/index.js';
 
 /**
@@ -11,8 +12,10 @@ import type { HookInput, GuardResult } from '../../core/index.js';
 export async function worktreeSelfRemoveGuard(input: HookInput, cwd: string): Promise<GuardResult> {
   const command = (input.tool_input?.command as string) ?? '';
 
-  // Only fire on git worktree remove
-  if (!/git\s+worktree\s+remove/.test(command)) return {};
+  // Only fire on an actual `git worktree remove`, never on text that merely
+  // contains the phrase — a heredoc, an issue body, a commit message (#683).
+  const removes = findCommands(command, ['git', 'worktree', 'remove']);
+  if (removes.length === 0) return {};
 
   // Check if we're in a worktree (not the main working tree)
   let inWorktree = false;
@@ -28,15 +31,14 @@ export async function worktreeSelfRemoveGuard(input: HookInput, cwd: string): Pr
 
   if (!inWorktree) return {};
 
-  // Parse the target path from command: git worktree remove [--force] <path>
-  const match = command.match(/git\s+worktree\s+remove\s+(?:--force\s+)?(.+?)(?:\s|$)/);
-  if (!match) return {};
-
-  const targetRaw = match[1].trim();
-  const targetPath = resolve(cwd, targetRaw);
+  // The target is the first positional after `remove`, whatever flags precede it.
   const cwdResolved = resolve(cwd);
+  const target = removes
+    .map(cmd => positionalArgs(cmd, 3)[0])
+    .find(token => token != null && resolve(cwd, token.value) === cwdResolved);
+  if (!target) return {};
 
-  if (targetPath !== cwdResolved) return {};
+  const targetRaw = target.value;
 
   return {
     decision: 'deny',

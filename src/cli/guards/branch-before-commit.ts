@@ -1,5 +1,6 @@
 import { execSync } from 'node:child_process';
 import { QUIET_STDIO } from '../../core/process.js';
+import { findCommands } from './command-parse.js';
 import type { HookInput, GuardResult } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 
@@ -26,8 +27,10 @@ function extractCommitMessage(command: string): string | undefined {
 export async function branchBeforeCommitGuard(input: HookInput, cwd: string): Promise<GuardResult> {
   const command = (input.tool_input?.command as string) ?? '';
 
-  // Only fire on git commit (word-boundary: avoid git commit-tree etc.)
-  if (!/git\s+commit(\s|$)/.test(command)) return {};
+  // Only fire on an actual `git commit`. Parsing rather than matching the raw
+  // text keeps `git commit-tree` out and, more importantly, keeps the phrase
+  // out when it appears inside a quoted argument or heredoc body (#683).
+  if (findCommands(command, ['git', 'commit']).length === 0) return {};
 
   // Check current branch
   let branch: string;

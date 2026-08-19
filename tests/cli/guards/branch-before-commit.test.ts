@@ -179,4 +179,32 @@ describe('branchBeforeCommitGuard', () => {
     const result = await branchBeforeCommitGuard(makeInput('git commit -m "feat: stuff"'), '/tmp/test');
     expect(result).toEqual({});
   });
+
+  // #683 — the trigger matched the raw invocation, so a command that merely
+  // quoted the phrase was treated as a commit.
+  describe('command-text precision (#683)', () => {
+    it('does not fire when the phrase only appears in a quoted argument', async () => {
+      mockExecSync.mockReturnValue('main');
+      const result = await branchBeforeCommitGuard(
+        makeInput('gh issue create --body "always git commit on a branch"'),
+        '/tmp/test',
+      );
+      expect(result).toEqual({});
+    });
+
+    it('does not fire on git commit-tree', async () => {
+      mockExecSync.mockReturnValue('main');
+      const result = await branchBeforeCommitGuard(makeInput('git commit-tree abc123'), '/tmp/test');
+      expect(result).toEqual({});
+    });
+
+    it('still fires on a genuine commit inside a compound command', async () => {
+      mockExecSync.mockReturnValue('main');
+      const result = await branchBeforeCommitGuard(
+        makeInput('git add -A && git commit -m "feat: stuff"'),
+        '/tmp/test',
+      );
+      expect(result.decision).toBe('deny');
+    });
+  });
 });

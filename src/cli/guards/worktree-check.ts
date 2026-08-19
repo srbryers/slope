@@ -9,6 +9,7 @@ import { SlopeStoreError } from '../../core/store.js';
 import type { SlopeSession } from '../../core/store.js';
 import { resolveStore } from '../store.js';
 import { resolveSessionStoreCwd } from '../session-scope.js';
+import { shellCommandSegments } from './command-parse.js';
 
 const COMMAND_TEXT_KEYS = ['command', 'cmd', 'input'] as const;
 const FILE_PATH_KEYS = ['file_path', 'path'] as const;
@@ -189,10 +190,10 @@ function isWorktreeRecoveryInput(input: HookInput): boolean {
 
   const command = extractCommandText(input);
   if (command === 'EnterWorktree') return true;
-  const segments = splitShellSegments(command);
+  const segments = shellCommandSegments(command);
   if (segments.length !== 1) return false;
 
-  const words = tokenizeShellWords(segments[0]);
+  const words = segments[0].words;
   return isGitWorktreeAdd(words) || isSlopeRecoveryCommand(words);
 }
 
@@ -200,10 +201,10 @@ function isRemoteOrReadOnlyCommandInput(input: HookInput): boolean {
   if (input.tool_name !== 'Bash') return false;
 
   const command = extractCommandText(input);
-  const segments = splitShellSegments(command);
+  const segments = shellCommandSegments(command);
   if (segments.length !== 1) return false;
 
-  const words = tokenizeShellWords(segments[0]);
+  const words = segments[0].words;
   const start = skipCommandPrefix(words, 0);
   if (words[start] === 'gh') return isAllowedGhCommand(words.slice(start + 1));
   if (words[start] === 'git') return isAllowedGitCommand(normalizeGitArgs(words.slice(start + 1)));
@@ -286,68 +287,7 @@ function isSlopeRecoveryCommand(words: string[]): boolean {
     || args[1] === 'heartbeat';
 }
 
-function splitShellSegments(command: string): string[] {
-  const segments: string[] = [];
-  let current = '';
-  let quote: '"' | "'" | null = null;
 
-  for (let i = 0; i < command.length; i++) {
-    const char = command[i];
-    if (char === '\\' && quote !== "'") {
-      current += char;
-      if (i + 1 < command.length) current += command[++i];
-      continue;
-    }
-    if ((char === '"' || char === "'") && (!quote || quote === char)) {
-      quote = quote ? null : char;
-      current += char;
-      continue;
-    }
-    if (!quote && char === '&' && command[i - 1] === '>') {
-      current += char;
-      continue;
-    }
-    if (!quote && (char === ';' || char === '\n' || char === '&' || char === '|')) {
-      if (current.trim()) segments.push(current.trim());
-      current = '';
-      if ((char === '&' && command[i + 1] === '&') || (char === '|' && command[i + 1] === '|')) i++;
-      continue;
-    }
-    current += char;
-  }
-
-  if (current.trim()) segments.push(current.trim());
-  return segments;
-}
-
-function tokenizeShellWords(segment: string): string[] {
-  const words: string[] = [];
-  let current = '';
-  let quote: '"' | "'" | null = null;
-
-  for (let i = 0; i < segment.length; i++) {
-    const char = segment[i];
-    if (char === '\\' && quote !== "'") {
-      if (i + 1 < segment.length) current += segment[++i];
-      continue;
-    }
-    if ((char === '"' || char === "'") && (!quote || quote === char)) {
-      quote = quote ? null : char;
-      continue;
-    }
-    if (!quote && /\s/.test(char)) {
-      if (current) {
-        words.push(current);
-        current = '';
-      }
-      continue;
-    }
-    current += char;
-  }
-
-  if (current) words.push(current);
-  return words;
-}
 
 function findSlopeExecutableIndex(words: string[]): number {
   const i = skipCommandPrefix(words, 0);

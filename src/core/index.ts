@@ -274,7 +274,8 @@ export type {
   RoadmapMigrationPlan,
   PlanRoadmapMigrationOptions,
 } from './roadmap-migration.js';
-export { extractSprintReferences, findShippedSprintsOnMain } from './analyzers/git.js';
+export { extractSprintReferences, findShippedSprintsOnMain, resolveTrunkRef } from './analyzers/git.js';
+export type { TrunkResolution, TrunkRefSource } from './analyzers/git.js';
 export type {
   RoadmapDefinition,
   RoadmapSprint,
