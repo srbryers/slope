@@ -113,3 +113,5 @@ sources:
     kind: phase
   - path: phases/phase-64.yaml
     kind: phase
+  - path: phases/phase-65.yaml
+    kind: phase

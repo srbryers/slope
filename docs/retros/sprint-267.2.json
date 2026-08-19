@@ -1,0 +1,86 @@
+{
+  "sprint_number": 267.2,
+  "theme": "Trunk Resolution in Worktrees",
+  "par": 4,
+  "slope": 4,
+  "score": 6,
+  "score_label": "double_bogey",
+  "date": "2026-08-19",
+  "github_issues": [
+    687
+  ],
+  "shots": [
+    {
+      "ticket_key": "S267.2-1",
+      "title": "Resolve the trunk to the remote-tracking ref with a documented fallback to the local ref (#687)",
+      "club": "long_iron",
+      "result": "missed_long",
+      "hazards": [
+        {
+          "type": "water",
+          "description": "The first cut broke the shell-injection guard. Replacing the candidate list with [resolved.ref, 'main', 'master', 'HEAD'] meant an EXPLICIT unsafe ref no longer short-circuited to an empty set — it was skipped by SAFE_REF_RE and then silently fell through to scanning main. The existing 'refuses unsafe refs' test caught it. Explicit refs must be honoured alone, never widened to defaults."
+        },
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "[architect review] Divergence was measured only in the behind direction, so scanning the remote silently dropped local-only sprints with no diagnostic. Ticket S267.2-2 promised a divergence warning and delivered half of it.",
+          "gotcha_id": "review:architect"
+        }
+      ],
+      "notes": "resolveTrunkRef prefers the local trunk's configured upstream (main@{upstream}), then the remote's recorded default branch (refs/remotes/origin/HEAD), then the local branch, then HEAD, reporting which source won and how far the local trunk is behind. findShippedSprintsOnMain scans through it. Scored as a miss: the security regression shipped into the working tree and was caught by an existing test, not by design."
+    },
+    {
+      "ticket_key": "S267.2-2",
+      "title": "Warn when the local and remote-tracking trunk diverge, since that is the condition that makes the check meaningless (#687)",
+      "club": "wedge",
+      "result": "green",
+      "hazards": [],
+      "notes": "slope roadmap validate now prints which ref it scanned and how far the local trunk is behind, but only when they have actually diverged — a quiet no-op in the main checkout, informative in a worktree. Divergence is the condition that makes shipped-commit detection meaningless, so it belongs next to the result, not in a separate command."
+    },
+    {
+      "ticket_key": "S267.2-3",
+      "title": "Cover the four shipped-commit consumers with worktree fixtures so status, retro, validate and the guard agree (#687)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "description": "mkdtempSync appends a random suffix to its argument, so mkdtempSync(join(root,'origin')) does not create 'origin' — it creates 'originAbC123'. Every git command then ran in a non-existent cwd and surfaced as `spawnSync cmd.exe ENOENT`, which reads like a missing git rather than a missing directory. Use mkdirSync for a known path."
+        },
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "[code review] Consolidating the tokenizers spread a fail-open path to phase-boundary, which can deny: an unterminated heredoc discarded the rest of the invocation so the guard saw nothing.",
+          "gotcha_id": "review:code"
+        }
+      ],
+      "notes": "tests/core/analyzers/trunk-ref.test.ts builds a real origin, a clone whose local main is deliberately left behind, and a worktree off that clone. Asserts the merged sprint is found from both the clone and the worktree, and that the two agree — the four consumers (roadmap validate, slope status, slope retro, post-hole-enforcement) all read one helper, so agreement at the helper is agreement everywhere."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 2,
+    "fairways_total": 3,
+    "greens_in_regulation": 2,
+    "greens_total": 3,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 4,
+    "hazard_penalties": 1,
+    "miss_directions": {
+      "long": 1,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [],
+  "special_plays": [],
+  "bunker_locations": [
+    "src/core/analyzers/git.ts findShippedSprintsOnMain: an explicit ref argument must be scanned alone. Appending the default candidates after it turns an unsafe-ref rejection into a silent scan of a different branch.",
+    "Node's mkdtempSync appends a random suffix; it never creates the exact path passed to it. In git fixtures the resulting ENOENT surfaces as a spawn failure and reads like a missing binary."
+  ],
+  "yardage_book_updates": [],
+  "course_management_notes": [],
+  "review_findings": [],
+  "notes": "Fixes #687. Blast radius was four times what the issue described: findShippedSprintsOnMain resolved [main, master, HEAD] — all local refs — and four call sites consume it, so roadmap validate, slope status, slope retro and the post-hole-enforcement guard all mis-reported together in a worktree. Since worktrees are the recommended way to run parallel sprints here, the check was always-on-and-wrong in exactly the workflow SLOPE encourages. Scored double_bogey: a shell-injection regression was caught by an existing test rather than by design, and independent review found the divergence measurement only covered one direction, so scanning the remote silently dropped local-only sprints."
+}

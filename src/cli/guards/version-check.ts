@@ -2,6 +2,7 @@ import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { QUIET_STDIO } from '../../core/process.js';
+import { findCommands, positionalArgs } from './command-parse.js';
 import type { HookInput, GuardResult } from '../../core/index.js';
 
 /**
@@ -12,9 +13,14 @@ import type { HookInput, GuardResult } from '../../core/index.js';
 export async function versionCheckGuard(input: HookInput, cwd: string): Promise<GuardResult> {
   const command = (input.tool_input?.command as string) ?? '';
 
-  // Only fire on git push targeting main/master
-  if (!command.includes('git push')) return {};
-  if (!/(main|master)/.test(command)) return {};
+  // Only fire on an actual `git push` whose arguments name main/master.
+  // Matching the raw text here blocked any command that merely mentioned
+  // both strings — a commit message, an issue body, a heredoc (#683).
+  const pushes = findCommands(command, ['git', 'push']);
+  const targetsTrunk = pushes.some(cmd =>
+    positionalArgs(cmd, 2).some(token => /(^|[:/])(main|master)$/.test(token.value)),
+  );
+  if (!targetsTrunk) return {};
 
   // Read local version from core package.json
   let localVersion: string;
