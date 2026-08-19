@@ -6,7 +6,14 @@
   "score": 4,
   "score_label": "par",
   "date": "2026-08-19",
-  "github_issues": [689, 685, 686, 684, 688, 690],
+  "github_issues": [
+    689,
+    685,
+    686,
+    684,
+    688,
+    690
+  ],
   "shots": [
     {
       "ticket_key": "S262-1",
@@ -42,14 +49,41 @@
       "title": "Lock the verified-fixed signal regressions with tests so #684/#686/#688/#690 can close (#684)",
       "club": "short_iron",
       "result": "green",
-      "hazards": [],
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "[code review] Two tests were non-discriminating: the #686 path allowlist was exercised only through a function that never reaches it, and a worktree-merge test omitted the worktree mock so its assertion held regardless of the code under test.",
+          "gotcha_id": "review:code"
+        }
+      ],
       "notes": "tests/core/issue-regressions.test.ts pins the reported SYMPTOM of each issue rather than the implementation: #684's exact scorecard shape renders 100% (3/3) and never '(0/0)'; every commit subject quoted in #686 and #690 extracts to an empty set while real feat(S80)/(S80-2) commits still ship; #688's staleness check reports OK against the count the map itself writes. These four were fixed in earlier sprints with no test holding the symptom, so they could have regressed silently."
     }
   ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 2,
+    "hazard_penalties": 0,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [],
+  "special_plays": [],
   "bunker_locations": [
     "src/cli/index.ts flag parsing is per-command and ad hoc: several commands match only the '--flag=value' spelling, so the space-separated form silently falls through to a positional. Worth auditing the other commands for the same gap.",
     "Verify a reported bug against the current build before scoping work on it. Four of the eight open issues were already fixed and one was half-fixed; triaging from issue text alone would have produced three unnecessary sprints."
   ],
+  "yardage_book_updates": [],
+  "course_management_notes": [],
   "review_findings": [],
-  "notes": "Closes the Phase 62 residue. #689 and #685 were both half-fixed already — #689's --help and equals form worked, #685's CLI path was safe — so the live surface was much smaller than filed, and the sprint spent its remaining budget on the regression tests that let #684, #686, #688 and #690 close honestly. Full suite green (4320 passed), typecheck clean, map regenerated."
+  "notes": "Closes the Phase 62 residue. #689 and #685 were both half-fixed already — #689's --help and equals form worked, #685's CLI path was safe — so the live surface was much smaller than filed, and the sprint spent its remaining budget on the regression tests that let #684, #686, #688 and #690 close honestly. Independent review found two of those tests non-discriminating: the #686 path allowlist was only reached through a function that never touches it, so it passed with the diff reverted. Both replaced with real git fixtures. Suite 4346 passing, typecheck clean, map regenerated."
 }

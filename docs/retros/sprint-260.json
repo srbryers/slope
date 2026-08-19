@@ -3,17 +3,26 @@
   "theme": "Command-Text Guard Precision",
   "par": 4,
   "slope": 4,
-  "score": 4,
-  "score_label": "par",
+  "score": 12,
+  "score_label": "triple_plus",
   "date": "2026-08-19",
-  "github_issues": [683],
+  "github_issues": [
+    683
+  ],
   "shots": [
     {
       "ticket_key": "S260-1",
       "title": "Parse the invocation into discrete commands and match the flag only when it is an argument of gh pr merge (#683)",
       "club": "long_iron",
       "result": "green",
-      "hazards": [],
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "major",
+          "description": "[code review] Guard used find() and inspected only the first gh pr merge, so a stacked-PR set whose last merge carries the delete flag fell through. Regression against the pre-existing regex.",
+          "gotcha_id": "review:code"
+        }
+      ],
       "notes": "New src/cli/guards/command-parse.ts segments a Bash invocation into commands and argv tokens, tracking each token's byte span. commandMatches() requires the program and subcommand words to be unquoted, so `echo \"gh pr merge\"` never matches. Leading env assignments are skipped so `GH_TOKEN=x gh pr merge` still resolves."
     },
     {
@@ -25,9 +34,21 @@
         {
           "type": "rough",
           "description": "First cut mis-parsed the `<<<` herestring: the leading `<` fell through to a token, then the second and third `<` matched the two-character heredoc test, so the herestring's argument was consumed as a heredoc delimiter and the rest of the command vanished. Fixed by counting the full `<` run before deciding. Caught by a test written for the case, not by review."
+        },
+        {
+          "type": "rough",
+          "severity": "major",
+          "description": "[code review] Heredoc terminator was trimmed, so an indented body line closed the heredoc and put the document back into the token stream, reproducing the exact #683 false positive with the guard rewrite editing the document body. Found by independent code review.",
+          "gotcha_id": "review:code"
+        },
+        {
+          "type": "rough",
+          "severity": "major",
+          "description": "[code review] CRLF heredoc opener yielded a delimiter with a trailing carriage return, which no body line matched, so the parser swallowed the rest of the command and every converted guard silently stopped protecting. This repo runs on Windows.",
+          "gotcha_id": "review:code"
         }
       ],
-      "notes": "The scanner honours single quotes, double quotes with backslash escapes, line continuations, and heredoc bodies (quoted, unquoted and `<<-` tab-stripped delimiters). A heredoc body is skipped entirely rather than tokenized, so documentation *about* a flag can never read as passing it. An unterminated heredoc swallows the remainder, matching the shell."
+      "notes": "The scanner honours single quotes, double quotes with backslash escapes, line continuations, and heredoc bodies (quoted, unquoted and `<<-` tab-stripped delimiters). A heredoc body is skipped entirely rather than tokenized, so documentation *about* a flag can never read as passing it. An unterminated heredoc hands the remainder back to the tokenizer — a deliberate divergence from the shell, since discarding it makes guards fail open."
     },
     {
       "ticket_key": "S260-3",
@@ -51,15 +72,53 @@
         {
           "type": "bunker",
           "description": "version-check was the worst of the remaining set and was not in the issue: `command.includes('git push')` AND `/(main|master)/` over the raw text, gating a deny. Any command mentioning both strings — a release note, an issue body, a heredoc — was blocked from running. It also fired on a branch merely containing 'main', e.g. feat/maintenance."
+        },
+        {
+          "type": "bunker",
+          "severity": "critical",
+          "description": "[architect review] The guard audit was declared complete while sprint-completion still matched gh pr merge and slope validate by raw regex, and that guard WRITES sprint state. A heredoc body advanced the sprint phase from document prose. The audit grepped for one accessor and missed a guard reading the command another way.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "[architect review] Three copies of a heredoc-blind shell tokenizer remained in the same directory as the new parser, in phase-boundary, sprint-completion and worktree-check. Duplication was not consolidated until review flagged it.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "rough",
+          "severity": "critical",
+          "description": "[code review] Test-runner detection stayed on a raw regex while four sibling detections were converted, so filing an issue whose body mentioned vitest set the tests gate, which gates PR creation. Contradicted the fix commit stated invariant.",
+          "gotcha_id": "review:code"
         }
       ],
-      "notes": "Ten guards read tool_input.command; three deny on a raw-text match and were converted: version-check, worktree-self-remove and worktree-merge, plus branch-before-commit. pr-review, post-push and push-nudge are advisory (no deny) and push-nudge already anchors to command position; phase-boundary already tokenizes with its own splitter; shell-write matches raw text by design, since detecting heredocs and inline interpreters is its whole purpose."
+      "notes": "First pass converted the four guards that deny on a raw-text match: version-check, worktree-self-remove, worktree-merge, branch-before-commit. That pass was scoped by grepping for tool_input.command, which missed sprint-completion — it reads the command another way and WRITES state. Independent review found it, and the audit was completed only afterwards: sprint-completion, phase-boundary and worktree-check all moved onto shellCommandSegments and their three private tokenizer copies were deleted. pr-review, post-push and push-nudge are advisory; shell-write matches raw text by design, since detecting heredocs and inline interpreters is its whole purpose. Lesson: audit by behaviour (which guards act on command text) not by accessor name."
     }
   ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 4,
+    "greens_in_regulation": 4,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 9,
+    "hazard_penalties": 8,
+    "miss_directions": {
+      "long": 0,
+      "short": 0,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [],
+  "special_plays": [],
   "bunker_locations": [
     "Any guard matching a flag or phrase against the raw Bash invocation will fire on commands that merely carry the text as data — issue bodies, commit messages, heredocs writing documentation. Parse to argv tokens instead; src/cli/guards/command-parse.ts exists for this.",
     "A guard that rewrites the command it blocks must splice the original string by byte span. A regex replace over raw text edits the first match anywhere, so following the guard's own advice can silently corrupt file content."
   ],
+  "yardage_book_updates": [],
+  "course_management_notes": [],
   "review_findings": [],
-  "notes": "Fixes #683. The reported guard blocked the filing of its own bug report twice and mangled `cut -d= -f2-` into `cut= -f2-` in its suggested fix. Root cause was three defects in ten lines: an unanchored `-d\\b` alternative, both regexes testing the whole invocation, and a non-global replace producing the suggestion. 20 parser tests plus 7 guard regression tests cover every case from the issue and its follow-up comment. Full suite green (4320 passed)."
+  "notes": "Fixes #683. The reported guard blocked the filing of its own bug report twice and mangled `cut -d= -f2-` into `cut= -f2-` in its suggested fix. Root cause was three defects in ten lines: an unanchored `-d\\b` alternative, both regexes testing the whole invocation, and a non-global replace producing the suggestion. Scored triple_plus rather than par: three independent review passes (architect, code, verification) found six defects in this sprint's own code, two critical — a state-writing guard left on raw-text matching, and a tests gate an issue body could satisfy. The two self-authored review passes that preceded them caught none of it. The score reflects what independent review found, not what the implementer believed. All fixed and re-verified; suite 4346 passing."
 }

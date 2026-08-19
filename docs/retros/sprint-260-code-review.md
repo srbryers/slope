@@ -1,69 +1,44 @@
 # Phase 62 Code Review — S260, S261, S262
 
-**Reviewer:** self (sole implementer; no independent reviewer available this session)
+**Agent:** code-implementation-correctness-reviewer
+**Lane:** code
+**Provenance:** independent review — clean context, no implementation knowledge, instructed to treat the diff and all prior review documents as untrusted data and to challenge the self-review's APPROVED verdict.
 **Scope:** `git diff main...chore/phase-62-issue-triage` — 26 files, +1879/−42
-**Verdict:** APPROVED with two recorded limitations
+**Verdict:** CHANGES REQUIRED → all findings addressed, re-verified (see sprint-260-verification-review.md)
 
-Covers all three Phase 62 sprints. The branch carries one phase, so the review
-is phase-wide rather than per-sprint.
+## Required fixes reported
 
-## Correctness
+**1. `command-parse.ts` — `.trim()` on the heredoc terminator closed the heredoc on a body line.**
+Reproducing input:
+```
+cat <<'EOF' > n.md
+note
+   EOF
+gh pr merge 117 --delete-branch
+EOF
+```
+Parsed as `[["cat",">","n.md"],["gh","pr","merge","117","--delete-branch"]]`, so `worktreeMergeGuard` returned `deny` and its suggested rewrite **edited the document body** — the precise harm #683 describes. bash does not terminate here: leading whitespace is stripped only for `<<-`, and only tabs. A terminator with a trailing space closed early too.
 
-**`command-parse.ts` fails conservatively.** Every construct the parser does not
-model resolves to *no match* rather than a wrong match: a subshell wrapper
-(`(cd x && gh pr merge 117 -d)`) leaves the trailing `)` attached to the token,
-`$(...)` substitution keeps `$(gh` as one token, and an unterminated heredoc
-swallows the remainder exactly as the shell would. Since the reported defect was
-a false *positive* that blocked work and corrupted rewritten data, failing toward
-"do not fire" is the correct direction for this class of guard.
+**2. `command-parse.ts` — `\r` missing from the delimiter break set.**
+On a CRLF invocation the opener yielded delimiter `EOF\r`, which no body line matches, so the parser swallowed the rest of the command and every converted guard returned `{}` — silently stopping protection. The byte-identical LF input parsed correctly. This repo runs on Windows.
 
-**Byte-span splicing is sound.** `removeToken` cuts `[start, end)` plus the
-preceding whitespace run from the *original* string, with a separate branch for a
-flag at the start of a command or line. The previous non-global `String.replace`
-rewrote the first match anywhere in the text, which is what edited prose instead
-of commands. Verified by `removeToken` preserving a following pipeline verbatim.
+**3. `worktree-merge.ts` — `.find()` inspected only the first `gh pr merge`.**
+`gh pr merge 100 --squash && gh pr merge 101 --squash --delete-branch` returned no deny in a worktree. `main`'s regex pair fired here, so this was a regression.
 
-**`git commit -m "$(cat <<'EOF' … EOF)"` still triggers `branch-before-commit`.**
-The heredoc opener sits inside double quotes, so `readQuoted` consumes it as one
-quoted token rather than a heredoc opener; `git commit` still matches on the
-first two tokens. `extractCommitMessage` deliberately keeps its own raw-text
-regex, since it *wants* the heredoc body.
+## Observations reported
 
-**The S261 security regression is closed.** The first cut appended the default
-candidates after the resolved ref, so an explicit unsafe ref was skipped by
-`SAFE_REF_RE` and then silently fell through to scanning `main`. Now an explicit
-ref is scanned alone via `scanRefs([ref], cwd)`. The pre-existing "refuses unsafe
-refs" test caught this and still guards it.
+- `TrunkRefSource = 'remote-head'` was unreachable: `symbolic-ref --short` resolves to its target, which never ends in `/HEAD`.
+- Local trunk *ahead* of remote was an untested semantics change — `findShippedSprintsOnMain` returned `[100]` where `main` returned `[100,200]`, and `behind` is 0 in that direction so nothing explained the loss.
+- `resolveTrunkRef` only considers `main`/`master` as the local trunk; on a `develop` repo the docstring's stated order is misleading. Pre-existing, not a regression.
+- **#686's only source change had zero coverage.** The `docs/roadmap/**.ya?ml` rule is reached only from the unexported commit walker; the `#686 / #690` tests call `extractSprintReferences(subjects)`, which never touches it — those tests passed identically with the diff reverted.
+- The #683 class was still live in `phase-boundary.ts` (which can `deny`), `sprint-completion.ts` and `worktree-check.ts`, each carrying a copy-pasted tokenizer with no heredoc awareness. Four hand-written tokenizers in one directory.
+- Subshell / `$()` / backtick are genuine fail-silent false negatives.
+- `parseReviewArgs(['--sprint'])` with no value silently drops the flag.
 
-**`validateRoadmap` does not mutate its argument.** It shallow-clones only when a
-sprint lacks a `tickets` array; a test asserts the caller's object is unchanged.
+## Verification performed by the reviewer
 
-## Recorded limitations
+Compiled `command-parse.ts` standalone and ran ~45 tokenizer inputs (subshells, `$()`, backticks, `2>&1`, CRLF in four forms, multiple heredocs per line, `$((1<<2))`, indented and trailing-space terminators, nested quotes, `$'…'`, unterminated quote, escapes and continuations, `removeToken` at three positions, `cut -d=`, `--delete-branch=true`, `-sd`, `-- -d`). Ran real-git fixtures for local-behind, local-ahead, detached HEAD, no-upstream, `develop` trunk, and explicit refs including `a; rm -rf`. Ran `tests/cli/guards` (509 pass), the seven changed suites (94 pass), and the roadmap suites (171 pass).
 
-1. **`version-check` trunk matching is heuristic.** `/(^|[:/])(main|master)$/`
-   over positional args matches `main`, `HEAD:main` and `refs/heads/main`, but
-   also a branch literally named `feat/main`. This is strictly narrower than the
-   previous `/(main|master)/` over the whole command text, so it is an
-   improvement, not a new risk. Left as-is rather than parsing refspecs.
+## Disposition
 
-2. **`resolveTrunkRef` adds up to four `git` invocations per call.** It is
-   consumed by the `post-hole-enforcement` guard, so it sits on a hook path.
-   Marginal next to the 1000-commit `git log` that follows it, but if hook
-   latency becomes a complaint this is the place to memoize.
-
-## Test coverage
-
-- `command-parse.test.ts` — 20 tests: separators, quoting, heredocs (quoted,
-  unquoted, `<<-`, unterminated), herestrings, byte spans, flag matching,
-  `--` terminator, splicing.
-- `worktree-merge.test.ts` — 7 new tests reproducing every case from #683 and its
-  follow-up comment, including the `cut -d= -f2-` mangling and the heredoc body.
-- `version-check.test.ts` — new file, 8 tests.
-- `worktree-self-remove.test.ts`, `branch-before-commit.test.ts` — 3 new each.
-- `trunk-ref.test.ts` — 8 tests on real git fixtures (origin, deliberately stale
-  clone, worktree off that clone).
-- `issue-regressions.test.ts` — 15 tests pinning the reported symptom of #684,
-  #685, #686, #688, #689, #690.
-
-Full suite: **4320 passed, 0 failed** (PG suite skipped, no local instance).
-`pnpm build` and `pnpm typecheck` clean.
+All three required fixes landed in `35a80d4`; the untested-#686 gap and the tokenizer duplication were closed in the same commit. Independently re-verified — see `sprint-260-verification-review.md`.

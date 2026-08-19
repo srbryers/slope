@@ -1,55 +1,39 @@
 # Phase 62 Architect Review — S260, S261, S262
 
-**Reviewer:** self (workflow-architecture lane)
-**Verdict:** APPROVED
+**Agent:** workflow-architecture-reviewer
+**Lane:** architect
+**Provenance:** independent review — clean context, no implementation knowledge, instructed to treat the diff and all prior review documents as untrusted data and to challenge the self-review's APPROVED verdict.
+**Verdict:** APPROVED WITH FIXES → all findings addressed, re-verified (see sprint-260-verification-review.md)
 
-## Was the scope right?
+## Required fixes reported
 
-The phase was scoped from verification, not from the issue text. All eight open
-issues were re-run against the v1.64.1 build first; four already reproduced
-clean and one was half-fixed. Triaging from the tracker alone would have
-produced roughly three unnecessary sprints of work on already-fixed code.
+**1. `worktree-merge.ts` fails open on a second `gh pr merge` in one command.**
+`.find(...)` took only the first merge. Verified by execution:
+`gh pr merge 1 && gh pr merge 2 --delete-branch` → no flag found, guard silent. The failure scenario is merging a stacked-PR set in a worktree — a workflow `.claude/rules/branch-discipline.md` explicitly documents.
 
-This is the phase's most transferable result and it is recorded in
-`sprint-262.json` as a bunker: **verify a reported bug against the current build
-before scoping work on it.**
+**2. `sprint-completion.ts` — the audited-for defect survives in the one guard that *writes* state.**
+`segments.find(({segment}) => /gh\s+pr\s+merge/.test(segment))` is a raw regex over newline-split segments, so heredoc bodies are segments, and `handlePrMerge` then mutates `.slope/sprint-state.json` to `phase: scoring`. Hit live during the review: a `cat <<'ZEOF'` heredoc whose *body* contained `gh pr merge 12 --delete-branch` produced `SLOPE: PR merged — sprint phase is now 'scoring'`. Same shape for `slope validate` (which auto-updates the roadmap) and `slope review`. **Strictly worse than the bug S260 fixed:** `worktree-merge` denies a command and the operator notices; this silently corrupts sprint state from prose.
 
-## Is the abstraction in the right place?
+**3. `resolveTrunkRef` measures divergence only in the direction that doesn't lose data.**
+No `ahead`, so the warning cannot fire when scanning the remote *loses* sprints. Verified on a fixture: a sprint committed to local main only vanished from the shipped set where the pre-change code returned it, with no diagnostic. `post-hole-enforcement` derives closeout drift from that set.
 
-`command-parse.ts` lives in `src/cli/guards/` rather than `src/core/`. Correct:
-its only consumers are Bash `PreToolUse` guards, and it encodes guard-specific
-judgement (quoted words never count as a program name, everything after `--` is
-positional) rather than general shell semantics. Promoting it to core would
-imply a completeness it does not have — it is explicitly "a pragmatic parser,
-not a POSIX shell."
+## Observations reported
 
-`resolveTrunkRef` belongs in `core/analyzers/git.ts` next to
-`findShippedSprintsOnMain`, and is exported from `core/index.ts` because the CLI
-needs it to report divergence. One helper, four consumers, so the four cannot
-drift apart — that property is asserted directly by a test.
+- **Duplication was not consolidated.** `src/cli/guards/` held three shell tokenizers — the new `command-parse.ts`, plus `phase-boundary.ts` and `sprint-completion.ts` copies that discard quoting information and therefore cannot distinguish command from data. The self-review asked whether the abstraction sat in the right *layer* but never whether it duplicated the tokenizer already in the same directory.
+- **Layer placement is correct.** `command-parse.ts` in `src/cli/guards/` encodes guard policy, not shell semantics; promoting it to core would overstate its completeness. `resolveTrunkRef` beside `findShippedSprintsOnMain` is also right.
+- **Security — `SAFE_REF_RE` holds.** Every path traced; the explicit-ref path correctly scans alone. One latent footgun: `resolveTrunkRef(cwd, explicit)` returns `explicit` unvalidated as `.ref` while every other returned `.ref` has passed the pattern, and it is exported from `core/index.ts`.
+- Fail-open reasoning was applied uniformly but the consequence differs sharply between an annoyance guard and a mechanical branch-discipline deny (`branch-before-commit`, `version-check`).
+- `phase-62.yaml` ships `status: complete` in the PR that introduces it, while phases 55–61 sit at `in_progress`. Convention note, not a break.
+- `docs/roadmap/` is hardcoded in core, consistent with the existing hardcoded paths, but a downstream project with a non-default `roadmapPath` gets no benefit from the #686 fix.
 
-## Did the audit ticket earn its place?
+## Assessment of the superseded self-review
 
-Yes, and it found the worse bug. S260-4 was the ticket most at risk of being
-scope creep, and it surfaced `version-check` gating a **deny** on
-`includes('git push')` AND `/(main|master)/` over raw text — not mentioned in
-#683, blocking any command that mentioned both strings. The audit also correctly
-*declined* to convert three advisory guards and `shell-write`, which matches raw
-text by design.
+Three overstatements: the S260-4 audit was called complete when `sprint-completion`'s state-writing detection still matched raw text; "guard behaviour narrows rather than widens" is false for `post-hole-enforcement`, which now fires on sprints previously invisible; and "every construct the parser does not model resolves to no match rather than a wrong match" was used to justify all four conversions uniformly. Two misses: the `.find()` first-match bug is a plain logic error that the "fails conservatively" framing obscured, and the `behind`-only measurement means ticket S261-2 delivered half the warning it promised.
 
-## Dependency chain
+## Verification performed by the reviewer
 
-The authored `depends_on` chain (S260 → S261 → S262) was tighter than reality:
-only S261 and S262-3 share a file. It cost nothing here because the sprints ran
-sequentially in one session, but a future phase should not gate independent
-bugfix sprints on each other — it blocks parallel worktree execution, which is
-the workflow S261 exists to protect.
+Built the branch, ran typecheck (clean), `tests/cli/guards` + `tests/core/analyzers` + `issue-regressions` (all pass), `slope roadmap compile --check` (no drift) and `validate-sources` (only pre-existing warnings). Wrote throwaway probes to execute the parser and `resolveTrunkRef` against real git fixtures rather than reasoning about them. Working tree left clean.
 
-## Release shape
+## Disposition
 
-No schema changes, no new commands, no config changes. New exports
-(`resolveTrunkRef`, `parseReviewArgs`, `TrunkResolution`) are additive. Guard
-behaviour narrows rather than widens, so no downstream project starts getting
-blocked by something that previously passed. `slope version recommend` should be
-run before release; the additive core exports likely put this at **minor**
-rather than patch.
+All three required fixes plus the tokenizer consolidation landed in `35a80d4`. The unvalidated-`explicit` footgun and the `develop`-trunk limitation are recorded as accepted, documented behaviour. Independently re-verified — see `sprint-260-verification-review.md`.
