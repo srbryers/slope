@@ -1,0 +1,65 @@
+{
+  "sprint_number": 260,
+  "theme": "Command-Text Guard Precision",
+  "par": 4,
+  "slope": 4,
+  "score": 4,
+  "score_label": "par",
+  "date": "2026-08-19",
+  "github_issues": [683],
+  "shots": [
+    {
+      "ticket_key": "S260-1",
+      "title": "Parse the invocation into discrete commands and match the flag only when it is an argument of gh pr merge (#683)",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [],
+      "notes": "New src/cli/guards/command-parse.ts segments a Bash invocation into commands and argv tokens, tracking each token's byte span. commandMatches() requires the program and subcommand words to be unquoted, so `echo \"gh pr merge\"` never matches. Leading env assignments are skipped so `GH_TOKEN=x gh pr merge` still resolves."
+    },
+    {
+      "ticket_key": "S260-2",
+      "title": "Exclude heredoc bodies and quoted string literals from guard command matching (#683)",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "description": "First cut mis-parsed the `<<<` herestring: the leading `<` fell through to a token, then the second and third `<` matched the two-character heredoc test, so the herestring's argument was consumed as a heredoc delimiter and the rest of the command vanished. Fixed by counting the full `<` run before deciding. Caught by a test written for the case, not by review."
+        }
+      ],
+      "notes": "The scanner honours single quotes, double quotes with backslash escapes, line continuations, and heredoc bodies (quoted, unquoted and `<<-` tab-stripped delimiters). A heredoc body is skipped entirely rather than tokenized, so documentation *about* a flag can never read as passing it. An unterminated heredoc swallows the remainder, matching the shell."
+    },
+    {
+      "ticket_key": "S260-3",
+      "title": "Anchor the -d short flag to an argument position and make the suggested rewrite byte-identical apart from the removed flag (#683)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "description": "The `--flag=value` head split has to be restricted to long flags. Applying it to short flags re-created the original bug from the other direction: `cut -d=` splits to `-d` and matches. Short flags take their value adjacently, long flags take it after `=`."
+        }
+      ],
+      "notes": "findFlagToken matches whole tokens (or a `--flag=value` head), skips quoted tokens, and stops at a bare `--`. removeToken splices the token plus its preceding whitespace out of the ORIGINAL string, so the suggestion differs from what the operator typed only by the flag — the previous non-global regex replace rewrote the first match anywhere, including inside prose being written to a file."
+    },
+    {
+      "ticket_key": "S260-4",
+      "title": "Audit the remaining Bash PreToolUse guards for the same raw-substring match and fix any that share it (#683)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "description": "version-check was the worst of the remaining set and was not in the issue: `command.includes('git push')` AND `/(main|master)/` over the raw text, gating a deny. Any command mentioning both strings — a release note, an issue body, a heredoc — was blocked from running. It also fired on a branch merely containing 'main', e.g. feat/maintenance."
+        }
+      ],
+      "notes": "Ten guards read tool_input.command; three deny on a raw-text match and were converted: version-check, worktree-self-remove and worktree-merge, plus branch-before-commit. pr-review, post-push and push-nudge are advisory (no deny) and push-nudge already anchors to command position; phase-boundary already tokenizes with its own splitter; shell-write matches raw text by design, since detecting heredocs and inline interpreters is its whole purpose."
+    }
+  ],
+  "bunker_locations": [
+    "Any guard matching a flag or phrase against the raw Bash invocation will fire on commands that merely carry the text as data — issue bodies, commit messages, heredocs writing documentation. Parse to argv tokens instead; src/cli/guards/command-parse.ts exists for this.",
+    "A guard that rewrites the command it blocks must splice the original string by byte span. A regex replace over raw text edits the first match anywhere, so following the guard's own advice can silently corrupt file content."
+  ],
+  "review_findings": [],
+  "notes": "Fixes #683. The reported guard blocked the filing of its own bug report twice and mangled `cut -d= -f2-` into `cut= -f2-` in its suggested fix. Root cause was three defects in ten lines: an unanchored `-d\\b` alternative, both regexes testing the whole invocation, and a non-global replace producing the suggestion. 20 parser tests plus 7 guard regression tests cover every case from the issue and its follow-up comment. Full suite green (4320 passed)."
+}

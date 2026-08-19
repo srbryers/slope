@@ -6,7 +6,7 @@ phase:
     - 260
     - 261
     - 262
-  status: planned
+  status: complete
   note: "Verification, not assumption, set this scope. Each issue was re-run against the 1.64.1 build rather than triaged from its text: #684's exact scorecard shape now reports 100% (3/3); #686 and #690's commit subjects all extract clean through the isSlopeMetadataOnlyCommit and isPlanningOnlyBareReference filters added in #521/#523; #688's two counters were unified on countMapMetadataFiles in fbcee82. The common thread in what remains is the same defect in three places — a signal derived from text or a ref that was never parsed for meaning."
 sprints:
   - id: 260
@@ -14,7 +14,7 @@ sprints:
     par: 4
     slope: 4
     type: bugfix + safety
-    status: planned
+    status: complete
     note: "worktreeMergeGuard tests two regexes against the raw Bash invocation, so any command carrying the flag as data matches — a gh issue create body, a heredoc writing documentation about the gotcha, a commit message. Worse, the deny message's suggested replacement is produced by a non-global replace over that same raw text, so following the guard's advice silently edits prose instead of fixing a command. The -d alternative is unanchored, so `cut -d= -f2-` matches and is rewritten to `cut= -f2-`. Reported hit 5x in one session; the guard blocked the filing of its own bug report twice."
     tickets:
       - key: S260-1
@@ -48,7 +48,7 @@ sprints:
     par: 4
     slope: 4
     type: bugfix + data integrity
-    status: planned
+    status: complete
     depends_on:
       - 260
     note: "findShippedSprintsOnMain resolves the trunk as ['main','master','HEAD'] — all local refs. A git worktree never fast-forwards its local main, so a merged sprint reads as unshipped and the check fires on exactly the workflow SLOPE recommends for parallel sprints. Blast radius is wider than the filed issue: four call sites consume it (roadmap validate, slope status, slope retro, and the post-hole-enforcement guard), so all four mis-report in a worktree. Prefer the configured upstream or refs/remotes/<remote>/HEAD, fall back to local only when no remote exists."
@@ -77,7 +77,7 @@ sprints:
     par: 4
     slope: 2
     type: bugfix + test coverage
-    status: planned
+    status: complete
     depends_on:
       - 261
     note: "The small residue, plus the tests that let four issues close honestly. slope review parses only --sprint=N: with --sprint 259 the flag is skipped and 259 falls through to the positional path argument, producing 'Failed to parse <cwd>/259'. The exported validateRoadmap still throws on a sprint with no tickets key — the CLI is safe because parseRoadmap normalizes first, so only direct API callers hit it. isSlopeMetadataPath still allowlists only docs/backlog/roadmap.json, not the modular docs/roadmap/**.yaml sources this project moved to, so a feat(Sxx) commit touching only phase YAML would count as shipped."
@@ -104,3 +104,7 @@ sprints:
         github_issue: 684
         depends_on:
           - S262-3
+scorecards:
+  "260": docs/retros/sprint-260.json
+  "261": docs/retros/sprint-261.json
+  "262": docs/retros/sprint-262.json

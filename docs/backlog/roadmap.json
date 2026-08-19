@@ -535,7 +535,7 @@
         261,
         262
       ],
-      "status": "planned",
+      "status": "complete",
       "note": "Verification, not assumption, set this scope. Each issue was re-run against the 1.64.1 build rather than triaged from its text: #684's exact scorecard shape now reports 100% (3/3); #686 and #690's commit subjects all extract clean through the isSlopeMetadataOnlyCommit and isPlanningOnlyBareReference filters added in #521/#523; #688's two counters were unified on countMapMetadataFiles in fbcee82. The common thread in what remains is the same defect in three places — a signal derived from text or a ref that was never parsed for meaning."
     }
   ],
@@ -6774,7 +6774,7 @@
       "par": 4,
       "slope": 4,
       "type": "bugfix + safety",
-      "status": "planned",
+      "status": "complete",
       "note": "worktreeMergeGuard tests two regexes against the raw Bash invocation, so any command carrying the flag as data matches — a gh issue create body, a heredoc writing documentation about the gotcha, a commit message. Worse, the deny message's suggested replacement is produced by a non-global replace over that same raw text, so following the guard's advice silently edits prose instead of fixing a command. The -d alternative is unanchored, so `cut -d= -f2-` matches and is rewritten to `cut= -f2-`. Reported hit 5x in one session; the guard blocked the filing of its own bug report twice.",
       "tickets": [
         {
@@ -6822,7 +6822,7 @@
       "par": 4,
       "slope": 4,
       "type": "bugfix + data integrity",
-      "status": "planned",
+      "status": "complete",
       "depends_on": [
         260
       ],
@@ -6863,7 +6863,7 @@
       "par": 4,
       "slope": 2,
       "type": "bugfix + test coverage",
-      "status": "planned",
+      "status": "complete",
       "depends_on": [
         261
       ],
