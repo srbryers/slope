@@ -75,4 +75,68 @@ describe('worktreeMergeGuard', () => {
     const result = await worktreeMergeGuard(makeInput('gh pr merge 117 --squash --delete-branch'), '/tmp/test');
     expect(result).toEqual({});
   });
+
+  // #683 — the guard matched the raw command text, so anything merely
+  // carrying the flag as data was blocked, and the rewrite it suggested
+  // edited that data instead of a command.
+  describe('command-text precision (#683)', () => {
+    it('does not fire on a gh pr merge without the flag in a compound command', async () => {
+      const result = await worktreeMergeGuard(
+        makeInput('gh pr merge 117 --squash --admin && git fetch && npm run deploy'),
+        '/tmp/test',
+      );
+      expect(result).toEqual({});
+      expect(mockExecSync).not.toHaveBeenCalled();
+    });
+
+    it('does not fire when the flag only appears inside an issue body', async () => {
+      const result = await worktreeMergeGuard(
+        makeInput('gh issue create --title "bug" --body "gh pr merge --delete-branch fails in a worktree"'),
+        '/tmp/test',
+      );
+      expect(result).toEqual({});
+    });
+
+    it('does not fire when the flag only appears inside a heredoc body', async () => {
+      const command = [
+        "python3 - <<'PY'",
+        'notes = "`gh pr merge --delete-branch` exits 1 in a worktree despite succeeding."',
+        'open("notes.md", "w").write(notes)',
+        'PY',
+      ].join('\n');
+      const result = await worktreeMergeGuard(makeInput(command), '/tmp/test');
+      expect(result).toEqual({});
+    });
+
+    it('does not fire on -d belonging to another program', async () => {
+      const result = await worktreeMergeGuard(
+        makeInput('gh pr merge 117 --squash | cut -d= -f2-'),
+        '/tmp/test',
+      );
+      expect(result).toEqual({});
+    });
+
+    it('still fires when the flag is genuinely passed inside a compound command', async () => {
+      mockWorktree();
+      const result = await worktreeMergeGuard(
+        makeInput('git fetch && gh pr merge 117 --squash --delete-branch && npm run deploy'),
+        '/tmp/test',
+      );
+      expect(result.decision).toBe('deny');
+    });
+
+    it('suggests a command that is byte-identical apart from the removed flag', async () => {
+      mockWorktree();
+      const command = 'gh pr merge 117 --squash --delete-branch --admin | cut -d= -f2-';
+      const result = await worktreeMergeGuard(makeInput(command), '/tmp/test');
+      expect(result.blockReason).toContain('gh pr merge 117 --squash --admin | cut -d= -f2-');
+      expect(result.blockReason).not.toContain('cut= -f2-');
+    });
+
+    it('names the flag that was actually passed', async () => {
+      mockWorktree();
+      const result = await worktreeMergeGuard(makeInput('gh pr merge 117 -d'), '/tmp/test');
+      expect(result.blockReason).toContain('`-d`');
+    });
+  });
 });

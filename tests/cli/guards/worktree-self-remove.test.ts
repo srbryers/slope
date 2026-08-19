@@ -88,4 +88,32 @@ describe('worktreeSelfRemoveGuard', () => {
     const result = await worktreeSelfRemoveGuard(makeInput('git worktree remove .'), '/tmp/test');
     expect(result).toEqual({});
   });
+
+  // #683 — the trigger matched the raw invocation, so any command carrying
+  // the phrase as data was blocked.
+  describe('command-text precision (#683)', () => {
+    it('does not fire when the phrase only appears in a quoted argument', async () => {
+      const result = await worktreeSelfRemoveGuard(
+        makeInput('gh issue create --body "never run git worktree remove . from inside"'),
+        '/tmp/test',
+      );
+      expect(result).toEqual({});
+      expect(mockExecSync).not.toHaveBeenCalled();
+    });
+
+    it('does not fire when the phrase only appears in a heredoc body', async () => {
+      const command = "cat <<'EOF' > notes.md\ngit worktree remove .\nEOF";
+      const result = await worktreeSelfRemoveGuard(makeInput(command), '/tmp/test');
+      expect(result).toEqual({});
+    });
+
+    it('still blocks a genuine self-remove inside a compound command', async () => {
+      mockWorktree();
+      const result = await worktreeSelfRemoveGuard(
+        makeInput('git fetch && git worktree remove --force . && echo done'),
+        '/tmp/test',
+      );
+      expect(result.decision).toBe('deny');
+    });
+  });
 });

@@ -1,6 +1,10 @@
 import { execSync } from 'node:child_process';
 import { QUIET_STDIO } from '../../core/process.js';
+import { parseShellCommands, commandMatches, findFlagToken, removeToken } from './command-parse.js';
 import type { HookInput, GuardResult } from '../../core/index.js';
+
+/** `gh pr merge` spellings for deleting the branch after the merge. */
+const DELETE_BRANCH_FLAGS = ['--delete-branch', '-d'];
 
 /**
  * Worktree-merge guard: fires PreToolUse on Bash.
@@ -8,13 +12,20 @@ import type { HookInput, GuardResult } from '../../core/index.js';
  * command to drop `--delete-branch`, which fails because the worktree
  * holds the target branch. The merge itself succeeds but the exit code
  * is 1, causing the agent to think it failed and retry.
+ *
+ * The flag is located by parsing the invocation into commands and argv
+ * tokens, never by matching the raw text: the guard used to fire on any
+ * command that merely carried the flag as data, and its suggested rewrite
+ * edited that data rather than a command (#683).
  */
 export async function worktreeMergeGuard(input: HookInput, cwd: string): Promise<GuardResult> {
   const command = (input.tool_input?.command as string) ?? '';
 
-  // Only fire on gh pr merge with --delete-branch
-  if (!/gh\s+pr\s+merge/.test(command)) return {};
-  if (!/(--delete-branch|-d\b)/.test(command)) return {};
+  // Only fire when the flag is genuinely an argument of a `gh pr merge`.
+  const merge = parseShellCommands(command).find(cmd => commandMatches(cmd, ['gh', 'pr', 'merge']));
+  if (!merge) return {};
+  const flag = findFlagToken(merge, DELETE_BRANCH_FLAGS);
+  if (!flag) return {};
 
   // Check if we're in a worktree (not the main working tree)
   try {
@@ -27,15 +38,14 @@ export async function worktreeMergeGuard(input: HookInput, cwd: string): Promise
     return {};
   }
 
-  // Rewrite the command: strip --delete-branch / -d
-  const fixed = command
-    .replace(/\s+--delete-branch/, '')
-    .replace(/\s+-d\b/, '');
+  // Splice the flag out of the original text: every other byte is preserved,
+  // so the suggestion is safe to run verbatim.
+  const fixed = removeToken(command, flag);
 
   return {
     decision: 'deny',
     blockReason: [
-      `SLOPE worktree-merge: \`--delete-branch\` will fail in a worktree (local branch cleanup can't switch to main).`,
+      `SLOPE worktree-merge: \`${flag.value}\` will fail in a worktree (local branch cleanup can't switch to main).`,
       `The merge succeeds but exits with code 1, making it look like it failed.`,
       ``,
       `Use this instead:`,
