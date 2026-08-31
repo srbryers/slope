@@ -407,3 +407,47 @@ describe('validateScorecard - integration', () => {
     expect(result.errors.length).toBeGreaterThanOrEqual(3);
   });
 });
+
+describe('scored: false — a sprint that closed without being scored', () => {
+  /*
+   * The gap this closes: a project archiving old phases found 31 sprints marked complete with no
+   * scorecard anywhere. `roadmap archive` will not compact over them and only needs a link, a file
+   * and a matching sprint_number. This validator demanded par, score and an ISO date. So the only
+   * card that satisfied the archive failed validation, and the choice was to break a gate or invent
+   * 31 scores. Inventing them is worse: the handicap those numbers feed is the point of the tool.
+   */
+  const unscored = {
+    sprint_number: 100,
+    sprint_id: 'S100',
+    scored: false,
+    theme: 'Reconstructed record, never scored at the time',
+    shots: [],
+    yardage_book_updates: [],
+    bunker_locations: [],
+    course_management_notes: [],
+  } as unknown as GolfScorecard;
+
+  it('accepts a card with no par, no score and no date', () => {
+    const r = validateScorecard(unscored);
+    expect(r.errors.map(e => e.code)).not.toContain('INVALID_PAR');
+    expect(r.errors.map(e => e.code)).not.toContain('INVALID_SCORE');
+    expect(r.errors.map(e => e.code)).not.toContain('INVALID_DATE');
+  });
+
+  it('still requires the sprint number, because a record of nothing is not a record', () => {
+    const { sprint_number: _drop, ...rest } = unscored as Record<string, unknown>;
+    const r = validateScorecard(rest as unknown as GolfScorecard);
+    expect(r.errors.map(e => e.code)).toContain('MISSING_SPRINT');
+  });
+
+  it('is not a way to skip the checks: omitting score without the flag still fails', () => {
+    const { scored: _drop, ...rest } = unscored as Record<string, unknown>;
+    const r = validateScorecard(rest as unknown as GolfScorecard);
+    expect(r.errors.map(e => e.code)).toContain('INVALID_SCORE');
+  });
+
+  it('refuses a card that claims to be unscored and carries a score anyway', () => {
+    const r = validateScorecard({ ...(unscored as object), score: 4, par: 4 } as unknown as GolfScorecard);
+    expect(r.errors.map(e => e.code)).toContain('UNSCORED_WITH_SCORE');
+  });
+});

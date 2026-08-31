@@ -18,7 +18,20 @@ export interface TrendPoint {
  * Compute per-sprint time-series of handicap, fairway%, and GIR%.
  * O(n) incremental — maintains running sums, no per-sprint computeHandicapCard() call.
  */
+/**
+ * A card counts toward the handicap unless it says it was never scored.
+ *
+ * `scored: false` exists for reconstructed history: a sprint that closed, and that nobody scored at
+ * the time. Such a card carries no score at all, so every statistic below must drop it rather than
+ * read a missing number as a zero. The alternative, which was refused when this landed, is to invent
+ * a score so the record parses -- and the handicap those numbers feed is the whole point of SLOPE.
+ */
+export function isScoredCard(card: GolfScorecard): boolean {
+  return (card as { scored?: boolean }).scored !== false;
+}
+
 export function computeHandicapTrend(scorecards: GolfScorecard[]): TrendPoint[] {
+  scorecards = scorecards.filter(isScoredCard);
   if (scorecards.length === 0) return [];
 
   const sorted = [...scorecards].sort((a, b) => compareSprintIdKeys(a.sprint_number, b.sprint_number));
@@ -76,6 +89,7 @@ export interface VelocityReport {
  * Threshold: 0.3 avoids noise (one bogey in 5 sprints = 0.2 swing).
  */
 export function computeVelocity(scorecards: GolfScorecard[]): VelocityReport {
+  scorecards = scorecards.filter(isScoredCard);
   if (scorecards.length === 0) {
     return {
       points: [],
@@ -294,6 +308,7 @@ const PLATEAU_THRESHOLD = 0.1;
  * Requires at least 10 scorecards for meaningful analysis.
  */
 export function computeConvergence(scorecards: GolfScorecard[]): ConvergenceCard {
+  scorecards = scorecards.filter(isScoredCard);
   if (scorecards.length < CONVERGENCE_MIN_SPRINTS) {
     return {
       improvement_rate: 0,

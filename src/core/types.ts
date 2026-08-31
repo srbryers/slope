@@ -142,6 +142,14 @@ export interface GolfScorecard extends HoleScore {
   type?: SprintType;
   /** Developer who played this sprint — omit for single-player repos */
   player?: string;
+  /**
+   * False when this sprint CLOSED WITHOUT BEING SCORED, which is a real state and had no way to be
+   * written down. Such a card is exempt from the par, score and date checks, and every handicap
+   * calculation must skip it. It must be set explicitly: a card that merely omits `score` still
+   * fails validation, because forgetting to score a sprint and recording that one went unscored are
+   * different things. Reach for it only for reconstructed history, never for a sprint you played.
+   */
+  scored?: boolean;
   date: string;
   training?: TrainingSession[];
   nutrition?: NutritionEntry[];

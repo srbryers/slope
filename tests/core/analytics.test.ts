@@ -477,3 +477,24 @@ describe('computeConvergence', () => {
     expect(result.sprints_since_improvement).toBeGreaterThanOrEqual(3);
   });
 });
+
+describe('unscored cards are dropped from the handicap', () => {
+  /* The flag is only honest if the statistics actually skip these. A missing score read as a zero
+     would be worse than the invented score the flag exists to avoid. */
+  const scored = (n: number) => ({
+    sprint_number: n, sprint_id: `S${n}`, par: 4, score: 5, score_label: 'bogey',
+    date: '2026-01-01', shots: [], yardage_book_updates: [], bunker_locations: [],
+    course_management_notes: [],
+  } as unknown as GolfScorecard);
+  const unscored = {
+    sprint_number: 99, sprint_id: 'S99', scored: false, shots: [],
+    yardage_book_updates: [], bunker_locations: [], course_management_notes: [],
+  } as unknown as GolfScorecard;
+
+  it('gives the same trend with and without an unscored card mixed in', () => {
+    const a = computeHandicapTrend([scored(1), scored(2)]);
+    const b = computeHandicapTrend([scored(1), unscored, scored(2)]);
+    expect(b.length).toBe(a.length);
+    expect(b.map(p => p.handicap)).toEqual(a.map(p => p.handicap));
+  });
+});
