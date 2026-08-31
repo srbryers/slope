@@ -51,7 +51,7 @@ function isValidISODate(s: string): boolean {
  * Accepts either `sprint_number` (TypeScript type) or `sprint` (retro JSON field name).
  */
 export function validateScorecard(
-  card: GolfScorecard & { sprint?: SprintId; completed_on?: string; started_on?: string },
+  card: GolfScorecard & { sprint?: SprintId; completed_on?: string; started_on?: string; scored?: boolean },
   options: ScorecardValidationOptions = {},
 ): ScorecardValidationResult {
   const errors: ScorecardValidationError[] = [];
@@ -69,15 +69,43 @@ export function validateScorecard(
   const effectiveScore = hasExplicitScore ? card.score : validPar ? card.par : undefined;
   const effectiveDate = card.date ?? card.completed_on ?? card.started_on;
 
+  /*
+   * `scored: false` -- a sprint that CLOSED WITHOUT BEING SCORED.
+   *
+   * There was no way to say this, and the gap had teeth. A project archiving old phases hit 31
+   * sprints marked complete in archived phases with no scorecard under any name. `roadmap archive`
+   * refuses to compact over them, and it only needs a link, a file, and a matching sprint_number --
+   * it never reads the score. But this validator demanded par, score and an ISO date, so the only
+   * card that satisfied the archive failed validation, 31 times over.
+   *
+   * That left one honest option and one dishonest one: break a gate, or invent 31 scores. Inventing
+   * them is the worse of the two by a distance, because the handicap those numbers feed is the
+   * whole point of the tool. A record that says "this closed and nobody scored it" is true, and
+   * truth that a gate cannot express gets rounded to a lie.
+   *
+   * So an unscored card must carry `scored: false` explicitly. It is not a way to skip the checks:
+   * a card that simply omits `score` still fails, because forgetting to score a sprint and
+   * deliberately recording that one went unscored are different things and should look different.
+   * Everything downstream that computes a handicap must skip these.
+   */
+  const unscored = card.scored === false;
+
   // Rule 6: basic field validation
-  if (!validPar) {
+  if (!unscored && !validPar) {
     errors.push({ code: 'INVALID_PAR', message: `par must be 3, 4, or 5 (got ${card.par})`, field: 'par' });
   }
-  if (typeof effectiveScore !== 'number' || effectiveScore <= 0) {
+  if (!unscored && (typeof effectiveScore !== 'number' || effectiveScore <= 0)) {
     errors.push({ code: 'INVALID_SCORE', message: `score must be > 0 (got ${card.score})`, field: 'score' });
   }
-  if (typeof effectiveDate !== 'string' || !isValidISODate(effectiveDate)) {
+  if (!unscored && (typeof effectiveDate !== 'string' || !isValidISODate(effectiveDate))) {
     errors.push({ code: 'INVALID_DATE', message: `date must be a valid ISO string (got "${effectiveDate}")`, field: 'date' });
+  }
+  if (unscored && hasExplicitScore) {
+    errors.push({
+      code: 'UNSCORED_WITH_SCORE',
+      message: 'a card marked scored: false must not also carry a score',
+      field: 'scored',
+    });
   }
   if (sprintNumber == null || sprintIdKey(sprintNumber) === null) {
     errors.push({ code: 'MISSING_SPRINT', message: 'sprint_number (or sprint) is required and must be > 0', field: 'sprint_number' });
