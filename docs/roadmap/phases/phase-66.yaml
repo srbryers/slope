@@ -1,0 +1,97 @@
+version: "1"
+phase:
+  name: Phase 66 — Reviewer Selection
+  description: "Fix #693: SLOPE decides which reviewer lanes a change needs but not how much model to spend on them, exempts docs-only work from review entirely, and never records which tier was actually used. Reviewer selection is the one part of SLOPE that does not tier its compute, while slope loop has routed by club and complexity for many sprints. Close all three so review depth is never left to operator judgement under deadline."
+  sprints:
+    - 273
+    - 274
+  status: planned
+  note: "Scope was corrected by independent architect review before any code was written; the first draft would have shipped without fixing the bug. Three corrections drive this version. (1) The tier ladder is DUPLICATED: src/cli/commands/review-state.ts detectTier and src/cli/guards/review-tier.ts reviewTierGuard implement the same four regexes and thresholds, and the guard is the one that actually fires — it runs PostToolUse on any plan write and writes .slope/review-state.json, which workflow-gate reads to block ExitPlanMode. detectTier only runs on a bare `slope review start`. Fixing one leaves the gating path broken. (2) The docs half of the skip condition is DEAD: isResearchOrDocs ANDs ticketCount === 0 and the branch ORs the same term, so the effective rule is 'zero tickets means skip' and the docs regex changes no outcome. Targeting isResearchOrDocs would be a no-op. (3) Neither skip site has a changed-file list — both consume plan markdown — so a content check needs a new input rather than more prose matching, which is the same text-derived-signal defect Phase 65 spent three sprints removing. ORDERING, recorded deliberately rather than left implicit: this phase follows Phase 64, so its five slope-5 architectural sprints will be reviewed under the current rules — exactly the work whose reviews this phase exists to deepen. Numbering it ahead was tried and reverted: findNextPlannedSprint only considers sprints AHEAD of the current cursor (S268), so decimal inserts at 267.4/267.5 sat behind it and became unreachable. Pulling this phase forward means deferring Phase 64, which is a product call for the operator, not a numbering trick. If Phase 64 starts first, treat its review depth as a known accepted risk."
+sprints:
+  - id: 273
+    theme: Tiered Reviewer Selection
+    par: 5
+    slope: 4
+    type: feature + review integrity
+    status: planned
+    github_issues:
+      - 693
+    note: "ReviewerAgentSpec carries id, name, lane, priority, scope, focus, evidence and prompt — nothing about how expensive the reviewer should be, so a retroactive scorecard check and a 291-line hand-written shell tokenizer produce specs of identical weight. Confirmed line-exact against v2.0.0. Consolidating the duplicated tier ladder comes first: deriving a tier is pointless while two copies of the ladder can disagree. slope loop's selectModel is binary (local vs API) and keys on authoring cost rather than review risk, so this reuses its club vocabulary and writes a real grader — the larger half of the sprint."
+    tickets:
+      - key: S273-1
+        title: Extract the duplicated tier ladder into one shared function called by both detectTier and reviewTierGuard (#693)
+        club: long_iron
+        complexity: moderate
+        github_issue: 693
+      - key: S273-2
+        title: Add a model tier to ReviewerAgentSpec and thread it through buildReviewerAgentSpecs (#693)
+        club: short_iron
+        complexity: standard
+        github_issue: 693
+      - key: S273-3
+        title: "Derive the tier from existing review signals, reusing slope loop's club vocabulary rather than its binary local/API split (#693)"
+        club: long_iron
+        complexity: risky
+        github_issue: 693
+        depends_on:
+          - S273-1
+          - S273-2
+      - key: S273-4
+        title: "Name the recommended model in slope review recommend and slope pr review, overridable with --model (#693)"
+        club: wedge
+        complexity: small
+        github_issue: 693
+        depends_on:
+          - S273-3
+      - key: S273-5
+        title: Persist the recommended tier into the review requirement so the gate can compare what was recommended against what ran (#693)
+        club: short_iron
+        complexity: standard
+        github_issue: 693
+        depends_on:
+          - S273-3
+  - id: 274
+    theme: Review Exemption Correctness
+    par: 5
+    slope: 4
+    type: bugfix + safety
+    status: planned
+    github_issues:
+      - 693
+    depends_on:
+      - 273
+    note: "The skip branch returns tier 'skip' with 0 rounds for zero-ticket work — and in this repo docs are not prose: docs/roadmap/**.yaml IS the roadmap, and a phase file defines sprint scope, dependency edges, par and slope for everything downstream. This very phase is the proof: an architect review of a docs-only change found the original scope would have fixed the path that never fires. The content check needs a real changed-file list, which only slope pr review currently has, so supplying that input is its own ticket rather than an assumption. recommendReviews in src/core/review.ts is the lane selector to change — review-tier.ts uses selectSpecialists plus a hardcoded architect line, so 'force an architect lane' means two different things until they agree."
+    tickets:
+      - key: S274-1
+        title: "Replace the zero-ticket skip — the real driver, since the isResearchOrDocs half is dead — with a content-aware check (#693)"
+        club: long_iron
+        complexity: risky
+        github_issue: 693
+      - key: S274-2
+        title: Give the tier decision a changed-file list where one exists and fail loudly where it does not, rather than regexing plan prose (#693)
+        club: long_iron
+        complexity: moderate
+        github_issue: 693
+        depends_on:
+          - S274-1
+      - key: S274-3
+        title: "Force an architect lane in recommendReviews when a change touches roadmap or architecture content (#693)"
+        club: short_iron
+        complexity: standard
+        github_issue: 693
+        depends_on:
+          - S274-2
+      - key: S274-4
+        title: Warn or refuse when a gate is satisfied below the recommended tier, absent an explicit override (#693)
+        club: short_iron
+        complexity: standard
+        github_issue: 693
+        depends_on:
+          - S273-5
+      - key: S274-5
+        title: Update .claude/rules/review-loop.md and the review-tier tests so the codified rule matches the implementation (#693)
+        club: wedge
+        complexity: small
+        github_issue: 693
+        depends_on:
+          - S274-3
