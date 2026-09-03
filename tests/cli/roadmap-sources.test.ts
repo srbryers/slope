@@ -141,6 +141,66 @@ describe('slope roadmap compile', () => {
     expect(logs.join('\n')).toContain('projection unchanged');
   });
 
+  // #700: compile is where the reported symptom happens, and the first cut of
+  // this warning reached validate-sources only, so compile stayed silent on
+  // the command people actually run.
+  it('reports an unregistered source from compile, including when the projection is unchanged', async () => {
+    const output = writeFixture();
+    await roadmapCommand(['compile']);
+    expect(existsSync(output)).toBe(true);
+
+    writeFileSync(
+      join(cwd, 'docs', 'roadmap', 'phases', 'phase-99-orphan.yaml'),
+      'version: 1\nphase:\n  name: Orphan\n  sprints: []\nsprints: []\n',
+    );
+
+    logs.length = 0;
+    await roadmapCommand(['compile']);
+    const text = logs.join('\n');
+    // Unchanged projection, and it still says so.
+    expect(text).toContain('projection unchanged');
+    expect(text).toContain('phases/phase-99-orphan.yaml');
+    expect(text).toContain('compiles to nothing');
+  });
+
+  // #700's own scenario is a freshly authored sprint dropped into backlog/,
+  // in a project whose backlog holds nothing registered yet. Scanning only
+  // directories that already hold a registered source left that case silent.
+  it('reports an unregistered source in a directory holding no registered source', async () => {
+    writeFixture();
+    mkdirSync(join(cwd, 'docs', 'roadmap', 'backlog'), { recursive: true });
+    writeFileSync(
+      join(cwd, 'docs', 'roadmap', 'backlog', 'fly-camera.yaml'),
+      'version: 1\nphase:\n  name: Fly camera\n  sprints: []\nsprints: []\n',
+    );
+
+    const store = loadRoadmapSourceStore(cwd);
+    const result = validateRoadmapSourceStore(store, { checkProjection: false });
+    const warning = result.warnings.find(issue => issue.code === 'unregistered_source');
+
+    expect(warning?.source).toBe('backlog/fly-camera.yaml');
+  });
+
+  // #702: the dry run used semantic comparison while the write compares
+  // bytes, so it said "already current" immediately before a rewrite.
+  it('predicts a bytes-only rewrite rather than reporting already current', async () => {
+    const output = writeFixture();
+    await roadmapCommand(['compile']);
+
+    // Strip the generated marker: content is current, bytes are not.
+    const parsed = JSON.parse(readFileSync(output, 'utf8'));
+    delete parsed._generated;
+    writeFileSync(output, `${JSON.stringify(parsed, null, 2)}\n`);
+
+    logs.length = 0;
+    await roadmapCommand(['compile', '--dry-run']);
+    expect(logs.join('\n')).toContain('would rewrite (content current, bytes differ)');
+
+    logs.length = 0;
+    await roadmapCommand(['compile']);
+    expect(logs.join('\n')).toContain('projection written');
+  });
+
   it('marks the owning modular source sprint complete and recompiles projection (#612)', async () => {
     const output = writeFixture();
     mkdirSync(join(cwd, 'docs', 'retros'), { recursive: true });

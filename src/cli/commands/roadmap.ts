@@ -84,6 +84,15 @@ function isReadOnly(flags: Record<string, string>): boolean {
   return flags['dry-run'] === 'true' || flags['read-only'] === 'true';
 }
 
+/** How many unregistered sources compile lists before pointing at
+ *  validate-sources for the rest. */
+const UNREGISTERED_WARNING_LIMIT = 5;
+
+/** Reader-facing home for the projection format change. A bare path resolves
+ *  only inside this repository, and the audience for that message is a
+ *  consumer repo with a pinned CI. */
+const UPGRADING_DOC_URL = 'https://github.com/srbryers/slope/blob/main/docs/upgrading.md';
+
 const DEFAULT_ROADMAP_PATH = 'docs/backlog/roadmap.json';
 const TERMINAL_ROADMAP_STATUSES = new Set(['complete', 'superseded']);
 const DEFAULT_UPCOMING_LIMIT = 3;
@@ -655,8 +664,14 @@ function compileSourcesSubcommand(flags: Record<string, string>, cwd: string): v
     // compiles to nothing and the command says "projection unchanged".
     // Reporting it only from validate-sources reaches nobody who has not
     // already suspected a problem.
-    for (const warning of validation.warnings.filter(issue => issue.code === 'unregistered_source')) {
-      console.log(`\n⚠ ${warning.source}: ${warning.message}`);
+    const unregistered = validation.warnings.filter(issue => issue.code === 'unregistered_source');
+    // Capped, because this now prints on the routine command. A tree with a
+    // hundred stray files should not bury the compile result it came for.
+    for (const warning of unregistered.slice(0, UNREGISTERED_WARNING_LIMIT)) {
+      console.log(`  ⚠ ${warning.source}: ${warning.message}`);
+    }
+    if (unregistered.length > UNREGISTERED_WARNING_LIMIT) {
+      console.log(`  ⚠ ${unregistered.length - UNREGISTERED_WARNING_LIMIT} more unregistered source(s); run \`slope roadmap validate-sources\` for the full list.`);
     }
 
     if (flags.check === 'true') {
@@ -671,7 +686,7 @@ function compileSourcesSubcommand(flags: Record<string, string>, cwd: string): v
             `  On disk: format ${onDiskFormat}. This binary writes format ${ROADMAP_PROJECTION_FORMAT}.`,
             '  Recompiling here produces a file the other version rejects, and vice versa.',
             '  Compile with whichever binary your CI pins as the last step before committing,',
-            '  or align the pin. See docs/upgrading.md for the format change.',
+            `  or align the pin. See ${UPGRADING_DOC_URL} for the format change.`,
           ].join('\n'));
         }
         throw new Error(

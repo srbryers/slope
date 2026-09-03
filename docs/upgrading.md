@@ -10,7 +10,7 @@ Notes for upgrades that change files SLOPE writes, where a mixed-version setup n
 
 Dependency entries. 1.64.x wrote `depends_on` as JSON numbers; 2.x writes canonical strings, because sprint identity became a string that preserves a trailing zero (`"458.10"` is not `458.1`). In a large roadmap this is every dependency entry in one commit. A 570-sprint project saw 1,334 lines change and nothing else.
 
-A format key. The generated header now carries `"format": 2`. A binary older than this key cannot read it, so the improved diagnostics below only ever reach binaries built after the change.
+A format key. The generated header now carries `"format": 2`. An older binary reads the file without complaint, because it strips the whole generated header before comparing, but it cannot act on the key. So the improved diagnostics below reach you when your pin moves, not before.
 
 **What you will see.** Before this release, each version accepted its own output and rejected the other's, reporting `Roadmap projection drift` and advising you to run `slope roadmap compile`. That advice could not work: recompiling with the newer binary produced a file the pinned one rejected again.
 
@@ -38,6 +38,6 @@ Reported as [#702](https://github.com/srbryers/slope/issues/702).
 
 `docs/roadmap/project.yaml` carries an explicit `sources:` registry. It is not a glob. A `.yaml` file dropped beside registered ones compiled to nothing, with exit 0 and no warning, so freshly authored sprints could sit inert while looking tracked.
 
-`slope roadmap validate-sources` now warns for any `.yaml` file in a directory that holds registered sources but which no registry entry produces. Add it to `sources:` or move it out of the tree.
+Both `slope roadmap compile` and `slope roadmap validate-sources` now warn for any `.yaml` file under `phases/`, `backlog/` or `archive/` that no registry entry produces. `compile` is where this bites, so the warning appears there even when the projection is unchanged. The file is named in the form `sources:` wants, so the fix is to paste it in, or move the file out of the tree.
 
 Reported as [#700](https://github.com/srbryers/slope/issues/700).

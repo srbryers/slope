@@ -709,18 +709,19 @@ function unregisteredSourceWarnings(store: RoadmapSourceStore): RoadmapSourceVal
   const registered = new Set(
     store.sources.map(source => comparablePath(source.absolutePath as string)),
   );
-  // Only look where registered sources already live, so an unrelated docs tree
-  // is never scanned. Note the safety of never reporting the manifest or the
-  // compiled output rests on parseRoadmapSourceProject forcing each source
-  // kind into phases/, backlog/ or archive/, which keeps both out of every
-  // scanned directory.
-  const directories = new Set(
-    store.sources
-      .map(source => dirname(source.absolutePath as string))
-      .filter(dir => existsSync(dir)),
-  );
+  // Scan the directories a source can legally live in, not only those that
+  // already hold one. #700's own scenario is freshly authored sprints dropped
+  // into backlog/ in a project whose backlog holds nothing registered yet, and
+  // scanning only occupied directories left exactly that case silent.
+  //
+  // These three names are where parseRoadmapSourceProject forces each source
+  // kind to live, which is also why the manifest and the compiled output can
+  // never be reported: neither sits in one of them.
+  const directories = SOURCE_KIND_DIRECTORIES
+    .map(name => join(store.sourceRoot, name))
+    .filter(dir => existsSync(dir));
 
-  for (const dir of [...directories].sort()) {
+  for (const dir of directories.sort()) {
     let entries: Dirent[];
     try {
       entries = readdirSync(dir, { withFileTypes: true });
@@ -728,8 +729,9 @@ function unregisteredSourceWarnings(store: RoadmapSourceStore): RoadmapSourceVal
       continue;
     }
     for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
-      // A directory named `nested.yaml` is not a source.
-      if (!entry.isFile()) continue;
+      // A directory named `nested.yaml` is not a source. A symlink to a yaml
+      // file is, and Dirent.isFile() is false for one, so check both.
+      if (!entry.isFile() && !entry.isSymbolicLink()) continue;
       if (!/\.ya?ml$/i.test(entry.name)) continue;
       const absolute = resolve(join(dir, entry.name));
       if (registered.has(comparablePath(absolute))) continue;
@@ -746,8 +748,17 @@ function unregisteredSourceWarnings(store: RoadmapSourceStore): RoadmapSourceVal
   return warnings;
 }
 
-/** Path form for comparing two references to the same file, honouring the
- *  case-insensitivity of the platform's filesystem. */
+/** Directories a roadmap source can live in, matching the kind-to-prefix rule
+ *  parseRoadmapSourceProject enforces. */
+const SOURCE_KIND_DIRECTORIES = ['phases', 'backlog', 'archive'];
+
+/** Path form for comparing two references to the same file.
+ *
+ *  Folds case where the platform's default filesystem does. macOS volumes can
+ *  be formatted case-sensitively, so on darwin this can merge two genuinely
+ *  distinct names; that costs a missed warning rather than a false one, which
+ *  is the right direction for advice a reader might act on.
+ */
 function comparablePath(path: string): string {
   return process.platform === 'win32' || process.platform === 'darwin'
     ? resolve(path).toLowerCase()
