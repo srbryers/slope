@@ -16,10 +16,10 @@ sprints:
     status: planned
     github_issues:
       - 706
-    note: "A read-named command that rewrites tracked files is surprising; one that silently deletes prose from them is a defect. Comment loss comes first because it destroys work that cannot be recovered except from git. The mutation question is separate and a design call: the scorecard auto-link is genuinely useful, so the options are moving the writes behind an explicit flag or naming every rewritten file in the output. Both are in scope; the ticket order lets the data-loss fix ship even if the ownership question needs another round."
+    note: "Scope corrected by architect review; the first draft misdescribed the mechanism. A comment-preserving surgical patcher already exists and is the PRIMARY write path: patchRoadmapSourceSprintText edits the status and scorecard lines byte-for-byte and leaves comments untouched. Comment loss is confined to two call sites that bypass it. First, the fallback full rewrite at roadmap-source-store.ts:403, reached only when the document shape defeats the patcher (flow-style entries, mixed EOLs, column-0 comments inside an entry), which is exactly the shape the reporter hit. Second, the archive manifest rewrite at roadmap-source-store.ts:660, which has no surgical path at all and is what `slope roadmap archive` uses. Anyone scoping this as 'round-trip through the yaml document API' risks rebuilding the patcher that already exists, or fixing the fallback and missing archive entirely. Separately, `slope validate --read-only` ALREADY EXISTS as an opt-out, added under #644 and #637, so the open question is whether the default should flip, not whether to add a flag."
     tickets:
       - key: S275-1
-        title: Preserve comments on roadmap source re-serialisation by round-tripping through the yaml document API (#706)
+        title: "Preserve comments in the fallback rewrite at the two call sites that bypass the surgical patcher (#706)"
         club: long_iron
         complexity: moderate
         github_issue: 706
@@ -29,19 +29,20 @@ sprints:
         complexity: standard
         github_issue: 706
       - key: S275-3
-        title: "Decide and implement source-write ownership: move the writes behind an explicit opt-in or document validate as a writer (#706)"
-        club: long_iron
+        title: "Decide whether the writing default should flip, given --read-only already exists as the opt-out (#706)"
+        club: driver
         complexity: risky
         github_issue: 706
         depends_on:
           - S275-2
       - key: S275-4
-        title: Cover comment survival and the rewritten-file manifest with tests over real phase YAML including an archived phase (#706)
+        title: Cover comment survival and the rewritten-file manifest with tests over a patcher-defeating document and an archive run (#706)
         club: short_iron
         complexity: standard
         github_issue: 706
         depends_on:
           - S275-1
+          - S275-2
   - id: 276
     theme: Projection Compatibility
     par: 4
@@ -77,3 +78,4 @@ sprints:
         github_issue: 702
         depends_on:
           - S276-1
+          - S276-2

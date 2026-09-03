@@ -6,7 +6,7 @@ phase:
     - 277
     - 278
   status: planned
-  note: "Root causes read from source rather than inferred from the reports. #697 is not a display bug: `ticket done` writes a best-effort event inside a try/catch that swallows failures, there is no completion ledger, and the roadmap module has no ticket-completion awareness at all — so the next-action commands cannot know. #698 is line-exact at src/cli/commands/ticket.ts:201, where an explicit flag returns as typed while the fallback path resolves HEAD properly; the asymmetry is the whole bug. #696 has one writer for one gate (findings_audited) out of five, and the regression label hardcodes `bun test` in a repo that declares pnpm. Adding the ledger needs a migration in both the SQLite and PostgreSQL backends, which is what makes S277 a driver sprint."
+  note: "Root causes read from source, and corrected once by architect review. #697 is not a display bug: `ticket done` writes a best-effort event inside a try/catch that swallows failures, and no completion table exists in either store backend. The first draft said the roadmap module has no completion awareness at all, which overstates it — agent.ts:147-168 does read events for kind 'ticket_done' (added under #348). The real state is three surfaces that disagree: agent reads events, now.ts findNextTicket excludes only actively claimed tickets, and the compact roadmap status recommends tickets[0] unconditionally, checking neither. That is why S277-3 targets all three rather than one. #698 is line-exact at src/cli/commands/ticket.ts:201, where an explicit flag returns as typed while the fallback resolves HEAD properly; the asymmetry is the whole bug. #696 has one writer for one gate (findings_audited) of five, and `bun test` at phase-cleanup.ts:73 is a display label rather than an executed command, so the fix is the label and the missing writers. Adding the ledger needs a migration in both the SQLite and PostgreSQL backends, which is what makes S277 a driver sprint."
 sprints:
   - id: 277
     theme: Ticket Completion Ledger
@@ -32,7 +32,7 @@ sprints:
         depends_on:
           - S277-1
       - key: S277-3
-        title: "Read the ledger in slope now, roadmap status and next-ticket selection so all three agree (#697)"
+        title: "Read the ledger in agent, slope now and compact roadmap status so all three surfaces agree (#697)"
         club: long_iron
         complexity: moderate
         github_issue: 697
@@ -68,7 +68,7 @@ sprints:
         complexity: moderate
         github_issue: 696
       - key: S278-2
-        title: Derive the regression command from project configuration and package-manager detection instead of assuming bun (#696)
+        title: "Derive the regression gate's label and command from package-manager detection instead of the hardcoded bun string (#696)"
         club: short_iron
         complexity: standard
         github_issue: 696
