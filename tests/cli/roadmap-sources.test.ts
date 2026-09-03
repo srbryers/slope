@@ -1046,7 +1046,13 @@ sprints:
   // source registered as `Phase-01.yaml` against a file named `phase-01.yaml`
   // loads and compiles, so reporting it as unregistered is a false claim, and
   // following the advice would add a duplicate registry entry.
-  it('does not warn when the registry entry differs only in case', () => {
+  //
+  // Windows and macOS only, deliberately. On a case-sensitive filesystem the
+  // premise does not exist: that registry entry names a file that is not
+  // there, so the store refuses to load long before any warning. comparablePath
+  // is platform-sensitive by design and this test has to be too. CI on Linux
+  // caught this; a Windows-only run never could.
+  it.skipIf(process.platform !== 'win32' && process.platform !== 'darwin')('does not warn when the registry entry differs only in case', () => {
     writeFixture();
     const manifestPath = join(cwd, 'docs', 'roadmap', 'project.yaml');
     writeFileSync(
