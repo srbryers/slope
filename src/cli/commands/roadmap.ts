@@ -73,6 +73,14 @@ function parseArgs(args: string[]): Record<string, string> {
   return result;
 }
 
+/** True when the caller asked for a pure check. `--read-only` and `--dry-run`
+ *  are accepted interchangeably: validate spells it one way, compile and
+ *  complete spelled it the other, and #706 asked for a check without having to
+ *  remember which command uses which word. */
+function isReadOnly(flags: Record<string, string>): boolean {
+  return flags['dry-run'] === 'true' || flags['read-only'] === 'true';
+}
+
 const DEFAULT_ROADMAP_PATH = 'docs/backlog/roadmap.json';
 const TERMINAL_ROADMAP_STATUSES = new Set(['complete', 'superseded']);
 const DEFAULT_UPCOMING_LIMIT = 3;
@@ -648,7 +656,11 @@ function compileSourcesSubcommand(flags: Record<string, string>, cwd: string): v
       console.log(`\nRoadmap projection is current: ${output}\n`);
       return;
     }
-    if (flags['dry-run'] === 'true') {
+    // `--read-only` is an alias for `--dry-run`. validate spells this
+    // `--read-only`, compile and complete spelled it `--dry-run`, and #706
+    // asked for a pure check without having to know which command uses which
+    // word. Both spellings work everywhere now.
+    if (isReadOnly(flags)) {
       console.log(`\nRoadmap compile dry run: ${changed ? 'would write' : 'already current'} ${output}`);
       console.log(`  Sources: ${store.sources.length}; phases: ${store.roadmap.phases.length}; sprints: ${store.roadmap.sprints.length}\n`);
       return;
@@ -666,14 +678,14 @@ function compileSourcesSubcommand(flags: Record<string, string>, cwd: string): v
 function completeSourcesSubcommand(flags: Record<string, string>, cwd: string): void {
   if (!Object.prototype.hasOwnProperty.call(flags, 'sprint') || flags.sprint === 'true') {
     console.error('\nMissing required --sprint=N for roadmap complete.');
-    console.error('Usage: slope roadmap complete --sprint=N [--source=<file>] [--scorecard=<path>] [--dry-run]\n');
+    console.error('Usage: slope roadmap complete --sprint=N [--source=<file>] [--scorecard=<path>] [--dry-run|--read-only]\n');
     process.exit(1);
     return;
   }
   const sprint = sprintIdKey(flags.sprint);
   if (sprint == null) {
     console.error(`\nInvalid sprint number: ${flags.sprint || '(empty)'}`);
-    console.error('Usage: slope roadmap complete --sprint=N [--source=<file>] [--scorecard=<path>] [--dry-run]\n');
+    console.error('Usage: slope roadmap complete --sprint=N [--source=<file>] [--scorecard=<path>] [--dry-run|--read-only]\n');
     process.exit(1);
     return;
   }
@@ -694,11 +706,11 @@ function completeSourcesSubcommand(flags: Record<string, string>, cwd: string): 
     const result = completeRoadmapSourceSprint(cwd, sprint, {
       sourceFlag: flags.source,
       scorecardPath,
-      dryRun: flags['dry-run'] === 'true',
+      dryRun: isReadOnly(flags),
       force: true,
     });
     const label = `S${sprint}`;
-    if (flags['dry-run'] === 'true') {
+    if (isReadOnly(flags)) {
       console.log(`\nRoadmap complete dry run: ${label} in ${result.source}`);
       console.log(`  Would change source: ${result.changed ? 'yes' : 'no'}`);
       if (scorecardPath) console.log(`  Scorecard: ${scorecardPath}`);
@@ -708,10 +720,10 @@ function completeSourcesSubcommand(flags: Record<string, string>, cwd: string): 
     console.log(`\nRoadmap source reconciled: ${label}`);
     console.log(`  Source: ${result.source}`);
     if (result.reformatted) {
-      console.log('  ⚠ Source could not be patched surgically and was rewritten in canonical YAML style.');
+      console.log('  ⚠ Source could not be patched surgically, so its formatting was normalised. Comments are preserved.');
     }
     if (scorecardPath) console.log(`  Scorecard: ${scorecardPath}`);
-    console.log(`  Projection: ${result.projection}`);
+    console.log(`  Projection: ${result.projectionPath ?? 'docs/backlog/roadmap.json'} ${result.projection}`);
     console.log('');
   } catch (error) {
     console.error(`\n${(error as Error).message}\n`);

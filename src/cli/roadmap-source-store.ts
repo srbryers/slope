@@ -228,6 +228,9 @@ export function assertNoProjectionContentLoss(store: RoadmapSourceStore, existin
 export interface CompleteRoadmapSourceSprintResult {
   source: string;
   projection: 'written' | 'unchanged';
+  /** Repo-relative path of the compiled projection, so callers can name the
+   *  tracked file they rewrote rather than only its status (#706). */
+  projectionPath?: string;
   changed: boolean;
   /** True when the source could not be patched surgically and was rewritten in canonical style. */
   reformatted?: boolean;
@@ -463,7 +466,16 @@ export function completeRoadmapSourceSprint(
     // silent projection rewrite destroyed authored planning work (GH #637).
     if (projection === 'written' && existing != null) assertNoProjectionContentLoss(reloaded, existing);
     if (projection === 'written') atomicWriteFileSync(reloaded.outputPath, projectionBytesForWrite(reloaded));
-    return { source: sourceLabel, projection, changed: true, reformatted };
+    // Carry the projection's path so callers can name the file they rewrote
+    // rather than saying "projection written" and leaving the reader to guess
+    // which tracked file just changed (#706).
+    return {
+      source: sourceLabel,
+      projection,
+      projectionPath: normalizeDiagnosticPath(relative(reloaded.cwd, reloaded.outputPath)),
+      changed: true,
+      reformatted,
+    };
   });
 }
 

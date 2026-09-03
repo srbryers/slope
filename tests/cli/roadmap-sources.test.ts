@@ -930,6 +930,63 @@ sprints:
     expect(store.sources[0].document.sprints[0].status).toBe('complete');
   });
 
+  // #706: the archive manifest rewrite had no surgical path at all, so it
+  // discarded project.yaml's authored description block wholesale.
+  it('preserves manifest comments when archiving moves sources', async () => {
+    writeFixture();
+    addPhaseOneArchiveEvidence();
+    const manifestPath = join(cwd, 'docs', 'roadmap', 'project.yaml');
+    writeFileSync(
+      manifestPath,
+      `# why this roadmap is shaped this way\n${readFileSync(manifestPath, 'utf8')}`,
+    );
+    await roadmapCommand(['compile']);
+
+    const store = loadRoadmapSourceStore(cwd);
+    const plan = planRoadmapSourceArchive(store, 8);
+
+    expect(plan.manifestYaml).toContain('# why this roadmap is shaped this way');
+    expect(plan.manifestYaml).toContain('archive/phase-01.yaml');
+  });
+
+  // #706: "projection written" never said which tracked file changed, so a
+  // reader watching the output could not tell what had been rewritten.
+  it('reports the projection path alongside its status', () => {
+    const root = join(cwd, 'docs', 'roadmap');
+    mkdirSync(join(root, 'phases'), { recursive: true });
+    writeFileSync(join(root, 'project.yaml'), `
+version: 1
+name: Path Roadmap
+output: ../backlog/roadmap.json
+sources:
+  - path: phases/phase-01.yaml
+    kind: phase
+`);
+    writeFileSync(join(root, 'phases', 'phase-01.yaml'), `version: 1
+phase:
+  name: Phase 1
+  status: active
+  sprints: [7]
+sprints:
+  - id: 7
+    theme: T
+    par: 3
+    slope: 1
+    type: feature
+    status: planned
+    tickets:
+      - key: S7-1
+        title: T1
+        club: wedge
+        complexity: small
+`);
+
+    const result = completeRoadmapSourceSprint(cwd, 7, {});
+
+    expect(result.projectionPath).toBe('docs/backlog/roadmap.json');
+    expect(result.projection).toBe('written');
+  });
+
   // #706: the fallback rewrite serialised a fresh object, discarding every
   // comment in the bundle. An authored history note was deleted silently and
   // recovered only from git.
