@@ -1,37 +1,47 @@
 # Phases 67-69 Architect Review
 
-**Agent:** workflow-architecture-reviewer
-**Lane:** architect
-**Model tier:** sonnet. Two opus attempts failed on server-side 529 Overloaded, so this pass ran a tier lower than the work warrants. Recorded here so the provenance is not read as stronger than it was.
-**Provenance:** independent review, clean context, instructed to check every technical claim against current source rather than trust the phase notes.
-**Verdict:** APPROVED WITH FIXES. All four required fixes applied.
+Two independent passes ran. The second overturned the first on its headline finding, so the second is the one to trust.
 
-## Required fixes and disposition
+| Pass | Model | Verdict | Outcome |
+|---|---|---|---|
+| 1 | sonnet | APPROVED WITH FIXES (4) | applied in 3d4dc38, then partly reverted |
+| 2 | opus | CHANGES REQUIRED (7) | applied here |
 
-**1. The #706 root cause was misdescribed. Applied.**
-A comment-preserving surgical patcher already exists and is the primary write path: `patchRoadmapSourceSprintText` edits status and scorecard lines byte-for-byte, leaving comments untouched. Comment loss is confined to two call sites that bypass it: the fallback full rewrite at `roadmap-source-store.ts:403`, reached only when the document shape defeats the patcher, and the archive manifest rewrite at `roadmap-source-store.ts:660`, which has no surgical path and is what `slope roadmap archive` uses. The original framing risked an implementer rebuilding the existing patcher, or fixing the fallback and missing archive entirely. S275 note and S275-1 title rewritten to name both sites.
+Pass 1 ran on sonnet only because two opus attempts failed on server-side 529. It is recorded rather than discarded, because the sequence is the finding: a weaker reviewer produced a confident, specific, wrong instruction that then sat in a sprint note an implementer would have followed.
 
-**2. `slope validate --read-only` already exists. Applied.**
-Added under #644 and #637 at `validate.ts:22` and `110-125`, with a code comment naming the surprise this phase set out to fix. S275-3 reframed from "add an opt-in" to "decide whether the default should flip", and its club raised to driver to match the risky complexity.
+## What pass 2 overturned
 
-**3. Two dependency edges understated. Applied.**
-S275-4 tests S275-2's output as well as S275-1's, so it now depends on both. S276-4's changelog note describes the behaviour S276-2 produces, so it now depends on S276-2 as well as S276-1.
+**Pass 1's headline fix was a category error.** It told implementers that scoping the comment fix as "round-trip through the yaml document API" risked rebuilding the surgical patcher that already exists. That conflates two different write paths. The patcher (`src/core/roadmap-source-patch.ts`) handles the line-level status edit and preserves comments. The Document API is exactly what the two whole-document sites need, and the archive manifest site at `roadmap-source-store.ts:660` has no patcher to rebuild at all. Checked directly against yaml 2.8.2: `parseDocument` preserves leading and inline comments through an edit.
 
-**4. Branch and PR sequencing. Recorded.**
-PR #695 is still open against main. The PR for this branch must target `chore/phase-66-reviewer-selection`, and #695 must merge with a merge commit rather than a squash, with its branch kept until this one is retargeted. Branch discipline records that this exact pattern cost three recoveries before, under #648.
+Had pass 1's wording shipped, an implementer would have tried to extend a line-based patcher to the document shapes it was written to decline, or declined to write anything.
 
-## A correction the review made to the author, not the plan
+**Pass 1 stopped one step short of its own correction.** It found that `agent.ts:147-168` already reads durable `ticket_done` events, then left S277-1 adding a new table with migrations in both backends as the root dependency of three other tickets. Nothing established the events table is insufficient: it exists in both backends, is indexed on `ticket_key`, and has `insertEvent` and `getEventsBySprint` on the store interface. The most expensive ticket across three phases was possibly unnecessary, and three tickets carried a fabricated dependency forcing serial execution.
 
-The Phase 68 note claimed the roadmap module has no ticket-completion awareness at all. That overstates it: `agent.ts:147-168` reads events for `kind: 'ticket_done'`, added under #348. The true state is three surfaces that disagree, since `now.ts` `findNextTicket` excludes only actively claimed tickets and the compact roadmap status recommends `tickets[0]` unconditionally. The note is corrected. S277-3's scope was already right for the real situation and now says so explicitly.
+**Pass 1's own retarget created a gap.** Narrowing S278-2 to a display label closed the label defect and dropped #696's explicit ask for a package-manager-aware regression command. No ticket wrote the `regression_passed` gate, so S278's "five-gate path without an override" had no writer to test for gate five.
 
-The review also corrected a claim in the other direction: `bun test` at `phase-cleanup.ts:73` is a display label rather than an executed command, so S278-2 now targets the label and the missing writers.
+## Required fixes from pass 2, and disposition
 
-## Checks the review ran
+1. **S275 note and S275-1 title rewritten.** They now name the Document API as the fix and warn against extending the patcher, the reverse of what they said. Applied.
+2. **S277-1 is now a decision, not an assumed migration.** It asks whether the existing events table suffices and builds a table only if not. Sprint drops from slope 5 to slope 4, since the driver-sized migration is contingent. Applied.
+3. **S278 gains a regression-gate writer** as its own ticket, reusing `sprint-completion.ts:295` test-runner detection and the exit-code-then-`updateGate` pattern at `:456-470`. Sprint grows to 5 tickets, par 5. Applied.
+4. **The second bun hardcode is in scope.** `post-push.ts:68` carries `bun test` as an actual command field, not a label. Applied.
+5. **S276-4 describes both kinds of upgrade churn**, including that S276-1's new header key is unreadable to older binaries, so the improved message never reaches the reporter's pinned CI. Applied.
+6. **S275-3 has a deliverable.** It now extends `--read-only` to compile and complete and records the default decision in the flag's help, rather than being a decision with no artefact. S275-4 depends on it. Applied.
+7. **S279-2 covers the whole package.** `prepare` ran only `tsc` while `build` also builds `packages/pi-extension`, which `files` ships, so a PATH-only fix still yields a git-URL install missing content a tarball has. Applied.
 
-Numbering: sprints 275-279 unique across all 178 sprints; main tops out at 272; Phase 66 (273/274) unmerged. Cycle detection across the full graph reported zero errors, and a manual trace of the new edges found none. `roadmap review` placed S275, S277 and S279 at dependency depth 0 and S276, S278 at depth 1, matching the authored edges.
+Also applied from pass 2's observations: **S276 no longer depends on S275**, which was gating the independent #700 fix behind #706.
 
-`roadmap validate-sources`, `roadmap compile --check` and `roadmap validate` all exit 0. The only warning on new content is S277 carrying five tickets, which matches its immediate predecessors S273 and S274 and the repo's own par formula.
+## Narrowed by pass 2, worth keeping
 
-## Left as noted
+S275-2 was substantially already implemented. `validate.ts:178-180` and `roadmap.ts:708-711` already name the rewritten source file and warn on reformat. The genuine gap is narrower: neither names the projection by path, neither says comments were destroyed, and the gate write into `.slope/` is silent. A fixture forcing the reformat path already exists at `tests/cli/roadmap-sources.test.ts:928`, lowering S275-4's cost.
 
-S279-3 carries a singular `github_issue` of 699 while covering both 699 and 705. The sprint-level `github_issues` carries both, so this matters only to automation reading the ticket field.
+## Left as noted, not fixed here
+
+- All five sprints carry no cross-phase dependency, so ordering is by numbering alone. That places Phase 64 (268-272, five unstarted slope-5 sprints) ahead of user-reported data loss. Raised for the operator rather than resolved by renumbering, since pulling these forward means deferring Phase 64.
+- #705 blocks the git-URL pin downstream projects use to consume unreleased fixes, including the fixes in Phases 67 and 68, and is scheduled last.
+- S279-3's second half is a real npm install from a git URL rather than a unit test. Club raised to long_iron to reflect it.
+- Pre-existing and outside this change: Phases 62, 63 and 65 sit at `in_progress` with every sprint complete; sprints 268-272 have no `status` field; `CLAUDE.md` describes `packages/core` and `packages/cli` while the source lives in `src/core` and `src/cli`, which will misdirect anyone implementing these sprints.
+
+## Checks
+
+Both passes ran `roadmap validate-sources`, `roadmap compile --check` and `roadmap validate`; all exit 0. Sprints 275-279 are unique across 178 sprints, and cycle detection reports none. The only warnings on new content are S277 and S278 carrying five tickets each, matching S273 and S274 precedent and the repo's par formula.

@@ -590,32 +590,32 @@
     },
     {
       "name": "Phase 67 — Source Fidelity",
-      "description": "Roadmap sources are read-write when they should be read-only, and the writes lose data. Fix #706 (validate mutates the working tree and the serialiser deletes YAML comments), #702 (1.64.1 and 2.0.0 emit incompatible projections and each rejects the other's, reported as 'drift'), and #700 (a yaml file dropped beside registered ones compiles to nothing, exit 0, no warning). All three are the same failure shape: the source of truth is being changed or ignored without saying so.",
+      "description": "Roadmap sources are read-write when they should be read-only, and the writes lose data. Fix #706 (validate mutates the working tree and re-serialisation deletes YAML comments), #702 (1.64.1 and 2.0.0 emit incompatible projections and each rejects the other's, reported as 'drift'), and #700 (a yaml file dropped beside registered ones compiles to nothing, exit 0, no warning). All three are the same failure shape: the source of truth is being changed or ignored without saying so.",
       "sprints": [
         275,
         276
       ],
       "status": "planned",
-      "note": "Scoped after re-running each report against the current build. #706 is the most severe and the cheapest: the yaml library already round-trips comments through parseDocument, and the code calls stringify(parse(x)), which discards them — a three-line history note was deleted silently. Confirmed in this repo by observing `slope validate` print 'projection written' while rewriting phase YAML. #702 is a direct consequence of the canonical sprint-id work: version 2 writes dependency ids as strings where 1.64.1 wrote numbers, so a repo whose CI pins the older binary fails compile --check after any 2.0 write. The projection header carries by/source/warning and no version, which is why the mismatch reports as drift. #700 needs no detection logic at all: no directory scan exists, the registry is the only input."
+      "note": "Scoped from source, then corrected twice by architect review. The second pass overturned the first, so the mechanism below is the one to trust. Roadmap source writes take two different paths and only one of them loses comments. The surgical patcher (src/core/roadmap-source-patch.ts) edits the status and scorecard lines textually and preserves everything around them; it is not the problem and must not be extended. The loss happens at the two sites that serialise a whole document: the fallback rewrite at roadmap-source-store.ts:403, reached when the document shape defeats the patcher, and the archive manifest rewrite at :660, which has no surgical path at all. Both should use the yaml package's Document API, which round-trips comments through an edit — checked directly against yaml 2.8.2. #702 and #700 are separate and both land in the compile and validate-sources detection pipeline."
     },
     {
       "name": "Phase 68 — Completion Truth",
-      "description": "SLOPE reports work as done and records nothing durable that says so. Fix #697 (`ticket done` succeeds, then `slope now` and `roadmap status` immediately recommend the same ticket again), #698 (an explicit commit flag is stored verbatim, so `--commit=HEAD` becomes permanent non-immutable evidence with no repair path), and #696 (four of the five phase cleanup gates have no writer, so the documented workflow cannot satisfy the boundary and users must reach for the manual override).",
+      "description": "SLOPE reports work as done and the surfaces that decide what to do next disagree about it. Fix #697 (`ticket done` succeeds, then `slope now` and `roadmap status` immediately recommend the same ticket again), #698 (an explicit commit flag is stored verbatim, so `--commit=HEAD` becomes permanent non-immutable evidence with no repair path), and #696 (four of the five phase cleanup gates have no writer, so the documented workflow cannot satisfy the boundary and users must reach for the manual override).",
       "sprints": [
         277,
         278
       ],
       "status": "planned",
-      "note": "Root causes read from source, and corrected once by architect review. #697 is not a display bug: `ticket done` writes a best-effort event inside a try/catch that swallows failures, and no completion table exists in either store backend. The first draft said the roadmap module has no completion awareness at all, which overstates it — agent.ts:147-168 does read events for kind 'ticket_done' (added under #348). The real state is three surfaces that disagree: agent reads events, now.ts findNextTicket excludes only actively claimed tickets, and the compact roadmap status recommends tickets[0] unconditionally, checking neither. That is why S277-3 targets all three rather than one. #698 is line-exact at src/cli/commands/ticket.ts:201, where an explicit flag returns as typed while the fallback resolves HEAD properly; the asymmetry is the whole bug. #696 has one writer for one gate (findings_audited) of five, and `bun test` at phase-cleanup.ts:73 is a display label rather than an executed command, so the fix is the label and the missing writers. Adding the ledger needs a migration in both the SQLite and PostgreSQL backends, which is what makes S277 a driver sprint."
+      "note": "Scoped from source and corrected twice by architect review; the second pass overturned part of the first. #697 is not a missing store, and the first draft's 'no completion ledger' framing was wrong twice over. An events table exists in both the SQLite and PostgreSQL backends, indexed on ticket_key, with insertEvent and getEventsBySprint on the store interface, and agent.ts:147-168 already reads ticket_done events from it. The real defect has two halves: the write is best-effort inside a try/catch that swallows failures (ticket.ts:135-149), and three surfaces disagree about what they read. agent.ts reads events, now.ts findNextTicket excludes only actively claimed tickets, and the compact roadmap status recommends tickets[0] unconditionally. So the first ticket is a decision about whether the existing table suffices, not an assumed migration. #698 is line-exact at ticket.ts:201, where an explicit flag returns as typed while the fallback resolves HEAD properly. #696 has one gate writer of five, and `bun test` is hardcoded in two places with different meanings."
     },
     {
       "name": "Phase 69 — Install and Map Accuracy",
-      "description": "Two independent defects that both make SLOPE report confidently wrong numbers about a project. Fix #699 (map refresh walks a gitignored SwiftPM .build tree and counts dependency checkouts as project source, reporting 2481 source files for a package with 36 tracked ones) and #705 (installing from a git URL fails on Windows because the packaged prepare step calls a bare tsc that is not on PATH during the nested install).",
+      "description": "Two independent defects that both make SLOPE report confidently wrong things about a project. Fix #699 (map refresh walks a gitignored SwiftPM .build tree and counts dependency checkouts as project source, reporting 2481 source files for a package with 36 tracked ones) and #705 (installing from a git URL fails on Windows because the packaged prepare step calls a bare tsc that is not on PATH during the nested install).",
       "sprints": [
         279
       ],
       "status": "planned",
-      "note": "Kept as one sprint because the two defects share no code and neither is large; splitting them would buy nothing. Both read from source rather than from the reports. #699: the skip list holds `build` but not `.build`, and there is no gitignore handling in the map command at all, so every dependency build changes the counts even when tracked source is unchanged. #705: the packaged prepare script is the bare string `tsc`, which works when node_modules/.bin is on PATH and does not during a nested git-dependency install on Windows; the reporter's workaround is a vendored tarball, which installs everywhere because a packed tarball never runs prepare. Respecting gitignore is the right fix for #699 rather than extending the skip list, since the list will always trail the ecosystem."
+      "note": "Kept as one sprint because the two defects share no code and neither is large. Both read from source. #699: the skip list at map.ts:34-37 holds `build` but not `.build`, and the map command consults gitignore nowhere, so every dependency build changes the counts even when tracked source is unchanged; `git check-ignore` already has precedent in this codebase at guards/commit-nudge.ts:31, compaction.ts:57 and stop-check.ts:104, so S279-1 reuses rather than invents. #705: the packaged prepare script is the bare string `tsc`, which works when the local bin directory is on PATH and does not during a nested git-dependency install on Windows. Review caught a second half the first draft missed: `prepare` runs only `tsc` while `build` also builds packages/pi-extension, and `files` ships that extension's dist, so fixing PATH alone still yields a git-URL install missing content a published tarball has. ORDERING NOTE: #705 blocks the git-URL pin that downstream projects use to consume unreleased fixes, including the fixes in Phases 67 and 68, so scheduling this phase last delays the mechanism by which the others are adopted."
     }
   ],
   "sprints": [
@@ -7950,27 +7950,27 @@
       "github_issues": [
         706
       ],
-      "note": "Scope corrected by architect review; the first draft misdescribed the mechanism. A comment-preserving surgical patcher already exists and is the PRIMARY write path: patchRoadmapSourceSprintText edits the status and scorecard lines byte-for-byte and leaves comments untouched. Comment loss is confined to two call sites that bypass it. First, the fallback full rewrite at roadmap-source-store.ts:403, reached only when the document shape defeats the patcher (flow-style entries, mixed EOLs, column-0 comments inside an entry), which is exactly the shape the reporter hit. Second, the archive manifest rewrite at roadmap-source-store.ts:660, which has no surgical path at all and is what `slope roadmap archive` uses. Anyone scoping this as 'round-trip through the yaml document API' risks rebuilding the patcher that already exists, or fixing the fallback and missing archive entirely. Separately, `slope validate --read-only` ALREADY EXISTS as an opt-out, added under #644 and #637, so the open question is whether the default should flip, not whether to add a flag.",
+      "note": "Do not extend the line-based patcher to cover the shapes it was written to decline. The two whole-document serialise sites are the fix, and the archive manifest site has no patcher to fall back on, so it needs the Document API outright. Two things scoped smaller than they first appeared. `slope validate --read-only` already exists as an opt-out (validate.ts:22, 110-125, added under #644 and #637), so the open question is the default rather than the flag; note that it exists on validate only, while #706's title also names roadmap compile. And both validate.ts:178-180 and roadmap.ts:708-711 already name the rewritten source file and warn when it was reformatted, so the reporting gap is narrower than 'name every file': neither names docs/backlog/roadmap.json by path, neither says comments were destroyed, and the gate write into .slope/ is silent. A fixture that forces the reformat path already exists at tests/cli/roadmap-sources.test.ts:928.",
       "tickets": [
         {
           "key": "S275-1",
-          "title": "Preserve comments in the fallback rewrite at the two call sites that bypass the surgical patcher (#706)",
+          "title": "Serialise through the yaml Document API at the two whole-document write sites, the patcher fallback and the archive manifest (#706)",
           "club": "long_iron",
           "complexity": "moderate",
           "github_issue": 706
         },
         {
           "key": "S275-2",
-          "title": "Name every tracked file a read-named command rewrote, in that command's own output (#706)",
+          "title": "Close the reporting gaps the existing reformat warning leaves: the projection path, comment loss, and the silent gate write (#706)",
           "club": "short_iron",
           "complexity": "standard",
           "github_issue": 706
         },
         {
           "key": "S275-3",
-          "title": "Decide whether the writing default should flip, given --read-only already exists as the opt-out (#706)",
-          "club": "driver",
-          "complexity": "risky",
+          "title": "Extend --read-only to roadmap compile and complete, and decide the default with the answer recorded in the flag's help (#706)",
+          "club": "short_iron",
+          "complexity": "standard",
           "github_issue": 706,
           "depends_on": [
             "S275-2"
@@ -7978,13 +7978,14 @@
         },
         {
           "key": "S275-4",
-          "title": "Cover comment survival and the rewritten-file manifest with tests over a patcher-defeating document and an archive run (#706)",
+          "title": "Cover comment survival on both write sites and the reporting output, reusing the existing reformat fixture (#706)",
           "club": "short_iron",
           "complexity": "standard",
           "github_issue": 706,
           "depends_on": [
             "S275-1",
-            "S275-2"
+            "S275-2",
+            "S275-3"
           ]
         }
       ]
@@ -8000,10 +8001,7 @@
         702,
         700
       ],
-      "depends_on": [
-        "275"
-      ],
-      "note": "Two versions disagree about one field and the error message blames the user's working tree. A format version in the generated header turns 'drift, run compile to regenerate' — advice that cannot work, because recompiling with the newer binary produces a file the pinned one rejects again — into a statement of what actually happened. Normalising dependency ids on read is the belt to that braces: both shapes should compare equal regardless of which binary wrote them. The unregistered-yaml warning lands here because it is the same class of silence and touches the same command.",
+      "note": "Two versions disagree about one field and the error message blames the user's working tree. Deliberately carries no dependency on S275: the two sprints touch the serialise path and the detection pipeline respectively, and gating #700 behind #706 would delay an independent one-line-shaped fix. Note the ordering trap in S276-1: adding a key to the generated header changes the projection bytes in every downstream repo, and a binary older than the change cannot read the new key, so the improved message only ever reaches binaries built after it. That makes the read-side normalisation in S276-2 the fix that actually helps the reporter's pinned 1.64.1 CI, and it is why the changelog ticket must describe both kinds of churn rather than only the dependency entries.",
       "tickets": [
         {
           "key": "S276-1",
@@ -8028,7 +8026,7 @@
         },
         {
           "key": "S276-4",
-          "title": "Record in the changelog that upgrading the pin rewrites every dependency entry in one commit (#702)",
+          "title": "Record the upgrade churn in the changelog: every dependency entry rewritten, plus a new header key that older binaries cannot read (#702)",
           "club": "wedge",
           "complexity": "small",
           "github_issue": 702,
@@ -8041,29 +8039,29 @@
     },
     {
       "id": 277,
-      "theme": "Ticket Completion Ledger",
+      "theme": "Ticket Completion Truth",
       "par": 5,
-      "slope": 5,
+      "slope": 4,
       "type": "bugfix + data integrity",
       "status": "planned",
       "github_issues": [
         697,
         698
       ],
-      "note": "The ledger has to exist before anything can read it, and it has to be a required write rather than a swallowed one — a completion that silently failed to record is the defect, not a variant of it. Evidence quality belongs in the same sprint: a ledger of literal 'HEAD' strings is worse than no ledger, because shipped-commit checks will consume it. The repair path is the ticket most likely to be cut under pressure and the one the reporter actually needed, since the claim is already released by the time the bad value is noticed.",
+      "note": "Rescoped after review: the original S277-1 added a table with migrations in both backends and made it the root dependency of three other tickets, while the sprint's own note said a durable events table already exists and is already read. Nothing established the events table is insufficient, so assuming a migration would have made the most expensive ticket in three phases a possibly unnecessary one, and forced three tickets into serial execution behind it. The first ticket now answers that question and only builds a table if the answer is no. That also drops the sprint from slope 5 to 4, since the driver-sized migration is contingent rather than certain.",
       "tickets": [
         {
           "key": "S277-1",
-          "title": "Add a durable ticket-completion table with matching SQLite and PostgreSQL migrations (#697)",
-          "club": "driver",
-          "complexity": "risky",
+          "title": "Decide whether the existing events table can serve as the completion ledger, and add a table only if it cannot (#697)",
+          "club": "long_iron",
+          "complexity": "moderate",
           "github_issue": 697
         },
         {
           "key": "S277-2",
-          "title": "Have ticket done write the ledger as a required step instead of a swallowed best-effort event (#697)",
-          "club": "long_iron",
-          "complexity": "moderate",
+          "title": "Make the completion write a required step whose failure surfaces, instead of a swallowed best-effort event (#697)",
+          "club": "short_iron",
+          "complexity": "standard",
           "github_issue": 697,
           "depends_on": [
             "S277-1"
@@ -8071,12 +8069,12 @@
         },
         {
           "key": "S277-3",
-          "title": "Read the ledger in agent, slope now and compact roadmap status so all three surfaces agree (#697)",
+          "title": "Read completion in agent, slope now and compact roadmap status so all three surfaces agree (#697)",
           "club": "long_iron",
           "complexity": "moderate",
           "github_issue": 697,
           "depends_on": [
-            "S277-2"
+            "S277-1"
           ]
         },
         {
@@ -8093,7 +8091,8 @@
           "complexity": "standard",
           "github_issue": 698,
           "depends_on": [
-            "S277-1"
+            "S277-1",
+            "S277-4"
           ]
         }
       ]
@@ -8101,17 +8100,14 @@
     {
       "id": 278,
       "theme": "Phase Gate Evidence",
-      "par": 4,
+      "par": 5,
       "slope": 3,
       "type": "bugfix + safety",
       "status": "planned",
       "github_issues": [
         696
       ],
-      "depends_on": [
-        "277"
-      ],
-      "note": "A boundary whose only reachable exit is the command labelled manual override teaches operators that the override is the normal path — the same signal erosion this project has recorded before. Four gates need writers; the fifth needs to stop assuming a package manager the project does not use. Hit directly while closing Phase 65 in this repo: `slope phase status 65` reported no cleanup state after the documented commands ran, and only `phase audit` plus `phase complete` moved it.",
+      "note": "A boundary whose only reachable exit is the command labelled manual override teaches operators that the override is the normal path. Four gates need writers, and review caught that the first draft left the fifth without one: retargeting the bun fix at a display label closed the label defect but dropped #696's explicit ask for a package-manager-aware regression command that can record the test gate. Both hardcodes are in scope and they differ in kind: phase-cleanup.ts:73 is a display label, post-push.ts:68 is an actual command field. detectPackageManager already exists at analyzers/stack.ts:57, and sprint-completion.ts already recognises test runners across pnpm, npm, yarn and bun at :295 then marks a gate on exit code at :456-470, so the regression writer has direct prior art to reuse rather than invent. Carries no dependency on S277: the two sprints share no code.",
       "tickets": [
         {
           "key": "S278-1",
@@ -8122,13 +8118,23 @@
         },
         {
           "key": "S278-2",
-          "title": "Derive the regression gate's label and command from package-manager detection instead of the hardcoded bun string (#696)",
-          "club": "short_iron",
-          "complexity": "standard",
+          "title": "Record the regression gate from a package-manager-aware test run, reusing the existing test-runner detection (#696)",
+          "club": "long_iron",
+          "complexity": "moderate",
           "github_issue": 696
         },
         {
           "key": "S278-3",
+          "title": "Derive both bun hardcodes from package-manager detection: the cleanup label and the post-push guard command (#696)",
+          "club": "short_iron",
+          "complexity": "standard",
+          "github_issue": 696,
+          "depends_on": [
+            "S278-2"
+          ]
+        },
+        {
+          "key": "S278-4",
           "title": "Expose a per-gate evidence command so phase complete stays a genuine manual override (#696)",
           "club": "short_iron",
           "complexity": "standard",
@@ -8138,14 +8144,14 @@
           ]
         },
         {
-          "key": "S278-4",
+          "key": "S278-5",
           "title": "Cover the full five-gate path so the documented workflow satisfies the boundary without an override (#696)",
           "club": "wedge",
           "complexity": "small",
           "github_issue": 696,
           "depends_on": [
             "S278-2",
-            "S278-3"
+            "S278-4"
           ]
         }
       ]
@@ -8161,7 +8167,7 @@
         699,
         705
       ],
-      "note": "The map fix should ask git what is ignored rather than grow a hardcoded directory list — the list already carries build, bin, obj, dist and temp and still missed .build, and it will miss the next ecosystem's convention too. Falling back to the existing list when git is unavailable keeps the command working outside a repository. The install fix is small but worth a real test: a git-URL install is how downstream projects pin an unreleased build, and it currently works on some platforms and not others, which is the hardest kind of breakage to diagnose.",
+      "note": "The map fix should ask git what is ignored rather than grow a hardcoded directory list; the list already carries build, bin, obj, dist and temp and still missed .build, and it will miss the next ecosystem's convention too. Falling back to the existing list when git is unavailable keeps the command working outside a repository. The install fix has to make a git-URL install produce the same package a published tarball produces, which means the prepare step covers the same ground as build, not just a PATH correction. The nested-install test is the expensive half of S279-3 and is worth its own attention: it is a real npm install from a git URL, not a unit test.",
       "tickets": [
         {
           "key": "S279-1",
@@ -8172,16 +8178,16 @@
         },
         {
           "key": "S279-2",
-          "title": "Make the packaged prepare step invoke the local TypeScript binary by path so a git-url install works on Windows (#705)",
+          "title": "Make prepare produce the same output as build, invoking each TypeScript run by path so a git-url install works on Windows (#705)",
           "club": "short_iron",
           "complexity": "standard",
           "github_issue": 705
         },
         {
           "key": "S279-3",
-          "title": "Cover both with tests: a gitignored build tree that must not be counted, and a nested install that must not need PATH (#699, #705)",
-          "club": "short_iron",
-          "complexity": "standard",
+          "title": "Cover a gitignored build tree that must not be counted, and a real git-url install that must not need PATH (#699, #705)",
+          "club": "long_iron",
+          "complexity": "moderate",
           "github_issue": 699,
           "depends_on": [
             "S279-1",

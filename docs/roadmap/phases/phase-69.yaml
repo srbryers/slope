@@ -1,11 +1,11 @@
 version: "1"
 phase:
   name: Phase 69 — Install and Map Accuracy
-  description: "Two independent defects that both make SLOPE report confidently wrong numbers about a project. Fix #699 (map refresh walks a gitignored SwiftPM .build tree and counts dependency checkouts as project source, reporting 2481 source files for a package with 36 tracked ones) and #705 (installing from a git URL fails on Windows because the packaged prepare step calls a bare tsc that is not on PATH during the nested install)."
+  description: "Two independent defects that both make SLOPE report confidently wrong things about a project. Fix #699 (map refresh walks a gitignored SwiftPM .build tree and counts dependency checkouts as project source, reporting 2481 source files for a package with 36 tracked ones) and #705 (installing from a git URL fails on Windows because the packaged prepare step calls a bare tsc that is not on PATH during the nested install)."
   sprints:
     - 279
   status: planned
-  note: "Kept as one sprint because the two defects share no code and neither is large; splitting them would buy nothing. Both read from source rather than from the reports. #699: the skip list holds `build` but not `.build`, and there is no gitignore handling in the map command at all, so every dependency build changes the counts even when tracked source is unchanged. #705: the packaged prepare script is the bare string `tsc`, which works when node_modules/.bin is on PATH and does not during a nested git-dependency install on Windows; the reporter's workaround is a vendored tarball, which installs everywhere because a packed tarball never runs prepare. Respecting gitignore is the right fix for #699 rather than extending the skip list, since the list will always trail the ecosystem."
+  note: "Kept as one sprint because the two defects share no code and neither is large. Both read from source. #699: the skip list at map.ts:34-37 holds `build` but not `.build`, and the map command consults gitignore nowhere, so every dependency build changes the counts even when tracked source is unchanged; `git check-ignore` already has precedent in this codebase at guards/commit-nudge.ts:31, compaction.ts:57 and stop-check.ts:104, so S279-1 reuses rather than invents. #705: the packaged prepare script is the bare string `tsc`, which works when the local bin directory is on PATH and does not during a nested git-dependency install on Windows. Review caught a second half the first draft missed: `prepare` runs only `tsc` while `build` also builds packages/pi-extension, and `files` ships that extension's dist, so fixing PATH alone still yields a git-URL install missing content a published tarball has. ORDERING NOTE: #705 blocks the git-URL pin that downstream projects use to consume unreleased fixes, including the fixes in Phases 67 and 68, so scheduling this phase last delays the mechanism by which the others are adopted."
 sprints:
   - id: 279
     theme: Install and Map Accuracy
@@ -16,7 +16,7 @@ sprints:
     github_issues:
       - 699
       - 705
-    note: "The map fix should ask git what is ignored rather than grow a hardcoded directory list — the list already carries build, bin, obj, dist and temp and still missed .build, and it will miss the next ecosystem's convention too. Falling back to the existing list when git is unavailable keeps the command working outside a repository. The install fix is small but worth a real test: a git-URL install is how downstream projects pin an unreleased build, and it currently works on some platforms and not others, which is the hardest kind of breakage to diagnose."
+    note: "The map fix should ask git what is ignored rather than grow a hardcoded directory list; the list already carries build, bin, obj, dist and temp and still missed .build, and it will miss the next ecosystem's convention too. Falling back to the existing list when git is unavailable keeps the command working outside a repository. The install fix has to make a git-URL install produce the same package a published tarball produces, which means the prepare step covers the same ground as build, not just a PATH correction. The nested-install test is the expensive half of S279-3 and is worth its own attention: it is a real npm install from a git URL, not a unit test."
     tickets:
       - key: S279-1
         title: Respect gitignore when counting source and test files, falling back to the skip list outside a repository (#699)
@@ -24,14 +24,14 @@ sprints:
         complexity: moderate
         github_issue: 699
       - key: S279-2
-        title: Make the packaged prepare step invoke the local TypeScript binary by path so a git-url install works on Windows (#705)
+        title: "Make prepare produce the same output as build, invoking each TypeScript run by path so a git-url install works on Windows (#705)"
         club: short_iron
         complexity: standard
         github_issue: 705
       - key: S279-3
-        title: "Cover both with tests: a gitignored build tree that must not be counted, and a nested install that must not need PATH (#699, #705)"
-        club: short_iron
-        complexity: standard
+        title: "Cover a gitignored build tree that must not be counted, and a real git-url install that must not need PATH (#699, #705)"
+        club: long_iron
+        complexity: moderate
         github_issue: 699
         depends_on:
           - S279-1
