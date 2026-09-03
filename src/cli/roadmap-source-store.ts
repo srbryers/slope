@@ -1,6 +1,6 @@
 import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, statSync, unlinkSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
-import { stringify } from 'yaml';
+import { parseDocument, stringify } from 'yaml';
 import {
   compileRoadmapSources,
   compareRoadmapSprintIds,
@@ -30,6 +30,42 @@ import { patchRoadmapSourceSprintText } from '../core/roadmap-source-patch.js';
 /** Deterministic JSON with sorted keys, for order-insensitive semantic comparison. */
 function stableJson(value: unknown): string {
   return JSON.stringify(sortKeysDeep(value));
+}
+
+/** Mark a sprint complete by editing the parsed document rather than
+ *  re-serialising a plain object.
+ *
+ *  The yaml package's Document keeps comments through an edit, so this is the
+ *  fallback for shapes the surgical text patcher declines. Serialising a fresh
+ *  object instead discards every comment in the bundle, which silently deleted
+ *  an authored history note from a phase file (#706).
+ *
+ *  Returns null when the document is not the shape this can safely edit, so
+ *  the caller keeps its existing behaviour rather than writing something
+ *  unexpected.
+ */
+function rewriteSprintStatusPreservingComments(
+  originalText: string,
+  sprintIndex: number,
+  scorecard: { scorecardKey?: string; scorecardPath?: string },
+): string | null {
+  if (sprintIndex < 0) return null;
+  let doc;
+  try {
+    doc = parseDocument(originalText);
+  } catch {
+    return null;
+  }
+  if (doc.errors.length > 0) return null;
+  // Only edit a sprint entry that is already a mapping; anything else means
+  // the shape is not what this expects and the caller should fall back.
+  if (doc.getIn(['sprints', sprintIndex]) == null) return null;
+
+  doc.setIn(['sprints', sprintIndex, 'status'], 'complete');
+  if (scorecard.scorecardKey && scorecard.scorecardPath) {
+    doc.setIn(['scorecards', scorecard.scorecardKey], scorecard.scorecardPath);
+  }
+  return String(doc);
 }
 
 function sortKeysDeep(value: unknown): unknown {
@@ -397,10 +433,18 @@ export function completeRoadmapSourceSprint(
     }
     if (nextText == null) {
       // The document shape prevents a confidently surgical edit (flow-style
-      // entries, mixed EOLs). Fall back to the legacy full rewrite, which
-      // reformats the bundle; post-write federation validation still runs.
+      // entries, mixed EOLs). Apply the same targeted change to the parsed
+      // document instead of serialising expectedDocument from scratch: the
+      // change is known exactly, and a full stringify discards every comment
+      // in the bundle, which silently deleted authored history (#706).
+      // Still marked reformatted, because node-level formatting can shift.
       reformatted = true;
-      nextText = stringify(expectedDocument);
+      const sprintIndex = freshOwner.document.sprints.findIndex(
+        item => roadmapSprintKey(fresh.roadmap, item) === storedKey,
+      );
+      nextText = rewriteSprintStatusPreservingComments(originalText, sprintIndex, {
+        ...(normalizedScorecard ? { scorecardKey, scorecardPath: normalizedScorecard } : {}),
+      }) ?? stringify(expectedDocument);
     }
     atomicWriteFileSync(freshOwner.absolutePath, nextText);
     const reloaded = loadRoadmapSourceStore(cwd, options.sourceFlag);
@@ -657,8 +701,39 @@ export function planRoadmapSourceArchive(
     through,
     moves,
     project,
-    manifestYaml: stringify(project, { lineWidth: 0 }),
+    manifestYaml: rewriteManifestSourcesPreservingComments(store.manifestPath, nextEntries)
+      ?? stringify(project, { lineWidth: 0 }),
   };
+}
+
+/** Rewrite only the `sources` list in the manifest, keeping the rest of the
+ *  document as authored.
+ *
+ *  Archiving changes nothing but which directory each source lives in, yet the
+ *  previous full stringify discarded every comment in project.yaml, including
+ *  the long authored description block (#706). This has no surgical text
+ *  patcher to fall back on, so the Document API is the only path that keeps
+ *  them. Comments written inside the sources list itself do not survive, since
+ *  that node is replaced wholesale; comments anywhere else do.
+ *
+ *  Returns null when the manifest cannot be read or parsed, so the caller
+ *  keeps its previous behaviour.
+ */
+function rewriteManifestSourcesPreservingComments(
+  manifestPath: string,
+  nextEntries: RoadmapSourceProject['sources'],
+): string | null {
+  let doc;
+  try {
+    doc = parseDocument(readFileSync(manifestPath, 'utf8'));
+  } catch {
+    return null;
+  }
+  if (doc.errors.length > 0) return null;
+  if (doc.getIn(['sources']) == null) return null;
+
+  doc.setIn(['sources'], nextEntries);
+  return String(doc);
 }
 
 export function applyRoadmapSourceArchive(
