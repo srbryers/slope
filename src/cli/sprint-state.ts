@@ -1,5 +1,5 @@
 import { readFileSync, existsSync, unlinkSync } from 'node:fs';
-import { isAbsolute, join } from 'node:path';
+import { isAbsolute, join, relative } from 'node:path';
 import { resolveRepoStatePath } from '../core/repo-state-scope.js';
 import { sprintIdKey, sprintIdsEqual, type SprintId } from '../core/sprint-id.js';
 import { atomicWriteFileSync, withFileLockSync } from './atomic-write.js';
@@ -411,6 +411,15 @@ export function isActiveSprintState(state: SprintState | null): state is SprintS
 
 function sprintStatePath(cwd: string): string {
   return resolveRepoStatePath(cwd, SPRINT_STATE_FILE);
+}
+
+/** Where sprint state actually lives for this checkout, repo-relative where
+ *  possible. In a linked worktree this resolves to the primary checkout, so a
+ *  caller reporting the write must not hardcode the default path. */
+export function sprintStateLocation(cwd: string): string {
+  const path = sprintStatePath(cwd);
+  const rel = relative(cwd, path);
+  return rel.startsWith('..') ? path : rel.replace(/\\/g, '/');
 }
 
 function saveSprintStateUnlocked(filePath: string, state: SprintState, touchUpdatedAt = true): void {

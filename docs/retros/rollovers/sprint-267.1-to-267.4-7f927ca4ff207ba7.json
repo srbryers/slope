@@ -1,0 +1,317 @@
+{
+  "version": 1,
+  "kind": "sprint_rollover",
+  "transition_id": "3a28882ae2fce164",
+  "from_sprint": "267.1",
+  "to_sprint": "267.4",
+  "from_label": "S267.1",
+  "to_label": "S267.4",
+  "recorded_at": "2026-09-03T17:14:18.725Z",
+  "actor": {
+    "name": "srbry",
+    "source": "env:USERNAME"
+  },
+  "request": {
+    "from": "267.1",
+    "to": "267.4",
+    "force": true,
+    "reason": "Operator re-prioritised Phase 67 ahead of Phase 64 on 2026-09-03. S267.4 fixes #706, where slope validate silently deletes YAML comments from roadmap sources. Phase 64 stays planned and untouched; the phase was renumbered from 275/276 because SLOPE models execution order by sprint id."
+  },
+  "forced": true,
+  "reason": "Operator re-prioritised Phase 67 ahead of Phase 64 on 2026-09-03. S267.4 fixes #706, where slope validate silently deletes YAML comments from roadmap sources. Phase 64 stays planned and untouched; the phase was renumbered from 275/276 because SLOPE models execution order by sprint id.",
+  "eligibility": {
+    "from_terminal": true,
+    "target_dependency_eligible": true,
+    "blocking_dependencies": [],
+    "target_dependencies": [],
+    "completion_evidence": {
+      "roadmap_complete": [
+        "61",
+        "62",
+        "63",
+        "64",
+        "65",
+        "66",
+        "67",
+        "68",
+        "69",
+        "70",
+        "71",
+        "72",
+        "73",
+        "74",
+        "75",
+        "76",
+        "77",
+        "78",
+        "79",
+        "80",
+        "81",
+        "82",
+        "83",
+        "84",
+        "86",
+        "87",
+        "88",
+        "89",
+        "90",
+        "91",
+        "92",
+        "93",
+        "94",
+        "95",
+        "96",
+        "97",
+        "98",
+        "99",
+        "100",
+        "101",
+        "102",
+        "103",
+        "104",
+        "105",
+        "106",
+        "107",
+        "108",
+        "109",
+        "110",
+        "111",
+        "112",
+        "113",
+        "114",
+        "114.5",
+        "115",
+        "116",
+        "117",
+        "118",
+        "119",
+        "120",
+        "121",
+        "122",
+        "123",
+        "124",
+        "125",
+        "126",
+        "127",
+        "130",
+        "131",
+        "132",
+        "133",
+        "134",
+        "135",
+        "136",
+        "137",
+        "137.5",
+        "138",
+        "139",
+        "140",
+        "141",
+        "142",
+        "143",
+        "143.5",
+        "143.6",
+        "143.7",
+        "143.8",
+        "143.9",
+        "143.95",
+        "143.97",
+        "143.98",
+        "143.99",
+        "144",
+        "145",
+        "146",
+        "146.1",
+        "146.2",
+        "146.3",
+        "148",
+        "149",
+        "150",
+        "151",
+        "151.1",
+        "152",
+        "152.1",
+        "153",
+        "154",
+        "216",
+        "217",
+        "218",
+        "219",
+        "220",
+        "221",
+        "222",
+        "223",
+        "224",
+        "226",
+        "227",
+        "228",
+        "229",
+        "230",
+        "231",
+        "232",
+        "233",
+        "234",
+        "235",
+        "236",
+        "241",
+        "242",
+        "243",
+        "244",
+        "246",
+        "247",
+        "248",
+        "249",
+        "250",
+        "251",
+        "252",
+        "253",
+        "254",
+        "256",
+        "258",
+        "259",
+        "260",
+        "260.1",
+        "261",
+        "262",
+        "263",
+        "264",
+        "264.1",
+        "264.2",
+        "265",
+        "266",
+        "267",
+        "267.1",
+        "267.2",
+        "267.3"
+      ],
+      "scorecards": [
+        "264.2",
+        "267",
+        "267.1",
+        "267.2"
+      ],
+      "local_terminal": [
+        "267.1"
+      ]
+    },
+    "scorecard_artifacts": [
+      {
+        "sprint": "264.2",
+        "path": "docs/retros/sprint-264.2.json",
+        "sha256": "29d40189950587d55533d76d318dc1ba44c14e6deb6646077f6b46fe53f60ba6"
+      },
+      {
+        "sprint": "267",
+        "path": "docs/retros/sprint-267.json",
+        "sha256": "de626ebc26280fa28d74f174516098fb85d3f14fa59a09cf63b848e17c622719"
+      },
+      {
+        "sprint": "267.1",
+        "path": "docs/retros/sprint-267.1.json",
+        "sha256": "11c948d0f56f3e607cad57042ef9d179659f166b7bdf852d564620eb6edbcf07"
+      },
+      {
+        "sprint": "267.2",
+        "path": "docs/retros/sprint-267.2.json",
+        "sha256": "c6201ecacaad48e3e6aa6229aa06bce030a21ba5522b81a63c7ad515bf440fdf"
+      }
+    ],
+    "expected_next": "267.4"
+  },
+  "roadmap": {
+    "path": "docs/backlog/roadmap.json",
+    "sha256": "a6e58900523c3eb8afd752598aa9729792a7526951008571a20bdf81772d0847",
+    "from_status": "complete",
+    "to_status": "planned"
+  },
+  "prior_state_sha256": "793d02b761a66c007ed3a0dc5d1608b5894c036b339df7ebe976be7732749420",
+  "prior_state": {
+    "sprint": "267.1",
+    "phase": "complete",
+    "gates": {
+      "tests": true,
+      "code_review": true,
+      "architect_review": true,
+      "scorecard": true,
+      "review_md": true
+    },
+    "review_gates": {
+      "code_review": {
+        "provenance": "independent_review",
+        "evidence": [
+          "docs/retros/sprint-267.1-code-review.md"
+        ],
+        "reviewer": "code-implementation-correctness-reviewer",
+        "verdict": "pass",
+        "updated_at": "2026-08-19T11:01:53.675Z"
+      },
+      "architect_review": {
+        "provenance": "independent_review",
+        "evidence": [
+          "docs/retros/sprint-267.1-architect-review.md"
+        ],
+        "reviewer": "workflow-architecture-reviewer",
+        "verdict": "pass",
+        "updated_at": "2026-08-19T11:01:54.113Z"
+      }
+    },
+    "review_requirements": {
+      "code_review": {
+        "priority": "unspecified"
+      },
+      "architect_review": {
+        "priority": "unspecified"
+      }
+    },
+    "started_at": "2026-08-19T11:00:19.459Z",
+    "updated_at": "2026-08-20T09:21:40.930Z",
+    "rollover": {
+      "transition_id": "0eb9fed509f76e34",
+      "from_sprint": "260",
+      "audit_path": "docs/retros/rollovers/sprint-260-to-267.1-d5023b299657de11.json",
+      "recorded_at": "2026-08-19T11:00:19.459Z",
+      "forced": true,
+      "reason": "Phase 62 (S260-S262) was authored against v1.64.1 while main advanced to v2.0.0. Sprints 260-262 and phases 62-64 were already taken, so the same work was rebased onto v2.0 and renumbered as decimal inserts after S267, the last complete sprint. Same tickets, scorecards and review evidence; new ids."
+    }
+  },
+  "next_state": {
+    "sprint": "267.4",
+    "phase": "planning",
+    "gates": {
+      "tests": false,
+      "code_review": false,
+      "architect_review": false,
+      "scorecard": false,
+      "review_md": false
+    },
+    "review_gates": {
+      "code_review": {
+        "provenance": "pending",
+        "evidence": []
+      },
+      "architect_review": {
+        "provenance": "pending",
+        "evidence": []
+      }
+    },
+    "review_requirements": {
+      "code_review": {
+        "priority": "unspecified"
+      },
+      "architect_review": {
+        "priority": "unspecified"
+      }
+    },
+    "started_at": "2026-09-03T17:14:18.725Z",
+    "updated_at": "2026-09-03T17:14:18.725Z",
+    "rollover": {
+      "transition_id": "3a28882ae2fce164",
+      "from_sprint": "267.1",
+      "audit_path": "docs/retros/rollovers/sprint-267.1-to-267.4-7f927ca4ff207ba7.json",
+      "recorded_at": "2026-09-03T17:14:18.725Z",
+      "forced": true,
+      "reason": "Operator re-prioritised Phase 67 ahead of Phase 64 on 2026-09-03. S267.4 fixes #706, where slope validate silently deletes YAML comments from roadmap sources. Phase 64 stays planned and untouched; the phase was renumbered from 275/276 because SLOPE models execution order by sprint id."
+    }
+  },
+  "claims_policy": "unchanged",
+  "sessions_policy": "unchanged"
+}

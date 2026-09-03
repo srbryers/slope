@@ -1,0 +1,143 @@
+{
+  "sprint_number": "267.4",
+  "theme": "Source Write Discipline",
+  "par": 4,
+  "slope": 4,
+  "score": 12,
+  "score_label": "triple_plus",
+  "date": "2026-09-03",
+  "shots": [
+    {
+      "ticket_key": "S267.4-1",
+      "title": "Serialise through the yaml Document API at the two whole-document write sites, the patcher fallback and the archive manifest (#706)",
+      "club": "long_iron",
+      "result": "missed_left",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "critical",
+          "description": "[code review] The document-level fallback shipped without the over-reach check the surgical path runs. With an anchored status shared by a later sprint, completing one sprint marked a second complete as well, in both the YAML and the projection. Main does not do this, so it was a regression worse than the comment loss the fallback exists to fix.",
+          "gotcha_id": "review:code"
+        },
+        {
+          "type": "rough",
+          "severity": "major",
+          "description": "[code review] The helper guarded only parseDocument, so setIn threw on aliased sprints and scorecards shapes that main reconciled cleanly, breaking its stated return-null contract.",
+          "gotcha_id": "review:code"
+        },
+        {
+          "type": "rough",
+          "severity": "moderate",
+          "description": "[code review] Both helpers returned String(doc), which wraps at 80 columns, where the stringify they replaced did not wrap. This repo's own project.yaml went from 126 to 158 lines, reflowing the authored description on every archive.",
+          "gotcha_id": "review:code"
+        },
+        {
+          "type": "rough",
+          "severity": "moderate",
+          "description": "[code review] A pre-existing unquoted numeric scorecards key and the quoted key written by setIn are different YAML keys, so the fallback left both in the file.",
+          "gotcha_id": "review:code"
+        }
+      ],
+      "notes": "Scored a miss. The first cut shipped a data-corruption regression that independent code review caught by execution: the fallback wrote without the over-reach check, so an anchored status marked a second sprint complete. The claim in the original commit that 'the existing reparse-and-compare guard still runs' was false, because that check sits inside the surgical branch. It does run now, added in response. Roadmap source writes take two paths and only one lost comments: the surgical patcher in src/core/roadmap-source-patch.ts preserves everything around the lines it edits and must NOT be extended. The loss was at the two whole-document serialise sites, the patcher fallback and the archive manifest, and both now edit the parsed document with lineWidth 0 so long authored notes are not reflowed."
+    },
+    {
+      "ticket_key": "S267.4-2",
+      "title": "Close the reporting gaps the existing reformat warning leaves: the projection path, comment loss, and the silent gate write (#706)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "description": "S267.4-1 made an existing warning inaccurate. The reformat message said the source 'was rewritten in canonical YAML style', which after the fix overstates what happens: formatting is normalised and comments survive. A fix in one ticket silently invalidated prose in another; both call sites had to be re-read, not just the one under edit."
+        },
+        {
+          "type": "rough",
+          "severity": "major",
+          "description": "[code review] The CLI printed 'Comments are preserved' unconditionally on the reformat path, including when the helper returned null and the bundle was serialised from scratch with its comments destroyed.",
+          "gotcha_id": "review:code"
+        },
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "[code review] The gate message hardcoded .slope/sprint-state.json, which resolves to the primary checkout from a linked worktree.",
+          "gotcha_id": "review:code"
+        }
+      ],
+      "notes": "Three gaps, all narrower than the issue implied because validate and roadmap already named the rewritten source and warned on reformat. completeRoadmapSourceSprint now carries the repo-relative projection path so both callers can name the file rather than reporting bare 'written'. The scorecard gate write into .slope/sprint-state.json was never mentioned at all and now is. The reformat wording is corrected at both sites."
+    },
+    {
+      "ticket_key": "S267.4-3",
+      "title": "Extend --read-only to roadmap compile and complete, and decide the default with the answer recorded in the flag's help (#706)",
+      "club": "short_iron",
+      "result": "missed_short",
+      "hazards": [
+        {
+          "type": "rough",
+          "description": "The flag already existed everywhere under three different names: --read-only on validate, --dry-run on roadmap compile and complete, and --check on compile for the exit-code variant. Reading the code first turned 'add a flag to two commands' into 'alias two words', avoiding a fourth mechanism for an idea that already had three."
+        },
+        {
+          "type": "bunker",
+          "severity": "critical",
+          "description": "[architect review] slope validate --dry-run still ran the full write path while the comment added beside it claimed both spellings worked. A reader following the sprint's own documentation, on the command the issue names, got the writes.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "rough",
+          "severity": "major",
+          "description": "[code review] parseArgs drops unknown flags, so --read-only was silently ignored by roadmap archive, migrate, sync and generate while a comment claimed it worked everywhere. roadmap archive --through=N --read-only moved and deleted source files.",
+          "gotcha_id": "review:code"
+        }
+      ],
+      "notes": "Scored a miss. The first cut wrote a comment claiming both spellings worked everywhere and then implemented neither half: validate still parsed only --read-only, so --dry-run ran the full write path on the very command the issue names, and parseArgs silently dropped --read-only on archive, migrate, sync and generate, where archive moved and deleted source files. Both reviews caught it by execution. Now both spellings route through one isReadOnly helper across validate, compile, complete, archive, migrate and sync. The default stays a writer, decided rather than left implicit: closeout depends on the reconciliation, and flipping it trades a surprising write for a silent omission people forget to run. Shipping without an automated test for the flag parse is what let the false claim survive; the CLI-level check that caught it afterwards is not a substitute."
+    },
+    {
+      "ticket_key": "S267.4-4",
+      "title": "Cover comment survival on both write sites and the reporting output, reusing the existing reformat fixture (#706)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "description": "The method for checking whether a test is discriminating was itself wrong. Stashing the source file did nothing, because both helpers had already been committed with S267.4-1, so the 'test passes without the fix' result was an artefact of the check rather than a property of the test. Nearly discarded a good test on it. Reverting the specific call site, not stashing the file, is the check that actually works when the code under test is already committed."
+        },
+        {
+          "type": "rough",
+          "description": "First archive test hand-rolled a fixture and failed twice: wrong planRoadmapSourceArchive signature (it takes a number, not an options object), then an invalid archive plan from an incomplete fixture. The suite already had writeFixture plus addPhaseOneArchiveEvidence for exactly this."
+        }
+      ],
+      "notes": "Three tests, each confirmed to fail with its fix reverted: comments survive the patcher fallback, comments survive the archive manifest rewrite, and the projection path is reported alongside its status. The manifest test reuses the existing archive fixture."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 2,
+    "fairways_total": 4,
+    "greens_in_regulation": 2,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 12,
+    "hazard_penalties": 8,
+    "miss_directions": {
+      "long": 0,
+      "short": 1,
+      "left": 1,
+      "right": 0
+    }
+  },
+  "conditions": [],
+  "special_plays": [],
+  "bunker_locations": [
+    "The document-level fallback in roadmap-source-store.ts must run the same reparse-and-compare over-reach check as the surgical path. Without it an anchored or aliased status silently mutates a second sprint.",
+    "yaml Document toString wraps at 80 columns by default. Pass lineWidth 0 anywhere the previous code used stringify with lineWidth 0, or every long authored note reflows.",
+    "src/core/roadmap-source-patch.ts is the comment-preserving path and must not be extended to shapes it declines.",
+    "parseArgs in roadmap.ts silently drops unknown flags, so a new flag name is accepted and ignored rather than rejected. Adding an alias means routing every writing subcommand through one helper.",
+    "Checking that a test is discriminating requires reverting the specific call site. Stashing the file is a no-op when the code under test is already committed."
+  ],
+  "yardage_book_updates": [],
+  "course_management_notes": [],
+  "github_issues": [
+    706
+  ],
+  "review_findings": [],
+  "notes": "Closes the data-loss half of #706, the first sprint of Phase 67, pulled ahead of Phase 64 on an operator decision. Scored triple_plus rather than par, and two tickets are misses. Independent code and architect review found eight defects by executing the code, two critical: the fallback wrote without the over-reach check, so an anchored status marked a second sprint complete, a regression worse than the bug being fixed; and validate --dry-run ran the full write path while a comment three lines away claimed otherwise. Both were shipped with a confident and false claim in the commit message. All eight are fixed and re-verified. The lasting lesson is that a claim about a safety check is worth nothing unless the check is on the path being changed."
+}

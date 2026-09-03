@@ -930,6 +930,135 @@ sprints:
     expect(store.sources[0].document.sprints[0].status).toBe('complete');
   });
 
+  // #706: the archive manifest rewrite had no surgical path at all, so it
+  // discarded project.yaml's authored description block wholesale.
+  it('preserves manifest comments when archiving moves sources', async () => {
+    writeFixture();
+    addPhaseOneArchiveEvidence();
+    const manifestPath = join(cwd, 'docs', 'roadmap', 'project.yaml');
+    writeFileSync(
+      manifestPath,
+      `# why this roadmap is shaped this way\n${readFileSync(manifestPath, 'utf8')}`,
+    );
+    await roadmapCommand(['compile']);
+
+    const store = loadRoadmapSourceStore(cwd);
+    const plan = planRoadmapSourceArchive(store, 8);
+
+    expect(plan.manifestYaml).toContain('# why this roadmap is shaped this way');
+    expect(plan.manifestYaml).toContain('archive/phase-01.yaml');
+  });
+
+  // Found by independent code review of S267.4. The document-level fallback
+  // shipped without the over-reach check the surgical path runs, so an
+  // anchored status shared by a later sprint let one reconcile mark a second
+  // sprint complete. Worse than the comment loss the fallback exists to fix.
+  it('refuses to reconcile when an anchored status would change another sprint', () => {
+    const root = join(cwd, 'docs', 'roadmap');
+    mkdirSync(join(root, 'phases'), { recursive: true });
+    writeFileSync(join(root, 'project.yaml'), `
+version: 1
+name: Anchor Roadmap
+output: ../backlog/roadmap.json
+sources:
+  - path: phases/phase-01.yaml
+    kind: phase
+`);
+    writeFileSync(join(root, 'phases', 'phase-01.yaml'), `version: 1
+phase:
+  name: Phase 1
+  status: active
+  sprints: [7, 8]
+sprints:
+  - {id: 7, theme: A, par: 3, slope: 1, type: feature, status: &planned planned, tickets: [{key: S7-1, title: T1, club: wedge, complexity: small}]}
+  - {id: 8, theme: B, par: 3, slope: 1, type: feature, status: *planned, tickets: [{key: S8-1, title: T1, club: wedge, complexity: small}]}
+`);
+
+    completeRoadmapSourceSprint(cwd, 7, {});
+
+    const store = loadRoadmapSourceStore(cwd);
+    const seven = store.sources[0].document.sprints.find(item => item.id === 7);
+    const eight = store.sources[0].document.sprints.find(item => item.id === 8);
+    expect(seven?.status).toBe('complete');
+    expect(eight?.status).toBe('planned');
+  });
+
+  // #706: "projection written" never said which tracked file changed, so a
+  // reader watching the output could not tell what had been rewritten.
+  it('reports the projection path alongside its status', () => {
+    const root = join(cwd, 'docs', 'roadmap');
+    mkdirSync(join(root, 'phases'), { recursive: true });
+    writeFileSync(join(root, 'project.yaml'), `
+version: 1
+name: Path Roadmap
+output: ../backlog/roadmap.json
+sources:
+  - path: phases/phase-01.yaml
+    kind: phase
+`);
+    writeFileSync(join(root, 'phases', 'phase-01.yaml'), `version: 1
+phase:
+  name: Phase 1
+  status: active
+  sprints: [7]
+sprints:
+  - id: 7
+    theme: T
+    par: 3
+    slope: 1
+    type: feature
+    status: planned
+    tickets:
+      - key: S7-1
+        title: T1
+        club: wedge
+        complexity: small
+`);
+
+    const result = completeRoadmapSourceSprint(cwd, 7, {});
+
+    expect(result.projectionPath).toBe('docs/backlog/roadmap.json');
+    expect(result.projection).toBe('written');
+  });
+
+  // #706: the fallback rewrite serialised a fresh object, discarding every
+  // comment in the bundle. An authored history note was deleted silently and
+  // recovered only from git.
+  it('preserves comments when the fallback rewrite runs', () => {
+    const root = join(cwd, 'docs', 'roadmap');
+    mkdirSync(join(root, 'phases'), { recursive: true });
+    writeFileSync(join(root, 'project.yaml'), `
+version: 1
+name: Flow Roadmap
+output: ../backlog/roadmap.json
+sources:
+  - path: phases/phase-01.yaml
+    kind: phase
+`);
+    // Flow-style sprint entry defeats the surgical patcher, so this exercises
+    // the fallback path specifically.
+    writeFileSync(join(root, 'phases', 'phase-01.yaml'), `# authored history: why this phase exists
+version: 1
+phase:
+  name: Phase 1
+  # this note was silently deleted before the fix
+  status: active
+  sprints: [7]
+sprints:
+  - {id: 7, theme: T, par: 3, slope: 1, type: feature, status: planned, tickets: [{key: S7-1, title: T1, club: wedge, complexity: small}]}
+`);
+
+    const result = completeRoadmapSourceSprint(cwd, 7, {});
+    expect(result.reformatted).toBe(true);
+
+    const text = readFileSync(join(root, 'phases', 'phase-01.yaml'), 'utf8');
+    expect(text).toContain('# authored history: why this phase exists');
+    expect(text).toContain('# this note was silently deleted before the fix');
+
+    const store = loadRoadmapSourceStore(cwd);
+    expect(store.sources[0].document.sprints[0].status).toBe('complete');
+  });
+
   it('refuses to reconcile when a sprint identity is ambiguous across sources', () => {
     const root = join(cwd, 'docs', 'roadmap');
     mkdirSync(join(root, 'phases'), { recursive: true });
