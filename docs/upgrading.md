@@ -18,13 +18,19 @@ Two things improve that now.
 
 `roadmap compile --check` distinguishes a version mismatch from real drift and says which format is on disk, rather than blaming your working tree.
 
-The comparison normalises dependency ids on read, so a projection written by either version compares equal to one written by the other. This is the half that helps a pinned CI, because it works regardless of which binary wrote the file.
+The comparison also normalises dependency ids on read, so a numeric entry compares equal to its canonical string form. Two limits are worth stating plainly.
+
+It does not help a trailing-zero id. A sprint authored `"458.10"` was written by 1.64.1 as the number `458.1`, and that is genuinely a different id, so drift is still reported. That is the right answer, and it is also the exact id shape canonical sprint identity exists for, so it is not a rare case in a project that uses decimal inserts.
+
+It only runs in a binary that has this code. A CI pinned at 1.64.1 does not, so the improvement reaches you when the pin moves, not before.
 
 **What to do.**
 
 If everything runs the same version, upgrade normally. Expect one large diff on `docs/backlog/roadmap.json` the first time you compile.
 
 If your CI pins an older version than you run locally, either align the pin, or compile with the pinned binary as the last step before committing. `slope roadmap archive` only exists on 2.x, so compacting a roadmap on a pinned repository means archiving with 2.x and then recompiling with the pin.
+
+**The source-mutation symptom.** #702 also reports that 1.64.1's `roadmap compile` rewrote a source YAML it was not asked to touch, converting dependency numbers to strings, after which its own `compile --check` failed on the projection it had just written. 2.x does not reproduce this: the checksum of every source file is unchanged across a `roadmap compile` run. Nothing was changed for it, because there is nothing to change here; the fix for anyone still on 1.64.1 is to move the pin.
 
 Reported as [#702](https://github.com/srbryers/slope/issues/702).
 

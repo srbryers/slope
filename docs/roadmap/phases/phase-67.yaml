@@ -49,7 +49,7 @@ sprints:
     par: 4
     slope: 3
     type: bugfix + compatibility
-    status: planned
+    status: complete
     github_issues:
       - 702
       - 700
@@ -80,3 +80,4 @@ sprints:
           - S267.5-2
 scorecards:
   "267.4": docs/retros/sprint-267.4.json
+  "267.5": docs/retros/sprint-267.5.json

@@ -56,6 +56,7 @@ import {
   validateRoadmapSourceStore,
   writeRoadmapSourceProjection,
   roadmapProjectionMatches,
+  roadmapProjectionWriteBytes,
   completeRoadmapSourceSprint,
 } from '../roadmap-source-store.js';
 import {
@@ -649,6 +650,15 @@ function compileSourcesSubcommand(flags: Record<string, string>, cwd: string): v
     const changed = existing == null || !roadmapProjectionMatches(existing, store.projection);
     const output = displayPath(cwd, store.outputPath);
 
+    // #700 asked for this warning from compile as well as validate-sources,
+    // and compile is where the reported symptom happened: an orphaned source
+    // compiles to nothing and the command says "projection unchanged".
+    // Reporting it only from validate-sources reaches nobody who has not
+    // already suspected a problem.
+    for (const warning of validation.warnings.filter(issue => issue.code === 'unregistered_source')) {
+      console.log(`\n⚠ ${warning.source}: ${warning.message}`);
+    }
+
     if (flags.check === 'true') {
       if (changed) {
         // A projection written by a different format generation is not drift,
@@ -661,7 +671,7 @@ function compileSourcesSubcommand(flags: Record<string, string>, cwd: string): v
             `  On disk: format ${onDiskFormat}. This binary writes format ${ROADMAP_PROJECTION_FORMAT}.`,
             '  Recompiling here produces a file the other version rejects, and vice versa.',
             '  Compile with whichever binary your CI pins as the last step before committing,',
-            '  or align the pin. See the changelog entry for the format change.',
+            '  or align the pin. See docs/upgrading.md for the format change.',
           ].join('\n'));
         }
         throw new Error(
@@ -676,7 +686,18 @@ function compileSourcesSubcommand(flags: Record<string, string>, cwd: string): v
     // asked for a pure check without having to know which command uses which
     // word. Both spellings work everywhere now.
     if (isReadOnly(flags)) {
-      console.log(`\nRoadmap compile dry run: ${changed ? 'would write' : 'already current'} ${output}`);
+      // Predict by the measure the write uses, which is exact bytes. Semantic
+      // equality is the right gate for --check but the wrong one here: a file
+      // whose content matches but whose bytes differ (missing marker, older
+      // dependency-id form) is still going to be rewritten, and a dry run that
+      // says "already current" first is worse than no dry run (#702).
+      const desired = roadmapProjectionWriteBytes(store);
+      const bytesDiffer = existing == null
+        || existing.replace(/\r\n/g, '\n') !== desired.replace(/\r\n/g, '\n');
+      const verdict = bytesDiffer
+        ? (changed ? 'would write' : 'would rewrite (content current, bytes differ)')
+        : 'already current';
+      console.log(`\nRoadmap compile dry run: ${verdict} ${output}`);
       console.log(`  Sources: ${store.sources.length}; phases: ${store.roadmap.phases.length}; sprints: ${store.roadmap.sprints.length}\n`);
       return;
     }

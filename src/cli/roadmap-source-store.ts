@@ -1,4 +1,4 @@
-import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, unlinkSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, unlinkSync, type Dirent } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { isMap, parseDocument, stringify } from 'yaml';
 import {
@@ -579,7 +579,16 @@ function dependencyNormalizedCanonicalJson(projection: string): string | null {
   return JSON.stringify(normalize(parsed));
 }
 
-/** Projection bytes to write: canonical content plus the generated-file marker. */
+/** Projection bytes to write: canonical content plus the generated-file marker.
+ *
+ *  Exported so a dry run can predict the write by the same measure the write
+ *  uses. Comparing semantics instead let `compile --dry-run` report "already
+ *  current" immediately before `compile` rewrote the file (#702).
+ */
+export function roadmapProjectionWriteBytes(store: RoadmapSourceStore): string {
+  return projectionBytesForWrite(store);
+}
+
 function projectionBytesForWrite(store: RoadmapSourceStore): string {
   const manifestLabel = normalizeDiagnosticPath(relative(store.cwd, store.manifestPath));
   return withRoadmapProjectionMarker(store.projection, manifestLabel);
@@ -693,11 +702,18 @@ export function validateRoadmapSourceStore(
  */
 function unregisteredSourceWarnings(store: RoadmapSourceStore): RoadmapSourceValidationResult['warnings'] {
   const warnings: RoadmapSourceValidationResult['warnings'] = [];
+  // Windows and macOS resolve paths case-insensitively, so a source registered
+  // as `phases/Phase-01.yaml` against a file named `phase-01.yaml` loads and
+  // compiles fine. Comparing case-sensitively would report that working file
+  // as unregistered, and following the advice would add a duplicate entry.
   const registered = new Set(
-    store.sources.map(source => resolve(source.absolutePath as string)),
+    store.sources.map(source => comparablePath(source.absolutePath as string)),
   );
   // Only look where registered sources already live, so an unrelated docs tree
-  // is never scanned.
+  // is never scanned. Note the safety of never reporting the manifest or the
+  // compiled output rests on parseRoadmapSourceProject forcing each source
+  // kind into phases/, backlog/ or archive/, which keeps both out of every
+  // scanned directory.
   const directories = new Set(
     store.sources
       .map(source => dirname(source.absolutePath as string))
@@ -705,24 +721,37 @@ function unregisteredSourceWarnings(store: RoadmapSourceStore): RoadmapSourceVal
   );
 
   for (const dir of [...directories].sort()) {
-    let entries: string[];
+    let entries: Dirent[];
     try {
-      entries = readdirSync(dir);
+      entries = readdirSync(dir, { withFileTypes: true });
     } catch {
       continue;
     }
-    for (const name of entries.sort()) {
-      if (!/\.ya?ml$/i.test(name)) continue;
-      const absolute = resolve(join(dir, name));
-      if (registered.has(absolute)) continue;
+    for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+      // A directory named `nested.yaml` is not a source.
+      if (!entry.isFile()) continue;
+      if (!/\.ya?ml$/i.test(entry.name)) continue;
+      const absolute = resolve(join(dir, entry.name));
+      if (registered.has(comparablePath(absolute))) continue;
       warnings.push({
         code: 'unregistered_source',
-        source: normalizeDiagnosticPath(relative(store.cwd, absolute)),
+        // Source-root relative, matching every sibling warning and, more
+        // importantly, matching the form the registry itself wants, so the
+        // advice below can be followed literally.
+        source: normalizeDiagnosticPath(relative(store.sourceRoot, absolute)),
         message: 'not listed in project.yaml sources, so it compiles to nothing. Add it to the registry or move it out of the sources tree.',
       });
     }
   }
   return warnings;
+}
+
+/** Path form for comparing two references to the same file, honouring the
+ *  case-insensitivity of the platform's filesystem. */
+function comparablePath(path: string): string {
+  return process.platform === 'win32' || process.platform === 'darwin'
+    ? resolve(path).toLowerCase()
+    : resolve(path);
 }
 
 const ARCHIVABLE_STATUSES = new Set([

@@ -1,0 +1,127 @@
+{
+  "sprint_number": "267.5",
+  "theme": "Projection Compatibility",
+  "par": 4,
+  "slope": 3,
+  "score": 11,
+  "score_label": "triple_plus",
+  "date": "2026-09-03",
+  "shots": [
+    {
+      "ticket_key": "S267.5-1",
+      "title": "Stamp a projection format version into the generated header and report a version mismatch as a version mismatch, not as drift (#702)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "description": "The first cut read an absent format key as format 1, so every projection written before the key existed reported as a version mismatch. That is every repo upgrading, which would have been worse than the drift message it replaces. Caught by the existing 'detects projection drift in check mode' test. An absent declaration now means unknown and falls through to the ordinary drift path; only an explicit differing format reports."
+        }
+      ],
+      "notes": "The header gained a format generation, and compile --check names both generations rather than blaming the working tree. One over-reach caught in flight by an existing test: an absent key was read as format 1, which would have reported every projection written before the key existed as a version conflict. Honest limit, recorded in docs/upgrading.md: this ships zero behaviour today, because 2 is the only value ever written and pre-key files return null by design. It first fires when a format 3 exists and this binary is the old one."
+    },
+    {
+      "ticket_key": "S267.5-2",
+      "title": "Normalise dependency ids on read so numeric and string forms compare equal across versions (#702)",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "description": "The first normalisation re-serialised the whole document, so it forgave every formatting difference rather than only the dependency-id representation. The existing 'treats only CRLF checkout conversion as projection-equivalent' test caught it. Narrowed by requiring both sides to already be canonical two-space JSON with a trailing newline, so a genuine formatting difference is still drift, pinned by a new test."
+        },
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "[architect review] The dry-run branch used the loosened semantic comparison while the real write compares exact bytes, so compile --dry-run reported already current immediately before compile rewrote the file. That is the same class of defect the previous sprint in this phase existed to remove.",
+          "gotcha_id": "review:architect"
+        }
+      ],
+      "notes": "The half that reaches a pinned CI, because it works regardless of which binary wrote the file. One over-reach caught in flight: the first normalisation re-serialised the whole document and forgave every formatting difference. Independent review then found the dry-run branch still used the loosened comparison while the real write compares bytes, so a dry run said already current immediately before a rewrite. Fixed by predicting the write with the bytes it would write."
+    },
+    {
+      "ticket_key": "S267.5-3",
+      "title": "Warn on yaml files under the sources directories that no registry entry produces (#700)",
+      "club": "short_iron",
+      "result": "missed_short",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "[architect review] The warning reached validate-sources only. #700 asked for it from roadmap compile as well, and compile is where the reported symptom happened: an orphaned source compiles to nothing and the command prints projection unchanged with exit 0. Reporting it only from validate-sources reaches nobody who has not already suspected a problem.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "rough",
+          "severity": "major",
+          "description": "[code review] On a case-insensitive filesystem a source registered as Phase-01.yaml against a file named phase-01.yaml loads and compiles, but the case-sensitive comparison reported it as unregistered. The warning's one claim was false and following its advice would add a duplicate registry entry. A samePath helper doing exactly this already existed in roadmap-source-migration.",
+          "gotcha_id": "review:code"
+        },
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "[code review] The warning printed a cwd-relative path where every sibling warning prints source-root-relative, and the registry wants the second form, so the advice handed the reader the wrong string. A directory named nested.yaml was also reported as a source.",
+          "gotcha_id": "review:code"
+        }
+      ],
+      "notes": "Scored a miss. #700 named two commands and this shipped one: the warning reached validate-sources while roadmap compile, where the reported symptom actually happens, still printed projection unchanged with no warning. Independent code review also found the comparison was case-sensitive, so on Windows and macOS a registered source that loads and compiles was reported as unregistered, with advice that would add a duplicate entry. Both fixed, plus the path form and a directory named like a source."
+    },
+    {
+      "ticket_key": "S267.5-4",
+      "title": "Record the upgrade churn in the changelog: every dependency entry rewritten, plus a new header key that older binaries cannot read (#702)",
+      "club": "wedge",
+      "result": "missed_short",
+      "hazards": [
+        {
+          "type": "rough",
+          "description": "The ticket said changelog and this repo has no CHANGELOG file; releases use generated notes from commits. Wrote docs/upgrading.md instead, which is discoverable and durable where a commit message is neither."
+        },
+        {
+          "type": "rough",
+          "severity": "major",
+          "description": "[code review] The upgrade note claimed a projection written by either version compares equal to the other's. False for a trailing-zero canonical id, which is the exact shape canonical sprint identity exists for, and the claim was repeated in the commit body. It also claimed the normalisation helps a pinned CI, which only holds when the pin is the newer binary.",
+          "gotcha_id": "review:code"
+        },
+        {
+          "type": "bunker",
+          "severity": "moderate",
+          "description": "[architect review] The mismatch message pointed the reader at a changelog entry, and this repo has no changelog file, which is the reason the ticket wrote docs/upgrading.md in the first place.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "bunker",
+          "severity": "moderate",
+          "description": "[architect review] #702's second reported symptom, 1.64.1 mutating a source yaml it was not asked to touch, was dropped rather than deferred. The scorecard asserted Closes #702 while saying nothing about it. Verified not reproducible on 2.x and now recorded.",
+          "gotcha_id": "review:architect"
+        }
+      ],
+      "notes": "Scored a miss. The note claimed a projection from either version compares equal to the other, which is false for a trailing-zero canonical id, the exact shape canonical sprint identity exists for. The commit body repeated it. It also pointed readers at a changelog this repo does not have, which is the reason the ticket wrote docs/upgrading.md at all. And #702 second symptom was dropped rather than deferred while the scorecard asserted Closes #702. All corrected; the source-mutation symptom is now recorded as checked and not reproducible on 2.x."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 2,
+    "fairways_total": 4,
+    "greens_in_regulation": 2,
+    "greens_total": 4,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 10,
+    "hazard_penalties": 5,
+    "miss_directions": {
+      "long": 0,
+      "short": 2,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [],
+  "special_plays": [],
+  "bunker_locations": [
+    "A compatibility shim must forgive exactly the difference it was written for. Re-serialising a document to compare it forgives all formatting, which turns a drift detector into a no-op.",
+    "An absent version declaration means unknown, not the oldest version. Reading absence as a specific generation makes every pre-existing file report as a conflict.",
+    "roadmapProjectionMatches in roadmap-source-store.ts is the single comparison point for projection equality; both the CRLF allowance and the dependency-id allowance live there and each needs its own test."
+  ],
+  "yardage_book_updates": [],
+  "course_management_notes": [],
+  "notes": "Closes #702 and #700, completing Phase 67. Scored triple_plus 11 against par 4. Attribution corrected after review: the two misses are the tickets that under-delivered, not the two where an over-reach was caught in flight and fixed before shipping. The first version of this scorecard had it backwards, candid about internal mistakes and quiet about delivery limits, which is the more flattering error of the two. Seven review findings across both lanes, all fixed. The sprint lesson is the mirror of S267.4: there a commit message claimed a check that never ran, here the checks ran and said so, and what went wrong instead was shipping less than the issue asked for while asserting it was closed."
+}

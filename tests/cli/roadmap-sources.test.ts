@@ -982,6 +982,49 @@ sprints:
     expect(result.warnings.filter(issue => issue.code === 'unregistered_source')).toHaveLength(0);
   });
 
+  // Found by independent code review. On a case-insensitive filesystem a
+  // source registered as `Phase-01.yaml` against a file named `phase-01.yaml`
+  // loads and compiles, so reporting it as unregistered is a false claim, and
+  // following the advice would add a duplicate registry entry.
+  it('does not warn when the registry entry differs only in case', () => {
+    writeFixture();
+    const manifestPath = join(cwd, 'docs', 'roadmap', 'project.yaml');
+    writeFileSync(
+      manifestPath,
+      readFileSync(manifestPath, 'utf8').replace('phases/phase-01.yaml', 'phases/Phase-01.yaml'),
+    );
+
+    const store = loadRoadmapSourceStore(cwd);
+    const result = validateRoadmapSourceStore(store, { checkProjection: false });
+
+    expect(result.warnings.filter(issue => issue.code === 'unregistered_source')).toHaveLength(0);
+  });
+
+  it('reports the orphan by its registry-relative path, so the advice can be followed', () => {
+    writeFixture();
+    writeFileSync(
+      join(cwd, 'docs', 'roadmap', 'phases', 'phase-99-orphan.yaml'),
+      'version: 1\nphase:\n  name: Orphan\n  sprints: []\nsprints: []\n',
+    );
+
+    const store = loadRoadmapSourceStore(cwd);
+    const result = validateRoadmapSourceStore(store, { checkProjection: false });
+    const warning = result.warnings.find(issue => issue.code === 'unregistered_source');
+
+    // `phases/x.yaml`, the form project.yaml wants, not `docs/roadmap/phases/x.yaml`.
+    expect(warning?.source).toBe('phases/phase-99-orphan.yaml');
+  });
+
+  it('does not treat a directory named like a source as one', () => {
+    writeFixture();
+    mkdirSync(join(cwd, 'docs', 'roadmap', 'phases', 'nested.yaml'), { recursive: true });
+
+    const store = loadRoadmapSourceStore(cwd);
+    const result = validateRoadmapSourceStore(store, { checkProjection: false });
+
+    expect(result.warnings.filter(issue => issue.code === 'unregistered_source')).toHaveLength(0);
+  });
+
   // #706: the archive manifest rewrite had no surgical path at all, so it
   // discarded project.yaml's authored description block wholesale.
   it('preserves manifest comments when archiving moves sources', async () => {
