@@ -1,6 +1,7 @@
 {
   "_generated": {
     "by": "slope roadmap compile",
+    "format": 2,
     "source": "docs/roadmap/project.yaml",
     "warning": "GENERATED FILE — do not edit. Edit the modular sources under docs/roadmap/ and re-run `slope roadmap compile`. Edits here are refused or discarded."
   },
@@ -7594,7 +7595,7 @@
       "par": 4,
       "slope": 3,
       "type": "bugfix + compatibility",
-      "status": "planned",
+      "status": "complete",
       "github_issues": [
         702,
         700

@@ -1,4 +1,4 @@
-import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, statSync, unlinkSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, unlinkSync, type Dirent } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { isMap, parseDocument, stringify } from 'yaml';
 import {
@@ -534,11 +534,61 @@ export function roadmapProjectionMatches(actual: string, expected: string): bool
   // is canonical marker-free bytes. Strip before comparing so a marked file is
   // not mistaken for drift, and so projections written before the marker existed
   // still compare equal (GH #644).
-  return stripRoadmapProjectionMarker(actual).replace(/\r\n/g, '\n')
-    === stripRoadmapProjectionMarker(expected).replace(/\r\n/g, '\n');
+  const left = stripRoadmapProjectionMarker(actual).replace(/\r\n/g, '\n');
+  const right = stripRoadmapProjectionMarker(expected).replace(/\r\n/g, '\n');
+  if (left === right) return true;
+  // Version 1.64.1 wrote dependency entries as JSON numbers where 2.x writes
+  // canonical strings, so two binaries rejected each other's output over a
+  // difference that carries no meaning (#702). Forgive exactly that, and
+  // nothing else: both sides must already be canonically formatted, so a real
+  // formatting difference is still reported as drift.
+  const leftCanonical = dependencyNormalizedCanonicalJson(left);
+  const rightCanonical = dependencyNormalizedCanonicalJson(right);
+  return leftCanonical != null && rightCanonical != null && leftCanonical === rightCanonical;
 }
 
-/** Projection bytes to write: canonical content plus the generated-file marker. */
+/** Canonical JSON with `depends_on` entries reduced to strings, or null when
+ *  the input is not parseable or is not already canonically formatted.
+ *
+ *  The formatting check is what keeps this narrow. Generated projections are
+ *  written as two-space JSON with a trailing newline, so a file that does not
+ *  round-trip to exactly that has been changed in some other way, and that is
+ *  drift rather than a version difference.
+ */
+function dependencyNormalizedCanonicalJson(projection: string): string | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(projection);
+  } catch {
+    return null;
+  }
+  if (`${JSON.stringify(parsed, null, 2)}\n` !== projection) return null;
+
+  const normalize = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(normalize);
+    if (value && typeof value === 'object') {
+      return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([key, entry]) => {
+        if (key === 'depends_on' && Array.isArray(entry)) {
+          return [key, entry.map(dep => (typeof dep === 'number' ? String(dep) : dep))];
+        }
+        return [key, normalize(entry)];
+      }));
+    }
+    return value;
+  };
+  return JSON.stringify(normalize(parsed));
+}
+
+/** Projection bytes to write: canonical content plus the generated-file marker.
+ *
+ *  Exported so a dry run can predict the write by the same measure the write
+ *  uses. Comparing semantics instead let `compile --dry-run` report "already
+ *  current" immediately before `compile` rewrote the file (#702).
+ */
+export function roadmapProjectionWriteBytes(store: RoadmapSourceStore): string {
+  return projectionBytesForWrite(store);
+}
+
 function projectionBytesForWrite(store: RoadmapSourceStore): string {
   const manifestLabel = normalizeDiagnosticPath(relative(store.cwd, store.manifestPath));
   return withRoadmapProjectionMarker(store.projection, manifestLabel);
@@ -635,8 +685,84 @@ export function validateRoadmapSourceStore(
     }
   }
 
+  for (const issue of unregisteredSourceWarnings(store)) result.warnings.push(issue);
+
   result.valid = result.errors.length === 0;
   return result;
+}
+
+/** Warn about yaml files sitting beside registered sources that no registry
+ *  entry produces.
+ *
+ *  `sources:` is an explicit registry, not a glob, so a file dropped next to
+ *  registered ones compiles to nothing: exit 0, "projection unchanged", no
+ *  warning. Two freshly authored sprints sat inert for hours looking tracked,
+ *  and the only tell was counts that nobody reads on a green run (#700). A
+ *  silent no-op with a clean exit is work that looks recorded and is not.
+ */
+function unregisteredSourceWarnings(store: RoadmapSourceStore): RoadmapSourceValidationResult['warnings'] {
+  const warnings: RoadmapSourceValidationResult['warnings'] = [];
+  // Windows and macOS resolve paths case-insensitively, so a source registered
+  // as `phases/Phase-01.yaml` against a file named `phase-01.yaml` loads and
+  // compiles fine. Comparing case-sensitively would report that working file
+  // as unregistered, and following the advice would add a duplicate entry.
+  const registered = new Set(
+    store.sources.map(source => comparablePath(source.absolutePath as string)),
+  );
+  // Scan the directories a source can legally live in, not only those that
+  // already hold one. #700's own scenario is freshly authored sprints dropped
+  // into backlog/ in a project whose backlog holds nothing registered yet, and
+  // scanning only occupied directories left exactly that case silent.
+  //
+  // These three names are where parseRoadmapSourceProject forces each source
+  // kind to live, which is also why the manifest and the compiled output can
+  // never be reported: neither sits in one of them.
+  const directories = SOURCE_KIND_DIRECTORIES
+    .map(name => join(store.sourceRoot, name))
+    .filter(dir => existsSync(dir));
+
+  for (const dir of directories.sort()) {
+    let entries: Dirent[];
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+      // A directory named `nested.yaml` is not a source. A symlink to a yaml
+      // file is, and Dirent.isFile() is false for one, so check both.
+      if (!entry.isFile() && !entry.isSymbolicLink()) continue;
+      if (!/\.ya?ml$/i.test(entry.name)) continue;
+      const absolute = resolve(join(dir, entry.name));
+      if (registered.has(comparablePath(absolute))) continue;
+      warnings.push({
+        code: 'unregistered_source',
+        // Source-root relative, matching every sibling warning and, more
+        // importantly, matching the form the registry itself wants, so the
+        // advice below can be followed literally.
+        source: normalizeDiagnosticPath(relative(store.sourceRoot, absolute)),
+        message: 'not listed in project.yaml sources, so it compiles to nothing. Add it to the registry or move it out of the sources tree.',
+      });
+    }
+  }
+  return warnings;
+}
+
+/** Directories a roadmap source can live in, matching the kind-to-prefix rule
+ *  parseRoadmapSourceProject enforces. */
+const SOURCE_KIND_DIRECTORIES = ['phases', 'backlog', 'archive'];
+
+/** Path form for comparing two references to the same file.
+ *
+ *  Folds case where the platform's default filesystem does. macOS volumes can
+ *  be formatted case-sensitively, so on darwin this can merge two genuinely
+ *  distinct names; that costs a missed warning rather than a false one, which
+ *  is the right direction for advice a reader might act on.
+ */
+function comparablePath(path: string): string {
+  return process.platform === 'win32' || process.platform === 'darwin'
+    ? resolve(path).toLowerCase()
+    : resolve(path);
 }
 
 const ARCHIVABLE_STATUSES = new Set([

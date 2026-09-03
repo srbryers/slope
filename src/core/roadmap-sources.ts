@@ -514,12 +514,44 @@ export function withRoadmapProjectionMarker(projection: string, sourcePath: stri
   const marked = {
     [ROADMAP_PROJECTION_MARKER_KEY]: {
       by: 'slope roadmap compile',
+      format: ROADMAP_PROJECTION_FORMAT,
       source: sourcePath,
       warning: `GENERATED FILE — do not edit. Edit the modular sources under docs/roadmap/ and re-run \`slope roadmap compile\`. Edits here are refused or discarded.`,
     },
     ...(parsed as Record<string, unknown>),
   };
   return `${JSON.stringify(marked, null, 2)}\n`;
+}
+
+/** Projection format generation.
+ *
+ *  Bumped when the compiled bytes change shape in a way an older binary
+ *  cannot reproduce. Format 2 is the canonical sprint-id work: dependency
+ *  entries are written as strings where 1.64.1 wrote numbers, which made two
+ *  versions reject each other's output and report it as the user's drift
+ *  (#702). Absent means a projection written before this key existed, which is
+ *  format 1.
+ */
+export const ROADMAP_PROJECTION_FORMAT = 2;
+
+/** The format generation a projection's bytes declare, or null when they
+ *  declare none.
+ *
+ *  Null is the common case for anything written before this key existed, and
+ *  it must NOT be read as "format 1 and therefore a mismatch": every repo
+ *  upgrading has such a file, and reporting them all as version conflicts
+ *  would be worse than the drift message it replaces. Only an explicit,
+ *  differing format is a mismatch.
+ */
+export function roadmapProjectionFormat(projection: string): number | null {
+  try {
+    const parsed = JSON.parse(projection) as Record<string, unknown> | null;
+    const marker = parsed?.[ROADMAP_PROJECTION_MARKER_KEY] as { format?: unknown } | undefined;
+    const format = marker?.format;
+    return typeof format === 'number' && Number.isFinite(format) ? format : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
