@@ -237,6 +237,8 @@ export {
   withRoadmapProjectionMarker,
   stripRoadmapProjectionMarker,
   ROADMAP_PROJECTION_MARKER_KEY,
+  ROADMAP_PROJECTION_FORMAT,
+  roadmapProjectionFormat,
   validateRoadmapSourceFederation,
 } from './roadmap-sources.js';
 export type {

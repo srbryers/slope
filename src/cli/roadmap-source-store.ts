@@ -1,4 +1,4 @@
-import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, statSync, unlinkSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, unlinkSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { isMap, parseDocument, stringify } from 'yaml';
 import {
@@ -534,8 +534,49 @@ export function roadmapProjectionMatches(actual: string, expected: string): bool
   // is canonical marker-free bytes. Strip before comparing so a marked file is
   // not mistaken for drift, and so projections written before the marker existed
   // still compare equal (GH #644).
-  return stripRoadmapProjectionMarker(actual).replace(/\r\n/g, '\n')
-    === stripRoadmapProjectionMarker(expected).replace(/\r\n/g, '\n');
+  const left = stripRoadmapProjectionMarker(actual).replace(/\r\n/g, '\n');
+  const right = stripRoadmapProjectionMarker(expected).replace(/\r\n/g, '\n');
+  if (left === right) return true;
+  // Version 1.64.1 wrote dependency entries as JSON numbers where 2.x writes
+  // canonical strings, so two binaries rejected each other's output over a
+  // difference that carries no meaning (#702). Forgive exactly that, and
+  // nothing else: both sides must already be canonically formatted, so a real
+  // formatting difference is still reported as drift.
+  const leftCanonical = dependencyNormalizedCanonicalJson(left);
+  const rightCanonical = dependencyNormalizedCanonicalJson(right);
+  return leftCanonical != null && rightCanonical != null && leftCanonical === rightCanonical;
+}
+
+/** Canonical JSON with `depends_on` entries reduced to strings, or null when
+ *  the input is not parseable or is not already canonically formatted.
+ *
+ *  The formatting check is what keeps this narrow. Generated projections are
+ *  written as two-space JSON with a trailing newline, so a file that does not
+ *  round-trip to exactly that has been changed in some other way, and that is
+ *  drift rather than a version difference.
+ */
+function dependencyNormalizedCanonicalJson(projection: string): string | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(projection);
+  } catch {
+    return null;
+  }
+  if (`${JSON.stringify(parsed, null, 2)}\n` !== projection) return null;
+
+  const normalize = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(normalize);
+    if (value && typeof value === 'object') {
+      return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([key, entry]) => {
+        if (key === 'depends_on' && Array.isArray(entry)) {
+          return [key, entry.map(dep => (typeof dep === 'number' ? String(dep) : dep))];
+        }
+        return [key, normalize(entry)];
+      }));
+    }
+    return value;
+  };
+  return JSON.stringify(normalize(parsed));
 }
 
 /** Projection bytes to write: canonical content plus the generated-file marker. */
@@ -635,8 +676,53 @@ export function validateRoadmapSourceStore(
     }
   }
 
+  for (const issue of unregisteredSourceWarnings(store)) result.warnings.push(issue);
+
   result.valid = result.errors.length === 0;
   return result;
+}
+
+/** Warn about yaml files sitting beside registered sources that no registry
+ *  entry produces.
+ *
+ *  `sources:` is an explicit registry, not a glob, so a file dropped next to
+ *  registered ones compiles to nothing: exit 0, "projection unchanged", no
+ *  warning. Two freshly authored sprints sat inert for hours looking tracked,
+ *  and the only tell was counts that nobody reads on a green run (#700). A
+ *  silent no-op with a clean exit is work that looks recorded and is not.
+ */
+function unregisteredSourceWarnings(store: RoadmapSourceStore): RoadmapSourceValidationResult['warnings'] {
+  const warnings: RoadmapSourceValidationResult['warnings'] = [];
+  const registered = new Set(
+    store.sources.map(source => resolve(source.absolutePath as string)),
+  );
+  // Only look where registered sources already live, so an unrelated docs tree
+  // is never scanned.
+  const directories = new Set(
+    store.sources
+      .map(source => dirname(source.absolutePath as string))
+      .filter(dir => existsSync(dir)),
+  );
+
+  for (const dir of [...directories].sort()) {
+    let entries: string[];
+    try {
+      entries = readdirSync(dir);
+    } catch {
+      continue;
+    }
+    for (const name of entries.sort()) {
+      if (!/\.ya?ml$/i.test(name)) continue;
+      const absolute = resolve(join(dir, name));
+      if (registered.has(absolute)) continue;
+      warnings.push({
+        code: 'unregistered_source',
+        source: normalizeDiagnosticPath(relative(store.cwd, absolute)),
+        message: 'not listed in project.yaml sources, so it compiles to nothing. Add it to the registry or move it out of the sources tree.',
+      });
+    }
+  }
+  return warnings;
 }
 
 const ARCHIVABLE_STATUSES = new Set([

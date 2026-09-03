@@ -32,6 +32,8 @@ import {
   generateRoadmapFromVision,
   RoadmapGenerationError,
   normalizeDiagnosticPath,
+  ROADMAP_PROJECTION_FORMAT,
+  roadmapProjectionFormat,
 } from '../../core/index.js';
 import type {
   RoadmapDefinition,
@@ -649,6 +651,19 @@ function compileSourcesSubcommand(flags: Record<string, string>, cwd: string): v
 
     if (flags.check === 'true') {
       if (changed) {
+        // A projection written by a different format generation is not drift,
+        // and "run compile to regenerate" cannot fix it: recompiling with the
+        // newer binary produces a file the pinned one rejects again (#702).
+        const onDiskFormat = existing == null ? null : roadmapProjectionFormat(existing);
+        if (onDiskFormat != null && onDiskFormat !== ROADMAP_PROJECTION_FORMAT) {
+          throw new Error([
+            `Roadmap projection format mismatch: ${output}.`,
+            `  On disk: format ${onDiskFormat}. This binary writes format ${ROADMAP_PROJECTION_FORMAT}.`,
+            '  Recompiling here produces a file the other version rejects, and vice versa.',
+            '  Compile with whichever binary your CI pins as the last step before committing,',
+            '  or align the pin. See the changelog entry for the format change.',
+          ].join('\n'));
+        }
         throw new Error(
           `Roadmap projection drift: ${output}. Run \`slope roadmap compile\` to regenerate it from modular sources.`,
         );

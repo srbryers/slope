@@ -1,6 +1,7 @@
 {
   "_generated": {
     "by": "slope roadmap compile",
+    "format": 2,
     "source": "docs/roadmap/project.yaml",
     "warning": "GENERATED FILE — do not edit. Edit the modular sources under docs/roadmap/ and re-run `slope roadmap compile`. Edits here are refused or discarded."
   },

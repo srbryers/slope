@@ -930,6 +930,58 @@ sprints:
     expect(store.sources[0].document.sprints[0].status).toBe('complete');
   });
 
+  // #702: 1.64.1 wrote depends_on as JSON numbers and 2.x writes canonical
+  // strings, so each version rejected the other's projection and reported it
+  // as the user's drift. Recompiling could not fix it.
+  it('treats numeric and string dependency ids as the same projection', () => {
+    // Generated projections are two-space JSON with a trailing newline; the
+    // normalisation deliberately only applies to that canonical shape.
+    const canonical = (value: unknown) => `${JSON.stringify(value, null, 2)}\n`;
+    const asStrings = canonical({ name: 'R', sprints: [{ id: '2', depends_on: ['1'] }] });
+    const asNumbers = canonical({ name: 'R', sprints: [{ id: '2', depends_on: [1] }] });
+
+    expect(roadmapProjectionMatches(asNumbers, asStrings)).toBe(true);
+  });
+
+  it('still reports a genuinely different projection as different', () => {
+    const canonical = (value: unknown) => `${JSON.stringify(value, null, 2)}\n`;
+    const a = canonical({ name: 'R', sprints: [{ id: '2', depends_on: ['1'] }] });
+    const b = canonical({ name: 'R', sprints: [{ id: '2', depends_on: ['3'] }] });
+
+    expect(roadmapProjectionMatches(a, b)).toBe(false);
+  });
+
+  it('does not forgive a formatting difference as a version difference', () => {
+    const canonical = `${JSON.stringify({ name: 'R', sprints: [] }, null, 2)}\n`;
+    const reindented = `${JSON.stringify({ name: 'R', sprints: [] }, null, 4)}\n`;
+
+    expect(roadmapProjectionMatches(reindented, canonical)).toBe(false);
+  });
+
+  // #700: sources is an explicit registry, not a glob, so a yaml file dropped
+  // beside registered ones compiled to nothing with a clean exit.
+  it('warns about a yaml file no registry entry produces', () => {
+    writeFixture();
+    const orphan = join(cwd, 'docs', 'roadmap', 'phases', 'phase-99-orphan.yaml');
+    writeFileSync(orphan, 'version: 1\nphase:\n  name: Orphan\n  sprints: []\nsprints: []\n');
+
+    const store = loadRoadmapSourceStore(cwd);
+    const result = validateRoadmapSourceStore(store, { checkProjection: false });
+
+    const warning = result.warnings.find(issue => issue.code === 'unregistered_source');
+    expect(warning?.source).toContain('phase-99-orphan.yaml');
+    // A warning, not an error: the roadmap itself is still valid.
+    expect(result.errors.filter(e => e.code === 'unregistered_source')).toHaveLength(0);
+  });
+
+  it('does not warn about registered sources', () => {
+    writeFixture();
+    const store = loadRoadmapSourceStore(cwd);
+    const result = validateRoadmapSourceStore(store, { checkProjection: false });
+
+    expect(result.warnings.filter(issue => issue.code === 'unregistered_source')).toHaveLength(0);
+  });
+
   // #706: the archive manifest rewrite had no surgical path at all, so it
   // discarded project.yaml's authored description block wholesale.
   it('preserves manifest comments when archiving moves sources', async () => {
