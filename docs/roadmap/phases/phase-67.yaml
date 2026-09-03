@@ -1,0 +1,80 @@
+version: "1"
+phase:
+  name: Phase 67 — Source Fidelity
+  description: "Roadmap sources are read-write when they should be read-only, and the writes lose data. Fix #706 (validate mutates the working tree and re-serialisation deletes YAML comments), #702 (1.64.1 and 2.0.0 emit incompatible projections and each rejects the other's, reported as 'drift'), and #700 (a yaml file dropped beside registered ones compiles to nothing, exit 0, no warning). All three are the same failure shape: the source of truth is being changed or ignored without saying so."
+  sprints:
+    - 275
+    - 276
+  status: planned
+  note: "Scoped from source, then corrected twice by architect review. The second pass overturned the first, so the mechanism below is the one to trust. Roadmap source writes take two different paths and only one of them loses comments. The surgical patcher (src/core/roadmap-source-patch.ts) edits the status and scorecard lines textually and preserves everything around them; it is not the problem and must not be extended. The loss happens at the two sites that serialise a whole document: the fallback rewrite at roadmap-source-store.ts:403, reached when the document shape defeats the patcher, and the archive manifest rewrite at :660, which has no surgical path at all. Both should use the yaml package's Document API, which round-trips comments through an edit — checked directly against yaml 2.8.2. #702 and #700 are separate and both land in the compile and validate-sources detection pipeline."
+sprints:
+  - id: 275
+    theme: Source Write Discipline
+    par: 4
+    slope: 4
+    type: bugfix + data integrity
+    status: planned
+    github_issues:
+      - 706
+    note: "Do not extend the line-based patcher to cover the shapes it was written to decline. The two whole-document serialise sites are the fix, and the archive manifest site has no patcher to fall back on, so it needs the Document API outright. Two things scoped smaller than they first appeared. `slope validate --read-only` already exists as an opt-out (validate.ts:22, 110-125, added under #644 and #637), so the open question is the default rather than the flag; note that it exists on validate only, while #706's title also names roadmap compile. And both validate.ts:178-180 and roadmap.ts:708-711 already name the rewritten source file and warn when it was reformatted, so the reporting gap is narrower than 'name every file': neither names docs/backlog/roadmap.json by path, neither says comments were destroyed, and the gate write into .slope/ is silent. A fixture that forces the reformat path already exists at tests/cli/roadmap-sources.test.ts:928."
+    tickets:
+      - key: S275-1
+        title: "Serialise through the yaml Document API at the two whole-document write sites, the patcher fallback and the archive manifest (#706)"
+        club: long_iron
+        complexity: moderate
+        github_issue: 706
+      - key: S275-2
+        title: "Close the reporting gaps the existing reformat warning leaves: the projection path, comment loss, and the silent gate write (#706)"
+        club: short_iron
+        complexity: standard
+        github_issue: 706
+      - key: S275-3
+        title: "Extend --read-only to roadmap compile and complete, and decide the default with the answer recorded in the flag's help (#706)"
+        club: short_iron
+        complexity: standard
+        github_issue: 706
+        depends_on:
+          - S275-2
+      - key: S275-4
+        title: "Cover comment survival on both write sites and the reporting output, reusing the existing reformat fixture (#706)"
+        club: short_iron
+        complexity: standard
+        github_issue: 706
+        depends_on:
+          - S275-1
+          - S275-2
+          - S275-3
+  - id: 276
+    theme: Projection Compatibility
+    par: 4
+    slope: 3
+    type: bugfix + compatibility
+    status: planned
+    github_issues:
+      - 702
+      - 700
+    note: "Two versions disagree about one field and the error message blames the user's working tree. Deliberately carries no dependency on S275: the two sprints touch the serialise path and the detection pipeline respectively, and gating #700 behind #706 would delay an independent one-line-shaped fix. Note the ordering trap in S276-1: adding a key to the generated header changes the projection bytes in every downstream repo, and a binary older than the change cannot read the new key, so the improved message only ever reaches binaries built after it. That makes the read-side normalisation in S276-2 the fix that actually helps the reporter's pinned 1.64.1 CI, and it is why the changelog ticket must describe both kinds of churn rather than only the dependency entries."
+    tickets:
+      - key: S276-1
+        title: "Stamp a projection format version into the generated header and report a version mismatch as a version mismatch, not as drift (#702)"
+        club: short_iron
+        complexity: standard
+        github_issue: 702
+      - key: S276-2
+        title: Normalise dependency ids on read so numeric and string forms compare equal across versions (#702)
+        club: long_iron
+        complexity: moderate
+        github_issue: 702
+      - key: S276-3
+        title: "Warn on yaml files under the sources directories that no registry entry produces (#700)"
+        club: short_iron
+        complexity: standard
+        github_issue: 700
+      - key: S276-4
+        title: "Record the upgrade churn in the changelog: every dependency entry rewritten, plus a new header key that older binaries cannot read (#702)"
+        club: wedge
+        complexity: small
+        github_issue: 702
+        depends_on:
+          - S276-1
+          - S276-2
