@@ -13,7 +13,7 @@ sprints:
     par: 4
     slope: 4
     type: bugfix + data integrity
-    status: planned
+    status: complete
     github_issues:
       - 706
     note: "Do not extend the line-based patcher to cover the shapes it was written to decline. The two whole-document serialise sites are the fix, and the archive manifest site has no patcher to fall back on, so it needs the Document API outright. Two things scoped smaller than they first appeared. `slope validate --read-only` already exists as an opt-out (validate.ts:22, 110-125, added under #644 and #637), so the open question is the default rather than the flag; note that it exists on validate only, while #706's title also names roadmap compile. And both validate.ts:178-180 and roadmap.ts:708-711 already name the rewritten source file and warn when it was reformatted, so the reporting gap is narrower than 'name every file': neither names docs/backlog/roadmap.json by path, neither says comments were destroyed, and the gate write into .slope/ is silent. A fixture that forces the reformat path already exists at tests/cli/roadmap-sources.test.ts:928."
@@ -78,3 +78,5 @@ sprints:
         depends_on:
           - S267.5-1
           - S267.5-2
+scorecards:
+  "267.4": docs/retros/sprint-267.4.json

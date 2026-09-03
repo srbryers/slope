@@ -10,7 +10,7 @@ import {
   validateScorecard,
 } from '../../core/index.js';
 import { loadConfig } from '../config.js';
-import { updateGate } from '../sprint-state.js';
+import { updateGate, sprintStateLocation } from '../sprint-state.js';
 import { completeRoadmapSourceSprint } from '../roadmap-source-store.js';
 import { sprintLabelForExecution } from '../workflow-resync.js';
 import { reconcileWorkflowCloseout, WORKFLOW_EXECUTION_ID_ENV } from '../workflow-closeout.js';
@@ -19,7 +19,10 @@ import type { RoadmapSourceError, SprintId } from '../../core/index.js';
 export async function validateCommand(input?: string | string[]): Promise<void> {
   const args = Array.isArray(input) ? input : input ? [input] : [];
   const validateSkills = args.includes('--skills');
-  const readOnly = args.includes('--read-only');
+  // Both spellings. Sibling roadmap commands used --dry-run for the same
+  // idea, and a reader who types the safe-sounding word on the command #706
+  // names must not get the full write path.
+  const readOnly = args.includes('--read-only') || args.includes('--dry-run');
   const sprintArgIndex = args.findIndex(arg => arg === '--sprint' || arg.startsWith('--sprint='));
   const requestedSprint = parseRequestedSprint(args, sprintArgIndex);
   const path = args.find((arg, index) => {
@@ -111,7 +114,7 @@ export async function validateCommand(input?: string | string[]): Promise<void> 
     // Say so. This was the one write validate never mentioned, so a reader
     // watching the output had no way to know sprint state had moved (#706).
     if (updateGate(cwd, 'scorecard', true)) {
-      console.log('  Marked the scorecard gate complete in .slope/sprint-state.json');
+      console.log(`  Marked the scorecard gate complete in ${sprintStateLocation(cwd)}`);
     }
     const completedRoadmapSprints = new Set<SprintId>();
     reconciled = reconcileModularRoadmapSources(cwd, validScorecards, completedRoadmapSprints);
@@ -192,7 +195,9 @@ export function reconcileModularRoadmapSources(
         : `${result.projectionPath} unchanged`;
       console.log(`  Roadmap source reconciled: S${scorecard.sprint} -> complete (rewrote ${result.source}; ${projectionNote})`);
       if (result.reformatted) {
-        console.log(`  ⚠ ${result.source} could not be patched surgically, so its formatting was normalised. Comments are preserved.`);
+        console.log(result.commentsPreserved
+          ? `  ⚠ ${result.source} could not be patched surgically, so its formatting was normalised. Comments are preserved.`
+          : `  ⚠ ${result.source} could not be edited in place and was rebuilt from its parsed contents. COMMENTS IN THIS FILE WERE LOST; recover them from git.`);
       }
       completedSprints.add(scorecard.sprint);
     } catch (error) {

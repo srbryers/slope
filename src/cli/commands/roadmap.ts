@@ -720,7 +720,9 @@ function completeSourcesSubcommand(flags: Record<string, string>, cwd: string): 
     console.log(`\nRoadmap source reconciled: ${label}`);
     console.log(`  Source: ${result.source}`);
     if (result.reformatted) {
-      console.log('  ⚠ Source could not be patched surgically, so its formatting was normalised. Comments are preserved.');
+      console.log(result.commentsPreserved
+        ? '  ⚠ Source could not be patched surgically, so its formatting was normalised. Comments are preserved.'
+        : '  ⚠ Source could not be edited in place and was rebuilt from its parsed contents. COMMENTS IN THIS FILE WERE LOST; recover them from git.');
     }
     if (scorecardPath) console.log(`  Scorecard: ${scorecardPath}`);
     console.log(`  Projection: ${result.projectionPath ?? 'docs/backlog/roadmap.json'} ${result.projection}`);
@@ -775,7 +777,7 @@ function validateMigrationArgs(args: string[]): void {
   const seen = new Set<string>();
   for (const arg of args) {
     const match = arg.match(/^--(path|source|mapping)=(.+)$/);
-    const key = arg === '--dry-run' ? 'dry-run' : match?.[1];
+    const key = arg === '--dry-run' || arg === '--read-only' ? 'dry-run' : match?.[1];
     if (!key) throw new Error(`Unknown roadmap migrate option: ${arg}`);
     if (seen.has(key)) throw new Error(`Duplicate roadmap migrate option: --${key}`);
     seen.add(key);
@@ -783,7 +785,7 @@ function validateMigrationArgs(args: string[]): void {
 }
 
 function migrateSourcesSubcommand(flags: Record<string, string>, cwd: string, args: string[]): void {
-  const dryRun = flags['dry-run'] === 'true';
+  const dryRun = isReadOnly(flags);
   try {
     validateMigrationArgs(args);
     const prepared = prepareRoadmapSourceMigration({
@@ -884,8 +886,8 @@ function archiveSourcesSubcommand(flags: Record<string, string>, cwd: string): v
       return;
     }
     for (const move of plan.moves) console.log(`  ${move.from} -> ${move.to}`);
-    if (flags['dry-run'] === 'true') {
-      console.log('\n  --dry-run: source files, manifest, and projection are unchanged.\n');
+    if (isReadOnly(flags)) {
+      console.log('\n  Read-only: source files, manifest, and projection are unchanged.\n');
       return;
     }
 
@@ -1151,7 +1153,7 @@ function modularAuthorityBlocksProjectionMutation(
 
 function syncSubcommand(flags: Record<string, string>, cwd: string): void {
   if (modularAuthorityBlocksProjectionMutation(flags, cwd, 'sync')) return;
-  const dryRun = flags['dry-run'] === 'true';
+  const dryRun = isReadOnly(flags);
   const path = resolveRoadmapPath(flags, cwd);
   const config = loadConfig(cwd);
   const scorecards = loadScorecards(config, cwd);
@@ -1278,7 +1280,7 @@ async function generateSubcommand(flags: Record<string, string>, cwd: string): P
   }
 
   const path = resolveRoadmapPath(flags, cwd);
-  const dryRun = flags['dry-run'] === 'true';
+  const dryRun = isReadOnly(flags);
 
   if (dryRun) {
     // Preview only \u2014 don't write to disk (GH #304)

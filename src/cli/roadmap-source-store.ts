@@ -1,6 +1,6 @@
 import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, statSync, unlinkSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
-import { parseDocument, stringify } from 'yaml';
+import { isMap, parseDocument, stringify } from 'yaml';
 import {
   compileRoadmapSources,
   compareRoadmapSprintIds,
@@ -50,22 +50,46 @@ function rewriteSprintStatusPreservingComments(
   scorecard: { scorecardKey?: string; scorecardPath?: string },
 ): string | null {
   if (sprintIndex < 0) return null;
-  let doc;
+  // Everything here is best-effort. setIn throws on shapes the path cannot
+  // walk (an aliased sprints list, an aliased scorecards map), and the
+  // contract is to return null so the caller falls back — so the whole body
+  // is guarded, not just the parse.
   try {
-    doc = parseDocument(originalText);
+    const doc = parseDocument(originalText);
+    if (doc.errors.length > 0) return null;
+
+    const entry = doc.getIn(['sprints', sprintIndex], true);
+    // The entry must be a real mapping node we can set a key on. An alias
+    // node shares its target, so writing through it mutates every sprint that
+    // references the same anchor.
+    if (entry == null || !isMap(entry)) return null;
+
+    doc.setIn(['sprints', sprintIndex, 'status'], 'complete');
+
+    if (scorecard.scorecardKey && scorecard.scorecardPath) {
+      const scorecards = doc.get('scorecards', true);
+      if (scorecards != null && !isMap(scorecards)) return null;
+      // A pre-existing unquoted numeric key (7:) and a quoted one ("7:") are
+      // the same scorecard but different YAML keys, so setIn would leave both
+      // behind. Drop any equivalent key first.
+      if (isMap(scorecards)) {
+        for (const item of [...scorecards.items]) {
+          const key = item.key as { value?: unknown } | null;
+          if (key != null && String(key.value) === String(scorecard.scorecardKey)) {
+            scorecards.items.splice(scorecards.items.indexOf(item), 1);
+          }
+        }
+      }
+      doc.setIn(['scorecards', scorecard.scorecardKey], scorecard.scorecardPath);
+    }
+
+    // lineWidth 0 disables wrapping. The default wraps at 80 columns, which
+    // would reflow every long authored note and description the moment any
+    // sprint is reconciled.
+    return doc.toString({ lineWidth: 0 });
   } catch {
     return null;
   }
-  if (doc.errors.length > 0) return null;
-  // Only edit a sprint entry that is already a mapping; anything else means
-  // the shape is not what this expects and the caller should fall back.
-  if (doc.getIn(['sprints', sprintIndex]) == null) return null;
-
-  doc.setIn(['sprints', sprintIndex, 'status'], 'complete');
-  if (scorecard.scorecardKey && scorecard.scorecardPath) {
-    doc.setIn(['scorecards', scorecard.scorecardKey], scorecard.scorecardPath);
-  }
-  return String(doc);
 }
 
 function sortKeysDeep(value: unknown): unknown {
@@ -234,6 +258,10 @@ export interface CompleteRoadmapSourceSprintResult {
   changed: boolean;
   /** True when the source could not be patched surgically and was rewritten in canonical style. */
   reformatted?: boolean;
+  /** True when a reformatted write still kept the document's comments. False
+   *  means the shape defeated even the document-level edit and the bundle was
+   *  serialised from scratch, losing them (#706). */
+  commentsPreserved?: boolean;
   /**
    * Set when the sprint holds a scorecard but its authored status is a deliberate
    * non-complete disposition (absorbed, blocked, ...). Reconciliation refuses to
@@ -409,6 +437,7 @@ export function completeRoadmapSourceSprint(
       } : {}),
     };
     let reformatted = false;
+    let commentsPreserved = false;
     let nextText: string | null = null;
     if (patchedText != null) {
       // Refuse a surgical patch that changed anything beyond the targeted
@@ -437,17 +466,31 @@ export function completeRoadmapSourceSprint(
     if (nextText == null) {
       // The document shape prevents a confidently surgical edit (flow-style
       // entries, mixed EOLs). Apply the same targeted change to the parsed
-      // document instead of serialising expectedDocument from scratch: the
-      // change is known exactly, and a full stringify discards every comment
-      // in the bundle, which silently deleted authored history (#706).
-      // Still marked reformatted, because node-level formatting can shift.
+      // document rather than serialising expectedDocument from scratch: a full
+      // stringify discards every comment in the bundle, which silently deleted
+      // authored history (#706).
       reformatted = true;
       const sprintIndex = freshOwner.document.sprints.findIndex(
         item => roadmapSprintKey(fresh.roadmap, item) === storedKey,
       );
-      nextText = rewriteSprintStatusPreservingComments(originalText, sprintIndex, {
+      const preserved = rewriteSprintStatusPreservingComments(originalText, sprintIndex, {
         ...(normalizedScorecard ? { scorecardKey, scorecardPath: normalizedScorecard } : {}),
-      }) ?? stringify(expectedDocument);
+      });
+      // Same over-reach check the surgical path runs. Without it an anchored
+      // status (`status: &planned planned` reused by a later sprint via
+      // `*planned`) let one reconcile mark a second sprint complete — a worse
+      // corruption than the comment loss this path exists to fix.
+      let preservedIsSafe = false;
+      if (preserved != null) {
+        try {
+          const reparsedPreserved = parseRoadmapSourceDocument(preserved, freshOwner.absolutePath);
+          preservedIsSafe = stableJson(reparsedPreserved) === stableJson(expectedDocument);
+        } catch {
+          preservedIsSafe = false;
+        }
+      }
+      commentsPreserved = preservedIsSafe;
+      nextText = preservedIsSafe ? preserved as string : stringify(expectedDocument);
     }
     atomicWriteFileSync(freshOwner.absolutePath, nextText);
     const reloaded = loadRoadmapSourceStore(cwd, options.sourceFlag);
@@ -475,6 +518,7 @@ export function completeRoadmapSourceSprint(
       projectionPath: normalizeDiagnosticPath(relative(reloaded.cwd, reloaded.outputPath)),
       changed: true,
       reformatted,
+      commentsPreserved,
     };
   });
 }
@@ -715,6 +759,7 @@ export function planRoadmapSourceArchive(
     project,
     manifestYaml: rewriteManifestSourcesPreservingComments(store.manifestPath, nextEntries)
       ?? stringify(project, { lineWidth: 0 }),
+
   };
 }
 
@@ -745,7 +790,10 @@ function rewriteManifestSourcesPreservingComments(
   if (doc.getIn(['sources']) == null) return null;
 
   doc.setIn(['sources'], nextEntries);
-  return String(doc);
+  // lineWidth 0 disables wrapping, matching the stringify call this replaced.
+  // The default wraps at 80 columns, which reflowed this project's own 2,300
+  // character description across 32 extra lines on every archive.
+  return doc.toString({ lineWidth: 0 });
 }
 
 export function applyRoadmapSourceArchive(

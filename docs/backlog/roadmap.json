@@ -7544,7 +7544,7 @@
       "par": 4,
       "slope": 4,
       "type": "bugfix + data integrity",
-      "status": "planned",
+      "status": "complete",
       "github_issues": [
         706
       ],
