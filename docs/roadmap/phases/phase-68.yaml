@@ -1,0 +1,89 @@
+version: "1"
+phase:
+  name: Phase 68 — Completion Truth
+  description: "SLOPE reports work as done and records nothing durable that says so. Fix #697 (`ticket done` succeeds, then `slope now` and `roadmap status` immediately recommend the same ticket again), #698 (an explicit commit flag is stored verbatim, so `--commit=HEAD` becomes permanent non-immutable evidence with no repair path), and #696 (four of the five phase cleanup gates have no writer, so the documented workflow cannot satisfy the boundary and users must reach for the manual override)."
+  sprints:
+    - 277
+    - 278
+  status: planned
+  note: "Root causes read from source rather than inferred from the reports. #697 is not a display bug: `ticket done` writes a best-effort event inside a try/catch that swallows failures, there is no completion ledger, and the roadmap module has no ticket-completion awareness at all — so the next-action commands cannot know. #698 is line-exact at src/cli/commands/ticket.ts:201, where an explicit flag returns as typed while the fallback path resolves HEAD properly; the asymmetry is the whole bug. #696 has one writer for one gate (findings_audited) out of five, and the regression label hardcodes `bun test` in a repo that declares pnpm. Adding the ledger needs a migration in both the SQLite and PostgreSQL backends, which is what makes S277 a driver sprint."
+sprints:
+  - id: 277
+    theme: Ticket Completion Ledger
+    par: 5
+    slope: 5
+    type: bugfix + data integrity
+    status: planned
+    github_issues:
+      - 697
+      - 698
+    note: "The ledger has to exist before anything can read it, and it has to be a required write rather than a swallowed one — a completion that silently failed to record is the defect, not a variant of it. Evidence quality belongs in the same sprint: a ledger of literal 'HEAD' strings is worse than no ledger, because shipped-commit checks will consume it. The repair path is the ticket most likely to be cut under pressure and the one the reporter actually needed, since the claim is already released by the time the bad value is noticed."
+    tickets:
+      - key: S277-1
+        title: Add a durable ticket-completion table with matching SQLite and PostgreSQL migrations (#697)
+        club: driver
+        complexity: risky
+        github_issue: 697
+      - key: S277-2
+        title: Have ticket done write the ledger as a required step instead of a swallowed best-effort event (#697)
+        club: long_iron
+        complexity: moderate
+        github_issue: 697
+        depends_on:
+          - S277-1
+      - key: S277-3
+        title: "Read the ledger in slope now, roadmap status and next-ticket selection so all three agree (#697)"
+        club: long_iron
+        complexity: moderate
+        github_issue: 697
+        depends_on:
+          - S277-2
+      - key: S277-4
+        title: Resolve an explicit commit flag to an immutable sha and refuse a ref that does not resolve (#698)
+        club: short_iron
+        complexity: standard
+        github_issue: 698
+      - key: S277-5
+        title: Give completed-ticket evidence a repair path that works after the claim is released (#698)
+        club: short_iron
+        complexity: standard
+        github_issue: 698
+        depends_on:
+          - S277-1
+  - id: 278
+    theme: Phase Gate Evidence
+    par: 4
+    slope: 3
+    type: bugfix + safety
+    status: planned
+    github_issues:
+      - 696
+    depends_on:
+      - 277
+    note: "A boundary whose only reachable exit is the command labelled manual override teaches operators that the override is the normal path — the same signal erosion this project has recorded before. Four gates need writers; the fifth needs to stop assuming a package manager the project does not use. Hit directly while closing Phase 65 in this repo: `slope phase status 65` reported no cleanup state after the documented commands ran, and only `phase audit` plus `phase complete` moved it."
+    tickets:
+      - key: S278-1
+        title: "Record the scorecard, handicap-card and map gates from the commands that satisfy them (#696)"
+        club: long_iron
+        complexity: moderate
+        github_issue: 696
+      - key: S278-2
+        title: Derive the regression command from project configuration and package-manager detection instead of assuming bun (#696)
+        club: short_iron
+        complexity: standard
+        github_issue: 696
+      - key: S278-3
+        title: Expose a per-gate evidence command so phase complete stays a genuine manual override (#696)
+        club: short_iron
+        complexity: standard
+        github_issue: 696
+        depends_on:
+          - S278-1
+      - key: S278-4
+        title: Cover the full five-gate path so the documented workflow satisfies the boundary without an override (#696)
+        club: wedge
+        complexity: small
+        github_issue: 696
+        depends_on:
+          - S278-2
+          - S278-3

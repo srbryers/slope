@@ -1,0 +1,79 @@
+version: "1"
+phase:
+  name: Phase 67 — Source Fidelity
+  description: "Roadmap sources are read-write when they should be read-only, and the writes lose data. Fix #706 (validate mutates the working tree and the serialiser deletes YAML comments), #702 (1.64.1 and 2.0.0 emit incompatible projections and each rejects the other's, reported as 'drift'), and #700 (a yaml file dropped beside registered ones compiles to nothing, exit 0, no warning). All three are the same failure shape: the source of truth is being changed or ignored without saying so."
+  sprints:
+    - 275
+    - 276
+  status: planned
+  note: "Scoped after re-running each report against the current build. #706 is the most severe and the cheapest: the yaml library already round-trips comments through parseDocument, and the code calls stringify(parse(x)), which discards them — a three-line history note was deleted silently. Confirmed in this repo by observing `slope validate` print 'projection written' while rewriting phase YAML. #702 is a direct consequence of the canonical sprint-id work: version 2 writes dependency ids as strings where 1.64.1 wrote numbers, so a repo whose CI pins the older binary fails compile --check after any 2.0 write. The projection header carries by/source/warning and no version, which is why the mismatch reports as drift. #700 needs no detection logic at all: no directory scan exists, the registry is the only input."
+sprints:
+  - id: 275
+    theme: Source Write Discipline
+    par: 4
+    slope: 4
+    type: bugfix + data integrity
+    status: planned
+    github_issues:
+      - 706
+    note: "A read-named command that rewrites tracked files is surprising; one that silently deletes prose from them is a defect. Comment loss comes first because it destroys work that cannot be recovered except from git. The mutation question is separate and a design call: the scorecard auto-link is genuinely useful, so the options are moving the writes behind an explicit flag or naming every rewritten file in the output. Both are in scope; the ticket order lets the data-loss fix ship even if the ownership question needs another round."
+    tickets:
+      - key: S275-1
+        title: Preserve comments on roadmap source re-serialisation by round-tripping through the yaml document API (#706)
+        club: long_iron
+        complexity: moderate
+        github_issue: 706
+      - key: S275-2
+        title: Name every tracked file a read-named command rewrote, in that command's own output (#706)
+        club: short_iron
+        complexity: standard
+        github_issue: 706
+      - key: S275-3
+        title: "Decide and implement source-write ownership: move the writes behind an explicit opt-in or document validate as a writer (#706)"
+        club: long_iron
+        complexity: risky
+        github_issue: 706
+        depends_on:
+          - S275-2
+      - key: S275-4
+        title: Cover comment survival and the rewritten-file manifest with tests over real phase YAML including an archived phase (#706)
+        club: short_iron
+        complexity: standard
+        github_issue: 706
+        depends_on:
+          - S275-1
+  - id: 276
+    theme: Projection Compatibility
+    par: 4
+    slope: 3
+    type: bugfix + compatibility
+    status: planned
+    github_issues:
+      - 702
+      - 700
+    depends_on:
+      - 275
+    note: "Two versions disagree about one field and the error message blames the user's working tree. A format version in the generated header turns 'drift, run compile to regenerate' — advice that cannot work, because recompiling with the newer binary produces a file the pinned one rejects again — into a statement of what actually happened. Normalising dependency ids on read is the belt to that braces: both shapes should compare equal regardless of which binary wrote them. The unregistered-yaml warning lands here because it is the same class of silence and touches the same command."
+    tickets:
+      - key: S276-1
+        title: "Stamp a projection format version into the generated header and report a version mismatch as a version mismatch, not as drift (#702)"
+        club: short_iron
+        complexity: standard
+        github_issue: 702
+      - key: S276-2
+        title: Normalise dependency ids on read so numeric and string forms compare equal across versions (#702)
+        club: long_iron
+        complexity: moderate
+        github_issue: 702
+      - key: S276-3
+        title: "Warn on yaml files under the sources directories that no registry entry produces (#700)"
+        club: short_iron
+        complexity: standard
+        github_issue: 700
+      - key: S276-4
+        title: Record in the changelog that upgrading the pin rewrites every dependency entry in one commit (#702)
+        club: wedge
+        complexity: small
+        github_issue: 702
+        depends_on:
+          - S276-1
