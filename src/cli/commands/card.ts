@@ -3,6 +3,7 @@ import type { MissDirection, PlayerHandicap } from '../../core/index.js';
 import { loadConfig } from '../config.js';
 import { loadScorecards } from '../loader.js';
 import { resolveMetaphor } from '../metaphor.js';
+import { recordPhaseGate } from '../phase-gate-recording.js';
 
 function parseCardArgs(args: string[]): { swarm: boolean; player?: string; team: boolean } {
   let player: string | undefined;
@@ -94,6 +95,13 @@ export function cardCommand(args: string[] = []): void {
 
   if (effectiveScorecards.length < 5) {
     console.log(`\nNote: Only ${effectiveScorecards.length} scorecard${effectiveScorecards.length === 1 ? '' : 's'} \u2014 windows fill at Sprint ${minSprint + 5 - effectiveScorecards.length}.`);
+  }
+
+  // The whole-project card only. `--player`, `--team` and `--swarm` are
+  // filtered views and return before this, so a per-player card cannot record
+  // a gate that means the project's handicap card was generated (#696).
+  if (!flags.player) {
+    recordPhaseGate(process.cwd(), 'handicap_generated', { config });
   }
 
   console.log('');

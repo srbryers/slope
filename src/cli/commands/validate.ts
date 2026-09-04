@@ -14,6 +14,7 @@ import { updateGate, sprintStateLocation } from '../sprint-state.js';
 import { completeRoadmapSourceSprint } from '../roadmap-source-store.js';
 import { sprintLabelForExecution } from '../workflow-resync.js';
 import { reconcileWorkflowCloseout, WORKFLOW_EXECUTION_ID_ENV } from '../workflow-closeout.js';
+import { recordPhaseGate } from '../phase-gate-recording.js';
 import type { RoadmapSourceError, SprintId } from '../../core/index.js';
 
 export async function validateCommand(input?: string | string[]): Promise<void> {
@@ -121,6 +122,10 @@ export async function validateCommand(input?: string | string[]): Promise<void> 
     if (reconciled && completedRoadmapSprints.size > 0) {
       reconciled = await reconcileValidatedWorkflowExecutions(cwd, completedRoadmapSprints);
     }
+    // Only on a clean run. The phase-boundary guard names this command beside
+    // the gate and nothing wrote it, so the documented workflow could not
+    // reach the boundary without the manual override (#696).
+    recordPhaseGate(cwd, 'scorecards_verified');
   } else if (readOnly) {
     // `validate` writes tracked files as a side effect: it marks the scorecard
     // gate, reconciles scorecard indexes and sprint status into the phase YAML,

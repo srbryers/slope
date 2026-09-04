@@ -11,14 +11,8 @@ import {
   roadmapSprintKeyFromId,
   sprintIdKey,
 } from '../../core/index.js';
-import { isPhaseComplete, pendingPhaseGates } from '../phase-cleanup.js';
+import { extractPhaseNumber, isPhaseComplete, pendingPhaseGates } from '../phase-cleanup.js';
 import { shellCommandSegments } from './command-parse.js';
-
-/** Extract phase number from name like "Phase 7 — Helmsman 3D". Falls back to array index + 1. */
-function extractPhaseNumber(name: string, index: number): number {
-  const match = name.match(/Phase\s+(\d+)/i);
-  return match ? parseInt(match[1], 10) : index + 1;
-}
 
 /**
  * Phase-boundary guard: fires PreToolUse on Bash.

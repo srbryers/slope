@@ -1,7 +1,37 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
+import { detectPackageManager } from '../core/analyzers/stack.js';
 
 const PHASE_CLEANUP_FILE = '.slope/phase-cleanup.json';
+
+/** Gate names, without the bookkeeping field. */
+export type PhaseGateName = 'scorecards_verified'
+  | 'handicap_generated'
+  | 'map_refreshed'
+  | 'findings_audited'
+  | 'regression_passed';
+
+export const PHASE_GATE_NAMES: readonly PhaseGateName[] = [
+  'scorecards_verified',
+  'handicap_generated',
+  'map_refreshed',
+  'findings_audited',
+  'regression_passed',
+];
+
+/**
+ * The regression command for this project.
+ *
+ * Was hardcoded to `bun test` in the gate label, so a pnpm project was told to
+ * run a tool it does not have, and the reporter's passing test run could not
+ * satisfy the gate it had just earned (#696). `test` is the script name in
+ * every one of these package managers, so only the runner differs.
+ */
+export function regressionCommand(cwd: string): string {
+  const pm = detectPackageManager(cwd);
+  if (!pm) return 'npm test';
+  return pm === 'bun' ? 'bun test' : `${pm} test`;
+}
 
 export interface PhaseCleanupGates {
   completed_at?: string;
@@ -60,24 +90,30 @@ export function isPhaseComplete(cwd: string, phase: number): boolean {
     gates.regression_passed;
 }
 
+/**
+ * Gate labels, each naming the command that records it.
+ *
+ * Every label points at a command that now writes its own gate, so the
+ * documented workflow reaches the boundary without `phase complete` (#696).
+ */
+export function phaseGateLabels(cwd: string): Record<PhaseGateName, string> {
+  return {
+    scorecards_verified: 'Scorecards verified (`slope validate`)',
+    handicap_generated: 'Handicap card generated (`slope card`)',
+    map_refreshed: 'Codebase map refreshed (`slope map`)',
+    findings_audited: 'Deferred findings audited (`slope phase audit`)',
+    regression_passed: `Regression passed (\`slope phase regression\`, runs \`${regressionCommand(cwd)}\`)`,
+  };
+}
+
 /** Get incomplete gates for a phase. Returns human-readable list. */
 export function pendingPhaseGates(cwd: string, phase: number): string[] {
   const state = loadPhaseCleanup(cwd);
   const gates = state.phases[String(phase)] ?? DEFAULT_GATES;
-  const labels: Record<keyof PhaseCleanupGates, string> = {
-    completed_at: '',
-    scorecards_verified: 'Scorecards verified (`slope validate` for all phase sprints)',
-    handicap_generated: 'Handicap card generated (`slope card`)',
-    map_refreshed: 'Codebase map refreshed (`slope map`)',
-    findings_audited: 'Deferred findings audited (`slope phase audit`)',
-    regression_passed: 'Regression passed (`bun test`)',
-  };
+  const labels = phaseGateLabels(cwd);
   const pending: string[] = [];
-  for (const [key, label] of Object.entries(labels)) {
-    if (key === 'completed_at') continue;
-    if (!gates[key as keyof PhaseCleanupGates]) {
-      pending.push(label);
-    }
+  for (const key of PHASE_GATE_NAMES) {
+    if (!gates[key]) pending.push(labels[key]);
   }
   return pending;
 }
@@ -106,6 +142,61 @@ export function markPhaseGate(
     gates.completed_at = new Date().toISOString();
   }
   savePhaseCleanup(cwd, state);
+}
+
+/**
+ * Phase number from a phase name like "Phase 7 — Helmsman 3D", falling back to
+ * position. Shared with the phase-boundary guard so both derive the number the
+ * same way; two copies would let the guard block on a phase no command could
+ * record against.
+ */
+export function extractPhaseNumber(name: string, index: number): number {
+  const match = name.match(/Phase\s+(\d+)/i);
+  return match ? parseInt(match[1], 10) : index + 1;
+}
+
+/**
+ * The phase a sprint belongs to, or null when the roadmap does not place it.
+ *
+ * The gate writers need this: `slope validate`, `card` and `map` are told
+ * nothing about phases, so each has to find the phase that owns the sprint it
+ * is working on before it can record anything (#696).
+ */
+export function phaseNumberForSprint(
+  roadmap: { phases?: Array<{ name: string; sprints: Array<string | number>; sprint_keys?: string[] }> } | null,
+  sprintKey: string,
+  normalise: (id: string | number) => string | null,
+): number | null {
+  if (!roadmap?.phases) return null;
+  for (let i = 0; i < roadmap.phases.length; i++) {
+    const phase = roadmap.phases[i];
+    const members = phase.sprint_keys ?? phase.sprints;
+    if (members.some(id => normalise(id) === sprintKey)) {
+      return extractPhaseNumber(phase.name, i);
+    }
+  }
+  return null;
+}
+
+/**
+ * Record a gate against the phase owning `sprintKey`, and say what happened.
+ *
+ * Returns null when the phase cannot be resolved, so a caller can stay quiet
+ * rather than claim it recorded something. Recording against a guessed phase
+ * would be worse than recording nothing: the boundary would open on evidence
+ * that belongs to a different phase.
+ */
+export function recordPhaseGateForSprint(
+  cwd: string,
+  roadmap: Parameters<typeof phaseNumberForSprint>[0],
+  sprintKey: string,
+  normalise: (id: string | number) => string | null,
+  gate: PhaseGateName,
+): number | null {
+  const phase = phaseNumberForSprint(roadmap, sprintKey, normalise);
+  if (phase == null) return null;
+  markPhaseGate(cwd, phase, gate, true);
+  return phase;
 }
 
 /** Mark all gates complete for a phase (manual override). */
