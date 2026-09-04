@@ -32,6 +32,24 @@ function setupRepo(): void {
   execSync('git commit -m init', { cwd, stdio: 'ignore' });
 }
 
+/**
+ * Whether this process may create symlinks.
+ *
+ * Windows refuses with EPERM unless Developer Mode is on or the process is
+ * elevated. Probing the capability keeps the test running wherever symlinks
+ * work, instead of skipping every Windows machine (#712).
+ */
+function canCreateSymlinks(): boolean {
+  const probe = join(tmpdir(), `slope-symlink-probe-${process.pid}-${Date.now()}`);
+  try {
+    symlinkSync(tmpdir(), probe);
+    rmSync(probe, { force: true });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 describe('slope worktree start', () => {
   beforeEach(() => {
     cwd = join(tmpdir(), `slope-worktree-start-${Date.now()}-${Math.random().toString(36).slice(2)}`);
@@ -134,7 +152,10 @@ describe('slope worktree start', () => {
     expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('parent test or format globs'));
   });
 
-  it('warns when a symlinked worktree path resolves inside the repository', async () => {
+  // Creating a symlink on Windows needs Developer Mode or elevation, and
+  // fails with EPERM otherwise. Gated on the capability rather than the
+  // platform, so it runs wherever symlinks are actually permitted (#712).
+  it.skipIf(!canCreateSymlinks())('warns when a symlinked worktree path resolves inside the repository', async () => {
     const inRepoRoot = join(cwd, 'worktrees');
     mkdirSync(inRepoRoot, { recursive: true });
     symlinkAlias = `${cwd}-alias`;

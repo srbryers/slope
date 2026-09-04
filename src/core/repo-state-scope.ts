@@ -28,7 +28,7 @@ export function resolvePrimaryCheckout(cwd: string): string | null {
  */
 export function resolveRepoSourceCwd(cwd: string = process.cwd()): string {
   const local = resolve(cwd);
-  const gitTopLevel = safeGit(local, ['rev-parse', '--show-toplevel']);
+  const gitTopLevel = nativeGitPath(local, ['rev-parse', '--show-toplevel']);
   return findNearestSlopeProject(local, gitTopLevel) ?? gitTopLevel ?? local;
 }
 
@@ -42,7 +42,7 @@ export function resolveRepoSourceCwd(cwd: string = process.cwd()): string {
  */
 export function resolveRepoStateCwd(cwd: string = process.cwd()): string {
   const local = resolve(cwd);
-  const gitTopLevel = safeGit(local, ['rev-parse', '--show-toplevel']);
+  const gitTopLevel = nativeGitPath(local, ['rev-parse', '--show-toplevel']);
   const nearestProject = findNearestSlopeProject(local, gitTopLevel);
   const primary = resolvePrimaryCheckout(local);
   const primaryIsSlopeProject = primary
@@ -94,6 +94,28 @@ function safeGit(cwd: string, args: string[]): string | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * A path from git, in this platform's own separator style.
+ *
+ * git reports paths with forward slashes on every platform, so on Windows
+ * `rev-parse --show-toplevel` returns `C:/Users/...` while everything derived
+ * from `resolve` or `mkdtempSync` uses backslashes. Both name the same
+ * directory and neither equals the other as a string.
+ *
+ * That leaked out of this module. `resolveRepoSourceCwd` returns the git value
+ * when there is no nearer SLOPE project, and the session heartbeat stores it
+ * as `worktree_path`. A record written from the git branch then failed every
+ * comparison against one written from a Node path, so worktree reconciliation
+ * could not match a session to its own checkout (#712).
+ *
+ * Normalising here rather than at each call site, because the mixing is what
+ * causes the bug and this is the one place the git values enter.
+ */
+function nativeGitPath(cwd: string, args: string[]): string | null {
+  const output = safeGit(cwd, args);
+  return output === null ? null : resolve(output);
 }
 
 function samePath(left: string, right: string): boolean {

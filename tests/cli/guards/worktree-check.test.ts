@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { worktreeCheckGuard, resetWorktreeCheckState } from '../../../src/cli/guards/worktree-check.js';
 import type { HookInput } from '../../../src/core/index.js';
 import { STALE_SESSION_THRESHOLD_MS } from '../../../src/core/constants.js';
@@ -10,8 +10,21 @@ vi.mock('node:child_process', () => ({
   execFileSync: vi.fn(),
 }));
 
-// Track sentinel files in memory instead of real filesystem
-const sentinelFiles = new Set<string>();
+// Track sentinel files in memory instead of real filesystem.
+//
+// Keys are normalised through `resolve`, because the code under test resolves
+// every path before touching the filesystem. On POSIX `/repo` is already
+// absolute so the two coincide; on Windows the code asks about `C:\repo` while
+// a fixture written as `/repo` would never match, and the whole file failed
+// (#712). Normalising both sides keeps the fixtures readable as POSIX strings
+// and correct on either platform.
+const rawSentinelFiles = new Set<string>();
+const sentinelFiles = {
+  add: (p: string) => rawSentinelFiles.add(resolve(p)),
+  delete: (p: string) => rawSentinelFiles.delete(resolve(p)),
+  has: (p: string) => rawSentinelFiles.has(resolve(p)),
+  clear: () => rawSentinelFiles.clear(),
+};
 
 vi.mock('node:fs', () => ({
   existsSync: vi.fn((p: string) => sentinelFiles.has(p)),
@@ -533,7 +546,8 @@ describe('worktreeCheckGuard', () => {
     });
     // Repo-scoped: written to the primary checkout's store, not the worktree's,
     // so `slope session list|prune|end` sees the same record (GH #630, #631).
-    expect(mockResolveStore).toHaveBeenCalledWith('/repo');
+    // Resolved, because the value the code produces is platform-native.
+    expect(mockResolveStore).toHaveBeenCalledWith(resolve('/repo'));
   });
 
   it('silently passes on store resolve error (#263)', async () => {
