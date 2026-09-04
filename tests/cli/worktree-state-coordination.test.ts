@@ -1,7 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { recordBaseline, loadBaseline, removeBaseline } from '../../src/cli/guards/git-utils.js';
 import { sessionBriefingGuard } from '../../src/cli/guards/session-briefing.js';
@@ -16,6 +15,7 @@ import {
 import { loadWorkflow } from '../../src/core/workflow-loader.js';
 import { createStore } from '../../src/store/index.js';
 import { detectSetupHints, findProjectRoot } from '../../src/mcp/index.js';
+import { makeTempDir } from '../helpers/temp-dir.js';
 
 let primary: string;
 let worktree: string;
@@ -27,7 +27,7 @@ function git(cwd: string, args: string[]): void {
 describe('cross-worktree state coordination', () => {
   beforeEach(() => {
     clearMemoryBackendCache();
-    primary = mkdtempSync(join(tmpdir(), 'slope-coordination-primary-'));
+    primary = makeTempDir('slope-coordination-primary-');
     worktree = `${primary}-worktree`;
     git(primary, ['init', '-q', '-b', 'main']);
     git(primary, ['config', 'user.email', 'test@example.com']);

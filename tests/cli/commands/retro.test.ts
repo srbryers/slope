@@ -10,9 +10,10 @@ import { memoryCommand } from '../../../src/cli/commands/memory.js';
 import { clearMemoryBackendCache, searchMemories } from '../../../src/core/memory.js';
 import { createSprintState, loadSprintState, saveSprintState } from '../../../src/cli/sprint-state.js';
 import { SqliteSlopeStore } from '../../../src/store/index.js';
+import { makeTempDir } from '../../helpers/temp-dir.js';
 
 function createTempDir(): string {
-  const cwd = mkdtempSync(join(tmpdir(), 'slope-retro-cli-'));
+  const cwd = makeTempDir('slope-retro-cli-');
   mkdirSync(join(cwd, '.slope'), { recursive: true });
   return cwd;
 }

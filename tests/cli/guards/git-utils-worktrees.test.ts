@@ -2,8 +2,8 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { tmpdir } from 'node:os';
 import { getActiveWorktrees } from '../../../src/cli/guards/git-utils.js';
+import { makeTempDir } from '../../helpers/temp-dir.js';
 
 /**
  * `getActiveWorktrees` had no test anywhere, and it compared git's output to
@@ -24,7 +24,7 @@ function git(cwd: string, args: string[]): void {
 }
 
 function setupRepoWithWorktree(): { primary: string; linked: string } {
-  const primary = mkdtempSync(join(tmpdir(), 'slope-worktrees-'));
+  const primary = makeTempDir('slope-worktrees-');
   dirs.push(primary);
   git(primary, ['init', '-b', 'main']);
   git(primary, ['config', 'user.email', 't@t']);

@@ -2,9 +2,9 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
 import { sessionCommand } from '../../../src/cli/commands/session.js';
 import { SqliteSlopeStore } from '../../../src/store/index.js';
+import { makeTempDir } from '../../helpers/temp-dir.js';
 
 let tmpDir: string;
 let originalCwd: string;
@@ -24,7 +24,7 @@ function createStore(): SqliteSlopeStore {
 
 describe('slope session command', () => {
   beforeEach(() => {
-    tmpDir = mkdtempSync(join(tmpdir(), 'slope-session-command-'));
+    tmpDir = makeTempDir('slope-session-command-');
     setupProject(tmpDir);
     originalCwd = process.cwd();
     process.chdir(tmpDir);

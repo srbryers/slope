@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { worktreeCheckGuard, resetWorktreeCheckState } from '../../../src/cli/guards/worktree-check.js';
 import { SqliteSlopeStore } from '../../../src/store/index.js';
 import type { HookInput } from '../../../src/core/index.js';
+import { makeTempDir } from '../../helpers/temp-dir.js';
 
 let cwd: string;
 let extraDirs: string[];
@@ -103,7 +104,7 @@ describe('worktreeCheckGuard SQLite deadlock recovery', () => {
     // leftover from an earlier run would short-circuit the guard before it can
     // reconcile. Reset on entry as well as exit.
     resetSentinels();
-    cwd = mkdtempSync(join(tmpdir(), 'slope-worktree-check-'));
+    cwd = makeTempDir('slope-worktree-check-');
     extraDirs = [];
     git(['init', '-q']);
     git(['checkout', '-q', '-b', 'main']);
