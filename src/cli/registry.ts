@@ -34,7 +34,7 @@ export interface CliCommandMeta {
 }
 
 /** Command files that are internal implementation modules, not user-invocable top-level commands. */
-export const CLI_INTERNAL_MODULES = ['phase', 'review-state', 'review-run', 'review-packet', 'sprint-plan'] as const;
+export const CLI_INTERNAL_MODULES = ['review-state', 'review-run', 'review-packet', 'sprint-plan'] as const;
 
 export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
   // ── Lifecycle ──────────────────────────────────────────────────
@@ -838,6 +838,32 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
       { name: 'show', desc: 'Show the completion evidence recorded for a ticket', flags: [
         { flag: '<key>', desc: 'Ticket key (e.g. S1-1)' },
         { flag: '--json', desc: 'Emit the completion record as JSON' },
+      ]},
+    ],
+  },
+  {
+    // Was an internal module, so `slope help` never listed it. Every phase
+    // cleanup gate names one of these subcommands, which made the recorded
+    // path as undiscoverable as it was unreachable (#696).
+    cmd: 'phase', desc: 'Phase boundary cleanup gates', category: 'lifecycle', audience: 'agent',
+    subcommands: [
+      { name: 'status', desc: 'Show cleanup gates for a phase (or all)', flags: [
+        { flag: '<N>', desc: 'Phase number; omit for every recorded phase' },
+      ]},
+      { name: 'audit', desc: 'Record the deferred-findings gate', flags: [
+        { flag: '<N>', desc: 'Phase number' },
+      ]},
+      { name: 'regression', desc: "Run the project's test command; record the gate on success", flags: [
+        { flag: '<N>', desc: 'Phase number; omit to use the phase being closed out' },
+        { flag: '--command=<cmd>', desc: 'Override the package-manager-derived test command' },
+      ]},
+      { name: 'gate', desc: 'Record one gate as evidence', flags: [
+        { flag: '<name>', desc: 'scorecards_verified | handicap_generated | map_refreshed | findings_audited | regression_passed' },
+        { flag: '<N>', desc: 'Phase number; omit to use the phase being closed out' },
+        { flag: '--clear', desc: 'Mark the gate incomplete instead' },
+      ]},
+      { name: 'complete', desc: 'Record every gate at once (manual override, checks nothing)', flags: [
+        { flag: '<N>', desc: 'Phase number' },
       ]},
     ],
   },
