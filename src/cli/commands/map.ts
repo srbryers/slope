@@ -5,6 +5,7 @@ import { compareSprintIdKeys, loadConfig, loadScorecards, detectLatestSprint, GU
 import type { SlopeConfig } from '../../core/index.js';
 import { CLI_COMMAND_REGISTRY } from '../registry.js';
 import { SLOPE_REGISTRY } from '../../mcp/registry.js';
+import { recordPhaseGate } from '../phase-gate-recording.js';
 
 // ── Helpers ─────────────────────────────────────────────────────
 
@@ -979,6 +980,9 @@ export async function mapCommand(args: string[], cwd: string = process.cwd()): P
     console.log(`  ${meta.cli_commands} CLI commands, ${meta.guards} guards`);
   }
   console.log(`\nMap written to ${relative(cwd, outputPath)}\n`);
+  // Only after a real write. `--check` returns above, so a staleness check
+  // never records the gate that says the map was refreshed (#696).
+  recordPhaseGate(cwd, 'map_refreshed');
 }
 
 function isSlopeShapedMap(content: string): boolean {

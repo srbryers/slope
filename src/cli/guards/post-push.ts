@@ -10,7 +10,7 @@ import {
 } from '../../core/index.js';
 import { loadSprintState } from '../sprint-state.js';
 import { loadSessionState, updateSessionState } from '../session-state.js';
-import { isPhaseComplete } from '../phase-cleanup.js';
+import { extractPhaseNumber, isPhaseComplete, pendingPhaseGates, regressionCommand } from '../phase-cleanup.js';
 import { resolveStore } from '../store.js';
 
 /**
@@ -68,7 +68,10 @@ export async function postPushGuard(input: HookInput, cwd: string): Promise<Guar
       contextText = `Sprint S${sprintState.sprint} — ${remainingClaims} claim(s) active, ${pendingGateCount} gate(s) pending.`;
       options = [
         { id: 'next-ticket', label: 'Continue with next ticket' },
-        { id: 'run-tests', label: 'Run tests', command: 'bun test' },
+        // Derived from the lockfile. This is an actual command field, not a
+        // label, so hardcoding `bun test` handed a pnpm project a command it
+        // could not run (#696).
+        { id: 'run-tests', label: 'Run tests', ...(regressionCommand(cwd) ? { command: regressionCommand(cwd)! } : {}) },
       ];
     } else {
       // "No claims" is not "all tickets done". It is also the state of a
@@ -93,7 +96,7 @@ export async function postPushGuard(input: HookInput, cwd: string): Promise<Guar
           : `Sprint S${sprintState.sprint} — ${completedTickets.recorded}/${completedTickets.total} tickets recorded done, none claimed.`;
         options = [
           { id: 'next-ticket', label: 'Claim the next ticket', command: 'slope now' },
-          { id: 'run-tests', label: 'Run tests' },
+          { id: 'run-tests', label: 'Run tests', ...(regressionCommand(cwd) ? { command: regressionCommand(cwd)! } : {}) },
         ];
       }
     }
@@ -141,11 +144,23 @@ export async function postPushGuard(input: HookInput, cwd: string): Promise<Guar
               const allDone = phaseKeys.every(sn =>
                 existsSync(join(cwd, config.scorecardDir, `sprint-${sn}.json`)),
               );
-              const phaseMatch = phase.name.match(/Phase\s+(\d+)/i);
-              const phaseNum = phaseMatch ? parseInt(phaseMatch[1], 10) : i + 1;
+              // Shared with the phase-boundary guard and the gate writers.
+              // This was a third inline copy of the same regex.
+              const phaseNum = extractPhaseNumber(phase.name, i);
               if (allDone && !isPhaseComplete(cwd, phaseNum)) {
                 contextText += `\n\nPhase ${phaseNum} (${phase.name}) is now complete — run phase boundary cleanup before starting the next phase.`;
-                options.push({ id: 'phase-cleanup', label: `Phase ${phaseNum} cleanup`, command: `slope phase complete ${phaseNum}` });
+                // Name the gates, not the override. Offering `phase complete`
+                // as the cleanup step is what taught people the override is
+                // the normal path (#696).
+                const pending = pendingPhaseGates(cwd, phaseNum);
+                for (const [i2, gate] of pending.entries()) {
+                  options.push({ id: `phase-gate-${i2}`, label: gate });
+                }
+                options.push({
+                  id: 'phase-override',
+                  label: `Phase ${phaseNum} cleanup (manual override — records every gate without checking)`,
+                  command: `slope phase complete ${phaseNum}`,
+                });
               }
               break;
             }

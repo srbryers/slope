@@ -56,7 +56,7 @@ sprints:
     par: 5
     slope: 3
     type: bugfix + safety
-    status: planned
+    status: complete
     github_issues:
       - 696
     note: "A boundary whose only reachable exit is the command labelled manual override teaches operators that the override is the normal path. Four gates need writers, and review caught that the first draft left the fifth without one: retargeting the bun fix at a display label closed the label defect but dropped #696's explicit ask for a package-manager-aware regression command that can record the test gate. Both hardcodes are in scope and they differ in kind: phase-cleanup.ts:73 is a display label, post-push.ts:68 is an actual command field. detectPackageManager already exists at analyzers/stack.ts:57, and sprint-completion.ts already recognises test runners across pnpm, npm, yarn and bun at :295 then marks a gate on exit code at :456-470, so the regression writer has direct prior art to reuse rather than invent. Carries no dependency on S267.6: the two sprints share no code."
@@ -95,3 +95,4 @@ sprints:
           - S267.7-4
 scorecards:
   "267.6": docs/retros/sprint-267.6.json
+  "267.7": docs/retros/sprint-267.7.json

@@ -1,0 +1,167 @@
+{
+  "sprint_number": "267.7",
+  "theme": "Phase Gate Evidence",
+  "par": 5,
+  "slope": 3,
+  "score": 14,
+  "score_label": "triple_plus",
+  "date": "2026-09-04",
+  "shots": [
+    {
+      "ticket_key": "S267.7-1",
+      "title": "Record the scorecard, handicap-card and map gates from the commands that satisfy them (#696)",
+      "club": "long_iron",
+      "result": "missed_short",
+      "hazards": [
+        {
+          "type": "water",
+          "severity": "critical",
+          "description": "[both reviews] The writers recorded mid-phase. validate, card and map run every sprint under the post-hole routine, and nothing checked whether the phase was finished, so from a phase's first scorecard onward all five gates could go true and the boundary opened on sprints never played. Both reviewers reproduced it independently. This repo's own ledger already held a Phase 68 gate earned at a commit behind HEAD. post-push.ts:148 already computed the missing predicate.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "water",
+          "severity": "major",
+          "description": "[code review] Once the next phase had a single scorecard, every gate recorded against it and the phase actually being closed got none. That is exactly the population the phase-boundary staleness advisory describes, and for them the manual override stayed the only route.",
+          "gotcha_id": "review:code"
+        },
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "[code review] One recovery scorecard outside every phase, read as the highest sprint number, silently vetoed all gate recording. validate, card and map all succeeded and wrote nothing, with no message anywhere. phase-boundary.ts already guards against the same stray card.",
+          "gotcha_id": "review:code"
+        },
+        {
+          "type": "water",
+          "severity": "critical",
+          "description": "[self, caught by the workflow test] The first cut resolved the phase from inferSprintContext, which after a phase's last sprint closes already points at the first sprint of the NEXT phase. Gates marked a phase whose work had not started and left the one being closed still blocking.",
+          "gotcha_id": "self"
+        },
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "[code review] The fix for the blocker used isRoadmapSprintTerminal, which counts `complete` as terminal, so it excluded exactly the sprints whose scorecards it needed. Every writer stopped recording. The reviewer predicted this from reading the uncommitted tree before it was built.",
+          "gotcha_id": "review:code"
+        },
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "[security review] The phase-boundary guard extracted a runnable command from each gate label, so with no lockfile it offered `--command=\"<your test command>\"` as something to run: a shell syntax error dressed as a suggestion.",
+          "gotcha_id": "review:security"
+        }
+      ],
+      "notes": "Scored a miss, and the whole sprint's difficulty sits here. Three attempts at one question: which phase do these gates belong to. The rule is now one function with the reasoning written down: the last phase in roadmap order whose scorable sprints all have scorecards, skipped if already complete. Getting it wrong was not obvious from any single command; each wrong version looked right in the case I happened to test."
+    },
+    {
+      "ticket_key": "S267.7-2",
+      "title": "Record the regression gate from a package-manager-aware test run, reusing the existing test-runner detection (#696)",
+      "club": "long_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "moderate",
+          "description": "[code review] No lockfile returned `npm test`, so a Python or Go repo was told to run npm and the gate was unreachable without --command. That is the bun hardcode with a different name on it. Returns null and asks for --command now.",
+          "gotcha_id": "review:code"
+        },
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "[code review] The command was split on whitespace and then handed to a shell as an argv array, so any --command carrying a quoted argument with spaces was collapsed, and the banner printed something different from what ran.",
+          "gotcha_id": "review:code"
+        },
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "[architect review] The comment claimed `test` is the script name for every package manager. `bun test` runs Bun's own runner, not the package.json script. Behaviour was right; the comment was not.",
+          "gotcha_id": "review:architect"
+        }
+      ],
+      "notes": "Reused detectPackageManager rather than isTestRunnerCommand, and both reviews agreed that was the right one: the first generates a command, the second only recognises one. Output is inherited rather than summarised, because a gate writer that hides why a run failed is not evidence. Still open from #696 and filed rather than folded in: the configured test command (LoopConfig.loopTestCmd) is not consulted."
+    },
+    {
+      "ticket_key": "S267.7-3",
+      "title": "Derive both bun hardcodes from package-manager detection: the cleanup label and the post-push guard command (#696)",
+      "club": "short_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "Both hardcodes gone, and they differed in kind: one was a display label, the other an actual command field handed to the operator. Found two more instances of the same defect in post-push while there, neither in the ticket: a third inline copy of the phase-number regex, and a cleanup suggestion that offered only the manual override."
+    },
+    {
+      "ticket_key": "S267.7-4",
+      "title": "Expose a per-gate evidence command so phase complete stays a genuine manual override (#696)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "[both reviews] --clear left completed_at set, so `phase status` printed a pending gate and a completion time together and the session briefing reported COMPLETE, because it branches on the stamp alone. --clear is this sprint's own addition and the only path that moves a gate to false, so the contradiction was new.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "rough",
+          "severity": "moderate",
+          "description": "[code review] Phase arguments went through parseInt, so -1, 0, 3.7 and 1abc each wrote a phantom ledger entry that then appeared in `phase status`.",
+          "gotcha_id": "review:code"
+        },
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "[both reviews] `slope phase` sat in CLI_INTERNAL_MODULES, so help never listed it. Every gate label names one of its subcommands, which left the recorded path as undiscoverable as it was unreachable. The registry test cannot catch this class: the internal-modules list is an allowlist the assertion unions in.",
+          "gotcha_id": "review:code"
+        },
+        {
+          "type": "rough",
+          "severity": "moderate",
+          "description": "[security review] parsePhaseArg was applied to the two subcommands this sprint added and not to the two that already existed, so `slope phase audit 3.7` still silently marked phase 3. The helper's own docstring describes that defect, left in place in half the same file.",
+          "gotcha_id": "review:security"
+        }
+      ],
+      "notes": "Both of #696's proposed remedies are delivered, automatic recording and an evidence command, so `phase complete` is an override again. Registered as agent audience, which leaves the deliberately bounded human surface untouched."
+    },
+    {
+      "ticket_key": "S267.7-5",
+      "title": "Cover the full five-gate path so the documented workflow satisfies the boundary without an override (#696)",
+      "club": "wedge",
+      "result": "in_the_hole",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "moderate",
+          "description": "[code review] Two of the eight tests did not discriminate. The card filter case used --player=<nobody>, which exits at 'no scorecards for player' before reaching the branch it meant to test, so deleting the guard left it green. And nothing covered the implicit phase default at all, which is precisely where the blocker lived. Found by mutating a copy of dist and re-running.",
+          "gotcha_id": "review:code"
+        }
+      ],
+      "notes": "The ticket that paid for itself. Writing the workflow test, rather than testing gates one at a time, immediately found two defects: gates recording against the wrong phase, and `phase status` hiding the gate list before any state existed. Both were invisible per-gate. The reviews then found that two of the tests could not fail, which is the same lesson one level up."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 4,
+    "fairways_total": 5,
+    "greens_in_regulation": 4,
+    "greens_total": 5,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 14,
+    "hazard_penalties": 9,
+    "miss_directions": {
+      "long": 0,
+      "short": 1,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [],
+  "special_plays": [],
+  "bunker_locations": [
+    "A gate that can be earned early and never invalidated is a flag, not evidence. These record from commands that run every sprint, so without a finished-phase precondition ordinary hygiene opens the boundary on work that has not happened.",
+    "isRoadmapSprintTerminal includes `complete`. Any filter meaning 'will never produce a scorecard' must exclude it, or it removes exactly the sprints whose scorecards it needs.",
+    "Deriving 'which phase' from a single sprint is wrong in both directions: the current sprint is already in the next phase, and the latest scorecard can be a stray card outside every phase. Resolve from the phases themselves.",
+    "Sprint ids from scorecards and sprint keys from the roadmap are different spellings. Comparing them without normalising through roadmapSprintKeyFromId fails silently on any trailing-zero decimal.",
+    "A test that reaches an early return never tests the branch it names. --player=<nonexistent> exits at 'no scorecards for player' long before the guard under test."
+  ],
+  "yardage_book_updates": [],
+  "course_management_notes": [],
+  "notes": "Closes #696, completing Phase 68. Scored triple_plus 14 against par 5 across five independent review passes, code, architect and security. Fifteen findings, one blocker found by both reviewers, all applied. The blocker and its two follow-on faults were all the same question asked three times: which phase does this gate belong to. Each wrong answer looked right in the case I tested, which is why the reviewers reproducing it in fixtures I had not built mattered more than any amount of re-reading. The code reviewer read my uncommitted fix for the blocker and predicted both of its faults before it was built, including that isRoadmapSprintTerminal would exclude completed sprints. Deferred with issues filed: the configured test command half of #696, gate provenance (phase gates are bare booleans while sprint review gates carry reviewer, evidence and verdict), and the phase-cleanup module sitting in src/cli where no MCP tool can read it."
+}

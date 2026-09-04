@@ -11,14 +11,8 @@ import {
   roadmapSprintKeyFromId,
   sprintIdKey,
 } from '../../core/index.js';
-import { isPhaseComplete, pendingPhaseGates } from '../phase-cleanup.js';
+import { extractPhaseNumber, isPhaseComplete, pendingPhaseGates } from '../phase-cleanup.js';
 import { shellCommandSegments } from './command-parse.js';
-
-/** Extract phase number from name like "Phase 7 — Helmsman 3D". Falls back to array index + 1. */
-function extractPhaseNumber(name: string, index: number): number {
-  const match = name.match(/Phase\s+(\d+)/i);
-  return match ? parseInt(match[1], 10) : index + 1;
-}
 
 /**
  * Phase-boundary guard: fires PreToolUse on Bash.
@@ -139,13 +133,17 @@ export async function phaseBoundaryGuard(input: HookInput, cwd: string): Promise
     title: 'Phase Boundary',
     context: `Phase ${prevPhaseNum} cleanup is incomplete. Complete these gates before starting Sprint ${targetKey} (Phase ${targetPhaseNum}).`,
     options: [
+      // Each gate carries the command that records it. The labels always
+      // named a command; nothing put it where the operator could run it, so
+      // the only option with a command attached was the override (#696).
       ...pending.map((gate, i) => ({
         id: `gate-${i}`,
         label: gate,
+        ...(gateCommand(gate, prevPhaseNum) ? { command: gateCommand(gate, prevPhaseNum)! } : {}),
       })),
       {
         id: 'override',
-        label: 'Mark phase complete (manual override)',
+        label: 'Mark phase complete (manual override — records every gate without checking)',
         command: `slope phase complete ${prevPhaseNum}`,
       },
     ],
@@ -157,6 +155,27 @@ export async function phaseBoundaryGuard(input: HookInput, cwd: string): Promise
     decision: 'deny',
     suggestion,
   };
+}
+
+/**
+ * The command that records a gate, matched from its own label.
+ *
+ * Labels come from `phaseGateLabels`, which names the command inside
+ * backticks. Reading it back keeps one definition of which command satisfies
+ * which gate, rather than a second mapping here that could drift from the
+ * labels the operator is reading.
+ */
+function gateCommand(label: string, phase: number): string | null {
+  const named = label.match(/`(slope [^`]+)`/);
+  if (!named) return null;
+  const command = named[1];
+  // A label can carry a placeholder rather than a command, when no lockfile
+  // was found and the regression command could not be derived. Offering
+  // `--command="<your test command>"` as something to run is a shell syntax
+  // error dressed up as a suggestion.
+  if (command.includes('<')) return null;
+  // Phase-scoped commands need the number; the repo-wide ones do not.
+  return /^slope phase\b/.test(command) ? `${command} ${phase}` : command;
 }
 
 function extractRelevantSlopeArgs(command: string): string[] | null {
