@@ -1,0 +1,174 @@
+{
+  "sprint_number": "267.6",
+  "theme": "Ticket Completion Truth",
+  "par": 5,
+  "slope": 4,
+  "score": 16,
+  "score_label": "triple_plus",
+  "date": "2026-09-04",
+  "shots": [
+    {
+      "ticket_key": "S267.6-1",
+      "title": "Decide whether the existing events table can serve as the completion ledger, and add a table only if it cannot (#697)",
+      "club": "long_iron",
+      "result": "in_the_hole",
+      "hazards": [],
+      "notes": "The answer was no new table. Checked rather than assumed: idx_events_ticket exists in both backends, and events.sprint_number was migrated to TEXT in both, so it stores \"267.10\" without collapsing it to 267.1. Both re-reviews verified those claims independently. What was actually missing was a single reader, not a table. Building one would have made the most expensive ticket in three phases an unnecessary one and forced three tickets into serial execution behind it."
+    },
+    {
+      "ticket_key": "S267.6-2",
+      "title": "Make the completion write a required step whose failure surfaces, instead of a swallowed best-effort event (#697)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "rough",
+          "severity": "major",
+          "description": "[code review] Shipped with no test. Reverting the hardening back to a swallowing catch left all 15 tests green, so the fix was unverified. Covered now by dropping the events table and asserting exit 1 with the claim still held.",
+          "gotcha_id": "review:code"
+        },
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "[code review] The read side kept the exact failure mode the write side had just lost: a failed ledger query became an empty map, so every surface reported the ticket unfinished with no diagnostic. Fixing one half of a swallow and leaving the other is worse than fixing neither, because the write now looks trustworthy.",
+          "gotcha_id": "review:code"
+        },
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "[code re-review] The read fix covered the query layer only. agent status still swallowed a store-open failure, and that is the surface agents consume: store.list runs before the ledger read, so a failure there skipped the read entirely and landed in the outer catch with no error set.",
+          "gotcha_id": "review:code"
+        }
+      ],
+      "notes": "The write now exits 1 and keeps the claim, so a lost write cannot report success. Scored green rather than better because the read half of the same swallow survived two passes: first at the query layer, then at the store-open layer in the one surface most likely to be automated against."
+    },
+    {
+      "ticket_key": "S267.6-3",
+      "title": "Read completion in agent, slope now and compact roadmap status so all three surfaces agree (#697)",
+      "club": "long_iron",
+      "result": "missed_short",
+      "hazards": [
+        {
+          "type": "water",
+          "severity": "critical",
+          "description": "[architect review] Half delivered. The three surfaces converged on completions and kept three different claim policies: now skipped every claimed ticket, agent status preferred a claimed one and matched claims from ANY player, and compact roadmap status ignored claims entirely. With one claim open, now said start S1-2 while roadmap status said work S1-1. In a two-agent sprint, agent status pointed both agents at the same ticket.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "water",
+          "severity": "major",
+          "description": "[architect review] The test written for this ticket compared agent and now only after ticket done had released the claim, which is the single state where the two policies coincide. A test aimed at the exact scenario the ticket names, constructed so it could not fail.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "[code re-review] selectNextTicket decides \"your own claim\" by player name, and no read surface accepted --actor while every write surface did. So a claim made under --actor=agent-a could never be matched back, and now advised force-taking work the caller already held.",
+          "gotcha_id": "review:code"
+        },
+        {
+          "type": "rough",
+          "severity": "moderate",
+          "description": "[code re-review] now --json reported tickets.completed as 0 while ledgerError was set. The text renderer already printed \"unknown\"; only the JSON path stated zero as fact, which is what an automated consumer reads.",
+          "gotcha_id": "review:code"
+        },
+        {
+          "type": "rough",
+          "severity": "moderate",
+          "description": "[self] Printing the Start hint for in-flight work meant dropping the gate that suppressed it, and that gate was load-bearing: a pending review decision outranks the ticket. Caught by an existing now test, not by me.",
+          "gotcha_id": "self"
+        },
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "[architect review] now --json omitted nextTicket entirely when the sprint was exhausted while agent status used null, so the two surfaces the ticket exists to align answered \"nothing next\" in two different shapes.",
+          "gotcha_id": "review:architect"
+        }
+      ],
+      "notes": "Scored a miss, and the worst of the sprint. The ticket says three surfaces agree; the first cut delivered three surfaces that agreed on completions and disagreed on claims, with a test narrow enough to miss it. selectNextTicket is now the one rule all three call, with a reason distinguishing all_claimed from all_complete. Honest residual limitation, filed as #715 and documented rather than implied away: identity is player name, claims never record session_id, so two agents sharing a machine identity still collide. --actor on all three read surfaces is the workaround, not a fix."
+    },
+    {
+      "ticket_key": "S267.6-4",
+      "title": "Resolve an explicit commit flag to an immutable sha and refuse a ref that does not resolve (#698)",
+      "club": "short_iron",
+      "result": "green",
+      "hazards": [
+        {
+          "type": "bunker",
+          "severity": "major",
+          "description": "[both reviews] A third path still stored the value verbatim: outside a git work tree the explicit flag returned unresolved, so --commit=HEAD became permanent evidence, printed one line above a warning saying no SHA had been attached. The command contradicted itself and #698 stayed fully reproducible there. isInsideGitWorkTree is also false when git is absent from PATH, which widens the reach.",
+          "gotcha_id": "review:architect"
+        }
+      ],
+      "notes": "Explicit values rev-parse through ^{commit}, so an abbreviated sha expands and a tree sha is refused. The refusal happens before the claim is released. One path missed on the first cut, and it was the path with no test."
+    },
+    {
+      "ticket_key": "S267.6-5",
+      "title": "Give completed-ticket evidence a repair path that works after the claim is released (#698)",
+      "club": "short_iron",
+      "result": "missed_short",
+      "hazards": [
+        {
+          "type": "water",
+          "severity": "critical",
+          "description": "[both reviews] repair and show resolved the CURRENT sprint through sprint state rather than the ticket's own sprint. Once state advanced, show reported a real completion as absent and repair refused it, advising ticket done, which needs a claim and would have filed the record under the wrong sprint. Evidence is audited after rollover, so the ticket's own scenario was the failing one. getEventsByTicket already existed and ticket_key is indexed in both backends.",
+          "gotcha_id": "review:architect"
+        },
+        {
+          "type": "rough",
+          "severity": "moderate",
+          "description": "[code review] repair rewrote player to whoever ran it, so correcting evidence silently reattributed the work.",
+          "gotcha_id": "review:code"
+        },
+        {
+          "type": "rough",
+          "severity": "moderate",
+          "description": "[code review] ticket show --json emitted `completed` only in the negative case, so a consumer reading that field saw a finished ticket as undefined and an unfinished one as false. Both read as not done.",
+          "gotcha_id": "review:code"
+        },
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "[code review] --notes= could not clear notes, because the guard tested truthiness rather than flag presence.",
+          "gotcha_id": "review:code"
+        },
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "[code re-review] repaired_by was written into the event and read by nothing, so ticket show could not say who corrected the evidence.",
+          "gotcha_id": "review:code"
+        }
+      ],
+      "notes": "Scored a miss. The ticket title says the repair path works after the claim is released, and it did, right up until sprint state moved on, which is when anyone would use it. Reading by sprint was the wrong primitive for a per-ticket command. slope ticket show was added alongside and is scope creep by the letter: not in any ticket, though repair genuinely needs a before view and nothing else surfaced recorded evidence. Registered and given a consistent JSON contract rather than split out."
+    }
+  ],
+  "stats": {
+    "fairways_hit": 3,
+    "fairways_total": 5,
+    "greens_in_regulation": 3,
+    "greens_total": 5,
+    "putts": 0,
+    "penalties": 0,
+    "hazards_hit": 15,
+    "hazard_penalties": 11,
+    "miss_directions": {
+      "long": 0,
+      "short": 2,
+      "left": 0,
+      "right": 0
+    }
+  },
+  "conditions": [],
+  "special_plays": [],
+  "bunker_locations": [
+    "A per-ticket command must resolve by ticket key. Resolving through current sprint state works until state advances, which is exactly when evidence gets audited, so the failure lands in the one scenario the feature exists for.",
+    "Converging surfaces on one input is not converging them on one answer. These three agreed on completions and kept three different claim policies, so the reported symptom survived under a live claim.",
+    "A test that exercises the state where two policies coincide cannot detect that they differ. The claim was released before comparing, which is the single state where all three surfaces agree by accident.",
+    "Fixing one side of a swallowed failure makes the other side worse, not neutral: the write now looks trustworthy while the read still turns 'could not look' into 'nothing recorded'.",
+    "Read-only commands must not open a store. resolveStore runs mkdirSync plus a full schema migration on sqlite, so a status report materialises a database in a repo that never had one.",
+    "Actor identity in SLOPE is player name; claims carry a session_id column that slope claim never populates. Any feature keying on 'my work' inherits that, and two agents on one machine collide silently (#715)."
+  ],
+  "yardage_book_updates": [],
+  "course_management_notes": [],
+  "notes": "Closes #697 and #698. Scored triple_plus 16 against par 5 across four independent review passes: code, architect, then a re-review of each on the fixes. Fifteen findings, two of them blockers, all applied. Both blockers were the same mistake in different clothes: a ticket declared done while the scenario it names still failed. S267.6-3 promised three surfaces that agree and shipped three that agree only while no claim is open, with a test built so it could not catch that. S267.6-5 promised a repair path that survives the claim being released and shipped one that dies at the next rollover. The re-reviews then caught a regression I introduced while fixing the first, and one honest limitation I had not stated: identity is player name, so multi-agent sprints need SLOPE_ACTOR or --actor. That is filed as #715 and written into docs/upgrading.md rather than implied away. Three follow-ups filed rather than folded in: #713 no reopen path, #714 standup renders completions as \"Decision made\", #715 claims never record session_id."
+}

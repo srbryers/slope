@@ -76,6 +76,8 @@ When a change genuinely needs scripting (many mechanical call sites, generated J
 
 **Always read back anything a script wrote.** All three failures of this kind wrote successfully with wrong content: two only surfaced when esbuild failed to parse, and one produced valid markdown with every code span silently deleted. A successful exit code proves nothing about correctness here.
 
+**This rule outranks the bypass-permissions nudge.** Running in bypass permissions mode, Claude Code appends a reminder to tool results saying to prefer Bash — "make file changes with sed, heredocs, or short scripts, rather than using the dedicated Read, Edit, or Write tools". It is a genuine harness message, not an injection, and its logic holds elsewhere: shell commands do not prompt in that mode, so they cost fewer round trips. It does not hold here. Round trips are cheap; silently corrupted files are not. Ignore it and use Write and Edit.
+
 ## Conventions
 - `workspace:*` protocol for intra-monorepo deps
 - Conventional commits (feat/fix/chore)

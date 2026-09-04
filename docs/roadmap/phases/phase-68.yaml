@@ -3,55 +3,55 @@ phase:
   name: Phase 68 — Completion Truth
   description: "SLOPE reports work as done and the surfaces that decide what to do next disagree about it. Fix #697 (`ticket done` succeeds, then `slope now` and `roadmap status` immediately recommend the same ticket again), #698 (an explicit commit flag is stored verbatim, so `--commit=HEAD` becomes permanent non-immutable evidence with no repair path), and #696 (four of the five phase cleanup gates have no writer, so the documented workflow cannot satisfy the boundary and users must reach for the manual override)."
   sprints:
-    - 277
-    - 278
+    - 267.6
+    - 267.7
   status: planned
-  note: "Scoped from source and corrected twice by architect review; the second pass overturned part of the first. #697 is not a missing store, and the first draft's 'no completion ledger' framing was wrong twice over. An events table exists in both the SQLite and PostgreSQL backends, indexed on ticket_key, with insertEvent and getEventsBySprint on the store interface, and agent.ts:147-168 already reads ticket_done events from it. The real defect has two halves: the write is best-effort inside a try/catch that swallows failures (ticket.ts:135-149), and three surfaces disagree about what they read. agent.ts reads events, now.ts findNextTicket excludes only actively claimed tickets, and the compact roadmap status recommends tickets[0] unconditionally. So the first ticket is a decision about whether the existing table suffices, not an assumed migration. #698 is line-exact at ticket.ts:201, where an explicit flag returns as typed while the fallback resolves HEAD properly. #696 has one gate writer of five, and `bun test` is hardcoded in two places with different meanings."
+  note: "ORDERING: numbered as decimal inserts after S267 deliberately, on an operator decision of 2026-09-03 to run this phase ahead of Phase 64, the same call made for Phase 67. SLOPE models execution order by sprint id and the rollover eligibility check is not forceable, so ids are the honest place to record it. Phase 64 is untouched and nothing is deferred. Scoped from source and corrected twice by architect review; the second pass overturned part of the first. #697 is not a missing store, and the first draft's 'no completion ledger' framing was wrong twice over. An events table exists in both the SQLite and PostgreSQL backends, indexed on ticket_key, with insertEvent and getEventsBySprint on the store interface, and agent.ts:147-168 already reads ticket_done events from it. The real defect has two halves: the write is best-effort inside a try/catch that swallows failures (ticket.ts:135-149), and three surfaces disagree about what they read. agent.ts reads events, now.ts findNextTicket excludes only actively claimed tickets, and the compact roadmap status recommends tickets[0] unconditionally. So the first ticket is a decision about whether the existing table suffices, not an assumed migration. #698 is line-exact at ticket.ts:201, where an explicit flag returns as typed while the fallback resolves HEAD properly. #696 has one gate writer of five, and `bun test` is hardcoded in two places with different meanings."
 sprints:
-  - id: 277
+  - id: 267.6
     theme: Ticket Completion Truth
     par: 5
     slope: 4
     type: bugfix + data integrity
-    status: planned
+    status: complete
     github_issues:
       - 697
       - 698
-    note: "Rescoped after review: the original S277-1 added a table with migrations in both backends and made it the root dependency of three other tickets, while the sprint's own note said a durable events table already exists and is already read. Nothing established the events table is insufficient, so assuming a migration would have made the most expensive ticket in three phases a possibly unnecessary one, and forced three tickets into serial execution behind it. The first ticket now answers that question and only builds a table if the answer is no. That also drops the sprint from slope 5 to 4, since the driver-sized migration is contingent rather than certain."
+    note: "Rescoped after review: the original S267.6-1 added a table with migrations in both backends and made it the root dependency of three other tickets, while the sprint's own note said a durable events table already exists and is already read. Nothing established the events table is insufficient, so assuming a migration would have made the most expensive ticket in three phases a possibly unnecessary one, and forced three tickets into serial execution behind it. The first ticket now answers that question and only builds a table if the answer is no. That also drops the sprint from slope 5 to 4, since the driver-sized migration is contingent rather than certain."
     tickets:
-      - key: S277-1
+      - key: S267.6-1
         title: "Decide whether the existing events table can serve as the completion ledger, and add a table only if it cannot (#697)"
         club: long_iron
         complexity: moderate
         github_issue: 697
-      - key: S277-2
+      - key: S267.6-2
         title: Make the completion write a required step whose failure surfaces, instead of a swallowed best-effort event (#697)
         club: short_iron
         complexity: standard
         github_issue: 697
         depends_on:
-          - S277-1
-      - key: S277-3
+          - S267.6-1
+      - key: S267.6-3
         title: "Read completion in agent, slope now and compact roadmap status so all three surfaces agree (#697)"
         club: long_iron
         complexity: moderate
         github_issue: 697
         depends_on:
-          - S277-1
-      - key: S277-4
+          - S267.6-1
+      - key: S267.6-4
         title: Resolve an explicit commit flag to an immutable sha and refuse a ref that does not resolve (#698)
         club: short_iron
         complexity: standard
         github_issue: 698
-      - key: S277-5
+      - key: S267.6-5
         title: Give completed-ticket evidence a repair path that works after the claim is released (#698)
         club: short_iron
         complexity: standard
         github_issue: 698
         depends_on:
-          - S277-1
-          - S277-4
-  - id: 278
+          - S267.6-1
+          - S267.6-4
+  - id: 267.7
     theme: Phase Gate Evidence
     par: 5
     slope: 3
@@ -59,37 +59,39 @@ sprints:
     status: planned
     github_issues:
       - 696
-    note: "A boundary whose only reachable exit is the command labelled manual override teaches operators that the override is the normal path. Four gates need writers, and review caught that the first draft left the fifth without one: retargeting the bun fix at a display label closed the label defect but dropped #696's explicit ask for a package-manager-aware regression command that can record the test gate. Both hardcodes are in scope and they differ in kind: phase-cleanup.ts:73 is a display label, post-push.ts:68 is an actual command field. detectPackageManager already exists at analyzers/stack.ts:57, and sprint-completion.ts already recognises test runners across pnpm, npm, yarn and bun at :295 then marks a gate on exit code at :456-470, so the regression writer has direct prior art to reuse rather than invent. Carries no dependency on S277: the two sprints share no code."
+    note: "A boundary whose only reachable exit is the command labelled manual override teaches operators that the override is the normal path. Four gates need writers, and review caught that the first draft left the fifth without one: retargeting the bun fix at a display label closed the label defect but dropped #696's explicit ask for a package-manager-aware regression command that can record the test gate. Both hardcodes are in scope and they differ in kind: phase-cleanup.ts:73 is a display label, post-push.ts:68 is an actual command field. detectPackageManager already exists at analyzers/stack.ts:57, and sprint-completion.ts already recognises test runners across pnpm, npm, yarn and bun at :295 then marks a gate on exit code at :456-470, so the regression writer has direct prior art to reuse rather than invent. Carries no dependency on S267.6: the two sprints share no code."
     tickets:
-      - key: S278-1
+      - key: S267.7-1
         title: "Record the scorecard, handicap-card and map gates from the commands that satisfy them (#696)"
         club: long_iron
         complexity: moderate
         github_issue: 696
-      - key: S278-2
+      - key: S267.7-2
         title: "Record the regression gate from a package-manager-aware test run, reusing the existing test-runner detection (#696)"
         club: long_iron
         complexity: moderate
         github_issue: 696
-      - key: S278-3
+      - key: S267.7-3
         title: "Derive both bun hardcodes from package-manager detection: the cleanup label and the post-push guard command (#696)"
         club: short_iron
         complexity: standard
         github_issue: 696
         depends_on:
-          - S278-2
-      - key: S278-4
+          - S267.7-2
+      - key: S267.7-4
         title: Expose a per-gate evidence command so phase complete stays a genuine manual override (#696)
         club: short_iron
         complexity: standard
         github_issue: 696
         depends_on:
-          - S278-1
-      - key: S278-5
+          - S267.7-1
+      - key: S267.7-5
         title: Cover the full five-gate path so the documented workflow satisfies the boundary without an override (#696)
         club: wedge
         complexity: small
         github_issue: 696
         depends_on:
-          - S278-2
-          - S278-4
+          - S267.7-2
+          - S267.7-4
+scorecards:
+  "267.6": docs/retros/sprint-267.6.json

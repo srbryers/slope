@@ -1,0 +1,303 @@
+{
+  "version": 1,
+  "kind": "sprint_rollover",
+  "transition_id": "bca00896ff46626e",
+  "from_sprint": "267.5",
+  "to_sprint": "267.6",
+  "from_label": "S267.5",
+  "to_label": "S267.6",
+  "recorded_at": "2026-09-04T12:19:00.417Z",
+  "actor": {
+    "name": "srbry",
+    "source": "env:USERNAME"
+  },
+  "request": {
+    "from": "267.5",
+    "to": "267.6",
+    "force": false
+  },
+  "forced": false,
+  "eligibility": {
+    "from_terminal": true,
+    "target_dependency_eligible": true,
+    "blocking_dependencies": [],
+    "target_dependencies": [],
+    "completion_evidence": {
+      "roadmap_complete": [
+        "61",
+        "62",
+        "63",
+        "64",
+        "65",
+        "66",
+        "67",
+        "68",
+        "69",
+        "70",
+        "71",
+        "72",
+        "73",
+        "74",
+        "75",
+        "76",
+        "77",
+        "78",
+        "79",
+        "80",
+        "81",
+        "82",
+        "83",
+        "84",
+        "86",
+        "87",
+        "88",
+        "89",
+        "90",
+        "91",
+        "92",
+        "93",
+        "94",
+        "95",
+        "96",
+        "97",
+        "98",
+        "99",
+        "100",
+        "101",
+        "102",
+        "103",
+        "104",
+        "105",
+        "106",
+        "107",
+        "108",
+        "109",
+        "110",
+        "111",
+        "112",
+        "113",
+        "114",
+        "114.5",
+        "115",
+        "116",
+        "117",
+        "118",
+        "119",
+        "120",
+        "121",
+        "122",
+        "123",
+        "124",
+        "125",
+        "126",
+        "127",
+        "130",
+        "131",
+        "132",
+        "133",
+        "134",
+        "135",
+        "136",
+        "137",
+        "137.5",
+        "138",
+        "139",
+        "140",
+        "141",
+        "142",
+        "143",
+        "143.5",
+        "143.6",
+        "143.7",
+        "143.8",
+        "143.9",
+        "143.95",
+        "143.97",
+        "143.98",
+        "143.99",
+        "144",
+        "145",
+        "146",
+        "146.1",
+        "146.2",
+        "146.3",
+        "148",
+        "149",
+        "150",
+        "151",
+        "151.1",
+        "152",
+        "152.1",
+        "153",
+        "154",
+        "216",
+        "217",
+        "218",
+        "219",
+        "220",
+        "221",
+        "222",
+        "223",
+        "224",
+        "226",
+        "227",
+        "228",
+        "229",
+        "230",
+        "231",
+        "232",
+        "233",
+        "234",
+        "235",
+        "236",
+        "241",
+        "242",
+        "243",
+        "244",
+        "246",
+        "247",
+        "248",
+        "249",
+        "250",
+        "251",
+        "252",
+        "253",
+        "254",
+        "256",
+        "258",
+        "259",
+        "260",
+        "260.1",
+        "261",
+        "262",
+        "263",
+        "264",
+        "264.1",
+        "264.2",
+        "265",
+        "266",
+        "267",
+        "267.1",
+        "267.2",
+        "267.3",
+        "267.4",
+        "267.5"
+      ],
+      "scorecards": [
+        "264.2",
+        "267"
+      ],
+      "local_terminal": [
+        "267.5"
+      ]
+    },
+    "scorecard_artifacts": [
+      {
+        "sprint": "264.2",
+        "path": "docs/retros/sprint-264.2.json",
+        "sha256": "29d40189950587d55533d76d318dc1ba44c14e6deb6646077f6b46fe53f60ba6"
+      },
+      {
+        "sprint": "267",
+        "path": "docs/retros/sprint-267.json",
+        "sha256": "de626ebc26280fa28d74f174516098fb85d3f14fa59a09cf63b848e17c622719"
+      }
+    ],
+    "expected_next": "267.6"
+  },
+  "roadmap": {
+    "path": "docs/backlog/roadmap.json",
+    "sha256": "e5e041c37b36b01156ee130b252eb28426892231a5f9cd85a72141af09391371",
+    "from_status": "complete",
+    "to_status": "planned"
+  },
+  "prior_state_sha256": "8a8e2ed41e854041f49ff09b80a558c2a5f3e1e88a1853208fb80e1cef4d2a4b",
+  "prior_state": {
+    "sprint": "267.5",
+    "phase": "complete",
+    "gates": {
+      "tests": true,
+      "code_review": true,
+      "architect_review": true,
+      "scorecard": true,
+      "review_md": true
+    },
+    "review_gates": {
+      "code_review": {
+        "provenance": "independent_review",
+        "evidence": [
+          "docs/retros/sprint-267.5-code-review.md"
+        ],
+        "reviewer": "code-implementation-correctness-reviewer",
+        "verdict": "pass",
+        "updated_at": "2026-09-03T19:49:48.988Z"
+      },
+      "architect_review": {
+        "provenance": "independent_review",
+        "evidence": [
+          "docs/retros/sprint-267.5-architect-review.md"
+        ],
+        "reviewer": "workflow-architecture-reviewer",
+        "verdict": "pass",
+        "updated_at": "2026-09-03T19:49:49.395Z"
+      }
+    },
+    "review_requirements": {
+      "code_review": {
+        "priority": "unspecified"
+      },
+      "architect_review": {
+        "priority": "unspecified"
+      }
+    },
+    "started_at": "2026-09-03T19:22:09.796Z",
+    "updated_at": "2026-09-03T22:17:00.242Z",
+    "rollover": {
+      "transition_id": "bf0e155973d98fef",
+      "from_sprint": "267.4",
+      "audit_path": "docs/retros/rollovers/sprint-267.4-to-267.5-abf00261c520ef10.json",
+      "recorded_at": "2026-09-03T19:22:09.796Z",
+      "forced": false
+    }
+  },
+  "next_state": {
+    "sprint": "267.6",
+    "phase": "planning",
+    "gates": {
+      "tests": false,
+      "code_review": false,
+      "architect_review": false,
+      "scorecard": false,
+      "review_md": false
+    },
+    "review_gates": {
+      "code_review": {
+        "provenance": "pending",
+        "evidence": []
+      },
+      "architect_review": {
+        "provenance": "pending",
+        "evidence": []
+      }
+    },
+    "review_requirements": {
+      "code_review": {
+        "priority": "unspecified"
+      },
+      "architect_review": {
+        "priority": "unspecified"
+      }
+    },
+    "started_at": "2026-09-04T12:19:00.417Z",
+    "updated_at": "2026-09-04T12:19:00.417Z",
+    "rollover": {
+      "transition_id": "bca00896ff46626e",
+      "from_sprint": "267.5",
+      "audit_path": "docs/retros/rollovers/sprint-267.5-to-267.6-49f9be2236095716.json",
+      "recorded_at": "2026-09-04T12:19:00.417Z",
+      "forced": false
+    }
+  },
+  "claims_policy": "unchanged",
+  "sessions_policy": "unchanged"
+}

@@ -792,6 +792,24 @@ export {
 } from './event-ingestion.js';
 export type { EventIngestionResult } from './event-ingestion.js';
 
+// Ticket completion ledger — the single reader behind `slope now`,
+// `agent status` and compact roadmap status (#697).
+export {
+  TICKET_DONE_KIND,
+  TicketCompletionReadError,
+  readTicketCompletion,
+  readTicketCompletions,
+  readCompletedTicketKeys,
+  readCompletedTicketKeysOrEmpty,
+  selectNextTicket,
+} from './ticket-completion.js';
+export type {
+  TicketCompletion,
+  NextTicketInput,
+  NextTicketReason,
+  NextTicketResult,
+} from './ticket-completion.js';
+
 // Analyzers
 export { runAnalyzers, loadRepoProfile, saveRepoProfile } from './analyzers/index.js';
 export { analyzeStack, detectPackageManager } from './analyzers/stack.js';

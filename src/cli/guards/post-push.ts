@@ -5,6 +5,8 @@ import {
   loadConfig,
   parseRoadmap,
   roadmapSprintKeyFromId,
+  findRoadmapSprint,
+  readCompletedTicketKeys,
 } from '../../core/index.js';
 import { loadSprintState } from '../sprint-state.js';
 import { loadSessionState, updateSessionState } from '../session-state.js';
@@ -51,6 +53,7 @@ export async function postPushGuard(input: HookInput, cwd: string): Promise<Guar
   if (sprintState && sprintState.phase === 'implementing') {
     // Check how many claims remain
     const remainingClaims = await countSprintClaims(cwd, sprintState.sprint);
+    const completedTickets = await countRecordedCompletions(cwd, sprintState.sprint);
 
     // Check pending gates
     const pendingGateCount = Object.values(sprintState.gates).filter(v => !v).length;
@@ -68,12 +71,31 @@ export async function postPushGuard(input: HookInput, cwd: string): Promise<Guar
         { id: 'run-tests', label: 'Run tests', command: 'bun test' },
       ];
     } else {
-      contextText = `Sprint S${sprintState.sprint} — all tickets done. Scoring workflow: auto-card, validate, review, PR.`;
-      options = [
-        { id: 'auto-card', label: 'Generate scorecard', command: 'slope auto-card' },
-        { id: 'validate', label: 'Validate scorecard', command: 'slope validate' },
-        { id: 'review', label: 'Generate review', command: `slope review --sprint=${sprintState.sprint}` },
-      ];
+      // "No claims" is not "all tickets done". It is also the state of a
+      // ticket nobody ever claimed, and the state `slope ticket done` leaves
+      // behind on success. Inferring completion from claims is the #697
+      // mistake, so read the ledger and say which it is.
+      // The options are the actionable half, so they follow the ledger too.
+      // Offering the closeout workflow on a sprint with unfinished tickets is
+      // the same wrong answer as the old "all tickets done" text.
+      const allDone = completedTickets !== null
+        && completedTickets.recorded === completedTickets.total;
+      if (allDone) {
+        contextText = `Sprint S${sprintState.sprint} — all ${completedTickets.total} tickets recorded done. Scoring workflow: auto-card, validate, review, PR.`;
+        options = [
+          { id: 'auto-card', label: 'Generate scorecard', command: 'slope auto-card' },
+          { id: 'validate', label: 'Validate scorecard', command: 'slope validate' },
+          { id: 'review', label: 'Generate review', command: `slope review --sprint=${sprintState.sprint}` },
+        ];
+      } else {
+        contextText = completedTickets === null
+          ? `Sprint S${sprintState.sprint} — no active claims, ${pendingGateCount} gate(s) pending.`
+          : `Sprint S${sprintState.sprint} — ${completedTickets.recorded}/${completedTickets.total} tickets recorded done, none claimed.`;
+        options = [
+          { id: 'next-ticket', label: 'Claim the next ticket', command: 'slope now' },
+          { id: 'run-tests', label: 'Run tests' },
+        ];
+      }
     }
   } else if (sprintState && sprintState.phase === 'scoring') {
     contextText = `Sprint S${sprintState.sprint} — scoring phase. Complete remaining gates.`;
@@ -143,6 +165,48 @@ export async function postPushGuard(input: HookInput, cwd: string): Promise<Guar
   };
 
   return { suggestion };
+}
+
+/**
+ * Recorded completions against the sprint's roadmap ticket count, or null when
+ * either is unavailable.
+ *
+ * Null is the honest answer for "cannot tell". Returning 0/0 would let the
+ * caller print "all tickets recorded done" for a sprint whose ledger simply
+ * could not be read.
+ */
+async function countRecordedCompletions(
+  cwd: string,
+  sprintNumber: SprintId,
+): Promise<{ recorded: number; total: number } | null> {
+  let total: number;
+  let ticketKeys: string[];
+  try {
+    const config = loadConfig(cwd);
+    const roadmapPath = join(cwd, config.roadmapPath);
+    if (!existsSync(roadmapPath)) return null;
+    const roadmap = parseRoadmap(JSON.parse(readFileSync(roadmapPath, 'utf8'))).roadmap;
+    if (!roadmap) return null;
+    const sprint = findRoadmapSprint(roadmap, sprintNumber);
+    if (!sprint || sprint.tickets.length === 0) return null;
+    total = sprint.tickets.length;
+    ticketKeys = sprint.tickets.map(t => t.key);
+  } catch {
+    return null;
+  }
+  let store: Awaited<ReturnType<typeof resolveStore>> | null = null;
+  try {
+    store = await resolveStore(cwd);
+    const completed = await readCompletedTicketKeys(store, sprintNumber);
+    // Count only this sprint's roadmap tickets. The ledger can hold keys the
+    // sprint does not list, which made the raw set size report "3/2 tickets
+    // recorded done" and never reach the all-done branch.
+    return { recorded: ticketKeys.filter(key => completed.has(key)).length, total };
+  } catch {
+    return null;
+  } finally {
+    store?.close();
+  }
 }
 
 async function countSprintClaims(cwd: string, sprintNumber: SprintId): Promise<number> {

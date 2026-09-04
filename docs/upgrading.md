@@ -41,3 +41,43 @@ Reported as [#702](https://github.com/srbryers/slope/issues/702).
 Both `slope roadmap compile` and `slope roadmap validate-sources` now warn for any `.yaml` file under `phases/`, `backlog/` or `archive/` that no registry entry produces. `compile` is where this bites, so the warning appears there even when the projection is unchanged. The file is named in the form `sources:` wants, so the fix is to paste it in, or move the file out of the tree.
 
 Reported as [#700](https://github.com/srbryers/slope/issues/700).
+
+## `slope ticket done --commit` now refuses a value git cannot resolve
+
+**Who this affects:** anyone scripting `ticket done` with a commit value that is not resolvable in the working repository. This is a behaviour change, and it exits 1 where the command previously exited 0.
+
+**What changed.** The flag used to be stored verbatim while the no-flag path resolved `HEAD` properly. So `--commit=HEAD` became permanent completion evidence pointing at a moving reference, and a typo became permanent evidence pointing at nothing. Explicit values now go through `git rev-parse --verify <value>^{commit}`, so an abbreviated SHA expands to 40 characters and a tag or branch resolves to the commit it names.
+
+Three cases that used to succeed now fail:
+
+- A value git cannot resolve, including a typo and a SHA fetched from another repository.
+- Any explicit value in a shallow clone that does not contain the named commit. CI checkouts using `fetch-depth: 1` are the common case.
+- Any explicit value outside a git work tree, or where `git` is not on `PATH`. The old behaviour recorded the raw string under a warning that said no SHA had been attached, which contradicted itself.
+
+Nothing is written when the value is refused, and the ticket's claim is not released, so the command can be re-run once the value is right.
+
+**What to do.** Pass a commit-ish the local repository can resolve, or omit the flag and let it use `HEAD`. In shallow CI, either deepen the fetch or drop the flag.
+
+**If evidence is already wrong,** `slope ticket repair <key> --commit=<sha>` corrects it. Repair needs no claim, because `ticket done` released it, and records a superseding entry rather than editing history. `slope ticket show <key>` prints what is currently recorded.
+
+Reported as [#698](https://github.com/srbryers/slope/issues/698).
+
+## Next-ticket answers now depend on actor identity
+
+**Who this affects:** anyone parsing `slope now --json` or `slope agent status --json`, and anyone running more than one agent against a single repository.
+
+**What changed.** `slope now`, `slope agent status` and compact `slope roadmap status` used to answer "what next" three different ways. They now share one rule: your own unfinished claim first, then the first unfinished ticket nobody has claimed, then a reason saying whether the rest is held by others or genuinely done.
+
+Two JSON shapes changed with it.
+
+`slope now --json` previously omitted `nextTicket` when the sprint had nothing to start. It is now always present and `null` in that case, matching `agent status`. Code doing `parsed.nextTicket.key` still throws, but it throws consistently on both surfaces rather than only one.
+
+`agent status --json` gains `nextTicketReason` (`in_flight`, `available`, `all_claimed`, `all_complete`, `no_tickets`) and an optional `ledgerError`. `slope now --json` gains `tickets: { total, completed, status }` and the same optional `ledgerError`. `AGENT_STATUS_VERSION` stays at 2, because these are additions rather than removals.
+
+**The identity limitation, stated plainly.** "Your own claim" is decided by player name, which is the identity model the rest of SLOPE already uses: `slope ticket done` finds your claim the same way. Claims carry a `session_id` column, but `slope claim` does not populate it, so name is the only discriminator available.
+
+The consequence: two agents on one machine, in one repository, with no explicit identity, both resolve to the same name (from `SLOPE_ACTOR`, `SLOPE_PLAYER`, a configured team actor, `USER`, `USERNAME`, then `git user.name`). Each then reads the other's claim as its own work in flight.
+
+**What to do** when running more than one agent against a repository: give each a distinct identity. Set `SLOPE_ACTOR` per agent, or pass `--actor=<name>`, which `now`, `agent status` and `roadmap status` all accept now for parity with `claim` and `ticket done`. A single agent needs no change.
+
+Tracked as [#715](https://github.com/srbryers/slope/issues/715).

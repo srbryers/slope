@@ -64,6 +64,10 @@ import {
   prepareRoadmapSourceMigration,
 } from '../roadmap-source-migration.js';
 import { serializeRoadmapMigrationMappingTemplate } from '../../core/roadmap-migration.js';
+import { resolveActor } from '../actor.js';
+import { resolveStore, storeAlreadyExists } from '../store.js';
+import { readCompletedTicketKeysOrEmpty, selectNextTicket } from '../../core/index.js';
+import type { SprintClaim } from '../../core/index.js';
 
 // --- Helpers ---
 
@@ -454,7 +458,7 @@ function reviewSubcommand(flags: Record<string, string>, cwd: string): void {
   console.log('');
 }
 
-function statusSubcommand(flags: Record<string, string>, cwd: string): void {
+async function statusSubcommand(flags: Record<string, string>, cwd: string): Promise<void> {
   const roadmap = loadRoadmapFile(flags, cwd);
   if (!roadmap) { process.exit(1); return; }
 
@@ -469,9 +473,40 @@ function statusSubcommand(flags: Record<string, string>, cwd: string): void {
 
   if (flags.full === 'true' || flags.history === 'true') {
     printFullRoadmapStatus(roadmap, currentSprint, completedSprints);
-  } else {
-    printCompactRoadmapStatus(roadmap, currentSprint, completedSprints, cwd);
+    return;
   }
+
+  // Recorded ticket completions and live claims, so the recommended action
+  // stops naming a ticket that `slope ticket done` already closed, or one
+  // somebody else is holding (#697).
+  //
+  // Only ever opens a store that already exists. `roadmap status` is a
+  // read-only report and was creating `.slope/slope.db` (schema migration and
+  // all) in repos that had never run one, purely by asking this question.
+  let completedTickets = new Set<string>();
+  let claims: SprintClaim[] = [];
+  let ledgerError: string | undefined;
+  if (storeAlreadyExists(cwd)) {
+    try {
+      const store = await resolveStore(cwd);
+      try {
+        claims = await store.list(currentSprint);
+        const read = await readCompletedTicketKeysOrEmpty(store, currentSprint);
+        completedTickets = read.keys;
+        ledgerError = read.error?.message;
+      } finally {
+        store.close();
+      }
+    } catch (error) {
+      ledgerError = (error as Error).message;
+    }
+  }
+  printCompactRoadmapStatus(roadmap, currentSprint, completedSprints, cwd, {
+    completedTickets,
+    claims,
+    self: resolveActor(cwd, { explicitActor: flags.actor }).name,
+    ledgerError,
+  });
 }
 
 function displayPath(cwd: string, path: string): string {
@@ -1054,7 +1089,16 @@ function printCompactRoadmapStatus(
   currentSprint: SprintId,
   completedSprints: Set<string>,
   cwd: string,
+  // Required, not defaulted. A default of "nothing recorded" silently gives a
+  // future caller the pre-fix behaviour with no error.
+  ledger: {
+    completedTickets: ReadonlySet<string>;
+    claims: readonly SprintClaim[];
+    self: string;
+    ledgerError?: string;
+  },
 ): void {
+  const { completedTickets, claims, self, ledgerError } = ledger;
   const current = findRoadmapSprint(roadmap, currentSprint);
   const currentLabel = current
     ? `${formatRoadmapSprintLabel(roadmap, roadmapSprintKey(roadmap, current))} ${current.theme || 'Untitled Sprint'}`
@@ -1068,6 +1112,18 @@ function printCompactRoadmapStatus(
   const nextReady = pendingAfterCurrent.find(s => blockedByForSprint(roadmap, s, completedSprints).length === 0);
   const upcoming = pendingAfterCurrent.slice(0, DEFAULT_UPCOMING_LIMIT);
   const realityLines = formatRoadmapRealitySection(buildRoadmapReality(cwd, roadmap), undefined, 5).slice(1);
+  // Same rule as `slope now` and `agent status`. Ignoring claims here was the
+  // last of the three disagreeing policies (#697).
+  const nextSelection = selectNextTicket({
+    tickets: (current?.tickets ?? []).map(t => t.key),
+    completed: completedTickets,
+    claimedBySelf: new Set(claims.filter(c => c.player === self).map(c => c.target)),
+    claimedByOthers: new Set(claims.filter(c => c.player !== self).map(c => c.target)),
+  });
+  const nextTicket = nextSelection.ticketKey
+    ? (current?.tickets ?? []).find(t => t.key === nextSelection.ticketKey)
+    : undefined;
+  const claimedTargets = new Set(claims.map(c => c.target));
 
   console.log(`\n# Roadmap Status - ${roadmap.name}`);
   console.log('\u2550'.repeat(40));
@@ -1095,7 +1151,13 @@ function printCompactRoadmapStatus(
       console.log(`  Dependencies: ${deps.join(', ')}`);
     }
     for (const ticket of current.tickets ?? []) {
-      console.log(`  - ${ticket.key}: ${ticket.title}`);
+      const mark = completedTickets.has(ticket.key)
+        ? ' [done]'
+        : claimedTargets.has(ticket.key) ? ' [claimed]' : '';
+      console.log(`  - ${ticket.key}: ${ticket.title}${mark}`);
+    }
+    if (ledgerError) {
+      console.log(`  Completion ledger unavailable: ${ledgerError}`);
     }
   }
 
@@ -1118,9 +1180,15 @@ function printCompactRoadmapStatus(
   console.log('\nRecommended next action:');
   if (realityLines.some(line => line.includes('[error]'))) {
     console.log('  Resolve the first roadmap reality error before advancing the lane.');
+  } else if (currentIsPending && current?.tickets?.length && nextTicket) {
+    const verb = nextSelection.reason === 'in_flight' ? 'Continue' : 'Work';
+    console.log(`  ${verb} ${nextTicket.key}: ${nextTicket.title}`);
+  } else if (currentIsPending && nextSelection.reason === 'all_claimed') {
+    console.log('  Every unfinished ticket is claimed by someone else. Wait, or take one over with slope claim --force.');
   } else if (currentIsPending && current?.tickets?.length) {
-    const first = current.tickets[0];
-    console.log(`  Work ${first.key}: ${first.title}`);
+    // Every ticket has a recorded completion. Recommending tickets[0] here is
+    // what made `ticket done` look like it had not registered (#697).
+    console.log(`  All ${current.tickets.length} tickets recorded done. Close out ${formatRoadmapSprintLabel(roadmap, roadmapSprintKey(roadmap, current))}.`);
   } else if (nextReady) {
     console.log(`  Start ${formatRoadmapSprintLabel(roadmap, roadmapSprintKey(roadmap, nextReady))}: ${nextReady.theme || 'Untitled Sprint'}`);
   } else {
@@ -1382,7 +1450,7 @@ export async function roadmapCommand(args: string[]): Promise<void> {
       reviewSubcommand(flags, cwd);
       break;
     case 'status':
-      statusSubcommand(flags, cwd);
+      await statusSubcommand(flags, cwd);
       break;
     case 'focus':
       focusSubcommand(flags, cwd);
