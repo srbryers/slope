@@ -2,7 +2,7 @@ import { execSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { dirname, resolve } from 'node:path';
-import { resolveRepoStateCwd, resolveRepoStatePath } from '../../core/index.js';
+import { resolveRepoStateCwd, resolveRepoStatePath, samePath } from '../../core/index.js';
 
 /**
  * Check if HEAD is at or behind origin/main.
@@ -133,8 +133,15 @@ export function getActiveWorktrees(cwd: string): ActiveWorktree[] {
       } else if (line.startsWith('branch ')) {
         currentBranch = line.slice('branch '.length).replace('refs/heads/', '').trim();
       } else if (line === '' && currentPath && currentBranch) {
-        // Skip the main worktree (same as cwd)
-        if (currentPath !== cwd) {
+        // Skip the main worktree (same as cwd).
+        //
+        // Compared through a canonical form, not as raw strings. `git worktree
+        // list --porcelain` reports forward slashes on every platform, so on
+        // Windows this never matched the native `cwd` and the primary checkout
+        // was reported as an agent worktree. next-action then raised
+        // `worktrees-active` against the directory the operator was standing
+        // in, listing their own unpushed commits as someone else's (#712).
+        if (!samePath(currentPath, cwd)) {
           // Check for unpushed commits
           let unpushed = 0;
           try {

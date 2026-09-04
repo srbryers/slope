@@ -104,21 +104,36 @@ function safeGit(cwd: string, args: string[]): string | null {
  * from `resolve` or `mkdtempSync` uses backslashes. Both name the same
  * directory and neither equals the other as a string.
  *
- * That leaked out of this module. `resolveRepoSourceCwd` returns the git value
- * when there is no nearer SLOPE project, and the session heartbeat stores it
- * as `worktree_path`. A record written from the git branch then failed every
- * comparison against one written from a Node path, so worktree reconciliation
- * could not match a session to its own checkout (#712).
+ * `resolveRepoSourceCwd` returns the git value when there is no nearer SLOPE
+ * project, and the session heartbeat stores it as `worktree_path`, so records
+ * were persisted in two spellings. Every comparison of those goes through
+ * `samePath`, which resolves both, so reconciliation was not broken; what this
+ * fixes is the inconsistency itself, and the display and raw-equality paths
+ * that read the stored string directly (#712).
  *
- * Normalising here rather than at each call site, because the mixing is what
- * causes the bug and this is the one place the git values enter.
+ * Resolved against `cwd`, not the process working directory, because git
+ * returns a relative path for some queries: `--git-common-dir` gives `.git` in
+ * a primary checkout. This is not the only place git paths enter the codebase,
+ * so a raw `!==` elsewhere is still a bug waiting to happen; `samePath` is the
+ * comparison to reach for.
  */
 function nativeGitPath(cwd: string, args: string[]): string | null {
   const output = safeGit(cwd, args);
-  return output === null ? null : resolve(output);
+  return output === null ? null : resolve(cwd, output);
 }
 
-function samePath(left: string, right: string): boolean {
+/**
+ * Whether two paths name the same location.
+ *
+ * Resolves through the filesystem so a symlink, a `..` segment, or git's
+ * forward-slash spelling all compare equal to the native form. Falls back to
+ * lexical resolution when either path does not exist.
+ *
+ * Exported because comparing these as raw strings is a recurring Windows bug:
+ * git reports forward slashes everywhere, so any `a !== b` against a Node path
+ * is always true there (#712).
+ */
+export function samePath(left: string, right: string): boolean {
   try {
     return realpathSync(left) === realpathSync(right);
   } catch {

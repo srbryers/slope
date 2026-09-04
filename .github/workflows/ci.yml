@@ -50,3 +50,36 @@ jobs:
 
       - name: Typecheck
         run: pnpm typecheck
+
+  # Windows, because the path bugs that only appear there were invisible to a
+  # Linux-only matrix. git reports forward slashes on every platform while Node
+  # returns backslashes, so a raw string comparison is always true on Windows
+  # and always false-negative in CI. Five tests were broken on main for an
+  # unknown stretch before anyone ran the suite there (#712).
+  #
+  # No Postgres service: the PG store tests skip without SLOPE_TEST_PG_URL, and
+  # the point of this job is path and filesystem behaviour, which the SQLite
+  # store already exercises. Keeping it lean keeps it fast enough to stay on.
+  ci-windows:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - uses: pnpm/action-setup@v6
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Test
+        run: pnpm test
+
+      - name: Typecheck
+        run: pnpm typecheck

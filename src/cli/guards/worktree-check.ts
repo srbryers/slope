@@ -429,7 +429,11 @@ async function reconcileWorktreeSession(
     const stateCwd = resolveSessionStoreCwd(cwd);
     store = await resolveStore(stateCwd);
 
-    const worktreePath = explicitWorktreePath ?? gitRevParse(cwd, '--show-toplevel');
+    // Resolved, so this writer and the session heartbeat store the same
+    // spelling. git returns forward slashes on every platform, so leaving it
+    // raw produced two forms of the same path in one column (#712).
+    const rawWorktreePath = explicitWorktreePath ?? gitRevParse(cwd, '--show-toplevel');
+    const worktreePath = resolve(cwd, rawWorktreePath);
     const branchCwd = explicitWorktreePath ?? cwd;
     const branch = safeGitRevParse(branchCwd, '--abbrev-ref', 'HEAD') ?? 'unknown';
 

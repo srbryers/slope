@@ -542,7 +542,10 @@ describe('worktreeCheckGuard', () => {
     expect(mockStore.updateSession).toHaveBeenCalledWith('test-session', {
       role: 'secondary',
       branch: 'fix/deadlock',
-      worktree_path: '/tmp/test',
+      // Resolved, matching the session heartbeat. This writer used to store
+      // git's raw forward-slash output, so the same column held two spellings
+      // of the same path (#712).
+      worktree_path: resolve('/tmp/test'),
     });
     // Repo-scoped: written to the primary checkout's store, not the worktree's,
     // so `slope session list|prune|end` sees the same record (GH #630, #631).

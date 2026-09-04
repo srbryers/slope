@@ -43,10 +43,13 @@ function canCreateSymlinks(): boolean {
   const probe = join(tmpdir(), `slope-symlink-probe-${process.pid}-${Date.now()}`);
   try {
     symlinkSync(tmpdir(), probe);
-    rmSync(probe, { force: true });
     return true;
   } catch {
     return false;
+  } finally {
+    // In the finally, so a successful create followed by a failed remove does
+    // not leave the probe behind in tmpdir.
+    try { rmSync(probe, { force: true }); } catch { /* nothing to clean up */ }
   }
 }
 
