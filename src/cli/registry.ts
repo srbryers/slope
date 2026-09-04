@@ -63,6 +63,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     flags: [
       { flag: '--sprint=<N>', desc: 'Override inferred current sprint' },
       { flag: '--json', desc: 'Output as JSON' },
+      { flag: '--actor=<name>', desc: 'Identity deciding which claims count as your work in flight' },
     ],
   },
   {
@@ -812,6 +813,7 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     subcommands: [
       { name: 'status', desc: 'Show current state (human or JSON)', flags: [
         { flag: '--json', desc: 'Emit AgentStatus JSON' },
+        { flag: '--actor=<name>', desc: 'Identity deciding which claims count as your work in flight' },
       ]},
       { name: 'next-md', desc: 'Generate AGENT_NEXT.md (current-state handoff)', flags: [
         { flag: '--output=<path>', desc: 'Write to a custom path (default: AGENT_NEXT.md)' },

@@ -15,7 +15,7 @@ import { resolveActor } from '../actor.js';
 import { loadConfig } from '../config.js';
 import { inferSprintContext } from '../sprint-inference.js';
 import { loadSprintState, pendingGateNames } from '../sprint-state.js';
-import { resolveStore } from '../store.js';
+import { resolveStore, storeAlreadyExists } from '../store.js';
 
 /**
  * `slope agent status` — machine-readable operational status (GH #310).
@@ -104,7 +104,8 @@ Output fields (status):
 async function statusSubcommand(args: string[]): Promise<void> {
   const json = args.includes('--json');
   const cwd = process.cwd();
-  const status = await collectAgentStatus(cwd);
+  const actor = args.find(a => a.startsWith('--actor='))?.slice('--actor='.length);
+  const status = await collectAgentStatus(cwd, actor);
 
   if (json) {
     console.log(JSON.stringify(status, null, 2));
@@ -114,7 +115,7 @@ async function statusSubcommand(args: string[]): Promise<void> {
   printHumanStatus(status);
 }
 
-export async function collectAgentStatus(cwd: string): Promise<AgentStatus> {
+export async function collectAgentStatus(cwd: string, actorOverride?: string): Promise<AgentStatus> {
   const config = loadConfig(cwd);
 
   // Vision
@@ -161,10 +162,11 @@ export async function collectAgentStatus(cwd: string): Promise<AgentStatus> {
   const activeClaims: string[] = [];
   const selfClaims = new Set<string>();
   const otherClaims = new Set<string>();
-  const self = resolveActor(cwd).name;
+  const self = resolveActor(cwd, { explicitActor: actorOverride }).name;
   let completedTickets = new Set<string>();
   let ledgerError: string | undefined;
-  if (currentSprint != null) {
+  // Read-only, so never create a store just to answer this.
+  if (currentSprint != null && storeAlreadyExists(cwd)) {
     try {
       const store = await resolveStore(cwd);
       try {
@@ -180,8 +182,12 @@ export async function collectAgentStatus(cwd: string): Promise<AgentStatus> {
       } finally {
         store.close();
       }
-    } catch {
-      // store unavailable — return empty
+    } catch (error) {
+      // Say so. `store.list` runs before the ledger read, so a failure there
+      // used to skip the read entirely and land here silently, leaving
+      // "nothing recorded" indistinguishable from "could not look" — the
+      // #697 behaviour this sprint exists to remove.
+      ledgerError = (error as Error).message;
     }
   }
 
@@ -422,6 +428,7 @@ export function renderAgentMarkdown(
   lines.push(`Current phase: ${s.phase}`);
   lines.push(`Current claim: ${s.activeClaims.length > 0 ? s.activeClaims.join(', ') + ' active' : 'none'}`);
   lines.push(`Next ticket: ${s.nextTicket ?? '—'}`);
+  if (s.ledgerError) lines.push(`Completion ledger unavailable: ${s.ledgerError}`);
   lines.push(`Next command: ${s.recommendedCommands[0] ?? '—'}`);
   lines.push('');
 
@@ -474,6 +481,7 @@ function printHumanStatus(s: AgentStatus): void {
   lines.push(`  Phase:         ${s.phase}`);
   lines.push(`  Claims:        ${s.activeClaims.length > 0 ? s.activeClaims.join(', ') : 'none'}`);
   lines.push(`  Next ticket:   ${s.nextTicket ?? '—'}`);
+  if (s.ledgerError) lines.push(`  Ledger:        unavailable — ${s.ledgerError}`);
   if (s.blockedBy.length > 0) {
     lines.push(`  Blocked by:    ${s.blockedBy.map(id => `S${id}`).join(', ')}`);
   }

@@ -12,7 +12,7 @@ import type { RoadmapDefinition, RoadmapSprint, RoadmapTicket, SprintClaim, Spri
 import { loadConfig } from '../config.js';
 import { inferSprintContext, loadRoadmapForInference } from '../sprint-inference.js';
 import { isRequiredReviewGate, isReviewGateSatisfied, loadSprintState, pendingGates, waivedReviewGateNames, type ReviewGateName } from '../sprint-state.js';
-import { resolveStore } from '../store.js';
+import { resolveStore, storeAlreadyExists } from '../store.js';
 import { resolveActor } from '../actor.js';
 import {
   readCompletedTicketKeysOrEmpty,
@@ -44,7 +44,8 @@ interface NowSnapshot {
   /** Recorded completions for the current sprint's tickets (#697). */
   tickets?: {
     total: number;
-    completed: number;
+    /** null when the ledger could not be read — unknown, not none. */
+    completed: number | null;
     status: NextTicketReason;
   };
   /** Set when the completion ledger could not be read, so the counts above
@@ -169,21 +170,30 @@ async function buildNowSnapshot(cwd: string, flags: Record<string, string>): Pro
   const phase = roadmap ? formatPhaseProgress(roadmap, sprint, completed) : undefined;
   const state = loadSprintState(cwd);
 
-  const store = await resolveStore(cwd);
-  let claims: SprintClaim[];
-  let completedTickets: Set<string>;
+  // Read-only, so never create a store to answer the question — opening one
+  // runs a full schema migration. A repo with no store simply has no claims
+  // and no completions yet, which is not an error.
+  let claims: SprintClaim[] = [];
+  let completedTickets = new Set<string>();
   let ledgerError: string | undefined;
-  try {
-    claims = await store.list(sprint);
-    const read = await readCompletedTicketKeysOrEmpty(store, sprint);
-    completedTickets = read.keys;
-    // Say so rather than rendering "nothing recorded" as fact. A silently
-    // empty ledger is what made every surface recommend finished work.
-    ledgerError = read.error?.message;
-  } finally {
-    store.close();
+  if (storeAlreadyExists(cwd)) {
+    const store = await resolveStore(cwd);
+    try {
+      claims = await store.list(sprint);
+      const read = await readCompletedTicketKeysOrEmpty(store, sprint);
+      completedTickets = read.keys;
+      // Say so rather than rendering "nothing recorded" as fact. A silently
+      // empty ledger is what made every surface recommend finished work.
+      ledgerError = read.error?.message;
+    } finally {
+      store.close();
+    }
   }
-  const self = resolveActor(cwd).name;
+  // `--actor` for parity with `claim`, `ticket done` and `ticket repair`.
+  // Without it a claim made under an override could never be matched back to
+  // its owner here, and two agents sharing a machine identity would each read
+  // the other's claim as their own in-flight work.
+  const self = resolveActor(cwd, { explicitActor: flags.actor }).name;
   const next = findNextTicket(current, claims, completedTickets, self);
 
   const partial: Omit<NowSnapshot, 'nextAction'> = {
@@ -210,7 +220,10 @@ async function buildNowSnapshot(cwd: string, flags: Record<string, string>): Pro
     },
     tickets: current ? {
       total: current.tickets.length,
-      completed: current.tickets.filter(t => completedTickets.has(t.key)).length,
+      // null, not 0, when the ledger could not be read. The text renderer
+      // already printed "unknown" here; JSON was still stating zero as fact,
+      // so a consumer reading `completed` reproduced the reported symptom.
+      completed: ledgerError ? null : current.tickets.filter(t => completedTickets.has(t.key)).length,
       status: next.reason,
     } : undefined,
     ledgerError,
@@ -247,8 +260,14 @@ function printNowSnapshot(snapshot: NowSnapshot): void {
     console.log(`Tickets: ${snapshot.tickets.completed}/${snapshot.tickets.total} recorded done`);
   }
   console.log(`Next: ${snapshot.nextAction}`);
-  if (snapshot.nextTicket && snapshot.nextAction.startsWith('Start ')) {
-    console.log(`Start: slope start --ticket=${snapshot.nextTicket.key}`);
+  // Only when the recommended action is actually the ticket. A pending review
+  // decision or a waiver outranks it, and printing a start command there tells
+  // the reader to do the wrong thing next. The "Continue " arm exists because
+  // in-flight work used to lose this line entirely.
+  if (snapshot.nextTicket
+    && (snapshot.nextAction.startsWith('Start ') || snapshot.nextAction.startsWith('Continue '))) {
+    const verb = snapshot.tickets?.status === 'in_flight' ? 'Resume' : 'Start';
+    console.log(`${verb}: slope start --ticket=${snapshot.nextTicket.key}`);
   }
   console.log(`More: slope roadmap status --sprint=${snapshot.sprint}\n`);
 }
@@ -258,9 +277,13 @@ function printUsage(): void {
 slope now - Compact current-state cockpit
 
 Usage:
-  slope now [--sprint=N] [--json]
+  slope now [--sprint=N] [--json] [--actor=<name>]
 
 Shows the current sprint, phase, sprint state, claim count, and next human action.
+
+--actor decides which claims count as your own work in flight. It defaults to
+the same identity slope claim uses, so two agents sharing a machine identity
+should each pass one, or set SLOPE_ACTOR.
 `);
 }
 

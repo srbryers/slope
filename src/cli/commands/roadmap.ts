@@ -504,7 +504,7 @@ async function statusSubcommand(flags: Record<string, string>, cwd: string): Pro
   printCompactRoadmapStatus(roadmap, currentSprint, completedSprints, cwd, {
     completedTickets,
     claims,
-    self: resolveActor(cwd).name,
+    self: resolveActor(cwd, { explicitActor: flags.actor }).name,
     ledgerError,
   });
 }
@@ -1089,12 +1089,14 @@ function printCompactRoadmapStatus(
   currentSprint: SprintId,
   completedSprints: Set<string>,
   cwd: string,
+  // Required, not defaulted. A default of "nothing recorded" silently gives a
+  // future caller the pre-fix behaviour with no error.
   ledger: {
     completedTickets: ReadonlySet<string>;
     claims: readonly SprintClaim[];
     self: string;
     ledgerError?: string;
-  } = { completedTickets: new Set(), claims: [], self: '' },
+  },
 ): void {
   const { completedTickets, claims, self, ledgerError } = ledger;
   const current = findRoadmapSprint(roadmap, currentSprint);

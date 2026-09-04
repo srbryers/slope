@@ -207,6 +207,33 @@ describe('completion truth with a live claim (#697)', () => {
     }
   });
 
+  it('lets a second agent state its identity so it is not handed the first one work', () => {
+    const cwd = setupRepo();
+    try {
+      runSlope(cwd, ['claim', '--sprint=1', '--target=S1-1', '--actor=agent-a']);
+
+      // Without --actor both agents resolve to the same machine identity, and
+      // agent B reads agent A's claim as its own work in flight. All three
+      // read surfaces accept --actor now, matching `claim` and `ticket done`,
+      // so B can say who it is. See #715 for the underlying gap.
+      const now = JSON.parse(runSlope(cwd, ['now', '--json', '--actor=agent-b']));
+      const agent = JSON.parse(runSlope(cwd, ['agent', 'status', '--json', '--actor=agent-b']));
+      const status = runSlope(cwd, ['roadmap', 'status', '--actor=agent-b']);
+
+      expect(now.nextTicket.key).toBe('S1-2');
+      expect(agent.nextTicket).toBe('S1-2');
+      expect(agent.nextTicketReason).toBe('available');
+      expect(status).toContain('Work S1-2: second');
+
+      // Agent A, naming itself, is told to resume its own ticket.
+      const a = JSON.parse(runSlope(cwd, ['agent', 'status', '--json', '--actor=agent-a']));
+      expect(a.nextTicket).toBe('S1-1');
+      expect(a.nextTicketReason).toBe('in_flight');
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
   it('reports work held by others rather than calling the sprint done', () => {
     const cwd = setupRepo();
     try {

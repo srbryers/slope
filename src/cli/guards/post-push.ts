@@ -75,16 +75,27 @@ export async function postPushGuard(input: HookInput, cwd: string): Promise<Guar
       // ticket nobody ever claimed, and the state `slope ticket done` leaves
       // behind on success. Inferring completion from claims is the #697
       // mistake, so read the ledger and say which it is.
-      contextText = completedTickets === null
-        ? `Sprint S${sprintState.sprint} — no active claims, ${pendingGateCount} gate(s) pending.`
-        : completedTickets.recorded === completedTickets.total
-          ? `Sprint S${sprintState.sprint} — all ${completedTickets.total} tickets recorded done. Scoring workflow: auto-card, validate, review, PR.`
+      // The options are the actionable half, so they follow the ledger too.
+      // Offering the closeout workflow on a sprint with unfinished tickets is
+      // the same wrong answer as the old "all tickets done" text.
+      const allDone = completedTickets !== null
+        && completedTickets.recorded === completedTickets.total;
+      if (allDone) {
+        contextText = `Sprint S${sprintState.sprint} — all ${completedTickets.total} tickets recorded done. Scoring workflow: auto-card, validate, review, PR.`;
+        options = [
+          { id: 'auto-card', label: 'Generate scorecard', command: 'slope auto-card' },
+          { id: 'validate', label: 'Validate scorecard', command: 'slope validate' },
+          { id: 'review', label: 'Generate review', command: `slope review --sprint=${sprintState.sprint}` },
+        ];
+      } else {
+        contextText = completedTickets === null
+          ? `Sprint S${sprintState.sprint} — no active claims, ${pendingGateCount} gate(s) pending.`
           : `Sprint S${sprintState.sprint} — ${completedTickets.recorded}/${completedTickets.total} tickets recorded done, none claimed.`;
-      options = [
-        { id: 'auto-card', label: 'Generate scorecard', command: 'slope auto-card' },
-        { id: 'validate', label: 'Validate scorecard', command: 'slope validate' },
-        { id: 'review', label: 'Generate review', command: `slope review --sprint=${sprintState.sprint}` },
-      ];
+        options = [
+          { id: 'next-ticket', label: 'Claim the next ticket', command: 'slope now' },
+          { id: 'run-tests', label: 'Run tests' },
+        ];
+      }
     }
   } else if (sprintState && sprintState.phase === 'scoring') {
     contextText = `Sprint S${sprintState.sprint} — scoring phase. Complete remaining gates.`;
@@ -169,6 +180,7 @@ async function countRecordedCompletions(
   sprintNumber: SprintId,
 ): Promise<{ recorded: number; total: number } | null> {
   let total: number;
+  let ticketKeys: string[];
   try {
     const config = loadConfig(cwd);
     const roadmapPath = join(cwd, config.roadmapPath);
@@ -178,6 +190,7 @@ async function countRecordedCompletions(
     const sprint = findRoadmapSprint(roadmap, sprintNumber);
     if (!sprint || sprint.tickets.length === 0) return null;
     total = sprint.tickets.length;
+    ticketKeys = sprint.tickets.map(t => t.key);
   } catch {
     return null;
   }
@@ -185,7 +198,10 @@ async function countRecordedCompletions(
   try {
     store = await resolveStore(cwd);
     const completed = await readCompletedTicketKeys(store, sprintNumber);
-    return { recorded: completed.size, total };
+    // Count only this sprint's roadmap tickets. The ledger can hold keys the
+    // sprint does not list, which made the raw set size report "3/2 tickets
+    // recorded done" and never reach the all-done branch.
+    return { recorded: ticketKeys.filter(key => completed.has(key)).length, total };
   } catch {
     return null;
   } finally {

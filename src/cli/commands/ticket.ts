@@ -15,7 +15,7 @@ import { isInsideGitWorkTree } from '../git-preflight.js';
 import { TICKET_DONE_KIND, readTicketCompletion } from '../../core/index.js';
 import type { TicketCompletion } from '../../core/index.js';
 import { loadSprintState } from '../sprint-state.js';
-import { resolveStore } from '../store.js';
+import { resolveStore, storeAlreadyExists } from '../store.js';
 
 /**
  * `slope ticket done <key>` — mark a ticket complete (GH #316).
@@ -156,6 +156,8 @@ async function doneSubcommand(args: string[]): Promise<void> {
     if (!ownClaim) {
       console.error(`No active claim for ${ticketKey} by ${playerDisplay} on ${formatSprintLabel(sprintNumber)}.`);
       console.error('Run `slope claim --target=' + ticketKey + ' --sprint=' + sprintNumber + '` first.');
+      // process.exit does not unwind, so the closing finally below never runs.
+      store.close();
       process.exit(1);
     }
 
@@ -359,6 +361,15 @@ async function showSubcommand(args: string[]): Promise<void> {
   const json = args.includes('--json');
   const cwd = process.cwd();
 
+  // Read-only, so never create a store to answer the question. Opening one
+  // runs a full schema migration, which is the defect this sprint fixed in
+  // `roadmap status` and then reintroduced here.
+  if (!storeAlreadyExists(cwd)) {
+    if (json) console.log(JSON.stringify({ ticketKey, completed: false }, null, 2));
+    else console.log(`\n${ticketKey}: no completion ledger yet.\n`);
+    return;
+  }
+
   const store = await resolveStore(cwd);
   let completion: TicketCompletion | undefined;
   try {
@@ -391,7 +402,10 @@ async function showSubcommand(args: string[]): Promise<void> {
   if (completion.commit) console.log(`  Commit:  ${completion.commit}`);
   if (completion.notes) console.log(`  Notes:   ${completion.notes}`);
   if (completion.at) console.log(`  Done at: ${completion.at}`);
-  if (completion.repaired) console.log('  Evidence was repaired after the original completion.');
+  if (completion.repaired) {
+    const by = completion.repairedBy ? ` by ${completion.repairedBy}` : '';
+    console.log(`  Evidence was repaired${by} after the original completion.`);
+  }
   console.log('');
 }
 

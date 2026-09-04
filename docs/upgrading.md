@@ -61,3 +61,23 @@ Nothing is written when the value is refused, and the ticket's claim is not rele
 **If evidence is already wrong,** `slope ticket repair <key> --commit=<sha>` corrects it. Repair needs no claim, because `ticket done` released it, and records a superseding entry rather than editing history. `slope ticket show <key>` prints what is currently recorded.
 
 Reported as [#698](https://github.com/srbryers/slope/issues/698).
+
+## Next-ticket answers now depend on actor identity
+
+**Who this affects:** anyone parsing `slope now --json` or `slope agent status --json`, and anyone running more than one agent against a single repository.
+
+**What changed.** `slope now`, `slope agent status` and compact `slope roadmap status` used to answer "what next" three different ways. They now share one rule: your own unfinished claim first, then the first unfinished ticket nobody has claimed, then a reason saying whether the rest is held by others or genuinely done.
+
+Two JSON shapes changed with it.
+
+`slope now --json` previously omitted `nextTicket` when the sprint had nothing to start. It is now always present and `null` in that case, matching `agent status`. Code doing `parsed.nextTicket.key` still throws, but it throws consistently on both surfaces rather than only one.
+
+`agent status --json` gains `nextTicketReason` (`in_flight`, `available`, `all_claimed`, `all_complete`, `no_tickets`) and an optional `ledgerError`. `slope now --json` gains `tickets: { total, completed, status }` and the same optional `ledgerError`. `AGENT_STATUS_VERSION` stays at 2, because these are additions rather than removals.
+
+**The identity limitation, stated plainly.** "Your own claim" is decided by player name, which is the identity model the rest of SLOPE already uses: `slope ticket done` finds your claim the same way. Claims carry a `session_id` column, but `slope claim` does not populate it, so name is the only discriminator available.
+
+The consequence: two agents on one machine, in one repository, with no explicit identity, both resolve to the same name (from `SLOPE_ACTOR`, `SLOPE_PLAYER`, a configured team actor, `USER`, `USERNAME`, then `git user.name`). Each then reads the other's claim as its own work in flight.
+
+**What to do** when running more than one agent against a repository: give each a distinct identity. Set `SLOPE_ACTOR` per agent, or pass `--actor=<name>`, which `now`, `agent status` and `roadmap status` all accept now for parity with `claim` and `ticket done`. A single agent needs no change.
+
+Tracked as [#715](https://github.com/srbryers/slope/issues/715).

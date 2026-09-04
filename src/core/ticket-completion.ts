@@ -33,6 +33,9 @@ export interface TicketCompletion {
   player?: string;
   /** True when this record superseded an earlier one via `ticket repair`. */
   repaired?: boolean;
+  /** Who ran the repair, when one was run. Distinct from `player`, which
+   *  stays with whoever did the work. */
+  repairedBy?: string;
   /** When the completion was recorded, ISO-8601. */
   at?: string;
 }
@@ -43,6 +46,7 @@ interface TicketDoneData {
   notes?: string;
   player?: string;
   repaired?: boolean;
+  repaired_by?: string;
 }
 
 /** True when an event records a ticket completion. */
@@ -61,6 +65,7 @@ function toCompletion(event: SlopeEvent): TicketCompletion {
     ...(data.notes ? { notes: data.notes } : {}),
     ...(data.player ? { player: data.player } : {}),
     ...(data.repaired ? { repaired: true } : {}),
+    ...(data.repaired_by ? { repairedBy: data.repaired_by } : {}),
     ...(event.timestamp ? { at: event.timestamp } : {}),
   };
 }
@@ -76,7 +81,11 @@ function toCompletion(event: SlopeEvent): TicketCompletion {
  */
 function supersedes(existing: TicketCompletion | undefined, candidate: TicketCompletion): boolean {
   if (!existing) return true;
-  if (!existing.at || !candidate.at) return true;
+  // A record without a timestamp cannot be shown to be newer, so it loses to
+  // one that has it. Both backends declare `timestamp TEXT NOT NULL` and
+  // `insertEvent` always sets it, so this is defensive rather than reachable.
+  if (!candidate.at) return false;
+  if (!existing.at) return true;
   return candidate.at >= existing.at;
 }
 
