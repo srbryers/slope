@@ -7,12 +7,13 @@ import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { retroCommand } from '../../../src/cli/commands/retro.js';
 import { memoryCommand } from '../../../src/cli/commands/memory.js';
-import { searchMemories } from '../../../src/core/memory.js';
+import { clearMemoryBackendCache, searchMemories } from '../../../src/core/memory.js';
 import { createSprintState, loadSprintState, saveSprintState } from '../../../src/cli/sprint-state.js';
 import { SqliteSlopeStore } from '../../../src/store/index.js';
+import { makeTempDir } from '../../helpers/temp-dir.js';
 
 function createTempDir(): string {
-  const cwd = mkdtempSync(join(tmpdir(), 'slope-retro-cli-'));
+  const cwd = makeTempDir('slope-retro-cli-');
   mkdirSync(join(cwd, '.slope'), { recursive: true });
   return cwd;
 }
@@ -57,8 +58,16 @@ describe('retro post-merge CLI', () => {
 
   afterEach(() => {
     process.chdir(origCwd);
-    if (linkedCwd && existsSync(linkedCwd)) rmSync(linkedCwd, { recursive: true, force: true });
-    rmSync(cwd, { recursive: true, force: true });
+    // `persistRetroMemories` opens a SqliteMemoryBackend that a module-level
+    // cache keeps for the life of the process. That is deliberate for a CLI
+    // run, but in a test worker the handle outlives the test, and Windows
+    // refuses to delete a file that is still open (#712). POSIX unlinks it
+    // regardless, which is why this only ever failed on Windows.
+    clearMemoryBackendCache();
+    const removeQuietly = (path: string) =>
+      rmSync(path, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+    if (linkedCwd && existsSync(linkedCwd)) removeQuietly(linkedCwd);
+    removeQuietly(cwd);
   });
 
   it('documents the accepted learning prefix syntax in post-merge help', async () => {

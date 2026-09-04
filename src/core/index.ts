@@ -309,6 +309,8 @@ export {
   resolveRepoSourceCwd,
   resolveRepoStateCwd,
   resolveRepoStatePath,
+  samePath,
+  canonicalPath,
 } from './repo-state-scope.js';
 
 // Test Plan
@@ -1030,6 +1032,11 @@ export {
   updateMemory,
   searchMemories,
   getMemoryById,
+  // The backend cache holds an open SQLite handle per state cwd for the life
+  // of the process. Fine for a one-shot CLI run, but the MCP server is
+  // long-lived and injects this namespace into `execute`, so agent code could
+  // open a handle the server had no way to close (#712).
+  clearMemoryBackendCache,
 } from './memory.js';
 export type {
   Memory,

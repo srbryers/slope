@@ -1,7 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   loadConfig,
@@ -11,6 +10,7 @@ import {
   resolveRepoStatePath,
 } from '../../src/core/index.js';
 import { createStore } from '../../src/store/index.js';
+import { makeTempDir } from '../helpers/temp-dir.js';
 
 let primary: string;
 let worktree: string;
@@ -21,7 +21,7 @@ function git(cwd: string, args: string[]): void {
 
 describe('repository state scope', () => {
   beforeEach(() => {
-    primary = mkdtempSync(join(tmpdir(), 'slope-state-primary-'));
+    primary = makeTempDir('slope-state-primary-');
     worktree = `${primary}-worktree`;
     git(primary, ['init', '-q', '-b', 'main']);
     git(primary, ['config', 'user.email', 'test@example.com']);

@@ -2,10 +2,10 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
 import { transcriptGuard } from '../../../src/cli/guards/transcript.js';
 import type { HookInput } from '../../../src/core/guard.js';
 import { SqliteSlopeStore } from '../../../src/store/index.js';
+import { makeTempDir } from '../../helpers/temp-dir.js';
 
 const TEST_DIR = join(process.cwd(), '.test-guard-transcripts');
 const TRANSCRIPTS_DIR = join(TEST_DIR, '.slope', 'transcripts');
@@ -194,7 +194,7 @@ describe('transcriptGuard', () => {
     });
 
     it('reconciles linked worktree identity through the routine heartbeat', async () => {
-      const primary = mkdtempSync(join(tmpdir(), 'slope-transcript-primary-'));
+      const primary = makeTempDir('slope-transcript-primary-');
       const linked = `${primary}-linked`;
       try {
         mkdirSync(join(primary, '.slope'), { recursive: true });
@@ -244,7 +244,7 @@ describe('transcriptGuard', () => {
     });
 
     it('calls updateHeartbeat after transcript append', async () => {
-      const isolatedCwd = mkdtempSync(join(tmpdir(), 'slope-transcript-heartbeat-'));
+      const isolatedCwd = makeTempDir('slope-transcript-heartbeat-');
       const mockStore = {
         getActiveSessions: vi.fn().mockResolvedValue([{
           session_id: 'test-sess-1',

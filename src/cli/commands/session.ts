@@ -10,6 +10,7 @@ import {
   resolveRepoSourceCwd,
   resolveRepoStateCwd,
   sprintIdKey,
+  samePath,
 } from '../../core/index.js';
 import type { SlopeSession, SprintClaim } from '../../core/index.js';
 import { STALE_SESSION_THRESHOLD_MS } from '../../core/constants.js';
@@ -26,7 +27,7 @@ import {
 function sessionMatchesContext(session: SlopeSession, cwd: string): boolean {
   if (session.worktree_path) {
     try {
-      if (realpathSync(session.worktree_path) !== realpathSync(cwd)) return false;
+      if (!samePath(session.worktree_path, cwd)) return false;
     } catch {
       return false;
     }
@@ -58,11 +59,10 @@ function canonicalSprintIdentity(value: unknown): string | undefined {
 }
 
 function sameCheckout(left: string, right: string): boolean {
-  try {
-    return realpathSync(left) === realpathSync(right);
-  } catch {
-    return left === right;
-  }
+  // The shared comparison, which uses realpathSync.native. The local copy used
+  // realpathSync, which leaves a Windows 8.3 short name unexpanded, so
+  // `C:\Users\RUNNER~1\...` never matched `C:\Users\runneradmin\...` (#712).
+  return samePath(left, right);
 }
 
 function printSessionHelp(): void {

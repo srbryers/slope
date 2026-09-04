@@ -6,6 +6,7 @@ import { execSync } from 'node:child_process';
 import { stopCheckGuard } from '../../../src/cli/guards/stop-check.js';
 import { recordBaseline } from '../../../src/cli/guards/git-utils.js';
 import type { HookInput } from '../../../src/core/index.js';
+import { makeTempDir } from '../../helpers/temp-dir.js';
 
 let tmpDir: string;
 
@@ -22,7 +23,7 @@ function git(cmd: string): string {
 }
 
 beforeEach(() => {
-  tmpDir = mkdtempSync(join(tmpdir(), 'slope-stop-check-'));
+  tmpDir = makeTempDir('slope-stop-check-');
   // Init a git repo with a remote
   git('init -b main');
   git('config user.email "test@test.com"');

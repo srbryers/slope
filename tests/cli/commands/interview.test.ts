@@ -3,11 +3,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { execSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync, mkdirSync, existsSync, readFileSync, realpathSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { makeTempDir } from '../../helpers/temp-dir.js';
 
 function createTempDir(): string {
-  return mkdtempSync(join(tmpdir(), 'slope-interview-test-'));
+  return makeTempDir('slope-interview-test-');
 }
 
 function runSlope(cwd: string, args: string[]): string {
