@@ -64,6 +64,8 @@ import {
   prepareRoadmapSourceMigration,
 } from '../roadmap-source-migration.js';
 import { serializeRoadmapMigrationMappingTemplate } from '../../core/roadmap-migration.js';
+import { resolveStore } from '../store.js';
+import { readCompletedTicketKeys } from '../ticket-completion.js';
 
 // --- Helpers ---
 
@@ -454,7 +456,7 @@ function reviewSubcommand(flags: Record<string, string>, cwd: string): void {
   console.log('');
 }
 
-function statusSubcommand(flags: Record<string, string>, cwd: string): void {
+async function statusSubcommand(flags: Record<string, string>, cwd: string): Promise<void> {
   const roadmap = loadRoadmapFile(flags, cwd);
   if (!roadmap) { process.exit(1); return; }
 
@@ -469,9 +471,25 @@ function statusSubcommand(flags: Record<string, string>, cwd: string): void {
 
   if (flags.full === 'true' || flags.history === 'true') {
     printFullRoadmapStatus(roadmap, currentSprint, completedSprints);
-  } else {
-    printCompactRoadmapStatus(roadmap, currentSprint, completedSprints, cwd);
+    return;
   }
+
+  // Recorded ticket completions, so the recommended action stops naming a
+  // ticket that `slope ticket done` already closed (#697). Status is a
+  // read-only report, so a store that will not open degrades to "nothing
+  // recorded" rather than failing the command.
+  let completedTickets = new Set<string>();
+  try {
+    const store = await resolveStore(cwd);
+    try {
+      completedTickets = await readCompletedTicketKeys(store, currentSprint);
+    } finally {
+      store.close();
+    }
+  } catch {
+    // store unavailable — report without completion evidence
+  }
+  printCompactRoadmapStatus(roadmap, currentSprint, completedSprints, cwd, completedTickets);
 }
 
 function displayPath(cwd: string, path: string): string {
@@ -1054,6 +1072,7 @@ function printCompactRoadmapStatus(
   currentSprint: SprintId,
   completedSprints: Set<string>,
   cwd: string,
+  completedTickets: ReadonlySet<string> = new Set(),
 ): void {
   const current = findRoadmapSprint(roadmap, currentSprint);
   const currentLabel = current
@@ -1068,6 +1087,7 @@ function printCompactRoadmapStatus(
   const nextReady = pendingAfterCurrent.find(s => blockedByForSprint(roadmap, s, completedSprints).length === 0);
   const upcoming = pendingAfterCurrent.slice(0, DEFAULT_UPCOMING_LIMIT);
   const realityLines = formatRoadmapRealitySection(buildRoadmapReality(cwd, roadmap), undefined, 5).slice(1);
+  const nextTicket = (current?.tickets ?? []).find(t => !completedTickets.has(t.key));
 
   console.log(`\n# Roadmap Status - ${roadmap.name}`);
   console.log('\u2550'.repeat(40));
@@ -1095,7 +1115,8 @@ function printCompactRoadmapStatus(
       console.log(`  Dependencies: ${deps.join(', ')}`);
     }
     for (const ticket of current.tickets ?? []) {
-      console.log(`  - ${ticket.key}: ${ticket.title}`);
+      const done = completedTickets.has(ticket.key) ? ' [done]' : '';
+      console.log(`  - ${ticket.key}: ${ticket.title}${done}`);
     }
   }
 
@@ -1118,9 +1139,12 @@ function printCompactRoadmapStatus(
   console.log('\nRecommended next action:');
   if (realityLines.some(line => line.includes('[error]'))) {
     console.log('  Resolve the first roadmap reality error before advancing the lane.');
+  } else if (currentIsPending && current?.tickets?.length && nextTicket) {
+    console.log(`  Work ${nextTicket.key}: ${nextTicket.title}`);
   } else if (currentIsPending && current?.tickets?.length) {
-    const first = current.tickets[0];
-    console.log(`  Work ${first.key}: ${first.title}`);
+    // Every ticket has a recorded completion. Recommending tickets[0] here is
+    // what made `ticket done` look like it had not registered (#697).
+    console.log(`  All ${current.tickets.length} tickets recorded done. Close out ${formatRoadmapSprintLabel(roadmap, roadmapSprintKey(roadmap, current))}.`);
   } else if (nextReady) {
     console.log(`  Start ${formatRoadmapSprintLabel(roadmap, roadmapSprintKey(roadmap, nextReady))}: ${nextReady.theme || 'Untitled Sprint'}`);
   } else {
@@ -1382,7 +1406,7 @@ export async function roadmapCommand(args: string[]): Promise<void> {
       reviewSubcommand(flags, cwd);
       break;
     case 'status':
-      statusSubcommand(flags, cwd);
+      await statusSubcommand(flags, cwd);
       break;
     case 'focus':
       focusSubcommand(flags, cwd);

@@ -13,6 +13,7 @@ import { loadConfig } from '../config.js';
 import { inferSprintContext, loadRoadmapForInference } from '../sprint-inference.js';
 import { isRequiredReviewGate, isReviewGateSatisfied, loadSprintState, pendingGates, waivedReviewGateNames, type ReviewGateName } from '../sprint-state.js';
 import { resolveStore } from '../store.js';
+import { readCompletedTicketKeys } from '../ticket-completion.js';
 
 interface NowSnapshot {
   sprint: SprintId;
@@ -34,6 +35,11 @@ interface NowSnapshot {
   claims: {
     total: number;
     ticketClaims: number;
+  };
+  /** Recorded completions for the current sprint's tickets (#697). */
+  tickets?: {
+    total: number;
+    completed: number;
   };
   nextAction: string;
   nextTicket?: RoadmapTicket;
@@ -86,10 +92,25 @@ function formatPhaseProgress(roadmap: RoadmapDefinition, sprint: SprintId, compl
   };
 }
 
-function findNextTicket(sprint: RoadmapSprint | undefined, claims: SprintClaim[]): RoadmapTicket | undefined {
+function findNextTicket(
+  sprint: RoadmapSprint | undefined,
+  claims: SprintClaim[],
+  completed: ReadonlySet<string> = new Set(),
+): RoadmapTicket | undefined {
   if (!sprint) return undefined;
   const claimedTargets = new Set(claims.map(c => c.target));
-  return sprint.tickets.find(ticket => !claimedTargets.has(ticket.key)) ?? sprint.tickets[0];
+  // Skip work that is claimed by someone AND work already recorded as done.
+  // Reading only claims meant a finished ticket was recommended again the
+  // moment its claim was released, which is what `slope ticket done` does on
+  // success (#697).
+  const next = sprint.tickets.find(
+    ticket => !claimedTargets.has(ticket.key) && !completed.has(ticket.key),
+  );
+  if (next) return next;
+  // Every ticket accounted for. Prefer reporting an unfinished one over
+  // silently pointing at the first, which read as "start here" on a sprint
+  // that was done.
+  return sprint.tickets.find(ticket => !completed.has(ticket.key)) ?? undefined;
 }
 
 function buildNextAction(snapshot: Omit<NowSnapshot, 'nextAction'>): string {
@@ -134,8 +155,10 @@ async function buildNowSnapshot(cwd: string, flags: Record<string, string>): Pro
 
   const store = await resolveStore(cwd);
   let claims: SprintClaim[];
+  let completedTickets: Set<string>;
   try {
     claims = await store.list(sprint);
+    completedTickets = await readCompletedTicketKeys(store, sprint);
   } finally {
     store.close();
   }
@@ -162,7 +185,11 @@ async function buildNowSnapshot(cwd: string, flags: Record<string, string>): Pro
       total: claims.length,
       ticketClaims: claims.filter(c => c.scope === 'ticket').length,
     },
-    nextTicket: findNextTicket(current, claims),
+    tickets: current ? {
+      total: current.tickets.length,
+      completed: current.tickets.filter(t => completedTickets.has(t.key)).length,
+    } : undefined,
+    nextTicket: findNextTicket(current, claims, completedTickets),
   };
 
   return {
@@ -186,6 +213,9 @@ function printNowSnapshot(snapshot: NowSnapshot): void {
     console.log(`Review downgrade: ${snapshot.sprintState.reviewWaivers.join(', ')} independently required but explicitly waived`);
   }
   console.log(`Claims: ${snapshot.claims.total} active, ${snapshot.claims.ticketClaims} ticket`);
+  if (snapshot.tickets) {
+    console.log(`Tickets: ${snapshot.tickets.completed}/${snapshot.tickets.total} recorded done`);
+  }
   console.log(`Next: ${snapshot.nextAction}`);
   if (snapshot.nextTicket && snapshot.nextAction.startsWith('Start ')) {
     console.log(`Start: slope start --ticket=${snapshot.nextTicket.key}`);

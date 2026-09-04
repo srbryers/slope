@@ -13,6 +13,7 @@ import { loadConfig } from '../config.js';
 import { inferSprintContext } from '../sprint-inference.js';
 import { loadSprintState, pendingGateNames } from '../sprint-state.js';
 import { resolveStore } from '../store.js';
+import { readCompletedTicketKeys } from '../ticket-completion.js';
 
 /**
  * `slope agent status` — machine-readable operational status (GH #310).
@@ -147,26 +148,22 @@ export async function collectAgentStatus(cwd: string): Promise<AgentStatus> {
   // Completed = any ticket with a `decision` event of kind `ticket_done`.
   // `slope ticket done` writes those, so we use them to advance nextTicket
   // past finished work even after the claim has been released. (#348)
+  // The read lives in ticket-completion.ts so `slope now` and compact roadmap
+  // status answer this question the same way agent status does (#697).
   const activeClaims: string[] = [];
-  const completedTickets = new Set<string>();
+  let completedTickets = new Set<string>();
   if (currentSprint != null) {
     try {
       const store = await resolveStore(cwd);
-      const claims = await store.list(currentSprint);
-      for (const c of claims) {
-        if (c.target) activeClaims.push(c.target);
-      }
       try {
-        const events = await store.getEventsBySprint(currentSprint);
-        for (const e of events) {
-          if (e.type === 'decision' && e.ticket_key && (e.data as { kind?: string })?.kind === 'ticket_done') {
-            completedTickets.add(e.ticket_key);
-          }
+        const claims = await store.list(currentSprint);
+        for (const c of claims) {
+          if (c.target) activeClaims.push(c.target);
         }
-      } catch {
-        // events optional — older stores may not have them
+        completedTickets = await readCompletedTicketKeys(store, currentSprint);
+      } finally {
+        store.close();
       }
-      store.close();
     } catch {
       // store unavailable — return empty
     }

@@ -12,6 +12,7 @@ import type { RoadmapDefinition } from '../../core/index.js';
 import { formatActorName, formatActorSource, resolveActor } from '../actor.js';
 import { loadConfig } from '../config.js';
 import { isInsideGitWorkTree } from '../git-preflight.js';
+import { TICKET_DONE_KIND, readTicketCompletions } from '../ticket-completion.js';
 import { loadSprintState } from '../sprint-state.js';
 import { resolveStore } from '../store.js';
 
@@ -35,6 +36,11 @@ export async function ticketCommand(args: string[]): Promise<void> {
     return;
   }
 
+  if (sub === 'repair') {
+    await repairSubcommand(args.slice(1));
+    return;
+  }
+
   console.error(`\nUnknown ticket subcommand: ${sub}\n`);
   printHelp();
   process.exit(1);
@@ -49,6 +55,10 @@ Usage:
   slope ticket done <key> --commit=<sha>     Attach a specific commit SHA
   slope ticket done <key> --notes="..."      Attach completion notes
   slope ticket done <key> --actor=<name>     Override actor identity for claim lookup
+
+  slope ticket repair <key> --commit=<sha>   Correct evidence on an already-completed
+                                             ticket; needs no claim
+  slope ticket repair <key> --notes="..."    Replace the recorded notes
 `);
 }
 
@@ -61,6 +71,9 @@ interface DoneFlags {
 interface CommitResolution {
   sha: string | null;
   missingGitWorkTree: boolean;
+  /** Set when an explicit --commit value named something git could not
+   *  resolve to a commit. Refused rather than recorded (#698). */
+  unresolvedRef?: string;
 }
 
 function parseFlags(args: string[]): DoneFlags {
@@ -74,19 +87,16 @@ function parseFlags(args: string[]): DoneFlags {
   return flags;
 }
 
-async function doneSubcommand(args: string[]): Promise<void> {
-  const ticketKey = args.find(a => !a.startsWith('--'));
-  if (!ticketKey) {
-    console.error('\nUsage: slope ticket done <key> [--commit=<sha>] [--notes="..."] [--actor=<name>]\n');
-    process.exit(1);
-  }
-  const flags = parseFlags(args);
-  const cwd = process.cwd();
-
-  const roadmap = loadRoadmap(cwd);
-
-  // Resolve current sprint — sprint state wins; otherwise match the roadmap
-  // ticket before falling back to the display label in S{N}-... keys.
+/**
+ * Sprint for a ticket — sprint state wins; otherwise match the roadmap ticket
+ * before falling back to the display label in S{N}-... keys. Shared so
+ * `repair` lands its correction on the same sprint `done` recorded (#698).
+ */
+function resolveSprintForTicket(
+  cwd: string,
+  ticketKey: string,
+  roadmap: RoadmapDefinition | null,
+): string {
   const state = loadSprintState(cwd);
   let sprintNumber: string | null = state?.sprint ?? null;
   if (sprintNumber == null && roadmap) {
@@ -102,6 +112,20 @@ async function doneSubcommand(args: string[]): Promise<void> {
     console.error('Run `slope sprint start --number=N` or use a ticket key like S1-1.');
     process.exit(1);
   }
+  return sprintNumber as string;
+}
+
+async function doneSubcommand(args: string[]): Promise<void> {
+  const ticketKey = args.find(a => !a.startsWith('--'));
+  if (!ticketKey) {
+    console.error('\nUsage: slope ticket done <key> [--commit=<sha>] [--notes="..."] [--actor=<name>]\n');
+    process.exit(1);
+  }
+  const flags = parseFlags(args);
+  const cwd = process.cwd();
+
+  const roadmap = loadRoadmap(cwd);
+  const sprintNumber = resolveSprintForTicket(cwd, ticketKey, roadmap);
 
   // 1. Verify ticket exists in roadmap (best-effort — warn but don't block)
   if (roadmap) {
@@ -129,23 +153,41 @@ async function doneSubcommand(args: string[]): Promise<void> {
 
     // 3. Resolve commit SHA — explicit flag wins, fall back to HEAD
     const commit = resolveCommitSha(flags.commit, cwd);
+    // Refuse before the claim is released. The reporter's complaint was that
+    // `--commit=HEAD` succeeded, released the claim, and left no supported way
+    // to correct the evidence afterwards (#698).
+    if (commit.unresolvedRef) {
+      console.error(`\n${ticketKey}: could not resolve --commit=${commit.unresolvedRef} to a commit.`);
+      console.error('Nothing was recorded and the claim is still yours. Pass a commit-ish git can resolve, or omit --commit to use HEAD.\n');
+      store.close();
+      process.exit(1);
+      return;
+    }
     const sha = commit.sha;
 
-    // 4. Record a 'decision' event for traceability (best-effort)
+    // 4. Record the completion. This is the ledger `slope now`, `agent` and
+    // roadmap status read to know the ticket is finished, so a failure here
+    // has to surface: a swallowed write left the command reporting success
+    // while nothing durable said the ticket was done, and the next-action
+    // commands went on recommending it (#697).
     try {
       await store.insertEvent({
         type: 'decision',
         sprint_number: sprintNumber,
         ticket_key: ticketKey,
         data: {
-          kind: 'ticket_done',
+          kind: TICKET_DONE_KIND,
           player,
           ...(sha ? { commit: sha } : {}),
           ...(flags.notes ? { notes: flags.notes } : {}),
         },
       });
-    } catch {
-      /* event recording is optional */
+    } catch (error) {
+      console.error(`\nCould not record completion for ${ticketKey}: ${(error as Error).message}`);
+      console.error('The claim was NOT released, so the ticket is still yours. Retry once the store is reachable.\n');
+      store.close();
+      process.exit(1);
+      return;
     }
 
     // 5. Release the claim
@@ -185,6 +227,90 @@ async function doneSubcommand(args: string[]): Promise<void> {
   console.log('');
 }
 
+/**
+ * `slope ticket repair <key> --commit=<sha>` — correct the evidence on an
+ * already-completed ticket (#698).
+ *
+ * The reporter's complaint was that a bad `--commit` value became permanent:
+ * `ticket done` releases the claim, and every other path into the ledger
+ * requires one. Repair deliberately does not need a claim, and records a fresh
+ * completion rather than editing the old event, so the ledger stays an
+ * append-only history of what was believed when.
+ */
+async function repairSubcommand(args: string[]): Promise<void> {
+  const ticketKey = args.find(a => !a.startsWith('--'));
+  if (!ticketKey) {
+    console.error('\nUsage: slope ticket repair <key> --commit=<sha> [--notes="..."] [--actor=<name>]\n');
+    process.exit(1);
+    return;
+  }
+  const flags = parseFlags(args);
+  if (!flags.commit && !flags.notes) {
+    console.error(`\nNothing to repair for ${ticketKey}: pass --commit=<sha> and/or --notes="...".\n`);
+    process.exit(1);
+    return;
+  }
+  const cwd = process.cwd();
+  const roadmap = loadRoadmap(cwd);
+  const sprintNumber = resolveSprintForTicket(cwd, ticketKey, roadmap);
+
+  // Only resolve when a commit was actually named. `done` falls back to HEAD
+  // when the flag is absent; repairing notes must not quietly retarget the
+  // commit at whatever HEAD happens to be now.
+  const commit: CommitResolution = flags.commit
+    ? resolveCommitSha(flags.commit, cwd)
+    : { sha: null, missingGitWorkTree: false };
+  if (commit.unresolvedRef) {
+    console.error(`\n${ticketKey}: could not resolve --commit=${commit.unresolvedRef} to a commit.`);
+    console.error('Nothing was recorded. Pass a commit-ish git can resolve.\n');
+    process.exit(1);
+    return;
+  }
+
+  const actor = resolveActor(cwd, { explicitActor: flags.actor });
+  const store = await resolveStore(cwd);
+  try {
+    const existing = await readTicketCompletions(store, sprintNumber);
+    const prior = existing.get(ticketKey);
+    if (!prior) {
+      console.error(`\nNo recorded completion for ${ticketKey} on ${formatSprintLabel(sprintNumber)}.`);
+      console.error('Repair corrects existing evidence. Run `slope ticket done ' + ticketKey + '` to record the completion first.\n');
+      process.exit(1);
+      return;
+    }
+
+    // Carry forward whatever this repair does not replace, so correcting the
+    // commit does not silently discard notes recorded with the original.
+    const notes = flags.notes ?? prior.notes;
+    const sha = commit.sha ?? prior.commit;
+    await store.insertEvent({
+      type: 'decision',
+      sprint_number: sprintNumber,
+      ticket_key: ticketKey,
+      data: {
+        kind: TICKET_DONE_KIND,
+        player: actor.name,
+        repaired: true,
+        ...(sha ? { commit: sha } : {}),
+        ...(notes ? { notes } : {}),
+      },
+    });
+
+    console.log(`\nTicket ${ticketKey}: evidence repaired.`);
+    console.log(`  Sprint:  ${formatSprintLabel(sprintNumber)}`);
+    console.log(`  Player:  ${formatActorName(actor)}`);
+    if (prior.commit) console.log(`  Was:     ${prior.commit}`);
+    if (sha) console.log(`  Commit:  ${sha}`);
+    if (notes) console.log(`  Notes:   ${notes}`);
+    if (commit.missingGitWorkTree) {
+      console.warn('Warning: no git repository detected; the value was recorded without verification.');
+    }
+    console.log('');
+  } finally {
+    store.close();
+  }
+}
+
 function loadRoadmap(cwd: string): RoadmapDefinition | null {
   try {
     const config = loadConfig(cwd);
@@ -198,7 +324,23 @@ function loadRoadmap(cwd: string): RoadmapDefinition | null {
 }
 
 function resolveCommitSha(explicit: string | undefined, cwd: string): CommitResolution {
-  if (explicit) return { sha: explicit, missingGitWorkTree: false };
+  // An explicit value gets the same resolution the fallback already did.
+  // Storing it verbatim recorded `HEAD` as permanent completion evidence,
+  // which is not immutable and breaks shipped-commit checks that read it
+  // later (#698). The asymmetry was the whole bug.
+  if (explicit) {
+    if (!isInsideGitWorkTree(cwd)) return { sha: explicit, missingGitWorkTree: true };
+    try {
+      const sha = execFileSync('git', ['rev-parse', '--verify', `${explicit}^{commit}`], {
+        cwd,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }).trim();
+      return { sha, missingGitWorkTree: false };
+    } catch {
+      return { sha: null, missingGitWorkTree: false, unresolvedRef: explicit };
+    }
+  }
   if (!isInsideGitWorkTree(cwd)) {
     return { sha: null, missingGitWorkTree: true };
   }
