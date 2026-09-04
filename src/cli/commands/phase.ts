@@ -25,8 +25,8 @@ export async function phaseCommand(args: string[]): Promise<void> {
 
   switch (sub) {
     case 'complete': {
-      const phase = parseInt(args[1], 10);
-      if (isNaN(phase)) {
+      const phase = parsePhaseArg(args[1]);
+      if (phase == null) {
         console.error('Error: phase number required. Usage: slope phase complete <N>');
         process.exit(1);
       }
@@ -58,8 +58,8 @@ export async function phaseCommand(args: string[]): Promise<void> {
     }
 
     case 'audit': {
-      const phase = parseInt(args[1], 10);
-      if (isNaN(phase)) {
+      const phase = parsePhaseArg(args[1]);
+      if (phase == null) {
         console.error('Error: phase number required. Usage: slope phase audit <N>');
         process.exit(1);
       }
@@ -152,6 +152,15 @@ async function regressionSubcommand(args: string[], cwd: string): Promise<void> 
   // it. A gate writer that hides why the run failed is not evidence.
   // Hand the whole string to the shell. Splitting on whitespace first mangled
   // any --command carrying a quoted argument with a space in it.
+  //
+  // The only `shell: true` in src/, and a security review flagged the reason:
+  // on Windows, cmd.exe searches the working directory before PATH, so a
+  // `pnpm.cmd` sitting in the repo would run instead of the real one. Kept
+  // deliberately, because running the repository's own test command is this
+  // command's entire purpose. Anyone running `pnpm test` in a hostile repo is
+  // already running its package.json scripts, so this grants no capability the
+  // operator was not exercising. stdio is inherited so the test output is the
+  // command's own rather than bytes SLOPE relays.
   const result = spawnSync(command, { cwd, stdio: 'inherit', shell: true });
 
   if (result.status !== 0) {

@@ -169,6 +169,11 @@ function gateCommand(label: string, phase: number): string | null {
   const named = label.match(/`(slope [^`]+)`/);
   if (!named) return null;
   const command = named[1];
+  // A label can carry a placeholder rather than a command, when no lockfile
+  // was found and the regression command could not be derived. Offering
+  // `--command="<your test command>"` as something to run is a shell syntax
+  // error dressed up as a suggestion.
+  if (command.includes('<')) return null;
   // Phase-scoped commands need the number; the repo-wide ones do not.
   return /^slope phase\b/.test(command) ? `${command} ${phase}` : command;
 }

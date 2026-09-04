@@ -344,6 +344,12 @@ describe('phase cleanup gates (#696)', () => {
         expect(r.status).toBe(1);
         expect(r.stderr).toContain('is not a phase number');
       }
+      // `audit` and `complete` kept bare parseInt after the first fix, so
+      // `slope phase audit 3.7` silently marked phase 3.
+      for (const sub of ['audit', 'complete']) {
+        expect(trySlope(cwd, ['phase', sub, '3.7']).status).toBe(1);
+        expect(trySlope(cwd, ['phase', sub, '1abc']).status).toBe(1);
+      }
       expect(Object.keys(gates(cwd))).toHaveLength(0);
     } finally {
       rmSync(cwd, { recursive: true, force: true });
