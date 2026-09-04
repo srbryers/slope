@@ -179,18 +179,19 @@ function showPhaseStatus(phase: number, cwd: string): void {
   const state = loadPhaseCleanup(cwd);
   const gates = state.phases[String(phase)];
 
-  if (!gates) {
-    console.log(`  Phase ${phase}: No cleanup state recorded`);
-    return;
-  }
-
-  const status = complete ? 'COMPLETE' : `${pending.length} gate(s) pending`;
+  // No recorded state means every gate is pending, so say which. Printing
+  // only "No cleanup state recorded" hid the gate list, and with it the
+  // command beside each gate, from anyone who had not already recorded one.
+  const status = complete
+    ? 'COMPLETE'
+    : `${pending.length} gate(s) pending${gates ? '' : ' (nothing recorded yet)'}`;
   console.log(`  Phase ${phase}: ${status}`);
   if (!complete) {
     for (const g of pending) {
       console.log(`    [ ] ${g}`);
     }
   }
+  if (!gates) return;
   if (gates.completed_at) {
     console.log(`    Completed: ${gates.completed_at}`);
   }

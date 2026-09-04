@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { parseRoadmap, roadmapSprintKeyFromId } from '../core/index.js';
+import { detectLatestSprint, parseRoadmap, roadmapSprintKeyFromId } from '../core/index.js';
 import type { SlopeConfig } from '../core/index.js';
 import { loadConfig } from './config.js';
 import { phaseNumberForSprint, recordPhaseGateForSprint, type PhaseGateName } from './phase-cleanup.js';
@@ -22,6 +22,23 @@ import { inferSprintContext } from './sprint-inference.js';
  * a boundary on evidence belonging elsewhere, which is worse than not recording.
  */
 /**
+ * The sprint whose phase these gates belong to.
+ *
+ * The latest sprint with a scorecard, not the next pending one. Cleanup runs
+ * after the last sprint of a phase closes, and at that moment the "current"
+ * sprint by inference is already the first sprint of the NEXT phase. Recording
+ * there marks gates on a phase whose work has not started, and leaves the
+ * phase actually being closed still blocking the boundary.
+ */
+function closeoutSprint(cwd: string, config: SlopeConfig): string {
+  const latest = detectLatestSprint(config, cwd);
+  if (latest !== '0') return latest;
+  // No scorecards yet: fall back to whatever sprint context says, so a
+  // first-phase project is not left with nowhere to record.
+  return inferSprintContext(cwd, config).sprint;
+}
+
+/**
  * The phase owning the current sprint, or null when it cannot be resolved.
  *
  * Lets `slope phase regression` and `slope phase gate` default to the phase
@@ -35,7 +52,7 @@ export function currentPhaseNumber(cwd: string, config?: SlopeConfig): number | 
     if (!existsSync(roadmapPath)) return null;
     const roadmap = parseRoadmap(JSON.parse(readFileSync(roadmapPath, 'utf8'))).roadmap;
     if (!roadmap) return null;
-    const sprintKey = roadmapSprintKeyFromId(roadmap, inferSprintContext(cwd, cfg).sprint);
+    const sprintKey = roadmapSprintKeyFromId(roadmap, closeoutSprint(cwd, cfg));
     if (sprintKey === null) return null;
     return phaseNumberForSprint(roadmap, sprintKey, id => roadmapSprintKeyFromId(roadmap, id));
   } catch {
@@ -56,8 +73,7 @@ export function recordPhaseGate(
     const roadmap = parseRoadmap(JSON.parse(readFileSync(roadmapPath, 'utf8'))).roadmap;
     if (!roadmap) return null;
 
-    const sprint = inferSprintContext(cwd, config).sprint;
-    const sprintKey = roadmapSprintKeyFromId(roadmap, sprint);
+    const sprintKey = roadmapSprintKeyFromId(roadmap, closeoutSprint(cwd, config));
     if (sprintKey === null) return null;
 
     phase = recordPhaseGateForSprint(
