@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { parseRoadmap, roadmapSprintKeyFromId } from '../core/index.js';
 import type { SlopeConfig } from '../core/index.js';
 import { loadConfig } from './config.js';
-import { recordPhaseGateForSprint, type PhaseGateName } from './phase-cleanup.js';
+import { phaseNumberForSprint, recordPhaseGateForSprint, type PhaseGateName } from './phase-cleanup.js';
 import { inferSprintContext } from './sprint-inference.js';
 
 /**
@@ -21,6 +21,28 @@ import { inferSprintContext } from './sprint-inference.js';
  * recorded and nothing is claimed: recording against a guessed phase would open
  * a boundary on evidence belonging elsewhere, which is worse than not recording.
  */
+/**
+ * The phase owning the current sprint, or null when it cannot be resolved.
+ *
+ * Lets `slope phase regression` and `slope phase gate` default to the phase
+ * being worked on, so the common case needs no number, while an explicit one
+ * still wins.
+ */
+export function currentPhaseNumber(cwd: string, config?: SlopeConfig): number | null {
+  try {
+    const cfg = config ?? loadConfig(cwd);
+    const roadmapPath = join(cwd, cfg.roadmapPath);
+    if (!existsSync(roadmapPath)) return null;
+    const roadmap = parseRoadmap(JSON.parse(readFileSync(roadmapPath, 'utf8'))).roadmap;
+    if (!roadmap) return null;
+    const sprintKey = roadmapSprintKeyFromId(roadmap, inferSprintContext(cwd, cfg).sprint);
+    if (sprintKey === null) return null;
+    return phaseNumberForSprint(roadmap, sprintKey, id => roadmapSprintKeyFromId(roadmap, id));
+  } catch {
+    return null;
+  }
+}
+
 export function recordPhaseGate(
   cwd: string,
   gate: PhaseGateName,
