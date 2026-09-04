@@ -24,10 +24,26 @@ import { join } from 'node:path';
  * compares a path, stores one, or passes a cwd into SLOPE.
  */
 export function makeTempDir(prefix: string): string {
-  return realpathSync(mkdtempSync(join(realpathSync(tmpdir()), prefix)));
+  return canonicalise(mkdtempSync(join(canonicalTmpdir(), prefix)));
 }
 
 /** The canonical temp root, for tests that build sibling paths themselves. */
 export function canonicalTmpdir(): string {
-  return realpathSync(tmpdir());
+  return canonicalise(tmpdir());
+}
+
+/**
+ * `realpathSync.native`, not `realpathSync`.
+ *
+ * The JavaScript implementation resolves symlinks and junctions but leaves an
+ * 8.3 short name alone, so it returned `C:\Users\RUNNER~1\...` unchanged and
+ * the first attempt at this helper fixed nothing. The native binding asks
+ * Windows to expand it and gives `C:\Users\runneradmin\...`.
+ */
+function canonicalise(path: string): string {
+  try {
+    return realpathSync.native(path);
+  } catch {
+    return realpathSync(path);
+  }
 }

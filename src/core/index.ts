@@ -310,6 +310,7 @@ export {
   resolveRepoStateCwd,
   resolveRepoStatePath,
   samePath,
+  canonicalPath,
 } from './repo-state-scope.js';
 
 // Test Plan

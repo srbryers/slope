@@ -135,9 +135,31 @@ function nativeGitPath(cwd: string, args: string[]): string | null {
  */
 export function samePath(left: string, right: string): boolean {
   try {
-    return realpathSync(left) === realpathSync(right);
+    return canonicalPath(left) === canonicalPath(right);
   } catch {
     return resolve(left) === resolve(right);
+  }
+}
+
+/**
+ * The filesystem's own name for a path.
+ *
+ * `realpathSync.native` rather than `realpathSync`, because the JavaScript
+ * implementation resolves symlinks and junctions but leaves a Windows 8.3
+ * short name alone. `C:\Users\RUNNER~1\...` and `C:\Users\runneradmin\...` are
+ * the same directory, and only the native binding says so. That difference is
+ * reachable in the product: `os.tmpdir()` returns the short form on some
+ * Windows configurations, including the GitHub runner, while git and
+ * `--show-toplevel` return the long one (#712).
+ *
+ * Falls back to the JavaScript implementation if the native binding is
+ * unavailable, which is still better than a raw string comparison.
+ */
+export function canonicalPath(path: string): string {
+  try {
+    return realpathSync.native(path);
+  } catch {
+    return realpathSync(path);
   }
 }
 
