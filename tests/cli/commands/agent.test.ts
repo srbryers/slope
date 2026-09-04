@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { collectAgentStatus, renderAgentMarkdown } from '../../../src/cli/commands/agent.js';
 import type { AgentStatus } from '../../../src/cli/commands/agent.js';
 import { resolveStore } from '../../../src/cli/store.js';
+import { resolveActor } from '../../../src/cli/actor.js';
 
 function makeTmpRepo(): string {
   const dir = mkdtempSync(join(tmpdir(), 'slope-agent-'));
@@ -350,9 +351,12 @@ describe('agent status (GH #310)', () => {
       updated_at: '2026-05-07T00:00:00Z',
     });
 
-    // Create a real claim on S1-1 so the agent has work in flight
+    // Create a real claim on S1-1 so the agent has work in flight.
+    // Claim as the resolved actor: since S267.6 "in flight" means the asking
+    // actor's own claim, so a hardcoded player reads as somebody else's work
+    // and is correctly skipped.
     const store = await resolveStore(cwd);
-    await store.claim({ sprint_number: 1, player: 'agent', target: 'S1-1', scope: 'ticket' });
+    await store.claim({ sprint_number: 1, player: resolveActor(cwd).name, target: 'S1-1', scope: 'ticket' });
     store.close();
 
     const status = await collectAgentStatus(cwd);

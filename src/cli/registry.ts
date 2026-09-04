@@ -823,9 +823,19 @@ export const CLI_COMMAND_REGISTRY: readonly CliCommandMeta[] = [
     subcommands: [
       { name: 'done', desc: 'Mark ticket complete; release claim', flags: [
         { flag: '<key>', desc: 'Ticket key (e.g. S1-1)' },
-        { flag: '--commit=<sha>', desc: 'Attach a specific commit SHA (default: HEAD)' },
+        { flag: '--commit=<sha>', desc: 'Attach a specific commit-ish (default: HEAD). Resolved to an immutable SHA; refused if git cannot resolve it' },
         { flag: '--notes=<text>', desc: 'Attach completion notes' },
         { flag: '--actor=<name>', desc: 'Actor override for claim lookup' },
+      ]},
+      { name: 'repair', desc: 'Correct evidence on an already-completed ticket; needs no claim', flags: [
+        { flag: '<key>', desc: 'Ticket key (e.g. S1-1)' },
+        { flag: '--commit=<sha>', desc: 'Replace the recorded commit' },
+        { flag: '--notes=<text>', desc: 'Replace the recorded notes; --notes= clears them' },
+        { flag: '--actor=<name>', desc: 'Actor override; recorded as the repairer, not the player' },
+      ]},
+      { name: 'show', desc: 'Show the completion evidence recorded for a ticket', flags: [
+        { flag: '<key>', desc: 'Ticket key (e.g. S1-1)' },
+        { flag: '--json', desc: 'Emit the completion record as JSON' },
       ]},
     ],
   },

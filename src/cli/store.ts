@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 import type { SlopeStore } from '../core/index.js';
 import { resolveRepoStateCwd } from '../core/index.js';
 import { loadConfig } from './config.js';
@@ -36,6 +38,21 @@ export function getStoreInfo(cwd: string = process.cwd()): StoreInfo {
     };
   }
   return { type };
+}
+
+/**
+ * True when opening the store would read rather than create.
+ *
+ * `resolveStore` on sqlite runs `mkdirSync` and a full schema migration, so a
+ * read-only report that opens one materialises a database in a repo that never
+ * had one. Non-sqlite backends are remote and have no local file to create, so
+ * they answer true and let the connection attempt decide.
+ */
+export function storeAlreadyExists(cwd: string = process.cwd()): boolean {
+  const stateCwd = resolveRepoStateCwd(cwd);
+  const info = getStoreInfo(stateCwd);
+  if (info.type !== 'sqlite') return true;
+  return existsSync(resolve(stateCwd, info.path ?? '.slope/slope.db'));
 }
 
 export async function resolveStore(cwd: string = process.cwd()): Promise<SlopeStore> {

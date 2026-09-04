@@ -64,8 +64,10 @@ import {
   prepareRoadmapSourceMigration,
 } from '../roadmap-source-migration.js';
 import { serializeRoadmapMigrationMappingTemplate } from '../../core/roadmap-migration.js';
-import { resolveStore } from '../store.js';
-import { readCompletedTicketKeys } from '../ticket-completion.js';
+import { resolveActor } from '../actor.js';
+import { resolveStore, storeAlreadyExists } from '../store.js';
+import { readCompletedTicketKeysOrEmpty, selectNextTicket } from '../../core/index.js';
+import type { SprintClaim } from '../../core/index.js';
 
 // --- Helpers ---
 
@@ -474,22 +476,37 @@ async function statusSubcommand(flags: Record<string, string>, cwd: string): Pro
     return;
   }
 
-  // Recorded ticket completions, so the recommended action stops naming a
-  // ticket that `slope ticket done` already closed (#697). Status is a
-  // read-only report, so a store that will not open degrades to "nothing
-  // recorded" rather than failing the command.
+  // Recorded ticket completions and live claims, so the recommended action
+  // stops naming a ticket that `slope ticket done` already closed, or one
+  // somebody else is holding (#697).
+  //
+  // Only ever opens a store that already exists. `roadmap status` is a
+  // read-only report and was creating `.slope/slope.db` (schema migration and
+  // all) in repos that had never run one, purely by asking this question.
   let completedTickets = new Set<string>();
-  try {
-    const store = await resolveStore(cwd);
+  let claims: SprintClaim[] = [];
+  let ledgerError: string | undefined;
+  if (storeAlreadyExists(cwd)) {
     try {
-      completedTickets = await readCompletedTicketKeys(store, currentSprint);
-    } finally {
-      store.close();
+      const store = await resolveStore(cwd);
+      try {
+        claims = await store.list(currentSprint);
+        const read = await readCompletedTicketKeysOrEmpty(store, currentSprint);
+        completedTickets = read.keys;
+        ledgerError = read.error?.message;
+      } finally {
+        store.close();
+      }
+    } catch (error) {
+      ledgerError = (error as Error).message;
     }
-  } catch {
-    // store unavailable — report without completion evidence
   }
-  printCompactRoadmapStatus(roadmap, currentSprint, completedSprints, cwd, completedTickets);
+  printCompactRoadmapStatus(roadmap, currentSprint, completedSprints, cwd, {
+    completedTickets,
+    claims,
+    self: resolveActor(cwd).name,
+    ledgerError,
+  });
 }
 
 function displayPath(cwd: string, path: string): string {
@@ -1072,8 +1089,14 @@ function printCompactRoadmapStatus(
   currentSprint: SprintId,
   completedSprints: Set<string>,
   cwd: string,
-  completedTickets: ReadonlySet<string> = new Set(),
+  ledger: {
+    completedTickets: ReadonlySet<string>;
+    claims: readonly SprintClaim[];
+    self: string;
+    ledgerError?: string;
+  } = { completedTickets: new Set(), claims: [], self: '' },
 ): void {
+  const { completedTickets, claims, self, ledgerError } = ledger;
   const current = findRoadmapSprint(roadmap, currentSprint);
   const currentLabel = current
     ? `${formatRoadmapSprintLabel(roadmap, roadmapSprintKey(roadmap, current))} ${current.theme || 'Untitled Sprint'}`
@@ -1087,7 +1110,18 @@ function printCompactRoadmapStatus(
   const nextReady = pendingAfterCurrent.find(s => blockedByForSprint(roadmap, s, completedSprints).length === 0);
   const upcoming = pendingAfterCurrent.slice(0, DEFAULT_UPCOMING_LIMIT);
   const realityLines = formatRoadmapRealitySection(buildRoadmapReality(cwd, roadmap), undefined, 5).slice(1);
-  const nextTicket = (current?.tickets ?? []).find(t => !completedTickets.has(t.key));
+  // Same rule as `slope now` and `agent status`. Ignoring claims here was the
+  // last of the three disagreeing policies (#697).
+  const nextSelection = selectNextTicket({
+    tickets: (current?.tickets ?? []).map(t => t.key),
+    completed: completedTickets,
+    claimedBySelf: new Set(claims.filter(c => c.player === self).map(c => c.target)),
+    claimedByOthers: new Set(claims.filter(c => c.player !== self).map(c => c.target)),
+  });
+  const nextTicket = nextSelection.ticketKey
+    ? (current?.tickets ?? []).find(t => t.key === nextSelection.ticketKey)
+    : undefined;
+  const claimedTargets = new Set(claims.map(c => c.target));
 
   console.log(`\n# Roadmap Status - ${roadmap.name}`);
   console.log('\u2550'.repeat(40));
@@ -1115,8 +1149,13 @@ function printCompactRoadmapStatus(
       console.log(`  Dependencies: ${deps.join(', ')}`);
     }
     for (const ticket of current.tickets ?? []) {
-      const done = completedTickets.has(ticket.key) ? ' [done]' : '';
-      console.log(`  - ${ticket.key}: ${ticket.title}${done}`);
+      const mark = completedTickets.has(ticket.key)
+        ? ' [done]'
+        : claimedTargets.has(ticket.key) ? ' [claimed]' : '';
+      console.log(`  - ${ticket.key}: ${ticket.title}${mark}`);
+    }
+    if (ledgerError) {
+      console.log(`  Completion ledger unavailable: ${ledgerError}`);
     }
   }
 
@@ -1140,7 +1179,10 @@ function printCompactRoadmapStatus(
   if (realityLines.some(line => line.includes('[error]'))) {
     console.log('  Resolve the first roadmap reality error before advancing the lane.');
   } else if (currentIsPending && current?.tickets?.length && nextTicket) {
-    console.log(`  Work ${nextTicket.key}: ${nextTicket.title}`);
+    const verb = nextSelection.reason === 'in_flight' ? 'Continue' : 'Work';
+    console.log(`  ${verb} ${nextTicket.key}: ${nextTicket.title}`);
+  } else if (currentIsPending && nextSelection.reason === 'all_claimed') {
+    console.log('  Every unfinished ticket is claimed by someone else. Wait, or take one over with slope claim --force.');
   } else if (currentIsPending && current?.tickets?.length) {
     // Every ticket has a recorded completion. Recommending tickets[0] here is
     // what made `ticket done` look like it had not registered (#697).

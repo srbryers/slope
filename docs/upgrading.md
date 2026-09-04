@@ -41,3 +41,23 @@ Reported as [#702](https://github.com/srbryers/slope/issues/702).
 Both `slope roadmap compile` and `slope roadmap validate-sources` now warn for any `.yaml` file under `phases/`, `backlog/` or `archive/` that no registry entry produces. `compile` is where this bites, so the warning appears there even when the projection is unchanged. The file is named in the form `sources:` wants, so the fix is to paste it in, or move the file out of the tree.
 
 Reported as [#700](https://github.com/srbryers/slope/issues/700).
+
+## `slope ticket done --commit` now refuses a value git cannot resolve
+
+**Who this affects:** anyone scripting `ticket done` with a commit value that is not resolvable in the working repository. This is a behaviour change, and it exits 1 where the command previously exited 0.
+
+**What changed.** The flag used to be stored verbatim while the no-flag path resolved `HEAD` properly. So `--commit=HEAD` became permanent completion evidence pointing at a moving reference, and a typo became permanent evidence pointing at nothing. Explicit values now go through `git rev-parse --verify <value>^{commit}`, so an abbreviated SHA expands to 40 characters and a tag or branch resolves to the commit it names.
+
+Three cases that used to succeed now fail:
+
+- A value git cannot resolve, including a typo and a SHA fetched from another repository.
+- Any explicit value in a shallow clone that does not contain the named commit. CI checkouts using `fetch-depth: 1` are the common case.
+- Any explicit value outside a git work tree, or where `git` is not on `PATH`. The old behaviour recorded the raw string under a warning that said no SHA had been attached, which contradicted itself.
+
+Nothing is written when the value is refused, and the ticket's claim is not released, so the command can be re-run once the value is right.
+
+**What to do.** Pass a commit-ish the local repository can resolve, or omit the flag and let it use `HEAD`. In shallow CI, either deepen the fetch or drop the flag.
+
+**If evidence is already wrong,** `slope ticket repair <key> --commit=<sha>` corrects it. Repair needs no claim, because `ticket done` released it, and records a superseding entry rather than editing history. `slope ticket show <key>` prints what is currently recorded.
+
+Reported as [#698](https://github.com/srbryers/slope/issues/698).

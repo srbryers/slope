@@ -7,13 +7,15 @@ import {
   findRoadmapSprint,
   roadmapSprintKey,
   roadmapSprintKeyFromId,
+  readCompletedTicketKeysOrEmpty,
+  selectNextTicket,
 } from '../../core/index.js';
-import type { RoadmapDefinition, RoadmapSprint } from '../../core/index.js';
+import type { RoadmapDefinition, RoadmapSprint, NextTicketReason } from '../../core/index.js';
+import { resolveActor } from '../actor.js';
 import { loadConfig } from '../config.js';
 import { inferSprintContext } from '../sprint-inference.js';
 import { loadSprintState, pendingGateNames } from '../sprint-state.js';
 import { resolveStore } from '../store.js';
-import { readCompletedTicketKeys } from '../ticket-completion.js';
 
 /**
  * `slope agent status` — machine-readable operational status (GH #310).
@@ -42,6 +44,12 @@ export interface AgentStatus {
   phase: 'planning' | 'plan_review' | 'reviewing' | 'implementing' | 'scoring' | 'pr_review' | 'complete' | 'unknown';
   activeClaims: string[];
   nextTicket: string | null;
+  /** Why `nextTicket` is what it is. `all_claimed` distinguishes "others hold
+   *  the remaining work" from `all_complete`, which means ready for closeout. */
+  nextTicketReason: NextTicketReason;
+  /** Set when the completion ledger could not be read, so `nextTicket` was
+   *  chosen without it. */
+  ledgerError?: string;
   blockedBy: string[];
   requiredGates: string[];
   recommendedCommands: string[];
@@ -151,16 +159,24 @@ export async function collectAgentStatus(cwd: string): Promise<AgentStatus> {
   // The read lives in ticket-completion.ts so `slope now` and compact roadmap
   // status answer this question the same way agent status does (#697).
   const activeClaims: string[] = [];
+  const selfClaims = new Set<string>();
+  const otherClaims = new Set<string>();
+  const self = resolveActor(cwd).name;
   let completedTickets = new Set<string>();
+  let ledgerError: string | undefined;
   if (currentSprint != null) {
     try {
       const store = await resolveStore(cwd);
       try {
         const claims = await store.list(currentSprint);
         for (const c of claims) {
-          if (c.target) activeClaims.push(c.target);
+          if (!c.target) continue;
+          activeClaims.push(c.target);
+          (c.player === self ? selfClaims : otherClaims).add(c.target);
         }
-        completedTickets = await readCompletedTicketKeys(store, currentSprint);
+        const read = await readCompletedTicketKeysOrEmpty(store, currentSprint);
+        completedTickets = read.keys;
+        ledgerError = read.error?.message;
       } finally {
         store.close();
       }
@@ -197,18 +213,23 @@ export async function collectAgentStatus(cwd: string): Promise<AgentStatus> {
   //   2. The first ticket that is neither claimed by anyone nor already done — #348
   //   3. null when the sprint is exhausted
   let nextTicket: string | null = null;
+  let nextTicketReason: NextTicketReason = 'no_tickets';
   let blockedBy: string[] = [];
   if (roadmap && currentSprint != null) {
     const sprint = findRoadmapSprint(roadmap, currentSprint);
     if (sprint) {
-      const claimed = new Set(activeClaims);
-      const inFlight = sprint.tickets.find(t => claimed.has(t.key));
-      if (inFlight) {
-        nextTicket = inFlight.key;
-      } else {
-        const next = sprint.tickets.find(t => !claimed.has(t.key) && !completedTickets.has(t.key));
-        nextTicket = next?.key ?? null;
-      }
+      // Same rule as `slope now` and roadmap status. Previously this matched
+      // claims from ANY player, so in a two-agent sprint it pointed both
+      // agents at the ticket the first one held, and it preferred a claimed
+      // ticket even when the ledger already recorded it done (#697).
+      const result = selectNextTicket({
+        tickets: sprint.tickets.map(t => t.key),
+        completed: completedTickets,
+        claimedBySelf: selfClaims,
+        claimedByOthers: otherClaims,
+      });
+      nextTicket = result.ticketKey ?? null;
+      nextTicketReason = result.reason;
       blockedBy = computeBlockers(roadmap, sprint, completedSprintIds);
     }
   }
@@ -232,6 +253,7 @@ export async function collectAgentStatus(cwd: string): Promise<AgentStatus> {
     sprintState,
   });
 
+
   return {
     _version: AGENT_STATUS_VERSION,
     vision,
@@ -240,6 +262,8 @@ export async function collectAgentStatus(cwd: string): Promise<AgentStatus> {
     phase,
     activeClaims,
     nextTicket,
+    nextTicketReason,
+    ...(ledgerError ? { ledgerError } : {}),
     blockedBy,
     requiredGates,
     recommendedCommands,

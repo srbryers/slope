@@ -12,7 +12,8 @@ import type { RoadmapDefinition } from '../../core/index.js';
 import { formatActorName, formatActorSource, resolveActor } from '../actor.js';
 import { loadConfig } from '../config.js';
 import { isInsideGitWorkTree } from '../git-preflight.js';
-import { TICKET_DONE_KIND, readTicketCompletions, type TicketCompletion } from '../ticket-completion.js';
+import { TICKET_DONE_KIND, readTicketCompletion } from '../../core/index.js';
+import type { TicketCompletion } from '../../core/index.js';
 import { loadSprintState } from '../sprint-state.js';
 import { resolveStore } from '../store.js';
 
@@ -165,7 +166,10 @@ async function doneSubcommand(args: string[]): Promise<void> {
     // to correct the evidence afterwards (#698).
     if (commit.unresolvedRef) {
       console.error(`\n${ticketKey}: could not resolve --commit=${commit.unresolvedRef} to a commit.`);
-      console.error('Nothing was recorded and the claim is still yours. Pass a commit-ish git can resolve, or omit --commit to use HEAD.\n');
+      console.error(commit.missingGitWorkTree
+        ? 'No git repository was detected here, so the value cannot be verified. Run `git init -b main`, or omit --commit to record the completion without one.'
+        : 'Pass a commit-ish git can resolve, or omit --commit to use HEAD.');
+      console.error('Nothing was recorded and the claim is still yours.\n');
       store.close();
       process.exit(1);
       return;
@@ -252,14 +256,14 @@ async function repairSubcommand(args: string[]): Promise<void> {
     return;
   }
   const flags = parseFlags(args);
-  if (!flags.commit && !flags.notes) {
-    console.error(`\nNothing to repair for ${ticketKey}: pass --commit=<sha> and/or --notes="...".\n`);
+  // Presence, not truthiness: `--notes=` is a request to clear the notes,
+  // which the truthy check refused as "nothing to repair".
+  if (flags.commit === undefined && flags.notes === undefined) {
+    console.error(`\nNothing to repair for ${ticketKey}: pass --commit=<sha> and/or --notes="..." (--notes= clears them).\n`);
     process.exit(1);
     return;
   }
   const cwd = process.cwd();
-  const roadmap = loadRoadmap(cwd);
-  const sprintNumber = resolveSprintForTicket(cwd, ticketKey, roadmap);
 
   // Only resolve when a commit was actually named. `done` falls back to HEAD
   // when the flag is absent; repairing notes must not quietly retarget the
@@ -269,26 +273,45 @@ async function repairSubcommand(args: string[]): Promise<void> {
     : { sha: null, missingGitWorkTree: false };
   if (commit.unresolvedRef) {
     console.error(`\n${ticketKey}: could not resolve --commit=${commit.unresolvedRef} to a commit.`);
-    console.error('Nothing was recorded. Pass a commit-ish git can resolve.\n');
+    console.error(commit.missingGitWorkTree
+      ? 'No git repository was detected here, so the value cannot be verified. Run `git init -b main` first.'
+      : 'Pass a commit-ish git can resolve.');
+    console.error('Nothing was recorded.\n');
     process.exit(1);
     return;
   }
 
   const actor = resolveActor(cwd, { explicitActor: flags.actor });
   const store = await resolveStore(cwd);
+  let prior: TicketCompletion | undefined;
   try {
-    const existing = await readTicketCompletions(store, sprintNumber);
-    const prior = existing.get(ticketKey);
-    if (!prior) {
-      console.error(`\nNo recorded completion for ${ticketKey} on ${formatSprintLabel(sprintNumber)}.`);
-      console.error('Repair corrects existing evidence. Run `slope ticket done ' + ticketKey + '` to record the completion first.\n');
-      process.exit(1);
-      return;
-    }
+    // By ticket key, not by current sprint. Resolving through sprint state
+    // made repair refuse a real completion the moment state advanced, which
+    // is precisely when bad evidence gets noticed (#698).
+    prior = await readTicketCompletion(store, ticketKey);
+  } catch (error) {
+    store.close();
+    console.error(`\nCould not read the completion ledger: ${(error as Error).message}`);
+    console.error('Nothing was recorded.\n');
+    process.exit(1);
+    return;
+  }
+  if (!prior) {
+    store.close();
+    console.error(`\nNo recorded completion for ${ticketKey}.`);
+    console.error(`Repair corrects existing evidence. Run \`slope ticket done ${ticketKey}\` to record the completion first.\n`);
+    process.exit(1);
+    return;
+  }
+  // The correction lands on the sprint the completion was recorded against,
+  // never on whatever sprint happens to be current.
+  const sprintNumber = prior.sprint ?? resolveSprintForTicket(cwd, ticketKey, loadRoadmap(cwd));
 
+  try {
     // Carry forward whatever this repair does not replace, so correcting the
     // commit does not silently discard notes recorded with the original.
-    const notes = flags.notes ?? prior.notes;
+    // `--notes=` with an empty value clears them; only an absent flag keeps.
+    const notes = flags.notes !== undefined ? flags.notes : prior.notes;
     const sha = commit.sha ?? prior.commit;
     await store.insertEvent({
       type: 'decision',
@@ -296,8 +319,11 @@ async function repairSubcommand(args: string[]): Promise<void> {
       ticket_key: ticketKey,
       data: {
         kind: TICKET_DONE_KIND,
-        player: actor.name,
+        // The original player, not the repairer. A correction to the evidence
+        // is not a change of who did the work.
+        player: prior.player ?? actor.name,
         repaired: true,
+        repaired_by: actor.name,
         ...(sha ? { commit: sha } : {}),
         ...(notes ? { notes } : {}),
       },
@@ -305,13 +331,12 @@ async function repairSubcommand(args: string[]): Promise<void> {
 
     console.log(`\nTicket ${ticketKey}: evidence repaired.`);
     console.log(`  Sprint:  ${formatSprintLabel(sprintNumber)}`);
-    console.log(`  Player:  ${formatActorName(actor)}`);
+    if (prior.player) console.log(`  Player:  ${prior.player}`);
+    console.log(`  Repaired by: ${formatActorName(actor)}`);
     if (prior.commit) console.log(`  Was:     ${prior.commit}`);
     if (sha) console.log(`  Commit:  ${sha}`);
     if (notes) console.log(`  Notes:   ${notes}`);
-    if (commit.missingGitWorkTree) {
-      console.warn('Warning: no git repository detected; the value was recorded without verification.');
-    }
+    else if (prior.notes) console.log('  Notes:   (cleared)');
     console.log('');
   } finally {
     store.close();
@@ -333,29 +358,40 @@ async function showSubcommand(args: string[]): Promise<void> {
   }
   const json = args.includes('--json');
   const cwd = process.cwd();
-  const sprintNumber = resolveSprintForTicket(cwd, ticketKey, loadRoadmap(cwd));
 
   const store = await resolveStore(cwd);
   let completion: TicketCompletion | undefined;
   try {
-    completion = (await readTicketCompletions(store, sprintNumber)).get(ticketKey);
+    // By ticket key. Reading through the current sprint reported a real
+    // completion as absent once sprint state moved on (#698).
+    completion = await readTicketCompletion(store, ticketKey);
+  } catch (error) {
+    store.close();
+    console.error(`\nCould not read the completion ledger: ${(error as Error).message}\n`);
+    process.exit(1);
+    return;
   } finally {
     store.close();
   }
 
   if (json) {
-    console.log(JSON.stringify(completion ?? { ticketKey, completed: false }, null, 2));
+    // `completed` is always present. Emitting it only in the negative case
+    // meant a consumer reading it got `undefined` for a finished ticket and
+    // `false` for an unfinished one, so both read as not done.
+    console.log(JSON.stringify({ ticketKey, completed: !!completion, ...completion }, null, 2));
     return;
   }
   if (!completion) {
-    console.log(`\n${ticketKey} on ${formatSprintLabel(sprintNumber)}: no recorded completion.\n`);
+    console.log(`\n${ticketKey}: no recorded completion.\n`);
     return;
   }
   console.log(`\nTicket ${ticketKey}`);
-  console.log(`  Sprint:  ${formatSprintLabel(sprintNumber)}`);
+  if (completion.sprint) console.log(`  Sprint:  ${formatSprintLabel(completion.sprint)}`);
+  if (completion.player) console.log(`  Player:  ${completion.player}`);
   if (completion.commit) console.log(`  Commit:  ${completion.commit}`);
   if (completion.notes) console.log(`  Notes:   ${completion.notes}`);
   if (completion.at) console.log(`  Done at: ${completion.at}`);
+  if (completion.repaired) console.log('  Evidence was repaired after the original completion.');
   console.log('');
 }
 
@@ -377,7 +413,14 @@ function resolveCommitSha(explicit: string | undefined, cwd: string): CommitReso
   // which is not immutable and breaks shipped-commit checks that read it
   // later (#698). The asymmetry was the whole bug.
   if (explicit) {
-    if (!isInsideGitWorkTree(cwd)) return { sha: explicit, missingGitWorkTree: true };
+    // Refuse rather than store the value unverified. Returning it verbatim
+    // here left the original #698 defect fully reproducible outside a work
+    // tree: `--commit=HEAD` was recorded permanently, under a warning saying
+    // no SHA had been attached. `isInsideGitWorkTree` is also false when git
+    // is missing from PATH, which widens the reach.
+    if (!isInsideGitWorkTree(cwd)) {
+      return { sha: null, missingGitWorkTree: true, unresolvedRef: explicit };
+    }
     try {
       const sha = execFileSync('git', ['rev-parse', '--verify', `${explicit}^{commit}`], {
         cwd,

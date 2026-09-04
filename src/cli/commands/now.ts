@@ -13,7 +13,12 @@ import { loadConfig } from '../config.js';
 import { inferSprintContext, loadRoadmapForInference } from '../sprint-inference.js';
 import { isRequiredReviewGate, isReviewGateSatisfied, loadSprintState, pendingGates, waivedReviewGateNames, type ReviewGateName } from '../sprint-state.js';
 import { resolveStore } from '../store.js';
-import { readCompletedTicketKeys } from '../ticket-completion.js';
+import { resolveActor } from '../actor.js';
+import {
+  readCompletedTicketKeysOrEmpty,
+  selectNextTicket,
+  type NextTicketReason,
+} from '../../core/index.js';
 
 interface NowSnapshot {
   sprint: SprintId;
@@ -40,9 +45,14 @@ interface NowSnapshot {
   tickets?: {
     total: number;
     completed: number;
+    status: NextTicketReason;
   };
+  /** Set when the completion ledger could not be read, so the counts above
+   *  are "unknown" rather than "none". */
+  ledgerError?: string;
   nextAction: string;
-  nextTicket?: RoadmapTicket;
+  /** Null, never absent, when there is nothing to start. */
+  nextTicket: RoadmapTicket | null;
 }
 
 function parseArgs(args: string[]): Record<string, string> {
@@ -95,22 +105,22 @@ function formatPhaseProgress(roadmap: RoadmapDefinition, sprint: SprintId, compl
 function findNextTicket(
   sprint: RoadmapSprint | undefined,
   claims: SprintClaim[],
-  completed: ReadonlySet<string> = new Set(),
-): RoadmapTicket | undefined {
-  if (!sprint) return undefined;
-  const claimedTargets = new Set(claims.map(c => c.target));
-  // Skip work that is claimed by someone AND work already recorded as done.
-  // Reading only claims meant a finished ticket was recommended again the
-  // moment its claim was released, which is what `slope ticket done` does on
-  // success (#697).
-  const next = sprint.tickets.find(
-    ticket => !claimedTargets.has(ticket.key) && !completed.has(ticket.key),
-  );
-  if (next) return next;
-  // Every ticket accounted for. Prefer reporting an unfinished one over
-  // silently pointing at the first, which read as "start here" on a sprint
-  // that was done.
-  return sprint.tickets.find(ticket => !completed.has(ticket.key)) ?? undefined;
+  completed: ReadonlySet<string>,
+  self: string,
+): { ticket: RoadmapTicket | null; reason: NextTicketReason } {
+  if (!sprint) return { ticket: null, reason: 'no_tickets' };
+  // One shared rule across `now`, `agent status` and roadmap status, so a live
+  // claim stops producing two different answers (#697).
+  const result = selectNextTicket({
+    tickets: sprint.tickets.map(t => t.key),
+    completed,
+    claimedBySelf: new Set(claims.filter(c => c.player === self).map(c => c.target)),
+    claimedByOthers: new Set(claims.filter(c => c.player !== self).map(c => c.target)),
+  });
+  const ticket = result.ticketKey
+    ? sprint.tickets.find(t => t.key === result.ticketKey) ?? null
+    : null;
+  return { ticket, reason: result.reason };
 }
 
 function buildNextAction(snapshot: Omit<NowSnapshot, 'nextAction'>): string {
@@ -124,7 +134,13 @@ function buildNextAction(snapshot: Omit<NowSnapshot, 'nextAction'>): string {
     return `Review decision for ${snapshot.sprintState.requiredReviewsPending.join(', ')}: attach independent/PR evidence, or explicitly waive with --waive-independent-review.`;
   }
   if (snapshot.nextTicket) {
-    return `Start ${snapshot.nextTicket.key}: ${snapshot.nextTicket.title}`;
+    const verb = snapshot.tickets?.status === 'in_flight' ? 'Continue' : 'Start';
+    return `${verb} ${snapshot.nextTicket.key}: ${snapshot.nextTicket.title}`;
+  }
+  if (snapshot.tickets?.status === 'all_claimed') {
+    // Not the same as done. Recommending closeout here would call a sprint
+    // finished while someone else is still mid-ticket.
+    return 'Every unfinished ticket is claimed by someone else. Wait, or take one over with slope claim --force.';
   }
   if (snapshot.sprintState && snapshot.sprintState.pendingGates.length > 0) {
     return `Clear pending gates: ${snapshot.sprintState.pendingGates.join(', ')}`;
@@ -156,12 +172,19 @@ async function buildNowSnapshot(cwd: string, flags: Record<string, string>): Pro
   const store = await resolveStore(cwd);
   let claims: SprintClaim[];
   let completedTickets: Set<string>;
+  let ledgerError: string | undefined;
   try {
     claims = await store.list(sprint);
-    completedTickets = await readCompletedTicketKeys(store, sprint);
+    const read = await readCompletedTicketKeysOrEmpty(store, sprint);
+    completedTickets = read.keys;
+    // Say so rather than rendering "nothing recorded" as fact. A silently
+    // empty ledger is what made every surface recommend finished work.
+    ledgerError = read.error?.message;
   } finally {
     store.close();
   }
+  const self = resolveActor(cwd).name;
+  const next = findNextTicket(current, claims, completedTickets, self);
 
   const partial: Omit<NowSnapshot, 'nextAction'> = {
     sprint,
@@ -188,8 +211,13 @@ async function buildNowSnapshot(cwd: string, flags: Record<string, string>): Pro
     tickets: current ? {
       total: current.tickets.length,
       completed: current.tickets.filter(t => completedTickets.has(t.key)).length,
+      status: next.reason,
     } : undefined,
-    nextTicket: findNextTicket(current, claims, completedTickets),
+    ledgerError,
+    // Always present, and null rather than absent when there is nothing to
+    // start, so a consumer reading `nextTicket.key` fails the same way on both
+    // surfaces instead of only on this one.
+    nextTicket: next.ticket,
   };
 
   return {
@@ -213,7 +241,9 @@ function printNowSnapshot(snapshot: NowSnapshot): void {
     console.log(`Review downgrade: ${snapshot.sprintState.reviewWaivers.join(', ')} independently required but explicitly waived`);
   }
   console.log(`Claims: ${snapshot.claims.total} active, ${snapshot.claims.ticketClaims} ticket`);
-  if (snapshot.tickets) {
+  if (snapshot.ledgerError) {
+    console.log(`Tickets: unknown — ${snapshot.ledgerError}`);
+  } else if (snapshot.tickets) {
     console.log(`Tickets: ${snapshot.tickets.completed}/${snapshot.tickets.total} recorded done`);
   }
   console.log(`Next: ${snapshot.nextAction}`);
