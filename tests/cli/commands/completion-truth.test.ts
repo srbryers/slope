@@ -188,17 +188,26 @@ describe('completion evidence (#698)', () => {
     const cwd = setupRepo();
     try {
       runSlope(cwd, ['sprint', 'begin', '--sprint=1', '--ticket=S1-1']);
-      runSlope(cwd, ['ticket', 'done', 'S1-1']);
+      runSlope(cwd, ['ticket', 'done', 'S1-1', '--notes=original notes']);
       const first = execSync('git rev-parse HEAD', { cwd, encoding: 'utf8' }).trim();
       execSync('git commit -q --allow-empty -m second', { cwd });
       const second = execSync('git rev-parse HEAD', { cwd, encoding: 'utf8' }).trim();
       expect(second).not.toBe(first);
 
+      // No claim is needed: `ticket done` released it, which was the whole
+      // reason bad evidence had no repair path.
       const out = runSlope(cwd, ['ticket', 'repair', 'S1-1', `--commit=${second}`]);
 
-      expect(out).toContain(second);
-      // Still one completed ticket, not two: the repair supersedes rather than
-      // appends a second answer.
+      expect(out).toContain(`Was:     ${first}`);
+      expect(out).toContain(`Commit:  ${second}`);
+      // The correction replaces the old evidence rather than sitting beside it.
+      const events = JSON.parse(runSlope(cwd, ['ticket', 'show', 'S1-1', '--json']));
+      expect(events.commit).toBe(second);
+      expect(events.commit).not.toBe(first);
+      // Notes it did not replace survive the repair.
+      expect(events.notes).toBe('original notes');
+
+      // Still one completed ticket, not two.
       const now = JSON.parse(runSlope(cwd, ['now', '--json']));
       expect(now.tickets).toEqual({ total: 2, completed: 1 });
     } finally {

@@ -12,7 +12,7 @@ import type { RoadmapDefinition } from '../../core/index.js';
 import { formatActorName, formatActorSource, resolveActor } from '../actor.js';
 import { loadConfig } from '../config.js';
 import { isInsideGitWorkTree } from '../git-preflight.js';
-import { TICKET_DONE_KIND, readTicketCompletions } from '../ticket-completion.js';
+import { TICKET_DONE_KIND, readTicketCompletions, type TicketCompletion } from '../ticket-completion.js';
 import { loadSprintState } from '../sprint-state.js';
 import { resolveStore } from '../store.js';
 
@@ -41,6 +41,11 @@ export async function ticketCommand(args: string[]): Promise<void> {
     return;
   }
 
+  if (sub === 'show') {
+    await showSubcommand(args.slice(1));
+    return;
+  }
+
   console.error(`\nUnknown ticket subcommand: ${sub}\n`);
   printHelp();
   process.exit(1);
@@ -59,6 +64,8 @@ Usage:
   slope ticket repair <key> --commit=<sha>   Correct evidence on an already-completed
                                              ticket; needs no claim
   slope ticket repair <key> --notes="..."    Replace the recorded notes
+
+  slope ticket show <key> [--json]           Show the recorded completion evidence
 `);
 }
 
@@ -309,6 +316,47 @@ async function repairSubcommand(args: string[]): Promise<void> {
   } finally {
     store.close();
   }
+}
+
+/**
+ * `slope ticket show <key>` — what the ledger currently records for a ticket.
+ *
+ * Repair needs a before picture: nothing else surfaced the recorded commit, so
+ * bad evidence was invisible until something downstream failed on it (#698).
+ */
+async function showSubcommand(args: string[]): Promise<void> {
+  const ticketKey = args.find(a => !a.startsWith('--'));
+  if (!ticketKey) {
+    console.error('\nUsage: slope ticket show <key> [--json]\n');
+    process.exit(1);
+    return;
+  }
+  const json = args.includes('--json');
+  const cwd = process.cwd();
+  const sprintNumber = resolveSprintForTicket(cwd, ticketKey, loadRoadmap(cwd));
+
+  const store = await resolveStore(cwd);
+  let completion: TicketCompletion | undefined;
+  try {
+    completion = (await readTicketCompletions(store, sprintNumber)).get(ticketKey);
+  } finally {
+    store.close();
+  }
+
+  if (json) {
+    console.log(JSON.stringify(completion ?? { ticketKey, completed: false }, null, 2));
+    return;
+  }
+  if (!completion) {
+    console.log(`\n${ticketKey} on ${formatSprintLabel(sprintNumber)}: no recorded completion.\n`);
+    return;
+  }
+  console.log(`\nTicket ${ticketKey}`);
+  console.log(`  Sprint:  ${formatSprintLabel(sprintNumber)}`);
+  if (completion.commit) console.log(`  Commit:  ${completion.commit}`);
+  if (completion.notes) console.log(`  Notes:   ${completion.notes}`);
+  if (completion.at) console.log(`  Done at: ${completion.at}`);
+  console.log('');
 }
 
 function loadRoadmap(cwd: string): RoadmapDefinition | null {

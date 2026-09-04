@@ -116,8 +116,19 @@ describe('slope ticket done (GH #316)', () => {
   it('honors --commit flag instead of HEAD', () => {
     const cwd = setupRepoWithClaim();
     try {
-      const out = runSlope(cwd, ['ticket', 'done', 'S1-1', '--commit=deadbeef']);
-      expect(out).toContain('Commit:  deadbeef');
+      // Was `--commit=deadbeef`, which stopped being accepted in S267.6: an
+      // explicit value now rev-parses, so an unresolvable one is refused
+      // rather than stored as permanent evidence (#698). Two real commits
+      // make the point the test was always making — the flag beats HEAD —
+      // and make it stronger, because the two values now differ.
+      const older = execSync('git rev-parse HEAD', { cwd, encoding: 'utf8' }).trim();
+      execSync('git commit -q --allow-empty -m later', { cwd });
+      const head = execSync('git rev-parse HEAD', { cwd, encoding: 'utf8' }).trim();
+      expect(head).not.toBe(older);
+
+      const out = runSlope(cwd, ['ticket', 'done', 'S1-1', `--commit=${older}`]);
+      expect(out).toContain(`Commit:  ${older}`);
+      expect(out).not.toContain(head);
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }
