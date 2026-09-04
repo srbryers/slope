@@ -122,10 +122,12 @@ export async function validateCommand(input?: string | string[]): Promise<void> 
     if (reconciled && completedRoadmapSprints.size > 0) {
       reconciled = await reconcileValidatedWorkflowExecutions(cwd, completedRoadmapSprints);
     }
-    // Only on a clean run. The phase-boundary guard names this command beside
-    // the gate and nothing wrote it, so the documented workflow could not
-    // reach the boundary without the manual override (#696).
-    recordPhaseGate(cwd, 'scorecards_verified');
+    // Only on a clean run, and only when this run actually covered every
+    // sprint in the phase. `slope validate docs/retros/sprint-1.json`
+    // validated one file and satisfied a gate that means every scorecard in
+    // the phase is valid (#696).
+    const covered = new Set(validScorecards.map(entry => entry.sprint));
+    recordPhaseGate(cwd, 'scorecards_verified', { coveredSprints: covered });
   } else if (readOnly) {
     // `validate` writes tracked files as a side effect: it marks the scorecard
     // gate, reconciles scorecard indexes and sprint status into the phase YAML,

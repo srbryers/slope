@@ -84,6 +84,9 @@ function setupRepo(packageManager: 'pnpm' | 'npm' | 'bun' = 'pnpm'): string {
       },
     ],
   }));
+  // Phase 1 owns sprint 1 only, and it is scored, so phase 1 is finished and
+  // its gates can be earned. Phase 2 is unscored, which is what makes the
+  // boundary live.
   writeFileSync(join(dir, 'docs', 'retros', 'sprint-1.json'), JSON.stringify(scorecard('1'), null, 2));
 
   // A lockfile, so the regression command is derived rather than assumed.
@@ -170,7 +173,11 @@ describe('phase cleanup gates (#696)', () => {
     try {
       runSlope(cwd, ['sprint', 'start', '--number=1', '--phase=implementing']);
 
-      runSlope(cwd, ['card', '--player=nobody-with-this-name']);
+      // `--team` renders a filtered view and returns before the recorder.
+      // An earlier version of this test used `--player=<nobody>`, which exits
+      // at "no scorecards for player" and never reaches the branch at all, so
+      // deleting the guard left it green.
+      runSlope(cwd, ['card', '--team']);
       expect((gates(cwd)['1'] as Record<string, boolean>)?.handicap_generated).toBeUndefined();
 
       runSlope(cwd, ['card']);
@@ -207,6 +214,157 @@ describe('phase cleanup gates (#696)', () => {
       const bad = trySlope(cwd, ['phase', 'gate', 'not_a_gate', '1']);
       expect(bad.status).toBe(1);
       expect(bad.stderr).toContain('Gate names:');
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('refuses to record a gate on a phase whose sprints are not all scored', () => {
+    const cwd = setupRepo();
+    try {
+      // Give phase 1 a second, unscored sprint. Its cleanup gates are then
+      // claims about work that has not finished.
+      const roadmapPath = join(cwd, 'docs', 'backlog', 'roadmap.json');
+      const roadmap = JSON.parse(readFileSync(roadmapPath, 'utf8'));
+      roadmap.phases[0].sprints = [1, 3];
+      roadmap.sprints.push({
+        id: 3, theme: 'Unfinished', par: 3, slope: 1, type: 'feature',
+        tickets: [{ key: 'S3-1', title: 'wip', club: 'wedge', complexity: 'small' }],
+      });
+      writeFileSync(roadmapPath, JSON.stringify(roadmap));
+
+      runSlope(cwd, ['map']);
+      runSlope(cwd, ['card']);
+
+      // These commands run every sprint under the post-hole routine. Without
+      // the precondition they record from the phase's first sprint onward and
+      // stay true, so the boundary opens on evidence gathered before the
+      // later sprints existed.
+      expect(gates(cwd)['1']).toBeUndefined();
+
+      // Score the missing sprint and the same commands now qualify.
+      writeFileSync(join(cwd, 'docs', 'retros', 'sprint-3.json'), JSON.stringify(scorecard('3'), null, 2));
+      runSlope(cwd, ['map']);
+      expect((gates(cwd)['1'] as Record<string, boolean>)?.map_refreshed).toBe(true);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('does not let a single-file validate satisfy the all-sprints gate', () => {
+    const cwd = setupRepo();
+    try {
+      const roadmapPath = join(cwd, 'docs', 'backlog', 'roadmap.json');
+      const roadmap = JSON.parse(readFileSync(roadmapPath, 'utf8'));
+      roadmap.phases[0].sprints = [1, 3];
+      roadmap.sprints.push({
+        id: 3, theme: 'Second', par: 3, slope: 1, type: 'feature',
+        tickets: [{ key: 'S3-1', title: 'more', club: 'wedge', complexity: 'small' }],
+      });
+      writeFileSync(roadmapPath, JSON.stringify(roadmap));
+      writeFileSync(join(cwd, 'docs', 'retros', 'sprint-3.json'), JSON.stringify(scorecard('3'), null, 2));
+
+      // One file, for a gate that means every scorecard in the phase is valid.
+      trySlope(cwd, ['validate', 'docs/retros/sprint-1.json']);
+      expect((gates(cwd)['1'] as Record<string, boolean>)?.scorecards_verified).toBeUndefined();
+
+      trySlope(cwd, ['validate']);
+      expect((gates(cwd)['1'] as Record<string, boolean>)?.scorecards_verified).toBe(true);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('defaults to the phase being closed out, not the next one', () => {
+    const cwd = setupRepo();
+    try {
+      // Phase 2's first sprint is scored, so the naive "latest scorecard"
+      // rule resolves to phase 2 while phase 1's gates are what is actually
+      // owed. Phase 2 is not finished, so it must not qualify.
+      const roadmapPath = join(cwd, 'docs', 'backlog', 'roadmap.json');
+      const roadmap = JSON.parse(readFileSync(roadmapPath, 'utf8'));
+      roadmap.phases[1].sprints = [2, 4];
+      roadmap.sprints.push({
+        id: 4, theme: 'Later', par: 3, slope: 1, type: 'feature',
+        tickets: [{ key: 'S4-1', title: 'later', club: 'wedge', complexity: 'small' }],
+      });
+      writeFileSync(roadmapPath, JSON.stringify(roadmap));
+      writeFileSync(join(cwd, 'docs', 'retros', 'sprint-2.json'), JSON.stringify(scorecard('2'), null, 2));
+
+      // No phase number given, so the default has to choose.
+      runSlope(cwd, ['phase', 'gate', 'handicap_generated']);
+      expect((gates(cwd)['1'] as Record<string, boolean>)?.handicap_generated).toBe(true);
+      expect(gates(cwd)['2']).toBeUndefined();
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('ignores a scorecard that belongs to no phase', () => {
+    const cwd = setupRepo();
+    try {
+      // Reading the highest scorecard number let one stray recovery card
+      // silently veto every gate, with no message anywhere.
+      writeFileSync(join(cwd, 'docs', 'retros', 'sprint-999.json'), JSON.stringify(scorecard('999'), null, 2));
+
+      runSlope(cwd, ['map']);
+      expect((gates(cwd)['1'] as Record<string, boolean>)?.map_refreshed).toBe(true);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('does not require a scorecard from a superseded sprint', () => {
+    const cwd = setupRepo();
+    try {
+      // Six phases in this repo contain superseded sprints, which never
+      // produce a scorecard. Requiring one from every listed sprint would
+      // lock those phases out of gate recording permanently.
+      const roadmapPath = join(cwd, 'docs', 'backlog', 'roadmap.json');
+      const roadmap = JSON.parse(readFileSync(roadmapPath, 'utf8'));
+      roadmap.phases[0].sprints = [1, 5];
+      roadmap.sprints.push({
+        id: 5, theme: 'Dropped', par: 3, slope: 1, type: 'feature', status: 'superseded',
+        tickets: [{ key: 'S5-1', title: 'dropped', club: 'wedge', complexity: 'small' }],
+      });
+      writeFileSync(roadmapPath, JSON.stringify(roadmap));
+
+      runSlope(cwd, ['map']);
+      expect((gates(cwd)['1'] as Record<string, boolean>)?.map_refreshed).toBe(true);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects a junk phase number instead of writing a phantom entry', () => {
+    const cwd = setupRepo();
+    try {
+      for (const bad of ['-1', '0', '3.7', '1abc']) {
+        const r = trySlope(cwd, ['phase', 'gate', 'map_refreshed', bad]);
+        expect(r.status).toBe(1);
+        expect(r.stderr).toContain('is not a phase number');
+      }
+      expect(Object.keys(gates(cwd))).toHaveLength(0);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('clears the completion stamp when a gate is cleared', () => {
+    const cwd = setupRepo();
+    try {
+      runSlope(cwd, ['phase', 'complete', '1']);
+      expect((gates(cwd)['1'] as Record<string, unknown>)?.completed_at).toBeTruthy();
+
+      runSlope(cwd, ['phase', 'gate', 'map_refreshed', '1', '--clear']);
+
+      // Leaving the stamp made `phase status` print a pending gate and a
+      // completion time together, and made the session briefing report
+      // COMPLETE, because it branches on the stamp alone.
+      expect((gates(cwd)['1'] as Record<string, unknown>)?.completed_at).toBeUndefined();
+      const status = runSlope(cwd, ['phase', 'status', '1']);
+      expect(status).toContain('1 gate(s) pending');
+      expect(status).not.toContain('Completed:');
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }

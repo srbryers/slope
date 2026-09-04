@@ -9,6 +9,7 @@ import {
   resolveRepoStatePath,
   sprintIdsEqual,
 } from '../../core/index.js';
+import { isPhaseComplete, pendingPhaseGates } from '../phase-cleanup.js';
 import { inferSprintContext } from '../sprint-inference.js';
 import { resolveStore } from '../store.js';
 import {
@@ -133,17 +134,24 @@ export async function sessionBriefingGuard(input: HookInput, cwd: string): Promi
     if (existsSync(cleanupPath)) {
       const cleanup = JSON.parse(readFileSync(cleanupPath, 'utf8'));
       if (cleanup.phases) {
-        const phases = Object.keys(cleanup.phases).sort();
+        // Numeric, not lexicographic. `["68","7"]` sorted as strings yields
+        // "7" as the latest phase.
+        const phases = Object.keys(cleanup.phases)
+          .map(key => parseInt(key, 10))
+          .filter(n => !isNaN(n))
+          .sort((a, b) => a - b);
         if (phases.length > 0) {
           const latest = phases[phases.length - 1];
-          const gates = cleanup.phases[latest];
-          if (gates.completed_at) {
+          // Read through the shared helpers rather than reimplementing them.
+          // The local copy branched on completed_at alone, so it reported
+          // COMPLETE on a phase whose gate had since been cleared, and it
+          // printed raw keys instead of the labels naming each command.
+          if (isPhaseComplete(cwd, latest)) {
             lines.push(`Phase ${latest} cleanup: COMPLETE`);
           } else {
-            const pending = Object.entries(gates)
-              .filter(([k, v]) => k !== 'completed_at' && !v)
-              .map(([k]) => k);
+            const pending = pendingPhaseGates(cwd, latest);
             lines.push(`Phase ${latest} cleanup: ${pending.length} gate(s) pending`);
+            for (const gate of pending) lines.push(`  [ ] ${gate}`);
           }
         }
       }

@@ -101,6 +101,19 @@ everything without checking anything.
 }
 
 /**
+ * A phase number from an argument, or null.
+ *
+ * `parseInt` accepted `-1`, `0`, `3.7` (as 3) and `1abc` (as 1), each of which
+ * wrote a phantom entry that then showed up in `slope phase status`.
+ */
+function parsePhaseArg(value: string | undefined): number | null {
+  if (value === undefined) return null;
+  if (!/^\d+$/.test(value)) return null;
+  const n = parseInt(value, 10);
+  return n >= 1 ? n : null;
+}
+
+/**
  * `slope phase regression [N]` — run the project's tests and record the gate.
  *
  * #696 reported the regression label hardcoded to `bun test` in a pnpm project
@@ -111,13 +124,24 @@ everything without checking anything.
 async function regressionSubcommand(args: string[], cwd: string): Promise<void> {
   const phaseArg = args.find(a => !a.startsWith('--'));
   const override = args.find(a => a.startsWith('--command='))?.slice('--command='.length);
+  if (override !== undefined && override.trim() === '') {
+    console.error('\n--command= needs a command to run.\n');
+    process.exit(1);
+    return;
+  }
   const command = override ?? regressionCommand(cwd);
+  if (!command) {
+    console.error('\nNo package manager lockfile found, so the test command cannot be derived.');
+    console.error('Pass one: slope phase regression --command="<your test command>"\n');
+    process.exit(1);
+    return;
+  }
 
-  const phase = phaseArg !== undefined
-    ? parseInt(phaseArg, 10)
-    : currentPhaseNumber(cwd);
-  if (phase == null || isNaN(phase)) {
-    console.error('\nCould not resolve the phase for this sprint.');
+  const phase = phaseArg !== undefined ? parsePhaseArg(phaseArg) : currentPhaseNumber(cwd);
+  if (phase == null) {
+    console.error(phaseArg !== undefined
+      ? `\n"${phaseArg}" is not a phase number.`
+      : '\nNo phase is currently being closed out (its sprints are not all scored, or it is already complete).');
     console.error('Pass it explicitly: slope phase regression <N>\n');
     process.exit(1);
     return;
@@ -126,8 +150,9 @@ async function regressionSubcommand(args: string[], cwd: string): Promise<void> 
   console.log(`\nPhase ${phase} regression: ${command}\n`);
   // Inherit stdio so the test output is the command's own, not a summary of
   // it. A gate writer that hides why the run failed is not evidence.
-  const [file, ...rest] = command.split(/\s+/);
-  const result = spawnSync(file, rest, { cwd, stdio: 'inherit', shell: true });
+  // Hand the whole string to the shell. Splitting on whitespace first mangled
+  // any --command carrying a quoted argument with a space in it.
+  const result = spawnSync(command, { cwd, stdio: 'inherit', shell: true });
 
   if (result.status !== 0) {
     console.error(`\nRegression failed (exit ${result.status ?? 'signal'}). Gate not recorded.\n`);
@@ -159,11 +184,11 @@ function gateSubcommand(args: string[], cwd: string): void {
     return;
   }
 
-  const phase = positional[1] !== undefined
-    ? parseInt(positional[1], 10)
-    : currentPhaseNumber(cwd);
-  if (phase == null || isNaN(phase)) {
-    console.error('\nCould not resolve the phase for this sprint.');
+  const phase = positional[1] !== undefined ? parsePhaseArg(positional[1]) : currentPhaseNumber(cwd);
+  if (phase == null) {
+    console.error(positional[1] !== undefined
+      ? `\n"${positional[1]}" is not a phase number.`
+      : '\nNo phase is currently being closed out (its sprints are not all scored, or it is already complete).');
     console.error(`Pass it explicitly: slope phase gate ${name} <N>\n`);
     process.exit(1);
     return;

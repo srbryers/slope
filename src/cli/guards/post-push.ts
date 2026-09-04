@@ -71,7 +71,7 @@ export async function postPushGuard(input: HookInput, cwd: string): Promise<Guar
         // Derived from the lockfile. This is an actual command field, not a
         // label, so hardcoding `bun test` handed a pnpm project a command it
         // could not run (#696).
-        { id: 'run-tests', label: 'Run tests', command: regressionCommand(cwd) },
+        { id: 'run-tests', label: 'Run tests', ...(regressionCommand(cwd) ? { command: regressionCommand(cwd)! } : {}) },
       ];
     } else {
       // "No claims" is not "all tickets done". It is also the state of a
@@ -96,7 +96,7 @@ export async function postPushGuard(input: HookInput, cwd: string): Promise<Guar
           : `Sprint S${sprintState.sprint} — ${completedTickets.recorded}/${completedTickets.total} tickets recorded done, none claimed.`;
         options = [
           { id: 'next-ticket', label: 'Claim the next ticket', command: 'slope now' },
-          { id: 'run-tests', label: 'Run tests', command: regressionCommand(cwd) },
+          { id: 'run-tests', label: 'Run tests', ...(regressionCommand(cwd) ? { command: regressionCommand(cwd)! } : {}) },
         ];
       }
     }

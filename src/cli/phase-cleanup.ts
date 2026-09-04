@@ -1,8 +1,24 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync, renameSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname } from 'node:path';
 import { detectPackageManager } from '../core/analyzers/stack.js';
+import { resolveRepoStatePath } from '../core/index.js';
 
 const PHASE_CLEANUP_FILE = '.slope/phase-cleanup.json';
+
+/**
+ * The ledger path, resolved to the primary checkout.
+ *
+ * A phase boundary is a property of the repository, not of one worktree.
+ * Joining on `cwd` gave each linked worktree its own ledger: a phase recorded
+ * complete in the primary checkout read as "nothing recorded yet" inside a
+ * worktree, and gates written there were invisible to everything else.
+ * `slope loop parallel` runs sprints in worktrees, and three commands write
+ * this file automatically now, so the split is reachable in normal use.
+ * Config and sprint state already resolve this way.
+ */
+function phaseCleanupPath(cwd: string): string {
+  return resolveRepoStatePath(cwd, PHASE_CLEANUP_FILE);
+}
 
 /** Gate names, without the bookkeeping field. */
 export type PhaseGateName = 'scorecards_verified'
@@ -27,9 +43,15 @@ export const PHASE_GATE_NAMES: readonly PhaseGateName[] = [
  * satisfy the gate it had just earned (#696). `test` is the script name in
  * every one of these package managers, so only the runner differs.
  */
-export function regressionCommand(cwd: string): string {
+export function regressionCommand(cwd: string): string | null {
   const pm = detectPackageManager(cwd);
-  if (!pm) return 'npm test';
+  // Null, not a guess. Falling back to `npm test` told a Python or Go repo to
+  // run a tool it does not have, which is the same defect as the bun
+  // hardcode with a different name on it.
+  if (!pm) return null;
+  // `bun test` runs Bun's own test runner rather than the package.json script
+  // the others invoke. That is what a bun project expects, so the difference
+  // is deliberate.
   return pm === 'bun' ? 'bun test' : `${pm} test`;
 }
 
@@ -56,7 +78,7 @@ const DEFAULT_GATES: PhaseCleanupGates = {
 
 /** Load phase cleanup state. Returns empty state if missing/corrupt. */
 export function loadPhaseCleanup(cwd: string): PhaseCleanupState {
-  const statePath = join(cwd, PHASE_CLEANUP_FILE);
+  const statePath = phaseCleanupPath(cwd);
   if (!existsSync(statePath)) return { phases: {} };
   try {
     const raw = JSON.parse(readFileSync(statePath, 'utf8'));
@@ -69,10 +91,9 @@ export function loadPhaseCleanup(cwd: string): PhaseCleanupState {
 
 /** Save phase cleanup state atomically via tmp + rename. */
 export function savePhaseCleanup(cwd: string, state: PhaseCleanupState): void {
-  const dir = join(cwd, '.slope');
-  mkdirSync(dir, { recursive: true });
+  const filePath = phaseCleanupPath(cwd);
+  mkdirSync(dirname(filePath), { recursive: true });
 
-  const filePath = join(cwd, PHASE_CLEANUP_FILE);
   const tmpPath = filePath + '.tmp';
   writeFileSync(tmpPath, JSON.stringify(state, null, 2) + '\n');
   renameSync(tmpPath, filePath);
@@ -98,11 +119,16 @@ export function isPhaseComplete(cwd: string, phase: number): boolean {
  */
 export function phaseGateLabels(cwd: string): Record<PhaseGateName, string> {
   return {
-    scorecards_verified: 'Scorecards verified (`slope validate`)',
+    scorecards_verified: 'Scorecards verified for all phase sprints (`slope validate`)',
     handicap_generated: 'Handicap card generated (`slope card`)',
     map_refreshed: 'Codebase map refreshed (`slope map`)',
     findings_audited: 'Deferred findings audited (`slope phase audit`)',
-    regression_passed: `Regression passed (\`slope phase regression\`, runs \`${regressionCommand(cwd)}\`)`,
+    regression_passed: (() => {
+      const cmd = regressionCommand(cwd);
+      return cmd
+        ? `Regression passed (\`slope phase regression\`, runs \`${cmd}\`)`
+        : 'Regression passed (`slope phase regression --command="<your test command>"`)';
+    })(),
   };
 }
 
@@ -140,6 +166,12 @@ export function markPhaseGate(
     gates.regression_passed;
   if (allComplete && !gates.completed_at) {
     gates.completed_at = new Date().toISOString();
+  } else if (!allComplete && gates.completed_at) {
+    // Clearing a gate has to clear the completion stamp with it. Leaving it
+    // made `phase status` print "1 gate(s) pending" and a completion time
+    // together, and made the session briefing report COMPLETE, because it
+    // branches on completed_at alone.
+    delete gates.completed_at;
   }
   savePhaseCleanup(cwd, state);
 }
