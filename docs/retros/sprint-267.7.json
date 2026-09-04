@@ -42,6 +42,12 @@
           "severity": "major",
           "description": "[code review] The fix for the blocker used isRoadmapSprintTerminal, which counts `complete` as terminal, so it excluded exactly the sprints whose scorecards it needed. Every writer stopped recording. The reviewer predicted this from reading the uncommitted tree before it was built.",
           "gotcha_id": "review:code"
+        },
+        {
+          "type": "rough",
+          "severity": "minor",
+          "description": "[security review] The phase-boundary guard extracted a runnable command from each gate label, so with no lockfile it offered `--command=\"<your test command>\"` as something to run: a shell syntax error dressed as a suggestion.",
+          "gotcha_id": "review:security"
         }
       ],
       "notes": "Scored a miss, and the whole sprint's difficulty sits here. Three attempts at one question: which phase do these gates belong to. The rule is now one function with the reasoning written down: the last phase in roadmap order whose scorable sprints all have scorecards, skipped if already complete. Getting it wrong was not obvious from any single command; each wrong version looked right in the case I happened to test."
@@ -104,6 +110,12 @@
           "severity": "minor",
           "description": "[both reviews] `slope phase` sat in CLI_INTERNAL_MODULES, so help never listed it. Every gate label names one of its subcommands, which left the recorded path as undiscoverable as it was unreachable. The registry test cannot catch this class: the internal-modules list is an allowlist the assertion unions in.",
           "gotcha_id": "review:code"
+        },
+        {
+          "type": "rough",
+          "severity": "moderate",
+          "description": "[security review] parsePhaseArg was applied to the two subcommands this sprint added and not to the two that already existed, so `slope phase audit 3.7` still silently marked phase 3. The helper's own docstring describes that defect, left in place in half the same file.",
+          "gotcha_id": "review:security"
         }
       ],
       "notes": "Both of #696's proposed remedies are delivered, automatic recording and an evidence command, so `phase complete` is an override again. Registered as agent audience, which leaves the deliberately bounded human surface untouched."
@@ -131,7 +143,7 @@
     "greens_total": 5,
     "putts": 0,
     "penalties": 0,
-    "hazards_hit": 12,
+    "hazards_hit": 14,
     "hazard_penalties": 9,
     "miss_directions": {
       "long": 0,
@@ -151,5 +163,5 @@
   ],
   "yardage_book_updates": [],
   "course_management_notes": [],
-  "notes": "Closes #696, completing Phase 68. Scored triple_plus 14 against par 5 across four independent review passes. Thirteen findings, one blocker found by both reviewers, all applied. The blocker and its two follow-on faults were all the same question asked three times: which phase does this gate belong to. Each wrong answer looked right in the case I tested, which is why the reviewers reproducing it in fixtures I had not built mattered more than any amount of re-reading. The code reviewer read my uncommitted fix for the blocker and predicted both of its faults before it was built, including that isRoadmapSprintTerminal would exclude completed sprints. Deferred with issues filed: the configured test command half of #696, gate provenance (phase gates are bare booleans while sprint review gates carry reviewer, evidence and verdict), and the phase-cleanup module sitting in src/cli where no MCP tool can read it."
+  "notes": "Closes #696, completing Phase 68. Scored triple_plus 14 against par 5 across five independent review passes, code, architect and security. Fifteen findings, one blocker found by both reviewers, all applied. The blocker and its two follow-on faults were all the same question asked three times: which phase does this gate belong to. Each wrong answer looked right in the case I tested, which is why the reviewers reproducing it in fixtures I had not built mattered more than any amount of re-reading. The code reviewer read my uncommitted fix for the blocker and predicted both of its faults before it was built, including that isRoadmapSprintTerminal would exclude completed sprints. Deferred with issues filed: the configured test command half of #696, gate provenance (phase gates are bare booleans while sprint review gates carry reviewer, evidence and verdict), and the phase-cleanup module sitting in src/cli where no MCP tool can read it."
 }
