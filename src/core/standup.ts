@@ -3,6 +3,7 @@
 
 import type { SlopeEvent, SprintClaim } from './types.js';
 import type { SprintId } from './sprint-id.js';
+import { TICKET_DONE_KIND } from './ticket-completion.js';
 
 /** Structured standup report — platform-agnostic agent status format */
 export interface StandupReport {
@@ -35,6 +36,22 @@ export interface HandoffEntry {
   for_role?: string;
 }
 
+function isTicketDoneEvent(event: SlopeEvent): boolean {
+  return event.type === 'decision' && event.data.kind === TICKET_DONE_KIND;
+}
+
+/** Ticket key plus commit for a `ticket_done` record; null when not one. */
+function describeTicketDone(event: SlopeEvent): string | null {
+  if (!isTicketDoneEvent(event)) return null;
+  const key = event.ticket_key;
+  const commit = typeof event.data.commit === 'string' && event.data.commit.length > 0
+    ? event.data.commit
+    : undefined;
+  if (key && commit) return `${key} @ ${commit}`;
+  if (key) return key;
+  return 'Ticket completed';
+}
+
 /**
  * Generate a standup report from a session's events and claims.
  * Extracts progress, blockers, decisions, and handoffs from recent events.
@@ -45,8 +62,10 @@ export function generateStandup(opts: {
   events: SlopeEvent[];
   claims: SprintClaim[];
   context?: StandupContext;
+  /** Keys from `readCompletedTicketKeys`. Completions live on the ledger, not `data.status`. */
+  completedTicketKeys?: ReadonlySet<string>;
 }): StandupReport {
-  const { sessionId, agent_role, events, claims, context } = opts;
+  const { sessionId, agent_role, events, claims, context, completedTicketKeys } = opts;
 
   // Determine current ticket from claims
   const ticketClaims = claims.filter(c => c.scope === 'ticket' && c.session_id === sessionId);
@@ -64,11 +83,16 @@ export function generateStandup(opts: {
     }
   }
 
-  // Extract decisions from decision events
+  // Extract decisions from decision events. `ticket_done` has neither
+  // `choice` nor `description`, so the generic fallback printed "Decision made"
+  // for every completion (#714).
   const decisions: string[] = [];
   for (const e of events) {
     if (e.type === 'decision') {
-      const desc = (e.data.choice as string) ?? (e.data.description as string) ?? 'Decision made';
+      const desc = describeTicketDone(e)
+        ?? (e.data.choice as string)
+        ?? (e.data.description as string)
+        ?? 'Decision made';
       decisions.push(desc);
     }
   }
@@ -100,10 +124,13 @@ export function generateStandup(opts: {
   if (blockers.length > 0) {
     status = 'blocked';
   }
-  // Check for completion markers
-  const hasCompletion = events.some(e =>
-    e.type === 'decision' && (e.data.status === 'complete' || e.data.choice === 'complete'),
-  );
+  // Completion is the ledger (`ticket_done` / `readCompletedTicketKeys`),
+  // not `data.status`, which `slope ticket done` never writes (#714).
+  const hasCompletion = (completedTicketKeys !== undefined && completedTicketKeys.size > 0)
+    || events.some(e =>
+      isTicketDoneEvent(e)
+      || (e.type === 'decision' && (e.data.status === 'complete' || e.data.choice === 'complete')),
+    );
   if (hasCompletion) {
     status = 'complete';
   }
