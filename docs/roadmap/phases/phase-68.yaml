@@ -13,7 +13,7 @@ sprints:
     par: 5
     slope: 4
     type: bugfix + data integrity
-    status: planned
+    status: complete
     github_issues:
       - 697
       - 698
@@ -93,3 +93,5 @@ sprints:
         depends_on:
           - S267.7-2
           - S267.7-4
+scorecards:
+  "267.6": docs/retros/sprint-267.6.json
