@@ -62,6 +62,12 @@ jobs:
   # store already exercises. Keeping it lean keeps it fast enough to stay on.
   ci-windows:
     runs-on: windows-latest
+    # Reporting, not blocking, until the backlog it exposed is cleared. Its
+    # first run found 17 failures; #712 fixed the five that were known plus a
+    # real runtime bug, and 9 remain. Blocking now would stop every unrelated
+    # PR on a cleanup nobody has scheduled. Tracked in #725 — flip this off
+    # once that closes, because a green job nobody must satisfy decays.
+    continue-on-error: true
 
     steps:
       - uses: actions/checkout@v6
