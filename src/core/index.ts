@@ -1067,3 +1067,27 @@ export {
   teamRoundDigest,
 } from './team-round/canonical.js';
 export type { CanonicalValue, DigestInput, DigestResult } from './team-round/canonical.js';
+
+// Team Round project identity and trust bootstrap (S268-1).
+export {
+  BOOTSTRAP_ADMIN_CAPABILITIES,
+  BOOTSTRAP_SCHEMA_REVISION,
+  BootstrapError,
+  assertProjectId,
+  bootstrapManifestBytes,
+  bootstrapProject,
+  formatBootstrapManifest,
+  isProjectId,
+  mintProjectId,
+} from './team-round/identity.js';
+export type {
+  BootstrapErrorCode,
+  BootstrapGrant,
+  BootstrapInput,
+  BootstrapManifest,
+  BootstrapPrincipal,
+  BootstrapResult,
+  GenesisRecords,
+  PrincipalSource,
+  ProjectId,
+} from './team-round/identity.js';
