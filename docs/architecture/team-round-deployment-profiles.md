@@ -1,8 +1,26 @@
 # Team Round Deployment Profiles
 
-Status: proposed amendment to `team-round-coordination.md`, for approval
+Status: accepted 2026-09-06
 Amends: "Authority Generation And Physical Write Barrier", "Store Protocol
 Negotiation", "Canonical Cryptography", and the S268 acceptance criteria
+
+## Decision Record
+
+Both open questions were decided on 2026-09-06, on the operator's instruction to
+take the recommended option.
+
+**Profiles, not SQLite removal.** Two named deployment profiles are adopted.
+SQLite keeps Team Round support and reports an advisory write barrier described
+honestly as accident prevention. PostgreSQL reports an enforced barrier only
+under a non-superuser application role.
+
+**Key management scoped to the managed profile.** Sealed payloads, cursor
+encryption and cryptographic deletion require `managed_multi_writer`.
+`local_single_writer` reports `redaction_retention = false` and fails those
+operations closed.
+
+The reasoning for each is in the sections below. Reopening either decision means
+amending this document, not working around it in code.
 
 ## Why This Exists
 

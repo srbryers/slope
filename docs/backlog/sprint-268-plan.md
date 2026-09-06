@@ -1,6 +1,6 @@
 # S268 Plan — Revision 2
 
-Status: re-planned after review; awaiting two operator decisions
+Status: re-planned after review; both operator decisions taken 2026-09-06
 Contract: `team-round-coordination.md`, `team-round-domain.md`,
 `team-round-workflow.md`
 Amendment: `docs/architecture/team-round-deployment-profiles.md`
@@ -59,27 +59,28 @@ It is one of five pinned primitives. HMAC commitments, cursor AEAD and sealed
 payload encryption do not exist yet, so "everything hashes through it" was an
 overstatement and S268-4 now owns the HMAC.
 
-## Two Decisions For The Operator
+## Two Decisions, Both Taken
 
-Both are in the amendment document and neither is a consequence of the code.
+Both went the recommended way on 2026-09-06 and are recorded in the amendment. Reopening either means amending that document, not working around it in code.
 
 **1. The write fence.** Neither backend enforces it as deployed. SQLite has no
 privilege model, so anything holding the file handle can drop the triggers.
 PostgreSQL runs as the `postgres` superuser in every documented setup, which
 bypasses privilege checks and can disable triggers with one session setting.
 
-The amendment recommends two named profiles: `local_single_writer` reporting an
-advisory barrier, and `managed_multi_writer` requiring a non-superuser
-application role and reporting an enforced one. The alternative is declaring
-SQLite unsupported for Team Round, which is cleaner on paper and removes the
-feature from nearly every existing deployment.
+Decided: two named profiles. `local_single_writer` reports an advisory barrier,
+and `managed_multi_writer` requires a non-superuser application role and
+reports an enforced one. The rejected alternative was declaring SQLite
+unsupported for Team Round, which is cleaner on paper and removes the feature
+from nearly every existing deployment.
 
 **2. Key management.** Sealed payloads, cursor encryption and cryptographic
 deletion need a managed key service that a local SQLite deployment does not
-have. Storing the key beside the ciphertext is not key management. The
-amendment scopes those criteria to `managed_multi_writer`, and has
-`local_single_writer` report `redaction_retention = false` and fail those
-operations closed.
+have. Storing the key beside the ciphertext is not key management.
+
+Decided: those criteria scope to `managed_multi_writer`. `local_single_writer`
+reports `redaction_retention = false` and fails those operations closed, which
+is a real capability reduction rather than a pretend one.
 
 ## Open Question Carried Forward
 

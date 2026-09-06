@@ -2,6 +2,14 @@
 
 Status: proposed normative contract for S264.1, S268, and S269
 
+Amended by:
+[Team Round Deployment Profiles](./team-round-deployment-profiles.md),
+accepted 2026-09-06. That amendment governs where the two disagree. It replaces
+the single universal write-barrier guarantee with two named deployment
+profiles, scopes the managed-key criteria to PostgreSQL, resolves this
+document's self-contradiction on legacy import identity, and moves
+authentication to before the append transaction opens.
+
 Issue: [#669](https://github.com/srbryers/slope/issues/669)
 
 Domain dependency:
