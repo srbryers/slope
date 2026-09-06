@@ -4,6 +4,11 @@ phase:
   description: "Implement the SLOPE Team Round contracts specified in S264-S264.2 after canonical sprint IDs ship in S267. The runtime evolves the existing event store into a shared coordination ledger, keeps one authoritative team score with actor-attributed evidence, and makes access control, fenced leases, typed resources, attribution, learning, workflow, status, and evaluation first-class."
   sprints:
     - 268
+    - "268.1"
+    - "268.2"
+    - "268.3"
+    - "268.4"
+    - "268.5"
     - 269
     - 270
     - 271
@@ -12,54 +17,206 @@ phase:
   note: "Adopt the durable orchestration semantics observed in block/buzz without copying its Nostr transport, cryptographic identity, or chat-first product surface. SLOPE remains repository-native and keeps hard worktree, store, and claim enforcement. Phase 64 follows the 2.0 sprint-id migration so every coordination record starts with canonical identity and the complete access envelope."
 sprints:
   - id: 268
-    theme: Coordination Ledger and Access Control
-    par: 4
-    slope: 5
+    theme: Ledger Substrate And Trust Bootstrap
+    par: 5
+    slope: 4
     type: major + coordination infrastructure
     depends_on:
+      - 264
+      - 264.1
       - 264.2
       - 267
-    note: "Evolve the existing event store into the authoritative coordination ledger rather than create a parallel source of truth. The first schema includes the minimum canonical scorecard identity and version fields, assignment, callback-obligation, handoff, verification-epoch, contribution, and artifact-provenance aggregates, plus complete event identity and access scope. It rejects idempotency conflicts, projects scorecard and status atomically, replays deterministically, and enforces capabilities, verification-domain invalidation, and redaction in the store. S270 extends attribution and estimator projections without introducing fields that S268 finalization already hashes."
+    note: "Rescoped from the original S268 after architect, backend and security review. The original put capabilities and visibility last, but every envelope carries an authorization and a visibility decision inside its own event hash, so the substrate is a prerequisite of the first append rather than a successor to it. This sprint delivers only what must exist before a single canonical byte is written, and takes no migration and no cutover. depends_on gained 264 and 264.1 because roadmap focus draws hazards from direct dependencies only, and their 40 findings are exactly this subject."
     research:
       - docs/research/buzz-multiplayer-collaboration.md
     tickets:
       - key: S268-1
-        title: Migrate the existing event store to a versioned coordination envelope and minimum canonical scorecard schema with project, round, attempt, scorecard, shot, penalty, loss-component, assignment, callback-obligation, handoff, verification-epoch, contribution, artifact-provenance, actor, session, role, contributor, verifier, authority, visibility, correlation, and causation identity
+        title: Project identity and the operator-confirmed trust bootstrap ceremony
         club: driver
         complexity: risky
         github_issue: 669
       - key: S268-2
-        title: Implement exact S264.1 idempotency, payload-conflict rejection, and version-2 one-event compound envelopes with the normative cycle-free digest DAG, owner/link bijection, per-affected-aggregate chain positions, singular-to-primary authorization equivalence, replayable per-operation and per-transition authorization sets, cross-adapter golden vectors, ordered locking, all-or-none reducers, contribution and verification-domain high-water marks, ordering, version-1-to-2 replay, and schema evolution
+        title: "Policy registry: identity, capability, visibility, and resource revisions with deny-by-default evaluation"
         club: driver
         complexity: risky
         github_issue: 669
         depends_on:
           - S268-1
       - key: S268-3
-        title: Implement deterministic draft and published scorecard projection, replay, and exactly-once Team Round finalization with explicit late-event and audited-reopen behavior
+        title: Canonical envelope v1 types, validator, and canonical request hash
         club: driver
         complexity: risky
         github_issue: 669
         depends_on:
-          - S268-1
           - S268-2
       - key: S268-4
-        title: Enforce deny-by-default capabilities, principal binding, authenticated artifact-producer provenance, atomic late-contribution approval invalidation, filtered projections, redaction, retention, and adversarial capability, authorization-substitution, and separation-of-duties bypass tests across compound recovery, waiver, and verification operations
-        club: driver
-        complexity: risky
+        title: Integrity chain functions and HMAC commitments for restricted content
+        club: long_iron
+        complexity: moderate
         github_issue: 669
         depends_on:
-          - S268-1
-          - S268-2
           - S268-3
+      - key: S268-5
+        title: Secret ingress scanner on every caller-controlled field before hashing or append
+        club: long_iron
+        complexity: moderate
+        github_issue: 669
+        depends_on:
+          - S268-3
+      - key: S268-6
+        title: Published cross-adapter golden vectors checked against an independent implementation
+        club: short_iron
+        complexity: standard
+        github_issue: 669
+        depends_on:
+          - S268-4
+          - S268-5
+  - id: "268.1"
+    theme: Ledger Migration Machine
+    par: 5
+    slope: 5
+    type: major + migration infrastructure
+    status: planned
+    depends_on:
+      - "268"
+    note: "Fence conformance suite first, then the SQLite and PostgreSQL fences, the durable resumable phase state machine, inventory, the deterministic import planner and total order, expand, backfill, quarantine, verify, signed manifest, and rollback. Cutover-capable but does not cut over. Split from the original S268 after review found the fence sequenced behind the schema change it protects. Depends on the deployment-profile amendment: SQLite reports an advisory barrier and PostgreSQL requires a non-superuser application role."
+    tickets:
+      - key: S268.1-1
+        title: Publish the fence conformance suite before either implementation exists
+        club: long_iron
+        complexity: moderate
+      - key: S268.1-2
+        title: Implement the SQLite advisory fence and the PostgreSQL enforced fence against that suite
+        club: driver
+        complexity: risky
+      - key: S268.1-3
+        title: Durable resumable phase machine with signed manifest and rollback
+        club: driver
+        complexity: risky
+      - key: S268.1-4
+        title: Deterministic import planner, total order, backfill, and quarantine
+        club: driver
+        complexity: risky
+      - key: S268.1-5
+        title: Expand schema and project-scoped composite keys on both backends
+        club: driver
+        complexity: risky
+  - id: "268.2"
+    theme: Canonical Append And Cutover
+    par: 5
+    slope: 5
+    type: major + coordination infrastructure
+    status: planned
+    depends_on:
+      - "268.1"
+    note: "The append transaction per adapter behind one narrow interface, idempotency identity and canonical request hash, retry and payload-conflict outcomes, ordering, the error taxonomy, the adapter conformance suite, protocol descriptor negotiation, authority generation, cutover, and legacy compatibility mode. Authentication resolves before the transaction opens, because better-sqlite3 transactions cannot await; the transaction re-checks the identity revision under the lock it already holds."
+    tickets:
+      - key: S268.2-1
+        title: Narrow ledger interface and the append transaction on both adapters
+        club: driver
+        complexity: risky
+      - key: S268.2-2
+        title: Idempotency identity, canonical request hash, retry and conflict outcomes
+        club: driver
+        complexity: risky
+      - key: S268.2-3
+        title: Protocol descriptor negotiation, authority generation, and fail-closed resolution
+        club: long_iron
+        complexity: moderate
+      - key: S268.2-4
+        title: Cutover and legacy compatibility mode across every mutable writer
+        club: driver
+        complexity: risky
+  - id: "268.3"
+    theme: Projection Replay And Finalization
+    par: 5
+    slope: 4
+    type: major + coordination infrastructure
+    status: planned
+    depends_on:
+      - "268.2"
+    note: "Projection substrate and cursors, draft and published scorecard projection, replay from genesis reproducing byte-identical content hashes on both backends, exactly-once finalization, late evidence, and audited reopen with an enforced correction scope and the reclose delta. Includes the roadmap reconciliation reopen requires, which the original plan omitted."
+    tickets:
+      - key: S268.3-1
+        title: Projection substrate, cursors, and reducer purity rules
+        club: driver
+        complexity: risky
+      - key: S268.3-2
+        title: Draft and published scorecard projection with field-level classification
+        club: driver
+        complexity: risky
+      - key: S268.3-3
+        title: Replay from genesis with byte-identical content hashes on both backends
+        club: driver
+        complexity: risky
+      - key: S268.3-4
+        title: Exactly-once finalization, late evidence, and recovery
+        club: driver
+        complexity: risky
+      - key: S268.3-5
+        title: Audited reopen with enforced correction scope, reclose delta, and roadmap reconciliation
+        club: driver
+        complexity: risky
+  - id: "268.4"
+    theme: Compound Version 2 Envelopes
+    par: 4
+    slope: 4
+    type: major + coordination infrastructure
+    status: planned
+    depends_on:
+      - "268.3"
+    note: "Compound envelope, the cycle-free digest DAG, replayable authorization set, event_aggregate_link, per-affected-aggregate chain positions, singular-to-primary equivalence, version 1 to 2 replay, and the golden vector and substitution corpus. OPEN QUESTION carried from architect review: every aggregate a compound event serves belongs to S270, S271 or S272, so this may belong later in the phase. Decide before starting."
+    tickets:
+      - key: S268.4-1
+        title: Compound envelope, digest DAG, and owner/link bijection
+        club: driver
+        complexity: risky
+      - key: S268.4-2
+        title: Per-affected-aggregate chain positions and replayable authorization set
+        club: driver
+        complexity: risky
+      - key: S268.4-3
+        title: Version 1 to 2 replay equivalence and the published substitution corpus
+        club: long_iron
+        complexity: moderate
+  - id: "268.5"
+    theme: Filtered Views Redaction And Retention
+    par: 5
+    slope: 5
+    type: major + security
+    status: planned
+    depends_on:
+      - "268.4"
+    note: "Filtered views and non-enumeration, cursor AEAD and the nonce service, the redaction state machine, retention deadlines assigned at append, the backup and restore activation gate, export, and the adversarial corpus. Scoped by the deployment-profile amendment: sealed payloads, cursor encryption and cryptographic deletion require the managed_multi_writer profile, and a local SQLite store reports redaction_retention false and fails those operations closed."
+    tickets:
+      - key: S268.5-1
+        title: Filtered projections and non-enumeration across cursor, count, error, and cache
+        club: driver
+        complexity: risky
+      - key: S268.5-2
+        title: Cursor AEAD and the nonce service under the managed profile
+        club: driver
+        complexity: risky
+      - key: S268.5-3
+        title: Redaction state machine and sealed payload destruction without rewriting the chain
+        club: driver
+        complexity: risky
+      - key: S268.5-4
+        title: Retention deadlines, expiry filtering, and the backup and restore activation gate
+        club: driver
+        complexity: risky
+      - key: S268.5-5
+        title: Adversarial corpus for the disclosure and redaction criteria on both backends
+        club: driver
+        complexity: risky
   - id: 269
     theme: Fenced Leases and Shared Resources
     par: 4
     slope: 5
     type: major + concurrency control
     depends_on:
-      - 268
-    note: "Make claims recoverable without permitting stale writers. Acquire and renew use authoritative store time and monotonic lease epochs; every mutation presents a fencing token. Ticket, area, port, database, and service claims share one typed overlap model with fair queueing and durable recovery."
+      - "268.5"
+    note: "Retargeted from 268 to 268.5 when S268 split into six. Leases need the append transaction, the fencing substrate, and the filtered-view rules, so depending on the first of the six would have let this start against a ledger that could not yet append. Make claims recoverable without permitting stale writers. Acquire and renew use authoritative store time and monotonic lease epochs; every mutation presents a fencing token. Ticket, area, port, database, and service claims share one typed overlap model with fair queueing and durable recovery."
     research:
       - docs/research/buzz-multiplayer-collaboration.md
     tickets:

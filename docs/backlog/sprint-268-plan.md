@@ -1,155 +1,107 @@
-# S268 Plan — Coordination Ledger and Access Control
+# S268 Plan — Revision 2
 
-Status: draft for architect review
-Contract: `docs/architecture/team-round-coordination.md`, `team-round-domain.md`, `team-round-workflow.md`
-Par 4, slope 5, four `driver` tickets.
+Status: re-planned after review; awaiting two operator decisions
+Contract: `team-round-coordination.md`, `team-round-domain.md`,
+`team-round-workflow.md`
+Amendment: `docs/architecture/team-round-deployment-profiles.md`
 
-## The Shape Of The Problem
+## What Happened To Revision 1
 
-S268 evolves the existing `events` table into the authoritative coordination
-ledger. Today that table has seven columns and no project, round, sequence,
-hash chain, or idempotency record. The target envelope carries about twenty
-identity fields, a per-project and per-aggregate hash chain, a store-assigned
-sequence, and an authorization decision, on both SQLite and PostgreSQL.
+Revision 1 planned all of Phase 64's storage layer as one sprint of four
+tickets. Three independent reviews at opus tier, architect, backend and
+security, all returned re-plan. The structure was wrong, not the ordering.
 
-The contract also requires a seven-phase migration behind a physical write
-fence, deterministic replay that reproduces byte-identical scorecard hashes,
-and hostile concurrency tests passing on both backends before the sprint can
-ship.
+The defect they agreed on: the last ticket built the authorization substrate the
+first ticket needed. Every canonical event carries `authorization.capability`,
+`policy_revision`, `decision_id` and a visibility decision *inside its own event
+hash*. An append path built before its policy model writes placeholder values
+that are immutable forever, and the contract's default classification is
+`restricted`, so a wrong placeholder over-discloses permanently.
 
-This is larger than one session. The plan below sequences it so each landing is
-independently useful and independently reviewable, rather than one commit that
-has to be right everywhere at once.
+The second defect: revision 1 changed schema at landing 1d and installed the
+write fence at 1e. The contract installs the fence before `inventory`, and
+`expand` is a phase behind that barrier. A store upgrading between those two
+landings would take a schema change with no barrier and no manifest.
 
-## What Is Already Done
+Neither reorders away inside four tickets, which is why the sprint split.
 
-`src/core/team-round/canonical.ts` implements RFC 8785 canonical JSON and the
-domain-separated SHA-256 digest, with 21 tests written against the contract.
-Everything else hashes through it, so it went first deliberately.
+## The Split
 
-## Sequencing
+S268 becomes six sprints. Decimal ids sort between 268 and 269, so S269 through
+S272 keep their numbers. S269 was retargeted from 268 to 268.5, because leases
+need an append path that the first of the six does not yet provide.
 
-The tickets are numbered in dependency order and the contract makes that
-ordering real, not stylistic. Each stage below is a landing.
+| Sprint | Delivers |
+|---|---|
+| S268 | Project identity and trust bootstrap, policy registry, envelope types and validator, canonical request hash, integrity chain, HMAC commitments, secret ingress scanner, published golden vectors. Additive only: no migration, no cutover. |
+| S268.1 | Migration machine. Fence conformance suite first, then both fences, the durable resumable phase machine, deterministic import planner, expand, backfill, quarantine, verify, signed manifest, rollback. Cutover-capable, not cut over. |
+| S268.2 | Canonical append per adapter behind one narrow interface, idempotency, conflict outcomes, error taxonomy, protocol negotiation, authority generation, cutover, legacy compatibility mode. |
+| S268.3 | Projection substrate, scorecard projection, replay, exactly-once finalization, audited reopen with enforced correction scope and roadmap reconciliation. |
+| S268.4 | Compound version 2 envelopes and the digest DAG. Open question below. |
+| S268.5 | Filtered views, cursor AEAD, redaction, retention, backup and restore gate, adversarial corpus. |
 
-### S268-1 — Envelope And Migration
+The full ticket breakdown lives in `docs/roadmap/phases/phase-64.yaml`, which is
+the source of truth. This document records why.
 
-**1a. Envelope types and validation.** The `team_event_v1` shape as types, plus
-a validator that rejects a missing required field, an unknown schema revision,
-an unbound identity, or a non-canonical payload *before* a sequence is
-assigned. Pure, no store. Tests are table-driven over each rejection.
+## What Is Already Built
 
-**1b. Chain and integrity.** `previous_project_hash`, `previous_aggregate_hash`,
-`event_hash` computed through the canonical digest, with verification over a
-built chain. The property that matters: a tampered event anywhere invalidates
-every later link.
+`src/core/team-round/canonical.ts`, exported from the core barrel, with 28
+tests. RFC 8785 canonical JSON and the domain-separated SHA-256 digest.
 
-**1c. Project binding.** A durable `project_id` persisted in both stores,
-independent of path, remote, branch, or connection string. A store whose rows
-map ambiguously to more than one project stops in quarantine rather than
-guessing. This gates every backfill.
+The security pass found three real defects in it and they are fixed. Sparse
+arrays emitted invalid JSON. `Date`, `Map`, `Set` and `RegExp` all hashed as
+`{}`, so a timestamp would have hashed as an empty object. The digest segments
+carrying the domain separation went unchecked, so three different project ids
+produced one digest, which broke the single property the framing exists to
+provide.
 
-**1d. Expand migration.** New columns and tables in both adapters: envelope
-columns, append metadata, idempotency records, projection cursors, immutable
-scorecard-version storage, integrity checkpoints. Additive only, read authority
-unchanged. SQLite is at schema 10, PostgreSQL at 7; both map to
-`team_round_ledger_revision = 1`, which store health reports alongside the
-adapter version.
+It is one of five pinned primitives. HMAC commitments, cursor AEAD and sealed
+payload encryption do not exist yet, so "everything hashes through it" was an
+overstatement and S268-4 now owns the HMAC.
 
-**1e. Write fence and phase machine.** The durable `inventory → expand →
-backfill → verify → cutover → observe → contract` machine, resumable from each
-checkpoint, with the adapter-specific physical fence. Migration refuses to start
-if the adapter cannot prove no pre-fence writer remains.
+## Two Decisions For The Operator
 
-**Honest risk.** 1e is the single riskiest piece in the phase. The fence is
-per-adapter and the contract says a custom adapter must install a
-conformance-tested equivalent. I intend to define the conformance test first and
-let it drive the two implementations, rather than write SQLite's fence and
-generalise afterwards.
+Both are in the amendment document and neither is a consequence of the code.
 
-### S268-2 — Idempotency, Conflict Rejection, Compound Envelopes
+**1. The write fence.** Neither backend enforces it as deployed. SQLite has no
+privilege model, so anything holding the file handle can drop the triggers.
+PostgreSQL runs as the `postgres` superuser in every documented setup, which
+bypasses privilege checks and can disable triggers with one session setting.
 
-**2a. Idempotency identity and request hash.** The six-part identity, and the
-request hash covering exactly the listed semantic inputs and excluding the
-listed transport ones. The test that earns its place: changing any covered
-field under the same identity is a payload conflict, and changing an excluded
-one is not.
+The amendment recommends two named profiles: `local_single_writer` reporting an
+advisory barrier, and `managed_multi_writer` requiring a non-superuser
+application role and reporting an enforced one. The alternative is declaring
+SQLite unsupported for Team Round, which is cleaner on paper and removes the
+feature from nearly every existing deployment.
 
-**2b. Retry outcomes.** Exact-hash retry writes no event, returns the original
-identity, and cannot refresh a lease or heartbeat.
+**2. Key management.** Sealed payloads, cursor encryption and cryptographic
+deletion need a managed key service that a local SQLite deployment does not
+have. Storing the key beside the ciphertext is not key management. The
+amendment scopes those criteria to `managed_multi_writer`, and has
+`local_single_writer` report `redaction_retention = false` and fail those
+operations closed.
 
-**2c. Version-2 compound envelopes.** The cycle-free digest DAG, owner/link
-bijection, and per-affected-aggregate chain positions. Eight of the inherited
-S264.2 hazards are about this exact area, so it gets its own landing and its own
-review pass.
+## Open Question Carried Forward
 
-### S268-3 — Projection, Replay, Finalization
+Whether S268.4 belongs in this phase at all. Every aggregate a compound event
+serves belongs to S270, S271 or S272, none of which exist. Decide before
+starting it rather than during.
 
-**3a. Reducer substrate.** Projection identity, durable cursor, and the purity
-rules. A cursor must not advance across a missing, quarantined, unauthorized, or
-unrecognized event. Determinism across both backends is a test, not a comment.
+## Review Notes Worth Keeping
 
-**3b. Draft and published scorecard projection.** The `canonical_scorecard_v1`
-shape and its `content_hash`.
-
-**3c. Replay.** Byte-identical reproduction of a closed round's scorecard from
-accepted events. This is the acceptance test for the whole phase.
-
-**3d. Exactly-once finalization.** The two-step `finalization_started → closed`
-transition with recovery, plus late-event and audited-reopen behaviour. Reopen
-preserves earlier published versions, nulls acceptance, increments the epoch.
-
-### S268-4 — Capabilities And Redaction
-
-Deny-by-default capabilities, principal binding, authenticated artifact
-provenance, atomic late-contribution approval invalidation, filtered
-projections, and redaction that destroys removable payload without rewriting the
-hash chain.
-
-The contract's own acceptance questions are the test list here, and they are
-adversarial by design: can a cursor, cache, count, error, or timing class
-disclose hidden existence?
-
-## Cross-Cutting Decisions To Settle Before Coding
-
-These are the questions I want the architect pass to answer, because getting
-them wrong is expensive after the migration lands.
-
-1. **Where does this code live?** `src/core/team-round/` is a new subtree. The
-   store adapters are `src/store/` and `src/store-pg/`. The append protocol
-   needs both, so either the protocol lives in core and adapters implement a
-   narrow interface, or each adapter implements the protocol. The first keeps
-   one authority; the second is easier to make atomic per backend.
-
-2. **Does this replace `SlopeStore.insertEvent` or sit beside it?** The
-   contract says evolve rather than parallel. But `insertEvent` has many callers
-   today, including `ticket done` from Phase 68. A shim that upgrades legacy
-   inserts into canonical events is one option; another is leaving legacy events
-   readable and only writing canonical ones after cutover.
-
-3. **How much of the fence is real in version 1?** The contract's fence is
-   demanding. A partial implementation that cannot prove the barrier is worse
-   than none, because the manifest would claim a guarantee it does not have.
-
-4. **What is `project_id` derived from on first migration?** It must not come
-   from path, remote, or branch. Something must mint it, and that decision is
-   permanent.
-
-5. **Do we need PostgreSQL running to develop this?** The hostile tests must
-   pass on both. `SLOPE_TEST_PG_URL` gates the PG suite today and CI runs a
-   service container, so the answer is probably yes for local work on 1d onward.
-
-## Review Tier
-
-Deep, three rounds, per `.claude/rules/review-loop.md`: new infrastructure and
-architectural changes. Round one is this plan.
-
-## What Would Make Me Stop And Re-Plan
-
-- The fence cannot be implemented honestly on SQLite. Then the migration story
-  changes and so does the sprint.
-- `project_id` minting turns out to need operator input. Then S268-1 grows a
-  human step and the sequencing changes.
-- Byte-identical replay across both backends proves impossible without pinning
-  something the contract has not pinned. Then the contract needs an amendment
-  before more code.
+- `slope roadmap focus` draws hazards from direct dependencies only. S268
+  declared `[264.2, 267]`, so S264's and S264.1's findings never appeared, and
+  those are exactly this subject. Adding 264 and 264.1 took the hazard context
+  from 63 to 111 and surfaced the unenforced `correction_scope` finding that
+  revision 1 had assumed away.
+- Byte-identical cross-backend replay needs `TEXT`/`BYTEA` payload storage
+  rather than `JSONB`, decimal-string normalisation at the row-mapper boundary,
+  and `COLLATE "C"` on every PostgreSQL text ordering. All three must land
+  before the first canonical row, because changing them afterwards rewrites
+  every row.
+- Authentication cannot happen inside the append transaction on
+  `better-sqlite3`, whose transactions are synchronous. It resolves first, and
+  the transaction re-checks the identity revision under the lock it holds.
+- PostgreSQL must run locally from S268.1 onward. Finding a composite-key or
+  sequence-gap defect in CI means a red main on the riskiest sprint of the
+  phase.
