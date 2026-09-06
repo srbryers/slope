@@ -142,23 +142,23 @@ describe('teamRoundDigest', () => {
   };
 
   it('is stable across equivalent inputs', () => {
-    expect(teamRoundDigest(base)).toBe(teamRoundDigest({ ...base, value: { a: 1 } }));
+    expect(teamRoundDigest(base).digest).toBe(teamRoundDigest({ ...base, value: { a: 1 } }).digest);
   });
 
   it('separates domains, so identical bytes under different purposes differ', () => {
-    expect(teamRoundDigest(base)).not.toBe(teamRoundDigest({ ...base, purpose: 'chain' }));
+    expect(teamRoundDigest(base).digest).not.toBe(teamRoundDigest({ ...base, purpose: 'chain' }).digest);
   });
 
   it('separates projects and schema revisions', () => {
-    expect(teamRoundDigest(base)).not.toBe(teamRoundDigest({ ...base, projectId: 'proj-2' }));
-    expect(teamRoundDigest(base)).not.toBe(teamRoundDigest({ ...base, schemaRevision: 'v2' }));
+    expect(teamRoundDigest(base).digest).not.toBe(teamRoundDigest({ ...base, projectId: 'proj-2' }).digest);
+    expect(teamRoundDigest(base).digest).not.toBe(teamRoundDigest({ ...base, schemaRevision: 'v2' }).digest);
   });
 
   it('cannot be fooled by moving a character across a segment boundary', () => {
     // The reason every segment is length-prefixed. Unframed concatenation
     // would make these two identical.
-    const left = teamRoundDigest({ ...base, purpose: 'ab', projectId: 'c' });
-    const right = teamRoundDigest({ ...base, purpose: 'a', projectId: 'bc' });
+    const left = teamRoundDigest({ ...base, purpose: 'ab', projectId: 'c' }).digest;
+    const right = teamRoundDigest({ ...base, purpose: 'a', projectId: 'bc' }).digest;
     expect(left).not.toBe(right);
   });
 
@@ -181,11 +181,73 @@ describe('teamRoundDigest', () => {
       frame(jcs),
     ])).digest('hex');
 
-    expect(teamRoundDigest(base)).toBe(expected);
+    expect(teamRoundDigest(base).digest).toBe(expected);
   });
 
   it('refuses to digest a value it cannot canonicalize', () => {
     expect(() => teamRoundDigest({ ...base, value: { score: 4.5 } }))
       .toThrow(CanonicalizationError);
+  });
+
+  it('returns the exact bytes it hashed, so caller storage cannot drift', () => {
+    // A caller needing both would otherwise canonicalize twice, and a getter
+    // or Proxy can answer differently the second time. The stored bytes and
+    // the hashed bytes would then disagree with nothing to detect it.
+    const result = teamRoundDigest(base);
+    expect(result.canonical).toBe('{"a":1}');
+  });
+
+  it('rejects a segment whose bytes are not recoverable', () => {
+    // Buffer.from replaces a lone surrogate with U+FFFD, so these three
+    // project ids all produced identical digest input. These segments carry
+    // the domain separation, so a collision here crosses projects.
+    for (const projectId of ['p\ud800', 'p\udc00']) {
+      expect(() => teamRoundDigest({ ...base, projectId })).toThrow(CanonicalizationError);
+    }
+    // The replacement character itself is a legitimate string and still hashes.
+    expect(teamRoundDigest({ ...base, projectId: 'p�' }).digest)
+      .not.toBe(teamRoundDigest(base).digest);
+  });
+});
+
+describe('canonicalJson rejects shapes that would hash as something else', () => {
+  it('rejects a sparse array rather than emitting invalid JSON', () => {
+    // `map` skips holes and `join` renders them empty, so this would have been
+    // `[,1]`, which no JSON parser accepts and no verifier can reproduce.
+    const sparse: unknown[] = [];
+    sparse[1] = 1;
+    expect(() => canonicalJson(sparse)).toThrow('sparse array hole');
+    expect(() => canonicalJson(new Array(3))).toThrow('sparse array hole');
+  });
+
+  it('rejects Date, Map, Set and RegExp instead of collapsing them to {}', () => {
+    // Each has no own enumerable keys, so all of these would have hashed
+    // identically to an empty object and to each other. A Date in occurred_at
+    // would hash as {} while the column stored the real timestamp.
+    for (const value of [new Date(0), new Map([['k', 'v']]), new Set([1]), /x/]) {
+      expect(() => canonicalJson({ evidence: value })).toThrow(CanonicalizationError);
+    }
+    // A null-prototype object is still a plain record and is accepted.
+    expect(canonicalJson(Object.assign(Object.create(null), { a: 1 }))).toBe('{"a":1}');
+  });
+
+  it('rejects a cycle rather than exhausting the stack', () => {
+    const cyclic: Record<string, unknown> = { a: 1 };
+    cyclic.self = cyclic;
+    expect(() => canonicalJson(cyclic)).toThrow('cyclic reference');
+  });
+
+  it('allows the same object in two sibling positions', () => {
+    // Repetition is not a cycle. Tracking per branch keeps this legal.
+    const shared = { id: 'x' };
+    expect(canonicalJson({ a: shared, b: shared })).toBe('{"a":{"id":"x"},"b":{"id":"x"}}');
+  });
+
+  it('bounds nesting rather than throwing a RangeError the taxonomy lacks', () => {
+    // Canonicalization runs inside the append transaction, where a RangeError
+    // maps to no defined error class. A few kilobytes of brackets is enough.
+    let deep: unknown = 0;
+    for (let i = 0; i < 200; i++) deep = [deep];
+    expect(() => canonicalJson(deep)).toThrow('nesting exceeds');
   });
 });

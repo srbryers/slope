@@ -1055,3 +1055,15 @@ export {
 
 // Built-in metaphors (auto-registers on import)
 export { golf, tennis, baseball, gaming, dnd, matrix, agile } from './metaphors/index.js';
+
+// Team Round coordination ledger (Phase 64).
+// Canonical serialization and digests. Everything in the phase hashes through
+// these, so they are exported for the store adapters and any independent
+// verifier rather than kept private to core.
+export {
+  CanonicalizationError,
+  canonicalJson,
+  canonicalUnsigned,
+  teamRoundDigest,
+} from './team-round/canonical.js';
+export type { CanonicalValue, DigestInput, DigestResult } from './team-round/canonical.js';

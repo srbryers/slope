@@ -57,10 +57,21 @@ export type CanonicalValue =
  * - Lone surrogates cannot round-trip through UTF-8.
  */
 export function canonicalJson(value: unknown): string {
-  return serialize(value, '');
+  return serialize(value, '', new Set(), 0);
 }
 
-function serialize(value: unknown, path: string): string {
+/**
+ * Depth bound.
+ *
+ * Canonicalization is recursive and runs inside the append transaction, so a
+ * deeply nested payload becomes a `RangeError` that the contract's error
+ * taxonomy has no entry for. Four kilobytes of `[[[[...]]]]` is enough to
+ * exhaust the default stack. A bound turns that into a normal rejection well
+ * below any legitimate envelope, which nests about six levels.
+ */
+const MAX_DEPTH = 64;
+
+function serialize(value: unknown, path: string, seen: Set<object>, depth: number): string {
   if (value === null) return 'null';
 
   switch (typeof value) {
@@ -78,8 +89,51 @@ function serialize(value: unknown, path: string): string {
       throw new CanonicalizationError(`${typeof value} is not serializable`, path);
   }
 
+  if (depth > MAX_DEPTH) {
+    throw new CanonicalizationError(`nesting exceeds ${MAX_DEPTH} levels`, path);
+  }
+  // A cycle would otherwise recurse until the stack dies. Tracked per branch,
+  // so a value legitimately repeated in two sibling positions is still fine.
+  if (seen.has(value as object)) {
+    throw new CanonicalizationError('cyclic reference has no canonical form', path);
+  }
+  seen.add(value as object);
+  try {
+    return serializeContainer(value, path, seen, depth);
+  } finally {
+    seen.delete(value as object);
+  }
+}
+
+function serializeContainer(value: object, path: string, seen: Set<object>, depth: number): string {
   if (Array.isArray(value)) {
-    return `[${value.map((item, i) => serialize(item, `${path}[${i}]`)).join(',')}]`;
+    const parts: string[] = [];
+    for (let i = 0; i < value.length; i++) {
+      // A hole is not `undefined` and not `null`. `map` skips it and `join`
+      // renders it as empty, so `[, 1]` would emit `[,1]`, which no JSON
+      // parser accepts. An independent verifier could then neither parse nor
+      // reproduce the bytes an event_hash was taken over. `new Array(n)` and
+      // `delete arr[i]` both produce holes, and both are easy to write.
+      if (!Object.prototype.hasOwnProperty.call(value, i)) {
+        throw new CanonicalizationError('sparse array hole has no canonical form', `${path}[${i}]`);
+      }
+      parts.push(serialize(value[i], `${path}[${i}]`, seen, depth + 1));
+    }
+    return `[${parts.join(',')}]`;
+  }
+
+  // Only plain objects. Date, Map, Set, RegExp and Error all have no own
+  // enumerable keys, so each would serialize as `{}` and collide with an empty
+  // object and with each other. A Date in `occurred_at` would hash as `{}`
+  // while the column stored the real timestamp, leaving the chain verifying
+  // over bytes that do not describe the row.
+  const proto = Object.getPrototypeOf(value);
+  if (proto !== Object.prototype && proto !== null) {
+    const name = (value as object).constructor?.name ?? 'object';
+    throw new CanonicalizationError(
+      `${name} has no canonical form; convert it to a string or plain object first`,
+      path,
+    );
   }
 
   const record = value as Record<string, unknown>;
@@ -94,7 +148,7 @@ function serialize(value: unknown, path: string): string {
     if (child === undefined) {
       throw new CanonicalizationError(`property "${key}" is undefined; omit it or use null`, path);
     }
-    parts.push(`${serializeString(key, path)}:${serialize(child, path ? `${path}.${key}` : key)}`);
+    parts.push(`${serializeString(key, path)}:${serialize(child, path ? `${path}.${key}` : key, seen, depth + 1)}`);
   }
   return `{${parts.join(',')}}`;
 }
@@ -169,22 +223,51 @@ function serializeString(value: string, path: string): string {
 export function canonicalUnsigned(value: bigint | number | string, field = 'value'): string {
   if (typeof value === 'bigint') {
     if (value < 0n) throw new CanonicalizationError(`${field} must not be negative`, field);
-    return value.toString(10);
+    return bounded(value.toString(10), field);
   }
   if (typeof value === 'number') {
     if (!Number.isSafeInteger(value) || value < 0) {
       throw new CanonicalizationError(`${field} must be a safe non-negative integer`, field);
     }
-    return String(value);
+    return bounded(String(value), field);
   }
   if (!UNSIGNED_DECIMAL.test(value)) {
     throw new CanonicalizationError(`${field} must match 0|[1-9][0-9]* — got "${value}"`, field);
   }
-  return value;
+  return bounded(value, field);
 }
 
-/** One length-prefixed segment of digest input. */
-function framed(segment: string): Buffer {
+/** Largest unsigned 64-bit value. */
+const MAX_UNSIGNED_64 = 18446744073709551615n;
+
+/**
+ * The contract describes these fields as 64-bit, so anything wider is a bug
+ * rather than a very large sequence. Accepting it would store a value no
+ * backend column can hold and no other implementation can read back.
+ */
+function bounded(decimal: string, field: string): string {
+  if (BigInt(decimal) > MAX_UNSIGNED_64) {
+    throw new CanonicalizationError(`${field} exceeds the unsigned 64-bit range`, field);
+  }
+  return decimal;
+}
+
+/**
+ * One length-prefixed segment of digest input.
+ *
+ * The segment is validated, not just measured. `Buffer.from(s, 'utf8')`
+ * replaces a lone surrogate with U+FFFD, so `"p\uD800"`, `"p\uDC00"` and
+ * `"p�"` all produced the same bytes and therefore the same digest. These
+ * segments carry the domain separation itself, so a collision here is a
+ * collision across projects, which is the one property the framing exists to
+ * guarantee.
+ */
+function framed(segment: string, field: string): Buffer {
+  if (typeof segment !== 'string') {
+    throw new CanonicalizationError(`${field} must be a string`, field);
+  }
+  // Reuse the string canonicalizer's surrogate checking rather than repeat it.
+  serializeString(segment, field);
   const body = Buffer.from(segment, 'utf8');
   if (body.length >= 0x1_0000_0000) {
     throw new CanonicalizationError('digest segment must be shorter than 2^32 bytes', 'segment');
@@ -201,8 +284,21 @@ export interface DigestInput {
   projectId: string;
   /** Registry revision that selected the algorithms and schema. */
   schemaRevision: string;
-  /** The value to canonicalize, or pre-canonicalized bytes. */
+  /**
+   * The value to canonicalize. Always canonicalized here.
+   *
+   * Passing already-canonical JSON text re-encodes it as a quoted string and
+   * silently changes the digest, so callers hand over the value and take the
+   * bytes back from the result.
+   */
   value: unknown;
+}
+
+export interface DigestResult {
+  /** Hex SHA-256 over the domain-separated framed input. */
+  digest: string;
+  /** The exact canonical bytes the digest covers. */
+  canonical: string;
 }
 
 /**
@@ -213,15 +309,19 @@ export interface DigestInput {
  * `("a", "bc")` would otherwise produce identical input, so a caller could
  * move a character across a boundary and keep the digest.
  */
-export function teamRoundDigest(input: DigestInput): string {
-  const jcs = canonicalJson(input.value);
+export function teamRoundDigest(input: DigestInput): DigestResult {
+  // Canonicalized exactly once, and the bytes are returned with the digest.
+  // A caller that needed both would otherwise call canonicalJson again, and a
+  // getter or Proxy could return something different the second time, so the
+  // stored bytes and the hashed bytes would disagree.
+  const canonical = canonicalJson(input.value);
   const bytes = Buffer.concat([
     Buffer.from(DOMAIN, 'ascii'),
     Buffer.from([0x00]),
-    framed(input.purpose),
-    framed(input.projectId),
-    framed(input.schemaRevision),
-    framed(jcs),
+    framed(input.purpose, 'purpose'),
+    framed(input.projectId, 'projectId'),
+    framed(input.schemaRevision, 'schemaRevision'),
+    framed(canonical, 'canonical'),
   ]);
-  return createHash('sha256').update(bytes).digest('hex');
+  return { digest: createHash('sha256').update(bytes).digest('hex'), canonical };
 }
